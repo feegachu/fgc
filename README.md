@@ -13,7 +13,7 @@
 ## 👥 멤버
 | 이예소 | 손가영 | 강현준 | 강호원 | 박민준 |
 |:------:|:------:|:------:|:------:|:------:|
-| <img width="512" height="512" alt="lee" src="https://github.com/user-attachments/assets/9c8ed3e5-76ab-4b63-a5e4-2016ae823d29" />" /> | <img width="512" height="512" alt="son" src="https://github.com/user-attachments/assets/385f53a3-a8a8-4d58-8d2a-348eac301a60" /> | <img width="512" height="512" alt="kangh" src="https://github.com/user-attachments/assets/687927df-7a03-41c2-a717-7f7845d09ee7" /> | <img width="512" height="512" alt="kanghh" src="https://github.com/user-attachments/assets/6b284df9-96e4-4e76-8a47-6d962dee263c" /> | <img width="512" height="512" alt="p" src="https://github.com/user-attachments/assets/24721b7b-4d14-4b1f-860b-1eacb9de82c5" /> |
+| <img width="512" height="512" alt="lee" src="https://github.com/user-attachments/assets/9c8ed3e5-76ab-4b63-a5e4-2016ae823d29" /> | <img width="512" height="512" alt="son" src="https://github.com/user-attachments/assets/385f53a3-a8a8-4d58-8d2a-348eac301a60" /> | <img width="512" height="512" alt="kangh" src="https://github.com/user-attachments/assets/687927df-7a03-41c2-a717-7f7845d09ee7" /> | <img width="512" height="512" alt="kanghh" src="https://github.com/user-attachments/assets/6b284df9-96e4-4e76-8a47-6d962dee263c" /> | <img width="512" height="512" alt="p" src="https://github.com/user-attachments/assets/24721b7b-4d14-4b1f-860b-1eacb9de82c5" /> |
 | PM / BA | DB/정산엔진 Lead | Tech Lead/Backend Lead | DevOps/QA Lead | Frontend/UX Lead |
 | [GitHub](https://github.com/yslee4601) | [GitHub](https://github.com/gayo73) | [GitHub](https://github.com/HyunJuneKang) | [GitHub](https://github.com/C4t4ddict) | [GitHub](https://github.com/ParkMinjun0721) |
 
