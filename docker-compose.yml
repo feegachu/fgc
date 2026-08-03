@@ -1,5 +1,4 @@
 # 팀원 전원이 똑같은 PostgreSQL 17을 씁니다.
-# "제 컴퓨터에선 되는데요"를 없애는 것이 목적입니다.
 services:
   db:
     image: postgres:17
