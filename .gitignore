@@ -74,3 +74,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+.codex
+AGENTS.md
