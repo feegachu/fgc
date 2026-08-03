@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: feegachu
+  profiles:
+    active: local
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fgc?currentSchema=fgc
+    username: fgc
+    password: fgc_local_only
+  flyway:
+    enabled: true
+    schemas: fgc
+    default-schema: fgc
+    baseline-on-migrate: true
+  batch:
+    jdbc:
+      initialize-schema: always   # Spring Batch 메타테이블 자동 생성
+    job:
+      enabled: false              # ★ 앱 뜰 때 배치가 저절로 돌면 안 됩니다
+  jackson:
+    time-zone: Asia/Seoul         # SIR-008
+    serialization:
+      write-dates-as-timestamps: false   # ISO-8601로 내보냄
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true   # DB snake_case ↔ Java camelCase 자동 매핑
+
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m               # 인터페이스정의서 2-1-1
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+# FGC 업무 설정 — 코드에 숫자를 박지 않기 위한 자리 (COR-004)
+fgc:
+  demo-month: 2026-07
+  batch:
+    daily-changed-contract:
+      cron: "0 0 2 * * *"        # 매일 02:00. 프로젝트 운영 가정일 뿐 법정 기준 아님
+      enabled: true

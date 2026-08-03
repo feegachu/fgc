@@ -1,4 +1,3 @@
-```gitignore
 # Spring Initializr
 HELP.md
 
@@ -47,6 +46,10 @@ logs/
 # Environment variables
 .env
 .env.*
+*.env
+
+# 환경변수 예제 파일은 Git에 포함
+!.env.example
 
 # Local / secret configuration
 application-local.properties
@@ -56,6 +59,11 @@ application-secret.properties
 application-secret.yml
 application-secret.yaml
 
+# 로컬 설정 예제 파일은 Git에 포함
+!application-local.properties.example
+!application-local.yml.example
+!application-local.yaml.example
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -63,4 +71,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.swp
-```
+*.swo
+*~
