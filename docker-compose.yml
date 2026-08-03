@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: fgc_local_only   # 로컬 전용. 실제 비밀번호가 아님
       TZ: Asia/Seoul
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - fgc-pgdata:/var/lib/postgresql/data
 volumes:

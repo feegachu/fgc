@@ -593,7 +593,7 @@ BigDecimal rate = new BigDecimal("0.8");
 도메인 중심 구조를 사용합니다.
 
 ```text
-com.shinhan.feegachu
+com.susukkang.fgc
 ├─ common
 ├─ auth
 ├─ base

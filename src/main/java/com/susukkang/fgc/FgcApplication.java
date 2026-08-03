@@ -1,13 +1,13 @@
-package com.shinhan.feegachu;
+package com.susukkang.fgc;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class FeegachuApplication {
+public class FgcApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(FeegachuApplication.class, args);
+        SpringApplication.run(FgcApplication.class, args);
     }
 
 }
