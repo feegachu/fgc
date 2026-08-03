@@ -1,6 +1,0 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/fgc?currentSchema=fgc
-    username: fgc
-    password: fgc_local_only
-    driver-class-name: org.postgresql.Driver
