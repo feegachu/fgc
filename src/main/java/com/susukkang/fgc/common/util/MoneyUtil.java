@@ -57,4 +57,24 @@ public final class MoneyUtil {
                 .map(MoneyUtil::roundWon)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+
+    /** amount 에 percent(%) 를 곱한 뒤 원 단위 HALF_UP 반올림한다. 예: percent=24.000000 → 24%. */
+    public static BigDecimal applyPercent(BigDecimal amount, BigDecimal percent) {
+        Objects.requireNonNull(amount, "amount는 null일 수 없습니다.");
+        Objects.requireNonNull(percent, "percent는 null일 수 없습니다.");
+
+        return roundWon(amount.multiply(percent).divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP));
+    }
+
+    /** numerator / denominator × 100 을 소수 6자리(HALF_UP)로 계산한다. cap_check.usage_pct(12,6) 저장용. */
+    public static BigDecimal usagePercent(BigDecimal numerator, BigDecimal denominator) {
+        Objects.requireNonNull(numerator, "numerator는 null일 수 없습니다.");
+        Objects.requireNonNull(denominator, "denominator는 null일 수 없습니다.");
+
+        if (denominator.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+        return numerator.multiply(BigDecimal.valueOf(100))
+                .divide(denominator, 6, RoundingMode.HALF_UP);
+    }
 }
