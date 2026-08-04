@@ -27,12 +27,9 @@ import java.time.LocalDate;
 import java.util.Map;
 
 /**
- * FGC-FUN-030 초년도 1,200% 한도 계산의 실시간 API(#3).
- * 업무 로직은 CapCheckService/CapCalculator 에 있고, 이 컨트롤러는 요청·응답 변환만 한다.
+ * FGC-FUN-030 초년도 1,200% 한도 계산의 실시간 API
  *
- * ★ 계약 등록·수정 이벤트와의 실제 연동은 이 PR 범위가 아니다. Contract 도메인이 아직 없어서
- *   (코드베이스 전체에 계약 등록·수정 API가 없음), 지금은 이 트리거 엔드포인트만 만들어 두고
- *   Contract 모듈이 생기면 그쪽에서 이 서비스(또는 이 API)를 호출하도록 한다.
+ *  Contract 모듈이 생기면 그쪽에서 이 서비스(또는 이 API)를 호출하도록 한다.
  */
 @Tag(name = "1200% 한도", description = "초년도 모집수수료 한도 계산 API")
 @RestController
