@@ -94,9 +94,10 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.ledger.alreadyPosted"
     ),
+    //확인
     LEDG_003(
             "FGC-LEDG-003",
-            HttpStatus.METHOD_NOT_ALLOWED,
+            HttpStatus.CONFLICT,
             "error.ledger.reverseOnly"
     ),
 
