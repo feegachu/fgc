@@ -9,10 +9,10 @@
       직접 쓰지 않는 이유는 COR-004(정책값을 코드에 박지 않는다) 때문이다.
     -->
     <select id="findFirstYearScheduleAmounts" resultType="com.susukkang.fgc.cap.dto.ScheduleAmountView">
-        SELECT sl.schedule_line_id,
-               sl.commission_item_id,
-               sl.contract_month_no,
-               sl.expected_amount AS amount
+        SELECT sl.schedule_line_id      AS scheduleLineId,
+               sl.commission_item_id     AS commissionItemId,
+               sl.contract_month_no      AS contractMonthNo,
+               sl.expected_amount        AS amount
           FROM fgc.schedule_line sl
           JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
          WHERE sh.contract_id = #{contractId}

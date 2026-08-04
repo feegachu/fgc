@@ -13,20 +13,21 @@
       (cap_rule_set 에는 commission_rule 과 달리 priority_no 컬럼이 없다). 실제로 그런 상황이
       생기면 이 정렬만으로는 부족하니 팀과 priority_no 추가를 논의해야 한다.
     -->
+    <!-- 컬럼 별칭을 camelCase 프로퍼티명과 동일하게 맞춰 map-underscore-to-camel-case 설정 없이도 매핑되게 한다. -->
     <select id="findApplicableRuleSet" resultType="com.susukkang.fgc.cap.dto.CapRuleSetView">
-        SELECT crs.cap_rule_set_id,
-               crs.policy_version_id,
-               crs.payment_stage,
-               crs.contract_date_from,
-               crs.contract_date_to,
-               crs.insurer_id,
-               crs.product_group_code,
-               crs.channel_code,
-               crs.first_year_months,
-               crs.premium_multiplier,
-               crs.compliance_deduction_pct,
-               crs.refund_addition_condition,
-               crs.warning_usage_pct
+        SELECT crs.cap_rule_set_id             AS capRuleSetId,
+               crs.policy_version_id            AS policyVersionId,
+               crs.payment_stage                AS paymentStage,
+               crs.contract_date_from           AS contractDateFrom,
+               crs.contract_date_to             AS contractDateTo,
+               crs.insurer_id                   AS insurerId,
+               crs.product_group_code           AS productGroupCode,
+               crs.channel_code                 AS channelCode,
+               crs.first_year_months            AS firstYearMonths,
+               crs.premium_multiplier           AS premiumMultiplier,
+               crs.compliance_deduction_pct     AS complianceDeductionPct,
+               crs.refund_addition_condition    AS refundAdditionCondition,
+               crs.warning_usage_pct            AS warningUsagePct
           FROM fgc.cap_rule_set crs
           JOIN fgc.policy_version pv ON pv.policy_version_id = crs.policy_version_id
          WHERE pv.status = 'ACTIVE'
@@ -46,13 +47,13 @@
     </select>
 
     <select id="findRuleItems" resultType="com.susukkang.fgc.cap.dto.CapRuleItemView">
-        SELECT cri.cap_rule_item_id,
-               cri.commission_item_id,
-               ci.item_code,
-               cri.inclusion_status,
-               cri.exclusion_type,
-               cri.attribution_method,
-               cri.decision_reason
+        SELECT cri.cap_rule_item_id      AS capRuleItemId,
+               cri.commission_item_id     AS commissionItemId,
+               ci.item_code               AS itemCode,
+               cri.inclusion_status       AS inclusionStatus,
+               cri.exclusion_type         AS exclusionType,
+               cri.attribution_method     AS attributionMethod,
+               cri.decision_reason        AS decisionReason
           FROM fgc.cap_rule_item cri
           JOIN fgc.commission_item ci ON ci.commission_item_id = cri.commission_item_id
          WHERE cri.cap_rule_set_id = #{capRuleSetId}
