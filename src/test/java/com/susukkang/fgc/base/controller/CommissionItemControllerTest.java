@@ -2,6 +2,8 @@ package com.susukkang.fgc.base.controller;
 
 import com.susukkang.fgc.base.dto.CommissionItemResponse;
 import com.susukkang.fgc.base.service.CommissionItemService;
+import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
+import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -32,6 +34,12 @@ class CommissionItemControllerTest {
     @MockitoBean
     private CommissionItemService commissionItemService;
 
+    @MockitoBean
+    private FgcMessageResolver messageResolver;
+
+    @MockitoBean
+    private ConstraintErrorCodeResolver constraintErrorCodeResolver;
+
     @Test
     void returnsEffectiveCommissionItemsForSettlementRole() throws Exception {
         LocalDate asOf = LocalDate.of(2026, 8, 4);
@@ -50,7 +58,7 @@ class CommissionItemControllerTest {
                 .andExpect(jsonPath("$.data[0].cashflowType").value("PAYMENT"))
                 .andExpect(jsonPath("$.data[0].itemCategory").value("SALES"))
                 .andExpect(jsonPath("$.error").isEmpty())
-                .andExpect(jsonPath("$.requestId", matchesPattern("^[0-9a-f-]{36}$")));
+                .andExpect(jsonPath("$.requestId", matchesPattern("^\\d{8}-[0-9a-f]{6}$")));
     }
 
     @ParameterizedTest
@@ -74,9 +82,8 @@ class CommissionItemControllerTest {
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.data").isEmpty())
-                .andExpect(jsonPath("$.error.code").value("FGC-COM-001"))
-                .andExpect(jsonPath("$.error.message")
-                        .value("기준일자(asOf)는 yyyy-MM-dd 형식이어야 합니다."));
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("asOf"));
     }
 
     @Test
@@ -84,9 +91,8 @@ class CommissionItemControllerTest {
         mockMvc.perform(get("/api/base/commission-items")
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("FGC-COM-001"))
-                .andExpect(jsonPath("$.error.message")
-                        .value("기준일자(asOf)는 필수입니다. yyyy-MM-dd 형식으로 입력하세요."));
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("asOf"));
     }
 
     @Test
