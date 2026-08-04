@@ -15,7 +15,7 @@ class ApiResponseTest {
     }
 
     @Test
-    void success는_데이터와_현재_요청_ID를_담는다() {
+    void successContainsDataAndCurrentRequestId() {
         RequestIdContext.set("test-request-123");
 
         ApiResponse<String> response = ApiResponse.success("result");
@@ -26,7 +26,7 @@ class ApiResponseTest {
     }
 
     @Test
-    void failure는_오류와_현재_요청_ID를_담는다() {
+    void failureContainsErrorAndCurrentRequestId() {
         RequestIdContext.set("test-request-456");
         ApiError error = new ApiError(
                 "FGC-TEST-001",

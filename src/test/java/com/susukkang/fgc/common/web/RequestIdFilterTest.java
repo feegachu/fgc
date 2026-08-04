@@ -20,7 +20,7 @@ class RequestIdFilterTest {
     }
 
     @Test
-    void 유효한_요청_ID는_그대로_사용한다() throws Exception {
+    void reusesValidRequestId() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         request.addHeader(RequestIdFilter.HEADER_NAME, "client-request-123");
@@ -39,7 +39,7 @@ class RequestIdFilterTest {
     }
 
     @Test
-    void 부적합한_요청_ID는_새로_생성한다() throws Exception {
+    void generatesNewRequestIdForInvalidRequestId() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         request.addHeader(RequestIdFilter.HEADER_NAME, "잘못된 요청 ID");

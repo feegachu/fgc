@@ -14,7 +14,7 @@ class FgcMessageResolverTest {
     );
 
     @Test
-    void 오류_코드의_메시지_키로_한국어_메시지를_조회한다() {
+    void resolvesKoreanMessageFromErrorCodeAndMessageKey() {
         String message = resolver.resolve(FgcErrorCode.CONT_001, Map.of());
 
         assertThat(message)
@@ -22,7 +22,7 @@ class FgcMessageResolverTest {
     }
 
     @Test
-    void 메시지의_플레이스홀더를_파라미터로_치환한다() {
+    void replacesMessagePlaceholderWithParameter() {
         String message = resolver.resolve(
                 FgcErrorCode.COMMON_002,
                 Map.of("field", "contractNo")

@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PageResponseTest {
 
     @Test
-    void 전체_건수로_전체_페이지_수를_계산한다() {
+    void calculatesTotalPagesFromTotalElements() {
         PageResponse<String> response = PageResponse.of(
                 List.of("A", "B"),
                 1,
@@ -25,7 +25,7 @@ class PageResponseTest {
     }
 
     @Test
-    void content는_변경할_수_없는_복사본으로_보관한다() {
+    void storesContentAsImmutableCopy() {
         List<String> content = new ArrayList<>(List.of("A"));
 
         PageResponse<String> response = PageResponse.of(
@@ -43,7 +43,7 @@ class PageResponseTest {
     }
 
     @Test
-    void 페이지와_크기가_허용_범위를_벗어나면_예외가_발생한다() {
+    void rejectsPageAndSizeOutsideAllowedRange() {
         assertThatThrownBy(() -> PageResponse.of(List.of(), 0, 10, 0, null))
                 .isInstanceOf(IllegalArgumentException.class);
 
