@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.16'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.jetbrains.kotlin.jvm'
+    id "org.jetbrains.kotlin.plugin.spring" version '2.4.0'
 }
 
 group = 'com.susukkang'
@@ -60,6 +62,8 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
 
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib"
 }
 
 tasks.withType(JavaCompile).configureEach {

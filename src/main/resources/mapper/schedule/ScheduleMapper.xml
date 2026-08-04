@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.schedule.mapper.ScheduleMapper">
+
+    <resultMap id="scheduleHeaderResultMap"
+               type="com.susukkang.fgc.schedule.dto.ScheduleHeaderListDTO">
+
+        <id property="scheduleHeaderId" column="schedule_header_id"/>
+
+        <result property="contractNo"          column="contract_no"/>
+        <result property="paymentStage"        column="payment_stage"/>
+        <result property="scheduleRegime"      column="schedule_regime"/>
+        <result property="schedulePurpose"     column="schedule_purpose"/>
+        <result property="scheduleVersionNo"   column="schedule_version_no"/>
+        <result property="status"              column="status"/>
+        <result property="activeYn"            column="active_yn"/>
+        <result property="lineCount"            column="line_count"/>
+        <result property="expectedTotal"        column="expected_total"/>
+        <result property="policyVersionId"      column="policy_version_id"/>
+        <result property="policyVersion"        column="policy_version"/>
+    </resultMap>
+
+    <select id="findScheduleHeaders"
+            parameterType="com.susukkang.fgc.schedule.dto.ScheduleSearchCondition"
+            resultMap="scheduleHeaderResultMap">
+
+        SELECT
+        sh.schedule_header_id,
+        c.contract_no,
+        sh.payment_stage,
+        sh.schedule_regime,
+        sh.schedule_purpose,
+        sh.schedule_version_no,
+        sh.status,
+        sh.active_yn,
+        sh.policy_version_id,
+        pv.version_no AS policy_version,
+        COUNT(sl.schedule_line_id) AS line_count,
+        COALESCE(SUM(sl.expected_amount), 0) AS expected_total
+        FROM schedule_header sh
+
+        JOIN insurance_contract c
+        ON c.contract_id = sh.contract_id
+
+        JOIN policy_version pv
+        ON pv.policy_version_id = sh.policy_version_id
+
+        LEFT JOIN schedule_line sl
+        ON sl.schedule_header_id = sh.schedule_header_id
+
+        <where>
+            sh.active_yn = TRUE
+
+            <if test="contractNo != null and contractNo != ''">
+                AND c.contract_no LIKE CONCAT('%', #{contractNo}, '%')
+            </if>
+
+            <if test="paymentStage != null">
+                AND sh.payment_stage = #{paymentStage}
+            </if>
+
+            <if test="scheduleRegime != null">
+                AND sh.schedule_regime = #{scheduleRegime}
+            </if>
+
+            <if test="schedulePurpose != null">
+                AND sh.schedule_purpose = #{schedulePurpose}
+            </if>
+
+            <if test="status != null">
+                AND sh.status = #{status}
+            </if>
+        </where>
+
+        GROUP BY
+        sh.schedule_header_id,
+        c.contract_no,
+        pv.version_no
+
+        ORDER BY
+        c.contract_no,
+        sh.payment_stage
+    </select>
+
+</mapper>
