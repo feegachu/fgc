@@ -1,7 +1,9 @@
 package com.susukkang.fgc.cap.mapper;
 
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
+import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapCheckInsertRow;
+import com.susukkang.fgc.cap.dto.CapCheckRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,4 +17,11 @@ public interface CapCheckMapper {
 
     /** cap_check_detail 일괄 INSERT. 항목이 없으면 호출 X */
     void insertCapCheckDetails(@Param("details") List<CapCheckDetailInsertRow> details);
+
+    /** 계약·지급단계의 가장 최근 cap_check 1건. 없으면 null. */
+    CapCheckRow findLatestByContractAndStage(@Param("contractId") Long contractId,
+                                              @Param("paymentStage") String paymentStage);
+
+    /** cap_check 1건에 속한 산입·제외 근거 라인 전체(detail_seq 순). */
+    List<CapCheckDetailLine> findDetailsByCapCheckId(@Param("capCheckId") Long capCheckId);
 }

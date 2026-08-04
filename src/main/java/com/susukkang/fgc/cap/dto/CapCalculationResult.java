@@ -7,9 +7,11 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
- * CapCalculator 계산 결과. cap_check 1행 + cap_check_detail 목록에 대응
+ * CapCalculator 순수 계산 결과. cap_check 1행 + cap_check_detail 목록에 대응하는 값을 담지만,
+ * 이 자체로는 아직 저장되지 않은 상태다 — 저장은 CapCheckService(오케스트레이션 계층)의 책임이다.
  *
  * limitAmount 계산 순서:
  *   basePremiumAmount = 월납환산 초회보험료 × premium_multiplier(기본 12)
@@ -19,7 +21,6 @@ import java.util.List;
  *   limitAmount = grossLimit - complianceDeductionAmount
  */
 public record CapCalculationResult(
-        Long capCheckId,
         Long contractId,
         PaymentStage paymentStage,
         CapCheckKind checkKind,
@@ -34,6 +35,7 @@ public record CapCalculationResult(
         BigDecimal remainingAmount,
         BigDecimal usagePct,
         CapResultStatus resultStatus,
-        List<CapCheckDetailLine> details
+        List<CapCheckDetailLine> details,
+        Map<String, Object> calculationSnapshot
 ) {
 }

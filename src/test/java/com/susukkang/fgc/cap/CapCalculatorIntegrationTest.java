@@ -2,9 +2,11 @@ package com.susukkang.fgc.cap;
 
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.cap.service.ProductRefundRateResolver;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -33,6 +35,8 @@ class CapCalculatorIntegrationTest {
 
     @Autowired
     private CapCalculator capCalculator;
+    @Autowired
+    private CapCheckService capCheckService;
     @Autowired
     private ProductRefundRateResolver refundRateResolver;
     @Autowired
@@ -82,12 +86,41 @@ class CapCalculatorIntegrationTest {
         assertThat(result.includedAmount()).isEqualByComparingTo("650000");
         assertThat(result.remainingAmount()).isEqualByComparingTo("550000");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
-        assertThat(result.capCheckId()).isNotNull();
+    }
+
+    // CapCheckService.calculateAndSave()는 계산 결과를 cap_check/cap_check_detail에 저장한다
+    @Test
+    void calculateAndSavePersistsCapCheckAndDetails() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        insertOperationalScheduleWithOneBaseCommissionLine(id, LocalDate.of(2026, 7, 10));
+
+        CapCheckSaveResult saved = capCheckService.calculateAndSave(
+                CapCalculationCommand.realtime(id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(saved.capCheckId()).isNotNull();
+        assertThat(saved.result().limitAmount()).isEqualByComparingTo("1200000");
 
         Integer detailCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.cap_check_detail WHERE cap_check_id = ?",
-                Integer.class, result.capCheckId());
+                Integer.class, saved.capCheckId());
         assertThat(detailCount).isEqualTo(1);
+    }
+
+    // CapCheckService.findLatest()는 저장된 판정을 재계산 없이 그대로 돌려준다
+    @Test
+    void findLatestReturnsPersistedCapCheckWithoutRecalculating() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        insertOperationalScheduleWithOneBaseCommissionLine(id, LocalDate.of(2026, 7, 10));
+
+        CapCheckSaveResult saved = capCheckService.calculateAndSave(
+                CapCalculationCommand.realtime(id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        CapCheckSaveResult found = capCheckService.findLatest(id, PaymentStage.GA_TO_FC).orElseThrow();
+
+        assertThat(found.capCheckId()).isEqualTo(saved.capCheckId());
+        assertThat(found.result().limitAmount()).isEqualByComparingTo("1200000");
+        assertThat(found.result().includedAmount()).isEqualByComparingTo("650000");
+        assertThat(found.result().details()).hasSize(1);
     }
 
     // A1(80% 공제대상 상품)은 12차월 예상해약환급률표가 한도에 가산된다

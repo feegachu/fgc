@@ -1,6 +1,5 @@
 package com.susukkang.fgc.cap.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapContractView;
@@ -9,7 +8,6 @@ import com.susukkang.fgc.cap.dto.CapRuleSetView;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.dto.ScheduleAmountView;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.cap.mapper.CapContractMapper;
 import com.susukkang.fgc.cap.mapper.CapRuleMapper;
 import com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper;
@@ -36,8 +34,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,8 +58,6 @@ class CapCalculatorImplTest {
     @Mock
     private CapScheduleAmountMapper capScheduleAmountMapper;
     @Mock
-    private CapCheckMapper capCheckMapper;
-    @Mock
     private ProductRefundRateResolver refundRateResolver;
 
     private CapCalculatorImpl capCalculator;
@@ -71,14 +65,7 @@ class CapCalculatorImplTest {
     @BeforeEach
     void setUp() {
         capCalculator = new CapCalculatorImpl(capContractMapper, capRuleMapper, capScheduleAmountMapper,
-                capCheckMapper, refundRateResolver, new ObjectMapper());
-
-        // cap_check INSERT 는 생성된 PK 를 row 에 되채워 준다 — 실제 IDENTITY 컬럼 동작을 흉내낸다.
-        lenient().doAnswer(invocation -> {
-            com.susukkang.fgc.cap.dto.CapCheckInsertRow row = invocation.getArgument(0);
-            row.setCapCheckId(999L);
-            return null;
-        }).when(capCheckMapper).insertCapCheck(any());
+                refundRateResolver);
     }
 
     private CapContractView contract(LocalDate contractDate, BigDecimal monthlyEquivalent,
@@ -149,7 +136,6 @@ class CapCalculatorImplTest {
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.includedAmount()).isEqualByComparingTo("0");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
-        assertThat(result.capCheckId()).isEqualTo(999L);
     }
 
     // 표준해약공제액 80% 이상 공제 대상은 12차월 예상해약환급률이 한도에 가산된다

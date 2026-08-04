@@ -31,4 +31,51 @@
         </foreach>
     </insert>
 
+    <!-- 컬럼 별칭을 camelCase 프로퍼티명과 동일하게 맞춰 map-underscore-to-camel-case 설정 없이도 매핑되게 한다. -->
+    <select id="findLatestByContractAndStage" resultType="com.susukkang.fgc.cap.dto.CapCheckRow">
+        SELECT cc.cap_check_id                 AS capCheckId,
+               cc.contract_id                   AS contractId,
+               cc.payment_stage                 AS paymentStage,
+               cc.check_kind                    AS checkKind,
+               cc.as_of_date                    AS asOfDate,
+               cc.cap_rule_set_id               AS capRuleSetId,
+               cc.refund_rate_table_id          AS refundRateTableId,
+               cc.base_premium_amount           AS basePremiumAmount,
+               cc.refund_12m_amount             AS refund12mAmount,
+               cc.compliance_deduction_amount   AS complianceDeductionAmount,
+               cc.limit_amount                  AS limitAmount,
+               cc.included_amount               AS includedAmount,
+               cc.remaining_amount              AS remainingAmount,
+               cc.usage_pct                     AS usagePct,
+               cc.result_status                 AS resultStatus,
+               cc.calculation_snapshot::text    AS calculationSnapshotJson
+          FROM fgc.cap_check cc
+         WHERE cc.contract_id = #{contractId}
+           AND cc.payment_stage = #{paymentStage}
+         ORDER BY cc.checked_at DESC, cc.cap_check_id DESC
+         LIMIT 1
+    </select>
+
+    <!--
+      CapCheckDetailLine 은 record 라 생성자 파라미터 순서(컴파일 -parameters 옵션으로 이름도 함께)로
+      매핑된다 — 컬럼 별칭을 레코드 컴포넌트명과 동일하게 맞춘다.
+      schedule_line_id 는 이 구현에서 항상 채워지므로 INNER JOIN 한다(transaction_attribution 기반
+      상세행은 아직 없다).
+    -->
+    <select id="findDetailsByCapCheckId" resultType="com.susukkang.fgc.cap.dto.CapCheckDetailLine">
+        SELECT ccd.detail_seq             AS detailSeq,
+               ccd.commission_item_id      AS commissionItemId,
+               ci.item_code                AS itemCode,
+               ccd.schedule_line_id        AS scheduleLineId,
+               sl.contract_month_no        AS contractMonthNo,
+               ccd.classification_snapshot AS classification,
+               ccd.amount                  AS amount,
+               ccd.decision_reason         AS decisionReason
+          FROM fgc.cap_check_detail ccd
+          JOIN fgc.commission_item ci ON ci.commission_item_id = ccd.commission_item_id
+          JOIN fgc.schedule_line sl   ON sl.schedule_line_id = ccd.schedule_line_id
+         WHERE ccd.cap_check_id = #{capCheckId}
+         ORDER BY ccd.detail_seq
+    </select>
+
 </mapper>
