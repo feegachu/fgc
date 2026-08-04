@@ -33,19 +33,22 @@ class MoneyUtilTest {
         ))).isEqualByComparingTo("301");
     }
 
+    // 퍼센트를 곱한 뒤 원 단위로 반올림한다
     @Test
-    void applyPercent_은_퍼센트를_곱한_뒤_원단위로_반올림한다() {
+    void appliesPercentAndRoundsToNearestWon() {
         BigDecimal result = MoneyUtil.applyPercent(new BigDecimal("1200000"), new BigDecimal("24.000000"));
         assertThat(result).isEqualByComparingTo("288000");
     }
 
+    // 분모가 0이면 0을 돌려준다
     @Test
-    void usagePercent_은_분모가_0이면_0을_돌려준다() {
+    void returnsZeroUsagePercentWhenDenominatorIsZero() {
         assertThat(MoneyUtil.usagePercent(new BigDecimal("100"), BigDecimal.ZERO)).isEqualByComparingTo("0");
     }
 
+    // 소수 6자리 HALF_UP으로 계산한다
     @Test
-    void usagePercent_은_소수6자리_HALF_UP이다() {
+    void calculatesUsagePercentWithSixDecimalsHalfUp() {
         BigDecimal result = MoneyUtil.usagePercent(new BigDecimal("1100000"), new BigDecimal("1200000"));
         assertThat(result).isEqualByComparingTo("91.666667");
     }

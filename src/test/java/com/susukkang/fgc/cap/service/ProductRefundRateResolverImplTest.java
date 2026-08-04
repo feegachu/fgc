@@ -29,8 +29,9 @@ class ProductRefundRateResolverImplTest {
         return new ProductRefundRateResolverImpl(refundRateMapper);
     }
 
+    // 표와 12차월 값이 있으면 표버전과 환급률을 돌려준다
     @Test
-    void 표와_12차월_값이_있으면_표버전과_환급률을_돌려준다() {
+    void returnsTableVersionAndRateWhenTableAndMonth12ValueExist() {
         RefundRateTableView table = new RefundRateTableView();
         table.setRefundRateTableId(777L);
         table.setPolicyVersionId(55L);
@@ -53,16 +54,18 @@ class ProductRefundRateResolverImplTest {
         assertThat(result.get().month12RatePct()).isEqualByComparingTo("24.000000");
     }
 
+    // 표가 없으면 빈값을 돌려준다
     @Test
-    void 표가_없으면_빈값을_돌려준다() {
+    void returnsEmptyWhenTableNotFound() {
         RefundRateQuery query = new RefundRateQuery(10L, 999L, 240, "FACE_TO_FACE", LocalDate.of(2026, 1, 15));
         when(refundRateMapper.findApplicableTable(any(), any(), any(), any(), any())).thenReturn(null);
 
         assertThat(resolverWithMapper().resolve(query)).isEmpty();
     }
 
+    // 표는 있지만 12차월 값이 없으면 빈값을 돌려준다
     @Test
-    void 표는_있지만_12차월_값이_없으면_빈값을_돌려준다() {
+    void returnsEmptyWhenTableExistsButMonth12ValueMissing() {
         RefundRateTableView table = new RefundRateTableView();
         table.setRefundRateTableId(777L);
         table.setPolicyVersionId(55L);

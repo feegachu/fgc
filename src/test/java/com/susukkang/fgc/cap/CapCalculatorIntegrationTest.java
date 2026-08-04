@@ -67,8 +67,9 @@ class CapCalculatorIntegrationTest {
                 """, scheduleHeaderId, contractDate, baseCommissionItemId);
     }
 
+    // C001(일반계약)은 기본한도 1,200,000원에 산입액이 반영된다
     @Test
-    void C001_일반계약은_기본한도_1200000원에_산입액이_반영된다() {
+    void generalContractC001ReflectsIncludedAmountInBasicLimit() {
         Long id = contractId("FGC-FGL01-202607-0001"); // STD-LIFE-A, 월납 100,000원, 80% 공제 아님
         insertOperationalScheduleWithOneBaseCommissionLine(id, LocalDate.of(2026, 7, 10));
 
@@ -89,11 +90,12 @@ class CapCalculatorIntegrationTest {
         assertThat(detailCount).isEqualTo(1);
     }
 
+    // A1(80% 공제대상 상품)은 12차월 예상해약환급률표가 한도에 가산된다
+    // FGC-FGL02-202601-0001 : STD-LIFE-B(80% 공제 대상), 월납 100,000원, 240개월납, 계약일 2026-01-15
+    // GA_TO_FC 1,200% 룰셋은 2026-07-01부터 적용되므로(REG-CAP-GA-2026-V1), 이 계약은
+    // INSURER_TO_GA 단계로 검증한다(REG-CAP-INS-2026-V1 은 2021-01-01부터 적용).
     @Test
-    void A1_80퍼센트_공제대상_상품은_12차월_예상해약환급률표가_한도에_가산된다() {
-        // FGC-FGL02-202601-0001 : STD-LIFE-B(80% 공제 대상), 월납 100,000원, 240개월납, 계약일 2026-01-15
-        // GA_TO_FC 1,200% 룰셋은 2026-07-01부터 적용되므로(REG-CAP-GA-2026-V1), 이 계약은
-        // INSURER_TO_GA 단계로 검증한다(REG-CAP-INS-2026-V1 은 2021-01-01부터 적용).
+    void standardDeduction80ProductA1AddsMonth12RefundRateToLimit() {
         Long id = contractId("FGC-FGL02-202601-0001");
 
         CapCalculationResult result = capCalculator.calculate(
@@ -107,8 +109,9 @@ class CapCalculatorIntegrationTest {
         assertThat(result.refundRateTableId()).isNotNull();
     }
 
+    // ProductRefundRateResolver는 STD-LIFE-B의 12차월 환급률과 표버전을 돌려준다
     @Test
-    void ProductRefundRateResolver는_STD_LIFE_B의_12차월_환급률과_표버전을_돌려준다() {
+    void resolverReturnsMonth12RateAndTableVersionForStdLifeB() {
         Long insurerId = jdbcTemplate.queryForObject(
                 "SELECT insurer_id FROM fgc.insurer WHERE insurer_code='FGL02'", Long.class);
         Long productId = jdbcTemplate.queryForObject(
@@ -122,8 +125,9 @@ class CapCalculatorIntegrationTest {
         assertThat(resolution.get().versionNo()).isEqualTo(1);
     }
 
+    // 계약일이 다른 2026/2027 계약도 같은 엔진으로 동일 기본한도를 계산한다
     @Test
-    void 계약일이_다른_2026_2027_계약도_같은_엔진으로_동일_기본한도를_계산한다() {
+    void calculatesSameBasicLimitForContractsInDifferentYears() {
         // C001(2026-07-10)과 G1(2027-03-02)은 둘 다 STD-LIFE-A · 월납 100,000원이다.
         Long c2026 = contractId("FGC-FGL01-202607-0001");
         Long c2027 = contractId("FGC-FGL01-202703-0001");

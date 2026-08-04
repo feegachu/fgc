@@ -131,8 +131,9 @@ class CapCalculatorImplTest {
         return s;
     }
 
+    // 월납 100,000원 일반 샘플의 기본 한도는 1,200,000원이다
     @Test
-    void 월납_100000원_일반_샘플의_기본_한도는_1200000원이다() {
+    void basicLimitIsMonthlyPremiumTimesTwelveForGeneralSample() {
         when(capContractMapper.findById(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
         when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
@@ -151,8 +152,9 @@ class CapCalculatorImplTest {
         assertThat(result.capCheckId()).isEqualTo(999L);
     }
 
+    // 표준해약공제액 80% 이상 공제 대상은 12차월 예상해약환급률이 한도에 가산된다
     @Test
-    void 표준해약공제액_80퍼센트_이상_공제_대상은_12차월_예상해약환급률이_한도에_가산된다() {
+    void addsMonth12RefundRateToLimitForStandardDeduction80Product() {
         when(capContractMapper.findById(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
         when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
@@ -172,8 +174,9 @@ class CapCalculatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
     }
 
+    // 원수사→GA 단계는 준법경영비 3%가 한도에서 공제된다
     @Test
-    void 원수사_GA_단계는_준법경영비_3퍼센트가_한도에서_공제된다() {
+    void deductsComplianceCostForInsurerToGaStage() {
         when(capContractMapper.findById(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
         when(capRuleMapper.findApplicableRuleSet(eq("INSURER_TO_GA"), any(), any(), any(), any()))
@@ -191,8 +194,9 @@ class CapCalculatorImplTest {
         assertThat(result.limitAmount()).isEqualByComparingTo("1443360");
     }
 
+    // 계약일이 2026/2027/2029이어도 같은 엔진이 같은 기본한도를 계산한다
     @Test
-    void 계약일이_2026_2027_2029이어도_같은_엔진이_같은_기본한도를_계산한다() {
+    void calculatesSameBasicLimitAcrossContractYears() {
         List<LocalDate> contractDates = List.of(
                 LocalDate.of(2026, 7, 1),   // 2026년 현행
                 LocalDate.of(2027, 3, 2),   // 2027년 4년 분급 시행 이후
@@ -217,8 +221,9 @@ class CapCalculatorImplTest {
         }
     }
 
+    // 산입/제외 항목이 섞이면 INCLUDED만 합산되고 초과 시 VIOLATION이다
     @Test
-    void 산입_제외_항목이_섞이면_INCLUDED만_합산되고_초과시_VIOLATION이다() {
+    void sumsOnlyIncludedItemsAndFlagsViolationWhenExceeded() {
         when(capContractMapper.findById(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
         when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
@@ -247,8 +252,9 @@ class CapCalculatorImplTest {
         assertThat(result.details()).hasSize(2);
     }
 
+    // 룰셋에 없는 항목이나 환급률표 미존재는 REVIEW_REQUIRED다
     @Test
-    void 룰셋에_없는_항목이나_환급률표_미존재는_REVIEW_REQUIRED이다() {
+    void flagsReviewRequiredWhenItemUnclassifiedOrRefundTableMissing() {
         when(capContractMapper.findById(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), true));
         when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
@@ -266,8 +272,9 @@ class CapCalculatorImplTest {
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
     }
 
+    // 사용률이 경고기준 이상이면 WARNING이다
     @Test
-    void 사용률이_경고기준_이상이면_WARNING이다() {
+    void flagsWarningWhenUsageAtOrAboveThreshold() {
         when(capContractMapper.findById(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
         when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
@@ -283,12 +290,10 @@ class CapCalculatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.WARNING);
     }
 
+    // 환급률표 조회는 검증실행일이 아니라 계약일을 기준으로 한다
+    // (MONTHLY 재검증의 asOfDate는 계약일보다 뒤일 수 있으나, REG-19상 기준일은 계약 체결일이다)
     @Test
-    void 환급률표_조회는_검증실행일이_아니라_계약일을_기준으로_한다() {
-        // MONTHLY 재검증은 asOfDate(검증 실행일)가 계약일보다 훨씬 뒤일 수 있다.
-        // 그래도 REG-19 상 1,200% 적용 규칙의 기준일은 계약 체결일이므로,
-        // 환급률표 조회는 계약일로 해야 한다(asOfDate 로 하면 재검증 시점에 활성화된
-        // 더 최신 표가 선택될 위험이 있다).
+    void resolvesRefundRateByContractDateNotValidationAsOfDate() {
         LocalDate contractDate = LocalDate.of(2026, 1, 15);
         LocalDate validationAsOfDate = LocalDate.of(2026, 9, 1);
 
@@ -310,8 +315,9 @@ class CapCalculatorImplTest {
         assertThat(captor.getValue().asOfDate()).isEqualTo(contractDate);
     }
 
+    // 존재하지 않는 계약이면 예외가 발생한다
     @Test
-    void 존재하지_않는_계약이면_예외가_발생한다() {
+    void throwsExceptionWhenContractNotFound() {
         when(capContractMapper.findById(CONTRACT_ID)).thenReturn(null);
 
         assertThatThrownBy(() -> capCalculator.calculate(
