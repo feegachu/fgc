@@ -50,17 +50,15 @@ public class CapCalculatorImpl implements CapCalculator {
     @Override
     @Transactional
     public CapCalculationResult calculate(CapCalculationCommand command) {
-        // 계약 등록·수정 시(REALTIME) 또는 월 검증 배치(MONTHLY) 어느 쪽에서 호출돼도
-        // 아래 순서는 완전히 동일하다 — 호출 시점에 따라 분기하는 로직은 없다.
+        // 계약 등록·수정 시(REALTIME) 또는 월 검증 배치(MONTHLY) 어느 쪽에서 호출돼도 아래 순서는 동일
         CapContractView contract = capContractMapper.findById(command.contractId());
         if (contract == null) {
             throw new FgcBusinessException(FgcErrorCode.CAP_003,
                     Map.of("contractId", command.contractId()));
         }
 
-        // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾는다(REG-19).
-        // 2026년 현행 계약, 2027년 4년 분급, 2029년 7년 분급 계약이 전부 같은 코드를 타는 이유가 이것이다 —
-        // cap_rule_set 이 계약일 범위로 정책을 구분해 두므로, 여기서는 "몇 년도 계약인지"를 몰라도 된다.
+        // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)
+        // cap_rule_set 이 계약일 범위로 정책을 구분해 두므로, 여기서는 "몇 년도 계약인지"를 몰라도 됨
         CapRuleSetView ruleSet = capRuleMapper.findApplicableRuleSet(
                 command.paymentStage().name(), contract.getContractDate(),
                 contract.getInsurerId(), contract.getProductGroupCode(), contract.getChannelCode());
@@ -69,32 +67,27 @@ public class CapCalculatorImpl implements CapCalculator {
                     Map.of("contractId", command.contractId(), "paymentStage", command.paymentStage()));
         }
 
-        // ── 1단계: 기본 한도식 ────────────────────────────────────────────
-        // 초년도 모집수수료 한도 = 월납환산 초회보험료 × 12 (premium_multiplier 는 정책값이라
-        // 자바 코드에 12를 고정하지 않고 cap_rule_set 에서 읽는다 — COR-004).
+        // 1) 기본 한도식
+        // 초년도 모집수수료 한도 = 월납환산 초회보험료 × 12
         BigDecimal basePremiumAmount = MoneyUtil.multiplyAndRound(
                 contract.getMonthlyEquivalentFirstPremium(), ruleSet.getPremiumMultiplier());
 
-        // ── 2단계: 저해지·표준미달형 등 80% 이상 공제 대상이면 한도를 가산 ──────
-        // 표준해약공제액의 80% 이상을 공제하는 상품은 12차월 예상 해약환급금만큼 한도가 더 크다(REG-08).
-        // 일반 상품(대부분)은 이 단계에서 그대로 0원이 더해진다.
+        // 2) 저해지·표준미달형 등 80% 이상 공제 대상이면 한도를 가산
+        // 표준해약공제액의 80% 이상을 공제하는 상품은 12차월 예상 해약환급금만큼 한도가 더 큼 (REG-08)
         RefundAddition refundAddition = resolveRefundAddition(contract, ruleSet, basePremiumAmount, command);
 
-        // ── 3단계: 준법경영비 등 공제 ────────────────────────────────────
-        // 원수사→GA 단계에서만 준법경영비 3%를 뺀 금액이 실제 한도가 된다(REG-10).
-        // GA→FC 단계는 compliance_deduction_pct 가 항상 0 이 되도록 DB CHECK 로 강제돼 있어
-        // 여기서 별도로 지급단계를 분기하지 않아도 자동으로 0원 공제가 된다.
+        // 3) 준법경영비 등 공제
+        // 원수사→GA 단계에서만 준법경영비 3%를 뺀 금액이 실제 한도가 됨 (REG-10)
+        // GA→FC 단계는 compliance_deduction_pct 가 항상 0이 되도록 DB CHECK로 강제
         BigDecimal grossLimit = basePremiumAmount.add(refundAddition.amount());
         BigDecimal complianceDeductionAmount = ruleSet.getComplianceDeductionPct().compareTo(BigDecimal.ZERO) > 0
                 ? MoneyUtil.applyPercent(grossLimit, ruleSet.getComplianceDeductionPct())
                 : BigDecimal.ZERO;
         BigDecimal limitAmount = grossLimit.subtract(complianceDeductionAmount);
 
-        // ── 4단계: 실제 산입액 집계 ──────────────────────────────────────
-        // 계약월차 1~firstYearMonths(기본 12) 안에 있는 예상 스케줄(schedule_line)을 한 줄씩 훑으면서,
-        // 그 수수료 항목이 이 룰셋에서 INCLUDED/EXCLUDED/REVIEW_REQUIRED 중 무엇인지 붙인다.
-        // "얼마를 냈나"(schedule_line)와 "그 돈이 한도에 들어가는가"(cap_rule_item)를 분리해 두었기 때문에,
-        // 수수료 항목의 산입 여부가 바뀌어도(정책 개정) 스케줄 생성 로직은 건드릴 필요가 없다.
+        // 4) 실제 산입액 집계
+        // 계약월차 1~firstYearMonths(기본 12) 안에 있는 예상 schedule_line 한 줄씩 훑으면서,
+        // 그 수수료 항목이 이 룰셋에서 INCLUDED/EXCLUDED/REVIEW_REQUIRED 중 무엇인지 붙임
         Map<Long, CapRuleItemView> ruleItemsByCommissionItem = new HashMap<>();
         for (CapRuleItemView item : capRuleMapper.findRuleItems(ruleSet.getCapRuleSetId())) {
             ruleItemsByCommissionItem.put(item.getCommissionItemId(), item);
@@ -104,13 +97,13 @@ public class CapCalculatorImpl implements CapCalculator {
 
         List<CapCheckDetailLine> details = new ArrayList<>();
         BigDecimal includedAmount = BigDecimal.ZERO;
-        // 환급률표를 못 찾은 경우(2단계)뿐 아니라, 산입 분류를 알 수 없는 항목이 하나라도 있으면
-        // 전체 판정을 REVIEW_REQUIRED 로 내려서 "억지로 계산하지 않고 사람이 보게" 한다.
+        // 환급률표를 못 찾은 경우뿐 아니라, 산입 분류를 알 수 없는 항목이 하나라도 있으면
+        // 전체 판정을 REVIEW_REQUIRED로 내림
         boolean anyReviewRequired = refundAddition.reviewRequired();
         int seq = 1;
         for (ScheduleAmountView line : scheduleAmounts) {
             CapRuleItemView ruleItem = ruleItemsByCommissionItem.get(line.getCommissionItemId());
-            // 룰셋에 아예 등록되지 않은 수수료 항목은 자동으로 산입/제외를 판단하지 않고 REVIEW_REQUIRED 로 둔다.
+            // 룰셋에 아예 등록되지 않은 수수료 항목은 자동으로 산입/제외를 판단하지 않고 REVIEW_REQUIRED로 둠
             String classification = ruleItem != null ? ruleItem.getInclusionStatus() : REVIEW_REQUIRED;
             String reason = ruleItem != null
                     ? ruleItem.getDecisionReason()
@@ -128,16 +121,14 @@ public class CapCalculatorImpl implements CapCalculator {
             }
         }
 
-        // ── 5단계: 잔여 한도·사용률·최종 판정 ─────────────────────────────
+        // 5) 잔여 한도·사용률·최종 판정
         BigDecimal remainingAmount = limitAmount.subtract(includedAmount);
         BigDecimal usagePct = MoneyUtil.usagePercent(includedAmount, limitAmount);
 
         CapResultStatus resultStatus = determineResultStatus(
                 anyReviewRequired, includedAmount, limitAmount, usagePct, ruleSet.getWarningUsagePct());
 
-        // ── 6단계: 스냅샷 저장 ──────────────────────────────────────────
-        // cap_check/cap_check_detail 은 append-only 테이블이다 — 매 계산이 새 이력행으로 쌓이고,
-        // 나중에 정책이 바뀌어도 "그때 무엇으로 계산했는지"가 그대로 남는다.
+        // 6) 스냅샷 저장
         Long capCheckId = persist(command, ruleSet, refundAddition, basePremiumAmount, complianceDeductionAmount,
                 limitAmount, includedAmount, remainingAmount, usagePct, resultStatus, details);
 
@@ -150,10 +141,7 @@ public class CapCalculatorImpl implements CapCalculator {
 
     /**
      * 80% 이상 공제 대상 상품이면 12차월 예상 해약환급금을 한도에 가산할 금액과, 그 판정에 쓴
-     * 환급률표(refund_rate_table_id·policy_version_id·version_no)를 계산해서 돌려준다.
-     *
-     * refund_addition_condition 이 'STANDARD_DEDUCTION_80' 이 아니거나 상품이 80% 공제 대상이
-     * 아니면(일반 상품 대부분) 가산 없이 0원을 돌려준다 — 이 경우가 기본 케이스다.
+     * 환급률표(refund_rate_table_id·policy_version_id·version_no)를 계산해서 돌려쥼
      */
     private RefundAddition resolveRefundAddition(CapContractView contract, CapRuleSetView ruleSet,
                                                    BigDecimal basePremiumAmount, CapCalculationCommand command) {
@@ -163,15 +151,12 @@ public class CapCalculatorImpl implements CapCalculator {
             return new RefundAddition(BigDecimal.ZERO, null, null, null, false);
         }
 
-        // ★ 반드시 계약 체결일(contract.getContractDate())로 조회한다 — command.asOfDate() 를 쓰면 안 된다.
-        //   REALTIME 계산은 asOfDate 가 곧 계약일이라 차이가 없지만, MONTHLY 월 재검증은 asOfDate 가
-        //   검증 실행월이라 계약일보다 한참 뒤일 수 있다. 그사이 새 환급률표 버전이 활성화됐다면
-        //   asOfDate 로 조회했을 때 "그때는 없던" 더 최신 표가 잘못 선택된다(REG-19: 계약 체결일 기준).
+        // 반드시 계약 체결일(contract.getContractDate())로 조회
         RefundRateQuery query = new RefundRateQuery(contract.getInsurerId(), contract.getProductId(),
                 contract.getPaymentTermMonths(), contract.getChannelCode(), contract.getContractDate());
         Optional<RefundRateResolution> resolution = refundRateResolver.resolve(query);
         if (resolution.isEmpty()) {
-            // 표(또는 12차월 값)가 없는 조합은 억지로 추정하지 않고 REVIEW_REQUIRED 로 남긴다(REG-23).
+            // 표(또는 12차월 값)가 없는 조합은 억지로 추정하지 않고 REVIEW_REQUIRED로 남김 (REG-23)
             return new RefundAddition(BigDecimal.ZERO, null, null, null, true);
         }
 
@@ -180,14 +165,6 @@ public class CapCalculatorImpl implements CapCalculator {
         return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(), false);
     }
 
-    /**
-     * 판정 우선순위(위에서부터 순서대로 확인, 먼저 걸리는 조건이 최종 결과):
-     *   1. REVIEW_REQUIRED — 룰셋 미분류 항목이나 환급률표 부재 등 사람 판단이 필요한 경우가 하나라도 있으면 최우선.
-     *      금액이 아무리 한도 안이어도 "자동으로는 확정할 수 없다"는 뜻이라 VIOLATION/WARNING 보다 앞선다.
-     *   2. VIOLATION — 산입액이 한도를 실제로 초과.
-     *   3. WARNING   — 아직 초과는 아니지만 사용률이 경고 기준(cap_rule_set.warning_usage_pct, 기본 90%) 이상.
-     *   4. NORMAL    — 위 어디에도 해당하지 않는 정상 범위.
-     */
     private CapResultStatus determineResultStatus(boolean anyReviewRequired, BigDecimal includedAmount,
                                                     BigDecimal limitAmount, BigDecimal usagePct,
                                                     BigDecimal warningUsagePct) {
@@ -203,11 +180,7 @@ public class CapCalculatorImpl implements CapCalculator {
         return CapResultStatus.NORMAL;
     }
 
-    /**
-     * cap_check 1행 + cap_check_detail N행을 append-only 로 저장한다(UPDATE/DELETE 는 DB 트리거가 막는다).
-     * calculation_snapshot 에는 컬럼으로 뽑아내지 않은 "그때 어떤 정책값을 썼는지"(배율·공제율·환급률표
-     * 버전 등)를 jsonb 로 같이 남겨서, 나중에 정책이 개정돼도 과거 판정을 그대로 재현·감사할 수 있게 한다.
-     */
+    // cap_check 1행 + cap_check_detail N행을 append-only로 저장
     private Long persist(CapCalculationCommand command, CapRuleSetView ruleSet, RefundAddition refundAddition,
                           BigDecimal basePremiumAmount, BigDecimal complianceDeductionAmount,
                           BigDecimal limitAmount, BigDecimal includedAmount, BigDecimal remainingAmount,

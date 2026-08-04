@@ -6,7 +6,7 @@ import lombok.Setter;
 import java.time.LocalDate;
 
 /**
- * refund_rate_table 헤더 1건 (+ 소속 policy_version 의 version_no).
+ * refund_rate_table 헤더 1건 (+ 소속 policy_version 의 version_no)
  */
 @Getter
 @Setter
