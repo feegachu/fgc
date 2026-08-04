@@ -3,10 +3,8 @@
 <mapper namespace="com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper">
 
     <!--
-      OPERATIONAL·active_yn=true 인 스케줄만 본다 — COMPARISON/SIMULATION 용 가상 스케줄이나
-      새로 만든 뒤 옛 버전이 된 스케줄이 산입액에 섞여 들어가지 않도록 막는 조건이다.
-      firstYearMonths 는 cap_rule_set.first_year_months 값을 그대로 받는다(기본 12) — 여기서 12를
-      직접 쓰지 않는 이유는 COR-004(정책값을 코드에 박지 않는다) 때문이다.
+      OPERATIONAL·active_yn=true 인 스케줄만 봄 — COMPARISON/SIMULATION 용 가상 스케줄이나
+      새로 만든 뒤 옛 버전이 된 스케줄이 산입액에 섞여 들어가지 않도록 막는 조건
     -->
     <select id="findFirstYearScheduleAmounts" resultType="com.susukkang.fgc.cap.dto.ScheduleAmountView">
         SELECT sl.schedule_line_id      AS scheduleLineId,

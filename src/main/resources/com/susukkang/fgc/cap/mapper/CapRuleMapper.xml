@@ -3,15 +3,12 @@
 <mapper namespace="com.susukkang.fgc.cap.mapper.CapRuleMapper">
 
     <!--
-      insurer_id/product_group_code/channel_code 가 NULL 인 룰셋 행은 "전체 적용" 와일드카드다.
+      insurer_id/product_group_code/channel_code 가 NULL 인 룰셋 행은 "전체 적용"
       값이 채워진 행일수록 더 구체적인 예외 규칙이므로, WHERE 절은 "NULL이거나 값이 같으면 후보"로
-      넓게 걸러내고 ORDER BY 에서 구체적인(= NULL 아닌 컬럼이 많은) 행을 최우선으로 고른다.
+      넓게 걸러내고 ORDER BY 에서 구체적인(= NULL 아닌 컬럼이 많은) 행을 최우선으로 고름
 
       마지막 두 정렬 기준(contract_date_from DESC, cap_rule_set_id DESC)은 "구체성이 같은 후보가
-      여러 개일 때 항상 같은 결과가 나오게"만 보장하는 타이브레이커다. 예를 들어 보험사 전용 룰과
-      상품군 전용 룰이 동시에 걸리는 경우, 어느 쪽이 업무적으로 우선인지는 아직 정의돼 있지 않다
-      (cap_rule_set 에는 commission_rule 과 달리 priority_no 컬럼이 없다). 실제로 그런 상황이
-      생기면 이 정렬만으로는 부족하니 팀과 priority_no 추가를 논의해야 한다.
+      여러 개일 때 항상 같은 결과가 나오게"만 보장
     -->
     <!-- 컬럼 별칭을 camelCase 프로퍼티명과 동일하게 맞춰 map-underscore-to-camel-case 설정 없이도 매핑되게 한다. -->
     <select id="findApplicableRuleSet" resultType="com.susukkang.fgc.cap.dto.CapRuleSetView">

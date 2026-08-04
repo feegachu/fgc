@@ -3,10 +3,10 @@
 <mapper namespace="com.susukkang.fgc.cap.mapper.RefundRateMapper">
 
     <!--
-      product_offering_id 로 조인하지 않는다 — 표의 실제 범위는 uq_refund_table_scope
-      (insurer_id, product_id, payment_term_months, channel_code, effective_from) 이다.
+      product_offering_id 로 조인하지 않음 — 표의 실제 범위는 uq_refund_table_scope
+      (insurer_id, product_id, payment_term_months, channel_code, effective_from)
       한 상품에 판매버전(product_offering)이 여러 개여도 표는 하나만 있을 수 있으므로,
-      판매버전으로 조인하면 같은 표를 중복으로 찾거나 못 찾는 경우가 생긴다.
+      판매버전으로 조인하면 같은 표를 중복으로 찾거나 못 찾는 경우가 생김
     -->
     <select id="findApplicableTable" resultType="com.susukkang.fgc.cap.dto.RefundRateTableView">
         SELECT rrt.refund_rate_table_id    AS refundRateTableId,

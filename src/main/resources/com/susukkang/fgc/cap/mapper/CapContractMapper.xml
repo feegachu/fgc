@@ -5,7 +5,7 @@
     <!--
       컬럼 별칭을 camelCase 프로퍼티명과 동일하게 붙인다. mybatis.map-underscore-to-camel-case
       설정(application.yml, git 미포함)이 없는 환경(CI 등)에서도 별도 설정 없이 결과가
-      올바르게 매핑되도록 SQL 자체에서 이름을 맞춘다.
+      올바르게 매핑되도록 SQL 자체에서 이름을 맞춤
     -->
     <select id="findById" resultType="com.susukkang.fgc.cap.dto.CapContractView">
         SELECT c.contract_id                          AS contractId,
