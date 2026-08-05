@@ -301,6 +301,29 @@ class CapCalculatorImplTest {
         assertThat(captor.getValue().asOfDate()).isEqualTo(contractDate);
     }
 
+    // schedule_line.expected_amount 는 numeric(15,2)라 원 미만 값이 들어올 수 있다 — 산입액에
+    // 합산되기 전에 각 행을 먼저 원 단위 HALF_UP 반올림해야 한다 (100.5 + 100.5 는 200이 아니라
+    // 101 + 101 = 202여야 한다)
+    @Test
+    void roundsEachScheduleLineToWonBeforeSummingIncludedAmount() {
+        when(capContractMapper.findById(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
+        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
+        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(includedItem(1L, "BASE_COMMISSION")));
+        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
+                scheduleLine(11L, 1L, 1, "100.5"),
+                scheduleLine(12L, 1L, 2, "100.5")
+        ));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(result.includedAmount()).isEqualByComparingTo("202");
+        assertThat(result.details()).extracting(d -> d.amount().toPlainString())
+                .containsExactly("101", "101");
+    }
+
     // 존재하지 않는 계약이면 예외가 발생한다
     @Test
     void throwsExceptionWhenContractNotFound() {

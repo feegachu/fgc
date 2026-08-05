@@ -15,6 +15,8 @@ import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -183,6 +185,36 @@ class CapCheckServiceImplTest {
         assertThat(result.page().content()).hasSize(1);
         assertThat(result.page().totalElements()).isEqualTo(1);
         assertThat(result.page().content().get(0).getContractNo()).isEqualTo("C001");
+    }
+
+    @Test
+    void searchRejectsPageBelowOne() {
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> capCheckService.search(criteria, 0, 20))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting(e -> ((FgcBusinessException) e).getErrorCode())
+                .isEqualTo(FgcErrorCode.COMMON_002);
+    }
+
+    @Test
+    void searchRejectsSizeBelowOne() {
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> capCheckService.search(criteria, 1, 0))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting(e -> ((FgcBusinessException) e).getErrorCode())
+                .isEqualTo(FgcErrorCode.COMMON_002);
+    }
+
+    @Test
+    void searchRejectsSizeAboveOneHundred() {
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> capCheckService.search(criteria, 1, 101))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting(e -> ((FgcBusinessException) e).getErrorCode())
+                .isEqualTo(FgcErrorCode.COMMON_002);
     }
 
     @SuppressWarnings("unchecked")

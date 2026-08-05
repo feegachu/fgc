@@ -17,6 +17,8 @@ import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,12 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class CapCheckServiceImpl implements CapCheckService {
+
+    // IF-API-30 페이징 계약(1-base page, size 1~100). 컨트롤러뿐 아니라 이 서비스를 부르는 어떤
+    // 호출자든 이 한도를 강제해야 해서 서비스 계층에서 직접 막는다 — 여기가 유일한 진입점이다.
+    private static final int MIN_PAGE = 1;
+    private static final int MIN_SIZE = 1;
+    private static final int MAX_SIZE = 100;
 
     private final CapCalculator capCalculator;
     private final CapCheckMapper capCheckMapper;
@@ -91,7 +99,21 @@ public class CapCheckServiceImpl implements CapCheckService {
     @Override
     @Transactional(readOnly = true)
     public CapCheckSearchResult search(CapCheckSearchCriteria criteria, int page, int size) {
-        int offset = (page - 1) * size;
+        if (page < MIN_PAGE) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, "page", Map.of("field", "page"), null);
+        }
+        if (size < MIN_SIZE || size > MAX_SIZE) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, "size", Map.of("field", "size"), null);
+        }
+
+        // size는 100 이하로 막혀 있지만 page는 위쪽 한도가 없어 (page-1)*size가 int 범위를 넘길 수
+        // 있다 — long으로 먼저 계산해 오버플로를 걸러낸 뒤에만 매퍼로 넘긴다.
+        long offsetLong = (long) (page - 1) * size;
+        if (offsetLong > Integer.MAX_VALUE) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, "page", Map.of("field", "page"), null);
+        }
+        int offset = (int) offsetLong;
+
         List<CapCheckListRow> rows = capCheckMapper.search(
                 criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
                 criteria.insurerId(), criteria.contractNo(), offset, size);
@@ -135,7 +157,10 @@ public class CapCheckServiceImpl implements CapCheckService {
         try {
             return objectMapper.writeValueAsString(snapshot);
         } catch (Exception e) {
-            return "{}";
+            // "{}"로 조용히 넘기면 근거(계산 스냅샷) 없는 cap_check가 성공한 것처럼 저장된다.
+            // calculateAndSave는 @Transactional이라 여기서 던지면 INSERT까지 통째로 롤백된다.
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500,
+                    Map.of("requestId", "calculation_snapshot 직렬화 실패: " + e.getMessage()));
         }
     }
 
@@ -147,7 +172,10 @@ public class CapCheckServiceImpl implements CapCheckService {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
-            return Map.of();
+            // 빈 맵으로 감추면 저장된 판정이 근거 없이 조회되는 것처럼 보인다 — 데이터가 깨졌다는
+            // 사실을 그대로 드러내야 원인 파악이 된다.
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500,
+                    Map.of("requestId", "calculation_snapshot 역직렬화 실패: " + e.getMessage()));
         }
     }
 }

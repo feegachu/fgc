@@ -106,12 +106,17 @@ public class CapCalculatorImpl implements CapCalculator {
             String itemCode = ruleItem != null ? ruleItem.getItemCode() : null;
             String itemName = ruleItem != null ? ruleItem.getItemName() : null;
 
+            // schedule_line.expected_amount는 컬럼 자체가 numeric(15,2)라 이론상 원 미만 값을 담을 수
+            // 있다(생성기가 정상 동작하면 항상 정수 won이겠지만, 그 보장을 이 엔진이 갖고 있지 않다).
+            // MoneyUtil 규칙("각 지급행을 원 단위 HALF_UP으로 반올림한 뒤 합산")대로 여기서 먼저 반올림한다.
+            BigDecimal amount = MoneyUtil.roundWon(line.getAmount());
+
             // evidenceRef는 스케줄 기반 산입 후보 시점에는 아직 존재하지 않는다(증빙 연결은 저장 이후 별도 절차) — null로 둔다
             details.add(new CapCheckDetailLine(seq++, line.getCommissionItemId(), itemCode, itemName,
-                    line.getScheduleLineId(), line.getContractMonthNo(), classification, line.getAmount(), reason, null));
+                    line.getScheduleLineId(), line.getContractMonthNo(), classification, amount, reason, null));
 
             if (INCLUDED.equals(classification)) {
-                includedAmount = includedAmount.add(line.getAmount());
+                includedAmount = includedAmount.add(amount);
             }
             if (REVIEW_REQUIRED.equals(classification)) {
                 anyReviewRequired = true;

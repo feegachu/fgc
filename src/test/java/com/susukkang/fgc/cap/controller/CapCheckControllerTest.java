@@ -6,6 +6,8 @@ import com.susukkang.fgc.cap.dto.CapCheckSummary;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -87,5 +89,19 @@ class CapCheckControllerTest {
     @Test
     void searchRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/cap/checks")).andExpect(status().isUnauthorized());
+    }
+
+    // page/size 범위 검증은 CapCheckServiceImpl이 담당하지만(단위테스트에서 직접 검증),
+    // 컨트롤러를 거쳐 GlobalExceptionHandler까지 400으로 잘 이어지는지도 확인한다.
+    @Test
+    void returns400WhenPageOrSizeOutOfRange() throws Exception {
+        given(capCheckService.search(any(), anyInt(), anyInt()))
+                .willThrow(new FgcBusinessException(FgcErrorCode.COMMON_002, "page",
+                        java.util.Map.of("field", "page"), null));
+
+        mockMvc.perform(get("/api/cap/checks").param("page", "0")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
     }
 }

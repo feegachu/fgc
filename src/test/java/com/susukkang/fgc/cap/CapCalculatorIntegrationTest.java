@@ -56,10 +56,14 @@ class CapCalculatorIntegrationTest {
                 "SELECT commission_item_id FROM fgc.commission_item WHERE item_code='BASE_COMMISSION'",
                 Long.class);
 
+        // findFirstYearScheduleAmounts는 schedule_purpose='OPERATIONAL', active_yn=true인 헤더만
+        // 본다. 둘 다 컬럼 기본값과 같지만, 기본값이 나중에 바뀌어도 이 테스트가 계속 맞는 헤더를
+        // 만들도록 명시적으로 값을 넣는다.
         Long scheduleHeaderId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.schedule_header
-                    (contract_id, payment_stage, policy_version_id, schedule_version_no, schedule_regime)
-                VALUES (?, 'GA_TO_FC', ?, 1, 'CURRENT')
+                    (contract_id, payment_stage, policy_version_id, schedule_version_no, schedule_regime,
+                     schedule_purpose, active_yn)
+                VALUES (?, 'GA_TO_FC', ?, 1, 'CURRENT', 'OPERATIONAL', true)
                 RETURNING schedule_header_id
                 """, Long.class, contractId, policyVersionId);
 
