@@ -81,4 +81,4 @@ AGENTS.md
 docs/
 .codex-tmp/
 .claude/
-CLAUDE.md
+CLAUDE.mdsrc/main/resources/application-prod.yml

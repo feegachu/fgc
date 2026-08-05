@@ -210,4 +210,3 @@ docker compose down -v && docker compose up -d && ./gradlew bootRun
 - API·배치 계약: `docs/05_인터페이스정의서_v2_0.md`
 - 규제 근거: `docs/07_규제조문표_v0.2.1.md`
 - 컨벤션: `docs/컨벤션/`
-test
