@@ -1,0 +1,5 @@
+# application-prod.yml
+spring:
+  flyway:
+    locations:
+      - classpath:db/migration
