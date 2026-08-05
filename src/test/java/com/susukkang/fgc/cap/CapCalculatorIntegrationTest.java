@@ -3,7 +3,10 @@ package com.susukkang.fgc.cap;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
+import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
+import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.service.CapCalculator;
@@ -126,6 +129,29 @@ class CapCalculatorIntegrationTest {
         assertThat(found.result().limitAmount()).isEqualByComparingTo("1200000");
         assertThat(found.result().includedAmount()).isEqualByComparingTo("650000");
         assertThat(found.result().details()).hasSize(1);
+    }
+
+    // IF-API-30(FUN-030-05): search/count/summarize SQL이 실제 join·필터 조건으로 동작하는지
+    // 검증한다 — 지금까지는 mock 매퍼로만 테스트돼 있었다
+    @Test
+    void searchReturnsPersistedCapCheckFilteredByContractNoWithSummaryCounts() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        insertOperationalScheduleWithOneBaseCommissionLine(id, LocalDate.of(2026, 7, 10));
+
+        CapCheckSaveResult saved = capCheckService.calculateAndSave(
+                CapCalculationCommand.realtime(id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(
+                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, "FGC-FGL01-202607-0001");
+        CapCheckSearchResult result = capCheckService.search(criteria, 1, 20);
+
+        assertThat(result.page().content())
+                .extracting(CapCheckListRow::getCapCheckId)
+                .contains(saved.capCheckId());
+        assertThat(result.page().totalElements()).isEqualTo(1);
+        assertThat(result.summary().normal()).isEqualTo(1);
+        assertThat(result.summary().warning() + result.summary().violation()
+                + result.summary().reviewRequired()).isEqualTo(0);
     }
 
     // IF-API-31(FUN-035): 저장된 계산 스냅샷을 재계산 없이 그대로 펼쳐 돌려주고, 항목별 INCLUDED
