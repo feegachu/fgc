@@ -7,12 +7,17 @@ import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapCheckInsertRow;
+import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckRow;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
+import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
+import com.susukkang.fgc.cap.dto.CapCheckSummary;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.web.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,10 +85,45 @@ public class CapCheckServiceImpl implements CapCheckService {
     @Transactional(readOnly = true)
     public Optional<CapCheckSaveResult> findLatest(Long contractId, PaymentStage paymentStage) {
         CapCheckRow row = capCheckMapper.findLatestByContractAndStage(contractId, paymentStage.name());
-        if (row == null) {
-            return Optional.empty();
-        }
+        return Optional.ofNullable(row).map(this::toSaveResult);
+    }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<CapCheckSaveResult> findByContract(Long contractId) {
+        // 지급단계별로 최대 1건씩(최신), 절대 합산하지 않는다 — 화면(CAP-W01/CONT-W02)이 각 게이지를
+        // 따로 그린다.
+        return capCheckMapper.findLatestPairByContract(contractId).stream()
+                .map(this::toSaveResult)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<CapCheckSaveResult> findById(Long capCheckId) {
+        CapCheckRow row = capCheckMapper.findById(capCheckId);
+        return Optional.ofNullable(row).map(this::toSaveResult);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CapCheckSearchResult search(CapCheckSearchCriteria criteria, int page, int size) {
+        int offset = (page - 1) * size;
+        List<CapCheckListRow> rows = capCheckMapper.search(
+                criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
+                criteria.insurerId(), criteria.contractNo(), offset, size);
+        long total = capCheckMapper.count(
+                criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
+                criteria.insurerId(), criteria.contractNo());
+        CapCheckSummary summary = CapCheckSummary.from(capCheckMapper.summarize(
+                criteria.month(), criteria.paymentStage(), criteria.insurerId(), criteria.contractNo()));
+
+        PageResponse<CapCheckListRow> pageResponse =
+                PageResponse.of(rows, page, size, total, "asOfDate,desc");
+        return new CapCheckSearchResult(summary, pageResponse);
+    }
+
+    private CapCheckSaveResult toSaveResult(CapCheckRow row) {
         List<CapCheckDetailLine> details = capCheckMapper.findDetailsByCapCheckId(row.getCapCheckId());
 
         CapCalculationResult result = new CapCalculationResult(
@@ -105,7 +145,7 @@ public class CapCheckServiceImpl implements CapCheckService {
                 readJson(row.getCalculationSnapshotJson())
         );
 
-        return Optional.of(new CapCheckSaveResult(row.getCapCheckId(), result));
+        return new CapCheckSaveResult(row.getCapCheckId(), result);
     }
 
     private String writeJson(Map<String, Object> snapshot) {

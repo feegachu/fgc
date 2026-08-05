@@ -5,8 +5,12 @@ import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapCheckInsertRow;
+import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckRow;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
+import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
+import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
@@ -60,7 +64,7 @@ class CapCheckServiceImplTest {
     @Test
     void calculateAndSavePersistsCapCheckAndDetailsAndReturnsGeneratedId() {
         CapCheckDetailLine detail = new CapCheckDetailLine(
-                1, 1L, "BASE_COMMISSION", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입");
+                1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null);
         CapCalculationResult result = sampleResult(List.of(detail));
 
         CapCalculationCommand command = CapCalculationCommand.realtime(1L, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
@@ -128,7 +132,7 @@ class CapCheckServiceImplTest {
         row.setCalculationSnapshotJson("{\"premiumMultiplier\":\"12.0000\"}");
 
         List<CapCheckDetailLine> details = List.of(new CapCheckDetailLine(
-                1, 1L, "BASE_COMMISSION", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입"));
+                1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null));
 
         when(capCheckMapper.findLatestByContractAndStage(1L, "GA_TO_FC")).thenReturn(row);
         when(capCheckMapper.findDetailsByCapCheckId(999L)).thenReturn(details);
@@ -140,6 +144,87 @@ class CapCheckServiceImplTest {
         assertThat(found.result().limitAmount()).isEqualByComparingTo("1200000");
         assertThat(found.result().details()).hasSize(1);
         assertThat(found.result().calculationSnapshot()).containsEntry("premiumMultiplier", "12.0000");
+    }
+
+    @Test
+    void findByContractReturnsBothPaymentStagesWithoutSumming() {
+        CapCheckRow gaToFc = sampleRow(999L, "GA_TO_FC");
+        CapCheckRow insurerToGa = sampleRow(1000L, "INSURER_TO_GA");
+        when(capCheckMapper.findLatestPairByContract(1L)).thenReturn(List.of(gaToFc, insurerToGa));
+        when(capCheckMapper.findDetailsByCapCheckId(999L)).thenReturn(List.of());
+        when(capCheckMapper.findDetailsByCapCheckId(1000L)).thenReturn(List.of());
+
+        List<CapCheckSaveResult> found = capCheckService.findByContract(1L);
+
+        assertThat(found).hasSize(2);
+        assertThat(found.get(0).result().paymentStage()).isEqualTo(PaymentStage.GA_TO_FC);
+        assertThat(found.get(1).result().paymentStage()).isEqualTo(PaymentStage.INSURER_TO_GA);
+    }
+
+    @Test
+    void findByIdReturnsEmptyWhenCapCheckDoesNotExist() {
+        when(capCheckMapper.findById(1234L)).thenReturn(null);
+
+        assertThat(capCheckService.findById(1234L)).isEmpty();
+    }
+
+    @Test
+    void searchBuildsPageResponseAndSummaryFromMapperResults() {
+        CapCheckListRow row = new CapCheckListRow();
+        row.setCapCheckId(999L);
+        row.setContractId(1L);
+        row.setContractNo("C001");
+        row.setPaymentStage("GA_TO_FC");
+        row.setAsOfDate(LocalDate.of(2026, 7, 10));
+        row.setBasePremiumAmount(new BigDecimal("1200000"));
+        row.setRefund12mAmount(BigDecimal.ZERO);
+        row.setComplianceDeductionAmount(BigDecimal.ZERO);
+        row.setLimitAmount(new BigDecimal("1200000"));
+        row.setIncludedAmount(new BigDecimal("650000"));
+        row.setRemainingAmount(new BigDecimal("550000"));
+        row.setUsagePct(new BigDecimal("54.166667"));
+        row.setResultStatus("NORMAL");
+        row.setCapRuleSetId(500L);
+
+        CapCheckStatusCount normalCount = new CapCheckStatusCount();
+        normalCount.setResultStatus("NORMAL");
+        normalCount.setCount(3);
+
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(
+                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, null);
+        when(capCheckMapper.search(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
+                criteria.insurerId(), criteria.contractNo(), 0, 20)).thenReturn(List.of(row));
+        when(capCheckMapper.count(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
+                criteria.insurerId(), criteria.contractNo())).thenReturn(1L);
+        when(capCheckMapper.summarize(criteria.month(), criteria.paymentStage(),
+                criteria.insurerId(), criteria.contractNo())).thenReturn(List.of(normalCount));
+
+        CapCheckSearchResult result = capCheckService.search(criteria, 1, 20);
+
+        assertThat(result.summary().normal()).isEqualTo(3);
+        assertThat(result.page().content()).hasSize(1);
+        assertThat(result.page().totalElements()).isEqualTo(1);
+        assertThat(result.page().content().get(0).getContractNo()).isEqualTo("C001");
+    }
+
+    private static CapCheckRow sampleRow(Long capCheckId, String paymentStage) {
+        CapCheckRow row = new CapCheckRow();
+        row.setCapCheckId(capCheckId);
+        row.setContractId(1L);
+        row.setPaymentStage(paymentStage);
+        row.setCheckKind("REALTIME");
+        row.setAsOfDate(LocalDate.of(2026, 7, 10));
+        row.setCapRuleSetId(500L);
+        row.setBasePremiumAmount(new BigDecimal("1200000"));
+        row.setRefund12mAmount(BigDecimal.ZERO);
+        row.setComplianceDeductionAmount(BigDecimal.ZERO);
+        row.setLimitAmount(new BigDecimal("1200000"));
+        row.setIncludedAmount(new BigDecimal("650000"));
+        row.setRemainingAmount(new BigDecimal("550000"));
+        row.setUsagePct(new BigDecimal("54.166667"));
+        row.setResultStatus("NORMAL");
+        row.setCalculationSnapshotJson("{}");
+        return row;
     }
 
     @SuppressWarnings("unchecked")

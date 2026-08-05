@@ -57,6 +57,127 @@
     </select>
 
     <!--
+      IF-API-14: 계약 1건의 지급단계별 최신 cap_check. DISTINCT ON (payment_stage) 로 각 단계 1건씩만
+      뽑는다 — vw_latest_cap_check 뷰와 같은 규칙(checked_at DESC, cap_check_id DESC)이지만 이 API는
+      calculation_snapshot 등 뷰에 없는 컬럼까지 필요해서 cap_check 를 직접 조회한다.
+    -->
+    <select id="findLatestPairByContract" resultType="com.susukkang.fgc.cap.dto.CapCheckRow">
+        SELECT DISTINCT ON (cc.payment_stage)
+               cc.cap_check_id                 AS capCheckId,
+               cc.contract_id                   AS contractId,
+               cc.payment_stage                 AS paymentStage,
+               cc.check_kind                    AS checkKind,
+               cc.as_of_date                    AS asOfDate,
+               cc.cap_rule_set_id               AS capRuleSetId,
+               cc.refund_rate_table_id          AS refundRateTableId,
+               cc.base_premium_amount           AS basePremiumAmount,
+               cc.refund_12m_amount             AS refund12mAmount,
+               cc.compliance_deduction_amount   AS complianceDeductionAmount,
+               cc.limit_amount                  AS limitAmount,
+               cc.included_amount               AS includedAmount,
+               cc.remaining_amount              AS remainingAmount,
+               cc.usage_pct                     AS usagePct,
+               cc.result_status                 AS resultStatus,
+               cc.calculation_snapshot::text    AS calculationSnapshotJson
+          FROM fgc.cap_check cc
+         WHERE cc.contract_id = #{contractId}
+         ORDER BY cc.payment_stage, cc.checked_at DESC, cc.cap_check_id DESC
+    </select>
+
+    <!-- IF-API-31: cap_check 1건을 PK로 직접 조회. -->
+    <select id="findById" resultType="com.susukkang.fgc.cap.dto.CapCheckRow">
+        SELECT cc.cap_check_id                 AS capCheckId,
+               cc.contract_id                   AS contractId,
+               cc.payment_stage                 AS paymentStage,
+               cc.check_kind                    AS checkKind,
+               cc.as_of_date                    AS asOfDate,
+               cc.cap_rule_set_id               AS capRuleSetId,
+               cc.refund_rate_table_id          AS refundRateTableId,
+               cc.base_premium_amount           AS basePremiumAmount,
+               cc.refund_12m_amount             AS refund12mAmount,
+               cc.compliance_deduction_amount   AS complianceDeductionAmount,
+               cc.limit_amount                  AS limitAmount,
+               cc.included_amount               AS includedAmount,
+               cc.remaining_amount              AS remainingAmount,
+               cc.usage_pct                     AS usagePct,
+               cc.result_status                 AS resultStatus,
+               cc.calculation_snapshot::text    AS calculationSnapshotJson
+          FROM fgc.cap_check cc
+         WHERE cc.cap_check_id = #{capCheckId}
+    </select>
+
+    <!-- IF-API-30 목록·건수·요약이 공유하는 검색조건. month는 as_of_date가 속한 달(그 달 1일 기준)로 거른다. -->
+    <sql id="searchWhere">
+        <where>
+            <if test="month != null">
+                AND date_trunc('month', cc.as_of_date) = date_trunc('month', #{month}::date)
+            </if>
+            <if test="paymentStage != null">
+                AND cc.payment_stage = #{paymentStage}
+            </if>
+            <if test="resultStatus != null">
+                AND cc.result_status = #{resultStatus}
+            </if>
+            <if test="insurerId != null">
+                AND ic.insurer_id = #{insurerId}
+            </if>
+            <if test="contractNo != null">
+                AND ic.contract_no = #{contractNo}
+            </if>
+        </where>
+    </sql>
+
+    <select id="search" resultType="com.susukkang.fgc.cap.dto.CapCheckListRow">
+        SELECT cc.cap_check_id                 AS capCheckId,
+               cc.contract_id                   AS contractId,
+               ic.contract_no                   AS contractNo,
+               cc.payment_stage                 AS paymentStage,
+               cc.as_of_date                    AS asOfDate,
+               cc.base_premium_amount           AS basePremiumAmount,
+               cc.refund_12m_amount             AS refund12mAmount,
+               cc.compliance_deduction_amount   AS complianceDeductionAmount,
+               cc.limit_amount                  AS limitAmount,
+               cc.included_amount               AS includedAmount,
+               cc.remaining_amount              AS remainingAmount,
+               cc.usage_pct                     AS usagePct,
+               cc.result_status                 AS resultStatus,
+               cc.cap_rule_set_id               AS capRuleSetId
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+        <include refid="searchWhere"/>
+         ORDER BY cc.as_of_date DESC, cc.cap_check_id DESC
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+        <include refid="searchWhere"/>
+    </select>
+
+    <select id="summarize" resultType="com.susukkang.fgc.cap.dto.CapCheckStatusCount">
+        SELECT cc.result_status AS resultStatus, COUNT(*) AS count
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+        <where>
+            <if test="month != null">
+                AND date_trunc('month', cc.as_of_date) = date_trunc('month', #{month}::date)
+            </if>
+            <if test="paymentStage != null">
+                AND cc.payment_stage = #{paymentStage}
+            </if>
+            <if test="insurerId != null">
+                AND ic.insurer_id = #{insurerId}
+            </if>
+            <if test="contractNo != null">
+                AND ic.contract_no = #{contractNo}
+            </if>
+        </where>
+         GROUP BY cc.result_status
+    </select>
+
+    <!--
       CapCheckDetailLine 은 record 라 생성자 파라미터 순서(컴파일 -parameters 옵션으로 이름도 함께)로
       매핑된다 — 컬럼 별칭을 레코드 컴포넌트명과 동일하게 맞춘다.
       schedule_line_id 는 이 구현에서 항상 채워지므로 INNER JOIN 한다(transaction_attribution 기반
@@ -66,11 +187,13 @@
         SELECT ccd.detail_seq             AS detailSeq,
                ccd.commission_item_id      AS commissionItemId,
                ci.item_code                AS itemCode,
+               ci.item_name                AS itemName,
                ccd.schedule_line_id        AS scheduleLineId,
                sl.contract_month_no        AS contractMonthNo,
                ccd.classification_snapshot AS classification,
                ccd.amount                  AS amount,
-               ccd.decision_reason         AS decisionReason
+               ccd.decision_reason         AS decisionReason,
+               ccd.evidence_ref            AS evidenceRef
           FROM fgc.cap_check_detail ccd
           JOIN fgc.commission_item ci ON ci.commission_item_id = ccd.commission_item_id
           JOIN fgc.schedule_line sl   ON sl.schedule_line_id = ccd.schedule_line_id

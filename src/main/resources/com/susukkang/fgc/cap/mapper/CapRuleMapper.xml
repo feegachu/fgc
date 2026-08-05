@@ -47,6 +47,7 @@
         SELECT cri.cap_rule_item_id      AS capRuleItemId,
                cri.commission_item_id     AS commissionItemId,
                ci.item_code               AS itemCode,
+               ci.item_name               AS itemName,
                cri.inclusion_status       AS inclusionStatus,
                cri.exclusion_type         AS exclusionType,
                cri.attribution_method     AS attributionMethod,

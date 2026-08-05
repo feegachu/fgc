@@ -46,10 +46,13 @@ public class CapCalculatorImpl implements CapCalculator {
     @Override
     public CapCalculationResult calculate(CapCalculationCommand command) {
         // 계약 등록·수정 시(REALTIME) 또는 월 검증 배치(MONTHLY) 어느 쪽에서 호출돼도 아래 순서는 동일
+        // 계약없음·룰셋없음은 이 엔진을 정상 호출했다면 생기지 않아야 하는 시스템 상황이다
+        // (호출자가 존재하는 계약 ID를 넘기고, cap_rule_set이 룰셋 데이터로 적용대상을 관리하기
+        // 때문). 인터페이스정의서 3-2절 동결 오류코드 표에 이 상황 전용 코드가 없어 COMMON_500을 쓴다.
         CapContractView contract = capContractMapper.findById(command.contractId());
         if (contract == null) {
-            throw new FgcBusinessException(FgcErrorCode.CAP_003,
-                    Map.of("contractId", command.contractId()));
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500,
+                    Map.of("requestId", "contractId=" + command.contractId() + " not found"));
         }
 
         // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)
@@ -58,8 +61,9 @@ public class CapCalculatorImpl implements CapCalculator {
                 command.paymentStage().name(), contract.getContractDate(),
                 contract.getInsurerId(), contract.getProductGroupCode(), contract.getChannelCode());
         if (ruleSet == null) {
-            throw new FgcBusinessException(FgcErrorCode.CAP_004,
-                    Map.of("contractId", command.contractId(), "paymentStage", command.paymentStage()));
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500,
+                    Map.of("requestId", "contractId=" + command.contractId()
+                            + ", paymentStage=" + command.paymentStage() + " no applicable cap_rule_set"));
         }
 
         // 1) 기본 한도식
@@ -107,9 +111,11 @@ public class CapCalculatorImpl implements CapCalculator {
                     ? ruleItem.getDecisionReason()
                     : "1,200% 룰셋에 분류되지 않은 수수료 항목이라 사람 판단이 필요하다";
             String itemCode = ruleItem != null ? ruleItem.getItemCode() : null;
+            String itemName = ruleItem != null ? ruleItem.getItemName() : null;
 
-            details.add(new CapCheckDetailLine(seq++, line.getCommissionItemId(), itemCode,
-                    line.getScheduleLineId(), line.getContractMonthNo(), classification, line.getAmount(), reason));
+            // evidenceRef는 스케줄 기반 산입 후보 시점에는 아직 존재하지 않는다(증빙 연결은 저장 이후 별도 절차) — null로 둔다
+            details.add(new CapCheckDetailLine(seq++, line.getCommissionItemId(), itemCode, itemName,
+                    line.getScheduleLineId(), line.getContractMonthNo(), classification, line.getAmount(), reason, null));
 
             if (INCLUDED.equals(classification)) {
                 includedAmount = includedAmount.add(line.getAmount());

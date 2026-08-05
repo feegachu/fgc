@@ -12,6 +12,7 @@ public class CapRuleItemView {
     private Long capRuleItemId;
     private Long commissionItemId;
     private String itemCode;
+    private String itemName;
     private String inclusionStatus;
     private String exclusionType;
     private String attributionMethod;
