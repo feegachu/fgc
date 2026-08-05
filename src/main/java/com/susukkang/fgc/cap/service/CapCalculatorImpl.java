@@ -46,9 +46,6 @@ public class CapCalculatorImpl implements CapCalculator {
     @Override
     public CapCalculationResult calculate(CapCalculationCommand command) {
         // 계약 등록·수정 시(REALTIME) 또는 월 검증 배치(MONTHLY) 어느 쪽에서 호출돼도 아래 순서는 동일
-        // 계약없음·룰셋없음은 이 엔진을 정상 호출했다면 생기지 않아야 하는 시스템 상황이다
-        // (호출자가 존재하는 계약 ID를 넘기고, cap_rule_set이 룰셋 데이터로 적용대상을 관리하기
-        // 때문). 인터페이스정의서 3-2절 동결 오류코드 표에 이 상황 전용 코드가 없어 COMMON_500을 쓴다.
         CapContractView contract = capContractMapper.findById(command.contractId());
         if (contract == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500,
@@ -56,7 +53,6 @@ public class CapCalculatorImpl implements CapCalculator {
         }
 
         // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)
-        // cap_rule_set 이 계약일 범위로 정책을 구분해 두므로, 여기서는 "몇 년도 계약인지"를 몰라도 됨
         CapRuleSetView ruleSet = capRuleMapper.findApplicableRuleSet(
                 command.paymentStage().name(), contract.getContractDate(),
                 contract.getInsurerId(), contract.getProductGroupCode(), contract.getChannelCode());
@@ -67,14 +63,11 @@ public class CapCalculatorImpl implements CapCalculator {
         }
 
         // 1) 기본 한도식
-        // 초년도 모집수수료 한도 = 월납환산 초회보험료 × 12 (premium_multiplier 는 정책값이라
-        // 자바 코드에 12를 고정하지 않고 cap_rule_set 에서 읽음 — COR-004)
         BigDecimal basePremiumAmount = MoneyUtil.multiplyAndRound(
                 contract.getMonthlyEquivalentFirstPremium(), ruleSet.getPremiumMultiplier());
 
         // 2) 저해지·표준미달형 등 80% 이상 공제 대상이면 한도를 가산
         // 표준해약공제액의 80% 이상을 공제하는 상품은 12차월 예상 해약환급금만큼 한도가 더 큼 (REG-08)
-        // 일반 상품(대부분)은 이 단계에서 그대로 0원이 더해짐
         RefundAddition refundAddition = resolveRefundAddition(contract, ruleSet, basePremiumAmount, command);
 
         // 3) 준법경영비 등 공제
@@ -143,8 +136,7 @@ public class CapCalculatorImpl implements CapCalculator {
     }
 
     // 80% 이상 공제 대상 상품이면 12차월 예상 해약환급금을 한도에 가산할 금액과, 그 판정에 쓴
-    // 환급률표(refund_rate_table_id·policy_version_id·version_no)를 계산해서 돌려줌.
-    // 조건에 안 맞으면(일반 상품 대부분) 가산 없이 0원을 돌려줌 — 이게 기본 케이스임
+    // 환급률표(refund_rate_table_id·policy_version_id·version_no)를 계산해서 돌려줌
     private RefundAddition resolveRefundAddition(CapContractView contract, CapRuleSetView ruleSet,
                                                    BigDecimal basePremiumAmount, CapCalculationCommand command) {
         boolean applies = REFUND_ADDITION_STANDARD_DEDUCTION_80.equals(ruleSet.getRefundAdditionCondition())
@@ -153,15 +145,11 @@ public class CapCalculatorImpl implements CapCalculator {
             return new RefundAddition(BigDecimal.ZERO, null, null, null, false);
         }
 
-        // 반드시 계약 체결일(contract.getContractDate())로 조회 — command.asOfDate() 를 쓰면 안 됨.
-        // REALTIME 계산은 asOfDate 가 곧 계약일이라 차이가 없지만, MONTHLY 월 재검증은 asOfDate 가
-        // 검증 실행월이라 계약일보다 한참 뒤일 수 있음. 그사이 새 환급률표 버전이 활성화됐다면
-        // asOfDate 로 조회했을 때 "그때는 없던" 더 최신 표가 잘못 선택됨 (REG-19: 계약 체결일 기준)
+        // 반드시 계약 체결일(contract.getContractDate())로 조회
         RefundRateQuery query = new RefundRateQuery(contract.getInsurerId(), contract.getProductId(),
                 contract.getPaymentTermMonths(), contract.getChannelCode(), contract.getContractDate());
         Optional<RefundRateResolution> resolution = refundRateResolver.resolve(query);
         if (resolution.isEmpty()) {
-            // 표(또는 12차월 값)가 없는 조합은 억지로 추정하지 않고 REVIEW_REQUIRED로 남김 (REG-23)
             return new RefundAddition(BigDecimal.ZERO, null, null, null, true);
         }
 
@@ -170,11 +158,6 @@ public class CapCalculatorImpl implements CapCalculator {
         return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(), false);
     }
 
-    // 판정 우선순위(위에서부터 먼저 걸리는 조건이 최종 결과):
-    // 1. REVIEW_REQUIRED — 룰셋 미분류 항목이나 환급률표 부재 등 사람 판단이 필요한 경우가 하나라도 있으면 최우선
-    // 2. VIOLATION — 산입액이 한도를 실제로 초과
-    // 3. WARNING — 아직 초과는 아니지만 사용률이 경고 기준(cap_rule_set.warning_usage_pct, 기본 90%) 이상
-    // 4. NORMAL — 위 어디에도 해당하지 않는 정상 범위
     private CapResultStatus determineResultStatus(boolean anyReviewRequired, BigDecimal includedAmount,
                                                     BigDecimal limitAmount, BigDecimal usagePct,
                                                     BigDecimal warningUsagePct) {

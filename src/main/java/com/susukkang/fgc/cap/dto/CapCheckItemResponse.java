@@ -7,9 +7,7 @@ import com.susukkang.fgc.common.util.DisplayFormat;
 import java.time.LocalDate;
 
 /**
- * cap_check 1건의 목록/게이지용 API 응답(SIR-008 준수) — IF-API-30(FUN-030) 전용.
- * 계산근거(cap_check_detail)는 담지 않는다 — IF-API-31(FUN-035, 강현준 담당)에서 capCheckId로 별도 조회한다
- * (공통규칙 #6). 계약 상세 탭의 IF-API-14(FUN-032, 박민준 담당)도 이 응답 모양을 참고하되 별도 이슈에서 구현한다.
+ * cap_check 1건의 목록/게이지용 API 응답
  */
 public record CapCheckItemResponse(
         Long capCheckId,

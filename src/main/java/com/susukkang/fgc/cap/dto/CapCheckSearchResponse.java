@@ -2,7 +2,7 @@ package com.susukkang.fgc.cap.dto;
 
 import java.util.List;
 
-/** IF-API-30 응답. summary(카드 4장)와 page 필드가 같은 레벨에 나란히 온다(인터페이스정의서 4-2절). */
+/** IF-API-30 응답. summary(카드 4장)와 page 필드가 같은 레벨에 나란히 옴 */
 public record CapCheckSearchResponse(
         CapCheckSummaryResponse summary,
         List<CapCheckItemResponse> content,

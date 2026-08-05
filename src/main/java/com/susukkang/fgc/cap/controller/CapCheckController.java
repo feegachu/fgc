@@ -21,13 +21,8 @@ import java.time.YearMonth;
 /**
  * FGC-FUN-030 초년도 1,200% 한도 계산 목록 조회 API — CAP-W01(목록).
  *
- * 이 컨트롤러는 FUN-030(손가영) 담당 범위인 IF-API-30만 다룬다. 같은 화면군의 다른 API는 담당이 다르다:
- *  - IF-API-14 (GET /api/contracts/{id}/cap/checks, 계약 상세 탭3) — FUN-032, 박민준 담당. 별도 이슈에서 구현된다.
- *  - IF-API-31 (GET /api/cap/checks/{id}/details, CAP-W02 계산근거 팝업) — FUN-035, 강현준 담당. 별도 이슈에서
- *    구현된다. 목록 응답의 capCheckId로 그 API를 연결하면 된다.
- *
- * 계산·저장 자체(CapCheckService#calculateAndSave)도 이 컨트롤러가 아니라 계약 등록·수정 이벤트 등
- * 다른 기능에서 호출한다 — 이 API는 조회 전용이다.
+ * 이 컨트롤러는 FUN-030 IF-API-30만 다룸
+ * 목록 응답의 capCheckId로 그 API를 연결하면 된다.
  */
 @Tag(name = "1200% 한도", description = "초년도 모집수수료 한도 계산 목록 조회 API")
 @RestController

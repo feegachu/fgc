@@ -7,8 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * cap_check 1행 조회 결과(투영). details/calculationSnapshot 은 별도로 조회·역직렬화해서
- * CapCheckService 가 CapCalculationResult 로 다시 조립한다.
+ * cap_check 1행 조회 결과
  */
 @Getter
 @Setter
