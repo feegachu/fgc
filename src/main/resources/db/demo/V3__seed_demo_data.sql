@@ -306,8 +306,15 @@ INSERT INTO policy_version(policy_code, policy_name, policy_type, source_class,
 SELECT v.code, v.name, v.ptype, v.src, 1, v.eff, 'DRAFT', v.regs, v.srcs,
        (SELECT user_id FROM app_user WHERE login_id='settle01')   -- 작성자
   FROM (VALUES
-    ('REG-CAP-INS-2026-V1','원수사→GA 초년도 1,200% 룰셋','CAP_1200','REGULATORY',
-     DATE '2021-01-01', ARRAY['REG-08','REG-10','REG-11'], ARRAY['보험업감독규정 제4-32조']),
+    -- REG-10(준법경영비 3% 공제, 제4-32조제14항)은 규제조문표 v0.2.1 시행 타임라인 기준
+    -- 2027.1.1(TM 2028.1.1)에야 시행된다 — REG-08(1,200%룰, 제5항) 자체의 보험사 2021.1.1
+    -- 시행일과는 별개다. 그래서 원수사→GA 룰셋을 두 시기로 나눈다:
+    --   REG-CAP-INS-2021-V1: 2021.1.1~ 1,200%룰만 적용, 공제 없음(REG-10 근거 없음)
+    --   REG-CAP-INS-2027-V1: 2027.1.1~ 준법경영비 3% 공제 추가(REG-10 시행)
+    ('REG-CAP-INS-2021-V1','원수사→GA 초년도 1,200% 룰셋(준법경영비 공제 시행 전)','CAP_1200','REGULATORY',
+     DATE '2021-01-01', ARRAY['REG-08','REG-11'], ARRAY['보험업감독규정 제4-32조']),
+    ('REG-CAP-INS-2027-V1','원수사→GA 초년도 1,200% 룰셋(준법경영비 3% 공제 포함)','CAP_1200','REGULATORY',
+     DATE '2027-01-01', ARRAY['REG-08','REG-10','REG-11'], ARRAY['보험업감독규정 제4-32조']),
     ('REG-CAP-GA-2026-V1','GA→설계사 초년도 1,200% 룰셋','CAP_1200','REGULATORY',
      DATE '2026-07-01', ARRAY['REG-08','REG-09','REG-11'], ARRAY['보험업감독규정 제4-32조']),
     ('INS-CUR-2026-V1','원수사→GA 현행 수입기준','CURRENT_COMMISSION','INSURER_RULE',
@@ -408,18 +415,23 @@ ON CONFLICT DO NOTHING;
 -- 10. 1,200% 룰셋 (cap_rule_set + cap_rule_item)
 --
 --     ★ 지급단계별로 룰셋이 따로 있습니다. 절대 합치지 않습니다.
---       준법경영비 3% 공제는 원수사→GA 에만 적용됩니다 (REG-10).
+--       준법경영비 3% 공제(REG-10, 제4-32조제14항)는 원수사→GA 게이지에만 2027.1.1부터
+--       적용됩니다 — REG-08(1,200%룰 자체) 시행일인 2021.1.1과는 다릅니다. 그래서 원수사→GA는
+--       2021~2026(공제 0%)과 2027~(공제 3%) 두 룰셋으로 나뉩니다.
 --       GA→설계사 룰셋의 공제율은 DB CHECK 로도 0이 강제됩니다.
 -- ============================================================================
-INSERT INTO cap_rule_set(policy_version_id, payment_stage, contract_date_from,
+-- 2021 룰셋은 contract_date_to='2026-12-31'로 닫아서 2027 룰셋과 기간이 겹치지 않게 한다.
+-- (아래 §17·19 및 V4 의 cap_rule_set 조인이 payment_stage만으로 매칭해도 행이 하나로 유지된다)
+INSERT INTO cap_rule_set(policy_version_id, payment_stage, contract_date_from, contract_date_to,
                          first_year_months, premium_multiplier,
                          compliance_deduction_pct, refund_addition_condition, warning_usage_pct)
-SELECT pv.policy_version_id, v.stage, v.date_from, 12, 12.0000,
+SELECT pv.policy_version_id, v.stage, v.date_from, v.date_to, 12, 12.0000,
        v.deduction, 'STANDARD_DEDUCTION_80', 90.0000
   FROM (VALUES
-    ('REG-CAP-INS-2026-V1','INSURER_TO_GA', DATE '2021-01-01', 3.0000),
-    ('REG-CAP-GA-2026-V1', 'GA_TO_FC',      DATE '2026-07-01', 0.0000)
-  ) AS v(policy_code, stage, date_from, deduction)
+    ('REG-CAP-INS-2021-V1','INSURER_TO_GA', DATE '2021-01-01', DATE '2026-12-31', 0.0000),
+    ('REG-CAP-INS-2027-V1','INSURER_TO_GA', DATE '2027-01-01', NULL::date,        3.0000),
+    ('REG-CAP-GA-2026-V1', 'GA_TO_FC',      DATE '2026-07-01', NULL::date,        0.0000)
+  ) AS v(policy_code, stage, date_from, date_to, deduction)
   JOIN policy_version pv ON pv.policy_code = v.policy_code
  WHERE pv.status='DRAFT'
 ON CONFLICT DO NOTHING;
@@ -559,16 +571,16 @@ UPDATE policy_version pv
        approved_by = (SELECT user_id FROM app_user WHERE login_id='gaadmin'),
        approval_evidence_ref = '시드 승인 (GOLDEN 프로파일)'
  WHERE pv.status='DRAFT'
-   AND pv.policy_code IN ('REG-CAP-INS-2026-V1','REG-CAP-GA-2026-V1','INS-CUR-2026-V1',
-                          'GA-CUR-2026-V1','GA-ALLOC-COMMON-2026-V1','INS-REFUND-2026-V1',
-                          'ASM-RECON-ZERO-2026-V1');
+   AND pv.policy_code IN ('REG-CAP-INS-2021-V1','REG-CAP-INS-2027-V1','REG-CAP-GA-2026-V1',
+                          'INS-CUR-2026-V1','GA-CUR-2026-V1','GA-ALLOC-COMMON-2026-V1',
+                          'INS-REFUND-2026-V1','ASM-RECON-ZERO-2026-V1');
 
 UPDATE policy_version pv
    SET status='ACTIVE'
  WHERE pv.status='APPROVED'
-   AND pv.policy_code IN ('REG-CAP-INS-2026-V1','REG-CAP-GA-2026-V1','INS-CUR-2026-V1',
-                          'GA-CUR-2026-V1','GA-ALLOC-COMMON-2026-V1','INS-REFUND-2026-V1',
-                          'ASM-RECON-ZERO-2026-V1');
+   AND pv.policy_code IN ('REG-CAP-INS-2021-V1','REG-CAP-INS-2027-V1','REG-CAP-GA-2026-V1',
+                          'INS-CUR-2026-V1','GA-CUR-2026-V1','GA-ALLOC-COMMON-2026-V1',
+                          'INS-REFUND-2026-V1','ASM-RECON-ZERO-2026-V1');
 
 -- ============================================================================
 -- 14. 보험계약 6건
@@ -899,7 +911,11 @@ SELECT ct.commission_transaction_id, t.attr_scope,
   JOIN commission_item ci        ON ci.item_code = t.item_code
   LEFT JOIN insurance_contract c ON c.contract_no = t.contract_no
   LEFT JOIN agent ra             ON ra.agent_code = t.recipient_code
+  -- 원수사→GA는 2021~2026(공제 0%)·2027~(공제 3%) 룰셋 두 개라 stage만으로는 계약을 특정 못 한다.
+  -- 1,200%룰 적용 룰셋은 계약 체결일 기준이므로(REG-19) c.contract_date로도 좁힌다.
   LEFT JOIN cap_rule_set crs     ON crs.payment_stage = t.stage
+                                AND crs.contract_date_from <= c.contract_date
+                                AND (crs.contract_date_to IS NULL OR crs.contract_date_to >= c.contract_date)
   LEFT JOIN cap_rule_item cri    ON cri.cap_rule_set_id = crs.cap_rule_set_id
                                 AND cri.commission_item_id = ci.commission_item_id
  WHERE NOT EXISTS (
