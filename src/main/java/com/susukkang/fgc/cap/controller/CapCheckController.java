@@ -8,6 +8,9 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,6 +40,15 @@ public class CapCheckController {
             description = "정산월·지급단계·판정·보험회사·계약번호로 검색하고, 요약 카드 4장(정상/주의/위반/검토필요)과 "
                     + "함께 페이징된 목록을 돌려준다."
     )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = CapCheckSearchResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류 등 (FGC-COMMON-002)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청")
+    })
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<CapCheckSearchResponse> search(
