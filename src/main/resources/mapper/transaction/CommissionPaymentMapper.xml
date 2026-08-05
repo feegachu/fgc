@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper">
+
+    <select id="existsAgent" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.agent
+             WHERE agent_id = #{agentId}
+        )
+    </select>
+
+    <select id="findContract"
+            resultType="com.susukkang.fgc.transaction.domain.ContractReference">
+        SELECT contract_id,
+               agent_id,
+               contract_date
+          FROM fgc.insurance_contract
+         WHERE contract_id = #{contractId}
+    </select>
+
+    <select id="countEarlierContracts" resultType="int">
+        SELECT COUNT(*)
+          FROM fgc.insurance_contract
+         WHERE agent_id = #{agentId}
+           AND contract_id &lt;&gt; #{contractId}
+           AND contract_date &lt; #{contractDate}
+    </select>
+
+    <select id="findCommissionItem"
+            resultType="com.susukkang.fgc.transaction.domain.CommissionItemReference">
+        SELECT commission_item_id,
+               cashflow_type
+          FROM fgc.commission_item
+         WHERE item_code = #{itemCode}
+           AND active_yn = TRUE
+           AND effective_from &lt;= #{asOf}
+           AND (effective_to IS NULL OR effective_to &gt;= #{asOf})
+    </select>
+
+    <select id="findAllocationPolicyId" resultType="long">
+        SELECT allocation_policy_id
+          FROM fgc.allocation_policy
+         WHERE policy_version_id = #{policyVersionId}
+           AND allocation_basis_code = #{allocationBasis}
+         ORDER BY allocation_policy_id
+         LIMIT 1
+    </select>
+
+    <select id="existsPolicyVersion" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.policy_version
+             WHERE policy_version_id = #{policyVersionId}
+               AND status IN ('APPROVED', 'ACTIVE')
+        )
+    </select>
+
+    <insert id="insertTransaction"
+            useGeneratedKeys="true"
+            keyProperty="paymentId"
+            keyColumn="commission_transaction_id">
+        INSERT INTO fgc.commission_transaction (
+            payment_stage,
+            source_type,
+            source_business_key,
+            recipient_agent_id,
+            commission_item_id,
+            policy_version_id,
+            settlement_month,
+            due_date,
+            amount,
+            cashflow_type,
+            status,
+            evidence_ref,
+            note
+        ) VALUES (
+            #{paymentStage},
+            'GA_MANUAL_PAYMENT',
+            #{sourceBusinessKey},
+            #{agentId},
+            #{commissionItemId},
+            #{policyVersionId},
+            #{settlementMonth},
+            #{dueDate},
+            #{amount},
+            #{cashflowType},
+            'DRAFT',
+            #{evidenceRef},
+            #{note}
+        )
+    </insert>
+
+    <update id="updateTransaction">
+        UPDATE fgc.commission_transaction
+           SET payment_stage = #{paymentStage},
+               recipient_agent_id = #{agentId},
+               commission_item_id = #{commissionItemId},
+               policy_version_id = #{policyVersionId},
+               settlement_month = #{settlementMonth},
+               due_date = #{dueDate},
+               amount = #{amount},
+               cashflow_type = #{cashflowType},
+               evidence_ref = #{evidenceRef},
+               note = #{note}
+         WHERE commission_transaction_id = #{paymentId}
+           AND status = 'DRAFT'
+    </update>
+
+    <delete id="deleteAttributions">
+        DELETE FROM fgc.transaction_attribution
+         WHERE commission_transaction_id = #{paymentId}
+    </delete>
+
+    <insert id="insertAttribution">
+        INSERT INTO fgc.transaction_attribution (
+            commission_transaction_id,
+            attribution_seq,
+            attribution_scope,
+            contract_id,
+            agent_id,
+            attribution_date,
+            attribution_month,
+            attributed_amount,
+            inclusion_status_snapshot,
+            exclusion_type_snapshot,
+            attribution_method,
+            allocation_policy_id,
+            allocation_basis_snapshot,
+            evidence_ref
+        ) VALUES (
+            #{paymentId},
+            1,
+            #{attributionScope},
+            #{attributedContractId},
+            #{agentId},
+            #{settlementMonth},
+            #{settlementMonth},
+            #{amount},
+            #{inclusionDecisionStatus},
+            CASE WHEN #{inclusionDecisionStatus} = 'EXCLUDED' THEN 'MANUAL_EXCLUSION' ELSE NULL END,
+            #{attributionMethod},
+            #{allocationPolicyId},
+            CAST(#{allocationBasisJson} AS jsonb),
+            #{evidenceRef}
+        )
+    </insert>
+
+    <select id="findById"
+            resultType="com.susukkang.fgc.transaction.domain.CommissionPaymentRow">
+        SELECT ct.commission_transaction_id AS payment_id,
+               ct.source_business_key,
+               NULLIF(ta.allocation_basis_snapshot ->> 'sourceContractId', '')::bigint AS contract_id,
+               ct.recipient_agent_id AS agent_id,
+               ci.item_code AS commission_item_code,
+               ci.item_name AS commission_item_name,
+               ct.amount,
+               ta.attribution_month,
+               ct.due_date AS scheduled_payment_date,
+               ct.payment_stage,
+               ct.status,
+               ta.contract_id AS attributed_contract_id,
+               ta.inclusion_status_snapshot AS inclusion_decision_status,
+               ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
+               ct.policy_version_id AS allocation_policy_version,
+               ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
+               COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
+               ta.attribution_method,
+               ct.note,
+               ct.created_at,
+               ct.updated_at
+          FROM fgc.commission_transaction ct
+          JOIN fgc.commission_item ci
+            ON ci.commission_item_id = ct.commission_item_id
+          LEFT JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+           AND ta.attribution_seq = 1
+         WHERE ct.commission_transaction_id = #{paymentId}
+    </select>
+
+    <select id="findConfirmationDataForUpdate"
+            resultType="com.susukkang.fgc.transaction.domain.ConfirmationData">
+        SELECT ct.commission_transaction_id AS payment_id,
+               ct.status,
+               ct.amount,
+               ta.attributed_amount,
+               ta.attribution_month,
+               ta.transaction_attribution_id,
+               ta.contract_id,
+               ct.recipient_agent_id AS agent_id,
+               ct.payment_stage,
+               ct.commission_item_id,
+               ct.policy_version_id,
+               ta.inclusion_status_snapshot AS inclusion_decision_status,
+               ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
+               ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
+               COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref
+          FROM fgc.commission_transaction ct
+          LEFT JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+           AND ta.attribution_seq = 1
+         WHERE ct.commission_transaction_id = #{paymentId}
+         FOR UPDATE OF ct
+    </select>
+
+    <select id="findCapRuleSnapshot"
+            resultType="com.susukkang.fgc.transaction.domain.CapRuleSnapshot">
+        SELECT crs.cap_rule_set_id,
+               cri.cap_rule_item_id,
+               cri.inclusion_status AS rule_inclusion_status,
+               cri.decision_reason,
+               c.monthly_equivalent_first_premium AS base_premium_amount,
+               crs.premium_multiplier,
+               crs.warning_usage_pct,
+               COALESCE((
+                   SELECT SUM(other_ta.attributed_amount)
+                     FROM fgc.transaction_attribution other_ta
+                     JOIN fgc.commission_transaction other_ct
+                       ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
+                    WHERE other_ta.contract_id = ta.contract_id
+                      AND other_ta.inclusion_status_snapshot = 'INCLUDED'
+                      AND other_ct.payment_stage = ct.payment_stage
+                      AND other_ct.status = 'CONFIRMED'
+                      AND other_ct.commission_transaction_id &lt;&gt; ct.commission_transaction_id
+                      AND other_ta.attribution_date &gt;= c.contract_date
+                      AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
+               ), 0) AS existing_included_amount
+          FROM fgc.commission_transaction ct
+          JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+           AND ta.attribution_seq = 1
+          JOIN fgc.insurance_contract c
+            ON c.contract_id = ta.contract_id
+          JOIN fgc.product_offering po
+            ON po.product_offering_id = c.product_offering_id
+          JOIN fgc.product p
+            ON p.product_id = po.product_id
+          JOIN fgc.cap_rule_set crs
+            ON crs.policy_version_id = ct.policy_version_id
+           AND crs.payment_stage = ct.payment_stage
+           AND c.contract_date &gt;= crs.contract_date_from
+           AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
+           AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
+           AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
+           AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+          JOIN fgc.cap_rule_item cri
+            ON cri.cap_rule_set_id = crs.cap_rule_set_id
+           AND cri.commission_item_id = ct.commission_item_id
+         WHERE ct.commission_transaction_id = #{paymentId}
+         ORDER BY (crs.insurer_id IS NOT NULL) DESC,
+                  (crs.product_group_code IS NOT NULL) DESC,
+                  (crs.channel_code IS NOT NULL) DESC,
+                  crs.cap_rule_set_id DESC
+         LIMIT 1
+    </select>
+
+    <insert id="insertCapCheck"
+            useGeneratedKeys="true"
+            keyProperty="capCheckId"
+            keyColumn="cap_check_id">
+        INSERT INTO fgc.cap_check (
+            contract_id,
+            payment_stage,
+            cap_rule_set_id,
+            candidate_transaction_id,
+            check_kind,
+            as_of_date,
+            base_premium_amount,
+            refund_12m_amount,
+            compliance_deduction_amount,
+            limit_amount,
+            included_amount,
+            remaining_amount,
+            usage_pct,
+            result_status,
+            calculation_snapshot
+        ) VALUES (
+            #{contractId},
+            #{paymentStage},
+            #{capRuleSetId},
+            #{paymentId},
+            'PRE_CONFIRM',
+            #{asOfDate},
+            #{basePremiumAmount},
+            0,
+            0,
+            #{limitAmount},
+            #{includedAmount},
+            #{remainingAmount},
+            #{usagePct},
+            #{resultStatus},
+            CAST(#{calculationSnapshotJson} AS jsonb)
+        )
+    </insert>
+
+    <insert id="insertCapCheckDetail">
+        INSERT INTO fgc.cap_check_detail (
+            cap_check_id,
+            detail_seq,
+            commission_item_id,
+            transaction_attribution_id,
+            classification_snapshot,
+            amount,
+            decision_reason,
+            evidence_ref
+        ) VALUES (
+            #{capCheckId},
+            1,
+            #{commissionItemId},
+            #{transactionAttributionId},
+            #{classificationSnapshot},
+            #{candidateAmount},
+            #{decisionReason},
+            #{evidenceRef}
+        )
+    </insert>
+
+    <insert id="insertExceptionCase">
+        INSERT INTO fgc.exception_case (
+            exception_key,
+            exception_type,
+            severity,
+            status,
+            contract_id,
+            agent_id,
+            policy_version_id,
+            source_entity_type,
+            source_entity_id,
+            title,
+            description
+        ) VALUES (
+            #{exceptionKey},
+            #{exceptionType},
+            #{severity},
+            'NEW',
+            #{contractId},
+            #{agentId},
+            #{policyVersionId},
+            'COMMISSION_TRANSACTION',
+            CAST(#{paymentId} AS varchar),
+            #{title},
+            #{description}
+        )
+        ON CONFLICT (exception_key) DO UPDATE
+           SET status = 'NEW',
+               title = EXCLUDED.title,
+               description = EXCLUDED.description,
+               updated_at = clock_timestamp()
+    </insert>
+
+    <update id="confirm">
+        UPDATE fgc.commission_transaction
+           SET status = 'CONFIRMED'
+         WHERE commission_transaction_id = #{paymentId}
+           AND status = 'DRAFT'
+    </update>
+
+</mapper>

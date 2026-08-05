@@ -1,0 +1,43 @@
+package com.susukkang.fgc.transaction.domain;
+
+import com.susukkang.fgc.common.code.AttributionMethod;
+import com.susukkang.fgc.common.code.InclusionDecisionStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Getter
+@Builder
+public class CommissionPaymentCommand {
+
+    @Setter
+    private Long paymentId;
+    private final String sourceBusinessKey;
+    private final Long sourceContractId;
+    private final Long agentId;
+    private final Long commissionItemId;
+    private final PaymentStage paymentStage;
+    private final Long policyVersionId;
+    private final LocalDate settlementMonth;
+    private final LocalDate dueDate;
+    private final BigDecimal amount;
+    private final String cashflowType;
+    private final String evidenceRef;
+    private final String note;
+    private final Long attributedContractId;
+    private final InclusionDecisionStatus inclusionDecisionStatus;
+    private final String inclusionDecisionReason;
+    private final AttributionMethod attributionMethod;
+    private final Long allocationPolicyId;
+    private final String allocationBasisJson;
+
+    public String getAttributionScope() {
+        return attributionMethod == AttributionMethod.NEWCOMER_NON_CONTRACT
+                ? "AGENT"
+                : "CONTRACT";
+    }
+}

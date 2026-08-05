@@ -1,6 +1,7 @@
 package com.susukkang.fgc.common.exception;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.susukkang.fgc.common.web.ApiError;
@@ -110,6 +111,23 @@ public class GlobalExceptionHandler {
                 .orElse(null);
 
         return validationError(field);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+            AccessDeniedException exception
+    ) {
+        FgcErrorCode errorCode = FgcErrorCode.AUTH_003;
+        ApiError apiError = createApiError(
+                errorCode,
+                null,
+                Map.of(),
+                productionDetail(exception.getMessage())
+        );
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.failure(apiError));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
