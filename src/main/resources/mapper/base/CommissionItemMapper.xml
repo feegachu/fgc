@@ -6,10 +6,10 @@
 
     <select id="findEffectiveItems"
             resultType="com.susukkang.fgc.base.dto.CommissionItemResponse">
-        SELECT item_code,
-               item_name,
-               cashflow_type,
-               item_category
+        SELECT item_code AS itemCode,
+               item_name AS itemName,
+               cashflow_type AS cashflowType,
+               item_category AS itemCategory
           FROM fgc.commission_item
          WHERE active_yn = TRUE
            AND effective_from &lt;= #{asOf}
