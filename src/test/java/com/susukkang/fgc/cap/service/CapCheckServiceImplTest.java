@@ -93,6 +93,36 @@ class CapCheckServiceImplTest {
         verify(capCheckMapper).insertCapCheckDetails(argThatDetailListHasCapCheckId(999L));
     }
 
+    // item_code/item_name/contract_month_no는 계산 당시 값을 cap_check_detail에 그대로 스냅샷해야
+    // 한다 — commission_item/schedule_line이 나중에 바뀌어도 과거 판정 근거가 그때 값으로 남게 하려면
+    // INSERT 시점에 빠짐없이 넘어가야 한다 (PR #2 코드리뷰 지적)
+    @Test
+    void calculateAndSaveSnapshotsItemCodeNameAndContractMonthNoOnDetailRows() {
+        CapCheckDetailLine detail = new CapCheckDetailLine(
+                1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 3, "INCLUDED", new BigDecimal("650000"), "산입", null);
+        CapCalculationResult result = sampleResult(List.of(detail));
+
+        CapCalculationCommand command = CapCalculationCommand.realtime(1L, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
+        when(capCalculator.calculate(command)).thenReturn(result);
+        doAnswer(invocation -> {
+            CapCheckInsertRow row = invocation.getArgument(0);
+            row.setCapCheckId(999L);
+            return null;
+        }).when(capCheckMapper).insertCapCheck(any());
+
+        capCheckService.calculateAndSave(command);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow>> detailsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(capCheckMapper).insertCapCheckDetails(detailsCaptor.capture());
+
+        com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow insertedDetail = detailsCaptor.getValue().get(0);
+        assertThat(insertedDetail.getItemCode()).isEqualTo("BASE_COMMISSION");
+        assertThat(insertedDetail.getItemName()).isEqualTo("FC 기본수수료");
+        assertThat(insertedDetail.getContractMonthNo()).isEqualTo(3);
+    }
+
     @Test
     void calculateAndSaveSkipsDetailInsertWhenNoDetails() {
         CapCalculationResult result = sampleResult(List.of());

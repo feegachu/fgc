@@ -20,14 +20,19 @@
         )
     </insert>
 
+    <!--
+      item_code/item_name/contract_month_no 는 계산 당시 값을 그대로 스냅샷한다(V5 마이그레이션).
+      commission_item/schedule_line을 나중에 다시 조인해서 읽으면, 그 사이 상품명이나 스케줄이
+      바뀔 때 과거 판정의 계산근거가 그때 값이 아니라 최신 값으로 보이게 된다.
+    -->
     <insert id="insertCapCheckDetails">
         INSERT INTO fgc.cap_check_detail (
-            cap_check_id, detail_seq, commission_item_id, schedule_line_id,
-            classification_snapshot, amount, decision_reason
+            cap_check_id, detail_seq, commission_item_id, item_code, item_name,
+            schedule_line_id, contract_month_no, classification_snapshot, amount, decision_reason
         ) VALUES
         <foreach collection="details" item="d" separator=",">
-            (#{d.capCheckId}, #{d.detailSeq}, #{d.commissionItemId}, #{d.scheduleLineId},
-             #{d.classificationSnapshot}, #{d.amount}, #{d.decisionReason})
+            (#{d.capCheckId}, #{d.detailSeq}, #{d.commissionItemId}, #{d.itemCode}, #{d.itemName},
+             #{d.scheduleLineId}, #{d.contractMonthNo}, #{d.classificationSnapshot}, #{d.amount}, #{d.decisionReason})
         </foreach>
     </insert>
 
@@ -135,23 +140,23 @@
     <!--
       CapCheckDetailLine 은 record 라 생성자 파라미터 순서(컴파일 -parameters 옵션으로 이름도 함께)로
       매핑된다 — 컬럼 별칭을 레코드 컴포넌트명과 동일하게 맞춘다.
-      schedule_line_id 는 이 구현에서 항상 채워지므로 INNER JOIN 한다(transaction_attribution 기반
-      상세행은 아직 없다).
+      item_code/item_name/contract_month_no는 cap_check_detail에 저장된 스냅샷 컬럼을 그대로
+      읽는다 — commission_item/schedule_line을 다시 조인하지 않는다. 계산 당시 값이 아니라 "지금"
+      값을 보여주면, 상품명이나 스케줄이 바뀐 뒤에는 과거 판정의 계산근거가 달라져 보인다
+      (PR #2 코드리뷰 지적).
     -->
     <select id="findDetailsByCapCheckId" resultType="com.susukkang.fgc.cap.dto.CapCheckDetailLine">
         SELECT ccd.detail_seq             AS detailSeq,
                ccd.commission_item_id      AS commissionItemId,
-               ci.item_code                AS itemCode,
-               ci.item_name                AS itemName,
+               ccd.item_code                AS itemCode,
+               ccd.item_name                AS itemName,
                ccd.schedule_line_id        AS scheduleLineId,
-               sl.contract_month_no        AS contractMonthNo,
+               ccd.contract_month_no        AS contractMonthNo,
                ccd.classification_snapshot AS classification,
                ccd.amount                  AS amount,
                ccd.decision_reason         AS decisionReason,
                ccd.evidence_ref            AS evidenceRef
           FROM fgc.cap_check_detail ccd
-          JOIN fgc.commission_item ci ON ci.commission_item_id = ccd.commission_item_id
-          JOIN fgc.schedule_line sl   ON sl.schedule_line_id = ccd.schedule_line_id
          WHERE ccd.cap_check_id = #{capCheckId}
          ORDER BY ccd.detail_seq
     </select>
