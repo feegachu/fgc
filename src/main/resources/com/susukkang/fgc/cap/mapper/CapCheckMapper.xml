@@ -57,54 +57,9 @@
     </select>
 
     <!--
-      IF-API-14: 계약 1건의 지급단계별 최신 cap_check. DISTINCT ON (payment_stage) 로 각 단계 1건씩만
-      뽑는다 — vw_latest_cap_check 뷰와 같은 규칙(checked_at DESC, cap_check_id DESC)이지만 이 API는
-      calculation_snapshot 등 뷰에 없는 컬럼까지 필요해서 cap_check 를 직접 조회한다.
+      IF-API-14(계약 상세 탭3, FUN-032·박민준)와 IF-API-31(계산근거 팝업, FUN-035·강현준)에 필요한
+      조회는 이 이슈(FUN-030) 범위가 아니라 각 담당 이슈에서 CapCheckMapper에 추가한다.
     -->
-    <select id="findLatestPairByContract" resultType="com.susukkang.fgc.cap.dto.CapCheckRow">
-        SELECT DISTINCT ON (cc.payment_stage)
-               cc.cap_check_id                 AS capCheckId,
-               cc.contract_id                   AS contractId,
-               cc.payment_stage                 AS paymentStage,
-               cc.check_kind                    AS checkKind,
-               cc.as_of_date                    AS asOfDate,
-               cc.cap_rule_set_id               AS capRuleSetId,
-               cc.refund_rate_table_id          AS refundRateTableId,
-               cc.base_premium_amount           AS basePremiumAmount,
-               cc.refund_12m_amount             AS refund12mAmount,
-               cc.compliance_deduction_amount   AS complianceDeductionAmount,
-               cc.limit_amount                  AS limitAmount,
-               cc.included_amount               AS includedAmount,
-               cc.remaining_amount              AS remainingAmount,
-               cc.usage_pct                     AS usagePct,
-               cc.result_status                 AS resultStatus,
-               cc.calculation_snapshot::text    AS calculationSnapshotJson
-          FROM fgc.cap_check cc
-         WHERE cc.contract_id = #{contractId}
-         ORDER BY cc.payment_stage, cc.checked_at DESC, cc.cap_check_id DESC
-    </select>
-
-    <!-- IF-API-31: cap_check 1건을 PK로 직접 조회. -->
-    <select id="findById" resultType="com.susukkang.fgc.cap.dto.CapCheckRow">
-        SELECT cc.cap_check_id                 AS capCheckId,
-               cc.contract_id                   AS contractId,
-               cc.payment_stage                 AS paymentStage,
-               cc.check_kind                    AS checkKind,
-               cc.as_of_date                    AS asOfDate,
-               cc.cap_rule_set_id               AS capRuleSetId,
-               cc.refund_rate_table_id          AS refundRateTableId,
-               cc.base_premium_amount           AS basePremiumAmount,
-               cc.refund_12m_amount             AS refund12mAmount,
-               cc.compliance_deduction_amount   AS complianceDeductionAmount,
-               cc.limit_amount                  AS limitAmount,
-               cc.included_amount               AS includedAmount,
-               cc.remaining_amount              AS remainingAmount,
-               cc.usage_pct                     AS usagePct,
-               cc.result_status                 AS resultStatus,
-               cc.calculation_snapshot::text    AS calculationSnapshotJson
-          FROM fgc.cap_check cc
-         WHERE cc.cap_check_id = #{capCheckId}
-    </select>
 
     <!-- IF-API-30 목록·건수·요약이 공유하는 검색조건. month는 as_of_date가 속한 달(그 달 1일 기준)로 거른다. -->
     <sql id="searchWhere">

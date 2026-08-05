@@ -90,23 +90,6 @@ public class CapCheckServiceImpl implements CapCheckService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CapCheckSaveResult> findByContract(Long contractId) {
-        // 지급단계별로 최대 1건씩(최신), 절대 합산하지 않는다 — 화면(CAP-W01/CONT-W02)이 각 게이지를
-        // 따로 그린다.
-        return capCheckMapper.findLatestPairByContract(contractId).stream()
-                .map(this::toSaveResult)
-                .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<CapCheckSaveResult> findById(Long capCheckId) {
-        CapCheckRow row = capCheckMapper.findById(capCheckId);
-        return Optional.ofNullable(row).map(this::toSaveResult);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public CapCheckSearchResult search(CapCheckSearchCriteria criteria, int page, int size) {
         int offset = (page - 1) * size;
         List<CapCheckListRow> rows = capCheckMapper.search(

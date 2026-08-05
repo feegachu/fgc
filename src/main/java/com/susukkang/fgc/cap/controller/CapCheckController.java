@@ -1,14 +1,10 @@
 package com.susukkang.fgc.cap.controller;
 
-import com.susukkang.fgc.cap.dto.CapCheckDetailPopupResponse;
-import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResponse;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
-import com.susukkang.fgc.common.exception.FgcBusinessException;
-import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,20 +12,24 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.YearMonth;
-import java.util.Map;
 
 /**
- * FGC-FUN-030 초년도 1,200% 한도 계산 조회 API — CAP-W01(목록) / CAP-W02(계산근거 팝업).
- * 계산·저장 자체(CapCheckService#calculateAndSave)는 이 컨트롤러가 아니라 ContractIssued 등 내부
- * 이벤트 리스너가 호출한다(인터페이스정의서 6장 "①즉시재계산") — 이 API는 조회 전용이다.
+ * FGC-FUN-030 초년도 1,200% 한도 계산 목록 조회 API — CAP-W01(목록).
+ *
+ * 이 컨트롤러는 FUN-030(손가영) 담당 범위인 IF-API-30만 다룬다. 같은 화면군의 다른 API는 담당이 다르다:
+ *  - IF-API-14 (GET /api/contracts/{id}/cap/checks, 계약 상세 탭3) — FUN-032, 박민준 담당. 별도 이슈에서 구현된다.
+ *  - IF-API-31 (GET /api/cap/checks/{id}/details, CAP-W02 계산근거 팝업) — FUN-035, 강현준 담당. 별도 이슈에서
+ *    구현된다. 목록 응답의 capCheckId로 그 API를 연결하면 된다.
+ *
+ * 계산·저장 자체(CapCheckService#calculateAndSave)도 이 컨트롤러가 아니라 계약 등록·수정 이벤트 등
+ * 다른 기능에서 호출한다 — 이 API는 조회 전용이다.
  */
-@Tag(name = "1200% 한도", description = "초년도 모집수수료 한도 계산 조회 API")
+@Tag(name = "1200% 한도", description = "초년도 모집수수료 한도 계산 목록 조회 API")
 @RestController
 @RequestMapping("/api/cap/checks")
 @RequiredArgsConstructor
@@ -62,25 +62,5 @@ public class CapCheckController {
                 contractNo);
 
         return ApiResponse.success(CapCheckSearchResponse.from(capCheckService.search(criteria, page, size)));
-    }
-
-    @Operation(
-            summary = "1,200% 계산근거 상세 조회 (IF-API-31)",
-            description = "검증 당시 저장된 cap_check/cap_check_detail/calculation_snapshot 스냅샷을 그대로 돌려준다. "
-                    + "다시 계산하지 않는다(CAP-W02)."
-    )
-    @GetMapping("/{capCheckId}/details")
-    @PreAuthorize("isAuthenticated()")
-    public ApiResponse<CapCheckDetailPopupResponse> findDetails(
-            @Parameter(description = "cap_check ID", example = "999")
-            @PathVariable Long capCheckId
-    ) {
-        // capCheckId는 항상 IF-API-30 목록에서 클릭해 들어오므로, 존재하지 않는 ID는 정상 사용자
-        // 흐름에서 생기지 않는 시스템 상황이다. 인터페이스정의서 3-2절 동결 오류코드 표에 이 상황
-        // 전용 코드가 없어 COMMON_500을 쓴다(CapCalculatorImpl의 같은 판단과 동일).
-        CapCheckSaveResult saved = capCheckService.findById(capCheckId)
-                .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_500,
-                        Map.of("capCheckId", capCheckId)));
-        return ApiResponse.success(CapCheckDetailPopupResponse.from(saved));
     }
 }

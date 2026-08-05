@@ -25,12 +25,6 @@ public interface CapCheckMapper {
     CapCheckRow findLatestByContractAndStage(@Param("contractId") Long contractId,
                                               @Param("paymentStage") String paymentStage);
 
-    /** IF-API-14: 계약 1건의 지급단계별(최대 2건) 최신 cap_check. 합산하지 않고 각 단계 그대로 돌려준다. */
-    List<CapCheckRow> findLatestPairByContract(@Param("contractId") Long contractId);
-
-    /** IF-API-31: cap_check 1건 PK 조회. */
-    CapCheckRow findById(@Param("capCheckId") Long capCheckId);
-
     /** cap_check 1건에 속한 산입·제외 근거 라인 전체(detail_seq 순). */
     List<CapCheckDetailLine> findDetailsByCapCheckId(@Param("capCheckId") Long capCheckId);
 

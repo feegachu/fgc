@@ -147,28 +147,6 @@ class CapCheckServiceImplTest {
     }
 
     @Test
-    void findByContractReturnsBothPaymentStagesWithoutSumming() {
-        CapCheckRow gaToFc = sampleRow(999L, "GA_TO_FC");
-        CapCheckRow insurerToGa = sampleRow(1000L, "INSURER_TO_GA");
-        when(capCheckMapper.findLatestPairByContract(1L)).thenReturn(List.of(gaToFc, insurerToGa));
-        when(capCheckMapper.findDetailsByCapCheckId(999L)).thenReturn(List.of());
-        when(capCheckMapper.findDetailsByCapCheckId(1000L)).thenReturn(List.of());
-
-        List<CapCheckSaveResult> found = capCheckService.findByContract(1L);
-
-        assertThat(found).hasSize(2);
-        assertThat(found.get(0).result().paymentStage()).isEqualTo(PaymentStage.GA_TO_FC);
-        assertThat(found.get(1).result().paymentStage()).isEqualTo(PaymentStage.INSURER_TO_GA);
-    }
-
-    @Test
-    void findByIdReturnsEmptyWhenCapCheckDoesNotExist() {
-        when(capCheckMapper.findById(1234L)).thenReturn(null);
-
-        assertThat(capCheckService.findById(1234L)).isEmpty();
-    }
-
-    @Test
     void searchBuildsPageResponseAndSummaryFromMapperResults() {
         CapCheckListRow row = new CapCheckListRow();
         row.setCapCheckId(999L);
@@ -205,26 +183,6 @@ class CapCheckServiceImplTest {
         assertThat(result.page().content()).hasSize(1);
         assertThat(result.page().totalElements()).isEqualTo(1);
         assertThat(result.page().content().get(0).getContractNo()).isEqualTo("C001");
-    }
-
-    private static CapCheckRow sampleRow(Long capCheckId, String paymentStage) {
-        CapCheckRow row = new CapCheckRow();
-        row.setCapCheckId(capCheckId);
-        row.setContractId(1L);
-        row.setPaymentStage(paymentStage);
-        row.setCheckKind("REALTIME");
-        row.setAsOfDate(LocalDate.of(2026, 7, 10));
-        row.setCapRuleSetId(500L);
-        row.setBasePremiumAmount(new BigDecimal("1200000"));
-        row.setRefund12mAmount(BigDecimal.ZERO);
-        row.setComplianceDeductionAmount(BigDecimal.ZERO);
-        row.setLimitAmount(new BigDecimal("1200000"));
-        row.setIncludedAmount(new BigDecimal("650000"));
-        row.setRemainingAmount(new BigDecimal("550000"));
-        row.setUsagePct(new BigDecimal("54.166667"));
-        row.setResultStatus("NORMAL");
-        row.setCalculationSnapshotJson("{}");
-        return row;
     }
 
     @SuppressWarnings("unchecked")

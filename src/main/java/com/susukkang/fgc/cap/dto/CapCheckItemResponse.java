@@ -7,8 +7,9 @@ import com.susukkang.fgc.common.util.DisplayFormat;
 import java.time.LocalDate;
 
 /**
- * cap_check 1건의 목록/게이지용 API 응답(SIR-008 준수) — IF-API-14·IF-API-30이 공유한다.
- * 계산근거(cap_check_detail)는 담지 않는다 — 그건 IF-API-31에서 별도로 연다(공통규칙 #6).
+ * cap_check 1건의 목록/게이지용 API 응답(SIR-008 준수) — IF-API-30(FUN-030) 전용.
+ * 계산근거(cap_check_detail)는 담지 않는다 — IF-API-31(FUN-035, 강현준 담당)에서 capCheckId로 별도 조회한다
+ * (공통규칙 #6). 계약 상세 탭의 IF-API-14(FUN-032, 박민준 담당)도 이 응답 모양을 참고하되 별도 이슈에서 구현한다.
  */
 public record CapCheckItemResponse(
         Long capCheckId,
@@ -39,17 +40,5 @@ public record CapCheckItemResponse(
                 DisplayFormat.won(row.getComplianceDeductionAmount()), DisplayFormat.won(row.getLimitAmount()),
                 DisplayFormat.won(row.getIncludedAmount()), DisplayFormat.won(row.getRemainingAmount()),
                 DisplayFormat.rate(row.getUsagePct()), status, status.label(), row.getCapRuleSetId());
-    }
-
-    /** IF-API-14 — 경로에 이미 계약 ID가 있어 contractNo 는 담지 않는다. */
-    public static CapCheckItemResponse from(CapCheckSaveResult saved) {
-        CapCalculationResult r = saved.result();
-        return new CapCheckItemResponse(
-                saved.capCheckId(), r.contractId(), null,
-                r.paymentStage(), r.paymentStage().label(), r.asOfDate(),
-                DisplayFormat.won(r.basePremiumAmount()), DisplayFormat.won(r.refund12mAmount()),
-                DisplayFormat.won(r.complianceDeductionAmount()), DisplayFormat.won(r.limitAmount()),
-                DisplayFormat.won(r.includedAmount()), DisplayFormat.won(r.remainingAmount()),
-                DisplayFormat.rate(r.usagePct()), r.resultStatus(), r.resultStatus().label(), r.capRuleSetId());
     }
 }
