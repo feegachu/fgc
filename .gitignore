@@ -75,6 +75,9 @@ Thumbs.db
 *.swo
 *~
 
-.codex
-.claude
+.codex/
 AGENTS.md
+docs/
+.codex-tmp/
+.claude/
+CLAUDE.mdsrc/main/resources/application-prod.yml
