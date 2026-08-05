@@ -3,6 +3,7 @@ package com.susukkang.fgc.cap.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapCheckInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
@@ -176,6 +177,59 @@ class CapCheckServiceImplTest {
         assertThat(found.result().limitAmount()).isEqualByComparingTo("1200000");
         assertThat(found.result().details()).hasSize(1);
         assertThat(found.result().calculationSnapshot()).containsEntry("premiumMultiplier", "12.0000");
+    }
+
+    @Test
+    void findDetailReturnsEmptyWhenCapCheckIdDoesNotExist() {
+        when(capCheckMapper.findById(999L)).thenReturn(null);
+
+        Optional<CapCheckBasisResponse> found = capCheckService.findDetail(999L);
+
+        assertThat(found).isEmpty();
+    }
+
+    // IF-API-31: 입력값·계산식·항목별 귀속금액·최종 합계를 저장된 스냅샷 그대로 조립해야 한다.
+    // detailIncludedSum(항목별 INCLUDED 합)이 cap_check.includedAmount와 같아야 화면 tfoot 검증이 통과한다.
+    @Test
+    void findDetailAssemblesBasisResponseWithDetailIncludedSumMatchingIncludedAmount() {
+        CapCheckRow row = new CapCheckRow();
+        row.setCapCheckId(999L);
+        row.setContractId(1L);
+        row.setContractNo("C001");
+        row.setPaymentStage("GA_TO_FC");
+        row.setCheckKind("REALTIME");
+        row.setAsOfDate(LocalDate.of(2026, 7, 10));
+        row.setCapRuleSetId(500L);
+        row.setRefundRateTableId(null);
+        row.setBasePremiumAmount(new BigDecimal("1200000"));
+        row.setRefund12mAmount(BigDecimal.ZERO);
+        row.setComplianceDeductionAmount(BigDecimal.ZERO);
+        row.setLimitAmount(new BigDecimal("1200000"));
+        row.setIncludedAmount(new BigDecimal("650000"));
+        row.setRemainingAmount(new BigDecimal("550000"));
+        row.setUsagePct(new BigDecimal("54.166667"));
+        row.setResultStatus("NORMAL");
+        row.setCalculationSnapshotJson("{\"premiumMultiplier\":\"12.0000\"}");
+
+        List<CapCheckDetailLine> details = List.of(
+                new CapCheckDetailLine(
+                        1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null),
+                new CapCheckDetailLine(
+                        2, 2L, "EDU_SUPPORT", "교육비", null, 1, "EXCLUDED", new BigDecimal("50000"), "제외", "SRC-004"));
+
+        when(capCheckMapper.findById(999L)).thenReturn(row);
+        when(capCheckMapper.findDetailsByCapCheckId(999L)).thenReturn(details);
+
+        CapCheckBasisResponse basis = capCheckService.findDetail(999L).orElseThrow();
+
+        assertThat(basis.capCheckId()).isEqualTo(999L);
+        assertThat(basis.contractNo()).isEqualTo("C001");
+        assertThat(basis.capRuleSetId()).isEqualTo(500L);
+        assertThat(basis.limitAmount()).isEqualByComparingTo("1200000");
+        assertThat(basis.includedAmount()).isEqualByComparingTo("650000");
+        assertThat(basis.details()).hasSize(2);
+        assertThat(basis.detailIncludedSum()).isEqualByComparingTo(basis.includedAmount());
+        assertThat(basis.calculationSnapshot()).containsEntry("premiumMultiplier", "12.0000");
     }
 
     @Test

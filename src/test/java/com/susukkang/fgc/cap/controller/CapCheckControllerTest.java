@@ -1,5 +1,7 @@
 package com.susukkang.fgc.cap.controller;
 
+import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
+import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.CapCheckSummary;
@@ -22,6 +24,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -103,5 +107,53 @@ class CapCheckControllerTest {
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+    }
+
+    private CapCheckBasisResponse sampleBasisResponse() {
+        List<CapCheckDetailLine> details = List.of(
+                new CapCheckDetailLine(
+                        1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null),
+                new CapCheckDetailLine(
+                        2, 2L, "EDU_SUPPORT", "교육비", null, 1, "EXCLUDED", new BigDecimal("50000"), "제외", "SRC-004"));
+
+        return new CapCheckBasisResponse(
+                999L, 1L, "C001", "GA_TO_FC", "REALTIME", LocalDate.of(2026, 7, 10), 500L,
+                new BigDecimal("1200000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("1200000"), new BigDecimal("650000"), new BigDecimal("550000"),
+                new BigDecimal("54.166667"), "NORMAL",
+                Map.of("premiumMultiplier", "12.0000"), details, new BigDecimal("650000"));
+    }
+
+    @Test
+    void findDetailReturnsBasisInInputRuleFormulaDetailTotalOrder() throws Exception {
+        given(capCheckService.findDetail(999L)).willReturn(Optional.of(sampleBasisResponse()));
+
+        mockMvc.perform(get("/api/cap/checks/999/details").with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.capCheckId").value(999))
+                .andExpect(jsonPath("$.data.contractNo").value("C001"))
+                .andExpect(jsonPath("$.data.capRuleSetId").value(500))
+                .andExpect(jsonPath("$.data.basePremiumAmount").value(1200000))
+                .andExpect(jsonPath("$.data.limitAmount").value(1200000))
+                .andExpect(jsonPath("$.data.includedAmount").value(650000))
+                .andExpect(jsonPath("$.data.usagePct").value("54.166667"))
+                .andExpect(jsonPath("$.data.detailIncludedSum").value(650000))
+                .andExpect(jsonPath("$.data.details[0].itemCode").value("BASE_COMMISSION"))
+                .andExpect(jsonPath("$.data.details[0].classification").value("INCLUDED"))
+                .andExpect(jsonPath("$.data.details[1].evidenceRef").value("SRC-004"));
+    }
+
+    @Test
+    void findDetailReturns404WhenCapCheckIdDoesNotExist() throws Exception {
+        given(capCheckService.findDetail(999L)).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/cap/checks/999/details").with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-004"));
+    }
+
+    @Test
+    void findDetailRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/cap/checks/999/details")).andExpect(status().isUnauthorized());
     }
 }

@@ -2,6 +2,7 @@ package com.susukkang.fgc.cap;
 
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
@@ -125,6 +126,32 @@ class CapCalculatorIntegrationTest {
         assertThat(found.result().limitAmount()).isEqualByComparingTo("1200000");
         assertThat(found.result().includedAmount()).isEqualByComparingTo("650000");
         assertThat(found.result().details()).hasSize(1);
+    }
+
+    // IF-API-31(FUN-035): 저장된 계산 스냅샷을 재계산 없이 그대로 펼쳐 돌려주고, 항목별 INCLUDED
+    // 합계(detailIncludedSum)가 cap_check.included_amount와 일치해야 한다
+    @Test
+    void findDetailReturnsPersistedBasisWithDetailIncludedSumMatchingIncludedAmount() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        insertOperationalScheduleWithOneBaseCommissionLine(id, LocalDate.of(2026, 7, 10));
+
+        CapCheckSaveResult saved = capCheckService.calculateAndSave(
+                CapCalculationCommand.realtime(id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        CapCheckBasisResponse basis = capCheckService.findDetail(saved.capCheckId()).orElseThrow();
+
+        assertThat(basis.capCheckId()).isEqualTo(saved.capCheckId());
+        assertThat(basis.contractNo()).isEqualTo("FGC-FGL01-202607-0001");
+        assertThat(basis.limitAmount()).isEqualByComparingTo("1200000");
+        assertThat(basis.includedAmount()).isEqualByComparingTo("650000");
+        assertThat(basis.details()).hasSize(1);
+        assertThat(basis.detailIncludedSum()).isEqualByComparingTo(basis.includedAmount());
+    }
+
+    // 존재하지 않는 capCheckId는 매퍼까지 실제로 태워도 빈 결과를 돌려줘야 한다(컨트롤러에서 404로 매핑)
+    @Test
+    void findDetailReturnsEmptyForNonExistentCapCheckId() {
+        assertThat(capCheckService.findDetail(-1L)).isEmpty();
     }
 
     // A1(80% 공제대상 상품)은 12차월 예상해약환급률표가 한도에 가산된다
