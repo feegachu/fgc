@@ -75,9 +75,8 @@ Thumbs.db
 *.swo
 *~
 
-.codex
+.codex/
 AGENTS.md
-
 docs/
 .codex-tmp/
 .claude/
