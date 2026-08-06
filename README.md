@@ -1,4 +1,4 @@
-﻿# 🚀 Fee GA Chu
+# 🚀 Fee GA Chu
 
 <!--<img width="512" height="512" alt="Property 1=Logo" src="" />-->
 
@@ -39,7 +39,7 @@
 For building and running the application you need:
 
 [![Java](https://img.shields.io/badge/Java-21-red.svg)]()
-[![SpringBoot](https://img.shields.io/badge/SpringBoot-4.1.0-green.svg)]()
+[![SpringBoot](https://img.shields.io/badge/SpringBoot-3.5.16-green.svg)]()
 
 <br>
 
