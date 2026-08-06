@@ -13,6 +13,11 @@ import java.util.Map;
  *   ② 계산식   - basePremiumAmount~usagePct 숫자 그대로. 수식 문자열은 화면에서 조립
  *   ③ 항목별   - details(cap_check_detail 스냅샷)
  *   ④ 합계/판정 - includedAmount/limitAmount/remainingAmount/usagePct/resultStatus
+ *
+ * basePremiumAmount는 월납환산 초회보험료 원액이다(화면정의서 CAP-W01 "기준 보험료"/CAP-W02
+ * "① 입력값 - 월납환산 초회보험료"). ×premiumMultiplier(기본 12) 한 값은 limitAmount 계산에만
+ * 쓰이고 별도로 노출되지 않는다 — 화면 ②계산식은 basePremiumAmount ×
+ * calculationSnapshot.premiumMultiplier로 조립한다.
  */
 public record CapCheckBasisResponse(
         Long capCheckId,

@@ -27,9 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-// 계산만 수행하고 저장은 안 함 — cap_check/cap_check_detail 저장과 트랜잭션 경계는
-// 호출자(예: CapCheckService) 책임. 실시간 API(#3)와 월 배치(#4)가 "언제·어떤 단위로
-// 커밋할지"를 다르게 관리해야 해서 분리함(배치는 청크 단위로 여러 건을 한 트랜잭션에 묶어야 함).
 @Service
 @RequiredArgsConstructor
 public class CapCalculatorImpl implements CapCalculator {
@@ -62,21 +59,30 @@ public class CapCalculatorImpl implements CapCalculator {
                             + ", paymentStage=" + command.paymentStage() + " no applicable cap_rule_set"));
         }
 
-        // 1) 기본 한도식
-        BigDecimal basePremiumAmount = MoneyUtil.multiplyAndRound(
-                contract.getMonthlyEquivalentFirstPremium(), ruleSet.getPremiumMultiplier());
+        // 1) 기준 보험료 = 월납환산 초회보험료 원액(화면정의서 CAP-W01 "기준 보험료"/CAP-W02
+        // "① 입력값 - 월납환산 초회보험료" = base_premium_amount). ×12 하지 않는다 — 그건
+        // "한도"(② 계산식의 결과)지 "기준 보험료" 자체가 아니다.
+        BigDecimal basePremiumAmount = contract.getMonthlyEquivalentFirstPremium();
+
+        // 한도식의 기준액(월납 원액 × 배수, 기본 12). 저장·노출하지 않고 grossLimit 계산에만 쓴다.
+        BigDecimal annualizedLimitBase = MoneyUtil.multiplyAndRound(
+                basePremiumAmount, ruleSet.getPremiumMultiplier());
 
         // 2) 저해지·표준미달형 등 80% 이상 공제 대상이면 한도를 가산
         // 표준해약공제액의 80% 이상을 공제하는 상품은 12차월 예상 해약환급금만큼 한도가 더 큼 (REG-08)
-        RefundAddition refundAddition = resolveRefundAddition(contract, ruleSet, basePremiumAmount, command);
+        RefundAddition refundAddition = resolveRefundAddition(contract, ruleSet, annualizedLimitBase, command);
 
         // 3) 준법경영비 등 공제
         // 원수사→GA 단계에서만 준법경영비 3%를 뺀 금액이 실제 한도가 됨 (REG-10)
         // GA→FC 단계는 compliance_deduction_pct 가 항상 0이 되도록 DB CHECK로 강제돼 있어
         // 여기서 별도로 지급단계를 분기하지 않아도 자동으로 0원 공제가 됨
-        BigDecimal grossLimit = basePremiumAmount.add(refundAddition.amount());
+        //
+        // ★ 공제 기준액은 "월납 기준 초회보험료"(REG-10 원문) — annualizedLimitBase(월납×12 +
+        // 환급가산)가 아니라 월납 원액(basePremiumAmount)에 3%를 곱한다. 연간화된 금액에 곱하면
+        // ×12 배만큼 부풀려진 금액이 공제돼 한도가 지나치게 줄어든다.
+        BigDecimal grossLimit = annualizedLimitBase.add(refundAddition.amount());
         BigDecimal complianceDeductionAmount = ruleSet.getComplianceDeductionPct().compareTo(BigDecimal.ZERO) > 0
-                ? MoneyUtil.applyPercent(grossLimit, ruleSet.getComplianceDeductionPct())
+                ? MoneyUtil.applyPercent(basePremiumAmount, ruleSet.getComplianceDeductionPct())
                 : BigDecimal.ZERO;
         BigDecimal limitAmount = grossLimit.subtract(complianceDeductionAmount);
 
@@ -99,6 +105,11 @@ public class CapCalculatorImpl implements CapCalculator {
         for (ScheduleAmountView line : scheduleAmounts) {
             CapRuleItemView ruleItem = ruleItemsByCommissionItem.get(line.getCommissionItemId());
             // 룰셋에 아예 등록되지 않은 수수료 항목은 자동으로 산입/제외를 판단하지 않고 REVIEW_REQUIRED로 둠
+            //
+            // 보류(TODO): cap_rule_item.evidence_required_yn(EXCLUDED 항목이 증빙을 요구하는지)을
+            // 이 엔진이 읽지 않는다. 지금은 룰셋 템플릿의 정적 inclusion_status만으로 판정하고, 건별
+            // 실제 증빙 유무는 확인하지 않음
+            // 건별 증빙 연결은 transaction_attribution 경로가 아직 없어 미구현 상태
             String classification = ruleItem != null ? ruleItem.getInclusionStatus() : REVIEW_REQUIRED;
             String reason = ruleItem != null
                     ? ruleItem.getDecisionReason()
@@ -143,7 +154,7 @@ public class CapCalculatorImpl implements CapCalculator {
     // 80% 이상 공제 대상 상품이면 12차월 예상 해약환급금을 한도에 가산할 금액과, 그 판정에 쓴
     // 환급률표(refund_rate_table_id·policy_version_id·version_no)를 계산해서 돌려줌
     private RefundAddition resolveRefundAddition(CapContractView contract, CapRuleSetView ruleSet,
-                                                   BigDecimal basePremiumAmount, CapCalculationCommand command) {
+                                                   BigDecimal annualizedLimitBase, CapCalculationCommand command) {
         boolean applies = REFUND_ADDITION_STANDARD_DEDUCTION_80.equals(ruleSet.getRefundAdditionCondition())
                 && Boolean.TRUE.equals(contract.getStandardDeduction80Yn());
         if (!applies) {
@@ -159,7 +170,7 @@ public class CapCalculatorImpl implements CapCalculator {
         }
 
         RefundRateResolution r = resolution.get();
-        BigDecimal amount = MoneyUtil.applyPercent(basePremiumAmount, r.month12RatePct());
+        BigDecimal amount = MoneyUtil.applyPercent(annualizedLimitBase, r.month12RatePct());
         return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(), false);
     }
 

@@ -88,7 +88,8 @@ class CapCalculatorIntegrationTest {
         CapCalculationResult result = capCalculator.calculate(
                 CapCalculationCommand.realtime(id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
 
-        assertThat(result.basePremiumAmount()).isEqualByComparingTo("1200000");
+        // basePremiumAmount는 월납 원액이다(×12 하지 않음) — 한도(1,200,000)와는 다른 값이다
+        assertThat(result.basePremiumAmount()).isEqualByComparingTo("100000");
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.limitAmount()).isEqualByComparingTo("1200000");
         assertThat(result.includedAmount()).isEqualByComparingTo("650000");
@@ -211,10 +212,11 @@ class CapCalculatorIntegrationTest {
         CapCalculationResult result = capCalculator.calculate(
                 CapCalculationCommand.realtime(id, PaymentStage.INSURER_TO_GA, LocalDate.of(2027, 3, 2)));
 
-        // gross 1,200,000 에서 준법경영비 3%(36,000) 공제 → 1,164,000
+        // 공제 기준은 grossLimit이 아니라 월납 원액이다(REG-10: "월납 기준 초회보험료의 3%").
+        // 월납 100,000 × 3% = 3,000 공제 → gross 1,200,000 − 3,000 = 1,197,000
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
-        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("36000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1164000");
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1197000");
     }
 
     // ProductRefundRateResolver는 STD-LIFE-B의 12차월 환급률과 표버전을 돌려준다
