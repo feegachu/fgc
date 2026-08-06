@@ -179,7 +179,7 @@
     </select>
 
     <select id="selectContractDetailById"
-            resultType="com.susukkang.fgc.contract.dto.ResponseContractDetail">
+            resultType="com.susukkang.fgc.contract.dto.ContractDetailResponse">
         SELECT
             ic.contract_no,
             p.product_name,

@@ -9,12 +9,12 @@ package com.susukkang.fgc.contract.domain;
  * @since 2026-08-05
  */
 public enum ContractStatus {
-    APPLIED,
-    ACTIVE,
-    UNPAID,
-    LAPSED,
-    REVIVED,
-    CANCELLED,
-    TERMINATED,
-    MATURED
+    APPLIED, //청약
+    ACTIVE, //유지
+    UNPAID, //미납
+    LAPSED, //실효
+    REVIVED, //부활
+    CANCELLED, //청약 철회
+    TERMINATED, //해지
+    MATURED //만기
 }

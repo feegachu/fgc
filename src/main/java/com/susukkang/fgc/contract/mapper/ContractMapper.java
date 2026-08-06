@@ -19,7 +19,7 @@ public interface ContractMapper {
     // 계약Id에 따른 계약 조회
     InsuranceContract selectById(Long id);
     // 계약Id에 따른 계약 및 상품 정보 조회
-    ResponseContractDetail selectContractDetailById(Long id);
+    ContractDetailResponse selectContractDetailById(Long id);
 
     boolean existsInsurer(Long insurerId);
 

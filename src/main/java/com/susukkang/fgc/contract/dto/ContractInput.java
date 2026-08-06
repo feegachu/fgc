@@ -22,8 +22,8 @@ public interface ContractInput {
     Long getAgentId();
     Long getOrganizationId();
     PaymentCycleCode getPaymentCycleCode();
-    BigDecimal getPremiumPerCycleAmount();
     BigDecimal getFirstPremiumAmount();
+    BigDecimal getMonthlyEquivalentFirstPremium();
     Integer getPaymentTermMonths();
     BigDecimal getStandardSurrenderDeductionAmount();
 }

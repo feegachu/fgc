@@ -1,8 +1,6 @@
 package com.susukkang.fgc.contract.service;
 
-import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.service.CapCheckService;
-import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
@@ -54,53 +52,37 @@ public class ContractService {
      * @since 2026-08-05
      */
     @Transactional
-    public ResponseContract createContract(ContractCreateRequest request) {
+    public ContractResponse createContract(ContractCreateRequest request) {
         validateInput(request); //검증
 
-        // 월환산납입보험료 = 주기별 납입보험료 / 주기
-        BigDecimal monthlyEquivalentFirstPremium =
-                calculateMonthlyEquivalentFirstPremium(
-                        request.getPaymentCycleCode(),
-                        request.getFirstPremiumAmount()
-                );
-        // 월 환산 보험료를 어떤 규칙을 사용했는지
+        // 납입 주기 -> 환산 코드 결정
         PremiumConversionRuleCode conversionRuleCode =
                 determineConversionRuleCode(
                         request.getPaymentCycleCode()
                 );
+        // 환산 코드 -> 주기별 보험료 계산
+        BigDecimal premiumPerCycleAmount =
+                calculatePremiumPerCycleAmount(
+                        conversionRuleCode,
+                        request.getMonthlyEquivalentFirstPremium()
+                );
         InsuranceContract insuranceContract =
                 InsuranceContract.builder()
-                        .insurerId(request.getInsurerId())
-                        .productOfferingId(request.getProductOfferingId())
-                        .contractNo(request.getContractNo())
-                        .contractDate(request.getContractDate())
-                        .agentId(request.getAgentId())
-                        .organizationId(request.getOrganizationId())
-                        .premiumPerCycleAmount(
-                                request.getPremiumPerCycleAmount()
-                        )
-                        .firstPremiumAmount(
-                                request.getFirstPremiumAmount()
-                        )
-                        .monthlyEquivalentFirstPremium(
-                                monthlyEquivalentFirstPremium
-                        )
-                        .premiumConversionRuleCode(
-                                conversionRuleCode
-                        )
-                        .paymentCycleCode(
-                                request.getPaymentCycleCode()
-                        )
-                        .paymentTermMonths(
-                                request.getPaymentTermMonths()
-                        )
-                        .standardSurrenderDeductionAmount(
-                                request.getStandardSurrenderDeductionAmount()
-                        )
-                        .currentStatus(
-                                request.getContractStatus()
-                        )
-                        .dataOrigin(DataOrigin.MANUAL) // 직접 입력 이므로
+                        .insurerId(request.getInsurerId())  //보험사 ID
+                        .productOfferingId(request.getProductOfferingId()) //상품 ID
+                        .contractNo(request.getContractNo()) //계약 번호
+                        .contractDate(request.getContractDate()) //계약일
+                        .agentId(request.getAgentId()) //설계사 ID
+                        .organizationId(request.getOrganizationId()) //조직 ID
+                        .premiumPerCycleAmount(premiumPerCycleAmount) //주기별 보험료 (환산값)
+                        .firstPremiumAmount(request.getFirstPremiumAmount()) //초회 보험료
+                        .monthlyEquivalentFirstPremium(request.getMonthlyEquivalentFirstPremium()) //월납 환산보험료
+                        .premiumConversionRuleCode(conversionRuleCode) //환산 코드
+                        .paymentCycleCode(request.getPaymentCycleCode()) //주기 코드
+                        .paymentTermMonths(request.getPaymentTermMonths()) //납입기간
+                        .standardSurrenderDeductionAmount(request.getStandardSurrenderDeductionAmount()) //해약공제액
+                        .currentStatus(request.getContractStatus()) //계약 상태
+                        .dataOrigin(DataOrigin.MANUAL) // 원본 데이터 출처 : 직접입력 : MANUAL
                         .build();
 
         int insertedRows = contractMapper.insertContract(insuranceContract);
@@ -113,23 +95,19 @@ public class ContractService {
 
         // 예상 스케줄 생성 FUN-036 1차
 
-        // 1200% 한도 검증 FUN-030 , REG-08~11 양방향 1200% 검증
-        // 1200% 한도 검증 1차 INS-GA
-        CapCalculationCommand command =
-                CapCalculationCommand.realtime(
-                        insuranceContract.getContractId(),
-                        PaymentStage.GA_TO_FC,
-                        LocalDate.now()
-                );
-
-        capCheckService.calculateAndSave(command);
-        //  1200% 한도 검증 1차 GA-FC
-
+        /*
+         * TODO(FUN-030, REG-08~11)
+         * 계약 저장 및 예상 스케줄 생성 완료 후 다음 양방향 1,200% 한도 검증을 수행한다.
+         * 1. 보험회사 → GA (PaymentStage.INSURER_TO_GA)
+         * 2. GA → FC     (PaymentStage.GA_TO_FC)
+         * 각 단계별 CapCalculationCommand를 생성하여
+         * capCheckService.calculateAndSave()를 호출한다.
+         */
 
         // 계약상태 사건 이력 등록 FUN-026 2차
 
 
-        return ResponseContract.builder()
+        return ContractResponse.builder()
                 .contractId(insuranceContract.getContractId())
                 .build();
     }
@@ -235,58 +213,13 @@ public class ContractService {
                 detail
         );
     }
-
     /**
-     * 설명 : 초회보험료를 월납 기준 보험료로 환산한다.
+     * 설명 : 납입주기에 따라 환산 코드를 결정하는 메서드
      *
-     * @param paymentCycleCode 납입주기
-     * @param firstPremiumAmount 초회보험료
-     * @return 월납환산 초회보험료
+     * @param  paymentCycleCode 납입주기 코드
+     * @return PremiumConversionRuleCode 환산 코드
      * @author hjKang
-     * @since 2026-08-05
-     */
-    private BigDecimal calculateMonthlyEquivalentFirstPremium(
-            PaymentCycleCode paymentCycleCode,
-            BigDecimal firstPremiumAmount
-    ) {
-        return switch (paymentCycleCode) {
-            case MONTHLY ->
-                    MoneyUtil.roundWon(firstPremiumAmount);
-            case QUARTERLY ->
-                    MoneyUtil.divideAndRound(
-                            firstPremiumAmount,
-                            BigDecimal.valueOf(3)
-                    );
-            case SEMI_ANNUAL ->
-                    MoneyUtil.divideAndRound(
-                            firstPremiumAmount,
-                            BigDecimal.valueOf(6)
-                    );
-            case ANNUAL ->
-                    MoneyUtil.divideAndRound(
-                            firstPremiumAmount,
-                            BigDecimal.valueOf(12)
-                    );
-            case SINGLE, OTHER ->
-                    throw new FgcBusinessException(
-                            FgcErrorCode.COMMON_002,
-                            "paymentCycleCode",
-                            Map.of(
-                                    "field", "paymentCycleCode",
-                                    "paymentCycleCode", paymentCycleCode
-                            ),
-                            "월납환산을 지원하지 않는 납입주기입니다."
-                    );
-        };
-    }
-
-    /**
-     * 설명 : 납입주기에 해당하는 월납환산 규칙을 반환한다.
-     *
-     * @param paymentCycleCode 납입주기
-     * @return 월납환산 규칙
-     * @author hjKang
-     * @since 2026-08-05
+     * @since 2026-08-06
      */
     private PremiumConversionRuleCode determineConversionRuleCode(
             PaymentCycleCode paymentCycleCode
@@ -296,20 +229,61 @@ public class ContractService {
                     PremiumConversionRuleCode.MONTHLY_AS_IS;
 
             case QUARTERLY ->
-                    PremiumConversionRuleCode.QUARTERLY_DIV_3;
+                    PremiumConversionRuleCode.MONTHLY_TO_QUARTERLY_X3;
 
             case SEMI_ANNUAL ->
-                    PremiumConversionRuleCode.SEMI_ANNUAL_DIV_6;
+                    PremiumConversionRuleCode.MONTHLY_TO_SEMI_ANNUAL_X6;
 
             case ANNUAL ->
-                    PremiumConversionRuleCode.ANNUAL_DIV_12;
+                    PremiumConversionRuleCode.MONTHLY_TO_ANNUAL_X12;
 
             case SINGLE, OTHER ->
                     throw new FgcBusinessException(
                             FgcErrorCode.COMMON_002,
                             "paymentCycleCode",
-                            Map.of("field", "paymentCycleCode"),
-                            "월납환산 규칙이 없는 납입주기입니다."
+                            Map.of(
+                                    "field", "paymentCycleCode",
+                                    "paymentCycleCode", paymentCycleCode
+                            ),
+                            "주기별 보험료를 역산할 수 없는 납입주기입니다."
+                    );
+        };
+    }
+    /**
+     * 설명 : 주기별 납입보험료를 월납환산보험료 * 보험료 환산 규칙으로 역산하여 계산한다
+     *
+     * @param conversionRuleCode 보험료 환산 규칙
+     * @param monthlyEquivalentFirstPremium 월납환산보험료
+     * @return 주기별 납입보험료
+     * @author hjKang
+     * @since 2026-08-06
+     */
+    private BigDecimal calculatePremiumPerCycleAmount(
+            PremiumConversionRuleCode conversionRuleCode,
+            BigDecimal monthlyEquivalentFirstPremium
+    ) {
+        return switch (conversionRuleCode) {
+            case MONTHLY_AS_IS ->
+                    MoneyUtil.roundWon(
+                            monthlyEquivalentFirstPremium
+                    );
+
+            case MONTHLY_TO_QUARTERLY_X3 ->
+                    MoneyUtil.multiplyAndRound(
+                            monthlyEquivalentFirstPremium,
+                            BigDecimal.valueOf(3)
+                    );
+
+            case MONTHLY_TO_SEMI_ANNUAL_X6 ->
+                    MoneyUtil.multiplyAndRound(
+                            monthlyEquivalentFirstPremium,
+                            BigDecimal.valueOf(6)
+                    );
+
+            case MONTHLY_TO_ANNUAL_X12 ->
+                    MoneyUtil.multiplyAndRound(
+                            monthlyEquivalentFirstPremium,
+                            BigDecimal.valueOf(12)
                     );
         };
     }
@@ -322,9 +296,9 @@ public class ContractService {
      * @since 2026-08-05
      */
     @Transactional(readOnly = true)
-    public ResponseContractDetail selectContractDetailById(Long contractId) {
+    public ContractDetailResponse selectContractDetailById(Long contractId) {
         // 계약 Id 검증 및 가져오기
-        ResponseContractDetail detail = contractMapper.selectContractDetailById(contractId);
+        ContractDetailResponse detail = contractMapper.selectContractDetailById(contractId);
         if (detail == null) {
             throw validationException(
                     "contractId",
@@ -351,7 +325,7 @@ public class ContractService {
      * @since 2026-08-05
      */
     @Transactional
-    public ResponseContract updateContract(Long id, ContractUpdateRequest request) {
+    public ContractResponse updateContract(Long id, ContractUpdateRequest request) {
         // 계약 Id 검증 및 계약 및 스케줄 정보 가져오기
         InsuranceContract currentContract = contractMapper.selectById(id); //기존 계약 정보
 
@@ -363,16 +337,16 @@ public class ContractService {
         }
         validateInputForUpdate(request); //수정값 유효성 검사
 
-        // 월납환산보험료 계산
-        BigDecimal monthlyEquivalentFirstPremium =
-                calculateMonthlyEquivalentFirstPremium(
-                        request.getPaymentCycleCode(),
-                        request.getFirstPremiumAmount()
-                );
-        // 납입주기 -> 납입주기 변환 코드 매핑
+        // 납입 주기 -> 환산 코드 결정
         PremiumConversionRuleCode conversionRuleCode =
                 determineConversionRuleCode(
                         request.getPaymentCycleCode()
+                );
+        // 환산 코드 -> 주기별 보험료 계산
+        BigDecimal premiumPerCycleAmount =
+                calculatePremiumPerCycleAmount(
+                        conversionRuleCode,
+                        request.getMonthlyEquivalentFirstPremium()
                 );
 
         // 수정할 계약 객체 생성
@@ -384,15 +358,13 @@ public class ContractService {
                 .contractDate(request.getContractDate()) //계약 일자
                 .agentId(request.getAgentId()) //설계사 ID
                 .organizationId(request.getOrganizationId()) //조직 ID
-                .premiumPerCycleAmount(request.getPremiumPerCycleAmount()) //주기 보험료
+                .premiumPerCycleAmount(premiumPerCycleAmount) //주기 보험료
                 .firstPremiumAmount(request.getFirstPremiumAmount()) // 초회 보험료
-                .monthlyEquivalentFirstPremium(monthlyEquivalentFirstPremium) //월납 환산 보험료
+                .monthlyEquivalentFirstPremium(request.getMonthlyEquivalentFirstPremium()) //월납 환산 보험료
                 .premiumConversionRuleCode(conversionRuleCode) //납입 주기 변환 코드
                 .paymentCycleCode(request.getPaymentCycleCode()) //납입 주기 코드
                 .paymentTermMonths(request.getPaymentTermMonths())  //납입 기간
-                .standardSurrenderDeductionAmount(
-                        request.getStandardSurrenderDeductionAmount()   //해약공제액
-                )
+                .standardSurrenderDeductionAmount(request.getStandardSurrenderDeductionAmount())//해약공제액
                 .currentStatus(request.getContractStatus())  //계약 상태
                 .dataOrigin(currentContract.getDataOrigin()) // 데이터 출처
                 .build();
@@ -424,7 +396,7 @@ public class ContractService {
          * 계약상태 사건 이력을 등록한다.
          */
 
-        return ResponseContract.builder()
+        return ContractResponse.builder()
                 .contractId(id)
                 .scheduleHeaderIds(List.of())
                 .build();

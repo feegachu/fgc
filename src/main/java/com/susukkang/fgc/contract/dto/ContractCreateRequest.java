@@ -43,9 +43,6 @@ public class ContractCreateRequest implements ContractInput {
     private PaymentCycleCode paymentCycleCode; //납입주기
     @NotNull
     @Positive
-    private BigDecimal premiumPerCycleAmount; //주기 보험료
-    @NotNull
-    @Positive
     private BigDecimal firstPremiumAmount; //초회 보험료
     @NotNull
     @Positive

@@ -10,8 +10,8 @@ package com.susukkang.fgc.contract.domain;
  * @since 2026-08-05
  */
 public enum PremiumConversionRuleCode {
-    MONTHLY_AS_IS,
-    QUARTERLY_DIV_3,
-    SEMI_ANNUAL_DIV_6,
-    ANNUAL_DIV_12,
+    MONTHLY_AS_IS,      //월 납입 x1
+    MONTHLY_TO_QUARTERLY_X3, //분기별 납입 x3
+    MONTHLY_TO_SEMI_ANNUAL_X6, //반년주기 납입 x6
+    MONTHLY_TO_ANNUAL_X12 //연간 납입 x12
 }

@@ -44,7 +44,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PostMapping
-    public ApiResponse<ResponseContract> createContract( @Valid @RequestBody ContractCreateRequest request ) {
+    public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
     /**
@@ -56,7 +56,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PutMapping("/{id}")
-    public ApiResponse<ResponseContract> updateContract( @PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
+    public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
     /**
@@ -68,7 +68,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @GetMapping("/{id}")
-    public ApiResponse<ResponseContractDetail> getContractById(@PathVariable Long id) {
+    public ApiResponse<ContractDetailResponse> getContractById(@PathVariable Long id) {
         return ApiResponse.success(contractService.selectContractDetailById(id));
     }
 }

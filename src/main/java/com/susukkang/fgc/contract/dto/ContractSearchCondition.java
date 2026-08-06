@@ -19,11 +19,11 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class ContractSearchCondition {
 
-    private String contractNo;
-    private Long insurerId;
-    private Long productOfferingId;
-    private Long agentId;
-    private String currentStatus;
-    private LocalDate contractDateFrom;
-    private LocalDate contractDateTo;
+    private String contractNo; //계약번호
+    private Long insurerId; //보험사 ID
+    private Long productOfferingId; //상품
+    private Long agentId; //FC ID
+    private String currentStatus; //계약상태
+    private LocalDate contractDateFrom; //계약일 시작
+    private LocalDate contractDateTo; //계약일 끝
 }

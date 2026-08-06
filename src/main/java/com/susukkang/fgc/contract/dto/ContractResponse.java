@@ -17,7 +17,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ResponseContract {
+public class ContractResponse {
     private Long contractId;
     private List<Long> scheduleHeaderIds;
 }

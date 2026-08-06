@@ -4,7 +4,7 @@ import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
-import com.susukkang.fgc.contract.dto.ResponseContractDetail;
+import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -123,7 +123,7 @@ class ContractMapperIntegrationTest {
         assertThat(selected.getCurrentStatus()).isEqualTo(TERMINATED);
         assertThat(selected.getPremiumPerCycleAmount()).isEqualByComparingTo("120000.00");
 
-        ResponseContractDetail detail =
+        ContractDetailResponse detail =
                 contractMapper.selectContractDetailById(contract.getContractId());
         assertThat(detail.getContractNo()).isEqualTo(contract.getContractNo());
         assertThat(detail.getContractStatus()).isEqualTo(TERMINATED);

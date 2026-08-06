@@ -43,10 +43,10 @@ public class ContractUpdateRequest implements ContractInput {
     private PaymentCycleCode paymentCycleCode; // 보험료 납입 주기
     @NotNull
     @Positive
-    private BigDecimal premiumPerCycleAmount; // 주기별 보험료
+    private BigDecimal firstPremiumAmount; // 초회 보험료
     @NotNull
     @Positive
-    private BigDecimal firstPremiumAmount; // 초회 보험료
+    private BigDecimal monthlyEquivalentFirstPremium; //월납 환산 보험료
     @NotNull
     @Positive
     private Integer paymentTermMonths; // 보험료 납입 기간(개월)

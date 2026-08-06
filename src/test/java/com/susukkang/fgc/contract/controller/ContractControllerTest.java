@@ -11,8 +11,8 @@ import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
-import com.susukkang.fgc.contract.dto.ResponseContract;
-import com.susukkang.fgc.contract.dto.ResponseContractDetail;
+import com.susukkang.fgc.contract.dto.ContractResponse;
+import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.service.ContractService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
-import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -76,7 +75,7 @@ class ContractControllerTest {
                 .contractNo("TEST-20260806-001")
                 .insurerName("미래가상생명")
                 .productName("가상 건강보장보험 A")
-                .contractDate(Date.valueOf("2026-08-06"))
+                .contractDate(LocalDate.of(2026, 8, 6))
                 .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
                 .agentIdName("FC-0001 서본부")
                 .contractStatus(ACTIVE)
@@ -87,7 +86,7 @@ class ContractControllerTest {
         when(contractService.selectByCondition(any(ContractSearchCondition.class)))
                 .thenReturn(List.of(contract));
 
-        mockMvc.perform(get("/api/contracts")
+        mockMvc.perform(get("/api/v1/contracts")
                         .param("contractNo", "TEST")
                         .with(user("admin").roles("GA_ADMIN")))
                 .andExpect(status().isOk())
@@ -99,10 +98,10 @@ class ContractControllerTest {
     @Test
     @DisplayName("보험계약 상세정보를 조회한다")
     void getContractDetailReturnsSuccess() throws Exception {
-        ResponseContractDetail detail = ResponseContractDetail.builder()
+        ContractDetailResponse detail = ContractDetailResponse.builder()
                 .contractNo("TEST-20260806-001")
                 .productName("가상 건강보장보험 A")
-                .contractDate(Date.valueOf("2026-08-06"))
+                .contractDate(LocalDate.of(2026, 8, 6))
                 .premiumPerCycleAmount(new BigDecimal("100000"))
                 .paymentCycleCode(MONTHLY)
                 .firstPremiumAmount(new BigDecimal("100000"))
@@ -126,7 +125,7 @@ class ContractControllerTest {
     @DisplayName("보험계약을 생성한다")
     void createContractReturnsSuccess() throws Exception {
         when(contractService.createContract(any(ContractCreateRequest.class)))
-                .thenReturn(ResponseContract.builder().contractId(21L).build());
+                .thenReturn(ContractResponse.builder().contractId(21L).build());
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("admin").roles("GA_ADMIN"))
@@ -142,7 +141,7 @@ class ContractControllerTest {
         when(contractService.updateContract(
                 eq(21L),
                 any(ContractUpdateRequest.class)
-        )).thenReturn(ResponseContract.builder().contractId(21L).build());
+        )).thenReturn(ContractResponse.builder().contractId(21L).build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("admin").roles("GA_ADMIN"))
@@ -162,7 +161,6 @@ class ContractControllerTest {
                 1L,
                 4L,
                 MONTHLY,
-                new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 120,

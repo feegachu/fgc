@@ -8,7 +8,7 @@ import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
-import com.susukkang.fgc.contract.dto.ResponseContract;
+import com.susukkang.fgc.contract.dto.ContractResponse;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ import java.util.List;
 import static com.susukkang.fgc.contract.domain.ContractStatus.ACTIVE;
 import static com.susukkang.fgc.contract.domain.PaymentCycleCode.MONTHLY;
 import static com.susukkang.fgc.contract.domain.PaymentCycleCode.QUARTERLY;
-import static com.susukkang.fgc.contract.domain.PremiumConversionRuleCode.QUARTERLY_DIV_3;
+import static com.susukkang.fgc.contract.domain.PremiumConversionRuleCode.MONTHLY_TO_QUARTERLY_X3;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,8 +67,8 @@ class ContractServiceTest {
     }
 
     @Test
-    @DisplayName("분기납 계약을 생성할 때 초회보험료를 3으로 나누어 저장한다")
-    void createContractCalculatesQuarterlyMonthlyEquivalent() {
+    @DisplayName("분기납 계약을 생성할 때 월납환산보험료의 3배를 주기별 보험료로 저장한다")
+    void createContractCalculatesQuarterlyPremiumPerCycle() {
         ContractCreateRequest request = createRequest();
         request.setPaymentCycleCode(QUARTERLY);
         request.setFirstPremiumAmount(new BigDecimal("300000"));
@@ -82,16 +82,16 @@ class ContractServiceTest {
             return 1;
         });
 
-        ResponseContract response = contractService.createContract(request);
+        ContractResponse response = contractService.createContract(request);
 
         ArgumentCaptor<InsuranceContract> captor = ArgumentCaptor.forClass(InsuranceContract.class);
         verify(contractMapper).insertContract(captor.capture());
         InsuranceContract saved = captor.getValue();
         assertThat(saved.getMonthlyEquivalentFirstPremium()).isEqualByComparingTo("100000");
-        assertThat(saved.getPremiumConversionRuleCode()).isEqualTo(QUARTERLY_DIV_3);
+        assertThat(saved.getPremiumPerCycleAmount()).isEqualByComparingTo("300000");
+        assertThat(saved.getPremiumConversionRuleCode()).isEqualTo(MONTHLY_TO_QUARTERLY_X3);
         assertThat(saved.getDataOrigin()).isEqualTo(DataOrigin.MANUAL);
         assertThat(response.getContractId()).isEqualTo(21L);
-        verify(capCheckService).calculateAndSave(any());
     }
 
     @Test
@@ -121,7 +121,7 @@ class ContractServiceTest {
                 request.getAgentId(), request.getOrganizationId());
         given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
 
-        ResponseContract response = contractService.updateContract(21L, request);
+        ContractResponse response = contractService.updateContract(21L, request);
 
         ArgumentCaptor<InsuranceContract> captor = ArgumentCaptor.forClass(InsuranceContract.class);
         verify(contractMapper).updateContract(captor.capture());
@@ -152,7 +152,7 @@ class ContractServiceTest {
                 1L, "TEST-001", 1L, LocalDate.now(), ACTIVE,
                 1L, 4L, MONTHLY,
                 new BigDecimal("100000"), new BigDecimal("100000"),
-                new BigDecimal("100000"), 120, new BigDecimal("50000")
+                120, new BigDecimal("50000")
         );
     }
 
