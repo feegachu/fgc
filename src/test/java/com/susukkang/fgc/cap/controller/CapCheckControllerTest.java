@@ -1,12 +1,14 @@
 package com.susukkang.fgc.cap.controller;
 
 import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
-import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
+import com.susukkang.fgc.cap.dto.CapCheckDetailResponse;
+import com.susukkang.fgc.cap.dto.CapCheckItemResponse;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.CapCheckSummary;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.CapResultStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -110,36 +112,36 @@ class CapCheckControllerTest {
     }
 
     private CapCheckBasisResponse sampleBasisResponse() {
-        List<CapCheckDetailLine> details = List.of(
-                new CapCheckDetailLine(
-                        1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null),
-                new CapCheckDetailLine(
-                        2, 2L, "EDU_SUPPORT", "교육비", null, 1, "EXCLUDED", new BigDecimal("50000"), "제외", "SRC-004"));
+        List<CapCheckDetailResponse> details = List.of(
+                new CapCheckDetailResponse(1, "FC 기본수수료", "INCLUDED", 650000L, "산입", null),
+                new CapCheckDetailResponse(2, "교육비", "EXCLUDED", 50000L, "제외", "SRC-004"));
 
-        return new CapCheckBasisResponse(
-                999L, 1L, "C001", "GA_TO_FC", "REALTIME", LocalDate.of(2026, 7, 10), 500L,
-                new BigDecimal("1200000"), BigDecimal.ZERO, BigDecimal.ZERO,
-                new BigDecimal("1200000"), new BigDecimal("650000"), new BigDecimal("550000"),
-                new BigDecimal("54.166667"), "NORMAL",
-                Map.of("premiumMultiplier", "12.0000"), details, new BigDecimal("650000"));
+        // basePremiumAmount는 월납 원액(100,000)이다 — limitAmount(1,200,000)와는 다른 값이다.
+        CapCheckItemResponse capCheck = new CapCheckItemResponse(
+                999L, 1L, "C001", PaymentStage.GA_TO_FC, PaymentStage.GA_TO_FC.label(),
+                LocalDate.of(2026, 7, 10),
+                100000L, 0L, 0L, 1200000L, 650000L, 550000L, "54.166667",
+                CapResultStatus.NORMAL, CapResultStatus.NORMAL.label(), 500L);
+
+        return new CapCheckBasisResponse(capCheck, details, Map.of("premiumMultiplier", "12.0000"));
     }
 
     @Test
-    void findDetailReturnsBasisInInputRuleFormulaDetailTotalOrder() throws Exception {
+    void findDetailReturnsNestedCapCheckDetailsAndCalculationSnapshot() throws Exception {
         given(capCheckService.findDetail(999L)).willReturn(Optional.of(sampleBasisResponse()));
 
         mockMvc.perform(get("/api/cap/checks/999/details").with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.capCheckId").value(999))
-                .andExpect(jsonPath("$.data.contractNo").value("C001"))
-                .andExpect(jsonPath("$.data.capRuleSetId").value(500))
-                .andExpect(jsonPath("$.data.basePremiumAmount").value(1200000))
-                .andExpect(jsonPath("$.data.limitAmount").value(1200000))
-                .andExpect(jsonPath("$.data.includedAmount").value(650000))
-                .andExpect(jsonPath("$.data.usagePct").value("54.166667"))
-                .andExpect(jsonPath("$.data.detailIncludedSum").value(650000))
-                .andExpect(jsonPath("$.data.details[0].itemCode").value("BASE_COMMISSION"))
-                .andExpect(jsonPath("$.data.details[0].classification").value("INCLUDED"))
+                .andExpect(jsonPath("$.data.capCheck.capCheckId").value(999))
+                .andExpect(jsonPath("$.data.capCheck.contractNo").value("C001"))
+                .andExpect(jsonPath("$.data.capCheck.capRuleSetId").value(500))
+                .andExpect(jsonPath("$.data.capCheck.basePremiumAmount").value(100000))
+                .andExpect(jsonPath("$.data.capCheck.limitAmount").value(1200000))
+                .andExpect(jsonPath("$.data.capCheck.includedAmount").value(650000))
+                .andExpect(jsonPath("$.data.capCheck.usagePct").value("54.166667"))
+                .andExpect(jsonPath("$.data.calculationSnapshot.premiumMultiplier").value("12.0000"))
+                .andExpect(jsonPath("$.data.details[0].commissionItemName").value("FC 기본수수료"))
+                .andExpect(jsonPath("$.data.details[0].classificationSnapshot").value("INCLUDED"))
                 .andExpect(jsonPath("$.data.details[1].evidenceRef").value("SRC-004"));
     }
 

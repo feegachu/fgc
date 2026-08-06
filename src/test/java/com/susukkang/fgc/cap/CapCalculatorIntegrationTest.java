@@ -155,10 +155,10 @@ class CapCalculatorIntegrationTest {
                 + result.summary().reviewRequired()).isEqualTo(0);
     }
 
-    // IF-API-31(FUN-035): 저장된 계산 스냅샷을 재계산 없이 그대로 펼쳐 돌려주고, 항목별 INCLUDED
-    // 합계(detailIncludedSum)가 cap_check.included_amount와 일치해야 한다
+    // IF-API-31(FUN-035, api-spec.md): 저장된 계산 스냅샷을 재계산 없이 capCheck+details[]+
+    // calculationSnapshot 구조로 그대로 펼쳐 돌려줘야 한다
     @Test
-    void findDetailReturnsPersistedBasisWithDetailIncludedSumMatchingIncludedAmount() {
+    void findDetailReturnsPersistedBasisAsNestedCapCheckAndDetails() {
         Long id = contractId("FGC-FGL01-202607-0001");
         insertOperationalScheduleWithOneBaseCommissionLine(id, LocalDate.of(2026, 7, 10));
 
@@ -167,12 +167,17 @@ class CapCalculatorIntegrationTest {
 
         CapCheckBasisResponse basis = capCheckService.findDetail(saved.capCheckId()).orElseThrow();
 
-        assertThat(basis.capCheckId()).isEqualTo(saved.capCheckId());
-        assertThat(basis.contractNo()).isEqualTo("FGC-FGL01-202607-0001");
-        assertThat(basis.limitAmount()).isEqualByComparingTo("1200000");
-        assertThat(basis.includedAmount()).isEqualByComparingTo("650000");
+        assertThat(basis.capCheck().capCheckId()).isEqualTo(saved.capCheckId());
+        assertThat(basis.capCheck().contractNo()).isEqualTo("FGC-FGL01-202607-0001");
+        assertThat(basis.capCheck().limitAmount()).isEqualTo(1_200_000L);
+        assertThat(basis.capCheck().includedAmount()).isEqualTo(650_000L);
         assertThat(basis.details()).hasSize(1);
-        assertThat(basis.detailIncludedSum()).isEqualByComparingTo(basis.includedAmount());
+        assertThat(basis.details().get(0).classificationSnapshot()).isEqualTo("INCLUDED");
+        long includedSum = basis.details().stream()
+                .filter(d -> "INCLUDED".equals(d.classificationSnapshot()))
+                .mapToLong(com.susukkang.fgc.cap.dto.CapCheckDetailResponse::amount)
+                .sum();
+        assertThat(includedSum).isEqualTo(basis.capCheck().includedAmount());
     }
 
     // 존재하지 않는 capCheckId는 매퍼까지 실제로 태워도 빈 결과를 돌려줘야 한다(컨트롤러에서 404로 매핑)

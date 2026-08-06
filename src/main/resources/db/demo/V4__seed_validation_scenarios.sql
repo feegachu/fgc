@@ -404,11 +404,7 @@ SELECT ct.commission_transaction_id,'CONTRACT',
   JOIN commission_item ci        ON ci.item_code = t.item_code
   JOIN insurance_contract c      ON c.contract_no = t.contract_no
   LEFT JOIN agent ra             ON ra.agent_code = t.recipient_code
-  -- 원수사→GA는 2021~2026(공제 0%)·2027~(공제 3%) 룰셋 두 개라 stage만으로는 계약을 특정 못 한다.
-  -- 1,200%룰 적용 룰셋은 계약 체결일 기준이므로(REG-19) c.contract_date로도 좁힌다.
   LEFT JOIN cap_rule_set crs     ON crs.payment_stage = t.stage
-                                AND crs.contract_date_from <= c.contract_date
-                                AND (crs.contract_date_to IS NULL OR crs.contract_date_to >= c.contract_date)
   LEFT JOIN cap_rule_item cri    ON cri.cap_rule_set_id = crs.cap_rule_set_id
                                 AND cri.commission_item_id = ci.commission_item_id
  WHERE NOT EXISTS (

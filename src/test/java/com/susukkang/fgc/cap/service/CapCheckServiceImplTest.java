@@ -188,10 +188,9 @@ class CapCheckServiceImplTest {
         assertThat(found).isEmpty();
     }
 
-    // IF-API-31: 입력값·계산식·항목별 귀속금액·최종 합계를 저장된 스냅샷 그대로 조립해야 한다.
-    // detailIncludedSum(항목별 INCLUDED 합)이 cap_check.includedAmount와 같아야 화면 tfoot 검증이 통과한다.
+    // IF-API-31(api-spec.md): capCheck + details[] + calculationSnapshot 구조로 조립해야 한다.
     @Test
-    void findDetailAssemblesBasisResponseWithDetailIncludedSumMatchingIncludedAmount() {
+    void findDetailAssemblesBasisResponseWithNestedCapCheckAndDetails() {
         CapCheckRow row = new CapCheckRow();
         row.setCapCheckId(999L);
         row.setContractId(1L);
@@ -201,7 +200,8 @@ class CapCheckServiceImplTest {
         row.setAsOfDate(LocalDate.of(2026, 7, 10));
         row.setCapRuleSetId(500L);
         row.setRefundRateTableId(null);
-        row.setBasePremiumAmount(new BigDecimal("1200000"));
+        // basePremiumAmount는 월납 원액(×12 하지 않음)이다 — 100,000 × 12 = 1,200,000이 한도(limitAmount)다.
+        row.setBasePremiumAmount(new BigDecimal("100000"));
         row.setRefund12mAmount(BigDecimal.ZERO);
         row.setComplianceDeductionAmount(BigDecimal.ZERO);
         row.setLimitAmount(new BigDecimal("1200000"));
@@ -222,13 +222,14 @@ class CapCheckServiceImplTest {
 
         CapCheckBasisResponse basis = capCheckService.findDetail(999L).orElseThrow();
 
-        assertThat(basis.capCheckId()).isEqualTo(999L);
-        assertThat(basis.contractNo()).isEqualTo("C001");
-        assertThat(basis.capRuleSetId()).isEqualTo(500L);
-        assertThat(basis.limitAmount()).isEqualByComparingTo("1200000");
-        assertThat(basis.includedAmount()).isEqualByComparingTo("650000");
+        assertThat(basis.capCheck().capCheckId()).isEqualTo(999L);
+        assertThat(basis.capCheck().contractNo()).isEqualTo("C001");
+        assertThat(basis.capCheck().capRuleSetId()).isEqualTo(500L);
+        assertThat(basis.capCheck().limitAmount()).isEqualTo(1_200_000L);
+        assertThat(basis.capCheck().includedAmount()).isEqualTo(650_000L);
         assertThat(basis.details()).hasSize(2);
-        assertThat(basis.detailIncludedSum()).isEqualByComparingTo(basis.includedAmount());
+        assertThat(basis.details().get(0).commissionItemName()).isEqualTo("FC 기본수수료");
+        assertThat(basis.details().get(0).classificationSnapshot()).isEqualTo("INCLUDED");
         assertThat(basis.calculationSnapshot()).containsEntry("premiumMultiplier", "12.0000");
     }
 
