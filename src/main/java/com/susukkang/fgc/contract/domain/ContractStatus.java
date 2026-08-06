@@ -14,7 +14,7 @@ public enum ContractStatus {
     UNPAID,
     LAPSED,
     REVIVED,
-    CANCELED,
+    CANCELLED,
     TERMINATED,
     MATURED
 }

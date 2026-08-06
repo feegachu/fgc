@@ -17,7 +17,7 @@ import java.util.List;
  * @since 2026-08-05
  */
 @RestController
-@RequestMapping("/api/contracts")
+@RequestMapping("/api/v1/contracts")
 @RequiredArgsConstructor
 public class ContractController {
     private final ContractService contractService;

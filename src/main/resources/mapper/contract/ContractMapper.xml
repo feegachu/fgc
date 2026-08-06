@@ -5,7 +5,7 @@
 
 <mapper namespace="com.susukkang.fgc.contract.mapper.ContractMapper">
 
-
+    <!-- 계약 검색 -->
     <select id="selectByCondition"
             parameterType="com.susukkang.fgc.contract.dto.ContractSearchCondition"
             resultType="com.susukkang.fgc.contract.dto.ContractView">
@@ -155,9 +155,10 @@
                    #{dataOrigin}
                )
     </insert>
-
+    <!-- 계약 ID 조회 -->
     <select id="selectById" parameterType="long" resultType="com.susukkang.fgc.contract.dto.InsuranceContract">
             SELECT
+                contract_id,
                 insurer_id,
                 product_offering_id,
                 contract_no,
@@ -180,6 +181,7 @@
     <select id="selectContractDetailById"
             resultType="com.susukkang.fgc.contract.dto.ResponseContractDetail">
         SELECT
+            ic.contract_no,
             p.product_name,
             ic.contract_date,
             ic.premium_per_cycle_amount,
@@ -197,7 +199,7 @@
                       ON p.product_id = po.product_id
         WHERE ic.contract_id = #{contractId}
     </select>
-
+    <!-- 계약 수정 -->
     <update id="updateContract"
             parameterType="com.susukkang.fgc.contract.dto.InsuranceContract">
         UPDATE

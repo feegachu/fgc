@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
@@ -27,6 +28,7 @@ import java.util.List;
  * @version 1.0
  * @since 2026-08-05
  */
+@Getter
 @Setter
 @Builder
 @RequiredArgsConstructor
@@ -46,6 +48,6 @@ public class ResponseContractDetail {
     private ContractStatus contractStatus; //계약상태
     private DataOrigin dataOrigin; //계약 출처
 
-    //계약상태 사건 이력 List
-    private List<ContractStatusEventResponse> contractStatusEventResponses;
+    //계약상태 사건 이력 List 2차
+    //private List<ContractStatusEventResponse> contractStatusEventResponses;
 }

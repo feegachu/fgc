@@ -11,7 +11,6 @@ import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
-import com.susukkang.fgc.contract.mapper.ContractStatusEventMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +32,6 @@ import java.util.Map;
 public class ContractService {
 
     private final ContractMapper contractMapper;
-    private final ContractStatusEventMapper contractStatusEventMapper;
     private final CapCheckService capCheckService;
     /**
      * 설명 : 검색 조건에 따라 계약을 조회한다.
@@ -115,7 +113,8 @@ public class ContractService {
 
         // 예상 스케줄 생성 FUN-036 1차
 
-        // 1200% 한도 검증 FUN-030 1차
+        // 1200% 한도 검증 FUN-030 , REG-08~11 양방향 1200% 검증
+        // 1200% 한도 검증 1차 INS-GA
         CapCalculationCommand command =
                 CapCalculationCommand.realtime(
                         insuranceContract.getContractId(),
@@ -124,6 +123,8 @@ public class ContractService {
                 );
 
         capCheckService.calculateAndSave(command);
+        //  1200% 한도 검증 1차 GA-FC
+
 
         // 계약상태 사건 이력 등록 FUN-026 2차
 
@@ -330,11 +331,11 @@ public class ContractService {
                     "존재하지 않는 보험계약입니다."
             );
         }
-        // 계약상태 사건 이력 가져오기
-        List<ContractStatusEventResponse> statusEvents =
-                contractStatusEventMapper.selectByContractId(contractId);
-        // ContractDetail에 Build 후 반환
-        detail.setContractStatusEventResponses(statusEvents);
+//        // 계약상태 사건 이력 가져오기 2차
+//        List<ContractStatusEventResponse> statusEvents =
+//                contractStatusEventMapper.selectByContractId(contractId);
+//        // ContractDetail에 Build 후 반환
+//        detail.setContractStatusEventResponses(statusEvents);
         return detail;
     }
 
