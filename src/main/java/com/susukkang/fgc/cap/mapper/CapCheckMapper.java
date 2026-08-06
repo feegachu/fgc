@@ -52,4 +52,11 @@ public interface CapCheckMapper {
                                          @Param("paymentStage") String paymentStage,
                                          @Param("insurerId") Long insurerId,
                                          @Param("contractNo") String contractNo);
+
+    /**
+     * IF-API-31(계산근거 팝업)용. cap_check_id로 cap_check 1건 + contractNo(insurance_contract join)를
+     * 조회한다. 없으면 null.
+     */
+    CapCheckRow findById(@Param("capCheckId") Long capCheckId);
+
 }

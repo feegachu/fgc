@@ -28,4 +28,5 @@ public class CapCheckRow {
     private BigDecimal usagePct;
     private String resultStatus;
     private String calculationSnapshotJson;
+    private String contractNo;
 }

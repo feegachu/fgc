@@ -140,6 +140,11 @@ public enum FgcErrorCode {
             HttpStatus.BAD_REQUEST,
             "error.common.validation"
     ),
+    COMMON_004(
+            "FGC-COMMON-004",
+            HttpStatus.NOT_FOUND,
+            "error.common.notFound"
+    ),
     COMMON_500(
             "FGC-COMMON-500",
             HttpStatus.INTERNAL_SERVER_ERROR,
