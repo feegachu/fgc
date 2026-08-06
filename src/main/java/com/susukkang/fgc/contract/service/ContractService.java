@@ -13,6 +13,7 @@ import com.susukkang.fgc.contract.mapper.ContractMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,6 +29,7 @@ import java.util.Objects;
  * @version 1.2
  */
 @Service
+@Validated
 @RequiredArgsConstructor
 public class ContractService {
 
