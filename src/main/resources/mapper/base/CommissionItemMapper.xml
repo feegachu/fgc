@@ -9,7 +9,9 @@
         SELECT item_code AS itemCode,
                item_name AS itemName,
                cashflow_type AS cashflowType,
-               item_category AS itemCategory
+               item_category AS itemCategory,
+               effective_from AS effectiveFrom,
+               effective_to AS effectiveTo
           FROM fgc.commission_item
          WHERE active_yn = TRUE
            AND effective_from &lt;= #{asOf}

@@ -46,7 +46,9 @@ class CommissionItemMapperIntegrationTest {
                         effectiveCode,
                         "통합 테스트 유효 항목",
                         "PAYMENT",
-                        "SALES"
+                        "SALES",
+                        LocalDate.of(2026, 1, 1),
+                        null
                 ));
         assertThat(result)
                 .extracting(CommissionItemResponse::itemCode)

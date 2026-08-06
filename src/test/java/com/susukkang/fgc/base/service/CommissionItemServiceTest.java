@@ -29,7 +29,8 @@ class CommissionItemServiceTest {
     void findsCommissionItemsEffectiveOnTheGivenDate() {
         LocalDate asOf = LocalDate.of(2026, 8, 4);
         CommissionItemResponse item = new CommissionItemResponse(
-                "BASE_COMMISSION", "FC 기본수수료", "PAYMENT", "SALES"
+                "BASE_COMMISSION", "FC 기본수수료", "PAYMENT", "SALES",
+                LocalDate.of(2026, 1, 1), null
         );
         given(commissionItemMapper.findEffectiveItems(asOf)).willReturn(List.of(item));
 
