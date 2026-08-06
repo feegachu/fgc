@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 설명 : 보험계약 등록·조회·수정 업무를 처리한다.
@@ -235,7 +236,7 @@ public class ContractService {
         }
     }
 
-    private void validateDuplicateContract(ContractCreateRequest request) {
+    private void validateDuplicateContract(ContractInput request) {
         if (contractMapper.existsContractNo(
                 request.getInsurerId(),
                 request.getContractNo()
@@ -386,7 +387,7 @@ public class ContractService {
                     "존재하지 않는 보험계약입니다."
             );
         }
-        validateInputForUpdate(request); //수정값 유효성 검사
+        validateInputForUpdate(currentContract,request); //수정값 유효성 검사
 
         // 납입 주기 -> 환산 코드 결정
         PremiumConversionRuleCode conversionRuleCode =
@@ -403,7 +404,7 @@ public class ContractService {
         // 수정할 계약 객체 생성
         InsuranceContract updatedContract = InsuranceContract.builder()
                 .contractId(id)    //계약 id - 유지
-                .contractNo(currentContract.getContractNo()) // 기존 계약번호 유지
+                .contractNo(request.getContractNo()) // 계약 번호 변경가능
                 .insurerId(request.getInsurerId()) //보험사 ID
                 .productOfferingId(request.getProductOfferingId()) //제품 ID
                 .contractDate(request.getContractDate()) //계약 일자
@@ -461,9 +462,47 @@ public class ContractService {
      * @author hjKang
      * @since 2026-08-05
      */
-    private void validateInputForUpdate(ContractUpdateRequest request) {
+    private void validateInputForUpdate(InsuranceContract currentContract,ContractUpdateRequest request) {
         validateContractDate(request); //계약 일자 적합한지 확인
         validateInsurerAndProduct(request); //보험사 , 보험상품 유무 확인
         validateAgentAndOrganization(request); // 직원 , 조직 유무 확인
+        validateContractIdentityForUpdate(currentContract,request); //원수사 , 계약 번호 중복 확인
+    }
+    /**
+     * 설명 : 계약 수정시 기존의 계약데이터의 원수사 , 계약 번호가 같을 경우 skip , 다를경우 중복 검사를 시행하는 함수
+     *
+     * @param  currentContract : 기존 계약 데이터
+     * @param  request : 변경할 계약 데이터
+     * @author hjKang
+     * @since 2026-08-06
+     */
+    private void validateContractIdentityForUpdate(InsuranceContract currentContract, ContractUpdateRequest request) {
+        boolean insurerChanged =
+                !Objects.equals(
+                        currentContract.getInsurerId(),
+                        request.getInsurerId()
+                );
+
+        boolean contractNoChanged =
+                !Objects.equals(
+                        currentContract.getContractNo(),
+                        request.getContractNo()
+                );
+
+        // 원수사와 계약번호가 모두 그대로면 자기 자신이므로 중복 검사 생략
+        if (!insurerChanged && !contractNoChanged) {
+            return;
+        }
+
+        // 둘 중 하나라도 변경되면 새 조합의 중복 여부 검사
+        if (contractMapper.existsContractNo(
+                request.getInsurerId(),
+                request.getContractNo()
+        )) {
+            throw validationException(
+                    "contractNo",
+                    "해당 보험사에 이미 등록된 계약번호입니다."
+            );
+        }
     }
 }

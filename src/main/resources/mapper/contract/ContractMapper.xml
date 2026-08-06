@@ -284,6 +284,7 @@
         UPDATE
             insurance_contract
         SET
+            contract_no = #{contractNo},
             insurer_id = #{insurerId},
             product_offering_id = #{productOfferingId},
             contract_date = #{contractDate},

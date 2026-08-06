@@ -15,6 +15,7 @@ import java.time.LocalDate;
  * @since 2026-08-06
  */
 public interface ContractInput {
+    String getContractNo();
     Long getInsurerId();
     Long getProductOfferingId();
     LocalDate getContractDate();

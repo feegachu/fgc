@@ -208,25 +208,69 @@ class ContractServiceTest {
     }
 
     @Test
-    @DisplayName("계약 수정 시 기존 계약번호와 데이터 출처를 유지한다")
-    void updateContractKeepsContractNumberAndDataOrigin() {
+    @DisplayName("계약 수정 시 계약번호를 변경하고 데이터 출처는 유지한다")
+    void updateContractChangesContractNumberAndKeepsDataOrigin() {
         ContractUpdateRequest request = updateRequest();
         InsuranceContract current = InsuranceContract.builder()
                 .contractId(21L)
                 .contractNo("KEEP-001")
+                .insurerId(1L)
                 .dataOrigin(DataOrigin.SEED)
                 .build();
         given(contractMapper.selectById(21L)).willReturn(current);
         givenValidReferences(request);
+        given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
+                .willReturn(false);
         given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
 
         ContractResponse response = contractService.updateContract(21L, request);
 
         ArgumentCaptor<InsuranceContract> captor = ArgumentCaptor.forClass(InsuranceContract.class);
         verify(contractMapper).updateContract(captor.capture());
-        assertThat(captor.getValue().getContractNo()).isEqualTo("KEEP-001");
+        assertThat(captor.getValue().getContractNo()).isEqualTo("TEST-001");
         assertThat(captor.getValue().getDataOrigin()).isEqualTo(DataOrigin.SEED);
         assertThat(response.getContractId()).isEqualTo(21L);
+    }
+
+    @Test
+    @DisplayName("원수사와 계약번호가 같으면 중복 검사를 생략한다")
+    void updateContractSkipsDuplicateCheckWhenIdentityIsUnchanged() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = InsuranceContract.builder()
+                .contractId(21L)
+                .contractNo(request.getContractNo())
+                .insurerId(request.getInsurerId())
+                .dataOrigin(DataOrigin.SEED)
+                .build();
+        given(contractMapper.selectById(21L)).willReturn(current);
+        givenValidReferences(request);
+        given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
+
+        contractService.updateContract(21L, request);
+
+        verify(contractMapper, never()).existsContractNo(any(), any());
+        verify(contractMapper).updateContract(any(InsuranceContract.class));
+    }
+
+    @Test
+    @DisplayName("변경할 원수사와 계약번호 조합이 중복되면 수정을 거절한다")
+    void updateContractRejectsDuplicateIdentity() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = InsuranceContract.builder()
+                .contractId(21L)
+                .contractNo("OLD-001")
+                .insurerId(request.getInsurerId())
+                .dataOrigin(DataOrigin.SEED)
+                .build();
+        given(contractMapper.selectById(21L)).willReturn(current);
+        givenValidReferences(request);
+        given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> contractService.updateContract(21L, request))
+                .isInstanceOf(FgcBusinessException.class);
+
+        verify(contractMapper, never()).updateContract(any(InsuranceContract.class));
     }
 
     @Test
@@ -292,10 +336,18 @@ class ContractServiceTest {
 
     private ContractUpdateRequest updateRequest() {
         return new ContractUpdateRequest(
-                1L, 1L, LocalDate.now(), ACTIVE,
-                1L, 4L, MONTHLY,
-                new BigDecimal("100000"), new BigDecimal("100000"),
-                120, new BigDecimal("50000")
+                "TEST-001",
+                1L,
+                1L,
+                LocalDate.now(),
+                ACTIVE,
+                1L,
+                4L,
+                MONTHLY,
+                new BigDecimal("100000"),
+                new BigDecimal("100000"),
+                120,
+                new BigDecimal("50000")
         );
     }
 }

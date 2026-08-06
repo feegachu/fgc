@@ -100,15 +100,16 @@ class ContractMapperIntegrationTest {
 
     @Test
     @DisplayName("계약을 수정하면 계약번호는 유지되고 수정값이 반영된다")
-    void updatesContractWithoutChangingContractNumber() {
+    void updatesContractIncludingContractNumber() {
         References refs = references();
         InsuranceContract contract = newContract(refs);
         contractMapper.insertContract(contract);
+        String changedContractNo = "IT-UPDATED-" + UUID.randomUUID();
         InsuranceContract updated = InsuranceContract.builder()
                 .contractId(contract.getContractId())
                 .insurerId(refs.insurerId())
                 .productOfferingId(refs.productOfferingId())
-                .contractNo(contract.getContractNo())
+                .contractNo(changedContractNo)
                 .contractDate(LocalDate.now())
                 .agentId(refs.agentId())
                 .organizationId(refs.organizationId())
@@ -126,13 +127,13 @@ class ContractMapperIntegrationTest {
         assertThat(contractMapper.updateContract(updated)).isEqualTo(1);
 
         InsuranceContract selected = contractMapper.selectById(contract.getContractId());
-        assertThat(selected.getContractNo()).isEqualTo(contract.getContractNo());
+        assertThat(selected.getContractNo()).isEqualTo(changedContractNo);
         assertThat(selected.getCurrentStatus()).isEqualTo(TERMINATED);
         assertThat(selected.getPremiumPerCycleAmount()).isEqualByComparingTo("120000.00");
 
         ContractDetailResponse detail =
                 contractMapper.selectContractDetailById(contract.getContractId());
-        assertThat(detail.getContractNo()).isEqualTo(contract.getContractNo());
+        assertThat(detail.getContractNo()).isEqualTo(changedContractNo);
         assertThat(detail.getContractStatus()).isEqualTo(TERMINATED);
     }
 

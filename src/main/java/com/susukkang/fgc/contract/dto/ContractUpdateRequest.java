@@ -28,6 +28,8 @@ import java.time.LocalDate;
 public class ContractUpdateRequest implements ContractInput {
 
     @NotNull
+    private String contractNo; // 계약 번호
+    @NotNull
     private Long insurerId; // 보험회사
     @NotNull
     private Long productOfferingId; // 상품 판매 버전
@@ -52,4 +54,5 @@ public class ContractUpdateRequest implements ContractInput {
     private Integer paymentTermMonths; // 보험료 납입 기간(개월)
     @PositiveOrZero
     private BigDecimal standardSurrenderDeductionAmount; // 표준 해약 공제액
+
 }

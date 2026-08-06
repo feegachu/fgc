@@ -198,6 +198,7 @@ class ContractControllerTest {
 
     private ContractUpdateRequest updateRequest() {
         return new ContractUpdateRequest(
+                "TEST-20260806-001",
                 3L,
                 4L,
                 LocalDate.of(2026, 8, 6),
