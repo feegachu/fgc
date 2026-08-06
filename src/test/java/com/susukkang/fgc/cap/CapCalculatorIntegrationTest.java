@@ -210,11 +210,7 @@ class CapCalculatorIntegrationTest {
 
     // REG-10(준법경영비 3% 공제)은 2027.1.1 이후 체결된 원수사→GA 계약부터 적용된다(REG-CAP-INS-2027-V1).
     // FGC-FGL01-202703-0001 : STD-LIFE-A(80% 공제 아님), 월납 100,000원, 계약일 2027-03-02
-    // CapCalculatorImpl은 공제 기준액으로 grossLimit을 쓴다(월납 원액
-    // 기준 계산은 feature/18에서만 수정됨 — 이번 PR은 db/demo 시드 보정만 가져왔다). 그래서 기대값은
-    // 3% × grossLimit(1,200,000) = 36,000이다. feature/18의 계산기 수정이 develop에 들어오면
-    // 3% × 월납 원액(100,000) = 3,000으로 다시 맞춰야 한다.
-
+    // 공제 기준액은 grossLimit이 아니라 월납 원액이다(feature/18 반영) — 3% × 100,000 = 3,000.
     @Test
     void complianceDeductionAppliesFromContractsDatedOnOrAfter20270101() {
         Long id = contractId("FGC-FGL01-202703-0001");
@@ -223,9 +219,8 @@ class CapCalculatorIntegrationTest {
                 CapCalculationCommand.realtime(id, PaymentStage.INSURER_TO_GA, LocalDate.of(2027, 3, 2)));
 
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
-        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("36000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1164000");
-
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1197000");
     }
 
     // ProductRefundRateResolver는 STD-LIFE-B의 12차월 환급률과 표버전을 돌려준다
