@@ -27,8 +27,18 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 public class SecurityConfig {
 
     /**
-     * /api/** - 순수 REST. 매 요청 인증 헤더를 싣고 오므로 CSRF 공격 시나리오가 없고,
-     * 미인증이면 리다이렉트 대신 항상 401을 돌려준다.
+     * /api/** - 미인증이면 리다이렉트 대신 항상 401을 돌려준다.
+     *
+     * 세션 인증을 막지 않는 이유
+     *  SessionCreationPolicy.STATELESS 를 걸면 폼 로그인 세션으로는 /api/** 를 못 부른다.
+     *  그런데 인터페이스정의서 3-4 는 "화면 스크립트가 401 을 받으면 location='/login'" 이라고
+     *  적어 두었다. 즉 화면이 세션 쿠키로 /api/** 를 Ajax 호출하는 것이 설계된 동작이다.
+     *  STATELESS 를 켜면 로그인한 사용자의 화면 Ajax 가 전부 401 이 된다.
+     *
+     * ⚠ CSRF 를 끈 것은 지금 /api/** 에 GET 밖에 없어서다(상태변경 엔드포인트 0개).
+     *  위와 같이 쿠키로도 인증되므로 CSRF 공격 시나리오는 성립한다.
+     *  첫 POST/PUT/DELETE 엔드포인트(TRAN-W02 지급 확정 등)를 만들기 전에 반드시
+     *  CSRF 를 다시 켜고 화면 스크립트가 X-CSRF-TOKEN 을 싣도록 바꿔야 한다.
      */
     @Bean
     @Order(1)

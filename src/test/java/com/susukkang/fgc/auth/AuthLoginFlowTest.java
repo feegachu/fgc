@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +48,27 @@ class AuthLoginFlowTest {
                 "SELECT count(*) FROM fgc.audit_log WHERE action_code = ? AND entity_id = ?",
                 Integer.class, actionCode, DEMO_LOGIN_ID);
         return count == null ? 0 : count;
+    }
+
+    /** 방금 쌓인 감사 행의 request_id */
+    private String latestAuditRequestId(String actionCode) {
+        return jdbcTemplate.queryForObject(
+                "SELECT request_id FROM fgc.audit_log WHERE action_code = ? AND entity_id = ?"
+                        + " ORDER BY audit_log_id DESC LIMIT 1",
+                String.class, actionCode, DEMO_LOGIN_ID);
+    }
+
+    private static String repeat(char c, int length) {
+        return String.valueOf(c).repeat(length);
+    }
+
+    /** formLogin() 빌더는 헤더를 받지 못해 X-Request-Id 를 실으려면 직접 POST 해야 한다. */
+    private MockHttpServletRequestBuilder loginWithRequestId(String password, String requestId) {
+        return post("/login")
+                .param("username", DEMO_LOGIN_ID)
+                .param("password", password)
+                .header("X-Request-Id", requestId)
+                .with(csrf());
     }
 
     // 정상 계정은 로그인되고 "/"로 보낸다
@@ -94,6 +116,55 @@ class AuthLoginFlowTest {
     void anonymousApiRequestReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/cap/checks"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /*
+     * 폼 로그인 세션으로 /api/** 를 부를 수 있어야 한다.
+     * 인터페이스정의서 3-4 가 "화면 스크립트는 401 을 받으면 location='/login'" 이라고 정한 것은
+     * 화면이 세션 쿠키로 /api/** 를 Ajax 호출한다는 뜻이다.
+     * API 체인에 SessionCreationPolicy.STATELESS 를 걸면 이 테스트가 깨진다 — 그건 설계 위반이다.
+     */
+    @Test
+    void formLoginSessionCanCallApi() throws Exception {
+        MockHttpSession session = (MockHttpSession) mockMvc
+                .perform(formLogin().user(DEMO_LOGIN_ID).password(DEMO_PASSWORD))
+                .andExpect(authenticated())
+                .andReturn()
+                .getRequest()
+                .getSession(false);
+
+        mockMvc.perform(get("/api/cap/checks").param("month", "2026-07").session(session))
+                .andExpect(status().isOk());
+    }
+
+    // X-Request-Id 가 컬럼 상한(80자)과 같은 길이여도 감사 행이 그대로 기록된다
+    @Test
+    void requestIdAtColumnLimitIsAudited() throws Exception {
+        String requestId = repeat('a', 80);
+        int before = auditCount("LOGIN_SUCCESS");
+
+        mockMvc.perform(loginWithRequestId(DEMO_PASSWORD, requestId))
+                .andExpect(authenticated());
+
+        assertThat(auditCount("LOGIN_SUCCESS")).isEqualTo(before + 1);
+        assertThat(latestAuditRequestId("LOGIN_SUCCESS")).isEqualTo(requestId);
+    }
+
+    /*
+     * 81자짜리 X-Request-Id 를 보내도 감사 행을 잃지 않는다.
+     * request_id 는 varchar(80) 이라 그대로 넣으면 INSERT 가 통째로 실패하고, 그 실패는
+     * ERROR 로그로만 남아 감사 행이 조용히 사라진다. 로그인 무차별 대입을 하는 쪽이
+     * 긴 헤더를 실어 자기 LOGIN_FAIL 기록을 지울 수 있으므로 반드시 막아야 한다.
+     */
+    @Test
+    void oversizedRequestIdStillLeavesAuditRow() throws Exception {
+        int before = auditCount("LOGIN_FAIL");
+
+        mockMvc.perform(loginWithRequestId("wrong-password", repeat('b', 81)))
+                .andExpect(unauthenticated());
+
+        assertThat(auditCount("LOGIN_FAIL")).isEqualTo(before + 1);
+        assertThat(latestAuditRequestId("LOGIN_FAIL")).hasSizeLessThanOrEqualTo(80);
     }
 
     // 로그인 화면 자체는 익명 접근을 허용한다

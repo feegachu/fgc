@@ -29,8 +29,17 @@ public class AuthAuditListener {
 
     private static final String ENTITY_TYPE = "APP_USER";
     private static final String UNKNOWN_LOGIN_ID = "UNKNOWN";
-    /** audit_log.entity_id 는 varchar(100) — 비정상적으로 긴 입력 때문에 감사 기록 자체를 잃지 않도록 자른다 */
+
+    /*
+     * 아래 두 길이는 audit_log 컬럼 정의(V1__baseline_v2_1_2.sql)와 반드시 같아야 한다.
+     * 한 글자라도 넘치면 INSERT 가 통째로 실패하고, 그 실패는 record() 의 catch 가
+     * ERROR 로그로만 남기므로 감사 행이 조용히 사라진다.
+     * login_id 와 X-Request-Id 는 둘 다 바깥에서 들어오는 값이라 길이를 믿을 수 없다.
+     */
+    /** audit_log.entity_id varchar(100) */
     private static final int ENTITY_ID_MAX_LENGTH = 100;
+    /** audit_log.request_id varchar(80) */
+    private static final int REQUEST_ID_MAX_LENGTH = 80;
 
     private final AuditLogMapper auditLogMapper;
 
@@ -72,7 +81,7 @@ public class AuthAuditListener {
                     .entityType(ENTITY_TYPE)
                     .entityId(entityId(loginId))
                     .reason(reason)
-                    .requestId(RequestIdContext.current())
+                    .requestId(clamp(RequestIdContext.current(), REQUEST_ID_MAX_LENGTH))
                     .clientIp(clientIp())
                     .build());
         } catch (RuntimeException ex) {
@@ -93,9 +102,15 @@ public class AuthAuditListener {
         if (loginId == null || loginId.isBlank()) {
             return UNKNOWN_LOGIN_ID;
         }
-        return loginId.length() > ENTITY_ID_MAX_LENGTH
-                ? loginId.substring(0, ENTITY_ID_MAX_LENGTH)
-                : loginId;
+        return clamp(loginId, ENTITY_ID_MAX_LENGTH);
+    }
+
+    /** 컬럼 길이를 넘는 값을 잘라 낸다. 감사 행을 통째로 잃느니 값이 잘리는 편이 낫다. */
+    private static String clamp(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() > maxLength ? value.substring(0, maxLength) : value;
     }
 
     /** 세 이벤트 모두 요청 스레드에서 발생하므로 현재 요청에서 바로 꺼낸다. */
