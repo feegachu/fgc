@@ -4,6 +4,7 @@ import com.susukkang.fgc.contract.dto.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 /**
  * 설명 : ContractMapper
@@ -25,14 +26,19 @@ public interface ContractMapper {
 
     boolean existsProductOffering(
             @Param("insurerId") Long insurerId,
-            @Param("productOfferingId") Long productOfferingId
+            @Param("productOfferingId") Long productOfferingId,
+            @Param("contractDate") LocalDate contractDate
     );
 
-    boolean existsAgent(Long agentId);
+    boolean existsAgent(
+            @Param("agentId") Long agentId,
+            @Param("contractDate") LocalDate contractDate
+    );
 
     boolean existsAgentOrganization(
             @Param("agentId") Long agentId,
-            @Param("organizationId") Long organizationId
+            @Param("organizationId") Long organizationId,
+            @Param("contractDate") LocalDate contractDate
     );
 
     boolean existsContractNo(

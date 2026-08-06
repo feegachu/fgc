@@ -157,7 +157,8 @@ public class ContractService {
 
         if (!contractMapper.existsProductOffering(
                 request.getInsurerId(),
-                request.getProductOfferingId()
+                request.getProductOfferingId(),
+                request.getContractDate()
         )) {
             throw validationException(
                     "productOfferingId",
@@ -167,7 +168,10 @@ public class ContractService {
     }
 
     private void validateAgentAndOrganization(ContractInput  request) {
-        if (!contractMapper.existsAgent(request.getAgentId())) {
+        if (!contractMapper.existsAgent(
+                request.getAgentId(),
+                request.getContractDate()
+        )) {
             throw validationException(
                     "agentId",
                     "존재하지 않는 설계사입니다."
@@ -176,7 +180,8 @@ public class ContractService {
 
         if (!contractMapper.existsAgentOrganization(
                 request.getAgentId(),
-                request.getOrganizationId()
+                request.getOrganizationId(),
+                request.getContractDate()
         )) {
             throw validationException(
                     "organizationId",

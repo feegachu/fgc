@@ -3,7 +3,10 @@ package com.susukkang.fgc.contract.service;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.domain.DataOrigin;
+import com.susukkang.fgc.contract.domain.PaymentCycleCode;
+import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
+import com.susukkang.fgc.contract.dto.ContractInput;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
@@ -13,6 +16,10 @@ import com.susukkang.fgc.contract.mapper.ContractMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -22,15 +29,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static com.susukkang.fgc.contract.domain.ContractStatus.ACTIVE;
 import static com.susukkang.fgc.contract.domain.PaymentCycleCode.MONTHLY;
-import static com.susukkang.fgc.contract.domain.PaymentCycleCode.QUARTERLY;
-import static com.susukkang.fgc.contract.domain.PremiumConversionRuleCode.MONTHLY_TO_QUARTERLY_X3;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -66,14 +73,17 @@ class ContractServiceTest {
         verify(contractMapper).selectByCondition(condition);
     }
 
-    @Test
-    @DisplayName("분기납 계약을 생성할 때 월납환산보험료의 3배를 주기별 보험료로 저장한다")
-    void createContractCalculatesQuarterlyPremiumPerCycle() {
+    @ParameterizedTest
+    @MethodSource("premiumConversionCases")
+    @DisplayName("납입주기에 따라 주기별 보험료와 환산 코드를 계산한다")
+    void createContractCalculatesPremiumByPaymentCycle(
+            PaymentCycleCode paymentCycleCode,
+            String expectedPremiumPerCycleAmount,
+            PremiumConversionRuleCode expectedRuleCode
+    ) {
         ContractCreateRequest request = createRequest();
-        request.setPaymentCycleCode(QUARTERLY);
-        request.setFirstPremiumAmount(new BigDecimal("300000"));
-        givenValidReferences(request.getInsurerId(), request.getProductOfferingId(),
-                request.getAgentId(), request.getOrganizationId());
+        request.setPaymentCycleCode(paymentCycleCode);
+        givenValidReferences(request);
         given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(false);
         given(contractMapper.insertContract(any(InsuranceContract.class))).willAnswer(invocation -> {
@@ -88,18 +98,35 @@ class ContractServiceTest {
         verify(contractMapper).insertContract(captor.capture());
         InsuranceContract saved = captor.getValue();
         assertThat(saved.getMonthlyEquivalentFirstPremium()).isEqualByComparingTo("100000");
-        assertThat(saved.getPremiumPerCycleAmount()).isEqualByComparingTo("300000");
-        assertThat(saved.getPremiumConversionRuleCode()).isEqualTo(MONTHLY_TO_QUARTERLY_X3);
+        assertThat(saved.getPremiumPerCycleAmount())
+                .isEqualByComparingTo(expectedPremiumPerCycleAmount);
+        assertThat(saved.getPremiumConversionRuleCode()).isEqualTo(expectedRuleCode);
         assertThat(saved.getDataOrigin()).isEqualTo(DataOrigin.MANUAL);
         assertThat(response.getContractId()).isEqualTo(21L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = PaymentCycleCode.class,
+            names = {"SINGLE", "OTHER"}
+    )
+    @DisplayName("역산을 지원하지 않는 납입주기는 계약 생성을 거절한다")
+    void createContractRejectsUnsupportedPaymentCycle(PaymentCycleCode paymentCycleCode) {
+        ContractCreateRequest request = createRequest();
+        request.setPaymentCycleCode(paymentCycleCode);
+        givenValidReferences(request);
+
+        assertThatThrownBy(() -> contractService.createContract(request))
+                .isInstanceOf(FgcBusinessException.class);
+
+        verify(contractMapper, never()).insertContract(any(InsuranceContract.class));
     }
 
     @Test
     @DisplayName("중복 계약번호이면 계약 생성을 거절한다")
     void createContractRejectsDuplicateContractNumber() {
         ContractCreateRequest request = createRequest();
-        givenValidReferences(request.getInsurerId(), request.getProductOfferingId(),
-                request.getAgentId(), request.getOrganizationId());
+        givenValidReferences(request);
         given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(true);
 
@@ -117,8 +144,7 @@ class ContractServiceTest {
                 .dataOrigin(DataOrigin.SEED)
                 .build();
         given(contractMapper.selectById(21L)).willReturn(current);
-        givenValidReferences(request.getInsurerId(), request.getProductOfferingId(),
-                request.getAgentId(), request.getOrganizationId());
+        givenValidReferences(request);
         given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
 
         ContractResponse response = contractService.updateContract(21L, request);
@@ -139,12 +165,47 @@ class ContractServiceTest {
                 .isInstanceOf(FgcBusinessException.class);
     }
 
-    private void givenValidReferences(Long insurerId, Long productOfferingId,
-                                      Long agentId, Long organizationId) {
-        given(contractMapper.existsInsurer(insurerId)).willReturn(true);
-        given(contractMapper.existsProductOffering(insurerId, productOfferingId)).willReturn(true);
-        given(contractMapper.existsAgent(agentId)).willReturn(true);
-        given(contractMapper.existsAgentOrganization(agentId, organizationId)).willReturn(true);
+    private void givenValidReferences(ContractInput request) {
+        given(contractMapper.existsInsurer(request.getInsurerId())).willReturn(true);
+        given(contractMapper.existsProductOffering(
+                request.getInsurerId(),
+                request.getProductOfferingId(),
+                request.getContractDate()
+        )).willReturn(true);
+        given(contractMapper.existsAgent(
+                request.getAgentId(),
+                request.getContractDate()
+        )).willReturn(true);
+        given(contractMapper.existsAgentOrganization(
+                request.getAgentId(),
+                request.getOrganizationId(),
+                request.getContractDate()
+        )).willReturn(true);
+    }
+
+    private static Stream<Arguments> premiumConversionCases() {
+        return Stream.of(
+                Arguments.of(
+                        PaymentCycleCode.MONTHLY,
+                        "100000",
+                        PremiumConversionRuleCode.MONTHLY_AS_IS
+                ),
+                Arguments.of(
+                        PaymentCycleCode.QUARTERLY,
+                        "300000",
+                        PremiumConversionRuleCode.MONTHLY_TO_QUARTERLY_X3
+                ),
+                Arguments.of(
+                        PaymentCycleCode.SEMI_ANNUAL,
+                        "600000",
+                        PremiumConversionRuleCode.MONTHLY_TO_SEMI_ANNUAL_X6
+                ),
+                Arguments.of(
+                        PaymentCycleCode.ANNUAL,
+                        "1200000",
+                        PremiumConversionRuleCode.MONTHLY_TO_ANNUAL_X12
+                )
+        );
     }
 
     private ContractCreateRequest createRequest() {

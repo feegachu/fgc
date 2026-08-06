@@ -46,15 +46,20 @@ class ContractMapperIntegrationTest {
     @DisplayName("보험사·상품판매버전·설계사·조직의 연관관계를 확인한다")
     void checksReferenceExistence() {
         References refs = references();
+        LocalDate contractDate = LocalDate.now();
 
         assertThat(contractMapper.existsInsurer(refs.insurerId())).isTrue();
         assertThat(contractMapper.existsProductOffering(
-                refs.insurerId(), refs.productOfferingId())).isTrue();
-        assertThat(contractMapper.existsAgent(refs.agentId())).isTrue();
+                refs.insurerId(), refs.productOfferingId(), contractDate)).isTrue();
+        assertThat(contractMapper.existsAgent(refs.agentId(), contractDate)).isTrue();
         assertThat(contractMapper.existsAgentOrganization(
-                refs.agentId(), refs.organizationId())).isTrue();
+                refs.agentId(), refs.organizationId(), contractDate)).isTrue();
         assertThat(contractMapper.existsProductOffering(
-                Long.MAX_VALUE, refs.productOfferingId())).isFalse();
+                Long.MAX_VALUE, refs.productOfferingId(), contractDate)).isFalse();
+        assertThat(contractMapper.existsProductOffering(
+                refs.insurerId(), refs.productOfferingId(), LocalDate.of(1900, 1, 1))).isFalse();
+        assertThat(contractMapper.existsAgent(
+                refs.agentId(), LocalDate.of(1900, 1, 1))).isFalse();
     }
 
     @Test

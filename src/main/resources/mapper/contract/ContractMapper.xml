@@ -28,7 +28,7 @@
                 ON p.product_id = po.product_id
             JOIN agent a              -- 설계사 번호 , 이름
                 ON a.agent_id = ic.agent_id
-            LEFT JOIN cap_check cc  --1200% 초과 여부
+            LEFT JOIN fgc.vw_latest_cap_check cc --1200% 한도 가장 최근껄 가져옴
                 ON cc.contract_id = ic.contract_id
             AND cc.payment_stage = 'GA_TO_FC'
 
@@ -50,7 +50,11 @@
                 AND ic.agent_id = #{agentId}
             </if>
 
-            <if test="currentStatus != null and currentStatus != ''">
+            <if test="capResultStatus != null">
+                AND cc.result_status = #{capResultStatus}
+            </if>
+            
+            <if test="currentStatus != null">
                 AND ic.current_status = #{currentStatus}
             </if>
 
@@ -86,6 +90,10 @@
               ON p.product_id = po.product_id
             WHERE p.insurer_id = #{insurerId}
               AND po.product_offering_id = #{productOfferingId}
+              AND p.active_yn = TRUE
+              AND po.active_yn = TRUE
+              AND po.sales_start_date <![CDATA[ <= ]]> #{contractDate}
+              AND (po.sales_end_date IS NULL OR po.sales_end_date <![CDATA[ >= ]]> #{contractDate})
         )
     </select>
     <!-- 설계사 존재 여부 확인 -->
@@ -94,15 +102,24 @@
             SELECT 1
             FROM fgc.agent
             WHERE agent_id = #{agentId}
+              AND active_yn = TRUE
+              AND agent_status = 'ACTIVE'
+              AND appointment_date <![CDATA[ <= ]]> #{contractDate}
+              AND (termination_date IS NULL OR termination_date <![CDATA[ >= ]]> #{contractDate})
         )
     </select>
     <!-- 설계사 조직 존재 여부 확인 -->
     <select id="existsAgentOrganization" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
-            FROM fgc.agent
-            WHERE agent_id = #{agentId}
-              AND organization_id = #{organizationId}
+            FROM fgc.agent a
+            JOIN fgc.organization o
+              ON o.organization_id = a.organization_id
+            WHERE a.agent_id = #{agentId}
+              AND a.organization_id = #{organizationId}
+              AND o.active_yn = TRUE
+              AND o.effective_from <![CDATA[ <= ]]> #{contractDate}
+              AND (o.effective_to IS NULL OR o.effective_to <![CDATA[ >= ]]> #{contractDate})
         )
     </select>
     <!-- 계약 존재 여부 확인 -->
@@ -220,5 +237,6 @@
             current_status = #{currentStatus},
             data_origin = #{dataOrigin}
         WHERE contract_id = #{contractId}
+
     </update>
 </mapper>

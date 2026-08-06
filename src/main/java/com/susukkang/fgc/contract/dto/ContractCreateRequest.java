@@ -5,6 +5,7 @@ import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -50,7 +51,6 @@ public class ContractCreateRequest implements ContractInput {
     @NotNull
     @Positive
     private Integer paymentTermMonths; //납입기간
-    @NotNull
-    @Positive
+    @PositiveOrZero
     private BigDecimal standardSurrenderDeductionAmount; //계약별 표준해약공제액 입력값
 }
