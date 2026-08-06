@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.contract.mapper.ContractMapper">
+
+
+    <select id="selectByCondition"
+            parameterType="com.susukkang.fgc.contract.dto.ContractSearchCondition"
+            resultType="com.susukkang.fgc.contract.dto.ContractView">
+        SELECT
+            ic.contract_no AS contract_no,
+            i.insurer_name AS insurer_name,
+            p.product_name AS product_name,
+            ic.contract_date AS contract_date,
+            ic.monthly_equivalent_first_premium AS monthly_equivalent_first_premium,
+            CONCAT('FC-', LPAD(a.agent_id::text, 4, '0'), ' ', a.agent_name) AS agent_id_name,
+            ic.current_status AS contract_status,
+            cc.result_status AS cap_result_status,
+            ic.data_origin AS data_origin
+        FROM insurance_contract ic --계약
+            JOIN insurer i         --보험회사 이름 가져와야함
+                ON i.insurer_id = ic.insurer_id
+            JOIN product_offering po --상품판매 버전을 가져와서 상품 테이블 JOIN
+                ON po.product_offering_id = ic.product_offering_id
+            JOIN product p           --상품판매 버전 id로
+                ON p.product_id = po.product_id
+            JOIN agent a              -- 설계사 번호 , 이름
+                ON a.agent_id = ic.agent_id
+            LEFT JOIN cap_check cc  --1200% 초과 여부
+                ON cc.contract_id = ic.contract_id
+            AND cc.payment_stage = 'GA_TO_FC'
+
+        <where>
+            <if test="contractNo != null and contractNo != ''">
+                AND ic.contract_no
+                LIKE CONCAT('%', #{contractNo}, '%')
+            </if>
+
+            <if test="insurerId != null">
+                AND ic.insurer_id = #{insurerId}
+            </if>
+
+            <if test="productOfferingId != null">
+                AND ic.product_offering_id = #{productOfferingId}
+            </if>
+
+            <if test="agentId != null">
+                AND ic.agent_id = #{agentId}
+            </if>
+
+            <if test="currentStatus != null and currentStatus != ''">
+                AND ic.current_status = #{currentStatus}
+            </if>
+
+            <if test="contractDateFrom != null">
+                AND ic.contract_date
+                <![CDATA[ >= ]]>
+                #{contractDateFrom}
+            </if>
+
+            <if test="contractDateTo != null">
+                AND ic.contract_date
+                <![CDATA[ <= ]]>
+                #{contractDateTo}
+            </if>
+        </where>
+        ORDER BY ic.contract_id DESC
+    </select>
+    <!-- 적합성 검사 추후에 다른 xml에 넣을 예정 -->
+    <!-- 보험회사 존재 여부 확인 -->
+    <select id="existsInsurer" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM fgc.insurer
+            WHERE insurer_id = #{insurerId}
+        )
+    </select>
+    <!-- 보험상품 존재 여부 확인 -->
+    <select id="existsProductOffering" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM fgc.product_offering po
+            JOIN fgc.product p
+              ON p.product_id = po.product_id
+            WHERE p.insurer_id = #{insurerId}
+              AND po.product_offering_id = #{productOfferingId}
+        )
+    </select>
+    <!-- 설계사 존재 여부 확인 -->
+    <select id="existsAgent" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM fgc.agent
+            WHERE agent_id = #{agentId}
+        )
+    </select>
+    <!-- 설계사 조직 존재 여부 확인 -->
+    <select id="existsAgentOrganization" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM fgc.agent
+            WHERE agent_id = #{agentId}
+              AND organization_id = #{organizationId}
+        )
+    </select>
+    <!-- 계약 존재 여부 확인 -->
+    <select id="existsContractNo" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM fgc.insurance_contract
+            WHERE insurer_id = #{insurerId}
+              AND contract_no = #{contractNo}
+        )
+    </select>
+    <!-- 계약 등록 -->
+    <insert id="insertContract"
+            parameterType="com.susukkang.fgc.contract.dto.InsuranceContract"
+            useGeneratedKeys="true"
+            keyProperty="contractId"
+            keyColumn="contract_id">
+        INSERT INTO insurance_contract (
+            insurer_id,
+            product_offering_id,
+            contract_no,
+            contract_date,
+            agent_id,
+            organization_id,
+            premium_per_cycle_amount,
+            first_premium_amount,
+            monthly_equivalent_first_premium,
+            premium_conversion_rule_code,
+            payment_cycle_code,
+            payment_term_months,
+            standard_surrender_deduction_amount,
+            current_status,
+            data_origin
+        )
+        VALUES (
+                   #{insurerId},
+                   #{productOfferingId},
+                   #{contractNo},
+                   #{contractDate},
+                   #{agentId},
+                   #{organizationId},
+                   #{premiumPerCycleAmount},
+                   #{firstPremiumAmount},
+                   #{monthlyEquivalentFirstPremium},
+                   #{premiumConversionRuleCode},
+                   #{paymentCycleCode},
+                   #{paymentTermMonths},
+                   #{standardSurrenderDeductionAmount},
+                   #{currentStatus},
+                   #{dataOrigin}
+               )
+    </insert>
+
+    <select id="selectById" parameterType="long" resultType="com.susukkang.fgc.contract.dto.InsuranceContract">
+            SELECT
+                insurer_id,
+                product_offering_id,
+                contract_no,
+                contract_date,
+                agent_id,
+                organization_id,
+                premium_per_cycle_amount,
+                first_premium_amount,
+                monthly_equivalent_first_premium,
+                premium_conversion_rule_code,
+                payment_cycle_code,
+                payment_term_months,
+                standard_surrender_deduction_amount,
+                current_status,
+                data_origin
+            FROM insurance_contract
+            WHERE contract_id = #{id}
+    </select>
+
+    <select id="selectContractDetailById"
+            resultType="com.susukkang.fgc.contract.dto.ResponseContractDetail">
+        SELECT
+            p.product_name,
+            ic.contract_date,
+            ic.premium_per_cycle_amount,
+            ic.payment_cycle_code,
+            ic.first_premium_amount,
+            ic.monthly_equivalent_first_premium,
+            ic.payment_term_months,
+            ic.standard_surrender_deduction_amount,
+            ic.current_status AS contract_status,
+            ic.data_origin
+        FROM insurance_contract ic
+                 JOIN product_offering po
+                      ON ic.product_offering_id = po.product_offering_id
+                 JOIN product p
+                      ON p.product_id = po.product_id
+        WHERE ic.contract_id = #{contractId}
+    </select>
+
+    <update id="updateContract"
+            parameterType="com.susukkang.fgc.contract.dto.InsuranceContract">
+        UPDATE
+            insurance_contract
+        SET
+            insurer_id = #{insurerId},
+            product_offering_id = #{productOfferingId},
+            contract_date = #{contractDate},
+            agent_id = #{agentId},
+            organization_id = #{organizationId},
+            premium_per_cycle_amount = #{premiumPerCycleAmount},
+            first_premium_amount = #{firstPremiumAmount},
+            monthly_equivalent_first_premium = #{monthlyEquivalentFirstPremium},
+            premium_conversion_rule_code = #{premiumConversionRuleCode},
+            payment_cycle_code = #{paymentCycleCode},
+            payment_term_months = #{paymentTermMonths},
+            standard_surrender_deduction_amount = #{standardSurrenderDeductionAmount},
+            current_status = #{currentStatus},
+            data_origin = #{dataOrigin}
+        WHERE contract_id = #{contractId}
+    </update>
+</mapper>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.contract.mapper.ContractStatusEventMapper">
+
+    <select id="selectByContractId"
+            resultType="com.susukkang.fgc.contract.dto.ContractStatusEventResponse">
+
+        SELECT event_seq,
+               previous_status,
+               new_status,
+               effective_at,
+               received_at,
+               processed_at,
+               reason_code
+        FROM fgc.contract_status_event
+        WHERE contract_id = #{contractId}
+        ORDER BY event_seq
+
+    </select>
+
+</mapper>
