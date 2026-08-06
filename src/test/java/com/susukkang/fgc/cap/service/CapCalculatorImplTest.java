@@ -132,7 +132,8 @@ class CapCalculatorImplTest {
                 CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
 
         assertThat(result.limitAmount()).isEqualByComparingTo("1200000");
-        assertThat(result.basePremiumAmount()).isEqualByComparingTo("1200000");
+        // basePremiumAmount는 월납 원액이다(×12 하지 않음) — 한도(1,200,000)와는 다른 값이다
+        assertThat(result.basePremiumAmount()).isEqualByComparingTo("100000");
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.includedAmount()).isEqualByComparingTo("0");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
@@ -175,9 +176,10 @@ class CapCalculatorImplTest {
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
                 CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 1, 15)));
 
-        // gross 1,488,000 × 3% = 44,640 공제 → 1,443,360
-        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("44640");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1443360");
+        // 공제 기준은 grossLimit이 아니라 월납 원액이다(REG-10: "월납 기준 초회보험료의 3%").
+        // 월납 100,000 × 3% = 3,000 공제 → gross 1,488,000 − 3,000 = 1,485,000
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1485000");
     }
 
     // 계약일이 2026/2027/2029이어도 같은 엔진이 같은 기본한도를 계산한다
