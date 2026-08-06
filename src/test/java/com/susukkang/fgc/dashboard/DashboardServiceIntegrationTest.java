@@ -53,12 +53,25 @@ class DashboardServiceIntegrationTest {
                 """, contractId, paymentStage, capRuleSetId(paymentStage), asOfDate, resultStatus, checkedAt);
     }
 
+    // guard_run_lifecycle(V7)이 INSERT 시 status='CREATED'만 허용한다 — 곧바로 COMPLETED로
+    // INSERT할 수 없고 CREATED→RUNNING→COMPLETED 순서로 UPDATE해야 한다. ck_validation_run_step은
+    // COMPLETED일 때 current_step이 정확히 8이어야 한다고 강제한다.
     private Long insertValidationRun(LocalDate month, int runNo, String status, OffsetDateTime createdAt) {
-        return jdbcTemplate.queryForObject("""
+        Long id = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, status, created_at)
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, 'CREATED', ?)
                 RETURNING validation_run_id
-                """, Long.class, month, runNo, status, createdAt);
+                """, Long.class, month, runNo, createdAt);
+        if (!"CREATED".equals(status)) {
+            jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?", id);
+            if ("COMPLETED".equals(status)) {
+                jdbcTemplate.update(
+                        "UPDATE fgc.validation_run SET status='COMPLETED', current_step=8 WHERE validation_run_id=?", id);
+            } else if ("FAILED".equals(status)) {
+                jdbcTemplate.update("UPDATE fgc.validation_run SET status='FAILED' WHERE validation_run_id=?", id);
+            }
+        }
+        return id;
     }
 
     private void insertArbitrageCheck(Long validationRunId, Long contractId, LocalDate asOfDate, String resultStatus) {
@@ -134,13 +147,31 @@ class DashboardServiceIntegrationTest {
     @Test
     void summarizeExcludesCapCheckOutsideRequestedMonth() {
         Long id = contractId("FGC-FGL01-202607-0002");
-        // 이 계약의 "최신" 판정 자체가 6월 것이면, 7월 대시보드에는 안 잡혀야 한다.
+        // 이 계약의 유일한 판정이 6월 것이면, 7월 대시보드에는 안 잡혀야 한다.
         insertCapCheck(id, "GA_TO_FC", LocalDate.of(2026, 6, 20), "VIOLATION",
                 OffsetDateTime.parse("2026-06-20T09:00:00+09:00"));
 
         DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
 
         assertThat(result.kpis().capViolation()).isEqualTo(0);
+    }
+
+    // coderabbitai 지적: vw_latest_cap_check는 계약·지급단계별 "전체 기간" 최신 판정을 먼저 고르므로,
+    // 7월 VIOLATION 이후 8월에 재판정(NORMAL)되면 그 계약의 전체 기간 최신은 8월 NORMAL이 되어
+    // 7월 대시보드에서 VIOLATION이 통째로 사라진다. 월 필터를 먼저 적용해야 이 문제가 없다.
+    @Test
+    void summarizeStillCountsJulyViolationEvenWhenContractWasRecheckedNormalInAugust() {
+        Long id = contractId("FGC-FGL01-202607-0004");
+        insertCapCheck(id, "GA_TO_FC", LocalDate.of(2026, 7, 15), "VIOLATION",
+                OffsetDateTime.parse("2026-07-15T09:00:00+09:00"));
+        insertCapCheck(id, "GA_TO_FC", LocalDate.of(2026, 8, 5), "NORMAL",
+                OffsetDateTime.parse("2026-08-05T09:00:00+09:00"));
+
+        DashboardSummaryResult julyResult = dashboardService.summarize(LocalDate.of(2026, 7, 1));
+        DashboardSummaryResult augustResult = dashboardService.summarize(LocalDate.of(2026, 8, 1));
+
+        assertThat(julyResult.kpis().capViolation()).isEqualTo(1);
+        assertThat(augustResult.kpis().capViolation()).isEqualTo(0);
     }
 
     // 2. 차익거래 검토대상: 월 필터 없음, dedup 없음(전부 카운트)
@@ -238,7 +269,7 @@ class DashboardServiceIntegrationTest {
         assertThat(recent.get(0).createdAt()).isEqualTo(OffsetDateTime.parse("2026-07-06T09:00:00+09:00"));
     }
 
-    // 8. 최근 검증 실행 3건: 최신순, 3건 제한, 진행률(%) 필드 없음
+    // 8. 최근 검증 실행 3건: 생성 시각(created_at) 최신순, 3건 제한, current_step(진행률) 포함
     @Test
     void summarizeReturnsAtMostThreeRecentValidationRunsSortedByLatest() {
         insertValidationRun(LocalDate.of(2026, 4, 1), 1, "COMPLETED", OffsetDateTime.parse("2026-05-01T09:00:00+09:00"));
@@ -251,5 +282,23 @@ class DashboardServiceIntegrationTest {
 
         assertThat(recent).hasSize(3);
         assertThat(recent.get(0).validationMonth()).isEqualTo(LocalDate.of(2026, 7, 1));
+        assertThat(recent.get(0).currentStep()).isEqualTo(8);
+    }
+
+    // coderabbitai 지적: validation_month DESC로 정렬하면 "과거 기준월을 나중에 재실행"한 경우
+    // 실제로 더 최근에 생성된 실행이 뒤로 밀린다. created_at 기준으로 정렬해야 한다.
+    @Test
+    void summarizeOrdersRecentRunsByCreationTimeNotValidationMonthWhenRerunOutOfOrder() {
+        // 5월 실행이 6월 실행보다 나중(오늘) 재실행됐다 — 기준월 순서와 생성 순서가 뒤바뀐 경우
+        Long juneRun = insertValidationRun(LocalDate.of(2026, 6, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-07-01T09:00:00+09:00"));
+        Long mayRerun = insertValidationRun(LocalDate.of(2026, 5, 1), 2, "COMPLETED",
+                OffsetDateTime.parse("2026-08-01T09:00:00+09:00"));
+
+        List<RecentValidationRunRow> recent = dashboardService.summarize(LocalDate.of(2026, 8, 1))
+                .recentValidationRuns();
+
+        assertThat(recent.get(0).validationRunId()).isEqualTo(mayRerun);
+        assertThat(recent.get(1).validationRunId()).isEqualTo(juneRun);
     }
 }

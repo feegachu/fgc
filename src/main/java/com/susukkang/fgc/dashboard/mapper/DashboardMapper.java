@@ -16,8 +16,11 @@ public interface DashboardMapper {
 
     /**
      * 1,200% 위반 건수
-     * 원본: vw_latest_cap_check(계약·지급단계별 최신 판정만) WHERE result_status = 'VIOLATION'
+     * 원본: cap_check WHERE result_status = 'VIOLATION'
      * 월 필터: 있음 — as_of_date가 month가 속한 달에 포함되는 행만
+     * 중복 처리: 계약·지급단계별 "이번 달 안에서" 최신 판정만(vw_latest_cap_check는 쓰지 않는다 —
+     *   그 뷰는 전체 기간 최신을 먼저 고르므로, 그 계약의 최신이 다른 달이면 이번 달 판정이 통째로
+     *   사라진다). 반드시 월 필터를 먼저 적용한 뒤 그 안에서 dedup해야 한다.
      */
     long countCapViolation(@Param("month") LocalDate month);
 
@@ -66,7 +69,8 @@ public interface DashboardMapper {
 
     /**
      * 최근 통합검증 실행 목록
-     * validation_run을 최신순으로 limit개
+     * validation_run을 생성 시각(created_at) 기준 최신순으로 limit개 — validation_month/run_no로
+     * 정렬하면 "과거 기준월을 나중에 재실행"한 경우 실제로 더 최근에 만들어진 실행이 뒤로 밀린다.
      * triggered_by/finalized_by는 app_user.user_id FK라 화면에
      * 보여줄 login_id를 얻으려면 app_user를 LEFT JOIN
      */

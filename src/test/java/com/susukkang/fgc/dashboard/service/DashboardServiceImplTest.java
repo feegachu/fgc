@@ -82,7 +82,7 @@ class DashboardServiceImplTest {
                 new RecentExceptionRow(1L, "CAP_VIOLATION", "CRITICAL", "C001", "제목", "NEW",
                         OffsetDateTime.parse("2026-07-10T09:00:00+09:00")));
         List<RecentValidationRunRow> runs = List.of(
-                new RecentValidationRunRow(1L, month, 1, "MONTHLY", "COMPLETED", "gaadmin",
+                new RecentValidationRunRow(1L, month, 1, "MONTHLY", "COMPLETED", 8, "gaadmin",
                         null, null, null, null, null));
         when(dashboardMapper.findRecentExceptions(5)).thenReturn(exceptions);
         when(dashboardMapper.findRecentValidationRuns(3)).thenReturn(runs);
