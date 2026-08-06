@@ -3,6 +3,7 @@ HELP.md
 
 # Gradle
 .gradle/
+.gradle-codex/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/

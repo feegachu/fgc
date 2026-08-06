@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapCheckInsertRow;
@@ -129,6 +130,16 @@ public class CapCheckServiceImpl implements CapCheckService {
         PageResponse<CapCheckListRow> pageResponse =
                 PageResponse.of(rows, page, size, total, "asOfDate,desc");
         return new CapCheckSearchResult(summary, pageResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<CapCheckBasisResponse> findDetail(Long capCheckId) {
+        CapCheckRow row = capCheckMapper.findById(capCheckId);
+        if (row == null) {
+            return Optional.empty();
+        }
+        return Optional.of(CapCheckBasisResponse.from(toSaveResult(row), row.getContractNo()));
     }
 
     private CapCheckSaveResult toSaveResult(CapCheckRow row) {

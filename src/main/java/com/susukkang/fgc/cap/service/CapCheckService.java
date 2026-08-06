@@ -1,6 +1,7 @@
 package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
@@ -13,9 +14,8 @@ import java.util.Optional;
  * "계산과 저장의 트랜잭션 경계는 이 계층에서 관리한다"는 요구사항에 따라, cap_check/cap_check_detail
  * 저장과 그 트랜잭션 범위를 여기서 책임진다. CapCalculator 자체는 저장을 모른다.
  *
- * FUN-030(이 이슈) 범위는 계산·저장과 IF-API-30(목록) 조회까지다. 계약 상세용 조회(IF-API-14,
- * FUN-032·박민준)나 계산근거 상세 조회(IF-API-31, FUN-035·강현준)가 필요해지면 그쪽 이슈에서
- * 이 서비스에 메서드를 추가해 연결한다.
+ * FUN-030 범위는 계산·저장과 IF-API-30(목록) 조회까지다. 계약 상세용 조회(IF-API-14, FUN-032·박민준)가
+ * 필요해지면 그쪽 이슈에서 이 서비스에 메서드를 추가해 연결한다.
  */
 public interface CapCheckService {
 
@@ -27,4 +27,10 @@ public interface CapCheckService {
 
     /** IF-API-30: 목록 검색(페이징) + 요약 카드 4장. */
     CapCheckSearchResult search(CapCheckSearchCriteria criteria, int page, int size);
+
+    /**
+     * IF-API-31(계산근거 팝업, FUN-035): capCheckId로 저장된 계산 스냅샷을 그대로 펼쳐서 돌려준다.
+     * 재계산하지 않는다. 해당 capCheckId가 없으면 Optional.empty() — 컨트롤러에서 404로 매핑한다.
+     */
+    Optional<CapCheckBasisResponse> findDetail(Long capCheckId);
 }

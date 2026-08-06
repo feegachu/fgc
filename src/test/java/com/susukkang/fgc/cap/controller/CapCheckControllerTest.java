@@ -1,10 +1,14 @@
 package com.susukkang.fgc.cap.controller;
 
+import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
+import com.susukkang.fgc.cap.dto.CapCheckDetailResponse;
+import com.susukkang.fgc.cap.dto.CapCheckItemResponse;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.CapCheckSummary;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.CapResultStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -22,6 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -103,5 +109,53 @@ class CapCheckControllerTest {
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+    }
+
+    private CapCheckBasisResponse sampleBasisResponse() {
+        List<CapCheckDetailResponse> details = List.of(
+                new CapCheckDetailResponse(1, "FC 기본수수료", "INCLUDED", 650000L, "산입", null),
+                new CapCheckDetailResponse(2, "교육비", "EXCLUDED", 50000L, "제외", "SRC-004"));
+
+        // basePremiumAmount는 월납 원액(100,000)이다 — limitAmount(1,200,000)와는 다른 값이다.
+        CapCheckItemResponse capCheck = new CapCheckItemResponse(
+                999L, 1L, "C001", PaymentStage.GA_TO_FC, PaymentStage.GA_TO_FC.label(),
+                LocalDate.of(2026, 7, 10),
+                100000L, 0L, 0L, 1200000L, 650000L, 550000L, "54.166667",
+                CapResultStatus.NORMAL, CapResultStatus.NORMAL.label(), 500L);
+
+        return new CapCheckBasisResponse(capCheck, details, Map.of("premiumMultiplier", "12.0000"));
+    }
+
+    @Test
+    void findDetailReturnsNestedCapCheckDetailsAndCalculationSnapshot() throws Exception {
+        given(capCheckService.findDetail(999L)).willReturn(Optional.of(sampleBasisResponse()));
+
+        mockMvc.perform(get("/api/cap/checks/999/details").with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.capCheck.capCheckId").value(999))
+                .andExpect(jsonPath("$.data.capCheck.contractNo").value("C001"))
+                .andExpect(jsonPath("$.data.capCheck.capRuleSetId").value(500))
+                .andExpect(jsonPath("$.data.capCheck.basePremiumAmount").value(100000))
+                .andExpect(jsonPath("$.data.capCheck.limitAmount").value(1200000))
+                .andExpect(jsonPath("$.data.capCheck.includedAmount").value(650000))
+                .andExpect(jsonPath("$.data.capCheck.usagePct").value("54.166667"))
+                .andExpect(jsonPath("$.data.calculationSnapshot.premiumMultiplier").value("12.0000"))
+                .andExpect(jsonPath("$.data.details[0].commissionItemName").value("FC 기본수수료"))
+                .andExpect(jsonPath("$.data.details[0].classificationSnapshot").value("INCLUDED"))
+                .andExpect(jsonPath("$.data.details[1].evidenceRef").value("SRC-004"));
+    }
+
+    @Test
+    void findDetailReturns404WhenCapCheckIdDoesNotExist() throws Exception {
+        given(capCheckService.findDetail(999L)).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/cap/checks/999/details").with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-004"));
+    }
+
+    @Test
+    void findDetailRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/cap/checks/999/details")).andExpect(status().isUnauthorized());
     }
 }
