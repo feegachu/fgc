@@ -20,9 +20,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 설명 : 수수료 지급 건 등록·수정·확정 REST API
+ *
+ * @author yslee
+ * @since 2026-08-06
+ * @version 1.2
+ */
 @Tag(name = "수수료 지급 건", description = "FUN-065 수수료 지급 건 등록·수정·확정 API")
 @RestController
-@RequestMapping("/api/commission-payments")
+@RequestMapping("/api/v1/commission-payments")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('SETTLEMENT')")
 public class CommissionPaymentApiController {

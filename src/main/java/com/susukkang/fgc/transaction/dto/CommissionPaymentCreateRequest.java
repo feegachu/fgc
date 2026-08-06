@@ -13,6 +13,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
+/**
+ * 설명 : 수수료 지급 건 등록 요청
+ *
+ * @author yslee
+ * @since 2026-08-05
+ * @version 1.2
+ */
 public record CommissionPaymentCreateRequest(
         @NotBlank @Size(max = 160) String sourceBusinessKey,
         Long contractId,

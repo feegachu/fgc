@@ -13,6 +13,13 @@ import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
 
+/**
+ * 설명 : 수수료 지급 건과 한도 검증 데이터 접근 매퍼
+ *
+ * @author yslee
+ * @since 2026-08-06
+ * @version 1.2
+ */
 @Mapper
 public interface CommissionPaymentMapper {
 
@@ -51,6 +58,8 @@ public interface CommissionPaymentMapper {
     ConfirmationData findConfirmationDataForUpdate(@Param("paymentId") Long paymentId);
 
     CapRuleSnapshot findCapRuleSnapshot(@Param("paymentId") Long paymentId);
+
+    CapRuleSnapshot findCapRuleSnapshotForCandidate(CommissionPaymentCommand command);
 
     void insertCapCheck(CapCheckCommand command);
 

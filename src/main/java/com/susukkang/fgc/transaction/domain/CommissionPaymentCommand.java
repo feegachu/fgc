@@ -10,6 +10,13 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * 설명 : 수수료 지급 건 등록·수정 명령
+ *
+ * @author yslee
+ * @since 2026-08-05
+ * @version 1.2
+ */
 @Getter
 @Builder
 public class CommissionPaymentCommand {

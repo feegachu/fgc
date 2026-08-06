@@ -2,8 +2,11 @@ package com.susukkang.fgc.transaction.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
+import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
@@ -32,6 +35,13 @@ import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 설명 : 수수료 지급 건 등록·수정·확정 서비스
+ *
+ * @author yslee
+ * @since 2026-08-06
+ * @version 1.2
+ */
 @Service
 @RequiredArgsConstructor
 public class CommissionPaymentServiceImpl implements CommissionPaymentService {
@@ -39,11 +49,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final CommissionPaymentMapper mapper;
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
+    private final CapCalculator capCalculator;
+    private final CommissionPaymentExceptionService exceptionService;
 
     @Override
     @Transactional
     public CommissionPaymentResponse create(CommissionPaymentCreateRequest request) {
         CommissionPaymentCommand command = commandFrom(request);
+
+        // 2026-08-06 yslee - 지급 건 등록 전에 FUN-033 한도 게이트 적용
+        // 기존 코드: 지급 건과 귀속행을 DRAFT로 먼저 저장하고 확정 시점에만 한도 검증
+        // 문제: FUN-065와 UC-11의 저장 시 사전검증 요구사항을 충족하지 못함
+        // 개선: 저장 전에 정책 분류와 실제 지급 후보 금액을 검증하고 초과 시 저장을 차단
+        validateBeforeSave(command, request.sourceBusinessKey());
         mapper.insertTransaction(command);
         mapper.insertAttribution(command);
         return requirePayment(command.getPaymentId()).toResponse();
@@ -59,6 +77,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         requireDraft(current);
 
         CommissionPaymentCommand command = commandFrom(paymentId, request);
+        validateBeforeSave(command, String.valueOf(paymentId));
         mapper.updateTransaction(command);
         mapper.deleteAttributions(paymentId);
         mapper.insertAttribution(command);
@@ -66,7 +85,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     @Override
-    @Transactional(noRollbackFor = FgcBusinessException.class)
+    @Transactional
     public CommissionPaymentResponse confirm(Long paymentId) {
         ConfirmationData data = requireConfirmationData(paymentId);
         requireDraft(data);
@@ -98,21 +117,44 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             );
         }
 
-        CapCheckCommand check = buildCapCheck(data, rule);
-        mapper.insertCapCheck(check);
-        mapper.insertCapCheckDetail(check);
+        CapCalculationResult calculation = calculateLimit(
+                data.contractId(),
+                data.paymentStage(),
+                data.attributionMonth()
+        );
+        validateRuleConsistency(rule, calculation, data);
 
+        CapValidationResult validation = capValidator.validate(new CapValidationRequest(
+                calculation.limitAmount(),
+                rule.warningUsagePct(),
+                rule.existingIncludedAmount(),
+                data.attributedAmount(),
+                data.inclusionDecisionStatus()
+        ));
+        CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
         if ("VIOLATION".equals(check.getResultStatus())) {
-            rejectWithException(
-                    data,
-                    "CAP_VIOLATION",
-                    "CRITICAL",
-                    "1,200% 한도 초과",
-                    "후보 지급 건을 포함하면 계약별 한도를 초과합니다.",
+            // 2026-08-06 yslee - 확정 실패 이력을 독립 트랜잭션으로 보존
+            // 기존 코드: 서비스 전체를 noRollbackFor로 설정해 예외 이력을 보존
+            // 문제: 검증 이후 다른 비즈니스 오류가 발생하면 지급 데이터가 부분 커밋될 수 있음
+            // 개선: 실패한 한도 점검과 예외 건만 REQUIRES_NEW로 저장하고 본 거래는 롤백
+            exceptionService.saveRejectedCapCheck(
+                    check,
+                    exceptionCommand(
+                            data,
+                            "CAP_VIOLATION",
+                            "CRITICAL",
+                            "1,200% 한도 초과",
+                            "후보 지급 건을 포함하면 계약별 한도를 초과합니다."
+                    )
+            );
+            throw new FgcBusinessException(
                     FgcErrorCode.CAP_001,
                     Map.of("n", check.getUsagePct())
             );
         }
+
+        mapper.insertCapCheck(check);
+        mapper.insertCapCheckDetail(check);
 
         if ("WARNING".equals(check.getResultStatus())) {
             saveException(
@@ -129,6 +171,30 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
         return requirePayment(paymentId).toResponse();
     }
+
+    private ExceptionCaseCommand exceptionCommand(
+            ConfirmationData data,
+            String exceptionType,
+            String severity,
+            String title,
+            String description
+    ) {
+        return ExceptionCaseCommand.builder()
+                .exceptionKey("PRE_CONFIRM:" + data.paymentId() + ":" + exceptionType)
+                .exceptionType(exceptionType)
+                .severity(severity)
+                .contractId(data.contractId())
+                .agentId(data.agentId())
+                .policyVersionId(data.policyVersionId())
+                .paymentId(data.paymentId())
+                .title(title)
+                .description(description)
+                .build();
+    }
+
+    /*
+     * 아래 메서드부터는 지급 건 명령 생성 및 공통 검증 로직이다.
+     */
 
     private CommissionPaymentCommand commandFrom(CommissionPaymentCreateRequest request) {
         return buildCommand(
@@ -151,7 +217,6 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 request.note()
         );
     }
-
     private CommissionPaymentCommand commandFrom(
             Long paymentId,
             CommissionPaymentUpdateRequest request
@@ -388,24 +453,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private CapCheckCommand buildCapCheck(
             ConfirmationData data,
-            CapRuleSnapshot rule
+            CapRuleSnapshot rule,
+            CapCalculationResult calculation,
+            CapValidationResult result
     ) {
-        CapValidationResult result = capValidator.validate(new CapValidationRequest(
-                rule.basePremiumAmount(),
-                rule.premiumMultiplier(),
-                rule.warningUsagePct(),
-                rule.existingIncludedAmount(),
-                data.attributedAmount(),
-                data.inclusionDecisionStatus()
-        ));
-
         return CapCheckCommand.builder()
                 .paymentId(data.paymentId())
                 .contractId(data.contractId())
                 .paymentStage(data.paymentStage().name())
                 .capRuleSetId(rule.capRuleSetId())
+                .refundRateTableId(calculation.refundRateTableId())
                 .asOfDate(data.attributionMonth())
-                .basePremiumAmount(rule.basePremiumAmount())
+                .basePremiumAmount(calculation.basePremiumAmount())
+                .refund12mAmount(calculation.refund12mAmount())
+                .complianceDeductionAmount(calculation.complianceDeductionAmount())
                 .limitAmount(result.limitAmount())
                 .includedAmount(result.includedAmount())
                 .remainingAmount(result.remainingAmount())
@@ -414,15 +475,156 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .calculationSnapshotJson(json(Map.of(
                         "existingIncludedAmount", rule.existingIncludedAmount(),
                         "candidateAmount", result.candidateIncludedAmount(),
-                        "premiumMultiplier", rule.premiumMultiplier()
+                        "premiumMultiplier", rule.premiumMultiplier(),
+                        "refundRateTableId", calculation.refundRateTableId() == null
+                                ? "NONE"
+                                : calculation.refundRateTableId()
                 )))
                 .commissionItemId(data.commissionItemId())
+                .itemCode(data.itemCode())
+                .itemName(data.itemName())
                 .transactionAttributionId(data.transactionAttributionId())
                 .classificationSnapshot(data.inclusionDecisionStatus().name())
                 .candidateAmount(data.attributedAmount())
                 .decisionReason(rule.decisionReason())
                 .evidenceRef(data.evidenceRef())
                 .build();
+    }
+
+    private void validateBeforeSave(
+            CommissionPaymentCommand command,
+            String sourceEntityId
+    ) {
+        if (command.getAttributedContractId() == null) {
+            return;
+        }
+
+        CapRuleSnapshot rule = mapper.findCapRuleSnapshotForCandidate(command);
+        if (rule == null) {
+            rejectWithException(
+                    command,
+                    sourceEntityId,
+                    "POLICY_MISSING",
+                    "HIGH",
+                    "저장 검증 정책 누락",
+                    "지급 건에 적용할 1,200% 분류정책을 찾을 수 없습니다.",
+                    FgcErrorCode.CAP_002
+            );
+        }
+
+        if (rule.ruleInclusionStatus() != command.getInclusionDecisionStatus()
+                || rule.ruleInclusionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED) {
+            rejectWithException(
+                    command,
+                    sourceEntityId,
+                    "CAP_REVIEW_REQUIRED",
+                    "HIGH",
+                    "산입 판단 검토 필요",
+                    rule.decisionReason(),
+                    FgcErrorCode.CAP_002
+            );
+        }
+
+        CapCalculationResult calculation = calculateLimit(
+                command.getAttributedContractId(),
+                command.getPaymentStage(),
+                command.getSettlementMonth()
+        );
+        validateRuleConsistency(rule, calculation, command, sourceEntityId);
+
+        CapValidationResult result = capValidator.validate(new CapValidationRequest(
+                calculation.limitAmount(),
+                rule.warningUsagePct(),
+                rule.existingIncludedAmount(),
+                command.getAmount(),
+                command.getInclusionDecisionStatus()
+        ));
+
+        if ("VIOLATION".equals(result.resultStatus())) {
+            rejectWithException(
+                    command,
+                    sourceEntityId,
+                    "CAP_VIOLATION",
+                    "CRITICAL",
+                    "1,200% 한도 초과",
+                    "후보 지급 건을 포함하면 계약별 한도를 초과합니다.",
+                    FgcErrorCode.CAP_001
+            );
+        }
+
+        if ("WARNING".equals(result.resultStatus())) {
+            saveException(
+                    command,
+                    sourceEntityId,
+                    "CAP_WARNING",
+                    "WARNING",
+                    "1,200% 한도 경고",
+                    "후보 지급 건을 포함한 사용률이 경고 기준 이상입니다."
+            );
+        }
+    }
+
+    private CapCalculationResult calculateLimit(
+            Long contractId,
+            com.susukkang.fgc.common.code.PaymentStage paymentStage,
+            java.time.LocalDate asOfDate
+    ) {
+        return capCalculator.calculate(CapCalculationCommand.realtime(
+                contractId,
+                paymentStage,
+                asOfDate
+        ));
+    }
+
+    private void validateRuleConsistency(
+            CapRuleSnapshot rule,
+            CapCalculationResult calculation,
+            ConfirmationData data
+    ) {
+        if (!rule.capRuleSetId().equals(calculation.capRuleSetId())) {
+            rejectWithException(
+                    data,
+                    "CAP_RULE_MISMATCH",
+                    "HIGH",
+                    "한도 정책 불일치",
+                    "지급 정책과 한도 계산 정책이 서로 다릅니다.",
+                    FgcErrorCode.CAP_002,
+                    Map.of()
+            );
+        }
+        if (calculation.resultStatus()
+                == com.susukkang.fgc.common.code.CapResultStatus.REVIEW_REQUIRED) {
+            rejectWithException(
+                    data,
+                    "CAP_REVIEW_REQUIRED",
+                    "HIGH",
+                    "한도 계산 검토 필요",
+                    "환급률표 또는 산입 분류 근거를 확인해야 합니다.",
+                    FgcErrorCode.CAP_002,
+                    Map.of()
+            );
+        }
+    }
+
+    private void validateRuleConsistency(
+            CapRuleSnapshot rule,
+            CapCalculationResult calculation,
+            CommissionPaymentCommand command,
+            String sourceEntityId
+    ) {
+        if (!rule.capRuleSetId().equals(calculation.capRuleSetId())
+                || calculation.resultStatus()
+                == com.susukkang.fgc.common.code.CapResultStatus.REVIEW_REQUIRED) {
+            rejectWithException(
+                    command,
+                    sourceEntityId,
+                    "CAP_RULE_MISMATCH",
+                    "HIGH",
+                    "한도 정책 검토 필요",
+                    "지급 정책과 한도 계산 정책 또는 환급률 근거를 확인해야 합니다.",
+                    FgcErrorCode.CAP_002
+            );
+        }
     }
 
     private void rejectWithException(
@@ -445,14 +647,44 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             String title,
             String description
     ) {
-        mapper.insertExceptionCase(ExceptionCaseCommand.builder()
-                .exceptionKey("PRE_CONFIRM:" + data.paymentId() + ":" + exceptionType)
+        exceptionService.save(exceptionCommand(
+                data,
+                exceptionType,
+                severity,
+                title,
+                description
+        ));
+    }
+
+    private void rejectWithException(
+            CommissionPaymentCommand command,
+            String sourceEntityId,
+            String exceptionType,
+            String severity,
+            String title,
+            String description,
+            FgcErrorCode errorCode
+    ) {
+        saveException(command, sourceEntityId, exceptionType, severity, title, description);
+        throw new FgcBusinessException(errorCode);
+    }
+
+    private void saveException(
+            CommissionPaymentCommand command,
+            String sourceEntityId,
+            String exceptionType,
+            String severity,
+            String title,
+            String description
+    ) {
+        exceptionService.save(ExceptionCaseCommand.builder()
+                .exceptionKey("PRE_SAVE:" + sourceEntityId + ":" + exceptionType)
                 .exceptionType(exceptionType)
                 .severity(severity)
-                .contractId(data.contractId())
-                .agentId(data.agentId())
-                .policyVersionId(data.policyVersionId())
-                .paymentId(data.paymentId())
+                .contractId(command.getAttributedContractId())
+                .agentId(command.getAgentId())
+                .policyVersionId(command.getPolicyVersionId())
+                .sourceEntityId(sourceEntityId)
                 .title(title)
                 .description(description)
                 .build());

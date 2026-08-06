@@ -11,6 +11,13 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 
+/**
+ * 설명 : 수수료 지급 건 조회 데이터
+ *
+ * @author yslee
+ * @since 2026-08-05
+ * @version 1.2
+ */
 public record CommissionPaymentRow(
         Long paymentId,
         String sourceBusinessKey,

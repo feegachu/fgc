@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.cap.mapper.CapCheckMapper">
+
+    <!--
+      cap_check/cap_check_detail 은 append-only 다(DB 트리거가 UPDATE/DELETE 를 막는다).
+      재계산할 때도 기존 행을 고치지 않고 새 행을 INSERT 한다 — 이전 판정 이력이 그대로 남는다.
+      useGeneratedKeys 로 IDENTITY PK 를 돌려받아 detail 행을 insertCapCheckDetails 에 그대로 넘긴다.
+    -->
+    <insert id="insertCapCheck" useGeneratedKeys="true" keyProperty="capCheckId" keyColumn="cap_check_id">
+        INSERT INTO fgc.cap_check (
+            validation_run_id, contract_id, payment_stage, cap_rule_set_id, refund_rate_table_id,
+            check_kind, as_of_date, base_premium_amount, refund_12m_amount, compliance_deduction_amount,
+            limit_amount, included_amount, remaining_amount, usage_pct, result_status, calculation_snapshot
+        ) VALUES (
+            #{validationRunId}, #{contractId}, #{paymentStage}, #{capRuleSetId}, #{refundRateTableId},
+            #{checkKind}, #{asOfDate}, #{basePremiumAmount}, #{refund12mAmount}, #{complianceDeductionAmount},
+            #{limitAmount}, #{includedAmount}, #{remainingAmount}, #{usagePct}, #{resultStatus},
+            COALESCE(#{calculationSnapshotJson}, '{}')::jsonb
+        )
+    </insert>
+
+    <!--
+      item_code/item_name/contract_month_no 는 계산 당시 값을 그대로 스냅샷한다(V5 마이그레이션).
+      commission_item/schedule_line을 나중에 다시 조인해서 읽으면, 그 사이 상품명이나 스케줄이
+      바뀔 때 과거 판정의 계산근거가 그때 값이 아니라 최신 값으로 보이게 된다.
+    -->
+    <insert id="insertCapCheckDetails">
+        INSERT INTO fgc.cap_check_detail (
+            cap_check_id, detail_seq, commission_item_id, item_code, item_name,
+            schedule_line_id, contract_month_no, classification_snapshot, amount, decision_reason
+        ) VALUES
+        <foreach collection="details" item="d" separator=",">
+            (#{d.capCheckId}, #{d.detailSeq}, #{d.commissionItemId}, #{d.itemCode}, #{d.itemName},
+             #{d.scheduleLineId}, #{d.contractMonthNo}, #{d.classificationSnapshot}, #{d.amount}, #{d.decisionReason})
+        </foreach>
+    </insert>
+
+    <!-- 컬럼 별칭을 camelCase 프로퍼티명과 동일하게 맞춰 map-underscore-to-camel-case 설정 없이도 매핑되게 한다. -->
+    <select id="findLatestByContractAndStage" resultType="com.susukkang.fgc.cap.dto.CapCheckRow">
+        SELECT cc.cap_check_id                 AS capCheckId,
+               cc.contract_id                   AS contractId,
+               cc.payment_stage                 AS paymentStage,
+               cc.check_kind                    AS checkKind,
+               cc.as_of_date                    AS asOfDate,
+               cc.cap_rule_set_id               AS capRuleSetId,
+               cc.refund_rate_table_id          AS refundRateTableId,
+               cc.base_premium_amount           AS basePremiumAmount,
+               cc.refund_12m_amount             AS refund12mAmount,
+               cc.compliance_deduction_amount   AS complianceDeductionAmount,
+               cc.limit_amount                  AS limitAmount,
+               cc.included_amount               AS includedAmount,
+               cc.remaining_amount              AS remainingAmount,
+               cc.usage_pct                     AS usagePct,
+               cc.result_status                 AS resultStatus,
+               cc.calculation_snapshot::text    AS calculationSnapshotJson
+          FROM fgc.cap_check cc
+         WHERE cc.contract_id = #{contractId}
+           AND cc.payment_stage = #{paymentStage}
+         ORDER BY cc.checked_at DESC, cc.cap_check_id DESC
+         LIMIT 1
+    </select>
+
+    <!--
+      IF-API-14(계약 상세 탭3, FUN-032·박민준)와 IF-API-31(계산근거 팝업, FUN-035·강현준)에 필요한
+      조회는 이 이슈(FUN-030) 범위가 아니라 각 담당 이슈에서 CapCheckMapper에 추가한다.
+    -->
+
+    <!-- IF-API-30 목록·건수·요약이 공유하는 검색조건. month는 as_of_date가 속한 달(그 달 1일 기준)로 거른다. -->
+    <sql id="searchWhere">
+        <where>
+            <if test="month != null">
+                AND date_trunc('month', cc.as_of_date) = date_trunc('month', #{month}::date)
+            </if>
+            <if test="paymentStage != null">
+                AND cc.payment_stage = #{paymentStage}
+            </if>
+            <if test="resultStatus != null">
+                AND cc.result_status = #{resultStatus}
+            </if>
+            <if test="insurerId != null">
+                AND ic.insurer_id = #{insurerId}
+            </if>
+            <if test="contractNo != null">
+                AND ic.contract_no = #{contractNo}
+            </if>
+        </where>
+    </sql>
+
+    <select id="search" resultType="com.susukkang.fgc.cap.dto.CapCheckListRow">
+        SELECT cc.cap_check_id                 AS capCheckId,
+               cc.contract_id                   AS contractId,
+               ic.contract_no                   AS contractNo,
+               cc.payment_stage                 AS paymentStage,
+               cc.as_of_date                    AS asOfDate,
+               cc.base_premium_amount           AS basePremiumAmount,
+               cc.refund_12m_amount             AS refund12mAmount,
+               cc.compliance_deduction_amount   AS complianceDeductionAmount,
+               cc.limit_amount                  AS limitAmount,
+               cc.included_amount               AS includedAmount,
+               cc.remaining_amount              AS remainingAmount,
+               cc.usage_pct                     AS usagePct,
+               cc.result_status                 AS resultStatus,
+               cc.cap_rule_set_id               AS capRuleSetId
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+        <include refid="searchWhere"/>
+         ORDER BY cc.as_of_date DESC, cc.cap_check_id DESC
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+        <include refid="searchWhere"/>
+    </select>
+
+    <select id="summarize" resultType="com.susukkang.fgc.cap.dto.CapCheckStatusCount">
+        SELECT cc.result_status AS resultStatus, COUNT(*) AS count
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+        <where>
+            <if test="month != null">
+                AND date_trunc('month', cc.as_of_date) = date_trunc('month', #{month}::date)
+            </if>
+            <if test="paymentStage != null">
+                AND cc.payment_stage = #{paymentStage}
+            </if>
+            <if test="insurerId != null">
+                AND ic.insurer_id = #{insurerId}
+            </if>
+            <if test="contractNo != null">
+                AND ic.contract_no = #{contractNo}
+            </if>
+        </where>
+         GROUP BY cc.result_status
+    </select>
+
+    <!--
+      CapCheckDetailLine 은 record 라 생성자 파라미터 순서(컴파일 -parameters 옵션으로 이름도 함께)로
+      매핑된다 — 컬럼 별칭을 레코드 컴포넌트명과 동일하게 맞춘다.
+      item_code/item_name/contract_month_no는 cap_check_detail에 저장된 스냅샷 컬럼을 그대로
+      읽는다 — commission_item/schedule_line을 다시 조인하지 않는다. 계산 당시 값이 아니라 "지금"
+      값을 보여주면, 상품명이나 스케줄이 바뀐 뒤에는 과거 판정의 계산근거가 달라져 보인다
+      (PR #2 코드리뷰 지적).
+    -->
+    <select id="findDetailsByCapCheckId" resultType="com.susukkang.fgc.cap.dto.CapCheckDetailLine">
+        SELECT ccd.detail_seq             AS detailSeq,
+               ccd.commission_item_id      AS commissionItemId,
+               ccd.item_code                AS itemCode,
+               ccd.item_name                AS itemName,
+               ccd.schedule_line_id        AS scheduleLineId,
+               ccd.contract_month_no        AS contractMonthNo,
+               ccd.classification_snapshot AS classification,
+               ccd.amount                  AS amount,
+               ccd.decision_reason         AS decisionReason,
+               ccd.evidence_ref            AS evidenceRef
+          FROM fgc.cap_check_detail ccd
+         WHERE ccd.cap_check_id = #{capCheckId}
+         ORDER BY ccd.detail_seq
+    </select>
+
+</mapper>

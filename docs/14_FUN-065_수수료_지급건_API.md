@@ -5,8 +5,8 @@
 - 기능 ID: `FGC-FUN-065`
 - 접근 역할: `SETTLEMENT`
 - 응답 형식: `ApiResponse<T> { data, error, requestId }`
-- 등록 상태: 항상 `DRAFT`
-- 확정 처리: 별도 Confirm API에서 FUN-033 사전 한도 검증 수행
+- 등록 상태: FUN-033 사전 한도 검증을 통과한 건만 `DRAFT`
+- 확정 처리: 별도 Confirm API에서 정책 변경·동시 지급을 고려해 FUN-033 최종 재검증 수행
 
 화면용 `@Controller`와 JSON API용 `@RestController`는 분리한다. 이 기능은 JSON API만 제공하므로
 `CommissionPaymentApiController`만 구현하며 화면 Controller는 화면 구현 시 별도로 추가한다.
@@ -15,11 +15,14 @@
 
 | 기능 | Method | URL | 성공 상태 |
 | --- | --- | --- | --- |
-| 지급 건 등록 | POST | `/api/commission-payments` | 201 |
-| DRAFT 수정 | PUT | `/api/commission-payments/{paymentId}` | 200 |
-| 지급 건 확정 | POST | `/api/commission-payments/{paymentId}/confirm` | 200 |
+| 지급 건 등록 | POST | `/api/v1/commission-payments` | 201 |
+| DRAFT 수정 | PUT | `/api/v1/commission-payments/{paymentId}` | 200 |
+| 지급 건 확정 | POST | `/api/v1/commission-payments/{paymentId}/confirm` | 200 |
 
 ## 3. 등록 API
+
+저장 전에 FUN-033 사전검증을 수행한다. 한도 초과 건은 지급 건을 저장하지 않고 예외 건만 생성한다.
+한도 이내 건은 `DRAFT`로 저장하며, 확정 시 동일 기준으로 다시 검증한다.
 
 ### Request
 
@@ -112,16 +115,17 @@
 
 ## 5. 확정 API
 
-Confirm API는 다음 순서로 처리한다.
+Confirm API는 등록·수정 시 통과한 지급 건을 다음 순서로 최종 재검증한다.
 
 1. 지급 건 행 잠금 및 `DRAFT` 확인
 2. 귀속계약·귀속금액 합계 확인
 3. 배부정책 버전·배부기준·제외 증빙 확인
 4. 지급 건의 정책 버전에서 `cap_rule_set` 및 `cap_rule_item` 조회
-5. `cap.service.CapValidator`를 호출해 기존 확정 산입액과 후보 지급액의 1,200% 한도 계산
-6. `cap_check`, `cap_check_detail`에 `PRE_CONFIRM` 결과 저장
-7. 실패 시 `exception_case` 생성 후 확정 차단
-8. 성공 시 `commission_transaction.status = CONFIRMED`
+5. `CapCalculator`에서 정책 버전·환급률을 반영한 한도를 조회
+6. `CapValidator`에서 기존 확정 산입액과 후보 지급액을 판정
+7. `cap_check`, `cap_check_detail`에 `PRE_CONFIRM` 결과 저장
+8. 실패 시 `exception_case` 생성 후 확정 차단
+9. 성공 시 `commission_transaction.status = CONFIRMED`
 
 검증 결과, 예외 생성, 상태 변경은 하나의 서비스 트랜잭션에서 처리한다. 검증 실패 시 지급 건은
 `DRAFT`로 유지하면서 `exception_case`는 보존한다.

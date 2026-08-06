@@ -10,6 +10,13 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 
+/**
+ * 설명 : 수수료 지급 건 응답
+ *
+ * @author yslee
+ * @since 2026-08-05
+ * @version 1.2
+ */
 public record CommissionPaymentResponse(
         Long paymentId,
         String sourceBusinessKey,

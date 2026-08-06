@@ -192,17 +192,68 @@
                ct.recipient_agent_id AS agent_id,
                ct.payment_stage,
                ct.commission_item_id,
+               ci.item_code,
+               ci.item_name,
                ct.policy_version_id,
                ta.inclusion_status_snapshot AS inclusion_decision_status,
                ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
                ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
                COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref
           FROM fgc.commission_transaction ct
+          JOIN fgc.commission_item ci
+            ON ci.commission_item_id = ct.commission_item_id
           LEFT JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
            AND ta.attribution_seq = 1
          WHERE ct.commission_transaction_id = #{paymentId}
          FOR UPDATE OF ct
+    </select>
+
+    <select id="findCapRuleSnapshotForCandidate"
+            resultType="com.susukkang.fgc.transaction.domain.CapRuleSnapshot">
+        SELECT crs.cap_rule_set_id,
+               cri.cap_rule_item_id,
+               cri.inclusion_status AS rule_inclusion_status,
+               cri.decision_reason,
+               c.monthly_equivalent_first_premium AS base_premium_amount,
+               crs.premium_multiplier,
+               crs.warning_usage_pct,
+               COALESCE((
+                   SELECT SUM(other_ta.attributed_amount)
+                     FROM fgc.transaction_attribution other_ta
+                     JOIN fgc.commission_transaction other_ct
+                       ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
+                    WHERE other_ta.contract_id = #{attributedContractId}
+                      AND other_ta.inclusion_status_snapshot = 'INCLUDED'
+                      AND other_ct.payment_stage = #{paymentStage}
+                      AND other_ct.status = 'CONFIRMED'
+                      AND (#{paymentId} IS NULL
+                           OR other_ct.commission_transaction_id &lt;&gt; #{paymentId})
+                      AND other_ta.attribution_date &gt;= c.contract_date
+                      AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
+               ), 0) AS existing_included_amount
+          FROM fgc.insurance_contract c
+          JOIN fgc.product_offering po
+            ON po.product_offering_id = c.product_offering_id
+          JOIN fgc.product p
+            ON p.product_id = po.product_id
+          JOIN fgc.cap_rule_set crs
+            ON crs.policy_version_id = #{policyVersionId}
+           AND crs.payment_stage = #{paymentStage}
+           AND c.contract_date &gt;= crs.contract_date_from
+           AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
+           AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
+           AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
+           AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+          JOIN fgc.cap_rule_item cri
+            ON cri.cap_rule_set_id = crs.cap_rule_set_id
+           AND cri.commission_item_id = #{commissionItemId}
+         WHERE c.contract_id = #{attributedContractId}
+         ORDER BY (crs.insurer_id IS NOT NULL) DESC,
+                  (crs.product_group_code IS NOT NULL) DESC,
+                  (crs.channel_code IS NOT NULL) DESC,
+                  crs.cap_rule_set_id DESC
+         LIMIT 1
     </select>
 
     <select id="findCapRuleSnapshot"
@@ -264,6 +315,7 @@
             contract_id,
             payment_stage,
             cap_rule_set_id,
+            refund_rate_table_id,
             candidate_transaction_id,
             check_kind,
             as_of_date,
@@ -280,12 +332,13 @@
             #{contractId},
             #{paymentStage},
             #{capRuleSetId},
+            #{refundRateTableId},
             #{paymentId},
             'PRE_CONFIRM',
             #{asOfDate},
             #{basePremiumAmount},
-            0,
-            0,
+            #{refund12mAmount},
+            #{complianceDeductionAmount},
             #{limitAmount},
             #{includedAmount},
             #{remainingAmount},
@@ -300,6 +353,8 @@
             cap_check_id,
             detail_seq,
             commission_item_id,
+            item_code,
+            item_name,
             transaction_attribution_id,
             classification_snapshot,
             amount,
@@ -309,6 +364,8 @@
             #{capCheckId},
             1,
             #{commissionItemId},
+            #{itemCode},
+            #{itemName},
             #{transactionAttributionId},
             #{classificationSnapshot},
             #{candidateAmount},
@@ -339,7 +396,7 @@
             #{agentId},
             #{policyVersionId},
             'COMMISSION_TRANSACTION',
-            CAST(#{paymentId} AS varchar),
+            COALESCE(CAST(#{paymentId} AS varchar), #{sourceEntityId}),
             #{title},
             #{description}
         )

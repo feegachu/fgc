@@ -29,7 +29,8 @@ public class CommissionItemController {
 
     @Operation(
             summary = "수수료 항목 기준정보 조회·선택",
-            description = "기준일자에 사용 가능한 수수료 항목을 조회합니다. 1,200% 산입 여부는 룰셋별 cap_rule_item에서 결정합니다."
+            description = "기준일자에 사용 가능한 수수료 항목과 사용기간을 조회합니다. "
+                    + "1,200% 산입 여부는 룰셋별 cap_rule_item에서 결정합니다."
     )
     @GetMapping
     @PreAuthorize("isAuthenticated()")

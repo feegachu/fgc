@@ -9,6 +9,13 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 설명 : CapValidator 단위 테스트
+ *
+ * @author yslee
+ * @since 2026-08-06
+ * @version 1.2
+ */
 class CapValidatorImplTest {
 
     private final CapValidator validator = new CapValidatorImpl();
@@ -56,8 +63,7 @@ class CapValidatorImplTest {
             InclusionDecisionStatus status
     ) {
         return new CapValidationRequest(
-                new BigDecimal("100000"),
-                new BigDecimal("12"),
+                new BigDecimal("1200000"),
                 new BigDecimal("90"),
                 new BigDecimal(existing),
                 new BigDecimal(candidate),

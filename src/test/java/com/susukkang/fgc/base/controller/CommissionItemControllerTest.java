@@ -45,7 +45,8 @@ class CommissionItemControllerTest {
         LocalDate asOf = LocalDate.of(2026, 8, 4);
         given(commissionItemService.findEffectiveItems(asOf)).willReturn(List.of(
                 new CommissionItemResponse(
-                        "BASE_COMMISSION", "FC 기본수수료", "PAYMENT", "SALES"
+                        "BASE_COMMISSION", "FC 기본수수료", "PAYMENT", "SALES",
+                        LocalDate.of(2026, 1, 1), null
                 )
         ));
 
@@ -57,6 +58,8 @@ class CommissionItemControllerTest {
                 .andExpect(jsonPath("$.data[0].itemName").value("FC 기본수수료"))
                 .andExpect(jsonPath("$.data[0].cashflowType").value("PAYMENT"))
                 .andExpect(jsonPath("$.data[0].itemCategory").value("SALES"))
+                .andExpect(jsonPath("$.data[0].effectiveFrom").value("2026-01-01"))
+                .andExpect(jsonPath("$.data[0].effectiveTo").isEmpty())
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.requestId", matchesPattern("^\\d{8}-[0-9a-f]{6}$")));
     }

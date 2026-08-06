@@ -1,8 +1,12 @@
 package com.susukkang.fgc.transaction.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapValidatorImpl;
 import com.susukkang.fgc.common.code.AttributionMethod;
+import com.susukkang.fgc.common.code.CapCheckKind;
+import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -29,6 +33,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,10 +45,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
+/**
+ * 설명 : 수수료 지급 건 서비스 단위 테스트
+ *
+ * @author yslee
+ * @since 2026-08-06
+ * @version 1.2
+ */
 class CommissionPaymentServiceImplTest {
 
     @Mock
     private CommissionPaymentMapper mapper;
+
+    @Mock
+    private CapCalculator capCalculator;
 
     private CommissionPaymentServiceImpl service;
 
@@ -51,13 +67,16 @@ class CommissionPaymentServiceImplTest {
         service = new CommissionPaymentServiceImpl(
                 mapper,
                 new ObjectMapper(),
-                new CapValidatorImpl()
+                new CapValidatorImpl(),
+                capCalculator,
+                new CommissionPaymentExceptionService(mapper)
         );
     }
 
     @Test
     void createsDraftPaymentAndAttribution() {
         stubReferences();
+        stubCapGate("0");
         doAnswer(invocation -> {
             invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(101L);
             return null;
@@ -70,6 +89,23 @@ class CommissionPaymentServiceImplTest {
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         verify(mapper).insertTransaction(any());
         verify(mapper).insertAttribution(any());
+    }
+
+    @Test
+    void blocksCreateBeforeInsertWhenCandidateExceedsCap() {
+        stubReferences();
+        stubCapGate("0");
+
+        CommissionPaymentCreateRequest request = createRequest(new BigDecimal("1300000"));
+
+        assertThatThrownBy(() -> service.create(request))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.CAP_001));
+
+        verify(mapper).insertExceptionCase(any());
+        verify(mapper, never()).insertTransaction(any());
+        verify(mapper, never()).insertAttribution(any());
     }
 
     @Test
@@ -128,6 +164,7 @@ class CommissionPaymentServiceImplTest {
         );
         given(mapper.findConfirmationDataForUpdate(101L)).willReturn(data);
         given(mapper.findCapRuleSnapshot(101L)).willReturn(capRule("500000"));
+        given(capCalculator.calculate(any())).willReturn(capCalculation());
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(55L);
             return null;
@@ -151,6 +188,7 @@ class CommissionPaymentServiceImplTest {
         );
         given(mapper.findConfirmationDataForUpdate(101L)).willReturn(data);
         given(mapper.findCapRuleSnapshot(101L)).willReturn(capRule("0"));
+        given(capCalculator.calculate(any())).willReturn(capCalculation());
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(56L);
             return null;
@@ -222,13 +260,22 @@ class CommissionPaymentServiceImplTest {
                 .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
     }
 
+    private void stubCapGate(String existingAmount) {
+        given(mapper.findCapRuleSnapshotForCandidate(any())).willReturn(capRule(existingAmount));
+        given(capCalculator.calculate(any())).willReturn(capCalculation());
+    }
+
     private CommissionPaymentCreateRequest createRequest() {
+        return createRequest(new BigDecimal("500000"));
+    }
+
+    private CommissionPaymentCreateRequest createRequest(BigDecimal amount) {
         return new CommissionPaymentCreateRequest(
                 "GA-2026-07-0001",
                 3L,
                 7L,
                 "BASE_COMMISSION",
-                new BigDecimal("500000"),
+                amount,
                 YearMonth.of(2026, 7),
                 LocalDate.of(2026, 7, 25),
                 PaymentStage.GA_TO_FC,
@@ -280,6 +327,8 @@ class CommissionPaymentServiceImplTest {
                 7L,
                 PaymentStage.GA_TO_FC,
                 11L,
+                "BASE_COMMISSION",
+                "FC 기본수수료",
                 policyVersionId,
                 InclusionDecisionStatus.INCLUDED,
                 "룰셋 산입",
@@ -298,6 +347,27 @@ class CommissionPaymentServiceImplTest {
                 new BigDecimal("12"),
                 new BigDecimal("90"),
                 new BigDecimal(existingAmount)
+        );
+    }
+
+    private CapCalculationResult capCalculation() {
+        return new CapCalculationResult(
+                3L,
+                PaymentStage.GA_TO_FC,
+                CapCheckKind.REALTIME,
+                LocalDate.of(2026, 7, 1),
+                31L,
+                null,
+                new BigDecimal("1200000"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                new BigDecimal("1200000"),
+                BigDecimal.ZERO,
+                new BigDecimal("1200000"),
+                BigDecimal.ZERO,
+                CapResultStatus.NORMAL,
+                List.of(),
+                Map.of()
         );
     }
 

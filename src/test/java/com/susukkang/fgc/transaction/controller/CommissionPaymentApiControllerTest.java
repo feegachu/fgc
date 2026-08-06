@@ -63,7 +63,7 @@ class CommissionPaymentApiControllerTest {
                 CommissionPaymentStatus.DRAFT
         ));
 
-        mockMvc.perform(post("/api/commission-payments")
+        mockMvc.perform(post("/api/v1/commission-payments")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -79,7 +79,7 @@ class CommissionPaymentApiControllerTest {
                 CommissionPaymentStatus.DRAFT
         ));
 
-        mockMvc.perform(put("/api/commission-payments/101")
+        mockMvc.perform(put("/api/v1/commission-payments/101")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -94,7 +94,7 @@ class CommissionPaymentApiControllerTest {
                 CommissionPaymentStatus.CONFIRMED
         ));
 
-        mockMvc.perform(post("/api/commission-payments/101/confirm")
+        mockMvc.perform(post("/api/v1/commission-payments/101/confirm")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -103,7 +103,7 @@ class CommissionPaymentApiControllerTest {
 
     @Test
     void rejectsNonSettlementRole() throws Exception {
-        mockMvc.perform(post("/api/commission-payments")
+        mockMvc.perform(post("/api/v1/commission-payments")
                         .with(user("ga-admin").roles("GA_ADMIN"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -113,7 +113,7 @@ class CommissionPaymentApiControllerTest {
 
     @Test
     void rejectsMissingRequiredValues() throws Exception {
-        mockMvc.perform(post("/api/commission-payments")
+        mockMvc.perform(post("/api/v1/commission-payments")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
