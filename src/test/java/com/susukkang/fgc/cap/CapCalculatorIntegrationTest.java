@@ -130,7 +130,8 @@ class CapCalculatorIntegrationTest {
     // A1(80% 공제대상 상품)은 12차월 예상해약환급률표가 한도에 가산된다
     // FGC-FGL02-202601-0001 : STD-LIFE-B(80% 공제 대상), 월납 100,000원, 240개월납, 계약일 2026-01-15
     // GA_TO_FC 1,200% 룰셋은 2026-07-01부터 적용되므로(REG-CAP-GA-2026-V1), 이 계약은
-    // INSURER_TO_GA 단계로 검증한다(REG-CAP-INS-2026-V1 은 2021-01-01부터 적용).
+    // INSURER_TO_GA 단계로 검증한다. 준법경영비 3% 공제(REG-10, 제4-32조제14항)는 2027.1.1부터
+    // 시행이라 2026-01-15 계약에는 아직 적용되지 않는다(REG-CAP-INS-2021-V2, 공제 0%, V6_1).
     @Test
     void standardDeduction80ProductA1AddsMonth12RefundRateToLimit() {
         Long id = contractId("FGC-FGL02-202601-0001");
@@ -140,10 +141,29 @@ class CapCalculatorIntegrationTest {
 
         // seed 공식: GREATEST(0,(12-2)*2.4) = 24.0% → 1,200,000 × 24% = 288,000
         assertThat(result.refund12mAmount()).isEqualByComparingTo("288000");
-        // gross 1,488,000 에서 준법경영비 3%(44,640) 공제 → 1,443,360
-        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("44640");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1443360");
+        // 준법경영비 3% 공제는 2027.1.1부터 시행이라 2026년 계약에는 적용되지 않는다 → gross 그대로 한도
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("0");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1488000");
         assertThat(result.refundRateTableId()).isNotNull();
+    }
+
+    // REG-10(준법경영비 3% 공제)은 2027.1.1 이후 체결된 원수사→GA 계약부터 적용된다(REG-CAP-INS-2027-V1).
+    // FGC-FGL01-202703-0001 : STD-LIFE-A(80% 공제 아님), 월납 100,000원, 계약일 2027-03-02
+    //
+    // ★ 이 브랜치(feature/21)의 CapCalculatorImpl은 공제 기준액으로 grossLimit을 쓴다(월납 원액
+    // 기준 계산은 feature/18에서만 수정됨 — 이번 PR은 db/demo 시드 보정만 가져왔다). 그래서 기대값은
+    // 3% × grossLimit(1,200,000) = 36,000이다. feature/18의 계산기 수정이 develop에 들어오면
+    // 3% × 월납 원액(100,000) = 3,000으로 다시 맞춰야 한다.
+    @Test
+    void complianceDeductionAppliesFromContractsDatedOnOrAfter20270101() {
+        Long id = contractId("FGC-FGL01-202703-0001");
+
+        CapCalculationResult result = capCalculator.calculate(
+                CapCalculationCommand.realtime(id, PaymentStage.INSURER_TO_GA, LocalDate.of(2027, 3, 2)));
+
+        assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("36000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1164000");
     }
 
     // ProductRefundRateResolver는 STD-LIFE-B의 12차월 환급률과 표버전을 돌려준다
