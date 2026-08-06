@@ -1,11 +1,14 @@
 package com.susukkang.fgc.contract.controller;
 
 import com.susukkang.fgc.common.web.ApiResponse;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.service.ContractService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -31,9 +34,11 @@ public class ContractController {
      * @since 2026-08-05
      */
     @GetMapping
-    // TODO: 계약 목록에 page, size 및 전체 건수 메타데이터를 적용한다.
-    public ApiResponse<List<ContractView>> getContractListByCondition(@ModelAttribute ContractSearchCondition condition) {
-        return ApiResponse.success(contractService.selectByCondition(condition));
+    public ApiResponse<PageResponse<ContractView>> getContractListByCondition(
+            @ModelAttribute @Valid ContractSearchCondition condition,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(contractService.selectByCondition(condition, page, size));
     }
 
     /**

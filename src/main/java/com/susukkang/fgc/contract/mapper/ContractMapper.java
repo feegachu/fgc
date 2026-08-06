@@ -15,8 +15,12 @@ import java.util.List;
  */
 @Mapper
 public interface ContractMapper {
-    // 검색조건에 따른 계약 조회
-    List<ContractView> selectByCondition(ContractSearchCondition condition);
+    // 검색조건에 따른 계약 조회 , condition : 검색 , size : 계약 최대 수  , offset : 현재 페이지
+    List<ContractView> selectByCondition(
+            @Param("condition") ContractSearchCondition condition,
+            @Param("size") int size,
+            @Param("offset") int offset
+    );
     // 계약Id에 따른 계약 조회
     InsuranceContract selectById(Long id);
     // 계약Id에 따른 계약 및 상품 정보 조회
@@ -49,4 +53,6 @@ public interface ContractMapper {
     int insertContract(InsuranceContract insuranceContract);
 
     int updateContract(InsuranceContract updatedContract);
+    // 현재 검색조건에 맞는 계약의 수를 구한다 -> 최대 페이지 수 계산
+    long countByCondition(ContractSearchCondition condition);
 }

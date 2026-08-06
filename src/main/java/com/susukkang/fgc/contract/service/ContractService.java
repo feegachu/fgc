@@ -4,6 +4,7 @@ import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
@@ -33,14 +34,54 @@ public class ContractService {
     private final CapCheckService capCheckService;
     /**
      * 설명 : 검색 조건에 따라 계약을 조회한다.
+     * 검색 조건과 현재 페이지 , 최대 계약수를 받아
+     * 보험 계약 목록을 출력하고 최대페이지 , 현재페이지를 PageResponse를 통해 출력
      *
-     * @param  condition 조회 조건
+     * @param condition 조회 조건
+     * @param page 현재 페이지
+     * @param size 한 페이지에 출력할 계약 수
      * @return List<ContractListDTO> 조회된 보험계약 목록
      * @author hjKang
      * @since 2026-08-05
      */
-    public List<ContractView> selectByCondition(ContractSearchCondition condition) {
-        return contractMapper.selectByCondition(condition);
+    public PageResponse<ContractView> selectByCondition(ContractSearchCondition condition, int page, int size) {
+        //입력값 검증
+        if (page < 1) {
+            throw validationException(
+                    "page",
+                    "page는 1 이상이어야 합니다."
+            );
+        }
+
+        if (size < 1 || size > 100) {
+            throw validationException(
+                    "size",
+                    "size는 1 이상 100 이하여야 합니다."
+            );
+        }
+        // offset : DB가 앞에서 건널 뛸 행 개수 -> offset 번째 부터 조회함
+        long offsetLong = (long)( page - 1 ) * size;
+
+        if (offsetLong > Integer.MAX_VALUE) {
+            throw validationException(
+                    "page",
+                    "요청할 수 있는 페이지 범위를 초과했습니다."
+            );
+        }
+        int offset = (int) offsetLong;
+
+        List<ContractView> contractViewList = contractMapper.selectByCondition(condition,size,offset);
+        // 검색조건에 해당하는 전체 계약 건수 조회
+        long totalContracts =
+                contractMapper.countByCondition(condition);
+
+        return PageResponse.of(
+                contractViewList,
+                page,
+                size,
+                totalContracts,
+                "contractId,desc"
+        );
     }
 
     /**

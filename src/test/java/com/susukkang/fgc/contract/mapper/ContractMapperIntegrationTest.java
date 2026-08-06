@@ -89,9 +89,11 @@ class ContractMapperIntegrationTest {
         ContractSearchCondition condition = new ContractSearchCondition();
         condition.setContractNo(contract.getContractNo());
 
-        List<ContractView> result = contractMapper.selectByCondition(condition);
+        List<ContractView> result = contractMapper.selectByCondition(condition, 20, 0);
+        long total = contractMapper.countByCondition(condition);
 
         assertThat(result).hasSize(1);
+        assertThat(total).isEqualTo(1);
         assertThat(result.getFirst().getContractNo()).isEqualTo(contract.getContractNo());
         assertThat(result.getFirst().getAgentIdName()).startsWith("FC-");
     }

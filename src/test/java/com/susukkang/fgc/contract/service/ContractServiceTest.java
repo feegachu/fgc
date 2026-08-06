@@ -1,6 +1,5 @@
 package com.susukkang.fgc.contract.service;
-
-import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
@@ -54,23 +53,97 @@ class ContractServiceTest {
     @Mock
     private ContractMapper contractMapper;
 
-    @Mock
-    private CapCheckService capCheckService;
-
     @InjectMocks
     private ContractService contractService;
 
     @Test
-    @DisplayName("검색 조건에 해당하는 보험계약 목록을 반환한다")
+    @DisplayName("검색 조건에 해당하는 보험계약 목록을 페이징하여 반환한다")
     void selectByConditionReturnsContracts() {
-        ContractSearchCondition condition = new ContractSearchCondition();
+        ContractSearchCondition condition =
+                new ContractSearchCondition();
+
         ContractView contract = ContractView.builder()
                 .contractNo("TEST-001")
                 .build();
-        given(contractMapper.selectByCondition(condition)).willReturn(List.of(contract));
 
-        assertThat(contractService.selectByCondition(condition)).containsExactly(contract);
-        verify(contractMapper).selectByCondition(condition);
+        given(
+                contractMapper.selectByCondition(
+                        condition,
+                        20,
+                        0
+                )
+        ).willReturn(List.of(contract));
+
+        given(
+                contractMapper.countByCondition(condition)
+        ).willReturn(1L);
+
+        PageResponse<ContractView> response =
+                contractService.selectByCondition(
+                        condition,
+                        1,
+                        20
+                );
+
+        assertThat(response.content())
+                .containsExactly(contract);
+
+        assertThat(response.page())
+                .isEqualTo(1);
+
+        assertThat(response.size())
+                .isEqualTo(20);
+
+        assertThat(response.totalElements())
+                .isEqualTo(1);
+
+        assertThat(response.totalPages())
+                .isEqualTo(1);
+
+        verify(contractMapper).selectByCondition(
+                condition,
+                20,
+                0
+        );
+
+        verify(contractMapper)
+                .countByCondition(condition);
+    }
+
+    @Test
+    @DisplayName("2페이지 조회 시 첫 20건을 건너뛴다")
+    void selectByConditionCalculatesOffset() {
+        ContractSearchCondition condition =
+                new ContractSearchCondition();
+
+        given(
+                contractMapper.selectByCondition(
+                        condition,
+                        20,
+                        20
+                )
+        ).willReturn(List.of());
+
+        given(
+                contractMapper.countByCondition(condition)
+        ).willReturn(21L);
+
+        PageResponse<ContractView> response =
+                contractService.selectByCondition(
+                        condition,
+                        2,
+                        20
+                );
+
+        assertThat(response.page()).isEqualTo(2);
+        assertThat(response.totalElements()).isEqualTo(21);
+        assertThat(response.totalPages()).isEqualTo(2);
+
+        verify(contractMapper).selectByCondition(
+                condition,
+                20,
+                20
+        );
     }
 
     @ParameterizedTest

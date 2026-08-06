@@ -7,7 +7,6 @@
 
     <!-- 계약 검색 -->
     <select id="selectByCondition"
-            parameterType="com.susukkang.fgc.contract.dto.ContractSearchCondition"
             resultType="com.susukkang.fgc.contract.dto.ContractView">
         SELECT
             ic.contract_no AS contract_no,
@@ -31,6 +30,66 @@
             LEFT JOIN fgc.vw_latest_cap_check cc --1200% 한도 가장 최근껄 가져옴
                 ON cc.contract_id = ic.contract_id
             AND cc.payment_stage = 'GA_TO_FC'
+            -- mapper로 받는 매개변수가 2개 이상일 경우 condition. 을 붙여 명시
+        <where>
+            <if test="condition.contractNo != null and condition.contractNo != ''">
+                AND ic.contract_no
+                LIKE CONCAT('%', #{condition.contractNo}, '%')
+            </if>
+
+            <if test="condition.insurerId != null">
+                AND ic.insurer_id = #{condition.insurerId}
+            </if>
+
+            <if test="condition.productOfferingId != null">
+                AND ic.product_offering_id = #{condition.productOfferingId}
+            </if>
+
+            <if test="condition.agentId != null">
+                AND ic.agent_id = #{condition.agentId}
+            </if>
+
+            <if test="condition.capResultStatus != null">
+                AND cc.result_status = #{condition.capResultStatus}
+            </if>
+
+            <if test="condition.currentStatus != null">
+                AND ic.current_status = #{condition.currentStatus}
+            </if>
+
+            <if test="condition.contractDateFrom != null">
+                AND ic.contract_date
+                <![CDATA[ >= ]]>
+                #{condition.contractDateFrom}
+            </if>
+
+            <if test="condition.contractDateTo != null">
+                AND ic.contract_date
+                <![CDATA[ <= ]]>
+                #{condition.contractDateTo}
+            </if>
+        </where>
+        ORDER BY ic.contract_id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+    <!-- 검색 조건에 맞는 계약 건수 가져오기 -->
+    <select id="countByCondition"
+            parameterType="com.susukkang.fgc.contract.dto.ContractSearchCondition"
+            resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.insurance_contract ic
+        JOIN fgc.insurer i
+        ON i.insurer_id = ic.insurer_id
+        JOIN fgc.product_offering po
+        ON po.product_offering_id = ic.product_offering_id
+        JOIN fgc.product p
+        ON p.product_id = po.product_id
+        JOIN fgc.agent a
+        ON a.agent_id = ic.agent_id
+        LEFT JOIN fgc.vw_latest_cap_check cc
+        ON cc.contract_id = ic.contract_id
+        AND cc.payment_stage = 'GA_TO_FC'
 
         <where>
             <if test="contractNo != null and contractNo != ''">
@@ -43,7 +102,8 @@
             </if>
 
             <if test="productOfferingId != null">
-                AND ic.product_offering_id = #{productOfferingId}
+                AND ic.product_offering_id =
+                #{productOfferingId}
             </if>
 
             <if test="agentId != null">
@@ -51,11 +111,13 @@
             </if>
 
             <if test="capResultStatus != null">
-                AND cc.result_status = #{capResultStatus}
+                AND cc.result_status =
+                #{capResultStatus}
             </if>
-            
+
             <if test="currentStatus != null">
-                AND ic.current_status = #{currentStatus}
+                AND ic.current_status =
+                #{currentStatus}
             </if>
 
             <if test="contractDateFrom != null">
@@ -70,8 +132,8 @@
                 #{contractDateTo}
             </if>
         </where>
-        ORDER BY ic.contract_id DESC
     </select>
+
     <!-- 적합성 검사 추후에 다른 xml에 넣을 예정 -->
     <!-- 보험회사 존재 여부 확인 -->
     <select id="existsInsurer" resultType="boolean">

@@ -6,6 +6,7 @@ import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
@@ -83,16 +84,23 @@ class ContractControllerTest {
                 .dataOrigin(DataOrigin.MANUAL)
                 .build();
 
-        when(contractService.selectByCondition(any(ContractSearchCondition.class)))
-                .thenReturn(List.of(contract));
+        when(contractService.selectByCondition(
+                any(ContractSearchCondition.class), eq(1), eq(20)
+        )).thenReturn(PageResponse.of(
+                List.of(contract), 1, 20, 1, "contractId,desc"
+        ));
 
         mockMvc.perform(get("/api/v1/contracts")
                         .param("contractNo", "TEST")
                         .with(user("admin").roles("GA_ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].contractNo").value("TEST-20260806-001"))
-                .andExpect(jsonPath("$.data[0].insurerName").value("미래가상생명"))
-                .andExpect(jsonPath("$.data[0].capResultStatus").value("NORMAL"));
+                .andExpect(jsonPath("$.data.content[0].contractNo").value("TEST-20260806-001"))
+                .andExpect(jsonPath("$.data.content[0].insurerName").value("미래가상생명"))
+                .andExpect(jsonPath("$.data.content[0].capResultStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1));
     }
 
     @Test
