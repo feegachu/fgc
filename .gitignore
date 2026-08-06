@@ -53,11 +53,9 @@ logs/
 !.env.example
 
 # Local / secret configuration
-application.yml
 application-local.properties
 src/main/resources/application-local.yml
 src/main/resources/application-prod.yml
-docker-compose.yml
 application-local.yaml
 application-secret.properties
 application-secret.yml
