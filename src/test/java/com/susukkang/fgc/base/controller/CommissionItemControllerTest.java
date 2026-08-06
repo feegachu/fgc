@@ -50,7 +50,7 @@ class CommissionItemControllerTest {
                 )
         ));
 
-        mockMvc.perform(get("/api/base/commission-items")
+        mockMvc.perform(get("/api/v1/base/commission-items")
                         .param("asOf", "2026-08-04")
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isOk())
@@ -70,7 +70,7 @@ class CommissionItemControllerTest {
         LocalDate asOf = LocalDate.of(2025, 12, 31);
         given(commissionItemService.findEffectiveItems(asOf)).willReturn(List.of());
 
-        mockMvc.perform(get("/api/base/commission-items")
+        mockMvc.perform(get("/api/v1/base/commission-items")
                         .param("asOf", "2025-12-31")
                         .with(user("fgc-user").roles(role)))
                 .andExpect(status().isOk())
@@ -80,7 +80,7 @@ class CommissionItemControllerTest {
 
     @Test
     void rejectsAnInvalidAsOfFormat() throws Exception {
-        mockMvc.perform(get("/api/base/commission-items")
+        mockMvc.perform(get("/api/v1/base/commission-items")
                         .param("asOf", "2026/08/04")
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isBadRequest())
@@ -91,7 +91,7 @@ class CommissionItemControllerTest {
 
     @Test
     void rejectsMissingAsOf() throws Exception {
-        mockMvc.perform(get("/api/base/commission-items")
+        mockMvc.perform(get("/api/v1/base/commission-items")
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
@@ -100,7 +100,7 @@ class CommissionItemControllerTest {
 
     @Test
     void requiresAuthentication() throws Exception {
-        mockMvc.perform(get("/api/base/commission-items")
+        mockMvc.perform(get("/api/v1/base/commission-items")
                         .param("asOf", "2026-08-04"))
                 .andExpect(status().isUnauthorized());
     }
