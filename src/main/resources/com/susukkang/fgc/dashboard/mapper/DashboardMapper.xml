@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.dashboard.mapper.DashboardMapper">
+
+
+    <select id="countCapViolation" resultType="long">
+        SELECT COUNT(*)
+        FROM vw_latest_cap_check as vw
+        WHERE result_status = 'VIOLATION'
+        AND date_trunc('month', vw.as_of_date) = date_trunc('month', #{month}::date)
+    </select>
+
+    <select id="countCapWarning" resultType="long">
+        SELECT COUNT(*)
+        FROM vw_latest_cap_check as vw
+        WHERE result_status = 'WARNING'
+        AND date_trunc('month', vw.as_of_date) = date_trunc('month', #{month}::date)
+    </select>
+
+    <select id="countArbitrageCandidate" resultType="long">
+        SELECT COUNT(*)
+        FROM arbitrage_check as aa
+        WHERE result_status = 'CANDIDATE'
+    </select>
+
+    <select id="countReconciliationMismatch" resultType="long">
+        SELECT COUNT(*)
+          FROM reconciliation_result
+          JOIN (
+              SELECT DISTINCT ON (settlement_month, payment_stage, insurer_id) reconciliation_run_id
+                FROM reconciliation_run
+               WHERE date_trunc('month', settlement_month) = date_trunc('month', #{month}::date)
+               ORDER BY settlement_month, payment_stage, insurer_id, created_at DESC, reconciliation_run_id DESC
+          ) AS latest_run ON latest_run.reconciliation_run_id = reconciliation_result.reconciliation_run_id
+         WHERE reconciliation_result.result_type &lt;&gt; 'MATCHED' <!-- <>깨짐 -->
+    </select>
+
+    <select id="countJournalImbalance" resultType="long">
+        SELECT COUNT(*)
+        FROM vw_journal_imbalance
+    </select>
+
+    <select id="countOpenException" resultType="long">
+        SELECT COUNT(*)
+        FROM exception_case
+        WHERE status IN ('NEW', 'IN_REVIEW')
+    </select>
+
+    <select id="findRecentExceptions" resultType="com.susukkang.fgc.dashboard.dto.RecentExceptionRow">
+        SELECT ec.exception_case_id AS exceptionCaseId,
+               ec.exception_type AS exceptionType,
+               ec.severity,
+               ic.contract_no AS contractNo,
+               ec.title,
+               ec.status,
+               ec.created_at AS createdAt
+          FROM exception_case ec
+          LEFT JOIN insurance_contract ic ON ic.contract_id = ec.contract_id
+         ORDER BY ec.created_at DESC
+         LIMIT #{limit}
+    </select>
+
+    <select id="findRecentValidationRuns" resultType="com.susukkang.fgc.dashboard.dto.RecentValidationRunRow">
+        SELECT vr.validation_run_id AS validationRunId,
+               vr.validation_month AS validationMonth,
+               vr.run_no AS runNo,
+               vr.run_type AS runType,
+               vr.status,
+               triggered.login_id AS triggeredBy,
+               vr.started_at AS startedAt,
+               vr.completed_at AS completedAt,
+               vr.finalized_at AS finalizedAt,
+               finalized.login_id AS finalizedBy,
+               vr.failure_message AS failureMessage
+          FROM validation_run vr
+          LEFT JOIN app_user triggered ON triggered.user_id = vr.triggered_by
+          LEFT JOIN app_user finalized ON finalized.user_id = vr.finalized_by
+         ORDER BY vr.validation_month DESC, vr.run_no DESC
+         LIMIT #{limit}
+    </select>
+
+</mapper>
