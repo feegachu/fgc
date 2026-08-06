@@ -6,6 +6,7 @@ import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.service.ContractService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -49,8 +50,9 @@ public class ContractController {
      * @author hjKang
      * @since 2026-08-05
      */
+
     @PostMapping
-    // TODO: 계약 생성 권한을 SETTLEMENT 역할로 제한한다.
+    @PreAuthorize("hasRole('SETTLEMENT')")
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
@@ -63,7 +65,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PutMapping("/{id}")
-    // TODO: 계약 수정 권한을 SETTLEMENT 역할로 제한한다.
+    @PreAuthorize("hasRole('SETTLEMENT')")
     public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }

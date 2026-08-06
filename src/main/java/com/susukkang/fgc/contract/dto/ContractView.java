@@ -20,6 +20,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ContractView {
+    private Long contractId; //계약 id , 표시는 X
     private String contractNo; //계약번호
     private String insurerName; //회사명
     private String productName; // 상품명

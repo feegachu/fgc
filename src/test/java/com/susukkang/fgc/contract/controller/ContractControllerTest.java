@@ -102,31 +102,51 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.totalPages").value(1));
     }
-
     @Test
     @DisplayName("보험계약 상세정보를 조회한다")
     void getContractDetailReturnsSuccess() throws Exception {
-        ContractDetailResponse detail = ContractDetailResponse.builder()
-                .contractNo("TEST-20260806-001")
-                .productName("가상 건강보장보험 A")
-                .contractDate(LocalDate.of(2026, 8, 6))
-                .premiumPerCycleAmount(new BigDecimal("100000"))
-                .paymentCycleCode(MONTHLY)
-                .firstPremiumAmount(new BigDecimal("100000"))
-                .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
-                .paymentTermMonths(120)
-                .standardSurrenderDeductionAmount(new BigDecimal("50000"))
-                .contractStatus(ACTIVE)
-                .dataOrigin(DataOrigin.MANUAL)
-                .build();
+        ContractDetailResponse detail =
+                ContractDetailResponse.builder()
+                        .contractNo("TEST-20260806-001")
+                        .productName("가상 건강보장보험 A")
+                        .contractDate(LocalDate.of(2026, 8, 6))
+                        .premiumPerCycleAmount(
+                                new BigDecimal("100000")
+                        )
+                        .paymentCycleCode(MONTHLY)
+                        .firstPremiumAmount(
+                                new BigDecimal("100000")
+                        )
+                        .monthlyEquivalentFirstPremium(
+                                new BigDecimal("100000")
+                        )
+                        .paymentTermMonths(120)
+                        .standardSurrenderDeductionAmount(
+                                new BigDecimal("50000")
+                        )
+                        .contractStatus(ACTIVE)
+                        .dataOrigin(DataOrigin.MANUAL)
+                        .build();
 
-        when(contractService.selectContractDetailById(21L)).thenReturn(detail);
+        when(contractService.selectContractDetailById(21L))
+                .thenReturn(detail);
 
-        mockMvc.perform(get("/api/v1/contracts/{id}", 21L)
-                        .with(user("admin").roles("GA_ADMIN")))
+        mockMvc.perform(
+                        get("/api/v1/contracts/{id}", 21L)
+                                .with(
+                                        user("settlement")
+                                                .roles("SETTLEMENT")
+                                )
+                )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.contractNo").value("TEST-20260806-001"))
-                .andExpect(jsonPath("$.data.productName").value("가상 건강보장보험 A"));
+                .andExpect(
+                        jsonPath("$.data.contractNo")
+                                .value("TEST-20260806-001")
+                )
+                .andExpect(
+                        jsonPath("$.data.productName")
+                                .value("가상 건강보장보험 A")
+                );
     }
 
     @Test
@@ -136,7 +156,7 @@ class ContractControllerTest {
                 .thenReturn(ContractResponse.builder().contractId(21L).build());
 
         mockMvc.perform(post("/api/v1/contracts")
-                        .with(user("admin").roles("GA_ADMIN"))
+                        .with(user("settlement").roles("SETTLEMENT"))
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
@@ -152,7 +172,7 @@ class ContractControllerTest {
         )).thenReturn(ContractResponse.builder().contractId(21L).build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
-                        .with(user("admin").roles("GA_ADMIN"))
+                        .with(user("settlement").roles("SETTLEMENT"))
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
@@ -190,5 +210,29 @@ class ContractControllerTest {
                 120,
                 new BigDecimal("50000")
         );
+    }
+
+    @Test
+    @DisplayName("정산담당자가 아니면 보험계약을 생성할 수 없다")
+    void createContractRejectsNonSettlementUser() throws Exception {
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("admin").roles("GA_ADMIN"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                createRequest()
+                        )))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("정산담당자가 아니면 보험계약을 수정할 수 없다")
+    void updateContractRejectsNonSettlementUser() throws Exception {
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
+                        .with(user("admin").roles("GA_ADMIN"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                updateRequest()
+                        )))
+                .andExpect(status().isForbidden());
     }
 }
