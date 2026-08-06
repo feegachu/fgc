@@ -101,13 +101,14 @@ class DashboardServiceIntegrationTest {
                 """, reconciliationRunId, matchGroupKey, resultType);
     }
 
-    private void insertExceptionCase(String exceptionKey, String status, OffsetDateTime createdAt) {
-        jdbcTemplate.update("""
+    private Long insertExceptionCase(String exceptionKey, String status, OffsetDateTime createdAt) {
+        return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.exception_case
                     (exception_key, exception_type, severity, status,
                      source_entity_type, source_entity_id, title, created_at)
                 VALUES (?, 'DATA_QUALITY', 'INFO', ?, 'TEST', ?, 'dashboard test', ?)
-                """, exceptionKey, status, exceptionKey, createdAt);
+                RETURNING exception_case_id
+                """, Long.class, exceptionKey, status, exceptionKey, createdAt);
     }
 
     // 차대 불균형 분개 하나(대변 없이 차변만)
@@ -267,6 +268,29 @@ class DashboardServiceIntegrationTest {
         assertThat(recent).hasSize(5);
         // 가장 최근(7월 6일)이 맨 앞
         assertThat(recent.get(0).createdAt()).isEqualTo(OffsetDateTime.parse("2026-07-06T09:00:00+09:00"));
+    }
+
+    // coderabbitai 지적: created_at만으로 정렬하면 동시각(tie) 행의 순서가 보장되지 않아
+    // LIMIT 경계에서 요청마다 다른 5건이 나올 수 있다. exception_case_id를 보조 정렬 키로 둬서
+    // 결정적으로 만든다 — 동일 시각 6건 중 최신 id 5개가 항상 같은 순서로 나와야 한다.
+    @Test
+    void summarizeBreaksRecentExceptionTiesByIdWhenCreatedAtIsIdentical() {
+        OffsetDateTime sameInstant = OffsetDateTime.parse("2026-07-10T09:00:00+09:00");
+        List<Long> ids = new java.util.ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            ids.add(insertExceptionCase("DASH-TEST-TIE-EXC-" + i, "NEW", sameInstant));
+        }
+
+        DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
+        List<RecentExceptionRow> recent = result.recentExceptions();
+
+        assertThat(recent).hasSize(5);
+        List<Long> expectedIdsDesc = ids.stream()
+                .sorted(java.util.Comparator.reverseOrder())
+                .limit(5)
+                .toList();
+        assertThat(recent.stream().map(RecentExceptionRow::exceptionCaseId).toList())
+                .isEqualTo(expectedIdsDesc);
     }
 
     // 8. 최근 검증 실행 3건: 생성 시각(created_at) 최신순, 3건 제한, current_step(진행률) 포함

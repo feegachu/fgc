@@ -69,15 +69,10 @@
                ec.created_at AS createdAt
           FROM fgc.exception_case ec
           LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
-         ORDER BY ec.created_at DESC
+         ORDER BY ec.created_at DESC, ec.exception_case_id DESC
          LIMIT #{limit}
     </select>
 
-    <!--
-      coderabbitai 지적: validation_month DESC, run_no DESC로 정렬하면 "과거 기준월을 오늘
-      재실행"한 경우 실제로 가장 최근에 만들어진 실행인데도 뒤로 밀린다(더 늦은 기준월의 예전
-      실행이 앞선다). "최근 실행"은 생성 시각 기준이어야 하므로 created_at으로 정렬한다.
-    -->
     <select id="findRecentValidationRuns" resultType="com.susukkang.fgc.dashboard.dto.RecentValidationRunRow">
         SELECT vr.validation_run_id AS validationRunId,
                vr.validation_month AS validationMonth,
