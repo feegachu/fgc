@@ -81,4 +81,8 @@ AGENTS.md
 docs/
 .codex-tmp/
 .claude/
-CLAUDE.md
+CLAUDE.mdsrc/main/resources/application-prod.yml
+src/main/resources/application-local.yml
+.codex_tmp/
+.serena/
+skills-lock.json
