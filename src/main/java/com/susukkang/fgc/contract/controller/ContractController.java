@@ -31,6 +31,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @GetMapping
+    // TODO: 계약 목록에 page, size 및 전체 건수 메타데이터를 적용한다.
     public ApiResponse<List<ContractView>> getContractListByCondition(@ModelAttribute ContractSearchCondition condition) {
         return ApiResponse.success(contractService.selectByCondition(condition));
     }
@@ -44,6 +45,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PostMapping
+    // TODO: 계약 생성 권한을 SETTLEMENT 역할로 제한한다.
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
@@ -56,11 +58,13 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PutMapping("/{id}")
+    // TODO: 계약 수정 권한을 SETTLEMENT 역할로 제한한다.
     public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
     /**
-     * 설명 : 계약 상세보기 - 기본 계약 + 계약상태 사건 이력
+     * 설명 : 계약 상세보기 - 현재는 기본 계약정보를 반환한다.
+     *       계약상태 사건 이력은 FUN-026 2차에서 포함한다.
      *
      * @param id 계약Id
      * @return 계약 상세보기 응답 정보

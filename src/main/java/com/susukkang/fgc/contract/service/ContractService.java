@@ -93,7 +93,11 @@ public class ContractService {
             );
         }
 
-        // 예상 스케줄 생성 FUN-036 1차
+        /*
+         * TODO(FUN-036)
+         * 계약 저장 후 보험회사 → GA, GA → FC 양방향 예상 지급 스케줄을 생성하고
+         * 생성된 scheduleHeaderId 목록을 응답에 포함한다.
+         */
 
         /*
          * TODO(FUN-030, REG-08~11)
@@ -104,7 +108,7 @@ public class ContractService {
          * capCheckService.calculateAndSave()를 호출한다.
          */
 
-        // 계약상태 사건 이력 등록 FUN-026 2차
+        // TODO(FUN-026, 2차): 계약 생성 상태 사건 이력을 등록한다.
 
 
         return ContractResponse.builder()
@@ -294,9 +298,10 @@ public class ContractService {
     }
     /**
      * 설명 : 계약 상세보기 서비스
-     *       계약의 기본정보 + 계약별 계약상태 사건 이력 List를 반환한다.
+     *       현재는 계약 기본정보를 반환한다.
+     *       계약별 계약상태 사건 이력은 FUN-026 2차에서 포함한다.
      * @param  contractId 계약 ID
-     * @return 계약 기본 + 계약별 계약상태 사건 이력
+     * @return 계약 기본정보
      * @author hjKang
      * @since 2026-08-05
      */
@@ -310,7 +315,7 @@ public class ContractService {
                     "존재하지 않는 보험계약입니다."
             );
         }
-//        // 계약상태 사건 이력 가져오기 2차
+//        // TODO(FUN-026, 2차): 계약상태 사건 이력을 조회하여 상세 응답에 포함한다.
 //        List<ContractStatusEventResponse> statusEvents =
 //                contractStatusEventMapper.selectByContractId(contractId);
 //        // ContractDetail에 Build 후 반환
@@ -389,13 +394,14 @@ public class ContractService {
          */
 
         /*
-         * TODO(FUN-030)
+         * TODO(FUN-030, REG-08~11)
          * FUN-036에서 새 스케줄 생성이 끝난 다음
+         * 보험회사 → GA와 GA → FC를 구분하여 각각
          * capCheckService.calculateAndSave()를 호출한다.
          */
 
         /*
-         * TODO(FUN-026)
+         * TODO(FUN-026, 2차)
          * existingContract.getCurrentStatus()와
          * request.getContractStatus()가 다른 경우
          * 계약상태 사건 이력을 등록한다.
