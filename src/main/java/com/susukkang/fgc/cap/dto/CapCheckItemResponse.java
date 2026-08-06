@@ -39,4 +39,16 @@ public record CapCheckItemResponse(
                 DisplayFormat.won(row.getIncludedAmount()), DisplayFormat.won(row.getRemainingAmount()),
                 DisplayFormat.rate(row.getUsagePct()), status, status.label(), row.getCapRuleSetId());
     }
+
+    /** IF-API-31 응답의 capCheck — 저장된 판정(CapCheckSaveResult)을 같은 표시 형식(SIR-008)으로 변환한다. */
+    public static CapCheckItemResponse from(CapCheckSaveResult saved, String contractNo) {
+        CapCalculationResult r = saved.result();
+        return new CapCheckItemResponse(
+                saved.capCheckId(), r.contractId(), contractNo,
+                r.paymentStage(), r.paymentStage().label(), r.asOfDate(),
+                DisplayFormat.won(r.basePremiumAmount()), DisplayFormat.won(r.refund12mAmount()),
+                DisplayFormat.won(r.complianceDeductionAmount()), DisplayFormat.won(r.limitAmount()),
+                DisplayFormat.won(r.includedAmount()), DisplayFormat.won(r.remainingAmount()),
+                DisplayFormat.rate(r.usagePct()), r.resultStatus(), r.resultStatus().label(), r.capRuleSetId());
+    }
 }
