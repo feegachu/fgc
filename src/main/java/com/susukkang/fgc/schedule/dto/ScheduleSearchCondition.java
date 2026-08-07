@@ -10,7 +10,6 @@ import lombok.*;
 @AllArgsConstructor
 // 검색 필터
 public class ScheduleSearchCondition {
-
     private String contractNo;                // 계약번호
     private String paymentStage;              // 지급단계
     private ScheduleRegime scheduleRegime;    // 적용체계
