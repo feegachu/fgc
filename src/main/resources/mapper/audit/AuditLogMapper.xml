@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FUN-001 개발 순서 10 -->
+<mapper namespace="com.susukkang.fgc.audit.mapper.AuditLogMapper">
+
+    <!--
+      client_ip 는 varchar 가 아니라 postgres inet 타입이다.
+      JDBC URL 에 stringtype=unspecified 가 없어서 ::inet 캐스트를 빼면
+      'column "client_ip" is of type inet but expression is of type character varying' 로 실패한다.
+      occurred_at 은 컬럼 기본값(clock_timestamp())에 맡긴다.
+    -->
+    <insert id="insert">
+        INSERT INTO fgc.audit_log (
+            user_id, action_code, entity_type, entity_id, reason, request_id, client_ip
+        ) VALUES (
+            #{userId}, #{actionCode}, #{entityType}, #{entityId}, #{reason}, #{requestId}, #{clientIp}::inet
+        )
+    </insert>
+
+</mapper>

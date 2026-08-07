@@ -62,9 +62,30 @@
     </select>
 
     <!--
-      IF-API-14(계약 상세 탭3, FUN-032·박민준)와 IF-API-31(계산근거 팝업, FUN-035·강현준)에 필요한
-      조회는 이 이슈(FUN-030) 범위가 아니라 각 담당 이슈에서 CapCheckMapper에 추가한다.
+      IF-API-31(계산근거 팝업, FUN-035)은 findById로 아래에 구현한다.
     -->
+    <select id="findById" resultType="com.susukkang.fgc.cap.dto.CapCheckRow">
+        SELECT cc.cap_check_id                 AS capCheckId,
+               cc.contract_id                   AS contractId,
+               ic.contract_no                   AS contractNo,
+               cc.payment_stage                 AS paymentStage,
+               cc.check_kind                    AS checkKind,
+               cc.as_of_date                    AS asOfDate,
+               cc.cap_rule_set_id               AS capRuleSetId,
+               cc.refund_rate_table_id          AS refundRateTableId,
+               cc.base_premium_amount           AS basePremiumAmount,
+               cc.refund_12m_amount             AS refund12mAmount,
+               cc.compliance_deduction_amount   AS complianceDeductionAmount,
+               cc.limit_amount                  AS limitAmount,
+               cc.included_amount               AS includedAmount,
+               cc.remaining_amount              AS remainingAmount,
+               cc.usage_pct                     AS usagePct,
+               cc.result_status                 AS resultStatus,
+               cc.calculation_snapshot::text    AS calculationSnapshotJson
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+         WHERE cc.cap_check_id = #{capCheckId}
+    </select>
 
     <!-- IF-API-30 목록·건수·요약이 공유하는 검색조건. month는 as_of_date가 속한 달(그 달 1일 기준)로 거른다. -->
     <sql id="searchWhere">
@@ -143,7 +164,6 @@
       item_code/item_name/contract_month_no는 cap_check_detail에 저장된 스냅샷 컬럼을 그대로
       읽는다 — commission_item/schedule_line을 다시 조인하지 않는다. 계산 당시 값이 아니라 "지금"
       값을 보여주면, 상품명이나 스케줄이 바뀐 뒤에는 과거 판정의 계산근거가 달라져 보인다
-      (PR #2 코드리뷰 지적).
     -->
     <select id="findDetailsByCapCheckId" resultType="com.susukkang.fgc.cap.dto.CapCheckDetailLine">
         SELECT ccd.detail_seq             AS detailSeq,

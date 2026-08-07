@@ -1,4 +1,4 @@
-﻿# 🚀 Fee GA Chu
+# 🚀 Fee GA Chu
 
 <!--<img width="512" height="512" alt="Property 1=Logo" src="" />-->
 
@@ -39,7 +39,7 @@
 For building and running the application you need:
 
 [![Java](https://img.shields.io/badge/Java-21-red.svg)]()
-[![SpringBoot](https://img.shields.io/badge/SpringBoot-4.1.0-green.svg)]()
+[![SpringBoot](https://img.shields.io/badge/SpringBoot-3.5.16-green.svg)]()
 
 <br>
 
@@ -71,7 +71,7 @@ For building and running the application you need:
 <div align="left">
 <img src="https://img.shields.io/badge/Java-007396?style=for-the-badge&logo=java&logoColor=white" />
 <img src="https://img.shields.io/badge/Spring%20Boot-5FA04E?style=for-the-badge&logo=SpringBoot&logoColor=white" />
-<img src="https://img.shields.io/badge/Spring%20Batch-5FA04E?style=for-the-badge&logo=Spring&logoColor=white" 
+<img src="https://img.shields.io/badge/Spring%20Batch-5FA04E?style=for-the-badge&logo=Spring&logoColor=white" />
 <img src="https://img.shields.io/badge/JPA-D70F64?style=for-the-badge&logo=jakarta&logoColor=white" /> 
 <img src="https://img.shields.io/badge/MyBatis-000000?style=for-the-badge&logo=MyBatis&logoColor=white" />
 <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />

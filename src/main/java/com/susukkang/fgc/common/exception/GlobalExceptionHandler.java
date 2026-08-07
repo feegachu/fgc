@@ -4,9 +4,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.susukkang.fgc.common.web.ApiError;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
@@ -16,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -117,22 +113,6 @@ public class GlobalExceptionHandler {
         return validationError(field);
     }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
-            AccessDeniedException exception
-    ) {
-        FgcErrorCode errorCode = FgcErrorCode.AUTH_003;
-        ApiError apiError = createApiError(
-                errorCode,
-                null,
-                Map.of(),
-                productionDetail(exception.getMessage())
-        );
-
-        return ResponseEntity
-                .status(errorCode.getStatus())
-                .body(ApiResponse.failure(apiError));
-    }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
@@ -176,6 +156,33 @@ public class GlobalExceptionHandler {
                 null,
                 params,
                 productionDetail(exception.getMostSpecificCause().getMessage())
+        );
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.failure(apiError));
+    }
+
+    // 2026-08-07 yslee - 접근 거부 예외에 대한 공통 오류 응답 처리 적용
+    // 기존 코드: 접근 거부 예외가 일반 예외 처리기로 전달되었다.
+    // 문제: 권한이 없는 요청이 HTTP 403 대신 HTTP 500으로 응답할 수 있었다.
+    // 개선: AccessDeniedException을 별도로 처리하여 HTTP 403과 FGC-AUTH-003을 반환한다.
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+            AccessDeniedException exception
+    ) {
+        FgcErrorCode errorCode = FgcErrorCode.AUTH_003;
+
+        log.warn(
+                "[{}] Access denied",
+                RequestIdContext.current()
+        );
+
+        ApiError apiError = createApiError(
+                errorCode,
+                null,
+                Map.of(),
+                productionDetail(exception.getMessage())
         );
 
         return ResponseEntity
