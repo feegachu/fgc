@@ -2,6 +2,7 @@ package com.susukkang.fgc.validation.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
@@ -84,7 +85,8 @@ class ValidationRunCreateServiceImplTest {
                 .thenReturn(List.of());
 
         service = new ValidationRunCreateServiceImpl(
-                validationRunMapper, policySnapshotMapper, new ObjectMapper(), new NoOpTransactionManager());
+                validationRunMapper, policySnapshotMapper, new ObjectMapper(),
+                new ConstraintErrorCodeResolver(), new NoOpTransactionManager());
     }
 
     // insert가 useGeneratedKeys로 row.validationRunId를 채우는 것을 mock에서 흉내낸다.

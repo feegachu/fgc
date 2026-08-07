@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapRuleSetView;
 import com.susukkang.fgc.cap.dto.RefundRateTableView;
 import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
@@ -25,10 +26,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
 public class ValidationRunCreateServiceImpl implements ValidationRunCreateService {
+
+    private static final String CONSTRAINT_ACTIVE_MONTHLY_RUN = "uq_validation_run_active_month";
+    private static final String CONSTRAINT_RUN_NO = "uq_validation_run";
 
     // findNextRunNo(사전 조회)와 insert(실제 반영) 사이는 잠기지 않는다 — 두 요청이 동시에
     // 같은 run_no를 계산해서 갈 수 있다. 그중 하나는 uq_validation_run(validation_month, run_no)
@@ -39,15 +44,18 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     private final ValidationRunMapper validationRunMapper;
     private final PolicySnapshotMapper policySnapshotMapper;
     private final ObjectMapper objectMapper;
+    private final ConstraintErrorCodeResolver constraintErrorCodeResolver;
     private final TransactionTemplate requiresNewTransactionTemplate;
 
     public ValidationRunCreateServiceImpl(ValidationRunMapper validationRunMapper,
                                            PolicySnapshotMapper policySnapshotMapper,
                                            ObjectMapper objectMapper,
+                                           ConstraintErrorCodeResolver constraintErrorCodeResolver,
                                            PlatformTransactionManager transactionManager) {
         this.validationRunMapper = validationRunMapper;
         this.policySnapshotMapper = policySnapshotMapper;
         this.objectMapper = objectMapper;
+        this.constraintErrorCodeResolver = constraintErrorCodeResolver;
         // PostgreSQL은 제약 위반이 한 번 나면 그 트랜잭션 전체가 "aborted" 상태가 되어 같은
         // 트랜잭션 안에서는 재시도 INSERT조차 거부한다(추가 오류만 쌓인다). 그래서 재시도마다
         // REQUIRES_NEW로 완전히 새 트랜잭션을 열어야 한다 — @Transactional을 그대로 쓰면 이
@@ -63,13 +71,11 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
             try {
                 return requiresNewTransactionTemplate.execute(status -> attemptCreate(command));
             } catch (DataIntegrityViolationException e) {
-                if (isActiveMonthlyRunConflict(e)) {
-                    // uq_validation_run_active_month 위반은 run_no를 새로 받아도 해결되지
-                    // 않는 진짜 업무 규칙 위반이다 — 재시도하지 않고 그대로 던져
-                    // ConstraintErrorCodeResolver가 VRUN_001(409)로 바꾸게 둔다.
-                    throw e;
-                }
-                if (attempt == MAX_RUN_NO_RETRIES) {
+                // run_no 채번 충돌(uq_validation_run)만 재시도한다. 활성 MONTHLY 중복
+                // (uq_validation_run_active_month)이나 그 밖의 무결성 위반은 재시도해도
+                // 해결되지 않으므로 그대로 던져 기존 예외 처리 경로(GlobalExceptionHandler →
+                // ConstraintErrorCodeResolver)를 타게 둔다.
+                if (!isRunNoCollision(e) || attempt == MAX_RUN_NO_RETRIES) {
                     throw e;
                 }
                 log.warn("validation_run run_no 충돌로 재시도합니다 (시도 {}/{})", attempt, MAX_RUN_NO_RETRIES);
@@ -78,15 +84,26 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
         throw new IllegalStateException("unreachable: MAX_RUN_NO_RETRIES 루프를 정상적으로 빠져나올 수 없다");
     }
 
-    // 실행 유형별 판단은 여기서 하지 않는다 — MONTHLY든 아니든 uq_validation_run(run_no)
-    // 충돌이면 재시도, uq_validation_run_active_month 충돌이면 즉시 실패로 동일하게 다룬다.
-    private boolean isActiveMonthlyRunConflict(DataIntegrityViolationException e) {
+    /**
+     * 위반된 제약이 uq_validation_run(run_no 채번 충돌)인지 판정한다.
+     * ConstraintErrorCodeResolver#extractConstraintName으로 PostgreSQL이 알려주는 정확한
+     * 제약 이름을 먼저 쓴다 — uq_validation_run과 uq_validation_run_active_month가 서로
+     * 접두어 관계라 메시지 문자열 부분일치만으로는 안전하게 구분할 수 없기 때문이다.
+     * 실제 PSQLException이 없는 경우(단위테스트의 합성 예외 등)에만 메시지 기반 대체 판정으로
+     * 넘어간다.
+     */
+    private boolean isRunNoCollision(DataIntegrityViolationException e) {
+        Optional<String> constraintName = constraintErrorCodeResolver.extractConstraintName(e);
+        if (constraintName.isPresent()) {
+            return CONSTRAINT_RUN_NO.equals(constraintName.get());
+        }
+
         Throwable root = e;
         while (root.getCause() != null) {
             root = root.getCause();
         }
         String message = root.getMessage() == null ? "" : root.getMessage().toLowerCase(Locale.ROOT);
-        return message.contains("uq_validation_run_active_month");
+        return message.contains(CONSTRAINT_RUN_NO) && !message.contains(CONSTRAINT_ACTIVE_MONTHLY_RUN);
     }
 
     private ValidationRunRow attemptCreate(CreateValidationRunCommand command) {
