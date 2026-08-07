@@ -20,10 +20,9 @@
     </select>
 
     <!--
-      status = #{expectedStatus} 조건이 핵심이다 — validation_run_id만 걸면 동시에 두 요청이
-      같은 실행을 서로 다른 상태로 밀 때 나중 것이 먼저 것을 덮어써 버린다(lost update).
-      실제 상태 검증(허용된 전이인지)은 이 SQL이 아니라 Java 쪽(ValidationRunStatus.canTransitionTo)
-      책임이다 — 여기서는 "내가 읽었던 그 상태가 맞을 때만" 바꾼다.
+      validation_run_id만 걸면 동시에 두 요청이
+      같은 실행을 서로 다른 상태로 밀 때 나중 것이 먼저 것을 덮어써 버린다(lost update)
+      실제 상태 검증(허용된 전이인지)은 이 SQL이 아니라 Java 쪽(ValidationRunStatus.canTransitionTo) 책임
     -->
     <update id="updateStatusIfCurrent">
         UPDATE fgc.validation_run

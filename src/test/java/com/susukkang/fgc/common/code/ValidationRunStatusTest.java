@@ -1,55 +1,58 @@
 package com.susukkang.fgc.common.code;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
- * ValidationRunStatus.canTransitionTo()가 fgc.guard_run_lifecycle() 트리거의 전이표와
- * 정확히 같은지 검증한다(DB 없이 순수 단위테스트).
- *
- * 전이표(V7__run_progress_and_snapshot_locks.sql의 guard_run_lifecycle 참고):
- *   CREATED   → RUNNING
- *   CREATED   → FAILED
- *   RUNNING   → COMPLETED
- *   RUNNING   → FAILED
- *   FAILED    → RUNNING
- *   COMPLETED → FINALIZED
- *   그 외 전부 불가, FINALIZED는 어디로도 못 감
- *
- * 주의: 이슈 설명의 허용 목록에는 CREATED → FAILED 가 없지만, 트리거 주석에는
- * 명시돼 있지 않다 — 실제 트리거 코드(IF NOT (...))를 다시 읽고 어느 쪽이 진짜인지
- * 확인한 뒤 테스트를 작성할 것. 이 파일의 목적 자체가 "코드와 DB가 어긋나지 않는지"
- * 증명하는 것이므로, 여기서 발견한 불일치가 있다면 그게 이 이슈의 진짜 산출물이다.
+ * ValidationRunStatus.canTransitionTo()가 guard_run_lifecycle() 트리거의 전이표와
+ * 일치하는지 검증한다. CREATED→FAILED는 트리거에 없으므로 허용하지 않는다(확인 완료).
  */
 class ValidationRunStatusTest {
 
     @Test
-    @Disabled("TODO(FUN-041): CREATED에서 허용된 모든 target이 true인지 확인")
+    // CREATED는 RUNNING으로만 갈 수 있다
     void createdCanTransitionToAllowedTargets() {
+        assertThat(ValidationRunStatus.CREATED.canTransitionTo(ValidationRunStatus.RUNNING)).isTrue();
     }
 
     @Test
-    @Disabled("TODO(FUN-041): RUNNING에서 허용된 모든 target이 true인지 확인")
+    // RUNNING은 COMPLETED 또는 FAILED로 갈 수 있다
     void runningCanTransitionToAllowedTargets() {
+        assertThat(ValidationRunStatus.RUNNING.canTransitionTo(ValidationRunStatus.COMPLETED)).isTrue();
+        assertThat(ValidationRunStatus.RUNNING.canTransitionTo(ValidationRunStatus.FAILED)).isTrue();
     }
 
     @Test
-    @Disabled("TODO(FUN-041): FAILED에서 RUNNING으로만 갈 수 있는지 확인")
+    // FAILED는 RUNNING으로만 갈 수 있다(재시도)
     void failedCanOnlyTransitionToRunning() {
+        assertThat(ValidationRunStatus.FAILED.canTransitionTo(ValidationRunStatus.RUNNING)).isTrue();
+        assertThat(ValidationRunStatus.FAILED.canTransitionTo(ValidationRunStatus.COMPLETED)).isFalse();
     }
 
     @Test
-    @Disabled("TODO(FUN-041): COMPLETED에서 FINALIZED로만 갈 수 있는지 확인")
+    // COMPLETED는 FINALIZED로만 갈 수 있다
     void completedCanOnlyTransitionToFinalized() {
+        assertThat(ValidationRunStatus.COMPLETED.canTransitionTo(ValidationRunStatus.FINALIZED)).isTrue();
+        assertThat(ValidationRunStatus.COMPLETED.canTransitionTo(ValidationRunStatus.RUNNING)).isFalse();
     }
 
     @Test
-    @Disabled("TODO(FUN-041): FINALIZED에서는 어떤 target으로도 못 가는지(자기 자신 포함) 확인")
+    // FINALIZED는 최종 상태라 자기 자신을 포함해 어디로도 못 간다
     void finalizedCannotTransitionToAnything() {
+        for (ValidationRunStatus target : ValidationRunStatus.values()) {
+            assertThat(ValidationRunStatus.FINALIZED.canTransitionTo(target)).isFalse();
+        }
     }
 
     @Test
-    @Disabled("TODO(FUN-041): 정의되지 않은 조합(예: CREATED->COMPLETED, CREATED->FINALIZED)이 전부 false인지 확인")
+    // 전이표에 없는 조합(CREATED→FAILED 포함)은 전부 false여야 한다
     void undefinedTransitionsAreRejected() {
+        assertThat(ValidationRunStatus.CREATED.canTransitionTo(ValidationRunStatus.FAILED)).isFalse();
+        assertThat(ValidationRunStatus.CREATED.canTransitionTo(ValidationRunStatus.COMPLETED)).isFalse();
+        assertThat(ValidationRunStatus.CREATED.canTransitionTo(ValidationRunStatus.FINALIZED)).isFalse();
+        assertThat(ValidationRunStatus.CREATED.canTransitionTo(ValidationRunStatus.CREATED)).isFalse();
+        assertThat(ValidationRunStatus.RUNNING.canTransitionTo(ValidationRunStatus.CREATED)).isFalse();
+        assertThat(ValidationRunStatus.RUNNING.canTransitionTo(ValidationRunStatus.FINALIZED)).isFalse();
     }
 }

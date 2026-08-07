@@ -7,9 +7,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * validation_run 1행 조회 결과.
- * 이 이슈(FUN-041 #1) 범위는 상태 전이 기반이라, INSERT/run_no 채번·policy_snapshot·
- * current_step 등은 다루지 않는다 — 상태 전이 판단에 필요한 컬럼만 옮겼다.
+ * validation_run 1행 조회 결과
  */
 @Getter
 @Setter
