@@ -53,7 +53,6 @@ logs/
 !.env.example
 
 # Local / secret configuration
-application.yml
 application-local.properties
 application-local.yml
 application-local.yaml
