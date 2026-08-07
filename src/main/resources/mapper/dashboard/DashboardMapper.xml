@@ -3,10 +3,10 @@
 <mapper namespace="com.susukkang.fgc.dashboard.mapper.DashboardMapper">
 
     <!--
-      coderabbitai 지적: vw_latest_cap_check는 계약·지급단계별 "전체 기간" 최신 판정을 먼저
+      vw_latest_cap_check는 계약·지급단계별 "전체 기간" 최신 판정을 먼저
       고른 뒤 월로 거른다. 그래서 7월 VIOLATION 뒤에 8월 NORMAL 판정이 생기면, 7월 대시보드를
       봐도 그 계약의 7월 VIOLATION이 사라진다(8월 행만 남고 필터에서 걸러짐).
-      기준월로 먼저 좁히고 그 안에서만 최신을 고르도록 순서를 바꾼다 — 뷰를 쓰지 않는다.
+      기준월로 먼저 좁히고 그 안에서만 최신을 고르도록 순서를 바꾼다
     -->
     <select id="countCapViolation" resultType="long">
         SELECT COUNT(*)
