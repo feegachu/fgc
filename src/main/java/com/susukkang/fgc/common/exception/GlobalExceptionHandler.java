@@ -1,6 +1,7 @@
 package com.susukkang.fgc.common.exception;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.susukkang.fgc.common.web.ApiError;
@@ -154,6 +155,40 @@ public class GlobalExceptionHandler {
                 null,
                 params,
                 productionDetail(exception.getMostSpecificCause().getMessage())
+        );
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.failure(apiError));
+    }
+
+    /**
+    * @author hjKang
+    * @since 2026-08-06
+    *
+     * 접근 권한이 없는 요청을 처리한다.
+     * 기존 코드: 접근 거부 예외에 대한 별도 처리가 없었다.
+     * 문제: AuthorizationDeniedException이 일반 예외 처리기에 전달되어
+     *       HTTP 403 대신 HTTP 500으로 응답했다.
+     * 개선: AccessDeniedException을 별도로 처리하여
+     *       HTTP 403과 FGC-AUTH-003 오류 응답을 반환한다
+    */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+            AccessDeniedException exception
+    ) {
+        FgcErrorCode errorCode = FgcErrorCode.AUTH_003;
+
+        log.warn(
+                "[{}] Access denied",
+                RequestIdContext.current()
+        );
+
+        ApiError apiError = createApiError(
+                errorCode,
+                null,
+                Map.of(),
+                productionDetail(exception.getMessage())
         );
 
         return ResponseEntity
