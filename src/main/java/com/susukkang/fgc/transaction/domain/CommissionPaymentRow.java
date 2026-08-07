@@ -21,6 +21,7 @@ import java.time.YearMonth;
 public record CommissionPaymentRow(
         Long paymentId,
         String sourceBusinessKey,
+        Integer paymentSequence,
         Long contractId,
         Long agentId,
         String commissionItemCode,
@@ -45,6 +46,7 @@ public record CommissionPaymentRow(
         return new CommissionPaymentResponse(
                 paymentId,
                 sourceBusinessKey,
+                paymentSequence,
                 contractId,
                 agentId,
                 commissionItemCode,

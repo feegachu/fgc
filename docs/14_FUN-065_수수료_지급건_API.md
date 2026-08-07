@@ -15,9 +15,9 @@
 
 | 기능 | Method | URL | 성공 상태 |
 | --- | --- | --- | --- |
-| 지급 건 등록 | POST | `/api/v1/commission-payments` | 201 |
-| DRAFT 수정 | PUT | `/api/v1/commission-payments/{paymentId}` | 200 |
-| 지급 건 확정 | POST | `/api/v1/commission-payments/{paymentId}/confirm` | 200 |
+| 지급 건 등록 | POST | `/api/commission-payments` | 201 |
+| DRAFT 수정 | PUT | `/api/commission-payments/{paymentId}` | 200 |
+| 지급 건 확정 | POST | `/api/commission-payments/{paymentId}/confirm` | 200 |
 
 ## 3. 등록 API
 

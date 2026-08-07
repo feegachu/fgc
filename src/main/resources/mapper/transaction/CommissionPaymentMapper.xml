@@ -21,12 +21,11 @@
          WHERE contract_id = #{contractId}
     </select>
 
-    <select id="countEarlierContracts" resultType="int">
+    <select id="countContractsBeforeMonth" resultType="int">
         SELECT COUNT(*)
           FROM fgc.insurance_contract
          WHERE agent_id = #{agentId}
-           AND contract_id &lt;&gt; #{contractId}
-           AND contract_date &lt; #{contractDate}
+           AND contract_date &lt; #{monthStart}
     </select>
 
     <select id="findCommissionItem"
@@ -66,6 +65,8 @@
             payment_stage,
             source_type,
             source_business_key,
+            source_contract_id,
+            source_sequence,
             recipient_agent_id,
             commission_item_id,
             policy_version_id,
@@ -80,6 +81,8 @@
             #{paymentStage},
             'GA_MANUAL_PAYMENT',
             #{sourceBusinessKey},
+            #{naturalContractId},
+            #{paymentSequence},
             #{agentId},
             #{commissionItemId},
             #{policyVersionId},
@@ -96,6 +99,8 @@
     <update id="updateTransaction">
         UPDATE fgc.commission_transaction
            SET payment_stage = #{paymentStage},
+               source_contract_id = #{naturalContractId},
+               source_sequence = #{paymentSequence},
                recipient_agent_id = #{agentId},
                commission_item_id = #{commissionItemId},
                policy_version_id = #{policyVersionId},
@@ -152,6 +157,7 @@
             resultType="com.susukkang.fgc.transaction.domain.CommissionPaymentRow">
         SELECT ct.commission_transaction_id AS payment_id,
                ct.source_business_key,
+               ct.source_sequence AS payment_sequence,
                NULLIF(ta.allocation_basis_snapshot ->> 'sourceContractId', '')::bigint AS contract_id,
                ct.recipient_agent_id AS agent_id,
                ci.item_code AS commission_item_code,
@@ -227,7 +233,11 @@
                       AND other_ta.inclusion_status_snapshot = 'INCLUDED'
                       AND other_ct.payment_stage = #{paymentStage}
                       AND other_ct.status = 'CONFIRMED'
-                      AND (#{paymentId} IS NULL
+                      <!-- 2026-08-07 yslee - 신규 등록의 NULL 지급 건 ID에 PostgreSQL bigint 타입 명시 -->
+                      <!-- 기존 코드: 타입 없는 NULL 바인드 파라미터를 IS NULL로 비교 -->
+                      <!-- 문제: PostgreSQL이 파라미터 데이터 타입을 결정하지 못해 저장 전 FUN-033 조회 실패 -->
+                      <!-- 개선: 지급 건 ID를 bigint로 명시 변환하여 등록·수정 공통 쿼리로 유지 -->
+                      AND (CAST(#{paymentId} AS bigint) IS NULL
                            OR other_ct.commission_transaction_id &lt;&gt; #{paymentId})
                       AND other_ta.attribution_date &gt;= c.contract_date
                       AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'

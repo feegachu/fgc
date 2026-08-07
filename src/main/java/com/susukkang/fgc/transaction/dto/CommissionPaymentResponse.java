@@ -20,6 +20,7 @@ import java.time.YearMonth;
 public record CommissionPaymentResponse(
         Long paymentId,
         String sourceBusinessKey,
+        Integer paymentSequence,
         Long contractId,
         Long agentId,
         String commissionItemCode,

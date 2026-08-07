@@ -200,6 +200,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return buildCommand(
                 null,
                 request.sourceBusinessKey(),
+                request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
                 request.commissionItemCode(),
@@ -224,6 +225,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return buildCommand(
                 paymentId,
                 null,
+                request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
                 request.commissionItemCode(),
@@ -245,6 +247,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private CommissionPaymentCommand buildCommand(
             Long paymentId,
             String sourceBusinessKey,
+            Integer paymentSequence,
             Long sourceContractId,
             Long agentId,
             String itemCode,
@@ -299,6 +302,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return CommissionPaymentCommand.builder()
                 .paymentId(paymentId)
                 .sourceBusinessKey(sourceBusinessKey)
+                .paymentSequence(paymentSequence)
                 .sourceContractId(sourceContractId)
                 .agentId(agentId)
                 .commissionItemId(item.commissionItemId())
@@ -359,11 +363,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {
+            // 2026-08-07 yslee - 위촉 당월 무실적 선지급분을 최초 신계약 모집월 기준으로 판정
+            // 기존 코드: 선택한 계약보다 날짜가 빠른 계약이 있으면 같은 모집월의 계약도 귀속 대상에서 제외
+            // 문제: REG-20은 단일 최초 계약이 아니라 최초 신계약 모집월의 신계약에 귀속하도록 규정
+            // 개선: 대상월 이전 계약 존재 여부만 확인하여 최초 모집월에 속한 신계약 전체를 허용
             boolean firstContract = YearMonth.from(target.contractDate()).equals(attributionMonth)
-                    && mapper.countEarlierContracts(
+                    && mapper.countContractsBeforeMonth(
                     agentId,
-                    target.contractId(),
-                    target.contractDate()
+                    attributionMonth.atDay(1)
             ) == 0;
             if (!firstContract) {
                 invalid("attributedContractId", "이월 선지급분은 최초 신계약 모집월에 귀속해야 합니다.");

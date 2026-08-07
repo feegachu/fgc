@@ -8,10 +8,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 데이터베이스 제약조건 위반을 대응하는 FgcErrorCode로 변환한다.
+ * 설명 : 데이터베이스 제약조건 위반을 대응하는 FgcErrorCode로 변환
  *
- * 등록되지 않은 제약조건은 반환하지 않으며,
- * 호출 측에서 공통 서버 오류로 처리한다.
+ * @author yslee
+ * @since 2026-08-07
+ * @version 1.2
  */
 @Component
 public class ConstraintErrorCodeResolver {
@@ -35,6 +36,14 @@ public class ConstraintErrorCodeResolver {
 
         mappings.put(
                 "uq_commission_transaction_source",
+                FgcErrorCode.TRAN_001
+        );
+        // 2026-08-07 yslee - 지급 건 귀속 자연키 중복을 업무 오류로 변환
+        // 기존 코드: 원천 업무키 중복만 지급 건 중복 오류로 처리
+        // 문제: 계약·설계사·항목·귀속월·순번 중복 제약 위반이 공통 서버 오류로 노출됨
+        // 개선: 귀속 자연키 제약 위반도 FGC-TRAN-001로 일관되게 응답
+        mappings.put(
+                "uq_commission_payment_natural",
                 FgcErrorCode.TRAN_001
         );
         mappings.put(

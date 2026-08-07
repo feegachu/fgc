@@ -27,10 +27,13 @@ public interface CommissionPaymentMapper {
 
     ContractReference findContract(@Param("contractId") Long contractId);
 
-    int countEarlierContracts(
+    // 2026-08-07 yslee - 최초 신계약 모집월 이전 계약 존재 여부 조회로 변경
+    // 기존 코드: 선택 계약보다 이른 계약 수를 조회
+    // 문제: 같은 최초 모집월에 먼저 체결된 계약까지 이월 귀속 판정에서 제외
+    // 개선: 대상 모집월 시작일 이전 계약만 조회하여 REG-20 월 단위 귀속을 지원
+    int countContractsBeforeMonth(
             @Param("agentId") Long agentId,
-            @Param("contractId") Long contractId,
-            @Param("contractDate") LocalDate contractDate
+            @Param("monthStart") LocalDate monthStart
     );
 
     CommissionItemReference findCommissionItem(

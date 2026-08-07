@@ -27,7 +27,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -44,7 +46,6 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
 /**
  * 설명 : 수수료 지급 건 서비스 단위 테스트
  *
@@ -52,6 +53,7 @@ import static org.mockito.Mockito.verify;
  * @since 2026-08-06
  * @version 1.2
  */
+@ExtendWith(MockitoExtension.class)
 class CommissionPaymentServiceImplTest {
 
     @Mock
@@ -92,6 +94,25 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void updatesDraftPaymentAndReplacesAttribution() {
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(confirmation(
+                CommissionPaymentStatus.DRAFT,
+                new BigDecimal("500000"),
+                3L
+        ));
+        stubReferences();
+        stubCapGate("0");
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+
+        CommissionPaymentResponse response = service.update(101L, updateRequest());
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        verify(mapper).updateTransaction(any());
+        verify(mapper).deleteAttributions(101L);
+        verify(mapper).insertAttribution(any());
+    }
+
+    @Test
     void blocksCreateBeforeInsertWhenCandidateExceedsCap() {
         stubReferences();
         stubCapGate("0");
@@ -121,6 +142,7 @@ class CommissionPaymentServiceImplTest {
 
         CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
                 "GA-2026-07-0002",
+                1,
                 null,
                 7L,
                 "SETTLEMENT_SUPPORT",
@@ -142,6 +164,195 @@ class CommissionPaymentServiceImplTest {
 
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         verify(mapper).insertAttribution(any());
+    }
+
+    @Test
+    void attributesSettlementSupportToNewContractInPaymentMonth() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem("SETTLEMENT_SUPPORT", LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(22L, "PAYMENT"));
+        given(mapper.existsPolicyVersion(3L)).willReturn(true);
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 20)));
+        stubCapGate("0");
+        doAnswer(invocation -> {
+            invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(103L);
+            return null;
+        }).when(mapper).insertTransaction(any());
+        given(mapper.findById(103L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+
+        service.create(new CommissionPaymentCreateRequest(
+                "GA-2026-07-SUPPORT",
+                1,
+                null,
+                7L,
+                "SETTLEMENT_SUPPORT",
+                new BigDecimal("300000"),
+                YearMonth.of(2026, 7),
+                LocalDate.of(2026, 7, 25),
+                PaymentStage.GA_TO_FC,
+                3L,
+                InclusionDecisionStatus.INCLUDED,
+                "지급월 신계약 귀속",
+                3L,
+                "MONTHLY_PREMIUM",
+                "EVIDENCE-SUPPORT",
+                AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY,
+                null
+        ));
+
+        ArgumentCaptor<CommissionPaymentCommand> captor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertAttribution(captor.capture());
+        assertThat(captor.getValue().getAttributedContractId()).isEqualTo(3L);
+        assertThat(captor.getValue().getSettlementMonth())
+                .isEqualTo(LocalDate.of(2026, 7, 1));
+    }
+
+    @Test
+    void carriesForwardSupportToAnyContractInFirstNewContractMonth() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem("SETTLEMENT_SUPPORT", LocalDate.of(2026, 9, 1)))
+                .willReturn(new CommissionItemReference(22L, "PAYMENT"));
+        given(mapper.existsPolicyVersion(3L)).willReturn(true);
+        given(mapper.findContract(9L))
+                .willReturn(new ContractReference(9L, 7L, LocalDate.of(2026, 9, 18)));
+        given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 9, 1)))
+                .willReturn(0);
+        stubCapGate("0");
+        doAnswer(invocation -> {
+            invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(104L);
+            return null;
+        }).when(mapper).insertTransaction(any());
+        given(mapper.findById(104L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+
+        service.create(new CommissionPaymentCreateRequest(
+                "GA-2026-07-CARRY",
+                1,
+                null,
+                7L,
+                "SETTLEMENT_SUPPORT",
+                new BigDecimal("300000"),
+                YearMonth.of(2026, 9),
+                LocalDate.of(2026, 9, 25),
+                PaymentStage.GA_TO_FC,
+                9L,
+                InclusionDecisionStatus.INCLUDED,
+                "위촉 당월 무실적 선지급분 최초 신계약월 귀속",
+                3L,
+                "MONTHLY_PREMIUM",
+                "EVIDENCE-CARRY",
+                AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD,
+                null
+        ));
+
+        verify(mapper).countContractsBeforeMonth(7L, LocalDate.of(2026, 9, 1));
+        verify(mapper).insertAttribution(any());
+    }
+
+    @Test
+    void updatesUnperformedAppointmentMonthAdvanceToFirstNewContractMonth() {
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(new ConfirmationData(
+                101L,
+                CommissionPaymentStatus.DRAFT,
+                new BigDecimal("300000"),
+                new BigDecimal("300000"),
+                LocalDate.of(2026, 7, 1),
+                201L,
+                null,
+                7L,
+                PaymentStage.GA_TO_FC,
+                22L,
+                "SETTLEMENT_SUPPORT",
+                "정착지원금(경력)",
+                null,
+                InclusionDecisionStatus.REVIEW_REQUIRED,
+                "위촉 당월 무실적 선지급",
+                null,
+                "EVIDENCE-CARRY"
+        ));
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem("SETTLEMENT_SUPPORT", LocalDate.of(2026, 9, 1)))
+                .willReturn(new CommissionItemReference(22L, "PAYMENT"));
+        given(mapper.existsPolicyVersion(3L)).willReturn(true);
+        given(mapper.findContract(9L))
+                .willReturn(new ContractReference(9L, 7L, LocalDate.of(2026, 9, 18)));
+        given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 9, 1)))
+                .willReturn(0);
+        stubCapGate("0");
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+
+        service.update(101L, new CommissionPaymentUpdateRequest(
+                1,
+                null,
+                7L,
+                "SETTLEMENT_SUPPORT",
+                new BigDecimal("300000"),
+                YearMonth.of(2026, 9),
+                LocalDate.of(2026, 9, 25),
+                PaymentStage.GA_TO_FC,
+                9L,
+                InclusionDecisionStatus.INCLUDED,
+                "최초 신계약 모집월 이월 귀속",
+                3L,
+                "MONTHLY_PREMIUM",
+                "EVIDENCE-CARRY",
+                AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD,
+                null
+        ));
+
+        ArgumentCaptor<CommissionPaymentCommand> captor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).updateTransaction(captor.capture());
+        assertThat(captor.getValue().getPaymentId()).isEqualTo(101L);
+        assertThat(captor.getValue().getAttributedContractId()).isEqualTo(9L);
+        assertThat(captor.getValue().getInclusionDecisionStatus())
+                .isEqualTo(InclusionDecisionStatus.INCLUDED);
+        verify(mapper).deleteAttributions(101L);
+        verify(mapper).insertAttribution(any());
+    }
+
+    @Test
+    void storesAllocationPolicyBasisAndEvidenceSnapshot() {
+        stubReferences();
+        given(mapper.findAllocationPolicyId(3L, "MONTHLY_PREMIUM")).willReturn(77L);
+        stubCapGate("0");
+        doAnswer(invocation -> {
+            invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(105L);
+            return null;
+        }).when(mapper).insertTransaction(any());
+        given(mapper.findById(105L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+
+        CommissionPaymentCreateRequest base = createRequest();
+        service.create(new CommissionPaymentCreateRequest(
+                "GA-2026-07-ALLOCATION",
+                base.paymentSequence(),
+                base.contractId(),
+                base.agentId(),
+                base.commissionItemCode(),
+                base.amount(),
+                base.attributionMonth(),
+                base.scheduledPaymentDate(),
+                base.paymentStage(),
+                base.attributedContractId(),
+                base.inclusionDecisionStatus(),
+                base.inclusionDecisionReason(),
+                3L,
+                "MONTHLY_PREMIUM",
+                "EVIDENCE-ALLOCATION",
+                AttributionMethod.APPROVED_ALLOCATION,
+                base.note()
+        ));
+
+        ArgumentCaptor<CommissionPaymentCommand> captor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertAttribution(captor.capture());
+        CommissionPaymentCommand command = captor.getValue();
+        assertThat(command.getPolicyVersionId()).isEqualTo(3L);
+        assertThat(command.getAllocationPolicyId()).isEqualTo(77L);
+        assertThat(command.getEvidenceRef()).isEqualTo("EVIDENCE-ALLOCATION");
+        assertThat(command.getAllocationBasisJson())
+                .contains("MONTHLY_PREMIUM");
     }
 
     @Test
@@ -222,12 +433,54 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void blocksConfirmationAndCreatesExceptionWhenExclusionEvidenceIsMissing() {
+        ConfirmationData data = new ConfirmationData(
+                101L,
+                CommissionPaymentStatus.DRAFT,
+                new BigDecimal("500000"),
+                new BigDecimal("500000"),
+                LocalDate.of(2026, 7, 1),
+                201L,
+                3L,
+                7L,
+                PaymentStage.GA_TO_FC,
+                11L,
+                "BASE_COMMISSION",
+                "FC 기본수수료",
+                3L,
+                InclusionDecisionStatus.EXCLUDED,
+                "규정상 제외",
+                "DIRECT",
+                null
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(data);
+
+        assertThatThrownBy(() -> service.confirm(101L))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.TRAN_004));
+
+        verify(mapper).insertExceptionCase(any());
+        verify(mapper, never()).confirm(101L);
+    }
+
+    @Test
+    void confirmMethodDefinesTransactionBoundary() throws NoSuchMethodException {
+        Transactional transactional = CommissionPaymentServiceImpl.class
+                .getMethod("confirm", Long.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+    }
+
+    @Test
     void rejectsCarryForwardWhenTargetIsNotFirstContract() {
         stubReferences();
-        given(mapper.countEarlierContracts(7L, 3L, LocalDate.of(2026, 7, 3)))
+        given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 7, 1)))
                 .willReturn(1);
         CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
                 "GA-2026-07-0003",
+                1,
                 null,
                 7L,
                 "BASE_COMMISSION",
@@ -272,6 +525,7 @@ class CommissionPaymentServiceImplTest {
     private CommissionPaymentCreateRequest createRequest(BigDecimal amount) {
         return new CommissionPaymentCreateRequest(
                 "GA-2026-07-0001",
+                1,
                 3L,
                 7L,
                 "BASE_COMMISSION",
@@ -293,6 +547,7 @@ class CommissionPaymentServiceImplTest {
     private CommissionPaymentUpdateRequest updateRequest() {
         CommissionPaymentCreateRequest request = createRequest();
         return new CommissionPaymentUpdateRequest(
+                request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
                 request.commissionItemCode(),
@@ -375,6 +630,7 @@ class CommissionPaymentServiceImplTest {
         return new CommissionPaymentRow(
                 101L,
                 "GA-2026-07-0001",
+                1,
                 3L,
                 7L,
                 "BASE_COMMISSION",

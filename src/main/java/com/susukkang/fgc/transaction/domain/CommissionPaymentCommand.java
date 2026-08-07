@@ -24,6 +24,7 @@ public class CommissionPaymentCommand {
     @Setter
     private Long paymentId;
     private final String sourceBusinessKey;
+    private final Integer paymentSequence;
     private final Long sourceContractId;
     private final Long agentId;
     private final Long commissionItemId;
@@ -46,5 +47,9 @@ public class CommissionPaymentCommand {
         return attributionMethod == AttributionMethod.NEWCOMER_NON_CONTRACT
                 ? "AGENT"
                 : "CONTRACT";
+    }
+
+    public Long getNaturalContractId() {
+        return sourceContractId != null ? sourceContractId : attributedContractId;
     }
 }

@@ -10,6 +10,7 @@ import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -18,7 +19,15 @@ import java.time.YearMonth;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 설명 : 수수료 지급 건 PostgreSQL 통합 테스트
+ *
+ * @author yslee
+ * @since 2026-08-07
+ * @version 1.2
+ */
 @SpringBootTest
 @Transactional
 class CommissionPaymentIntegrationTest {
@@ -28,8 +37,40 @@ class CommissionPaymentIntegrationTest {
 
     @Test
     void persistsAndConfirmsPaymentAgainstProjectErd() {
-        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+        CommissionPaymentCreateRequest request = request(
                 "IT-FUN065-" + UUID.randomUUID(),
+                1
+        );
+
+        CommissionPaymentResponse created = commissionPaymentService.create(request);
+        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
+                created.paymentId()
+        );
+
+        assertThat(created.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.attributedContractId()).isEqualTo(1L);
+        assertThat(confirmed.allocationPolicyVersion()).isEqualTo(4L);
+        assertThat(confirmed.paymentSequence()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsDuplicateManualPaymentNaturalKeyInDatabase() {
+        String runId = UUID.randomUUID().toString();
+        commissionPaymentService.create(request("IT-FUN065-A-" + runId, 99));
+
+        assertThatThrownBy(() -> commissionPaymentService.create(
+                request("IT-FUN065-B-" + runId, 99)
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private CommissionPaymentCreateRequest request(
+            String sourceBusinessKey,
+            int paymentSequence
+    ) {
+        return new CommissionPaymentCreateRequest(
+                sourceBusinessKey,
+                paymentSequence,
                 1L,
                 6L,
                 "BASE_COMMISSION",
@@ -46,15 +87,5 @@ class CommissionPaymentIntegrationTest {
                 AttributionMethod.DIRECT,
                 "rollback integration test"
         );
-
-        CommissionPaymentResponse created = commissionPaymentService.create(request);
-        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
-                created.paymentId()
-        );
-
-        assertThat(created.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
-        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
-        assertThat(confirmed.attributedContractId()).isEqualTo(1L);
-        assertThat(confirmed.allocationPolicyVersion()).isEqualTo(4L);
     }
 }
