@@ -89,6 +89,7 @@
           FROM fgc.validation_run vr
           LEFT JOIN fgc.app_user triggered ON triggered.user_id = vr.triggered_by
           LEFT JOIN fgc.app_user finalized ON finalized.user_id = vr.finalized_by
+         WHERE vr.run_type = 'MONTHLY'
          ORDER BY vr.created_at DESC, vr.validation_run_id DESC
          LIMIT #{limit}
     </select>

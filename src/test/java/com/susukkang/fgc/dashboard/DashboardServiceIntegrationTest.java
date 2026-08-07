@@ -57,11 +57,15 @@ class DashboardServiceIntegrationTest {
     // INSERT할 수 없고 CREATED→RUNNING→COMPLETED 순서로 UPDATE해야 한다. ck_validation_run_step은
     // COMPLETED일 때 current_step이 정확히 8이어야 한다고 강제한다.
     private Long insertValidationRun(LocalDate month, int runNo, String status, OffsetDateTime createdAt) {
+        return insertValidationRun(month, runNo, status, createdAt, "MONTHLY");
+    }
+
+    private Long insertValidationRun(LocalDate month, int runNo, String status, OffsetDateTime createdAt, String runType) {
         Long id = jdbcTemplate.queryForObject("""
-                INSERT INTO fgc.validation_run (validation_month, run_no, status, created_at)
-                VALUES (?, ?, 'CREATED', ?)
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status, created_at)
+                VALUES (?, ?, ?, 'CREATED', ?)
                 RETURNING validation_run_id
-                """, Long.class, month, runNo, createdAt);
+                """, Long.class, month, runNo, runType, createdAt);
         if (!"CREATED".equals(status)) {
             jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?", id);
             if ("COMPLETED".equals(status)) {
@@ -324,5 +328,31 @@ class DashboardServiceIntegrationTest {
 
         assertThat(recent.get(0).validationRunId()).isEqualTo(mayRerun);
         assertThat(recent.get(1).validationRunId()).isEqualTo(juneRun);
+    }
+
+    // 리뷰 지적: DASH-W01은 "최근 월 통합검증 실행 3건"을 정의한다. 계약별 수동검증(MANUAL_CONTRACT)이
+    // 섞여서 조회되면, 그 실행들이 최근 3건 자리를 차지해 정작 월 통합검증(MONTHLY) 기록이 화면에서
+    // 사라질 수 있다. MONTHLY만 걸러서 최근 3건을 반환해야 한다.
+    @Test
+    void summarizeReturnsOnlyMonthlyRunsAmongRecentValidationRunsEvenWhenManualContractRunsAreNewer() {
+        Long monthlyRun1 = insertValidationRun(LocalDate.of(2026, 4, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-05-01T09:00:00+09:00"), "MONTHLY");
+        Long monthlyRun2 = insertValidationRun(LocalDate.of(2026, 5, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-06-01T09:00:00+09:00"), "MONTHLY");
+        Long monthlyRun3 = insertValidationRun(LocalDate.of(2026, 6, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-07-01T09:00:00+09:00"), "MONTHLY");
+        // MANUAL_CONTRACT 실행들이 MONTHLY보다 나중에 생성됐다 — 정렬만 하면 최근 3건 자리를 차지한다.
+        insertValidationRun(LocalDate.of(2026, 7, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-08-01T09:00:00+09:00"), "MANUAL_CONTRACT");
+        insertValidationRun(LocalDate.of(2026, 7, 1), 2, "COMPLETED",
+                OffsetDateTime.parse("2026-08-02T09:00:00+09:00"), "MANUAL_CONTRACT");
+
+        List<RecentValidationRunRow> recent = dashboardService.summarize(LocalDate.of(2026, 8, 1))
+                .recentValidationRuns();
+
+        assertThat(recent).hasSize(3);
+        assertThat(recent).allSatisfy(row -> assertThat(row.runType()).isEqualTo("MONTHLY"));
+        assertThat(recent.stream().map(RecentValidationRunRow::validationRunId).toList())
+                .containsExactly(monthlyRun3, monthlyRun2, monthlyRun1);
     }
 }
