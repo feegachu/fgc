@@ -54,7 +54,8 @@ logs/
 
 # Local / secret configuration
 application-local.properties
-application-local.yml
+src/main/resources/application-local.yml
+src/main/resources/application-prod.yml
 application-local.yaml
 application-secret.properties
 application-secret.yml
@@ -79,5 +80,14 @@ Thumbs.db
 AGENTS.md
 docs/
 .codex-tmp/
+.codex_tmp/
+.serena/
+.venv/
+.python-version
+pyproject.toml
+skills-lock.json
+uv.lock
+src/fgc/
 .claude/
-CLAUDE.mdsrc/main/resources/application-prod.yml
+CLAUDE.md
+
