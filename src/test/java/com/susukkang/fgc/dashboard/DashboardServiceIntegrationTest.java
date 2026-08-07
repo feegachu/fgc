@@ -57,6 +57,7 @@ class DashboardServiceIntegrationTest {
     // INSERT할 수 없고 CREATED→RUNNING→COMPLETED 순서로 UPDATE해야 한다. ck_validation_run_step은
     // COMPLETED일 때 current_step이 정확히 8이어야 한다고 강제한다.
     private Long insertValidationRun(LocalDate month, int runNo, String status, OffsetDateTime createdAt) {
+
         return insertValidationRun(month, runNo, status, createdAt, "MONTHLY");
     }
 
@@ -66,6 +67,7 @@ class DashboardServiceIntegrationTest {
                 VALUES (?, ?, ?, 'CREATED', ?)
                 RETURNING validation_run_id
                 """, Long.class, month, runNo, runType, createdAt);
+
         if (!"CREATED".equals(status)) {
             jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?", id);
             if ("COMPLETED".equals(status)) {
@@ -111,8 +113,10 @@ class DashboardServiceIntegrationTest {
                     (exception_key, exception_type, severity, status,
                      source_entity_type, source_entity_id, title, created_at)
                 VALUES (?, 'DATA_QUALITY', 'INFO', ?, 'TEST', ?, 'dashboard test', ?)
+
                 RETURNING exception_case_id
                 """, Long.class, exceptionKey, status, exceptionKey, createdAt);
+
     }
 
     // 차대 불균형 분개 하나(대변 없이 차변만)
@@ -274,7 +278,8 @@ class DashboardServiceIntegrationTest {
         assertThat(recent.get(0).createdAt()).isEqualTo(OffsetDateTime.parse("2026-07-06T09:00:00+09:00"));
     }
 
-    // coderabbitai 지적: created_at만으로 정렬하면 동시각(tie) 행의 순서가 보장되지 않아
+
+    // created_at만으로 정렬하면 동시각(tie) 행의 순서가 보장되지 않아
     // LIMIT 경계에서 요청마다 다른 5건이 나올 수 있다. exception_case_id를 보조 정렬 키로 둬서
     // 결정적으로 만든다 — 동일 시각 6건 중 최신 id 5개가 항상 같은 순서로 나와야 한다.
     @Test
@@ -330,7 +335,7 @@ class DashboardServiceIntegrationTest {
         assertThat(recent.get(1).validationRunId()).isEqualTo(juneRun);
     }
 
-    // 리뷰 지적: DASH-W01은 "최근 월 통합검증 실행 3건"을 정의한다. 계약별 수동검증(MANUAL_CONTRACT)이
+    // DASH-W01은 "최근 월 통합검증 실행 3건"을 정의한다. 계약별 수동검증(MANUAL_CONTRACT)이
     // 섞여서 조회되면, 그 실행들이 최근 3건 자리를 차지해 정작 월 통합검증(MONTHLY) 기록이 화면에서
     // 사라질 수 있다. MONTHLY만 걸러서 최근 3건을 반환해야 한다.
     @Test
