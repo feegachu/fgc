@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FUN-001 개발 순서 5 -->
+<mapper namespace="com.susukkang.fgc.auth.mapper.AuthUserMapper">
+
+    <!-- 컬럼 별칭을 camelCase 프로퍼티명과 동일하게 맞춰 map-underscore-to-camel-case 설정 없이도 매핑되게 한다. -->
+    <select id="findByLoginId" resultType="com.susukkang.fgc.auth.dto.AppUserView">
+        SELECT u.user_id        AS userId,
+               u.login_id       AS loginId,
+               u.password_hash  AS passwordHash,
+               u.user_name      AS userName,
+               u.account_status AS accountStatus,
+               r.role_code      AS roleCode
+          FROM fgc.app_user u
+          JOIN fgc.app_role r ON r.role_id = u.role_id
+         WHERE u.login_id = #{loginId}
+    </select>
+
+</mapper>

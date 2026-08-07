@@ -14,16 +14,6 @@ public enum FgcErrorCode {
             HttpStatus.UNPROCESSABLE_ENTITY,
             "error.cap.reviewRequired"
     ),
-    CAP_003(
-            "FGC-CAP-003",
-            HttpStatus.NOT_FOUND,
-            "error.cap.contractNotFound"
-    ),
-    CAP_004(
-            "FGC-CAP-004",
-            HttpStatus.UNPROCESSABLE_ENTITY,
-            "error.cap.ruleSetNotFound"
-    ),
 
     TRAN_001(
             "FGC-TRAN-001",
@@ -149,6 +139,11 @@ public enum FgcErrorCode {
             "FGC-COMMON-002",
             HttpStatus.BAD_REQUEST,
             "error.common.validation"
+    ),
+    COMMON_004(
+            "FGC-COMMON-004",
+            HttpStatus.NOT_FOUND,
+            "error.common.notFound"
     ),
     COMMON_500(
             "FGC-COMMON-500",

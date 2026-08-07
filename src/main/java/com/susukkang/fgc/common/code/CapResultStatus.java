@@ -14,5 +14,15 @@ public enum CapResultStatus {
     NORMAL,
     WARNING,
     VIOLATION,
-    REVIEW_REQUIRED
+    REVIEW_REQUIRED;
+
+    /** SIR-008: 코드값은 항상 한글 라벨과 함께 응답한다 — 화면이 아니라 서버가 라벨을 만든다. */
+    public String label() {
+        return switch (this) {
+            case NORMAL -> "정상";
+            case WARNING -> "주의";
+            case VIOLATION -> "위반";
+            case REVIEW_REQUIRED -> "검토필요";
+        };
+    }
 }

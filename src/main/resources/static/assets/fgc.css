@@ -1,0 +1,510 @@
+/* =====================================================================
+ * FGC 공통 컴포넌트 스타일
+ * ---------------------------------------------------------------------
+ * 기준: 화면정의서 v2.0 §4 「전 화면 공통 규칙 12개」
+ *
+ * [원칙] 여기에 없는 색은 화면에서 쓰지 않습니다.
+ *   상태를 색으로만 구분하면 색각 이상이 있는 분이 못 읽습니다.
+ *   그래서 모든 배지는 "색 + 글자"를 함께 씁니다(§4-4).
+ *
+ * [Thymeleaf 이관 시] 그대로 /static/css/fgc.css 로 옮기면 됩니다.
+ * ===================================================================== */
+
+/* ---------------------------------------------------------------------
+ * 0. 토큰 (Tailwind 설정과 같은 값. CSS에서 직접 쓰려고 복사해 둔 것)
+ * ------------------------------------------------------------------- */
+:root {
+  --fgc-primary:            #00152a;
+  --fgc-primary-container:  #102a43;
+  --fgc-secondary:          #44617d;
+  --fgc-surface:            #f6fafe;
+  --fgc-surface-lowest:     #ffffff;
+  --fgc-surface-low:        #f0f4f8;
+  --fgc-surface-container:  #eaeef2;
+  --fgc-on-surface:         #171c1f;
+  --fgc-on-surface-variant: #43474d;
+  --fgc-outline:            #74777e;
+  --fgc-outline-variant:    #c3c6ce;
+
+  /* 상태 5색 (§4-4) */
+  --fgc-success: #22C55E;  /* 정상       */
+  --fgc-warning: #F59E0B;  /* 주의       */
+  --fgc-danger:  #EF4444;  /* 위반·차단  */
+  --fgc-closed:  #627D98;  /* 검토필요   */
+  --fgc-info:    #3E8ED0;  /* 진행중     */
+
+  --fgc-success-bg: #DCFCE7;
+  --fgc-warning-bg: #FEF3C7;
+  --fgc-danger-bg:  #FEE2E2;
+  --fgc-closed-bg:  #E2E8F0;
+  --fgc-info-bg:    #DBEAFE;
+}
+
+/* ---------------------------------------------------------------------
+ * 1. 상태 배지 (§4-4)  — 색 + 글자 병기 필수
+ *    <span class="fgc-badge fgc-badge--violation">위반</span>
+ * ------------------------------------------------------------------- */
+.fgc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 0.25rem;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.fgc-badge::before {                 /* 색맹 대응 점 표식 */
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  flex: none;
+}
+.fgc-badge--normal    { color: #15803D; background: var(--fgc-success-bg); border-color: #86EFAC; }
+.fgc-badge--warning   { color: #B45309; background: var(--fgc-warning-bg); border-color: #FCD34D; }
+.fgc-badge--violation { color: #B91C1C; background: var(--fgc-danger-bg);  border-color: #FCA5A5; }
+.fgc-badge--review    { color: #475569; background: var(--fgc-closed-bg);  border-color: #CBD5E1; }
+.fgc-badge--progress  { color: #1D4ED8; background: var(--fgc-info-bg);    border-color: #93C5FD; }
+.fgc-badge--neutral   { color: #43474d; background: #F1F5F9;               border-color: #E2E8F0; }
+
+/* 정책 출처분류 배지 (POL-W01 · source_class)
+ * REGULATORY 규제=파랑 / INSURER_RULE 보험사 규칙=초록
+ * GA_POLICY 회사 정책=회색 / PROJECT_ASSUMPTION 프로젝트 가정=주황 */
+.fgc-badge--src-regulatory { color: #1D4ED8; background: var(--fgc-info-bg);    border-color: #93C5FD; }
+.fgc-badge--src-insurer    { color: #15803D; background: var(--fgc-success-bg); border-color: #86EFAC; }
+.fgc-badge--src-ga         { color: #475569; background: var(--fgc-closed-bg);  border-color: #CBD5E1; }
+.fgc-badge--src-assumption { color: #B45309; background: var(--fgc-warning-bg); border-color: #FCD34D; }
+
+/* 릴리스 배지 (사이드바에서 2차 화면 표시용) */
+.fgc-badge--phase2 {
+  color: #64748B; background: #F1F5F9; border-color: #E2E8F0;
+  font-size: 10px; padding: 1px 5px;
+}
+.fgc-badge--phase2::before { display: none; }
+
+/* ---------------------------------------------------------------------
+ * 2. 금액·요율 표기 (§4-1 · §4-2 · §4-3)
+ *    금액: 원 단위, 천단위 콤마, 소수점 없음
+ *    음수: 빨강 + 괄호      예) (1,517,944)
+ *    요율: 소수점 4자리     예) 650.0000%
+ *    [금지] 화면에서 반올림하지 마세요. 서버가 원 단위 HALF_UP으로 보냅니다.
+ * ------------------------------------------------------------------- */
+.fgc-num,
+.fgc-amount,
+.fgc-rate {
+  font-family: Inter, sans-serif;
+  font-variant-numeric: tabular-nums;   /* 숫자 폭을 고정해 표가 흔들리지 않게 */
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+  text-align: right;
+  white-space: nowrap;
+}
+.fgc-amount--negative { color: var(--fgc-danger); font-weight: 600; }
+.fgc-amount--zero     { color: var(--fgc-on-surface-variant); }
+.fgc-rate             { font-weight: 500; }
+
+/* ---------------------------------------------------------------------
+ * 3. 한도 게이지 (CAP-W01 · CONT-W02 · TRAN-W02)
+ *    [규제] 지급단계 게이지 2개는 절대 합산하지 않습니다.
+ *           원수사→GA / GA→설계사를 각각 별도 게이지로 그립니다.
+ * ------------------------------------------------------------------- */
+.fgc-gauge { width: 100%; }
+.fgc-gauge__track {
+  position: relative;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--fgc-surface-container);
+  overflow: hidden;
+}
+.fgc-gauge__bar {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width .35s ease;
+}
+.fgc-gauge__bar--normal    { background: var(--fgc-success); }
+.fgc-gauge__bar--warning   { background: var(--fgc-warning); }
+.fgc-gauge__bar--violation { background: var(--fgc-danger); }
+.fgc-gauge__bar--review    { background: var(--fgc-closed); }
+/* 90% 주의선 · 100% 한도선 */
+.fgc-gauge__mark {
+  position: absolute; top: -3px; bottom: -3px;
+  width: 2px;
+}
+.fgc-gauge__mark--warn  { background: var(--fgc-warning); left: 90%; }
+.fgc-gauge__mark--limit { background: var(--fgc-danger);  left: 100%; transform: translateX(-2px); }
+
+.fgc-gauge__legend {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 6px;
+  font-size: 12px; color: var(--fgc-on-surface-variant);
+}
+
+/* 게이지 카드 (지급단계 구분) */
+.fgc-stage-card {
+  border: 1px solid var(--fgc-outline-variant);
+  border-radius: 0.5rem;
+  background: var(--fgc-surface-lowest);
+  padding: 16px;
+}
+.fgc-stage-card--insurer { border-top: 3px solid var(--fgc-secondary); }
+.fgc-stage-card--fc      { border-top: 3px solid var(--fgc-primary-container); }
+
+/* ---------------------------------------------------------------------
+ * 4. 10단계 스텝퍼 (VRUN-W02)
+ * ------------------------------------------------------------------- */
+.fgc-stepper { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; }
+.fgc-stepper__step { flex: 1 1 0; min-width: 92px; text-align: center; position: relative; }
+.fgc-stepper__step::after {           /* 연결선 */
+  content: ""; position: absolute; top: 13px; left: 50%; right: -50%;
+  height: 2px; background: var(--fgc-outline-variant); z-index: 0;
+}
+.fgc-stepper__step:last-child::after { display: none; }
+.fgc-stepper__dot {
+  position: relative; z-index: 1;
+  width: 28px; height: 28px; margin: 0 auto 6px;
+  border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  background: var(--fgc-surface-container);
+  color: var(--fgc-on-surface-variant);
+  border: 2px solid var(--fgc-outline-variant);
+}
+.fgc-stepper__label { font-size: 11px; line-height: 15px; color: var(--fgc-on-surface-variant); padding: 0 4px; }
+.fgc-stepper__step--done    .fgc-stepper__dot { background: var(--fgc-success); border-color: var(--fgc-success); color: #fff; }
+.fgc-stepper__step--done::after              { background: var(--fgc-success); }
+.fgc-stepper__step--running .fgc-stepper__dot { background: var(--fgc-info);    border-color: var(--fgc-info);    color: #fff; animation: fgc-pulse 1.2s ease-in-out infinite; }
+.fgc-stepper__step--failed  .fgc-stepper__dot { background: var(--fgc-danger);  border-color: var(--fgc-danger);  color: #fff; }
+.fgc-stepper__step--done    .fgc-stepper__label,
+.fgc-stepper__step--running .fgc-stepper__label { color: var(--fgc-on-surface); font-weight: 600; }
+@keyframes fgc-pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+
+/* ---------------------------------------------------------------------
+ * 5. 확정 후 잠금 (§4-8)
+ *    FINALIZED / CONFIRMED / POSTED 자료는 전 화면 읽기전용 + 자물쇠
+ * ------------------------------------------------------------------- */
+.fgc-locked {
+  position: relative;
+  background: repeating-linear-gradient(
+    45deg, transparent, transparent 9px,
+    rgba(98,125,152,.06) 9px, rgba(98,125,152,.06) 18px);
+}
+.fgc-lock-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 0.25rem;
+  background: var(--fgc-closed-bg); color: #334155;
+  font-size: 12px; font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------
+ * 6. 고정 안내·경고 배너 (§4-5 · 화면별 상단 고정 문구)
+ * ------------------------------------------------------------------- */
+.fgc-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px; border-radius: 0.25rem;
+  font-size: 13px; line-height: 19px;
+  border: 1px solid;
+}
+.fgc-banner--info  { background: var(--fgc-info-bg);    border-color: #93C5FD; color: #1E3A8A; }
+.fgc-banner--warn  { background: var(--fgc-warning-bg); border-color: #FCD34D; color: #78350F; }
+.fgc-banner--error { background: var(--fgc-danger-bg);  border-color: #FCA5A5; color: #7F1D1D; }
+.fgc-banner--muted { background: var(--fgc-surface-low); border-color: var(--fgc-outline-variant); color: var(--fgc-on-surface-variant); }
+
+/* ---------------------------------------------------------------------
+ * 7. 근거 툴팁 (§4-5)
+ *    [원칙] 근거 없는 숫자는 화면에 표시하지 않습니다.
+ *    요율·한도·판정에는 반드시 근거(REG-08 · 제4-32조제11항)를 붙입니다.
+ * ------------------------------------------------------------------- */
+.fgc-evidence {
+  position: relative;
+  border-bottom: 1px dotted var(--fgc-outline);
+  cursor: help;
+}
+.fgc-evidence__tip {
+  position: absolute; bottom: calc(100% + 6px); left: 0;
+  min-width: 200px; max-width: 340px;
+  padding: 8px 10px; border-radius: 0.25rem;
+  background: #1f2937; color: #f8fafc;
+  font-size: 12px; line-height: 17px; font-weight: 400;
+  text-align: left; white-space: normal;
+  opacity: 0; visibility: hidden; transition: opacity .12s;
+  z-index: 60;
+  box-shadow: 0 6px 18px rgba(0,0,0,.22);
+}
+.fgc-evidence:hover .fgc-evidence__tip,
+.fgc-evidence:focus-within .fgc-evidence__tip { opacity: 1; visibility: visible; }
+
+/* ---------------------------------------------------------------------
+ * 8. 표 공통 (§4-7 목록은 서버 페이징 20행)
+ * ------------------------------------------------------------------- */
+.fgc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fgc-table thead th {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--fgc-surface-low);
+  color: var(--fgc-on-surface-variant);
+  font-size: 12px; font-weight: 600; text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--fgc-outline-variant);
+  white-space: nowrap;
+}
+.fgc-table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e8edf2;
+  color: var(--fgc-on-surface);
+  vertical-align: middle;
+}
+.fgc-table tbody tr:hover { background: #f3f8fd; }
+.fgc-table tfoot td {
+  padding: 8px 12px; font-weight: 700;
+  background: var(--fgc-surface-low);
+  border-top: 2px solid var(--fgc-outline-variant);
+}
+.fgc-table th.fgc-th-num, .fgc-table td.fgc-td-num { text-align: right; }
+
+/* 조회 결과 없음 (부록A 표준 문구) */
+.fgc-empty {
+  padding: 48px 16px; text-align: center;
+  color: var(--fgc-on-surface-variant); font-size: 13px;
+}
+
+/* ---------------------------------------------------------------------
+ * 9. 버튼
+ * ------------------------------------------------------------------- */
+.fgc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 14px; border-radius: 0.25rem;
+  font-size: 13px; font-weight: 600; line-height: 18px;
+  border: 1px solid transparent; cursor: pointer;
+  transition: background .12s, border-color .12s, opacity .12s;
+}
+.fgc-btn--primary { background: var(--fgc-primary); color: #fff; }
+.fgc-btn--primary:hover:not(:disabled) { background: var(--fgc-primary-container); }
+.fgc-btn--danger  { background: var(--fgc-danger); color: #fff; }
+.fgc-btn--ghost   { background: transparent; color: var(--fgc-on-surface); border-color: var(--fgc-outline-variant); }
+.fgc-btn--ghost:hover:not(:disabled) { background: var(--fgc-surface-container); }
+.fgc-btn:disabled {
+  opacity: .45; cursor: not-allowed;
+  background: var(--fgc-surface-container); color: var(--fgc-on-surface-variant);
+  border-color: var(--fgc-outline-variant);
+}
+
+/* ---------------------------------------------------------------------
+ * 10. 입력 폼
+ * ------------------------------------------------------------------- */
+.fgc-field { display: flex; flex-direction: column; gap: 4px; }
+.fgc-label { font-size: 12px; font-weight: 600; color: var(--fgc-on-surface-variant); }
+.fgc-label--required::after { content: " *"; color: var(--fgc-danger); }
+.fgc-input, .fgc-select, .fgc-textarea {
+  padding: 7px 10px; border-radius: 0.25rem;
+  border: 1px solid var(--fgc-outline-variant);
+  background: var(--fgc-surface-lowest);
+  font-size: 13px; color: var(--fgc-on-surface);
+  font-family: Inter, sans-serif;
+}
+.fgc-input:focus, .fgc-select:focus, .fgc-textarea:focus {
+  outline: none; border-color: var(--fgc-secondary);
+  box-shadow: 0 0 0 2px rgba(68,97,125,.18);
+}
+.fgc-input:disabled, .fgc-select:disabled { background: var(--fgc-surface-container); color: var(--fgc-on-surface-variant); }
+.fgc-input--error { border-color: var(--fgc-danger); }
+.fgc-help  { font-size: 11px; color: var(--fgc-on-surface-variant); }
+.fgc-error { font-size: 12px; color: var(--fgc-danger); font-weight: 600; }
+
+/* ---------------------------------------------------------------------
+ * 11. 카드 / 패널
+ * ------------------------------------------------------------------- */
+.fgc-card {
+  background: var(--fgc-surface-lowest);
+  border: 1px solid var(--fgc-outline-variant);
+  border-radius: 0.5rem;
+}
+.fgc-card__head {
+  padding: 12px 16px; border-bottom: 1px solid var(--fgc-outline-variant);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.fgc-card__title { font-family: "Hanken Grotesk", sans-serif; font-size: 15px; font-weight: 700; color: var(--fgc-on-surface); }
+.fgc-card__body { padding: 16px; }
+
+/* KPI 카드 (DASH-W01) */
+.fgc-kpi {
+  display: block; text-align: left; width: 100%;
+  background: var(--fgc-surface-lowest);
+  border: 1px solid var(--fgc-outline-variant);
+  border-left: 4px solid var(--fgc-outline-variant);
+  border-radius: 0.5rem; padding: 14px 16px; cursor: pointer;
+  transition: box-shadow .12s, transform .12s;
+}
+.fgc-kpi:hover { box-shadow: 0 4px 14px rgba(0,21,42,.10); transform: translateY(-1px); }
+.fgc-kpi__label { font-size: 12px; color: var(--fgc-on-surface-variant); font-weight: 600; }
+.fgc-kpi__value { font-size: 28px; font-weight: 800; font-family: Inter, sans-serif; font-variant-numeric: tabular-nums; line-height: 36px; }
+.fgc-kpi__sub   { font-size: 11px; color: var(--fgc-on-surface-variant); }
+.fgc-kpi--danger  { border-left-color: var(--fgc-danger); }
+.fgc-kpi--danger  .fgc-kpi__value { color: var(--fgc-danger); }
+.fgc-kpi--warning { border-left-color: var(--fgc-warning); }
+.fgc-kpi--warning .fgc-kpi__value { color: #B45309; }
+.fgc-kpi--info    { border-left-color: var(--fgc-info); }
+.fgc-kpi--info    .fgc-kpi__value { color: #1D4ED8; }
+.fgc-kpi--closed  { border-left-color: var(--fgc-closed); }
+.fgc-kpi--closed  .fgc-kpi__value { color: #475569; }
+.fgc-kpi--success { border-left-color: var(--fgc-success); }
+.fgc-kpi--success .fgc-kpi__value { color: #15803D; }
+
+/* ---------------------------------------------------------------------
+ * 12. 탭
+ * ------------------------------------------------------------------- */
+.fgc-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--fgc-outline-variant); overflow-x: auto; }
+.fgc-tab {
+  padding: 9px 16px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  color: var(--fgc-on-surface-variant); border-bottom: 2px solid transparent;
+  background: none; border-top: none; border-left: none; border-right: none; cursor: pointer;
+}
+.fgc-tab:hover { color: var(--fgc-on-surface); background: var(--fgc-surface-low); }
+.fgc-tab[aria-selected="true"] { color: var(--fgc-primary); border-bottom-color: var(--fgc-primary); background: var(--fgc-surface-lowest); }
+.fgc-tabpanel[hidden] { display: none; }
+
+/* ---------------------------------------------------------------------
+ * 13. 모달 / 팝업 (CAP-W02 · RECO-W02 · 차단 안내)
+ * ------------------------------------------------------------------- */
+.fgc-modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,21,42,.48);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.fgc-modal-backdrop[hidden] { display: none; }
+.fgc-modal {
+  background: var(--fgc-surface-lowest);
+  border-radius: 0.5rem;
+  width: 100%; max-height: 88vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0,0,0,.3);
+}
+.fgc-modal__head {
+  padding: 14px 20px; border-bottom: 1px solid var(--fgc-outline-variant);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.fgc-modal__body { padding: 20px; overflow-y: auto; }
+.fgc-modal__foot {
+  padding: 12px 20px; border-top: 1px solid var(--fgc-outline-variant);
+  display: flex; justify-content: flex-end; gap: 8px;
+  background: var(--fgc-surface-low);
+}
+
+/* 계산근거 4단 팝업 단계 표시 (§4-6) */
+.fgc-calc-step { border-left: 3px solid var(--fgc-secondary); padding-left: 14px; margin-bottom: 20px; }
+.fgc-calc-step__no {
+  display: inline-block; margin-bottom: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  color: var(--fgc-secondary); text-transform: uppercase;
+}
+.fgc-formula {
+  font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 22px;
+  background: var(--fgc-surface-low); border: 1px solid var(--fgc-outline-variant);
+  border-radius: 0.25rem; padding: 10px 12px; white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------------
+ * 14. 좌우 대조 패널 (RECO-W02 · AUDT-W01)
+ * ------------------------------------------------------------------- */
+.fgc-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .fgc-compare { grid-template-columns: 1fr; } }
+.fgc-compare__side { border: 1px solid var(--fgc-outline-variant); border-radius: 0.5rem; overflow: hidden; }
+.fgc-compare__head { padding: 8px 14px; font-size: 12px; font-weight: 700; background: var(--fgc-surface-low); border-bottom: 1px solid var(--fgc-outline-variant); }
+.fgc-compare__side--expected .fgc-compare__head { color: #1D4ED8; }
+.fgc-compare__side--actual   .fgc-compare__head { color: #15803D; }
+.fgc-diff-cell { background: #FEF9C3; }   /* 바뀐 칸 노랑 강조 (AUDT-W01) */
+.fgc-missing   { color: var(--fgc-on-surface-variant); font-style: normal; }
+
+/* ---------------------------------------------------------------------
+ * 15. 확정 조건 체크리스트 (VRUN-W02 · 운영정책서 제44조)
+ * ------------------------------------------------------------------- */
+.fgc-check { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #e8edf2; }
+.fgc-check__icon { flex: none; width: 20px; height: 20px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; }
+.fgc-check--pass .fgc-check__icon { background: var(--fgc-success); }
+.fgc-check--fail .fgc-check__icon { background: var(--fgc-danger); }
+.fgc-check__body { flex: 1; font-size: 13px; }
+.fgc-check__meta { font-size: 12px; color: var(--fgc-on-surface-variant); margin-top: 2px; }
+
+/* ---------------------------------------------------------------------
+ * 16. 사이드바 / 헤더 / 푸터 (fgc-shell.js 가 주입하는 마크업의 스타일)
+ * ------------------------------------------------------------------- */
+.fgc-sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 260px; z-index: 40;
+  background: var(--fgc-primary); color: #fff;
+  display: flex; flex-direction: column; overflow-y: auto;
+}
+.fgc-sidebar__brand { padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 12px; }
+.fgc-sidebar__brand-name { font-family: "Hanken Grotesk", sans-serif; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.fgc-sidebar__brand-sub  { font-size: 11px; color: rgba(255,255,255,.62); }
+.fgc-sidebar__group { padding: 12px 20px 4px; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: rgba(255,255,255,.45); text-transform: uppercase; }
+.fgc-sidebar__link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 20px; font-size: 13px; color: rgba(255,255,255,.82);
+  text-decoration: none; border-left: 3px solid transparent;
+}
+.fgc-sidebar__link:hover { background: var(--fgc-primary-container); color: #fff; }
+.fgc-sidebar__link[aria-current="page"] {
+  background: var(--fgc-primary-container); color: #fff; font-weight: 700;
+  border-left-color: #bfddfe;
+}
+.fgc-sidebar__link--disabled { color: rgba(255,255,255,.34); cursor: not-allowed; pointer-events: none; }
+.fgc-sidebar__id { margin-left: auto; font-size: 10px; color: rgba(255,255,255,.34); font-family: "JetBrains Mono", monospace; }
+.fgc-sidebar__user { margin-top: auto; padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; }
+
+.fgc-header {
+  position: fixed; top: 0; right: 0; left: 260px; height: 60px; z-index: 30;
+  background: var(--fgc-surface-lowest); border-bottom: 1px solid var(--fgc-outline-variant);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px;
+}
+.fgc-header__title { font-family: "Hanken Grotesk", sans-serif; font-size: 18px; font-weight: 700; color: var(--fgc-primary); }
+.fgc-header__id { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--fgc-on-surface-variant); }
+
+.fgc-main { margin-left: 260px; padding: 84px 24px 96px; min-height: 100vh; }
+
+.fgc-footer {
+  position: fixed; left: 260px; right: 0; bottom: 0; z-index: 20;
+  background: var(--fgc-surface-low); border-top: 1px solid var(--fgc-outline-variant);
+  padding: 8px 24px; font-size: 11px; color: var(--fgc-on-surface-variant);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+/* §4-12 교육용 표시 — 전 화면 하단 고정 (COR-009) */
+.fgc-disclaimer { font-weight: 600; color: #B45309; }
+
+/* 로그인 등 셸이 없는 화면 */
+.fgc-bare .fgc-main { margin-left: 0; padding: 0; }
+.fgc-bare .fgc-footer { left: 0; }
+
+/* ---------------------------------------------------------------------
+ * 17. 접근성 · 유틸
+ * ------------------------------------------------------------------- */
+/* 화면에는 안 보이지만 스크린리더는 읽는 텍스트.
+   clip 은 deprecated 라 clip-path 를 쓴다. (근거 없음 — CSS 기술표준이라 REG/SRC 근거 없음) */
+.fgc-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+.fgc-mono { font-family: "JetBrains Mono", monospace; font-size: 12px; }
+.fgc-muted { color: var(--fgc-on-surface-variant); }
+.fgc-page-title { font-family: "Hanken Grotesk", sans-serif; font-size: 24px; font-weight: 700; line-height: 32px; color: var(--fgc-on-surface); }
+.fgc-page-desc  { font-size: 13px; color: var(--fgc-on-surface-variant); margin-top: 4px; }
+.fgc-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+
+/* 토스트 (차단 메시지 표시용) */
+.fgc-toast-wrap { position: fixed; top: 74px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+.fgc-toast {
+  max-width: 460px; padding: 12px 16px; border-radius: 0.25rem;
+  font-size: 13px; line-height: 19px; color: #fff;
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
+  animation: fgc-slide-in .18s ease;
+}
+.fgc-toast--error { background: #991B1B; }
+.fgc-toast--info  { background: #1E3A8A; }
+.fgc-toast--ok    { background: #166534; }
+@keyframes fgc-slide-in { from { opacity: 0; transform: translateX(16px) } to { opacity: 1; transform: none } }
+
+@media print {
+  .fgc-sidebar, .fgc-header, .fgc-footer { display: none; }
+  .fgc-main { margin-left: 0; padding: 0; }
+}

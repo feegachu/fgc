@@ -27,7 +27,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
     public static final String ATTRIBUTE_NAME = "fgc.requestId";
 
     private static final Pattern VALID_REQUEST_ID =
-            Pattern.compile("^[A-Za-z0-9._-]{1,100}$");
+            Pattern.compile("^[A-Za-z0-9._-]{1,80}$");
 
     @Override
     protected void doFilterInternal(

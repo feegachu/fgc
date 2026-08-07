@@ -1,6 +1,5 @@
 package com.susukkang.fgc.cap.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapContractView;
@@ -9,7 +8,6 @@ import com.susukkang.fgc.cap.dto.CapRuleSetView;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.dto.ScheduleAmountView;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.cap.mapper.CapContractMapper;
 import com.susukkang.fgc.cap.mapper.CapRuleMapper;
 import com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper;
@@ -36,8 +34,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,8 +58,6 @@ class CapCalculatorImplTest {
     @Mock
     private CapScheduleAmountMapper capScheduleAmountMapper;
     @Mock
-    private CapCheckMapper capCheckMapper;
-    @Mock
     private ProductRefundRateResolver refundRateResolver;
 
     private CapCalculatorImpl capCalculator;
@@ -71,14 +65,7 @@ class CapCalculatorImplTest {
     @BeforeEach
     void setUp() {
         capCalculator = new CapCalculatorImpl(capContractMapper, capRuleMapper, capScheduleAmountMapper,
-                capCheckMapper, refundRateResolver, new ObjectMapper());
-
-        // cap_check INSERT 는 생성된 PK 를 row 에 되채워 준다 — 실제 IDENTITY 컬럼 동작을 흉내낸다.
-        lenient().doAnswer(invocation -> {
-            com.susukkang.fgc.cap.dto.CapCheckInsertRow row = invocation.getArgument(0);
-            row.setCapCheckId(999L);
-            return null;
-        }).when(capCheckMapper).insertCapCheck(any());
+                refundRateResolver);
     }
 
     private CapContractView contract(LocalDate contractDate, BigDecimal monthlyEquivalent,
@@ -145,11 +132,11 @@ class CapCalculatorImplTest {
                 CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
 
         assertThat(result.limitAmount()).isEqualByComparingTo("1200000");
-        assertThat(result.basePremiumAmount()).isEqualByComparingTo("1200000");
+        // basePremiumAmount는 월납 원액이다(×12 하지 않음) — 한도(1,200,000)와는 다른 값이다
+        assertThat(result.basePremiumAmount()).isEqualByComparingTo("100000");
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.includedAmount()).isEqualByComparingTo("0");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
-        assertThat(result.capCheckId()).isEqualTo(999L);
     }
 
     // 표준해약공제액 80% 이상 공제 대상은 12차월 예상해약환급률이 한도에 가산된다
@@ -189,9 +176,10 @@ class CapCalculatorImplTest {
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
                 CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 1, 15)));
 
-        // gross 1,488,000 × 3% = 44,640 공제 → 1,443,360
-        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("44640");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1443360");
+        // 공제 기준은 grossLimit이 아니라 월납 원액이다(REG-10: "월납 기준 초회보험료의 3%").
+        // 월납 100,000 × 3% = 3,000 공제 → gross 1,488,000 − 3,000 = 1,485,000
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1485000");
     }
 
     // 계약일이 2026/2027/2029이어도 같은 엔진이 같은 기본한도를 계산한다
@@ -313,6 +301,29 @@ class CapCalculatorImplTest {
         ArgumentCaptor<RefundRateQuery> captor = ArgumentCaptor.forClass(RefundRateQuery.class);
         verify(refundRateResolver).resolve(captor.capture());
         assertThat(captor.getValue().asOfDate()).isEqualTo(contractDate);
+    }
+
+    // schedule_line.expected_amount 는 numeric(15,2)라 원 미만 값이 들어올 수 있다 — 산입액에
+    // 합산되기 전에 각 행을 먼저 원 단위 HALF_UP 반올림해야 한다 (100.5 + 100.5 는 200이 아니라
+    // 101 + 101 = 202여야 한다)
+    @Test
+    void roundsEachScheduleLineToWonBeforeSummingIncludedAmount() {
+        when(capContractMapper.findById(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
+        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
+        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(includedItem(1L, "BASE_COMMISSION")));
+        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
+                scheduleLine(11L, 1L, 1, "100.5"),
+                scheduleLine(12L, 1L, 2, "100.5")
+        ));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(result.includedAmount()).isEqualByComparingTo("202");
+        assertThat(result.details()).extracting(d -> d.amount().toPlainString())
+                .containsExactly("101", "101");
     }
 
     // 존재하지 않는 계약이면 예외가 발생한다

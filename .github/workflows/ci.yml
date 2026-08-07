@@ -45,9 +45,6 @@ jobs:
           SPRING_DATASOURCE_URL: ${{ secrets.CI_DB_URL }}
           SPRING_DATASOURCE_USERNAME: ${{ secrets.CI_DB_USERNAME }}
           SPRING_DATASOURCE_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-          # application-local.yml(git 미포함)에만 있던 시드 데이터 위치를 CI에도 적용한다.
-          # 이게 없으면 Flyway가 classpath:db/migration(스키마)만 적용하고
-          # classpath:db/demo(V3/V4 시드 계약·상품·룰셋)는 건너뛰어, 시드 데이터를
-          # 전제로 하는 통합테스트가 CI에서만 EmptyResultDataAccessException으로 실패한다.
+          # application-local.yml(git 미포함)에만 있던 시드 데이터 위치를 CI에도 적용
           SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
         run: ./gradlew clean build
