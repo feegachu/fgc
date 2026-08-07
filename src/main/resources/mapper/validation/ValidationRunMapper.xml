@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.validation.mapper.ValidationRunMapper">
+
+    <select id="findById" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
+        SELECT validation_run_id AS validationRunId,
+               validation_month  AS validationMonth,
+               run_no            AS runNo,
+               run_type          AS runType,
+               status,
+               started_at        AS startedAt,
+               completed_at      AS completedAt,
+               finalized_at      AS finalizedAt,
+               triggered_by      AS triggeredBy,
+               finalized_by      AS finalizedBy,
+               failure_message   AS failureMessage,
+               created_at        AS createdAt
+          FROM fgc.validation_run
+         WHERE validation_run_id = #{validationRunId}
+    </select>
+
+    <!--
+      status = #{expectedStatus} 조건이 핵심이다 — validation_run_id만 걸면 동시에 두 요청이
+      같은 실행을 서로 다른 상태로 밀 때 나중 것이 먼저 것을 덮어써 버린다(lost update).
+      실제 상태 검증(허용된 전이인지)은 이 SQL이 아니라 Java 쪽(ValidationRunStatus.canTransitionTo)
+      책임이다 — 여기서는 "내가 읽었던 그 상태가 맞을 때만" 바꾼다.
+    -->
+    <update id="updateStatusIfCurrent">
+        UPDATE fgc.validation_run
+           SET status = #{newStatus}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = #{expectedStatus}
+    </update>
+
+</mapper>
