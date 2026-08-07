@@ -53,6 +53,7 @@ class ValidationRunControllerTest {
     private ValidationRunRow createdRow() {
         ValidationRunRow row = new ValidationRunRow();
         row.setValidationRunId(100L);
+        row.setRunNo(1);
         row.setStatus("CREATED");
         return row;
     }
@@ -81,6 +82,7 @@ class ValidationRunControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.validationRunId").value(100))
+                .andExpect(jsonPath("$.data.runNo").value(1))
                 .andExpect(jsonPath("$.data.status").value("CREATED"));
     }
 
