@@ -35,13 +35,15 @@ public class ValidationRunTransitionServiceImpl implements ValidationRunTransiti
 
         int affected = validationRunMapper.updateStatusIfCurrent(
                 validationRunId, currentStatus.name(), targetStatus.name());
-        if(affected==0){
+        if (affected == 0) {
+            // 0건은 "그 사이 삭제됨"과 "그 사이 상태만 바뀜"을 둘 다 가리킬 수 있어 재조회로 구분한다.
+            if (validationRunMapper.findById(validationRunId) == null) {
+                throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
+            }
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of("id", validationRunId));
         }
 
-        // 최신 행 반환 — UPDATE로 바뀐 status를 반영해야 한다(전이 전 값을 그대로
-        //돌려주면 호출자가 여전히 CREATED/RUNNING 등 옛 상태를 보게 된다).
-        validationRunRow.setStatus(targetStatus.name());
-        return validationRunRow;
+        // 메모리 객체를 고쳐서 반환하면 DB/트리거가 채운 컬럼을 놓치므로 다시 조회해서 반환한다.
+        return validationRunMapper.findById(validationRunId);
     }
 }

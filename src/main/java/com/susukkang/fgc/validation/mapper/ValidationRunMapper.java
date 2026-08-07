@@ -15,8 +15,8 @@ public interface ValidationRunMapper {
      * WHERE 절에 validation_run_id뿐 아니라 status = #{expectedStatus}까지 걸어야
      * 동시에 두 요청이 같은 실행을 전이시키려 할 때 하나만 성공(낙관적 락과 같은 효과).
      *
-     * @return 반영된 행 수. 0이면 "실행이 없거나" "그 사이 status가 바뀌었거나" 둘 중 하나 —
-     *         구분은 Service가 findById로 먼저 존재를 확인한 뒤 판단한다
+     * @return 반영된 행 수. 0이면 실행 미존재/상태 충돌 둘 다 가능
+     * — 사전 조회 이후 삭제됐을 수도 있으니, 구분은 Service가 0건일 때 findById로 재조회해서 판단
      */
     int updateStatusIfCurrent(@Param("validationRunId") Long validationRunId,
                                @Param("expectedStatus") String expectedStatus,

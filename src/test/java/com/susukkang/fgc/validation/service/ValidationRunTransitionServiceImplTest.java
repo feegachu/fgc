@@ -69,9 +69,11 @@ class ValidationRunTransitionServiceImplTest {
     }
 
     @Test
-    // 전이 규칙은 통과했지만(RUNNING→COMPLETED) 조건부 UPDATE가 0건이면 VRUN_005(경합)
+    // UPDATE가 0건이어도 실행이 여전히 존재하면(상태만 바뀐 경합) VRUN_005
     void throwsStateConflictWhenConditionalUpdateAffectsZeroRows() {
-        when(validationRunMapper.findById(1L)).thenReturn(rowWithStatus("RUNNING"));
+        when(validationRunMapper.findById(1L))
+                .thenReturn(rowWithStatus("RUNNING"))
+                .thenReturn(rowWithStatus("FAILED"));
         when(validationRunMapper.updateStatusIfCurrent(1L, "RUNNING", "COMPLETED")).thenReturn(0);
 
         assertThatThrownBy(() -> service.transition(1L, ValidationRunStatus.COMPLETED))
@@ -81,9 +83,25 @@ class ValidationRunTransitionServiceImplTest {
     }
 
     @Test
-    // 정상 케이스 — UPDATE가 1건 반영되면 최신 상태(targetStatus)로 바뀐 행을 돌려줘야 한다
+    // UPDATE가 0건이고 재조회에서도 사라졌으면(그 사이 삭제) 경합이 아니라 COMMON_004
+    void throwsNotFoundWhenRunDeletedBetweenFindAndUpdate() {
+        when(validationRunMapper.findById(1L))
+                .thenReturn(rowWithStatus("RUNNING"))
+                .thenReturn(null);
+        when(validationRunMapper.updateStatusIfCurrent(1L, "RUNNING", "COMPLETED")).thenReturn(0);
+
+        assertThatThrownBy(() -> service.transition(1L, ValidationRunStatus.COMPLETED))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting(e -> ((FgcBusinessException) e).getErrorCode())
+                .isEqualTo(FgcErrorCode.COMMON_004);
+    }
+
+    @Test
+    // 정상 케이스 — UPDATE 성공 뒤 재조회한 행(트리거가 채운 컬럼 포함)을 돌려줘야 한다
     void returnsUpdatedRowOnSuccessfulTransition() {
-        when(validationRunMapper.findById(1L)).thenReturn(rowWithStatus("CREATED"));
+        when(validationRunMapper.findById(1L))
+                .thenReturn(rowWithStatus("CREATED"))
+                .thenReturn(rowWithStatus("RUNNING"));
         when(validationRunMapper.updateStatusIfCurrent(1L, "CREATED", "RUNNING")).thenReturn(1);
 
         ValidationRunRow result = service.transition(1L, ValidationRunStatus.RUNNING);
