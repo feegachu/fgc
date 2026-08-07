@@ -18,7 +18,7 @@ import java.util.List;
 
 @Tag(name = "기준정보", description = "FGC 기준정보 조회 API")
 @RestController
-@RequestMapping("/api/base/commission-items")
+@RequestMapping("/api/v1/base/commission-items")
 public class CommissionItemController {
 
     private final CommissionItemService commissionItemService;

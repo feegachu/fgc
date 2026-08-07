@@ -114,7 +114,7 @@ class AuthLoginFlowTest {
     // 미인증 REST 요청은 리다이렉트하지 않고 401 (인터페이스정의서 3-4: Ajax = 401)
     @Test
     void anonymousApiRequestReturnsUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/cap/checks"))
+        mockMvc.perform(get("/api/v1/cap/checks"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -133,7 +133,7 @@ class AuthLoginFlowTest {
                 .getRequest()
                 .getSession(false);
 
-        mockMvc.perform(get("/api/cap/checks").param("month", "2026-07").session(session))
+        mockMvc.perform(get("/api/v1/cap/checks").param("month", "2026-07").session(session))
                 .andExpect(status().isOk());
     }
 

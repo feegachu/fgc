@@ -57,11 +57,17 @@ class DashboardServiceIntegrationTest {
     // INSERT할 수 없고 CREATED→RUNNING→COMPLETED 순서로 UPDATE해야 한다. ck_validation_run_step은
     // COMPLETED일 때 current_step이 정확히 8이어야 한다고 강제한다.
     private Long insertValidationRun(LocalDate month, int runNo, String status, OffsetDateTime createdAt) {
+
+        return insertValidationRun(month, runNo, status, createdAt, "MONTHLY");
+    }
+
+    private Long insertValidationRun(LocalDate month, int runNo, String status, OffsetDateTime createdAt, String runType) {
         Long id = jdbcTemplate.queryForObject("""
-                INSERT INTO fgc.validation_run (validation_month, run_no, status, created_at)
-                VALUES (?, ?, 'CREATED', ?)
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status, created_at)
+                VALUES (?, ?, ?, 'CREATED', ?)
                 RETURNING validation_run_id
-                """, Long.class, month, runNo, createdAt);
+                """, Long.class, month, runNo, runType, createdAt);
+
         if (!"CREATED".equals(status)) {
             jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?", id);
             if ("COMPLETED".equals(status)) {
@@ -101,13 +107,16 @@ class DashboardServiceIntegrationTest {
                 """, reconciliationRunId, matchGroupKey, resultType);
     }
 
-    private void insertExceptionCase(String exceptionKey, String status, OffsetDateTime createdAt) {
-        jdbcTemplate.update("""
+    private Long insertExceptionCase(String exceptionKey, String status, OffsetDateTime createdAt) {
+        return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.exception_case
                     (exception_key, exception_type, severity, status,
                      source_entity_type, source_entity_id, title, created_at)
                 VALUES (?, 'DATA_QUALITY', 'INFO', ?, 'TEST', ?, 'dashboard test', ?)
-                """, exceptionKey, status, exceptionKey, createdAt);
+
+                RETURNING exception_case_id
+                """, Long.class, exceptionKey, status, exceptionKey, createdAt);
+
     }
 
     // 차대 불균형 분개 하나(대변 없이 차변만)
@@ -269,6 +278,30 @@ class DashboardServiceIntegrationTest {
         assertThat(recent.get(0).createdAt()).isEqualTo(OffsetDateTime.parse("2026-07-06T09:00:00+09:00"));
     }
 
+
+    // created_at만으로 정렬하면 동시각(tie) 행의 순서가 보장되지 않아
+    // LIMIT 경계에서 요청마다 다른 5건이 나올 수 있다. exception_case_id를 보조 정렬 키로 둬서
+    // 결정적으로 만든다 — 동일 시각 6건 중 최신 id 5개가 항상 같은 순서로 나와야 한다.
+    @Test
+    void summarizeBreaksRecentExceptionTiesByIdWhenCreatedAtIsIdentical() {
+        OffsetDateTime sameInstant = OffsetDateTime.parse("2026-07-10T09:00:00+09:00");
+        List<Long> ids = new java.util.ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            ids.add(insertExceptionCase("DASH-TEST-TIE-EXC-" + i, "NEW", sameInstant));
+        }
+
+        DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
+        List<RecentExceptionRow> recent = result.recentExceptions();
+
+        assertThat(recent).hasSize(5);
+        List<Long> expectedIdsDesc = ids.stream()
+                .sorted(java.util.Comparator.reverseOrder())
+                .limit(5)
+                .toList();
+        assertThat(recent.stream().map(RecentExceptionRow::exceptionCaseId).toList())
+                .isEqualTo(expectedIdsDesc);
+    }
+
     // 8. 최근 검증 실행 3건: 생성 시각(created_at) 최신순, 3건 제한, current_step(진행률) 포함
     @Test
     void summarizeReturnsAtMostThreeRecentValidationRunsSortedByLatest() {
@@ -300,5 +333,31 @@ class DashboardServiceIntegrationTest {
 
         assertThat(recent.get(0).validationRunId()).isEqualTo(mayRerun);
         assertThat(recent.get(1).validationRunId()).isEqualTo(juneRun);
+    }
+
+    // DASH-W01은 "최근 월 통합검증 실행 3건"을 정의한다. 계약별 수동검증(MANUAL_CONTRACT)이
+    // 섞여서 조회되면, 그 실행들이 최근 3건 자리를 차지해 정작 월 통합검증(MONTHLY) 기록이 화면에서
+    // 사라질 수 있다. MONTHLY만 걸러서 최근 3건을 반환해야 한다.
+    @Test
+    void summarizeReturnsOnlyMonthlyRunsAmongRecentValidationRunsEvenWhenManualContractRunsAreNewer() {
+        Long monthlyRun1 = insertValidationRun(LocalDate.of(2026, 4, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-05-01T09:00:00+09:00"), "MONTHLY");
+        Long monthlyRun2 = insertValidationRun(LocalDate.of(2026, 5, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-06-01T09:00:00+09:00"), "MONTHLY");
+        Long monthlyRun3 = insertValidationRun(LocalDate.of(2026, 6, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-07-01T09:00:00+09:00"), "MONTHLY");
+        // MANUAL_CONTRACT 실행들이 MONTHLY보다 나중에 생성됐다 — 정렬만 하면 최근 3건 자리를 차지한다.
+        insertValidationRun(LocalDate.of(2026, 7, 1), 1, "COMPLETED",
+                OffsetDateTime.parse("2026-08-01T09:00:00+09:00"), "MANUAL_CONTRACT");
+        insertValidationRun(LocalDate.of(2026, 7, 1), 2, "COMPLETED",
+                OffsetDateTime.parse("2026-08-02T09:00:00+09:00"), "MANUAL_CONTRACT");
+
+        List<RecentValidationRunRow> recent = dashboardService.summarize(LocalDate.of(2026, 8, 1))
+                .recentValidationRuns();
+
+        assertThat(recent).hasSize(3);
+        assertThat(recent).allSatisfy(row -> assertThat(row.runType()).isEqualTo("MONTHLY"));
+        assertThat(recent.stream().map(RecentValidationRunRow::validationRunId).toList())
+                .containsExactly(monthlyRun3, monthlyRun2, monthlyRun1);
     }
 }
