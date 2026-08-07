@@ -31,4 +31,28 @@
            AND status = #{expectedStatus}
     </update>
 
+    <select id="findNextRunNo" resultType="int">
+        SELECT COALESCE(MAX(run_no), 0) + 1
+          FROM fgc.validation_run
+         WHERE validation_month = #{validationMonth}
+    </select>
+
+    <select id="existsActiveMonthlyRun" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.validation_run
+             WHERE validation_month = #{validationMonth}
+               AND run_type = 'MONTHLY'
+               AND status IN ('CREATED', 'RUNNING')
+        )
+    </select>
+
+    <!-- policySnapshotJson이 null이면 컬럼 기본값('{}'::jsonb)이 아니라 COALESCE가 대신
+         '{}'를 넣는다 — INSERT 문에 컬럼을 아예 안 쓰는 것과 값으로 null을 보내는 건 다르다
+         (null을 보내면 NOT NULL 제약에 걸린다). CapCheckMapper#insertCapCheck와 같은 방식. -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="validationRunId" keyColumn="validation_run_id">
+        INSERT INTO fgc.validation_run (validation_month, run_no, run_type, triggered_by, policy_snapshot)
+        VALUES (#{validationMonth}, #{runNo}, #{runType}, #{triggeredBy}, COALESCE(#{policySnapshotJson}, '{}')::jsonb)
+    </insert>
+
 </mapper>
