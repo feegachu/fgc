@@ -122,10 +122,7 @@ class ValidationRunMapperIntegrationTest {
     }
 
     @Test
-    // 같은 달에 COMPLETED MONTHLY 실행만 있으면 false인지.
-    // ck_validation_run_step 제약이 COMPLETED일 땐 current_step=8을 강제해서,
-    // updateStatusIfCurrent(status만 바꿈)로는 RUNNING→COMPLETED로 못 간다 — current_step까지
-    // 같이 올리는 raw UPDATE가 필요하다(DashboardServiceIntegrationTest#insertValidationRun 참고).
+    // 같은 달에 COMPLETED MONTHLY 실행만 있으면 false인지
     void existsActiveMonthlyRunReturnsFalseWhenNoActiveRun() {
         LocalDate month = LocalDate.of(2026, 9, 1);
         Long id = insertCreatedRun(month, 1);

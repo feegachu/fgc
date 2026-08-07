@@ -91,8 +91,7 @@ class ValidationRunCreateServiceImplTest {
     // MANUAL_CONTRACT/PRE_CONFIRM은 활성 MONTHLY 실행이 있어도 통과해야 함
     void allowsNonMonthlyRunTypeEvenWhenMonthlyRunIsActive() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        // MONTHLY가 아니면 existsActiveMonthlyRun을 아예 안 부르므로 스텁하지 않는다 —
-        // 만약 구현이 이 메서드를 호출한다면 mock 기본값(false)이라 통과에 영향 없다.
+        // MONTHLY가 아니면 existsActiveMonthlyRun을 아예 안 부르므로 스텁 X
         when(validationRunMapper.findNextRunNo(month)).thenReturn(1);
         stubSuccessfulInsert(100L, "CREATED");
 
