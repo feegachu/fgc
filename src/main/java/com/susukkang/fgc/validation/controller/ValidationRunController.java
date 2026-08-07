@@ -70,7 +70,7 @@ public class ValidationRunController {
         LocalDate validationMonth;
         try {
             validationMonth = DateUtil.parseSettlementMonth(request.validationMonth());
-        } catch (DateTimeException e) {
+        } catch (DateTimeException | NullPointerException e) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "validationMonth",
                     Map.of("field", "validationMonth"), null);
         }

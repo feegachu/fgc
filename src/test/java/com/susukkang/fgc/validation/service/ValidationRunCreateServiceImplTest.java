@@ -15,6 +15,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,17 +27,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * ValidationRunCreateServiceImpl 단위테스트
  * ValidationRunMapper를 mock으로 대체해 "중복 체크 → run_no 채번 → INSERT" 흐름만 검증
+ *
+ * NoOpTransactionManager: create()가 이제 TransactionTemplate(REQUIRES_NEW)로 재시도
+ * 트랜잭션을 직접 여는 구조라, 진짜 DataSource 없이도 TransactionTemplate.execute()가
+ * 동작하려면 PlatformTransactionManager가 하나 있어야 한다. 여기서는 실제로 커밋·롤백할
+ * 대상이 없으므로(ValidationRunMapper 자체가 mock) 아무 것도 안 하는 최소 구현을 쓴다 —
+ * ValidationRunMapperIntegrationTest가 실제 DB·실제 트랜잭션 매니저로 이 부분까지 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class ValidationRunCreateServiceImplTest {
+
+    private static class NoOpTransactionManager extends AbstractPlatformTransactionManager {
+        @Override
+        protected Object doGetTransaction() {
+            return new Object();
+        }
+
+        @Override
+        protected void doBegin(Object transaction, TransactionDefinition definition) {
+        }
+
+        @Override
+        protected void doCommit(DefaultTransactionStatus status) {
+        }
+
+        @Override
+        protected void doRollback(DefaultTransactionStatus status) {
+        }
+    }
 
     @Mock
     private ValidationRunMapper validationRunMapper;
@@ -52,7 +83,8 @@ class ValidationRunCreateServiceImplTest {
         lenient().when(policySnapshotMapper.findActiveProductOfferings(any()))
                 .thenReturn(List.of());
 
-        service = new ValidationRunCreateServiceImpl(validationRunMapper, policySnapshotMapper, new ObjectMapper());
+        service = new ValidationRunCreateServiceImpl(
+                validationRunMapper, policySnapshotMapper, new ObjectMapper(), new NoOpTransactionManager());
     }
 
     // insert가 useGeneratedKeys로 row.validationRunId를 채우는 것을 mock에서 흉내낸다.
@@ -125,5 +157,56 @@ class ValidationRunCreateServiceImplTest {
         assertThat(captor.getValue().getRunType()).isEqualTo("MONTHLY");
         assertThat(captor.getValue().getTriggeredBy()).isEqualTo(42L);
         assertThat(result.getStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
+    // run_no 채번 경합(uq_validation_run 위반)은 활성 월 중복이 아니므로 재시도해서 결국 성공해야 한다
+    void retriesOnRunNoCollisionAndSucceeds() {
+        LocalDate month = LocalDate.of(2026, 8, 1);
+        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
+        // 1차 시도(run_no=3)는 경쟁자와 충돌, 2차 시도(run_no=4)는 성공한다고 가정.
+        when(validationRunMapper.findNextRunNo(month)).thenReturn(3, 4);
+        doThrow(new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint \"uq_validation_run\""))
+                .doAnswer(invocation -> {
+                    ValidationRunInsertRow insertedRow = invocation.getArgument(0);
+                    insertedRow.setValidationRunId(100L);
+                    return null;
+                })
+                .when(validationRunMapper).insert(any());
+
+        ValidationRunRow found = new ValidationRunRow();
+        found.setValidationRunId(100L);
+        found.setStatus("CREATED");
+        when(validationRunMapper.findById(100L)).thenReturn(found);
+
+        CreateValidationRunCommand command =
+                new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 1L);
+
+        ValidationRunRow result = service.create(command);
+
+        assertThat(result.getStatus()).isEqualTo("CREATED");
+        verify(validationRunMapper, times(2)).insert(any());
+        verify(validationRunMapper, times(2)).findNextRunNo(month);
+    }
+
+    @Test
+    // 활성 MONTHLY 중복(uq_validation_run_active_month 위반)은 run_no 문제가 아니라 재시도해도
+    // 해결되지 않는다 — 재시도 없이 그대로 던져야 한다(GlobalExceptionHandler가 VRUN_001/409로 변환)
+    void doesNotRetryOnActiveMonthlyRunConflict() {
+        LocalDate month = LocalDate.of(2026, 8, 1);
+        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
+        when(validationRunMapper.findNextRunNo(month)).thenReturn(1);
+        doThrow(new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint \"uq_validation_run_active_month\""))
+                .when(validationRunMapper).insert(any());
+
+        CreateValidationRunCommand command =
+                new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 1L);
+
+        assertThatThrownBy(() -> service.create(command))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        verify(validationRunMapper, times(1)).insert(any());
     }
 }
