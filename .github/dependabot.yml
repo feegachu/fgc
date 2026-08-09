@@ -1,0 +1,16 @@
+# FGC-SER-010: 오픈소스 의존성 취약점 관리
+# "Dependabot 또는 동등 도구와 이미지 스캔을 CI에 포함한다" — 검증기준: 공통(CI)
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies]

@@ -3,21 +3,34 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - develop
-      - main
+    branches: [develop, main]
+  push:
+    branches: [develop, main]     # 머지 후 develop 검증 + README 뱃지 소스
+
+# 같은 브랜치에 새 푸시가 오면 진행 중 실행을 취소한다(러너 절약).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write        # JUnit 리포트를 PR 체크로 생성
 
 jobs:
+  # ⚠️ job id 'build'를 바꾸지 말 것.
+  # 브랜치 보호의 필수 체크 이름이라, 바꾸면 머지가 영영 막힌다.
   build:
+    name: 정합성 회귀 방지 (PostgreSQL 통합테스트)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17          # docker-compose.yml과 동일 버전 (FGC-ECR-003)
         env:
           POSTGRES_DB: fgc
           POSTGRES_USER: fgc
-          POSTGRES_PASSWORD: fgc_local_only
+          POSTGRES_PASSWORD: fgc_local_only   # 로컬/CI 전용. 실제 비밀번호가 아님
           TZ: Asia/Seoul
         ports:
           - 5432:5432
@@ -37,14 +50,33 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Grant execute permission
-        run: chmod +x gradlew
+      - name: Set up Gradle (의존성·빌드 캐시)
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
         env:
-          SPRING_DATASOURCE_URL: ${{ secrets.CI_DB_URL }}
-          SPRING_DATASOURCE_USERNAME: ${{ secrets.CI_DB_USERNAME }}
-          SPRING_DATASOURCE_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-          # application-local.yml(git 미포함)에만 있던 시드 데이터 위치를 CI에도 적용
+          # 위 services가 띄운 컨테이너를 그대로 가리킨다.
+          # 값이 이 파일에 이미 평문으로 있으므로 secrets로 감출 실익이 없다.
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/fgc
+          SPRING_DATASOURCE_USERNAME: fgc
+          SPRING_DATASOURCE_PASSWORD: fgc_local_only
+          # 시드까지 올려야 통합테스트가 돈다.
+          # migration/demo 간 버전 중복도 여기서 걸린다 (PR #30 재발 방지).
           SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
-        run: ./gradlew clean build
+        run: ./gradlew build
+
+      - name: Publish test report (PR 체크로 노출)
+        uses: mikepenz/action-junit-report@v5
+        if: ${{ !cancelled() }}
+        with:
+          report_paths: '**/build/test-results/test/TEST-*.xml'
+          check_name: 테스트 결과
+          detailed_summary: true
+
+      - name: Upload HTML test report (실패 분석용)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-report
+          path: build/reports/tests/test
+          retention-days: 7

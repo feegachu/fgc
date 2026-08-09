@@ -5,6 +5,10 @@
 
 > 보험 판매수수료 규제 대응 · 분급 · 환수 · 정산 검증 플랫폼
 
+[![정합성 회귀 방지](https://img.shields.io/github/actions/workflow/status/feegachu/fgc/ci.yml?branch=develop&label=%EC%A0%95%ED%95%A9%EC%84%B1%20%ED%9A%8C%EA%B7%80%20%EB%B0%A9%EC%A7%80&logo=github)](https://github.com/feegachu/fgc/actions/workflows/ci.yml)
+![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 
 ---
 
@@ -26,6 +30,25 @@
 
 > 기존 엑셀이나 노후 전산망으로는 감당하기 불가능한 수백만 건의 분급 스케줄을 처리하고 설계사별 한도를 실시간으로 합산·검증합니다. 이를 통해 수수료 정산의 인건비를 절감하고, 환수 누락액 및 규제 위반 리스크를 원천 차단합니다.
 
+
+<br>
+
+## 🔒 정합성 보증
+
+수수료 계산은 틀리면 안 되는 코드입니다. 그래서 **정합성을 사람의 주의력이 아니라 CI로 강제**합니다.
+
+모든 PR에서 실제 PostgreSQL 17(로컬 `docker-compose`와 동일 버전)을 띄워 통합테스트를 실행하며,
+**하나라도 깨지면 머지가 차단**됩니다.
+
+| 보장 | 근거 |
+|---|---|
+| H2 등 대체 DB 없이 실제 PostgreSQL로 검증 | `FGC-TER-004` |
+| 로컬과 CI가 같은 DB 버전(`postgres:17`)을 사용 | `FGC-ECR-003` |
+| `db/migration`·`db/demo` 간 Flyway 버전 중복 시 즉시 실패 | PR #30 재발 방지 |
+| 보호 브랜치 + 리뷰 승인 1인 필수 | `FGC-ECR-004` · `FGC-QUR-004` |
+| 의존성 취약점 주간 스캔(Dependabot) | `FGC-SER-010` |
+
+깨진 테스트는 PR의 **"테스트 결과"** 체크에서 어느 테스트가 왜 실패했는지 바로 확인할 수 있습니다.
 
 <br>
 
