@@ -1,5 +1,15 @@
 # FGC-SER-010: 오픈소스 의존성 취약점 관리
 # "Dependabot 또는 동등 도구와 이미지 스캔을 CI에 포함한다" — 검증기준: 공통(CI)
+#
+# ⚠️ 이 파일은 "버전 업데이트" 주기만 정한다. 실제 취약점 탐지는 저장소 설정이다:
+#   - Dependabot alerts          : Settings > Code security  (활성 상태)
+#   - Dependabot security updates: Settings > Code security  (활성 상태)
+#     → 확인: gh api repos/feegachu/fgc/automated-security-fixes
+#   두 설정이 꺼지면 이 파일만으로는 CVE를 잡지 못한다.
+#
+# 컨테이너 이미지 스캔은 1차 범위에 없다. FGC는 Dockerfile이 없어 자체 빌드 이미지가
+# 없고, CI의 postgres:17은 테스트용 업스트림 공식 이미지다. 이미지 빌드·배포는
+# FGC-ECR-005(Docker 이미지, Stage/Prod 분리)로 2차이므로 스캐너도 그때 함께 넣는다.
 version: 2
 updates:
   - package-ecosystem: gradle

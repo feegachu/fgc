@@ -71,6 +71,12 @@ jobs:
           SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
         run: ./gradlew build
 
+      # 알려진 한계: 외부 fork에서 온 PR은 checks: write 를 선언해도 GITHUB_TOKEN이
+      # 읽기 전용이라 "테스트 결과" 체크가 생성되지 않는다(이 액션은 warning으로 넘어간다).
+      # 필수 체크인 build 자체는 정상 보고되므로 머지가 막히지는 않고, 테스트 상세만
+      # 안 보인다. 그때는 아래 아티팩트로 확인한다.
+      # 현재 팀은 같은 저장소의 브랜치로 PR을 올리므로 실제로 발생하지 않는다.
+      # fork 기여가 상시화되면 workflow_run으로 분리한다.
       - name: Publish test report (PR 체크로 노출)
         uses: mikepenz/action-junit-report@v5
         if: ${{ !cancelled() }}
