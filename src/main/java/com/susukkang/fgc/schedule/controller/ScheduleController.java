@@ -35,15 +35,15 @@ public class ScheduleController {
     /**
      * 설명 : 회차보기 버튼을 눌러 스케줄의 회차별 예상 금액을 확인한다
      *
-     * @param  scheduleId 스케줄 헤더 Id
+     * @param  scheduleHeaderId 스케줄 헤더 Id
      * @return 스케줄 세부 내역
      * @author hjKang
      * @since 2026-08-07
      */
-//    @GetMapping("/{scheduleId}")
-//    public ApiResponse<ScheduleDetailResponse> getSchedule(@PathVariable Long scheduleId) {
-//        return ApiResponse.success(scheduleService.getSchedule(scheduleId));
-//    }
+    @GetMapping("/{scheduleHeaderId}")
+    public ApiResponse<ScheduleDetailResponse> getScheduleLineById(@PathVariable Long scheduleHeaderId) {
+        return ApiResponse.success(scheduleService.selectScheduleDetailById(scheduleHeaderId));
+    }
 
 //    // 새 버전으로 재생성
 //    @PostMapping("/{scheduleId}/regenerate")

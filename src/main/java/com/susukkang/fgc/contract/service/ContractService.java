@@ -423,8 +423,7 @@ public class ContractService {
                 .dataOrigin(currentContract.getDataOrigin()) // 데이터 출처
                 .build();
 
-        int updatedRows =
-                contractMapper.updateContract(updatedContract);
+        int updatedRows = contractMapper.updateContract(updatedContract);
 
         if (updatedRows != 1) {
             throw new FgcBusinessException(

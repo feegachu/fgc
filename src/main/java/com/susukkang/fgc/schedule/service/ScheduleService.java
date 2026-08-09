@@ -3,7 +3,11 @@ package com.susukkang.fgc.schedule.service;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.contract.dto.ContractDetailResponse;
+import com.susukkang.fgc.contract.dto.ContractResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import jakarta.validation.Valid;
@@ -65,10 +69,7 @@ public class ScheduleService {
         );
     }
 
-    private FgcBusinessException validationException(
-            String field,
-            String detail
-    ) {
+    private FgcBusinessException validationException(String field, String detail) {
         return new FgcBusinessException(
                 FgcErrorCode.COMMON_002,
                 field,
@@ -76,8 +77,30 @@ public class ScheduleService {
                 detail
         );
     }
-//    public List<Long> generateSchedules(Long contractId) {
-//        return scheduleMapper.findGenerationContext();
-//    }
+    /**
+     * 설명 : 스케줄 헤더의 상세보기를 눌러 스케줄 상세보기를 조회한다.
+     * @param scheduleId 스케줄 아이디
+     * @return ScheduleDetailResponse 조회된 보험계약 목록
+     * @author hjKang
+     * @since 2026-08-09
+     */
+    public ScheduleDetailResponse selectScheduleDetailById(Long scheduleHeaderId) {
+        // 스케줄 Id 검증 및 가져오기
+        ScheduleDetailResponse detail  = scheduleMapper.selectScheduleDetailById(scheduleHeaderId);
+
+        if (detail == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "scheduleHeaderId",
+                    Map.of("scheduleHeaderId", scheduleHeaderId),
+                    "해당 스케줄을 찾을 수 없습니다."
+            );
+        }
+
+        // TODO(FUN-039, 1차) 스케줄 상태·조정·버전 관리
+        // 스케줄 상태 조정 버전 가져오기
+
+        return detail ;
+    }
 
 }

@@ -1,9 +1,6 @@
 package com.susukkang.fgc.schedule.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.List;
 
@@ -15,9 +12,10 @@ import java.util.List;
  * @since 2026-08-09
  */
 @Getter
-@Builder
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class ScheduleDetailResponse {
     private ScheduleHeaderResponse header; // 스케줄 헤더
     private List<ScheduleLineResponse> schedules; // 회차별 예상 스케줄 목록

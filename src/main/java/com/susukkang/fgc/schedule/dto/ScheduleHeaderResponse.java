@@ -21,7 +21,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ScheduleHeaderResponse {
     private Long scheduleHeaderId; // 스케줄 헤더 ID
-    private String contractId; // 계약 Id
+    private String contractNo; // 화면에 표시할 계약 번호
     private PaymentStage paymentStage; // 지급 단계
     private String scheduleRegime; // 적용 체계
     private String schedulePurpose; // 스케줄 용도

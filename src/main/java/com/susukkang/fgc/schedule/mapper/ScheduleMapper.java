@@ -1,12 +1,6 @@
 package com.susukkang.fgc.schedule.mapper;
 
-import com.susukkang.fgc.contract.dto.ContractSearchCondition;
-import com.susukkang.fgc.contract.dto.ContractView;
-import com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO;
-import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
-import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
-import jakarta.validation.Valid;
+import com.susukkang.fgc.schedule.dto.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -43,9 +37,21 @@ public interface ScheduleMapper {
      * @return 저장된 행 수
      */
     int insertScheduleHeader(ScheduleHeaderInsertDTO header);
+    /**
+     * 설명 : 스케줄 헤더 Id를 통해 스케줄 헤더와 회차별 라인을 조회한다.
+     *
+     * @param scheduleHeaderId 스케줄 헤더 ID
+     * @return 스케줄 헤더 1건 및 스케줄 라인 N건
+     * @author hjKang
+     * @since 2026-08-09
+     */
+    ScheduleDetailResponse selectScheduleDetailById(
+            @Param("scheduleHeaderId") Long scheduleHeaderId
+    );
 
     /**
      * 회차별 예상 스케줄 라인을 일괄 저장한다.
+     *
      *
      * @param lines 저장할 스케줄 라인 목록
      * @return 저장된 행 수
