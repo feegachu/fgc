@@ -78,7 +78,7 @@ Thumbs.db
 
 .codex/
 AGENTS.md
-docs/
+docs-other/
 .codex-tmp/
 .codex_tmp/
 .serena/
@@ -90,4 +90,5 @@ uv.lock
 src/fgc/
 .claude/
 CLAUDE.md
+.agents/
 
