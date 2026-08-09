@@ -33,6 +33,11 @@ jobs:
           POSTGRES_USER: fgc
           POSTGRES_PASSWORD: fgc_local_only   # 로컬/CI 전용. 실제 비밀번호가 아님
           TZ: Asia/Seoul
+        # docker-compose.yml은 "5433:5432"인데 여기가 5432인 건 의도된 차이다.
+        # 왼쪽은 호스트 포트일 뿐이고 컨테이너 안 PostgreSQL은 양쪽 다 5432로 뜬다.
+        # 로컬이 5433인 이유는 개발자 PC에 이미 깔린 PostgreSQL(5432)과 겹치지 않게
+        # 비키는 것이고, 러너는 매번 새 VM이라 5432가 비어 있어 피할 이유가 없다.
+        # ⚠️ 이 값을 바꾸면 아래 SPRING_DATASOURCE_URL의 포트도 같이 바꿔야 한다.
         ports:
           - 5432:5432
         options: >-
