@@ -1093,7 +1093,16 @@ EXPECTED_TABLE 환급금 합산 = 금지
 }
 ```
 
-## 38. 지급 건 초안 예시
+## 38. 지급 건 초안 예시 (DB 적재용 입력 사실 — 업무키 기준)
+
+> 아래 §38·§39는 **시드를 적재할 때 필요한 입력 사실**이지 API 요청 본문이 아니다.
+> 시드는 대리키(ID)가 생성되기 전에 작성하므로 `recipientAgentCode`·`commissionItemCode`·
+> `contractNo` 같은 **업무키**로 쓰고, 테이블 단위로 나눠 적재한다.
+>
+> **API 요청 본문은 `IF-API-22`를 따르며 형태가 다르다** — `commissionItemId` 등 대리키를 쓰고
+> 귀속행을 `attributions[]`로 한 요청에 중첩해 보낸다. 둘을 섞어 쓰지 않는다.
+>
+> 귀속금액 합계는 지급액과 같아야 한다: §39 `attributedAmount` 100,000 = §38 `amount` 100,000.
 
 ```json
 {
@@ -1112,7 +1121,10 @@ EXPECTED_TABLE 환급금 합산 = 금지
 }
 ```
 
-## 39. 귀속 예시
+## 39. 귀속 예시 (DB 적재용 입력 사실 — 업무키 기준)
+
+> §38의 지급 건에 `sourceBusinessKey`로 연결한다. API에서는 이 내용이 `IF-API-22` 요청의
+> `attributions[]` 원소로 들어간다.
 
 ```json
 {

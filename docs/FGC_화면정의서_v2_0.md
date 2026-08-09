@@ -412,7 +412,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `cap_check`, `arbitrage_check`, `reconciliation_result`, `vw_journal_imbalance`, `exception_case`, `validation_run`
-- API: `GET /api/dashboard/summary?month=2026-07`
+- API: `GET /api/v1/dashboard/summary?month=2026-07`
 
 **관련 요구사항** FUN-057 / PER-004
 
@@ -445,7 +445,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회
 
-**데이터** API: `GET /api/base/organizations`, `/insurers`, `/products`, `/agents`, `/commission-items`
+**데이터** API: `GET /api/v1/base/organizations`, `/insurers`, `/products`, `/agents`, `/commission-items`
 
 **관련 요구사항** FUN-005 ~ FUN-009
 
@@ -489,7 +489,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회
 
-**데이터** API: `GET /api/policies?type=...&asOf=2026-07-01`
+**데이터** API: `GET /api/v1/policies?type=...&asOf=2026-07-01`
 
 **관련 요구사항** FUN-011, FUN-012, FUN-013 / REG-08·09·10·11·22
 
@@ -532,7 +532,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `insurance_contract`, `insurer`, `product`, `product_offering`, `agent`, `cap_check`
-- API: `GET /api/contracts?page=1&size=20&...`
+- API: `GET /api/v1/contracts?page=1&size=20&...`
 
 **관련 요구사항** FUN-018, FUN-058(2차 확장)
 
@@ -576,7 +576,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회 / 처리 버튼은 `SETTLEMENT`·`GA_ADMIN`
 
-**데이터** API: `GET /api/contracts/{id}`, `GET /api/contracts/{id}/schedules` 등 탭별 분리
+**데이터** API: `GET /api/v1/contracts/{id}`, `GET /api/v1/contracts/{id}/schedules` 등 탭별 분리
 
 **관련 요구사항** FUN-018, FUN-032, FUN-035, FUN-036, FUN-063
 
@@ -627,7 +627,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 **데이터**
 - 쓰기: `insurance_contract` (`data_origin='MANUAL'`)
 - 연쇄: 저장 트랜잭션 안에서 `schedule_header` + `schedule_line` 생성
-- API: `POST /api/contracts`, `PUT /api/contracts/{id}`
+- API: `POST /api/v1/contracts`, `PUT /api/v1/contracts/{id}`
 
 **관련 요구사항** FUN-018, FUN-036, FUN-040
 
@@ -672,7 +672,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회 / `SETTLEMENT`만 등록
 
-**데이터** API: `GET /api/transactions?...`
+**데이터** API: `GET /api/v1/transactions?...`
 
 **관련 요구사항** FUN-065, FUN-031
 
@@ -771,7 +771,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 **데이터**
 - 쓰기: `commission_transaction`, `transaction_attribution`
 - 검증 시 생성: `cap_check`(`check_kind='PRE_CONFIRM'`), `cap_check_detail`, `exception_case`
-- API: `POST /api/transactions` (작성중 저장) / `POST /api/transactions/{id}/confirm` (확정)
+- API: `POST /api/v1/transactions` (작성중 저장) / `POST /api/v1/transactions/{id}/confirm` (확정)
 
 **관련 요구사항** FUN-065, FUN-031, FUN-033, FUN-034 / REG-08·09·11·20·21
 
@@ -814,7 +814,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회
 
-**데이터** API: `GET /api/schedules?...`
+**데이터** API: `GET /api/v1/schedules?...`
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 
@@ -874,7 +874,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `schedule_header`, `schedule_line`, `commission_rule`
-- API: `GET /api/schedules/{id}`, `POST /api/schedules/{id}/regenerate`
+- API: `GET /api/v1/schedules/{id}`, `POST /api/v1/schedules/{id}/regenerate`
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 
@@ -939,7 +939,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `cap_check`, `cap_rule_set`, `insurance_contract`
-- API: `GET /api/cap-checks?month=&stage=&status=`
+- API: `GET /api/v1/cap-checks?month=&stage=&status=`
 
 **관련 요구사항** FUN-030, FUN-032, FUN-034 / REG-08·09·10·23
 
@@ -1075,7 +1075,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `arbitrage_check`, `contract_financial_snapshot`, `refund_rate_table`
-- API: `GET /api/arbitrage-checks?...`, `POST /api/contracts/{id}/arbitrage-check` (수동 검증)
+- API: `GET /api/v1/arbitrage-checks?...`, `POST /api/v1/contracts/{id}/arbitrage-check` (수동 검증)
 
 **관련 요구사항** FUN-063 / REG-12, REG-23
 
@@ -1148,7 +1148,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `journal_header`, `journal_line`, `journal_account`, `vw_journal_imbalance`
-- API: `GET /api/journals?...`, `POST /api/journals/{id}/reverse`
+- API: `GET /api/v1/journals?...`, `POST /api/v1/journals/{id}/reverse`
 
 **관련 요구사항** FUN-046, FUN-047 / SAR-002
 
@@ -1219,7 +1219,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기·쓰기: `reconciliation_run`, `reconciliation_result`, `reconciliation_match`, 뷰 `vw_reconciliation_summary`
-- API: `POST /api/reconciliations`, `GET /api/reconciliations/{id}/results`
+- API: `POST /api/v1/reconciliations`, `GET /api/v1/reconciliations/{id}/results`
 
 **관련 요구사항** FUN-048, FUN-049, FUN-050, FUN-051, FUN-052 / 운영정책서 제36조
 
@@ -1339,7 +1339,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기·쓰기: `exception_case`, `exception_action`
-- API: `GET /api/exceptions?...`, `POST /api/exceptions/{id}/actions`
+- API: `GET /api/v1/exceptions?...`, `POST /api/v1/exceptions/{id}/actions`
 
 **관련 요구사항** FUN-052, FUN-053, FUN-034
 
@@ -1378,7 +1378,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회 / 실행 생성은 `SETTLEMENT`
 
-**데이터** `validation_run` / API: `POST /api/validation-runs`
+**데이터** `validation_run` / API: `POST /api/v1/validation-runs`
 
 **관련 요구사항** FUN-041
 
@@ -1450,7 +1450,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 **데이터**
 - 읽기·쓰기: `validation_run`, `validation_target`
 - 연결: `cap_check`, `arbitrage_check`, `journal_header`, `reconciliation_run`, `exception_case`
-- API: `POST /api/validation-runs/{id}/execute`, `POST /api/validation-runs/{id}/finalize`
+- API: `POST /api/v1/validation-runs/{id}/execute`, `POST /api/v1/validation-runs/{id}/finalize`
 
 **관련 요구사항** FUN-041, FUN-042, FUN-043, FUN-044
 
@@ -1490,7 +1490,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** `COMPLIANCE`, `SYSTEM_ADMIN`
 
-**데이터** `audit_log` / API: `GET /api/audit-logs?...`
+**데이터** `audit_log` / API: `GET /api/v1/audit-logs?...`
 
 **관련 요구사항** FUN-061 / SER-009
 
