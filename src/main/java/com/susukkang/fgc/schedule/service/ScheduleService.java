@@ -1,8 +1,10 @@
 package com.susukkang.fgc.schedule.service;
 
-import com.susukkang.fgc.schedule.dto.ScheduleHeaderListDTO;
+import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,15 +16,13 @@ public class ScheduleService {
 
     private final ScheduleMapper scheduleMapper;
 
-    public List<ScheduleHeaderListDTO> getSchedules(
-            ScheduleSearchCondition condition
-    ) {
-        return scheduleMapper.findScheduleHeaders(condition);
+    public PageResponse<ScheduleHeaderResponse> selectByCondition(
+            @Valid ScheduleSearchCondition condition, int page, int size) {
+        return null;
     }
 
-    public List<Long> generateSchedules(
-            Long contractId
-    ) {
-        return scheduleMapper.findGenerationContext();
-    }
+//    public List<Long> generateSchedules(Long contractId) {
+//        return scheduleMapper.findGenerationContext();
+//    }
+
 }

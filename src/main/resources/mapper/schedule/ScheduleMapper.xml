@@ -6,7 +6,7 @@
 <mapper namespace="com.susukkang.fgc.schedule.mapper.ScheduleMapper">
 
     <resultMap id="scheduleHeaderResultMap"
-               type="com.susukkang.fgc.schedule.dto.ScheduleHeaderListDTO">
+               type="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
 
         <id property="scheduleHeaderId" column="schedule_header_id"/>
 
