@@ -17,10 +17,11 @@ permissions:
   checks: write        # JUnit 리포트를 PR 체크로 생성
 
 jobs:
-  # ⚠️ job id 'build'를 바꾸지 말 것.
-  # 브랜치 보호의 필수 체크 이름이라, 바꾸면 머지가 영영 막힌다.
+  # ⚠️ 이 job의 체크 이름은 'build'이며, 브랜치 보호의 필수 체크로 등록되어 있다.
+  # job id를 바꾸거나 name: 을 새로 붙이면 체크 이름이 따라 바뀌고,
+  # 보호 규칙이 찾는 이름이 사라져 모든 PR의 머지가 영구 차단된다.
+  # (name: 을 지정하면 job id가 아니라 그 name이 체크 이름이 된다.)
   build:
-    name: 정합성 회귀 방지 (PostgreSQL 통합테스트)
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -45,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
