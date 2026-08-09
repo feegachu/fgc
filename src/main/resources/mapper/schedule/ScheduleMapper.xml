@@ -5,84 +5,102 @@
 
 <mapper namespace="com.susukkang.fgc.schedule.mapper.ScheduleMapper">
 
-    <resultMap id="scheduleHeaderResultMap"
-               type="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
-
-        <id property="scheduleHeaderId" column="schedule_header_id"/>
-
-        <result property="contractNo"          column="contract_no"/>
-        <result property="paymentStage"        column="payment_stage"/>
-        <result property="scheduleRegime"      column="schedule_regime"/>
-        <result property="schedulePurpose"     column="schedule_purpose"/>
-        <result property="scheduleVersionNo"   column="schedule_version_no"/>
-        <result property="status"              column="status"/>
-        <result property="activeYn"            column="active_yn"/>
-        <result property="lineCount"            column="line_count"/>
-        <result property="expectedTotal"        column="expected_total"/>
-        <result property="policyVersionId"      column="policy_version_id"/>
-        <result property="policyVersion"        column="policy_version"/>
-    </resultMap>
-
-    <select id="findScheduleHeaders"
-            parameterType="com.susukkang.fgc.schedule.dto.ScheduleSearchCondition"
-            resultMap="scheduleHeaderResultMap">
-
+    <!-- 검색 조건에 해당하는 스케줄 헤더 목록을 조회한다. -->
+    <select id="selectByCondition"
+            resultType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
         SELECT
-        sh.schedule_header_id,
-        c.contract_no,
-        sh.payment_stage,
-        sh.schedule_regime,
-        sh.schedule_purpose,
-        sh.schedule_version_no,
-        sh.status,
-        sh.active_yn,
-        sh.policy_version_id,
-        pv.version_no AS policy_version,
-        COUNT(sl.schedule_line_id) AS line_count,
-        COALESCE(SUM(sl.expected_amount), 0) AS expected_total
-        FROM schedule_header sh
-
-        JOIN insurance_contract c
-        ON c.contract_id = sh.contract_id
-
+            sh.schedule_header_id,
+            c.contract_no,
+            sh.payment_stage,
+            sh.schedule_regime,
+            sh.schedule_purpose,
+            sh.schedule_version_no,
+            sh.status,
+            sh.active_yn,
+            COUNT(sl.schedule_line_id) AS line_count,
+            COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
+            CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label
+        FROM
+            schedule_header sh
+        JOIN
+            insurance_contract c
+                ON c.contract_id = sh.contract_id
         JOIN policy_version pv
-        ON pv.policy_version_id = sh.policy_version_id
-
+                ON pv.policy_version_id = sh.policy_version_id
         LEFT JOIN schedule_line sl
-        ON sl.schedule_header_id = sh.schedule_header_id
-
+                ON sl.schedule_header_id = sh.schedule_header_id
         <where>
-            sh.active_yn = TRUE
-
-            <if test="contractNo != null and contractNo != ''">
-                AND c.contract_no LIKE CONCAT('%', #{contractNo}, '%')
+            <if test="condition.contractNo != null
+                      and condition.contractNo != ''">
+                AND c.contract_no
+                LIKE CONCAT('%', #{condition.contractNo}, '%')
             </if>
 
-            <if test="paymentStage != null">
-                AND sh.payment_stage = #{paymentStage}
+            <if test="condition.paymentStage != null
+                      and condition.paymentStage != ''">
+                AND sh.payment_stage = #{condition.paymentStage}
             </if>
 
-            <if test="scheduleRegime != null">
-                AND sh.schedule_regime = #{scheduleRegime}
+            <if test="condition.scheduleRegime != null">
+                AND sh.schedule_regime = #{condition.scheduleRegime}
             </if>
 
-            <if test="schedulePurpose != null">
-                AND sh.schedule_purpose = #{schedulePurpose}
+            <if test="condition.schedulePurpose != null
+                      and condition.schedulePurpose != ''">
+                AND sh.schedule_purpose = #{condition.schedulePurpose}
             </if>
 
-            <if test="status != null">
-                AND sh.status = #{status}
+            <if test="condition.status != null
+                      and condition.status != ''">
+                AND sh.status = #{condition.status}
             </if>
         </where>
-
         GROUP BY
-        sh.schedule_header_id,
-        c.contract_no,
-        pv.version_no
+            sh.schedule_header_id,
+            c.contract_no,
+            pv.policy_code,
+            pv.version_no
+        ORDER BY sh.schedule_header_id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
 
-        ORDER BY
-        c.contract_no,
-        sh.payment_stage
+    <!-- 검색 조건에 해당하는 스케줄 헤더의 전체 건수를 조회한다. -->
+    <select id="countByCondition"
+            resultType="long">
+        SELECT
+            COUNT(*)
+        FROM
+            schedule_header sh
+        JOIN
+            insurance_contract c
+                ON c.contract_id = sh.contract_id
+        <where>
+            <if test="condition.contractNo != null
+                      and condition.contractNo != ''">
+                AND c.contract_no
+                LIKE CONCAT('%', #{condition.contractNo}, '%')
+            </if>
+
+            <if test="condition.paymentStage != null
+                      and condition.paymentStage != ''">
+                AND sh.payment_stage = #{condition.paymentStage}
+            </if>
+
+            <if test="condition.scheduleRegime != null">
+                AND sh.schedule_regime = #{condition.scheduleRegime}
+            </if>
+
+            <if test="condition.schedulePurpose != null
+                      and condition.schedulePurpose != ''">
+                AND sh.schedule_purpose = #{condition.schedulePurpose}
+            </if>
+
+            <if test="condition.status != null
+                      and condition.status != ''">
+                AND sh.status = #{condition.status}
+            </if>
+        </where>
     </select>
 
 </mapper>

@@ -17,7 +17,6 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleSearchCondition {
-
     private String contractNo; // 계약 번호
     private String paymentStage; // 지급 단계
     private ScheduleRegime scheduleRegime; // 적용 체계

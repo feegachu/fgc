@@ -20,9 +20,8 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleHeaderResponse {
-
     private Long scheduleHeaderId; // 스케줄 헤더 ID
-    private String contractNo; // 계약 번호
+    private String contractId; // 계약 Id
     private PaymentStage paymentStage; // 지급 단계
     private String scheduleRegime; // 적용 체계
     private String schedulePurpose; // 스케줄 용도
@@ -31,6 +30,5 @@ public class ScheduleHeaderResponse {
     private Boolean activeYn; // 현재 사용 여부
     private Integer lineCount; // 전체 회차 수
     private BigDecimal expectedTotal; // 예상 총액
-    private Long policyVersionId; // 정책 버전 ID
-    private String policyVersion; // 정책 버전 표시명
+    private String policyVersionLabel; // 정책 버전 표시값
 }

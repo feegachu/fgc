@@ -7,13 +7,15 @@ import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/v1/schedules")
 public class ScheduleController {
 
-    ScheduleService scheduleService;
+    private final ScheduleService scheduleService;
     /**
      * 설명 : 검색 조건에 따라 스케줄을 조회한다
      *

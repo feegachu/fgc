@@ -50,7 +50,6 @@ public class ContractController {
      * @author hjKang
      * @since 2026-08-05
      */
-
     @PostMapping
     @PreAuthorize("hasRole('SETTLEMENT')")
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
