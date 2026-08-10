@@ -78,7 +78,10 @@ Thumbs.db
 
 .codex/
 AGENTS.md
-docs/
+# 로컬 문서 보관소에는 회의록·원수사 자료 등이 섞여 있으므로 기본적으로 차단한다.
+# 이 PR에서 공개 기준 문서로 이미 추적한 파일은 ignore 규칙과 관계없이 계속 관리된다.
+docs/*/
+docs-other/
 .codex-tmp/
 .codex_tmp/
 .serena/
@@ -90,4 +93,5 @@ uv.lock
 src/fgc/
 .claude/
 CLAUDE.md
+.agents/
 
