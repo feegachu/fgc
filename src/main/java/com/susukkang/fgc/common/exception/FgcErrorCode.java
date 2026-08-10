@@ -83,6 +83,16 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.validationRun.finalizedImmutable"
     ),
+    VRUN_004(
+            "FGC-VRUN-004",
+            HttpStatus.CONFLICT,
+            "error.validationRun.invalidTransition"
+    ),
+    VRUN_005(
+            "FGC-VRUN-005",
+            HttpStatus.CONFLICT,
+            "error.validationRun.stateConflict"
+    ),
 
     LEDG_001(
             "FGC-LEDG-001",

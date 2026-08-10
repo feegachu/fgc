@@ -5,6 +5,10 @@
 
 > 보험 판매수수료 규제 대응 · 분급 · 환수 · 정산 검증 플랫폼
 
+[![정합성 회귀 방지](https://img.shields.io/github/actions/workflow/status/feegachu/fgc/ci.yml?branch=develop&label=%EC%A0%95%ED%95%A9%EC%84%B1%20%ED%9A%8C%EA%B7%80%20%EB%B0%A9%EC%A7%80&logo=github)](https://github.com/feegachu/fgc/actions/workflows/ci.yml)
+![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 
 ---
 
@@ -26,6 +30,48 @@
 
 > 기존 엑셀이나 노후 전산망으로는 감당하기 불가능한 수백만 건의 분급 스케줄을 처리하고 설계사별 한도를 실시간으로 합산·검증합니다. 이를 통해 수수료 정산의 인건비를 절감하고, 환수 누락액 및 규제 위반 리스크를 원천 차단합니다.
 
+
+<br>
+
+## 🔒 정합성 보증
+
+수수료 계산은 틀리면 안 되는 코드입니다. 그래서 **정합성을 사람의 주의력이 아니라 CI로 강제**합니다.
+
+`develop`·`main`을 대상으로 하는 모든 PR에서 실제 PostgreSQL 17(로컬 `docker-compose`와 동일 버전)을
+띄워 통합테스트를 실행하며, **하나라도 깨지면 머지가 차단**됩니다.
+
+`develop`에는 브랜치 보호가 적용되어 있어 `build` 체크 통과와 리뷰 승인 1인이 **필수**입니다.
+확인: `gh api repos/feegachu/fgc/branches/develop/protection`
+
+| 보장 | 근거 |
+|---|---|
+| H2 등 대체 DB 없이 실제 PostgreSQL로 검증 | `FGC-TER-004` |
+| 로컬과 CI가 같은 DB 버전(`postgres:17`)을 사용 | `FGC-ECR-003` |
+| `db/migration`·`db/demo` 간 Flyway 버전 중복 시 즉시 실패 | PR #30 재발 방지 |
+| 보호 브랜치 + 리뷰 승인 1인 필수 | `FGC-ECR-004` · `FGC-QUR-004` |
+| 의존성 취약점 탐지·자동 수정 PR (Dependabot) | `FGC-SER-010` |
+
+깨진 테스트는 PR의 **"테스트 결과"** 체크에서 어느 테스트가 왜 실패했는지 바로 확인할 수 있습니다.
+같은 저장소의 브랜치 PR은 CI가 직접 게시하고, 읽기 전용 토큰을 쓰는 Dependabot·외부 fork PR은
+JUnit XML을 넘겨받은 별도 `workflow_run`이 동일 커밋에 게시합니다.
+
+### 취약점 검사 범위
+
+`FGC-SER-010`에 대한 실제 적용 범위입니다. `.github/dependabot.yml`은 **버전 업데이트 주기만** 정하고,
+취약점 탐지 자체는 저장소 보안 설정과 해석된 Gradle 의존성 그래프 제출이 모두 필요하므로 나눠서 적습니다.
+
+| 항목 | 상태 | 관리 위치 |
+|---|---|---|
+| Gradle 의존성 버전 업데이트 | 주 1회 | `.github/dependabot.yml` |
+| GitHub Actions 버전 업데이트 | 월 1회 | `.github/dependabot.yml` |
+| Gradle 의존성 그래프 제출 | `develop` push마다 | `.github/workflows/dependency-submission.yml` |
+| Dependabot alerts (CVE 탐지) | 활성 | Settings → Code security |
+| Dependabot security updates (자동 수정 PR) | 활성 | Settings → Code security |
+| 컨테이너 이미지 스캔 | **2차** (`FGC-ECR-005`) | — |
+
+이미지 스캔이 1차에 없는 이유: FGC는 Dockerfile이 없어 자체 빌드 이미지가 없고,
+CI의 `postgres:17`은 테스트용 업스트림 공식 이미지입니다. 이미지 빌드·배포가 도입되는
+`FGC-ECR-005`(2차) 시점에 스캐너를 함께 넣습니다.
 
 <br>
 
