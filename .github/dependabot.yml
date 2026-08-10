@@ -20,7 +20,6 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    labels: [dependencies]
     # 일반 버전 업데이트는 minor/patch만 한 PR로 묶는다.
     # 메이저 업그레이드는 호환성·마이그레이션 검토가 필요한 별도 작업으로 진행한다.
     groups:
@@ -35,7 +34,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    labels: [dependencies]
     # SHA 고정은 유지하면서 같은 메이저 안의 업데이트만 한 PR로 받는다.
     groups:
       github-actions-minor-patch:
