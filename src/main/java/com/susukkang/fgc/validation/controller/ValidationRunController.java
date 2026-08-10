@@ -102,7 +102,7 @@ public class ValidationRunController {
     }
 
     @Operation(
-            summary = "월 통합검증 실행 목록 조회 (#41)",
+            summary = "월 통합검증 실행 목록 조회",
             description = "검증월·상태로 검색하고, 실행/확정/실패/진행 단계 정보를 페이징된 목록으로 돌려준다. "
                     + "인증된 전체 사용자(SYSTEM_ADMIN, GA_ADMIN, SETTLEMENT, COMPLIANCE)가 조회할 수 있다."
     )
