@@ -1,0 +1,41 @@
+name: Publish Test Report
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+# 이 workflow는 기본 브랜치의 코드로 실행된다. PR 코드를 checkout하거나 실행하지 않고
+# CI가 만든 JUnit XML만 읽어 read-only PR에도 체크 결과를 게시한다.
+permissions:
+  actions: read
+  checks: write
+  contents: read
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion != 'cancelled' && (github.event.workflow_run.actor.login == 'dependabot[bot]' || github.event.workflow_run.head_repository.full_name != github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Download JUnit XML
+        id: download
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: junit-test-results
+          path: junit-results
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      # 컴파일 단계에서 실패해 XML이 생성되지 않은 경우 build 체크만 실패 상태로 남는다.
+      - name: Publish test report
+        if: ${{ steps.download.outcome == 'success' }}
+        uses: mikepenz/action-junit-report@v6
+        with:
+          commit: ${{ github.event.workflow_run.head_sha }}
+          report_paths: 'junit-results/**/TEST-*.xml'
+          check_name: 테스트 결과
+          detailed_summary: true

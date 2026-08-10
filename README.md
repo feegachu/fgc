@@ -52,16 +52,19 @@
 | 의존성 취약점 탐지·자동 수정 PR (Dependabot) | `FGC-SER-010` |
 
 깨진 테스트는 PR의 **"테스트 결과"** 체크에서 어느 테스트가 왜 실패했는지 바로 확인할 수 있습니다.
+같은 저장소의 브랜치 PR은 CI가 직접 게시하고, 읽기 전용 토큰을 쓰는 Dependabot·외부 fork PR은
+JUnit XML을 넘겨받은 별도 `workflow_run`이 동일 커밋에 게시합니다.
 
 ### 취약점 검사 범위
 
 `FGC-SER-010`에 대한 실제 적용 범위입니다. `.github/dependabot.yml`은 **버전 업데이트 주기만** 정하고,
-취약점 탐지 자체는 저장소 보안 설정이라 나눠서 적습니다.
+취약점 탐지 자체는 저장소 보안 설정과 해석된 Gradle 의존성 그래프 제출이 모두 필요하므로 나눠서 적습니다.
 
 | 항목 | 상태 | 관리 위치 |
 |---|---|---|
 | Gradle 의존성 버전 업데이트 | 주 1회 | `.github/dependabot.yml` |
 | GitHub Actions 버전 업데이트 | 월 1회 | `.github/dependabot.yml` |
+| Gradle 의존성 그래프 제출 | `develop` push마다 | `.github/workflows/dependency-submission.yml` |
 | Dependabot alerts (CVE 탐지) | 활성 | Settings → Code security |
 | Dependabot security updates (자동 수정 PR) | 활성 | Settings → Code security |
 | 컨테이너 이미지 스캔 | **2차** (`FGC-ECR-005`) | — |

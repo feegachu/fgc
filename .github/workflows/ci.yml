@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Java 21
         uses: actions/setup-java@v5
@@ -57,7 +57,8 @@ jobs:
           distribution: 'temurin'
 
       - name: Set up Gradle (의존성·빌드 캐시)
-        uses: gradle/actions/setup-gradle@v4
+        # v6는 캐시 컴포넌트의 별도 이용약관 검토가 필요해 Node 24 기반 최신 v5를 사용한다.
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Build and test
         env:
@@ -71,22 +72,37 @@ jobs:
           SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
         run: ./gradlew build
 
-      # 알려진 한계: 외부 fork에서 온 PR은 checks: write 를 선언해도 GITHUB_TOKEN이
-      # 읽기 전용이라 "테스트 결과" 체크가 생성되지 않는다(이 액션은 warning으로 넘어간다).
-      # 필수 체크인 build 자체는 정상 보고되므로 머지가 막히지는 않고, 테스트 상세만
-      # 안 보인다. 그때는 아래 아티팩트로 확인한다.
-      # 현재 팀은 같은 저장소의 브랜치로 PR을 올리므로 실제로 발생하지 않는다.
-      # fork 기여가 상시화되면 workflow_run으로 분리한다.
-      - name: Publish test report (PR 체크로 노출)
-        uses: mikepenz/action-junit-report@v5
+      # Dependabot/fork PR의 토큰은 read-only이므로, 권한 있는 별도 workflow_run이
+      # 이 아티팩트를 읽어 동일 커밋에 "테스트 결과" 체크를 게시한다.
+      - name: Upload JUnit XML
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
+        with:
+          name: junit-test-results
+          path: '**/build/test-results/test/TEST-*.xml'
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Publish test report (쓰기 가능한 실행)
+        uses: mikepenz/action-junit-report@v6
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || (github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)) }}
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_name: 테스트 결과
           detailed_summary: true
 
+      # Dependabot/fork PR에서도 현재 job summary와 로그 annotation은 즉시 남긴다.
+      # 별도 체크 게시 자체는 test-report.yml의 workflow_run이 담당한다.
+      - name: Annotate test report (Dependabot/fork PR)
+        uses: mikepenz/action-junit-report@v6
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.actor == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository) }}
+        with:
+          report_paths: '**/build/test-results/test/TEST-*.xml'
+          annotate_only: true
+          detailed_summary: true
+
       - name: Upload HTML test report (실패 분석용)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: test-report
