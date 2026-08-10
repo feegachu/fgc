@@ -79,7 +79,7 @@ class CapCheckControllerTest {
                 PageResponse.of(List.of(sampleListRow(CapResultStatus.NORMAL)), 1, 20, 1, "asOfDate,desc"));
         given(capCheckService.search(any(), anyInt(), anyInt())).willReturn(searchResult);
 
-        mockMvc.perform(get("/api/v1/cap/checks").with(user("settle01").roles("SETTLEMENT")))
+        mockMvc.perform(get("/api/v1/cap-checks").with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.summary.normal").value(3))
                 .andExpect(jsonPath("$.data.summary.violation").value(1))
@@ -94,7 +94,7 @@ class CapCheckControllerTest {
 
     @Test
     void searchRequiresAuthentication() throws Exception {
-        mockMvc.perform(get("/api/v1/cap/checks")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/cap-checks")).andExpect(status().isUnauthorized());
     }
 
     // page/size 범위 검증은 CapCheckServiceImpl이 담당하지만(단위테스트에서 직접 검증),
@@ -105,7 +105,7 @@ class CapCheckControllerTest {
                 .willThrow(new FgcBusinessException(FgcErrorCode.COMMON_002, "page",
                         java.util.Map.of("field", "page"), null));
 
-        mockMvc.perform(get("/api/v1/cap/checks").param("page", "0")
+        mockMvc.perform(get("/api/v1/cap-checks").param("page", "0")
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
@@ -130,7 +130,7 @@ class CapCheckControllerTest {
     void findDetailReturnsNestedCapCheckDetailsAndCalculationSnapshot() throws Exception {
         given(capCheckService.findDetail(999L)).willReturn(Optional.of(sampleBasisResponse()));
 
-        mockMvc.perform(get("/api/v1/cap/checks/999/details").with(user("settle01").roles("SETTLEMENT")))
+        mockMvc.perform(get("/api/v1/cap-checks/999/details").with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.capCheck.capCheckId").value(999))
                 .andExpect(jsonPath("$.data.capCheck.contractNo").value("C001"))
@@ -149,13 +149,13 @@ class CapCheckControllerTest {
     void findDetailReturns404WhenCapCheckIdDoesNotExist() throws Exception {
         given(capCheckService.findDetail(999L)).willReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/cap/checks/999/details").with(user("settle01").roles("SETTLEMENT")))
+        mockMvc.perform(get("/api/v1/cap-checks/999/details").with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("FGC-COMMON-004"));
     }
 
     @Test
     void findDetailRequiresAuthentication() throws Exception {
-        mockMvc.perform(get("/api/v1/cap/checks/999/details")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/cap-checks/999/details")).andExpect(status().isUnauthorized());
     }
 }
