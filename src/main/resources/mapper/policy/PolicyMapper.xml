@@ -6,7 +6,6 @@
 <mapper namespace="com.susukkang.fgc.policy.mapper.PolicyMapper">
 
     <!-- 적용 가능한 수수료 정책 매핑 -->
-    <!-- ResolvedCommissionPolicy <-> DB snake_case column -->
     <resultMap id="resolvedCommissionPolicyResultMap"
                type="com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy">
         <id property="policyVersionId" column="policy_version_id"/>
@@ -17,7 +16,6 @@
 
 
     <!-- 적용 가능한 수수료 규칙 매핑 -->
-    <!-- ResolvedCommissionRule <-> commission_rule -->
     <resultMap id="resolvedCommissionRuleResultMap"
                type="com.susukkang.fgc.policy.dto.ResolvedCommissionRule">
         <id property="commissionRuleId" column="commission_rule_id"/>
@@ -39,8 +37,7 @@
     </resultMap>
 
 
-    <!--계약일, 상품 판매버전, 보험회사, 수수료체계 및 지급 단계를 기준으로
-        현재 적용 가능한 ACTIVE 현행 수수료 정책을 가져온다.-->
+    <!-- 계약 조건과 지급 단계를 기준으로 적용 가능한 ACTIVE 현행 수수료 정책을 조회한다. -->
     <select id="findApplicableCurrentCommissionPolicies"
             resultMap="resolvedCommissionPolicyResultMap">
 
@@ -61,13 +58,10 @@
             pv.policy_type = 'CURRENT_COMMISSION'
         AND
             pv.status = 'ACTIVE'
-        <!-- <=를 그냥 쓰면 XML 태그시작 <과 헷갈리기 때문에 CDATA로 감싸서 일반 문자열로 처리함 -->
-        <!-- 계약 성립일이 정책 결정일 안에 있는지 -->
         AND
             pv.effective_from <![CDATA[ <= ]]> c.contract_date
         AND
             (pv.effective_to IS NULL OR pv.effective_to <![CDATA[ >= ]]> c.contract_date)
-        <!-- 정책 버전 code가 범용 (NULL) 이거나 상품 정책 regime_code 과 일치하는지 -->
         AND
             (pv.fee_regime_code IS NULL OR pv.fee_regime_code = po.fee_regime_code)
         AND
@@ -79,7 +73,7 @@
         AND
             (po.sales_end_date IS NULL OR po.sales_end_date <![CDATA[ >= ]]> c.contract_date)
 
-        <!-- 해당 정책을 적용 중인 수수료 규칙이 있는지 확인. -->
+        <!-- 해당 지급단계에서 계약 조건과 일치하는 규칙을 가진 정책만 선택한다. -->
         AND EXISTS (
             SELECT 1
         FROM

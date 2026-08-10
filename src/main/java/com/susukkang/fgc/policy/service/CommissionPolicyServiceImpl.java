@@ -41,16 +41,12 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
      * @return 적용된 정책 버전과 수수료 규칙 목록
      */
     @Override
-    public ResolvedCommissionPolicy resolveCurrentCommission(Long contractId, PaymentStage paymentStage ) {
-        //입력 파라미터 검증 , 계약 ID , INS->GA or GA->FC가 아닌지 체크
+    public ResolvedCommissionPolicy resolveCurrentCommission(Long contractId, PaymentStage paymentStage) {
         validateQueryCondition(contractId, paymentStage);
 
         List<ResolvedCommissionPolicy> policies =
                 policyMapper.findApplicableCurrentCommissionPolicies(contractId, paymentStage);
-        //정책 검증
-        //조회 결과 0건 → 적용 정책 없음
-        //조회 결과 1건 → 정상
-        //조회 결과 2건 이상 → 중복 활성 정책 오류
+
         if (policies == null || policies.isEmpty()) {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_002,
@@ -77,7 +73,6 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     "계약에 적용 가능한 현행 수수료 정책이 여러 건 존재합니다."
             );
         }
-        //List에 하나 남은 정책을 가져와서 policy에 주입
         ResolvedCommissionPolicy policy = policies.getFirst();
 
         List<ResolvedCommissionRule> rules =
@@ -98,8 +93,6 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     "정책에 적용 가능한 수수료 규칙이 없습니다."
             );
         }
-
-
         List<ResolvedCommissionRule> resolvedRules =
                 resolveApplicableRules(rules, policy.getPolicyVersionId());
 
@@ -112,7 +105,8 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                 .build();
     }
     /**
-     * 가져온 여러 RuleSet들 중 비슷한 유형끼리 그룹화를 하고
+     * 후보 규칙을 수수료 항목, 지급 대상 직급 및 회차별로 그룹화하고
+     * 각 그룹에서 구체성과 우선순위에 따라 최종 규칙을 선택한다.
      *
      * @param candidateRules 계약 조건에 맞는 후보 수수료 규칙
      * @param policyVersionId 정책 버전 ID
@@ -126,18 +120,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
     ) {
         Map<RuleKey, List<ResolvedCommissionRule>> rulesByKey = new HashMap<>();
 
-        /*
-         * 모든 룰셋을 수수료 항목, 지급 대상 직급 및 회차별 RuleKey로 그룹화한다.
-         *
-         * 룰 A → RuleKey(기본수수료, FC, 1)
-         * 룰 B → RuleKey(기본수수료, FC, 1)
-         * 룰 C → RuleKey(관리수수료, SM, 1)
-         * 룰 D → RuleKey(기본수수료, FC, 2)
-         *
-         * 결과: {A, B}, {C}, {D}
-         */
         for (ResolvedCommissionRule rule : candidateRules) {
-            // 룰셋 유효성 검증
             validateCandidateRule(rule, policyVersionId);
 
             for (int installmentNo = rule.getInstallmentFrom();
@@ -153,15 +136,18 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                         rule.getAgentRankCode(),
                         installmentNo
                 );
-                // 동일한 업무키의 규칙 목록이 없으면 새 목록을 생성한 후 현재 규칙을 추가
                 rulesByKey.computeIfAbsent(key, ignored -> new ArrayList<>())
                         .add(installmentRule);
             }
         }
-        //
+
         List<ResolvedCommissionRule> resolvedRules = new ArrayList<>();
         for (Map.Entry<RuleKey, List<ResolvedCommissionRule>> entry : rulesByKey.entrySet()) {
-            resolvedRules.add(selectMostApplicableRule(entry.getKey(), entry.getValue(), policyVersionId ));
+            resolvedRules.add(selectMostApplicableRule(
+                    entry.getKey(),
+                    entry.getValue(),
+                    policyVersionId
+            ));
         }
 
         resolvedRules.sort(
@@ -179,12 +165,13 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
     }
     /** 수수료 항목, 지급 대상 직급 및 회차로 구성된 최종 규칙 선택 키. */
     private record RuleKey(
-            Long commissionItemId,       //수수료 항목 ID
-            AgentRankCode agentRankCode, //지급 대상 직급
-            int installmentNo            //지급 회차
-    ) { }
+            Long commissionItemId,
+            AgentRankCode agentRankCode,
+            int installmentNo
+    ) {
+    }
 
-    /** 그룹 안에서 구체성(보험사,상품,조직 이 얼마나 명확한지)이 가장 높고 priorityNo가 가장 작은 규칙을 선택한다. */
+    /** 그룹 안에서 구체성이 가장 높고 priorityNo가 가장 작은 규칙을 선택한다. */
     private ResolvedCommissionRule selectMostApplicableRule(
             RuleKey key,
             List<ResolvedCommissionRule> candidates,
@@ -239,7 +226,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
         return specificity;
     }
 
-    /** 룰셋 컬럼값 이상 여부 검증. */
+    /** 최종 규칙 선택에 필요한 필수값과 회차 범위를 검증한다. */
     private void validateCandidateRule(
             ResolvedCommissionRule rule,
             Long policyVersionId
@@ -263,9 +250,6 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
             );
         }
     }
-
-
-
     /**
      * 설명 : 현행 수수료 정책 조회에 필요한 계약 ID와 지급 단계를 검증한다.
      *
