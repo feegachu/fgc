@@ -31,7 +31,9 @@ dependencies {
 
     // DB / MyBatis
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
-    runtimeOnly 'org.postgresql:postgresql'
+    // ConstraintErrorCodeResolver가 PSQLException에서 위반된 제약 이름을 직접 읽어야 해서
+    // runtimeOnly로는 컴파일이 안 된다.
+    implementation 'org.postgresql:postgresql'
 
     // Flyway
     implementation 'org.flywaydb:flyway-core'
