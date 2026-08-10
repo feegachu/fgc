@@ -95,16 +95,18 @@ class ValidationRunStepProgressListenerTest {
     }
 
     @Test
-    void recordsCreationFailureAuditWhenInitialStepFailsBeforeRunIsCreated() {
+    // FGC-FUN-061: validation_run 생성 전 실패도 JobExecution ID로 감사 추적한다.
+    void recordsCreationFailureAuditWithJobExecutionIdWhenInitialStepFailsBeforeRunIsCreated() {
         ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(1, true, lifecycleService, auditService);
         JobExecution jobExecution = new JobExecution(new JobInstance(7L, "MonthlyValidationJob"), validJobParameters());
+        jobExecution.setId(42L);
         StepExecution stepExecution = new StepExecution("createRunStep", jobExecution);
         stepExecution.setStatus(BatchStatus.FAILED);
         stepExecution.addFailureException(new RuntimeException("duplicate monthly run"));
 
         listener.afterStep(stepExecution);
 
-        verify(auditService).recordRunCreationFailed(org.mockito.ArgumentMatchers.eq(jobExecution.getId()),
+        verify(auditService).recordRunCreationFailed(org.mockito.ArgumentMatchers.eq(42L),
                 org.mockito.ArgumentMatchers.eq(parameters()), contains("duplicate monthly run"));
     }
 
