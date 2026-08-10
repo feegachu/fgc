@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.validation.mapper.ValidationRunMapper">
+
+    <select id="findById" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
+        SELECT validation_run_id AS validationRunId,
+               validation_month  AS validationMonth,
+               run_no            AS runNo,
+               run_type          AS runType,
+               status,
+               started_at        AS startedAt,
+               completed_at      AS completedAt,
+               finalized_at      AS finalizedAt,
+               triggered_by      AS triggeredBy,
+               finalized_by      AS finalizedBy,
+               failure_message   AS failureMessage,
+               created_at        AS createdAt
+          FROM fgc.validation_run
+         WHERE validation_run_id = #{validationRunId}
+    </select>
+
+    <!--
+      validation_run_id만 걸면 동시에 두 요청이
+      같은 실행을 서로 다른 상태로 밀 때 나중 것이 먼저 것을 덮어써 버린다(lost update)
+      실제 상태 검증(허용된 전이인지)은 이 SQL이 아니라 Java 쪽(ValidationRunStatus.canTransitionTo) 책임
+    -->
+    <update id="updateStatusIfCurrent">
+        UPDATE fgc.validation_run
+           SET status = #{newStatus}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = #{expectedStatus}
+    </update>
+
+    <select id="findNextRunNo" resultType="int">
+        SELECT COALESCE(MAX(run_no), 0) + 1
+          FROM fgc.validation_run
+         WHERE validation_month = #{validationMonth}
+    </select>
+
+    <select id="existsActiveMonthlyRun" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.validation_run
+             WHERE validation_month = #{validationMonth}
+               AND run_type = 'MONTHLY'
+               AND status IN ('CREATED', 'RUNNING')
+        )
+    </select>
+
+    <!-- policySnapshotJson이 null이면 컬럼 기본값('{}'::jsonb)이 아니라 COALESCE가 대신
+         '{}'를 넣는다 — INSERT 문에 컬럼을 아예 안 쓰는 것과 값으로 null을 보내는 건 다르다
+         (null을 보내면 NOT NULL 제약에 걸린다). CapCheckMapper#insertCapCheck와 같은 방식. -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="validationRunId" keyColumn="validation_run_id">
+        INSERT INTO fgc.validation_run (validation_month, run_no, run_type, triggered_by, policy_snapshot)
+        VALUES (#{validationMonth}, #{runNo}, #{runType}, #{triggeredBy}, COALESCE(#{policySnapshotJson}, '{}')::jsonb)
+    </insert>
+
+
+</mapper>
