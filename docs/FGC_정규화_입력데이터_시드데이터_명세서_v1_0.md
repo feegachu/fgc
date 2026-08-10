@@ -15,7 +15,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 > **어떤 데이터가 어떤 형태로 DB에 미리 존재해야 하는지**,  
 > **어떤 합성 시나리오로 계산결과를 검증해야 하는지**를 확정한다.
 
-> **정합성 기준:** 규제 기대값은 `FGC 규제 근거·조문표 v0.2.1`의 REG-01~24를 따르고, 컬럼·제약·적재순서는 `src/main/resources/db/migration/` V1~V7을 모두 적용한 v2.1.7을 따른다. `db/demo`의 현재 데이터는 아래 전체 GOLDEN 목표의 축소 fixture다.
+> **정합성 기준:** 규제 기대값은 `FGC 규제 근거·조문표 v0.2.1`의 REG-01~24를 따르고, 컬럼·제약·적재순서는 `src/main/resources/db/migration/` V1~V7을 모두 적용한 v2.1.7을 따른다. SRC 정의는 07_규제조문표_v0.2.1.md §11을 따른다. `db/demo`의 현재 데이터는 아래 전체 GOLDEN 목표의 축소 fixture다.
 
 ---
 
@@ -335,7 +335,10 @@ prior_three_year_experience_yn = false  # 모집 이력 기준의 파생값
 experience_checked_on = 2026-06-30
 newcomer_support_eligible_yn = true
 newcomer_support_end_date = 2027-06-30
-evidence_ref = SYNTHETIC:REG-21:A-FC-003
+evidence_ref = SYNTHETIC:REG-21:A-FC-003 registration_scheduled_date
+history_window_start_date = registration_scheduled_date - 3 years
+history_window_end_date = registration_scheduled_date - 1 day
+newcomer_support_end_date = registration_scheduled_date + 1 year - 1 day
 ```
 
 `agent_history`에는 위 등록·모집 이력의 발생일·종료일·확인일·출처참조를 각각 저장한다. 이력 원천이 없거나 두 이력을 구분할 수 없으면 `newcomer_support_eligible_yn`을 확정하지 않고 `REVIEW_REQUIRED`로 둔다. (`REG-21`, `SRC-025`)
@@ -349,7 +352,10 @@ prior_three_year_registration_history_count = 1
 prior_three_year_recruitment_history_count = 1
 prior_three_year_experience_yn = true
 newcomer_support_eligible_yn = false
-evidence_ref = SYNTHETIC:REG-21:A-FC-002
+evidence_ref = SYNTHETIC:REG-21:A-FC-002 registration_scheduled_date
+history_window_start_date = registration_scheduled_date - 3 years
+history_window_end_date = registration_scheduled_date - 1 day
+newcomer_support_end_date = registration_scheduled_date + 1 year - 1 day
 ```
 
 ## 9. 원수사 설계사코드
@@ -520,7 +526,7 @@ warning_usage_pct = 90
 | ADJUSTMENT | 정책에 따라 | DIRECT |
 | CLAWBACK | 차감 | DIRECT |
 
-신인활동지원비를 `EXCLUDED`로 넣는 시드는 직전 3년의 등록·모집 이력을 구분한 조회결과, 최근 등록일, 지원근거 `evidence_ref`를 반드시 가진다. 두 이력 중 하나라도 확인할 수 없으면 `REVIEW_REQUIRED`다. (`REG-21`, `SRC-022`, `SRC-025`)
+신인활동지원비를 `EXCLUDED`로 넣는 시드는 직전 3년의 등록·모집 이력을 구분한 조회결과, 최근 등록일, 등록예정일과 조회기간 시작·종료일, 지원근거 `evidence_ref`를 반드시 가진다. 두 이력 중 하나라도 확인할 수 없으면 `REVIEW_REQUIRED`다. (`REG-21`, `SRC-022`, `SRC-025`)
 
 각 `cap_rule_item`은 실행 가능한 시드에서 `decision_reason`을 반드시 저장한다. `EXCLUDED`이면 `exclusion_type`과 `evidence_required_yn=true`, `APPROVED_ALLOCATION`이면 `allocation_policy_id`가 필수다. REG-11의 허용 제외유형은 녹취, 방송송출, 적격 신인활동지원으로 구분하고, REG-10 준법경영비는 GA→설계사 제외유형으로 재사용하지 않는다.
 
@@ -1380,6 +1386,8 @@ REG-17·18·24처럼 FGC가 외부 의무 전체를 구현하지 않는 영역�
 - [ ] `contract_status_event.processed_at` 신규값 0건, Job별 처리이력은 별도 테이블에 존재
 - [ ] `cap_check_detail` 항목코드·항목명·조건부 회차 스냅샷 누락 0건
 - [ ] REG-17·18·24 메타데이터/범위 밖 기능을 규제 완료로 표시한 테스트 0건
+- [ ] 등록·모집 이력이 누락되거나 구분되지 않은 신인 판정은
+      `REVIEW_REQUIRED`이며 적격 여부가 확정되지 않음
 
 # 부록 B. 참고자료
 
