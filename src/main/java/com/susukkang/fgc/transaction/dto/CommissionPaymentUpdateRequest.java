@@ -1,18 +1,19 @@
 package com.susukkang.fgc.transaction.dto;
 
-import com.susukkang.fgc.common.code.AttributionMethod;
-import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
 
 /**
  * 설명 : 수수료 지급 건 수정 요청
@@ -30,13 +31,8 @@ public record CommissionPaymentUpdateRequest(
         @NotNull YearMonth attributionMonth,
         @NotNull LocalDate scheduledPaymentDate,
         @NotNull PaymentStage paymentStage,
-        Long attributedContractId,
-        @NotNull InclusionDecisionStatus inclusionDecisionStatus,
-        @NotBlank @Size(max = 1000) String inclusionDecisionReason,
         Long allocationPolicyVersion,
-        @Size(max = 200) String allocationBasis,
-        @Size(max = 500) String evidenceRef,
-        @NotNull AttributionMethod attributionMethod,
+        @NotEmpty List<@Valid CommissionPaymentAttributionRequest> attributions,
         @Size(max = 1000) String note
 ) {
 }

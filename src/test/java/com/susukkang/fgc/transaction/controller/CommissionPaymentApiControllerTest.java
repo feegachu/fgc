@@ -3,6 +3,7 @@ package com.susukkang.fgc.transaction.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
+import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.config.SecurityConfig;
@@ -10,6 +11,7 @@ import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionResponse;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -70,7 +73,7 @@ class CommissionPaymentApiControllerTest {
                 CommissionPaymentStatus.DRAFT
         ));
 
-        mockMvc.perform(post("/api/v1/commission-payments")
+        mockMvc.perform(post("/api/v1/transactions")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +89,7 @@ class CommissionPaymentApiControllerTest {
                 CommissionPaymentStatus.DRAFT
         ));
 
-        mockMvc.perform(put("/api/v1/commission-payments/101")
+        mockMvc.perform(put("/api/v1/transactions/101")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -101,7 +104,7 @@ class CommissionPaymentApiControllerTest {
                 CommissionPaymentStatus.CONFIRMED
         ));
 
-        mockMvc.perform(post("/api/v1/commission-payments/101/confirm")
+        mockMvc.perform(post("/api/v1/transactions/101/confirm")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -110,7 +113,7 @@ class CommissionPaymentApiControllerTest {
 
     @Test
     void rejectsNonSettlementRole() throws Exception {
-        mockMvc.perform(post("/api/v1/commission-payments")
+        mockMvc.perform(post("/api/v1/transactions")
                         .with(user("ga-admin").roles("GA_ADMIN"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -120,14 +123,14 @@ class CommissionPaymentApiControllerTest {
 
     @Test
     void rejectsUpdateAndConfirmForNonSettlementRole() throws Exception {
-        mockMvc.perform(put("/api/v1/commission-payments/101")
+        mockMvc.perform(put("/api/v1/transactions/101")
                         .with(user("ga-admin").roles("GA_ADMIN"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validUpdateJson()))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/v1/commission-payments/101/confirm")
+        mockMvc.perform(post("/api/v1/transactions/101/confirm")
                         .with(user("ga-admin").roles("GA_ADMIN"))
                         .with(csrf()))
                 .andExpect(status().isForbidden());
@@ -135,7 +138,7 @@ class CommissionPaymentApiControllerTest {
 
     @Test
     void rejectsMissingRequiredValues() throws Exception {
-        mockMvc.perform(post("/api/v1/commission-payments")
+        mockMvc.perform(post("/api/v1/transactions")
                         .with(user("settlement01").roles("SETTLEMENT"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -155,13 +158,17 @@ class CommissionPaymentApiControllerTest {
                 java.util.Map.entry("attributionMonth", "2026-07"),
                 java.util.Map.entry("scheduledPaymentDate", "2026-07-25"),
                 java.util.Map.entry("paymentStage", "GA_TO_FC"),
-                java.util.Map.entry("attributedContractId", 3L),
-                java.util.Map.entry("inclusionDecisionStatus", "INCLUDED"),
-                java.util.Map.entry("inclusionDecisionReason", "룰셋 산입"),
                 java.util.Map.entry("allocationPolicyVersion", 3L),
-                java.util.Map.entry("allocationBasis", "DIRECT"),
-                java.util.Map.entry("evidenceRef", "EVIDENCE-001"),
-                java.util.Map.entry("attributionMethod", "DIRECT")
+                java.util.Map.entry("attributions", List.of(java.util.Map.of(
+                        "contractId", 3L,
+                        "amount", 500000,
+                        "inclusionDecisionStatus", "INCLUDED",
+                        "exclusionType", "NONE",
+                        "inclusionDecisionReason", "룰셋 산입",
+                        "allocationBasis", "DIRECT",
+                        "evidenceRef", "EVIDENCE-001",
+                        "attributionMethod", "DIRECT"
+                )))
         )));
     }
 
@@ -190,12 +197,17 @@ class CommissionPaymentApiControllerTest {
                 PaymentStage.GA_TO_FC,
                 status,
                 3L,
-                InclusionDecisionStatus.INCLUDED,
-                "룰셋 산입",
-                3L,
-                "DIRECT",
-                "EVIDENCE-001",
-                AttributionMethod.DIRECT,
+                List.of(new CommissionPaymentAttributionResponse(
+                        1,
+                        3L,
+                        new BigDecimal("500000"),
+                        InclusionDecisionStatus.INCLUDED,
+                        ExclusionType.NONE,
+                        "룰셋 산입",
+                        "DIRECT",
+                        "EVIDENCE-001",
+                        AttributionMethod.DIRECT
+                )),
                 null,
                 OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-07-01T09:00:00+09:00")

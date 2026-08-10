@@ -58,6 +58,18 @@ class CapValidatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
     }
 
+    @Test
+    void returnsReviewRequiredForReviewRequiredAttribution() {
+        CapValidationResult result = validator.validate(request(
+                "500000",
+                "300000",
+                InclusionDecisionStatus.REVIEW_REQUIRED
+        ));
+
+        assertThat(result.candidateIncludedAmount()).isZero();
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
+    }
+
     private CapValidationRequest request(
             String existing,
             String candidate,

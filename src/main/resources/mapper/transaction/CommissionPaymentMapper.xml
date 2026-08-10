@@ -75,7 +75,6 @@
             amount,
             cashflow_type,
             status,
-            evidence_ref,
             note
         ) VALUES (
             #{paymentStage},
@@ -91,7 +90,6 @@
             #{amount},
             #{cashflowType},
             'DRAFT',
-            #{evidenceRef},
             #{note}
         )
     </insert>
@@ -108,7 +106,6 @@
                due_date = #{dueDate},
                amount = #{amount},
                cashflow_type = #{cashflowType},
-               evidence_ref = #{evidenceRef},
                note = #{note}
          WHERE commission_transaction_id = #{paymentId}
            AND status = 'DRAFT'
@@ -119,7 +116,11 @@
          WHERE commission_transaction_id = #{paymentId}
     </delete>
 
-    <insert id="insertAttribution">
+    <!-- 2026-08-10 yslee - 지급 건의 계약별 귀속행을 순번대로 일괄 저장 -->
+    <!-- 기존 코드: 지급 건마다 attribution_seq=1인 귀속행 한 건만 저장 -->
+    <!-- 문제: 공통비·정착지원금처럼 여러 계약에 배부되는 지급 건을 표현할 수 없음 -->
+    <!-- 개선: 요청 귀속 목록을 foreach로 저장하고 제외유형 NONE은 DB의 NULL로 정규화 -->
+    <insert id="insertAttributions">
         INSERT INTO fgc.transaction_attribution (
             commission_transaction_id,
             attribution_seq,
@@ -135,22 +136,25 @@
             allocation_policy_id,
             allocation_basis_snapshot,
             evidence_ref
-        ) VALUES (
-            #{paymentId},
-            1,
-            #{attributionScope},
-            #{attributedContractId},
-            #{agentId},
-            #{settlementMonth},
-            #{settlementMonth},
-            #{amount},
-            #{inclusionDecisionStatus},
-            CASE WHEN #{inclusionDecisionStatus} = 'EXCLUDED' THEN 'MANUAL_EXCLUSION' ELSE NULL END,
-            #{attributionMethod},
-            #{allocationPolicyId},
-            CAST(#{allocationBasisJson} AS jsonb),
-            #{evidenceRef}
-        )
+        ) VALUES
+        <foreach collection="attributions" item="attribution" separator=",">
+            (
+                #{attribution.paymentId},
+                #{attribution.attributionSequence},
+                #{attribution.attributionScope},
+                #{attribution.contractId},
+                #{attribution.agentId},
+                #{attribution.attributionMonth},
+                #{attribution.attributionMonth},
+                #{attribution.amount},
+                #{attribution.inclusionDecisionStatus},
+                NULLIF(#{attribution.exclusionType}, 'NONE'),
+                #{attribution.attributionMethod},
+                #{attribution.allocationPolicyId},
+                CAST(#{attribution.allocationBasisJson} AS jsonb),
+                #{attribution.evidenceRef}
+            )
+        </foreach>
     </insert>
 
     <select id="findById"
@@ -167,27 +171,38 @@
                ci.item_code AS commission_item_code,
                ci.item_name AS commission_item_name,
                ct.amount,
-               ta.attribution_month,
+               ct.settlement_month AS attribution_month,
                ct.due_date AS scheduled_payment_date,
                ct.payment_stage,
                ct.status,
-               ta.contract_id AS attributed_contract_id,
-               ta.inclusion_status_snapshot AS inclusion_decision_status,
-               ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
                ct.policy_version_id AS allocation_policy_version,
-               ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
-               COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
-               ta.attribution_method,
                ct.note,
                ct.created_at,
                ct.updated_at
           FROM fgc.commission_transaction ct
           JOIN fgc.commission_item ci
             ON ci.commission_item_id = ct.commission_item_id
-          LEFT JOIN fgc.transaction_attribution ta
-            ON ta.commission_transaction_id = ct.commission_transaction_id
-           AND ta.attribution_seq = 1
          WHERE ct.commission_transaction_id = #{paymentId}
+    </select>
+
+    <!-- 2026-08-10 yslee - 지급 건 응답에 전체 계약별 귀속행 반환 -->
+    <!-- 기존 코드: 첫 번째 귀속행을 지급 건 본문에 평탄화하여 반환 -->
+    <!-- 문제: 두 번째 이후 귀속 계약·금액·증빙·배부기준이 응답에서 소실 -->
+    <!-- 개선: attribution_seq 순으로 전체 귀속행을 별도 목록으로 조회 -->
+    <select id="findAttributions"
+            resultType="com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionRow">
+        SELECT ta.attribution_seq AS attribution_sequence,
+               ta.contract_id,
+               ta.attributed_amount AS amount,
+               ta.inclusion_status_snapshot AS inclusion_decision_status,
+               COALESCE(ta.exclusion_type_snapshot, 'NONE') AS exclusion_type,
+               ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
+               ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
+               ta.evidence_ref,
+               ta.attribution_method
+          FROM fgc.transaction_attribution ta
+         WHERE ta.commission_transaction_id = #{paymentId}
+         ORDER BY ta.attribution_seq
     </select>
 
     <select id="findConfirmationDataForUpdate"
@@ -196,6 +211,15 @@
                ct.status,
                ct.amount,
                ta.attributed_amount,
+               <!-- 2026-08-10 yslee - 잠금 조회에서 귀속 합계를 상관 서브쿼리로 계산 -->
+               <!-- 기존 코드: 윈도 함수 SUM(...) OVER와 FOR UPDATE를 한 SELECT에서 함께 사용 -->
+               <!-- 문제: PostgreSQL은 윈도 함수가 있는 SELECT의 FOR UPDATE를 허용하지 않아 확정 요청이 실패 -->
+               <!-- 개선: 상관 서브쿼리로 합계를 계산하여 지급 건 행 잠금과 다중 귀속 합계 검증을 함께 유지 -->
+               (
+                   SELECT SUM(total_ta.attributed_amount)
+                     FROM fgc.transaction_attribution total_ta
+                    WHERE total_ta.commission_transaction_id = ct.commission_transaction_id
+               ) AS total_attributed_amount,
                ta.attribution_month,
                ta.transaction_attribution_id,
                ta.contract_id,
@@ -206,16 +230,18 @@
                ci.item_name,
                ct.policy_version_id,
                ta.inclusion_status_snapshot AS inclusion_decision_status,
+               COALESCE(ta.exclusion_type_snapshot, 'NONE') AS exclusion_type,
                ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
                ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
-               COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref
+               COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
+               ta.attribution_method
           FROM fgc.commission_transaction ct
           JOIN fgc.commission_item ci
             ON ci.commission_item_id = ct.commission_item_id
-          LEFT JOIN fgc.transaction_attribution ta
+          JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
-           AND ta.attribution_seq = 1
          WHERE ct.commission_transaction_id = #{paymentId}
+         ORDER BY ta.attribution_seq
          FOR UPDATE OF ct
     </select>
 
@@ -240,11 +266,27 @@
                       AND other_ct.commission_transaction_id &lt;&gt; ct.commission_transaction_id
                       AND other_ta.attribution_date &gt;= c.contract_date
                       AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
-               ), 0) AS existing_included_amount
+               ), 0) AS existing_included_amount,
+               (
+                   SELECT SUM(compliance_ta.attributed_amount)
+                     FROM fgc.transaction_attribution compliance_ta
+                     JOIN fgc.commission_transaction compliance_ct
+                       ON compliance_ct.commission_transaction_id = compliance_ta.commission_transaction_id
+                    WHERE compliance_ta.contract_id = ta.contract_id
+                      AND compliance_ta.exclusion_type_snapshot = 'COMPLIANCE_3PCT'
+                      AND NULLIF(BTRIM(compliance_ta.evidence_ref), '') IS NOT NULL
+                      AND compliance_ct.payment_stage = ct.payment_stage
+                      AND (
+                          compliance_ct.status = 'CONFIRMED'
+                          OR compliance_ct.commission_transaction_id = ct.commission_transaction_id
+                      )
+                      AND compliance_ta.attribution_date &gt;= c.contract_date
+                      AND compliance_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
+               ) AS compliance_evidence_amount
           FROM fgc.commission_transaction ct
           JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
-           AND ta.attribution_seq = 1
+           AND ta.transaction_attribution_id = #{transactionAttributionId}
           JOIN fgc.insurance_contract c
             ON c.contract_id = ta.contract_id
           JOIN fgc.product_offering po

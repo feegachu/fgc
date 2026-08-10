@@ -19,6 +19,7 @@ public record CapRuleSnapshot(
         BigDecimal basePremiumAmount,
         BigDecimal premiumMultiplier,
         BigDecimal warningUsagePct,
-        BigDecimal existingIncludedAmount
+        BigDecimal existingIncludedAmount,
+        BigDecimal complianceEvidenceAmount
 ) {
 }

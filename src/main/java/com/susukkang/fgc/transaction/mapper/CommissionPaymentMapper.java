@@ -4,6 +4,8 @@ import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
 import com.susukkang.fgc.transaction.domain.CommissionItemReference;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentCommand;
+import com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionCommand;
+import com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionRow;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
@@ -12,6 +14,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 설명 : 수수료 지급 건과 한도 검증 데이터 접근 매퍼
@@ -54,13 +57,18 @@ public interface CommissionPaymentMapper {
 
     void deleteAttributions(@Param("paymentId") Long paymentId);
 
-    void insertAttribution(CommissionPaymentCommand command);
+    void insertAttributions(@Param("attributions") List<CommissionPaymentAttributionCommand> attributions);
 
     CommissionPaymentRow findById(@Param("paymentId") Long paymentId);
 
-    ConfirmationData findConfirmationDataForUpdate(@Param("paymentId") Long paymentId);
+    List<CommissionPaymentAttributionRow> findAttributions(@Param("paymentId") Long paymentId);
 
-    CapRuleSnapshot findCapRuleSnapshot(@Param("paymentId") Long paymentId);
+    List<ConfirmationData> findConfirmationDataForUpdate(@Param("paymentId") Long paymentId);
+
+    CapRuleSnapshot findCapRuleSnapshot(
+            @Param("paymentId") Long paymentId,
+            @Param("transactionAttributionId") Long transactionAttributionId
+    );
 
     void insertCapCheck(CapCheckCommand command);
 

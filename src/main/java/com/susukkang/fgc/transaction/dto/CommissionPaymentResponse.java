@@ -1,14 +1,13 @@
 package com.susukkang.fgc.transaction.dto;
 
-import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
-import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
+import java.util.List;
 
 /**
  * 설명 : 수수료 지급 건 응답
@@ -30,13 +29,8 @@ public record CommissionPaymentResponse(
         LocalDate scheduledPaymentDate,
         PaymentStage paymentStage,
         CommissionPaymentStatus status,
-        Long attributedContractId,
-        InclusionDecisionStatus inclusionDecisionStatus,
-        String inclusionDecisionReason,
         Long allocationPolicyVersion,
-        String allocationBasis,
-        String evidenceRef,
-        AttributionMethod attributionMethod,
+        List<CommissionPaymentAttributionResponse> attributions,
         String note,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt

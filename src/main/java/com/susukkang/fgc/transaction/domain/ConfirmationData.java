@@ -1,7 +1,9 @@
 package com.susukkang.fgc.transaction.domain;
 
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
+import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
+import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.PaymentStage;
 
 import java.math.BigDecimal;
@@ -19,6 +21,7 @@ public record ConfirmationData(
         CommissionPaymentStatus status,
         BigDecimal amount,
         BigDecimal attributedAmount,
+        BigDecimal totalAttributedAmount,
         LocalDate attributionMonth,
         Long transactionAttributionId,
         Long contractId,
@@ -29,8 +32,10 @@ public record ConfirmationData(
         String itemName,
         Long policyVersionId,
         InclusionDecisionStatus inclusionDecisionStatus,
+        ExclusionType exclusionType,
         String inclusionDecisionReason,
         String allocationBasis,
-        String evidenceRef
+        String evidenceRef,
+        AttributionMethod attributionMethod
 ) {
 }

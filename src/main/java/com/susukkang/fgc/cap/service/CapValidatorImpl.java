@@ -40,7 +40,13 @@ public class CapValidatorImpl implements CapValidator {
                 .divide(limit, 6, RoundingMode.HALF_UP);
 
         CapResultStatus resultStatus;
-        if (remaining.signum() < 0) {
+        // 2026-08-10 yslee - 검토필요 귀속행을 자동 정상 판정에서 제외
+        // 기존 코드: INCLUDED가 아니면 후보액만 0으로 만들고 NORMAL/WARNING/VIOLATION 중 하나를 반환
+        // 문제: REVIEW_REQUIRED 귀속행이 기존 산입액 여유로 정상 판정되어 확정될 수 있음
+        // 개선: 검토필요 상태를 최우선 결과로 반환하여 확정 서비스가 FGC-CAP-002로 차단
+        if (request.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED) {
+            resultStatus = CapResultStatus.REVIEW_REQUIRED;
+        } else if (remaining.signum() < 0) {
             resultStatus = CapResultStatus.VIOLATION;
         } else if (usagePct.compareTo(request.warningUsagePct()) >= 0) {
             resultStatus = CapResultStatus.WARNING;

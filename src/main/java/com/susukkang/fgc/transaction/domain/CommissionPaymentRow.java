@@ -1,8 +1,6 @@
 package com.susukkang.fgc.transaction.domain;
 
-import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
-import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 
@@ -10,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
+import java.util.List;
 
 /**
  * 설명 : 수수료 지급 건 조회 데이터
@@ -31,18 +30,12 @@ public record CommissionPaymentRow(
         LocalDate scheduledPaymentDate,
         PaymentStage paymentStage,
         CommissionPaymentStatus status,
-        Long attributedContractId,
-        InclusionDecisionStatus inclusionDecisionStatus,
-        String inclusionDecisionReason,
         Long allocationPolicyVersion,
-        String allocationBasis,
-        String evidenceRef,
-        AttributionMethod attributionMethod,
         String note,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
-    public CommissionPaymentResponse toResponse() {
+    public CommissionPaymentResponse toResponse(List<CommissionPaymentAttributionRow> attributions) {
         return new CommissionPaymentResponse(
                 paymentId,
                 sourceBusinessKey,
@@ -56,13 +49,8 @@ public record CommissionPaymentRow(
                 scheduledPaymentDate,
                 paymentStage,
                 status,
-                attributedContractId,
-                inclusionDecisionStatus,
-                inclusionDecisionReason,
                 allocationPolicyVersion,
-                allocationBasis,
-                evidenceRef,
-                attributionMethod,
+                attributions.stream().map(CommissionPaymentAttributionRow::toResponse).toList(),
                 note,
                 createdAt,
                 updatedAt

@@ -1,7 +1,5 @@
 package com.susukkang.fgc.transaction.domain;
 
-import com.susukkang.fgc.common.code.AttributionMethod;
-import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import lombok.Builder;
 import lombok.Getter;
@@ -34,22 +32,6 @@ public class CommissionPaymentCommand {
     private final LocalDate dueDate;
     private final BigDecimal amount;
     private final String cashflowType;
-    private final String evidenceRef;
     private final String note;
-    private final Long attributedContractId;
-    private final InclusionDecisionStatus inclusionDecisionStatus;
-    private final String inclusionDecisionReason;
-    private final AttributionMethod attributionMethod;
-    private final Long allocationPolicyId;
-    private final String allocationBasisJson;
-
-    public String getAttributionScope() {
-        return attributionMethod == AttributionMethod.NEWCOMER_NON_CONTRACT
-                ? "AGENT"
-                : "CONTRACT";
-    }
-
-    public Long getNaturalContractId() {
-        return sourceContractId != null ? sourceContractId : attributedContractId;
-    }
+    private final Long naturalContractId;
 }
