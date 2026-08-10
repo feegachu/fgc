@@ -11,6 +11,7 @@ import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
+import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -141,7 +142,8 @@ public class ContractService {
 
         // FUN-036: 계약 저장과 같은 트랜잭션에서 양방향 예상 스케줄을 생성한다.
         // 정책 없음·중복 지급단계는 exception_case 검토 큐에 등록되고 생성에서 제외된다.
-        scheduleService.generateSchedules(insuranceContract);
+        ScheduleGenerationResult scheduleResult =
+                scheduleService.generateSchedules(insuranceContract);
 
         /*
          * TODO(FUN-030, REG-08~11)
@@ -157,6 +159,7 @@ public class ContractService {
 
         return ContractResponse.builder()
                 .contractId(insuranceContract.getContractId())
+                .scheduleHeaderIds(scheduleResult.scheduleHeaderIds())
                 .build();
     }
 

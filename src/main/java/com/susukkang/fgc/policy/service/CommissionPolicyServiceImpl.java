@@ -91,7 +91,8 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     "commissionRules",
                     Map.of(
                             "policyVersionId", policy.getPolicyVersionId(),
-                            "paymentStage", paymentStage.name()
+                            "paymentStage", paymentStage.name(),
+                            "reason", "POLICY_MISSING"
                     ),
                     "정책에 적용 가능한 수수료 규칙이 없습니다."
             );

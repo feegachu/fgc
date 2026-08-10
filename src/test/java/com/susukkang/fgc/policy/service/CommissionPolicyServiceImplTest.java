@@ -186,6 +186,9 @@ class CommissionPolicyServiceImplTest {
                         contractId,
                         paymentStage
                 ))
-                .isInstanceOf(FgcBusinessException.class);
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception -> assertThat(
+                        ((FgcBusinessException) exception).getParams()
+                ).containsEntry("reason", "POLICY_MISSING"));
     }
 }

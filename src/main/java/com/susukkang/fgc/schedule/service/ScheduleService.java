@@ -127,12 +127,12 @@ public class ScheduleService {
     /**
      * 설명 : 계약 ID에 따라 회차별 스케줄을 자동 생성한다
      * @param contract 계약 class
-     * @return scheduleCounts 생성된 스케줄 라인 수
+     * @return 새로 생성된 스케줄 헤더 ID 목록과 라인 수
      * @author hjKang
      * @since 2026-08-10
      */
     @Transactional
-    public int generateSchedules(InsuranceContract contract) {
+    public ScheduleGenerationResult generateSchedules(InsuranceContract contract) {
         // 입력값 검증
         if (contract == null || contract.getContractId() == null) {
             throw new FgcBusinessException(
@@ -178,16 +178,21 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500);
         }
 
+        List<Long> createdHeaderIds = new ArrayList<>();
         int createdLineCount = 0;
         for (PaymentStage paymentStage : paymentStages) {
             ResolvedCommissionPolicy policy = resolvedPolicies.get(paymentStage);
 
             if (policy != null) {
-                createdLineCount += createSchedule(savedContract, policy);
+                CreatedSchedule createdSchedule = createSchedule(savedContract, policy);
+                if (createdSchedule.scheduleHeaderId() != null) {
+                    createdHeaderIds.add(createdSchedule.scheduleHeaderId());
+                }
+                createdLineCount += createdSchedule.createdLineCount();
             }
         }
 
-        return createdLineCount;
+        return new ScheduleGenerationResult(createdHeaderIds, createdLineCount);
     }
 
     /**
@@ -246,9 +251,9 @@ public class ScheduleService {
      *
      * @param contract 저장된 계약
      * @param policy 적용할 단일 정책
-     * @return 저장된 스케줄 라인 수
+     * @return 생성된 헤더 ID와 저장된 라인 수
      */
-    private int createSchedule(
+    private CreatedSchedule createSchedule(
             InsuranceContract contract,
             ResolvedCommissionPolicy policy
     ) {
@@ -260,7 +265,7 @@ public class ScheduleService {
 
         // 같은 정책으로 이미 생성된 활성 운영 스케줄은 다시 만들지 않는다.
         if (Objects.equals(activePolicyVersionId, policy.getPolicyVersionId())) {
-            return 0;
+            return new CreatedSchedule(null, 0);
         }
 
         int nextVersionNo = scheduleMapper.selectNextScheduleVersionNo(
@@ -298,7 +303,11 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500);
         }
 
-        return insertedLineCount;
+        return new CreatedSchedule(header.getScheduleHeaderId(), insertedLineCount);
+    }
+
+    /** 지급단계 한 건의 스케줄 생성 결과. */
+    private record CreatedSchedule(Long scheduleHeaderId, int createdLineCount) {
     }
     /**
      * 설명 : 정책 조회 서비스에서 반환된 수수료 정책이 스케줄 생성에 사용 가능한지 검증한다.

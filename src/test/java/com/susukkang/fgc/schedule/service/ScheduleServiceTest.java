@@ -13,6 +13,7 @@ import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO;
+import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
@@ -172,9 +173,11 @@ class ScheduleServiceTest {
         given(scheduleMapper.insertAllScheduleLines(any()))
                 .willAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
 
-        int createdLineCount = scheduleService.generateSchedules(contract);
+        ScheduleGenerationResult generationResult = scheduleService.generateSchedules(contract);
 
-        assertThat(createdLineCount).isEqualTo(3);
+        assertThat(generationResult.createdLineCount()).isEqualTo(3);
+        assertThat(generationResult.scheduleHeaderIds())
+                .containsExactly(1000L, 1001L);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ScheduleLineInsertDTO>> linesCaptor =
@@ -284,9 +287,10 @@ class ScheduleServiceTest {
                 any(), any(), any(), any(), any()))
                 .willReturn(1);
 
-        int createdLineCount = scheduleService.generateSchedules(contract);
+        ScheduleGenerationResult generationResult = scheduleService.generateSchedules(contract);
 
-        assertThat(createdLineCount).isZero();
+        assertThat(generationResult.createdLineCount()).isZero();
+        assertThat(generationResult.scheduleHeaderIds()).isEmpty();
         verify(scheduleMapper, times(2)).upsertPolicyReviewCase(
                 any(), any(), any(), any(), any());
         verify(scheduleMapper, never()).insertScheduleHeader(any());
@@ -324,9 +328,10 @@ class ScheduleServiceTest {
                 contract.getContractId(), PaymentStage.GA_TO_FC))
                 .willReturn(200L);
 
-        int createdLineCount = scheduleService.generateSchedules(contract);
+        ScheduleGenerationResult generationResult = scheduleService.generateSchedules(contract);
 
-        assertThat(createdLineCount).isZero();
+        assertThat(generationResult.createdLineCount()).isZero();
+        assertThat(generationResult.scheduleHeaderIds()).isEmpty();
         verify(scheduleMapper, never()).insertScheduleHeader(any());
         verify(scheduleMapper, never()).insertAllScheduleLines(any());
     }

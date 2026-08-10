@@ -1,5 +1,8 @@
 package com.susukkang.fgc.schedule.dto;
 
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
+import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import lombok.*;
 
@@ -18,8 +21,8 @@ import lombok.*;
 @AllArgsConstructor
 public class ScheduleSearchCondition {
     private String contractNo;     // 계약번호
-    private String stage;          // 지급 단계
+    private PaymentStage stage;          // 지급 단계
     private ScheduleRegime regime; // 적용 체계
-    private String purpose;        // 스케줄 용도
-    private String status;         // 스케줄 상태
+    private SchedulePurpose purpose;        // 스케줄 용도
+    private ScheduleHeaderStatus status;         // 스케줄 상태
 }
