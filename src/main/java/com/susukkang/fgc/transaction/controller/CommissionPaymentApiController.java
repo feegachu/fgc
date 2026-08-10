@@ -30,11 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "수수료 지급 건", description = "FUN-065 수수료 지급 건 등록·수정·확정 API")
 @RestController
-// 2026-08-07 yslee - 미확정 API 버전 접두사를 지급 건 경로에서 제거
-// 기존 코드: 미확정 버전 접두사가 포함된 지급 건 경로를 사용
-// 문제: 인터페이스 정의서에서 API 버전 경로 도입이 검토 중이므로 현재 확정 경로로 사용할 수 없음
-// 개선: 현재 프로젝트 API 규칙에 맞춰 /api/commission-payments로 통일
-@RequestMapping("/api/commission-payments")
+// 2026-08-10 yslee - 확정된 API 버전 경로 적용
+// 기존 코드: /api/commission-payments 경로 사용
+// 문제: 프로젝트 API 경로가 /api/v1로 확정되어 지급 건 API만 버전 접두사가 누락됨
+// 개선: 지급 건 등록·수정·확정 API를 /api/v1/commission-payments로 통일
+@RequestMapping("/api/v1/commission-payments")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('SETTLEMENT')")
 public class CommissionPaymentApiController {
