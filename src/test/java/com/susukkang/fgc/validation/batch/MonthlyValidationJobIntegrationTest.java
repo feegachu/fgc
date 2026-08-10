@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.job.SimpleJob;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
@@ -76,6 +77,15 @@ class MonthlyValidationJobIntegrationTest {
                 .addLong("triggeredBy", 3L)
                 .addString("requestId", requestId)
                 .toJobParameters();
+    }
+
+    @Test
+    void configuresMasterStepsInTheRequiredOrder() {
+        assertThat(monthlyValidationJob).isInstanceOf(SimpleJob.class);
+        assertThat(((SimpleJob) monthlyValidationJob).getStepNames()).containsExactly(
+                "createRunStep", "selectTargetStep", "regenerateScheduleStep",
+                "capCheckStep", "arbitrageCheckStep", "journalPostingStep",
+                "imbalanceCheckStep", "reconciliationStep", "exceptionGenerationStep");
     }
 
     @Test
