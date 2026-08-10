@@ -16,6 +16,7 @@ import com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
+import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,6 +69,32 @@ class ScheduleServiceTest {
                 .thenReturn(1);
         lenient().when(scheduleMapper.selectActiveOperationalPolicyVersionId(any(), any()))
                 .thenReturn(null);
+    }
+
+    @Test
+    void defaultsSchedulePurposeToOperational() {
+        ScheduleSearchCondition condition = new ScheduleSearchCondition();
+        given(scheduleMapper.selectByCondition(condition, 20, 0L))
+                .willReturn(List.of());
+        given(scheduleMapper.countByCondition(condition)).willReturn(0L);
+
+        scheduleService.selectByCondition(condition, 1, 20);
+
+        assertThat(condition.getPurpose()).isEqualTo(SchedulePurpose.OPERATIONAL);
+        verify(scheduleMapper).selectByCondition(condition, 20, 0L);
+        verify(scheduleMapper).countByCondition(condition);
+    }
+
+    @Test
+    void selectsOperationalSchedulesByContractId() {
+        Long contractId = 10L;
+        given(scheduleMapper.selectByContractId(contractId))
+                .willReturn(List.of());
+
+        List<?> result = scheduleService.selectByContractId(contractId);
+
+        assertThat(result).isEmpty();
+        verify(scheduleMapper).selectByContractId(contractId);
     }
 
     @Test

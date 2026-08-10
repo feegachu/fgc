@@ -15,6 +15,8 @@ import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.dto.ContractResponse;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.service.ContractService;
+import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
+import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +70,27 @@ class ContractControllerTest {
 
     @MockitoBean
     private ContractService contractService;
+
+    @MockitoBean
+    private ScheduleService scheduleService;
+
+    @Test
+    @DisplayName("계약 ID로 운영용 예상 스케줄 목록을 조회한다")
+    void getContractSchedulesReturnsSuccess() throws Exception {
+        ScheduleHeaderResponse schedule = ScheduleHeaderResponse.builder()
+                .scheduleHeaderId(100L)
+                .contractNo("TEST-20260806-001")
+                .build();
+
+        when(scheduleService.selectByContractId(21L))
+                .thenReturn(List.of(schedule));
+
+        mockMvc.perform(get("/api/v1/contracts/{contractId}/schedules", 21L)
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].scheduleHeaderId").value(100))
+                .andExpect(jsonPath("$.data[0].contractNo").value("TEST-20260806-001"));
+    }
 
     @Test
     @DisplayName("보험계약 목록을 조회한다")

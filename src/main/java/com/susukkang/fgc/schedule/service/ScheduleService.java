@@ -67,19 +67,27 @@ public class ScheduleService {
                     "size는 1 이상 100 이하여야 합니다."
             );
         }
+        //검색 조건 검사
+        if (condition == null) {
+            condition = new ScheduleSearchCondition();
+        }
 
+        // 검색 용도가 지정되지 않으면 운영 스케줄만 조회한다.
+        if (condition.getPurpose() == null) {
+            condition.setPurpose(SchedulePurpose.OPERATIONAL);
+        }
         // offset : DB가 앞에서 건널 뛸 행 개수 -> offset 번째 부터 조회함
         long offset = (long) (page - 1) * size;
         List<ScheduleHeaderResponse> scheduleHeaderList = scheduleMapper.selectByCondition(condition,size,offset);
-        // 검색조건에 해당하는 전체 계약 건수 조회
-        long totalContracts =
+        // 검색 조건에 해당하는 전체 스케줄 건수 조회
+        long totalSchedules =
                 scheduleMapper.countByCondition(condition);
 
         return PageResponse.of(
                 scheduleHeaderList,
                 page,
                 size,
-                totalContracts,
+                totalSchedules,
                 "scheduleHeaderId,desc"
         );
     }
@@ -304,6 +312,22 @@ public class ScheduleService {
         }
 
         return new CreatedSchedule(header.getScheduleHeaderId(), insertedLineCount);
+    }
+
+    /**
+     * 계약 ID에 해당하는 운영용 예상 스케줄 헤더 목록을 조회한다.
+     *
+     * @param contractId 계약 ID
+     * @return 계약에 연결된 운영용 예상 스케줄 헤더 목록
+     */
+    public List<ScheduleHeaderResponse> selectByContractId(Long contractId) {
+        if (contractId == null) {
+            throw validationException(
+                    "contractId",
+                    "계약 ID는 필수입니다."
+            );
+        }
+        return scheduleMapper.selectByContractId(contractId);
     }
 
     /** 지급단계 한 건의 스케줄 생성 결과. */

@@ -350,4 +350,43 @@
           AND schedule_purpose = 'OPERATIONAL'
           AND active_yn = TRUE
     </update>
+
+    <!-- 계약 ID를 기준으로 활성 운영 스케줄 헤더 목록을 조회한다. -->
+    <select id="selectByContractId"
+            resultType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
+        SELECT
+            sh.schedule_header_id,
+            c.contract_no,
+            sh.payment_stage,
+            sh.schedule_regime,
+            sh.schedule_purpose,
+            sh.schedule_version_no,
+            sh.status,
+            sh.active_yn,
+            COUNT(sl.schedule_line_id) AS line_count,
+            COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
+            CONCAT(
+                    pv.policy_code,
+                    ' v',
+                    pv.version_no
+            ) AS policy_version_label
+        FROM fgc.schedule_header sh
+                 JOIN fgc.insurance_contract c
+                      ON c.contract_id = sh.contract_id
+                 JOIN fgc.policy_version pv
+                      ON pv.policy_version_id = sh.policy_version_id
+                 LEFT JOIN fgc.schedule_line sl
+                           ON sl.schedule_header_id = sh.schedule_header_id
+        WHERE sh.contract_id = #{contractId}
+          AND sh.schedule_purpose = 'OPERATIONAL'
+          AND sh.active_yn = TRUE
+        GROUP BY
+            sh.schedule_header_id,
+            c.contract_no,
+            pv.policy_code,
+            pv.version_no
+        ORDER BY
+            sh.payment_stage,
+            sh.schedule_header_id DESC
+    </select>
 </mapper>
