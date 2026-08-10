@@ -34,7 +34,7 @@ import java.util.Map;
  */
 @Tag(name = "1200% 한도", description = "초년도 모집수수료 한도 계산 목록 조회 API")
 @RestController
-@RequestMapping("/api/v1/cap/checks")
+@RequestMapping("/api/v1/cap-checks")
 @RequiredArgsConstructor
 public class CapCheckController {
 
