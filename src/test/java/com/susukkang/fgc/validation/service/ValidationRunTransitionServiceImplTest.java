@@ -110,6 +110,22 @@ class ValidationRunTransitionServiceImplTest {
     }
 
     @Test
+    // UPDATE는 성공(affected==1)했지만 재조회 사이에 행이 삭제됐으면 null을 그대로 반환하지 않고
+    // COMMON_004로 던져야 한다 — updateStatusIfCurrent가 성공을 보고했다고 해서 그 뒤의 재조회까지
+    // 항상 값이 있다고 가정하면 안 된다.
+    void throwsNotFoundWhenRunDeletedAfterSuccessfulUpdate() {
+        when(validationRunMapper.findById(1L))
+                .thenReturn(rowWithStatus("CREATED"))
+                .thenReturn(null);
+        when(validationRunMapper.updateStatusIfCurrent(1L, "CREATED", "RUNNING")).thenReturn(1);
+
+        assertThatThrownBy(() -> service.transition(1L, ValidationRunStatus.RUNNING))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting(e -> ((FgcBusinessException) e).getErrorCode())
+                .isEqualTo(FgcErrorCode.COMMON_004);
+    }
+
+    @Test
     // FINALIZED는 최종 상태라 어떤 target을 줘도 VRUN_004로 막혀야 한다
     void blocksAnyTransitionFromFinalized() {
         when(validationRunMapper.findById(1L)).thenReturn(rowWithStatus("FINALIZED"));
