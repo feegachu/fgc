@@ -1,6 +1,6 @@
 package com.susukkang.fgc.validation.batch;
 
-import com.susukkang.fgc.validation.service.ValidationRunBatchProgressService;
+import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 class ValidationRunStepProgressListenerTest {
 
     @Mock
-    private ValidationRunBatchProgressService progressService;
+    private ValidationRunBatchLifecycleService lifecycleService;
 
     @Mock
     private ValidationRunBatchAuditService auditService;
@@ -46,54 +46,52 @@ class ValidationRunStepProgressListenerTest {
 
     @Test
     void initialStepSuccessCallsStartRunningNotAdvanceStep() {
-        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(1, true, progressService, auditService);
+        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(1, true, lifecycleService, auditService);
         StepExecution stepExecution = stepExecutionWithRunId(100L);
         stepExecution.setStatus(BatchStatus.COMPLETED);
 
         listener.afterStep(stepExecution);
 
-        verify(progressService).startRunning(100L);
-        verify(auditService).recordStarted(100L, parameters());
-        verify(progressService, never()).advanceStep(anyLong(), anyInt());
+        verify(lifecycleService).start(100L, parameters());
+        verify(lifecycleService, never()).advance(anyLong(), anyInt());
     }
 
     @Test
     void laterStepSuccessCallsAdvanceStepWithItsStepNo() {
-        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(3, false, progressService, auditService);
+        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(3, false, lifecycleService, auditService);
         StepExecution stepExecution = stepExecutionWithRunId(100L);
         stepExecution.setStatus(BatchStatus.COMPLETED);
 
         listener.afterStep(stepExecution);
 
-        verify(progressService).advanceStep(100L, 3);
-        verify(progressService, never()).startRunning(anyLong());
+        verify(lifecycleService).advance(100L, 3);
+        verify(lifecycleService, never()).start(anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void stepFailureCallsMarkFailedWithStepNoAndExceptionMessage() {
-        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(5, false, progressService, auditService);
+        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(5, false, lifecycleService, auditService);
         StepExecution stepExecution = stepExecutionWithRunId(100L);
         stepExecution.setStatus(BatchStatus.FAILED);
         stepExecution.addFailureException(new RuntimeException("boom"));
 
         listener.afterStep(stepExecution);
 
-        verify(progressService).markFailed(eq(100L), eq(5), contains("boom"));
-        verify(auditService).recordFailed(eq(100L), org.mockito.ArgumentMatchers.eq(parameters()), contains("boom"));
+        verify(lifecycleService).fail(eq(100L), eq(5), org.mockito.ArgumentMatchers.eq(parameters()), contains("boom"));
     }
 
     @Test
     void doesNothingWhenValidationRunIdIsMissing() {
-        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(1, true, progressService, auditService);
+        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(1, true, lifecycleService, auditService);
         JobExecution jobExecution = new JobExecution(new JobInstance(1L, "MonthlyValidationJob"), new JobParameters());
         StepExecution stepExecution = new StepExecution("step", jobExecution);
         stepExecution.setStatus(BatchStatus.COMPLETED);
 
         listener.afterStep(stepExecution);
 
-        verify(progressService, never()).startRunning(anyLong());
-        verify(progressService, never()).advanceStep(anyLong(), anyInt());
-        verify(progressService, never()).markFailed(anyLong(), anyInt(), anyString());
+        verify(lifecycleService, never()).start(anyLong(), org.mockito.ArgumentMatchers.any());
+        verify(lifecycleService, never()).advance(anyLong(), anyInt());
+        verify(lifecycleService, never()).fail(anyLong(), anyInt(), org.mockito.ArgumentMatchers.any(), anyString());
     }
 
     private static long eq(long value) {

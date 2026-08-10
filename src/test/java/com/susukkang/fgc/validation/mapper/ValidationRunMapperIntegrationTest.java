@@ -260,6 +260,7 @@ class ValidationRunMapperIntegrationTest {
         List<ValidationRunListRow> rows = validationRunMapper.search(month, null, 1, 1);
 
         assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getRunNo()).isEqualTo(2);
     }
 
     // ── #57 MonthlyValidationJob 진행 기록(transitionToRunning/updateCurrentStep/

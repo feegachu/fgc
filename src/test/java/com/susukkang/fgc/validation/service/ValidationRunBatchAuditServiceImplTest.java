@@ -14,6 +14,7 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ValidationRunBatchAuditServiceImplTest {
@@ -26,6 +27,7 @@ class ValidationRunBatchAuditServiceImplTest {
 
     @Test
     void recordsTriggeredByAndRequestIdWhenTheRunStarts() {
+        when(auditLogMapper.insert(org.mockito.ArgumentMatchers.any())).thenReturn(1);
         ValidationRunBatchAuditService service = new ValidationRunBatchAuditServiceImpl(auditLogMapper);
 
         service.recordStarted(100L, parameters);
@@ -42,6 +44,7 @@ class ValidationRunBatchAuditServiceImplTest {
 
     @Test
     void recordsFailureReasonWithTheSameAuditContext() {
+        when(auditLogMapper.insert(org.mockito.ArgumentMatchers.any())).thenReturn(1);
         ValidationRunBatchAuditService service = new ValidationRunBatchAuditServiceImpl(auditLogMapper);
 
         service.recordFailed(100L, parameters, "Step capCheckStep failed");

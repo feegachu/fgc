@@ -53,6 +53,6 @@ public class PlaceholderStepTasklet implements Tasklet {
             log.info("[TODO][validationRunId={}] {} — 실제 로직 미구현", validationRunId, stepDescription);
         }
 
-        return RepeatStatus.FINISHED;
+        throw new PlaceholderStepExecutionBlockedException(stepDescription);
     }
 }

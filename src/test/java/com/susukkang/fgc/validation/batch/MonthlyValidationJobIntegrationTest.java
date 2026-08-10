@@ -19,6 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -55,9 +56,12 @@ class MonthlyValidationJobIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private final List<Long> createdValidationRunIds = new ArrayList<>();
+
     @AfterEach
     void cleanUp() {
-        jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_month = ?", TEST_MONTH);
+        createdValidationRunIds.forEach(id -> jdbcTemplate.update(
+                "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", id));
     }
 
     // JobRepository 메타테이블은 이 테스트가 지우지 않는다(validation_run만 지운다) — 그래서
@@ -75,40 +79,37 @@ class MonthlyValidationJobIntegrationTest {
     }
 
     @Test
-    void runsAllEightStepsInOrderAndCompletesTheValidationRun() throws Exception {
+    void blocksPlaceholderExecutionAndDoesNotCompleteTheValidationRun() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
         long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
 
         JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters("req-1", runNo));
 
-        assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
-        assertThat(jobExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
+        assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.FAILED);
 
         Set<String> completedStepNames = jobExecution.getStepExecutions().stream()
                 .filter(se -> se.getStatus() == BatchStatus.COMPLETED)
                 .map(StepExecution::getStepName)
                 .collect(Collectors.toSet());
 
-        assertThat(completedStepNames).contains(
-                "createRunStep", "selectTargetStep", "regenerateScheduleStep",
-                "capCheckStep", "arbitrageCheckStep", "journalPostingStep",
-                "imbalanceCheckStep", "reconciliationStep", "exceptionGenerationStep");
+        assertThat(completedStepNames).containsExactly("createRunStep");
 
         // capCheckStep은 INSURER_TO_GA/GA_TO_FC 2개 파티션 워커로 나뉘어 실행돼야 한다.
         long capCheckWorkerCount = jobExecution.getStepExecutions().stream()
                 .filter(se -> se.getStepName().startsWith("capCheckWorkerStep"))
                 .count();
-        assertThat(capCheckWorkerCount).isEqualTo(2);
+        assertThat(capCheckWorkerCount).isZero();
 
         Long validationRunId = ValidationRunBatchContext.getValidationRunId(jobExecution.getExecutionContext());
         assertThat(validationRunId).isNotNull();
+        createdValidationRunIds.add(validationRunId);
 
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
-        assertThat(row.getStatus()).isEqualTo("COMPLETED");
+        assertThat(row.getStatus()).isEqualTo("FAILED");
         assertThat(row.getValidationMonth()).isEqualTo(TEST_MONTH);
         assertThat(row.getRunNo()).isEqualTo(Math.toIntExact(runNo));
         assertThat(row.getStartedAt()).isNotNull();
-        assertThat(row.getCompletedAt()).isNotNull();
+        assertThat(row.getCompletedAt()).isNull();
     }
 
     @Test

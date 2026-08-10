@@ -3,7 +3,7 @@ package com.susukkang.fgc.validation.batch;
 import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
-import com.susukkang.fgc.validation.service.ValidationRunBatchProgressService;
+import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ public class MonthlyValidationJobConfig {
 
     // Tasklet 안에서 실제 업무 로직을 부를 때 필요한 서비스 2개
     private final ValidationRunCreateService validationRunCreateService;
-    private final ValidationRunBatchProgressService validationRunBatchProgressService;
+    private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
 
     @Bean
@@ -48,8 +48,7 @@ public class MonthlyValidationJobConfig {
                                      Step exceptionGenerationStep) {
         return new JobBuilder("MonthlyValidationJob", jobRepository)
                 .validator(new MonthlyValidationJobParametersValidator())
-                .listener(new MonthlyValidationJobExecutionListener(
-                        validationRunBatchProgressService, validationRunBatchAuditService))
+                .listener(new MonthlyValidationJobExecutionListener(validationRunBatchLifecycleService))
                 .start(createRunStep)
                 .next(selectTargetStep)
                 .next(regenerateScheduleStep)
@@ -159,6 +158,6 @@ public class MonthlyValidationJobConfig {
     // @Bean 메서드마다 "new ValidationRunStepProgressListener(번호, ..., 서비스)"를 반복해서 쓰지 않으려고 뽑아 둔 헬퍼
     private ValidationRunStepProgressListener progressListener(int stepNo, boolean initialStep) {
         return new ValidationRunStepProgressListener(
-                stepNo, initialStep, validationRunBatchProgressService, validationRunBatchAuditService);
+                stepNo, initialStep, validationRunBatchLifecycleService, validationRunBatchAuditService);
     }
 }

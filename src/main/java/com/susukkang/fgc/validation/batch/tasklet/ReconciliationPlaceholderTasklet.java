@@ -27,6 +27,6 @@ public class ReconciliationPlaceholderTasklet implements Tasklet {
             log.info("[TODO][validationRunId={}] ⑦양방향 대사 (paymentStage={}) — 실제 로직 미구현",
                     validationRunId, stage);
         }
-        return RepeatStatus.FINISHED;
+        throw new PlaceholderStepExecutionBlockedException("reconciliationStep");
     }
 }

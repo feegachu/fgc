@@ -1,7 +1,6 @@
 package com.susukkang.fgc.validation.batch;
 
-import com.susukkang.fgc.validation.service.ValidationRunBatchProgressService;
-import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
+import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,10 +19,7 @@ import static org.mockito.Mockito.verify;
 class MonthlyValidationJobExecutionListenerTest {
 
     @Mock
-    private ValidationRunBatchProgressService progressService;
-
-    @Mock
-    private ValidationRunBatchAuditService auditService;
+    private ValidationRunBatchLifecycleService lifecycleService;
 
     private static MonthlyValidationJobParameters parameters() {
         return new MonthlyValidationJobParameters(
@@ -46,34 +42,33 @@ class MonthlyValidationJobExecutionListenerTest {
 
     @Test
     void completedJobCompletesTheRun() {
-        MonthlyValidationJobExecutionListener listener = new MonthlyValidationJobExecutionListener(progressService, auditService);
+        MonthlyValidationJobExecutionListener listener = new MonthlyValidationJobExecutionListener(lifecycleService);
         JobExecution jobExecution = jobExecution(BatchStatus.COMPLETED);
         jobExecution.getExecutionContext().putLong("validationRunId", 100L);
 
         listener.afterJob(jobExecution);
 
-        verify(progressService).completeRun(100L);
-        verify(auditService).recordCompleted(100L, parameters());
+        verify(lifecycleService).complete(100L, parameters());
     }
 
     @Test
     void failedJobDoesNotCallCompleteRun() {
-        MonthlyValidationJobExecutionListener listener = new MonthlyValidationJobExecutionListener(progressService, auditService);
+        MonthlyValidationJobExecutionListener listener = new MonthlyValidationJobExecutionListener(lifecycleService);
         JobExecution jobExecution = jobExecution(BatchStatus.FAILED);
         jobExecution.getExecutionContext().putLong("validationRunId", 100L);
 
         listener.afterJob(jobExecution);
 
-        verify(progressService, never()).completeRun(org.mockito.ArgumentMatchers.anyLong());
+        verify(lifecycleService, never()).complete(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void completedJobWithoutValidationRunIdDoesNothing() {
-        MonthlyValidationJobExecutionListener listener = new MonthlyValidationJobExecutionListener(progressService, auditService);
+        MonthlyValidationJobExecutionListener listener = new MonthlyValidationJobExecutionListener(lifecycleService);
         JobExecution jobExecution = jobExecution(BatchStatus.COMPLETED);
 
         listener.afterJob(jobExecution);
 
-        verify(progressService, never()).completeRun(org.mockito.ArgumentMatchers.anyLong());
+        verify(lifecycleService, never()).complete(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 }

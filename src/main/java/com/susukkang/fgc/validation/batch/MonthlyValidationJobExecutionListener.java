@@ -3,7 +3,7 @@ package com.susukkang.fgc.validation.batch;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
-import com.susukkang.fgc.validation.service.ValidationRunBatchProgressService;
+import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.BatchStatus;
@@ -17,8 +17,7 @@ import org.springframework.batch.core.JobExecutionListener;
 @RequiredArgsConstructor
 public class MonthlyValidationJobExecutionListener implements JobExecutionListener {
 
-    private final ValidationRunBatchProgressService progressService;
-    private final ValidationRunBatchAuditService auditService;
+    private final ValidationRunBatchLifecycleService lifecycleService;
 
     @Override
     public void beforeJob(JobExecution jobExecution) {
@@ -37,8 +36,7 @@ public class MonthlyValidationJobExecutionListener implements JobExecutionListen
                 return;
             }
             MonthlyValidationJobParameters parameters = MonthlyValidationJobParameters.from(jobExecution.getJobParameters());
-            progressService.completeRun(validationRunId);
-            auditService.recordCompleted(validationRunId, parameters);
+            lifecycleService.complete(validationRunId, parameters);
         } finally {
             RequestIdContext.clear();
         }
