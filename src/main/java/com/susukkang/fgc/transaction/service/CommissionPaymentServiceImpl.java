@@ -15,6 +15,7 @@ import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
 import com.susukkang.fgc.transaction.domain.CommissionItemReference;
@@ -108,13 +109,18 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             );
             validateRuleConsistency(rule, calculation, data);
 
-            CapValidationResult validation = capValidator.validate(new CapValidationRequest(
+            CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                     calculation.limitAmount(),
                     rule.warningUsagePct(),
                     rule.existingIncludedAmount(),
                     data.attributedAmount(),
                     data.inclusionDecisionStatus()
             ));
+            CapValidationResult validation = mergeScheduleAndActualValidation(
+                    calculation,
+                    actualValidation,
+                    rule.warningUsagePct()
+            );
             CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
             mapper.insertCapCheck(check);
             mapper.insertCapCheckDetail(check);
@@ -557,16 +563,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             CapCalculationResult calculation,
             CapValidationResult result
     ) {
-        // 2026-08-10 yslee - 계산 단계의 검토필요 상태를 최종 점검 결과에 우선 반영
-        // 기존 코드: 준법경영비 증빙 누락 시 cap_check 저장 전에 예외를 던져 계산 스냅샷이 남지 않음
-        // 문제: 실제 증빙액·최대 허용액·적용액을 감사 시점에 재현할 수 없음
-        // 개선: REVIEW_REQUIRED cap_check와 상세 근거를 먼저 저장한 뒤 확정을 차단
-        CapResultStatus resultStatus = calculation.resultStatus() == CapResultStatus.REVIEW_REQUIRED
-                ? CapResultStatus.REVIEW_REQUIRED
-                : result.resultStatus();
         Map<String, Object> snapshot = new LinkedHashMap<>(calculation.calculationSnapshot());
+        snapshot.put("scheduledIncludedAmount", calculation.includedAmount());
         snapshot.put("existingIncludedAmount", rule.existingIncludedAmount());
         snapshot.put("candidateAmount", result.candidateIncludedAmount());
+        snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
+                .add(result.candidateIncludedAmount()));
+        snapshot.put("effectiveIncludedAmount", result.includedAmount());
         snapshot.put("refundRateTableId", calculation.refundRateTableId() == null
                 ? "NONE"
                 : calculation.refundRateTableId());
@@ -584,7 +587,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .includedAmount(result.includedAmount())
                 .remainingAmount(result.remainingAmount())
                 .usagePct(result.usagePct())
-                .resultStatus(resultStatus)
+                .resultStatus(result.resultStatus())
                 .calculationSnapshotJson(json(snapshot))
                 .commissionItemId(data.commissionItemId())
                 .itemCode(data.itemCode())
@@ -595,6 +598,54 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .decisionReason(rule.decisionReason())
                 .evidenceRef(data.evidenceRef())
                 .build();
+    }
+
+    // 2026-08-10 yslee - 지급기준 스케줄과 실제 확정 지급의 두 한도 판정을 결합
+    // 기존 코드: CapCalculator의 스케줄 산입액·VIOLATION을 버리고 CONFIRMED 수기 지급액만 확정 게이트에 사용
+    // 문제: 지급기준 스케줄이 이미 한도를 초과해도 실제 확정 이력이 적으면 후보 지급 건을 정상 확정할 수 있음
+    // 개선: 두 산입액을 중복 합산하지 않고 큰 값을 적용하며 REVIEW_REQUIRED·VIOLATION을 최우선으로 보존
+    private CapValidationResult mergeScheduleAndActualValidation(
+            CapCalculationResult calculation,
+            CapValidationResult actualValidation,
+            BigDecimal warningUsagePct
+    ) {
+        BigDecimal effectiveIncludedAmount = calculation.includedAmount()
+                .max(actualValidation.includedAmount());
+        BigDecimal remainingAmount = calculation.limitAmount()
+                .subtract(effectiveIncludedAmount);
+        BigDecimal usagePct = calculation.limitAmount().signum() == 0
+                ? (effectiveIncludedAmount.signum() == 0
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(100))
+                : MoneyUtil.usagePercent(
+                        effectiveIncludedAmount,
+                        calculation.limitAmount()
+                );
+
+        CapResultStatus resultStatus;
+        if (calculation.resultStatus() == CapResultStatus.REVIEW_REQUIRED
+                || actualValidation.resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
+            resultStatus = CapResultStatus.REVIEW_REQUIRED;
+        } else if (calculation.resultStatus() == CapResultStatus.VIOLATION
+                || actualValidation.resultStatus() == CapResultStatus.VIOLATION
+                || remainingAmount.signum() < 0) {
+            resultStatus = CapResultStatus.VIOLATION;
+        } else if (calculation.resultStatus() == CapResultStatus.WARNING
+                || actualValidation.resultStatus() == CapResultStatus.WARNING
+                || usagePct.compareTo(warningUsagePct) >= 0) {
+            resultStatus = CapResultStatus.WARNING;
+        } else {
+            resultStatus = CapResultStatus.NORMAL;
+        }
+
+        return new CapValidationResult(
+                calculation.limitAmount(),
+                actualValidation.candidateIncludedAmount(),
+                effectiveIncludedAmount,
+                remainingAmount,
+                usagePct,
+                resultStatus
+        );
     }
 
     private CapCalculationResult calculateLimit(

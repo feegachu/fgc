@@ -38,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
@@ -210,6 +211,79 @@ class CommissionPaymentServiceImplTest {
 
         verify(mapper).insertExceptionCase(any());
         verify(mapper, never()).confirm(101L);
+    }
+
+    // 2026-08-10 yslee - 지급기준 스케줄이 이미 한도를 넘은 후보 지급 확정 차단
+    // 기존 코드: CapCalculator가 VIOLATION을 반환해도 limitAmount만 사용하고 스케줄 산입액은 폐기
+    // 문제: CONFIRMED 수기 지급이 없으면 스케줄 사용률 119%인 계약도 후보액만으로 NORMAL 판정
+    // 개선: 스케줄 판정과 실제 지급 판정 중 엄격한 결과를 cap_check에 저장하고 FGC-CAP-001로 차단
+    @Test
+    void blocksConfirmationWhenScheduleCalculationAlreadyViolatesLimit() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "10000", "10000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(
+                3L,
+                CapResultStatus.VIOLATION,
+                Map.of(),
+                new BigDecimal("1428000")
+        ));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(59L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+
+        assertThatThrownBy(() -> service.confirm(101L))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
+
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(mapper).insertCapCheck(captor.capture());
+        assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("1428000");
+        assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("119");
+        assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        verify(mapper).insertExceptionCase(any());
+        verify(mapper, never()).confirm(101L);
+    }
+
+    // 2026-08-10 yslee - 스케줄과 실제 지급을 같은 금액 흐름의 병렬 관점으로 결합
+    // 기존 코드: 두 값을 함께 사용하지 않아 스케줄 판정이 누락됨
+    // 문제: 단순 합산으로 보완하면 대사 전 동일 지급분을 두 번 산입하여 정상 지급도 차단할 수 있음
+    // 개선: 스케줄 산입액과 기존 확정액+후보액 중 큰 값을 최종 산입액으로 사용
+    @Test
+    void usesStricterAmountWithoutDoubleCountingScheduleAndActualViews() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "50000", "50000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("850000", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(
+                3L,
+                CapResultStatus.NORMAL,
+                Map.of(),
+                new BigDecimal("900000")
+        ));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(60L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+        given(mapper.confirm(101L)).willReturn(1);
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "50000")));
+
+        service.confirm(101L);
+
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(mapper).insertCapCheck(captor.capture());
+        assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("900000");
+        assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.NORMAL);
+        assertThat(captor.getValue().getCalculationSnapshotJson())
+                .contains("scheduledIncludedAmount", "existingIncludedAmount", "effectiveIncludedAmount");
+        verify(mapper).confirm(101L);
     }
 
     @Test
@@ -485,6 +559,19 @@ class CommissionPaymentServiceImplTest {
             CapResultStatus resultStatus,
             Map<String, Object> snapshot
     ) {
+        return capCalculation(contractId, resultStatus, snapshot, BigDecimal.ZERO);
+    }
+
+    private CapCalculationResult capCalculation(
+            Long contractId,
+            CapResultStatus resultStatus,
+            Map<String, Object> snapshot,
+            BigDecimal includedAmount
+    ) {
+        BigDecimal limitAmount = new BigDecimal("1200000");
+        BigDecimal remainingAmount = limitAmount.subtract(includedAmount);
+        BigDecimal usagePct = includedAmount.multiply(BigDecimal.valueOf(100))
+                .divide(limitAmount, 6, RoundingMode.HALF_UP);
         return new CapCalculationResult(
                 contractId,
                 PaymentStage.GA_TO_FC,
@@ -495,10 +582,10 @@ class CommissionPaymentServiceImplTest {
                 new BigDecimal("100000"),
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
-                new BigDecimal("1200000"),
-                BigDecimal.ZERO,
-                new BigDecimal("1200000"),
-                BigDecimal.ZERO,
+                limitAmount,
+                includedAmount,
+                remainingAmount,
+                usagePct,
                 resultStatus,
                 List.of(),
                 snapshot
