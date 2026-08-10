@@ -222,6 +222,28 @@ feat(contract): 계약 상태 이력 조회 API 구현
 
 ## 4. 기본 작업 흐름
 
+# 코드 주석 및 Commit 컨벤션
+
+<파일 헤더 주석 양식 - JavaDoc 표준>
+/**
+* 설명 : ${type_name}
+*
+* @author yslee
+* @since ${date}
+* @version 1.2
+  */
+
+
+<코드 수정 주석 양식>
+
+// {$date} 작성자 - 어떤 코드 수정사항 적용 내용
+// 기존 코드: 기존 코드 설명
+// 문제: 기존 코드 문제 설명
+// 개선: 개선사항 내용
+private double predictDelay(List<TrainData> data) {
+// 구현...
+}
+
 ### 4.1 `develop` 브랜치 최신화
 
 작업을 시작하기 전에 원격 `develop` 브랜치를 최신 상태로 맞춥니다.

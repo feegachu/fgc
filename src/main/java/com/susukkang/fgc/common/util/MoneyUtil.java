@@ -84,4 +84,29 @@ public final class MoneyUtil {
         return numerator.multiply(BigDecimal.valueOf(100))
                 .divide(denominator, 6, RoundingMode.HALF_UP);
     }
+
+    /**
+     * 작성자 : hjKang
+     * 설명 : amount를 WON_SCALE만큼 반올림한다.
+     *
+     * @param amount 금액
+     * @return 반올림된 금액
+     * @author hjKang
+     * @since 2026-08-05
+     */
+
+    public static BigDecimal divideAndRound(
+            BigDecimal amount,
+            BigDecimal divisor
+    ) {
+        Objects.requireNonNull(amount, "amount는 null일 수 없습니다.");
+        Objects.requireNonNull(divisor, "divisor는 null일 수 없습니다.");
+
+
+        return amount.divide(
+                divisor,
+                WON_SCALE,
+                ROUNDING_MODE
+        );
+    }
 }
