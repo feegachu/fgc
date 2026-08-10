@@ -95,6 +95,16 @@
         pv.fee_regime_code IS NULL
         OR pv.fee_regime_code = po.fee_regime_code
         )
+        AND (
+        pv.basic_document_version IS NULL
+        OR pv.basic_document_version = po.basic_document_version
+        )
+        AND po.active_yn = TRUE
+        AND po.sales_start_date <![CDATA[ <= ]]> c.contract_date
+        AND (
+        po.sales_end_date IS NULL
+        OR po.sales_end_date <![CDATA[ >= ]]> c.contract_date
+        )
 
         <!-- 해당 지급 단계의 적용 가능한 규칙을 가진 정책만 선택한다. -->
         AND EXISTS (

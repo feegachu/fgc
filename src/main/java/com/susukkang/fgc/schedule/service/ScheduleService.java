@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -271,6 +272,72 @@ public class ScheduleService {
                     "조회된 정책의 지급 단계가 요청과 일치하지 않습니다."
             );
         }
+
+        validateNoOverlappingRules(policy);
+    }
+
+    /**
+     * 설명 : 하나의 계약에 적용된 수수료 규칙 사이에 중복 회차가 존재하는지 검증한다.
+     * 범용 규칙과 상품·조직 전용 규칙이 동시에 조회되더라도 같은 수수료 항목과
+     * 지급 대상 직급의 회차가 겹치면 이중 스케줄이 생성될 수 있으므로 생성을 중단한다.
+     * 규칙 우선순위에 따른 선택은 정책 조회 영역에서 명시적으로 해결해야 한다.
+     *
+     * @param policy 중복 여부를 검증할 적용 정책
+     */
+    private void validateNoOverlappingRules(ResolvedCommissionPolicy policy) {
+        List<ResolvedCommissionRule> rules = policy.getRules();
+
+        for (int i = 0; i < rules.size(); i++) {
+            ResolvedCommissionRule current = rules.get(i);
+            validateRuleInstallmentRange(current);
+
+            for (int j = i + 1; j < rules.size(); j++) {
+                ResolvedCommissionRule candidate = rules.get(j);
+                validateRuleInstallmentRange(candidate);
+
+                boolean sameTarget = Objects.equals(
+                        current.getCommissionItemId(), candidate.getCommissionItemId()
+                ) && current.getAgentRankCode() == candidate.getAgentRankCode();
+                boolean overlaps = current.getInstallmentFrom() <= candidate.getInstallmentTo()
+                        && candidate.getInstallmentFrom() <= current.getInstallmentTo();
+
+                if (sameTarget && overlaps) {
+                    throw new FgcBusinessException(
+                            FgcErrorCode.COMMON_002,
+                            "commissionRules",
+                            Map.of(
+                                    "policyVersionId", String.valueOf(policy.getPolicyVersionId()),
+                                    "firstRuleId", String.valueOf(current.getCommissionRuleId()),
+                                    "secondRuleId", String.valueOf(candidate.getCommissionRuleId())
+                            ),
+                            "동일한 수수료 항목과 지급 대상에 중복 적용되는 회차 규칙이 있습니다."
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * 설명 : 수수료 규칙의 적용 시작·종료 회차가 스케줄 생성 가능한 값인지 검증한다.
+     *
+     * @param rule 검증할 수수료 규칙
+     */
+    private void validateRuleInstallmentRange(ResolvedCommissionRule rule) {
+        if (rule == null
+                || rule.getInstallmentFrom() == null
+                || rule.getInstallmentTo() == null
+                || rule.getInstallmentFrom() < 1
+                || rule.getInstallmentTo() < rule.getInstallmentFrom()) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "installmentRange",
+                    Map.of(
+                            "commissionRuleId",
+                            rule == null ? "" : String.valueOf(rule.getCommissionRuleId())
+                    ),
+                    "수수료 규칙의 적용 회차 범위가 올바르지 않습니다."
+            );
+        }
     }
 
     /**
@@ -393,7 +460,9 @@ public class ScheduleService {
     }
 
     /**
-     * 설명 : 계약일과 지급 회차를 기준으로 지급 예정일을 계산한다.
+     * 설명 : 현재 프로젝트의 예상 스케줄 산정 가정에 따라 계약일과 지급 회차를 기준으로
+     * 지급 예정일을 계산한다. 실제 운영 지급일은 보험회사·GA별 지급기준이 다를 수 있으므로
+     * 향후 paymentConditionCode 또는 별도 지급일 정책이 제공되면 해당 규칙으로 대체해야 한다.
      *
      * @param contractDate 계약일
      * @param installmentNo 지급 회차

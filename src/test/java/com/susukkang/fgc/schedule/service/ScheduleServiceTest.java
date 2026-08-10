@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicyType;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -124,6 +126,58 @@ class ScheduleServiceTest {
         assertThat(gaLines.getFirst().getBeneficiaryAgentId()).isEqualTo(20L);
         verify(agentMapper, never()).findActiveAgentIdFromOrganizationHierarchy(
                 any(), any(), any());
+    }
+
+    @Test
+    void rejectsOverlappingRulesForSameCommissionItemAndBeneficiary() {
+        InsuranceContract contract = InsuranceContract.builder()
+                .contractId(10L)
+                .contractDate(LocalDate.of(2026, 8, 10))
+                .agentId(20L)
+                .organizationId(30L)
+                .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
+                .build();
+
+        ResolvedCommissionRule firstRule =
+                rule(1000L, AgentRankCode.FC, 1, 12, "100.000000");
+        ResolvedCommissionRule overlappingRule = ResolvedCommissionRule.builder()
+                .commissionRuleId(1001L)
+                .commissionItemId(1000L)
+                .agentRankCode(AgentRankCode.FC)
+                .installmentFrom(12)
+                .installmentTo(24)
+                .basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM")
+                .calculationType(CalculationType.RATE)
+                .ratePct(new BigDecimal("50.000000"))
+                .roundingScale(0)
+                .roundingMode(RoundingMode.HALF_UP)
+                .build();
+        ResolvedCommissionPolicy insurerPolicy = policy(
+                100L,
+                PaymentStage.INSURER_TO_GA,
+                rule(3000L, null, 1, 1, "100.000000")
+        );
+        ResolvedCommissionPolicy gaPolicy = ResolvedCommissionPolicy.builder()
+                .policyVersionId(200L)
+                .policyType(PolicyType.CURRENT_COMMISSION)
+                .paymentStage(PaymentStage.GA_TO_FC)
+                .rules(List.of(firstRule, overlappingRule))
+                .build();
+
+        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(commissionPolicyService.resolveCurrentCommission(
+                contract.getContractId(), PaymentStage.INSURER_TO_GA))
+                .willReturn(insurerPolicy);
+        given(commissionPolicyService.resolveCurrentCommission(
+                contract.getContractId(), PaymentStage.GA_TO_FC))
+                .willReturn(gaPolicy);
+
+        assertThatThrownBy(() -> scheduleService.generateSchedules(contract))
+                .isInstanceOf(FgcBusinessException.class)
+                .hasMessage("FGC-COMMON-002");
+
+        verify(scheduleMapper, never()).insertScheduleHeader(any());
+        verify(scheduleMapper, never()).insertAllScheduleLines(any());
     }
 
     private ResolvedCommissionPolicy policy(
