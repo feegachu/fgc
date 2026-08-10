@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.validation.mapper.PolicySnapshotMapper">
+
+    <!-- CapRuleMapper#findApplicableRuleSet과 같은 WHERE(활성 기간 + policy_version.status='ACTIVE')를
+         쓰되, 계약별 payment_stage/insurer_id 등으로 좁히지 않고 asOfDate 하나로만 전체를 나열한다. -->
+    <select id="findActiveCapRuleSets" resultType="com.susukkang.fgc.cap.dto.CapRuleSetView">
+        SELECT crs.cap_rule_set_id             AS capRuleSetId,
+               crs.policy_version_id            AS policyVersionId,
+               crs.payment_stage                AS paymentStage,
+               crs.contract_date_from           AS contractDateFrom,
+               crs.contract_date_to             AS contractDateTo,
+               crs.insurer_id                   AS insurerId,
+               crs.product_group_code           AS productGroupCode,
+               crs.channel_code                 AS channelCode,
+               crs.first_year_months            AS firstYearMonths,
+               crs.premium_multiplier           AS premiumMultiplier,
+               crs.compliance_deduction_pct     AS complianceDeductionPct,
+               crs.refund_addition_condition    AS refundAdditionCondition,
+               crs.warning_usage_pct            AS warningUsagePct
+          FROM fgc.cap_rule_set crs
+          JOIN fgc.policy_version pv ON pv.policy_version_id = crs.policy_version_id
+         WHERE pv.status = 'ACTIVE'
+           AND crs.contract_date_from &lt;= #{asOfDate}
+           AND (crs.contract_date_to IS NULL OR crs.contract_date_to >= #{asOfDate})
+         ORDER BY crs.payment_stage, crs.cap_rule_set_id
+    </select>
+
+    <select id="findActiveRefundRateTables" resultType="com.susukkang.fgc.cap.dto.RefundRateTableView">
+        SELECT rrt.refund_rate_table_id    AS refundRateTableId,
+               rrt.policy_version_id        AS policyVersionId,
+               pv.version_no                AS versionNo,
+               rrt.standard_deduction_80_yn AS standardDeduction80Yn,
+               rrt.effective_from           AS effectiveFrom
+          FROM fgc.refund_rate_table rrt
+          JOIN fgc.policy_version pv ON pv.policy_version_id = rrt.policy_version_id
+         WHERE pv.status = 'ACTIVE'
+           AND rrt.effective_from &lt;= #{asOfDate}
+           AND (rrt.effective_to IS NULL OR rrt.effective_to >= #{asOfDate})
+         ORDER BY rrt.refund_rate_table_id
+    </select>
+
+    <select id="findActiveProductOfferings" resultType="com.susukkang.fgc.validation.dto.ProductOfferingSnapshotView">
+        SELECT product_offering_id      AS productOfferingId,
+               product_id               AS productId,
+               channel_code             AS channelCode,
+               fee_regime_code          AS feeRegimeCode,
+               standard_deduction_80_yn AS standardDeduction80Yn
+          FROM fgc.product_offering
+         WHERE active_yn = true
+           AND sales_start_date &lt;= #{asOfDate}
+           AND (sales_end_date IS NULL OR sales_end_date >= #{asOfDate})
+         ORDER BY product_offering_id
+    </select>
+
+</mapper>
