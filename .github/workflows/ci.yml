@@ -58,7 +58,7 @@ jobs:
 
       - name: Set up Gradle (의존성·빌드 캐시)
         # v6는 캐시 컴포넌트의 별도 이용약관 검토가 필요해 Node 24 기반 최신 v5를 사용한다.
-        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Build and test
         env:
