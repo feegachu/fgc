@@ -36,18 +36,18 @@
                 LIKE CONCAT('%', #{condition.contractNo}, '%')
             </if>
 
-            <if test="condition.paymentStage != null
-                      and condition.paymentStage != ''">
-                AND sh.payment_stage = #{condition.paymentStage}
+            <if test="condition.stage != null
+                      and condition.stage != ''">
+                AND sh.payment_stage = #{condition.stage}
             </if>
 
-            <if test="condition.scheduleRegime != null">
-                AND sh.schedule_regime = #{condition.scheduleRegime}
+            <if test="condition.regime != null">
+                AND sh.schedule_regime = #{condition.regime}
             </if>
 
-            <if test="condition.schedulePurpose != null
-                      and condition.schedulePurpose != ''">
-                AND sh.schedule_purpose = #{condition.schedulePurpose}
+            <if test="condition.purpose != null
+                      and condition.purpose != ''">
+                AND sh.schedule_purpose = #{condition.purpose}
             </if>
 
             <if test="condition.status != null
@@ -82,18 +82,18 @@
                 LIKE CONCAT('%', #{condition.contractNo}, '%')
             </if>
 
-            <if test="condition.paymentStage != null
-                      and condition.paymentStage != ''">
-                AND sh.payment_stage = #{condition.paymentStage}
+            <if test="condition.stage != null
+                      and condition.stage != ''">
+                AND sh.payment_stage = #{condition.stage}
             </if>
 
-            <if test="condition.scheduleRegime != null">
-                AND sh.schedule_regime = #{condition.scheduleRegime}
+            <if test="condition.regime != null">
+                AND sh.schedule_regime = #{condition.regime}
             </if>
 
-            <if test="condition.schedulePurpose != null
-                      and condition.schedulePurpose != ''">
-                AND sh.schedule_purpose = #{condition.schedulePurpose}
+            <if test="condition.purpose != null
+                      and condition.purpose != ''">
+                AND sh.schedule_purpose = #{condition.purpose}
             </if>
 
             <if test="condition.status != null
@@ -138,6 +138,7 @@
             <result property="ratePct" column="rate_pct"/>
             <result property="expectedAmount" column="expected_amount"/>
             <result property="status" column="line_status"/>
+            <result property="ruleRef" column="source_commission_rule_id"/>
         </collection>
     </resultMap>
 
@@ -169,7 +170,8 @@
             sl.calculation_type,
             sl.rate_pct,
             sl.expected_amount,
-            sl.line_status
+            sl.line_status,
+            sl.source_commission_rule_id
         -- 필요한 JOIN 컬럼들
         FROM schedule_header sh
              JOIN insurance_contract c
@@ -272,4 +274,80 @@
             )
         </foreach>
     </insert>
+
+    <!-- 정책 없음·중복으로 생성하지 못한 지급단계를 공통 예외 큐에 검토 대상으로 등록한다. -->
+    <insert id="upsertPolicyReviewCase">
+        INSERT INTO fgc.exception_case
+        (
+            exception_key,
+            exception_type,
+            severity,
+            status,
+            contract_id,
+            source_entity_type,
+            source_entity_id,
+            title,
+            description
+        )
+        VALUES
+        (
+            CONCAT(
+                'SCHEDULE_POLICY:',
+                #{contractId},
+                ':',
+                #{paymentStage},
+                ':',
+                #{exceptionType}
+            ),
+            #{exceptionType},
+            'HIGH',
+            'NEW',
+            #{contractId},
+            'INSURANCE_CONTRACT',
+            CAST(#{contractId} AS varchar),
+            #{title},
+            #{description}
+        )
+        ON CONFLICT (exception_key)
+        DO UPDATE SET
+            status = 'NEW',
+            title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            resolved_at = NULL,
+            updated_at = clock_timestamp()
+    </insert>
+
+    <!-- 같은 계약의 동시 스케줄 생성을 직렬화한다. -->
+    <select id="lockContractForScheduleGeneration" resultType="long">
+        SELECT contract_id
+        FROM fgc.insurance_contract
+        WHERE contract_id = #{contractId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectActiveOperationalPolicyVersionId" resultType="long">
+        SELECT policy_version_id
+        FROM fgc.schedule_header
+        WHERE contract_id = #{contractId}
+          AND payment_stage = #{paymentStage}
+          AND schedule_purpose = 'OPERATIONAL'
+          AND active_yn = TRUE
+    </select>
+
+    <select id="selectNextScheduleVersionNo" resultType="int">
+        SELECT COALESCE(MAX(schedule_version_no), 0) + 1
+        FROM fgc.schedule_header
+        WHERE contract_id = #{contractId}
+          AND payment_stage = #{paymentStage}
+          AND schedule_purpose = 'OPERATIONAL'
+    </select>
+
+    <update id="deactivateActiveOperationalSchedule">
+        UPDATE fgc.schedule_header
+        SET active_yn = FALSE
+        WHERE contract_id = #{contractId}
+          AND payment_stage = #{paymentStage}
+          AND schedule_purpose = 'OPERATIONAL'
+          AND active_yn = TRUE
+    </update>
 </mapper>

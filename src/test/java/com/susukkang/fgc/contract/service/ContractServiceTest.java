@@ -12,6 +12,7 @@ import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.dto.ContractResponse;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +53,9 @@ class ContractServiceTest {
 
     @Mock
     private ContractMapper contractMapper;
+
+    @Mock
+    private ScheduleService scheduleService;
 
     @InjectMocks
     private ContractService contractService;
@@ -176,6 +180,7 @@ class ContractServiceTest {
         assertThat(saved.getPremiumConversionRuleCode()).isEqualTo(expectedRuleCode);
         assertThat(saved.getDataOrigin()).isEqualTo(DataOrigin.MANUAL);
         assertThat(response.getContractId()).isEqualTo(21L);
+        verify(scheduleService).generateSchedules(saved);
     }
 
     @ParameterizedTest

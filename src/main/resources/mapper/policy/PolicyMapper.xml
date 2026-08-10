@@ -17,6 +17,9 @@
 
         <result property="paymentStage"
                 column="payment_stage"/>
+
+        <result property="scheduleRegime"
+                column="schedule_regime"/>
     </resultMap>
 
 
@@ -70,13 +73,14 @@
         계약일, 상품 판매버전, 보험회사, 수수료체계 및 지급 단계를 기준으로
         현재 적용 가능한 ACTIVE 현행 수수료 정책 한 건을 조회한다.
     -->
-    <select id="findApplicableCurrentCommissionPolicy"
+    <select id="findApplicableCurrentCommissionPolicies"
             resultMap="resolvedCommissionPolicyResultMap">
 
         SELECT
         pv.policy_version_id,
         pv.policy_type,
-        #{paymentStage} AS payment_stage
+        #{paymentStage} AS payment_stage,
+        po.fee_regime_code AS schedule_regime
 
         FROM fgc.policy_version pv
         JOIN fgc.insurance_contract c
@@ -132,8 +136,6 @@
         pv.effective_from DESC,
         pv.version_no DESC,
         pv.policy_version_id DESC
-
-        LIMIT 1
     </select>
 
 

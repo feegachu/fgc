@@ -9,7 +9,6 @@ import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
-import com.susukkang.fgc.policy.mapper.PolicyMapper;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.code.ScheduleGenReason;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
@@ -23,8 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -68,9 +69,7 @@ public class ScheduleService {
         }
 
         // offset : DB가 앞에서 건널 뛸 행 개수 -> offset 번째 부터 조회함
-        long offsetLong = (long)( page - 1 ) * size;
-
-        int offset = (int) offsetLong;
+        long offset = (long) (page - 1) * size;
         List<ScheduleHeaderResponse> scheduleHeaderList = scheduleMapper.selectByCondition(condition,size,offset);
         // 검색조건에 해당하는 전체 계약 건수 조회
         long totalContracts =
@@ -158,79 +157,148 @@ public class ScheduleService {
             );
         }
 
-        // 해당 계약의 정책 룰셋 조회
-        // TODO FUN-011 현행 수수료 정책 조회 적용
+        List<PaymentStage> paymentStages = List.of(
+                PaymentStage.INSURER_TO_GA,
+                PaymentStage.GA_TO_FC
+        );
+        Map<PaymentStage, ResolvedCommissionPolicy> resolvedPolicies =
+                new EnumMap<>(PaymentStage.class);
 
-        //원수사->GA
-        ResolvedCommissionPolicy insurerToGaPolicy =
-                commissionPolicyService.resolveCurrentCommission(
-                        contractId,
-                        PaymentStage.INSURER_TO_GA
+        // 두 지급단계 정책을 모두 검증한 다음 저장을 시작하여 부분 INSERT를 방지한다.
+        for (PaymentStage paymentStage : paymentStages) {
+            resolvedPolicies.put(
+                    paymentStage,
+                    resolvePolicyOrRegisterReview(contractId, paymentStage)
+            );
+        }
+
+        Long lockedContractId =
+                scheduleMapper.lockContractForScheduleGeneration(contractId);
+        if (!Objects.equals(lockedContractId, contractId)) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        }
+
+        int createdLineCount = 0;
+        for (PaymentStage paymentStage : paymentStages) {
+            ResolvedCommissionPolicy policy = resolvedPolicies.get(paymentStage);
+
+            if (policy != null) {
+                createdLineCount += createSchedule(savedContract, policy);
+            }
+        }
+
+        return createdLineCount;
+    }
+
+    /**
+     * 설명 : 지급단계에 적용할 정책을 조회한다. 정책이 없거나 복수로 선택된 경우에는
+     * 해당 지급단계의 스케줄 생성을 건너뛰고 exception_case에 검토 건을 등록한다.
+     * 그 외의 정책·시스템 오류는 정상 실패 처리를 위해 상위로 전달한다.
+     *
+     * @param contractId 계약 ID
+     * @param paymentStage 지급 단계
+     * @return 적용 정책, 검토가 필요한 경우 null
+     */
+    private ResolvedCommissionPolicy resolvePolicyOrRegisterReview(
+            Long contractId,
+            PaymentStage paymentStage
+    ) {
+        try {
+            ResolvedCommissionPolicy policy =
+                    commissionPolicyService.resolveCurrentCommission(
+                            contractId,
+                            paymentStage
+                    );
+            validateResolvedPolicy(policy, paymentStage);
+            return policy;
+        } catch (FgcBusinessException exception) {
+            Object reasonValue = exception.getParams().get("reason");
+            String reason = reasonValue == null ? null : reasonValue.toString();
+
+            if (!"POLICY_MISSING".equals(reason)
+                    && !"POLICY_DUPLICATE".equals(reason)) {
+                throw exception;
+            }
+
+            String title = "수수료 정책 검토 필요 - " + paymentStage.name();
+            String description = exception.getDetail() == null
+                    ? "예상 스케줄에 적용할 수수료 정책을 확정할 수 없습니다."
+                    : exception.getDetail();
+
+            int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+                    contractId,
+                    paymentStage,
+                    reason,
+                    title,
+                    description
+            );
+
+            if (affectedRows != 1) {
+                throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+            }
+
+            return null;
+        }
+    }
+
+    /**
+     * 설명 : 확정된 단일 정책을 기준으로 지급단계별 스케줄 헤더와 라인을 생성한다.
+     *
+     * @param contract 저장된 계약
+     * @param policy 적용할 단일 정책
+     * @return 저장된 스케줄 라인 수
+     */
+    private int createSchedule(
+            InsuranceContract contract,
+            ResolvedCommissionPolicy policy
+    ) {
+        Long activePolicyVersionId =
+                scheduleMapper.selectActiveOperationalPolicyVersionId(
+                        contract.getContractId(),
+                        policy.getPaymentStage()
                 );
-        //GA->설계사
-        ResolvedCommissionPolicy gaToFcPolicy =
-                commissionPolicyService.resolveCurrentCommission(
-                        contractId,
-                        PaymentStage.GA_TO_FC
-                );
 
-        // 룰셋 유효성 검사
-        // 원수사 -> GA
-        validateResolvedPolicy(insurerToGaPolicy, PaymentStage.INSURER_TO_GA);
-        // GA -> FC
-        validateResolvedPolicy(gaToFcPolicy, PaymentStage.GA_TO_FC);
-        
-        // 스케줄 헤더 생성
-        //원수사->GA
-        ScheduleHeaderInsertDTO insToGaHeader = createScheduleHeader(savedContract,insurerToGaPolicy);
-        //GA->FC
-        ScheduleHeaderInsertDTO gaToFcHeader = createScheduleHeader(savedContract,gaToFcPolicy);
-
-        //스케줄 헤더 저장
-        //원수사->GA
-        int insurerHeaderRows = scheduleMapper.insertScheduleHeader(insToGaHeader);
-
-        if (insurerHeaderRows != 1
-                || insToGaHeader.getScheduleHeaderId() == null) {
-            throw new FgcBusinessException(
-                    FgcErrorCode.COMMON_500
-            );
-        }
-        //GA->FC
-        int gaHeaderRows = scheduleMapper.insertScheduleHeader(gaToFcHeader);
-
-        if (gaHeaderRows != 1
-                || gaToFcHeader.getScheduleHeaderId() == null) {
-            throw new FgcBusinessException(
-                    FgcErrorCode.COMMON_500
-            );
+        // 같은 정책으로 이미 생성된 활성 운영 스케줄은 다시 만들지 않는다.
+        if (Objects.equals(activePolicyVersionId, policy.getPolicyVersionId())) {
+            return 0;
         }
 
-        // 스케줄 라인 생성
-        // 원수사->GA
-        List<ScheduleLineInsertDTO> insToGaLines = createScheduleLines(savedContract,insToGaHeader,insurerToGaPolicy);
-        // GA->FC
-        List<ScheduleLineInsertDTO> gaToFcLines = createScheduleLines(savedContract,gaToFcHeader,gaToFcPolicy);
-
-        //스케줄 라인 저장
-        // 원수사->GA
-        int insurerLineCount = scheduleMapper.insertAllScheduleLines(insToGaLines);
-
-        if (insurerLineCount != insToGaLines.size()) {
-            throw new FgcBusinessException(
-                    FgcErrorCode.COMMON_500
-            );
-        }
-        // GA->FC
-        int gaLineCount = scheduleMapper.insertAllScheduleLines(gaToFcLines);
-
-        if (gaLineCount != gaToFcLines.size()) {
-            throw new FgcBusinessException(
-                    FgcErrorCode.COMMON_500
-            );
+        int nextVersionNo = scheduleMapper.selectNextScheduleVersionNo(
+                contract.getContractId(),
+                policy.getPaymentStage()
+        );
+        if (nextVersionNo < 1) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
         }
 
-        return insurerLineCount + gaLineCount;
+        if (activePolicyVersionId != null) {
+            int deactivatedRows =
+                    scheduleMapper.deactivateActiveOperationalSchedule(
+                            contract.getContractId(),
+                            policy.getPaymentStage()
+                    );
+            if (deactivatedRows != 1) {
+                throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+            }
+        }
+
+        ScheduleHeaderInsertDTO header =
+                createScheduleHeader(contract, policy, nextVersionNo);
+        int headerRows = scheduleMapper.insertScheduleHeader(header);
+
+        if (headerRows != 1 || header.getScheduleHeaderId() == null) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        }
+
+        List<ScheduleLineInsertDTO> lines =
+                createScheduleLines(contract, header, policy);
+        int insertedLineCount = scheduleMapper.insertAllScheduleLines(lines);
+
+        if (insertedLineCount != lines.size()) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        }
+
+        return insertedLineCount;
     }
     /**
      * 설명 : 정책 조회 서비스에서 반환된 수수료 정책이 스케줄 생성에 사용 가능한지 검증한다.
@@ -424,6 +492,8 @@ public class ScheduleService {
             BigDecimal basisAmount,
             ResolvedCommissionRule rule
     ) {
+        validateRoundingPolicy(rule);
+
         if (rule.getCalculationType() == null) {
             throw new IllegalArgumentException(
                     "수수료 계산 방식이 없습니다."
@@ -457,6 +527,42 @@ public class ScheduleService {
                         );
             }
         };
+    }
+
+    /**
+     * 설명 : 예상 수수료 상세행에 적용할 반올림 정책을 검증한다.
+     * 운영정책과 DB 제약에 따라 원 단위(scale 0) HALF_UP만 허용한다.
+     *
+     * @param rule 반올림 정책을 포함한 수수료 규칙
+     */
+    private void validateRoundingPolicy(ResolvedCommissionRule rule) {
+        if (rule == null
+                || rule.getRoundingScale() == null
+                || rule.getRoundingMode() == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "roundingPolicy",
+                    Map.of(
+                            "commissionRuleId",
+                            rule == null ? "" : String.valueOf(rule.getCommissionRuleId())
+                    ),
+                    "수수료 계산에 필요한 반올림 정책이 없습니다."
+            );
+        }
+
+        if (rule.getRoundingScale() != 0
+                || rule.getRoundingMode() != RoundingMode.HALF_UP) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "roundingPolicy",
+                    Map.of(
+                            "commissionRuleId", String.valueOf(rule.getCommissionRuleId()),
+                            "roundingScale", rule.getRoundingScale(),
+                            "roundingMode", rule.getRoundingMode().name()
+                    ),
+                    "예상 수수료는 상세행별 원 단위 HALF_UP 반올림만 허용합니다."
+            );
+        }
     }
 
     /**
@@ -635,14 +741,18 @@ public class ScheduleService {
      * @author hjKang
      * @since 2026-08-10
      */
-    private ScheduleHeaderInsertDTO createScheduleHeader(InsuranceContract contract, ResolvedCommissionPolicy policy) {
+    private ScheduleHeaderInsertDTO createScheduleHeader(
+            InsuranceContract contract,
+            ResolvedCommissionPolicy policy,
+            int scheduleVersionNo
+    ) {
         ScheduleHeaderInsertDTO header = ScheduleHeaderInsertDTO.builder()
                 .contractId(contract.getContractId())
                 .paymentStage(policy.getPaymentStage())
                 .policyVersionId(policy.getPolicyVersionId())
-                .scheduleVersionNo(1)
+                .scheduleVersionNo(scheduleVersionNo)
                 .schedulePurpose(SchedulePurpose.OPERATIONAL)
-                .scheduleRegime(determineScheduleRegime(policy.getPolicyType()))
+                .scheduleRegime(determineScheduleRegime(policy))
                 .status(ScheduleHeaderStatus.PLANNED)
                 .activeYn(Boolean.TRUE)
                 .generationReason(ScheduleGenReason.CONTRACT_CREATED)
@@ -652,10 +762,15 @@ public class ScheduleService {
     /**
      * 설명 : 들어온 정책의 유형에 따라 매핑되어서 스케줄 헤더의 regime로 반환된다.
      * 현행 , 4년 , 7년에 따라 맞춰서 반환하며 다른 commission일 경우 에러를 반환함.
-     * @param policyType 정책유형
+     * @param policy 조회된 정책과 상품 판매버전의 적용 체계
      * @return 스케줄 헤더 DTO
      */
-    private ScheduleRegime determineScheduleRegime(PolicyType policyType) {
+    private ScheduleRegime determineScheduleRegime(ResolvedCommissionPolicy policy) {
+        if (policy.getScheduleRegime() != null) {
+            return policy.getScheduleRegime();
+        }
+
+        PolicyType policyType = policy.getPolicyType();
         return switch(policyType){
             case CURRENT_COMMISSION->ScheduleRegime.CURRENT;//현행
             case FOUR_YEAR_COMMISSION->ScheduleRegime.FOUR_YEAR_2027; //4년 분급

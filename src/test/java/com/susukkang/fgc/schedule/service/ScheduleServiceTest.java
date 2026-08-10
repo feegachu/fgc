@@ -6,6 +6,7 @@ import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
@@ -13,8 +14,10 @@ import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
+import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -26,6 +29,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +58,78 @@ class ScheduleServiceTest {
 
     @InjectMocks
     private ScheduleService scheduleService;
+
+    @BeforeEach
+    void setUpScheduleGenerationDefaults() {
+        lenient().when(scheduleMapper.lockContractForScheduleGeneration(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(scheduleMapper.selectNextScheduleVersionNo(any(), any()))
+                .thenReturn(1);
+        lenient().when(scheduleMapper.selectActiveOperationalPolicyVersionId(any(), any()))
+                .thenReturn(null);
+    }
+
+    @Test
+    void keepsLargePaginationOffsetAsLong() {
+        ScheduleSearchCondition condition = new ScheduleSearchCondition();
+        int page = 30_000_000;
+        int size = 100;
+        long expectedOffset = 2_999_999_900L;
+
+        given(scheduleMapper.selectByCondition(condition, size, expectedOffset))
+                .willReturn(List.of());
+        given(scheduleMapper.countByCondition(condition)).willReturn(0L);
+
+        scheduleService.selectByCondition(condition, page, size);
+
+        verify(scheduleMapper).selectByCondition(condition, size, expectedOffset);
+    }
+
+    @Test
+    void roundsEachCommissionLineAtHalfWonBeforeSumming() {
+        ResolvedCommissionRule rule = rule(
+                1000L,
+                AgentRankCode.FC,
+                1,
+                2,
+                "50.000000"
+        );
+
+        BigDecimal firstLine = ReflectionTestUtils.invokeMethod(
+                scheduleService,
+                "calculateExpectedAmount",
+                BigDecimal.ONE,
+                rule
+        );
+        BigDecimal secondLine = ReflectionTestUtils.invokeMethod(
+                scheduleService,
+                "calculateExpectedAmount",
+                BigDecimal.ONE,
+                rule
+        );
+
+        assertThat(firstLine).isEqualByComparingTo("1");
+        assertThat(secondLine).isEqualByComparingTo("1");
+        assertThat(firstLine.add(secondLine)).isEqualByComparingTo("2");
+    }
+
+    @Test
+    void rejectsUnsupportedRoundingPolicy() {
+        ResolvedCommissionRule rule = ResolvedCommissionRule.builder()
+                .commissionRuleId(1000L)
+                .calculationType(CalculationType.RATE)
+                .ratePct(new BigDecimal("10"))
+                .roundingScale(2)
+                .roundingMode(RoundingMode.HALF_EVEN)
+                .build();
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                scheduleService,
+                "calculateExpectedAmount",
+                BigDecimal.ONE,
+                rule
+        )).isInstanceOf(FgcBusinessException.class);
+    }
 
     @Test
     void generatesInsurerAndGaSchedulesFromResolvedPolicies() {
@@ -178,6 +256,96 @@ class ScheduleServiceTest {
 
         verify(scheduleMapper, never()).insertScheduleHeader(any());
         verify(scheduleMapper, never()).insertAllScheduleLines(any());
+    }
+
+    @Test
+    void registersReviewCasesAndSkipsSchedulesWhenPoliciesCannotBeResolved() {
+        InsuranceContract contract = InsuranceContract.builder()
+                .contractId(10L)
+                .contractDate(LocalDate.of(2026, 8, 10))
+                .build();
+
+        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(commissionPolicyService.resolveCurrentCommission(
+                contract.getContractId(), PaymentStage.INSURER_TO_GA))
+                .willThrow(policyResolutionException(
+                        contract.getContractId(),
+                        PaymentStage.INSURER_TO_GA,
+                        "POLICY_MISSING"
+                ));
+        given(commissionPolicyService.resolveCurrentCommission(
+                contract.getContractId(), PaymentStage.GA_TO_FC))
+                .willThrow(policyResolutionException(
+                        contract.getContractId(),
+                        PaymentStage.GA_TO_FC,
+                        "POLICY_DUPLICATE"
+                ));
+        given(scheduleMapper.upsertPolicyReviewCase(
+                any(), any(), any(), any(), any()))
+                .willReturn(1);
+
+        int createdLineCount = scheduleService.generateSchedules(contract);
+
+        assertThat(createdLineCount).isZero();
+        verify(scheduleMapper, times(2)).upsertPolicyReviewCase(
+                any(), any(), any(), any(), any());
+        verify(scheduleMapper, never()).insertScheduleHeader(any());
+        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+    }
+
+    @Test
+    void skipsGenerationWhenSamePoliciesAreAlreadyActive() {
+        InsuranceContract contract = InsuranceContract.builder()
+                .contractId(10L)
+                .contractDate(LocalDate.of(2026, 8, 10))
+                .build();
+        ResolvedCommissionPolicy insurerPolicy = policy(
+                100L,
+                PaymentStage.INSURER_TO_GA,
+                rule(1000L, null, 1, 1, "100.000000")
+        );
+        ResolvedCommissionPolicy gaPolicy = policy(
+                200L,
+                PaymentStage.GA_TO_FC,
+                rule(2000L, AgentRankCode.FC, 1, 1, "100.000000")
+        );
+
+        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(commissionPolicyService.resolveCurrentCommission(
+                contract.getContractId(), PaymentStage.INSURER_TO_GA))
+                .willReturn(insurerPolicy);
+        given(commissionPolicyService.resolveCurrentCommission(
+                contract.getContractId(), PaymentStage.GA_TO_FC))
+                .willReturn(gaPolicy);
+        given(scheduleMapper.selectActiveOperationalPolicyVersionId(
+                contract.getContractId(), PaymentStage.INSURER_TO_GA))
+                .willReturn(100L);
+        given(scheduleMapper.selectActiveOperationalPolicyVersionId(
+                contract.getContractId(), PaymentStage.GA_TO_FC))
+                .willReturn(200L);
+
+        int createdLineCount = scheduleService.generateSchedules(contract);
+
+        assertThat(createdLineCount).isZero();
+        verify(scheduleMapper, never()).insertScheduleHeader(any());
+        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+    }
+
+    private FgcBusinessException policyResolutionException(
+            Long contractId,
+            PaymentStage paymentStage,
+            String reason
+    ) {
+        return new FgcBusinessException(
+                FgcErrorCode.COMMON_002,
+                "commissionPolicy",
+                Map.of(
+                        "contractId", contractId,
+                        "paymentStage", paymentStage.name(),
+                        "reason", reason
+                ),
+                "예상 스케줄에 적용할 정책을 확정할 수 없습니다."
+        );
     }
 
     private ResolvedCommissionPolicy policy(

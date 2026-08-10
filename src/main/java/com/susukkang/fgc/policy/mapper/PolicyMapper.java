@@ -18,14 +18,16 @@ import java.util.List;
 @Mapper
 public interface PolicyMapper {
 
+
     /**
-     * 설명 : 계약 ID와 지급 단계를 기준으로 적용 가능한 현행 수수료 정책을 조회한다.
+     * 설명 : 계약과 지급 단계에 적용 가능한 현행 수수료 정책 목록을 조회한다.
+     * 정책 중복 여부는 서비스 계층에서 조회 건수를 기준으로 판정한다.
      *
      * @param contractId 계약 ID
      * @param paymentStage 지급 단계
-     * @return 적용 가능한 현행 수수료 정책
+     * @return 적용 가능한 현행 수수료 정책 목록
      */
-    ResolvedCommissionPolicy findApplicableCurrentCommissionPolicy(
+    List<ResolvedCommissionPolicy> findApplicableCurrentCommissionPolicies(
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage
     );

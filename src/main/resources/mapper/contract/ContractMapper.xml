@@ -9,15 +9,16 @@
     <select id="selectByCondition"
             resultType="com.susukkang.fgc.contract.dto.ContractView">
         SELECT
-            ic.contract_no,
-            i.insurer_name,
-            p.product_name,
-            ic.contract_date,
-            ic.monthly_equivalent_first_premium,
+            ic.contract_id AS contract_id,
+            ic.contract_no AS contract_no,
+            i.insurer_name AS insurer_name,
+            p.product_name AS product_name,
+            ic.contract_date AS contract_date,
+            ic.monthly_equivalent_first_premium AS monthly_equivalent_first_premium,
             CONCAT('FC-', LPAD(a.agent_id::text, 4, '0'), ' ', a.agent_name) AS agent_id_name,
-            ic.current_status,
-            cc.result_status,
-            ic.data_origin
+            ic.current_status AS contract_status,
+            cc.result_status AS cap_result_status,
+            ic.data_origin AS data_origin
         FROM insurance_contract ic --계약
             JOIN insurer i         --보험회사 이름 가져와야함
                 ON i.insurer_id = ic.insurer_id

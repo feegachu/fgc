@@ -29,6 +29,8 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
     /**
      * 설명 : 계약과 지급 단계에 적용할 현행 수수료 정책과 규칙 목록을 조회한다.
+     * 적용 가능한 활성 정책이 정확히 한 건인 경우에만 수수료 규칙을 조회한다.
+     * 정책이 없거나 복수로 조회되면 스케줄 생성을 중단할 수 있도록 예외를 발생시킨다.
      *
      * @param contractId 계약 ID
      * @param paymentStage 지급 단계
@@ -41,23 +43,40 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
     ) {
         validateQueryCondition(contractId, paymentStage);
 
-        ResolvedCommissionPolicy policy =
-                policyMapper.findApplicableCurrentCommissionPolicy(
+        List<ResolvedCommissionPolicy> policies =
+                policyMapper.findApplicableCurrentCommissionPolicies(
                         contractId,
                         paymentStage
                 );
 
-        if (policy == null) {
+        if (policies == null || policies.isEmpty()) {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_002,
                     "commissionPolicy",
                     Map.of(
                             "contractId", contractId,
-                            "paymentStage", paymentStage.name()
+                            "paymentStage", paymentStage.name(),
+                            "reason", "POLICY_MISSING"
                     ),
                     "계약에 적용할 현행 수수료 정책이 없습니다."
             );
         }
+
+        if (policies.size() > 1) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "commissionPolicy",
+                    Map.of(
+                            "contractId", contractId,
+                            "paymentStage", paymentStage.name(),
+                            "reason", "POLICY_DUPLICATE",
+                            "policyCount", policies.size()
+                    ),
+                    "계약에 적용 가능한 현행 수수료 정책이 여러 건 존재합니다."
+            );
+        }
+
+        ResolvedCommissionPolicy policy = policies.getFirst();
 
         List<ResolvedCommissionRule> rules =
                 policyMapper.findApplicableCommissionRules(
@@ -82,6 +101,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                 .policyVersionId(policy.getPolicyVersionId())
                 .policyType(policy.getPolicyType())
                 .paymentStage(paymentStage)
+                .scheduleRegime(policy.getScheduleRegime())
                 .rules(List.copyOf(rules))
                 .build();
     }
