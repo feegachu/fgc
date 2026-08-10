@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ERR-500', '처리 오류', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+  <div class="fgc-card" style="max-width:560px;margin-top:40px">
+    <div class="fgc-card__head"><span class="fgc-card__title">500 · 처리 오류</span></div>
+    <div class="fgc-card__body">
+      <p>처리 중 오류가 발생했습니다.</p>
+      <!-- 부록 A FGC-COMMON-500 — 담당자가 로그를 찾을 수 있도록 요청번호를 반드시 보여준다. -->
+      <p class="fgc-help">
+        요청번호 <span class="fgc-mono" th:text="${requestId} ?: '-'">-</span> 를 담당자에게 알려주세요.
+      </p>
+      <a class="fgc-btn fgc-btn--ghost" th:href="@{/}" style="margin-top:16px;text-decoration:none">대시보드로</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>
