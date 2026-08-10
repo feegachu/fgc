@@ -6,130 +6,94 @@
 <mapper namespace="com.susukkang.fgc.policy.mapper.PolicyMapper">
 
     <!-- 적용 가능한 수수료 정책 매핑 -->
+    <!-- ResolvedCommissionPolicy <-> DB snake_case column -->
     <resultMap id="resolvedCommissionPolicyResultMap"
                type="com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy">
-
-        <id property="policyVersionId"
-            column="policy_version_id"/>
-
-        <result property="policyType"
-                column="policy_type"/>
-
-        <result property="paymentStage"
-                column="payment_stage"/>
-
-        <result property="scheduleRegime"
-                column="schedule_regime"/>
+        <id property="policyVersionId" column="policy_version_id"/>
+        <result property="policyType" column="policy_type"/>
+        <result property="paymentStage" column="payment_stage"/>
+        <result property="scheduleRegime" column="schedule_regime"/>
     </resultMap>
 
 
     <!-- 적용 가능한 수수료 규칙 매핑 -->
+    <!-- ResolvedCommissionRule <-> commission_rule -->
     <resultMap id="resolvedCommissionRuleResultMap"
                type="com.susukkang.fgc.policy.dto.ResolvedCommissionRule">
-
-        <id property="commissionRuleId"
-            column="commission_rule_id"/>
-
-        <result property="commissionItemId"
-                column="commission_item_id"/>
-
-        <result property="organizationId"
-                column="organization_id"/>
-
-        <result property="agentRankCode"
-                column="agent_rank_code"/>
-
-        <result property="installmentFrom"
-                column="installment_from"/>
-
-        <result property="installmentTo"
-                column="installment_to"/>
-
-        <result property="basisCode"
-                column="basis_code"/>
-
-        <result property="calculationType"
-                column="calculation_type"/>
-
-        <result property="ratePct"
-                column="rate_pct"/>
-
-        <result property="fixedAmount"
-                column="fixed_amount"/>
-
-        <result property="roundingScale"
-                column="rounding_scale"/>
-
-        <result property="roundingMode"
-                column="rounding_mode"
-                javaType="java.math.RoundingMode"/>
-
-        <result property="paymentConditionCode"
-                column="payment_condition_code"/>
+        <id property="commissionRuleId" column="commission_rule_id"/>
+        <result property="commissionItemId" column="commission_item_id"/>
+        <result property="insurerId" column="insurer_id"/>
+        <result property="productOfferingId" column="product_offering_id"/>
+        <result property="organizationId" column="organization_id"/>
+        <result property="agentRankCode" column="agent_rank_code"/>
+        <result property="installmentFrom" column="installment_from"/>
+        <result property="installmentTo" column="installment_to"/>
+        <result property="basisCode" column="basis_code"/>
+        <result property="calculationType" column="calculation_type"/>
+        <result property="ratePct" column="rate_pct"/>
+        <result property="fixedAmount" column="fixed_amount"/>
+        <result property="roundingScale" column="rounding_scale"/>
+        <result property="roundingMode" column="rounding_mode" javaType="java.math.RoundingMode"/>
+        <result property="paymentConditionCode" column="payment_condition_code"/>
+        <result property="priorityNo" column="priority_no"/>
     </resultMap>
 
 
-    <!--
-        계약일, 상품 판매버전, 보험회사, 수수료체계 및 지급 단계를 기준으로
-        현재 적용 가능한 ACTIVE 현행 수수료 정책 한 건을 조회한다.
-    -->
+    <!--계약일, 상품 판매버전, 보험회사, 수수료체계 및 지급 단계를 기준으로
+        현재 적용 가능한 ACTIVE 현행 수수료 정책을 가져온다.-->
     <select id="findApplicableCurrentCommissionPolicies"
             resultMap="resolvedCommissionPolicyResultMap">
 
         SELECT
-        pv.policy_version_id,
-        pv.policy_type,
-        #{paymentStage} AS payment_stage,
-        po.fee_regime_code AS schedule_regime
+            pv.policy_version_id,
+            pv.policy_type,
+            #{paymentStage} AS payment_stage,
+            po.fee_regime_code AS schedule_regime
+        FROM
+            policy_version pv
+        JOIN
+            insurance_contract c
+                ON c.contract_id = #{contractId}
+        JOIN
+            product_offering po
+                ON po.product_offering_id = c.product_offering_id
+        WHERE
+            pv.policy_type = 'CURRENT_COMMISSION'
+        AND
+            pv.status = 'ACTIVE'
+        <!-- <=를 그냥 쓰면 XML 태그시작 <과 헷갈리기 때문에 CDATA로 감싸서 일반 문자열로 처리함 -->
+        <!-- 계약 성립일이 정책 결정일 안에 있는지 -->
+        AND
+            pv.effective_from <![CDATA[ <= ]]> c.contract_date
+        AND
+            (pv.effective_to IS NULL OR pv.effective_to <![CDATA[ >= ]]> c.contract_date)
+        <!-- 정책 버전 code가 범용 (NULL) 이거나 상품 정책 regime_code 과 일치하는지 -->
+        AND
+            (pv.fee_regime_code IS NULL OR pv.fee_regime_code = po.fee_regime_code)
+        AND
+            (pv.basic_document_version IS NULL OR pv.basic_document_version = po.basic_document_version)
+        AND
+            po.active_yn = TRUE
+        AND
+            po.sales_start_date <![CDATA[ <= ]]> c.contract_date
+        AND
+            (po.sales_end_date IS NULL OR po.sales_end_date <![CDATA[ >= ]]> c.contract_date)
 
-        FROM fgc.policy_version pv
-        JOIN fgc.insurance_contract c
-        ON c.contract_id = #{contractId}
-        JOIN fgc.product_offering po
-        ON po.product_offering_id = c.product_offering_id
-
-        WHERE pv.policy_type = 'CURRENT_COMMISSION'
-        AND pv.status = 'ACTIVE'
-        AND pv.effective_from <![CDATA[ <= ]]> c.contract_date
-        AND (
-        pv.effective_to IS NULL
-        OR pv.effective_to <![CDATA[ >= ]]> c.contract_date
-        )
-        AND (
-        pv.fee_regime_code IS NULL
-        OR pv.fee_regime_code = po.fee_regime_code
-        )
-        AND (
-        pv.basic_document_version IS NULL
-        OR pv.basic_document_version = po.basic_document_version
-        )
-        AND po.active_yn = TRUE
-        AND po.sales_start_date <![CDATA[ <= ]]> c.contract_date
-        AND (
-        po.sales_end_date IS NULL
-        OR po.sales_end_date <![CDATA[ >= ]]> c.contract_date
-        )
-
-        <!-- 해당 지급 단계의 적용 가능한 규칙을 가진 정책만 선택한다. -->
+        <!-- 해당 정책을 적용 중인 수수료 규칙이 있는지 확인. -->
         AND EXISTS (
-        SELECT 1
-        FROM fgc.commission_rule cr
-        WHERE cr.policy_version_id = pv.policy_version_id
-        AND cr.payment_stage = #{paymentStage}
-        AND (
-        cr.insurer_id IS NULL
-        OR cr.insurer_id = c.insurer_id
-        )
-        AND (
-        cr.product_offering_id IS NULL
-        OR cr.product_offering_id =
-        c.product_offering_id
-        )
-        AND (
-        cr.organization_id IS NULL
-        OR cr.organization_id =
-        c.organization_id
-        )
+            SELECT 1
+        FROM
+            commission_rule cr
+        WHERE
+            cr.policy_version_id = pv.policy_version_id
+        AND
+            cr.payment_stage = #{paymentStage}
+        AND
+            (cr.insurer_id IS NULL OR cr.insurer_id = c.insurer_id )
+        AND
+            (cr.product_offering_id IS NULL OR cr.product_offering_id = c.product_offering_id)
+        AND
+            (cr.organization_id IS NULL OR cr.organization_id = c.organization_id)
         )
 
         ORDER BY
@@ -149,7 +113,6 @@
         SELECT
             cr.commission_rule_id,
             cr.commission_item_id,
-            cr.organization_id,
             cr.agent_rank_code,
             cr.installment_from,
             cr.installment_to,
@@ -159,32 +122,28 @@
             cr.fixed_amount,
             cr.rounding_scale,
             cr.rounding_mode,
-            cr.payment_condition_code
+            cr.payment_condition_code,
+            cr.insurer_id,
+            cr.organization_id,
+            cr.product_offering_id,
+            cr.priority_no
 
-        FROM fgc.commission_rule cr
-                 JOIN fgc.insurance_contract c
-                      ON c.contract_id = #{contractId}
+        FROM
+            commission_rule cr
+        JOIN
+            insurance_contract c
+                ON c.contract_id = #{contractId}
 
-        WHERE cr.policy_version_id = #{policyVersionId}
-          AND cr.payment_stage = #{paymentStage}
-
-          AND (
-            cr.insurer_id IS NULL
-                OR cr.insurer_id = c.insurer_id
-            )
-
-          AND (
-            cr.product_offering_id IS NULL
-                OR cr.product_offering_id =
-                   c.product_offering_id
-            )
-
-          AND (
-            cr.organization_id IS NULL
-                OR cr.organization_id =
-                   c.organization_id
-            )
-
+        WHERE
+            cr.policy_version_id = #{policyVersionId}
+        AND
+            cr.payment_stage = #{paymentStage}
+        AND
+            (cr.insurer_id IS NULL OR cr.insurer_id = c.insurer_id )
+        AND
+            (cr.product_offering_id IS NULL OR cr.product_offering_id = c.product_offering_id )
+        AND
+            (cr.organization_id IS NULL OR cr.organization_id = c.organization_id )
         ORDER BY
             cr.priority_no ASC,
             cr.installment_from ASC,

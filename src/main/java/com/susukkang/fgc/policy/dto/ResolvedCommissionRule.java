@@ -18,14 +18,13 @@ import java.math.RoundingMode;
  * @since 2026-08-10
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResolvedCommissionRule {
 
     private Long commissionRuleId;        // 수수료 규칙 ID
     private Long commissionItemId;        // 수수료 항목 ID
-    private Long organizationId;          // 조직 ID
     private AgentRankCode agentRankCode;         // 수수료 수령 대상 설계사 직급 코드
     private Integer installmentFrom;      // 규칙 적용 시작 회차
     private Integer installmentTo;        // 규칙 적용 종료 회차
@@ -36,4 +35,9 @@ public class ResolvedCommissionRule {
     private Integer roundingScale;      // 반올림 후 유지할 소수점 자릿수
     private RoundingMode roundingMode;        // 반올림 방식(HALF_UP)
     private String paymentConditionCode;  // 수수료 지급 조건 코드
+
+    private Long insurerId;            // 보험회사 조건, NULL이면 모든 보험회사에 적용
+    private Long organizationId;       // 조직 조건, NULL이면 모든 조직에 적용
+    private Long productOfferingId;    // 상품 판매버전 조건, NULL이면 모든 상품에 적용
+    private Integer priorityNo;        // 구체성이 같을 때 적용할 우선순위(작을수록 우선)
 }

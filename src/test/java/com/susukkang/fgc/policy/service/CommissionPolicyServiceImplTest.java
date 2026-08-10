@@ -2,6 +2,7 @@ package com.susukkang.fgc.policy.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicyType;
+import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
@@ -47,6 +48,11 @@ class CommissionPolicyServiceImplTest {
         ResolvedCommissionRule rule =
                 ResolvedCommissionRule.builder()
                         .commissionRuleId(1000L)
+                        .commissionItemId(2000L)
+                        .agentRankCode(AgentRankCode.FC)
+                        .installmentFrom(1)
+                        .installmentTo(1)
+                        .priorityNo(100)
                         .build();
 
         given(policyMapper.findApplicableCurrentCommissionPolicies(
@@ -70,7 +76,9 @@ class CommissionPolicyServiceImplTest {
         assertThat(result.getPolicyType())
                 .isEqualTo(PolicyType.CURRENT_COMMISSION);
         assertThat(result.getPaymentStage()).isEqualTo(paymentStage);
-        assertThat(result.getRules()).containsExactly(rule);
+        assertThat(result.getRules())
+                .extracting(ResolvedCommissionRule::getCommissionRuleId)
+                .containsExactly(rule.getCommissionRuleId());
 
         verify(policyMapper).findApplicableCurrentCommissionPolicies(
                 contractId,
@@ -187,5 +195,128 @@ class CommissionPolicyServiceImplTest {
                         paymentStage
                 ))
                 .isInstanceOf(FgcBusinessException.class);
+    }
+
+    @Test
+    void prefersOrganizationSpecificRuleOnlyForItsInstallmentRange() {
+        Long contractId = 10L;
+        Long policyVersionId = 100L;
+        PaymentStage paymentStage = PaymentStage.GA_TO_FC;
+        ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder()
+                .policyVersionId(policyVersionId)
+                .policyType(PolicyType.CURRENT_COMMISSION)
+                .paymentStage(paymentStage)
+                .build();
+        ResolvedCommissionRule generalRule = ResolvedCommissionRule.builder()
+                .commissionRuleId(1000L)
+                .commissionItemId(2000L)
+                .agentRankCode(AgentRankCode.FC)
+                .installmentFrom(1)
+                .installmentTo(3)
+                .priorityNo(100)
+                .build();
+        ResolvedCommissionRule organizationRule = generalRule.toBuilder()
+                .commissionRuleId(1001L)
+                .organizationId(3000L)
+                .installmentFrom(1)
+                .installmentTo(1)
+                .build();
+
+        given(policyMapper.findApplicableCurrentCommissionPolicies(
+                contractId, paymentStage)).willReturn(List.of(policy));
+        given(policyMapper.findApplicableCommissionRules(
+                policyVersionId, contractId, paymentStage))
+                .willReturn(List.of(generalRule, organizationRule));
+
+        ResolvedCommissionPolicy result =
+                commissionPolicyService.resolveCurrentCommission(
+                        contractId, paymentStage);
+
+        assertThat(result.getRules())
+                .extracting(ResolvedCommissionRule::getCommissionRuleId)
+                .containsExactly(1001L, 1000L, 1000L);
+        assertThat(result.getRules())
+                .extracting(ResolvedCommissionRule::getInstallmentFrom)
+                .containsExactly(1, 2, 3);
+        assertThat(result.getRules())
+                .allMatch(rule -> rule.getInstallmentFrom()
+                        .equals(rule.getInstallmentTo()));
+    }
+
+    @Test
+    void usesSmallerPriorityNumberWhenSpecificityIsEqual() {
+        Long contractId = 10L;
+        Long policyVersionId = 100L;
+        PaymentStage paymentStage = PaymentStage.GA_TO_FC;
+        ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder()
+                .policyVersionId(policyVersionId)
+                .build();
+        ResolvedCommissionRule insurerRule = ResolvedCommissionRule.builder()
+                .commissionRuleId(1000L)
+                .commissionItemId(2000L)
+                .agentRankCode(AgentRankCode.FC)
+                .installmentFrom(1)
+                .installmentTo(1)
+                .insurerId(1L)
+                .priorityNo(20)
+                .build();
+        ResolvedCommissionRule organizationRule = insurerRule.toBuilder()
+                .commissionRuleId(1001L)
+                .insurerId(null)
+                .organizationId(2L)
+                .priorityNo(10)
+                .build();
+
+        given(policyMapper.findApplicableCurrentCommissionPolicies(
+                contractId, paymentStage)).willReturn(List.of(policy));
+        given(policyMapper.findApplicableCommissionRules(
+                policyVersionId, contractId, paymentStage))
+                .willReturn(List.of(insurerRule, organizationRule));
+
+        ResolvedCommissionPolicy result =
+                commissionPolicyService.resolveCurrentCommission(
+                        contractId, paymentStage);
+
+        assertThat(result.getRules())
+                .extracting(ResolvedCommissionRule::getCommissionRuleId)
+                .containsExactly(1001L);
+    }
+
+    @Test
+    void rejectsRulesWithSameSpecificityAndPriority() {
+        Long contractId = 10L;
+        Long policyVersionId = 100L;
+        PaymentStage paymentStage = PaymentStage.GA_TO_FC;
+        ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder()
+                .policyVersionId(policyVersionId)
+                .build();
+        ResolvedCommissionRule firstRule = ResolvedCommissionRule.builder()
+                .commissionRuleId(1000L)
+                .commissionItemId(2000L)
+                .agentRankCode(AgentRankCode.FC)
+                .installmentFrom(1)
+                .installmentTo(1)
+                .insurerId(1L)
+                .priorityNo(10)
+                .build();
+        ResolvedCommissionRule secondRule = firstRule.toBuilder()
+                .commissionRuleId(1001L)
+                .insurerId(null)
+                .organizationId(2L)
+                .build();
+
+        given(policyMapper.findApplicableCurrentCommissionPolicies(
+                contractId, paymentStage)).willReturn(List.of(policy));
+        given(policyMapper.findApplicableCommissionRules(
+                policyVersionId, contractId, paymentStage))
+                .willReturn(List.of(firstRule, secondRule));
+
+        assertThatThrownBy(() ->
+                commissionPolicyService.resolveCurrentCommission(
+                        contractId, paymentStage))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception -> assertThat(
+                        ((FgcBusinessException) exception).getParams())
+                        .containsEntry("reason", "RULE_DUPLICATE"));
     }
 }
