@@ -17,4 +17,14 @@ public enum ValidationRunStatus {
             case FINALIZED -> false;
         };
     }
+
+    public String label() {
+        return switch (this) {
+            case CREATED -> "생성됨";
+            case RUNNING -> "실행중";
+            case COMPLETED -> "완료";
+            case FAILED -> "실패";
+            case FINALIZED -> "확정";
+        };
+    }
 }
