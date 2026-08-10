@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
