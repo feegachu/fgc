@@ -12,6 +12,7 @@
 # 컨테이너 이미지 스캔은 1차 범위에 없다. FGC는 Dockerfile이 없어 자체 빌드 이미지가
 # 없고, CI의 postgres:17은 테스트용 업스트림 공식 이미지다. 이미지 빌드·배포는
 # FGC-ECR-005(Docker 이미지, Stage/Prod 분리)로 2차이므로 스캐너도 그때 함께 넣는다.
+# 아래 메이저 제외 규칙은 일반 버전 업데이트에만 적용되며 보안 업데이트는 막지 않는다.
 version: 2
 updates:
   - package-ecosystem: gradle
@@ -19,10 +20,25 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    labels: [dependencies]
+    # 일반 버전 업데이트는 minor/patch만 한 PR로 묶는다.
+    # 메이저 업그레이드는 호환성·마이그레이션 검토가 필요한 별도 작업으로 진행한다.
+    groups:
+      gradle-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
-    labels: [dependencies]
+    # SHA 고정은 유지하면서 같은 메이저 안의 업데이트만 한 PR로 받는다.
+    groups:
+      github-actions-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
