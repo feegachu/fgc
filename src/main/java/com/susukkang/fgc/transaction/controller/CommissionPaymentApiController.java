@@ -47,7 +47,7 @@ public class CommissionPaymentApiController {
     // 개선: 등록·수정·확정 Operation에 주요 성공 및 업무 오류 상태를 명시
     @Operation(
             summary = "수수료 지급 건 DRAFT 등록",
-            description = "계약·설계사·수수료 항목과 FUN-033 한도를 검증한 후 DRAFT로 저장합니다."
+            description = "필수값과 계약·설계사·수수료 항목을 검증한 후 DRAFT로 저장합니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -56,8 +56,6 @@ public class CommissionPaymentApiController {
                     responseCode = "400", description = "필수값·귀속·증빙 검증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "지급 건 자연키 중복"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "422", description = "FUN-033 한도 초과 또는 정책 검토 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "정산담당자 권한 없음")
     })
@@ -73,7 +71,7 @@ public class CommissionPaymentApiController {
 
     @Operation(
             summary = "DRAFT 수수료 지급 건 수정",
-            description = "DRAFT 지급 건만 수정하며 변경값으로 FUN-033 사전검증을 다시 수행합니다."
+            description = "DRAFT 지급 건의 필수값과 참조 정보를 검증한 후 변경 내용을 저장합니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -82,8 +80,6 @@ public class CommissionPaymentApiController {
                     responseCode = "400", description = "필수값·귀속·증빙 검증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "DRAFT가 아니거나 자연키 중복"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "422", description = "FUN-033 한도 초과 또는 정책 검토 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "정산담당자 권한 없음")
     })

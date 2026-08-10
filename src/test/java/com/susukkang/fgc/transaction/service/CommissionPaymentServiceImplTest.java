@@ -45,6 +45,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * 설명 : 수수료 지급 건 서비스 단위 테스트
@@ -70,15 +71,13 @@ class CommissionPaymentServiceImplTest {
                 mapper,
                 new ObjectMapper(),
                 new CapValidatorImpl(),
-                capCalculator,
-                new CommissionPaymentExceptionService(mapper)
+                capCalculator
         );
     }
 
     @Test
     void createsDraftPaymentAndAttribution() {
         stubReferences();
-        stubCapGate("0");
         doAnswer(invocation -> {
             invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(101L);
             return null;
@@ -101,7 +100,6 @@ class CommissionPaymentServiceImplTest {
                 3L
         ));
         stubReferences();
-        stubCapGate("0");
         given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
 
         CommissionPaymentResponse response = service.update(101L, updateRequest());
@@ -113,20 +111,22 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
-    void blocksCreateBeforeInsertWhenCandidateExceedsCap() {
+    void createsDraftBeforeFun033ValidationEvenWhenCandidateExceedsCap() {
         stubReferences();
-        stubCapGate("0");
+        doAnswer(invocation -> {
+            invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(106L);
+            return null;
+        }).when(mapper).insertTransaction(any());
+        given(mapper.findById(106L)).willReturn(row(CommissionPaymentStatus.DRAFT));
 
         CommissionPaymentCreateRequest request = createRequest(new BigDecimal("1300000"));
 
-        assertThatThrownBy(() -> service.create(request))
-                .isInstanceOfSatisfying(FgcBusinessException.class,
-                        exception -> assertThat(exception.getErrorCode())
-                                .isEqualTo(FgcErrorCode.CAP_001));
+        CommissionPaymentResponse response = service.create(request);
 
-        verify(mapper).insertExceptionCase(any());
-        verify(mapper, never()).insertTransaction(any());
-        verify(mapper, never()).insertAttribution(any());
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        verify(mapper).insertTransaction(any());
+        verify(mapper).insertAttribution(any());
+        verifyNoInteractions(capCalculator);
     }
 
     @Test
@@ -174,7 +174,6 @@ class CommissionPaymentServiceImplTest {
         given(mapper.existsPolicyVersion(3L)).willReturn(true);
         given(mapper.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 20)));
-        stubCapGate("0");
         doAnswer(invocation -> {
             invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(103L);
             return null;
@@ -219,7 +218,6 @@ class CommissionPaymentServiceImplTest {
                 .willReturn(new ContractReference(9L, 7L, LocalDate.of(2026, 9, 18)));
         given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 9, 1)))
                 .willReturn(0);
-        stubCapGate("0");
         doAnswer(invocation -> {
             invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(104L);
             return null;
@@ -279,7 +277,6 @@ class CommissionPaymentServiceImplTest {
                 .willReturn(new ContractReference(9L, 7L, LocalDate.of(2026, 9, 18)));
         given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 9, 1)))
                 .willReturn(0);
-        stubCapGate("0");
         given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
 
         service.update(101L, new CommissionPaymentUpdateRequest(
@@ -316,7 +313,6 @@ class CommissionPaymentServiceImplTest {
     void storesAllocationPolicyBasisAndEvidenceSnapshot() {
         stubReferences();
         given(mapper.findAllocationPolicyId(3L, "MONTHLY_PREMIUM")).willReturn(77L);
-        stubCapGate("0");
         doAnswer(invocation -> {
             invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(105L);
             return null;
@@ -471,6 +467,8 @@ class CommissionPaymentServiceImplTest {
                 .getAnnotation(Transactional.class);
 
         assertThat(transactional).isNotNull();
+        assertThat(transactional.noRollbackFor())
+                .containsExactly(CommissionPaymentConfirmationRejectedException.class);
     }
 
     @Test
@@ -511,11 +509,6 @@ class CommissionPaymentServiceImplTest {
         given(mapper.existsPolicyVersion(3L)).willReturn(true);
         given(mapper.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
-    }
-
-    private void stubCapGate(String existingAmount) {
-        given(mapper.findCapRuleSnapshotForCandidate(any())).willReturn(capRule(existingAmount));
-        given(capCalculator.calculate(any())).willReturn(capCalculation());
     }
 
     private CommissionPaymentCreateRequest createRequest() {

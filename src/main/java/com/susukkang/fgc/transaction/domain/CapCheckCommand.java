@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.domain;
 
+import com.susukkang.fgc.common.code.CapResultStatus;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -33,7 +34,7 @@ public class CapCheckCommand {
     private final BigDecimal includedAmount;
     private final BigDecimal remainingAmount;
     private final BigDecimal usagePct;
-    private final String resultStatus;
+    private final CapResultStatus resultStatus;
     private final String calculationSnapshotJson;
     private final Long commissionItemId;
     private final String itemCode;

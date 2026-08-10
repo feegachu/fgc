@@ -24,6 +24,27 @@ UPDATE fgc.commission_transaction ct
    AND ta.attribution_seq = 1
    AND ct.source_type = 'GA_MANUAL_PAYMENT';
 
+-- 2026-08-10 yslee - 기존 수기 지급 건의 자연키 중복을 결정적 지급 순번으로 분리
+-- 기존 코드: 기존 행의 source_sequence를 모두 기본값 1로 유지
+-- 문제: 같은 계약·설계사·항목·귀속월의 기존 행이 여러 개면 UNIQUE 인덱스 생성 실패
+-- 개선: 지급 건 ID 순서로 그룹 내 양의 순번을 부여한 후 인덱스를 생성
+WITH numbered AS (
+    SELECT commission_transaction_id,
+           (ROW_NUMBER() OVER (
+               PARTITION BY source_contract_id,
+                            recipient_agent_id,
+                            commission_item_id,
+                            settlement_month
+               ORDER BY commission_transaction_id
+           ))::integer AS source_sequence
+      FROM fgc.commission_transaction
+     WHERE source_type = 'GA_MANUAL_PAYMENT'
+)
+UPDATE fgc.commission_transaction ct
+   SET source_sequence = numbered.source_sequence
+  FROM numbered
+ WHERE numbered.commission_transaction_id = ct.commission_transaction_id;
+
 ALTER TABLE fgc.commission_transaction
     ENABLE TRIGGER trg_commission_transaction_guard;
 

@@ -2,6 +2,7 @@ package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
+import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import org.springframework.stereotype.Service;
 
@@ -38,13 +39,13 @@ public class CapValidatorImpl implements CapValidator {
                 : included.multiply(ONE_HUNDRED)
                 .divide(limit, 6, RoundingMode.HALF_UP);
 
-        String resultStatus;
+        CapResultStatus resultStatus;
         if (remaining.signum() < 0) {
-            resultStatus = "VIOLATION";
+            resultStatus = CapResultStatus.VIOLATION;
         } else if (usagePct.compareTo(request.warningUsagePct()) >= 0) {
-            resultStatus = "WARNING";
+            resultStatus = CapResultStatus.WARNING;
         } else {
-            resultStatus = "NORMAL";
+            resultStatus = CapResultStatus.NORMAL;
         }
 
         return new CapValidationResult(

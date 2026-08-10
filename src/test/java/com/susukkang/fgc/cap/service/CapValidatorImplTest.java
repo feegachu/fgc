@@ -2,6 +2,7 @@ package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
+import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +31,7 @@ class CapValidatorImplTest {
 
         assertThat(result.limitAmount()).isEqualByComparingTo("1200000");
         assertThat(result.includedAmount()).isEqualByComparingTo("800000");
-        assertThat(result.resultStatus()).isEqualTo("NORMAL");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
     }
 
     @Test
@@ -54,7 +55,7 @@ class CapValidatorImplTest {
         ));
 
         assertThat(result.remainingAmount()).isNegative();
-        assertThat(result.resultStatus()).isEqualTo("VIOLATION");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
     }
 
     private CapValidationRequest request(

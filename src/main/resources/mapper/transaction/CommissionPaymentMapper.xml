@@ -158,7 +158,11 @@
         SELECT ct.commission_transaction_id AS payment_id,
                ct.source_business_key,
                ct.source_sequence AS payment_sequence,
-               NULLIF(ta.allocation_basis_snapshot ->> 'sourceContractId', '')::bigint AS contract_id,
+               <!-- 2026-08-10 yslee - 지급 건 원계약 조회 기준을 정규 컬럼으로 통일 -->
+               <!-- 기존 코드: 귀속 스냅샷 JSON의 sourceContractId를 원계약으로 조회 -->
+               <!-- 문제: 정규 컬럼과 JSON이 달라지면 응답과 자연키 제약이 서로 다른 계약을 사용 -->
+               <!-- 개선: 자연키의 기준인 commission_transaction.source_contract_id를 조회 -->
+               ct.source_contract_id AS contract_id,
                ct.recipient_agent_id AS agent_id,
                ci.item_code AS commission_item_code,
                ci.item_name AS commission_item_name,
@@ -213,57 +217,6 @@
            AND ta.attribution_seq = 1
          WHERE ct.commission_transaction_id = #{paymentId}
          FOR UPDATE OF ct
-    </select>
-
-    <select id="findCapRuleSnapshotForCandidate"
-            resultType="com.susukkang.fgc.transaction.domain.CapRuleSnapshot">
-        SELECT crs.cap_rule_set_id,
-               cri.cap_rule_item_id,
-               cri.inclusion_status AS rule_inclusion_status,
-               cri.decision_reason,
-               c.monthly_equivalent_first_premium AS base_premium_amount,
-               crs.premium_multiplier,
-               crs.warning_usage_pct,
-               COALESCE((
-                   SELECT SUM(other_ta.attributed_amount)
-                     FROM fgc.transaction_attribution other_ta
-                     JOIN fgc.commission_transaction other_ct
-                       ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
-                    WHERE other_ta.contract_id = #{attributedContractId}
-                      AND other_ta.inclusion_status_snapshot = 'INCLUDED'
-                      AND other_ct.payment_stage = #{paymentStage}
-                      AND other_ct.status = 'CONFIRMED'
-                      <!-- 2026-08-07 yslee - 신규 등록의 NULL 지급 건 ID에 PostgreSQL bigint 타입 명시 -->
-                      <!-- 기존 코드: 타입 없는 NULL 바인드 파라미터를 IS NULL로 비교 -->
-                      <!-- 문제: PostgreSQL이 파라미터 데이터 타입을 결정하지 못해 저장 전 FUN-033 조회 실패 -->
-                      <!-- 개선: 지급 건 ID를 bigint로 명시 변환하여 등록·수정 공통 쿼리로 유지 -->
-                      AND (CAST(#{paymentId} AS bigint) IS NULL
-                           OR other_ct.commission_transaction_id &lt;&gt; #{paymentId})
-                      AND other_ta.attribution_date &gt;= c.contract_date
-                      AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
-               ), 0) AS existing_included_amount
-          FROM fgc.insurance_contract c
-          JOIN fgc.product_offering po
-            ON po.product_offering_id = c.product_offering_id
-          JOIN fgc.product p
-            ON p.product_id = po.product_id
-          JOIN fgc.cap_rule_set crs
-            ON crs.policy_version_id = #{policyVersionId}
-           AND crs.payment_stage = #{paymentStage}
-           AND c.contract_date &gt;= crs.contract_date_from
-           AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
-           AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
-           AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
-           AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
-          JOIN fgc.cap_rule_item cri
-            ON cri.cap_rule_set_id = crs.cap_rule_set_id
-           AND cri.commission_item_id = #{commissionItemId}
-         WHERE c.contract_id = #{attributedContractId}
-         ORDER BY (crs.insurer_id IS NOT NULL) DESC,
-                  (crs.product_group_code IS NOT NULL) DESC,
-                  (crs.channel_code IS NOT NULL) DESC,
-                  crs.cap_rule_set_id DESC
-         LIMIT 1
     </select>
 
     <select id="findCapRuleSnapshot"
@@ -385,7 +338,11 @@
     </insert>
 
     <insert id="insertExceptionCase">
-        INSERT INTO fgc.exception_case (
+        <!-- 2026-08-10 yslee - 종결 예외의 상태를 동일 키 재발로부터 보호 -->
+        <!-- 기존 코드: 동일 exception_key가 재발하면 모든 상태를 NEW로 변경 -->
+        <!-- 문제: 담당자가 RESOLVED 또는 REJECTED로 종결한 처리 결과가 유실 -->
+        <!-- 개선: 진행 중 상태만 갱신하고 종결 상태는 유지 -->
+        INSERT INTO fgc.exception_case AS existing (
             exception_key,
             exception_type,
             severity,
@@ -415,6 +372,7 @@
                title = EXCLUDED.title,
                description = EXCLUDED.description,
                updated_at = clock_timestamp()
+         WHERE existing.status NOT IN ('RESOLVED', 'REJECTED')
     </insert>
 
     <update id="confirm">

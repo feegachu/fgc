@@ -62,8 +62,6 @@ public interface CommissionPaymentMapper {
 
     CapRuleSnapshot findCapRuleSnapshot(@Param("paymentId") Long paymentId);
 
-    CapRuleSnapshot findCapRuleSnapshotForCandidate(CommissionPaymentCommand command);
-
     void insertCapCheck(CapCheckCommand command);
 
     void insertCapCheckDetail(CapCheckCommand command);

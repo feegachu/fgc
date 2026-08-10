@@ -1,5 +1,7 @@
 package com.susukkang.fgc.cap.dto;
 
+import com.susukkang.fgc.common.code.CapResultStatus;
+
 import java.math.BigDecimal;
 
 /**
@@ -15,6 +17,6 @@ public record CapValidationResult(
         BigDecimal includedAmount,
         BigDecimal remainingAmount,
         BigDecimal usagePct,
-        String resultStatus
+        CapResultStatus resultStatus
 ) {
 }
