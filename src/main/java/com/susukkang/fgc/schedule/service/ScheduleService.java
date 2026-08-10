@@ -1,21 +1,30 @@
 package com.susukkang.fgc.schedule.service;
 
+import com.susukkang.fgc.base.mapper.AgentMapper;
+import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
-import com.susukkang.fgc.contract.dto.ContractDetailResponse;
-import com.susukkang.fgc.contract.dto.ContractResponse;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
-import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
+import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
+import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
+import com.susukkang.fgc.policy.mapper.PolicyMapper;
+import com.susukkang.fgc.policy.service.CommissionPolicyService;
+import com.susukkang.fgc.schedule.code.ScheduleGenReason;
+import com.susukkang.fgc.schedule.code.SchedulePurpose;
+import com.susukkang.fgc.schedule.code.ScheduleRegime;
+import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
+import com.susukkang.fgc.schedule.dto.*;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -23,8 +32,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ScheduleService {
 
+    private final CommissionPolicyService commissionPolicyService;
     private final ScheduleMapper scheduleMapper;
     private final ContractMapper contractMapper;
+    private final AgentMapper agentMapper;
 
     /**
      * 설명 : 검색 조건에 따라 스케줄 헤더를 조회한다.
@@ -90,6 +101,13 @@ public class ScheduleService {
      */
     public ScheduleDetailResponse selectScheduleDetailById(Long scheduleHeaderId) {
         // 스케줄 Id 검증 및 가져오기
+        if (scheduleHeaderId == null) {
+            throw validationException(
+                    "scheduleHeaderId",
+                    "스케줄 헤더 ID는 필수입니다."
+            );
+        }
+
         ScheduleDetailResponse detail  = scheduleMapper.selectScheduleDetailById(scheduleHeaderId);
 
         if (detail == null) {
@@ -113,14 +131,15 @@ public class ScheduleService {
      * @author hjKang
      * @since 2026-08-10
      */
+    @Transactional
     public int generateSchedules(InsuranceContract contract) {
         // 입력값 검증
-        if (contract == null || contract.getContractNo() == null) {
+        if (contract == null || contract.getContractId() == null) {
             throw new FgcBusinessException(
-                    FgcErrorCode.CONT_001,
-                    "contractNo",
-                    Map.of("contractNo", ""),
-                    "계약번호가 존재하지 않습니다."
+                    FgcErrorCode.COMMON_002,
+                    "contractId",
+                    Map.of("contractId", ""),
+                    "계약 ID가 존재하지 않습니다."
             );
         }
 
@@ -141,9 +160,440 @@ public class ScheduleService {
         // 해당 계약의 정책 룰셋 조회
         // TODO FUN-011 현행 수수료 정책 조회 적용
 
+        //원수사->GA
+        ResolvedCommissionPolicy insurerToGaPolicy =
+                commissionPolicyService.resolveCurrentCommission(
+                        contractId,
+                        PaymentStage.INSURER_TO_GA
+                );
+        //GA->설계사
+        ResolvedCommissionPolicy gaToFcPolicy =
+                commissionPolicyService.resolveCurrentCommission(
+                        contractId,
+                        PaymentStage.GA_TO_FC
+                );
+
+        // 룰셋 유효성 검사
+        // 원수사 -> GA
+        validateResolvedPolicy(insurerToGaPolicy, PaymentStage.INSURER_TO_GA);
+        // GA -> FC
+        validateResolvedPolicy(gaToFcPolicy, PaymentStage.GA_TO_FC);
+        
         // 스케줄 헤더 생성
+        //원수사->GA
+        ScheduleHeaderInsertDTO insToGaHeader = createScheduleHeader(savedContract,insurerToGaPolicy);
+        //GA->FC
+        ScheduleHeaderInsertDTO gaToFcHeader = createScheduleHeader(savedContract,gaToFcPolicy);
+
+        //스케줄 헤더 저장
+        //원수사->GA
+        int insurerHeaderRows = scheduleMapper.insertScheduleHeader(insToGaHeader);
+
+        if (insurerHeaderRows != 1
+                || insToGaHeader.getScheduleHeaderId() == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_500
+            );
+        }
+        //GA->FC
+        int gaHeaderRows = scheduleMapper.insertScheduleHeader(gaToFcHeader);
+
+        if (gaHeaderRows != 1
+                || gaToFcHeader.getScheduleHeaderId() == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_500
+            );
+        }
 
         // 스케줄 라인 생성
-        return 0;
+        // 원수사->GA
+        List<ScheduleLineInsertDTO> insToGaLines = createScheduleLines(savedContract,insToGaHeader,insurerToGaPolicy);
+        // GA->FC
+        List<ScheduleLineInsertDTO> gaToFcLines = createScheduleLines(savedContract,gaToFcHeader,gaToFcPolicy);
+
+        //스케줄 라인 저장
+        // 원수사->GA
+        int insurerLineCount = scheduleMapper.insertAllScheduleLines(insToGaLines);
+
+        if (insurerLineCount != insToGaLines.size()) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_500
+            );
+        }
+        // GA->FC
+        int gaLineCount = scheduleMapper.insertAllScheduleLines(gaToFcLines);
+
+        if (gaLineCount != gaToFcLines.size()) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_500
+            );
+        }
+
+        return insurerLineCount + gaLineCount;
+    }
+    /**
+     * 설명 : 정책 조회 서비스에서 반환된 수수료 정책이 스케줄 생성에 사용 가능한지 검증한다.
+     * 정책 버전, 정책 유형, 지급 단계 및 수수료 규칙 목록의 필수값을 확인하고,
+     * 조회된 정책의 지급 단계가 요청한 지급 단계와 일치하는지 확인한다.
+     *
+     * @param policy 정책 조회 서비스에서 반환된 수수료 정책
+     * @param expectedPaymentStage 요청한 지급 단계
+     */
+    private void validateResolvedPolicy(
+            ResolvedCommissionPolicy policy,
+            PaymentStage expectedPaymentStage
+    ) {
+        if (policy == null
+                || policy.getPolicyVersionId() == null
+                || policy.getPolicyType() == null
+                || policy.getPaymentStage() == null
+                || policy.getRules() == null
+                || policy.getRules().isEmpty()) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "commissionPolicy",
+                    Map.of(
+                            "paymentStage",
+                            expectedPaymentStage.name()
+                    ),
+                    "적용 가능한 수수료 정책 또는 규칙이 없습니다."
+            );
+        }
+
+        if (policy.getPaymentStage() != expectedPaymentStage) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "paymentStage",
+                    Map.of(
+                            "expected", expectedPaymentStage.name(),
+                            "actual", policy.getPaymentStage().name()
+                    ),
+                    "조회된 정책의 지급 단계가 요청과 일치하지 않습니다."
+            );
+        }
+    }
+
+    /**
+     * 설명 : 계약과 생성된 스케줄 헤더 , 사용되는 정책에 따라 회차별 스케줄 Line을 하나씩 생성하여 반환한다.
+     *  정책과 수수료 유형, 월납보험료 등 입력 파라미터의 필드에 따라 예상액이 산출되는 방식이 다름
+     * @param contract 현재 계약
+     * @param header 생성된 스케줄의 헤더
+     * @param policy 해당 계약에 적용되는 정책
+     * @return 회차별 스케줄 Lines
+     * @author hjKang
+     * @since 2026-08-10
+     */
+    private List<ScheduleLineInsertDTO> createScheduleLines(InsuranceContract contract,ScheduleHeaderInsertDTO header, ResolvedCommissionPolicy policy) {
+        List<ScheduleLineInsertDTO> lines = new ArrayList<>();
+        int lineNo = 1;
+        for (ResolvedCommissionRule rule : policy.getRules()) {
+            BigDecimal basisAmount = resolveBasisAmount(contract, rule.getBasisCode());
+            BigDecimal expectedAmount = calculateExpectedAmount(basisAmount, rule);
+            Long beneficiaryAgentId = resolveBeneficiaryAgentId(contract, policy, rule);
+            for (int installmentNo = rule.getInstallmentFrom();
+                 installmentNo <= rule.getInstallmentTo();
+                 installmentNo++) {
+                ScheduleLineInsertDTO line = ScheduleLineInsertDTO.builder()
+                        .scheduleHeaderId(header.getScheduleHeaderId())
+                        .lineNo(lineNo++)
+                        .installmentNo(installmentNo)
+                        .contractMonthNo(calculateContractMonthNo(installmentNo))
+                        .dueDate(calculateDueDate(contract.getContractDate(),installmentNo))
+                        .commissionItemId(rule.getCommissionItemId())
+                        .beneficiaryAgentId(beneficiaryAgentId)
+                        .basisCode(rule.getBasisCode())
+                        .basisAmount(basisAmount)
+                        .calculationType(rule.getCalculationType())
+                        .ratePct(rule.getRatePct())
+                        .fixedAmount(rule.getFixedAmount())
+                        .expectedAmount(expectedAmount)
+                        .roundingScale(rule.getRoundingScale())
+                        .roundingMode(rule.getRoundingMode())
+                        .paymentConditionCode(rule.getPaymentConditionCode())
+                        .lineStatus(ScheduleLineStatus.PLANNED)
+                        .sourceCommissionRuleId(rule.getCommissionRuleId())
+                        .build();
+                lines.add(line);
+            }
+        }
+        return lines;
+    }
+    /**
+     * 설명 : 수수료 규칙의 기준 코드를 이용해 계약에서 계산 기준금액을 가져온다.
+     *
+     * @param contract 계산 대상 계약
+     * @param basisCode 수수료 계산 기준 코드
+     * @return 수수료 계산 기준금액
+     */
+    private BigDecimal resolveBasisAmount(InsuranceContract contract, String basisCode) {
+        if (basisCode == null) {
+            throw new IllegalArgumentException(
+                    "수수료 계산 기준 코드가 없습니다."
+            );
+        }
+
+        return switch (basisCode) {
+            case "MONTHLY_EQUIVALENT_FIRST_PREMIUM" ->
+                    contract.getMonthlyEquivalentFirstPremium();
+
+            default -> throw new IllegalArgumentException(
+                    "지원하지 않는 수수료 계산 기준입니다: "
+                            + basisCode
+            );
+        };
+    }
+    /**
+     * 설명 : 수수료 규칙의 계산 방식과 반올림 조건을 적용하여 스케줄 라인의 예상 지급액을 계산한다.
+     * FIXED 방식은 정책에 설정된 고정금액을 사용하고,
+     * RATE 방식은 기준금액에 정책 요율을 적용하여 예상 지급액을 계산한다.
+     *
+     * @param basisAmount 수수료 계산 기준금액
+     * @param rule 예상 지급액 계산에 적용할 수수료 규칙
+     * @return 반올림 정책이 적용된 예상 지급액
+     * @author hjKang
+     * @since 2026-08-10
+     */
+    private BigDecimal calculateExpectedAmount(
+            BigDecimal basisAmount,
+            ResolvedCommissionRule rule
+    ) {
+        if (rule.getCalculationType() == null) {
+            throw new IllegalArgumentException(
+                    "수수료 계산 방식이 없습니다."
+            );
+        }
+        return switch (rule.getCalculationType()) {
+            case FIXED -> {  //정책 유형이 고정된 값일 경우
+                if (rule.getFixedAmount() == null) {
+                    throw new IllegalArgumentException(
+                            "정액 계산에 필요한 고정금액이 없습니다."
+                    );
+                }
+                yield rule.getFixedAmount().setScale(
+                        rule.getRoundingScale(),
+                        rule.getRoundingMode()
+                );
+            }
+
+            case RATE -> { // 정책 유형이 월납환산료 비례 일 경우
+                if (basisAmount == null || rule.getRatePct() == null) {
+                    throw new IllegalArgumentException(
+                            "정률 계산에 필요한 기준금액 또는 요율이 없습니다."
+                    );
+                }
+                yield basisAmount
+                        .multiply(rule.getRatePct())
+                        .movePointLeft(2)
+                        .setScale(
+                                rule.getRoundingScale(),
+                                rule.getRoundingMode()
+                        );
+            }
+        };
+    }
+
+    /**
+     * 설명 : 계약일과 지급 회차를 기준으로 지급 예정일을 계산한다.
+     *
+     * @param contractDate 계약일
+     * @param installmentNo 지급 회차
+     * @return 지급 예정일
+     */
+    private LocalDate calculateDueDate(LocalDate contractDate, int installmentNo) {
+        if (contractDate == null){
+            throw new IllegalArgumentException(
+                "계약일은 필수 입니다."
+            );
+        }
+        if (installmentNo < 1){
+            throw new IllegalArgumentException(
+                "지급 회차는 1이상이어야 합니다."
+            );
+        }
+
+        return contractDate.plusMonths(installmentNo-1);
+    }
+    /**
+     * 설명 : 계약, 지급 단계 및 수수료 규칙을 기준으로 실제 수수료 수령 설계사 ID를 결정한다.
+     * 원수사→GA 단계는 개인 수령자가 없으므로 null을 반환하고,
+     * GA→설계사 단계는 직급에 따라 모집설계사 또는 상위 조직의 활성 설계사를 조회한다.
+     *
+     * @param contract 수수료 스케줄을 생성할 계약
+     * @param policy 계약에 적용된 수수료 정책
+     * @param rule 적용할 수수료 규칙
+     * @return 지급 대상 설계사 ID, 원수사→GA 단계이면 null
+     */
+    // FUN-008 : 설계사 조직 id 와 직급 코드, 계약일을 통해 활성화 되어있는 설계사 ID를 찾는다.
+    private Long resolveBeneficiaryAgentId(
+            InsuranceContract contract,
+            ResolvedCommissionPolicy policy,
+            ResolvedCommissionRule rule
+    ) {
+        if (contract == null || policy == null || rule == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "beneficiaryAgent",
+                    Map.of(
+                            "contract", String.valueOf(contract),
+                            "policy", String.valueOf(policy),
+                            "rule", String.valueOf(rule)
+                    ),
+                    "지급 대상 설계사를 결정하기 위한 정보가 없습니다."
+            );
+        }
+
+        PaymentStage paymentStage = policy.getPaymentStage();
+
+        if (paymentStage == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "paymentStage",
+                    Map.of(
+                            "policyVersionId",
+                            String.valueOf(policy.getPolicyVersionId())
+                    ),
+                    "정책의 지급 단계 정보가 없습니다."
+            );
+        }
+
+        // 원수사→GA 예상 수입은 개인 설계사 수령자가 없다.
+        if (paymentStage == PaymentStage.INSURER_TO_GA) {
+            return null;
+        }
+
+        AgentRankCode agentRankCode = rule.getAgentRankCode();
+
+        if (agentRankCode == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "agentRankCode",
+                    Map.of(
+                            "commissionRuleId",
+                            String.valueOf(rule.getCommissionRuleId())
+                    ),
+                    "수수료 규칙에 지급 대상 직급 정보가 없습니다."
+            );
+        }
+
+        // FC 수수료는 계약에 등록된 모집설계사에게 지급한다.
+        if (agentRankCode == AgentRankCode.FC) {
+            if (contract.getAgentId() == null) {
+                throw new FgcBusinessException(
+                        FgcErrorCode.COMMON_002,
+                        "agentId",
+                        Map.of(
+                                "contractId",
+                                String.valueOf(contract.getContractId())
+                        ),
+                        "계약의 모집설계사 정보가 없습니다."
+                );
+            }
+
+            return contract.getAgentId();
+        }
+
+        // 관리자 수수료는 계약 소속 조직부터 상위 조직으로 탐색하여
+        // 규칙에 지정된 직급의 활성 설계사를 조회한다.
+        return findActiveAgentId(
+                contract.getContractDate(),
+                contract.getOrganizationId(),
+                agentRankCode
+        );
+    }
+    /**
+     * 설명 : 조직 ID, 직급 코드 및 계약일을 기준으로 해당 시점에 활성 상태인
+     * 설계사 ID를 계약 소속 조직과 상위 조직에서 조회한다.
+     *
+     * @param contractDate 설계사 활성 여부를 판단할 기준일인 계약일
+     * @param organizationId 조회를 시작할 계약 소속 조직 ID
+     * @param agentRankCode 조회할 설계사 직급 코드
+     * @return 조직과 직급에 해당하는 활성 설계사 ID
+     */
+    private Long findActiveAgentId(
+            LocalDate contractDate,
+            Long organizationId,
+            AgentRankCode agentRankCode
+    ) {
+        if (contractDate == null
+                || organizationId == null
+                || agentRankCode == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "beneficiaryAgent",
+                    Map.of(
+                            "contractDate", String.valueOf(contractDate),
+                            "organizationId", String.valueOf(organizationId),
+                            "agentRankCode", String.valueOf(agentRankCode)
+                    ),
+                    "지급 대상 설계사 조회 조건이 올바르지 않습니다."
+            );
+        }
+        Long agentId =
+                agentMapper.findActiveAgentIdFromOrganizationHierarchy(
+                        organizationId,
+                        agentRankCode,
+                        contractDate
+                );
+        if (agentId == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "beneficiaryAgentId",
+                    Map.of(
+                            "contractDate", contractDate,
+                            "organizationId", organizationId,
+                            "agentRankCode", agentRankCode.name()
+                    ),
+                    "조직과 직급에 해당하는 활성 설계사를 찾을 수 없습니다."
+            );
+        }
+        return agentId;
+    }
+    /**
+     * 설명 : 계약 정보와 지급 회차를 통해서 계약차월을 계산한다.
+     * 단 현행스케줄은 지급회차와 계약차월이 동일 하므로 그대로 반환 이후 2차 때 확장 고려
+     * @param installmentNo 지급회차
+     * @return installmentNo 계약차월
+     */
+    private Integer calculateContractMonthNo(int installmentNo) {
+        //FUN-036 현행 월납 스케줄은 지급회차와 계약차월이 동일 but 4년 7년 분급일 경우 상이 하므로 확장 해야함
+        return installmentNo;
+    }
+    /**
+     * 설명 : 생성된 계약과 적용되는 정책에 맞춰 스케줄 헤더를 생성한다.
+     * @param contract 현재 계약
+     * @param policy 계약에 적용되는 정책
+     * @return 스케줄 헤더 DTO
+     * @author hjKang
+     * @since 2026-08-10
+     */
+    private ScheduleHeaderInsertDTO createScheduleHeader(InsuranceContract contract, ResolvedCommissionPolicy policy) {
+        ScheduleHeaderInsertDTO header = ScheduleHeaderInsertDTO.builder()
+                .contractId(contract.getContractId())
+                .paymentStage(policy.getPaymentStage())
+                .policyVersionId(policy.getPolicyVersionId())
+                .scheduleVersionNo(1)
+                .schedulePurpose(SchedulePurpose.OPERATIONAL)
+                .scheduleRegime(determineScheduleRegime(policy.getPolicyType()))
+                .status(ScheduleHeaderStatus.PLANNED)
+                .activeYn(Boolean.TRUE)
+                .generationReason(ScheduleGenReason.CONTRACT_CREATED)
+                .build();
+        return header;
+    }
+    /**
+     * 설명 : 들어온 정책의 유형에 따라 매핑되어서 스케줄 헤더의 regime로 반환된다.
+     * 현행 , 4년 , 7년에 따라 맞춰서 반환하며 다른 commission일 경우 에러를 반환함.
+     * @param policyType 정책유형
+     * @return 스케줄 헤더 DTO
+     */
+    private ScheduleRegime determineScheduleRegime(PolicyType policyType) {
+        return switch(policyType){
+            case CURRENT_COMMISSION->ScheduleRegime.CURRENT;//현행
+            case FOUR_YEAR_COMMISSION->ScheduleRegime.FOUR_YEAR_2027; //4년 분급
+            case SEVEN_YEAR_COMMISSION->ScheduleRegime.SEVEN_YEAR_2029; //7년분급
+            default -> throw new IllegalArgumentException(
+                    "스케줄을 생성할 수 없는 정책 유형입니다: " + policyType
+            );
+        };
     }
 }

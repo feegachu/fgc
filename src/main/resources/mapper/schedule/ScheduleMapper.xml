@@ -104,7 +104,7 @@
     </select>
 
 
-    <!-- 상세 응답: 헤더 한 건 + 라인 N건 -->
+    <!-- 상세 응답: 헤더 한 건과 스케줄 라인 목록을 매핑한다. -->
     <resultMap id="scheduleDetailResultMap"
                type="com.susukkang.fgc.schedule.dto.ScheduleDetailResponse">
 
@@ -185,4 +185,91 @@
         WHERE sh.schedule_header_id = #{scheduleHeaderId}
         ORDER BY sl.line_no
     </select>
+
+    <!-- 예상 스케줄 헤더를 저장한다. -->
+    <insert id="insertScheduleHeader"
+            parameterType="com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO"
+            useGeneratedKeys="true"
+            keyProperty="scheduleHeaderId"
+            keyColumn="schedule_header_id">
+
+        INSERT INTO fgc.schedule_header
+        (
+            contract_id,
+            payment_stage,
+            policy_version_id,
+            schedule_version_no,
+            schedule_purpose,
+            scenario_code,
+            schedule_regime,
+            status,
+            active_yn,
+            generation_reason,
+            regenerated_from_id
+        )
+        VALUES
+            (
+                #{contractId},
+                #{paymentStage},
+                #{policyVersionId},
+                #{scheduleVersionNo},
+                #{schedulePurpose},
+                #{scenarioCode},
+                #{scheduleRegime},
+                #{status},
+                #{activeYn},
+                #{generationReason},
+                #{regeneratedFromId}
+            )
+    </insert>
+
+    <!-- 스케줄 라인 목록을 schedule_line에 일괄 삽입한다. -->
+    <insert id="insertAllScheduleLines">
+        INSERT INTO fgc.schedule_line
+        (
+        schedule_header_id,
+        line_no,
+        installment_no,
+        contract_month_no,
+        due_date,
+        commission_item_id,
+        beneficiary_agent_id,
+        basis_code,
+        basis_amount,
+        calculation_type,
+        rate_pct,
+        fixed_amount,
+        expected_amount,
+        rounding_scale,
+        rounding_mode,
+        payment_condition_code,
+        line_status,
+        source_commission_rule_id
+        )
+        VALUES
+        <foreach collection="lines"
+                 item="line"
+                 separator=",">
+            (
+                #{line.scheduleHeaderId},
+                #{line.lineNo},
+                #{line.installmentNo},
+                #{line.contractMonthNo},
+                #{line.dueDate},
+                #{line.commissionItemId},
+                #{line.beneficiaryAgentId},
+                #{line.basisCode},
+                #{line.basisAmount},
+                #{line.calculationType},
+                #{line.ratePct},
+                #{line.fixedAmount},
+                #{line.expectedAmount},
+                #{line.roundingScale},
+                #{line.roundingMode},
+                #{line.paymentConditionCode},
+                #{line.lineStatus},
+                #{line.sourceCommissionRuleId}
+            )
+        </foreach>
+    </insert>
 </mapper>

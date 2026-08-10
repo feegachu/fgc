@@ -1,6 +1,7 @@
 package com.susukkang.fgc.schedule.dto;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,7 +27,7 @@ public class ScheduleHeaderResponse {
     private String scheduleRegime; // 적용 체계
     private String schedulePurpose; // 스케줄 용도
     private Integer scheduleVersionNo; // 스케줄 버전
-    private String status; // 스케줄 상태
+    private ScheduleHeaderStatus status; // 스케줄 상태
     private Boolean activeYn; // 현재 사용 여부
     private Integer lineCount; // 전체 회차 수
     private BigDecimal expectedTotal; // 예상 총액

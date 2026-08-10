@@ -1,11 +1,14 @@
 package com.susukkang.fgc.schedule.dto;
 
+import com.susukkang.fgc.common.code.CalculationType;
+import com.susukkang.fgc.common.code.ScheduleLineStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 
 /**
@@ -31,11 +34,13 @@ public class ScheduleLineInsertDTO {
     private Long beneficiaryAgentId; // 수령자 설계사 ID
     private String basisCode; // 기준 코드
     private BigDecimal basisAmount; // 기준 금액
-    private String calculationType; // 계산 방식(RATE, FIXED)
+    private CalculationType calculationType; // 계산 방식(RATE, FIXED)
     private BigDecimal ratePct; // 적용 요율
     private BigDecimal fixedAmount; // 정액 금액
+    private Integer roundingScale;      // 반올림 후 유지할 소수점 자릿수
+    private RoundingMode roundingMode;        // 반올림 방식(HALF_UP)
     private BigDecimal expectedAmount; // 예상 금액
     private String paymentConditionCode; // 지급 조건 코드
-    private String lineStatus; // 스케줄 라인 상태
+    private ScheduleLineStatus lineStatus; // 스케줄 라인 상태
     private Long sourceCommissionRuleId; // 생성 근거 수수료 규칙 ID
 }

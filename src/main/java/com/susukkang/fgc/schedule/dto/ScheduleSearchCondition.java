@@ -1,6 +1,6 @@
 package com.susukkang.fgc.schedule.dto;
 
-import com.susukkang.fgc.schedule.domain.ScheduleRegime;
+import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import lombok.*;
 
 /**

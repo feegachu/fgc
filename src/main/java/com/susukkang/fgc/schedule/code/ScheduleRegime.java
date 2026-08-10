@@ -1,4 +1,4 @@
-package com.susukkang.fgc.schedule.domain;
+package com.susukkang.fgc.schedule.code;
 
 public enum ScheduleRegime {
     CURRENT,            //현행

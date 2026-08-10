@@ -1,8 +1,10 @@
 package com.susukkang.fgc.schedule.dto;
 
 import com.susukkang.fgc.common.code.PaymentStage;
-import com.susukkang.fgc.schedule.domain.SchedulePurpose;
-import com.susukkang.fgc.schedule.domain.ScheduleRegime;
+import com.susukkang.fgc.schedule.code.ScheduleGenReason;
+import com.susukkang.fgc.schedule.code.SchedulePurpose;
+import com.susukkang.fgc.schedule.code.ScheduleRegime;
+import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,9 +31,8 @@ public class ScheduleHeaderInsertDTO {
     private SchedulePurpose schedulePurpose; // 스케줄 용도
     private String scenarioCode; // 시나리오 코드
     private ScheduleRegime scheduleRegime; // 적용 체계
-    private String status; // 스케줄 상태
+    private ScheduleHeaderStatus status; // 스케줄 상태
     private Boolean activeYn; // 현재 사용 여부
-    private String generationReason; // 생성 사유
+    private ScheduleGenReason generationReason; // 생성 사유
     private Long regeneratedFromId; // 재생성 원본 헤더 ID
-    private Long generatedBy; // 생성 사용자 ID
 }

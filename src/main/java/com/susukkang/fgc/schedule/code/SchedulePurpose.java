@@ -1,4 +1,4 @@
-package com.susukkang.fgc.schedule.domain;
+package com.susukkang.fgc.schedule.code;
 
 public enum SchedulePurpose {
     OPERATIONAL, // 운영

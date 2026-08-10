@@ -50,13 +50,11 @@ public interface ScheduleMapper {
     );
 
     /**
-     * 회차별 예상 스케줄 라인을 일괄 저장한다.
-     *
-     *
-     * @param lines 저장할 스케줄 라인 목록
-     * @return 저장된 행 수
+     * 설명 : 스케줄 라인 목록을 schedule_line에 일괄 저장한다.
+     * @param scheduleLineList 스케줄 라인 목록
+     * @return 삽입된 스케줄 라인의 수
+     * @author hjKang
+     * @since 2026-08-09
      */
-    int insertScheduleLines(@Param("lines") List<ScheduleLineInsertDTO> lines);
-
-
+    int insertAllScheduleLines(@Param("lines") List<ScheduleLineInsertDTO> scheduleLineList);
 }
