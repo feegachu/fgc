@@ -36,7 +36,8 @@ class MonthlyValidationStepCoordinatorTest {
         when(capCheckBatchPort.check(stepContext(), PaymentStage.GA_TO_FC)).thenReturn(result);
 
         assertThatThrownBy(() -> coordinator.checkCaps(stepContext(), PaymentStage.GA_TO_FC, 1))
-                .isInstanceOf(SkipLimitExceededException.class);
+                .isInstanceOf(SkipLimitExceededException.class)
+                .hasMessageContaining("GA_TO_FC");
 
         verify(capCheckBatchPort).check(stepContext(), PaymentStage.GA_TO_FC);
     }

@@ -34,7 +34,7 @@ public class MonthlyValidationStepCoordinator {
 
     public StepProcessingResult checkCaps(ValidationStepContext context, PaymentStage paymentStage, long skipLimit) {
         StepProcessingResult result = capCheckBatchPort.check(context, paymentStage);
-        enforceSkipLimit("capCheckStep", result, skipLimit);
+        enforceSkipLimit("capCheckStep", paymentStage, result, skipLimit);
         return result;
     }
 
@@ -62,12 +62,12 @@ public class MonthlyValidationStepCoordinator {
         return exceptionGenerationPort.generate(context);
     }
 
-    private void enforceSkipLimit(String stepName, StepProcessingResult result, long skipLimit) {
+    private void enforceSkipLimit(String stepName, PaymentStage paymentStage, StepProcessingResult result, long skipLimit) {
         if (skipLimit < 0) {
             throw new IllegalArgumentException("skipLimit은 음수일 수 없습니다.");
         }
         if (result.skippedCount() > skipLimit) {
-            throw new SkipLimitExceededException(stepName, result.skippedCount(), skipLimit);
+            throw new SkipLimitExceededException(stepName, paymentStage, result.skippedCount(), skipLimit);
         }
     }
 }
