@@ -162,6 +162,24 @@ class ValidationRunCreateServiceImplTest {
     }
 
     @Test
+    // MonthlyValidationJob은 JobParameters의 runNo와 validation_run.run_no가 반드시 같아야 한다.
+    void createsRunWithExplicitRunNoForBatch() {
+        LocalDate month = LocalDate.of(2026, 8, 1);
+        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
+        stubSuccessfulInsert(100L, "CREATED");
+
+        ValidationRunRow result = service.create(
+                new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L, 7));
+
+        ArgumentCaptor<ValidationRunInsertRow> captor = ArgumentCaptor.forClass(ValidationRunInsertRow.class);
+        verify(validationRunMapper).insert(captor.capture());
+        verify(validationRunMapper, never()).findNextRunNo(month);
+
+        assertThat(captor.getValue().getRunNo()).isEqualTo(7);
+        assertThat(result.getStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
     // run_no 채번 경합(uq_validation_run 위반)은 활성 월 중복이 아니므로 재시도해서 결국 성공해야 한다
     void retriesOnRunNoCollisionAndSucceeds() {
         LocalDate month = LocalDate.of(2026, 8, 1);

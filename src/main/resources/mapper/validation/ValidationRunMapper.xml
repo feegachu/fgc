@@ -93,4 +93,39 @@
         <include refid="searchWhere"/>
     </select>
 
+    <!-- MonthlyValidationJob 진행 기록 -->
+    <update id="transitionToRunning">
+        UPDATE fgc.validation_run
+           SET status = 'RUNNING',
+               current_step = 1,
+               started_at = now()
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'CREATED'
+    </update>
+
+    <update id="updateCurrentStep">
+        UPDATE fgc.validation_run
+           SET current_step = #{currentStep}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+    </update>
+
+    <update id="transitionToCompleted">
+        UPDATE fgc.validation_run
+           SET status = 'COMPLETED',
+               current_step = 8,
+               completed_at = now()
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+    </update>
+
+    <update id="transitionToFailed">
+        UPDATE fgc.validation_run
+           SET status = 'FAILED',
+               current_step = #{currentStep},
+               failure_message = #{failureMessage}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+    </update>
+
 </mapper>

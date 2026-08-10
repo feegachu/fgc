@@ -57,16 +57,18 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
         this.objectMapper = objectMapper;
         this.constraintErrorCodeResolver = constraintErrorCodeResolver;
         // PostgreSQL은 제약 위반이 한 번 나면 그 트랜잭션 전체가 "aborted" 상태가 되어 같은
-        // 트랜잭션 안에서는 재시도 INSERT조차 거부한다(추가 오류만 쌓인다). 그래서 재시도마다
-        // REQUIRES_NEW로 완전히 새 트랜잭션을 열어야 한다 — @Transactional을 그대로 쓰면 이
-        // 메서드 전체가 하나의 트랜잭션이라 자기 자신을 다시 호출해도(self-invocation) AOP
-        // 프록시를 안 거쳐 새 트랜잭션이 안 열리므로, TransactionTemplate으로 명시적으로 연다.
+        // 트랜잭션 안에서는 재시도 INSERT조차 거부
+        // 재시도마다 REQUIRES_NEW로 완전히 새 트랜잭션을 열어야함
         this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
         this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override
     public ValidationRunRow create(CreateValidationRunCommand command) {
+        if (command.runNo() != null) {
+            return requiresNewTransactionTemplate.execute(status -> attemptCreate(command));
+        }
+
         for (int attempt = 1; attempt <= MAX_RUN_NO_RETRIES; attempt++) {
             try {
                 return requiresNewTransactionTemplate.execute(status -> attemptCreate(command));
@@ -85,12 +87,7 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     }
 
     /**
-     * 위반된 제약이 uq_validation_run(run_no 채번 충돌)인지 판정한다.
-     * ConstraintErrorCodeResolver#extractConstraintName으로 PostgreSQL이 알려주는 정확한
-     * 제약 이름을 먼저 쓴다 — uq_validation_run과 uq_validation_run_active_month가 서로
-     * 접두어 관계라 메시지 문자열 부분일치만으로는 안전하게 구분할 수 없기 때문이다.
-     * 실제 PSQLException이 없는 경우(단위테스트의 합성 예외 등)에만 메시지 기반 대체 판정으로
-     * 넘어간다.
+     * 위반된 제약이 uq_validation_run(run_no 채번 충돌)인지 판정
      */
     private boolean isRunNoCollision(DataIntegrityViolationException e) {
         Optional<String> constraintName = constraintErrorCodeResolver.extractConstraintName(e);
@@ -118,7 +115,9 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
         // 2. run_no 채번 — 재시도마다(=매 attempt마다) 새 트랜잭션에서 다시 계산해야 한다.
         // 그래야 방금 실패를 유발한 경쟁자의 INSERT가 이 시점에 보이는 값 기준으로 다음
         // run_no를 새로 받는다.
-        int runNo = validationRunMapper.findNextRunNo(command.validationMonth());
+        int runNo = command.runNo() != null
+                ? command.runNo()
+                : validationRunMapper.findNextRunNo(command.validationMonth());
 
         // 3. policy_snapshot
         List<CapRuleSetView> capRuleSets = policySnapshotMapper.findActiveCapRuleSets(command.validationMonth());
