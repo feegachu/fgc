@@ -74,7 +74,7 @@ class ValidationRunSearchControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].validationRunId").value(100))
                 .andExpect(jsonPath("$.data.content[0].runType").value("MONTHLY"))
-                .andExpect(jsonPath("$.data.content[0].runTypeLabel").value("월정기검증"))
+                .andExpect(jsonPath("$.data.content[0].runTypeLabel").value("월간"))
                 .andExpect(jsonPath("$.data.content[0].status").value("RUNNING"))
                 .andExpect(jsonPath("$.data.content[0].statusLabel").value("실행중"))
                 .andExpect(jsonPath("$.data.totalElements").value(1));

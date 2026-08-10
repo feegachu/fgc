@@ -37,7 +37,7 @@ class ValidationRunItemResponseTest {
 
         assertThat(response.validationRunId()).isEqualTo(100L);
         assertThat(response.runType()).isEqualTo(ValidationRunType.MONTHLY);
-        assertThat(response.runTypeLabel()).isEqualTo("월정기검증");
+        assertThat(response.runTypeLabel()).isEqualTo("월간");
         assertThat(response.status()).isEqualTo(ValidationRunStatus.FAILED);
         assertThat(response.statusLabel()).isEqualTo("실패");
         assertThat(response.currentStep()).isEqualTo(3);
