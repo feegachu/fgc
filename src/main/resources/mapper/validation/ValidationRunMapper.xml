@@ -55,4 +55,5 @@
         VALUES (#{validationMonth}, #{runNo}, #{runType}, #{triggeredBy}, COALESCE(#{policySnapshotJson}, '{}')::jsonb)
     </insert>
 
+
 </mapper>

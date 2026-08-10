@@ -42,7 +42,6 @@ public class ValidationRunTransitionServiceImpl implements ValidationRunTransiti
             }
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of("id", validationRunId));
         }
-
         // 메모리 객체를 고쳐서 반환하면 DB/트리거가 채운 컬럼을 놓치므로 다시 조회해서 반환
         ValidationRunRow updatedRow = validationRunMapper.findById(validationRunId);
         if (updatedRow == null) {

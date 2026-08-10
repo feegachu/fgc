@@ -1,18 +1,19 @@
 package com.susukkang.fgc.validation.mapper;
 
+
 import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.junit.jupiter.api.Disabled;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 
 /**
  * ValidationRunMapper를 로컬 db로 검증
@@ -28,8 +29,10 @@ class ValidationRunMapperIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+
     // guard_run_lifecycle(V7)이 INSERT 시 status='CREATED'만 허용. run_type은 안 넣으면
     // DB 기본값(MONTHLY)이 채워진다.
+
     private Long insertCreatedRun(LocalDate month, int runNo) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, status)
@@ -37,6 +40,7 @@ class ValidationRunMapperIntegrationTest {
                 RETURNING validation_run_id
                 """, Long.class, month, runNo);
     }
+
 
     private Long insertCreatedRun(LocalDate month, int runNo, String runType) {
         return jdbcTemplate.queryForObject("""
@@ -184,4 +188,5 @@ class ValidationRunMapperIntegrationTest {
         assertThatThrownBy(() -> validationRunMapper.insert(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
 }
