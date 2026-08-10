@@ -18,13 +18,14 @@ public enum ValidationRunStatus {
         };
     }
 
+    /** 화면정의서 "월 통합검증 실행 상태" 코드-표기 매핑표(docs/FGC_화면정의서_v2_0.md)와 일치시킨다. */
     public String label() {
         return switch (this) {
             case CREATED -> "생성됨";
             case RUNNING -> "실행중";
-            case COMPLETED -> "완료";
+            case COMPLETED -> "계산완료";
             case FAILED -> "실패";
-            case FINALIZED -> "확정";
+            case FINALIZED -> "확정(잠김)";
         };
     }
 }

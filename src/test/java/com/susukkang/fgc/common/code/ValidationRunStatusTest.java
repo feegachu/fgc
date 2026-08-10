@@ -61,8 +61,8 @@ class ValidationRunStatusTest {
     void everyStatusHasALabel() {
         assertThat(ValidationRunStatus.CREATED.label()).isEqualTo("생성됨");
         assertThat(ValidationRunStatus.RUNNING.label()).isEqualTo("실행중");
-        assertThat(ValidationRunStatus.COMPLETED.label()).isEqualTo("완료");
+        assertThat(ValidationRunStatus.COMPLETED.label()).isEqualTo("계산완료");
         assertThat(ValidationRunStatus.FAILED.label()).isEqualTo("실패");
-        assertThat(ValidationRunStatus.FINALIZED.label()).isEqualTo("확정");
+        assertThat(ValidationRunStatus.FINALIZED.label()).isEqualTo("확정(잠김)");
     }
 }
