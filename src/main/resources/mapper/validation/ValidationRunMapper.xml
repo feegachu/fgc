@@ -8,6 +8,7 @@
                run_no            AS runNo,
                run_type          AS runType,
                status,
+               current_step      AS currentStep,
                started_at        AS startedAt,
                completed_at      AS completedAt,
                finalized_at      AS finalizedAt,
@@ -17,6 +18,25 @@
                created_at        AS createdAt
           FROM fgc.validation_run
          WHERE validation_run_id = #{validationRunId}
+    </select>
+
+    <select id="findByMonthAndRunNo" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
+        SELECT validation_run_id AS validationRunId,
+               validation_month  AS validationMonth,
+               run_no            AS runNo,
+               run_type          AS runType,
+               status,
+               current_step      AS currentStep,
+               started_at        AS startedAt,
+               completed_at      AS completedAt,
+               finalized_at      AS finalizedAt,
+               triggered_by      AS triggeredBy,
+               finalized_by      AS finalizedBy,
+               failure_message   AS failureMessage,
+               created_at        AS createdAt
+          FROM fgc.validation_run
+         WHERE validation_month = #{validationMonth}
+           AND run_no = #{runNo}
     </select>
 
     <!--
@@ -92,5 +112,45 @@
         FROM fgc.validation_run vr
         <include refid="searchWhere"/>
     </select>
+
+    <!-- MonthlyValidationJob 진행 기록 -->
+    <update id="transitionToRunning">
+        UPDATE fgc.validation_run
+           SET status = 'RUNNING',
+               current_step = 1,
+               started_at = now()
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'CREATED'
+    </update>
+
+    <!-- current_step <= #{currentStep} 조건이 역행(뒤 단계에서 앞 단계 번호로 되돌아가는 것)을
+         막는다. "<="(< 아님)인 이유: journalPostingStep·imbalanceCheckStep이 같은 stepNo=6을
+         공유해서 같은 값을 두 번 쓰는 게 정상이기 때문 -->
+    <update id="updateCurrentStep">
+        UPDATE fgc.validation_run
+           SET current_step = #{currentStep}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+           AND current_step &lt;= #{currentStep}
+    </update>
+
+    <update id="transitionToCompleted">
+        UPDATE fgc.validation_run
+           SET status = 'COMPLETED',
+               current_step = 8,
+               completed_at = now()
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+    </update>
+
+    <update id="transitionToFailed">
+        UPDATE fgc.validation_run
+           SET status = 'FAILED',
+               current_step = #{currentStep},
+               failure_message = #{failureMessage}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+           AND current_step &lt;= #{currentStep}
+    </update>
 
 </mapper>
