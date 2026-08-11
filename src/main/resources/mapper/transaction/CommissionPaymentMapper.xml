@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper">
+
+    <select id="existsAgent" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.agent
+             WHERE agent_id = #{agentId}
+        )
+    </select>
+
+    <select id="findAgentAppointmentDate" resultType="java.time.LocalDate">
+        SELECT appointment_date
+          FROM fgc.agent
+         WHERE agent_id = #{agentId}
+    </select>
+
+    <select id="findContract"
+            resultType="com.susukkang.fgc.transaction.domain.ContractReference">
+        SELECT contract_id,
+               agent_id,
+               contract_date
+          FROM fgc.insurance_contract
+         WHERE contract_id = #{contractId}
+    </select>
+
+    <select id="countContractsBeforeMonth" resultType="int">
+        SELECT COUNT(*)
+          FROM fgc.insurance_contract
+         WHERE agent_id = #{agentId}
+           AND contract_date &lt; #{monthStart}
+    </select>
+
+    <select id="findCommissionItem"
+            resultType="com.susukkang.fgc.transaction.domain.CommissionItemReference">
+        SELECT commission_item_id,
+               item_code,
+               cashflow_type
+         FROM fgc.commission_item
+         WHERE commission_item_id = #{commissionItemId}
+           AND active_yn = TRUE
+           AND effective_from &lt;= #{asOf}
+           AND (effective_to IS NULL OR effective_to &gt;= #{asOf})
+    </select>
+
+    <select id="findAllocationPolicyId" resultType="long">
+        SELECT allocation_policy_id
+          FROM fgc.allocation_policy
+         WHERE policy_version_id = #{policyVersionId}
+           AND allocation_basis_code = #{allocationBasis}
+         ORDER BY allocation_policy_id
+         LIMIT 1
+    </select>
+
+    <select id="existsPolicyVersion" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.policy_version
+             WHERE policy_version_id = #{policyVersionId}
+               AND status IN ('APPROVED', 'ACTIVE')
+        )
+    </select>
+
+    <!-- 2026-08-11 yslee - 지급 건 본문 증빙을 등록·수정·조회 SQL에 연결 -->
+    <!-- 기존 코드: transaction_attribution.evidence_ref만 저장하고 부모 evidence_ref는 항상 NULL -->
+    <!-- 문제: 화면의 지급 원천 증빙과 DB commission_transaction 컬럼이 API 왕복 과정에서 누락 -->
+    <!-- 개선: CommissionPaymentCommand.evidenceRef를 부모 행에 저장하고 응답 조회에 포함 -->
+    <insert id="insertTransaction"
+            useGeneratedKeys="true"
+            keyProperty="paymentId"
+            keyColumn="commission_transaction_id">
+        INSERT INTO fgc.commission_transaction (
+            payment_stage,
+            source_type,
+            source_business_key,
+            source_contract_id,
+            recipient_agent_id,
+            commission_item_id,
+            policy_version_id,
+            settlement_month,
+            due_date,
+            amount,
+            cashflow_type,
+            status,
+            evidence_ref,
+            note
+        ) VALUES (
+            #{paymentStage},
+            #{sourceType},
+            #{sourceBusinessKey},
+            #{naturalContractId},
+            #{agentId},
+            #{commissionItemId},
+            #{policyVersionId},
+            #{settlementMonth},
+            #{dueDate},
+            #{amount},
+            #{cashflowType},
+            'DRAFT',
+            #{evidenceRef},
+            #{note}
+        )
+    </insert>
+
+    <update id="updateTransaction">
+        UPDATE fgc.commission_transaction
+           SET payment_stage = #{paymentStage},
+               source_type = #{sourceType},
+               source_business_key = #{sourceBusinessKey},
+               source_contract_id = #{naturalContractId},
+               recipient_agent_id = #{agentId},
+               commission_item_id = #{commissionItemId},
+               policy_version_id = #{policyVersionId},
+               settlement_month = #{settlementMonth},
+               due_date = #{dueDate},
+               amount = #{amount},
+               cashflow_type = #{cashflowType},
+               evidence_ref = #{evidenceRef},
+               note = #{note}
+         WHERE commission_transaction_id = #{paymentId}
+           AND status = 'DRAFT'
+           AND source_type = 'GA_MANUAL_PAYMENT'
+    </update>
+
+    <!-- 2026-08-11 yslee - 거절된 DRAFT의 과거 점검 스냅샷과 신규 귀속행 참조를 분리 -->
+    <!-- 기존 코드: 실패 cap_check_detail이 기존 귀속행을 FK로 참조하여 DRAFT 수정 시 삭제가 실패 -->
+    <!-- 문제: 검증 거절 후 금액·귀속을 고쳐 다시 확정할 수 없어서 FUN-065의 DRAFT 수정 계약을 위반 -->
+    <!-- 개선: 과거 점검 스냅샷은 보존하고 변경 전 귀속행에 대한 직접 FK만 해제 -->
+    <update id="detachPreConfirmDetails">
+        UPDATE fgc.cap_check_detail ccd
+           SET transaction_attribution_id = NULL
+          FROM fgc.cap_check cc
+         WHERE ccd.cap_check_id = cc.cap_check_id
+           AND cc.candidate_transaction_id = #{paymentId}
+           AND cc.check_kind = 'PRE_CONFIRM'
+    </update>
+
+    <delete id="deleteAttributions">
+        DELETE FROM fgc.transaction_attribution
+         WHERE commission_transaction_id = #{paymentId}
+    </delete>
+
+    <!-- 2026-08-10 yslee - 지급 건의 계약별 귀속행을 순번대로 일괄 저장 -->
+    <!-- 기존 코드: 지급 건마다 attribution_seq=1인 귀속행 한 건만 저장 -->
+    <!-- 문제: 공통비·정착지원금처럼 여러 계약에 배부되는 지급 건을 표현할 수 없음 -->
+    <!-- 개선: 요청 귀속 목록을 foreach로 저장하고 제외유형 NONE은 DB의 NULL로 정규화 -->
+    <insert id="insertAttributions">
+        INSERT INTO fgc.transaction_attribution (
+            commission_transaction_id,
+            attribution_seq,
+            attribution_scope,
+            contract_id,
+            agent_id,
+            attribution_date,
+            attribution_month,
+            attributed_amount,
+            inclusion_status_snapshot,
+            exclusion_type_snapshot,
+            attribution_method,
+            allocation_policy_id,
+            allocation_basis_snapshot,
+            evidence_ref
+        ) VALUES
+        <foreach collection="attributions" item="attribution" separator=",">
+            (
+                #{attribution.paymentId},
+                #{attribution.attributionSequence},
+                #{attribution.attributionScope},
+                #{attribution.contractId},
+                #{attribution.agentId},
+                #{attribution.attributionDate},
+                #{attribution.attributionMonth},
+                #{attribution.amount},
+                #{attribution.inclusionDecisionStatus},
+                NULLIF(#{attribution.exclusionType}, 'NONE'),
+                #{attribution.attributionMethod},
+                #{attribution.allocationPolicyId},
+                CAST(#{attribution.allocationBasisJson} AS jsonb),
+                #{attribution.evidenceRef}
+            )
+        </foreach>
+    </insert>
+
+    <select id="findById"
+            resultType="com.susukkang.fgc.transaction.domain.CommissionPaymentRow">
+        SELECT ct.commission_transaction_id AS payment_id,
+               ct.source_type,
+               ct.source_business_key,
+               <!-- 2026-08-10 yslee - 지급 건 원계약 조회 기준을 정규 컬럼으로 통일 -->
+               <!-- 기존 코드: 귀속 스냅샷 JSON의 sourceContractId를 원계약으로 조회 -->
+               <!-- 문제: 정규 컬럼과 JSON이 달라지면 응답과 자연키 제약이 서로 다른 계약을 사용 -->
+               <!-- 개선: 자연키의 기준인 commission_transaction.source_contract_id를 조회 -->
+               ct.source_contract_id AS contract_id,
+               ct.recipient_agent_id AS agent_id,
+               ct.commission_item_id,
+               ci.item_code AS commission_item_code,
+               ci.item_name AS commission_item_name,
+               ct.amount,
+               ct.settlement_month,
+               ct.cashflow_type,
+               ct.due_date AS scheduled_payment_date,
+               ct.payment_stage,
+               ct.status,
+               ct.policy_version_id AS allocation_policy_version,
+               ct.evidence_ref,
+               ct.note,
+               ct.created_at,
+               ct.updated_at
+          FROM fgc.commission_transaction ct
+          JOIN fgc.commission_item ci
+            ON ci.commission_item_id = ct.commission_item_id
+         WHERE ct.commission_transaction_id = #{paymentId}
+    </select>
+
+    <!-- 2026-08-10 yslee - 지급 건 응답에 전체 계약별 귀속행 반환 -->
+    <!-- 기존 코드: 첫 번째 귀속행을 지급 건 본문에 평탄화하여 반환 -->
+    <!-- 문제: 두 번째 이후 귀속 계약·금액·증빙·배부기준이 응답에서 소실 -->
+    <!-- 개선: attribution_seq 순으로 전체 귀속행을 별도 목록으로 조회 -->
+    <select id="findAttributions"
+            resultType="com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionRow">
+        SELECT ta.attribution_seq AS attribution_sequence,
+               ta.contract_id,
+               ta.attribution_date,
+               ta.attribution_month,
+               ta.attributed_amount AS amount,
+               ta.inclusion_status_snapshot AS inclusion_decision_status,
+               COALESCE(ta.exclusion_type_snapshot, 'NONE') AS exclusion_type,
+               ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
+               ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
+               ta.evidence_ref,
+               ta.attribution_method
+          FROM fgc.transaction_attribution ta
+         WHERE ta.commission_transaction_id = #{paymentId}
+         ORDER BY ta.attribution_seq
+    </select>
+
+    <select id="findConfirmationDataForUpdate"
+            resultType="com.susukkang.fgc.transaction.domain.ConfirmationData">
+        SELECT ct.commission_transaction_id AS payment_id,
+               ct.status,
+               ct.amount,
+               ta.attributed_amount,
+               <!-- 2026-08-10 yslee - 잠금 조회에서 귀속 합계를 상관 서브쿼리로 계산 -->
+               <!-- 기존 코드: 윈도 함수 SUM(...) OVER와 FOR UPDATE를 한 SELECT에서 함께 사용 -->
+               <!-- 문제: PostgreSQL은 윈도 함수가 있는 SELECT의 FOR UPDATE를 허용하지 않아 확정 요청이 실패 -->
+               <!-- 개선: 상관 서브쿼리로 합계를 계산하여 지급 건 행 잠금과 다중 귀속 합계 검증을 함께 유지 -->
+               (
+                   SELECT SUM(total_ta.attributed_amount)
+                     FROM fgc.transaction_attribution total_ta
+                    WHERE total_ta.commission_transaction_id = ct.commission_transaction_id
+               ) AS total_attributed_amount,
+               ct.confirm_idempotency_key,
+               ta.attribution_date,
+               ta.attribution_month,
+               ta.transaction_attribution_id,
+               ta.contract_id,
+               ct.recipient_agent_id AS agent_id,
+               ct.payment_stage,
+               ct.commission_item_id,
+               ci.item_code,
+               ci.item_name,
+               ct.policy_version_id,
+               ta.inclusion_status_snapshot AS inclusion_decision_status,
+               COALESCE(ta.exclusion_type_snapshot, 'NONE') AS exclusion_type,
+               ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
+               ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
+               COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
+               ta.attribution_method
+          FROM fgc.commission_transaction ct
+          JOIN fgc.commission_item ci
+            ON ci.commission_item_id = ct.commission_item_id
+          <!-- 2026-08-11 yslee - 귀속 전 DRAFT도 지급 건 행을 잠가 조회 -->
+          <!-- 기존 코드: transaction_attribution을 INNER JOIN하여 귀속 0건 지급 건을 미존재로 처리 -->
+          <!-- 문제: 임시저장은 가능해도 수정·확정 시 지급 건 자체를 찾지 못해 COMMON-002가 발생 -->
+          <!-- 개선: LEFT JOIN으로 본문을 유지하고 확정 서비스가 TRAN-002 귀속 누락을 판정 -->
+          LEFT JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+         WHERE ct.commission_transaction_id = #{paymentId}
+         ORDER BY ta.attribution_seq
+         FOR UPDATE OF ct
+    </select>
+
+    <!-- 2026-08-11 yslee - 동일 계약의 여러 DRAFT 확정을 계약 행 기준으로 직렬화 -->
+    <!-- 기존 코드: 각 지급 건 행만 잠가 서로 다른 DRAFT는 동시에 한도 잔액을 읽음 -->
+    <!-- 문제: 두 요청이 같은 기존 산입액을 보고 모두 확정되어 합산 한도를 넘길 수 있음 -->
+    <!-- 개선: 귀속 계약을 ID 순서로 잠가 같은 계약의 사전검증과 CONFIRMED 전환을 순차 처리 -->
+    <select id="lockAttributedContracts">
+        SELECT c.contract_id
+          FROM fgc.insurance_contract c
+         WHERE c.contract_id IN (
+               SELECT ta.contract_id
+                 FROM fgc.transaction_attribution ta
+                WHERE ta.commission_transaction_id = #{paymentId}
+                  AND ta.contract_id IS NOT NULL
+         )
+         ORDER BY c.contract_id
+         FOR UPDATE
+    </select>
+
+    <select id="findCapRuleSnapshot"
+            resultType="com.susukkang.fgc.transaction.domain.CapRuleSnapshot">
+        SELECT crs.cap_rule_set_id,
+               cri.cap_rule_item_id,
+               cri.inclusion_status AS rule_inclusion_status,
+               cri.decision_reason,
+               c.monthly_equivalent_first_premium AS base_premium_amount,
+               crs.premium_multiplier,
+               crs.warning_usage_pct,
+               COALESCE((
+                   SELECT SUM(other_ta.attributed_amount)
+                     FROM fgc.transaction_attribution other_ta
+                     JOIN fgc.commission_transaction other_ct
+                       ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
+                    WHERE other_ta.contract_id = ta.contract_id
+                      AND other_ta.inclusion_status_snapshot = 'INCLUDED'
+                      AND other_ct.payment_stage = ct.payment_stage
+                      AND other_ct.status = 'CONFIRMED'
+                      AND other_ct.commission_transaction_id &lt;&gt; ct.commission_transaction_id
+                      AND other_ta.attribution_date &gt;= c.contract_date
+                      AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
+               ), 0) AS existing_included_amount,
+               (
+                   SELECT SUM(compliance_ta.attributed_amount)
+                     FROM fgc.transaction_attribution compliance_ta
+                     JOIN fgc.commission_transaction compliance_ct
+                       ON compliance_ct.commission_transaction_id = compliance_ta.commission_transaction_id
+                    WHERE compliance_ta.contract_id = ta.contract_id
+                      AND compliance_ta.exclusion_type_snapshot = 'COMPLIANCE_3PCT'
+                      AND NULLIF(BTRIM(compliance_ta.evidence_ref), '') IS NOT NULL
+                      AND compliance_ct.payment_stage = ct.payment_stage
+                      AND (
+                          compliance_ct.status = 'CONFIRMED'
+                          OR compliance_ct.commission_transaction_id = ct.commission_transaction_id
+                      )
+                      AND compliance_ta.attribution_date &gt;= c.contract_date
+                      AND compliance_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
+               ) AS compliance_evidence_amount
+          FROM fgc.commission_transaction ct
+          JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+           AND ta.transaction_attribution_id = #{transactionAttributionId}
+          JOIN fgc.insurance_contract c
+            ON c.contract_id = ta.contract_id
+          JOIN fgc.product_offering po
+            ON po.product_offering_id = c.product_offering_id
+          JOIN fgc.product p
+            ON p.product_id = po.product_id
+          JOIN fgc.cap_rule_set crs
+            ON crs.policy_version_id = ct.policy_version_id
+           AND crs.payment_stage = ct.payment_stage
+           AND c.contract_date &gt;= crs.contract_date_from
+           AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
+           AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
+           AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
+           AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+          JOIN fgc.cap_rule_item cri
+            ON cri.cap_rule_set_id = crs.cap_rule_set_id
+           AND cri.commission_item_id = ct.commission_item_id
+         WHERE ct.commission_transaction_id = #{paymentId}
+         ORDER BY (crs.insurer_id IS NOT NULL) DESC,
+                  (crs.product_group_code IS NOT NULL) DESC,
+                  (crs.channel_code IS NOT NULL) DESC,
+                  crs.cap_rule_set_id DESC
+         LIMIT 1
+    </select>
+
+    <insert id="insertCapCheck"
+            useGeneratedKeys="true"
+            keyProperty="capCheckId"
+            keyColumn="cap_check_id">
+        INSERT INTO fgc.cap_check (
+            contract_id,
+            payment_stage,
+            cap_rule_set_id,
+            refund_rate_table_id,
+            candidate_transaction_id,
+            check_kind,
+            as_of_date,
+            base_premium_amount,
+            refund_12m_amount,
+            compliance_deduction_amount,
+            limit_amount,
+            included_amount,
+            remaining_amount,
+            usage_pct,
+            result_status,
+            calculation_snapshot
+        ) VALUES (
+            #{contractId},
+            #{paymentStage},
+            #{capRuleSetId},
+            #{refundRateTableId},
+            #{paymentId},
+            'PRE_CONFIRM',
+            #{asOfDate},
+            #{basePremiumAmount},
+            #{refund12mAmount},
+            #{complianceDeductionAmount},
+            #{limitAmount},
+            #{includedAmount},
+            #{remainingAmount},
+            #{usagePct},
+            #{resultStatus},
+            CAST(#{calculationSnapshotJson} AS jsonb)
+        )
+    </insert>
+
+    <insert id="insertCapCheckDetail">
+        INSERT INTO fgc.cap_check_detail (
+            cap_check_id,
+            detail_seq,
+            commission_item_id,
+            item_code,
+            item_name,
+            transaction_attribution_id,
+            classification_snapshot,
+            amount,
+            decision_reason,
+            evidence_ref
+        ) VALUES (
+            #{capCheckId},
+            1,
+            #{commissionItemId},
+            #{itemCode},
+            #{itemName},
+            #{transactionAttributionId},
+            #{classificationSnapshot},
+            #{candidateAmount},
+            #{decisionReason},
+            #{evidenceRef}
+        )
+    </insert>
+
+    <insert id="insertExceptionCase">
+        <!-- 2026-08-10 yslee - 종결 예외의 상태를 동일 키 재발로부터 보호 -->
+        <!-- 기존 코드: 동일 exception_key가 재발하면 모든 상태를 NEW로 변경 -->
+        <!-- 문제: 담당자가 RESOLVED 또는 REJECTED로 종결한 처리 결과가 유실 -->
+        <!-- 개선: 진행 중 상태만 갱신하고 종결 상태는 유지 -->
+        INSERT INTO fgc.exception_case AS existing (
+            exception_key,
+            exception_type,
+            severity,
+            status,
+            contract_id,
+            agent_id,
+            policy_version_id,
+            source_entity_type,
+            source_entity_id,
+            title,
+            description
+        ) VALUES (
+            #{exceptionKey},
+            #{exceptionType},
+            #{severity},
+            'NEW',
+            #{contractId},
+            #{agentId},
+            #{policyVersionId},
+            'COMMISSION_TRANSACTION',
+            COALESCE(CAST(#{paymentId} AS varchar), #{sourceEntityId}),
+            #{title},
+            #{description}
+        )
+        ON CONFLICT (exception_key) DO UPDATE
+           SET status = 'NEW',
+               title = EXCLUDED.title,
+               description = EXCLUDED.description,
+               updated_at = clock_timestamp()
+         WHERE existing.status NOT IN ('RESOLVED', 'REJECTED')
+    </insert>
+
+    <select id="findCapCheckIds" resultType="long">
+        SELECT response.cap_check_id
+          FROM fgc.commission_transaction ct
+          CROSS JOIN LATERAL unnest(ct.confirm_cap_check_ids)
+               WITH ORDINALITY AS response(cap_check_id, response_order)
+         WHERE ct.commission_transaction_id = #{paymentId}
+         ORDER BY response.response_order
+    </select>
+
+    <update id="confirm">
+        UPDATE fgc.commission_transaction
+           SET status = 'CONFIRMED',
+               confirm_idempotency_key = #{idempotencyKey},
+               confirm_cap_check_ids = string_to_array(#{capCheckIdsCsv}, ',')::bigint[]
+         WHERE commission_transaction_id = #{paymentId}
+           AND status = 'DRAFT'
+           AND source_type = 'GA_MANUAL_PAYMENT'
+    </update>
+
+</mapper>
