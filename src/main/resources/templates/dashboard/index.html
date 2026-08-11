@@ -190,8 +190,7 @@
     </span>
   </div>
 
-</main>
-
+<!-- 스크립트는 main 안에 둔다 — 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
 <script>
 /* 화면 폭이 좁으면 아래 두 카드를 세로로 */
 (function () {
@@ -204,5 +203,6 @@
   window.addEventListener("resize", reflow);
 })();
 </script>
+</main>
 </body>
 </html>

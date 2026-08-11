@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-BASE-W01 기준정보 조회 (탭 5개)
+  요구사항 FUN-005 ~ FUN-009
+  데이터  읽기 organization, insurer, product, product_offering, agent, commission_item
+  API     GET /api/v1/base/organizations · /insurers · /products · /agents · /commission-items
+  라우트  GET /base → base/index.html
+
+  [1차 범위] 조회·선택만 합니다. 등록·수정은 2차입니다.
+             데이터는 시드(DAR-011)로 넣습니다. 파일 업로드 기능은 없습니다(COR-010).
+  [막을 것] 이 화면에 1,200% 산입 여부를 표시하지 않습니다.
+            산입/제외는 항목 자체의 성질이 아니라 룰셋(cap_rule_item)이 정하는 것이라
+            FGC-UI-POL-W01 에서 봅니다.
+  [주의] 이 조회 API는 다른 화면의 드롭다운으로도 재사용되므로 공용으로 만듭니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-BASE-W01)의 정적 골격만 옮겼다.
+  탭별 표(조직·보험회사·상품·설계사·수수료 항목)는 기준정보 조회 API(GET /api/v1/base/*)
+  연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-BASE-W01', '기준정보 조회', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <h1 class="fgc-page-title">기준정보 조회</h1>
+  <p class="fgc-page-desc">
+    계약·지급을 등록할 때 고르는 <strong>바탕 자료</strong>입니다.
+    1차에서는 <strong>보기만</strong> 합니다. 등록·수정 기능은 2차에 만듭니다.
+  </p>
+
+  <div class="fgc-banner fgc-banner--muted" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">database</span>
+    <span>
+      원수사에서 온 자료는 <strong>이미 우리 형식으로 정리되어 DB에 들어와 있다</strong>는 전제입니다(COR-010).
+      그래서 파일을 올리거나 컬럼을 맞추는 화면이 없습니다.
+    </span>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="fgc-tabs" role="tablist">
+      <button class="fgc-tab" role="tab" aria-selected="true"  aria-controls="tab-org"      id="b1">조직</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-insurer"  id="b2">보험회사</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-product"  id="b3">상품</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-agent"    id="b4">설계사</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-item"     id="b5">수수료 항목</button>
+    </div>
+
+    <!-- 탭별 표는 기준정보 조회 API(GET /api/v1/base/*) 연동 시 서버 렌더링으로 채운다 -->
+    <section class="fgc-tabpanel fgc-card" id="tab-org"     role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem"></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-insurer" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-product" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-agent"   role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-item"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+  </div>
+
+<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
+<script>
+/* 탭 전환 — aria-selected 와 hidden 만 바꾼다. 표 데이터는 API 연동 시 서버 렌더링으로 채운다 */
+(function () {
+  "use strict";
+  var tabs = document.querySelectorAll(".fgc-tab");
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", t === tab ? "true" : "false"); });
+      document.querySelectorAll(".fgc-tabpanel").forEach(function (p) {
+        p.hidden = p.id !== tab.getAttribute("aria-controls");
+      });
+    });
+  });
+})();
+</script>
+</main>
+</body>
+</html>

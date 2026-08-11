@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-CAP-W02 1,200% 계산근거 (팝업)
+  요구사항 FUN-035 / REG-06A · REG-11 · REG-20 · REG-21
+  데이터  읽기 cap_check, cap_check_detail, cap_check.calculation_snapshot(JSON)
+  API     GET /api/v1/cap-checks/{capCheckId}/details   (Ajax · 모달)
+
+  [★ 막을 것] 이 팝업에서 다시 계산하지 않습니다.
+    검증하던 그 순간에 저장해 둔 스냅샷을 그대로 펼쳐 보여줄 뿐입니다.
+    지금 다시 계산하면 "그때 왜 이 금액이었는지"를 설명할 수 없게 됩니다.
+
+  [화면 구성] 화면정의서 §4-6 공통 규칙: 입력값 → 계산식 → 항목별 → 합계 4단
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-CAP-W02)의 정적 골격만 옮겼다.
+  페이지가 아니라 프래그먼트(modal)다 — CAP-W01(cap/list.html)에서 IF-API-31(SIR-006)로
+  Ajax 로드해 모달에 끼운다. 셸 레이아웃(page)을 쓰지 않는다.
+  데이터 영역(요약·입력값·계산식·항목별·합계)은 IF-API-31 연동 시 채운다.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="modal" class="fgc-cap-detail">
+
+  <div class="fgc-banner fgc-banner--muted">
+    <span class="material-symbols-outlined" style="font-size:18px">history_toggle_off</span>
+    <span>
+      이 화면은 <strong class="fgc-mono">cap_check.calculation_snapshot</strong>(검증 당시 저장한 계산 스냅샷)을
+      표로 펼친 것입니다. <strong>여기서 다시 계산하지 않습니다.</strong>
+    </span>
+  </div>
+
+  <!-- 요약 헤더 — IF-API-31 연동 시 채운다 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">
+        계약 <span class="fgc-mono" id="sum-contract">—</span> ·
+        <span id="sum-stage">—</span>
+      </span>
+      <span id="sum-badge"></span>
+    </div>
+    <div class="fgc-card__body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
+      <div><div class="fgc-label">기준일</div><div class="fgc-mono" id="sum-asof">—</div></div>
+      <div><div class="fgc-label">검증 종류</div><div id="sum-kind">—</div></div>
+      <div><div class="fgc-label">적용 룰셋</div><div class="fgc-mono" id="sum-ruleset">—</div></div>
+      <div><div class="fgc-label">판정 ID</div><div class="fgc-mono" id="sum-id">—</div></div>
+    </div>
+  </section>
+
+  <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1.6fr;gap:16px" id="calc-grid">
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- ① 입력값 — IF-API-31 연동 시 채운다 -->
+      <section class="fgc-card">
+        <div class="fgc-card__head"><span class="fgc-card__title">① 입력값</span></div>
+        <div class="fgc-card__body">
+          <div class="fgc-calc-step">
+            <span class="fgc-calc-step__no">STEP 1 · 무엇을 가지고 계산했나</span>
+            <table class="fgc-table" style="font-size:12px">
+              <tbody id="input-body">
+                <tr><td colspan="2"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 계산식 — IF-API-31 연동 시 채운다 -->
+      <section class="fgc-card">
+        <div class="fgc-card__head"><span class="fgc-card__title">② 계산식</span></div>
+        <div class="fgc-card__body">
+          <div class="fgc-calc-step">
+            <span class="fgc-calc-step__no">STEP 2 · 어떻게 계산했나</span>
+            <div class="fgc-formula" id="formula">—</div>
+            <p class="fgc-help" style="margin-top:10px" id="formula-note"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 합계와 판정 — IF-API-31 연동 시 채운다 -->
+      <section class="fgc-card">
+        <div class="fgc-card__head"><span class="fgc-card__title">④ 합계와 판정</span></div>
+        <div class="fgc-card__body">
+          <div class="fgc-calc-step">
+            <span class="fgc-calc-step__no">STEP 4 · 그래서 결론이 무엇인가</span>
+            <div class="fgc-gauge" style="margin-bottom:14px">
+              <div class="fgc-gauge__track" style="height:14px">
+                <div class="fgc-gauge__bar" id="final-bar" style="width:0%"></div>
+                <div class="fgc-gauge__mark fgc-gauge__mark--warn"></div>
+              </div>
+              <div class="fgc-gauge__legend">
+                <span>0</span><span id="final-limit-label">한도</span>
+              </div>
+            </div>
+            <table class="fgc-table" style="font-size:13px">
+              <tbody id="final-body">
+                <tr><td colspan="2"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ③ 항목별 산입 내역 — IF-API-31 연동 시 채운다 -->
+    <section class="fgc-card" style="align-self:start">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">③ 항목별 산입 내역</span>
+        <span class="fgc-muted" style="font-size:12px">cap_check_detail</span>
+      </div>
+      <div class="fgc-card__body" style="padding-bottom:0">
+        <div class="fgc-calc-step" style="margin-bottom:0">
+          <span class="fgc-calc-step__no">STEP 3 · 어떤 돈을 넣고 어떤 돈을 뺐나</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table">
+          <thead>
+            <tr>
+              <th style="width:34px">#</th>
+              <th>항목</th>
+              <th class="fgc-th-num" style="width:110px">금액</th>
+              <th style="width:88px">판정</th>
+              <th>판단 이유</th>
+              <th style="width:150px">근거</th>
+              <th style="width:110px">원천</th>
+            </tr>
+          </thead>
+          <tbody id="detail-body">
+            <tr><td colspan="7"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2">산입 합계</td>
+              <td class="fgc-td-num"><span class="fgc-amount" id="detail-included">0</span></td>
+              <td colspan="4" class="fgc-muted" style="font-weight:400">제외·검토필요 금액은 합계에 넣지 않습니다</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="fgc-card__body">
+        <div class="fgc-banner fgc-banner--warn">
+          <span class="material-symbols-outlined" style="font-size:18px">priority_high</span>
+          <span>
+            <strong>이름만 보고 제외하면 안 됩니다.</strong>
+            교육비·복리후생비·대여금이라는 이름이 붙어 있어도
+            실제로 모집이나 판매촉진의 대가라면 수수료등에 포함됩니다(REG-11 · REG-22).
+            판단 이유(<span class="fgc-mono">decision_reason</span>)는 저장이 필수입니다.
+          </span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px">
+    <a class="fgc-btn fgc-btn--primary" id="go-exception" th:href="@{/exceptions}" style="text-decoration:none">
+      관련 예외 건 보기
+    </a>
+  </div>
+
+</div>
+</body>
+</html>

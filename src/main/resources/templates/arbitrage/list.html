@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-ARB-W01 차익거래 검증
+  요구사항 FUN-063 / REG-12 · REG-23
+  데이터  읽기 arbitrage_check, contract_financial_snapshot, refund_rate_table
+  API     GET  /api/v1/arbitrage-checks?month=&status=&insurerId=&contractNo=
+          POST /api/v1/contracts/{id}/arbitrage-check   (수동 검증)
+  라우트  GET /arbitrage-checks → arbitrage/list.html
+
+  [★ "위반"이라는 단어를 쓰지 않습니다]
+    CANDIDATE 는 "검토대상"일 뿐 위반 확정이 아닙니다.
+    사람이 사유를 확인하기 전에는 위반이라고 부르지 않습니다.
+
+  [막을 것]
+   · 지급단계(원수사→GA / GA→설계사) 합산 — 각각 따로 봅니다
+   · 상품코드가 안 맞거나 환급률표가 없을 때 억지로 계산하기
+     → REVIEW_REQUIRED(자료부족)로 두고 예외를 만듭니다
+
+  [실행 시점] 실효·해지·금액 변경이 생긴 즉시 + 일일 변경분 배치 + 월 전체 배치
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-ARB-W01)의 정적 골격만 옮겼다.
+  데이터 영역(요약카드·목록·상세 패널)은 차익거래 조회 API 연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ARB-W01', '차익거래 검증', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <h1 class="fgc-page-title">차익거래 검증</h1>
+  <p class="fgc-page-desc">
+    계약자가 낸 보험료보다 <strong>회사가 내보낸 돈(수수료 + 해약환급금)</strong>이 더 많아졌는지 봅니다.
+    많아졌다면 "보험을 들었다 깨는 것만으로 이득을 보는" 구조일 수 있어 사람이 확인해야 합니다.
+  </p>
+
+  <!-- 판정식 -->
+  <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">function</span>
+    <span>
+      <span class="fgc-mono">기본 초과액 = max(0, 지급수수료등 − 환수금 − 실제 납입보험료)</span><br>
+      <span class="fgc-mono">환급금 합산 = max(0, 지급수수료등 + 해약환급금 − 환수금 − 실제 납입보험료)</span><br>
+      해약환급금을 <strong>합산하는 조건</strong>: 표준해약공제액을 80% 이상 공제하는 상품이면서
+      계약 후 <strong>3년(36개월) 이내</strong> 해지된 경우입니다(REG-12).
+      실효도 대상이며, 실효사유가 생긴 시점을 해지 시점으로 봅니다.
+    </span>
+  </div>
+
+  <div class="fgc-banner fgc-banner--warn" style="margin-top:10px">
+    <span class="material-symbols-outlined" style="font-size:18px">translate</span>
+    <span>
+      이 화면에는 <strong>"위반"이라는 말이 나오지 않습니다.</strong>
+      계산 결과가 0을 넘으면 <strong>검토대상(CANDIDATE)</strong>이 될 뿐이고,
+      실제 위반 여부는 사람이 사유를 확인한 뒤에 판단합니다.
+      또 지급단계별로 따로 계산하며 <strong>합산하지 않습니다.</strong>
+    </span>
+  </div>
+
+  <!-- ① 검색 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__body fgc-toolbar">
+      <div class="fgc-field" style="min-width:140px">
+        <label class="fgc-label" for="f-month">정산월</label>
+        <input class="fgc-input" id="f-month" type="month" th:value="${month}" value="2026-07">
+      </div>
+      <div class="fgc-field" style="min-width:150px">
+        <label class="fgc-label" for="f-status">판정</label>
+        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:170px">
+        <label class="fgc-label" for="f-stage">지급단계</label>
+        <select class="fgc-select" id="f-stage">
+          <option value="GA_TO_FC">GA→설계사</option>
+          <option value="INSURER_TO_GA">원수사→GA</option>
+        </select>
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-insurer">보험회사</label>
+        <select class="fgc-select" id="f-insurer"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:120px">
+        <label class="fgc-label" for="f-contract">계약번호</label>
+        <input class="fgc-input" id="f-contract" type="text" placeholder="C005">
+      </div>
+      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </button>
+    </div>
+  </section>
+
+  <!-- ② 요약 카드 3장 — 차익거래 조회 API 연동 시 서버 렌더링으로 채운다 -->
+  <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px"
+           id="summary-cards"></section>
+
+  <div style="margin-top:16px;display:grid;grid-template-columns:1.25fr 1fr;gap:16px" id="arb-grid">
+
+    <!-- ③ 목록 -->
+    <section class="fgc-card">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">③ 계약별 판정</span>
+        <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table" style="min-width:900px">
+          <thead>
+            <tr>
+              <th style="width:64px">계약</th>
+              <th style="width:92px">기준일</th>
+              <th style="width:66px">계약차월</th>
+              <th class="fgc-th-num" style="width:104px">누적 납입보험료</th>
+              <th class="fgc-th-num" style="width:104px">확정 수수료</th>
+              <th class="fgc-th-num" style="width:100px">지급예정액</th>
+              <th class="fgc-th-num" style="width:104px">해약환급금</th>
+              <th style="width:92px">환급금 출처</th>
+              <th class="fgc-th-num" style="width:100px">초과액</th>
+              <th style="width:100px">판정</th>
+            </tr>
+          </thead>
+          <tbody id="list-body">
+            <tr><td colspan="10"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ④ 상세 패널 -->
+    <section class="fgc-card" style="align-self:start">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">④ 상세</span>
+        <span id="detail-badge"></span>
+      </div>
+      <div class="fgc-card__body" id="detail-body">
+        <p class="fgc-muted" style="font-size:13px;margin:0">왼쪽 목록에서 한 건을 고르세요.</p>
+      </div>
+    </section>
+  </div>
+
+<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
+<script>
+/* 화면 폭이 좁으면 목록·상세를 세로로 — 데이터 렌더링은 API 연동 시 추가 */
+(function () {
+  "use strict";
+  function reflow() {
+    document.getElementById("arb-grid").style.gridTemplateColumns =
+      window.innerWidth < 1150 ? "1fr" : "1.25fr 1fr";
+  }
+  reflow();
+  window.addEventListener("resize", reflow);
+})();
+</script>
+</main>
+</body>
+</html>

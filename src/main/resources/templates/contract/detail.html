@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-CONT-W02 보험계약 상세 (탭 6개)
+  요구사항 FUN-018 · 032 · 035 · 036 · 063 / REG-08 · REG-12
+  데이터  insurance_contract 외 7종
+  API     GET /api/v1/contracts/{id}                       (MPA)
+          GET /api/v1/contracts/{id}/schedules             (Ajax · 탭2)
+          GET /api/v1/contracts/{id}/cap-checks            (Ajax · 탭3)
+          GET /api/v1/contracts/{id}/arbitrage-checks      (Ajax · 탭4)
+          GET /api/v1/contracts/{id}/journals              (Ajax · 탭5)
+          GET /api/v1/contracts/{id}/transactions          (Ajax · 탭6)
+          GET /api/v1/contracts/{id}/status-events         (Ajax · 기본정보 탭 안)
+  라우트  GET /contracts/{id} → contract/detail.html
+
+  [주의] 탭을 클릭할 때만 그 탭 자료를 읽습니다(lazy load).
+         탭마다 계약 기본정보를 다시 읽지 않습니다.
+  [막을 것] 확정된 스케줄 행 금액을 고치는 기능 자체를 만들지 않습니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-CONT-W02)의 정적 골격만 옮겼다.
+  요약 헤더는 IF-API-12 연동 시 서버 렌더링으로, 탭 6개 내용은 IF-API-12~17 연동 시 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W02', '보험계약 상세', '보험계약', '/contracts')}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <!-- 목업 head 의 .kv 스타일 — ~{::main} 으로 main 만 옮겨지므로 여기 둔다 -->
+  <style>
+    .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 12px 20px; }
+    .kv dt { font-size: 11px; color: #43474d; font-weight: 600; }
+    .kv dd { margin: 2px 0 0; font-size: 13px; }
+  </style>
+
+  <!-- ① 계약 요약 헤더 — IF-API-12 연동 시 서버 렌더링으로 채운다 -->
+  <section class="fgc-card">
+    <div class="fgc-card__head">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="fgc-page-title" style="font-size:20px" id="h-no">—</span>
+        <span id="h-status"></span>
+        <span id="h-cap"></span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <a class="fgc-btn fgc-btn--ghost" id="btn-edit" href="#" style="text-decoration:none" data-fgc-action="edit">
+          <span class="material-symbols-outlined" style="font-size:18px">edit</span> 수정
+        </a>
+        <button class="fgc-btn fgc-btn--ghost" id="btn-regen" data-fgc-action="regenerate">
+          <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 스케줄 재생성
+        </button>
+        <button class="fgc-btn fgc-btn--primary" id="btn-recheck" data-fgc-action="recheck">
+          <span class="material-symbols-outlined" style="font-size:18px">speed</span> 한도 재검증
+        </button>
+      </div>
+    </div>
+    <div class="fgc-card__body">
+      <!-- 계약자 표시는 없습니다 — 개인정보를 저장하지 않습니다 (SRC-027 D-05) -->
+      <dl class="kv">
+        <div><dt>보험회사</dt><dd id="h-insurer">—</dd></div>
+        <div><dt>상품</dt><dd id="h-product">—</dd></div>
+        <div><dt>계약일</dt><dd class="fgc-mono" id="h-date">—</dd></div>
+        <div><dt>월납환산 초회보험료</dt><dd id="h-premium">—</dd></div>
+        <div><dt>담당(모집) 설계사</dt><dd class="fgc-mono" id="h-agent">—</dd></div>
+        <div><dt>소속</dt><dd id="h-org">—</dd></div>
+        <div><dt>데이터 출처</dt><dd id="h-origin">—</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ② 탭 6개 — 각 패널 내용은 탭 클릭 시(lazy load) IF-API-13~17·16 으로 채운다.
+       탭1 기본정보(+상태이력 IF-API-16) · 탭2 스케줄 IF-API-13 · 탭3 1,200% IF-API-14
+       탭4 차익거래 IF-API-15 · 탭5 원장 IF-API-17 · 탭6 지급·대사 IF-API-17 -->
+  <div style="margin-top:16px">
+    <div class="fgc-tabs" role="tablist">
+      <button class="fgc-tab" role="tab" aria-selected="true"  aria-controls="tab-basic"  id="t1">기본정보</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-sched"  id="t2">예상 스케줄</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-cap"    id="t3">1,200%</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-arb"    id="t4">차익거래</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-ledger" id="t5">원장</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-pay"    id="t6">지급·대사</button>
+    </div>
+
+    <section class="fgc-tabpanel fgc-card" id="tab-basic"  role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem"></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-sched"  role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-cap"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-arb"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-ledger" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-pay"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+  </div>
+
+  <script>
+  /* 탭 전환(레이아웃 동작만) — 탭 자료 lazy load 는 IF-API-13~17 연동 시 추가.
+     ~{::main} 이 main 요소만 옮기므로 스크립트를 main 안에 둔다. */
+  (function () {
+    "use strict";
+    var tabs = document.querySelectorAll(".fgc-tab");
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () {
+        tabs.forEach(function (o) { o.setAttribute("aria-selected", o === t ? "true" : "false"); });
+        document.querySelectorAll(".fgc-tabpanel").forEach(function (p) {
+          p.hidden = p.id !== t.getAttribute("aria-controls");
+        });
+      });
+    });
+  })();
+  </script>
+
+</main>
+</body>
+</html>

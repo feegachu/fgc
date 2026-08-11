@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-LEDG-W01 검증원장 조회 (복식부기)
+  요구사항 FUN-046(원장 기록) · FUN-047(정정·역분개) / SAR-002
+  데이터  읽기 journal_header, journal_line, journal_account, vw_journal_imbalance
+  API     GET  /api/v1/journals?period=&type=&account=&contract=&status=
+          GET  /api/v1/journals/imbalances?validationRunId=   (Ajax · 불균형 배너)
+          POST /api/v1/journals/{id}/reverse                  (사유 필수)
+  라우트  GET /journals → ledger/list.html
+
+  [막을 것]
+   · 분개 수정 — UPDATE API 자체를 만들지 않습니다
+   · 분개 삭제 — DELETE 를 DB 트리거가 거부합니다
+   · 차변≠대변인 상태로 기표(POSTED) 전환
+   · 한 줄에 차변·대변을 동시에 적기 — DB CHECK 가 막습니다
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-LEDG-W01)의 정적 골격만 옮겼다.
+  데이터 영역(분개 목록·상세·불균형 배너·필터 선택지)은 IF-API 연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-LEDG-W01', '검증원장 조회', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <h1 class="fgc-page-title">검증원장 조회</h1>
+  <p class="fgc-page-desc">
+    <strong>복식부기</strong>(하나의 거래를 차변·대변 두 쪽에 같은 금액으로 적는 방식)로
+    돈의 흐름을 기록해 두고, 양쪽 합계가 맞는지 확인합니다.
+  </p>
+
+  <!-- 상단 고정 안내 -->
+  <div class="fgc-banner fgc-banner--muted" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">menu_book</span>
+    <!-- 원장 안내 문구(FGC.NOTICE.LEDGER)는 메시지 프로퍼티로 채운다 -->
+    <span><strong id="notice-ledger"></strong></span>
+  </div>
+
+  <!-- ② 불균형 경고 배너 — vw_journal_imbalance 조회 결과로 서버 렌더링 시 전환한다 -->
+  <div class="fgc-banner fgc-banner--error" id="imbalance-banner" style="margin-top:10px" hidden>
+    <span class="material-symbols-outlined" style="font-size:18px">error</span>
+    <span id="imbalance-text"></span>
+  </div>
+  <div class="fgc-banner fgc-banner--info" id="balance-banner" style="margin-top:10px">
+    <span class="material-symbols-outlined" style="font-size:18px">check_circle</span>
+    <span>
+      차변 합계와 대변 합계가 다른 분개가 <strong>0건</strong>입니다
+      (<span class="fgc-mono">vw_journal_imbalance</span>).
+      기표(POSTED)로 넘기기 전에는 반드시 0건이어야 하고, 월 통합검증 확정 조건 ②번이기도 합니다.
+    </span>
+  </div>
+
+  <!-- 고정 문구 -->
+  <div class="fgc-banner fgc-banner--warn" style="margin-top:10px">
+    <span class="material-symbols-outlined" style="font-size:18px">edit_off</span>
+    <span><strong>수정·삭제는 없습니다. 잘못됐으면 역분개로 고칩니다.</strong>
+      잘못된 분개를 지우면 "그때 무슨 일이 있었는지"가 사라지기 때문입니다.</span>
+  </div>
+
+  <!-- ① 검색 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__body fgc-toolbar">
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-from">분개일 (시작)</label>
+        <input class="fgc-input" id="f-from" type="date" value="2026-07-01">
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-to">분개일 (끝)</label>
+        <input class="fgc-input" id="f-to" type="date" value="2026-07-31">
+      </div>
+      <div class="fgc-field" style="min-width:220px">
+        <label class="fgc-label" for="f-type">분개 유형</label>
+        <select class="fgc-select" id="f-type"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:150px">
+        <label class="fgc-label" for="f-account">계정과목</label>
+        <select class="fgc-select" id="f-account"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:120px">
+        <label class="fgc-label" for="f-contract">계약번호</label>
+        <input class="fgc-input" id="f-contract" type="text" placeholder="C001">
+      </div>
+      <div class="fgc-field" style="min-width:120px">
+        <label class="fgc-label" for="f-status">상태</label>
+        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
+      </div>
+      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </button>
+    </div>
+  </section>
+
+  <div style="margin-top:16px;display:grid;grid-template-columns:1.35fr 1fr;gap:16px" id="ledger-grid">
+
+    <!-- ③ 분개 목록 -->
+    <section class="fgc-card">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">분개 목록</span>
+        <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table">
+          <thead>
+            <tr>
+              <th style="width:126px">분개번호</th>
+              <th style="width:92px">분개일</th>
+              <th style="width:170px">유형</th>
+              <th style="width:66px">계약</th>
+              <th class="fgc-th-num" style="width:104px">차변 합계</th>
+              <th class="fgc-th-num" style="width:104px">대변 합계</th>
+              <th style="width:88px">상태</th>
+            </tr>
+          </thead>
+          <tbody id="list-body">
+            <tr><td colspan="7"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ④ 상세 패널 -->
+    <section class="fgc-card" style="align-self:start">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">분개 상세</span>
+        <span id="detail-badge"></span>
+      </div>
+      <div class="fgc-card__body" id="detail-body">
+        <p class="fgc-muted" style="font-size:13px;margin:0">왼쪽 목록에서 분개를 고르세요.</p>
+      </div>
+    </section>
+  </div>
+
+<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
+<script>
+/* 화면 폭이 좁으면 목록·상세 2단 그리드를 세로로 — 데이터 렌더링은 IF-API 연동 시 추가 */
+(function () {
+  "use strict";
+  function reflow() {
+    document.getElementById("ledger-grid").style.gridTemplateColumns =
+      window.innerWidth < 1150 ? "1fr" : "1.35fr 1fr";
+  }
+  reflow();
+  window.addEventListener("resize", reflow);
+})();
+</script>
+</main>
+</body>
+</html>

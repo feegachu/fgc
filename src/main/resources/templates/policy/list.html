@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-POL-W01 정책·룰셋 조회 (탭 4개)
+  요구사항 FUN-011 · FUN-012 · FUN-013 / REG-08 · 09 · 10 · 11 · 22
+  데이터  읽기 policy_version, commission_rule, cap_rule_set, cap_rule_item,
+              refund_rate_table, refund_rate_line
+  API     GET /api/v1/policies?type=&asOf=&status=      GET /api/v1/policies/{id}
+  라우트  GET /policies → policy/list.html
+
+  [막을 것] 1차에서는 요율 수정 기능을 만들지 않습니다.
+            ACTIVE 정책의 자식 행은 DB 트리거가 UPDATE 자체를 거부합니다.
+  [표시 규칙] 근거(REG 코드)가 비어 있는 행은 회색으로 두고 "근거 미기재"라고 적습니다.
+              근거 없는 숫자를 그냥 보여주면 안 됩니다.
+  [주의] 정책을 고를 기준일은 "오늘"이 아니라 대부분 "계약일"입니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-POL-W01)의 정적 골격만 옮겼다.
+  탭별 표(정책 버전·수수료 규칙·1,200% 룰셋·예상 해약환급률표)는
+  정책 조회 API(GET /api/v1/policies) 연동 시 서버 렌더링으로 채운다.
+  제목의 가운뎃점은 th:* 표현식 안에 쓸 수 없어 페이지 인자에서는 공백으로 대신했다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-POL-W01', '정책·룰셋 조회', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <h1 class="fgc-page-title">정책 · 룰셋 조회</h1>
+      <p class="fgc-page-desc">
+        수수료를 얼마나 줄지, 무엇을 1,200% 한도에 넣을지를 정해 둔 <strong>규칙표</strong>입니다.
+        계산에 쓰이는 모든 숫자는 코드가 아니라 여기서 읽습니다(COR-004).
+      </p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label class="fgc-label" for="as-of" style="margin:0">적용 기준일</label>
+      <input class="fgc-input" id="as-of" type="date" value="2026-07-01" style="padding:5px 8px">
+    </div>
+  </div>
+
+  <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">event</span>
+    <span>
+      <strong>기준일을 "오늘"로 잡으면 안 되는 경우가 많습니다.</strong>
+      1,200%룰과 차익거래는 <strong>계약 체결일</strong> 기준으로 정책을 고르고,
+      분급 체계는 <strong>상품 판매개시일·기초서류 버전</strong> 기준으로 고릅니다(REG-19).
+      두 기준을 섞으면 전혀 다른 요율이 적용됩니다.
+    </span>
+  </div>
+
+  <div class="fgc-banner fgc-banner--muted" style="margin-top:10px">
+    <span class="material-symbols-outlined" style="font-size:18px">palette</span>
+    <span>
+      출처 색: <span class="fgc-badge fgc-badge--src-regulatory">규제</span>
+      <span class="fgc-badge fgc-badge--src-insurer">보험사 규칙</span>
+      <span class="fgc-badge fgc-badge--src-ga">회사 정책</span>
+      <span class="fgc-badge fgc-badge--src-assumption">프로젝트 가정</span>
+      — <strong>주황색(프로젝트 가정)은 실제 규정이 아니라 우리가 임시로 정한 값</strong>이라는 뜻입니다.
+      발표 때 이 값을 법정 기준처럼 말하면 안 됩니다.
+    </span>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="fgc-tabs" role="tablist">
+      <button class="fgc-tab" role="tab" aria-selected="true"  aria-controls="tab-version" id="p1">정책 버전</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-rule"    id="p2">수수료 규칙</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-cap"     id="p3">1,200% 룰셋</button>
+      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-refund"  id="p4">예상 해약환급률표</button>
+    </div>
+
+    <!-- 탭별 표는 정책 조회 API(GET /api/v1/policies) 연동 시 서버 렌더링으로 채운다 -->
+    <section class="fgc-tabpanel fgc-card" id="tab-version" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem"></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-rule"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-cap"     role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-refund"  role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+  </div>
+
+<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
+<script>
+/* 탭 전환 — aria-selected 와 hidden 만 바꾼다. 표 데이터는 API 연동 시 서버 렌더링으로 채운다 */
+(function () {
+  "use strict";
+  var tabs = document.querySelectorAll(".fgc-tab");
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", t === tab ? "true" : "false"); });
+      document.querySelectorAll(".fgc-tabpanel").forEach(function (p) {
+        p.hidden = p.id !== tab.getAttribute("aria-controls");
+      });
+    });
+  });
+})();
+</script>
+</main>
+</body>
+</html>

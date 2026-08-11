@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-RECO-W01 대사 실행·결과
+  요구사항 FUN-048~051 / 운영정책서 제36조
+  데이터  reconciliation_run, reconciliation_result, reconciliation_match, vw_reconciliation_summary
+  API     POST /api/v1/reconciliations                    (실행)
+          GET  /api/v1/reconciliations/{id}/results       (Ajax)
+  라우트  GET /reconciliations → reco/list.html
+
+  [대사 방향 2개]
+   · 원수사→GA : 우리가 계산한 예상 수입 스케줄  vs  원수사가 보낸 실제 명세
+   · GA→설계사 : 우리가 계산한 예상 지급 스케줄  vs  GA가 확정한 실제 지급 건
+  [매칭키] 계약번호 + 지급단계 + 설계사 + 수수료 항목 + 회차
+
+  [막을 것]
+   · 같은 정산월·지급단계·보험회사로 실행 2건 만들기 — DB UNIQUE 가 막습니다
+   · 화면에서 결과 유형(일치/불일치)을 사람이 바꾸기 — 계산 결과이지 의견이 아닙니다
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-RECO-W01)의 정적 골격만 옮겼다.
+  데이터 영역(요약 카드·결과 목록·실행 이력·필터 선택지)은 IF-API 연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-RECO-W01', '대사 실행·결과', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <h1 class="fgc-page-title">대사 실행 · 결과</h1>
+  <p class="fgc-page-desc">
+    <strong>대사(對査)</strong>란 서로 다른 두 자료를 나란히 놓고 금액이 맞는지 확인하는 것입니다.
+    FGC는 <strong>줄 예정이던 돈(예상 스케줄)</strong>과 <strong>실제로 준 돈</strong>을 맞춰 봅니다.
+  </p>
+
+  <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">straighten</span>
+    <span>
+      <!-- 허용오차 안내 문구(FGC.NOTICE.TOLERANCE)는 메시지 프로퍼티로 채운다 -->
+      <strong id="notice-tolerance"></strong>
+      회차와 지급예정일도 정확히 맞아야 일치로 봅니다. (2차에서 허용오차 정책을 도입합니다)
+    </span>
+  </div>
+
+  <!-- ① 실행 영역 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head"><span class="fgc-card__title">① 대사 실행</span></div>
+    <div class="fgc-card__body fgc-toolbar">
+      <div class="fgc-field" style="min-width:140px">
+        <label class="fgc-label fgc-label--required" for="r-month">정산월</label>
+        <input class="fgc-input" id="r-month" type="month" th:value="${month}" value="2026-07">
+      </div>
+      <div class="fgc-field" style="min-width:170px">
+        <label class="fgc-label fgc-label--required" for="r-stage">지급단계</label>
+        <select class="fgc-select" id="r-stage">
+          <option value="GA_TO_FC">GA→설계사</option>
+          <option value="INSURER_TO_GA">원수사→GA</option>
+        </select>
+      </div>
+      <div class="fgc-field" style="min-width:150px">
+        <label class="fgc-label" for="r-insurer">보험회사</label>
+        <select class="fgc-select" id="r-insurer"><option value="">전체</option></select>
+      </div>
+      <button class="fgc-btn fgc-btn--primary" id="btn-run" data-fgc-action="reconcile">
+        <span class="material-symbols-outlined" style="font-size:18px">play_arrow</span> 대사 실행
+      </button>
+      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" data-fgc-action="bulk">
+        <span class="material-symbols-outlined" style="font-size:18px">playlist_add</span> 불일치 예외 일괄 생성
+      </button>
+    </div>
+    <div class="fgc-card__body" style="padding-top:0">
+      <p class="fgc-help">
+        같은 정산월 · 지급단계 · 보험회사 조합으로는 실행을 2건 만들 수 없습니다.
+        다시 돌려도 결과가 중복으로 쌓이지 않습니다
+        (<span class="fgc-mono">UNIQUE(reconciliation_run_id, match_group_key)</span>).
+      </p>
+    </div>
+  </section>
+
+  <!-- ② 실행 요약 — 대상·일치·불일치·일치율·차액 카드는 IF-API 연동 시 채운다 -->
+  <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px"
+           id="summary-cards"></section>
+
+  <div style="margin-top:16px;display:grid;grid-template-columns:1fr;gap:16px">
+
+    <!-- ③ 결과 목록 -->
+    <section class="fgc-card">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">③ 대사 결과</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="fgc-label" for="f-type" style="margin:0">결과 유형</label>
+          <select class="fgc-select" id="f-type" style="padding:4px 8px"><option value="">전체 (11종)</option></select>
+          <label style="display:flex;gap:4px;align-items:center;font-size:12px">
+            <input type="checkbox" id="f-mismatch"> 불일치만
+          </label>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table" style="min-width:1080px">
+          <thead>
+            <tr>
+              <th style="width:66px">계약</th>
+              <th style="width:130px">수수료 항목</th>
+              <th style="width:52px">회차</th>
+              <th style="width:130px">예상 설계사</th>
+              <th style="width:130px">실제 설계사</th>
+              <th class="fgc-th-num" style="width:100px">예상 금액</th>
+              <th class="fgc-th-num" style="width:100px">실제 금액</th>
+              <th class="fgc-th-num" style="width:100px">차액</th>
+              <th style="width:130px">결과 유형</th>
+              <th style="width:180px">주 원인</th>
+              <th style="width:80px"></th>
+            </tr>
+          </thead>
+          <tbody id="result-body">
+            <tr><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5">합계</td>
+              <td class="fgc-td-num"><span class="fgc-amount" id="sum-expected">0</span></td>
+              <td class="fgc-td-num"><span class="fgc-amount" id="sum-actual">0</span></td>
+              <td class="fgc-td-num"><span class="fgc-amount" id="sum-diff">0</span></td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- ④ 실행 이력 -->
+    <section class="fgc-card">
+      <div class="fgc-card__head"><span class="fgc-card__title">④ 실행 이력</span></div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table">
+          <thead>
+            <tr>
+              <th>실행 ID</th><th>정산월</th><th>지급단계</th><th>보험회사</th>
+              <th>상태</th><th class="fgc-th-num">대상</th><th class="fgc-th-num">일치</th>
+              <th class="fgc-th-num">불일치</th><th class="fgc-th-num">일치율</th>
+              <th class="fgc-th-num">차액 합계</th><th>시작 · 완료</th>
+            </tr>
+          </thead>
+          <tbody id="run-body">
+            <tr><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+</main>
+</body>
+</html>
