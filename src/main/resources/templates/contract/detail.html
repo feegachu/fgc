@@ -40,13 +40,13 @@
         <span id="h-cap"></span>
       </div>
       <div style="display:flex;gap:8px">
-        <a class="fgc-btn fgc-btn--ghost" id="btn-edit" href="#" style="text-decoration:none" data-fgc-action="edit">
+        <a class="fgc-btn fgc-btn--ghost" id="btn-edit" href="#" style="text-decoration:none" data-fgc-action="edit" th:disabled="${readOnly}">
           <span class="material-symbols-outlined" style="font-size:18px">edit</span> 수정
         </a>
-        <button class="fgc-btn fgc-btn--ghost" id="btn-regen" data-fgc-action="regenerate">
+        <button class="fgc-btn fgc-btn--ghost" id="btn-regen" data-fgc-action="regenerate" th:disabled="${readOnly}">
           <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 스케줄 재생성
         </button>
-        <button class="fgc-btn fgc-btn--primary" id="btn-recheck" data-fgc-action="recheck">
+        <button class="fgc-btn fgc-btn--primary" id="btn-recheck" data-fgc-action="recheck" th:disabled="${readOnly}">
           <span class="material-symbols-outlined" style="font-size:18px">speed</span> 한도 재검증
         </button>
       </div>
@@ -80,7 +80,7 @@
 
     <section class="fgc-tabpanel fgc-card" id="tab-basic"  role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem"></section>
     <section class="fgc-tabpanel fgc-card" id="tab-sched"  role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
-    <section class="fgc-tabpanel fgc-card" id="tab-cap"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-cap"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden><!-- 지급단계별(원수사→GA / GA→설계사) 판정을 반드시 분리 표시한다 — 합산 금지(규제조문표 §0.3). IF-API-14 연동 시 단계별 패널 2개로 렌더링 --></section>
     <section class="fgc-tabpanel fgc-card" id="tab-arb"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
     <section class="fgc-tabpanel fgc-card" id="tab-ledger" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
     <section class="fgc-tabpanel fgc-card" id="tab-pay"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>

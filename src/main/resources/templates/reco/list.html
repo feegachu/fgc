@@ -34,7 +34,7 @@
     <span class="material-symbols-outlined" style="font-size:18px">straighten</span>
     <span>
       <!-- 허용오차 안내 문구(FGC.NOTICE.TOLERANCE)는 메시지 프로퍼티로 채운다 -->
-      <strong id="notice-tolerance"></strong>
+      <strong id="notice-tolerance">1차 허용오차 0원 — 1원만 달라도 불일치입니다.</strong>
       회차와 지급예정일도 정확히 맞아야 일치로 봅니다. (2차에서 허용오차 정책을 도입합니다)
     </span>
   </div>
@@ -58,10 +58,10 @@
         <label class="fgc-label" for="r-insurer">보험회사</label>
         <select class="fgc-select" id="r-insurer"><option value="">전체</option></select>
       </div>
-      <button class="fgc-btn fgc-btn--primary" id="btn-run" data-fgc-action="reconcile">
+      <button class="fgc-btn fgc-btn--primary" id="btn-run" data-fgc-action="reconcile" th:disabled="${readOnly}">
         <span class="material-symbols-outlined" style="font-size:18px">play_arrow</span> 대사 실행
       </button>
-      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" data-fgc-action="bulk">
+      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" data-fgc-action="bulk" th:disabled="${readOnly}">
         <span class="material-symbols-outlined" style="font-size:18px">playlist_add</span> 불일치 예외 일괄 생성
       </button>
     </div>

@@ -40,12 +40,12 @@
     <span class="material-symbols-outlined" style="font-size:18px">error</span>
     <span id="imbalance-text"></span>
   </div>
-  <div class="fgc-banner fgc-banner--info" id="balance-banner" style="margin-top:10px">
-    <span class="material-symbols-outlined" style="font-size:18px">check_circle</span>
+  <!-- 데이터 미연동 상태를 검증 완료(0건 성공)로 표시하지 않는다 — 집계 결과가 있을 때만 성공/오류 배너로 전환 -->
+  <div class="fgc-banner fgc-banner--muted" id="balance-banner" style="margin-top:10px">
+    <span class="material-symbols-outlined" style="font-size:18px">info</span>
     <span>
-      차변 합계와 대변 합계가 다른 분개가 <strong>0건</strong>입니다
-      (<span class="fgc-mono">vw_journal_imbalance</span>).
-      기표(POSTED)로 넘기기 전에는 반드시 0건이어야 하고, 월 통합검증 확정 조건 ②번이기도 합니다.
+      원장 균형(차변=대변, <span class="fgc-mono">vw_journal_imbalance</span> 0건 여부)은 IF-API-34 연동 시 집계 결과로 표시합니다.
+      기표(POSTED) 전에는 반드시 0건이어야 하며 월 통합검증 확정 조건 ②번입니다.
     </span>
   </div>
 
@@ -61,11 +61,11 @@
     <div class="fgc-card__body fgc-toolbar">
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-from">분개일 (시작)</label>
-        <input class="fgc-input" id="f-from" type="date" value="2026-07-01">
+        <input class="fgc-input" id="f-from" type="date" th:value="${month} + '-01'" value="2026-07-01">
       </div>
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-to">분개일 (끝)</label>
-        <input class="fgc-input" id="f-to" type="date" value="2026-07-31">
+        <input class="fgc-input" id="f-to" type="date" th:value="${T(java.time.YearMonth).parse(month).atEndOfMonth()}" value="2026-07-31">
       </div>
       <div class="fgc-field" style="min-width:220px">
         <label class="fgc-label" for="f-type">분개 유형</label>

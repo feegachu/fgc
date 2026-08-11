@@ -157,23 +157,25 @@
                 <th style="width:36px">#</th>
                 <th style="width:96px">귀속 범위</th>
                 <th style="width:100px">계약번호</th>
+                <th style="width:100px">설계사</th>
                 <th style="width:120px">귀속일</th>
                 <th style="width:110px">귀속월</th>
                 <th style="width:120px" class="fgc-th-num">귀속금액</th>
                 <th style="width:118px">산입 판정</th>
                 <th style="width:150px">귀속 방법</th>
+                <th style="width:110px">배부정책</th>
                 <th>증빙</th>
                 <th style="width:40px"></th>
               </tr>
             </thead>
             <tbody id="attr-body">
-              <tr><td colspan="10"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+              <tr><td colspan="12"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="5">귀속금액 합계</td>
+                <td colspan="6">귀속금액 합계</td>
                 <td class="fgc-td-num"><span class="fgc-amount" id="attr-sum">0</span></td>
-                <td colspan="4" id="attr-diff" class="fgc-muted"></td>
+                <td colspan="5" id="attr-diff" class="fgc-muted"></td>
               </tr>
             </tfoot>
           </table>
@@ -221,13 +223,13 @@
       <!-- ④ 버튼 — 동작은 IF-API-22(저장)·24(사전검증)·25(확정) 연동 시 붙인다 -->
       <section class="fgc-card">
         <div class="fgc-card__body" style="display:flex;flex-direction:column;gap:8px">
-          <button class="fgc-btn fgc-btn--ghost" id="btn-save" data-fgc-action="save">
+          <button class="fgc-btn fgc-btn--ghost" id="btn-save" data-fgc-action="save" th:disabled="${readOnly}">
             <span class="material-symbols-outlined" style="font-size:18px">save</span> 임시저장 (검증 없음)
           </button>
-          <button class="fgc-btn fgc-btn--ghost" id="btn-precheck" data-fgc-action="precheck">
+          <button class="fgc-btn fgc-btn--ghost" id="btn-precheck" data-fgc-action="precheck" th:disabled="${readOnly}">
             <span class="material-symbols-outlined" style="font-size:18px">calculate</span> 사전검증
           </button>
-          <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm">
+          <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${readOnly}">
             <span class="material-symbols-outlined" style="font-size:18px">verified</span> 확정
           </button>
           <p class="fgc-help" style="margin:4px 0 0">

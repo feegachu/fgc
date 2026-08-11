@@ -1,5 +1,6 @@
 package com.susukkang.fgc.common.web;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -102,6 +103,11 @@ public class ScreenViewController {
         return "vrun/detail";
     }
 
+    /**
+     * AUDT-W01 은 다른 1차 화면과 달리 "전체 조회"가 아니다 — 화면정의서 :1491 권한
+     * COMPLIANCE·SYSTEM_ADMIN. FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
+     */
+    @PreAuthorize("hasAnyRole('COMPLIANCE', 'SYSTEM_ADMIN')")
     @GetMapping("/audit-logs")
     public String auditLogList() {
         return "audit/list";

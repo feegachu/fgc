@@ -85,7 +85,7 @@
           <label class="fgc-label fgc-label--required" for="contractDate">계약일 (계약 체결일)</label>
           <input class="fgc-input" id="contractDate" type="date" required>
           <span class="fgc-help">
-            미래 날짜는 넣을 수 없습니다. 1,200%룰과 차익거래는 <strong>이 날짜</strong>를 기준으로 판단합니다(REG-19).
+            미래 날짜는 넣을 수 없습니다. 1,200%룰과 차익거래는 <strong>이 날짜</strong>를 기준으로 판단합니다(REG-19). 분급 체계·수수료율은 상품 판매개시일·기초서류 버전 기준으로 별도로 정해집니다(REG-19).
           </span>
           <span class="fgc-error" id="err-contractDate" hidden></span>
         </div>
@@ -209,7 +209,7 @@
     <div style="display:flex;justify-content:flex-end;gap:8px">
       <a class="fgc-btn fgc-btn--ghost" th:href="@{/contracts}" style="text-decoration:none">취소</a>
       <!-- data-fgc-action: COMPLIANCE(준법·감사) 역할로 로그인하면 자동으로 회색이 됩니다 -->
-      <button class="fgc-btn fgc-btn--primary" id="save-btn" type="submit" data-fgc-action="save" disabled>
+      <button class="fgc-btn fgc-btn--primary" id="save-btn" type="submit" data-fgc-action="save" disabled th:disabled="${readOnly}">
         <span class="material-symbols-outlined" style="font-size:18px">save</span>
         저장하고 예상 스케줄 만들기
       </button>
