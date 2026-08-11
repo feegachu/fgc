@@ -134,6 +134,7 @@ public class GlobalExceptionHandler {
         return validationError(field);
     }
 
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
             MethodArgumentTypeMismatchException exception
@@ -183,17 +184,10 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.failure(apiError));
     }
 
-    /**
-    * @author hjKang
-    * @since 2026-08-06
-    *
-     * 접근 권한이 없는 요청을 처리한다.
-     * 기존 코드: 접근 거부 예외에 대한 별도 처리가 없었다.
-     * 문제: AuthorizationDeniedException이 일반 예외 처리기에 전달되어
-     *       HTTP 403 대신 HTTP 500으로 응답했다.
-     * 개선: AccessDeniedException을 별도로 처리하여
-     *       HTTP 403과 FGC-AUTH-003 오류 응답을 반환한다
-    */
+    // 2026-08-07 yslee - 접근 거부 예외에 대한 공통 오류 응답 처리 적용
+    // 기존 코드: 접근 거부 예외가 일반 예외 처리기로 전달되었다.
+    // 문제: 권한이 없는 요청이 HTTP 403 대신 HTTP 500으로 응답할 수 있었다.
+    // 개선: AccessDeniedException을 별도로 처리하여 HTTP 403과 FGC-AUTH-003을 반환한다.
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
             AccessDeniedException exception

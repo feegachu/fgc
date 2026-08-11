@@ -510,12 +510,6 @@ gradlew.bat bootRun
 
 충돌 표시 예시:
 
-```text
-<<<<<<< HEAD
-=======
->>>>>>> develop
-```
-
 ---
 
 ## 10. Flyway 및 DDL 변경 규칙
