@@ -95,6 +95,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 개선: 같은 계약 행 잠금과 멱등키를 포함해 점검·예외·상태 처리를 한 트랜잭션에서 수행
     @Transactional(noRollbackFor = CommissionPaymentConfirmationRejectedException.class)
     public CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey) {
+        // 2026-08-11 yslee - 운영정책서 제31조의 확정 게이트 6단계 순서를 코드에 명시
+        // 기존 코드: 실제 확정 로직은 정책 순서를 따르지만 단계별 주석이 없어 문서와 코드의 대응 확인이 어려움
+        // 문제: 검증 순서가 변경되어도 리뷰 과정에서 정책 위반을 즉시 식별하기 어려움
+        // 개선: ① DRAFT 저장 ② 귀속행 입력 ③ 귀속합계=지급액 ④ REVIEW_REQUIRED 없음
+        //       ⑤ 1,200% 사전검증 ⑥ CONFIRMED 상태 변경 순서를 고정하고 아래 로직에서 동일하게 수행
         validateIdempotencyKey(idempotencyKey);
         String normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey);
         List<ConfirmationData> attributions = requireConfirmationData(paymentId);
