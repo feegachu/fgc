@@ -1,17 +1,24 @@
 package com.susukkang.fgc.validation.controller;
 
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.CreateValidationRunResponse;
+import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
+import com.susukkang.fgc.validation.dto.ValidationRunSearchResponse;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -20,9 +27,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,7 +40,7 @@ import java.time.LocalDate;
 import java.util.Map;
 
 /**
- * FGC-FUN-041 검증 실행 생성 API
+ * FGC-FUN-041 검증 실행 생성/목록 조회 API
  */
 @Tag(name = "검증 실행", description = "월 통합검증·수동검증 실행 생성/조회 API")
 @RestController
@@ -40,6 +49,7 @@ import java.util.Map;
 public class ValidationRunController {
 
     private final ValidationRunCreateService validationRunCreateService;
+    private final ValidationRunSearchService validationRunSearchService;
 
     @Operation(
             summary = "검증 실행 생성 (IF-API-45)",
@@ -89,5 +99,59 @@ public class ValidationRunController {
         ValidationRunRow row = validationRunCreateService.create(command);
 
         return ApiResponse.success(CreateValidationRunResponse.from(row));
+    }
+
+    @Operation(
+            summary = "월 통합검증 실행 목록 조회",
+            description = "검증월·상태로 검색하고, 실행/확정/실패/진행 단계 정보를 페이징된 목록으로 돌려준다. "
+                    + "인증된 전체 사용자(SYSTEM_ADMIN, GA_ADMIN, SETTLEMENT, COMPLIANCE)가 조회할 수 있다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = ValidationRunSearchResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류, "
+                            + "status 값 오류 등 (FGC-COMMON-002)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청")
+    })
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ValidationRunSearchResponse> search(
+            @Parameter(description = "검증월(yyyy-MM)", example = "2026-08")
+            @RequestParam(required = false) String month,
+            @Parameter(description = "실행 상태(CREATED/RUNNING/COMPLETED/FAILED/FINALIZED)")
+            @RequestParam(required = false) String status,
+            @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size
+    ) {
+        // 1) month 파싱
+        LocalDate validationMonth = null;
+        if(month != null){
+            try {
+                validationMonth = DateUtil.parseSettlementMonth(month);
+            } catch (DateTimeException | NullPointerException e){
+                throw new FgcBusinessException(FgcErrorCode.COMMON_002, "month",
+                        Map.of("field", "month"), null);
+            }
+        }
+
+        // 2) status 검증
+        if (status != null){
+            try {
+                ValidationRunStatus.valueOf(status);
+            } catch (IllegalArgumentException e){
+                throw new FgcBusinessException(FgcErrorCode.COMMON_002, "status",
+                        Map.of("field", "status"), null);
+            }
+        }
+
+        // 3) criteria 조립 + 서비스 호출
+        ValidationRunSearchCriteria criteria = new ValidationRunSearchCriteria(validationMonth, status);
+        PageResponse<ValidationRunListRow> pageResponse = validationRunSearchService.search(criteria, page, size);
+
+        // 4) 응답 변환
+        return ApiResponse.success(ValidationRunSearchResponse.from(pageResponse));
     }
 }

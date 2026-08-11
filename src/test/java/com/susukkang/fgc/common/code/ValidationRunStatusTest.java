@@ -55,4 +55,14 @@ class ValidationRunStatusTest {
         assertThat(ValidationRunStatus.RUNNING.canTransitionTo(ValidationRunStatus.CREATED)).isFalse();
         assertThat(ValidationRunStatus.RUNNING.canTransitionTo(ValidationRunStatus.FINALIZED)).isFalse();
     }
+
+    @Test
+    // SIR-008: 값 5개 전부 한글 라벨이 있어야 한다(#41 목록 응답이 statusLabel로 노출)
+    void everyStatusHasALabel() {
+        assertThat(ValidationRunStatus.CREATED.label()).isEqualTo("생성됨");
+        assertThat(ValidationRunStatus.RUNNING.label()).isEqualTo("실행중");
+        assertThat(ValidationRunStatus.COMPLETED.label()).isEqualTo("계산완료");
+        assertThat(ValidationRunStatus.FAILED.label()).isEqualTo("실패");
+        assertThat(ValidationRunStatus.FINALIZED.label()).isEqualTo("확정(잠김)");
+    }
 }

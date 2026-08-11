@@ -162,6 +162,68 @@ class ValidationRunCreateServiceImplTest {
     }
 
     @Test
+    // MonthlyValidationJob은 JobParameters의 runNo와 validation_run.run_no가 반드시 같아야 한다.
+    void createsRunWithExplicitRunNoForBatch() {
+        LocalDate month = LocalDate.of(2026, 8, 1);
+        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
+        stubSuccessfulInsert(100L, "CREATED");
+
+        ValidationRunRow result = service.create(
+                new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L, 7));
+
+        ArgumentCaptor<ValidationRunInsertRow> captor = ArgumentCaptor.forClass(ValidationRunInsertRow.class);
+        verify(validationRunMapper).insert(captor.capture());
+        verify(validationRunMapper, never()).findNextRunNo(month);
+
+        assertThat(captor.getValue().getRunNo()).isEqualTo(7);
+        assertThat(result.getStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
+    // 재시작 시나리오: INSERT는 이미 커밋됐는데 그 이후(Step 완료 기록 등)에서 중단된 뒤
+    // 같은 (validationMonth, runNo)로 create()를 다시 부르면, 새 INSERT를 시도하지 않고
+    // 기존 행을 그대로 재사용해야 한다(멱등성).
+    void reusesExistingRunOnRestartWithSameExplicitRunNo() {
+        LocalDate month = LocalDate.of(2026, 8, 1);
+        ValidationRunRow existing = new ValidationRunRow();
+        existing.setValidationRunId(100L);
+        existing.setStatus("RUNNING");
+        existing.setRunType("MONTHLY");
+        existing.setTriggeredBy(42L);
+        when(validationRunMapper.findByMonthAndRunNo(month, 7)).thenReturn(existing);
+
+        ValidationRunRow result = service.create(
+                new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L, 7));
+
+        assertThat(result).isSameAs(existing);
+        verify(validationRunMapper, never()).insert(any());
+        verify(validationRunMapper, never()).existsActiveMonthlyRun(any());
+    }
+
+    @Test
+    // 같은 (validationMonth, runNo)에 이미 다른 요청(runType 또는 triggeredBy가 다른) 행이
+    // 있으면 재시작이 아니라 진짜 충돌이므로 VRUN_005로 막아야 한다
+    void throwsStateConflictWhenExistingRunDoesNotMatchTheRequest() {
+        LocalDate month = LocalDate.of(2026, 8, 1);
+        ValidationRunRow existing = new ValidationRunRow();
+        existing.setValidationRunId(100L);
+        existing.setStatus("RUNNING");
+        existing.setRunType("MONTHLY");
+        existing.setTriggeredBy(999L);
+        when(validationRunMapper.findByMonthAndRunNo(month, 7)).thenReturn(existing);
+
+        CreateValidationRunCommand command =
+                new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L, 7);
+
+        assertThatThrownBy(() -> service.create(command))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting(e -> ((FgcBusinessException) e).getErrorCode())
+                .isEqualTo(FgcErrorCode.VRUN_005);
+
+        verify(validationRunMapper, never()).insert(any());
+    }
+
+    @Test
     // run_no 채번 경합(uq_validation_run 위반)은 활성 월 중복이 아니므로 재시도해서 결국 성공해야 한다
     void retriesOnRunNoCollisionAndSucceeds() {
         LocalDate month = LocalDate.of(2026, 8, 1);

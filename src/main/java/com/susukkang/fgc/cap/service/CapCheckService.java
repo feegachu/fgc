@@ -10,12 +10,7 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import java.util.Optional;
 
 /**
- * CapCalculator(계산)와 저장을 하나로 묶는 오케스트레이션 계층(#3).
- * "계산과 저장의 트랜잭션 경계는 이 계층에서 관리한다"는 요구사항에 따라, cap_check/cap_check_detail
- * 저장과 그 트랜잭션 범위를 여기서 책임진다. CapCalculator 자체는 저장을 모른다.
- *
- * FUN-030 범위는 계산·저장과 IF-API-30(목록) 조회까지다. 계약 상세용 조회(IF-API-14, FUN-032·박민준)가
- * 필요해지면 그쪽 이슈에서 이 서비스에 메서드를 추가해 연결한다.
+ * CapCalculator(계산)와 저장을 하나로 묶는 오케스트레이션 계층
  */
 public interface CapCheckService {
 

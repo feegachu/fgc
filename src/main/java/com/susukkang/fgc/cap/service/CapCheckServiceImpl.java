@@ -35,7 +35,7 @@ import java.util.Optional;
 public class CapCheckServiceImpl implements CapCheckService {
 
     // IF-API-30 페이징 계약(1-base page, size 1~100). 컨트롤러뿐 아니라 이 서비스를 부르는 어떤
-    // 호출자든 이 한도를 강제해야 해서 서비스 계층에서 직접 막는다 — 여기가 유일한 진입점이다.
+    // 호출자든 이 한도를 강제해야 해서 서비스 계층에서 직접 막는다
     private static final int MIN_PAGE = 1;
     private static final int MIN_SIZE = 1;
     private static final int MAX_SIZE = 100;
