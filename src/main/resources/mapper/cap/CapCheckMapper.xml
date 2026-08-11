@@ -3,9 +3,8 @@
 <mapper namespace="com.susukkang.fgc.cap.mapper.CapCheckMapper">
 
     <!--
-      cap_check/cap_check_detail 은 append-only 다(DB 트리거가 UPDATE/DELETE 를 막는다).
-      재계산할 때도 기존 행을 고치지 않고 새 행을 INSERT 한다 — 이전 판정 이력이 그대로 남는다.
-      useGeneratedKeys 로 IDENTITY PK 를 돌려받아 detail 행을 insertCapCheckDetails 에 그대로 넘긴다.
+      순수 INSERT 대신 ON CONFLICT ... DO UPDATE로 바꿈
+      useGeneratedKeys로 IDENTITY PK를 돌려받는다 — 영향받은 행의 cap_check_id가 그대로 돌아옴
     -->
     <insert id="insertCapCheck" useGeneratedKeys="true" keyProperty="capCheckId" keyColumn="cap_check_id">
         INSERT INTO fgc.cap_check (
@@ -18,7 +17,39 @@
             #{limitAmount}, #{includedAmount}, #{remainingAmount}, #{usagePct}, #{resultStatus},
             COALESCE(#{calculationSnapshotJson}, '{}')::jsonb
         )
+        ON CONFLICT ON CONSTRAINT uq_cap_check_monthly DO UPDATE SET
+            cap_rule_set_id              = EXCLUDED.cap_rule_set_id,
+            refund_rate_table_id         = EXCLUDED.refund_rate_table_id,
+            check_kind                   = EXCLUDED.check_kind,
+            as_of_date                   = EXCLUDED.as_of_date,
+            base_premium_amount          = EXCLUDED.base_premium_amount,
+            refund_12m_amount            = EXCLUDED.refund_12m_amount,
+            compliance_deduction_amount  = EXCLUDED.compliance_deduction_amount,
+            limit_amount                 = EXCLUDED.limit_amount,
+            included_amount              = EXCLUDED.included_amount,
+            remaining_amount             = EXCLUDED.remaining_amount,
+            usage_pct                    = EXCLUDED.usage_pct,
+            result_status                = EXCLUDED.result_status,
+            calculation_snapshot         = EXCLUDED.calculation_snapshot,
+            checked_at                   = clock_timestamp()
     </insert>
+
+    <!-- §7-6 공통규칙 1 "UPSERT 또는 ON CONFLICT DO NOTHING — '지웠다 다시 넣기' 금지"를
+         cap_check_detail에도 지킨다(코드리뷰 지적, 2026-08-11 — 이전엔 deleteCapCheckDetails로
+         전부 지운 뒤 다시 넣었다). uq_cap_check_detail UNIQUE(cap_check_id, detail_seq)를
+         충돌 대상으로 삼아 자리(detail_seq)별로 upsert한다.
+
+         다만 재계산 결과가 이전보다 항목 수가 "줄었을" 수 있다(산입 대상이 빠지는 경우) —
+         upsert만으로는 그 초과분(예: 이전엔 3개였는데 이번엔 2개)이 안 지워진다. 그래서
+         pruneCapCheckDetails로 이번 계산이 실제로 채운 detail_seq보다 큰 뒷자리만 잘라낸다 —
+         "지웠다 다시 넣기"가 아니라 "안 쓰는 꼬리만 정리"이므로 규칙 위반이 아니다.
+         cap_check_detail도 FINALIZED 이전에는 DELETE가 허용된다(trg_cap_check_detail_immutable
+         → guard_finalized_validation_result, insertCapCheck 주석과 같은 트리거). -->
+    <delete id="pruneCapCheckDetails">
+        DELETE FROM fgc.cap_check_detail
+         WHERE cap_check_id = #{capCheckId}
+           AND detail_seq > #{maxDetailSeq}
+    </delete>
 
     <!--
       item_code/item_name/contract_month_no 는 계산 당시 값을 그대로 스냅샷한다(V5 마이그레이션).
@@ -34,6 +65,15 @@
             (#{d.capCheckId}, #{d.detailSeq}, #{d.commissionItemId}, #{d.itemCode}, #{d.itemName},
              #{d.scheduleLineId}, #{d.contractMonthNo}, #{d.classificationSnapshot}, #{d.amount}, #{d.decisionReason})
         </foreach>
+        ON CONFLICT ON CONSTRAINT uq_cap_check_detail DO UPDATE SET
+            commission_item_id      = EXCLUDED.commission_item_id,
+            item_code                = EXCLUDED.item_code,
+            item_name                = EXCLUDED.item_name,
+            schedule_line_id         = EXCLUDED.schedule_line_id,
+            contract_month_no        = EXCLUDED.contract_month_no,
+            classification_snapshot  = EXCLUDED.classification_snapshot,
+            amount                   = EXCLUDED.amount,
+            decision_reason          = EXCLUDED.decision_reason
     </insert>
 
     <!-- 컬럼 별칭을 camelCase 프로퍼티명과 동일하게 맞춰 map-underscore-to-camel-case 설정 없이도 매핑되게 한다. -->

@@ -107,9 +107,11 @@ class ValidationRunMapperIntegrationTest {
     @Test
     // run_no 1,2가 이미 있으면 findNextRunNo가 3을 반환하는지 둘 다 MANUAL_CONTRACT로 넣음
     void findNextRunNoReturnsMaxPlusOne() {
+        // uq_validation_run_active_manual_contract(V9) 때문에 MANUAL_CONTRACT 활성 실행은
+        // 동시에 1건만 가능하다 — 두 번째 행은 활성-1건 제약이 없는 PRE_CONFIRM으로 넣는다.
         LocalDate month = LocalDate.of(2026, 9, 1);
         insertCreatedRun(month, 1, "MANUAL_CONTRACT");
-        insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+        insertCreatedRun(month, 2, "PRE_CONFIRM");
 
         Integer nextRunNo = validationRunMapper.findNextRunNo(month);
 
@@ -251,15 +253,129 @@ class ValidationRunMapperIntegrationTest {
     @Test
     // limit/offset이 실제로 페이징되는지 — run_no 1,2,3 중 offset=1, limit=1이면 1건만
     void searchRespectsOffsetAndLimit() {
+        // uq_validation_run_active_month 때문에 같은 달 두 번째부터는 MONTHLY가 아닌 다른
+        // runType으로 넣어야 하고, uq_validation_run_active_manual_contract(V9) 때문에
+        // MANUAL_CONTRACT 활성 실행도 동시에 1건만 가능하다 — 그래서 두 번째는
+        // MANUAL_CONTRACT, 세 번째는 활성-1건 제약이 없는 PRE_CONFIRM으로 넣는다.
         LocalDate month = LocalDate.of(2026, 9, 1);
         insertCreatedRun(month, 1);
-        // uq_validation_run_active_month 때문에 같은 달 두 번째부터는 MANUAL_CONTRACT로 넣는다.
         insertCreatedRun(month, 2, "MANUAL_CONTRACT");
-        insertCreatedRun(month, 3, "MANUAL_CONTRACT");
+        insertCreatedRun(month, 3, "PRE_CONFIRM");
 
         List<ValidationRunListRow> rows = validationRunMapper.search(month, null, 1, 1);
 
         assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getRunNo()).isEqualTo(2);
+    }
+
+    // ── #57 MonthlyValidationJob 진행 기록(transitionToRunning/updateCurrentStep/
+    //    transitionToCompleted/transitionToFailed) ────────────────────────────────
+
+    @Test
+    // CREATED → RUNNING 전이 시 current_step=1, started_at도 같이 채워지는지
+    void transitionToRunningSetsStatusStepAndStartedAt() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+
+        int affected = validationRunMapper.transitionToRunning(id);
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunMapper.findById(id);
+        assertThat(row.getStatus()).isEqualTo("RUNNING");
+        assertThat(row.getCurrentStep()).isEqualTo(1);
+        assertThat(row.getStartedAt()).isNotNull();
+    }
+
+    @Test
+    // 이미 CREATED가 아니면(RUNNING 등) 0건 — 중복 호출로 진행상황이 두 번 시작되지 않게
+    void transitionToRunningReturnsZeroWhenNotCreated() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+
+        int affected = validationRunMapper.transitionToRunning(id);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    // RUNNING 상태에서 current_step만 전진하고 status는 그대로인지
+    void updateCurrentStepAdvancesStepWhileStayingRunning() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+
+        int affected = validationRunMapper.updateCurrentStep(id, 4);
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunMapper.findById(id);
+        assertThat(row.getStatus()).isEqualTo("RUNNING");
+        assertThat(row.getCurrentStep()).isEqualTo(4);
+    }
+
+    @Test
+    // CREATED 상태(RUNNING 아님)에서는 updateCurrentStep이 0건 — ck_validation_run_step이
+    // CREATED에서 current_step=0만 허용하므로, 조건절이 그 위반을 미리 막아야 한다
+    void updateCurrentStepReturnsZeroWhenNotRunning() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+
+        int affected = validationRunMapper.updateCurrentStep(id, 2);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    // current_step을 이미 지나온 단계 번호로 되돌릴 수 없다(0건) — 역행 방지
+    void updateCurrentStepReturnsZeroWhenGoingBackward() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+        validationRunMapper.updateCurrentStep(id, 5);
+
+        int affected = validationRunMapper.updateCurrentStep(id, 3);
+
+        assertThat(affected).isZero();
+        assertThat(validationRunMapper.findById(id).getCurrentStep()).isEqualTo(5);
+    }
+
+    @Test
+    // journalPostingStep·imbalanceCheckStep이 같은 stepNo=6을 공유 — 같은 값으로 다시
+    // 호출해도(역행이 아니라 제자리) 성공해야 한다
+    void updateCurrentStepAllowsSettingTheSameStepAgain() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+        validationRunMapper.updateCurrentStep(id, 6);
+
+        int affected = validationRunMapper.updateCurrentStep(id, 6);
+
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    // RUNNING → COMPLETED 전이 시 current_step=8, completed_at도 같이 채워지는지
+    void transitionToCompletedSetsStatusStepAndCompletedAt() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+
+        int affected = validationRunMapper.transitionToCompleted(id);
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunMapper.findById(id);
+        assertThat(row.getStatus()).isEqualTo("COMPLETED");
+        assertThat(row.getCurrentStep()).isEqualTo(8);
+        assertThat(row.getCompletedAt()).isNotNull();
+    }
+
+    @Test
+    // RUNNING → FAILED 전이 시 실패한 단계 번호와 사유가 같이 남는지
+    void transitionToFailedRecordsFailedStepAndMessage() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+        validationRunMapper.updateCurrentStep(id, 3);
+
+        int affected = validationRunMapper.transitionToFailed(id, 5, "차익거래 검증 중 예외 발생");
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunMapper.findById(id);
+        assertThat(row.getStatus()).isEqualTo("FAILED");
+        assertThat(row.getCurrentStep()).isEqualTo(5);
+        assertThat(row.getFailureMessage()).isEqualTo("차익거래 검증 중 예외 발생");
     }
 
 }
