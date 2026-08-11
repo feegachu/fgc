@@ -40,3 +40,5 @@ fgc:
     daily-changed-contract:
       cron: "0 0 2 * * *"        # 매일 02:00. 프로젝트 운영 가정일 뿐 법정 기준 아님
       enabled: true
+      triggered-by-user-id: 1    # @Scheduled 자동 실행이 triggered_by에 남길 app_user.user_id.
+                                  # 운영 환경에서는 실제 배치 서비스 계정의 user_id로 바꿔야 함
