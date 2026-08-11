@@ -6,7 +6,6 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -29,7 +28,6 @@ import java.util.List;
 public record CommissionPaymentUpdateRequest(
         @NotBlank @Pattern(regexp = "GA_MANUAL_PAYMENT") String sourceType,
         @NotBlank @Size(max = 160) String sourceBusinessKey,
-        @NotNull @Positive Integer paymentSequence,
         Long contractId,
         @NotNull Long agentId,
         @NotNull @Positive Long commissionItemId,
@@ -39,7 +37,7 @@ public record CommissionPaymentUpdateRequest(
         @NotNull LocalDate scheduledPaymentDate,
         @NotNull PaymentStage paymentStage,
         Long allocationPolicyVersion,
-        @NotEmpty List<@NotNull @Valid CommissionPaymentAttributionRequest> attributions,
+        @NotNull List<@NotNull @Valid CommissionPaymentAttributionRequest> attributions,
         @Size(max = 1000) String note
 ) {
 }

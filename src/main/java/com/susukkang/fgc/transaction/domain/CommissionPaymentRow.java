@@ -20,7 +20,6 @@ public record CommissionPaymentRow(
         Long paymentId,
         String sourceType,
         String sourceBusinessKey,
-        Integer paymentSequence,
         Long contractId,
         Long agentId,
         Long commissionItemId,
@@ -45,7 +44,6 @@ public record CommissionPaymentRow(
                 paymentId,
                 sourceType,
                 sourceBusinessKey,
-                paymentSequence,
                 contractId,
                 agentId,
                 commissionItemId,
@@ -60,6 +58,10 @@ public record CommissionPaymentRow(
                 allocationPolicyVersion,
                 attributions.stream().map(CommissionPaymentAttributionRow::toResponse).toList(),
                 List.copyOf(capCheckIds),
+                // 2026-08-11 yslee - 분개 원장 식별자의 후속 연동 경계를 명시
+                // 기존 코드: journalHeaderId에 설명 없이 항상 null을 반환
+                // 문제: FUN-065 누락인지 FUN-046 미연동 상태인지 API 응답만으로 구분하기 어려움
+                // 개선: FUN-046 복식부기 분개 생성 완료 후 연결할 통합 지점으로 유지
                 null,
                 note,
                 createdAt,

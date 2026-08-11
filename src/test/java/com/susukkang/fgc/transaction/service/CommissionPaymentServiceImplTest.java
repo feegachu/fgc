@@ -107,6 +107,23 @@ class CommissionPaymentServiceImplTest {
                 .containsExactly(new BigDecimal("300000"), new BigDecimal("200000"));
     }
 
+    // 2026-08-11 yslee - 귀속행 입력 전 지급 본문 DRAFT 저장 검증
+    // 기존 코드: 빈 귀속 목록을 MyBatis 일괄 INSERT로 전달
+    // 문제: 귀속 작업 전 임시저장이 SQL 오류로 실패
+    // 개선: 지급 본문만 저장하고 빈 귀속 응답을 반환
+    @Test
+    void createsDraftWithoutAttributions() {
+        stubReferences(3L);
+        stubInsertAndResponse(List.of());
+
+        CommissionPaymentResponse response = service.create(createRequest(List.of()));
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat(response.attributions()).isEmpty();
+        verify(mapper).insertTransaction(any());
+        verify(mapper, never()).insertAttributions(anyList());
+    }
+
     // 2026-08-11 yslee - 최신 FUN-065의 저장·확정 분리 계약 검증
     // 기존 코드: 등록 성공만 확인하여 REVIEW_REQUIRED 초안 저장이 FUN-033을 호출하지 않는지 증명하지 못함
     // 문제: 저장 시 사전검증이 재도입되면 입력 중인 초안이 한도 판정 때문에 보존되지 않을 수 있음
@@ -183,6 +200,54 @@ class CommissionPaymentServiceImplTest {
         assertThat(attributionCaptor.getValue())
                 .extracting(CommissionPaymentAttributionCommand::getAttributionMonth)
                 .containsOnly(LocalDate.of(2026, 7, 1));
+    }
+
+    // 2026-08-11 yslee - 행별 반올림과 합계 후 반올림이 갈리는 입력값 검증
+    // 기존 코드: 100.50과 200.49는 두 계산 순서 모두 합계 301원이라 순서 회귀를 찾지 못함
+    // 문제: 상세행 반올림이 합계 뒤로 이동해도 테스트가 통과
+    // 개선: 100.50원 두 행을 각각 101원으로 만든 뒤 202원 지급액과 일치하는지 검증
+    @Test
+    void roundsEachAttributionBeforeComparingWithPaymentTotal() {
+        stubReferences(3L, 9L);
+        stubInsertAndResponse(List.of(
+                attributionRow(1, 3L, "101"),
+                attributionRow(2, 9L, "101")
+        ));
+        List<CommissionPaymentAttributionRequest> attributions = List.of(
+                attribution(3L, "100.50", AttributionMethod.APPROVED_ALLOCATION),
+                attribution(9L, "100.50", AttributionMethod.APPROVED_ALLOCATION)
+        );
+        CommissionPaymentCreateRequest source = createRequest(attributions);
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                new BigDecimal("202"),
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                source.allocationPolicyVersion(),
+                source.attributions(),
+                source.note()
+        );
+
+        service.create(request);
+
+        ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getAmount()).isEqualByComparingTo("202");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionPaymentAttributionCommand>> attributionCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(mapper).insertAttributions(attributionCaptor.capture());
+        assertThat(attributionCaptor.getValue())
+                .extracting(CommissionPaymentAttributionCommand::getAmount)
+                .containsExactly(new BigDecimal("101"), new BigDecimal("101"));
     }
 
     // 2026-08-11 yslee - 인터페이스 월 날짜 형식의 월초 제약 검증
@@ -403,6 +468,28 @@ class CommissionPaymentServiceImplTest {
         verify(mapper).insertAttributions(anyList());
     }
 
+    // 2026-08-11 yslee - 기존 귀속을 모두 지운 DRAFT 수정 검증
+    // 기존 코드: 수정 요청도 귀속행 1건 이상을 강제
+    // 문제: 작성 중인 DRAFT에서 잘못 입력한 귀속을 전부 제거해 저장할 수 없음
+    // 개선: DRAFT 본문은 갱신하고 기존 귀속 삭제 후 빈 상세 INSERT는 생략
+    @Test
+    void updatesDraftToEmptyAttributionList() {
+        stubReferences(3L);
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        )));
+        given(mapper.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(mapper.findAttributions(101L)).willReturn(List.of());
+
+        CommissionPaymentResponse response = service.update(101L, updateRequest(List.of()));
+
+        assertThat(response.attributions()).isEmpty();
+        verify(mapper).deleteAttributions(101L);
+        verify(mapper, never()).insertAttributions(anyList());
+    }
+
     @Test
     void rejectsUpdateWhenPaymentIsNotDraft() {
         given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(withStatus(confirmation(
@@ -413,7 +500,30 @@ class CommissionPaymentServiceImplTest {
         assertThatThrownBy(() -> service.update(101L, updateRequest(List.of(
                 attribution(3L, "500000", AttributionMethod.DIRECT)
         )))).isInstanceOfSatisfying(FgcBusinessException.class,
-                exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_005));
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_005));
+    }
+
+    // 2026-08-11 yslee - 귀속행 없는 DRAFT의 확정 차단 검증
+    // 기존 코드: INNER JOIN 조회로 지급 건을 미존재 처리
+    // 문제: 귀속 누락 업무 오류가 COMMON-002로 잘못 응답되고 예외 이력도 남지 않음
+    // 개선: 지급 본문을 조회한 뒤 TRAN-002와 DATA_QUALITY 예외를 생성
+    @Test
+    void blocksConfirmationWhenDraftHasNoAttributions() {
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(
+                emptyDraftConfirmation()
+        ));
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.TRAN_002));
+
+        ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
+                ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
+        verify(mapper).insertExceptionCase(captor.capture());
+        assertThat(captor.getValue().getExceptionType()).isEqualTo("DATA_QUALITY");
+        verify(capCalculator, never()).calculate(any());
+        verify(mapper, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -515,6 +625,104 @@ class CommissionPaymentServiceImplTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
 
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    // 2026-08-11 yslee - WARNING 경고율 직전 89% 경계 검증
+    // 기존 코드: 90% 이상 사례만 있어 비교 연산이 >로 바뀌거나 임계값이 낮아지는 회귀를 탐지하지 못함
+    // 문제: 정상 건이 경고 예외로 잘못 분류될 수 있음
+    // 개선: 한도 1,200,000원의 정확한 89%는 NORMAL임을 검증
+    @Test
+    void keepsNormalAtEightyNinePercentUsage() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "1068000", "1068000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(63L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+        given(mapper.confirm(101L, "warning-89", "63")).willReturn(1);
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1068000")));
+
+        service.confirm(101L, "warning-89");
+
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(mapper).insertCapCheck(captor.capture());
+        assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("89");
+        assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.NORMAL);
+        verify(mapper, never()).insertExceptionCase(any());
+    }
+
+    // 2026-08-11 yslee - WARNING 경고율 정확히 90% 경계 검증
+    // 기존 코드: 경고 범위 중간값만 검증하여 경계 포함 조건을 직접 증명하지 못함
+    // 문제: 비교 연산이 >=에서 >로 바뀌면 정확히 90%인 지급 건이 NORMAL로 통과
+    // 개선: 한도 1,200,000원의 정확한 90%는 WARNING이며 경고 예외를 저장
+    @Test
+    void flagsWarningAtExactlyNinetyPercentUsage() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "1080000", "1080000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(64L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+        given(mapper.confirm(101L, "warning-90", "64")).willReturn(1);
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1080000")));
+
+        service.confirm(101L, "warning-90");
+
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(mapper).insertCapCheck(captor.capture());
+        assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("90");
+        assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.WARNING);
+        verify(mapper).insertExceptionCase(any());
+    }
+
+    // 2026-08-11 yslee - 지급 정책과 계산 정책 불일치의 업무 예외 변환 검증
+    // 기존 코드: CAP_RULE_MISMATCH 저장 시 DB CHECK 위반으로 500 오류 발생
+    // 문제: 의도한 FGC-CAP-002 확정 차단과 예외 이력이 보존되지 않음
+    // 개선: 불일치 유형을 저장하고 검토필요 업무 오류로 확정을 차단
+    @Test
+    void blocksConfirmationWithCapRuleMismatch() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        CapRuleSnapshot mismatchedRule = new CapRuleSnapshot(
+                99L,
+                41L,
+                InclusionDecisionStatus.INCLUDED,
+                "지급 정책 룰셋",
+                new BigDecimal("100000"),
+                new BigDecimal("12"),
+                new BigDecimal("90"),
+                BigDecimal.ZERO,
+                null
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(mismatchedRule);
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.CAP_002));
+
+        ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
+                ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
+        verify(mapper).insertExceptionCase(captor.capture());
+        assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_RULE_MISMATCH");
+        verify(mapper, never()).insertCapCheck(any());
         verify(mapper, never()).confirm(any(), any(), any());
     }
 
@@ -797,7 +1005,6 @@ class CommissionPaymentServiceImplTest {
         return new CommissionPaymentCreateRequest(
                 "GA_MANUAL_PAYMENT",
                 "GA-2026-07-0001",
-                1,
                 3L,
                 7L,
                 11L,
@@ -821,7 +1028,6 @@ class CommissionPaymentServiceImplTest {
         return new CommissionPaymentUpdateRequest(
                 request.sourceType(),
                 request.sourceBusinessKey(),
-                request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
                 request.commissionItemId(),
@@ -843,7 +1049,6 @@ class CommissionPaymentServiceImplTest {
         return new CommissionPaymentCreateRequest(
                 source.sourceType(),
                 source.sourceBusinessKey(),
-                source.paymentSequence(),
                 source.contractId(),
                 source.agentId(),
                 source.commissionItemId(),
@@ -957,6 +1162,33 @@ class CommissionPaymentServiceImplTest {
         );
     }
 
+    private ConfirmationData emptyDraftConfirmation() {
+        return new ConfirmationData(
+                101L,
+                CommissionPaymentStatus.DRAFT,
+                new BigDecimal("500000"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                7L,
+                PaymentStage.GA_TO_FC,
+                11L,
+                "BASE_COMMISSION",
+                "FC 기본수수료",
+                3L,
+                null,
+                ExclusionType.NONE,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
     private ConfirmationData withConfirmationState(
             ConfirmationData data,
             CommissionPaymentStatus status,
@@ -1035,7 +1267,6 @@ class CommissionPaymentServiceImplTest {
                 101L,
                 "GA_MANUAL_PAYMENT",
                 "GA-2026-07-0001",
-                1,
                 3L,
                 7L,
                 11L,

@@ -23,7 +23,6 @@ public class CommissionPaymentCommand {
     private Long paymentId;
     private final String sourceType;
     private final String sourceBusinessKey;
-    private final Integer paymentSequence;
     private final Long sourceContractId;
     private final Long agentId;
     private final Long commissionItemId;

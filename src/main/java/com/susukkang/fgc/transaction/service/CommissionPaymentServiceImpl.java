@@ -216,7 +216,6 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 null,
                 request.sourceType(),
                 request.sourceBusinessKey(),
-                request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
                 request.commissionItemId(),
@@ -239,7 +238,6 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 paymentId,
                 request.sourceType(),
                 request.sourceBusinessKey(),
-                request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
                 request.commissionItemId(),
@@ -258,7 +256,6 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long paymentId,
             String sourceType,
             String sourceBusinessKey,
-            Integer paymentSequence,
             Long sourceContractId,
             Long agentId,
             Long commissionItemId,
@@ -314,7 +311,6 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .paymentId(paymentId)
                 .sourceType(sourceType)
                 .sourceBusinessKey(sourceBusinessKey)
-                .paymentSequence(paymentSequence)
                 .sourceContractId(sourceContractId)
                 .agentId(agentId)
                 .commissionItemId(item.commissionItemId())
@@ -498,6 +494,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long paymentId,
             List<CommissionPaymentAttributionCommand> attributions
     ) {
+        // 2026-08-11 yslee - 귀속행이 없는 지급 건은 DRAFT 본문만 저장
+        // 기존 코드: 빈 목록도 MyBatis 일괄 INSERT에 전달
+        // 문제: 화면에서 귀속 전 임시저장한 DRAFT가 SQL 문법 오류로 실패
+        // 개선: 빈 목록이면 상세 INSERT를 생략하고 확정 단계에서 귀속 필수 검증
+        if (attributions.isEmpty()) {
+            return;
+        }
         for (CommissionPaymentAttributionCommand attribution : attributions) {
             attribution.setPaymentId(paymentId);
         }

@@ -29,6 +29,8 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -83,6 +85,46 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(jsonPath("$.data.settlementMonth").value("2026-07-01"))
                 .andExpect(jsonPath("$.data.attributions[0].attributionDate").value("2026-07-10"))
                 .andExpect(jsonPath("$.data.attributions[0].attributionMonth").value("2026-07-01"));
+    }
+
+    // 2026-08-11 yslee - 귀속 입력 전 DRAFT 등록 API 허용 검증
+    // 기존 코드: attributions에 @NotEmpty를 적용하여 빈 목록을 400으로 차단
+    // 문제: TRAN-W02에서 지급 본문을 먼저 임시저장한 뒤 귀속행을 추가할 수 없음
+    // 개선: 빈 목록 DRAFT는 등록하고 확정 요청에서만 귀속 누락을 차단
+    @Test
+    void createsDraftBeforeAnyAttributionIsEntered() throws Exception {
+        given(commissionPaymentService.create(any())).willReturn(response(
+                CommissionPaymentStatus.DRAFT
+        ));
+        java.util.Map<String, Object> values = objectMapper.readValue(
+                validCreateJson(),
+                new com.fasterxml.jackson.core.type.TypeReference<>() {
+                }
+        );
+        values.put("attributions", List.of());
+
+        mockMvc.perform(post("/api/v1/transactions")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(values)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("DRAFT"));
+    }
+
+    // 2026-08-11 yslee - 지급 상태 변경 API의 CSRF 토큰 필수 검증
+    // 기존 코드: 테스트가 csrf()를 항상 넣어 토큰 없는 위조 요청의 차단 여부를 확인하지 않음
+    // 문제: SecurityConfig에서 CSRF가 다시 꺼져도 지급 등록 테스트가 계속 통과
+    // 개선: 인증된 세션이어도 토큰이 없으면 403이고 서비스는 호출되지 않음을 검증
+    @Test
+    void rejectsCreateWithoutCsrfToken() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateJson()))
+                .andExpect(status().isForbidden());
+
+        verify(commissionPaymentService, never()).create(any());
     }
 
     // 2026-08-11 yslee - 역할 매트릭스의 SYSTEM_ADMIN 전체권한 회귀 검증
@@ -197,7 +239,6 @@ class CommissionPaymentApiControllerTest {
         return objectMapper.writeValueAsString(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
                 java.util.Map.entry("sourceType", "GA_MANUAL_PAYMENT"),
                 java.util.Map.entry("sourceBusinessKey", "GA-2026-07-0001"),
-                java.util.Map.entry("paymentSequence", 1),
                 java.util.Map.entry("contractId", 3L),
                 java.util.Map.entry("agentId", 7L),
                 java.util.Map.entry("commissionItemId", 11L),
@@ -235,7 +276,6 @@ class CommissionPaymentApiControllerTest {
                 101L,
                 "GA_MANUAL_PAYMENT",
                 "GA-2026-07-0001",
-                1,
                 3L,
                 7L,
                 11L,

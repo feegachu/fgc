@@ -73,7 +73,6 @@
             source_type,
             source_business_key,
             source_contract_id,
-            source_sequence,
             recipient_agent_id,
             commission_item_id,
             policy_version_id,
@@ -88,7 +87,6 @@
             #{sourceType},
             #{sourceBusinessKey},
             #{naturalContractId},
-            #{paymentSequence},
             #{agentId},
             #{commissionItemId},
             #{policyVersionId},
@@ -107,7 +105,6 @@
                source_type = #{sourceType},
                source_business_key = #{sourceBusinessKey},
                source_contract_id = #{naturalContractId},
-               source_sequence = #{paymentSequence},
                recipient_agent_id = #{agentId},
                commission_item_id = #{commissionItemId},
                policy_version_id = #{policyVersionId},
@@ -185,7 +182,6 @@
         SELECT ct.commission_transaction_id AS payment_id,
                ct.source_type,
                ct.source_business_key,
-               ct.source_sequence AS payment_sequence,
                <!-- 2026-08-10 yslee - 지급 건 원계약 조회 기준을 정규 컬럼으로 통일 -->
                <!-- 기존 코드: 귀속 스냅샷 JSON의 sourceContractId를 원계약으로 조회 -->
                <!-- 문제: 정규 컬럼과 JSON이 달라지면 응답과 자연키 제약이 서로 다른 계약을 사용 -->
@@ -268,7 +264,11 @@
           FROM fgc.commission_transaction ct
           JOIN fgc.commission_item ci
             ON ci.commission_item_id = ct.commission_item_id
-          JOIN fgc.transaction_attribution ta
+          <!-- 2026-08-11 yslee - 귀속 전 DRAFT도 지급 건 행을 잠가 조회 -->
+          <!-- 기존 코드: transaction_attribution을 INNER JOIN하여 귀속 0건 지급 건을 미존재로 처리 -->
+          <!-- 문제: 임시저장은 가능해도 수정·확정 시 지급 건 자체를 찾지 못해 COMMON-002가 발생 -->
+          <!-- 개선: LEFT JOIN으로 본문을 유지하고 확정 서비스가 TRAN-002 귀속 누락을 판정 -->
+          LEFT JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
          WHERE ct.commission_transaction_id = #{paymentId}
          ORDER BY ta.attribution_seq

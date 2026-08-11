@@ -20,7 +20,6 @@ public record CommissionPaymentResponse(
         @JsonProperty("commissionTransactionId") Long paymentId,
         String sourceType,
         String sourceBusinessKey,
-        Integer paymentSequence,
         Long contractId,
         Long agentId,
         Long commissionItemId,

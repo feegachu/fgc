@@ -60,8 +60,7 @@ class CommissionPaymentIntegrationTest {
     @Test
     void persistsAndConfirmsPaymentAgainstProjectErd() {
         CommissionPaymentCreateRequest request = request(
-                "IT-FUN065-" + UUID.randomUUID(),
-                1
+                "IT-FUN065-" + UUID.randomUUID()
         );
 
         CommissionPaymentResponse created = commissionPaymentService.create(request);
@@ -77,7 +76,6 @@ class CommissionPaymentIntegrationTest {
                 .extracting(attribution -> attribution.contractId())
                 .isEqualTo(1L);
         assertThat(confirmed.allocationPolicyVersion()).isEqualTo(4L);
-        assertThat(confirmed.paymentSequence()).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT attribution_date
                   FROM fgc.transaction_attribution
@@ -102,6 +100,113 @@ class CommissionPaymentIntegrationTest {
                 .isEqualTo(LocalDate.of(2026, 7, 31));
     }
 
+    // 2026-08-11 yslee - 귀속행 입력 전 DRAFT의 PostgreSQL 저장·확정 경계 검증
+    // 기존 코드: 빈 귀속 목록은 DTO와 일괄 INSERT 및 INNER JOIN 조회에서 차단
+    // 문제: 화면의 지급 본문 선저장 흐름을 재현할 수 없고 누락 확정이 잘못된 오류로 응답
+    // 개선: DRAFT 본문은 저장하되 확정은 TRAN-002로 차단하고 DATA_QUALITY 이력을 보존
+    @Test
+    void persistsDraftWithoutAttributionsAndBlocksConfirmation() {
+        String runId = UUID.randomUUID().toString();
+        CommissionPaymentCreateRequest source = request(
+                "IT-FUN065-EMPTY-" + runId,
+                BigDecimal.ZERO
+        );
+        CommissionPaymentCreateRequest emptyDraft = new CommissionPaymentCreateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                source.amount(),
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                source.allocationPolicyVersion(),
+                List.of(),
+                source.note()
+        );
+
+        CommissionPaymentResponse created = commissionPaymentService.create(emptyDraft);
+
+        assertThat(created.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat(created.attributions()).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.transaction_attribution
+                 WHERE commission_transaction_id = ?
+                """, Integer.class, created.paymentId())).isZero();
+
+        assertThatThrownBy(() -> commissionPaymentService.confirm(
+                created.paymentId(), "IT-EMPTY-" + runId
+        )).isInstanceOfSatisfying(FgcBusinessException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(FgcErrorCode.TRAN_002));
+        assertThat(paymentStatus(created.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT exception_type
+                  FROM fgc.exception_case
+                 WHERE source_entity_type = 'COMMISSION_TRANSACTION'
+                   AND source_entity_id = ?
+                """, String.class, String.valueOf(created.paymentId())))
+                .isEqualTo("DATA_QUALITY");
+    }
+
+    // 2026-08-11 yslee - CAP_RULE_MISMATCH 예외 유형의 실제 DB CHECK 통합 검증
+    // 기존 코드: 서비스가 사용하는 유형이 baseline CHECK 허용 목록에서 누락
+    // 문제: 정책 불일치 이력 INSERT가 DataIntegrityViolationException으로 실패
+    // 개선: V13 적용 후 동일 유형을 정상 저장하고 조회할 수 있는지 PostgreSQL에서 검증
+    @Test
+    void databaseAcceptsCapRuleMismatchExceptionType() {
+        String exceptionKey = "IT-FUN065-CAP-RULE-MISMATCH-" + UUID.randomUUID();
+
+        int inserted = jdbcTemplate.update("""
+                INSERT INTO fgc.exception_case (
+                    exception_key,
+                    exception_type,
+                    severity,
+                    status,
+                    source_entity_type,
+                    source_entity_id,
+                    title
+                ) VALUES (?, 'CAP_RULE_MISMATCH', 'HIGH', 'NEW',
+                          'COMMISSION_TRANSACTION', 'IT-FUN065', '한도 정책 불일치')
+                """, exceptionKey);
+
+        assertThat(inserted).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT exception_type
+                  FROM fgc.exception_case
+                 WHERE exception_key = ?
+                """, String.class, exceptionKey)).isEqualTo("CAP_RULE_MISMATCH");
+    }
+
+    // 2026-08-11 yslee - V14의 불필요한 지급 순번 구조 제거 통합 검증
+    // 기존 코드: source_sequence 컬럼과 순번 포함 UNIQUE 인덱스가 API 입력을 강제
+    // 문제: 기존 source_business_key 중복 제약이 있는데 순번만 바꿔 동일 지급을 우회 저장 가능
+    // 개선: 후속 Flyway가 순번 컬럼·인덱스를 제거하고 source_contract_id는 유지하는지 확인
+    @Test
+    void databaseRemovesPaymentSequenceButKeepsSourceContract() {
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM information_schema.columns
+                 WHERE table_schema = 'fgc'
+                   AND table_name = 'commission_transaction'
+                   AND column_name = 'source_sequence'
+                """, Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT to_regclass('fgc.uq_commission_payment_natural')",
+                String.class
+        )).isNull();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM information_schema.columns
+                 WHERE table_schema = 'fgc'
+                   AND table_name = 'commission_transaction'
+                   AND column_name = 'source_contract_id'
+                """, Integer.class)).isEqualTo(1);
+    }
+
     // 2026-08-10 yslee - 하나의 지급 건에 여러 계약 귀속행을 저장하고 전부 검증
     // 기존 코드: 첫 번째 귀속행만 저장·조회·확정하여 다중 계약 배부를 재현할 수 없음
     // 문제: 두 번째 이후 계약의 지급액이 FUN-033 한도 검증과 cap_check 이력에서 누락
@@ -117,7 +222,6 @@ class CommissionPaymentIntegrationTest {
         CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
                 "GA_MANUAL_PAYMENT",
                 "IT-FUN065-MULTI-" + runId,
-                3_000_000 + Math.floorMod(runId.hashCode(), 1_000_000),
                 1L,
                 6L,
                 commissionItemId(),
@@ -151,15 +255,24 @@ class CommissionPaymentIntegrationTest {
         )).isEqualTo(2);
     }
 
+    // 2026-08-11 yslee - 원천 업무키 하나로 지급 건 중복을 차단하는 DB 계약 검증
+    // 기존 코드: 계약·설계사·항목·정산월에 사용자가 입력한 순번까지 붙여 중복을 판단
+    // 문제: 순번만 바꾸면 같은 지급을 다시 저장할 수 있어 중복 방지 목적과 충돌
+    // 개선: 서로 다른 업무키는 허용하고 기존 source_type+source_business_key UNIQUE만 동일 요청을 차단
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void rejectsDuplicateManualPaymentNaturalKeyInDatabase() {
+    void rejectsDuplicateSourceBusinessKeyInDatabase() {
         String runId = UUID.randomUUID().toString();
-        int paymentSequence = 2_000_000 + Math.floorMod(runId.hashCode(), 1_000_000);
-        commissionPaymentService.create(request("IT-FUN065-A-" + runId, paymentSequence));
+        String sourceBusinessKey = "IT-FUN065-A-" + runId;
+        CommissionPaymentResponse first = commissionPaymentService.create(request(sourceBusinessKey));
+        CommissionPaymentResponse differentBusinessKey = commissionPaymentService.create(request(
+                "IT-FUN065-B-" + runId
+        ));
+
+        assertThat(differentBusinessKey.paymentId()).isNotEqualTo(first.paymentId());
 
         assertThatThrownBy(() -> commissionPaymentService.create(
-                request("IT-FUN065-B-" + runId, paymentSequence)
+                request(sourceBusinessKey)
         )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -231,7 +344,6 @@ class CommissionPaymentIntegrationTest {
                 """, paymentId);
         CommissionPaymentCreateRequest manualRequest = request(
                 "IT-FUN065-MANUAL-OVERWRITE-" + UUID.randomUUID(),
-                3_500_000,
                 new BigDecimal("999")
         );
 
@@ -263,12 +375,10 @@ class CommissionPaymentIntegrationTest {
         String runId = UUID.randomUUID().toString();
         CommissionPaymentResponse first = commissionPaymentService.create(request(
                 "IT-FUN065-LOCK-A-" + runId,
-                4_000_000 + Math.floorMod(runId.hashCode(), 100_000),
                 new BigDecimal("200000")
         ));
         CommissionPaymentResponse second = commissionPaymentService.create(request(
                 "IT-FUN065-LOCK-B-" + runId,
-                4_100_000 + Math.floorMod(runId.hashCode(), 100_000),
                 new BigDecimal("200000")
         ));
 
@@ -310,7 +420,6 @@ class CommissionPaymentIntegrationTest {
         String runId = UUID.randomUUID().toString();
         CommissionPaymentResponse created = commissionPaymentService.create(request(
                 "IT-FUN065-IDEM-" + runId,
-                5_000_000 + Math.floorMod(runId.hashCode(), 100_000),
                 BigDecimal.ZERO
         ));
         String idempotencyKey = "IT-IDEM-" + runId;
@@ -343,12 +452,10 @@ class CommissionPaymentIntegrationTest {
         String runId = UUID.randomUUID().toString();
         CommissionPaymentResponse first = commissionPaymentService.create(request(
                 "IT-FUN065-IDEM-CROSS-A-" + runId,
-                5_100_000 + Math.floorMod(runId.hashCode(), 40_000),
                 BigDecimal.ZERO
         ));
         CommissionPaymentResponse second = commissionPaymentService.create(request(
                 "IT-FUN065-IDEM-CROSS-B-" + runId,
-                5_150_000 + Math.floorMod(runId.hashCode(), 40_000),
                 BigDecimal.ZERO
         ));
         String idempotencyKey = "IT-IDEM-CROSS-" + runId;
@@ -376,7 +483,6 @@ class CommissionPaymentIntegrationTest {
         String runId = UUID.randomUUID().toString();
         CommissionPaymentCreateRequest rejectedRequest = request(
                 "IT-FUN065-IDEM-RECOVER-" + runId,
-                5_200_000 + Math.floorMod(runId.hashCode(), 100_000),
                 new BigDecimal("1300000")
         );
         CommissionPaymentResponse created = commissionPaymentService.create(rejectedRequest);
@@ -428,10 +534,8 @@ class CommissionPaymentIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void capViolationKeepsDraftAndPersistsFailureWithoutReopeningResolvedException() {
         String runId = UUID.randomUUID().toString();
-        int paymentSequence = 1000 + Math.floorMod(runId.hashCode(), 1_000_000);
         CommissionPaymentResponse created = commissionPaymentService.create(request(
                 "IT-FUN065-CAP-" + runId,
-                paymentSequence,
                 new BigDecimal("1300000")
         ));
 
@@ -576,21 +680,18 @@ class CommissionPaymentIntegrationTest {
     }
 
     private CommissionPaymentCreateRequest request(
-            String sourceBusinessKey,
-            int paymentSequence
+            String sourceBusinessKey
     ) {
-        return request(sourceBusinessKey, paymentSequence, BigDecimal.ZERO);
+        return request(sourceBusinessKey, BigDecimal.ZERO);
     }
 
     private CommissionPaymentCreateRequest request(
             String sourceBusinessKey,
-            int paymentSequence,
             BigDecimal amount
     ) {
         return new CommissionPaymentCreateRequest(
                 "GA_MANUAL_PAYMENT",
                 sourceBusinessKey,
-                paymentSequence,
                 1L,
                 6L,
                 commissionItemId(),
@@ -636,7 +737,6 @@ class CommissionPaymentIntegrationTest {
         return new CommissionPaymentUpdateRequest(
                 source.sourceType(),
                 source.sourceBusinessKey(),
-                source.paymentSequence(),
                 source.contractId(),
                 source.agentId(),
                 source.commissionItemId(),
