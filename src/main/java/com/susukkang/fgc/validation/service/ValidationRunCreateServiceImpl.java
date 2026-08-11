@@ -132,6 +132,14 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
                 && validationRunMapper.existsActiveMonthlyRun(command.validationMonth())) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_001, Map.of());
         }
+        // 1-1. MANUAL_CONTRACT 중복 체크 — uq_validation_run_active_manual_contract(V8)의
+        // 사전 확인. DB 제약이 최후 방어선이고, 여기서 미리 걸러야 CreateDailyRunTasklet에
+        // 원시 DataIntegrityViolationException 대신 다른 검증 실패와 같은 형태의
+        // FgcBusinessException(VRUN_001)이 올라간다(코드리뷰 반영, 2026-08-11).
+        if (command.runType() == ValidationRunType.MANUAL_CONTRACT
+                && validationRunMapper.existsActiveManualContractRun()) {
+            throw new FgcBusinessException(FgcErrorCode.VRUN_001, Map.of());
+        }
 
         // 2. run_no 채번
         int runNo = command.runNo() != null

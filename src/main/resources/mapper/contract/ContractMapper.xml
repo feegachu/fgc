@@ -253,7 +253,8 @@
                 payment_term_months,
                 standard_surrender_deduction_amount,
                 current_status,
-                data_origin
+                data_origin,
+                updated_at
             FROM insurance_contract
             WHERE contract_id = #{id}
     </select>
