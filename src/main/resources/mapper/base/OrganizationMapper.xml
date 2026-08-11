@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.base.mapper.OrganizationMapper">
+
+    <sql id="organizationSearchConditions">
+        o.effective_from &lt;= #{criteria.asOf}
+        AND (o.effective_to IS NULL OR o.effective_to &gt;= #{criteria.asOf})
+        <if test="criteria.keyword != null">
+            AND (
+                LOWER(o.organization_code) LIKE CONCAT('%', LOWER(#{criteria.keyword}), '%')
+                OR LOWER(o.organization_name) LIKE CONCAT('%', LOWER(#{criteria.keyword}), '%')
+            )
+        </if>
+    </sql>
+
+    <select id="selectOrganizations"
+            resultType="com.susukkang.fgc.base.dto.OrganizationRow">
+        SELECT o.organization_id AS organizationId,
+               o.organization_code AS organizationCode,
+               o.organization_name AS organizationName,
+               o.organization_type AS organizationType,
+               o.parent_id AS parentId,
+               parent.organization_name AS parentName,
+               o.effective_from AS effectiveFrom,
+               o.effective_to AS effectiveTo,
+               o.active_yn AS activeYn
+          FROM fgc.organization o
+          LEFT JOIN fgc.organization parent
+            ON parent.organization_id = o.parent_id
+         WHERE <include refid="organizationSearchConditions"/>
+         ORDER BY o.organization_code ASC
+         LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countOrganizations" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.organization o
+         WHERE <include refid="organizationSearchConditions"/>
+    </select>
+
+</mapper>
