@@ -11,6 +11,19 @@ import java.time.LocalDate;
 public record CreateValidationRunCommand(
         LocalDate validationMonth,
         ValidationRunType runType,
-        Long triggeredBy
+        Long triggeredBy,
+        Integer runNo
 ) {
+
+    /**
+     * 화면/API에서 실행을 생성할 때는 서비스가 다음 회차를 채번한다.
+     * MonthlyValidationJob은 JobParameters의 runNo를 명시적으로 전달한다.
+     */
+    public CreateValidationRunCommand(
+            LocalDate validationMonth,
+            ValidationRunType runType,
+            Long triggeredBy
+    ) {
+        this(validationMonth, runType, triggeredBy, null);
+    }
 }

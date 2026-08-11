@@ -9,6 +9,7 @@
     <select id="selectByCondition"
             resultType="com.susukkang.fgc.contract.dto.ContractView">
         SELECT
+            ic.contract_id AS contract_id,
             ic.contract_no AS contract_no,
             i.insurer_name AS insurer_name,
             p.product_name AS product_name,
