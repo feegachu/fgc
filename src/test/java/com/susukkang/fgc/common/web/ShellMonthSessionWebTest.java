@@ -135,6 +135,29 @@ class ShellMonthSessionWebTest {
 
         assertThat(session.getAttribute("fgc.month")).isEqualTo("2026-05");
 
+        // Ant 패턴 /api/** 는 뒤가 비어 있는 /api 도 잡는다 — SecurityConfig 와 판정이 갈리면 안 된다
+        MockHttpServletRequest apiRoot = new MockHttpServletRequest("GET", "/api");
+        apiRoot.setSession(session);
+        advice.month("2026-02", apiRoot);
+
+        assertThat(session.getAttribute("fgc.month")).isEqualTo("2026-05");
+
+        // context path 가 붙어도 API 는 API 다. getRequestURI() 는 context path 를 포함한다.
+        MockHttpServletRequest behindContextPath = new MockHttpServletRequest("GET", "/fgc/api/v1/cap-checks");
+        behindContextPath.setContextPath("/fgc");
+        behindContextPath.setSession(session);
+        advice.month("2026-03", behindContextPath);
+
+        assertThat(session.getAttribute("fgc.month")).isEqualTo("2026-05");
+
+        // 반대로 context path 아래의 화면 요청은 그대로 세션을 바꿔야 한다
+        MockHttpServletRequest pageBehindContextPath = new MockHttpServletRequest("GET", "/fgc/");
+        pageBehindContextPath.setContextPath("/fgc");
+        pageBehindContextPath.setSession(session);
+        assertThat(advice.month("2026-04", pageBehindContextPath)).isEqualTo("2026-04");
+        assertThat(session.getAttribute("fgc.month")).isEqualTo("2026-04");
+        session.setAttribute("fgc.month", "2026-05");
+
         MockHttpServletRequest nextPage = new MockHttpServletRequest("GET", "/");
         nextPage.setSession(session);
         assertThat(advice.month(null, nextPage)).isEqualTo("2026-05");

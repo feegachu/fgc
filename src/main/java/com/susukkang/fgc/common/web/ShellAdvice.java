@@ -37,7 +37,7 @@ public class ShellAdvice {
     private static final String SESSION_KEY = "fgc.month";
 
     /** SecurityConfig 의 securityMatcher("/api/**") 와 같은 경계. 이 아래는 화면이 아니다. */
-    private static final String API_PREFIX = "/api/";
+    private static final String API_ROOT = "/api";
 
     /** COR-004 — 기준월을 코드에 박지 않는다. application.yml 의 fgc.demo-month. */
     private final YearMonth demoMonth;
@@ -60,7 +60,7 @@ public class ShellAdvice {
      */
     @ModelAttribute("month")
     public String month(@RequestParam(required = false) String month, HttpServletRequest request) {
-        if (!request.getRequestURI().startsWith(API_PREFIX) && month != null && parse(month) != null) {
+        if (!isApiRequest(request) && month != null && parse(month) != null) {
             request.getSession().setAttribute(SESSION_KEY, month);
             return month;
         }
@@ -105,6 +105,21 @@ public class ShellAdvice {
         return authentication != null && authentication.getPrincipal() instanceof FgcUserDetails user
                 ? user.getUserName()
                 : "-";
+    }
+
+    /**
+     * SecurityConfig 의 securityMatcher("/api/**") 와 같은 판정.
+     *
+     * getRequestURI() 를 그대로 보면 안 된다 — context path 가 앞에 붙어 있다. 지금은
+     * server.servlet.context-path 가 비어 있어 우연히 맞지만, 나중에 /fgc 를 붙이는 순간
+     * /fgc/api/v1/... 이 "화면 요청"으로 새어 들어와 Ajax 의 month 가 헤더 기준월을 덮어쓴다.
+     * context path 를 떼고 앱 안쪽 경로만 본다.
+     *
+     * "/api" 자체도 API 로 친다 — Ant 패턴 /api/** 는 뒤에 아무것도 없는 /api 도 매칭한다.
+     */
+    private static boolean isApiRequest(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return path.equals(API_ROOT) || path.startsWith(API_ROOT + "/");
     }
 
     private static YearMonth parse(String value) {
