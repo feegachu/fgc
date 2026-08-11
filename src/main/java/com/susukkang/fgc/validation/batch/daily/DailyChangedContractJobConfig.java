@@ -70,6 +70,7 @@ public class DailyChangedContractJobConfig {
                 .build();
     }
 
+    // CreateDailyRunTasklet이 상태전이·감사로그를 이미 스스로 책임지므로 리스너 없이둠
     @Bean
     public Step createDailyRunStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         CreateDailyRunTasklet tasklet = new CreateDailyRunTasklet(
@@ -80,7 +81,6 @@ public class DailyChangedContractJobConfig {
                 batchWatermarkMapper);
         return new StepBuilder("createDailyRunStep", jobRepository)
                 .tasklet(tasklet, transactionManager)
-                .listener(progressListener(1, true))
                 .build();
     }
 

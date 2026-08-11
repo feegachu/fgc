@@ -150,6 +150,28 @@ class CreateDailyRunTaskletTest {
         assertThat(ValidationRunBatchContext.getValidationRunId(chunkContext)).isEqualTo(99L);
     }
 
+    // 운영정책서(docs/FGC_가상_GA_운영정책서_v1_0.md)의 "FINALIZED 결과는 절대 덮어쓰지 않는다"
+    // 원칙을 이 배치에서도 지키는지 확인한다 — reuseOrRecreate의 switch가 COMPLETED와
+    // FINALIZED를 같은 분기(createAndStart)로 묶어놓았는데, 누군가 나중에 이 switch를
+    // 나누면서 FINALIZED 케이스를 실수로 빠뜨리는 회귀를 잡기 위해 별도로 고정해 둔다.
+    @Test
+    void existingFinalizedRunCausesFreshRunToBeCreatedWithoutTouchingTheFinalizedRow() {
+        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))
+                .willReturn(runWithStatus(ValidationRunStatus.FINALIZED));
+        ValidationRunRow freshRun = runWithStatus(ValidationRunStatus.CREATED);
+        freshRun.setValidationRunId(77L);
+        given(validationRunCreateService.create(any())).willReturn(freshRun);
+
+        ChunkContext chunkContext = newChunkContext();
+        tasklet.execute(null, chunkContext);
+
+        // FINALIZED였던 기존 실행(id=42)에는 어떤 전이 호출도 가지 않는다 — 새 실행(77)만 시작된다.
+        verify(lifecycleService).start(eq(77L), any());
+        verify(lifecycleService, never()).start(eq(42L), any());
+        verify(validationRunTransitionService, never()).transition(anyLong(), any());
+        assertThat(ValidationRunBatchContext.getValidationRunId(chunkContext)).isEqualTo(77L);
+    }
+
     @Test
     void watermarkAndRunStartedAtAreStoredInJobExecutionContext() {
         given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))

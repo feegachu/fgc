@@ -6,35 +6,27 @@ import com.susukkang.fgc.common.web.RequestIdContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * IF-BAT-02 @Scheduled 자동 실행 + 수동 재실행 진입점의 구현체
- *
- * ★ Spring이 자동설정하는 기본 JobLauncher(bean 이름 "jobLauncher")는 동기다 —
- * jobLauncher.run(...)을 부른 스레드가 Job이 끝날 때까지 막힌다. 이 Job은 HTTP 요청
- * 스레드(수동 재실행)나 Spring 스케줄러 스레드(@Scheduled)에서 launch되므로 그 스레드를
- * 몇 분씩 붙들면 안 된다. 그렇다고 별도의 비동기 JobLauncher Bean을 추가하면(예전 시도),
- * JobLauncherTestUtils처럼 스프링 배치 테스트 인프라가 JobLauncher를 타입으로만
- * 주입받는 곳까지 후보가 2개로 늘어 주입이 모호해지고, "launchJob() 호출 직후 최종 상태를
- * assert"하는 기존 통합테스트가 깨진다(CI에서 실제로 발생 — MonthlyValidationJobIntegrationTest).
- * 그래서 JobLauncher는 Boot 기본값(동기, 유일한 Bean) 그대로 두고, 이 클래스 안에서만
- * 별도 TaskExecutor로 jobLauncher.run(...) 호출 자체를 백그라운드로 던진다 — Spring
- * 빈 그래프에 새 JobLauncher 후보를 추가하지 않으므로 다른 곳의 주입에 영향이 없다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DailyChangedContractJobTrigger {
 
-    private final TaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("daily-ccj-");
+    private final ThreadPoolTaskExecutor taskExecutor = createExecutor();
 
     private final Job dailyChangedContractJob;
     private final JobLauncher jobLauncher;
@@ -45,21 +37,38 @@ public class DailyChangedContractJobTrigger {
     @Value("${fgc.batch.daily-changed-contract.enabled}")
     private boolean enabled;
 
+    private static ThreadPoolTaskExecutor createExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix("daily-ccj-");
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(10);
+        // 대기열(10)까지 찬 뒤엔 새 launch 요청을 호출자 스레드에서 그대로 실행한다 —
+        // 예외를 던져 요청을 그냥 버리는 것(AbortPolicy)보다, 느리더라도 실행은 되게 하는
+        // 편이 배치 트리거 성격에 맞다.
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+
     @Scheduled(cron = "${fgc.batch.daily-changed-contract.cron}", zone = "Asia/Seoul")
     public void runScheduled() {
         if (!enabled) {
             log.info("fgc.batch.daily-changed-contract.enabled=false — 자동 실행을 건너뜁니다.");
             return;
         }
+        // 스케줄러 스레드는 결과를 기다리는 호출자가 없다 — launch() 안의 로깅으로 충분하다.
         launch(scheduledTriggeredByUserId, RequestIdContext.generate());
     }
 
-    /** 운영자가 화면/API에서 재실행을 요청했을 때 컨트롤러가 호출하는 진입점. */
-    public void runManual(long triggeredBy, String requestId) {
-        launch(triggeredBy, requestId);
+    /**
+     * 운영자가 화면/API에서 재실행을 요청했을 때 호출하는 진입점
+     */
+    public CompletableFuture<JobExecution> runManual(long triggeredBy, String requestId) {
+        return launch(triggeredBy, requestId);
     }
 
-    private void launch(long triggeredBy, String requestId) {
+    private CompletableFuture<JobExecution> launch(long triggeredBy, String requestId) {
         String validationMonth = DateUtil.formatSettlementMonth(
                 DateUtil.nowSeoul().toLocalDate().withDayOfMonth(1));
 
@@ -75,15 +84,25 @@ public class DailyChangedContractJobTrigger {
                 .addString("requestId", requestId)
                 .toJobParameters();
 
-        taskExecutor.execute(() -> {
-            try {
-                jobLauncher.run(dailyChangedContractJob, jobParameters);
-            } catch (Exception e) {
-                // JobLauncher.run()의 checked 예외 4종(JobInstanceAlreadyCompleteException 등)을
-                // 여기서 다 구분해봐야 호출자가 할 수 있는 일이 없다(재실행은 requestId를 새로
-                // 받아 다시 부르는 것뿐) — 로그만 남기고 흡수한다.
-                log.error("DailyChangedContractJob 실행 요청 실패 (requestId={})", requestId, e);
-            }
-        });
+        // whenComplete는 exceptionally와 달리 예외를 다른 값으로 바꿔치기하지 않는다 — 로그만
+        // 남기고, 반환된 CompletableFuture는 실패 상태를 그대로 유지해 호출자가 원하면 알 수 있다.
+        return CompletableFuture
+                .supplyAsync(() -> runOrWrap(jobParameters), taskExecutor)
+                .whenComplete((jobExecution, ex) -> {
+                    if (ex != null) {
+                        log.error("DailyChangedContractJob 실행 요청 실패 (requestId={})", requestId, ex);
+                    }
+                });
+    }
+
+    private JobExecution runOrWrap(JobParameters jobParameters) {
+        try {
+            return jobLauncher.run(dailyChangedContractJob, jobParameters);
+        } catch (Exception e) {
+            // JobLauncher.run()의 checked 예외 4종(JobInstanceAlreadyCompleteException 등)을
+            // CompletableFuture.supplyAsync의 Supplier는 checked exception을 못 던지므로
+            // unchecked로 감싸 전달한다. 최종적으로 whenComplete에서 로그로 남는다.
+            throw new IllegalStateException("DailyChangedContractJob launch 실패", e);
+        }
     }
 }
