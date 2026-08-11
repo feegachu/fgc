@@ -27,6 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * 설명 : 규제 정책과 증빙 실제액을 적용하는 수수료 한도 계산 구현체
+ *
+ * @author yslee
+ * @since 2026-08-10
+ * @version 1.2
+ */
 @Service
 @RequiredArgsConstructor
 public class CapCalculatorImpl implements CapCalculator {
@@ -72,19 +79,17 @@ public class CapCalculatorImpl implements CapCalculator {
         // 표준해약공제액의 80% 이상을 공제하는 상품은 12차월 예상 해약환급금만큼 한도가 더 큼 (REG-08)
         RefundAddition refundAddition = resolveRefundAddition(contract, ruleSet, annualizedLimitBase, command);
 
-        // 3) 준법경영비 등 공제
-        // 원수사→GA 단계에서만 준법경영비 3%를 뺀 금액이 실제 한도가 됨 (REG-10)
-        // GA→FC 단계는 compliance_deduction_pct 가 항상 0이 되도록 DB CHECK로 강제돼 있어
-        // 여기서 별도로 지급단계를 분기하지 않아도 자동으로 0원 공제가 됨
-        //
-        // ★ 공제 기준액은 "월납 기준 초회보험료"(REG-10 원문) — annualizedLimitBase(월납×12 +
-        // 환급가산)가 아니라 월납 원액(basePremiumAmount)에 3%를 곱한다. 연간화된 금액에 곱하면
-        // ×12 배만큼 부풀려진 금액이 공제돼 한도가 지나치게 줄어든다.
+        // 2026-08-10 yslee - 준법경영비를 증빙 실제액 기준으로 제한
+        // 기존 코드: 정책 공제율이 0보다 크면 월납 초회보험료의 3%를 일괄 공제
+        // 문제: 실제 지급·증빙 금액이 없거나 상한보다 적어도 최대액을 자동 공제하여 REG-10 위반
+        // 개선: 증빙 실제액과 정책상 최대 허용액 중 작은 금액만 공제하고 증빙 누락은 검토필요 처리
         BigDecimal grossLimit = annualizedLimitBase.add(refundAddition.amount());
-        BigDecimal complianceDeductionAmount = ruleSet.getComplianceDeductionPct().compareTo(BigDecimal.ZERO) > 0
-                ? MoneyUtil.applyPercent(basePremiumAmount, ruleSet.getComplianceDeductionPct())
-                : BigDecimal.ZERO;
-        BigDecimal limitAmount = grossLimit.subtract(complianceDeductionAmount);
+        ComplianceDeduction complianceDeduction = resolveComplianceDeduction(
+                basePremiumAmount,
+                ruleSet.getComplianceDeductionPct(),
+                command.complianceEvidenceAmount()
+        );
+        BigDecimal limitAmount = grossLimit.subtract(complianceDeduction.appliedAmount());
 
         // 4) 실제 산입액 집계
         // 계약월차 1~firstYearMonths(기본 12) 안에 있는 예상 schedule_line 한 줄씩 훑으면서,
@@ -100,7 +105,8 @@ public class CapCalculatorImpl implements CapCalculator {
         BigDecimal includedAmount = BigDecimal.ZERO;
         // 환급률표를 못 찾은 경우(2단계)뿐 아니라, 산입 분류를 알 수 없는 항목이 하나라도 있으면
         // 전체 판정을 REVIEW_REQUIRED로 내림
-        boolean anyReviewRequired = refundAddition.reviewRequired();
+        boolean anyReviewRequired = refundAddition.reviewRequired()
+                || complianceDeduction.reviewRequired();
         int seq = 1;
         for (ScheduleAmountView line : scheduleAmounts) {
             CapRuleItemView ruleItem = ruleItemsByCommissionItem.get(line.getCommissionItemId());
@@ -142,12 +148,12 @@ public class CapCalculatorImpl implements CapCalculator {
                 anyReviewRequired, includedAmount, limitAmount, usagePct, ruleSet.getWarningUsagePct());
 
         // 6) 감사·재현용 스냅샷 구성 (저장은 CapCheckService 책임)
-        Map<String, Object> snapshot = buildSnapshot(ruleSet, refundAddition);
+        Map<String, Object> snapshot = buildSnapshot(ruleSet, refundAddition, complianceDeduction);
 
         return new CapCalculationResult(
                 command.contractId(), command.paymentStage(), command.checkKind(), command.asOfDate(),
                 ruleSet.getCapRuleSetId(), refundAddition.refundRateTableId(),
-                basePremiumAmount, refundAddition.amount(), complianceDeductionAmount, limitAmount,
+                basePremiumAmount, refundAddition.amount(), complianceDeduction.appliedAmount(), limitAmount,
                 includedAmount, remainingAmount, usagePct, resultStatus, details, snapshot);
     }
 
@@ -174,6 +180,35 @@ public class CapCalculatorImpl implements CapCalculator {
         return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(), false);
     }
 
+    private ComplianceDeduction resolveComplianceDeduction(
+            BigDecimal basePremiumAmount,
+            BigDecimal maximumPct,
+            BigDecimal evidenceAmount
+    ) {
+        if (maximumPct == null || maximumPct.signum() <= 0) {
+            return new ComplianceDeduction(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false);
+        }
+        BigDecimal maximumAmount = MoneyUtil.applyPercent(basePremiumAmount, maximumPct);
+        if (evidenceAmount == null) {
+            return new ComplianceDeduction(null, maximumAmount, BigDecimal.ZERO, true);
+        }
+        if (evidenceAmount.signum() < 0) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "complianceEvidenceAmount",
+                    Map.of("field", "complianceEvidenceAmount"),
+                    "준법경영비 증빙 금액은 0 이상이어야 합니다."
+            );
+        }
+        BigDecimal verifiedAmount = MoneyUtil.roundWon(evidenceAmount);
+        return new ComplianceDeduction(
+                verifiedAmount,
+                maximumAmount,
+                verifiedAmount.min(maximumAmount),
+                false
+        );
+    }
+
     private CapResultStatus determineResultStatus(boolean anyReviewRequired, BigDecimal includedAmount,
                                                     BigDecimal limitAmount, BigDecimal usagePct,
                                                     BigDecimal warningUsagePct) {
@@ -190,18 +225,33 @@ public class CapCalculatorImpl implements CapCalculator {
     }
 
     // 컬럼으로 뽑아내지 않은 "그때 어떤 정책값을 썼는지"를 감사·재현용으로 남김
-    private Map<String, Object> buildSnapshot(CapRuleSetView ruleSet, RefundAddition refundAddition) {
+    private Map<String, Object> buildSnapshot(
+            CapRuleSetView ruleSet,
+            RefundAddition refundAddition,
+            ComplianceDeduction complianceDeduction
+    ) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("premiumMultiplier", ruleSet.getPremiumMultiplier());
         snapshot.put("refundAdditionCondition", ruleSet.getRefundAdditionCondition());
         snapshot.put("refundRateTablePolicyVersionId", refundAddition.policyVersionId());
         snapshot.put("refundRateTableVersionNo", refundAddition.versionNo());
         snapshot.put("complianceDeductionPct", ruleSet.getComplianceDeductionPct());
+        snapshot.put("complianceEvidenceAmount", complianceDeduction.evidenceAmount());
+        snapshot.put("complianceMaximumAmount", complianceDeduction.maximumAmount());
+        snapshot.put("complianceAppliedAmount", complianceDeduction.appliedAmount());
         snapshot.put("warningUsagePct", ruleSet.getWarningUsagePct());
         return snapshot;
     }
 
     private record RefundAddition(BigDecimal amount, Long refundRateTableId, Long policyVersionId,
                                    Integer versionNo, boolean reviewRequired) {
+    }
+
+    private record ComplianceDeduction(
+            BigDecimal evidenceAmount,
+            BigDecimal maximumAmount,
+            BigDecimal appliedAmount,
+            boolean reviewRequired
+    ) {
     }
 }

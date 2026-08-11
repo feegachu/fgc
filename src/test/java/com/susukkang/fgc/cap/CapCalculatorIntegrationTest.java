@@ -27,11 +27,16 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * 설명 : 실제 PostgreSQL 정책·스케줄·준법경영비 계산 통합 테스트
  * 실제 로컬 PostgreSQL(docker-compose fgc-db)에 적용된 시드데이터(V3/V4)를 대상으로
  * CapCalculator/ProductRefundRateResolver 매퍼 SQL이 실제로 맞물려 동작하는지 검증한다.
  *
  * schedule_line 은 ScheduleGenerator(FGC-FUN-012/013/018)가 아직 없어 seed 에 없으므로,
  * 이 테스트가 직접 최소한의 예상 스케줄 1건을 만들어 넣는다. 트랜잭션은 끝나면 롤백된다.
+ *
+ * @author yslee
+ * @since 2026-08-10
+ * @version 1.2
  */
 @SpringBootTest
 @Transactional
@@ -254,7 +259,12 @@ class CapCalculatorIntegrationTest {
         Long id = contractId("FGC-FGL01-202703-0001");
 
         CapCalculationResult result = capCalculator.calculate(
-                CapCalculationCommand.realtime(id, PaymentStage.INSURER_TO_GA, LocalDate.of(2027, 3, 2)));
+                CapCalculationCommand.realtime(
+                        id,
+                        PaymentStage.INSURER_TO_GA,
+                        LocalDate.of(2027, 3, 2),
+                        new BigDecimal("3000")
+                ));
 
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");

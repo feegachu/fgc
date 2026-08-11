@@ -38,8 +38,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * FGC-FUN-030 초년도 수수료 한도 계산 엔진 단위테스트.
+ * 설명 : FGC-FUN-030 초년도 수수료 한도 계산 엔진 단위 테스트
  * DB 없이 매퍼를 mock 으로 대체해 계산식 자체(기본식·80% 가산·준법경영비 공제·산입 분류·판정)를 검증한다.
+ *
+ * @author yslee
+ * @since 2026-08-10
+ * @version 1.2
  */
 @ExtendWith(MockitoExtension.class)
 class CapCalculatorImplTest {
@@ -161,25 +165,81 @@ class CapCalculatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
     }
 
-    // 원수사→GA 단계는 준법경영비 3%가 한도에서 공제된다
+    // 2026-08-10 yslee - 준법경영비 실제 증빙액·상한·누락 회귀 시나리오 추가
+    // 기존 코드: 증빙 입력 없이 월납 초회보험료의 3% 전액 공제를 정상으로 단정
+    // 문제: REG-10의 실제 지급·증빙 금액 기준과 최대 허용률 의미를 검증하지 못함
+    // 개선: 실제액 미만·상한 초과·증빙 누락·GA_TO_FC 미적용을 각각 검증
     @Test
-    void deductsComplianceCostForInsurerToGaStage() {
-        when(capContractMapper.findById(CONTRACT_ID))
-                .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
-        when(capRuleMapper.findApplicableRuleSet(eq("INSURER_TO_GA"), any(), any(), any(), any()))
-                .thenReturn(ruleSet("INSURER_TO_GA", new BigDecimal("3.0000"), "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
-        when(refundRateResolver.resolve(any(RefundRateQuery.class)))
-                .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("24.000000"))));
+    void deductsOnlyVerifiedComplianceAmountBelowMaximum() {
+        stubComplianceCalculation("INSURER_TO_GA", new BigDecimal("3.0000"));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID,
+                PaymentStage.INSURER_TO_GA,
+                LocalDate.of(2026, 1, 15),
+                new BigDecimal("2000")
+        ));
+
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("2000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1486000");
+        assertThat(result.calculationSnapshot().get("complianceMaximumAmount").toString()).isEqualTo("3000");
+    }
+
+    @Test
+    void capsVerifiedComplianceAmountAtMaximum() {
+        stubComplianceCalculation("INSURER_TO_GA", new BigDecimal("3.0000"));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID,
+                PaymentStage.INSURER_TO_GA,
+                LocalDate.of(2026, 1, 15),
+                new BigDecimal("5000")
+        ));
+
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("1485000");
+    }
+
+    @Test
+    void requiresReviewWhenComplianceEvidenceIsMissing() {
+        stubComplianceCalculation("INSURER_TO_GA", new BigDecimal("3.0000"));
 
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
                 CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 1, 15)));
 
-        // 공제 기준은 grossLimit이 아니라 월납 원액이다(REG-10: "월납 기준 초회보험료의 3%").
-        // 월납 100,000 × 3% = 3,000 공제 → gross 1,488,000 − 3,000 = 1,485,000
-        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1485000");
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("0");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
+    }
+
+    @Test
+    void ignoresComplianceEvidenceForGaToFcStage() {
+        when(capContractMapper.findById(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), false));
+        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "NONE"));
+        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID,
+                PaymentStage.GA_TO_FC,
+                LocalDate.of(2026, 1, 15),
+                new BigDecimal("5000")
+        ));
+
+        assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("0");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
+    }
+
+    private void stubComplianceCalculation(String stage, BigDecimal maximumPct) {
+        when(capContractMapper.findById(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
+        when(capRuleMapper.findApplicableRuleSet(eq(stage), any(), any(), any(), any()))
+                .thenReturn(ruleSet(stage, maximumPct, "STANDARD_DEDUCTION_80"));
+        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(refundRateResolver.resolve(any(RefundRateQuery.class)))
+                .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("24.000000"))));
     }
 
     // 계약일이 2026/2027/2029이어도 같은 엔진이 같은 기본한도를 계산한다
