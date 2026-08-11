@@ -14,8 +14,10 @@ import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.dto.ContractResponse;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
+import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.service.ContractService;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,14 +84,24 @@ class ContractControllerTest {
                 .contractNo("TEST-20260806-001")
                 .build();
 
-        when(scheduleService.selectByContractId(21L))
-                .thenReturn(List.of(schedule));
+        ScheduleLineResponse line = ScheduleLineResponse.builder()
+                .lineNo(1)
+                .installmentNo(1)
+                .build();
+        when(scheduleService.selectByContractId(
+                21L, com.susukkang.fgc.common.code.PaymentStage.INSURER_TO_GA))
+                .thenReturn(ContractScheduleResponse.builder()
+                        .headers(List.of(schedule))
+                        .lines(List.of(line))
+                        .build());
 
         mockMvc.perform(get("/api/v1/contracts/{contractId}/schedules", 21L)
+                        .param("paymentStage", "INSURER_TO_GA")
                         .with(user("admin").roles("GA_ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].scheduleHeaderId").value(100))
-                .andExpect(jsonPath("$.data[0].contractNo").value("TEST-20260806-001"));
+                .andExpect(jsonPath("$.data.headers[0].scheduleHeaderId").value(100))
+                .andExpect(jsonPath("$.data.headers[0].contractNo").value("TEST-20260806-001"))
+                .andExpect(jsonPath("$.data.lines[0].installmentNo").value(1));
     }
 
     @Test

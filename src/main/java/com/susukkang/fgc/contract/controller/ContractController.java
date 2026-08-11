@@ -4,14 +4,12 @@ import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.service.ContractService;
-import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * 설명 : ContractController
@@ -89,11 +87,12 @@ public class ContractController {
      * @return 계약에 연결된 운영용 예상 스케줄 헤더 목록
      */
     @GetMapping("/{contractId}/schedules")
-    public ApiResponse<List<ScheduleHeaderResponse>> getContractSchedules(
-            @PathVariable Long contractId
+    public ApiResponse<ContractScheduleResponse> getContractSchedules(
+            @PathVariable Long contractId,
+            @RequestParam PaymentStage paymentStage
     ) {
         return ApiResponse.success(
-                scheduleService.selectByContractId(contractId)
+                scheduleService.selectByContractId(contractId, paymentStage)
         );
     }
 }

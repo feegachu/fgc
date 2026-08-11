@@ -99,5 +99,8 @@ public interface ScheduleMapper {
             @Param("paymentStage") PaymentStage paymentStage
     );
 
-    List<ScheduleHeaderResponse> selectByContractId(@Param("contractId") Long contractId);
+    ScheduleDetailResponse selectByContractIdAndPaymentStage(
+            @Param("contractId") Long contractId,
+            @Param("paymentStage") PaymentStage paymentStage
+    );
 }

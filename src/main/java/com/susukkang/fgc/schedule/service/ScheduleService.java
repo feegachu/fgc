@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
@@ -320,14 +321,38 @@ public class ScheduleService {
      * @param contractId 계약 ID
      * @return 계약에 연결된 운영용 예상 스케줄 헤더 목록
      */
-    public List<ScheduleHeaderResponse> selectByContractId(Long contractId) {
+    public ContractScheduleResponse selectByContractId(
+            Long contractId,
+            PaymentStage paymentStage
+    ) {
         if (contractId == null) {
             throw validationException(
                     "contractId",
                     "계약 ID는 필수입니다."
             );
         }
-        return scheduleMapper.selectByContractId(contractId);
+        if (paymentStage == null) {
+            throw validationException(
+                    "paymentStage",
+                    "지급 단계는 필수입니다."
+            );
+        }
+
+        ScheduleDetailResponse detail = scheduleMapper.selectByContractIdAndPaymentStage(
+                contractId,
+                paymentStage
+        );
+        if (detail == null) {
+            return ContractScheduleResponse.builder()
+                    .headers(List.of())
+                    .lines(List.of())
+                    .build();
+        }
+
+        return ContractScheduleResponse.builder()
+                .headers(List.of(detail.getHeader()))
+                .lines(detail.getSchedules() == null ? List.of() : detail.getSchedules())
+                .build();
     }
 
     /** 지급단계 한 건의 스케줄 생성 결과. */
@@ -455,7 +480,7 @@ public class ScheduleService {
         List<ScheduleLineInsertDTO> lines = new ArrayList<>();
         int lineNo = 1;
         for (ResolvedCommissionRule rule : policy.getRules()) {
-            BigDecimal basisAmount = resolveBasisAmount(contract, rule.getBasisCode());
+            BigDecimal basisAmount = resolveBasisAmount(contract, rule);
             BigDecimal expectedAmount = calculateExpectedAmount(basisAmount, rule);
             Long beneficiaryAgentId = resolveBeneficiaryAgentId(contract, policy, rule);
             for (int installmentNo = rule.getInstallmentFrom();
@@ -490,10 +515,29 @@ public class ScheduleService {
      * 설명 : 수수료 규칙의 기준 코드를 이용해 계약에서 계산 기준금액을 가져온다.
      *
      * @param contract 계산 대상 계약
-     * @param basisCode 수수료 계산 기준 코드
+     * @param rule 수수료 계산 규칙
      * @return 수수료 계산 기준금액
      */
-    private BigDecimal resolveBasisAmount(InsuranceContract contract, String basisCode) {
+    private BigDecimal resolveBasisAmount(
+            InsuranceContract contract,
+            ResolvedCommissionRule rule
+    ) {
+        if (rule == null || rule.getCalculationType() == null) {
+            throw new IllegalArgumentException(
+                    "수수료 계산 방식이 없습니다."
+            );
+        }
+
+        if (rule.getCalculationType() == CalculationType.FIXED) {
+            if (rule.getFixedAmount() == null) {
+                throw new IllegalArgumentException(
+                        "정액 계산에 필요한 고정금액이 없습니다."
+                );
+            }
+            return rule.getFixedAmount();
+        }
+
+        String basisCode = rule.getBasisCode();
         if (basisCode == null) {
             throw new IllegalArgumentException(
                     "수수료 계산 기준 코드가 없습니다."

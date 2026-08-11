@@ -17,6 +17,8 @@
             sh.schedule_version_no,
             sh.status,
             sh.active_yn,
+            sh.generated_at,
+            sh.generation_reason,
             COUNT(sl.schedule_line_id) AS line_count,
             COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
             CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label
@@ -122,6 +124,8 @@
             <result property="lineCount" column="line_count"/>
             <result property="expectedTotal" column="expected_total"/>
             <result property="policyVersionLabel" column="policy_version_label"/>
+            <result property="generationReason" column="generation_reason"/>
+            <result property="generatedAt" column="generated_at"/>
         </association>
 
         <collection property="schedules"
@@ -155,6 +159,8 @@
             sh.schedule_version_no,
             sh.status AS header_status,
             sh.active_yn,
+            sh.generation_reason,
+            sh.generated_at,
             COUNT(sl.schedule_line_id) OVER (PARTITION BY sh.schedule_header_id) AS line_count,
             COALESCE(SUM(sl.expected_amount) OVER (PARTITION BY sh.schedule_header_id),0) AS expected_total,
             CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label,
@@ -352,8 +358,8 @@
     </update>
 
     <!-- 계약 ID를 기준으로 활성 운영 스케줄 헤더 목록을 조회한다. -->
-    <select id="selectByContractId"
-            resultType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
+    <select id="selectByContractIdAndPaymentStage"
+            resultMap="scheduleDetailResultMap">
         SELECT
             sh.schedule_header_id,
             c.contract_no,
@@ -361,15 +367,30 @@
             sh.schedule_regime,
             sh.schedule_purpose,
             sh.schedule_version_no,
-            sh.status,
+            sh.status AS header_status,
             sh.active_yn,
-            COUNT(sl.schedule_line_id) AS line_count,
-            COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
+            sh.generation_reason,
+            sh.generated_at,
+            COUNT(sl.schedule_line_id) OVER (PARTITION BY sh.schedule_header_id) AS line_count,
+            COALESCE(SUM(sl.expected_amount) OVER (PARTITION BY sh.schedule_header_id), 0) AS expected_total,
             CONCAT(
                     pv.policy_code,
                     ' v',
                     pv.version_no
-            ) AS policy_version_label
+            ) AS policy_version_label,
+            sl.line_no,
+            sl.installment_no,
+            sl.contract_month_no,
+            sl.due_date,
+            ci.item_name AS commission_item_name,
+            a.agent_name AS recipient_name,
+            sl.basis_code,
+            sl.basis_amount,
+            sl.calculation_type,
+            sl.rate_pct,
+            sl.expected_amount,
+            sl.line_status,
+            sl.source_commission_rule_id
         FROM fgc.schedule_header sh
                  JOIN fgc.insurance_contract c
                       ON c.contract_id = sh.contract_id
@@ -377,16 +398,14 @@
                       ON pv.policy_version_id = sh.policy_version_id
                  LEFT JOIN fgc.schedule_line sl
                            ON sl.schedule_header_id = sh.schedule_header_id
+                 LEFT JOIN fgc.agent a
+                           ON a.agent_id = sl.beneficiary_agent_id
+                 LEFT JOIN fgc.commission_item ci
+                           ON ci.commission_item_id = sl.commission_item_id
         WHERE sh.contract_id = #{contractId}
+          AND sh.payment_stage = #{paymentStage}
           AND sh.schedule_purpose = 'OPERATIONAL'
           AND sh.active_yn = TRUE
-        GROUP BY
-            sh.schedule_header_id,
-            c.contract_no,
-            pv.policy_code,
-            pv.version_no
-        ORDER BY
-            sh.payment_stage,
-            sh.schedule_header_id DESC
+        ORDER BY sl.line_no
     </select>
 </mapper>

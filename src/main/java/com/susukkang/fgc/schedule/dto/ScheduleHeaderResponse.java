@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 /**
  * 예상 스케줄 목록 조회 응답 DTO
@@ -32,4 +33,6 @@ public class ScheduleHeaderResponse {
     private Integer lineCount; // 전체 회차 수
     private BigDecimal expectedTotal; // 예상 총액
     private String policyVersionLabel; // 정책 버전 표시값
+    private String generationReason; //생성 사유
+    private OffsetDateTime generatedAt; // 생성 일시
 }

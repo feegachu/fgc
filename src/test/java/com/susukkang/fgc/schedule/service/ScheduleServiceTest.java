@@ -16,6 +16,8 @@ import com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
+import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import org.junit.jupiter.api.Test;
@@ -88,13 +90,53 @@ class ScheduleServiceTest {
     @Test
     void selectsOperationalSchedulesByContractId() {
         Long contractId = 10L;
-        given(scheduleMapper.selectByContractId(contractId))
-                .willReturn(List.of());
+        ScheduleDetailResponse detail = ScheduleDetailResponse.builder()
+                .header(ScheduleHeaderResponse.builder().scheduleHeaderId(100L).build())
+                .schedules(List.of())
+                .build();
+        given(scheduleMapper.selectByContractIdAndPaymentStage(
+                contractId, PaymentStage.INSURER_TO_GA))
+                .willReturn(detail);
 
-        List<?> result = scheduleService.selectByContractId(contractId);
+        var result = scheduleService.selectByContractId(
+                contractId, PaymentStage.INSURER_TO_GA);
 
-        assertThat(result).isEmpty();
-        verify(scheduleMapper).selectByContractId(contractId);
+        assertThat(result.getHeaders()).hasSize(1);
+        assertThat(result.getLines()).isEmpty();
+        verify(scheduleMapper).selectByContractIdAndPaymentStage(
+                contractId, PaymentStage.INSURER_TO_GA);
+    }
+
+    @Test
+    void generatesFixedRulesWithoutResolvingRateBasis() {
+        InsuranceContract contract = InsuranceContract.builder()
+                .contractId(10L)
+                .contractDate(LocalDate.of(2026, 8, 10))
+                .build();
+        ResolvedCommissionRule fixedRule = ResolvedCommissionRule.builder()
+                .commissionRuleId(1000L)
+                .commissionItemId(1000L)
+                .installmentFrom(1)
+                .installmentTo(1)
+                .basisCode("FIXED_AMOUNT")
+                .calculationType(CalculationType.FIXED)
+                .fixedAmount(new BigDecimal("25000"))
+                .roundingScale(0)
+                .roundingMode(RoundingMode.HALF_UP)
+                .build();
+
+        @SuppressWarnings("unchecked")
+        List<ScheduleLineInsertDTO> lines = ReflectionTestUtils.invokeMethod(
+                scheduleService,
+                "createScheduleLines",
+                contract,
+                ScheduleHeaderInsertDTO.builder().scheduleHeaderId(100L).build(),
+                policy(200L, PaymentStage.INSURER_TO_GA, fixedRule)
+        );
+
+        assertThat(lines).hasSize(1);
+        assertThat(lines.getFirst().getBasisAmount()).isEqualByComparingTo("25000");
+        assertThat(lines.getFirst().getExpectedAmount()).isEqualByComparingTo("25000");
     }
 
     @Test
