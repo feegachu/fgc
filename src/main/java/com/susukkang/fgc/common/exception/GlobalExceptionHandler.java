@@ -38,6 +38,19 @@ import java.util.Map;
  *  열면 오류 화면 대신 JSON 이 그대로 보였다). @RestController 만 걸러내면 MPA 예외는
  *  Spring Boot 의 /error 디스패치로 흘러가 오류 화면이 뜬다.
  *  @Controller 로 거르면 안 된다 — @RestController 가 @Controller 의 메타 애노테이션이라 둘 다 잡힌다.
+ *
+ *  규칙 1("전부 @RestControllerAdvice 한 클래스에서")과의 관계
+ *   규칙 1 과 규칙 3 은 한 advice 로 동시에 만족할 수 없다. 범위를 안 걸면 MPA 도 JSON 을 받아
+ *   규칙 3 이 깨지고, 걸면 "한 클래스"가 아니게 된다. 규칙 3 이 사용자가 보는 결과이므로 그쪽을 택했다.
+ *
+ *  아직 안 메운 구멍 — MPA 저장 화면이 생길 때
+ *   지금 상태를 바꾸는 엔드포인트는 전부 @RestController 위에 있다(ContractController,
+ *   ValidationRunController). @Controller 는 로그인 화면·대시보드·정적 화면뿐이고 전부 GET 이라
+ *   업무 예외를 던지지 않는다. 그래서 이 제한이 현재 잃는 것은 없다.
+ *   CONT-W03·TRAN-W02 같은 MPA 저장 화면이 @Controller 로 붙는 순간, 그 화면의
+ *   FgcBusinessException(예: FGC-CONT-001 계약번호 중복)이 3-2 매핑표를 못 타고
+ *   error/500.html 의 일반 문구로만 나간다. 그때는 이 클래스의 매핑을 재사용해 오류 화면을
+ *   렌더링하는 @ControllerAdvice 를 따로 두어야 한다 — 매핑을 복사하지 말 것.
  */
 public class GlobalExceptionHandler {
 
