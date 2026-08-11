@@ -36,6 +36,9 @@ public class ShellAdvice {
 
     private static final String SESSION_KEY = "fgc.month";
 
+    /** SecurityConfig 의 securityMatcher("/api/**") 와 같은 경계. 이 아래는 화면이 아니다. */
+    private static final String API_PREFIX = "/api/";
+
     /** COR-004 — 기준월을 코드에 박지 않는다. application.yml 의 fgc.demo-month. */
     private final YearMonth demoMonth;
 
@@ -49,10 +52,15 @@ public class ShellAdvice {
      * 형식이 틀린 month 는 400 을 던지지 않고 조용히 기본값으로 되돌린다. 헤더 select 가 보내는
      * 값이라 사용자가 직접 입력할 일이 없고, 셸이 죽으면 화면 전체가 안 뜨기 때문이다.
      * 값을 실제로 쓰는 컨트롤러(예: 대시보드)가 자기 규칙대로 다시 검증한다.
+     *
+     * /api/** 의 ?month= 로는 세션을 바꾸지 않는다
+     *  이 advice 는 @RestController 에도 걸린다(위 클래스 주석 참고). 화면이 한도게이지·검증실행
+     *  Ajax(SIR-006)를 자기 필터의 month 로 호출하는 순간, 그 값이 헤더 기준월까지 덮어써 버린다.
+     *  기준월을 바꾸는 주체는 헤더 select 하나뿐이고 그건 언제나 MPA 요청이다.
      */
     @ModelAttribute("month")
     public String month(@RequestParam(required = false) String month, HttpServletRequest request) {
-        if (month != null && parse(month) != null) {
+        if (!request.getRequestURI().startsWith(API_PREFIX) && month != null && parse(month) != null) {
             request.getSession().setAttribute(SESSION_KEY, month);
             return month;
         }
