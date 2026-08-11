@@ -244,7 +244,7 @@ class CommissionPolicyServiceImplTest {
     }
 
     @Test
-    void usesSmallerPriorityNumberWhenSpecificityIsEqual() {
+    void prioritizesInsurerRuleOverOrganizationRuleRegardlessOfPriorityNumber() {
         Long contractId = 10L;
         Long policyVersionId = 100L;
         PaymentStage paymentStage = PaymentStage.GA_TO_FC;
@@ -279,11 +279,28 @@ class CommissionPolicyServiceImplTest {
 
         assertThat(result.getRules())
                 .extracting(ResolvedCommissionRule::getCommissionRuleId)
-                .containsExactly(1001L);
+                .containsExactly(1000L);
     }
 
     @Test
-    void rejectsRulesWithSameSpecificityAndPriority() {
+    void prioritizesProductOfferingRuleOverInsurerRuleRegardlessOfPriorityNumber() {
+        Long contractId = 10L;
+        Long policyVersionId = 100L;
+        PaymentStage paymentStage = PaymentStage.GA_TO_FC;
+        ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(policyVersionId).build();
+        ResolvedCommissionRule productOfferingRule = ResolvedCommissionRule.builder().commissionRuleId(1000L).commissionItemId(2000L).agentRankCode(AgentRankCode.FC).installmentFrom(1).installmentTo(1).productOfferingId(3L).priorityNo(20).build();
+        ResolvedCommissionRule insurerRule = productOfferingRule.toBuilder().commissionRuleId(1001L).productOfferingId(null).insurerId(1L).priorityNo(10).build();
+
+        given(policyMapper.findApplicableCurrentCommissionPolicies(contractId, paymentStage)).willReturn(List.of(policy));
+        given(policyMapper.findApplicableCommissionRules(policyVersionId, contractId, paymentStage)).willReturn(List.of(productOfferingRule, insurerRule));
+
+        ResolvedCommissionPolicy result = commissionPolicyService.resolveCurrentCommission(contractId, paymentStage);
+
+        assertThat(result.getRules()).extracting(ResolvedCommissionRule::getCommissionRuleId).containsExactly(1000L);
+    }
+
+    @Test
+    void rejectsRulesWithSameSelectionOrderAndPriority() {
         Long contractId = 10L;
         Long policyVersionId = 100L;
         PaymentStage paymentStage = PaymentStage.GA_TO_FC;
@@ -301,8 +318,6 @@ class CommissionPolicyServiceImplTest {
                 .build();
         ResolvedCommissionRule secondRule = firstRule.toBuilder()
                 .commissionRuleId(1001L)
-                .insurerId(null)
-                .organizationId(2L)
                 .build();
 
         given(policyMapper.findApplicableCurrentCommissionPolicies(

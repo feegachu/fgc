@@ -31,6 +31,13 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
     private final PolicyMapper policyMapper;
 
+    // 운영정책서 제11조의 규칙 선택 순서: 상품 판매버전 > 보험사 > 조직 > priorityNo
+    private static final Comparator<ResolvedCommissionRule> RULE_SELECTION_ORDER =
+            Comparator.comparing((ResolvedCommissionRule rule) -> rule.getProductOfferingId() != null).reversed()
+                    .thenComparing(rule -> rule.getInsurerId() != null, Comparator.reverseOrder())
+                    .thenComparing(rule -> rule.getOrganizationId() != null, Comparator.reverseOrder())
+                    .thenComparing(ResolvedCommissionRule::getPriorityNo);
+
     /**
      * 설명 : 계약과 지급 단계에 적용할 현행 수수료 정책과 규칙 목록을 조회한다.
      * 적용 가능한 활성 정책이 정확히 한 건인 경우에만 수수료 규칙을 조회한다.
@@ -171,29 +178,20 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
     ) {
     }
 
-    /** 그룹 안에서 구체성이 가장 높고 priorityNo가 가장 작은 규칙을 선택한다. */
+    /** 그룹 안에서 상품 판매버전, 보험사, 조직, priorityNo 순으로 우선 규칙을 선택한다. */
     private ResolvedCommissionRule selectMostApplicableRule(
             RuleKey key,
             List<ResolvedCommissionRule> candidates,
             Long policyVersionId
     ) {
-        int highestSpecificity = candidates.stream()
-                .mapToInt(this::calculateSpecificity)
-                .max()
-                .orElseThrow();
-
-        int highestPriority = candidates.stream()
-                .filter(rule -> calculateSpecificity(rule) == highestSpecificity)
-                .mapToInt(ResolvedCommissionRule::getPriorityNo)
-                .min()
-                .orElseThrow();
-
-        List<ResolvedCommissionRule> winners = candidates.stream()
-                .filter(rule -> calculateSpecificity(rule) == highestSpecificity)
-                .filter(rule -> rule.getPriorityNo() == highestPriority)
+        List<ResolvedCommissionRule> sortedCandidates = candidates.stream()
+                .sorted(RULE_SELECTION_ORDER)
                 .toList();
+        ResolvedCommissionRule winner = sortedCandidates.getFirst();
 
-        if (winners.size() > 1) {
+        // 선택 조건과 priorityNo까지 같으면 임의로 고르지 않고 중복 규칙으로 처리
+        if (sortedCandidates.size() > 1
+                && RULE_SELECTION_ORDER.compare(winner, sortedCandidates.get(1)) == 0) {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
@@ -208,22 +206,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
             );
         }
 
-        return winners.getFirst();
-    }
-
-    /** 보험회사, 상품 판매버전, 조직 조건 중 지정된 조건의 개수를 반환한다. */
-    private int calculateSpecificity(ResolvedCommissionRule rule) {
-        int specificity = 0;
-        if (rule.getInsurerId() != null) {
-            specificity++;
-        }
-        if (rule.getProductOfferingId() != null) {
-            specificity++;
-        }
-        if (rule.getOrganizationId() != null) {
-            specificity++;
-        }
-        return specificity;
+        return winner;
     }
 
     /** 최종 규칙 선택에 필요한 필수값과 회차 범위를 검증한다. */
