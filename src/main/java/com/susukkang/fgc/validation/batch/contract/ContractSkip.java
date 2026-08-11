@@ -10,4 +10,5 @@ public record ContractSkip(Long contractId, String reasonCode, String message) {
             throw new IllegalArgumentException("reasonCode는 필수입니다.");
         }
     }
+
 }

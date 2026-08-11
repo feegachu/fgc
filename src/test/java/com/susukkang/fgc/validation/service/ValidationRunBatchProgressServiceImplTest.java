@@ -65,6 +65,19 @@ class ValidationRunBatchProgressServiceImplTest {
     }
 
     @Test
+    // step=1은 startRunning 전담 — advanceStep(1)은 매퍼도 안 부르고 바로 거부
+    void advanceStepRejectsStepOne() {
+        assertThatThrownBy(() -> service.advanceStep(1L, 1))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void advanceStepRejectsStepAboveEight() {
+        assertThatThrownBy(() -> service.advanceStep(1L, 9))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void completeRunDelegatesToMapper() {
         when(validationRunMapper.transitionToCompleted(1L)).thenReturn(1);
 
@@ -100,5 +113,17 @@ class ValidationRunBatchProgressServiceImplTest {
                 .isInstanceOf(FgcBusinessException.class)
                 .extracting(e -> ((FgcBusinessException) e).getErrorCode())
                 .isEqualTo(FgcErrorCode.VRUN_005);
+    }
+
+    @Test
+    void markFailedRejectsStepZero() {
+        assertThatThrownBy(() -> service.markFailed(1L, 0, "boom"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void markFailedRejectsStepAboveEight() {
+        assertThatThrownBy(() -> service.markFailed(1L, 9, "boom"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

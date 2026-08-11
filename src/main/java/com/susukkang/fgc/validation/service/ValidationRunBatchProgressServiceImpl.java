@@ -25,6 +25,10 @@ public class ValidationRunBatchProgressServiceImpl implements ValidationRunBatch
     @Override
     @Transactional
     public void advanceStep(Long validationRunId, int step) {
+        // ①createRunStep은 startRunning()이 전담하므로 advanceStep은 ②~⑧(2~8)만 받는다.
+        if (step < 2 || step > 8) {
+            throw new IllegalArgumentException("advanceStep의 step은 2~8이어야 합니다: " + step);
+        }
         requireAffected(validationRunMapper.updateCurrentStep(validationRunId, step), validationRunId);
     }
 
@@ -37,6 +41,9 @@ public class ValidationRunBatchProgressServiceImpl implements ValidationRunBatch
     @Override
     @Transactional
     public void markFailed(Long validationRunId, int failedStep, String failureMessage) {
+        if (failedStep < 1 || failedStep > 8) {
+            throw new IllegalArgumentException("markFailed의 failedStep은 1~8이어야 합니다: " + failedStep);
+        }
         requireAffected(
                 validationRunMapper.transitionToFailed(validationRunId, failedStep, failureMessage),
                 validationRunId);

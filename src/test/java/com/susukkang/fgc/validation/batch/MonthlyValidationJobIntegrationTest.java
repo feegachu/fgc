@@ -30,10 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * IF-BAT-01 MonthlyValidationJob(#57) 골격 통합테스트. 실제 JobRepository/DB로 Job 전체를
- * 한 번 돌려서 "8단계가 순서대로 다 뛰는지 + validation_run이 COMPLETED로 마감되는지"를
- * 검증한다. 각 Step의 실제 판정 로직은 아직 자리표시자(PlaceholderStepTasklet)라서, 이
- * 테스트는 그 로직의 정확성이 아니라 배선(순서·파티션·진행상황 기록)이 맞는지만 본다 —
- * 실제 로직이 채워지는 후속 이슈들이 각자 Step 단위 테스트를 추가한다.
+ * 한 번 돌려서 "①createRunStep은 정상 완료되고, 아직 실제 포트 구현이 없는 ②~⑧ 자리에서
+ * Job이 FAILED로 멈추며 validation_run도 FAILED로 남는지"를 검증한다(#60에서 각 Step이
+ * MonthlyValidationStepCoordinator의 포트를 실제 구현으로 갈아끼우면, 이 테스트도 정상 완료
+ * 경로(COMPLETED)를 검증하도록 갱신해야 한다). 지금 이 테스트는 로직의 정확성이 아니라
+ * 배선(순서·파티션·진행상황 기록·실패 전파)이 맞는지만 본다.
  *
  * @Transactional을 안 쓴다: Spring Batch가 Step마다 자기 트랜잭션을 커밋해야 JobRepository가
  * 다음 Step에서 이전 상태를 볼 수 있다 — 테스트를 하나의 롤백 트랜잭션으로 감싸면 그 커밋이

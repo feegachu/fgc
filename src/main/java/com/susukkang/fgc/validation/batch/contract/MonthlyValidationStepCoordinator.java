@@ -28,8 +28,10 @@ public class MonthlyValidationStepCoordinator {
         return targetSelectionPort.selectTargets(context);
     }
 
-    public StepProcessingResult regenerateSchedules(ValidationStepContext context) {
-        return scheduleRegenerationPort.regenerateSchedules(context);
+    public StepProcessingResult regenerateSchedules(ValidationStepContext context, long skipLimit) {
+        StepProcessingResult result = scheduleRegenerationPort.regenerateSchedules(context);
+        enforceSkipLimit("regenerateScheduleStep", result, skipLimit);
+        return result;
     }
 
     public StepProcessingResult checkCaps(ValidationStepContext context, PaymentStage paymentStage, long skipLimit) {
@@ -38,8 +40,20 @@ public class MonthlyValidationStepCoordinator {
         return result;
     }
 
-    public StepProcessingResult checkArbitrage(ValidationStepContext context) {
-        return arbitrageCheckBatchPort.check(context);
+    public StepProcessingResult checkArbitrage(ValidationStepContext context, long skipLimit) {
+        StepProcessingResult result = arbitrageCheckBatchPort.check(context);
+        enforceSkipLimit("arbitrageCheckStep", result, skipLimit);
+        return result;
+    }
+
+    /** 지급단계 구분이 없는 Step(regenerateScheduleStep·arbitrageCheckStep)용. */
+    private void enforceSkipLimit(String stepName, StepProcessingResult result, long skipLimit) {
+        if (skipLimit < 0) {
+            throw new IllegalArgumentException("skipLimit은 음수일 수 없습니다.");
+        }
+        if (result.skippedCount() > skipLimit) {
+            throw new SkipLimitExceededException(stepName, result.skippedCount(), skipLimit);
+        }
     }
 
     public JournalPostingResult postJournals(ValidationStepContext context) {
@@ -63,6 +77,7 @@ public class MonthlyValidationStepCoordinator {
     }
 
     private void enforceSkipLimit(String stepName, PaymentStage paymentStage, StepProcessingResult result, long skipLimit) {
+
         if (skipLimit < 0) {
             throw new IllegalArgumentException("skipLimit은 음수일 수 없습니다.");
         }

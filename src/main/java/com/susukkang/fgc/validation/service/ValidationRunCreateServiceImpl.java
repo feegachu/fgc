@@ -35,10 +35,7 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     private static final String CONSTRAINT_ACTIVE_MONTHLY_RUN = "uq_validation_run_active_month";
     private static final String CONSTRAINT_RUN_NO = "uq_validation_run";
 
-    // findNextRunNo(사전 조회)와 insert(실제 반영) 사이는 잠기지 않는다 — 두 요청이 동시에
-    // 같은 run_no를 계산해서 갈 수 있다. 그중 하나는 uq_validation_run(validation_month, run_no)
-    // 위반으로 INSERT가 실패하는데, 이건 "실행이 이미 진행 중"이라는 업무 규칙 위반이 아니라
-    // 단순 채번 충돌이라 몇 번 재시도하면 대부분 바로 해결된다. 무한 재시도는 위험하니 상한을 둔다.
+    // findNextRunNo(사전 조회)와 insert(실제 반영) 사이는 잠기지 X
     private static final int MAX_RUN_NO_RETRIES = 3;
 
     private final ValidationRunMapper validationRunMapper;
@@ -66,7 +63,7 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     @Override
     public ValidationRunRow create(CreateValidationRunCommand command) {
         if (command.runNo() != null) {
-            return requiresNewTransactionTemplate.execute(status -> attemptCreate(command));
+            return createWithExplicitRunNo(command);
         }
 
         for (int attempt = 1; attempt <= MAX_RUN_NO_RETRIES; attempt++) {
@@ -87,6 +84,32 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     }
 
     /**
+     * 명시적 runNo(배치가 JobParameters로 넘긴 값)로 생성할 때는 멱등적으로 동작해야 한다 —
+     * INSERT는 커밋됐는데 그 뒤 Step 완료 기록 전에 배치가 중단되면, 재시작이 같은
+     * (validationMonth, runNo)로 이 메서드를 다시 부른다. 매번 새 INSERT를 시도하면
+     * uq_validation_run 위반으로 재시작 자체가 실패한다 — 그래서 INSERT 전에 먼저 같은
+     * 업무키의 기존 행이 있는지 확인하고, 있으면(그리고 같은 요청이면) 그 행을 그대로
+     * 돌려준다. 업무키는 같은데 runType/triggeredBy가 다르면 서로 다른 요청이 같은 회차를
+     * 다투는 것이므로 충돌로 처리한다.
+     */
+    private ValidationRunRow createWithExplicitRunNo(CreateValidationRunCommand command) {
+        ValidationRunRow existing = validationRunMapper.findByMonthAndRunNo(command.validationMonth(), command.runNo());
+        if (existing != null) {
+            if (matchesRequest(existing, command)) {
+                return existing;
+            }
+            throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of(
+                    "validationMonth", command.validationMonth(), "runNo", command.runNo()));
+        }
+        return requiresNewTransactionTemplate.execute(status -> attemptCreate(command));
+    }
+
+    private boolean matchesRequest(ValidationRunRow existing, CreateValidationRunCommand command) {
+        return command.runType().name().equals(existing.getRunType())
+                && command.triggeredBy().equals(existing.getTriggeredBy());
+    }
+
+    /**
      * 위반된 제약이 uq_validation_run(run_no 채번 충돌)인지 판정
      */
     private boolean isRunNoCollision(DataIntegrityViolationException e) {
@@ -104,17 +127,13 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     }
 
     private ValidationRunRow attemptCreate(CreateValidationRunCommand command) {
-        // 1. MONTHLY 중복 체크 — 앱 레벨 사전 체크(친절한 메시지용). 진짜 방어선은 DB의
-        // uq_validation_run_active_month이고, 이 사전 체크를 두 요청이 동시에 통과해도
-        // INSERT 단계에서 결국 하나만 성공한다(위 isActiveMonthlyRunConflict 참고).
+        // 1. MONTHLY 중복 체크
         if (command.runType() == ValidationRunType.MONTHLY
                 && validationRunMapper.existsActiveMonthlyRun(command.validationMonth())) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_001, Map.of());
         }
 
-        // 2. run_no 채번 — 재시도마다(=매 attempt마다) 새 트랜잭션에서 다시 계산해야 한다.
-        // 그래야 방금 실패를 유발한 경쟁자의 INSERT가 이 시점에 보이는 값 기준으로 다음
-        // run_no를 새로 받는다.
+        // 2. run_no 채번
         int runNo = command.runNo() != null
                 ? command.runNo()
                 : validationRunMapper.findNextRunNo(command.validationMonth());

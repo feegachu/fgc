@@ -15,6 +15,13 @@ public interface ValidationRunMapper {
     ValidationRunRow findById(@Param("validationRunId") Long validationRunId);
 
     /**
+     * (validationMonth, runNo) 복합 유니크 키로 단건 조회. 없으면 null.
+     * 배치가 명시적 runNo로 재시작할 때 이미 만든 행을 재사용할지 판단하는 용도(멱등성).
+     */
+    ValidationRunRow findByMonthAndRunNo(@Param("validationMonth") LocalDate validationMonth,
+                                          @Param("runNo") int runNo);
+
+    /**
      * validationMonth에 이미 있는 실행들 중 최대 run_no + 1. 하나도 없으면 1
      */
     Integer findNextRunNo(@Param("validationMonth") LocalDate validationMonth);
