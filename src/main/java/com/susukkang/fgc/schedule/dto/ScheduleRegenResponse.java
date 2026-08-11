@@ -17,5 +17,5 @@ import lombok.*;
 @AllArgsConstructor
 public class ScheduleRegenResponse {
     Long scheduleHeaderId; //새 스케줄 헤더 ID
-    Long scheduleVersionNo; //새 스케줄 번호
+    Long versionNo; //새 스케줄 번호
 }

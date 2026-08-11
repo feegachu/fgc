@@ -34,12 +34,12 @@ class ScheduleControllerTest {
 
     @Test
     void regeneratesScheduleWithReason() throws Exception {
-        when(scheduleService.regenerateSchedules(10L, "정책 변경 반영")).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).scheduleVersionNo(2L).build());
+        when(scheduleService.regenerateSchedules(10L, "정책 변경 반영")).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).versionNo(2L).build());
 
         mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scheduleHeaderId").value(11))
-                .andExpect(jsonPath("$.data.scheduleVersionNo").value(2));
+                .andExpect(jsonPath("$.data.versionNo").value(2));
 
         verify(scheduleService).regenerateSchedules(10L, "정책 변경 반영");
     }
@@ -55,7 +55,7 @@ class ScheduleControllerTest {
     @Test
     void acceptsReasonAtMaximumLength() throws Exception {
         String reason = "가".repeat(40);
-        when(scheduleService.regenerateSchedules(10L, reason)).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).scheduleVersionNo(2L).build());
+        when(scheduleService.regenerateSchedules(10L, reason)).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).versionNo(2L).build());
 
         mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).contentType(APPLICATION_JSON).content("{\"reason\":\"" + reason + "\"}"))
                 .andExpect(status().isOk());

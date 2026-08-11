@@ -160,7 +160,7 @@ class ScheduleServiceTest {
         ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "정책 변경 반영");
 
         assertThat(response.getScheduleHeaderId()).isEqualTo(11L);
-        assertThat(response.getScheduleVersionNo()).isEqualTo(2L);
+        assertThat(response.getVersionNo()).isEqualTo(2L);
         verify(scheduleMapper).lockContractForScheduleGeneration(20L);
         verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
         ArgumentCaptor<ScheduleHeaderInsertDTO> headerCaptor = ArgumentCaptor.forClass(ScheduleHeaderInsertDTO.class);
@@ -178,6 +178,16 @@ class ScheduleServiceTest {
         assertThat(lineCaptor.getValue().get(0).getLineStatus()).isEqualTo(ScheduleLineStatus.CONFIRMED);
         assertThat(lineCaptor.getValue().get(1).getExpectedAmount()).isEqualByComparingTo("200000");
         assertThat(lineCaptor.getValue().get(1).getLineStatus()).isEqualTo(ScheduleLineStatus.PLANNED);
+    }
+
+    @Test
+    void registersReviewAndPreservesExistingHeaderWhenPolicyIsMissing() {
+        assertRegenerationRegistersReview("POLICY_MISSING");
+    }
+
+    @Test
+    void registersReviewAndPreservesExistingHeaderWhenPoliciesAreDuplicated() {
+        assertRegenerationRegistersReview("POLICY_DUPLICATE");
     }
 
     @Test
@@ -520,6 +530,24 @@ class ScheduleServiceTest {
                 ),
                 "예상 스케줄에 적용할 정책을 확정할 수 없습니다."
         );
+    }
+
+    private void assertRegenerationRegistersReview(String reason) {
+        ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).scheduleVersionNo(1).status(ScheduleHeaderStatus.CONFIRMED).activeYn(true).build();
+        InsuranceContract contract = InsuranceContract.builder().contractId(20L).build();
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(oldHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(contract);
+        given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willThrow(policyResolutionException(20L, PaymentStage.INSURER_TO_GA, reason));
+        given(scheduleMapper.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
+
+        ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "정책 변경 반영");
+
+        assertThat(response.getScheduleHeaderId()).isEqualTo(10L);
+        assertThat(response.getVersionNo()).isEqualTo(1L);
+        verify(scheduleMapper).upsertPolicyReviewCase(20L, PaymentStage.INSURER_TO_GA, reason, "수수료 정책 검토 필요 - INSURER_TO_GA", "예상 스케줄에 적용할 정책을 확정할 수 없습니다.");
+        verify(scheduleMapper, never()).updateScheduleHeaderStatus(any(), any(), any(Boolean.class));
+        verify(scheduleMapper, never()).insertScheduleHeader(any());
+        verify(scheduleMapper, never()).insertAllScheduleLines(any());
     }
 
     private ResolvedCommissionPolicy policy(

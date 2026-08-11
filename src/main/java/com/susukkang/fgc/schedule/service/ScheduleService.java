@@ -979,11 +979,16 @@ public class ScheduleService {
             throw validationException("contractId", "존재하지 않는 계약입니다.");
 
         // 계약과 지급단계에 현재 적용되는 수수료 정책 조회 및 검증
-        ResolvedCommissionPolicy policy = commissionPolicyService.resolveCurrentCommission(
+        ResolvedCommissionPolicy policy = resolvePolicyOrRegisterReview(
                 oldHeader.getContractId(),
                 oldHeader.getPaymentStage()
         );
-        validateResolvedPolicy(policy, oldHeader.getPaymentStage());
+        if (policy == null) {
+            return ScheduleRegenResponse.builder()
+                    .scheduleHeaderId(oldHeader.getScheduleHeaderId())
+                    .versionNo(oldHeader.getScheduleVersionNo().longValue())
+                    .build();
+        }
 
         // 확정된 과거 회차를 새 버전에서도 그대로 보존하기 위해 기존 라인을 조회
         List<ScheduleLineInsertDTO> oldLines =
@@ -1023,7 +1028,7 @@ public class ScheduleService {
         // 새 스케줄 헤더 ID와 버전 번호를 응답으로 반환
         return ScheduleRegenResponse.builder()
                 .scheduleHeaderId(newHeader.getScheduleHeaderId())
-                .scheduleVersionNo(newHeader.getScheduleVersionNo().longValue())
+                .versionNo(newHeader.getScheduleVersionNo().longValue())
                 .build();
     }
 
