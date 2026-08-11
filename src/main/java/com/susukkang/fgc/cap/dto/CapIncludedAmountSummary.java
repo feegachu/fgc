@@ -8,7 +8,13 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
-/** 계약·설계사·지급단계별 초년도 한도 산입액 합계 DTO. */
+/**
+ * 설명 : 계약·설계사·지급단계별 초년도 한도 산입액 합계를 전달하는 DTO
+ *
+ * @author hjKang
+ * @version 1.0
+ * @since 2026-08-12
+ */
 @Getter
 @Builder
 @NoArgsConstructor
