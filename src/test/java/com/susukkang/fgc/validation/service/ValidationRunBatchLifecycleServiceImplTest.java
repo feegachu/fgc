@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
@@ -91,15 +92,18 @@ class ValidationRunBatchLifecycleServiceImplTest {
     // progressService가 먼저 예외를 던지면 auditService는 아예 호출되지 않아야 한다 —
     // "상태 갱신 실패 + 감사로그만 성공"처럼 절반만 반영된 상태가 코드 레벨에서부터
     // 나오지 않게 막는다(실제 롤백 보장은 @Transactional + 통합테스트가 마저 증명한다).
-    void doesNotRecordAuditWhenProgressUpdateFails() {
+    //
+    // 예외를 try/catch로 삼키지 않고 assertThatThrownBy로 직접 검증한다 — 삼키면
+    // start()가 내부에서 예외를 조용히 먹고 정상 반환해도(감사로그 호출만 안 했다면) 이
+    // 테스트가 똑같이 통과해 버린다. 예외가 "호출자에게까지 전파되는지"까지 확인해야
+    // @Transactional이 실제로 롤백을 발동시킬 신호(런타임 예외 전파)가 있다는 걸 보장한다.
+    void progressUpdateFailurePropagatesAndSkipsAuditLogging() {
         ValidationRunBatchLifecycleServiceImpl service = service();
-        willThrow(new RuntimeException("db down")).given(progressService).startRunning(100L);
+        RuntimeException dbDown = new RuntimeException("db down");
+        willThrow(dbDown).given(progressService).startRunning(100L);
 
-        try {
-            service.start(100L, parameters());
-        } catch (RuntimeException expected) {
-            // 예외 자체는 이 테스트의 관심사가 아니다 — 아래 verifyNoInteractions가 핵심.
-        }
+        assertThatThrownBy(() -> service.start(100L, parameters()))
+                .isSameAs(dbDown);
 
         verifyNoInteractions(auditService);
     }

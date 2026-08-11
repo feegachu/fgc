@@ -1,7 +1,6 @@
 package com.susukkang.fgc.validation.batch.contract;
 
 import com.susukkang.fgc.common.code.ValidationRunType;
-import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 
 import java.time.LocalDate;
 import java.util.Objects;
@@ -29,14 +28,5 @@ public record ValidationJobContext(
         if (requestId == null || requestId.isBlank()) {
             throw new IllegalArgumentException("requestId는 필수입니다.");
         }
-    }
-
-    /**
-     * MonthlyValidationJobParameters(JobParameters를 파싱한 결과)를 그대로 옮겨 담음
-     */
-    public static ValidationJobContext from(MonthlyValidationJobParameters parameters) {
-        return new ValidationJobContext(
-                parameters.validationMonth(), parameters.runNo(), parameters.runType(),
-                parameters.triggeredBy(), parameters.requestId());
     }
 }
