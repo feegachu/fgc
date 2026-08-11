@@ -1,6 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -98,15 +99,15 @@ class DailyChangedContractJobIntegrationTest {
                 .collect(Collectors.toSet());
         assertThat(executedStepNames).contains("changedContractStep");
 
-        // validation_run이 정상적으로 RUNNING(1단계) 상태로 남아 있는지 — CreateDailyRunTasklet이
-        // 스스로 호출한 lifecycleService.start() 한 번만 반영된 결과여야 한다.
-        List<Long> validationRunIds = jdbcTemplate.queryForList(
-                "SELECT validation_run_id FROM fgc.validation_run WHERE created_at >= now() - interval '1 minute'",
-                Long.class);
-        createdValidationRunIds.addAll(validationRunIds);
-        assertThat(validationRunIds).hasSize(1);
+        // 시간창 기반 조회(created_at >= now() - interval)는 같은 DB를 공유하는 다른
+        // 테스트/실행이 만든 행까지 주워서 hasSize(1) 검증이 흔들리고, cleanUp이 남의 행까지
+        // 지울 위험이 있다(코드리뷰 지적, 2026-08-11) — CreateDailyRunTasklet이 Job
+        // ExecutionContext에 정확히 심어 둔 validationRunId를 그대로 읽는다.
+        Long validationRunId = ValidationRunBatchContext.getValidationRunId(jobExecution.getExecutionContext());
+        assertThat(validationRunId).isNotNull();
+        createdValidationRunIds.add(validationRunId);
 
-        ValidationRunRow row = validationRunMapper.findById(validationRunIds.get(0));
+        ValidationRunRow row = validationRunMapper.findById(validationRunId);
         assertThat(row.getStatus()).isIn(
                 ValidationRunStatus.RUNNING.name(),
                 ValidationRunStatus.COMPLETED.name(),

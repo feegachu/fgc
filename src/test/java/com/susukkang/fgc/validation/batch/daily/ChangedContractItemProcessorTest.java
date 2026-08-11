@@ -11,8 +11,13 @@ import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobInstance;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.StepExecution;
 
 import java.util.List;
 import java.util.Map;
@@ -45,6 +50,11 @@ class ChangedContractItemProcessorTest {
     void setUp() {
         processor = new ChangedContractItemProcessor(
                 contractMapper, scheduleService, capCheckService, contractStatusEventProcessingMapper);
+
+        JobExecution jobExecution = new JobExecution(
+                new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), new JobParameters());
+        jobExecution.getExecutionContext().putLong("validationRunId", 777L);
+        processor.beforeStep(new StepExecution("changedContractStep", jobExecution));
     }
 
     private InsuranceContract contract(long contractId) {
@@ -61,9 +71,18 @@ class ChangedContractItemProcessorTest {
 
         assertThat(result.success()).isTrue();
         assertThat(result.contractId()).isEqualTo(1L);
+        assertThat(result.pendingEventIds()).containsExactly(100L);
         verify(scheduleService).generateSchedules(any());
+
+        // cap_check가 이 배치의 validation_run에 실제로 연결되는지 확인한다(코드리뷰 지적,
+        // 2026-08-11) — CapCalculationCommand.realtime()을 그대로 썼다면 validationRunId가
+        // 항상 null이라 uq_cap_check_monthly 중복방지가 무력화되고 §7-5 "그 밑에 결과를
+        // 붙인다"도 어긋난다.
+        ArgumentCaptor<CapCalculationCommand> captor = ArgumentCaptor.forClass(CapCalculationCommand.class);
         // PaymentStage 2개(INSURER_TO_GA, GA_TO_FC) 각각 1번씩 -> 총 2번
-        verify(capCheckService, times(2)).calculateAndSave(any(CapCalculationCommand.class));
+        verify(capCheckService, times(2)).calculateAndSave(captor.capture());
+        assertThat(captor.getAllValues())
+                .allSatisfy(command -> assertThat(command.validationRunId()).isEqualTo(777L));
     }
 
     @Test

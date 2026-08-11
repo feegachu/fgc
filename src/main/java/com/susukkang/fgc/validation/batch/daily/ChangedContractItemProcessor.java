@@ -8,8 +8,11 @@ import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
+import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
 import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.annotation.BeforeStep;
 import org.springframework.batch.item.ItemProcessor;
 
 import java.time.LocalDate;
@@ -29,19 +32,29 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
     private final CapCheckService capCheckService;
     private final ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
 
+    private Long validationRunId;
+
+    @BeforeStep
+    public void beforeStep(StepExecution stepExecution) {
+        this.validationRunId = ValidationRunBatchContext.getValidationRunId(
+                stepExecution.getJobExecution().getExecutionContext());
+    }
+
     @Override
     public ChangedContractResult process(Long contractId) {
+        List<Long> pendingEventIds = contractStatusEventProcessingMapper.findPendingEventIds(
+                contractId, DailyChangedContractJobNames.JOB_NAME);
+
         try {
             InsuranceContract contract = contractMapper.selectById(contractId);
             if (contract == null) {
                 // Reader가 목록을 뽑은 시점과 Processor가 실제로 조회하는 시점 사이에 계약이
                 // 삭제될 일은 이 도메인에서는 없지만(계약은 논리 삭제/상태변경만 함), 방어적으로
                 // 데이터 품질 스킵으로 처리한다.
-                return ChangedContractResult.dataQualitySkip(contractId, "계약을 찾을 수 없음: " + contractId);
+                return ChangedContractResult.dataQualitySkip(
+                        contractId, "계약을 찾을 수 없음: " + contractId, pendingEventIds);
             }
 
-            List<Long> pendingEventIds = contractStatusEventProcessingMapper.findPendingEventIds(
-                    contractId, DailyChangedContractJobNames.JOB_NAME);
             if (!pendingEventIds.isEmpty()) {
                 scheduleService.generateSchedules(contract);
             }
@@ -49,12 +62,12 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
             LocalDate asOfDate = LocalDate.now(DateUtil.SEOUL_ZONE);
             for (PaymentStage paymentStage : PaymentStage.values()) {
                 capCheckService.calculateAndSave(
-                        CapCalculationCommand.realtime(contractId, paymentStage, asOfDate));
+                        CapCalculationCommand.dailyBatch(contractId, paymentStage, asOfDate, validationRunId));
             }
 
-            return ChangedContractResult.success(contractId);
+            return ChangedContractResult.success(contractId, pendingEventIds);
         } catch (FgcBusinessException e) {
-            return ChangedContractResult.dataQualitySkip(contractId, describe(e));
+            return ChangedContractResult.dataQualitySkip(contractId, describe(e), pendingEventIds);
         }
     }
 

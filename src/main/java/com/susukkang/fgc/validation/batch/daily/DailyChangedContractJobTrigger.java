@@ -3,6 +3,7 @@ package com.susukkang.fgc.validation.batch.daily;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.RequestIdContext;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
@@ -49,6 +50,15 @@ public class DailyChangedContractJobTrigger {
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
+    }
+
+    // taskExecutor는 Spring @Bean이 아니라 필드 초기화식으로 직접 만든 POJO라, 컨테이너가
+    // 종료될 때 자동으로 destroy()를 불러주지 않는다(Spring이 생명주기를 모르는 객체이므로).
+    // @PreDestroy로 이 컴포넌트 자체의 종료 시점에 맞춰 명시적으로 shutdown 해준다 — 안 하면
+    // 워커 스레드가 애플리케이션 종료 후에도 남아있을 수 있다.
+    @PreDestroy
+    public void shutdown() {
+        taskExecutor.shutdown();
     }
 
     @Scheduled(cron = "${fgc.batch.daily-changed-contract.cron}", zone = "Asia/Seoul")

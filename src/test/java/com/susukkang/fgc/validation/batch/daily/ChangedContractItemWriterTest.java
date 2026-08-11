@@ -16,7 +16,6 @@ import org.springframework.batch.item.Chunk;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -47,10 +46,9 @@ class ChangedContractItemWriterTest {
 
     @Test
     void successResultMarksPendingEventsSucceeded() {
-        given(contractStatusEventProcessingMapper.findPendingEventIds(1L, DailyChangedContractJobNames.JOB_NAME))
-                .willReturn(List.of(10L, 11L));
-
-        writer.write(new Chunk<>(List.of(ChangedContractResult.success(1L))));
+        // pendingEventIds는 이제 Writer가 다시 조회하지 않고 Processor가 넘겨준 값을 그대로
+        // 쓴다(TOCTOU 레이스 방지, 코드리뷰 반영) — 그래서 결과 자체에 담아 전달한다.
+        writer.write(new Chunk<>(List.of(ChangedContractResult.success(1L, List.of(10L, 11L)))));
 
         verify(contractStatusEventProcessingMapper).insertProcessing(10L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
         verify(contractStatusEventProcessingMapper).insertProcessing(11L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
@@ -59,10 +57,8 @@ class ChangedContractItemWriterTest {
 
     @Test
     void dataQualitySkipResultCreatesExceptionCaseAndMarksEventsFailed() {
-        given(contractStatusEventProcessingMapper.findPendingEventIds(2L, DailyChangedContractJobNames.JOB_NAME))
-                .willReturn(List.of(20L));
-
-        writer.write(new Chunk<>(List.of(ChangedContractResult.dataQualitySkip(2L, "FGC-CONT-001"))));
+        writer.write(new Chunk<>(List.of(
+                ChangedContractResult.dataQualitySkip(2L, "FGC-CONT-001", List.of(20L)))));
 
         verify(exceptionCaseMapper).insertDataQualityCase(eq(777L), eq(2L), eq("일일 변경 계약 재검증 실패"), eq("FGC-CONT-001"));
         verify(contractStatusEventProcessingMapper).insertProcessing(20L, DailyChangedContractJobNames.JOB_NAME, "FAILED", 777L, "FGC-CONT-001");

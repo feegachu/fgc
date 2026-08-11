@@ -32,8 +32,10 @@ public class ChangedContractItemWriter implements ItemWriter<ChangedContractResu
     @Override
     public void write(Chunk<? extends ChangedContractResult> chunk) {
         for (ChangedContractResult result : chunk) {
-            List<Long> pendingEventIds = contractStatusEventProcessingMapper.findPendingEventIds(
-                    result.contractId(), DailyChangedContractJobNames.JOB_NAME);
+            // Processor가 조회한 스냅샷을 그대로 쓴다 — 여기서 다시 조회하면 Processor가
+            // 결정을 내린 시점과 이 write() 시점 사이에 새로 들어온 이벤트까지 주워서
+            // SUCCEEDED로 찍어버리는 TOCTOU 레이스가 생긴다(ChangedContractResult 참고).
+            List<Long> pendingEventIds = result.pendingEventIds();
 
             if (result.success()) {
                 // 성공 시엔 SUCCEEDED로 기록한다 — uq_cse_processing_succeeded 부분 유니크
