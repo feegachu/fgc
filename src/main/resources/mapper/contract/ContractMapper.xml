@@ -236,7 +236,7 @@
                )
     </insert>
     <!-- 계약 ID 조회 -->
-    <select id="selectById" parameterType="long" resultType="com.susukkang.fgc.contract.dto.InsuranceContract">
+    <select id="selectContractById" parameterType="long" resultType="com.susukkang.fgc.contract.dto.InsuranceContract">
             SELECT
                 contract_id,
                 insurer_id,

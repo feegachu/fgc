@@ -73,7 +73,7 @@ class ContractMapperIntegrationTest {
         assertThat(contractMapper.existsContractNo(
                 refs.insurerId(), contract.getContractNo())).isTrue();
 
-        InsuranceContract selected = contractMapper.selectById(contract.getContractId());
+        InsuranceContract selected = contractMapper.selectContractById(contract.getContractId());
         assertThat(selected.getContractId()).isEqualTo(contract.getContractId());
         assertThat(selected.getContractNo()).isEqualTo(contract.getContractNo());
         assertThat(selected.getMonthlyEquivalentFirstPremium())
@@ -126,7 +126,7 @@ class ContractMapperIntegrationTest {
 
         assertThat(contractMapper.updateContract(updated)).isEqualTo(1);
 
-        InsuranceContract selected = contractMapper.selectById(contract.getContractId());
+        InsuranceContract selected = contractMapper.selectContractById(contract.getContractId());
         assertThat(selected.getContractNo()).isEqualTo(changedContractNo);
         assertThat(selected.getCurrentStatus()).isEqualTo(TERMINATED);
         assertThat(selected.getPremiumPerCycleAmount()).isEqualByComparingTo("120000.00");

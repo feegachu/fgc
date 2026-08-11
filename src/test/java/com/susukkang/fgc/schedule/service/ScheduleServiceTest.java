@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicyType;
+import com.susukkang.fgc.common.code.ScheduleLineStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
@@ -85,6 +86,23 @@ class ScheduleServiceTest {
         assertThat(condition.getPurpose()).isEqualTo(SchedulePurpose.OPERATIONAL);
         verify(scheduleMapper).selectByCondition(condition, 20, 0L);
         verify(scheduleMapper).countByCondition(condition);
+    }
+
+    @Test
+    void preservesLockedLinesAndRecalculatesPlannedLinesWhenRegenerating() {
+        ScheduleLineInsertDTO confirmedOldLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(10L).lineNo(1).installmentNo(1).contractMonthNo(1).dueDate(LocalDate.of(2026, 8, 10)).commissionItemId(100L).beneficiaryAgentId(20L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("100000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("100000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.CONFIRMED).sourceCommissionRuleId(1000L).build();
+        ScheduleLineInsertDTO recalculatedFirstLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(20L).lineNo(1).installmentNo(1).contractMonthNo(1).dueDate(LocalDate.of(2026, 8, 10)).commissionItemId(100L).beneficiaryAgentId(20L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("200000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("200000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.PLANNED).sourceCommissionRuleId(2000L).build();
+        ScheduleLineInsertDTO recalculatedFutureLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(20L).lineNo(2).installmentNo(2).contractMonthNo(2).dueDate(LocalDate.of(2026, 9, 10)).commissionItemId(100L).beneficiaryAgentId(20L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("200000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("200000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.PLANNED).sourceCommissionRuleId(2000L).build();
+
+        @SuppressWarnings("unchecked")
+        List<ScheduleLineInsertDTO> mergedLines = ReflectionTestUtils.invokeMethod(scheduleService, "mergeLockedScheduleLines", List.of(confirmedOldLine), List.of(recalculatedFirstLine, recalculatedFutureLine), 30L);
+
+        assertThat(mergedLines).hasSize(2);
+        assertThat(mergedLines.get(0).getScheduleHeaderId()).isEqualTo(30L);
+        assertThat(mergedLines.get(0).getExpectedAmount()).isEqualByComparingTo("100000");
+        assertThat(mergedLines.get(0).getLineStatus()).isEqualTo(ScheduleLineStatus.CONFIRMED);
+        assertThat(mergedLines.get(1).getExpectedAmount()).isEqualByComparingTo("200000");
+        assertThat(mergedLines.get(1).getLineStatus()).isEqualTo(ScheduleLineStatus.PLANNED);
     }
 
     @Test
@@ -223,7 +241,7 @@ class ScheduleServiceTest {
                 rule(2000L, AgentRankCode.FC, 1, 1, "650.000000")
         );
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -314,7 +332,7 @@ class ScheduleServiceTest {
                 .rules(List.of(firstRule, overlappingRule))
                 .build();
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -337,7 +355,7 @@ class ScheduleServiceTest {
                 .contractDate(LocalDate.of(2026, 8, 10))
                 .build();
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willThrow(policyResolutionException(
@@ -383,7 +401,7 @@ class ScheduleServiceTest {
                 rule(2000L, AgentRankCode.FC, 1, 1, "100.000000")
         );
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
