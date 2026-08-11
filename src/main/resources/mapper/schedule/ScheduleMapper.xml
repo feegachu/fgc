@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.schedule.mapper.ScheduleMapper">
+
+    <!-- 검색 조건에 해당하는 스케줄 헤더 목록을 조회한다. -->
+    <select id="selectByCondition"
+            resultType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
+        SELECT
+            sh.schedule_header_id,
+            c.contract_no,
+            sh.payment_stage,
+            sh.schedule_regime,
+            sh.schedule_purpose,
+            sh.schedule_version_no,
+            sh.status,
+            sh.active_yn,
+            sh.generated_at,
+            sh.generation_reason,
+            COUNT(sl.schedule_line_id) AS line_count,
+            COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
+            CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label
+        FROM
+            schedule_header sh
+        JOIN
+            insurance_contract c
+                ON c.contract_id = sh.contract_id
+        JOIN policy_version pv
+                ON pv.policy_version_id = sh.policy_version_id
+        LEFT JOIN schedule_line sl
+                ON sl.schedule_header_id = sh.schedule_header_id
+        <where>
+            <if test="condition.contractNo != null
+                      and condition.contractNo != ''">
+                AND c.contract_no
+                LIKE CONCAT('%', #{condition.contractNo}, '%')
+            </if>
+
+            <if test="condition.stage != null
+                      and condition.stage != ''">
+                AND sh.payment_stage = #{condition.stage}
+            </if>
+
+            <if test="condition.regime != null">
+                AND sh.schedule_regime = #{condition.regime}
+            </if>
+
+            <if test="condition.purpose != null
+                      and condition.purpose != ''">
+                AND sh.schedule_purpose = #{condition.purpose}
+            </if>
+
+            <if test="condition.status != null
+                      and condition.status != ''">
+                AND sh.status = #{condition.status}
+            </if>
+        </where>
+        GROUP BY
+            sh.schedule_header_id,
+            c.contract_no,
+            pv.policy_code,
+            pv.version_no
+        ORDER BY sh.schedule_header_id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <!-- 검색 조건에 해당하는 스케줄 헤더의 전체 건수를 조회한다. -->
+    <select id="countByCondition"
+            resultType="long">
+        SELECT
+            COUNT(*)
+        FROM
+            schedule_header sh
+        JOIN
+            insurance_contract c
+                ON c.contract_id = sh.contract_id
+        <where>
+            <if test="condition.contractNo != null
+                      and condition.contractNo != ''">
+                AND c.contract_no
+                LIKE CONCAT('%', #{condition.contractNo}, '%')
+            </if>
+
+            <if test="condition.stage != null
+                      and condition.stage != ''">
+                AND sh.payment_stage = #{condition.stage}
+            </if>
+
+            <if test="condition.regime != null">
+                AND sh.schedule_regime = #{condition.regime}
+            </if>
+
+            <if test="condition.purpose != null
+                      and condition.purpose != ''">
+                AND sh.schedule_purpose = #{condition.purpose}
+            </if>
+
+            <if test="condition.status != null
+                      and condition.status != ''">
+                AND sh.status = #{condition.status}
+            </if>
+        </where>
+    </select>
+
+
+    <!-- 상세 응답: 헤더 한 건과 스케줄 라인 목록을 매핑한다. -->
+    <resultMap id="scheduleDetailResultMap"
+               type="com.susukkang.fgc.schedule.dto.ScheduleDetailResponse">
+
+        <!-- 스케줄 헤더 한 건 -->
+        <association property="header"
+                     javaType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
+            <id property="scheduleHeaderId" column="schedule_header_id"/>
+            <result property="contractNo" column="contract_no"/>
+            <result property="paymentStage" column="payment_stage"/>
+            <result property="scheduleRegime" column="schedule_regime"/>
+            <result property="schedulePurpose" column="schedule_purpose"/>
+            <result property="scheduleVersionNo" column="schedule_version_no"/>
+            <result property="status" column="header_status"/>
+            <result property="activeYn" column="active_yn"/>
+            <result property="lineCount" column="line_count"/>
+            <result property="expectedTotal" column="expected_total"/>
+            <result property="policyVersionLabel" column="policy_version_label"/>
+            <result property="generationReason" column="generation_reason"/>
+            <result property="generatedAt" column="generated_at"/>
+        </association>
+
+        <collection property="schedules"
+                    ofType="com.susukkang.fgc.schedule.dto.ScheduleLineResponse">
+            <id property="lineNo" column="line_no"/>
+            <result property="installmentNo" column="installment_no"/>
+            <result property="contractMonthNo" column="contract_month_no"/>
+            <result property="dueDate" column="due_date"/>
+            <result property="commissionItemName" column="commission_item_name"/>
+            <result property="recipientName" column="recipient_name"/>
+            <result property="basisCode" column="basis_code"/>
+            <result property="basisAmount" column="basis_amount"/>
+            <result property="calculationType" column="calculation_type"/>
+            <result property="ratePct" column="rate_pct"/>
+            <result property="expectedAmount" column="expected_amount"/>
+            <result property="status" column="line_status"/>
+            <result property="ruleRef" column="source_commission_rule_id"/>
+        </collection>
+    </resultMap>
+
+
+    <!-- 스케줄 헤더 ID를 통해 스케줄 헤더 및 라인 N개를 가져온다. -->
+    <select id="selectScheduleDetailById" resultMap="scheduleDetailResultMap">
+        SELECT
+            -- 헤더 컬럼
+            sh.schedule_header_id,
+            c.contract_no,
+            sh.payment_stage,
+            sh.schedule_regime,
+            sh.schedule_purpose,
+            sh.schedule_version_no,
+            sh.status AS header_status,
+            sh.active_yn,
+            sh.generation_reason,
+            sh.generated_at,
+            COUNT(sl.schedule_line_id) OVER (PARTITION BY sh.schedule_header_id) AS line_count,
+            COALESCE(SUM(sl.expected_amount) OVER (PARTITION BY sh.schedule_header_id),0) AS expected_total,
+            CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label,
+            -- 라인 컬럼
+            sl.line_no,
+            sl.installment_no,
+            sl.contract_month_no,
+            sl.due_date,
+            ci.item_name AS commission_item_name,
+            a.agent_name AS recipient_name,
+            sl.basis_code,
+            sl.basis_amount,
+            sl.calculation_type,
+            sl.rate_pct,
+            sl.expected_amount,
+            sl.line_status,
+            sl.source_commission_rule_id
+        -- 필요한 JOIN 컬럼들
+        FROM schedule_header sh
+             JOIN insurance_contract c
+                  ON c.contract_id = sh.contract_id
+             JOIN policy_version pv
+                  ON pv.policy_version_id = sh.policy_version_id
+             LEFT JOIN schedule_line sl
+                   ON sl.schedule_header_id = sh.schedule_header_id
+             LEFT JOIN agent a
+                   ON a.agent_id = sl.beneficiary_agent_id
+             LEFT JOIN commission_item ci
+                   ON ci.commission_item_id = sl.commission_item_id
+        WHERE sh.schedule_header_id = #{scheduleHeaderId}
+        ORDER BY sl.line_no
+    </select>
+
+    <!-- 예상 스케줄 헤더를 저장한다. -->
+    <insert id="insertScheduleHeader"
+            parameterType="com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO"
+            useGeneratedKeys="true"
+            keyProperty="scheduleHeaderId"
+            keyColumn="schedule_header_id">
+
+        INSERT INTO fgc.schedule_header
+        (
+            contract_id,
+            payment_stage,
+            policy_version_id,
+            schedule_version_no,
+            schedule_purpose,
+            scenario_code,
+            schedule_regime,
+            status,
+            active_yn,
+            generation_reason,
+            regenerated_from_id
+        )
+        VALUES
+            (
+                #{contractId},
+                #{paymentStage},
+                #{policyVersionId},
+                #{scheduleVersionNo},
+                #{schedulePurpose},
+                #{scenarioCode},
+                #{scheduleRegime},
+                #{status},
+                #{activeYn},
+                #{generationReason},
+                #{regeneratedFromId}
+            )
+    </insert>
+
+    <!-- 스케줄 라인 목록을 schedule_line에 일괄 삽입한다. -->
+    <insert id="insertAllScheduleLines">
+        INSERT INTO fgc.schedule_line
+        (
+        schedule_header_id,
+        line_no,
+        installment_no,
+        contract_month_no,
+        due_date,
+        commission_item_id,
+        beneficiary_agent_id,
+        basis_code,
+        basis_amount,
+        calculation_type,
+        rate_pct,
+        fixed_amount,
+        expected_amount,
+        rounding_scale,
+        rounding_mode,
+        payment_condition_code,
+        line_status,
+        source_commission_rule_id
+        )
+        VALUES
+        <foreach collection="lines"
+                 item="line"
+                 separator=",">
+            (
+                #{line.scheduleHeaderId},
+                #{line.lineNo},
+                #{line.installmentNo},
+                #{line.contractMonthNo},
+                #{line.dueDate},
+                #{line.commissionItemId},
+                #{line.beneficiaryAgentId},
+                #{line.basisCode},
+                #{line.basisAmount},
+                #{line.calculationType},
+                #{line.ratePct},
+                #{line.fixedAmount},
+                #{line.expectedAmount},
+                #{line.roundingScale},
+                #{line.roundingMode},
+                #{line.paymentConditionCode},
+                #{line.lineStatus},
+                #{line.sourceCommissionRuleId}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 정책 없음·중복으로 생성하지 못한 지급단계를 공통 예외 큐에 검토 대상으로 등록한다. -->
+    <insert id="upsertPolicyReviewCase">
+        INSERT INTO fgc.exception_case
+        (
+            exception_key,
+            exception_type,
+            severity,
+            status,
+            contract_id,
+            source_entity_type,
+            source_entity_id,
+            title,
+            description
+        )
+        VALUES
+        (
+            CONCAT(
+                'SCHEDULE_POLICY:',
+                #{contractId},
+                ':',
+                #{paymentStage},
+                ':',
+                #{exceptionType}
+            ),
+            #{exceptionType},
+            'HIGH',
+            'NEW',
+            #{contractId},
+            'INSURANCE_CONTRACT',
+            CAST(#{contractId} AS varchar),
+            #{title},
+            #{description}
+        )
+        ON CONFLICT (exception_key)
+        DO UPDATE SET
+            status = 'NEW',
+            title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            resolved_at = NULL,
+            updated_at = clock_timestamp()
+    </insert>
+
+    <!-- 같은 계약의 동시 스케줄 생성을 직렬화한다. -->
+    <select id="lockContractForScheduleGeneration" resultType="long">
+        SELECT contract_id
+        FROM fgc.insurance_contract
+        WHERE contract_id = #{contractId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectActiveOperationalPolicyVersionId" resultType="long">
+        SELECT policy_version_id
+        FROM fgc.schedule_header
+        WHERE contract_id = #{contractId}
+          AND payment_stage = #{paymentStage}
+          AND schedule_purpose = 'OPERATIONAL'
+          AND active_yn = TRUE
+    </select>
+
+    <select id="selectNextScheduleVersionNo" resultType="int">
+        SELECT COALESCE(MAX(schedule_version_no), 0) + 1
+        FROM fgc.schedule_header
+        WHERE contract_id = #{contractId}
+          AND payment_stage = #{paymentStage}
+          AND schedule_purpose = 'OPERATIONAL'
+    </select>
+
+    <update id="deactivateActiveOperationalSchedule">
+        UPDATE fgc.schedule_header
+        SET active_yn = FALSE
+        WHERE contract_id = #{contractId}
+          AND payment_stage = #{paymentStage}
+          AND schedule_purpose = 'OPERATIONAL'
+          AND active_yn = TRUE
+    </update>
+
+    <!-- 계약 ID를 기준으로 활성 운영 스케줄 헤더 목록을 조회한다. -->
+    <select id="selectByContractIdAndPaymentStage"
+            resultMap="scheduleDetailResultMap">
+        SELECT
+            sh.schedule_header_id,
+            c.contract_no,
+            sh.payment_stage,
+            sh.schedule_regime,
+            sh.schedule_purpose,
+            sh.schedule_version_no,
+            sh.status AS header_status,
+            sh.active_yn,
+            sh.generation_reason,
+            sh.generated_at,
+            COUNT(sl.schedule_line_id) OVER (PARTITION BY sh.schedule_header_id) AS line_count,
+            COALESCE(SUM(sl.expected_amount) OVER (PARTITION BY sh.schedule_header_id), 0) AS expected_total,
+            CONCAT(
+                    pv.policy_code,
+                    ' v',
+                    pv.version_no
+            ) AS policy_version_label,
+            sl.line_no,
+            sl.installment_no,
+            sl.contract_month_no,
+            sl.due_date,
+            ci.item_name AS commission_item_name,
+            a.agent_name AS recipient_name,
+            sl.basis_code,
+            sl.basis_amount,
+            sl.calculation_type,
+            sl.rate_pct,
+            sl.expected_amount,
+            sl.line_status,
+            sl.source_commission_rule_id
+        FROM fgc.schedule_header sh
+                 JOIN fgc.insurance_contract c
+                      ON c.contract_id = sh.contract_id
+                 JOIN fgc.policy_version pv
+                      ON pv.policy_version_id = sh.policy_version_id
+                 LEFT JOIN fgc.schedule_line sl
+                           ON sl.schedule_header_id = sh.schedule_header_id
+                 LEFT JOIN fgc.agent a
+                           ON a.agent_id = sl.beneficiary_agent_id
+                 LEFT JOIN fgc.commission_item ci
+                           ON ci.commission_item_id = sl.commission_item_id
+        WHERE sh.contract_id = #{contractId}
+          AND sh.payment_stage = #{paymentStage}
+          AND sh.schedule_purpose = 'OPERATIONAL'
+          AND sh.active_yn = TRUE
+        ORDER BY sl.line_no
+    </select>
+</mapper>
