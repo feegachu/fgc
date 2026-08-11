@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.validation.batch.contract.ValidationRunCompletionGate;
 import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
@@ -30,10 +31,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 @RequiredArgsConstructor
 public class MonthlyValidationJobConfig {
 
-    // Tasklet 안에서 실제 업무 로직을 부를 때 필요한 서비스 2개
+    // Tasklet 안에서 실제 업무 로직을 부를 때 필요한 서비스들. validationRunCompletionGate는
+    // #75부터 추가 — 스프링이 NoOpValidationRunCompletionGate(@Component)를 자동으로 주입해
+    // 준다. 원장 대사·예외 생성 도메인이 실제 구현되면 그 구현체를 @Primary로 등록해
+    // 이 필드에 자동으로 바뀌어 들어오게 하는 것이 의도된 확장 방법이다.
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
+    private final ValidationRunCompletionGate validationRunCompletionGate;
 
     @Bean
     public Job monthlyValidationJob(JobRepository jobRepository,
@@ -48,7 +53,8 @@ public class MonthlyValidationJobConfig {
                                      Step exceptionGenerationStep) {
         return new JobBuilder("MonthlyValidationJob", jobRepository)
                 .validator(new MonthlyValidationJobParametersValidator())
-                .listener(new MonthlyValidationJobExecutionListener(validationRunBatchLifecycleService))
+                .listener(new MonthlyValidationJobExecutionListener(
+                        validationRunBatchLifecycleService, validationRunCompletionGate))
                 .start(createRunStep)
                 .next(selectTargetStep)
                 .next(regenerateScheduleStep)
