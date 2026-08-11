@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.cap.mapper.CapIncludedAmountMapper">
+
+    <!-- 지급 확정 직전 기존 확정액과 현재 지급 건의 초년도 산입액을 계약·설계사별로 합산한다. -->
+    <select id="sumIncludedAmountByContractAndAgent" resultType="com.susukkang.fgc.cap.dto.CapIncludedAmountSummary">
+        SELECT ta.contract_id,
+               ta.agent_id,
+               ct.payment_stage,
+               COALESCE(SUM(ta.attributed_amount), 0) AS included_amount
+          FROM transaction_attribution ta
+          JOIN commission_transaction ct
+            ON ct.commission_transaction_id = ta.commission_transaction_id
+          JOIN insurance_contract c
+            ON c.contract_id = ta.contract_id
+         WHERE ta.contract_id = #{contractId}
+           AND ct.payment_stage = #{paymentStage}
+           AND ta.inclusion_status_snapshot = 'INCLUDED'
+           AND ta.attribution_month >= date_trunc('month', c.contract_date)
+           AND ta.attribution_month <![CDATA[ < ]]> date_trunc('month', c.contract_date) + INTERVAL '12 months'
+           AND (ct.status = 'CONFIRMED' OR ct.commission_transaction_id = #{transactionId})
+         GROUP BY ta.contract_id, ta.agent_id, ct.payment_stage
+    </select>
+
+    <!-- 월 검증 시 초년도에 귀속된 확정 지급 건의 산입액을 계약·설계사별로 재합산한다. -->
+    <select id="sumConfirmedIncludedAmountByContractAndAgent" resultType="com.susukkang.fgc.cap.dto.CapIncludedAmountSummary">
+        SELECT ta.contract_id,
+               ta.agent_id,
+               ct.payment_stage,
+               COALESCE(SUM(ta.attributed_amount), 0) AS included_amount
+          FROM transaction_attribution ta
+          JOIN commission_transaction ct
+            ON ct.commission_transaction_id = ta.commission_transaction_id
+          JOIN insurance_contract c
+            ON c.contract_id = ta.contract_id
+         WHERE ta.contract_id = #{contractId}
+           AND ct.payment_stage = #{paymentStage}
+           AND ta.inclusion_status_snapshot = 'INCLUDED'
+           AND ta.attribution_month >= date_trunc('month', c.contract_date)
+           AND ta.attribution_month <![CDATA[ < ]]> date_trunc('month', c.contract_date) + INTERVAL '12 months'
+           AND ct.status = 'CONFIRMED'
+         GROUP BY ta.contract_id, ta.agent_id, ct.payment_stage
+    </select>
+
+</mapper>
