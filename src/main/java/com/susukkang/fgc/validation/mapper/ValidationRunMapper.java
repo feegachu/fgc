@@ -44,22 +44,7 @@ public interface ValidationRunMapper {
                                @Param("newStatus") String newStatus);
 
     /**
-     * FGC-FUN-041 목록 조회(#41). month/status 는 둘 다 선택조건 — null이면 그 조건을 걸지 않는다.
-     * ValidationRunMapper.xml에 이 id로 &lt;select&gt;를 작성해야 한다. CapCheckMapper.xml의
-     * searchWhere/search를 그대로 참고하면 된다:
-     *   - FROM fgc.validation_run vr
-     *   - LEFT JOIN fgc.app_user triggered ON triggered.user_id = vr.triggered_by
-     *   - LEFT JOIN fgc.app_user finalized ON finalized.user_id = vr.finalized_by
-     *     (DashboardMapper.xml의 findRecentValidationRuns와 동일한 조인 — login_id를
-     *     triggeredBy/finalizedBy로 별칭)
-     *   - month가 있으면 WHERE vr.validation_month = #{month} (date_trunc 불필요 —
-     *     validation_month 자체가 그 달 1일로 저장되는 컬럼이라 CapCheck의 as_of_date 유도와 다름)
-     *   - status가 있으면 AND vr.status = #{status}
-     *   - ORDER BY vr.validation_month DESC, vr.run_no DESC (최근 검증월·회차 우선 —
-     *     RecentValidationRunRow가 vr.created_at DESC로 정렬하는 것과는 다른 정렬 기준이니 주의)
-     *   - LIMIT #{limit} OFFSET #{offset}
-     * resultType은 ValidationRunListRow — 컬럼 별칭을 그 필드명과 정확히 맞춰야 한다
-     * (map-underscore-to-camel-case 미설정 상태).
+     * FGC-FUN-041 목록 조회
      */
     List<ValidationRunListRow> search(@Param("month") LocalDate month,
                                        @Param("status") String status,
@@ -67,11 +52,40 @@ public interface ValidationRunMapper {
                                        @Param("limit") int limit);
 
     /**
-     * search와 같은 조건(month/status)의 전체 건수 — 페이징 totalElements 계산용.
-     * ValidationRunMapper.xml에 search와 WHERE 절을 공유하는 &lt;sql id="searchWhere"&gt;를 두고
-     * 두 &lt;select&gt;가 &lt;include&gt;로 재사용하면 두 쿼리의 조건이 어긋날 일이 없다
-     * (CapCheckMapper.xml의 searchWhere 참고).
+     * search와 같은 조건(month/status)의 전체 건수 — 페이징 totalElements 계산용
      */
     long count(@Param("month") LocalDate month,
                @Param("status") String status);
+
+    /**
+     * 배치 진행 기록 1/4: CREATED → RUNNING 전이와 동시에 current_step을 1로, started_at을 now()로 채움
+     *
+     * @return 반영된 행 수. 0이면 실행 미존재이거나 이미 CREATED가 아님.
+     */
+    int transitionToRunning(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * 배치 진행 기록 2/4: RUNNING 상태에서 current_step만 전진(②~⑧)
+     *
+     * @return 반영된 행 수. 0이면 그 사이 상태가 RUNNING이 아니게 됐다는 뜻(동시 실행 등).
+     */
+    int updateCurrentStep(@Param("validationRunId") Long validationRunId,
+                           @Param("currentStep") int currentStep);
+
+    /**
+     * 배치 진행 기록 3/4: 8단계(예외생성)까지 전부 성공한 뒤 RUNNING → COMPLETED로 전이
+     *
+     * @return 반영된 행 수. 0이면 그 사이 상태가 RUNNING이 아니게 됨.
+     */
+    int transitionToCompleted(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * 배치 진행 기록 4/4: 임의의 Step이 실패하면 RUNNING → FAILED로 전이하면서 실패한
+     * Step 번호를 current_step에, 실패 사유를 failure_message에 남김
+     *
+     * @return 반영된 행 수. 0이면 그 사이 상태가 RUNNING이 아니게 됨.
+     */
+    int transitionToFailed(@Param("validationRunId") Long validationRunId,
+                            @Param("currentStep") int currentStep,
+                            @Param("failureMessage") String failureMessage);
 }
