@@ -17,10 +17,4 @@ public class AuthViewController {
     public String loginPage() {
         return "auth/login";
     }
-
-    // ponytail: "/"는 로그인 성공 후 임시 착지 페이지. DASH-W01(FUN-057) 만들 때 DashboardController로 옮길 것
-    @GetMapping("/")
-    public String home() {
-        return "home";
-    }
 }

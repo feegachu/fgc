@@ -94,6 +94,53 @@ class CapCheckServiceImplTest {
         verify(capCheckMapper).insertCapCheckDetails(argThatDetailListHasCapCheckId(999L));
     }
 
+    // insertCapCheck가 ON CONFLICT DO UPDATE로 기존 행을 재사용할 수 있게 되면서(코드리뷰 반영,
+    // 2026-08-11 — 같은 실행 안에서의 재계산·재시도 시 uq_cap_check_monthly UNIQUE 위반 방지),
+    // insertCapCheckDetails가 (cap_check_id, detail_seq) upsert이므로, 이번 계산이 채운 만큼만
+    // 남기고 그보다 뒷자리(예전엔 있었지만 이번엔 없어진 detail)를 pruneCapCheckDetails로
+    // 잘라내야 한다("지웠다 다시 넣기" 대신 꼬리 정리, §7-6 공통규칙 1 — 코드리뷰 반영).
+    @Test
+    void calculateAndSavePrunesExcessDetailsAfterUpsertingNewOnes() {
+        CapCheckDetailLine detail = new CapCheckDetailLine(
+                1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null);
+        CapCalculationResult result = sampleResult(List.of(detail));
+
+        CapCalculationCommand command = CapCalculationCommand.realtime(1L, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
+        when(capCalculator.calculate(command)).thenReturn(result);
+        doAnswer(invocation -> {
+            CapCheckInsertRow row = invocation.getArgument(0);
+            row.setCapCheckId(999L);
+            return null;
+        }).when(capCheckMapper).insertCapCheck(any());
+
+        capCheckService.calculateAndSave(command);
+
+        verify(capCheckMapper).pruneCapCheckDetails(999L, 1);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(capCheckMapper);
+        order.verify(capCheckMapper).insertCapCheck(any());
+        order.verify(capCheckMapper).pruneCapCheckDetails(999L, 1);
+        order.verify(capCheckMapper).insertCapCheckDetails(any());
+    }
+
+    // 재계산 결과 항목이 하나도 없으면(maxDetailSeq=0) 예전 detail 전부가 잘려나가야 한다.
+    @Test
+    void calculateAndSavePrunesAllDetailsWhenNewResultHasNone() {
+        CapCalculationResult result = sampleResult(List.of());
+
+        CapCalculationCommand command = CapCalculationCommand.realtime(1L, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
+        when(capCalculator.calculate(command)).thenReturn(result);
+        doAnswer(invocation -> {
+            CapCheckInsertRow row = invocation.getArgument(0);
+            row.setCapCheckId(999L);
+            return null;
+        }).when(capCheckMapper).insertCapCheck(any());
+
+        capCheckService.calculateAndSave(command);
+
+        verify(capCheckMapper).pruneCapCheckDetails(999L, 0);
+        verify(capCheckMapper, org.mockito.Mockito.never()).insertCapCheckDetails(any());
+    }
+
     // item_code/item_name/contract_month_no는 계산 당시 값을 cap_check_detail에 그대로 스냅샷해야
     // 한다 — commission_item/schedule_line이 나중에 바뀌어도 과거 판정 근거가 그때 값으로 남게 하려면
     // INSERT 시점에 빠짐없이 넘어가야 한다 (PR #2 코드리뷰 지적)
