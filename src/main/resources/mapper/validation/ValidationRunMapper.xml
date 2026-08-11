@@ -153,4 +153,26 @@
            AND current_step &lt;= #{currentStep}
     </update>
 
+    <select id="findManualContractRunCreatedBetween" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
+        SELECT validation_run_id AS validationRunId,
+               validation_month  AS validationMonth,
+               run_no            AS runNo,
+               run_type          AS runType,
+               status,
+               current_step      AS currentStep,
+               started_at        AS startedAt,
+               completed_at      AS completedAt,
+               finalized_at      AS finalizedAt,
+               triggered_by      AS triggeredBy,
+               finalized_by      AS finalizedBy,
+               failure_message   AS failureMessage,
+               created_at        AS createdAt
+          FROM fgc.validation_run
+         WHERE run_type = 'MANUAL_CONTRACT'
+           AND created_at >= #{dayStart}
+           AND created_at &lt;  #{dayEnd}
+         ORDER BY run_no DESC
+         LIMIT 1
+    </select>
+
 </mapper>

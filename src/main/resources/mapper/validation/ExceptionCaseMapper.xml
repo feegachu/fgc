@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.validation.mapper.ExceptionCaseMapper">
+
+    <!-- severity는 항상 WARNING으로 둔다 — 데이터 품질 문제는 그 계약 하나의 검증만 못
+         돌린 것이지, CRITICAL(치명)로 볼 만큼 전체 실행을 위협하지 않는다. -->
+    <insert id="insertDataQualityCase">
+        INSERT INTO fgc.exception_case
+            (exception_key, exception_type, severity, status,
+             validation_run_id, contract_id, source_entity_type, source_entity_id,
+             title, description)
+        VALUES
+            (CONCAT('DATA_QUALITY:', #{validationRunId}, ':INSURANCE_CONTRACT:', #{contractId}),
+             'DATA_QUALITY', 'WARNING', 'NEW',
+             #{validationRunId}, #{contractId}, 'INSURANCE_CONTRACT', CAST(#{contractId} AS varchar),
+             #{title}, #{description})
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
+</mapper>

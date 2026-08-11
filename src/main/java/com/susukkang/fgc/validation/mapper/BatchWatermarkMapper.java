@@ -1,0 +1,29 @@
+package com.susukkang.fgc.validation.mapper;
+
+import com.susukkang.fgc.validation.dto.BatchWatermarkRow;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.time.OffsetDateTime;
+
+/**
+ * fgc.batch_watermark 전용 매퍼. "여기까지는 처리했다"는 기준선을 읽고, Step이 성공한 뒤에만 전진시킴
+ */
+@Mapper
+public interface BatchWatermarkMapper {
+
+    /** job_name으로 현재 워터마크 1행을 조회한다. 시드가 이미 넣어 뒀으므로 정상 흐름에선 항상 있다. */
+    BatchWatermarkRow findByJobName(@Param("jobName") String jobName);
+
+    /**
+     * Step이 성공했을 때만 부른다. lastProcessedAt/lastRunId/lastSuccessAt을 새 값으로 덮어쓰고,
+     * processedCount는 이번에 처리한 건수만큼 더함(누적)
+     *
+     * @return 반영된 행 수. 정상 흐름에서는 항상 1(시드 행이 있으므로) — 0이면 job_name 오타 등
+     *         배선 문제를 의심해야 한다.
+     */
+    int advance(@Param("jobName") String jobName,
+                @Param("lastProcessedAt") OffsetDateTime lastProcessedAt,
+                @Param("lastRunId") Long lastRunId,
+                @Param("processedCountDelta") long processedCountDelta);
+}

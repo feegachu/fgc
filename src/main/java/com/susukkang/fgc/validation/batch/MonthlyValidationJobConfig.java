@@ -115,6 +115,8 @@ public class MonthlyValidationJobConfig {
                 .build();
     }
 
+    // 차익거래 검증·원장 불균형 재검사에 대응하는 실제 서비스 구현체가 코드베이스에
+    // 아직 없으므로..
     @Bean
     public Step arbitrageCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("arbitrageCheckStep", jobRepository)
