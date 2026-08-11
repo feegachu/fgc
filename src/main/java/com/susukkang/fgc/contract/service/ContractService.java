@@ -10,6 +10,8 @@ import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.schedule.service.ScheduleService;
+import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,7 @@ public class ContractService {
 
     private final ContractMapper contractMapper;
     private final CapCheckService capCheckService;
+    private final ScheduleService scheduleService;
     /**
      * 설명 : 검색 조건에 따라 계약을 조회한다.
      * 검색 조건과 현재 페이지 , 최대 계약수를 받아
@@ -137,11 +140,10 @@ public class ContractService {
             );
         }
 
-        /*
-         * TODO(FUN-036)
-         * 계약 저장 후 보험회사 → GA, GA → FC 양방향 예상 지급 스케줄을 생성하고
-         * 생성된 scheduleHeaderId 목록을 응답에 포함한다.
-         */
+        // FUN-036: 계약 저장과 같은 트랜잭션에서 양방향 예상 스케줄을 생성한다.
+        // 정책 없음·중복 지급단계는 exception_case 검토 큐에 등록되고 생성에서 제외된다.
+        ScheduleGenerationResult scheduleResult =
+                scheduleService.generateSchedules(insuranceContract);
 
         /*
          * TODO(FUN-030, REG-08~11)
@@ -157,6 +159,7 @@ public class ContractService {
 
         return ContractResponse.builder()
                 .contractId(insuranceContract.getContractId())
+                .scheduleHeaderIds(scheduleResult.scheduleHeaderIds())
                 .build();
     }
 
@@ -423,8 +426,7 @@ public class ContractService {
                 .dataOrigin(currentContract.getDataOrigin()) // 데이터 출처
                 .build();
 
-        int updatedRows =
-                contractMapper.updateContract(updatedContract);
+        int updatedRows = contractMapper.updateContract(updatedContract);
 
         if (updatedRows != 1) {
             throw new FgcBusinessException(

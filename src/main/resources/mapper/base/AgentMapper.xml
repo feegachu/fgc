@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.base.mapper.AgentMapper">
+    <!-- 조직 계층 및 직급별 설계사 조회 SQL -->
+    <select id="findActiveAgentIdFromOrganizationHierarchy"
+            resultType="long">
+
+        WITH RECURSIVE organization_hierarchy AS (
+            -- 계약 소속 조직에서 탐색을 시작한다.
+            SELECT o.organization_id,
+                   o.parent_id,
+                   0 AS hierarchy_depth
+            FROM fgc.organization o
+            WHERE o.organization_id = #{organizationId}
+
+            UNION ALL
+
+            -- 최상위 조직까지 상위 조직을 순서대로 탐색한다.
+            SELECT parent.organization_id,
+                   parent.parent_id,
+                   child.hierarchy_depth + 1
+            FROM fgc.organization parent
+                     JOIN organization_hierarchy child
+                          ON parent.organization_id = child.parent_id)
+
+        SELECT
+            a.agent_id
+        FROM organization_hierarchy oh
+                 JOIN fgc.agent a
+                      ON a.organization_id = oh.organization_id
+        WHERE a.rank_code = #{rankCode}
+          AND a.agent_status = 'ACTIVE'
+          AND a.active_yn = TRUE
+          AND a.appointment_date <![CDATA[ <= ]]> #{asOf}
+          AND (
+            a.termination_date IS NULL
+                OR a.termination_date <![CDATA[ >= ]]> #{asOf}
+            )
+        ORDER BY
+            oh.hierarchy_depth ASC,
+            a.agent_id ASC
+            LIMIT 1
+    </select>
+
+</mapper>
