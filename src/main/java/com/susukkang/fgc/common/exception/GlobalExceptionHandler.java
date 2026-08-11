@@ -18,6 +18,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 
@@ -188,6 +189,41 @@ public class GlobalExceptionHandler {
                 errorCode,
                 null,
                 Map.of(),
+                productionDetail(exception.getMessage())
+        );
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.failure(apiError));
+    }
+
+    /**
+    * @author 이예소
+    * @since 2026-08-10
+    *
+     * 연결된 화면도 정적 파일도 없는 경로 요청을 처리한다.
+     * 기존 코드: NoResourceFoundException에 대한 별도 처리가 없었다.
+     * 문제: 아직 만들지 않은 화면 경로(/cap-checks 등)를 클릭하면
+     *       일반 예외 처리기로 넘어가 HTTP 404 대신 HTTP 500으로 응답했다.
+     * 개선: NoResourceFoundException을 별도로 처리하여
+     *       HTTP 404와 FGC-COMMON-004 오류 응답을 반환한다.
+    */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(
+            NoResourceFoundException exception
+    ) {
+        FgcErrorCode errorCode = FgcErrorCode.COMMON_004;
+
+        log.warn(
+                "[{}] No handler or static resource: {}",
+                RequestIdContext.current(),
+                exception.getResourcePath()
+        );
+
+        ApiError apiError = createApiError(
+                errorCode,
+                null,
+                Map.of("id", exception.getResourcePath()),
                 productionDetail(exception.getMessage())
         );
 
