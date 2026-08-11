@@ -3,26 +3,8 @@
 <mapper namespace="com.susukkang.fgc.cap.mapper.CapCheckMapper">
 
     <!--
-      cap_check/cap_check_detail은 FINALIZED된 validation_run 밑에서만 진짜 append-only다
-      (trg_cap_check_immutable → guard_finalized_validation_result가 FINALIZED에만 UPDATE/DELETE를
-      막는다, V1__baseline_v2_1_2.sql:1570-1600). FINALIZED 이전(RUNNING 등)에는 DB가 UPDATE를
-      허용한다.
-
-      그런데 uq_cap_check_monthly UNIQUE(validation_run_id, contract_id, payment_stage)와 맞물리면
-      "같은 실행을 재시도"할 때 문제가 생긴다 — 이 배치(#76 DailyChangedContractJob)는 FAILED된
-      validation_run을 새로 만들지 않고 RUNNING으로 되돌려 재사용하는데(CreateDailyRunTasklet),
-      매 launch마다 requestId가 달라 Spring Batch가 새 JobInstance로 취급해 체크포인트 이어읽기가
-      안 된다 — 그래서 재시도가 처음부터 다시 훑으며 이미 성공 저장된 (run, contract, stage)를
-      또 INSERT하려다 UNIQUE 위반으로 죽고, watermark도 전진 안 해서 다음 재시도도 똑같이
-      반복 실패한다(코드리뷰로 발견, 2026-08-11).
-
-      그래서 순수 INSERT 대신 ON CONFLICT ... DO UPDATE로 바꾼다. §7-6 공통규칙 1
-      "모든 Writer는 UPSERT 또는 ON CONFLICT DO NOTHING"과도 맞는 방향이고, REALTIME 호출
-      (validationRunId=null)은 NULL끼리 유니크 충돌이 안 나므로 이 변경에 전혀 영향받지 않는다
-      — MONTHLY/PRE_CONFIRM/일일배치 전부에서 "같은 실행 안에서 같은 계약·단계를 다시 계산하면
-      최신 계산으로 덮어쓴다"는 일관된 의미가 된다.
-      useGeneratedKeys로 IDENTITY PK를 돌려받는다 — INSERT든 ON CONFLICT DO UPDATE든 영향받은
-      행의 cap_check_id가 그대로 돌아온다.
+      순수 INSERT 대신 ON CONFLICT ... DO UPDATE로 바꿈
+      useGeneratedKeys로 IDENTITY PK를 돌려받는다 — 영향받은 행의 cap_check_id가 그대로 돌아옴
     -->
     <insert id="insertCapCheck" useGeneratedKeys="true" keyProperty="capCheckId" keyColumn="cap_check_id">
         INSERT INTO fgc.cap_check (

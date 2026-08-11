@@ -67,6 +67,19 @@
         )
     </select>
 
+    <!-- uq_validation_run_active_manual_contract(V8)의 애플리케이션측 사전 확인.
+         DB 제약이 최후 방어선이라면, 이건 그 앞에서 더 친절한 FgcErrorCode(VRUN_001)로
+         걸러내는 역할 — existsActiveMonthlyRun과 같은 패턴. validation_month로 좁히지 않는
+         이유는 V8 마이그레이션 주석과 동일(MANUAL_CONTRACT는 대상월 스코프가 없음). -->
+    <select id="existsActiveManualContractRun" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.validation_run
+             WHERE run_type = 'MANUAL_CONTRACT'
+               AND status IN ('CREATED', 'RUNNING')
+        )
+    </select>
+
     <!-- policySnapshotJson이 null이면 컬럼 기본값('{}'::jsonb)이 아니라 COALESCE가 대신
          '{}'를 넣는다 — INSERT 문에 컬럼을 아예 안 쓰는 것과 값으로 null을 보내는 건 다르다
          (null을 보내면 NOT NULL 제약에 걸린다)-->

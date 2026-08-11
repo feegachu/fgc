@@ -34,6 +34,12 @@ public interface ValidationRunMapper {
     boolean existsActiveMonthlyRun(@Param("validationMonth") LocalDate validationMonth);
 
     /**
+     * run_type='MANUAL_CONTRACT'이고 status가 CREATED/RUNNING인(=활성) 실행이 있는지.
+     * uq_validation_run_active_manual_contract(V8)의 애플리케이션측 사전 확인용.
+     */
+    boolean existsActiveManualContractRun();
+
+    /**
      * validation_run 1행 INSERT
      */
     void insert(ValidationRunInsertRow row);
