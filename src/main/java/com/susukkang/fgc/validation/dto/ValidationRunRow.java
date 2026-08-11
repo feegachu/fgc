@@ -17,6 +17,7 @@ public class ValidationRunRow {
     private Integer runNo;
     private String runType;
     private String status;
+    private Integer currentStep;
     private OffsetDateTime startedAt;
     private OffsetDateTime completedAt;
     private OffsetDateTime finalizedAt;
