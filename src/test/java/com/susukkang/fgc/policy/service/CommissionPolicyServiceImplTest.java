@@ -304,13 +304,25 @@ class CommissionPolicyServiceImplTest {
     }
 
     @Test
-    void prioritizesSpecificAgentRankRuleOverGeneralRuleRegardlessOfPriorityNumber() {
+    void preservesGeneralAndSpecificAgentRankRulesAsDifferentPaymentTargets() {
         ResolvedCommissionRule generalRule = validRule().toBuilder().commissionRuleId(1000L).agentRankCode(null).priorityNo(10).build();
         ResolvedCommissionRule fcRule = generalRule.toBuilder().commissionRuleId(1001L).agentRankCode(AgentRankCode.FC).priorityNo(20).build();
 
         ResolvedCommissionPolicy result = resolveRules(List.of(generalRule, fcRule));
 
-        assertThat(result.getRules()).extracting(ResolvedCommissionRule::getCommissionRuleId).containsExactly(1001L);
+        assertThat(result.getRules()).extracting(ResolvedCommissionRule::getCommissionRuleId).containsExactly(1000L, 1001L);
+    }
+
+    @Test
+    void preservesManagementRulesForEachAgentRank() {
+        ResolvedCommissionRule teamLeaderRule = validRule().toBuilder().commissionRuleId(1000L).agentRankCode(AgentRankCode.TEAM_LEADER).priorityNo(100).build();
+        ResolvedCommissionRule branchManagerRule = teamLeaderRule.toBuilder().commissionRuleId(1001L).agentRankCode(AgentRankCode.BRANCH_MANAGER).build();
+        ResolvedCommissionRule divisionHeadRule = teamLeaderRule.toBuilder().commissionRuleId(1002L).agentRankCode(AgentRankCode.DIVISION_HEAD).build();
+
+        ResolvedCommissionPolicy result = resolveRules(List.of(teamLeaderRule, branchManagerRule, divisionHeadRule));
+
+        assertThat(result.getRules()).extracting(ResolvedCommissionRule::getAgentRankCode)
+                .containsExactly(AgentRankCode.TEAM_LEADER, AgentRankCode.BRANCH_MANAGER, AgentRankCode.DIVISION_HEAD);
     }
 
     @Test
