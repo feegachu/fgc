@@ -1,5 +1,7 @@
 package com.susukkang.fgc.common.web;
 
+import com.susukkang.fgc.auth.dto.AppUserView;
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.dashboard.controller.DashboardViewController;
 import com.susukkang.fgc.dashboard.dto.DashboardKpiCounts;
@@ -41,22 +43,31 @@ class ShellMonthSessionWebTest {
     @MockitoBean
     DashboardService dashboardService;
 
-    private static com.susukkang.fgc.auth.dto.FgcUserDetails settleUser() {
-        var view = new com.susukkang.fgc.auth.dto.AppUserView();
-        view.setUserId(1L);
-        view.setLoginId("settle01");
-        view.setPasswordHash("x");
-        view.setUserName("정산담당");
-        view.setRoleCode("SETTLEMENT");
-        return new com.susukkang.fgc.auth.dto.FgcUserDetails(view, true, true);
+    private static FgcUserDetails settleUser() {
+        return userWithRole("SETTLEMENT");
     }
 
-    @Test
-    void month_param_persists_into_next_paramless_request() throws Exception {
+    private static FgcUserDetails userWithRole(String roleCode) {
+        var view = new AppUserView();
+        view.setUserId(1L);
+        view.setLoginId("tester");
+        view.setPasswordHash("x");
+        view.setUserName("테스터");
+        view.setRoleCode(roleCode);
+        return new FgcUserDetails(view, true, true);
+    }
+
+    /** 대시보드 화면은 셸까지 렌더링해야 뜬다 — 숫자는 이 테스트들의 관심사가 아니라 전부 0으로 둔다. */
+    private void stubEmptySummary() {
         given(dashboardService.summarize(any())).willAnswer(inv -> new DashboardSummaryResult(
                 (LocalDate) inv.getArgument(0),
                 new DashboardKpiCounts(0, 0, 0, 0, 0, 0),
                 List.of(), List.of()));
+    }
+
+    @Test
+    void month_param_persists_into_next_paramless_request() throws Exception {
+        stubEmptySummary();
 
         MockHttpSession session = new MockHttpSession();
 
@@ -78,13 +89,30 @@ class ShellMonthSessionWebTest {
      */
     @Test
     void month_select_reloads_with_unshadowed_url_constructor() throws Exception {
-        given(dashboardService.summarize(any())).willAnswer(inv -> new DashboardSummaryResult(
-                (LocalDate) inv.getArgument(0),
-                new DashboardKpiCounts(0, 0, 0, 0, 0, 0),
-                List.of(), List.of()));
+        stubEmptySummary();
 
         mvc.perform(get("/").with(user(settleUser())))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("new window.URL(location)")));
+    }
+
+    /**
+     * 사이드바에서 역할 제한이 문서에 명시된 화면은 AUDT-W01 하나뿐이다
+     * (화면정의서 v2.0 "권한 COMPLIANCE, SYSTEM_ADMIN"). 이 셸이 21개 화면 전체의 메뉴 기준이라
+     * 여기서 새면 나머지 화면에 그대로 전파된다.
+     */
+    @Test
+    void audit_log_menu_is_shown_only_to_compliance_and_system_admin() throws Exception {
+        stubEmptySummary();
+
+        for (String allowed : List.of("COMPLIANCE", "SYSTEM_ADMIN")) {
+            mvc.perform(get("/").with(user(userWithRole(allowed))))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("/audit-logs")));
+        }
+        for (String denied : List.of("SETTLEMENT", "GA_ADMIN")) {
+            mvc.perform(get("/").with(user(userWithRole(denied))))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(
+                            org.hamcrest.Matchers.containsString("/audit-logs"))));
+        }
     }
 
     /**

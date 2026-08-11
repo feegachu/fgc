@@ -89,6 +89,10 @@
       <div class="fgc-kpi__sub fgc-mono">vw_journal_imbalance · 기표 전 0건이어야 함</div>
     </a>
 
+    <!-- OPEN 은 exception_case.status 값이 아니라 EXCP-W01 의 묶음 필터다(= NEW + IN_REVIEW).
+         exception/list.html 상태 select 의 <option value="OPEN"> 과 같은 어휘를 쓴다.
+         EXCP-W01 이 실데이터를 붙일 때 OPEN 을 status IN ('NEW','IN_REVIEW') 로 풀어서
+         IF-API-43 에 넘겨야 한다 — 그대로 넘기면 어떤 행과도 매칭되지 않는다. -->
     <a class="fgc-kpi fgc-kpi--info" style="text-decoration:none"
        th:href="@{/exceptions(status='OPEN', month=${month})}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
