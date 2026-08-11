@@ -72,7 +72,7 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
                 lifecycleService.start(validationRunId, parameters);
             } else {
                 // 2~8 성공 = RUNNING 상태를 유지한 채 current_step만 이 Step의 번호로 전진
-                lifecycleService.advance(validationRunId, stepNo);
+                lifecycleService.advance(validationRunId, stepNo, parameters);
             }
         } else {
             // 실패 사유는 이 Step에서 던진 예외들의 메시지를 모아 남김

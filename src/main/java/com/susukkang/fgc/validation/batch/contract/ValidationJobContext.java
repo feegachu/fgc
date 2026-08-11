@@ -15,6 +15,9 @@ public record ValidationJobContext(
 ) {
     public ValidationJobContext {
         Objects.requireNonNull(validationMonth, "validationMonth는 필수입니다.");
+        if (validationMonth.getDayOfMonth() != 1) {
+            throw new IllegalArgumentException("validationMonth는 해당 월의 첫날이어야 합니다.");
+        }
         if (runNo <= 0) {
             throw new IllegalArgumentException("runNo는 1 이상이어야 합니다.");
         }
