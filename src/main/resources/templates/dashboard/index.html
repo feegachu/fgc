@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-DASH-W01 업무 대시보드
+  요구사항 FUN-057 / PER-001(응답 3초 이내) · PER-004
+  데이터  읽기 cap_check, arbitrage_check, reconciliation_result,
+              vw_journal_imbalance, exception_case, validation_run
+  라우트  GET /  (IF-API-03 과 같은 DashboardService 를 서버에서 직접 호출)
+
+  [막을 것]
+   · 대시보드에서 새 판정을 만들지 않습니다. 이미 저장된 결과를 세기만 합니다.
+   · 대시보드 숫자를 따로 테이블에 저장하지 않습니다. 매번 집계해서 읽습니다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-DASH-W01', '업무 대시보드', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <h1 class="fgc-page-title">업무 대시보드</h1>
+      <p class="fgc-page-desc">
+        오늘 사람이 봐야 할 것만 모았습니다. 카드를 누르면 해당 목록으로 이동합니다.
+        기준 정산월은 오른쪽 위에서 바꿉니다.
+      </p>
+    </div>
+    <div class="fgc-muted" style="font-size:12px" th:with="latest=${summary.recentRuns().isEmpty() ? null : summary.recentRuns()[0]}">
+      마지막 검증 실행
+      <!-- 가운뎃점(·)은 작은따옴표 문자열 안에 둔다 — layout/default.html 주석 참고 -->
+      <span class="fgc-mono" th:if="${latest}"
+            th:text="${latest.validationMonth()} + ' ' + ${latest.runNo()} + '회차 · ' + ${latest.status()}">—</span>
+      <span class="fgc-mono" th:unless="${latest}">—</span>
+    </div>
+  </div>
+
+  <!-- ② KPI 카드 6장 — 각 카드가 어느 테이블을 세는지, 누르면 어디로 가는지가 화면정의서 §5 에 정해져 있다 -->
+  <section style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(216px,1fr));gap:12px"
+           aria-label="핵심 현황 6종">
+
+    <a class="fgc-kpi fgc-kpi--danger" style="text-decoration:none"
+       th:href="@{/cap-checks(status='VIOLATION', month=${month})}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="fgc-kpi__label">1,200% 위반</span>
+        <span class="material-symbols-outlined" style="font-size:18px;color:#74777e">gavel</span>
+      </div>
+      <div class="fgc-kpi__value" th:text="${summary.capViolation()}">0<span
+              style="font-size:14px;font-weight:600;margin-left:2px">건</span></div>
+      <div class="fgc-kpi__sub fgc-mono">cap_check · result_status = VIOLATION</div>
+    </a>
+
+    <a class="fgc-kpi fgc-kpi--warning" style="text-decoration:none"
+       th:href="@{/cap-checks(status='WARNING', month=${month})}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="fgc-kpi__label">1,200% 주의 (90% 이상)</span>
+        <span class="material-symbols-outlined" style="font-size:18px;color:#74777e">speed</span>
+      </div>
+      <div class="fgc-kpi__value" th:text="${summary.capWarning()}">0</div>
+      <div class="fgc-kpi__sub fgc-mono">cap_check · result_status = WARNING</div>
+    </a>
+
+    <a class="fgc-kpi fgc-kpi--warning" style="text-decoration:none"
+       th:href="@{/arbitrage-checks(status='CANDIDATE', month=${month})}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="fgc-kpi__label">차익거래 검토대상</span>
+        <span class="material-symbols-outlined" style="font-size:18px;color:#74777e">compare_arrows</span>
+      </div>
+      <div class="fgc-kpi__value" th:text="${summary.arbitrageCandidate()}">0</div>
+      <!-- CANDIDATE 는 "위반 확정"이 아니다. 화면에 '위반'이라고 쓰지 말 것 -->
+      <div class="fgc-kpi__sub fgc-mono">arbitrage_check · CANDIDATE (위반 확정 아님)</div>
+    </a>
+
+    <a class="fgc-kpi fgc-kpi--danger" style="text-decoration:none"
+       th:href="@{/reconciliations(onlyMismatch=true, month=${month})}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="fgc-kpi__label">대사 불일치</span>
+        <span class="material-symbols-outlined" style="font-size:18px;color:#74777e">rule</span>
+      </div>
+      <div class="fgc-kpi__value" th:text="${summary.reconMismatch()}">0</div>
+      <div class="fgc-kpi__sub fgc-mono">reconciliation_result · 허용오차 0원</div>
+    </a>
+
+    <a style="text-decoration:none"
+       th:classappend="${summary.journalImbalance() == 0} ? 'fgc-kpi fgc-kpi--success' : 'fgc-kpi fgc-kpi--danger'"
+       th:href="@{/journals(imbalanceOnly=true, month=${month})}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="fgc-kpi__label">원장 불균형</span>
+        <span class="material-symbols-outlined" style="font-size:18px;color:#74777e">balance</span>
+      </div>
+      <div class="fgc-kpi__value" th:text="${summary.journalImbalance()}">0</div>
+      <div class="fgc-kpi__sub fgc-mono">vw_journal_imbalance · 기표 전 0건이어야 함</div>
+    </a>
+
+    <!-- OPEN 은 exception_case.status 값이 아니라 EXCP-W01 의 묶음 필터다(= NEW + IN_REVIEW).
+         exception/list.html 상태 select 의 <option value="OPEN"> 과 같은 어휘를 쓴다.
+         EXCP-W01 이 실데이터를 붙일 때 OPEN 을 status IN ('NEW','IN_REVIEW') 로 풀어서
+         IF-API-43 에 넘겨야 한다 — 그대로 넘기면 어떤 행과도 매칭되지 않는다. -->
+    <a class="fgc-kpi fgc-kpi--info" style="text-decoration:none"
+       th:href="@{/exceptions(status='OPEN', month=${month})}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="fgc-kpi__label">미처리 예외</span>
+        <span class="material-symbols-outlined" style="font-size:18px;color:#74777e">inbox</span>
+      </div>
+      <div class="fgc-kpi__value" th:text="${summary.openException()}">0</div>
+      <div class="fgc-kpi__sub fgc-mono">exception_case · NEW + 검토중</div>
+    </a>
+  </section>
+
+  <div style="margin-top:20px;display:grid;grid-template-columns:1.3fr 1fr;gap:16px" id="lower-grid">
+
+    <!-- ③ 최근 예외 5건 -->
+    <section class="fgc-card">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">최근 예외 5건</span>
+        <a class="fgc-btn fgc-btn--ghost" th:href="@{/exceptions}"
+           style="padding:4px 10px;font-size:12px;text-decoration:none">예외함 전체 보기</a>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table">
+          <thead>
+            <tr><th>유형</th><th>심각도</th><th>계약</th><th>내용</th><th>상태</th><th>발생</th></tr>
+          </thead>
+          <tbody>
+            <tr th:each="e : ${summary.recentExceptions()}">
+              <td><span class="fgc-badge fgc-badge--neutral" th:text="${e.exceptionType()}">-</span></td>
+              <td><span class="fgc-badge fgc-badge--neutral" th:text="${e.severity()}">-</span></td>
+              <!-- D-05·SRC-027 — 계약은 계약번호로만 식별한다. 계약자 이름 컬럼을 추가하지 말 것 -->
+              <td class="fgc-mono" th:text="${e.contractNo()}">-</td>
+              <!-- 화면정의서 DASH-W01 "③ 최근 예외 5건 목록 — 클릭하면 예외함으로 이동".
+                   <tr> 은 <a> 로 감쌀 수 없어(무효 HTML) 제목 칸을 링크로 만든다.
+                   상태 필터는 넘기지 않는다 — 이 목록은 최근 5건이라 RESOLVED 도 들어올 수 있고,
+                   status=OPEN 을 붙이면 방금 누른 그 행이 목록에서 사라진다. -->
+              <td style="max-width:280px">
+                <a th:href="@{/exceptions(contractNo=${e.contractNo()})}" th:text="${e.title()}">-</a>
+              </td>
+              <td><span class="fgc-badge fgc-badge--neutral" th:text="${e.status()}">-</span></td>
+              <td class="fgc-mono fgc-muted" style="font-size:11px"
+                  th:text="${#temporals.format(e.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
+            </tr>
+            <tr th:if="${summary.recentExceptions().isEmpty()}">
+              <td colspan="6" class="fgc-muted" style="text-align:center;padding:24px"
+                  th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ④ 최근 월 통합검증 실행 3건 -->
+    <section class="fgc-card">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">최근 월 통합검증 실행 3건</span>
+        <a class="fgc-btn fgc-btn--ghost" th:href="@{/validation-runs}"
+           style="padding:4px 10px;font-size:12px;text-decoration:none">실행 목록</a>
+      </div>
+      <div class="fgc-card__body" style="display:flex;flex-direction:column;gap:12px">
+
+        <a th:each="r : ${summary.recentRuns()}"
+           th:href="@{/validation-runs/{id}(id=${r.validationRunId()})}"
+           style="display:block;text-decoration:none;color:inherit;border:1px solid #c3c6ce;border-radius:.25rem;padding:10px 12px"
+           th:with="pct=${r.currentStep() == null ? 0 : r.currentStep() * 10},
+                    tone=${r.status() == 'FAILED' ? 'violation'
+                        : (r.status() == 'FINALIZED' ? 'review'
+                        : (r.status() == 'COMPLETED' ? 'normal' : 'warning'))}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="font-weight:700;font-size:13px"
+                  th:text="${r.validationMonth()} + ' · ' + ${r.runNo()} + '회차'">-</span>
+            <span class="fgc-badge fgc-badge--neutral" th:text="${r.status()}">-</span>
+          </div>
+          <div class="fgc-gauge" style="margin-top:8px">
+            <div class="fgc-gauge__track" style="height:6px">
+              <!-- 클래스명을 통째로 삼항식에 넣지 말 것 — Thymeleaf 는 표현식 안의 __...__ 를
+                   전처리 구문으로 해석해서 fgc-gauge__bar 가 두 번 나오면 파싱이 깨진다.
+                   접미사만 고르고(th:with tone) 여기서 붙인다. -->
+              <div class="fgc-gauge__bar" th:classappend="'fgc-gauge' + '__bar--' + ${tone}"
+                   th:style="'width:' + ${pct} + '%'"></div>
+            </div>
+          </div>
+          <div class="fgc-kpi__sub" style="margin-top:6px"
+               th:text="${r.currentStep() == null ? 0 : r.currentStep()} + '/10 단계 · 실행 ' + ${r.triggeredBy()}">-</div>
+          <div class="fgc-error" style="margin-top:6px;font-size:11px"
+               th:if="${r.failureMessage()}" th:text="${r.failureMessage()}"></div>
+          <div class="fgc-kpi__sub" style="margin-top:4px" th:if="${r.finalizedAt()}"
+               th:text="'확정 ' + ${#temporals.format(r.finalizedAt(), 'yyyy-MM-dd HH:mm')} + ' · ' + ${r.finalizedBy()}"></div>
+        </a>
+
+        <p class="fgc-muted" style="text-align:center;padding:24px;margin:0"
+           th:if="${summary.recentRuns().isEmpty()}" th:text="#{info.common.empty}">
+          조건에 맞는 자료가 없습니다.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <!-- 안내 -->
+  <div class="fgc-banner fgc-banner--muted" style="margin-top:16px">
+    <span class="material-symbols-outlined" style="font-size:18px">info</span>
+    <span>
+      이 화면의 숫자는 <strong>이미 저장된 검증 결과를 세기만</strong> 한 것입니다.
+      여기서 판정을 새로 만들거나 바꾸지 않습니다. 판정을 다시 하려면
+      <a th:href="@{/validation-runs}">월 통합검증</a>을 실행하세요.
+    </span>
+  </div>
+
+</main>
+
+<script>
+/* 화면 폭이 좁으면 아래 두 카드를 세로로 */
+(function () {
+  "use strict";
+  function reflow() {
+    document.getElementById("lower-grid").style.gridTemplateColumns =
+      window.innerWidth < 1100 ? "1fr" : "1.3fr 1fr";
+  }
+  reflow();
+  window.addEventListener("resize", reflow);
+})();
+</script>
+</body>
+</html>

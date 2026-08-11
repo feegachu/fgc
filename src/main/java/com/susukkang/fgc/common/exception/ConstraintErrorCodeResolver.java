@@ -107,6 +107,12 @@ public class ConstraintErrorCodeResolver {
                 "uq_validation_run_active_month",
                 FgcErrorCode.VRUN_001
         );
+        // MANUAL_CONTRACT(일일배치)판 uq_validation_run_active_month(V8 마이그레이션) —
+        // "활성 실행 중복"이라는 같은 업무 규칙 위반이라 같은 VRUN_001로 매핑한다.
+        mappings.put(
+                "uq_validation_run_active_manual_contract",
+                FgcErrorCode.VRUN_001
+        );
         mappings.put(
                 "uq_validation_run",
                 FgcErrorCode.VRUN_001

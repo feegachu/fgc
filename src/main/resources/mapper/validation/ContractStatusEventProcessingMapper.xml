@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper">
+
+    <select id="findPendingEventIds" resultType="long">
+        SELECT e.contract_status_event_id
+          FROM fgc.contract_status_event e
+         WHERE e.contract_id = #{contractId}
+           AND NOT EXISTS (
+               SELECT 1
+                 FROM fgc.contract_status_event_processing p
+                WHERE p.contract_status_event_id = e.contract_status_event_id
+                  AND p.processing_job = #{jobName}
+                  AND p.processing_status = 'SUCCEEDED'
+           )
+         ORDER BY e.effective_at ASC, e.event_seq ASC
+    </select>
+
+    <!-- 배치 공통규칙 1 "모든 Writer는 UPSERT 또는 ON CONFLICT DO NOTHING" 준수.
+         SUCCEEDED는 uq_cse_processing_succeeded 부분 유니크 인덱스와 충돌할 수 있는 유일한
+         케이스라 ON CONFLICT DO NOTHING이 있으면 재처리해도 조용히 무시된다.
+         FAILED는 애초에 유니크 제약이 없어 이 절이 걸릴 일이 없다(항상 새 행으로 쌓임). -->
+    <insert id="insertProcessing">
+        INSERT INTO fgc.contract_status_event_processing
+            (contract_status_event_id, processing_job, processing_status, validation_run_id, failure_reason)
+        VALUES
+            (#{contractStatusEventId}, #{jobName}, #{processingStatus}, #{validationRunId}, #{failureReason})
+        ON CONFLICT DO NOTHING
+    </insert>
+
+</mapper>
