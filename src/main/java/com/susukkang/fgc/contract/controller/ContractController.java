@@ -4,14 +4,12 @@ import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.service.ContractService;
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.schedule.service.ScheduleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-
-import java.util.List;
 
 /**
  * 설명 : ContractController
@@ -25,6 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ContractController {
     private final ContractService contractService;
+    private final ScheduleService scheduleService;
 
     /**
      * 설명 : 검색 조건에 따라 보험계약 목록을 조회한다.
@@ -50,7 +49,6 @@ public class ContractController {
      * @author hjKang
      * @since 2026-08-05
      */
-
     @PostMapping
     @PreAuthorize("hasRole('SETTLEMENT')")
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
@@ -81,5 +79,20 @@ public class ContractController {
     @GetMapping("/{id}")
     public ApiResponse<ContractDetailResponse> getContractById(@PathVariable Long id) {
         return ApiResponse.success(contractService.selectContractDetailById(id));
+    }
+    /**
+     * 계약 ID에 해당하는 운영용 예상 스케줄 헤더 목록을 조회한다.
+     *
+     * @param contractId 계약 ID
+     * @return 계약에 연결된 운영용 예상 스케줄 헤더 목록
+     */
+    @GetMapping("/{contractId}/schedules")
+    public ApiResponse<ContractScheduleResponse> getContractSchedules(
+            @PathVariable Long contractId,
+            @RequestParam PaymentStage paymentStage
+    ) {
+        return ApiResponse.success(
+                scheduleService.selectByContractId(contractId, paymentStage)
+        );
     }
 }

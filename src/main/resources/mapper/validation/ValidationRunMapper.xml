@@ -8,6 +8,7 @@
                run_no            AS runNo,
                run_type          AS runType,
                status,
+               current_step      AS currentStep,
                started_at        AS startedAt,
                completed_at      AS completedAt,
                finalized_at      AS finalizedAt,
@@ -17,6 +18,25 @@
                created_at        AS createdAt
           FROM fgc.validation_run
          WHERE validation_run_id = #{validationRunId}
+    </select>
+
+    <select id="findByMonthAndRunNo" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
+        SELECT validation_run_id AS validationRunId,
+               validation_month  AS validationMonth,
+               run_no            AS runNo,
+               run_type          AS runType,
+               status,
+               current_step      AS currentStep,
+               started_at        AS startedAt,
+               completed_at      AS completedAt,
+               finalized_at      AS finalizedAt,
+               triggered_by      AS triggeredBy,
+               finalized_by      AS finalizedBy,
+               failure_message   AS failureMessage,
+               created_at        AS createdAt
+          FROM fgc.validation_run
+         WHERE validation_month = #{validationMonth}
+           AND run_no = #{runNo}
     </select>
 
     <!--
@@ -49,11 +69,88 @@
 
     <!-- policySnapshotJson이 null이면 컬럼 기본값('{}'::jsonb)이 아니라 COALESCE가 대신
          '{}'를 넣는다 — INSERT 문에 컬럼을 아예 안 쓰는 것과 값으로 null을 보내는 건 다르다
-         (null을 보내면 NOT NULL 제약에 걸린다). CapCheckMapper#insertCapCheck와 같은 방식. -->
+         (null을 보내면 NOT NULL 제약에 걸린다)-->
     <insert id="insert" useGeneratedKeys="true" keyProperty="validationRunId" keyColumn="validation_run_id">
         INSERT INTO fgc.validation_run (validation_month, run_no, run_type, triggered_by, policy_snapshot)
         VALUES (#{validationMonth}, #{runNo}, #{runType}, #{triggeredBy}, COALESCE(#{policySnapshotJson}, '{}')::jsonb)
     </insert>
 
+    <sql id="searchWhere">
+        <where>
+            <if test="month != null">
+                AND vr.validation_month = #{month}
+            </if>
+            <if test="status != null">
+                AND vr.status = #{status}
+            </if>
+        </where>
+    </sql>
+
+    <select id="search" resultType="com.susukkang.fgc.validation.dto.ValidationRunListRow">
+        SELECT vr.validation_run_id AS validationRunId,
+               vr.validation_month AS validationMonth,
+               vr.run_no AS runNo,
+               vr.run_type AS runType,
+               vr.status,
+               vr.current_step AS currentStep,
+               triggered.login_id AS triggeredBy,
+               vr.started_at AS startedAt,
+               vr.completed_at AS completedAt,
+               finalized.login_id AS finalizedBy,
+               vr.finalized_at AS finalizedAt,
+               vr.failure_message AS failureMessage
+        FROM fgc.validation_run vr
+        LEFT JOIN fgc.app_user triggered ON triggered.user_id = vr.triggered_by
+        LEFT JOIN fgc.app_user finalized ON finalized.user_id = vr.finalized_by
+        <include refid="searchWhere"/>
+        ORDER BY vr.validation_month DESC, vr.run_no DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.validation_run vr
+        <include refid="searchWhere"/>
+    </select>
+
+    <!-- MonthlyValidationJob 진행 기록 -->
+    <update id="transitionToRunning">
+        UPDATE fgc.validation_run
+           SET status = 'RUNNING',
+               current_step = 1,
+               started_at = now()
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'CREATED'
+    </update>
+
+    <!-- current_step <= #{currentStep} 조건이 역행(뒤 단계에서 앞 단계 번호로 되돌아가는 것)을
+         막는다. "<="(< 아님)인 이유: journalPostingStep·imbalanceCheckStep이 같은 stepNo=6을
+         공유해서 같은 값을 두 번 쓰는 게 정상이기 때문 -->
+    <update id="updateCurrentStep">
+        UPDATE fgc.validation_run
+           SET current_step = #{currentStep}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+           AND current_step &lt;= #{currentStep}
+    </update>
+
+    <update id="transitionToCompleted">
+        UPDATE fgc.validation_run
+           SET status = 'COMPLETED',
+               current_step = 8,
+               completed_at = now()
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+    </update>
+
+    <update id="transitionToFailed">
+        UPDATE fgc.validation_run
+           SET status = 'FAILED',
+               current_step = #{currentStep},
+               failure_message = #{failureMessage}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'RUNNING'
+           AND current_step &lt;= #{currentStep}
+    </update>
 
 </mapper>

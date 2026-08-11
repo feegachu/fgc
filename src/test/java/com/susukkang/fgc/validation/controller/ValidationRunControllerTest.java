@@ -12,6 +12,7 @@ import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -49,6 +50,10 @@ class ValidationRunControllerTest {
 
     @MockitoBean
     private ValidationRunCreateService validationRunCreateService;
+
+    // 컨트롤러 생성자가 두 서비스를 다 필요로 하므로 이 테스트에서 안 쓰더라도 빈으로 있어야 한다
+    @MockitoBean
+    private ValidationRunSearchService validationRunSearchService;
 
     private ValidationRunRow createdRow() {
         ValidationRunRow row = new ValidationRunRow();
