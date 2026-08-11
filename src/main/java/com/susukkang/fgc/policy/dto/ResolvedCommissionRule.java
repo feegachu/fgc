@@ -2,6 +2,7 @@ package com.susukkang.fgc.policy.dto;
 
 import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
+import com.susukkang.fgc.common.code.FeeComponentType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,6 +23,8 @@ import java.math.RoundingMode;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResolvedCommissionRule {
+
+    private FeeComponentType feeComponentType; // 수수료 구성 유형
 
     private Long commissionRuleId;        // 수수료 규칙 ID
     private Long commissionItemId;        // 수수료 항목 ID

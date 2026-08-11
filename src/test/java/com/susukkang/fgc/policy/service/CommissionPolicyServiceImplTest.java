@@ -3,6 +3,8 @@ package com.susukkang.fgc.policy.service;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.code.AgentRankCode;
+import com.susukkang.fgc.common.code.CalculationType;
+import com.susukkang.fgc.common.code.FeeComponentType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
@@ -13,6 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,7 +50,7 @@ class CommissionPolicyServiceImplTest {
                         .build();
 
         ResolvedCommissionRule rule =
-                ResolvedCommissionRule.builder()
+                validRule().toBuilder()
                         .commissionRuleId(1000L)
                         .commissionItemId(2000L)
                         .agentRankCode(AgentRankCode.FC)
@@ -207,7 +211,7 @@ class CommissionPolicyServiceImplTest {
                 .policyType(PolicyType.CURRENT_COMMISSION)
                 .paymentStage(paymentStage)
                 .build();
-        ResolvedCommissionRule generalRule = ResolvedCommissionRule.builder()
+        ResolvedCommissionRule generalRule = validRule().toBuilder()
                 .commissionRuleId(1000L)
                 .commissionItemId(2000L)
                 .agentRankCode(AgentRankCode.FC)
@@ -251,7 +255,7 @@ class CommissionPolicyServiceImplTest {
         ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder()
                 .policyVersionId(policyVersionId)
                 .build();
-        ResolvedCommissionRule insurerRule = ResolvedCommissionRule.builder()
+        ResolvedCommissionRule insurerRule = validRule().toBuilder()
                 .commissionRuleId(1000L)
                 .commissionItemId(2000L)
                 .agentRankCode(AgentRankCode.FC)
@@ -288,7 +292,7 @@ class CommissionPolicyServiceImplTest {
         Long policyVersionId = 100L;
         PaymentStage paymentStage = PaymentStage.GA_TO_FC;
         ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(policyVersionId).build();
-        ResolvedCommissionRule productOfferingRule = ResolvedCommissionRule.builder().commissionRuleId(1000L).commissionItemId(2000L).agentRankCode(AgentRankCode.FC).installmentFrom(1).installmentTo(1).productOfferingId(3L).priorityNo(20).build();
+        ResolvedCommissionRule productOfferingRule = validRule().toBuilder().commissionRuleId(1000L).commissionItemId(2000L).agentRankCode(AgentRankCode.FC).installmentFrom(1).installmentTo(1).productOfferingId(3L).priorityNo(20).build();
         ResolvedCommissionRule insurerRule = productOfferingRule.toBuilder().commissionRuleId(1001L).productOfferingId(null).insurerId(1L).priorityNo(10).build();
 
         given(policyMapper.findApplicableCurrentCommissionPolicies(contractId, paymentStage)).willReturn(List.of(policy));
@@ -307,7 +311,7 @@ class CommissionPolicyServiceImplTest {
         ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder()
                 .policyVersionId(policyVersionId)
                 .build();
-        ResolvedCommissionRule firstRule = ResolvedCommissionRule.builder()
+        ResolvedCommissionRule firstRule = validRule().toBuilder()
                 .commissionRuleId(1000L)
                 .commissionItemId(2000L)
                 .agentRankCode(AgentRankCode.FC)
@@ -333,5 +337,90 @@ class CommissionPolicyServiceImplTest {
                 .satisfies(exception -> assertThat(
                         ((FgcBusinessException) exception).getParams())
                         .containsEntry("reason", "RULE_DUPLICATE"));
+    }
+
+    @Test
+    void rejectsRuleWhenInstallmentRangeExceedsSupportedLimit() {
+        assertInvalidRule(validRule().toBuilder().installmentTo(85).build());
+    }
+
+    @Test
+    void rejectsRuleWhenInstallmentStartsBelowOne() {
+        assertInvalidRule(validRule().toBuilder().installmentFrom(0).build());
+    }
+
+    @Test
+    void rejectsRuleWhenInstallmentRangeIsReversed() {
+        assertInvalidRule(validRule().toBuilder().installmentFrom(2).installmentTo(1).build());
+    }
+
+    @Test
+    void acceptsRuleAtMaximumSupportedInstallment() {
+        ResolvedCommissionPolicy result = resolveSingleRule(validRule().toBuilder().installmentFrom(84).installmentTo(84).build());
+        assertThat(result.getRules()).extracting(ResolvedCommissionRule::getInstallmentFrom).containsExactly(84);
+    }
+
+    @Test
+    void rejectsRuleWhenPriorityIsMissing() {
+        assertInvalidRule(validRule().toBuilder().priorityNo(null).build());
+    }
+
+    @Test
+    void rejectsRuleWhenFeeComponentTypeIsMissing() {
+        assertInvalidRule(validRule().toBuilder().feeComponentType(null).build());
+    }
+
+    @Test
+    void rejectsRuleWhenRequiredCalculationFieldIsMissing() {
+        assertInvalidRule(validRule().toBuilder().roundingMode(null).build());
+    }
+
+    @Test
+    void rejectsRateRuleWhenFixedAmountIsAlsoPresent() {
+        assertInvalidRule(validRule().toBuilder().fixedAmount(BigDecimal.ONE).build());
+    }
+
+    @Test
+    void rejectsFixedRuleWhenRateIsAlsoPresent() {
+        ResolvedCommissionRule rule = validRule().toBuilder().calculationType(CalculationType.FIXED).fixedAmount(BigDecimal.ONE).ratePct(BigDecimal.ONE).build();
+        assertInvalidRule(rule);
+    }
+
+    @Test
+    void acceptsFixedRuleWithNonNegativeFixedAmount() {
+        ResolvedCommissionRule rule = validRule().toBuilder().calculationType(CalculationType.FIXED).fixedAmount(BigDecimal.ZERO).ratePct(null).build();
+        ResolvedCommissionPolicy result = resolveSingleRule(rule);
+        assertThat(result.getRules()).extracting(ResolvedCommissionRule::getCalculationType).containsExactly(CalculationType.FIXED);
+    }
+
+    @Test
+    void handlesNullPolicyVersionIdWithoutMapCreationFailure() {
+        ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(null).build();
+        given(policyMapper.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
+        given(policyMapper.findApplicableCommissionRules(null, 10L, PaymentStage.GA_TO_FC)).willReturn(List.of());
+
+        assertThatThrownBy(() -> commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC))
+                .isInstanceOf(FgcBusinessException.class)
+                .isNotInstanceOf(NullPointerException.class);
+    }
+
+    // 정상 규칙의 공통 필드를 생성해 각 테스트가 검증 대상만 변경하도록 한다.
+    private ResolvedCommissionRule validRule() {
+        return ResolvedCommissionRule.builder().commissionRuleId(1000L).commissionItemId(2000L).feeComponentType(FeeComponentType.CURRENT).agentRankCode(AgentRankCode.FC).installmentFrom(1).installmentTo(1).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").calculationType(CalculationType.RATE).ratePct(BigDecimal.ONE).roundingScale(0).roundingMode(RoundingMode.HALF_UP).priorityNo(100).build();
+    }
+
+    // 단일 후보 규칙의 유효성 검증 실패를 공통 시나리오로 확인한다.
+    private void assertInvalidRule(ResolvedCommissionRule rule) {
+        assertThatThrownBy(() -> resolveSingleRule(rule))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception -> assertThat(((FgcBusinessException) exception).getParams()).containsEntry("reason", "INVALID_RULE"));
+    }
+
+    // 단일 후보 규칙을 조회하는 공통 정책 시나리오를 실행한다.
+    private ResolvedCommissionPolicy resolveSingleRule(ResolvedCommissionRule rule) {
+        ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(100L).build();
+        given(policyMapper.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
+        given(policyMapper.findApplicableCommissionRules(100L, 10L, PaymentStage.GA_TO_FC)).willReturn(List.of(rule));
+        return commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC);
     }
 }

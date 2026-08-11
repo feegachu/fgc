@@ -1,6 +1,7 @@
 package com.susukkang.fgc.policy.service;
 
 import com.susukkang.fgc.common.code.AgentRankCode;
+import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -29,6 +30,8 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
+    // 현재 시스템이 지원하는 7년 체계의 최대 회차이며 비정상 범위 확장을 방지한다.
+    private static final int MAX_SUPPORTED_INSTALLMENT_NO = 84;
     private final PolicyMapper policyMapper;
 
     // 운영정책서 제11조의 규칙 선택 순서: 상품 판매버전 > 보험사 > 조직 > priorityNo
@@ -94,7 +97,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
                     Map.of(
-                            "policyVersionId", policy.getPolicyVersionId(),
+                            "policyVersionId", String.valueOf(policy.getPolicyVersionId()),
                             "paymentStage", paymentStage.name()
                     ),
                     "정책에 적용 가능한 수수료 규칙이 없습니다."
@@ -196,8 +199,8 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
                     Map.of(
-                            "policyVersionId", policyVersionId,
-                            "commissionItemId", key.commissionItemId(),
+                            "policyVersionId", String.valueOf(policyVersionId),
+                            "commissionItemId", String.valueOf(key.commissionItemId()),
                             "agentRankCode", String.valueOf(key.agentRankCode()),
                             "installmentNo", key.installmentNo(),
                             "reason", "RULE_DUPLICATE"
@@ -217,11 +220,19 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
         if (rule == null
                 || rule.getCommissionRuleId() == null
                 || rule.getCommissionItemId() == null
+                || rule.getFeeComponentType() == null
                 || rule.getInstallmentFrom() == null
                 || rule.getInstallmentTo() == null
                 || rule.getInstallmentFrom() < 1
                 || rule.getInstallmentTo() < rule.getInstallmentFrom()
-                || rule.getPriorityNo() == null) {
+                || rule.getInstallmentTo() > MAX_SUPPORTED_INSTALLMENT_NO
+                || rule.getPriorityNo() == null
+                || rule.getCalculationType() == null
+                || rule.getBasisCode() == null
+                || rule.getBasisCode().isBlank()
+                || rule.getRoundingScale() == null
+                || rule.getRoundingMode() == null
+                || hasInvalidCalculationValue(rule)) {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
@@ -232,6 +243,14 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     "수수료 규칙의 필수값 또는 회차 범위가 올바르지 않습니다."
             );
         }
+    }
+
+    /** 계산 유형별 금액 필드가 DB 제약과 동일한 조합인지 검증한다. */
+    private boolean hasInvalidCalculationValue(ResolvedCommissionRule rule) {
+        if (rule.getCalculationType() == CalculationType.RATE) {
+            return rule.getRatePct() == null || rule.getRatePct().signum() < 0 || rule.getFixedAmount() != null;
+        }
+        return rule.getFixedAmount() == null || rule.getFixedAmount().signum() < 0 || rule.getRatePct() != null;
     }
     /**
      * 설명 : 현행 수수료 정책 조회에 필요한 계약 ID와 지급 단계를 검증한다.

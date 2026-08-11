@@ -20,6 +20,7 @@
                type="com.susukkang.fgc.policy.dto.ResolvedCommissionRule">
         <id property="commissionRuleId" column="commission_rule_id"/>
         <result property="commissionItemId" column="commission_item_id"/>
+        <result property="feeComponentType" column="fee_component_type"/>
         <result property="insurerId" column="insurer_id"/>
         <result property="productOfferingId" column="product_offering_id"/>
         <result property="organizationId" column="organization_id"/>
@@ -107,6 +108,7 @@
         SELECT
             cr.commission_rule_id,
             cr.commission_item_id,
+            cr.fee_component_type,
             cr.agent_rank_code,
             cr.installment_from,
             cr.installment_to,
