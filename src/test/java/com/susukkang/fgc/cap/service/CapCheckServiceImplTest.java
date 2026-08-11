@@ -94,6 +94,31 @@ class CapCheckServiceImplTest {
         verify(capCheckMapper).insertCapCheckDetails(argThatDetailListHasCapCheckId(999L));
     }
 
+    // insertCapCheck가 ON CONFLICT DO UPDATE로 기존 행을 재사용할 수 있게 되면서(코드리뷰 반영,
+    // 2026-08-11 — 같은 실행 안에서의 재계산·재시도 시 uq_cap_check_monthly UNIQUE 위반 방지),
+    // 예전 detail이 남아있지 않도록 항상 먼저 지우고 다시 넣어야 한다.
+    @Test
+    void calculateAndSaveAlwaysDeletesOldDetailsBeforeInsertingNewOnes() {
+        CapCheckDetailLine detail = new CapCheckDetailLine(
+                1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null);
+        CapCalculationResult result = sampleResult(List.of(detail));
+
+        CapCalculationCommand command = CapCalculationCommand.realtime(1L, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
+        when(capCalculator.calculate(command)).thenReturn(result);
+        doAnswer(invocation -> {
+            CapCheckInsertRow row = invocation.getArgument(0);
+            row.setCapCheckId(999L);
+            return null;
+        }).when(capCheckMapper).insertCapCheck(any());
+
+        capCheckService.calculateAndSave(command);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(capCheckMapper);
+        order.verify(capCheckMapper).insertCapCheck(any());
+        order.verify(capCheckMapper).deleteCapCheckDetails(999L);
+        order.verify(capCheckMapper).insertCapCheckDetails(any());
+    }
+
     // item_code/item_name/contract_month_no는 계산 당시 값을 cap_check_detail에 그대로 스냅샷해야
     // 한다 — commission_item/schedule_line이 나중에 바뀌어도 과거 판정 근거가 그때 값으로 남게 하려면
     // INSERT 시점에 빠짐없이 넘어가야 한다 (PR #2 코드리뷰 지적)

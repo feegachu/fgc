@@ -19,6 +19,7 @@ import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.StepExecution;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -45,6 +46,7 @@ class ChangedContractItemProcessorTest {
     private ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
 
     private ChangedContractItemProcessor processor;
+    private final OffsetDateTime watermark = OffsetDateTime.parse("2026-08-10T02:00:00+09:00");
 
     @BeforeEach
     void setUp() {
@@ -54,11 +56,17 @@ class ChangedContractItemProcessorTest {
         JobExecution jobExecution = new JobExecution(
                 new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), new JobParameters());
         jobExecution.getExecutionContext().putLong("validationRunId", 777L);
+        jobExecution.getExecutionContext().putString("lastProcessedAt", watermark.toString());
         processor.beforeStep(new StepExecution("changedContractStep", jobExecution));
     }
 
+    // 기본 계약은 watermark보다 이전에 바뀐 것으로 만든다 — 그래야 순수 상태 이벤트 유무만으로
+    // 재생성 여부가 갈리는 기존 테스트들의 전제가 그대로 유지된다.
     private InsuranceContract contract(long contractId) {
-        return InsuranceContract.builder().contractId(contractId).build();
+        return InsuranceContract.builder()
+                .contractId(contractId)
+                .updatedAt(watermark.minusDays(1))
+                .build();
     }
 
     @Test
@@ -96,6 +104,26 @@ class ChangedContractItemProcessorTest {
         assertThat(result.success()).isTrue();
         verify(scheduleService, never()).generateSchedules(any());
         verify(capCheckService, times(2)).calculateAndSave(any(CapCalculationCommand.class));
+    }
+
+    // FGC-FUN-039의 "언제" 트리거는 상태 이벤트뿐 아니라 "계약·정책 변경"도 포함한다.
+    // ContractService#updateContract가 보험료·납입기간 등을 바꿔도 contract_status_event를
+    // 안 남기는 경로가 있어서, 상태 이벤트 유무만으로 재생성을 판단하면 이 경로가 조용히
+    // 누락된다(코드리뷰 지적, 2026-08-11) — updated_at이 watermark 이후인지도 같이 본다.
+    @Test
+    void contractUpdatedAfterWatermarkTriggersScheduleRegenerationEvenWithoutStatusEvent() {
+        InsuranceContract contract = InsuranceContract.builder()
+                .contractId(1L)
+                .updatedAt(watermark.plusHours(1))
+                .build();
+        given(contractMapper.selectById(1L)).willReturn(contract);
+        given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
+                .willReturn(List.of());
+
+        ChangedContractResult result = processor.process(1L);
+
+        assertThat(result.success()).isTrue();
+        verify(scheduleService).generateSchedules(any());
     }
 
     @Test

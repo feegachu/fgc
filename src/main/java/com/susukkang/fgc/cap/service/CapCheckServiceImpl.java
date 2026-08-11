@@ -71,6 +71,11 @@ public class CapCheckServiceImpl implements CapCheckService {
                 .build();
         capCheckMapper.insertCapCheck(row);
 
+        // insertCapCheck가 ON CONFLICT DO UPDATE로 기존 행을 재사용했을 수 있다(같은 실행 안에서의
+        // 재계산·재시도, CapCheckMapper.xml 주석 참고) — 그 경우 예전 detail이 이번 재계산과
+        // 안 맞을 수 있으므로 항상 먼저 지운다. 새로 INSERT된 행이면 지울 게 없어 안전한 no-op이다.
+        capCheckMapper.deleteCapCheckDetails(row.getCapCheckId());
+
         if (!result.details().isEmpty()) {
             List<CapCheckDetailInsertRow> detailRows = new ArrayList<>(result.details().size());
             for (CapCheckDetailLine d : result.details()) {

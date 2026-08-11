@@ -115,14 +115,7 @@ public class MonthlyValidationJobConfig {
                 .build();
     }
 
-    // ★★★ 미구현(REG-12 규제 공백, 2026-08-11 코드리뷰로 재확인) ★★★ 차익거래 검증
-    // (FGC-FUN-063)·원장 불균형 재검사에 대응하는 실제 서비스 구현체가 코드베이스에 아직
-    // 없다(#60이 만든 ArbitrageCheckBatchPort·LedgerImbalanceCheckPort 인터페이스뿐).
-    // REG-12(docs/07_규제조문표_v0.2.1.md)는 보장성보험 해지·실효 시 지급수수료+해약환급금을
-    // 누적보험료와 대사해 차익거래를 점검하도록 요구하는 필수 규제 항목이라, 이 두 Step이
-    // Placeholder로 남아있는 한 MonthlyValidationJob도 그 규제를 실제로 만족시키지 못한다.
-    // DailyChangedContractJob(#76, ChangedContractItemProcessor)도 같은 이유로 이 검증을
-    // 하지 않는다 — 별도 이슈 트래킹 없이 이 주석들로 미구현 상태를 남겨두기로 함(2026-08-11).
+    // 차익거래 검증 및 원장 불균형 재검증은 로직 구현 후 추가 예정
     @Bean
     public Step arbitrageCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("arbitrageCheckStep", jobRepository)

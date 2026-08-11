@@ -45,7 +45,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DailyChangedContractJobConfig {
 
-    private static final int CHUNK_SIZE = 200;
+    private static final int CHUNK_SIZE = 100;
 
     private final ValidationRunMapper validationRunMapper;
     private final ValidationRunCreateService validationRunCreateService;
