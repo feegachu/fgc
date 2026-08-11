@@ -92,6 +92,21 @@ public class ShellAdvice {
                 : "COMPLIANCE";
     }
 
+    /**
+     * 셸 사이드바에 뜨는 로그인 사용자 이름.
+     *
+     * 목업의 sec:authentication="principal.userName" 을 대신한다. 그 표현식은 익명 사용자일 때
+     * principal 이 "anonymousUser" 문자열이라 userName 프로퍼티를 못 찾고 렌더링 도중에 터진다.
+     * 오류 화면(error/404 등)은 permitAll 인 /assets/** 나 /error 로 인증 없이도 도달하므로,
+     * 그때 셸이 반쯤 그려지다 응답이 잘려 나갔다. roleCode 와 같은 방식으로 안전하게 뽑는다.
+     */
+    @ModelAttribute("userName")
+    public String userName(Authentication authentication) {
+        return authentication != null && authentication.getPrincipal() instanceof FgcUserDetails user
+                ? user.getUserName()
+                : "-";
+    }
+
     private static YearMonth parse(String value) {
         try {
             return YearMonth.parse(value);

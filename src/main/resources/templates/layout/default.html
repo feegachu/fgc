@@ -18,8 +18,7 @@
 <!-- 셸 레이아웃, 즉 21개의 화면을 모두 해제하는 파일 -->
 <html th:fragment="page(content, screenId, title, parentTitle, parentHref)"
       class="light" lang="ko"
-      xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+      xmlns:th="http://www.thymeleaf.org">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -198,7 +197,10 @@
     <span>조직·설계사 관리</span>
     <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
   </a>
+  <!-- 사이드바에서 유일하게 역할 제한이 있는 화면이다 — 화면정의서 v2.0 AUDT-W01 "권한 COMPLIANCE, SYSTEM_ADMIN".
+       나머지 항목은 전부 "전체 조회"라 숨기지 않는다. 서버 측 403 차단은 FGC-FUN-002 본체 작업이다. -->
   <a class="fgc-sidebar__link" th:href="@{/audit-logs}"
+     th:if="${roleCode == 'COMPLIANCE' or roleCode == 'SYSTEM_ADMIN'}"
      th:attrappend="aria-current=${screenId == 'FGC-UI-AUDT-W01' ? 'page' : null}">
     <span class="material-symbols-outlined" style="font-size:18px">history</span>
     <span>감사로그</span><span class="fgc-sidebar__id">AUDT-W01</span>
@@ -211,7 +213,9 @@
 
   <!-- 로그인 사용자 -->
   <div class="fgc-sidebar__user">
-    <div style="font-weight:700" sec:authentication="principal.userName">-</div>
+    <!-- sec:authentication="principal.userName" 을 쓰지 않는다 — 익명 사용자일 때 principal 이
+         "anonymousUser" 문자열이라 렌더링 도중 터진다(오류 화면은 인증 없이도 도달한다). -->
+    <div style="font-weight:700" th:text="${userName}">-</div>
     <div style="color:rgba(255,255,255,.6)">
       <span th:text="#{'role.' + ${roleCode}}">-</span> ·
       <span class="fgc-mono" th:text="${roleCode}">-</span>

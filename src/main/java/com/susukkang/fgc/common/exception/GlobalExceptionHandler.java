@@ -3,6 +3,7 @@ package com.susukkang.fgc.common.exception;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.susukkang.fgc.common.web.ApiError;
 import com.susukkang.fgc.common.web.ApiResponse;
@@ -18,12 +19,11 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 
 @Slf4j
-@RestControllerAdvice
+@RestControllerAdvice(annotations = RestController.class)
 @RequiredArgsConstructor
 
 /**
@@ -31,6 +31,13 @@ import java.util.Map;
  *
  * 예외 유형에 따라 HTTP 상태와 FgcErrorCode를 결정하고,
  * 사용자 메시지를 생성하여 ApiError로 반환한다.
+ *
+ * annotations = RestController.class 인 이유 — 인터페이스정의서 3-3 규칙 3
+ *  이 제한이 없으면 이 advice 가 MPA @Controller 의 예외까지 잡아 JSON 으로 내려보낸다.
+ *  그러면 templates/error/403·404·500.html 이 영원히 렌더링되지 않는다(브라우저로 없는 경로를
+ *  열면 오류 화면 대신 JSON 이 그대로 보였다). @RestController 만 걸러내면 MPA 예외는
+ *  Spring Boot 의 /error 디스패치로 흘러가 오류 화면이 뜬다.
+ *  @Controller 로 거르면 안 된다 — @RestController 가 @Controller 의 메타 애노테이션이라 둘 다 잡힌다.
  */
 public class GlobalExceptionHandler {
 
@@ -197,40 +204,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.failure(apiError));
     }
 
-    /**
-    * @author 이예소
-    * @since 2026-08-10
-    *
-     * 연결된 화면도 정적 파일도 없는 경로 요청을 처리한다.
-     * 기존 코드: NoResourceFoundException에 대한 별도 처리가 없었다.
-     * 문제: 아직 만들지 않은 화면 경로(/cap-checks 등)를 클릭하면
-     *       일반 예외 처리기로 넘어가 HTTP 404 대신 HTTP 500으로 응답했다.
-     * 개선: NoResourceFoundException을 별도로 처리하여
-     *       HTTP 404와 FGC-COMMON-004 오류 응답을 반환한다.
-    */
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(
-            NoResourceFoundException exception
-    ) {
-        FgcErrorCode errorCode = FgcErrorCode.COMMON_004;
-
-        log.warn(
-                "[{}] No handler or static resource: {}",
-                RequestIdContext.current(),
-                exception.getResourcePath()
-        );
-
-        ApiError apiError = createApiError(
-                errorCode,
-                null,
-                Map.of("id", exception.getResourcePath()),
-                productionDetail(exception.getMessage())
-        );
-
-        return ResponseEntity
-                .status(errorCode.getStatus())
-                .body(ApiResponse.failure(apiError));
-    }
+    /*
+     * NoResourceFoundException 핸들러는 지웠다 (2026-08-11).
+     *
+     * 원래 목적은 "아직 만들지 않은 화면 경로를 클릭하면 500 이 나던 것"을 404 로 바꾸는 것이었는데,
+     * 이제 templates/error/404.html 이 그 자리를 대신한다. 그리고 이 advice 가
+     * annotations = RestController.class 로 제한되면서 애초에 호출되지도 않는다 —
+     * NoResourceFoundException 은 컨트롤러가 아니라 정적 리소스 핸들러가 던져서
+     * 적용 대상 타입 자체가 없기 때문이다.
+     *
+     * 부작용: 로그인 상태에서 /api/** 의 오타 경로는 FGC 봉투가 아니라 Spring Boot 기본 오류 JSON 이
+     * 나간다(미인증이면 그 전에 401). 봉투가 필요해지면 여기가 아니라 FgcErrorAttributes 를 넓혀야 한다.
+     */
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(
