@@ -6,6 +6,7 @@ import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Mapper
@@ -31,6 +32,12 @@ public interface ValidationRunMapper {
      * 있는지
      */
     boolean existsActiveMonthlyRun(@Param("validationMonth") LocalDate validationMonth);
+
+    /**
+     * run_type='MANUAL_CONTRACT'이고 status가 CREATED/RUNNING인(=활성) 실행이 있는지.
+     * uq_validation_run_active_manual_contract(V8)의 애플리케이션측 사전 확인용.
+     */
+    boolean existsActiveManualContractRun();
 
     /**
      * validation_run 1행 INSERT
@@ -95,4 +102,13 @@ public interface ValidationRunMapper {
     int transitionToFailed(@Param("validationRunId") Long validationRunId,
                             @Param("currentStep") int currentStep,
                             @Param("failureMessage") String failureMessage);
+
+    /**
+     * DailyChangedContractJob의 "하루 1건" 규칙 지원용
+     * run_type='MANUAL_CONTRACT'이고 created_at이 [dayStart, dayEnd)
+     * 구간(Asia/Seoul 자정~다음날 자정)에 속하는 실행 중
+     * 가장 최근(run_no가 가장 큰) 1건을 돌려줌
+     */
+    ValidationRunRow findManualContractRunCreatedBetween(@Param("dayStart") OffsetDateTime dayStart,
+                                                          @Param("dayEnd") OffsetDateTime dayEnd);
 }

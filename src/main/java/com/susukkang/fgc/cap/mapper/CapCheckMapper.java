@@ -15,11 +15,26 @@ import java.util.List;
 @Mapper
 public interface CapCheckMapper {
 
-    /** cap_check는 append-only 스냅샷. INSERT 후 row.capCheckId에 생성된 PK 가 채워짐 */
+    /**
+     * cap_check upsert — INSERT 후 row.capCheckId에 생성/갱신된 PK가 채워짐
+     * (validation_run_id, contract_id, payment_stage)가 이미 있으면(같은 실행 안에서의 재계산·
+     * 재시도) 새로 계산한 값으로 덮어쓴다 — FINALIZED 이전에는 DB가 이를 허용
+     * REALTIME(validationRunId=null)은 NULL끼리 유니크 충돌이 나지 않아 항상 순수 INSERT처럼 동작
+     */
     void insertCapCheck(CapCheckInsertRow row);
 
-    /** cap_check_detail 일괄 INSERT. 항목이 없으면 호출 X */
+    /**
+     * cap_check_detail 일괄 upsert — (cap_check_id, detail_seq)가 이미 있으면 새 계산값으로
+     * 덮어쓴다. 항목이 없으면 호출 X.
+     */
     void insertCapCheckDetails(@Param("details") List<CapCheckDetailInsertRow> details);
+
+    /**
+     * insertCapCheck가 UPDATE 경로를 탔을 때, 이번 재계산이 실제로 채운 마지막 detail_seq보다
+     * 큰(=예전 계산엔 있었지만 이번엔 없어진) 뒷자리 detail 행만 잘라낸다. maxDetailSeq가 0이면
+     * (이번 계산에 detail이 하나도 없으면) 전부 지운다.
+     */
+    void pruneCapCheckDetails(@Param("capCheckId") Long capCheckId, @Param("maxDetailSeq") int maxDetailSeq);
 
     /** 계약·지급단계의 가장 최근 cap_check 1건. 없으면 null. */
     CapCheckRow findLatestByContractAndStage(@Param("contractId") Long contractId,

@@ -115,6 +115,7 @@ public class MonthlyValidationJobConfig {
                 .build();
     }
 
+    // 차익거래 검증 및 원장 불균형 재검증은 로직 구현 후 추가 예정
     @Bean
     public Step arbitrageCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("arbitrageCheckStep", jobRepository)

@@ -107,9 +107,11 @@ class ValidationRunMapperIntegrationTest {
     @Test
     // run_no 1,2가 이미 있으면 findNextRunNo가 3을 반환하는지 둘 다 MANUAL_CONTRACT로 넣음
     void findNextRunNoReturnsMaxPlusOne() {
+        // uq_validation_run_active_manual_contract(V9) 때문에 MANUAL_CONTRACT 활성 실행은
+        // 동시에 1건만 가능하다 — 두 번째 행은 활성-1건 제약이 없는 PRE_CONFIRM으로 넣는다.
         LocalDate month = LocalDate.of(2026, 9, 1);
         insertCreatedRun(month, 1, "MANUAL_CONTRACT");
-        insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+        insertCreatedRun(month, 2, "PRE_CONFIRM");
 
         Integer nextRunNo = validationRunMapper.findNextRunNo(month);
 
@@ -251,11 +253,14 @@ class ValidationRunMapperIntegrationTest {
     @Test
     // limit/offset이 실제로 페이징되는지 — run_no 1,2,3 중 offset=1, limit=1이면 1건만
     void searchRespectsOffsetAndLimit() {
+        // uq_validation_run_active_month 때문에 같은 달 두 번째부터는 MONTHLY가 아닌 다른
+        // runType으로 넣어야 하고, uq_validation_run_active_manual_contract(V9) 때문에
+        // MANUAL_CONTRACT 활성 실행도 동시에 1건만 가능하다 — 그래서 두 번째는
+        // MANUAL_CONTRACT, 세 번째는 활성-1건 제약이 없는 PRE_CONFIRM으로 넣는다.
         LocalDate month = LocalDate.of(2026, 9, 1);
         insertCreatedRun(month, 1);
-        // uq_validation_run_active_month 때문에 같은 달 두 번째부터는 MANUAL_CONTRACT로 넣는다.
         insertCreatedRun(month, 2, "MANUAL_CONTRACT");
-        insertCreatedRun(month, 3, "MANUAL_CONTRACT");
+        insertCreatedRun(month, 3, "PRE_CONFIRM");
 
         List<ValidationRunListRow> rows = validationRunMapper.search(month, null, 1, 1);
 
