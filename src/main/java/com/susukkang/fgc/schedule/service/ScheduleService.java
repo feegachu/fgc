@@ -301,12 +301,17 @@ public class ScheduleService {
         return saveSchedule(contract, policy, header);
     }
     // 스케줄 헤더와 회차별 라인을 저장하고 저장 결과를 반환
-    private CreatedSchedule saveSchedule(InsuranceContract contract, ResolvedCommissionPolicy policy, ScheduleHeaderInsertDTO header) {
+    private CreatedSchedule saveSchedule(InsuranceContract contract,
+                                         ResolvedCommissionPolicy policy,
+                                         ScheduleHeaderInsertDTO header) {
         return saveSchedule(contract, policy, header, List.of());
     }
 
     // 스케줄 헤더를 저장한 뒤 확정된 기존 회차는 보존하고 나머지 회차를 계산하여 저장
-    private CreatedSchedule saveSchedule(InsuranceContract contract, ResolvedCommissionPolicy policy, ScheduleHeaderInsertDTO header, List<ScheduleLineInsertDTO> oldLines) {
+    private CreatedSchedule saveSchedule(InsuranceContract contract,
+                                         ResolvedCommissionPolicy policy,
+                                         ScheduleHeaderInsertDTO header,
+                                         List<ScheduleLineInsertDTO> oldLines) {
         // 새로운 스케줄 헤더 저장 및 생성된 헤더 ID 검증
         int headerRows = scheduleMapper.insertScheduleHeader(header);
         if (headerRows != 1 || header.getScheduleHeaderId() == null) throw new FgcBusinessException(FgcErrorCode.COMMON_500);
@@ -322,7 +327,10 @@ public class ScheduleService {
     }
 
     // 확정된 기존 회차와 새로 계산한 미래 회차를 하나의 새 스케줄 버전으로 병합
-    private List<ScheduleLineInsertDTO> mergeLockedScheduleLines(List<ScheduleLineInsertDTO> oldLines, List<ScheduleLineInsertDTO> calculatedLines, Long newHeaderId) {
+    private List<ScheduleLineInsertDTO> mergeLockedScheduleLines(
+            List<ScheduleLineInsertDTO> oldLines,
+            List<ScheduleLineInsertDTO> calculatedLines,
+            Long newHeaderId) {
         Map<ScheduleLineKey, ScheduleLineInsertDTO> lockedLines = new LinkedHashMap<>();
         for (ScheduleLineInsertDTO oldLine : oldLines) {
             if (isLockedLineStatus(oldLine.getLineStatus())) lockedLines.put(toScheduleLineKey(oldLine), oldLine);
@@ -938,7 +946,8 @@ public class ScheduleService {
                 ScheduleHeaderStatus.ADJUSTED,
                 false
         );
-        if (updatedRows != 1) throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        if (updatedRows != 1)
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
         // 계약과 지급단계에 해당하는 다음 스케줄 버전 번호 조회
         int nextVersionNo = scheduleMapper.selectNextScheduleVersionNo(
                 oldHeader.getContractId(),
