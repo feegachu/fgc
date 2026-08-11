@@ -124,7 +124,13 @@
               <td><span class="fgc-badge fgc-badge--neutral" th:text="${e.severity()}">-</span></td>
               <!-- D-05·SRC-027 — 계약은 계약번호로만 식별한다. 계약자 이름 컬럼을 추가하지 말 것 -->
               <td class="fgc-mono" th:text="${e.contractNo()}">-</td>
-              <td style="max-width:280px" th:text="${e.title()}">-</td>
+              <!-- 화면정의서 DASH-W01 "③ 최근 예외 5건 목록 — 클릭하면 예외함으로 이동".
+                   <tr> 은 <a> 로 감쌀 수 없어(무효 HTML) 제목 칸을 링크로 만든다.
+                   상태 필터는 넘기지 않는다 — 이 목록은 최근 5건이라 RESOLVED 도 들어올 수 있고,
+                   status=OPEN 을 붙이면 방금 누른 그 행이 목록에서 사라진다. -->
+              <td style="max-width:280px">
+                <a th:href="@{/exceptions(contractNo=${e.contractNo()})}" th:text="${e.title()}">-</a>
+              </td>
               <td><span class="fgc-badge fgc-badge--neutral" th:text="${e.status()}">-</span></td>
               <td class="fgc-mono fgc-muted" style="font-size:11px"
                   th:text="${#temporals.format(e.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
