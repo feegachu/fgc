@@ -60,7 +60,9 @@ class WatermarkAdvanceStepListenerTest {
         listener.afterStep(stepExecution);
 
         verify(batchWatermarkMapper).advance(
-                eq(DailyChangedContractJobNames.JOB_NAME), eq(runStartedAt), eq(777L), eq(5L));
+                eq(DailyChangedContractJobNames.JOB_NAME),
+                eq(DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME),
+                eq(runStartedAt), eq(777L), eq(5L));
     }
 
     @Test
@@ -80,6 +82,6 @@ class WatermarkAdvanceStepListenerTest {
 
         listener.afterStep(stepExecution);
 
-        verify(batchWatermarkMapper, never()).advance(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong());
+        verify(batchWatermarkMapper, never()).advance(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyLong());
     }
 }

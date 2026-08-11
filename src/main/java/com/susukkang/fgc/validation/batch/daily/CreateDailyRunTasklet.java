@@ -55,9 +55,11 @@ public class CreateDailyRunTasklet implements Tasklet {
 
         // changedContractStep의 Reader가 "어디서부터 변경분으로 볼지" 기준으로 쓸 watermark를
         // 여기서 미리 읽어 Job ExecutionContext에 박아둔다. V2 마이그레이션이 심어둔 시드 행이
-        // 있으므로 findByJobName은 null을 반환하지 않는다(운영 정책서 §9-1: watermark 행은
-        // 배치가 최초 실행되기 전에 이미 만들어져 있어야 함).
-        BatchWatermarkRow watermark = batchWatermarkMapper.findByJobName(DailyChangedContractJobNames.JOB_NAME);
+        // 있으므로 findByJobNameAndStepName은 null을 반환하지 않는다(운영 정책서 §9-1: watermark
+        // 행은 배치가 최초 실행되기 전에 이미 만들어져 있어야 함). batch_watermark의 PK가
+        // (job_name, step_name)이라(V2_1 마이그레이션) 두 값을 모두 넘긴다.
+        BatchWatermarkRow watermark = batchWatermarkMapper.findByJobNameAndStepName(
+                DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME);
         DailyBatchContext.putLastProcessedAt(chunkContext, watermark.getLastProcessedAt());
 
         // watermark를 이번 실행이 끝난 뒤 어디로 전진시킬지는 "이 Step이 실행되기 시작한 시각"으로

@@ -63,7 +63,9 @@ class CreateDailyRunTaskletTest {
         BatchWatermarkRow watermark = new BatchWatermarkRow();
         watermark.setJobName(DailyChangedContractJobNames.JOB_NAME);
         watermark.setLastProcessedAt(seededWatermark);
-        given(batchWatermarkMapper.findByJobName(DailyChangedContractJobNames.JOB_NAME)).willReturn(watermark);
+        given(batchWatermarkMapper.findByJobNameAndStepName(
+                DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME))
+                .willReturn(watermark);
     }
 
     private ChunkContext newChunkContext() {

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.susukkang.fgc.validation.mapper.BatchWatermarkMapper">
 
-    <select id="findByJobName" resultType="com.susukkang.fgc.validation.dto.BatchWatermarkRow">
+    <select id="findByJobNameAndStepName" resultType="com.susukkang.fgc.validation.dto.BatchWatermarkRow">
         SELECT job_name          AS jobName,
                step_name         AS stepName,
                last_processed_at AS lastProcessedAt,
@@ -11,6 +11,7 @@
                processed_count   AS processedCount
           FROM fgc.batch_watermark
          WHERE job_name = #{jobName}
+           AND step_name = #{stepName}
     </select>
 
     <!-- trg_batch_watermark_touch(V2)가 updated_at을 자동으로 채워주므로 여기서는 안 건드린다. -->
@@ -21,6 +22,7 @@
                last_success_at   = now(),
                processed_count   = processed_count + #{processedCountDelta}
          WHERE job_name = #{jobName}
+           AND step_name = #{stepName}
     </update>
 
 </mapper>
