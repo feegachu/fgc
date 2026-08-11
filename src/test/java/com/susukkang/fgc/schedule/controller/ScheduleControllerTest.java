@@ -53,6 +53,17 @@ class ScheduleControllerTest {
     }
 
     @Test
+    void acceptsReasonAtMaximumLength() throws Exception {
+        String reason = "가".repeat(40);
+        when(scheduleService.regenerateSchedules(10L, reason)).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).scheduleVersionNo(2L).build());
+
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).contentType(APPLICATION_JSON).content("{\"reason\":\"" + reason + "\"}"))
+                .andExpect(status().isOk());
+
+        verify(scheduleService).regenerateSchedules(10L, reason);
+    }
+
+    @Test
     void rejectsRegenerationWithoutSettlementRole() throws Exception {
         mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("admin").roles("GA_ADMIN")).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
                 .andExpect(status().isForbidden());

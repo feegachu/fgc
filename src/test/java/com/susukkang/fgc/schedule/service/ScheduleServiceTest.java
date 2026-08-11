@@ -108,6 +108,35 @@ class ScheduleServiceTest {
     }
 
     @Test
+    void preservesLockedLineWithoutDuplicatingRecalculatedLineWhenBeneficiaryChanges() {
+        ScheduleLineInsertDTO lockedLine = scheduleLine(100L, 1, 20L, ScheduleLineStatus.CONFIRMED, "100000");
+        ScheduleLineInsertDTO changedBeneficiaryLine = scheduleLine(100L, 1, 30L, ScheduleLineStatus.PLANNED, "200000");
+
+        @SuppressWarnings("unchecked")
+        List<ScheduleLineInsertDTO> mergedLines = ReflectionTestUtils.invokeMethod(scheduleService, "mergeLockedScheduleLines", List.of(lockedLine), List.of(changedBeneficiaryLine), 30L);
+
+        assertThat(mergedLines).hasSize(1);
+        assertThat(mergedLines.getFirst().getBeneficiaryAgentId()).isEqualTo(20L);
+        assertThat(mergedLines.getFirst().getExpectedAmount()).isEqualByComparingTo("100000");
+        assertThat(mergedLines.getFirst().getLineStatus()).isEqualTo(ScheduleLineStatus.CONFIRMED);
+    }
+
+    @Test
+    void preservesMultipleLockedBeneficiariesInSameItemAndInstallment() {
+        ScheduleLineInsertDTO changedLockedLine = scheduleLine(100L, 1, 20L, ScheduleLineStatus.CONFIRMED, "100000");
+        ScheduleLineInsertDTO unchangedLockedLine = scheduleLine(100L, 1, 40L, ScheduleLineStatus.CONFIRMED, "50000");
+        ScheduleLineInsertDTO changedCalculatedLine = scheduleLine(100L, 1, 30L, ScheduleLineStatus.PLANNED, "200000");
+        ScheduleLineInsertDTO unchangedCalculatedLine = scheduleLine(100L, 1, 40L, ScheduleLineStatus.PLANNED, "60000");
+
+        @SuppressWarnings("unchecked")
+        List<ScheduleLineInsertDTO> mergedLines = ReflectionTestUtils.invokeMethod(scheduleService, "mergeLockedScheduleLines", List.of(changedLockedLine, unchangedLockedLine), List.of(changedCalculatedLine, unchangedCalculatedLine), 30L);
+
+        assertThat(mergedLines).hasSize(2);
+        assertThat(mergedLines).extracting(ScheduleLineInsertDTO::getBeneficiaryAgentId).containsExactlyInAnyOrder(20L, 40L);
+        assertThat(mergedLines).allMatch(line -> line.getLineStatus() == ScheduleLineStatus.CONFIRMED);
+    }
+
+    @Test
     void regeneratesScheduleAsNewVersionAndPreservesConfirmedLine() {
         ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).policyVersionId(100L).scheduleVersionNo(1).status(ScheduleHeaderStatus.CONFIRMED).activeYn(true).build();
         InsuranceContract contract = InsuranceContract.builder().contractId(20L).contractDate(LocalDate.of(2026, 8, 10)).monthlyEquivalentFirstPremium(new BigDecimal("200000")).build();
@@ -132,6 +161,8 @@ class ScheduleServiceTest {
 
         assertThat(response.getScheduleHeaderId()).isEqualTo(11L);
         assertThat(response.getScheduleVersionNo()).isEqualTo(2L);
+        verify(scheduleMapper).lockContractForScheduleGeneration(20L);
+        verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
         ArgumentCaptor<ScheduleHeaderInsertDTO> headerCaptor = ArgumentCaptor.forClass(ScheduleHeaderInsertDTO.class);
         verify(scheduleMapper).insertScheduleHeader(headerCaptor.capture());
         assertThat(headerCaptor.getValue().getRegeneratedFromId()).isEqualTo(10L);
@@ -502,6 +533,10 @@ class ScheduleServiceTest {
                 .paymentStage(paymentStage)
                 .rules(List.of(rule))
                 .build();
+    }
+
+    private ScheduleLineInsertDTO scheduleLine(Long commissionItemId, int installmentNo, Long beneficiaryAgentId, ScheduleLineStatus status, String expectedAmount) {
+        return ScheduleLineInsertDTO.builder().commissionItemId(commissionItemId).installmentNo(installmentNo).beneficiaryAgentId(beneficiaryAgentId).expectedAmount(new BigDecimal(expectedAmount)).lineStatus(status).build();
     }
 
     private ResolvedCommissionRule rule(
