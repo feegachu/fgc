@@ -23,6 +23,12 @@ public class ValidationRunBatchAuditServiceImpl implements ValidationRunBatchAud
     }
 
     @Override
+    public void recordStepAdvanced(Long validationRunId, MonthlyValidationJobParameters parameters, int step) {
+        record("VALIDATION_RUN_STEP_ADVANCED", "VALIDATION_RUN", validationRunId, parameters,
+                "MonthlyValidationJob advanced to step " + step);
+    }
+
+    @Override
     public void recordFailed(Long validationRunId, MonthlyValidationJobParameters parameters, String failureMessage) {
         record("VALIDATION_RUN_FAILED", "VALIDATION_RUN", validationRunId, parameters, failureMessage);
     }

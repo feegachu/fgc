@@ -9,6 +9,8 @@ public interface ValidationRunBatchAuditService {
 
     void recordCompleted(Long validationRunId, MonthlyValidationJobParameters parameters);
 
+    void recordStepAdvanced(Long validationRunId, MonthlyValidationJobParameters parameters, int step);
+
     void recordFailed(Long validationRunId, MonthlyValidationJobParameters parameters, String failureMessage);
 
     void recordRunCreationFailed(Long jobExecutionId, MonthlyValidationJobParameters parameters, String failureMessage);

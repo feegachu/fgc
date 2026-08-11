@@ -53,7 +53,8 @@ class ValidationRunStepProgressListenerTest {
         listener.afterStep(stepExecution);
 
         verify(lifecycleService).start(100L, parameters());
-        verify(lifecycleService, never()).advance(anyLong(), anyInt());
+      
+        verify(lifecycleService, never()).advance(anyLong(), anyInt(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -64,7 +65,8 @@ class ValidationRunStepProgressListenerTest {
 
         listener.afterStep(stepExecution);
 
-        verify(lifecycleService).advance(100L, 3);
+        verify(lifecycleService).advance(100L, 3, parameters());
+
         verify(lifecycleService, never()).start(anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
@@ -90,8 +92,30 @@ class ValidationRunStepProgressListenerTest {
         listener.afterStep(stepExecution);
 
         verify(lifecycleService, never()).start(anyLong(), org.mockito.ArgumentMatchers.any());
-        verify(lifecycleService, never()).advance(anyLong(), anyInt());
+        verify(lifecycleService, never()).advance(anyLong(), anyInt(), org.mockito.ArgumentMatchers.any());
         verify(lifecycleService, never()).fail(anyLong(), anyInt(), org.mockito.ArgumentMatchers.any(), anyString());
+    }
+
+    @Test
+    // FGC-FUN-061: validation_run 생성 전 실패도 JobExecution ID로 감사 추적한다.
+    void recordsCreationFailureAuditWithJobExecutionIdWhenInitialStepFailsBeforeRunIsCreated() {
+        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(1, true, lifecycleService, auditService);
+        JobExecution jobExecution = new JobExecution(new JobInstance(7L, "MonthlyValidationJob"), validJobParameters());
+        jobExecution.setId(42L);
+        StepExecution stepExecution = new StepExecution("createRunStep", jobExecution);
+        stepExecution.setStatus(BatchStatus.FAILED);
+        stepExecution.addFailureException(new RuntimeException("duplicate monthly run"));
+
+        listener.afterStep(stepExecution);
+
+        verify(auditService).recordRunCreationFailed(org.mockito.ArgumentMatchers.eq(42L),
+                org.mockito.ArgumentMatchers.eq(parameters()), contains("duplicate monthly run"));
+    }
+
+    private static JobParameters validJobParameters() {
+        return new JobParametersBuilder().addString("validationMonth", "2026-08").addLong("runNo", 1L)
+                .addString("runType", "MONTHLY").addLong("triggeredBy", 12L)
+                .addString("requestId", "request-1").toJobParameters();
     }
 
     private static long eq(long value) {

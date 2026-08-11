@@ -18,8 +18,10 @@ public class ValidationRunBatchLifecycleServiceImpl implements ValidationRunBatc
     }
 
     @Override @Transactional
-    public void advance(Long id, int step) {
+    public void advance(Long id, int step, MonthlyValidationJobParameters parameters) {
         progressService.advanceStep(id, step);
+        auditService.recordStepAdvanced(id, parameters, step);
+
     }
 
     @Override @Transactional
