@@ -304,6 +304,16 @@ class CommissionPolicyServiceImplTest {
     }
 
     @Test
+    void prioritizesSpecificAgentRankRuleOverGeneralRuleRegardlessOfPriorityNumber() {
+        ResolvedCommissionRule generalRule = validRule().toBuilder().commissionRuleId(1000L).agentRankCode(null).priorityNo(10).build();
+        ResolvedCommissionRule fcRule = generalRule.toBuilder().commissionRuleId(1001L).agentRankCode(AgentRankCode.FC).priorityNo(20).build();
+
+        ResolvedCommissionPolicy result = resolveRules(List.of(generalRule, fcRule));
+
+        assertThat(result.getRules()).extracting(ResolvedCommissionRule::getCommissionRuleId).containsExactly(1001L);
+    }
+
+    @Test
     void rejectsRulesWithSameSelectionOrderAndPriority() {
         Long contractId = 10L;
         Long policyVersionId = 100L;
@@ -394,14 +404,15 @@ class CommissionPolicyServiceImplTest {
     }
 
     @Test
-    void handlesNullPolicyVersionIdWithoutMapCreationFailure() {
+    void rejectsPolicyWhenPolicyVersionIdIsMissing() {
         ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(null).build();
         given(policyMapper.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
-        given(policyMapper.findApplicableCommissionRules(null, 10L, PaymentStage.GA_TO_FC)).willReturn(List.of());
 
         assertThatThrownBy(() -> commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC))
                 .isInstanceOf(FgcBusinessException.class)
-                .isNotInstanceOf(NullPointerException.class);
+                .satisfies(exception -> assertThat(((FgcBusinessException) exception).getParams()).containsEntry("reason", "INVALID_POLICY"));
+
+        verify(policyMapper, never()).findApplicableCommissionRules(any(), any(), any());
     }
 
     // 정상 규칙의 공통 필드를 생성해 각 테스트가 검증 대상만 변경하도록 한다.
@@ -418,9 +429,14 @@ class CommissionPolicyServiceImplTest {
 
     // 단일 후보 규칙을 조회하는 공통 정책 시나리오를 실행한다.
     private ResolvedCommissionPolicy resolveSingleRule(ResolvedCommissionRule rule) {
+        return resolveRules(List.of(rule));
+    }
+
+    // 여러 후보 규칙을 조회하는 공통 정책 시나리오를 실행한다.
+    private ResolvedCommissionPolicy resolveRules(List<ResolvedCommissionRule> rules) {
         ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(100L).build();
         given(policyMapper.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
-        given(policyMapper.findApplicableCommissionRules(100L, 10L, PaymentStage.GA_TO_FC)).willReturn(List.of(rule));
+        given(policyMapper.findApplicableCommissionRules(100L, 10L, PaymentStage.GA_TO_FC)).willReturn(rules);
         return commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC);
     }
 }

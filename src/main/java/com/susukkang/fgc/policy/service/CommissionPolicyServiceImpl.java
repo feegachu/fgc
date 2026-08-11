@@ -1,6 +1,5 @@
 package com.susukkang.fgc.policy.service;
 
-import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -34,11 +33,12 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
     private static final int MAX_SUPPORTED_INSTALLMENT_NO = 84;
     private final PolicyMapper policyMapper;
 
-    // 운영정책서 제11조의 규칙 선택 순서: 상품 판매버전 > 보험사 > 조직 > priorityNo
+    // 운영정책서 제21조의 규칙 선택 순서: 상품 판매버전 > 보험사 > 조직 > 설계사 직급 > priorityNo
     private static final Comparator<ResolvedCommissionRule> RULE_SELECTION_ORDER =
             Comparator.comparing((ResolvedCommissionRule rule) -> rule.getProductOfferingId() != null).reversed()
                     .thenComparing(rule -> rule.getInsurerId() != null, Comparator.reverseOrder())
                     .thenComparing(rule -> rule.getOrganizationId() != null, Comparator.reverseOrder())
+                    .thenComparing(rule -> rule.getAgentRankCode() != null, Comparator.reverseOrder())
                     .thenComparing(ResolvedCommissionRule::getPriorityNo);
 
     /**
@@ -84,6 +84,20 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
             );
         }
         ResolvedCommissionPolicy policy = policies.getFirst();
+
+        // 정책 버전 ID가 없는 비정상 정책은 규칙 조회 전에 차단한다.
+        if (policy.getPolicyVersionId() == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "commissionPolicy",
+                    Map.of(
+                            "contractId", contractId,
+                            "paymentStage", paymentStage.name(),
+                            "reason", "INVALID_POLICY"
+                    ),
+                    "수수료 정책 버전 정보가 올바르지 않습니다."
+            );
+        }
 
         List<ResolvedCommissionRule> rules =
                 policyMapper.findApplicableCommissionRules(
@@ -143,7 +157,6 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
                 RuleKey key = new RuleKey(
                         rule.getCommissionItemId(),
-                        rule.getAgentRankCode(),
                         installmentNo
                 );
                 rulesByKey.computeIfAbsent(key, ignored -> new ArrayList<>())
@@ -173,15 +186,14 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
         );
         return List.copyOf(resolvedRules);
     }
-    /** 수수료 항목, 지급 대상 직급 및 회차로 구성된 최종 규칙 선택 키. */
+    /** 수수료 항목과 회차로 구성된 최종 규칙 선택 키. */
     private record RuleKey(
             Long commissionItemId,
-            AgentRankCode agentRankCode,
             int installmentNo
     ) {
     }
 
-    /** 그룹 안에서 상품 판매버전, 보험사, 조직, priorityNo 순으로 우선 규칙을 선택한다. */
+    /** 그룹 안에서 상품 판매버전, 보험사, 조직, 설계사 직급, priorityNo 순으로 우선 규칙을 선택한다. */
     private ResolvedCommissionRule selectMostApplicableRule(
             RuleKey key,
             List<ResolvedCommissionRule> candidates,
@@ -201,7 +213,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     Map.of(
                             "policyVersionId", String.valueOf(policyVersionId),
                             "commissionItemId", String.valueOf(key.commissionItemId()),
-                            "agentRankCode", String.valueOf(key.agentRankCode()),
+                            "agentRankCode", String.valueOf(winner.getAgentRankCode()),
                             "installmentNo", key.installmentNo(),
                             "reason", "RULE_DUPLICATE"
                     ),
