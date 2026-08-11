@@ -244,7 +244,7 @@
     <!-- 목업의 sessionStorage + fgc:month-change 커스텀이벤트를 ?month= 전체 리로드로 대체한다.
          SIR-006 이 1차를 MPA 위주로 규정한다 — Ajax 는 한도게이지·검증실행·대사상세만. -->
     <select class="fgc-select" id="fgc-month" style="padding:5px 8px"
-            onchange="var u=new URL(location);u.searchParams.set('month',this.value);location=u">
+            onchange="var u=new window.URL(location);u.searchParams.set('month',this.value);location=u">
       <option th:each="m : ${monthOptions}" th:value="${m}" th:text="${m}"
               th:selected="${m == month}">2026-07</option>
     </select>
