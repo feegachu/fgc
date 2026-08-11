@@ -31,10 +31,20 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
     }
 
     /**
-     * afterStep은 Spring Batch가 "이 Step이 성공했든 실패했든, 끝난 직후" 정확히 한 번 불러주는 콜백
+     * afterStep은 Spring Batch가 "이 Step이 성공했든 실패했든, 끝난 직후" 정확히 한 번 불러주는 콜백.
      */
     @Override
     public ExitStatus afterStep(StepExecution stepExecution) {
+        try {
+            return doAfterStep(stepExecution);
+        } catch (RuntimeException e) {
+            log.error("Step {}({}) 진행상황 기록 중 예외가 발생해 Job을 FAILED로 전파합니다",
+                    stepNo, stepExecution.getStepName(), e);
+            return ExitStatus.FAILED;
+        }
+    }
+
+    private ExitStatus doAfterStep(StepExecution stepExecution) {
         // 1) 이 Step이 속한 Job 전체의 ExecutionContext에서 validationRunId를 꺼냄
         Long validationRunId = ValidationRunBatchContext.getValidationRunId(
                 stepExecution.getJobExecution().getExecutionContext());

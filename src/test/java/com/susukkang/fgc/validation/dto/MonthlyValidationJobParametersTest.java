@@ -97,6 +97,16 @@ class MonthlyValidationJobParametersTest {
     }
 
     @Test
+    // ValidationJobContext(batch.contract)가 triggeredBy<=0을 거부하는 것과 기준을 맞춘다
+    void rejectsTriggeredByBelowOne() {
+        JobParameters params = validBuilder().addLong("triggeredBy", 0L).toJobParameters();
+
+        assertThatThrownBy(() -> MonthlyValidationJobParameters.from(params))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("triggeredBy");
+    }
+
+    @Test
     void rejectsBlankRequestId() {
         JobParameters params = validBuilder().addString("requestId", "  ").toJobParameters();
 

@@ -8,16 +8,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.StepExecution;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -92,6 +95,22 @@ class ValidationRunStepProgressListenerTest {
         verify(lifecycleService, never()).start(anyLong(), org.mockito.ArgumentMatchers.any());
         verify(lifecycleService, never()).advance(anyLong(), anyInt());
         verify(lifecycleService, never()).fail(anyLong(), anyInt(), org.mockito.ArgumentMatchers.any(), anyString());
+    }
+
+    @Test
+    // lifecycleService.advance가 예외를 던지면(예: VRUN_005 상태 충돌) afterStep이 그걸 삼키지
+    // 않고 ExitStatus.FAILED로 바꿔 돌려줘야 Job이 그 자리에서 멈추고 다음 Step이 안 돈다
+    // (실제로 예외가 그냥 던져지면 Spring Batch가 로그만 남기고 다음 Step을 계속 실행한다는
+    // 것을 별도 스크래치 테스트로 재현 확인했다).
+    void wrapsLifecycleServiceExceptionIntoFailedExitStatus() {
+        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(3, false, lifecycleService, auditService);
+        StepExecution stepExecution = stepExecutionWithRunId(100L);
+        stepExecution.setStatus(BatchStatus.COMPLETED);
+        willThrow(new RuntimeException("db down")).given(lifecycleService).advance(100L, 3);
+
+        ExitStatus result = listener.afterStep(stepExecution);
+
+        assertThat(result).isEqualTo(ExitStatus.FAILED);
     }
 
     private static long eq(long value) {

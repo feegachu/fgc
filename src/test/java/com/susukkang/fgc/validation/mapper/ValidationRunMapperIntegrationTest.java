@@ -276,6 +276,7 @@ class ValidationRunMapperIntegrationTest {
         assertThat(affected).isEqualTo(1);
         ValidationRunRow row = validationRunMapper.findById(id);
         assertThat(row.getStatus()).isEqualTo("RUNNING");
+        assertThat(row.getCurrentStep()).isEqualTo(1);
         assertThat(row.getStartedAt()).isNotNull();
     }
 
@@ -301,6 +302,7 @@ class ValidationRunMapperIntegrationTest {
         assertThat(affected).isEqualTo(1);
         ValidationRunRow row = validationRunMapper.findById(id);
         assertThat(row.getStatus()).isEqualTo("RUNNING");
+        assertThat(row.getCurrentStep()).isEqualTo(4);
     }
 
     @Test
@@ -315,6 +317,32 @@ class ValidationRunMapperIntegrationTest {
     }
 
     @Test
+    // current_step을 이미 지나온 단계 번호로 되돌릴 수 없다(0건) — 역행 방지
+    void updateCurrentStepReturnsZeroWhenGoingBackward() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+        validationRunMapper.updateCurrentStep(id, 5);
+
+        int affected = validationRunMapper.updateCurrentStep(id, 3);
+
+        assertThat(affected).isZero();
+        assertThat(validationRunMapper.findById(id).getCurrentStep()).isEqualTo(5);
+    }
+
+    @Test
+    // journalPostingStep·imbalanceCheckStep이 같은 stepNo=6을 공유 — 같은 값으로 다시
+    // 호출해도(역행이 아니라 제자리) 성공해야 한다
+    void updateCurrentStepAllowsSettingTheSameStepAgain() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunMapper.transitionToRunning(id);
+        validationRunMapper.updateCurrentStep(id, 6);
+
+        int affected = validationRunMapper.updateCurrentStep(id, 6);
+
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
     // RUNNING → COMPLETED 전이 시 current_step=8, completed_at도 같이 채워지는지
     void transitionToCompletedSetsStatusStepAndCompletedAt() {
         Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
@@ -325,6 +353,7 @@ class ValidationRunMapperIntegrationTest {
         assertThat(affected).isEqualTo(1);
         ValidationRunRow row = validationRunMapper.findById(id);
         assertThat(row.getStatus()).isEqualTo("COMPLETED");
+        assertThat(row.getCurrentStep()).isEqualTo(8);
         assertThat(row.getCompletedAt()).isNotNull();
     }
 
@@ -340,6 +369,7 @@ class ValidationRunMapperIntegrationTest {
         assertThat(affected).isEqualTo(1);
         ValidationRunRow row = validationRunMapper.findById(id);
         assertThat(row.getStatus()).isEqualTo("FAILED");
+        assertThat(row.getCurrentStep()).isEqualTo(5);
         assertThat(row.getFailureMessage()).isEqualTo("차익거래 검증 중 예외 발생");
     }
 

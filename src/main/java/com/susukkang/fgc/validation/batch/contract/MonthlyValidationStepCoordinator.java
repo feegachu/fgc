@@ -28,8 +28,10 @@ public class MonthlyValidationStepCoordinator {
         return targetSelectionPort.selectTargets(context);
     }
 
-    public StepProcessingResult regenerateSchedules(ValidationStepContext context) {
-        return scheduleRegenerationPort.regenerateSchedules(context);
+    public StepProcessingResult regenerateSchedules(ValidationStepContext context, long skipLimit) {
+        StepProcessingResult result = scheduleRegenerationPort.regenerateSchedules(context);
+        enforceSkipLimit("regenerateScheduleStep", result, skipLimit);
+        return result;
     }
 
     public StepProcessingResult checkCaps(ValidationStepContext context, PaymentStage paymentStage, long skipLimit) {
@@ -38,8 +40,10 @@ public class MonthlyValidationStepCoordinator {
         return result;
     }
 
-    public StepProcessingResult checkArbitrage(ValidationStepContext context) {
-        return arbitrageCheckBatchPort.check(context);
+    public StepProcessingResult checkArbitrage(ValidationStepContext context, long skipLimit) {
+        StepProcessingResult result = arbitrageCheckBatchPort.check(context);
+        enforceSkipLimit("arbitrageCheckStep", result, skipLimit);
+        return result;
     }
 
     public JournalPostingResult postJournals(ValidationStepContext context) {

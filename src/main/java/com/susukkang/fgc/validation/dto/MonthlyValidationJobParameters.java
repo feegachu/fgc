@@ -46,10 +46,12 @@ public record MonthlyValidationJobParameters(
             throw new IllegalArgumentException("runType 값이 올바르지 않습니다: " + runTypeRaw, e);
         }
 
-        // triggeredBy: 형식 검증이 필요 없는 단순 필수값이라 null 체크만
+        // triggeredBy: ValidationJobContext(batch.contract 패키지)가 <= 0을 거부하는 것과
+        // 기준을 맞춘다 — 여기서 걸러야 할 값을 통과시키면 이후 ValidationJobContext 생성
+        // 시점에서야 실패해 Job 검증 단계의 의미가 없어진다.
         Long triggeredBy = jobParameters.getLong("triggeredBy");
-        if (triggeredBy == null) {
-            throw new IllegalArgumentException("triggeredBy는 필수입니다.");
+        if (triggeredBy == null || triggeredBy <= 0) {
+            throw new IllegalArgumentException("triggeredBy는 1 이상이어야 합니다: " + triggeredBy);
         }
 
         // requestId: 2-5절 헤더(X-Request-Id)와 같은 값을 배치에도 남겨서, 사람이 호출한

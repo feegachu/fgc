@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,15 +31,53 @@ class MonthlyValidationStepCoordinatorTest {
     @Test
     void capCheckPassesPaymentStageAndFailsWhenSkipLimitIsExceeded() {
         MonthlyValidationStepCoordinator coordinator = coordinator();
-        StepProcessingResult result = new StepProcessingResult(10, 2, 0,
-                List.of(new ContractSkip(1L, "MISSING_DATA", "missing"),
-                        new ContractSkip(2L, "MISSING_DATA", "missing")));
+        StepProcessingResult result = twoSkipsResult();
         when(capCheckBatchPort.check(stepContext(), PaymentStage.GA_TO_FC)).thenReturn(result);
 
         assertThatThrownBy(() -> coordinator.checkCaps(stepContext(), PaymentStage.GA_TO_FC, 1))
                 .isInstanceOf(SkipLimitExceededException.class);
 
         verify(capCheckBatchPort).check(stepContext(), PaymentStage.GA_TO_FC);
+    }
+
+    @Test
+    // skip 건수가 한도(2) 이내면 통과 — 한도 직전 경계값
+    void capCheckSucceedsWhenSkipCountIsAtTheLimit() {
+        MonthlyValidationStepCoordinator coordinator = coordinator();
+        StepProcessingResult result = twoSkipsResult();
+        when(capCheckBatchPort.check(stepContext(), PaymentStage.GA_TO_FC)).thenReturn(result);
+
+        StepProcessingResult actual = coordinator.checkCaps(stepContext(), PaymentStage.GA_TO_FC, 2);
+
+        assertThat(actual).isSameAs(result);
+    }
+
+    @Test
+    // regenerateScheduleStep(③)도 skip 한도를 검사해야 한다 — checkCaps에만 있던 검사를 확장
+    void regenerateSchedulesFailsWhenSkipLimitIsExceeded() {
+        MonthlyValidationStepCoordinator coordinator = coordinator();
+        StepProcessingResult result = twoSkipsResult();
+        when(scheduleRegenerationPort.regenerateSchedules(stepContext())).thenReturn(result);
+
+        assertThatThrownBy(() -> coordinator.regenerateSchedules(stepContext(), 1))
+                .isInstanceOf(SkipLimitExceededException.class);
+    }
+
+    @Test
+    // arbitrageCheckStep(⑤)도 skip 한도를 검사해야 한다 — checkCaps에만 있던 검사를 확장
+    void checkArbitrageFailsWhenSkipLimitIsExceeded() {
+        MonthlyValidationStepCoordinator coordinator = coordinator();
+        StepProcessingResult result = twoSkipsResult();
+        when(arbitrageCheckBatchPort.check(stepContext())).thenReturn(result);
+
+        assertThatThrownBy(() -> coordinator.checkArbitrage(stepContext(), 1))
+                .isInstanceOf(SkipLimitExceededException.class);
+    }
+
+    private StepProcessingResult twoSkipsResult() {
+        return new StepProcessingResult(10, 2, 0,
+                List.of(new ContractSkip(1L, "MISSING_DATA", "missing"),
+                        new ContractSkip(2L, "MISSING_DATA", "missing")));
     }
 
     @Test
@@ -73,7 +112,7 @@ class MonthlyValidationStepCoordinatorTest {
         ValidationJobContext jobContext = jobContext();
         ValidationRunCreationResult creationResult = new ValidationRunCreationResult(100L);
         StepProcessingResult result = StepProcessingResult.success(5);
-        JournalPostingResult journalResult = new JournalPostingResult(5, 0);
+        JournalPostingResult journalResult = JournalPostingResult.success(5);
 
         when(validationRunCreationPort.create(jobContext)).thenReturn(creationResult);
         when(targetSelectionPort.selectTargets(stepContext())).thenReturn(result);
@@ -84,8 +123,8 @@ class MonthlyValidationStepCoordinatorTest {
 
         coordinator.createRun(jobContext);
         coordinator.selectTargets(stepContext());
-        coordinator.regenerateSchedules(stepContext());
-        coordinator.checkArbitrage(stepContext());
+        coordinator.regenerateSchedules(stepContext(), 100);
+        coordinator.checkArbitrage(stepContext(), 100);
         coordinator.postJournals(stepContext());
         coordinator.generateExceptions(stepContext());
 
