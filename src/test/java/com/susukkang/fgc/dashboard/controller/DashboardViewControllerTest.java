@@ -109,7 +109,10 @@ class DashboardViewControllerTest {
                 // 런타임은 정상이다. 표현식을 문자열 리터럴 결합으로 바꾼 뒤에도 결과가 같아야 한다.
                 .andExpect(content().string(containsString("업무 대시보드 (FGC-UI-DASH-W01) · FGC")))
                 .andExpect(content().string(containsString("2026-07-01 · 1회차")))
-                .andExpect(content().string(containsString("8/10 단계 · 실행 gaadmin")));
+                .andExpect(content().string(containsString("8/10 단계 · 실행 gaadmin")))
+                // FUN-057 인수조건 "항목 클릭 시 해당 목록으로 이동" —
+                // 화면정의서 "③ 최근 예외 5건 목록 — 클릭하면 예외함으로 이동"
+                .andExpect(content().string(containsString("/exceptions?contractNo=C001")));
     }
 
     @Test

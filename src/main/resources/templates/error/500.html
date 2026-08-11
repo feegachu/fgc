@@ -6,10 +6,13 @@
   <div class="fgc-card" style="max-width:560px;margin-top:40px">
     <div class="fgc-card__head"><span class="fgc-card__title">500 · 처리 오류</span></div>
     <div class="fgc-card__body">
-      <p>처리 중 오류가 발생했습니다.</p>
-      <!-- 부록 A FGC-COMMON-500 — 담당자가 로그를 찾을 수 있도록 요청번호를 반드시 보여준다. -->
-      <p class="fgc-help">
-        요청번호 <span class="fgc-mono" th:text="${requestId} ?: '-'">-</span> 를 담당자에게 알려주세요.
+      <!-- 인터페이스정의서 3-3 SIR-007 규칙 3·4 — 문구는 messages.properties 에만 두고
+           화면과 JSON 이 같은 키를 쓴다. GlobalExceptionHandler 도 같은 error.common.internal 을
+           FgcErrorCode.COMMON_500 으로 내보내므로, 여기에 문자열을 다시 적으면 나중에 둘이 갈라진다.
+           FgcMessageResolver 가 {requestId} 를 단순 치환하는 방식이라 같은 방식으로 맞춘다
+           (MessageFormat 의 {0} 문법이 아니다). 부록 A FGC-COMMON-500 이 요구하는 요청번호다. -->
+      <p th:text="${#strings.replace(#messages.msg('error.common.internal'), '{requestId}', requestId ?: '-')}">
+        처리 중 오류가 발생했습니다. 요청번호 -를 담당자에게 알려주세요.
       </p>
       <a class="fgc-btn fgc-btn--ghost" th:href="@{/}" style="margin-top:16px;text-decoration:none">대시보드로</a>
     </div>
