@@ -231,6 +231,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 request.paymentStage(),
                 request.allocationPolicyVersion(),
                 request.attributions(),
+                request.evidenceRef(),
                 request.note()
         );
     }
@@ -253,6 +254,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 request.paymentStage(),
                 request.allocationPolicyVersion(),
                 request.attributions(),
+                request.evidenceRef(),
                 request.note()
         );
     }
@@ -271,6 +273,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             com.susukkang.fgc.common.code.PaymentStage paymentStage,
             Long policyVersionId,
             List<CommissionPaymentAttributionRequest> attributionRequests,
+            String evidenceRef,
             String note
     ) {
         // 2026-08-11 yslee - 외부 요청값 검증과 원 단위 저장 규칙을 지급 건 생성 경로에 일괄 적용
@@ -285,6 +288,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 settlementMonth
         );
         validateCashflowType(cashflowType, item);
+        validatePaymentEvidence(evidenceRef, attributionRequests);
         validateAttributionMethodCompatibility(item.itemCode(), attributionRequests);
         validatePolicyVersion(policyVersionId);
         if (sourceContractId != null) {
@@ -325,10 +329,26 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .dueDate(dueDate)
                 .amount(MoneyUtil.roundWon(amount))
                 .cashflowType(cashflowType)
+                .evidenceRef(evidenceRef)
                 .note(note)
                 .naturalContractId(naturalContractId)
                 .build();
         return new PreparedPayment(payment, attributions);
+    }
+
+    // 2026-08-11 yslee - 지급 건 본문의 제외 증빙 참조를 화면·DB 계약에 맞게 검증
+    // 기존 코드: 귀속행 evidenceRef만 검증하고 commission_transaction.evidence_ref는 요청·저장에서 누락
+    // 문제: TRAN-W02 지급 건 증빙을 입력해도 보존할 수 없고 제외 지급의 원천 근거를 감사에서 추적할 수 없음
+    // 개선: 제외 귀속이 하나라도 있으면 지급 건 증빙을 필수화하고 부모·귀속행 증빙을 각각 저장
+    private void validatePaymentEvidence(
+            String evidenceRef,
+            List<CommissionPaymentAttributionRequest> attributionRequests
+    ) {
+        boolean hasExcludedAttribution = attributionRequests.stream()
+                .anyMatch(request -> request.inclusionDecisionStatus() == InclusionDecisionStatus.EXCLUDED);
+        if (hasExcludedAttribution && !StringUtils.hasText(evidenceRef)) {
+            throw new FgcBusinessException(FgcErrorCode.TRAN_004);
+        }
     }
 
     private CommissionPaymentAttributionCommand buildAttribution(

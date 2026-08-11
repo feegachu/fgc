@@ -71,11 +71,18 @@ class CommissionPaymentIntegrationTest {
 
         assertThat(created.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         assertThat(created.contractId()).isEqualTo(1L);
+        assertThat(created.evidenceRef()).isEqualTo("IT-PAYMENT-EVIDENCE");
         assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(confirmed.attributions()).singleElement()
                 .extracting(attribution -> attribution.contractId())
                 .isEqualTo(1L);
         assertThat(confirmed.allocationPolicyVersion()).isEqualTo(4L);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT evidence_ref
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, String.class, created.paymentId()))
+                .isEqualTo("IT-PAYMENT-EVIDENCE");
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT attribution_date
                   FROM fgc.transaction_attribution
@@ -124,6 +131,7 @@ class CommissionPaymentIntegrationTest {
                 source.paymentStage(),
                 source.allocationPolicyVersion(),
                 List.of(),
+                source.evidenceRef(),
                 source.note()
         );
 
@@ -235,6 +243,7 @@ class CommissionPaymentIntegrationTest {
                         attribution(1L, new BigDecimal("10")),
                         attribution(secondContractId, new BigDecimal("10"))
                 ),
+                "IT-PAYMENT-EVIDENCE-MULTI",
                 "다중 계약 귀속 통합 테스트"
         );
 
@@ -712,6 +721,7 @@ class CommissionPaymentIntegrationTest {
                         "IT-EVIDENCE",
                         AttributionMethod.DIRECT
                 )),
+                "IT-PAYMENT-EVIDENCE",
                 "rollback integration test"
         );
     }
@@ -759,6 +769,7 @@ class CommissionPaymentIntegrationTest {
                                 attribution.attributionMethod()
                         ))
                         .toList(),
+                source.evidenceRef(),
                 source.note()
         );
     }

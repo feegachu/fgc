@@ -83,6 +83,7 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(jsonPath("$.data.commissionTransactionId").value(101))
                 .andExpect(jsonPath("$.data.status").value("DRAFT"))
                 .andExpect(jsonPath("$.data.settlementMonth").value("2026-07-01"))
+                .andExpect(jsonPath("$.data.evidenceRef").value("PAYMENT-EVIDENCE"))
                 .andExpect(jsonPath("$.data.attributions[0].attributionDate").value("2026-07-10"))
                 .andExpect(jsonPath("$.data.attributions[0].attributionMonth").value("2026-07-01"));
     }
@@ -248,6 +249,7 @@ class CommissionPaymentApiControllerTest {
                 java.util.Map.entry("scheduledPaymentDate", "2026-07-25"),
                 java.util.Map.entry("paymentStage", "GA_TO_FC"),
                 java.util.Map.entry("allocationPolicyVersion", 3L),
+                java.util.Map.entry("evidenceRef", "PAYMENT-EVIDENCE"),
                 java.util.Map.entry("attributions", List.of(java.util.Map.of(
                         "contractId", 3L,
                         "attributionDate", "2026-07-10",
@@ -303,6 +305,7 @@ class CommissionPaymentApiControllerTest {
                 )),
                 List.of(55L),
                 null,
+                "PAYMENT-EVIDENCE",
                 null,
                 OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-07-01T09:00:00+09:00")

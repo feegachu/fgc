@@ -654,7 +654,7 @@ contract/
 ```
 
 * JSON API 응답
-* `/api` 경로 사용
+* `/api/v1` 경로 사용
 
 ### 명명 규칙
 

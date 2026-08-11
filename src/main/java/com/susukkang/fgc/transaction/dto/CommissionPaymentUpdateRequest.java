@@ -25,6 +25,10 @@ import java.util.List;
 // 기존 코드: 수정 요청에 원천 업무키가 없고 항목 코드·귀속월 중심의 내부 전용 필드를 사용
 // 문제: DRAFT 원장의 자연키와 실제 귀속일을 수정 API로 온전히 보존하거나 변경할 수 없음
 // 개선: 원천유형·업무키·항목 ID·정산월·현금흐름과 실제 귀속일 목록을 등록 API와 동일하게 입력
+// 2026-08-11 yslee - 지급 건 본문 증빙 참조를 IF-API-23 수정 요청에 추가
+// 기존 코드: DRAFT 수정 시 지급 건 증빙을 보존하거나 변경할 입력값이 없음
+// 문제: 수정 API 호출 후 commission_transaction.evidence_ref가 계속 NULL로 유지
+// 개선: 등록 요청과 같은 evidenceRef 계약으로 부모 증빙을 수정 가능하게 구성
 public record CommissionPaymentUpdateRequest(
         @NotBlank @Pattern(regexp = "GA_MANUAL_PAYMENT") String sourceType,
         @NotBlank @Size(max = 160) String sourceBusinessKey,
@@ -38,6 +42,7 @@ public record CommissionPaymentUpdateRequest(
         @NotNull PaymentStage paymentStage,
         Long allocationPolicyVersion,
         @NotNull List<@NotNull @Valid CommissionPaymentAttributionRequest> attributions,
+        @Size(max = 500) String evidenceRef,
         @Size(max = 1000) String note
 ) {
 }

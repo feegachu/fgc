@@ -186,6 +186,7 @@ class CommissionPaymentServiceImplTest {
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
         verify(mapper).insertTransaction(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getAmount()).isEqualByComparingTo("301");
+        assertThat(paymentCaptor.getValue().getEvidenceRef()).isEqualTo("PAYMENT-EVIDENCE");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> attributionCaptor =
@@ -231,6 +232,7 @@ class CommissionPaymentServiceImplTest {
                 source.paymentStage(),
                 source.allocationPolicyVersion(),
                 source.attributions(),
+                source.evidenceRef(),
                 source.note()
         );
 
@@ -945,6 +947,51 @@ class CommissionPaymentServiceImplTest {
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_004));
     }
 
+    // 2026-08-11 yslee - 지급 건 본문과 귀속행의 제외 증빙을 별도 계약으로 검증
+    // 기존 코드: 귀속행 evidenceRef만 있으면 commission_transaction.evidence_ref 없이도 DRAFT 저장
+    // 문제: 지급 원천 근거와 귀속 판정 근거를 분리 보존하는 TRAN-W02·V1 스키마 계약이 누락
+    // 개선: 제외 귀속행 자체에 증빙이 있어도 지급 건 evidenceRef가 없으면 TRAN-004로 차단
+    @Test
+    void rejectsExcludedAttributionWithoutPaymentEvidence() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        CommissionPaymentAttributionRequest excluded = new CommissionPaymentAttributionRequest(
+                3L,
+                LocalDate.of(2026, 7, 3),
+                new BigDecimal("500000"),
+                InclusionDecisionStatus.EXCLUDED,
+                ExclusionType.VOICE_RECORDING,
+                "녹취비 제외",
+                "DIRECT",
+                "ATTRIBUTION-EVIDENCE",
+                AttributionMethod.DIRECT
+        );
+        CommissionPaymentCreateRequest source = createRequest(List.of(excluded));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                source.amount(),
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                source.allocationPolicyVersion(),
+                source.attributions(),
+                null,
+                source.note()
+        );
+
+        assertThatThrownBy(() -> service.create(request))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_004));
+
+        verify(mapper, never()).insertTransaction(any());
+    }
+
     @Test
     void rejectsComplianceExclusionForGaToFcStage() {
         stubReferences(3L);
@@ -1017,6 +1064,7 @@ class CommissionPaymentServiceImplTest {
                 PaymentStage.GA_TO_FC,
                 3L,
                 attributions,
+                "PAYMENT-EVIDENCE",
                 "수기 등록"
         );
     }
@@ -1038,6 +1086,7 @@ class CommissionPaymentServiceImplTest {
                 request.paymentStage(),
                 request.allocationPolicyVersion(),
                 request.attributions(),
+                request.evidenceRef(),
                 request.note()
         );
     }
@@ -1059,6 +1108,7 @@ class CommissionPaymentServiceImplTest {
                 source.paymentStage(),
                 source.allocationPolicyVersion(),
                 source.attributions(),
+                source.evidenceRef(),
                 source.note()
         );
     }
@@ -1279,6 +1329,7 @@ class CommissionPaymentServiceImplTest {
                 PaymentStage.GA_TO_FC,
                 status,
                 3L,
+                "PAYMENT-EVIDENCE",
                 "수기 등록",
                 OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-07-01T09:00:00+09:00")

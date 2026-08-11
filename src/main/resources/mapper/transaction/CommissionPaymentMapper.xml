@@ -64,6 +64,10 @@
         )
     </select>
 
+    <!-- 2026-08-11 yslee - 지급 건 본문 증빙을 등록·수정·조회 SQL에 연결 -->
+    <!-- 기존 코드: transaction_attribution.evidence_ref만 저장하고 부모 evidence_ref는 항상 NULL -->
+    <!-- 문제: 화면의 지급 원천 증빙과 DB commission_transaction 컬럼이 API 왕복 과정에서 누락 -->
+    <!-- 개선: CommissionPaymentCommand.evidenceRef를 부모 행에 저장하고 응답 조회에 포함 -->
     <insert id="insertTransaction"
             useGeneratedKeys="true"
             keyProperty="paymentId"
@@ -81,6 +85,7 @@
             amount,
             cashflow_type,
             status,
+            evidence_ref,
             note
         ) VALUES (
             #{paymentStage},
@@ -95,6 +100,7 @@
             #{amount},
             #{cashflowType},
             'DRAFT',
+            #{evidenceRef},
             #{note}
         )
     </insert>
@@ -112,6 +118,7 @@
                due_date = #{dueDate},
                amount = #{amount},
                cashflow_type = #{cashflowType},
+               evidence_ref = #{evidenceRef},
                note = #{note}
          WHERE commission_transaction_id = #{paymentId}
            AND status = 'DRAFT'
@@ -198,6 +205,7 @@
                ct.payment_stage,
                ct.status,
                ct.policy_version_id AS allocation_policy_version,
+               ct.evidence_ref,
                ct.note,
                ct.created_at,
                ct.updated_at
