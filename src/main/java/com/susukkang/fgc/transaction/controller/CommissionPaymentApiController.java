@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -36,7 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 // 개선: 지급 건 등록·수정·확정 API를 /api/v1/transactions로 통일
 @RequestMapping("/api/v1/transactions")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('SETTLEMENT')")
+// 2026-08-11 yslee - 지급 API 권한을 역할 매트릭스의 정산담당자·시스템관리자로 제한
+// 기존 코드: SETTLEMENT만 허용하여 모든 기능 권한을 가진 SYSTEM_ADMIN도 접근 차단
+// 문제: 인터페이스 정의서의 SYSTEM_ADMIN 전부 권한과 FUN-065 API 인가가 불일치
+// 개선: SETTLEMENT 업무권한을 유지하면서 SYSTEM_ADMIN의 전체관리 권한도 허용
+@PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
 public class CommissionPaymentApiController {
 
     private final CommissionPaymentService commissionPaymentService;
@@ -113,8 +118,10 @@ public class CommissionPaymentApiController {
     @PostMapping("/{paymentId}/confirm")
     public ApiResponse<CommissionPaymentResponse> confirm(
             @Parameter(description = "지급 건 ID", required = true)
-            @PathVariable Long paymentId
+            @PathVariable Long paymentId,
+            @Parameter(description = "확정 재요청 중복 방지 키")
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        return ApiResponse.success(commissionPaymentService.confirm(paymentId));
+        return ApiResponse.success(commissionPaymentService.confirm(paymentId, idempotencyKey));
     }
 }

@@ -36,11 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 설명 : 수수료 지급 건 등록·수정·확정 서비스
@@ -77,7 +79,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         requireDraft(current.get(0));
 
         PreparedPayment prepared = commandFrom(paymentId, request);
-        mapper.updateTransaction(prepared.payment());
+        if (mapper.updateTransaction(prepared.payment()) != 1) {
+            throw new FgcBusinessException(FgcErrorCode.TRAN_005);
+        }
+        mapper.detachPreConfirmDetails(paymentId);
         mapper.deleteAttributions(paymentId);
         persistAttributions(paymentId, prepared.attributions());
         return requirePayment(paymentId);
@@ -87,12 +92,23 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 2026-08-10 yslee - 확정 검증 결과와 예외 이력을 지급 건 확정 트랜잭션으로 통합
     // 기존 코드: 잠긴 지급 건을 참조하는 한도 점검을 REQUIRES_NEW 트랜잭션에서 저장
     // 문제: 부모 지급 건의 FOR UPDATE 잠금과 FK 검사가 충돌하고 이슈 #14의 동일 트랜잭션 조건을 위반
-    // 개선: 확정 거절 예외만 롤백 대상에서 제외하고 점검·예외·상태 처리를 한 트랜잭션에서 수행
+    // 개선: 같은 계약 행 잠금과 멱등키를 포함해 점검·예외·상태 처리를 한 트랜잭션에서 수행
     @Transactional(noRollbackFor = CommissionPaymentConfirmationRejectedException.class)
-    public CommissionPaymentResponse confirm(Long paymentId) {
+    public CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey) {
+        validateIdempotencyKey(idempotencyKey);
+        String normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey);
         List<ConfirmationData> attributions = requireConfirmationData(paymentId);
+        ConfirmationData first = attributions.get(0);
+        if (first.status() == CommissionPaymentStatus.CONFIRMED
+                && normalizedIdempotencyKey != null
+                && normalizedIdempotencyKey.equals(first.confirmIdempotencyKey())) {
+            return requirePayment(paymentId, mapper.findCapCheckIds(paymentId));
+        }
         requireDraft(attributions.get(0));
+        mapper.lockAttributedContracts(paymentId);
         validateConfirmationRequiredValues(attributions);
+
+        List<Long> capCheckIds = new ArrayList<>();
 
         // 2026-08-10 yslee - 지급 건의 모든 계약별 귀속행을 독립 검증
         // 기존 코드: attribution_seq=1인 단일 귀속행만 FUN-033 검증
@@ -104,7 +120,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             CapCalculationResult calculation = calculateLimit(
                     data.contractId(),
                     data.paymentStage(),
-                    data.attributionMonth(),
+                    data.attributionDate(),
                     rule.complianceEvidenceAmount()
             );
             validateRuleConsistency(rule, calculation, data);
@@ -124,6 +140,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
             mapper.insertCapCheck(check);
             mapper.insertCapCheckDetail(check);
+            capCheckIds.add(check.getCapCheckId());
 
             if (check.getResultStatus() == CapResultStatus.REVIEW_REQUIRED) {
                 rejectWithException(
@@ -160,10 +177,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             }
         }
 
-        if (mapper.confirm(paymentId) != 1) {
+        String capCheckIdsCsv = capCheckIds.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
+        if (mapper.confirm(paymentId, normalizedIdempotencyKey, capCheckIdsCsv) != 1) {
             throw new FgcBusinessException(FgcErrorCode.TRAN_005);
         }
-        return requirePayment(paymentId);
+        return requirePayment(paymentId, capCheckIds);
     }
 
     private ExceptionCaseCommand exceptionCommand(
@@ -194,13 +214,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private PreparedPayment commandFrom(CommissionPaymentCreateRequest request) {
         return buildCommand(
                 null,
+                request.sourceType(),
                 request.sourceBusinessKey(),
                 request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
-                request.commissionItemCode(),
+                request.commissionItemId(),
                 request.amount(),
-                request.attributionMonth(),
+                request.settlementMonth(),
+                request.cashflowType(),
                 request.scheduledPaymentDate(),
                 request.paymentStage(),
                 request.allocationPolicyVersion(),
@@ -215,13 +237,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     ) {
         return buildCommand(
                 paymentId,
-                null,
+                request.sourceType(),
+                request.sourceBusinessKey(),
                 request.paymentSequence(),
                 request.contractId(),
                 request.agentId(),
-                request.commissionItemCode(),
+                request.commissionItemId(),
                 request.amount(),
-                request.attributionMonth(),
+                request.settlementMonth(),
+                request.cashflowType(),
                 request.scheduledPaymentDate(),
                 request.paymentStage(),
                 request.allocationPolicyVersion(),
@@ -232,24 +256,34 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private PreparedPayment buildCommand(
             Long paymentId,
+            String sourceType,
             String sourceBusinessKey,
             Integer paymentSequence,
             Long sourceContractId,
             Long agentId,
-            String itemCode,
+            Long commissionItemId,
             BigDecimal amount,
-            YearMonth attributionMonth,
+            LocalDate settlementMonth,
+            String cashflowType,
             java.time.LocalDate dueDate,
             com.susukkang.fgc.common.code.PaymentStage paymentStage,
             Long policyVersionId,
             List<CommissionPaymentAttributionRequest> attributionRequests,
             String note
     ) {
+        // 2026-08-11 yslee - 외부 요청값 검증과 원 단위 저장 규칙을 지급 건 생성 경로에 일괄 적용
+        // 기존 코드: 항목 코드로 현금흐름을 추론하고 입력 금액·귀속월을 그대로 저장
+        // 문제: IF-API-22·23 입력과 저장 스냅샷이 다르며 소수 원 금액과 실제 귀속일이 손실될 수 있음
+        // 개선: 요청 항목 ID·현금흐름을 교차 검증하고 지급액·귀속액은 HALF_UP 원 단위로 정규화
+        validateSourceType(sourceType);
+        validateMonthStart(settlementMonth);
         requireAgent(agentId);
         CommissionItemReference item = requireCommissionItem(
-                itemCode,
-                attributionMonth
+                commissionItemId,
+                settlementMonth
         );
+        validateCashflowType(cashflowType, item);
+        validateAttributionMethodCompatibility(item.itemCode(), attributionRequests);
         validatePolicyVersion(policyVersionId);
         if (sourceContractId != null) {
             requireContract(sourceContractId, "contractId");
@@ -262,7 +296,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     index + 1,
                     sourceContractId,
                     agentId,
-                    attributionMonth,
+                    settlementMonth,
                     paymentStage,
                     policyVersionId,
                     attributionRequests.get(index)
@@ -278,6 +312,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         CommissionPaymentCommand payment = CommissionPaymentCommand.builder()
                 .paymentId(paymentId)
+                .sourceType(sourceType)
                 .sourceBusinessKey(sourceBusinessKey)
                 .paymentSequence(paymentSequence)
                 .sourceContractId(sourceContractId)
@@ -285,10 +320,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .commissionItemId(item.commissionItemId())
                 .paymentStage(paymentStage)
                 .policyVersionId(policyVersionId)
-                .settlementMonth(attributionMonth.atDay(1))
+                .settlementMonth(settlementMonth)
                 .dueDate(dueDate)
-                .amount(amount)
-                .cashflowType(item.cashflowType())
+                .amount(MoneyUtil.roundWon(amount))
+                .cashflowType(cashflowType)
                 .note(note)
                 .naturalContractId(naturalContractId)
                 .build();
@@ -300,7 +335,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             int sequence,
             Long sourceContractId,
             Long agentId,
-            YearMonth attributionMonth,
+            LocalDate settlementMonth,
             com.susukkang.fgc.common.code.PaymentStage paymentStage,
             Long policyVersionId,
             CommissionPaymentAttributionRequest request
@@ -310,7 +345,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 sourceContractId,
                 request.contractId(),
                 agentId,
-                attributionMonth,
+                settlementMonth,
+                request.attributionDate(),
                 request.attributionMethod()
         );
         Long allocationPolicyId = resolveAllocationPolicy(
@@ -324,8 +360,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .attributionSequence(sequence)
                 .agentId(agentId)
                 .contractId(contractId)
-                .attributionMonth(attributionMonth.atDay(1))
-                .amount(request.amount())
+                .attributionDate(request.attributionDate())
+                .attributionMonth(request.attributionDate().withDayOfMonth(1))
+                .amount(MoneyUtil.roundWon(request.amount()))
                 .inclusionDecisionStatus(request.inclusionDecisionStatus())
                 .exclusionType(normalizeExclusionType(request.exclusionType()))
                 .inclusionDecisionReason(request.inclusionDecisionReason())
@@ -344,7 +381,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long sourceContractId,
             Long requestedAttributedContractId,
             Long agentId,
-            YearMonth attributionMonth,
+            LocalDate settlementMonth,
+            LocalDate attributionDate,
             AttributionMethod attributionMethod
     ) {
         if (attributionMethod == AttributionMethod.NEWCOMER_NON_CONTRACT) {
@@ -371,22 +409,30 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
 
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
-                && !YearMonth.from(target.contractDate()).equals(attributionMonth)) {
-            invalid("attributionMonth", "정착지원금은 지급월의 신계약에 귀속해야 합니다.");
+                && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
+                || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
+            invalid("attributionDate", "정착지원금은 지급월의 신계약에 실제 귀속해야 합니다.");
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {
-            // 2026-08-07 yslee - 위촉 당월 무실적 선지급분을 최초 신계약 모집월 기준으로 판정
-            // 기존 코드: 선택한 계약보다 날짜가 빠른 계약이 있으면 같은 모집월의 계약도 귀속 대상에서 제외
-            // 문제: REG-20은 단일 최초 계약이 아니라 최초 신계약 모집월의 신계약에 귀속하도록 규정
-            // 개선: 대상월 이전 계약 존재 여부만 확인하여 최초 모집월에 속한 신계약 전체를 허용
+            // 2026-08-11 yslee - 위촉 당월 무실적 선지급분을 실제 최초 신계약 모집월로 이월
+            // 기존 코드: 대상 계약이 최초 모집월에 속하는지만 확인하여 지급월과 같은 달도 이월 방식으로 허용
+            // 문제: REG-20의 "지급월 무실적 후 최초 신계약월 이월" 조건을 재현하지 못하고 귀속방식이 왜곡될 수 있음
+            // 개선: 정산월이 위촉월인지, 실제 귀속월이 그보다 뒤인지와 대상월 이전 계약 부재를 함께 확인
+            YearMonth attributionMonth = YearMonth.from(attributionDate);
+            YearMonth settlementYearMonth = YearMonth.from(settlementMonth);
+            YearMonth appointmentMonth = YearMonth.from(
+                    mapper.findAgentAppointmentDate(agentId)
+            );
             boolean firstContract = YearMonth.from(target.contractDate()).equals(attributionMonth)
                     && mapper.countContractsBeforeMonth(
                     agentId,
                     attributionMonth.atDay(1)
             ) == 0;
-            if (!firstContract) {
-                invalid("attributedContractId", "이월 선지급분은 최초 신계약 모집월에 귀속해야 합니다.");
+            if (!settlementYearMonth.equals(appointmentMonth)
+                    || !attributionMonth.isAfter(settlementYearMonth)
+                    || !firstContract) {
+                invalid("attributedContractId", "위촉월 무실적 선지급분은 이후 최초 신계약 모집월에 귀속해야 합니다.");
             }
         }
         return targetId;
@@ -530,14 +576,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     Map.of()
             );
         }
-        if (data.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION
-                && !StringUtils.hasText(data.allocationBasis())) {
+        // 2026-08-11 yslee - 배부 방식 전체의 확정 전 배부근거 검증
+        // 기존 코드: APPROVED_ALLOCATION만 배부기준을 요구하고 정착지원금 월배부·이월배부는 누락
+        // 문제: 배부기준이 없는 정착지원금도 CONFIRMED로 전환되어 REG-20 귀속을 재현할 수 없음
+        // 개선: 직접귀속을 제외한 실제 배부 방식은 확정 시 저장된 배부기준을 공통 확인
+        boolean allocationBasisRequired = data.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION
+                || data.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                || data.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD;
+        if (allocationBasisRequired && !StringUtils.hasText(data.allocationBasis())) {
             rejectWithException(
                     data,
                     "ALLOCATION_EVIDENCE_MISSING",
                     "HIGH",
                     "배부 근거 누락",
-                    "승인 배부 귀속행에는 배부기준이 필요합니다.",
+                    "배부 귀속행에는 배부기준이 필요합니다.",
                     FgcErrorCode.TRAN_004,
                     Map.of()
             );
@@ -579,7 +631,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .paymentStage(data.paymentStage().name())
                 .capRuleSetId(rule.capRuleSetId())
                 .refundRateTableId(calculation.refundRateTableId())
-                .asOfDate(data.attributionMonth())
+                .asOfDate(data.attributionDate())
                 .basePremiumAmount(calculation.basePremiumAmount())
                 .refund12mAmount(calculation.refund12mAmount())
                 .complianceDeductionAmount(calculation.complianceDeductionAmount())
@@ -755,11 +807,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private CommissionPaymentResponse requirePayment(Long paymentId) {
+        return requirePayment(paymentId, List.of());
+    }
+
+    private CommissionPaymentResponse requirePayment(Long paymentId, List<Long> capCheckIds) {
         CommissionPaymentRow payment = mapper.findById(paymentId);
         if (payment == null) {
             invalid("paymentId", "지급 건을 찾을 수 없습니다.");
         }
-        return payment.toResponse(mapper.findAttributions(paymentId));
+        return payment.toResponse(mapper.findAttributions(paymentId), capCheckIds);
     }
 
     private void requireAgent(Long agentId) {
@@ -777,17 +833,72 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private CommissionItemReference requireCommissionItem(
-            String itemCode,
-            YearMonth attributionMonth
+            Long commissionItemId,
+            LocalDate settlementMonth
     ) {
         CommissionItemReference item = mapper.findCommissionItem(
-                itemCode,
-                attributionMonth.atDay(1)
+                commissionItemId,
+                settlementMonth
         );
         if (item == null) {
-            invalid("commissionItemCode", "귀속월에 유효한 수수료 항목이 아닙니다.");
+            invalid("commissionItemId", "정산월에 유효한 수수료 항목이 아닙니다.");
         }
         return item;
+    }
+
+    private void validateSourceType(String sourceType) {
+        if (!"GA_MANUAL_PAYMENT".equals(sourceType)) {
+            invalid("sourceType", "수기 지급 API는 GA_MANUAL_PAYMENT 원천만 저장할 수 있습니다.");
+        }
+    }
+
+    private void validateMonthStart(LocalDate settlementMonth) {
+        if (settlementMonth.getDayOfMonth() != 1) {
+            invalid("settlementMonth", "정산월은 해당 월의 1일(YYYY-MM-01)이어야 합니다.");
+        }
+    }
+
+    private void validateCashflowType(
+            String requestedCashflowType,
+            CommissionItemReference item
+    ) {
+        if (!item.cashflowType().equals(requestedCashflowType)) {
+            invalid("cashflowType", "수수료 항목의 지급·차감 구분과 요청값이 다릅니다.");
+        }
+    }
+
+    // 2026-08-11 yslee - 규제상 전용 귀속방식과 수수료 항목 조합 검증
+    // 기존 코드: 귀속방식만 보고 정착지원금·신인활동지원비 규칙을 적용
+    // 문제: 기본수수료가 정착지원금 이월로 저장되거나 정착지원금이 일반 직접귀속으로 우회될 수 있음
+    // 개선: 항목의 산입 판단은 룰셋에 맡기되 전용 귀속방식은 해당 항목에서만 사용하도록 제한
+    private void validateAttributionMethodCompatibility(
+            String itemCode,
+            List<CommissionPaymentAttributionRequest> attributions
+    ) {
+        for (CommissionPaymentAttributionRequest attribution : attributions) {
+            AttributionMethod method = attribution.attributionMethod();
+            boolean settlementMethod = method == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || method == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD;
+            if (settlementMethod != "SETTLEMENT_SUPPORT".equals(itemCode)) {
+                invalid("attributionMethod", "정착지원금 전용 귀속방식은 SETTLEMENT_SUPPORT 항목에만 사용할 수 있습니다.");
+            }
+
+            boolean newcomerMethod = method == AttributionMethod.NEWCOMER_NON_CONTRACT;
+            if (newcomerMethod != "NEWCOMER_SUPPORT".equals(itemCode)) {
+                invalid("attributionMethod", "신인 비계약 귀속방식은 NEWCOMER_SUPPORT 항목에만 사용할 수 있습니다.");
+            }
+        }
+    }
+
+    private void validateIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey != null
+                && (!StringUtils.hasText(idempotencyKey) || idempotencyKey.length() > 160)) {
+            invalid("Idempotency-Key", "멱등키는 공백이 아닌 160자 이하 문자열이어야 합니다.");
+        }
+    }
+
+    private String normalizeIdempotencyKey(String idempotencyKey) {
+        return StringUtils.hasText(idempotencyKey) ? idempotencyKey.trim() : null;
     }
 
     private void validatePolicyVersion(Long policyVersionId) {

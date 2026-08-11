@@ -10,6 +10,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -18,14 +19,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.UUID;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +54,9 @@ class CommissionPaymentIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     @Test
     void persistsAndConfirmsPaymentAgainstProjectErd() {
         CommissionPaymentCreateRequest request = request(
@@ -57,7 +66,8 @@ class CommissionPaymentIntegrationTest {
 
         CommissionPaymentResponse created = commissionPaymentService.create(request);
         CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
-                created.paymentId()
+                created.paymentId(),
+                "IT-CONFIRM-" + created.paymentId()
         );
 
         assertThat(created.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
@@ -68,6 +78,28 @@ class CommissionPaymentIntegrationTest {
                 .isEqualTo(1L);
         assertThat(confirmed.allocationPolicyVersion()).isEqualTo(4L);
         assertThat(confirmed.paymentSequence()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT attribution_date
+                  FROM fgc.transaction_attribution
+                 WHERE commission_transaction_id = ?
+                   AND attribution_seq = 1
+                """, LocalDate.class, created.paymentId()))
+                .isEqualTo(LocalDate.of(2026, 7, 31));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT attribution_month
+                  FROM fgc.transaction_attribution
+                 WHERE commission_transaction_id = ?
+                   AND attribution_seq = 1
+                """, LocalDate.class, created.paymentId()))
+                .isEqualTo(LocalDate.of(2026, 7, 1));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT as_of_date
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                 ORDER BY cap_check_id DESC
+                 LIMIT 1
+                """, LocalDate.class, created.paymentId()))
+                .isEqualTo(LocalDate.of(2026, 7, 31));
     }
 
     // 2026-08-10 yslee - 하나의 지급 건에 여러 계약 귀속행을 저장하고 전부 검증
@@ -83,13 +115,15 @@ class CommissionPaymentIntegrationTest {
                 "FGC-FGL01-202607-0002"
         );
         CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                "GA_MANUAL_PAYMENT",
                 "IT-FUN065-MULTI-" + runId,
                 3_000_000 + Math.floorMod(runId.hashCode(), 1_000_000),
                 1L,
                 6L,
-                "BASE_COMMISSION",
+                commissionItemId(),
                 new BigDecimal("20"),
-                YearMonth.of(2026, 7),
+                LocalDate.of(2026, 7, 1),
+                "PAYMENT",
                 LocalDate.of(2026, 7, 31),
                 PaymentStage.GA_TO_FC,
                 4L,
@@ -101,7 +135,10 @@ class CommissionPaymentIntegrationTest {
         );
 
         CommissionPaymentResponse created = commissionPaymentService.create(request);
-        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(created.paymentId());
+        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
+                created.paymentId(),
+                "IT-CONFIRM-MULTI-" + runId
+        );
 
         assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(confirmed.attributions())
@@ -124,6 +161,262 @@ class CommissionPaymentIntegrationTest {
         assertThatThrownBy(() -> commissionPaymentService.create(
                 request("IT-FUN065-B-" + runId, paymentSequence)
         )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    // 2026-08-11 yslee - 이슈 #65 원수사 명세 DRAFT의 수기 지급 수정 경로 차단 검증
+    // 기존 코드: 상태가 DRAFT이면 source_type과 무관하게 PUT이 원수사 명세 원장을 덮어씀
+    // 문제: 외부 명세 사실이 수기 지급 화면의 계약·금액·업무키로 변조되어 대사 추적성이 사라짐
+    // 개선: GA_MANUAL_PAYMENT 행만 갱신하는 SQL 조건을 실제 PostgreSQL에서 검증
+    @Test
+    void doesNotOverwriteInsurerStatementDraftThroughManualPaymentUpdate() {
+        String sourceBusinessKey = "IT-FUN065-INSURER-" + UUID.randomUUID();
+        Long paymentId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction (
+                    payment_stage,
+                    source_type,
+                    source_business_key,
+                    source_contract_id,
+                    recipient_agent_id,
+                    commission_item_id,
+                    policy_version_id,
+                    settlement_month,
+                    due_date,
+                    amount,
+                    cashflow_type,
+                    status
+                ) VALUES (
+                    'INSURER_TO_GA',
+                    'INSURER_STATEMENT',
+                    ?,
+                    1,
+                    6,
+                    ?,
+                    4,
+                    DATE '2026-07-01',
+                    DATE '2026-07-31',
+                    100,
+                    'PAYMENT',
+                    'DRAFT'
+                )
+                RETURNING commission_transaction_id
+                """, Long.class, sourceBusinessKey, commissionItemId());
+        jdbcTemplate.update("""
+                INSERT INTO fgc.transaction_attribution (
+                    commission_transaction_id,
+                    attribution_seq,
+                    attribution_scope,
+                    contract_id,
+                    agent_id,
+                    attribution_date,
+                    attribution_month,
+                    attributed_amount,
+                    inclusion_status_snapshot,
+                    attribution_method,
+                    allocation_basis_snapshot,
+                    evidence_ref
+                ) VALUES (
+                    ?,
+                    1,
+                    'CONTRACT',
+                    1,
+                    6,
+                    DATE '2026-07-31',
+                    DATE '2026-07-01',
+                    100,
+                    'INCLUDED',
+                    'DIRECT',
+                    '{}'::jsonb,
+                    'IT-INSURER-STATEMENT'
+                )
+                """, paymentId);
+        CommissionPaymentCreateRequest manualRequest = request(
+                "IT-FUN065-MANUAL-OVERWRITE-" + UUID.randomUUID(),
+                3_500_000,
+                new BigDecimal("999")
+        );
+
+        assertThatThrownBy(() -> commissionPaymentService.update(
+                paymentId,
+                updateRequest(manualRequest, new BigDecimal("999"))
+        )).isInstanceOfSatisfying(FgcBusinessException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(FgcErrorCode.TRAN_005));
+
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT source_type, source_business_key, amount
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, paymentId))
+                .containsEntry("source_type", "INSURER_STATEMENT")
+                .containsEntry("source_business_key", sourceBusinessKey)
+                .containsEntry("amount", new BigDecimal("100.00"));
+    }
+
+    // 2026-08-11 yslee - 같은 계약의 두 DRAFT 확정을 PostgreSQL 계약 행 잠금으로 직렬화
+    // 기존 코드: 지급 건별 FOR UPDATE만 사용하여 서로 다른 DRAFT가 같은 기존 산입액을 동시에 조회
+    // 문제: 각각은 한도 이내지만 합계는 초과하는 두 요청이 모두 CONFIRMED가 될 수 있음
+    // 개선: 동일 계약 200,000원 요청 두 건을 동시에 실행해 한 건 성공·한 건 한도 차단을 검증
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void serializesConcurrentConfirmationsForSameContract() throws Exception {
+        String runId = UUID.randomUUID().toString();
+        CommissionPaymentResponse first = commissionPaymentService.create(request(
+                "IT-FUN065-LOCK-A-" + runId,
+                4_000_000 + Math.floorMod(runId.hashCode(), 100_000),
+                new BigDecimal("200000")
+        ));
+        CommissionPaymentResponse second = commissionPaymentService.create(request(
+                "IT-FUN065-LOCK-B-" + runId,
+                4_100_000 + Math.floorMod(runId.hashCode(), 100_000),
+                new BigDecimal("200000")
+        ));
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> firstResult = executor.submit(() -> confirmOutcome(
+                    first.paymentId(), "IT-LOCK-A-" + runId, ready, start
+            ));
+            Future<String> secondResult = executor.submit(() -> confirmOutcome(
+                    second.paymentId(), "IT-LOCK-B-" + runId, ready, start
+            ));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(List.of(firstResult.get(), secondResult.get()))
+                    .containsExactlyInAnyOrder("CONFIRMED", "CAP_001");
+        } finally {
+            executor.shutdownNow();
+        }
+
+        Integer confirmedCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id IN (?, ?)
+                   AND status = 'CONFIRMED'
+                """, Integer.class, first.paymentId(), second.paymentId());
+        assertThat(confirmedCount).isEqualTo(1);
+    }
+
+    // 2026-08-11 yslee - 성공한 확정의 멱등키와 cap_check 응답을 실제 DB에서 재현
+    // 기존 코드: 동일 요청 재전송 시 DRAFT 상태 오류로 끝나 최초 cap_check 결과를 알 수 없음
+    // 문제: 응답 유실 후 재시도에서 중복 검증 이력이 생기거나 성공 여부를 복구하지 못함
+    // 개선: 같은 키 재요청은 추가 cap_check 없이 최초 ID 목록을 그대로 반환
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void returnsSameCapChecksForIdempotentConfirmationRetry() {
+        String runId = UUID.randomUUID().toString();
+        CommissionPaymentResponse created = commissionPaymentService.create(request(
+                "IT-FUN065-IDEM-" + runId,
+                5_000_000 + Math.floorMod(runId.hashCode(), 100_000),
+                BigDecimal.ZERO
+        ));
+        String idempotencyKey = "IT-IDEM-" + runId;
+
+        CommissionPaymentResponse first = commissionPaymentService.confirm(
+                created.paymentId(), idempotencyKey
+        );
+        CommissionPaymentResponse retried = commissionPaymentService.confirm(
+                created.paymentId(), idempotencyKey
+        );
+
+        assertThat(first.capCheckIds()).isNotEmpty();
+        assertThat(retried.capCheckIds()).containsExactlyElementsOf(first.capCheckIds());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                   AND check_kind = 'PRE_CONFIRM'
+                """, Integer.class, created.paymentId()))
+                .isEqualTo(first.capCheckIds().size());
+    }
+
+    // 2026-08-11 yslee - 서로 다른 지급 건 사이의 Idempotency-Key 재사용 차단 검증
+    // 기존 코드: 지급 건 내부 재시도만 비교하여 같은 키가 다른 지급 건을 각각 확정할 수 있었음
+    // 문제: 클라이언트 한 요청이 두 지급 건에 적용되어 중복 확정으로 해석될 수 있음
+    // 개선: 전역 부분 UNIQUE로 두 번째 확정을 롤백하고 해당 지급 건과 점검 이력을 DRAFT 상태로 보존
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void rejectsIdempotencyKeyReuseAcrossDifferentPayments() {
+        String runId = UUID.randomUUID().toString();
+        CommissionPaymentResponse first = commissionPaymentService.create(request(
+                "IT-FUN065-IDEM-CROSS-A-" + runId,
+                5_100_000 + Math.floorMod(runId.hashCode(), 40_000),
+                BigDecimal.ZERO
+        ));
+        CommissionPaymentResponse second = commissionPaymentService.create(request(
+                "IT-FUN065-IDEM-CROSS-B-" + runId,
+                5_150_000 + Math.floorMod(runId.hashCode(), 40_000),
+                BigDecimal.ZERO
+        ));
+        String idempotencyKey = "IT-IDEM-CROSS-" + runId;
+
+        commissionPaymentService.confirm(first.paymentId(), idempotencyKey);
+
+        assertThatThrownBy(() -> commissionPaymentService.confirm(
+                second.paymentId(), idempotencyKey
+        )).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(paymentStatus(second.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                """, Integer.class, second.paymentId())).isZero();
+    }
+
+    // 2026-08-11 yslee - 실패 점검이 있는 DRAFT 수정 후 성공 확정의 멱등 응답 분리 검증
+    // 기존 코드: 과거 실패 cap_check가 귀속행 FK를 잡고 수정이 막히며 재요청에는 과거 ID까지 섞임
+    // 문제: 금액을 고쳐 정상 확정해도 최초 성공 응답을 동일하게 복구할 수 없음
+    // 개선: 과거 상세 FK만 해제해 DRAFT를 수정하고 성공 시도의 capCheckIds만 스냅샷으로 반환
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void retriesSuccessfulConfirmationAfterRejectedDraftUpdate() {
+        String runId = UUID.randomUUID().toString();
+        CommissionPaymentCreateRequest rejectedRequest = request(
+                "IT-FUN065-IDEM-RECOVER-" + runId,
+                5_200_000 + Math.floorMod(runId.hashCode(), 100_000),
+                new BigDecimal("1300000")
+        );
+        CommissionPaymentResponse created = commissionPaymentService.create(rejectedRequest);
+        assertCapViolation(created.paymentId());
+
+        List<Long> rejectedCapCheckIds = jdbcTemplate.queryForList("""
+                SELECT cap_check_id
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                   AND result_status = 'VIOLATION'
+                 ORDER BY cap_check_id
+                """, Long.class, created.paymentId());
+
+        CommissionPaymentResponse updated = commissionPaymentService.update(
+                created.paymentId(),
+                updateRequest(rejectedRequest, BigDecimal.ZERO)
+        );
+        assertThat(updated.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.cap_check_detail
+                 WHERE cap_check_id IN (
+                       SELECT cap_check_id
+                         FROM fgc.cap_check
+                        WHERE candidate_transaction_id = ?
+                          AND result_status = 'VIOLATION'
+                 )
+                   AND transaction_attribution_id IS NOT NULL
+                """, Integer.class, created.paymentId())).isZero();
+
+        String idempotencyKey = "IT-IDEM-RECOVER-" + runId;
+        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
+                created.paymentId(), idempotencyKey
+        );
+        CommissionPaymentResponse retried = commissionPaymentService.confirm(
+                created.paymentId(), idempotencyKey
+        );
+
+        assertThat(confirmed.capCheckIds()).doesNotContainAnyElementsOf(rejectedCapCheckIds);
+        assertThat(retried.capCheckIds()).containsExactlyElementsOf(confirmed.capCheckIds());
     }
 
     // 2026-08-10 yslee - PostgreSQL에서 확정 실패의 잠금·트랜잭션·예외 상태를 통합 검증
@@ -164,7 +457,10 @@ class CommissionPaymentIntegrationTest {
     }
 
     private void assertCapViolation(Long paymentId) {
-        assertThatThrownBy(() -> commissionPaymentService.confirm(paymentId))
+        assertThatThrownBy(() -> commissionPaymentService.confirm(
+                paymentId,
+                "IT-CONFIRM-VIOLATION-" + paymentId
+        ))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(FgcErrorCode.CAP_001));
@@ -210,6 +506,17 @@ class CommissionPaymentIntegrationTest {
     // 개선: @AfterEach에서 고유 접두사로 과거 잔존 건까지 자식 테이블 순서대로 일괄 삭제
     @AfterEach
     void cleanupCommittedCapTests() {
+        // 2026-08-11 yslee - 확정 원장의 불변성 트리거를 보존하면서 통합 테스트 전용 데이터 정리
+        // 기존 코드: CONFIRMED 지급 건의 귀속 행을 일반 DELETE로 먼저 제거
+        // 문제: 운영 불변성 트리거가 정상 차단하여 후속 통합 테스트가 이전 데이터 때문에 실패
+        // 개선: 별도 테스트 정리 트랜잭션에서만 사용자 트리거를 비활성화하고 고유 접두사의 행만 삭제
+        TransactionTemplate cleanupTransaction = new TransactionTemplate(transactionManager);
+        cleanupTransaction.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
+        cleanupTransaction.executeWithoutResult(status -> cleanupCommittedCapTestData());
+    }
+
+    private void cleanupCommittedCapTestData() {
+        jdbcTemplate.execute("SET LOCAL session_replication_role = replica");
         jdbcTemplate.update("""
                 DELETE FROM fgc.cap_check_detail
                  WHERE cap_check_id IN (
@@ -220,6 +527,8 @@ class CommissionPaymentIntegrationTest {
                                 FROM fgc.commission_transaction
                                WHERE source_business_key LIKE 'IT-FUN065-CAP-%'
                                   OR source_business_key LIKE 'IT-FUN065-A-%'
+                                  OR source_business_key LIKE 'IT-FUN065-LOCK-%'
+                                  OR source_business_key LIKE 'IT-FUN065-IDEM-%'
                         )
                  )
                 """);
@@ -230,6 +539,8 @@ class CommissionPaymentIntegrationTest {
                          FROM fgc.commission_transaction
                         WHERE source_business_key LIKE 'IT-FUN065-CAP-%'
                            OR source_business_key LIKE 'IT-FUN065-A-%'
+                           OR source_business_key LIKE 'IT-FUN065-LOCK-%'
+                           OR source_business_key LIKE 'IT-FUN065-IDEM-%'
                  )
                 """);
         jdbcTemplate.update("""
@@ -240,6 +551,8 @@ class CommissionPaymentIntegrationTest {
                          FROM fgc.commission_transaction
                         WHERE source_business_key LIKE 'IT-FUN065-CAP-%'
                            OR source_business_key LIKE 'IT-FUN065-A-%'
+                           OR source_business_key LIKE 'IT-FUN065-LOCK-%'
+                           OR source_business_key LIKE 'IT-FUN065-IDEM-%'
                    )
                 """);
         jdbcTemplate.update("""
@@ -249,12 +562,16 @@ class CommissionPaymentIntegrationTest {
                          FROM fgc.commission_transaction
                         WHERE source_business_key LIKE 'IT-FUN065-CAP-%'
                            OR source_business_key LIKE 'IT-FUN065-A-%'
+                           OR source_business_key LIKE 'IT-FUN065-LOCK-%'
+                           OR source_business_key LIKE 'IT-FUN065-IDEM-%'
                  )
                 """);
         jdbcTemplate.update("""
                 DELETE FROM fgc.commission_transaction
                  WHERE source_business_key LIKE 'IT-FUN065-CAP-%'
                     OR source_business_key LIKE 'IT-FUN065-A-%'
+                    OR source_business_key LIKE 'IT-FUN065-LOCK-%'
+                    OR source_business_key LIKE 'IT-FUN065-IDEM-%'
                 """);
     }
 
@@ -271,18 +588,21 @@ class CommissionPaymentIntegrationTest {
             BigDecimal amount
     ) {
         return new CommissionPaymentCreateRequest(
+                "GA_MANUAL_PAYMENT",
                 sourceBusinessKey,
                 paymentSequence,
                 1L,
                 6L,
-                "BASE_COMMISSION",
+                commissionItemId(),
                 amount,
-                YearMonth.of(2026, 7),
+                LocalDate.of(2026, 7, 1),
+                "PAYMENT",
                 LocalDate.of(2026, 7, 31),
                 PaymentStage.GA_TO_FC,
                 4L,
                 List.of(new CommissionPaymentAttributionRequest(
                         1L,
+                        LocalDate.of(2026, 7, 31),
                         amount,
                         InclusionDecisionStatus.INCLUDED,
                         ExclusionType.NONE,
@@ -298,6 +618,7 @@ class CommissionPaymentIntegrationTest {
     private CommissionPaymentAttributionRequest attribution(Long contractId, BigDecimal amount) {
         return new CommissionPaymentAttributionRequest(
                 contractId,
+                LocalDate.of(2026, 7, 31),
                 amount,
                 InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE,
@@ -305,6 +626,64 @@ class CommissionPaymentIntegrationTest {
                 "DIRECT",
                 "IT-EVIDENCE-" + contractId,
                 AttributionMethod.DIRECT
+        );
+    }
+
+    private CommissionPaymentUpdateRequest updateRequest(
+            CommissionPaymentCreateRequest source,
+            BigDecimal amount
+    ) {
+        return new CommissionPaymentUpdateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.paymentSequence(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                amount,
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                source.allocationPolicyVersion(),
+                source.attributions().stream()
+                        .map(attribution -> new CommissionPaymentAttributionRequest(
+                                attribution.contractId(),
+                                attribution.attributionDate(),
+                                amount,
+                                attribution.inclusionDecisionStatus(),
+                                attribution.exclusionType(),
+                                attribution.inclusionDecisionReason(),
+                                attribution.allocationBasis(),
+                                attribution.evidenceRef(),
+                                attribution.attributionMethod()
+                        ))
+                        .toList(),
+                source.note()
+        );
+    }
+
+    private String confirmOutcome(
+            Long paymentId,
+            String idempotencyKey,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws InterruptedException {
+        ready.countDown();
+        start.await();
+        try {
+            return commissionPaymentService.confirm(paymentId, idempotencyKey)
+                    .status()
+                    .name();
+        } catch (FgcBusinessException exception) {
+            return exception.getErrorCode().name();
+        }
+    }
+
+    private Long commissionItemId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code = 'BASE_COMMISSION'",
+                Long.class
         );
     }
 }

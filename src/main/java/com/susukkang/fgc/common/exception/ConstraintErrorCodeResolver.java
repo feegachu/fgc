@@ -87,6 +87,14 @@ public class ConstraintErrorCodeResolver {
                 "uq_commission_payment_natural",
                 FgcErrorCode.TRAN_001
         );
+        // 2026-08-11 yslee - 지급 확정 멱등키 중복을 거래 중복 업무 오류로 변환
+        // 기존 코드: 지급 건 원천키와 자연키 중복 제약만 FGC-TRAN-001로 변환
+        // 문제: 서로 다른 지급 건이 같은 Idempotency-Key를 사용하면 공통 500 오류로 노출
+        // 개선: 확정 멱등키 고유 제약도 FGC-TRAN-001·409로 일관되게 응답
+        mappings.put(
+                "uq_commission_transaction_confirm_idempotency",
+                FgcErrorCode.TRAN_001
+        );
         mappings.put(
                 "uq_contract_no",
                 FgcErrorCode.CONT_001

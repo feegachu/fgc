@@ -7,7 +7,6 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -19,14 +18,17 @@ import java.util.List;
  */
 public record CommissionPaymentRow(
         Long paymentId,
+        String sourceType,
         String sourceBusinessKey,
         Integer paymentSequence,
         Long contractId,
         Long agentId,
+        Long commissionItemId,
         String commissionItemCode,
         String commissionItemName,
         BigDecimal amount,
-        LocalDate attributionMonth,
+        LocalDate settlementMonth,
+        String cashflowType,
         LocalDate scheduledPaymentDate,
         PaymentStage paymentStage,
         CommissionPaymentStatus status,
@@ -35,22 +37,30 @@ public record CommissionPaymentRow(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
-    public CommissionPaymentResponse toResponse(List<CommissionPaymentAttributionRow> attributions) {
+    public CommissionPaymentResponse toResponse(
+            List<CommissionPaymentAttributionRow> attributions,
+            List<Long> capCheckIds
+    ) {
         return new CommissionPaymentResponse(
                 paymentId,
+                sourceType,
                 sourceBusinessKey,
                 paymentSequence,
                 contractId,
                 agentId,
+                commissionItemId,
                 commissionItemCode,
                 commissionItemName,
                 amount,
-                YearMonth.from(attributionMonth),
+                settlementMonth,
+                cashflowType,
                 scheduledPaymentDate,
                 paymentStage,
                 status,
                 allocationPolicyVersion,
                 attributions.stream().map(CommissionPaymentAttributionRow::toResponse).toList(),
+                List.copyOf(capCheckIds),
+                null,
                 note,
                 createdAt,
                 updatedAt

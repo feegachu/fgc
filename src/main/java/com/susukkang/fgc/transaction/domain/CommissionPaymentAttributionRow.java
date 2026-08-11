@@ -6,6 +6,7 @@ import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionResponse;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * 설명 : 수수료 지급 건 계약별 귀속 조회 데이터
@@ -17,6 +18,8 @@ import java.math.BigDecimal;
 public record CommissionPaymentAttributionRow(
         Integer attributionSequence,
         Long contractId,
+        LocalDate attributionDate,
+        LocalDate attributionMonth,
         BigDecimal amount,
         InclusionDecisionStatus inclusionDecisionStatus,
         ExclusionType exclusionType,
@@ -29,6 +32,8 @@ public record CommissionPaymentAttributionRow(
         return new CommissionPaymentAttributionResponse(
                 attributionSequence,
                 contractId,
+                attributionDate,
+                attributionMonth,
                 amount,
                 inclusionDecisionStatus,
                 exclusionType,

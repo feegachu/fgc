@@ -28,6 +28,8 @@ public interface CommissionPaymentMapper {
 
     boolean existsAgent(@Param("agentId") Long agentId);
 
+    LocalDate findAgentAppointmentDate(@Param("agentId") Long agentId);
+
     ContractReference findContract(@Param("contractId") Long contractId);
 
     // 2026-08-07 yslee - 최초 신계약 모집월 이전 계약 존재 여부 조회로 변경
@@ -40,7 +42,7 @@ public interface CommissionPaymentMapper {
     );
 
     CommissionItemReference findCommissionItem(
-            @Param("itemCode") String itemCode,
+            @Param("commissionItemId") Long commissionItemId,
             @Param("asOf") LocalDate asOf
     );
 
@@ -53,7 +55,9 @@ public interface CommissionPaymentMapper {
 
     void insertTransaction(CommissionPaymentCommand command);
 
-    void updateTransaction(CommissionPaymentCommand command);
+    int updateTransaction(CommissionPaymentCommand command);
+
+    void detachPreConfirmDetails(@Param("paymentId") Long paymentId);
 
     void deleteAttributions(@Param("paymentId") Long paymentId);
 
@@ -64,6 +68,8 @@ public interface CommissionPaymentMapper {
     List<CommissionPaymentAttributionRow> findAttributions(@Param("paymentId") Long paymentId);
 
     List<ConfirmationData> findConfirmationDataForUpdate(@Param("paymentId") Long paymentId);
+
+    List<Long> lockAttributedContracts(@Param("paymentId") Long paymentId);
 
     CapRuleSnapshot findCapRuleSnapshot(
             @Param("paymentId") Long paymentId,
@@ -76,5 +82,11 @@ public interface CommissionPaymentMapper {
 
     void insertExceptionCase(ExceptionCaseCommand command);
 
-    int confirm(@Param("paymentId") Long paymentId);
+    List<Long> findCapCheckIds(@Param("paymentId") Long paymentId);
+
+    int confirm(
+            @Param("paymentId") Long paymentId,
+            @Param("idempotencyKey") String idempotencyKey,
+            @Param("capCheckIdsCsv") String capCheckIdsCsv
+    );
 }

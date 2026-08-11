@@ -21,6 +21,7 @@ public class CommissionPaymentCommand {
 
     @Setter
     private Long paymentId;
+    private final String sourceType;
     private final String sourceBusinessKey;
     private final Integer paymentSequence;
     private final Long sourceContractId;

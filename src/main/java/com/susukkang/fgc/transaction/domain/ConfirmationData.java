@@ -22,6 +22,8 @@ public record ConfirmationData(
         BigDecimal amount,
         BigDecimal attributedAmount,
         BigDecimal totalAttributedAmount,
+        String confirmIdempotencyKey,
+        LocalDate attributionDate,
         LocalDate attributionMonth,
         Long transactionAttributionId,
         Long contractId,

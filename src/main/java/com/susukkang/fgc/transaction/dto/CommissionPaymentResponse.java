@@ -1,12 +1,12 @@
 package com.susukkang.fgc.transaction.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -17,20 +17,25 @@ import java.util.List;
  * @version 1.2
  */
 public record CommissionPaymentResponse(
-        Long paymentId,
+        @JsonProperty("commissionTransactionId") Long paymentId,
+        String sourceType,
         String sourceBusinessKey,
         Integer paymentSequence,
         Long contractId,
         Long agentId,
+        Long commissionItemId,
         String commissionItemCode,
         String commissionItemName,
         BigDecimal amount,
-        YearMonth attributionMonth,
+        LocalDate settlementMonth,
+        String cashflowType,
         LocalDate scheduledPaymentDate,
         PaymentStage paymentStage,
         CommissionPaymentStatus status,
         Long allocationPolicyVersion,
         List<CommissionPaymentAttributionResponse> attributions,
+        List<Long> capCheckIds,
+        Long journalHeaderId,
         String note,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt

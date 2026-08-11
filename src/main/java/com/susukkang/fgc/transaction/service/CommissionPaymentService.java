@@ -17,5 +17,5 @@ public interface CommissionPaymentService {
 
     CommissionPaymentResponse update(Long paymentId, CommissionPaymentUpdateRequest request);
 
-    CommissionPaymentResponse confirm(Long paymentId);
+    CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey);
 }

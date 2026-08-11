@@ -12,6 +12,12 @@
         )
     </select>
 
+    <select id="findAgentAppointmentDate" resultType="java.time.LocalDate">
+        SELECT appointment_date
+          FROM fgc.agent
+         WHERE agent_id = #{agentId}
+    </select>
+
     <select id="findContract"
             resultType="com.susukkang.fgc.transaction.domain.ContractReference">
         SELECT contract_id,
@@ -31,9 +37,10 @@
     <select id="findCommissionItem"
             resultType="com.susukkang.fgc.transaction.domain.CommissionItemReference">
         SELECT commission_item_id,
+               item_code,
                cashflow_type
-          FROM fgc.commission_item
-         WHERE item_code = #{itemCode}
+         FROM fgc.commission_item
+         WHERE commission_item_id = #{commissionItemId}
            AND active_yn = TRUE
            AND effective_from &lt;= #{asOf}
            AND (effective_to IS NULL OR effective_to &gt;= #{asOf})
@@ -78,7 +85,7 @@
             note
         ) VALUES (
             #{paymentStage},
-            'GA_MANUAL_PAYMENT',
+            #{sourceType},
             #{sourceBusinessKey},
             #{naturalContractId},
             #{paymentSequence},
@@ -97,6 +104,8 @@
     <update id="updateTransaction">
         UPDATE fgc.commission_transaction
            SET payment_stage = #{paymentStage},
+               source_type = #{sourceType},
+               source_business_key = #{sourceBusinessKey},
                source_contract_id = #{naturalContractId},
                source_sequence = #{paymentSequence},
                recipient_agent_id = #{agentId},
@@ -109,6 +118,20 @@
                note = #{note}
          WHERE commission_transaction_id = #{paymentId}
            AND status = 'DRAFT'
+           AND source_type = 'GA_MANUAL_PAYMENT'
+    </update>
+
+    <!-- 2026-08-11 yslee - 거절된 DRAFT의 과거 점검 스냅샷과 신규 귀속행 참조를 분리 -->
+    <!-- 기존 코드: 실패 cap_check_detail이 기존 귀속행을 FK로 참조하여 DRAFT 수정 시 삭제가 실패 -->
+    <!-- 문제: 검증 거절 후 금액·귀속을 고쳐 다시 확정할 수 없어서 FUN-065의 DRAFT 수정 계약을 위반 -->
+    <!-- 개선: 과거 점검 스냅샷은 보존하고 변경 전 귀속행에 대한 직접 FK만 해제 -->
+    <update id="detachPreConfirmDetails">
+        UPDATE fgc.cap_check_detail ccd
+           SET transaction_attribution_id = NULL
+          FROM fgc.cap_check cc
+         WHERE ccd.cap_check_id = cc.cap_check_id
+           AND cc.candidate_transaction_id = #{paymentId}
+           AND cc.check_kind = 'PRE_CONFIRM'
     </update>
 
     <delete id="deleteAttributions">
@@ -144,7 +167,7 @@
                 #{attribution.attributionScope},
                 #{attribution.contractId},
                 #{attribution.agentId},
-                #{attribution.attributionMonth},
+                #{attribution.attributionDate},
                 #{attribution.attributionMonth},
                 #{attribution.amount},
                 #{attribution.inclusionDecisionStatus},
@@ -160,6 +183,7 @@
     <select id="findById"
             resultType="com.susukkang.fgc.transaction.domain.CommissionPaymentRow">
         SELECT ct.commission_transaction_id AS payment_id,
+               ct.source_type,
                ct.source_business_key,
                ct.source_sequence AS payment_sequence,
                <!-- 2026-08-10 yslee - 지급 건 원계약 조회 기준을 정규 컬럼으로 통일 -->
@@ -168,10 +192,12 @@
                <!-- 개선: 자연키의 기준인 commission_transaction.source_contract_id를 조회 -->
                ct.source_contract_id AS contract_id,
                ct.recipient_agent_id AS agent_id,
+               ct.commission_item_id,
                ci.item_code AS commission_item_code,
                ci.item_name AS commission_item_name,
                ct.amount,
-               ct.settlement_month AS attribution_month,
+               ct.settlement_month,
+               ct.cashflow_type,
                ct.due_date AS scheduled_payment_date,
                ct.payment_stage,
                ct.status,
@@ -193,6 +219,8 @@
             resultType="com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionRow">
         SELECT ta.attribution_seq AS attribution_sequence,
                ta.contract_id,
+               ta.attribution_date,
+               ta.attribution_month,
                ta.attributed_amount AS amount,
                ta.inclusion_status_snapshot AS inclusion_decision_status,
                COALESCE(ta.exclusion_type_snapshot, 'NONE') AS exclusion_type,
@@ -220,6 +248,8 @@
                      FROM fgc.transaction_attribution total_ta
                     WHERE total_ta.commission_transaction_id = ct.commission_transaction_id
                ) AS total_attributed_amount,
+               ct.confirm_idempotency_key,
+               ta.attribution_date,
                ta.attribution_month,
                ta.transaction_attribution_id,
                ta.contract_id,
@@ -243,6 +273,23 @@
          WHERE ct.commission_transaction_id = #{paymentId}
          ORDER BY ta.attribution_seq
          FOR UPDATE OF ct
+    </select>
+
+    <!-- 2026-08-11 yslee - 동일 계약의 여러 DRAFT 확정을 계약 행 기준으로 직렬화 -->
+    <!-- 기존 코드: 각 지급 건 행만 잠가 서로 다른 DRAFT는 동시에 한도 잔액을 읽음 -->
+    <!-- 문제: 두 요청이 같은 기존 산입액을 보고 모두 확정되어 합산 한도를 넘길 수 있음 -->
+    <!-- 개선: 귀속 계약을 ID 순서로 잠가 같은 계약의 사전검증과 CONFIRMED 전환을 순차 처리 -->
+    <select id="lockAttributedContracts">
+        SELECT c.contract_id
+          FROM fgc.insurance_contract c
+         WHERE c.contract_id IN (
+               SELECT ta.contract_id
+                 FROM fgc.transaction_attribution ta
+                WHERE ta.commission_transaction_id = #{paymentId}
+                  AND ta.contract_id IS NOT NULL
+         )
+         ORDER BY c.contract_id
+         FOR UPDATE
     </select>
 
     <select id="findCapRuleSnapshot"
@@ -417,11 +464,23 @@
          WHERE existing.status NOT IN ('RESOLVED', 'REJECTED')
     </insert>
 
+    <select id="findCapCheckIds" resultType="long">
+        SELECT response.cap_check_id
+          FROM fgc.commission_transaction ct
+          CROSS JOIN LATERAL unnest(ct.confirm_cap_check_ids)
+               WITH ORDINALITY AS response(cap_check_id, response_order)
+         WHERE ct.commission_transaction_id = #{paymentId}
+         ORDER BY response.response_order
+    </select>
+
     <update id="confirm">
         UPDATE fgc.commission_transaction
-           SET status = 'CONFIRMED'
+           SET status = 'CONFIRMED',
+               confirm_idempotency_key = #{idempotencyKey},
+               confirm_cap_check_ids = string_to_array(#{capCheckIdsCsv}, ',')::bigint[]
          WHERE commission_transaction_id = #{paymentId}
            AND status = 'DRAFT'
+           AND source_type = 'GA_MANUAL_PAYMENT'
     </update>
 
 </mapper>
