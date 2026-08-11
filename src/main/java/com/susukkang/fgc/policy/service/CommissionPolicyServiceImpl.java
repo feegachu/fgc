@@ -1,5 +1,7 @@
 package com.susukkang.fgc.policy.service;
 
+import com.susukkang.fgc.common.code.AgentRankCode;
+import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -10,6 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +30,17 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
+    // 현재 시스템이 지원하는 7년 체계의 최대 회차이며 비정상 범위 확장을 방지한다.
+    private static final int MAX_SUPPORTED_INSTALLMENT_NO = 84;
     private final PolicyMapper policyMapper;
+
+    // 운영정책서 제21조의 규칙 선택 순서: 상품 판매버전 > 보험사 > 설계사 직급 > 조직 > priorityNo
+    private static final Comparator<ResolvedCommissionRule> RULE_SELECTION_ORDER =
+            Comparator.comparing((ResolvedCommissionRule rule) -> rule.getProductOfferingId() != null).reversed()
+                    .thenComparing(rule -> rule.getInsurerId() != null, Comparator.reverseOrder())
+                    .thenComparing(rule -> rule.getAgentRankCode() != null, Comparator.reverseOrder())
+                    .thenComparing(rule -> rule.getOrganizationId() != null, Comparator.reverseOrder())
+                    .thenComparing(ResolvedCommissionRule::getPriorityNo);
 
     /**
      * 설명 : 계약과 지급 단계에 적용할 현행 수수료 정책과 규칙 목록을 조회한다.
@@ -37,17 +52,11 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
      * @return 적용된 정책 버전과 수수료 규칙 목록
      */
     @Override
-    public ResolvedCommissionPolicy resolveCurrentCommission(
-            Long contractId,
-            PaymentStage paymentStage
-    ) {
+    public ResolvedCommissionPolicy resolveCurrentCommission(Long contractId, PaymentStage paymentStage) {
         validateQueryCondition(contractId, paymentStage);
 
         List<ResolvedCommissionPolicy> policies =
-                policyMapper.findApplicableCurrentCommissionPolicies(
-                        contractId,
-                        paymentStage
-                );
+                policyMapper.findApplicableCurrentCommissionPolicies(contractId, paymentStage);
 
         if (policies == null || policies.isEmpty()) {
             throw new FgcBusinessException(
@@ -75,8 +84,21 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     "계약에 적용 가능한 현행 수수료 정책이 여러 건 존재합니다."
             );
         }
-
         ResolvedCommissionPolicy policy = policies.getFirst();
+
+        // 정책 버전 ID가 없는 비정상 정책은 규칙 조회 전에 차단한다.
+        if (policy.getPolicyVersionId() == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "commissionPolicy",
+                    Map.of(
+                            "contractId", contractId,
+                            "paymentStage", paymentStage.name(),
+                            "reason", "INVALID_POLICY"
+                    ),
+                    "수수료 정책 버전 정보가 올바르지 않습니다."
+            );
+        }
 
         List<ResolvedCommissionRule> rules =
                 policyMapper.findApplicableCommissionRules(
@@ -90,23 +112,161 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
                     Map.of(
-                            "policyVersionId", policy.getPolicyVersionId(),
-                            "paymentStage", paymentStage.name(),
-                            "reason", "POLICY_MISSING"
+                            "policyVersionId", String.valueOf(policy.getPolicyVersionId()),
+                            "paymentStage", paymentStage.name()
                     ),
                     "정책에 적용 가능한 수수료 규칙이 없습니다."
             );
         }
+        List<ResolvedCommissionRule> resolvedRules =
+                resolveApplicableRules(rules, policy.getPolicyVersionId());
 
         return ResolvedCommissionPolicy.builder()
                 .policyVersionId(policy.getPolicyVersionId())
                 .policyType(policy.getPolicyType())
                 .paymentStage(paymentStage)
                 .scheduleRegime(policy.getScheduleRegime())
-                .rules(List.copyOf(rules))
+                .rules(resolvedRules)
                 .build();
     }
+    /**
+     * 후보 규칙을 수수료 항목, 지급 대상 직급 및 회차별로 그룹화하고
+     * 각 그룹에서 구체성과 우선순위에 따라 최종 규칙을 선택한다.
+     *
+     * @param candidateRules 계약 조건에 맞는 후보 수수료 규칙
+     * @param policyVersionId 정책 버전 ID
+     * @return 회차별로 확정된 최종 수수료 규칙 목록
+     * @author hjKang
+     * @since 2026-08-10
+     */
+    private List<ResolvedCommissionRule> resolveApplicableRules(
+            List<ResolvedCommissionRule> candidateRules,
+            Long policyVersionId
+    ) {
+        Map<RuleKey, List<ResolvedCommissionRule>> rulesByKey = new HashMap<>();
 
+        for (ResolvedCommissionRule rule : candidateRules) {
+            validateCandidateRule(rule, policyVersionId);
+
+            for (int installmentNo = rule.getInstallmentFrom();
+                 installmentNo <= rule.getInstallmentTo();
+                 installmentNo++) {
+                ResolvedCommissionRule installmentRule = rule.toBuilder()
+                        .installmentFrom(installmentNo)
+                        .installmentTo(installmentNo)
+                        .build();
+
+                RuleKey key = new RuleKey(
+                        rule.getCommissionItemId(),
+                        rule.getAgentRankCode(),
+                        installmentNo
+                );
+                rulesByKey.computeIfAbsent(key, ignored -> new ArrayList<>())
+                        .add(installmentRule);
+            }
+        }
+
+        List<ResolvedCommissionRule> resolvedRules = new ArrayList<>();
+        for (Map.Entry<RuleKey, List<ResolvedCommissionRule>> entry : rulesByKey.entrySet()) {
+            resolvedRules.add(selectMostApplicableRule(
+                    entry.getKey(),
+                    entry.getValue(),
+                    policyVersionId
+            ));
+        }
+
+        resolvedRules.sort(
+                Comparator.comparing(
+                                ResolvedCommissionRule::getCommissionItemId,
+                                Comparator.nullsFirst(Comparator.naturalOrder())
+                        )
+                        .thenComparing(
+                                ResolvedCommissionRule::getAgentRankCode,
+                                Comparator.nullsFirst(Comparator.naturalOrder())
+                        )
+                        .thenComparing(ResolvedCommissionRule::getInstallmentFrom)
+        );
+        return List.copyOf(resolvedRules);
+    }
+    /** 수수료 항목, 지급 대상 직급 및 회차로 구성된 최종 규칙 선택 키. */
+    private record RuleKey(
+            Long commissionItemId,
+            AgentRankCode agentRankCode,
+            int installmentNo
+    ) {
+    }
+
+    /** 그룹 안에서 상품 판매버전, 보험사, 설계사 직급, 조직, priorityNo 순으로 우선 규칙을 선택한다. */
+    private ResolvedCommissionRule selectMostApplicableRule(
+            RuleKey key,
+            List<ResolvedCommissionRule> candidates,
+            Long policyVersionId
+    ) {
+        List<ResolvedCommissionRule> sortedCandidates = candidates.stream()
+                .sorted(RULE_SELECTION_ORDER)
+                .toList();
+        ResolvedCommissionRule winner = sortedCandidates.getFirst();
+
+        // 선택 조건과 priorityNo까지 같으면 임의로 고르지 않고 중복 규칙으로 처리
+        if (sortedCandidates.size() > 1
+                && RULE_SELECTION_ORDER.compare(winner, sortedCandidates.get(1)) == 0) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "commissionRules",
+                    Map.of(
+                            "policyVersionId", String.valueOf(policyVersionId),
+                            "commissionItemId", String.valueOf(key.commissionItemId()),
+                            "agentRankCode", String.valueOf(key.agentRankCode()),
+                            "installmentNo", key.installmentNo(),
+                            "reason", "RULE_DUPLICATE"
+                    ),
+                    "동일한 우선순위와 구체성을 가진 수수료 규칙이 여러 건 존재합니다."
+            );
+        }
+
+        return winner;
+    }
+
+    /** 최종 규칙 선택에 필요한 필수값과 회차 범위를 검증한다. */
+    private void validateCandidateRule(
+            ResolvedCommissionRule rule,
+            Long policyVersionId
+    ) {
+        if (rule == null
+                || rule.getCommissionRuleId() == null
+                || rule.getCommissionItemId() == null
+                || rule.getFeeComponentType() == null
+                || rule.getInstallmentFrom() == null
+                || rule.getInstallmentTo() == null
+                || rule.getInstallmentFrom() < 1
+                || rule.getInstallmentTo() < rule.getInstallmentFrom()
+                || rule.getInstallmentTo() > MAX_SUPPORTED_INSTALLMENT_NO
+                || rule.getPriorityNo() == null
+                || rule.getCalculationType() == null
+                || rule.getBasisCode() == null
+                || rule.getBasisCode().isBlank()
+                || rule.getRoundingScale() == null
+                || rule.getRoundingMode() == null
+                || hasInvalidCalculationValue(rule)) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "commissionRules",
+                    Map.of(
+                            "policyVersionId", String.valueOf(policyVersionId),
+                            "reason", "INVALID_RULE"
+                    ),
+                    "수수료 규칙의 필수값 또는 회차 범위가 올바르지 않습니다."
+            );
+        }
+    }
+
+    /** 계산 유형별 금액 필드가 DB 제약과 동일한 조합인지 검증한다. */
+    private boolean hasInvalidCalculationValue(ResolvedCommissionRule rule) {
+        if (rule.getCalculationType() == CalculationType.RATE) {
+            return rule.getRatePct() == null || rule.getRatePct().signum() < 0 || rule.getFixedAmount() != null;
+        }
+        return rule.getFixedAmount() == null || rule.getFixedAmount().signum() < 0 || rule.getRatePct() != null;
+    }
     /**
      * 설명 : 현행 수수료 정책 조회에 필요한 계약 ID와 지급 단계를 검증한다.
      *
