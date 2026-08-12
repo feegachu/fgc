@@ -198,6 +198,21 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.data.contractId").value(21));
     }
 
+    /** FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 계약 등록도 허용된다. */
+    @Test
+    @DisplayName("SYSTEM_ADMIN 도 보험계약을 생성할 수 있다")
+    void createContractAllowsSystemAdmin() throws Exception {
+        when(contractService.createContract(any(ContractCreateRequest.class)))
+                .thenReturn(ContractResponse.builder().contractId(21L).build());
+
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("admin").roles("SYSTEM_ADMIN"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contractId").value(21));
+    }
+
     @Test
     @DisplayName("보험계약을 수정한다")
     void updateContractReturnsSuccess() throws Exception {

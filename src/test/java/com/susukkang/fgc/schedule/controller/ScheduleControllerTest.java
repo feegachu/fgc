@@ -68,4 +68,13 @@ class ScheduleControllerTest {
         mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("admin").roles("GA_ADMIN")).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
                 .andExpect(status().isForbidden());
     }
+
+    /** FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 재생성도 허용된다. */
+    @Test
+    void allowsRegenerationForSystemAdmin() throws Exception {
+        when(scheduleService.regenerateSchedules(10L, "정책 변경 반영")).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).versionNo(2L).build());
+
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("admin").roles("SYSTEM_ADMIN")).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
+                .andExpect(status().isOk());
+    }
 }
