@@ -65,13 +65,13 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403", description = "SETTLEMENT 권한 없음"),
+                    responseCode = "403", description = "허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001)")
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     public ApiResponse<CreateValidationRunResponse> create(
             @RequestBody CreateValidationRunRequest request,
             @AuthenticationPrincipal FgcUserDetails principal

@@ -28,7 +28,8 @@
         아직 안 적었다는 뜻이라 확정할 수 없습니다.
       </p>
     </div>
-    <a class="fgc-btn fgc-btn--primary" th:href="@{/transactions/new}" style="text-decoration:none" data-fgc-action="create">
+    <!-- 등록은 SETTLEMENT (화면정의서 :673, IF-API-22). a 태그는 disabled 가 없어 숨긴다. -->
+    <a class="fgc-btn fgc-btn--primary" th:href="@{/transactions/new}" th:if="${canProcess}" style="text-decoration:none" data-fgc-action="create">
       <span class="material-symbols-outlined" style="font-size:18px">add</span> 신규 등록
     </a>
   </div>

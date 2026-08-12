@@ -45,10 +45,11 @@
       <button class="fgc-btn fgc-btn--ghost" data-fgc-na="목업에서는 파일을 내려받지 않습니다. 실제 개발에서는 GET /api/v1/schedules/{id}/export 로 만듭니다.">
         <span class="material-symbols-outlined" style="font-size:18px">download</span> 엑셀 다운로드
       </button>
-      <button class="fgc-btn fgc-btn--ghost" id="btn-regenerate" data-fgc-action="regenerate" th:disabled="${readOnly}">
+      <!-- 재생성·확정은 SETTLEMENT (화면정의서 :873, IF-API-29) — GA_ADMIN 도 비활성이어야 한다 -->
+      <button class="fgc-btn fgc-btn--ghost" id="btn-regenerate" data-fgc-action="regenerate" th:disabled="${!canProcess}">
         <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 새 버전 만들기
       </button>
-      <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${readOnly}">
+      <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${!canProcess}">
         <span class="material-symbols-outlined" style="font-size:18px">lock</span> 확정
       </button>
     </div>
