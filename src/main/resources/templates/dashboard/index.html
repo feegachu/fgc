@@ -7,16 +7,6 @@
     <div class="page-header-copy"><h1 class="page-title">업무 대시보드</h1><p class="page-description">이번 달 정산 병목과 우선 처리 업무를 한눈에 확인합니다.</p></div>
   </header>
 
-  <form class="dashboard-control-bar" method="get" th:action="@{/}">
-    <input type="hidden" name="month" th:value="${month}">
-    <div class="dashboard-control-fields">
-      <label class="dashboard-control-field"><span class="dashboard-control-label">집계 기준</span><select class="select-control" disabled><option>저장 완료 결과</option></select></label>
-      <label class="dashboard-control-field"><span class="dashboard-control-label">조직 범위</span><select class="select-control" disabled><option>전체 조직</option></select></label>
-      <div class="dashboard-updated"><p class="dashboard-updated-label">집계 정산월</p><p class="dashboard-updated-value" th:text="${month == null ? '집계월 미지정 · 저장 결과 기준' : month + ' · 저장 결과 기준'}">2026-07 · 저장 결과 기준</p></div>
-    </div>
-    <div class="dashboard-control-actions"><button class="button button-secondary" type="submit">새로고침</button><a class="button button-primary" th:href="@{/validation-runs}">정산 실행</a></div>
-  </form>
-
   <section class="kpi-grid" aria-label="주요 검증 지표">
     <a class="kpi-card kpi-card-error" th:href="@{/cap-checks(status='VIOLATION',month=${month})}"><div class="kpi-card-header"><span class="kpi-label">1,200% 위반</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.capViolation()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">확정 위반 판정</span></div></a>
     <a class="kpi-card kpi-card-warning" th:href="@{/cap-checks(status='WARNING',month=${month})}"><div class="kpi-card-header"><span class="kpi-label">1,200% 주의</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.capWarning()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">사용률 경고 기준 이상</span></div></a>
