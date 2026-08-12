@@ -28,6 +28,11 @@
     1차에서는 <strong>보기만</strong> 합니다. 등록·수정 기능은 2차에 만듭니다.
   </p>
 
+  <!-- 2026-08-12 yslee - FUN-009 조회 기준일과 실제 수수료 항목 데이터를 화면에 연결 -->
+  <p class="fgc-muted" style="margin-top:8px;font-size:12px">
+    조회 기준일: <span class="fgc-mono" th:text="${asOf}">2026-08-01</span>
+  </p>
+
   <div class="fgc-banner fgc-banner--muted" style="margin-top:12px">
     <span class="material-symbols-outlined" style="font-size:18px">database</span>
     <span>
@@ -50,7 +55,43 @@
     <section class="fgc-tabpanel fgc-card" id="tab-insurer" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></section>
     <section class="fgc-tabpanel fgc-card" id="tab-product" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></section>
     <section class="fgc-tabpanel fgc-card" id="tab-agent"   role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></section>
-    <section class="fgc-tabpanel fgc-card" id="tab-item"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-item" role="tabpanel"
+             style="border-top:0;border-radius:0 0 .5rem .5rem" hidden>
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">수수료 항목</span>
+        <span class="fgc-muted" style="font-size:12px"
+              th:text="|${#lists.size(commissionItems)}건|">0건</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table">
+          <thead>
+          <tr>
+            <th>항목코드</th>
+            <th>항목명</th>
+            <th>지급·차감 구분</th>
+            <th>분류</th>
+            <th>사용 시작일</th>
+            <th>사용 종료일</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="item : ${commissionItems}">
+            <td class="fgc-mono" th:text="${item.itemCode()}">BASE_COMMISSION</td>
+            <td th:text="${item.itemName()}">FC 기본수수료</td>
+            <td th:text="${item.cashflowType()}">PAYMENT</td>
+            <td th:text="${item.itemCategory()}">SALES</td>
+            <td class="fgc-mono" th:text="${item.effectiveFrom()}">2026-01-01</td>
+            <td class="fgc-mono" th:text="${item.effectiveTo() ?: '-'}">-</td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(commissionItems)}">
+            <td colspan="6">
+              <div class="fgc-empty">조건에 맞는 수수료 항목이 없습니다.</div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
 <!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
