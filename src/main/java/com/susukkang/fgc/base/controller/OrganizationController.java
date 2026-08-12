@@ -32,7 +32,7 @@ public class OrganizationController {
                     + "적용기간 안의 비활성 조직도 반환되며 activeYn=false인 항목은 선택할 수 없습니다."
     )
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE')")
     public ApiResponse<PageResponse<OrganizationResponse>> search(
             @Parameter(description = "조직 코드 또는 조직명 검색어")
             @RequestParam(required = false)

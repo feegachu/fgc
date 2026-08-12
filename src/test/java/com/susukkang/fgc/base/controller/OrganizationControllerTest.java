@@ -3,6 +3,7 @@ package com.susukkang.fgc.base.controller;
 import com.susukkang.fgc.base.dto.OrganizationResponse;
 import com.susukkang.fgc.base.dto.OrganizationSearchCriteria;
 import com.susukkang.fgc.base.service.OrganizationService;
+import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -32,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrganizationController.class)
-@Import({OrganizationController.class, GlobalExceptionHandler.class})
+@Import({OrganizationController.class, GlobalExceptionHandler.class, SecurityConfig.class})
 class OrganizationControllerTest {
 
     @Autowired
@@ -110,6 +111,14 @@ class OrganizationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content").isArray())
                 .andExpect(jsonPath("$.data.content").isEmpty());
+    }
+
+    @Test
+    void rejectsAuthenticatedUserWithoutAllowedRole() throws Exception {
+        mockMvc.perform(get("/api/v1/base/organizations")
+                        .param("asOf", "2026-08-11")
+                        .with(user("other-user").roles("USER")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
