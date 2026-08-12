@@ -13,20 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * "FINALIZED 상태의 검증 실행과 그 하위 결과가 재실행으로 변경되지 않는지 검증".
- *
- * 이 불변성은 애플리케이션 코드가 아니라 DB 트리거(trg_validation_run_finalized,
- * guard_finalized_validation_result — V1__baseline_v2_1_2.sql:1570-1648)가 보장한다.
- * CreateDailyRunTasklet의 FINALIZED 분기(existingFinalizedRunCausesFreshRunToBeCreated...
- * WithoutTouchingTheFinalizedRow)는 "우리 애플리케이션이 FINALIZED 행을 건드리지 않는다"만
- * 증명하고, "DB가 애초에 그걸 허용 안 한다"는 이 트리거 자체는 아직 테스트가 없었다 —
- * 여기서 직접 raw SQL로 우회 시도를 해서 확인한다.
- *
- * @Transactional로 테스트 종료 시 자동 롤백시킨다 — FINALIZED 행은 트리거가 DELETE
- * 자체를 막아 수동 정리가 불가능했지만(코드리뷰 반영), 롤백은 트리거를 거치지 않고
- * 트랜잭션 전체를 되돌리므로 FINALIZED 행도 문제없이 정리된다. 각 테스트가 기대하는
- * 예외(assertThatThrownBy)는 항상 메서드의 마지막 statement이므로, 트리거가 트랜잭션을
- * abort 상태로 만들어도 이후 같은 트랜잭션 내 추가 DB 접근은 없다.
+ * "FINALIZED 상태의 검증 실행과 그 하위 결과가 재실행으로 변경되지 않는지 검증"
  */
 @SpringBootTest
 @Transactional
