@@ -87,6 +87,17 @@ public class ShellAdvice {
         return "COMPLIANCE".equals(roleCode(authentication));
     }
 
+    /**
+     * 등록·실행 버튼의 노출·활성 기준. 인터페이스정의서 §4-2 의 쓰기 API 는 전부 SETTLEMENT
+     * 이고 SYSTEM_ADMIN 은 "전부"(§4-1)라, 처리 버튼을 가진 화면 전체가 이 한 값을 공유한다.
+     * readOnly 와 별개인 이유 — GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다.
+     */
+    @ModelAttribute("canProcess")
+    public boolean canProcess(Authentication authentication) {
+        String role = roleCode(authentication);
+        return "SETTLEMENT".equals(role) || "SYSTEM_ADMIN".equals(role);
+    }
+
     /** 셸 헤더·사이드바의 역할 배지. messages.properties 의 role.{code} 키로 라벨을 찾는다. */
     @ModelAttribute("roleCode")
     public String roleCode(Authentication authentication) {

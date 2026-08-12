@@ -50,7 +50,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PostMapping
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
@@ -63,7 +63,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
