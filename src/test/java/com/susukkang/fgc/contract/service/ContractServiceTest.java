@@ -9,9 +9,12 @@ import com.susukkang.fgc.contract.dto.ContractInput;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
+import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
+import com.susukkang.fgc.contract.dto.ContractStatusEventRow;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.contract.dto.ContractResponse;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.mapper.ContractStatusEventMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +32,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -56,10 +60,45 @@ class ContractServiceTest {
     private ContractMapper contractMapper;
 
     @Mock
+    private ContractStatusEventMapper contractStatusEventMapper;
+
+    @Mock
     private ScheduleService scheduleService;
 
     @InjectMocks
     private ContractService contractService;
+
+    @Test
+    @DisplayName("계약 상태 사건에 Job별 처리 이력을 묶고 미처리는 빈 배열로 반환한다")
+    void selectStatusEventsGroupsProcessingsByEvent() {
+        InsuranceContract contract = InsuranceContract.builder().contractId(21L).build();
+        given(contractMapper.selectContractById(21L)).willReturn(contract);
+
+        OffsetDateTime firstEffective = OffsetDateTime.parse("2026-07-10T00:00:00+09:00");
+        OffsetDateTime secondEffective = OffsetDateTime.parse("2026-07-15T00:00:00+09:00");
+        given(contractStatusEventMapper.selectByContractId(21L)).willReturn(List.of(
+                new ContractStatusEventRow(101L, 1, null, ACTIVE, firstEffective,
+                        firstEffective.plusDays(1), "INSURER_FEED", "EVENT-1"),
+                new ContractStatusEventRow(102L, 2, ACTIVE,
+                        com.susukkang.fgc.contract.domain.ContractStatus.TERMINATED,
+                        secondEffective, secondEffective.plusDays(1), "INSURER_FEED", "EVENT-2")
+        ));
+        given(contractStatusEventMapper.selectProcessingsByContractId(21L)).willReturn(List.of(
+                new ContractStatusEventProcessingRow(102L, "DailyChangedContractJob", "FAILED",
+                        secondEffective.plusDays(1).plusHours(1)),
+                new ContractStatusEventProcessingRow(102L, "DailyChangedContractJob", "SUCCEEDED",
+                        secondEffective.plusDays(1).plusHours(2))
+        ));
+
+        var response = contractService.selectStatusEventsByContractId(21L);
+
+        assertThat(response).hasSize(2);
+        assertThat(response.getFirst().effectiveAt()).isEqualTo(firstEffective);
+        assertThat(response.getFirst().processings()).isEmpty();
+        assertThat(response.get(1).processings())
+                .extracting(processing -> processing.processingStatus())
+                .containsExactly("FAILED", "SUCCEEDED");
+    }
 
     @Test
     @DisplayName("검색 조건에 해당하는 보험계약 목록을 페이징하여 반환한다")

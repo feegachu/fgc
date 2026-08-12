@@ -23,11 +23,6 @@ public class ScreenViewController {
         return "policy/list";
     }
 
-    @GetMapping("/contracts")
-    public String contractList() {
-        return "contract/list";
-    }
-
     /**
      * CONT-W03 — 인터페이스정의서 IF-API-18/19 역할 SETTLEMENT (+SYSTEM_ADMIN 은 전부, §4-1).
      * FGC-FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.

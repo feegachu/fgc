@@ -1,272 +1,39 @@
-<!DOCTYPE html>
-<!--
-  FGC 공통 셸 (사이드바·헤더·푸터)
-  원본: 30_산출물/화면_MVP/assets/_shell-reference.html  (목업의 fgc-shell.js 가 만들던 HTML)
-
-  [쓰는 법] 각 화면 템플릿은 <html> 한 줄만 적는다.
-    <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CAP-W01', '1,200% 한도 검증 현황', null, null)}">
-    <body><main class="fgc-main"> ...본문... </main></body></html>
-    하위 화면이면 마지막 두 인자에 상위 화면 제목·링크를 넣는다.
-
-  [지켜야 할 것]
-   · 푸터의 "교육용 프로토타입입니다..." 문구는 지우지 않는다 (COR-009 · 화면정의서 §4-12).
-   · 2차 화면 링크는 회색 + '2차' 배지 + 클릭 불가를 유지한다.
-   · 메뉴 순서는 화면정의서 v2.0 §2 그대로다. 임의로 바꾸지 않는다.
-   · 목업의 Tailwind CDN 은 옮기지 않았다 — 21개 화면 전수조사 결과 유틸리티 클래스 사용 0건이고,
-     레이아웃은 전부 fgc.css + 인라인 style 이라 필요가 없다(오프라인 데모 리스크도 사라진다).
--->
-<!-- 셸 레이아웃, 즉 21개의 화면을 모두 해제하는 파일 -->
-<html th:fragment="page(content, screenId, title, parentTitle, parentHref)"
-      class="light" lang="ko"
-      xmlns:th="http://www.thymeleaf.org">
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:fragment="page(content, screenId, title, parentTitle, parentHref)">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- 가운뎃점(·)은 반드시 작은따옴표 문자열 안에 둔다. |...| 리터럴 치환 안에 그대로 쓰면
-     IntelliJ 의 Thymeleaf 검사기가 · 를 표현식 토큰으로 끊어 오류로 표시한다(런타임은 정상). -->
-<title th:text="${title} + ' (' + ${screenId} + ') · FGC'">FGC</title>
-
-<!-- Ajax POST(IF-API-24·25 등)가 CSRF 토큰을 실을 수 있도록 미리 심어 둔다.
-     MPA 폼은 th:action 이 히든 필드를 자동으로 넣으므로 이 meta 가 필요 없다. -->
-<meta name="_csrf" th:if="${_csrf}" th:content="${_csrf.token}">
-<meta name="_csrf_header" th:if="${_csrf}" th:content="${_csrf.headerName}">
-
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" th:href="@{/assets/fgc.css}">
-<style> body { font-family: Inter, sans-serif; margin: 0; background: #f6fafe; } </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#467AA2">
+  <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+  <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
+  <title th:text="${title} + ' (' + ${screenId} + ') · FGC'">FGC</title>
+  <link rel="icon" type="image/png" sizes="32x32" th:href="@{/images/brand/favicon-32.png}">
+  <link rel="stylesheet" th:href="@{/assets/fgc.css}">
+  <link rel="stylesheet" th:href="@{/css/common/variables.css}">
+  <link rel="stylesheet" th:href="@{/css/common/reset.css}">
+  <link rel="stylesheet" th:href="@{/css/common/layout.css}">
+  <link rel="stylesheet" th:href="@{/css/common/components.css}">
+  <link rel="stylesheet" th:href="@{/css/common/utilities.css}">
+  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-DASH-W01'}" th:href="@{/css/features/dashboard.css}">
+  <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CONT-')}" th:href="@{/css/features/contract.css}">
 </head>
-
-<body>
-
-<!-- ===================== 사이드바 ===================== -->
-<aside class="fgc-sidebar" aria-label="주 메뉴">
-
-  <div class="fgc-sidebar__brand">
-    <div style="width:36px;height:36px;border-radius:.25rem;background:#102a43;display:flex;align-items:center;justify-content:center">
-      <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">account_balance</span>
-    </div>
-    <div>
-      <div class="fgc-sidebar__brand-name">FGC</div>
-      <div class="fgc-sidebar__brand-sub">GA 수수료 정산·검증 v2.0</div>
-    </div>
-  </div>
-
-  <!-- 홈 -->
-  <div class="fgc-sidebar__group">홈</div>
-  <a class="fgc-sidebar__link" th:href="@{/}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-DASH-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">dashboard</span>
-    <span>업무 대시보드</span>
-    <span class="fgc-sidebar__id">DASH-W01</span>
-  </a>
-
-  <!-- 계약·지급 -->
-  <div class="fgc-sidebar__group">계약·지급</div>
-  <a class="fgc-sidebar__link" th:href="@{/contracts}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-CONT-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">description</span>
-    <span>보험계약</span><span class="fgc-sidebar__id">CONT-W01</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">event_repeat</span>
-    <span>계약상태 사건</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-  <a class="fgc-sidebar__link" th:href="@{/transactions}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-TRAN-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">payments</span>
-    <span>수수료 지급 건</span><span class="fgc-sidebar__id">TRAN-W01</span>
-  </a>
-
-  <!-- 예상 스케줄 -->
-  <div class="fgc-sidebar__group">예상 스케줄</div>
-  <a class="fgc-sidebar__link" th:href="@{/schedules}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-SCHE-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">event_note</span>
-    <span>현행 예상 스케줄</span><span class="fgc-sidebar__id">SCHE-W01</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">calendar_month</span>
-    <span>4년·7년 분급 스케줄</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-
-  <!-- 규제 검증 -->
-  <div class="fgc-sidebar__group">규제 검증</div>
-  <a class="fgc-sidebar__link" th:href="@{/cap-checks}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-CAP-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">speed</span>
-    <span>1,200% 한도 검증</span><span class="fgc-sidebar__id">CAP-W01</span>
-  </a>
-  <a class="fgc-sidebar__link" th:href="@{/arbitrage-checks}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-ARB-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">compare_arrows</span>
-    <span>차익거래 검증</span><span class="fgc-sidebar__id">ARB-W01</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">request_quote</span>
-    <span>계약체결비용 한도</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">build_circle</span>
-    <span>유지관리·장기유지</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-
-  <!-- 원장·대사 -->
-  <div class="fgc-sidebar__group">원장·대사</div>
-  <a class="fgc-sidebar__link" th:href="@{/journals}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-LEDG-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">menu_book</span>
-    <span>검증원장(복식부기)</span><span class="fgc-sidebar__id">LEDG-W01</span>
-  </a>
-  <a class="fgc-sidebar__link" th:href="@{/reconciliations}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-RECO-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">rule</span>
-    <span>대사 실행·결과</span><span class="fgc-sidebar__id">RECO-W01</span>
-  </a>
-
-  <!-- 월 통합검증 -->
-  <div class="fgc-sidebar__group">월 통합검증</div>
-  <a class="fgc-sidebar__link" th:href="@{/validation-runs}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-VRUN-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">fact_check</span>
-    <span>실행 목록·상세·확정</span><span class="fgc-sidebar__id">VRUN-W01</span>
-  </a>
-
-  <!-- 예외 -->
-  <div class="fgc-sidebar__group">예외</div>
-  <a class="fgc-sidebar__link" th:href="@{/exceptions}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-EXCP-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">inbox</span>
-    <span>예외함</span><span class="fgc-sidebar__id">EXCP-W01</span>
-  </a>
-
-  <!-- 환수 (전부 2차) -->
-  <div class="fgc-sidebar__group">환수</div>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">receipt_long</span>
-    <span>환수 검토·계산</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">mark_email_read</span>
-    <span>통지·이의·상계</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-
-  <!-- 리포트 (전부 2차) -->
-  <div class="fgc-sidebar__group">리포트</div>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">assessment</span>
-    <span>정산·대사 보고서</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">receipt</span>
-    <span>설계사 수수료 명세</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">search</span>
-    <span>통합 검색</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-
-  <!-- 관리 -->
-  <div class="fgc-sidebar__group">관리</div>
-  <a class="fgc-sidebar__link" th:href="@{/base}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-BASE-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">inventory_2</span>
-    <span>기준정보 조회</span><span class="fgc-sidebar__id">BASE-W01</span>
-  </a>
-  <a class="fgc-sidebar__link" th:href="@{/policies}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-POL-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">policy</span>
-    <span>정책·룰셋 조회</span><span class="fgc-sidebar__id">POL-W01</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">approval</span>
-    <span>정책 등록·승인</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">groups</span>
-    <span>조직·설계사 관리</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-  <!-- 사이드바에서 유일하게 역할 제한이 있는 화면이다 — 화면정의서 v2.0 AUDT-W01 "권한 COMPLIANCE, SYSTEM_ADMIN".
-       나머지 항목은 전부 "전체 조회"라 숨기지 않는다. 서버 측 403 차단은 FGC-FUN-002 본체 작업이다. -->
-  <a class="fgc-sidebar__link" th:href="@{/audit-logs}"
-     th:if="${roleCode == 'COMPLIANCE' or roleCode == 'SYSTEM_ADMIN'}"
-     th:attrappend="aria-current=${screenId == 'FGC-UI-AUDT-W01' ? 'page' : null}">
-    <span class="material-symbols-outlined" style="font-size:18px">history</span>
-    <span>감사로그</span><span class="fgc-sidebar__id">AUDT-W01</span>
-  </a>
-  <a class="fgc-sidebar__link fgc-sidebar__link--disabled" href="#" tabindex="-1" aria-disabled="true">
-    <span class="material-symbols-outlined" style="font-size:18px">manage_accounts</span>
-    <span>사용자·역할</span>
-    <span class="fgc-badge fgc-badge--phase2" style="margin-left:auto">2차</span>
-  </a>
-
-  <!-- 로그인 사용자 -->
-  <div class="fgc-sidebar__user">
-    <!-- sec:authentication="principal.userName" 을 쓰지 않는다 — 익명 사용자일 때 principal 이
-         "anonymousUser" 문자열이라 렌더링 도중 터진다(오류 화면은 인증 없이도 도달한다). -->
-    <div style="font-weight:700" th:text="${userName}">-</div>
-    <div style="color:rgba(255,255,255,.6)">
-      <span th:text="#{'role.' + ${roleCode}}">-</span> ·
-      <span class="fgc-mono" th:text="${roleCode}">-</span>
-    </div>
-    <form method="post" th:action="@{/logout}" style="margin-top:8px">
-      <button type="submit"
-              style="display:inline-flex;gap:4px;align-items:center;background:none;border:0;padding:0;cursor:pointer;color:#bfddfe;font-size:12px">
-        <span class="material-symbols-outlined" style="font-size:18px">logout</span>로그아웃
-      </button>
-    </form>
-  </div>
-</aside>
-
-<!-- ===================== 헤더 ===================== -->
-<header class="fgc-header">
-  <div style="display:flex;align-items:center;gap:10px;min-width:0">
-    <!-- 하위 화면일 때만 나오는 상위 화면 링크 -->
-    <th:block th:if="${parentTitle}">
-      <a th:href="${parentHref}" th:text="${parentTitle}"
-         style="color:#43474d;text-decoration:none;font-size:12px">상위 화면</a>
-      <span style="color:#c3c6ce;font-size:12px">›</span>
-    </th:block>
-
-    <span class="fgc-header__title" th:text="${title}">화면 제목</span>
-    <span class="fgc-header__id" th:text="${screenId}">FGC-UI-XXX-W01</span>
-  </div>
-
-  <div style="display:flex;align-items:center;gap:14px">
-    <label class="fgc-label" for="fgc-month" style="margin:0">기준 정산월</label>
-    <!-- 목업의 sessionStorage + fgc:month-change 커스텀이벤트를 ?month= 전체 리로드로 대체한다.
-         SIR-006 이 1차를 MPA 위주로 규정한다 — Ajax 는 한도게이지·검증실행·대사상세만. -->
-    <select class="fgc-select" id="fgc-month" style="padding:5px 8px"
-            onchange="var u=new window.URL(location);u.searchParams.set('month',this.value);location=u">
-      <option th:each="m : ${monthOptions}" th:value="${m}" th:text="${m}"
-              th:selected="${m == month}">2026-07</option>
-    </select>
-    <span class="fgc-badge fgc-badge--neutral"
-          th:title="#{'role.' + ${roleCode} + '.desc'}"
-          th:text="#{'role.' + ${roleCode}}">역할</span>
-  </div>
-</header>
-
-<!-- ===================== 본문 ===================== -->
-<th:block th:replace="${content}"/>
-
-<!-- ===================== 푸터 ===================== -->
-<footer class="fgc-footer">
-  <span>FGC v2.0 · 화면정의서 v2.0 · 요구사항명세서 v2.2.2 · 스키마 v2.1.2</span>
-  <!-- COR-009 · 화면정의서 §4-12 — 이 문구는 절대 지우지 마세요 -->
-  <span class="fgc-disclaimer">교육용 프로토타입입니다. 실제 지급 결정에 사용할 수 없습니다.</span>
-</footer>
-
+<body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">
+  <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
+  <aside th:replace="~{layout/fragments/sidebar :: sidebar(${screenId})}"></aside>
+  <div class="app-sidebar-backdrop" data-action="close-app-sidebar" aria-hidden="true"></div>
+  <header th:replace="~{layout/fragments/header :: header(${title}, ${parentTitle}, ${parentHref})}"></header>
+  <nav th:replace="~{layout/fragments/workspace-tabs :: workspaceTabs(${screenId}, ${title})}"></nav>
+  <div class="app-main"><th:block th:replace="${content}"></th:block></div>
+  <footer class="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
+  <div id="toast-region" class="toast-region" role="region" aria-label="알림" aria-live="polite"></div>
+  <div id="modal-root"></div>
+  <script th:src="@{/js/common/workspace-tabs.js}" defer></script>
+  <script th:src="@{/js/common/app-shell.js}" defer></script>
+  <script th:src="@{/js/common/modal.js}" defer></script>
+  <script th:src="@{/js/common/toast.js}" defer></script>
+  <script th:src="@{/js/common/api-client.js}" defer></script>
+  <script th:if="${screenId == 'FGC-UI-DASH-W01'}" th:src="@{/js/features/dashboard/dashboard.js}" defer></script>
 </body>
 </html>

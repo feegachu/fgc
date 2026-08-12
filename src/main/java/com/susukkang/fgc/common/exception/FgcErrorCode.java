@@ -116,6 +116,12 @@ public enum FgcErrorCode {
             "error.ledger.reverseOnly"
     ),
 
+    JOURNAL_001(
+            "FGC-JOURNAL-001",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.journal.invalidAccount"
+    ),
+
     RECO_001(
             "FGC-RECO-001",
             HttpStatus.CONFLICT,
