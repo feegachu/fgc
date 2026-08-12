@@ -288,6 +288,12 @@
   text-underline-offset: 0.15rem;
 }
 
+.cap-negative-amount,
+.cap-detail-mismatch {
+  color: var(--color-status-error-text);
+  font-weight: 600;
+}
+
 .cap-usage-cell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 4.5rem;

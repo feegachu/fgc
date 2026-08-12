@@ -13,7 +13,12 @@
     contractNo: document.getElementById("cap-contract-no"),
     size: document.getElementById("cap-page-size")
   };
-  var state = { page: 1, abortController: null };
+  var state = {
+    page: 1,
+    abortController: null,
+    detailAbortController: null,
+    detailRequestId: 0
+  };
 
   var STATUS_CLASS = {
     NORMAL: "status-badge-success",
@@ -48,6 +53,18 @@
 
   function won(value) {
     return number(value) + "원";
+  }
+
+  function refundAddition(value) {
+    return Number(value) === 0 ? "해당없음" : won(value);
+  }
+
+  function remainingAmount(value) {
+    var parsed = Number(value);
+    if (parsed < 0) {
+      return '<span class="cap-negative-amount">(' + number(Math.abs(parsed)) + "원)</span>";
+    }
+    return won(value);
   }
 
   function percent(value) {
@@ -141,11 +158,11 @@
       '<td><span class="cap-stage-label"><span class="cap-stage-dot' + (isAgent ? " is-agent" : "") + '"></span>' + escapeHtml(item.paymentStageLabel) + '</span></td>' +
       '<td class="tabular-nums">' + escapeHtml(item.asOfDate) + '</td>' +
       '<td class="text-right tabular-nums">' + won(item.basePremiumAmount) + '</td>' +
-      '<td class="text-right tabular-nums">' + won(item.refund12mAmount) + '</td>' +
+      '<td class="text-right tabular-nums">' + refundAddition(item.refund12mAmount) + '</td>' +
       '<td class="text-right tabular-nums">' + deduction + '</td>' +
       '<td class="text-right tabular-nums">' + won(item.limitAmount) + '</td>' +
       '<td class="text-right tabular-nums"><button class="cap-basis-button" type="button" data-cap-detail-id="' + escapeHtml(item.capCheckId) + '">' + won(item.includedAmount) + '</button></td>' +
-      '<td class="text-right tabular-nums">' + won(item.remainingAmount) + '</td>' +
+      '<td class="text-right tabular-nums">' + remainingAmount(item.remainingAmount) + '</td>' +
       '<td><div class="cap-usage-cell"><span class="cap-usage-track"><span class="cap-usage-bar ' + (STATUS_PROGRESS_CLASS[item.resultStatus] || "") + '" style="--cap-progress:' + visualWidth(item.usagePct) + '"></span></span><span class="cap-usage-value">' + escapeHtml(percent(item.usagePct)) + '</span></div></td>' +
       '<td class="text-center">' + statusBadge(item) + '</td>' +
       '<td class="tabular-nums">ID ' + escapeHtml(item.capRuleSetId) + '</td></tr>';
@@ -221,6 +238,10 @@
     return "<tr><th scope=\"row\">" + escapeHtml(label) + "</th><td class=\"text-right tabular-nums\">" + escapeHtml(value) + "</td></tr>";
   }
 
+  function detailPairHtml(label, valueHtml) {
+    return "<tr><th scope=\"row\">" + escapeHtml(label) + "</th><td class=\"text-right tabular-nums\">" + valueHtml + "</td></tr>";
+  }
+
   function renderDetail(data) {
     var item = data.capCheck;
     var snapshot = data.calculationSnapshot || {};
@@ -235,7 +256,7 @@
     var insurerStage = item.paymentStage === "INSURER_TO_GA";
     document.getElementById("input-body").innerHTML =
       detailPair("월납환산 초회보험료", won(item.basePremiumAmount)) +
-      detailPair("12차월 환급금 가산", won(item.refund12mAmount)) +
+      detailPair("12차월 환급금 가산", refundAddition(item.refund12mAmount)) +
       detailPair("준법경영비 공제", insurerStage ? won(item.complianceDeductionAmount) : "적용하지 않음") +
       detailPair("보험료 배수", snapshot.premiumMultiplier == null ? "—" : snapshot.premiumMultiplier);
 
@@ -250,7 +271,7 @@
     document.getElementById("final-limit-label").textContent = "한도 " + won(item.limitAmount);
     document.getElementById("final-body").innerHTML =
       detailPair("한도", won(item.limitAmount)) + detailPair("산입금액", won(item.includedAmount)) +
-      detailPair("잔여", won(item.remainingAmount)) + detailPair("사용률", percent(item.usagePct)) +
+      detailPairHtml("잔여", remainingAmount(item.remainingAmount)) + detailPair("사용률", percent(item.usagePct)) +
       detailPair("저장 판정", item.resultStatusLabel);
 
     var details = data.details || [];
@@ -261,10 +282,22 @@
         '</td><td class="text-right tabular-nums">' + won(detail.amount) + '</td><td><span class="status-badge ' + badgeClass + '">' + escapeHtml(label) +
         "</span></td><td>" + escapeHtml(detail.decisionReason || "—") + "</td><td>" + escapeHtml(detail.evidenceRef || "—") + "</td><td>저장 스냅샷</td></tr>";
     }).join("") : '<tr><td colspan="7"><div class="cap-inline-message">저장된 항목별 산입 내역이 없습니다.</div></td></tr>';
-    document.getElementById("detail-included").textContent = number(item.includedAmount);
+    var includedDetailTotal = details.reduce(function (total, detail) {
+      return detail.classificationSnapshot === "INCLUDED" ? total + Number(detail.amount || 0) : total;
+    }, 0);
+    document.getElementById("detail-included").textContent = number(includedDetailTotal);
+    var includedNote = document.getElementById("detail-included-note");
+    var includedMatches = includedDetailTotal === Number(item.includedAmount);
+    includedNote.classList.toggle("cap-detail-mismatch", !includedMatches);
+    includedNote.textContent = includedMatches
+      ? "제외·검토필요 금액은 합계에 넣지 않습니다 · 저장 산입금액과 일치"
+      : "저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.";
   }
 
   function openDetail(capCheckId) {
+    if (state.detailAbortController) state.detailAbortController.abort();
+    state.detailAbortController = new AbortController();
+    var requestId = ++state.detailRequestId;
     var stateBox = document.getElementById("cap-detail-state");
     var content = document.getElementById("cap-detail-content");
     stateBox.className = "modal-body cap-detail-state";
@@ -272,13 +305,17 @@
     stateBox.hidden = false;
     content.hidden = true;
     window.FgcUi.modal.open("cap-detail");
-    window.FgcUi.apiClient.request("/api/v1/cap-checks/" + encodeURIComponent(capCheckId) + "/details")
+    window.FgcUi.apiClient.request("/api/v1/cap-checks/" + encodeURIComponent(capCheckId) + "/details", {
+      signal: state.detailAbortController.signal
+    })
       .then(function (envelope) {
+        if (requestId !== state.detailRequestId) return;
         renderDetail(envelope.data);
         stateBox.hidden = true;
         content.hidden = false;
       })
       .catch(function (error) {
+        if (requestId !== state.detailRequestId || (error && error.name === "AbortError")) return;
         stateBox.className = "modal-body cap-detail-state is-error";
         stateBox.textContent = error && error.message ? error.message : "계산근거를 불러오지 못했습니다.";
       });
