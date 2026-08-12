@@ -528,7 +528,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 **막아야 할 것**
 - 계약자 이름 열을 추가하지 마세요. **저장하지 않습니다**(SRC-027 D-05). 계약 식별은 계약번호로 합니다.
 
-**권한** 전체 조회 / `SETTLEMENT`·`GA_ADMIN`만 등록 버튼
+**권한** 전체 조회 / `SETTLEMENT`만 등록 버튼 (2026-08-12 교정 — IF-API-18·§4-1 역할 정의와 일치화, 근거대장 참조)
 
 **데이터**
 - 읽기: `insurance_contract`, `insurer`, `product`, `product_offering`, `agent`, `cap_check`
@@ -574,7 +574,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 - 확정(`CONFIRMED`)된 스케줄 행의 금액을 화면에서 고치는 기능 → **만들지 마세요.** DB 트리거가 거부합니다.
 - 탭마다 계약 정보를 다시 계산하지 마세요. 헤더에서 한 번만 조회합니다.
 
-**권한** 전체 조회 / 처리 버튼은 `SETTLEMENT`·`GA_ADMIN`
+**권한** 전체 조회 / 처리 버튼은 `SETTLEMENT` (2026-08-12 교정 — IF-API-19/29/33·§4-1과 일치화)
 
 **데이터** API: `GET /api/v1/contracts/{id}`, `GET /api/v1/contracts/{id}/schedules` 등 탭별 분리
 
@@ -587,7 +587,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 ### FGC-UI-CONT-W03 · 보험계약 등록·수정
 
-| 메뉴경로 | 계약·지급 > 보험계약 > 등록 | 유형 | 입력 폼 | 역할 | SETTLEMENT·GA_ADMIN | 우선순위 | 필수 |
+| 메뉴경로 | 계약·지급 > 보험계약 > 등록 | 유형 | 입력 폼 | 역할 | SETTLEMENT | 우선순위 | 필수 |
 |---|---|---|---|---|---|---|---|
 
 **이 화면은 무엇인가**
@@ -622,7 +622,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 - 계약번호 중복 저장 → 서버에서 막고 "이미 등록된 계약번호입니다"를 보여줍니다.
 - 필수값 누락 상태로 저장 버튼 활성화 → 비활성으로 둡니다.
 
-**권한** `SETTLEMENT`, `GA_ADMIN`
+**권한** `SETTLEMENT` (2026-08-12 교정 — IF-API-18/19·§4-1과 일치화)
 
 **데이터**
 - 쓰기: `insurance_contract` (`data_origin='MANUAL'`)
@@ -1215,7 +1215,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 - 같은 정산월·지급단계·보험회사로 실행이 두 번 만들어지지 않게 합니다(DB UNIQUE).
 - 화면에서 결과 유형을 바꾸는 기능 금지.
 
-**권한** 전체 조회 / 실행은 `SETTLEMENT`
+**권한** 전체 조회 / 실행·불일치 예외 일괄 생성은 `SETTLEMENT` (IF-API-38·42)
 
 **데이터**
 - 읽기·쓰기: `reconciliation_run`, `reconciliation_result`, `reconciliation_match`, 뷰 `vw_reconciliation_summary`
