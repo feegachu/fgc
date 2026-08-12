@@ -77,11 +77,14 @@ public class ShellAdvice {
                 .toList();
     }
 
-    /** 준법·감사(COMPLIANCE)는 조회만 한다. 화면은 이 한 값만 보고 처리 버튼을 잠근다. */
+    /**
+     * 준법·감사(COMPLIANCE)는 조회만 한다. 화면은 이 한 값만 보고 처리 버튼을 잠근다.
+     * roleCode 와 같은 판정을 공유한다 — 미인증이면 roleCode 가 COMPLIANCE 로 떨어지는데
+     * readOnly 만 false 면 "조회만" 배지에 처리 버튼이 활성인 모순 상태가 된다.
+     */
     @ModelAttribute("readOnly")
     public boolean readOnly(Authentication authentication) {
-        return authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_COMPLIANCE".equals(a.getAuthority()));
+        return "COMPLIANCE".equals(roleCode(authentication));
     }
 
     /** 셸 헤더·사이드바의 역할 배지. messages.properties 의 role.{code} 키로 라벨을 찾는다. */
