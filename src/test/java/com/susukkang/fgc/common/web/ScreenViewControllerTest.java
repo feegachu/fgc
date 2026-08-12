@@ -116,6 +116,16 @@ class ScreenViewControllerTest {
                         "/status-events")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event.newStatus")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event.sourceSystem")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-fgc-action=\"regenerate\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-label=\"스케줄 재생성, 연동 대기\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-fgc-action=\"recheck\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-label=\"한도 재검증, 연동 대기\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "timeZone: \"Asia/Seoul\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
