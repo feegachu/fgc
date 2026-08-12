@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-AUDT-W01 감사로그 조회
+  요구사항 FUN-061 / SER-009 · REG-22
+  데이터  읽기 audit_log  (UPDATE · DELETE 를 DB 트리거가 거부하는 append-only 테이블)
+  API     GET /api/v1/audit-logs?entityType=&entityId=&userId=&action=&from=&to=
+  권한    COMPLIANCE(준법·감사) · SYSTEM_ADMIN
+  라우트  GET /audit-logs → audit/list.html
+
+  [막을 것] 수정 · 삭제 버튼 자체를 만들지 않습니다.
+            감사로그를 고칠 수 있으면 감사로그가 아닙니다.
+  [주의] before_value / after_value 는 JSON 입니다.
+         전부 늘어놓지 말고 바뀐 칸만 노랗게 강조합니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-AUDT-W01)의 정적 골격만 옮겼다.
+  데이터 영역(필터 선택지·목록·변경 내용 비교)은
+  감사로그 조회 API(GET /api/v1/audit-logs) 연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-AUDT-W01', '감사로그 조회', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <h1 class="fgc-page-title">감사로그 조회</h1>
+  <p class="fgc-page-desc">
+    누가 · 언제 · 무엇을 · 왜 바꿨는지 기록입니다.
+    <strong>기록만 쌓이고 고치거나 지울 수 없습니다.</strong>
+  </p>
+
+  <div class="fgc-banner fgc-banner--muted" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">lock</span>
+    <span>
+      이 화면에는 <strong>수정·삭제 버튼이 없습니다.</strong> 일부러 만들지 않았습니다.
+      DB에서도 <span class="fgc-mono">audit_log</span> 테이블의 UPDATE·DELETE 를 트리거가 거부합니다.
+      지급기준을 몰래 바꾸거나 소급 적용하는 것을 막기 위한 장치입니다(REG-22).
+    </span>
+  </div>
+
+  <!-- ① 검색 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__body fgc-toolbar">
+      <div class="fgc-field" style="min-width:150px">
+        <label class="fgc-label" for="f-from">발생 시각 (시작)</label>
+        <input class="fgc-input" id="f-from" type="date" value="2026-07-01">
+      </div>
+      <div class="fgc-field" style="min-width:150px">
+        <label class="fgc-label" for="f-to">발생 시각 (끝)</label>
+        <input class="fgc-input" id="f-to" type="date" value="2026-08-31">
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-user">행위자</label>
+        <select class="fgc-select" id="f-user"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:180px">
+        <label class="fgc-label" for="f-action">행위 종류</label>
+        <select class="fgc-select" id="f-action"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:180px">
+        <label class="fgc-label" for="f-entity">대상 종류</label>
+        <select class="fgc-select" id="f-entity"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-eid">대상 ID</label>
+        <input class="fgc-input" id="f-eid" type="text" placeholder="4104">
+      </div>
+      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </button>
+    </div>
+  </section>
+
+  <div style="margin-top:16px;display:grid;grid-template-columns:1.5fr 1fr;gap:16px" id="audit-grid">
+
+    <!-- ② 목록 -->
+    <section class="fgc-card">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">감사 기록</span>
+        <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fgc-table">
+          <thead>
+            <tr>
+              <th style="width:130px">발생시각</th>
+              <th style="width:84px">행위자</th>
+              <th style="width:150px">행위</th>
+              <th style="width:150px">대상 종류</th>
+              <th style="width:70px">대상 ID</th>
+              <th>사유</th>
+              <th>정책버전</th>
+              <th style="width:110px">요청 ID</th>
+            </tr>
+          </thead>
+          <tbody id="list-body">
+            <tr><td colspan="8"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ③ 변경 내용 비교 -->
+    <section class="fgc-card" style="align-self:start">
+      <div class="fgc-card__head">
+        <span class="fgc-card__title">변경 내용 비교</span>
+        <span class="fgc-muted" style="font-size:11px">바뀐 칸만 노랗게</span>
+      </div>
+      <div class="fgc-card__body" id="diff-body">
+        <p class="fgc-muted" style="font-size:13px;margin:0">왼쪽 목록에서 한 건을 고르세요.</p>
+      </div>
+    </section>
+  </div>
+
+<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
+<script>
+/* 화면 폭이 좁으면 목록·비교 패널을 세로로 — 데이터 렌더링은 API 연동 시 추가 */
+(function () {
+  "use strict";
+  function reflow() {
+    document.getElementById("audit-grid").style.gridTemplateColumns =
+      window.innerWidth < 1150 ? "1fr" : "1.5fr 1fr";
+  }
+  reflow();
+  window.addEventListener("resize", reflow);
+})();
+</script>
+</main>
+</body>
+</html>

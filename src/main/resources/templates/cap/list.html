@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-CAP-W01 1,200% 한도 검증 현황  ★ 규제 검증의 중심 화면
+  요구사항 FUN-030 · FUN-032 · FUN-034 / REG-08 · 09 · 10 · 23
+  데이터  읽기 cap_check, cap_rule_set, insurance_contract, vw_latest_cap_check
+  API     GET /api/v1/cap-checks?month=&stage=&status=&insurerId=&contractNo=
+  라우트  GET /cap-checks → cap/list.html (화면정의서 5-2)
+
+  ★★ 절대 규칙 ★★
+   1) 게이지는 지급단계별로 반드시 2개를 따로 그립니다.
+        원수사→GA (INSURER_TO_GA)  ·  GA→설계사 (GA_TO_FC)
+      둘은 서로 다른 규제입니다. 절대 합산하지 않습니다.
+   2) 준법경영비 3% 공제는 원수사→GA 단계에만 적용합니다(REG-10).
+      GA→설계사 게이지에는 공제란 자체를 그리지 않습니다. DB CHECK 로도 0이 강제됩니다.
+   3) 규제 판정 단위는 "계약 1건"입니다.
+      설계사별·지점별 합계는 규제 판정이 아니라 모니터링 지표일 뿐이므로 라벨을 반드시 붙입니다.
+   4) 화면에서 판정을 바꾸지 않습니다. 저장된 result_status 를 그대로 씁니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-CAP-W01)의 정적 골격만 옮겼다.
+  데이터 영역(게이지·요약카드·목록)은 IF-API-30 연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CAP-W01', '1,200% 한도 검증 현황', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <h1 class="fgc-page-title">1,200% 한도 검증 현황</h1>
+  <p class="fgc-page-desc">
+    계약 1건에 대해 <strong>첫 1년 동안 준 돈</strong>이 월납환산 초회보험료의 <strong>12배</strong>를 넘었는지 봅니다.
+    넘으면 위반입니다. 일시적으로 넘긴 시점이 있어도 위반입니다.
+  </p>
+
+  <!-- 공식 안내 -->
+  <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">function</span>
+    <span>
+      <span class="fgc-mono">한도 = 월납환산 초회보험료 × 12 ( + 12차월 예상 해약환급금 ) ( − 준법경영비 공제 )</span><br>
+      <span class="fgc-mono">사용률 = 산입금액 ÷ 한도 × 100</span> ·
+      90% 이상이면 <strong>주의</strong>, 100%를 넘으면 <strong>위반</strong>입니다.
+      배수 12와 주의 기준 90%는 코드가 아니라 룰셋(<span class="fgc-mono">cap_rule_set</span>)에서 읽습니다.
+    </span>
+  </div>
+
+  <!-- 지급단계 2개 게이지 — IF-API-30 연동 시 서버 렌더링으로 채운다 -->
+  <section style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px" id="stage-grid"></section>
+
+  <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">warning</span>
+    <span>
+      <strong>위 두 게이지를 더하지 마세요.</strong>
+      원수사→GA와 GA→설계사는 서로 다른 규제이고 기준도 다릅니다.
+      하나로 합쳐 보여주면 둘 다 틀린 숫자가 됩니다(규제조문표 §0.3 금지사항 ③).
+    </span>
+  </div>
+
+  <!-- ① 검색 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__body fgc-toolbar">
+      <div class="fgc-field" style="min-width:140px">
+        <label class="fgc-label" for="f-month">정산월</label>
+        <input class="fgc-input" id="f-month" type="month" th:value="${month}" value="2026-07">
+      </div>
+      <div class="fgc-field" style="min-width:170px">
+        <label class="fgc-label" for="f-stage">지급단계</label>
+        <select class="fgc-select" id="f-stage">
+          <option value="">전체 (단계별로 행이 나뉩니다)</option>
+          <option value="GA_TO_FC">GA→설계사</option>
+          <option value="INSURER_TO_GA">원수사→GA</option>
+        </select>
+      </div>
+      <div class="fgc-field" style="min-width:150px">
+        <label class="fgc-label" for="f-status">판정</label>
+        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-insurer">보험회사</label>
+        <select class="fgc-select" id="f-insurer"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:120px">
+        <label class="fgc-label" for="f-contract">계약번호</label>
+        <input class="fgc-input" id="f-contract" type="text" placeholder="C004">
+      </div>
+      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </button>
+    </div>
+  </section>
+
+  <!-- ② 요약 카드 4장 — IF-API-30 연동 시 채운다 -->
+  <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px"
+           id="summary-cards"></section>
+
+  <!-- ③ 계약별 목록 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">계약별 판정 목록</span>
+      <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="fgc-table" style="min-width:1180px">
+        <thead>
+          <tr>
+            <th style="width:66px">계약</th>
+            <th style="width:110px">지급단계</th>
+            <th style="width:92px">기준일</th>
+            <th class="fgc-th-num" style="width:100px">기준 보험료</th>
+            <th class="fgc-th-num" style="width:100px">환급금 가산</th>
+            <th class="fgc-th-num" style="width:110px">준법경영비 공제</th>
+            <th class="fgc-th-num" style="width:100px">한도</th>
+            <th class="fgc-th-num" style="width:100px">산입금액</th>
+            <th class="fgc-th-num" style="width:100px">잔여</th>
+            <th style="width:190px">사용률</th>
+            <th style="width:120px">판정</th>
+            <th style="width:126px">룰셋</th>
+          </tr>
+        </thead>
+        <tbody id="list-body">
+          <tr><td colspan="12"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 모니터링 지표 (규제 판정 아님) -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">설계사별 합계</span>
+      <span class="fgc-badge fgc-badge--neutral">모니터링 지표 — 규제 판정이 아닙니다</span>
+    </div>
+    <div class="fgc-card__body" style="padding-bottom:0">
+      <div class="fgc-banner fgc-banner--muted">
+        <span class="material-symbols-outlined" style="font-size:18px">info</span>
+        <span>
+          1,200%룰은 <strong>계약 1건 단위</strong>로 판단합니다.
+          아래 설계사별 합계는 회사 내부에서 흐름을 보려고 만든 참고 수치이며,
+          이것으로 위반 여부를 판정하지 않습니다.
+        </span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="fgc-table">
+        <thead>
+          <tr><th>설계사</th><th>소속</th><th class="fgc-th-num">계약 수</th>
+              <th class="fgc-th-num">한도 합계</th><th class="fgc-th-num">산입 합계</th>
+              <th class="fgc-th-num">평균 사용률</th></tr>
+        </thead>
+        <tbody id="agent-body">
+          <tr><td colspan="6"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+<!-- 스크립트는 main 안에 둔다 — 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
+<script>
+/* 화면 폭이 좁으면 게이지 2장을 세로로 — 데이터 렌더링은 IF-API-30 연동 시 추가 */
+(function () {
+  "use strict";
+  function reflow() {
+    document.getElementById("stage-grid").style.gridTemplateColumns =
+      window.innerWidth < 980 ? "1fr" : "1fr 1fr";
+  }
+  reflow();
+  window.addEventListener("resize", reflow);
+})();
+</script>
+</main>
+</body>
+</html>
