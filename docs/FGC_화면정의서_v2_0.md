@@ -1415,16 +1415,53 @@ FGC — GA 수수료 정산·검증 플랫폼
 ⑤ 확정 조건 체크리스트
 ⑥ [확정] 버튼
 
+**항목 정의 — ① 실행 헤더 · ② 진행 단계**
+
+| 항목 | 출처 | 비고 |
+|---|---|---|
+| 검증월 · 회차 | `validation_run.validation_month` · `run_no` | |
+| 실행 상태 | `validation_run.status` | `CREATED`·`RUNNING`·`COMPLETED`·`FAILED`·`FINALIZED` **5개** |
+| **진행 단계 (1~10)** | **`validation_run.current_step`** | ★ 아래 설명 |
+| 진행률 % | `current_step / 10 × 100` | 화면에서 계산 |
+| 실패 단계 | `status='FAILED'` 일 때의 `current_step` | 실패 사유는 `failure_message` |
+| 단계 이름 | **DB 아님 — 화면 상수** | `화면_MVP/assets/fgc-seed.js` 의 `validationSteps` |
+| 실행자 · 시작 · 완료 | `triggered_by` · `started_at` · `completed_at` | |
+| 확정자 · 확정시각 | `finalized_by` · `finalized_at` | |
+
+> **★ `status` 5개와 10단계는 서로 다른 축입니다.** 헷갈리기 쉬운 지점입니다.
+> `status` 는 실행의 거친 생명주기이고, `current_step` 은 그 안에서의 진행 위치입니다.
+> 둘의 관계는 DB 제약 `ck_validation_run_step` 이 강제합니다 —
+> `CREATED`=0 / `RUNNING`·`FAILED`=0~8 / `COMPLETED`=8 / `FINALIZED`=10.
+>
+> **9단계(담당자 검토)에는 별도 값이 없습니다.** `COMPLETED` + `current_step=8` 이
+> 곧 "배치 끝, 사람 검토 대기"입니다. 스텝퍼는 1~8 초록 / 9·10 회색으로 그려집니다.
+>
+> **진행률을 Spring Batch 메타테이블(`batch_step_execution`)에서 읽지 마세요.**
+> Step 8개가 10단계와 1:1이 아니고(6단계=Step 2개, 4단계=partition 2개, 7단계=2회),
+> 9·10단계는 Spring Batch 에 Step 자체가 없습니다. `validation_run` 에 `job_execution_id`
+> 도 없어 조인할 키가 없습니다. 각 Step 이 `current_step` 을 갱신하고 화면은 그것만 읽습니다.
+
 **⑤ 확정 조건 체크리스트 (운영정책서 제44조 — 6개 전부 초록이어야 확정 가능)**
 
-| # | 조건 | 확인 방법 |
+> 제44조에는 항목이 7개 적혀 있지만 마지막 `확정 사용자와 시각 기록` 은 **사전조건이 아니라
+> 확정의 사후효과**입니다(`finalized_by`·`finalized_at` 에 자동 기록). 게이트는 앞의 6개입니다.
+> **이 목록·순서를 바꾸지 마세요** — 예전에 정책서·쿡북·이 문서가 서로 다른 6개를 갖고
+> 있었습니다(SRC-027 감사). SQL 정본은 `08_화면별_SQL_쿡북_v1_0.md` IF-API-50 입니다.
+
+화면에 표시하는 문구는 아래 그대로 씁니다. **쿡북 SQL 의 `label` · MVP 목업과 문자열이 같아야 합니다**(API 가 `conditions[].label` 로 그대로 내려보냅니다).
+
+| # | 조건 (화면 표시 문구) | 확인 방법 |
 |---|---|---|
-| 1 | 실행 상태가 계산완료 | `validation_run.status = 'COMPLETED'` |
-| 2 | 차변·대변 불균형 0건 | `vw_journal_imbalance` 조회 |
-| 3 | 심각도 CRITICAL 미처리 예외 0건 | `exception_case` |
-| 4 | 정책 없음·중복 0건 | 예외 유형으로 확인 |
-| 5 | 귀속합계 오류 0건 | 지급 건 검증 |
-| 6 | 상세 합계 = 요약 합계 | 두 값을 나란히 표시 |
+| 1 | 검증 실행 상태가 계산완료(COMPLETED)인가 | `validation_run.status='COMPLETED' AND current_step=8` |
+| 2 | 원장 불균형(차변≠대변)이 0건인가 | `vw_journal_imbalance` ⋈ `journal_header` **WHERE `validation_run_id`** |
+| 3 | 심각도 긴급(CRITICAL) 미처리 예외가 0건인가 | `exception_case` — **`severity='CRITICAL'` 필터 필수** |
+| 4 | 정책 없음 · 정책 중복이 0건인가 | `exception_case.exception_type IN ('POLICY_MISSING','POLICY_DUPLICATE')` |
+| 5 | 귀속합계 오류가 0건인가 | `vw_transaction_attribution_balance` ⋈ `commission_transaction` **WHERE `settlement_month` = 검증월** |
+| 6 | 계약별 상세 합계 = 실행 요약 합계인가 | `cap_check.included_amount` vs `SUM(cap_check_detail.amount WHERE INCLUDED)` |
+
+> **2·5번은 반드시 실행 범위로 좁혀야 합니다.** 뷰를 그냥 세면 다른 실행의 불균형까지
+> 세어 확정이 영영 막힙니다. 뷰에 `validation_run_id` 가 없어 부모 테이블로 되짚어야 하고,
+> `commission_transaction` 에는 실행 연결이 아예 없어 정산월로 맞춥니다.
 
 각 항목마다 "바로가기" 링크를 붙입니다. 실패하면 어디를 고쳐야 하는지 바로 알 수 있게요.
 

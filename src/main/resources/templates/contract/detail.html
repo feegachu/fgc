@@ -40,9 +40,11 @@
         <span id="h-cap"></span>
       </div>
       <div style="display:flex;gap:8px">
-        <a class="fgc-btn fgc-btn--ghost" id="btn-edit" href="#" style="text-decoration:none" data-fgc-action="edit" th:disabled="${readOnly}">
+        <!-- a 태그에는 disabled 속성이 적용되지 않는다 — button 으로 두고,
+             IF-API-12 연동 시 /contracts/{id}/edit 이동을 붙인다. -->
+        <button class="fgc-btn fgc-btn--ghost" id="btn-edit" type="button" data-fgc-action="edit" th:disabled="${readOnly}">
           <span class="material-symbols-outlined" style="font-size:18px">edit</span> 수정
-        </a>
+        </button>
         <button class="fgc-btn fgc-btn--ghost" id="btn-regen" data-fgc-action="regenerate" th:disabled="${readOnly}">
           <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 스케줄 재생성
         </button>

@@ -208,8 +208,11 @@
     <!-- ── 버튼 ─────────────────────────────────────── -->
     <div style="display:flex;justify-content:flex-end;gap:8px">
       <a class="fgc-btn fgc-btn--ghost" th:href="@{/contracts}" style="text-decoration:none">취소</a>
-      <!-- data-fgc-action: COMPLIANCE(준법·감사) 역할로 로그인하면 자동으로 회색이 됩니다 -->
-      <button class="fgc-btn fgc-btn--primary" id="save-btn" type="submit" data-fgc-action="save" disabled th:disabled="${readOnly}">
+      <!-- 정적 disabled 로 시작한다 — 필수값을 다 채워야 활성화(화면정의서 :622).
+           th:disabled 를 걸면 정적 disabled 를 덮어써 readOnly=false 에서 즉시 활성화돼 버린다
+           (vrun/detail.html 확정 버튼과 같은 함정). IF-API-18 연동 시
+           th:disabled="${readOnly or !formValid}" 로 두 조건을 합친다. -->
+      <button class="fgc-btn fgc-btn--primary" id="save-btn" type="submit" data-fgc-action="save" disabled>
         <span class="material-symbols-outlined" style="font-size:18px">save</span>
         저장하고 예상 스케줄 만들기
       </button>
