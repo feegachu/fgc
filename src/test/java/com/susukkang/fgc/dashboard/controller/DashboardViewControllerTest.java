@@ -98,8 +98,15 @@ class DashboardViewControllerTest {
                 // ShellAdvice 기본 기준월(fgc.demo-month)
                 .andExpect(model().attribute("month", "2026-07"))
                 .andExpect(content().string(containsString("2026-07")))
+                .andExpect(content().string(containsString("id=\"global-settlement-month\"")))
                 .andExpect(content().string(containsString(
-                        "type=\"hidden\" name=\"month\" value=\"2026-07\"")))
+                        "/cap-checks?status=VIOLATION&amp;month=2026-07")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        containsString("dashboard-control-bar"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("집계 기준"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("조직 범위"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("새로고침"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("정산 실행"))))
                 // 사이드바가 서버에서 렌더링됐는지 — 목업의 fgc-shell.js 를 대체한 부분
                 .andExpect(content().string(containsString("업무 대시보드")))
                 .andExpect(content().string(containsString("FGC-UI-DASH-W01")))
