@@ -118,7 +118,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                         exceptionType,
                         command.validationRunId(),
                         command.paymentId(),
-                        command.paymentStage()
+                        command.paymentStage(),
+                        command.capRuleSetId()
                 ))
                 .exceptionType(exceptionType)
                 .severity(severity)
@@ -136,13 +137,15 @@ public class CapExceptionServiceImpl implements CapExceptionService {
             ExceptionType exceptionType,
             Long validationRunId,
             Long paymentId,
-            PaymentStage paymentStage
+            PaymentStage paymentStage,
+            Long capRuleSetId
     ) {
         return exceptionType.name()
                 + ":" + validationRunId
                 + ":COMMISSION_TRANSACTION"
                 + ":" + paymentId
-                + ":" + paymentStage.name();
+                + ":" + paymentStage.name()
+                + ":" + capRuleSetId;
     }
 
     private String createDescription(CapExceptionCreateCommand command) {
@@ -173,6 +176,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         if (command.agentId() == null) throw new IllegalArgumentException("설계사 ID가 없습니다.");
         if (command.policyVersionId() == null) throw new IllegalArgumentException("정책 버전 ID가 없습니다.");
         if (command.paymentStage() == null) throw new IllegalArgumentException("지급 단계가 없습니다.");
+        if (command.capRuleSetId() == null) throw new IllegalArgumentException("한도 룰셋 ID가 없습니다.");
         if (command.resultStatus() == null) throw new IllegalArgumentException("한도 판정 결과가 없습니다.");
         if (command.resultStatus() == CapResultStatus.WARNING
                 || command.resultStatus() == CapResultStatus.VIOLATION) {

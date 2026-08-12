@@ -125,7 +125,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
         if (capExceptionService.hasUnresolvedViolation(paymentId)) {
-            throw new CommissionPaymentConfirmationRejectedException(FgcErrorCode.CAP_001);
+            throw new CommissionPaymentConfirmationRejectedException(FgcErrorCode.CAP_003);
         }
         requireDraft(attributions.get(0));
         mapper.lockAttributedContracts(paymentId);

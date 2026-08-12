@@ -42,7 +42,7 @@ class CapExceptionMapperIntegrationTest {
         TestReference reference = testReference();
         Long paymentId = insertDraftPayment(reference);
         String exceptionKey = "CAP_VIOLATION:null:COMMISSION_TRANSACTION:"
-                + paymentId + ":GA_TO_FC";
+                + paymentId + ":GA_TO_FC:" + reference.capRuleSetId();
 
         capExceptionMapper.insertException(exception(
                 exceptionKey, paymentId, reference, ExceptionType.CAP_VIOLATION, ExceptionSeverity.HIGH));

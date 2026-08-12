@@ -63,7 +63,7 @@ class CapExceptionServiceImplTest {
         verify(capExceptionMapper).insertException(captor.capture());
         CapExceptionInsertDTO inserted = captor.getValue();
         assertThat(inserted.getExceptionKey())
-                .isEqualTo("CAP_WARNING:77:COMMISSION_TRANSACTION:10:GA_TO_FC");
+                .isEqualTo("CAP_WARNING:77:COMMISSION_TRANSACTION:10:GA_TO_FC:3");
         assertThat(inserted.getExceptionType()).isEqualTo(ExceptionType.CAP_WARNING);
         assertThat(inserted.getSeverity()).isEqualTo(ExceptionSeverity.WARNING);
         assertThat(inserted.getValidationRunId()).isEqualTo(77L);
@@ -81,7 +81,7 @@ class CapExceptionServiceImplTest {
 
         verify(capExceptionMapper).insertException(captor.capture());
         assertThat(captor.getValue().getExceptionKey())
-                .isEqualTo("CAP_VIOLATION:null:COMMISSION_TRANSACTION:10:GA_TO_FC");
+                .isEqualTo("CAP_VIOLATION:null:COMMISSION_TRANSACTION:10:GA_TO_FC:3");
         assertThat(captor.getValue().getExceptionType()).isEqualTo(ExceptionType.CAP_VIOLATION);
         assertThat(captor.getValue().getSeverity()).isEqualTo(ExceptionSeverity.CRITICAL);
         assertThat(captor.getValue().getDescription()).contains("초과액=100");
@@ -99,9 +99,9 @@ class CapExceptionServiceImplTest {
         assertThat(captor.getAllValues())
                 .extracting(CapExceptionInsertDTO::getExceptionKey)
                 .containsExactly(
-                        "CAP_WARNING:null:COMMISSION_TRANSACTION:10:GA_TO_FC",
-                        "CAP_WARNING:null:COMMISSION_TRANSACTION:11:GA_TO_FC",
-                        "CAP_WARNING:77:COMMISSION_TRANSACTION:10:GA_TO_FC"
+                        "CAP_WARNING:null:COMMISSION_TRANSACTION:10:GA_TO_FC:3",
+                        "CAP_WARNING:null:COMMISSION_TRANSACTION:11:GA_TO_FC:3",
+                        "CAP_WARNING:77:COMMISSION_TRANSACTION:10:GA_TO_FC:4"
                 );
     }
 

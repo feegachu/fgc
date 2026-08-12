@@ -835,7 +835,7 @@ class CommissionPaymentServiceImplTest {
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
-                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_003));
 
         verify(capCalculator, never()).calculate(any());
         verify(mapper, never()).confirm(any(), any(), any());
