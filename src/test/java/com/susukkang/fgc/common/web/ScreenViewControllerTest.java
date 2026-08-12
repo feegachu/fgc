@@ -97,6 +97,19 @@ class ScreenViewControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * COMPLIANCE "모든 처리 버튼 회색"(화면정의서 :229) — readOnly 모델값이 아니라
+     * 실제 렌더링(th:disabled)을 본다. 대표로 RECO-W01 의 처리 버튼 2개.
+     */
+    @Test
+    void process_buttons_disabled_for_compliance_but_not_settlement() throws Exception {
+        mvc.perform(get("/reconciliations").with(user(complianceUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("disabled=\"disabled\"")));
+        mvc.perform(get("/reconciliations").with(user(settleUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
+    }
+
     /** 교육용 면책문구(COR-009)는 어느 화면에서도 빠지면 안 된다 — 대표로 한 화면만 확인. */
     @Test
     void footer_disclaimer_present() throws Exception {

@@ -52,8 +52,11 @@
 
   <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
     <span class="material-symbols-outlined" style="font-size:18px">info</span>
-    <!-- 확정 안내 문구(FGC.NOTICE.FINALIZE)는 메시지 프로퍼티로 채운다 -->
-    <span><strong id="notice-finalize"></strong></span>
+    <!-- 확정 안내 문구 — IF-API-50/51 연동 시 서버 렌더링(메시지 프로퍼티)으로 교체한다 -->
+    <span>
+      <strong id="notice-finalize">확정하면 이 실행의 결과는 고칠 수 없습니다.</strong>
+      바로잡으려면 새 실행을 만들어야 합니다. (운영정책서 제43조)
+    </span>
   </div>
 
   <!-- ① 실행 헤더 -->
