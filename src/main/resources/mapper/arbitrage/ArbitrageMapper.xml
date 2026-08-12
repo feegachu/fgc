@@ -5,6 +5,92 @@
 
 <mapper namespace="com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper">
 
-    <insert id="selectByCondition"
+    <!-- 차익거래 검증 결과를 화면 조회 DTO에 매핑한다. -->
+    <resultMap id="arbitrageCheckViewMap"
+               type="com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView">
+        <id property="arbitrageCheckId" column="arbitrage_check_id"/>
+        <result property="contractId" column="contract_id"/>
+        <result property="contractNo" column="contract_no"/>
+        <result property="paymentStage" column="payment_stage"/>
+        <result property="asOfDate" column="as_of_date"/>
+        <result property="contractMonthNo" column="contract_month_no"/>
+        <result property="cumulativePaidPremium" column="cumulative_paid_premium"/>
+        <result property="paidCommissionAmount" column="paid_commission_amount"/>
+        <result property="plannedCommissionAmount" column="planned_commission_amount"/>
+        <result property="includedSurrenderValueAmount"
+                column="included_surrender_value_amount"/>
+        <result property="netDifferenceAmount" column="net_difference_amount"/>
+        <result property="refundAdditionAppliedYn"
+                column="refund_addition_applied_yn"/>
+        <result property="surrenderValueSourceType"
+                column="surrender_value_source_type"/>
+        <result property="resultStatus" column="result_status"/>
+        <result property="decisionReason" column="decision_reason"/>
+    </resultMap>
 
+    <!-- 목록과 요약 조회에 동일한 검색 조건을 적용한다. -->
+    <sql id="arbitrageSearchCondition">
+        <where>
+            <if test="condition.month != null">
+                AND TO_CHAR(ac.as_of_date, 'YYYY-MM') = #{condition.month}
+            </if>
+            <if test="condition.status != null">
+                AND ac.result_status = #{condition.status}
+            </if>
+            <if test="condition.stage != null">
+                AND ac.payment_stage = #{condition.stage}
+            </if>
+            <if test="condition.insurerId != null">
+                AND c.insurer_id = #{condition.insurerId}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 검색 조건에 해당하는 차익거래 검증 결과 목록을 조회한다. -->
+    <select id="selectByCondition"
+            resultMap="arbitrageCheckViewMap">
+        SELECT
+            ac.arbitrage_check_id,
+            ac.contract_id,
+            c.contract_no,
+            ac.payment_stage,
+            ac.as_of_date,
+            ac.contract_month_no,
+            ac.cumulative_paid_premium,
+            ac.paid_commission_amount,
+            ac.planned_commission_amount,
+            ac.included_surrender_value_amount,
+            ac.net_difference_amount,
+            ac.refund_addition_applied_yn,
+            ac.surrender_value_source_type,
+            ac.result_status,
+            ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
+        FROM
+            arbitrage_check ac
+        JOIN
+            insurance_contract c
+        ON
+            c.contract_id = ac.contract_id
+        <include refid="arbitrageSearchCondition"/>
+        ORDER BY
+            ac.arbitrage_check_id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <!-- 검색 조건에 해당하는 차익거래 검증 결과의 판정별 건수를 조회한다. -->
+    <select id="arbitrageCheckSummary"
+            resultType="com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSummary">
+        SELECT
+            COUNT(*) FILTER (WHERE ac.result_status = 'CLEAR') AS clear_count,
+            COUNT(*) FILTER (WHERE ac.result_status = 'CANDIDATE') AS candidate_count,
+            COUNT(*) FILTER (WHERE ac.result_status = 'REVIEW_REQUIRED') AS review_required_count
+        FROM
+            arbitrage_check ac
+        JOIN
+            insurance_contract c
+        ON
+            c.contract_id = ac.contract_id
+        <include refid="arbitrageSearchCondition"/>
+    </select>
 </mapper>
