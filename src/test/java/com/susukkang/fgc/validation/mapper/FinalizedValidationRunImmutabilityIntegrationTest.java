@@ -1,11 +1,11 @@
 package com.susukkang.fgc.validation.mapper;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * #77 "FINALIZED 상태의 검증 실행과 그 하위 결과가 재실행으로 변경되지 않는지 검증".
+ * "FINALIZED 상태의 검증 실행과 그 하위 결과가 재실행으로 변경되지 않는지 검증".
  *
  * 이 불변성은 애플리케이션 코드가 아니라 DB 트리거(trg_validation_run_finalized,
  * guard_finalized_validation_result — V1__baseline_v2_1_2.sql:1570-1648)가 보장한다.
@@ -21,8 +21,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * WithoutTouchingTheFinalizedRow)는 "우리 애플리케이션이 FINALIZED 행을 건드리지 않는다"만
  * 증명하고, "DB가 애초에 그걸 허용 안 한다"는 이 트리거 자체는 아직 테스트가 없었다 —
  * 여기서 직접 raw SQL로 우회 시도를 해서 확인한다.
+ *
+ * @Transactional로 테스트 종료 시 자동 롤백시킨다 — FINALIZED 행은 트리거가 DELETE
+ * 자체를 막아 수동 정리가 불가능했지만(코드리뷰 반영), 롤백은 트리거를 거치지 않고
+ * 트랜잭션 전체를 되돌리므로 FINALIZED 행도 문제없이 정리된다. 각 테스트가 기대하는
+ * 예외(assertThatThrownBy)는 항상 메서드의 마지막 statement이므로, 트리거가 트랜잭션을
+ * abort 상태로 만들어도 이후 같은 트랜잭션 내 추가 DB 접근은 없다.
  */
 @SpringBootTest
+@Transactional
 class FinalizedValidationRunImmutabilityIntegrationTest {
 
     @Autowired
@@ -30,12 +37,6 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
 
     private Long validationRunId;
     private Long capCheckId;
-
-    @AfterEach
-    void cleanUp() {
-        // FINALIZED 행은 트리거가 DELETE 자체를 막으므로 지우지 않는다 — 테스트가 남기는
-        // 소량의 데이터는 다른 테스트의 조회 조건과 겹치지 않아 해가 없다.
-    }
 
     private Long contractId() {
         return jdbcTemplate.queryForObject(
@@ -126,6 +127,28 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
 
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "UPDATE fgc.cap_check SET result_status='VIOLATION' WHERE cap_check_id=?", capCheckId))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    // trg_cap_check_immutable(V1__baseline_v2_1_2.sql:1559-1649)은 UPDATE와 DELETE를 함께
+    // 막는다 — 위 UPDATE 테스트만으로는 DELETE 차단까지 검증되지 않아 추가한다(코드리뷰 반영).
+    @Test
+    void deletingCapCheckUnderAFinalizedRunIsRejectedByDbTrigger() {
+        validationRunId = createRunningValidationRun();
+        capCheckId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.cap_check
+                    (validation_run_id, contract_id, payment_stage, cap_rule_set_id, check_kind,
+                     as_of_date, base_premium_amount, limit_amount, included_amount, remaining_amount,
+                     result_status)
+                VALUES (?, ?, 'GA_TO_FC', ?, 'MONTHLY', ?, 100000, 1200000, 0, 1200000, 'NORMAL')
+                RETURNING cap_check_id
+                """, Long.class, validationRunId, contractId(), capRuleSetId(), LocalDate.of(2031, 5, 10));
+        assertThat(capCheckId).isNotNull();
+
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "DELETE FROM fgc.cap_check WHERE cap_check_id=?", capCheckId))
                 .isInstanceOf(DataAccessException.class);
     }
 }
