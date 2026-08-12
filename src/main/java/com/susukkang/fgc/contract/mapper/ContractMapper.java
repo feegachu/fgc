@@ -26,11 +26,6 @@ public interface ContractMapper {
     // 계약Id에 따른 계약 및 상품 정보 조회
     ContractDetailResponse selectContractDetailById(Long id);
 
-    Long selectContractIdByBusinessKey(
-            @Param("insurerId") Long insurerId,
-            @Param("contractNo") String contractNo
-    );
-
     boolean existsInsurer(Long insurerId);
 
     boolean existsProductOffering(

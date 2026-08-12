@@ -373,13 +373,9 @@ public class ContractService {
      * 처리일은 사건 원본의 폐기 예정 processed_at이 아니라 Job별 처리 테이블에서 읽는다.
      */
     @Transactional(readOnly = true)
-    public List<ContractStatusEventResponse> selectStatusEventsByBusinessKey(
-            Long insurerId,
-            String contractNo
-    ) {
-        Long contractId = contractMapper.selectContractIdByBusinessKey(insurerId, contractNo);
-        if (contractId == null) {
-            throw validationException("contractNo", "존재하지 않는 보험계약입니다.");
+    public List<ContractStatusEventResponse> selectStatusEventsByContractId(Long contractId) {
+        if (contractMapper.selectContractById(contractId) == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
         }
 
         List<ContractStatusEventRow> events = contractStatusEventMapper.selectByContractId(contractId);

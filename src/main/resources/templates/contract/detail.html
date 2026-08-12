@@ -3,7 +3,7 @@
   FGC-UI-CONT-W02 보험계약 상세
   - 계약자명은 표시하지 않는다(SRC-027 D-05).
   - 기본정보는 GET /api/v1/contracts/{id} 응답으로 채운다.
-  - 상태이력은 GET /api/v1/contracts/status-events?insurerId={insurerId}&contractNo={contractNo} 응답을 수용한다.
+  - 상태이력은 GET /api/v1/contracts/{id}/status-events 응답을 수용한다.
     effectiveAt, receivedAt, processings[]를 사용하며 이벤트와 처리 작업을 분리해 표시한다.
   - 상태이력 기본 정렬은 효력일시 오름차순이며 도착일시 오름차순으로 전환할 수 있다.
   - 나머지 탭은 해당 API 연동 시 lazy load한다.
@@ -314,14 +314,8 @@
       sorted.forEach(function (event) { list.append(historyEvent(event)); });
     }
 
-    function loadStatusHistory(apiClient, insurerId, contractNo) {
-      if (insurerId == null || !contractNo) {
-        historyEmpty("상태이력을 조회할 수 없습니다.", "계약의 보험회사 또는 계약번호를 확인해 주세요.");
-        return Promise.resolve();
-      }
-      var historyPath = "/api/v1/contracts/status-events?insurerId=" + encodeURIComponent(insurerId)
-        + "&contractNo=" + encodeURIComponent(contractNo);
-      return apiClient.request(historyPath)
+    function loadStatusHistory(apiClient) {
+      return apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/status-events")
         .then(function (response) {
           var data = response.data;
           statusEvents = Array.isArray(data) ? data : (data && Array.isArray(data.events) ? data.events : []);
@@ -399,15 +393,11 @@
       }
 
       apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId))
-        .then(function (response) {
-          var data = response.data || {};
-          populateContract(data);
-          return loadStatusHistory(apiClient, data.insurerId, data.contractNo);
-        })
+        .then(function (response) { populateContract(response.data || {}); })
         .catch(function (error) {
           text("contract-detail-load-state", error && error.message ? error.message : "계약 정보를 불러오지 못했습니다.");
-          historyEmpty("상태이력을 조회할 수 없습니다.", "계약 기본정보를 먼저 확인해 주세요.");
         });
+      loadStatusHistory(apiClient);
     });
   })();
   </script>

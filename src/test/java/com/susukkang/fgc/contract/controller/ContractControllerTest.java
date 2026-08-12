@@ -143,7 +143,6 @@ class ContractControllerTest {
     void getContractDetailReturnsSuccess() throws Exception {
         ContractDetailResponse detail =
                 ContractDetailResponse.builder()
-                        .insurerId(7L)
                         .contractNo("TEST-20260806-001")
                         .productName("가상 건강보장보험 A")
                         .contractDate(LocalDate.of(2026, 8, 6))
@@ -177,10 +176,6 @@ class ContractControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(
-                        jsonPath("$.data.insurerId")
-                                .value(7)
-                )
-                .andExpect(
                         jsonPath("$.data.contractNo")
                                 .value("TEST-20260806-001")
                 )
@@ -196,7 +191,7 @@ class ContractControllerTest {
         OffsetDateTime effectiveAt = OffsetDateTime.parse("2026-07-15T00:00:00+09:00");
         OffsetDateTime receivedAt = OffsetDateTime.parse("2026-07-16T06:00:00+09:00");
         OffsetDateTime processedAt = OffsetDateTime.parse("2026-07-16T06:30:00+09:00");
-        when(contractService.selectStatusEventsByBusinessKey(7L, "SHARED-001")).thenReturn(List.of(
+        when(contractService.selectStatusEventsByContractId(21L)).thenReturn(List.of(
                 new com.susukkang.fgc.contract.dto.ContractStatusEventResponse(
                         2, ACTIVE, com.susukkang.fgc.contract.domain.ContractStatus.TERMINATED,
                         effectiveAt, receivedAt,
@@ -206,9 +201,7 @@ class ContractControllerTest {
                 )
         ));
 
-        mockMvc.perform(get("/api/v1/contracts/status-events")
-                        .param("insurerId", "7")
-                        .param("contractNo", "SHARED-001")
+        mockMvc.perform(get("/api/v1/contracts/{id}/status-events", 21L)
                         .with(user("settlement").roles("SETTLEMENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].eventSeq").value(2))

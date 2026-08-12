@@ -113,7 +113,7 @@ class ScreenViewControllerTest {
         mvc.perform(get("/contracts/1").with(user(settleUser())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "/api/v1/contracts/status-events?insurerId=")))
+                        "/status-events")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event.newStatus")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event.sourceSystem")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(

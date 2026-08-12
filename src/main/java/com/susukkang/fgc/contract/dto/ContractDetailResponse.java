@@ -26,7 +26,6 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class ContractDetailResponse {
     //기본 정보 탭
-    private Long insurerId; //보험회사Id(상태이력 업무키)
     private String contractNo; //계약번호
     private String productName; //상품명
     private LocalDate contractDate; //계약일
