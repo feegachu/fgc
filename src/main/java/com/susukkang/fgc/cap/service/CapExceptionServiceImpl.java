@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 /**
  * 설명 : 한도 검증 결과가 주의 또는 위반인 경우 중복 없는 한도 예외 건을 생성하는 서비스 구현체
@@ -64,7 +65,9 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         CapExceptionStatusRow exception = capExceptionMapper.selectExceptionForUpdate(command.exceptionCaseId());
         if (exception == null) throw new IllegalArgumentException("존재하지 않는 한도 예외입니다.");
         if ("RESOLVED".equals(exception.status())) return;
-        if ("REJECTED".equals(exception.status())) throw new IllegalStateException("종결된 예외는 해결할 수 없습니다.");
+        if (!Set.of("NEW", "IN_REVIEW").contains(exception.status())) {
+            throw new IllegalStateException("해결할 수 없는 예외 상태입니다.");
+        }
 
         if (capExceptionMapper.insertExceptionAction(command) != 1) {
             throw new IllegalStateException("한도 예외 해결조치 저장에 실패했습니다.");
@@ -110,7 +113,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 : "1,200% 한도 사용률 주의";
 
         return CapExceptionInsertDTO.builder()
-                .exceptionKey(createExceptionKey(command.paymentId(), command.policyVersionId()))
+                .exceptionKey(createExceptionKey(command.paymentId(), command.capRuleSetId()))
                 .exceptionType(exceptionType)
                 .severity(severity)
                 .validationRunId(command.validationRunId())
@@ -123,8 +126,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 .build();
     }
 
-    private String createExceptionKey(Long paymentId, Long policyVersionId) {
-        return "CAP:" + paymentId + ":CAP_CHECK:" + policyVersionId;
+    private String createExceptionKey(Long paymentId, Long capRuleSetId) {
+        return "CAP:" + paymentId + ":CAP_CHECK:" + capRuleSetId;
     }
 
     private String createDescription(CapExceptionCreateCommand command) {
@@ -132,7 +135,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 .subtract(command.limitAmount())
                 .max(BigDecimal.ZERO);
 
-        return "지급단계=" + command.paymentStage()
+        return "한도검증ID=" + command.capCheckId()
+                + ", 지급단계=" + command.paymentStage()
                 + ", 기준일=" + command.asOfDate()
                 + ", 한도룰셋ID=" + command.capRuleSetId()
                 + ", 환급률표ID=" + command.refundRateTableId()
@@ -143,7 +147,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 + ", 산입액=" + command.includedAmount()
                 + ", 잔여액=" + command.remainingAmount()
                 + ", 사용률=" + command.usagePct()
-                + "%, 초과액=" + exceededAmount;
+                + "%, 초과액=" + exceededAmount
+                + ", 계산근거=" + command.calculationSnapshot();
     }
 
     private void validateCreateCommand(CapExceptionCreateCommand command) {

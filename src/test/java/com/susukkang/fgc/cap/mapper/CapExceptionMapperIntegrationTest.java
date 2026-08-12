@@ -41,7 +41,7 @@ class CapExceptionMapperIntegrationTest {
     void escalatesWarningToViolationWithoutDuplicateAndResolvesWithAction() {
         TestReference reference = testReference();
         Long paymentId = insertDraftPayment(reference);
-        String exceptionKey = "CAP:" + paymentId + ":CAP_CHECK:" + reference.policyVersionId();
+        String exceptionKey = "CAP:" + paymentId + ":CAP_CHECK:" + reference.capRuleSetId();
 
         capExceptionMapper.insertException(exception(
                 exceptionKey, paymentId, reference, ExceptionType.CAP_WARNING, ExceptionSeverity.WARNING));
@@ -85,6 +85,21 @@ class CapExceptionMapperIntegrationTest {
                  WHERE exception_case_id = ?
                 """, String.class, exceptionCaseId)).isEqualTo("REDUCE");
         assertThat(capExceptionService.hasUnresolvedViolation(paymentId)).isFalse();
+
+        int resolvedDuplicateRows = capExceptionMapper.insertException(exception(
+                exceptionKey, paymentId, reference, ExceptionType.CAP_VIOLATION, ExceptionSeverity.CRITICAL));
+
+        assertThat(resolvedDuplicateRows).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.exception_case WHERE exception_key = ?",
+                Integer.class,
+                exceptionKey
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.exception_case WHERE exception_key = ?",
+                String.class,
+                exceptionKey
+        )).isEqualTo("RESOLVED");
     }
 
     private CapExceptionInsertDTO exception(
@@ -112,12 +127,18 @@ class CapExceptionMapperIntegrationTest {
                 SELECT c.contract_id,
                        a.agent_id,
                        ci.commission_item_id,
+                       crs.cap_rule_set_id,
                        crs.policy_version_id,
                        u.user_id
                   FROM fgc.insurance_contract c
                   CROSS JOIN LATERAL (SELECT agent_id FROM fgc.agent ORDER BY agent_id LIMIT 1) a
                   CROSS JOIN LATERAL (SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1) ci
-                  CROSS JOIN LATERAL (SELECT policy_version_id FROM fgc.cap_rule_set ORDER BY cap_rule_set_id LIMIT 1) crs
+                  CROSS JOIN LATERAL (
+                       SELECT cap_rule_set_id, policy_version_id
+                         FROM fgc.cap_rule_set
+                        ORDER BY cap_rule_set_id
+                        LIMIT 1
+                  ) crs
                   CROSS JOIN LATERAL (SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1) u
                  ORDER BY c.contract_id
                  LIMIT 1
@@ -125,6 +146,7 @@ class CapExceptionMapperIntegrationTest {
                 resultSet.getLong("contract_id"),
                 resultSet.getLong("agent_id"),
                 resultSet.getLong("commission_item_id"),
+                resultSet.getLong("cap_rule_set_id"),
                 resultSet.getLong("policy_version_id"),
                 resultSet.getLong("user_id")
         ));
@@ -167,6 +189,7 @@ class CapExceptionMapperIntegrationTest {
             Long contractId,
             Long agentId,
             Long commissionItemId,
+            Long capRuleSetId,
             Long policyVersionId,
             Long userId
     ) {

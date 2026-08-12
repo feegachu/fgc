@@ -723,6 +723,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .validationRunId(null)
                 .paymentStage(data.paymentStage())
                 .asOfDate(check.getAsOfDate())
+                .capCheckId(check.getCapCheckId())
                 .capRuleSetId(check.getCapRuleSetId())
                 .refundRateTableId(check.getRefundRateTableId())
                 .basePremiumAmount(check.getBasePremiumAmount())
@@ -733,6 +734,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .remainingAmount(check.getRemainingAmount())
                 .usagePct(check.getUsagePct())
                 .resultStatus(check.getResultStatus())
+                .calculationSnapshot(check.getCalculationSnapshotJson())
                 .build();
     }
 

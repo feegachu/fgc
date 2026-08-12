@@ -66,6 +66,10 @@ class CapExceptionServiceImplTest {
         assertThat(inserted.getExceptionType()).isEqualTo(ExceptionType.CAP_WARNING);
         assertThat(inserted.getSeverity()).isEqualTo(ExceptionSeverity.WARNING);
         assertThat(inserted.getValidationRunId()).isEqualTo(77L);
+        assertThat(inserted.getDescription())
+                .contains("한도검증ID=6")
+                .contains("한도룰셋ID=3")
+                .contains("계산근거={\"source\":\"test\"}");
     }
 
     @Test
@@ -82,7 +86,7 @@ class CapExceptionServiceImplTest {
     }
 
     @Test
-    void createsDifferentNaturalKeysForDifferentPaymentOrPolicyVersion() {
+    void createsDifferentNaturalKeysForDifferentPaymentOrCapRuleSet() {
         ArgumentCaptor<CapExceptionInsertDTO> captor = ArgumentCaptor.forClass(CapExceptionInsertDTO.class);
 
         capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 10L, 3L, null));
@@ -120,6 +124,19 @@ class CapExceptionServiceImplTest {
     }
 
     @Test
+    void rejectsResolutionForStatusOutsideAllowedOpenStatuses() {
+        CapExceptionResolveCommand command = resolveCommand();
+        given(capExceptionMapper.selectExceptionForUpdate(5L))
+                .willReturn(new CapExceptionStatusRow(5L, "REJECTED"));
+
+        assertThatThrownBy(() -> capExceptionService.resolve(command))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("해결할 수 없는 예외 상태입니다.");
+        verify(capExceptionMapper, never()).insertExceptionAction(command);
+        verify(capExceptionMapper, never()).updateExceptionResolved(5L);
+    }
+
+    @Test
     void requiresResolutionActionCodeAndReason() {
         CapExceptionResolveCommand command = CapExceptionResolveCommand.builder()
                 .exceptionCaseId(5L)
@@ -141,18 +158,19 @@ class CapExceptionServiceImplTest {
     private CapExceptionCreateCommand command(
             CapResultStatus status,
             Long paymentId,
-            Long policyVersionId,
+            Long capRuleSetId,
             Long validationRunId
     ) {
         return CapExceptionCreateCommand.builder()
                 .paymentId(paymentId)
                 .contractId(1L)
                 .agentId(2L)
-                .policyVersionId(policyVersionId)
+                .policyVersionId(30L)
                 .validationRunId(validationRunId)
                 .paymentStage(PaymentStage.GA_TO_FC)
                 .asOfDate(LocalDate.of(2026, 8, 12))
-                .capRuleSetId(4L)
+                .capCheckId(6L)
+                .capRuleSetId(capRuleSetId)
                 .refundRateTableId(5L)
                 .basePremiumAmount(new BigDecimal("100"))
                 .refund12mAmount(BigDecimal.ZERO)
@@ -168,6 +186,7 @@ class CapExceptionServiceImplTest {
                         ? new BigDecimal("110")
                         : new BigDecimal("90"))
                 .resultStatus(status)
+                .calculationSnapshot("{\"source\":\"test\"}")
                 .build();
     }
 
