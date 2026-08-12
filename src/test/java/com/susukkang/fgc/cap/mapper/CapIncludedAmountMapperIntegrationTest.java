@@ -155,6 +155,75 @@ class CapIncludedAmountMapperIntegrationTest {
                 .isEqualByComparingTo(insurerToGaAmountBeforeTest.add(new BigDecimal("500000")));
     }
 
+    /**
+     * 설명 : 월 재합산 시 확정된 차감 지급 건을 상세행 반올림 후 산입액에서 차감하는지 검증한다
+     *
+     * @author hjKang
+     * @since 2026-08-12
+     */
+    @Test
+    void subtractsConfirmedDeductionFromMonthlyIncludedAmount() {
+        TestReference reference = testReference();
+        BigDecimal amountBeforeTest = includedAmountForAgent(
+                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(
+                        reference.contractId(), PaymentStage.GA_TO_FC),
+                reference.agentId());
+
+        Long paymentTransactionId = insertTransaction(
+                reference, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("1000.50"));
+        insertAttribution(paymentTransactionId, reference,
+                reference.contractDate(), new BigDecimal("1000.50"));
+        confirmTransaction(paymentTransactionId);
+
+        Long deductionTransactionId = insertTransaction(
+                reference, PaymentStage.GA_TO_FC, "DEDUCTION", new BigDecimal("200.50"));
+        insertAttribution(deductionTransactionId, reference,
+                reference.contractDate().plusMonths(1), new BigDecimal("200.50"));
+        confirmTransaction(deductionTransactionId);
+
+        sqlSession.clearCache();
+        List<CapIncludedAmountSummary> summaries =
+                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(
+                        reference.contractId(), PaymentStage.GA_TO_FC);
+
+        assertThat(includedAmountForAgent(summaries, reference.agentId()))
+                .isEqualByComparingTo(amountBeforeTest.add(new BigDecimal("800")));
+    }
+
+    /**
+     * 설명 : 지급 확정 직전 현재 DRAFT 차감 지급 건을 산입액에서 차감하는지 검증한다
+     *
+     * @author hjKang
+     * @since 2026-08-12
+     */
+    @Test
+    void subtractsCurrentDraftDeductionBeforeConfirmation() {
+        TestReference reference = testReference();
+        BigDecimal amountBeforeTest = includedAmountForAgent(
+                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(
+                        reference.contractId(), PaymentStage.GA_TO_FC),
+                reference.agentId());
+
+        Long paymentTransactionId = insertTransaction(
+                reference, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("1000.50"));
+        insertAttribution(paymentTransactionId, reference,
+                reference.contractDate(), new BigDecimal("1000.50"));
+        confirmTransaction(paymentTransactionId);
+
+        Long currentDeductionTransactionId = insertTransaction(
+                reference, PaymentStage.GA_TO_FC, "DEDUCTION", new BigDecimal("200.50"));
+        insertAttribution(currentDeductionTransactionId, reference,
+                reference.contractDate().plusMonths(1), new BigDecimal("200.50"));
+
+        sqlSession.clearCache();
+        List<CapIncludedAmountSummary> summaries =
+                capIncludedAmountMapper.sumIncludedAmountByContractAndAgent(
+                        reference.contractId(), currentDeductionTransactionId, PaymentStage.GA_TO_FC);
+
+        assertThat(includedAmountForAgent(summaries, reference.agentId()))
+                .isEqualByComparingTo(amountBeforeTest.add(new BigDecimal("800")));
+    }
+
     private BigDecimal includedAmountForAgent(List<CapIncludedAmountSummary> summaries, Long agentId) {
         return summaries.stream()
                 .filter(summary -> agentId.equals(summary.getAgentId()))
@@ -183,17 +252,22 @@ class CapIncludedAmountMapperIntegrationTest {
     }
 
     private Long insertTransaction(TestReference reference, PaymentStage paymentStage, BigDecimal amount) {
+        return insertTransaction(reference, paymentStage, "PAYMENT", amount);
+    }
+
+    private Long insertTransaction(TestReference reference, PaymentStage paymentStage,
+                                   String cashflowType, BigDecimal amount) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
                     payment_stage, source_type, source_business_key, recipient_agent_id,
                     commission_item_id, settlement_month, amount, cashflow_type, status
                 ) VALUES (
                     ?, 'GA_MANUAL_PAYMENT', ?, ?, ?,
-                    date_trunc('month', ?::date)::date, ?, 'PAYMENT', 'DRAFT'
+                    date_trunc('month', ?::date)::date, ?, ?, 'DRAFT'
                 )
                 RETURNING commission_transaction_id
                 """, Long.class, paymentStage.name(), "IT-FUN031-" + UUID.randomUUID(), reference.agentId(),
-                reference.commissionItemId(), reference.contractDate(), amount);
+                reference.commissionItemId(), reference.contractDate(), amount, cashflowType);
     }
 
     private void insertAttribution(Long transactionId, TestReference reference,

@@ -9,7 +9,16 @@
             ta.contract_id,
             ta.agent_id,
             ct.payment_stage,
-            COALESCE(SUM(ROUND(ta.attributed_amount, 0)), 0) AS included_amount
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN ct.cashflow_type = 'DEDUCTION'
+                            THEN -ROUND(ta.attributed_amount, 0)
+                        ELSE ROUND(ta.attributed_amount, 0)
+                    END
+                ),
+                0
+            ) AS included_amount
         FROM
             transaction_attribution ta
         JOIN
@@ -44,7 +53,16 @@
             ta.contract_id,
             ta.agent_id,
             ct.payment_stage,
-            COALESCE(SUM(ROUND(ta.attributed_amount, 0)), 0) AS included_amount
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN ct.cashflow_type = 'DEDUCTION'
+                            THEN -ROUND(ta.attributed_amount, 0)
+                        ELSE ROUND(ta.attributed_amount, 0)
+                    END
+                ),
+                0
+            ) AS included_amount
         FROM
             transaction_attribution ta
         JOIN
