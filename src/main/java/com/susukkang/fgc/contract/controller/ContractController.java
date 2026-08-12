@@ -1,7 +1,5 @@
 package com.susukkang.fgc.contract.controller;
 
-import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
-import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
