@@ -5,6 +5,34 @@
 
 <mapper namespace="com.susukkang.fgc.contract.mapper.ContractStatusEventMapper">
 
-    <!-- TODO(FUN-026, 2차): 계약 ID별 계약 상태 변경이력 조회 및 생성 -->
+    <select id="selectByContractId"
+            resultType="com.susukkang.fgc.contract.dto.ContractStatusEventRow">
+        SELECT contract_status_event_id,
+               event_seq,
+               previous_status,
+               new_status,
+               effective_at,
+               received_at,
+               source_system,
+               source_event_key
+          FROM fgc.contract_status_event
+         WHERE contract_id = #{contractId}
+         ORDER BY effective_at ASC, event_seq ASC
+    </select>
+
+    <select id="selectProcessingsByContractId"
+            resultType="com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow">
+        SELECT p.contract_status_event_id,
+               p.processing_job,
+               p.processing_status,
+               p.processed_at
+          FROM fgc.contract_status_event_processing p
+          JOIN fgc.contract_status_event e
+            ON e.contract_status_event_id = p.contract_status_event_id
+         WHERE e.contract_id = #{contractId}
+         ORDER BY p.contract_status_event_id ASC,
+                  p.processed_at ASC,
+                  p.contract_status_event_processing_id ASC
+    </select>
 
 </mapper>

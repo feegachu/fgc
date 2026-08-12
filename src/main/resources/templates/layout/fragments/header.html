@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"><body>
+<header class="app-header" th:fragment="header(pageTitle, parentTitle, parentHref)">
+  <div class="app-header-leading">
+    <button class="icon-button app-mobile-menu-button" type="button" data-action="open-app-sidebar" aria-controls="app-sidebar" aria-expanded="false" aria-label="주요 업무 메뉴 열기">
+      <span class="material-symbols-rounded" aria-hidden="true">menu</span>
+    </button>
+    <div class="app-header-breadcrumb">
+      <a th:if="${parentTitle != null}" th:href="${parentHref}" th:text="${parentTitle}">상위 화면</a>
+      <span th:if="${parentTitle != null}" aria-hidden="true">›</span>
+      <p class="app-header-title" th:text="${pageTitle}">업무 대시보드</p>
+    </div>
+  </div>
+  <div class="app-header-actions">
+    <label class="app-header-field" for="global-settlement-month">
+      <span class="app-header-field-label">기준 정산월</span>
+      <select id="global-settlement-month" class="select-control tabular-nums" name="month" data-action="change-global-month" aria-label="기준 정산월">
+        <option th:each="m : ${monthOptions}" th:value="${m}" th:text="${m}" th:selected="${m == month}">2026-07</option>
+      </select>
+    </label>
+    <span class="status-badge status-badge-neutral app-header-role" th:title="#{'role.' + ${roleCode} + '.desc'}" th:text="#{'role.' + ${roleCode}}">역할</span>
+  </div>
+</header>
+</body></html>

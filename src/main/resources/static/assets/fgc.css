@@ -50,7 +50,7 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 0.25rem;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-sans);
   font-size: 12px;
   line-height: 16px;
   font-weight: 600;
@@ -96,7 +96,7 @@
 .fgc-num,
 .fgc-amount,
 .fgc-rate {
-  font-family: Inter, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;   /* 숫자 폭을 고정해 표가 흔들리지 않게 */
   font-feature-settings: "tnum" 1;
   letter-spacing: -0.01em;
@@ -302,7 +302,7 @@
   border: 1px solid var(--fgc-outline-variant);
   background: var(--fgc-surface-lowest);
   font-size: 13px; color: var(--fgc-on-surface);
-  font-family: Inter, sans-serif;
+  font-family: var(--font-sans);
 }
 .fgc-input:focus, .fgc-select:focus, .fgc-textarea:focus {
   outline: none; border-color: var(--fgc-secondary);
@@ -325,7 +325,7 @@
   padding: 12px 16px; border-bottom: 1px solid var(--fgc-outline-variant);
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
-.fgc-card__title { font-family: "Hanken Grotesk", sans-serif; font-size: 15px; font-weight: 700; color: var(--fgc-on-surface); }
+.fgc-card__title { font-family: var(--font-sans); font-size: 15px; font-weight: 700; color: var(--fgc-on-surface); }
 .fgc-card__body { padding: 16px; }
 
 /* KPI 카드 (DASH-W01) */
@@ -339,7 +339,7 @@
 }
 .fgc-kpi:hover { box-shadow: 0 4px 14px rgba(0,21,42,.10); transform: translateY(-1px); }
 .fgc-kpi__label { font-size: 12px; color: var(--fgc-on-surface-variant); font-weight: 600; }
-.fgc-kpi__value { font-size: 28px; font-weight: 800; font-family: Inter, sans-serif; font-variant-numeric: tabular-nums; line-height: 36px; }
+.fgc-kpi__value { font-size: 28px; font-weight: 800; font-family: var(--font-sans); font-variant-numeric: tabular-nums; line-height: 36px; }
 .fgc-kpi__sub   { font-size: 11px; color: var(--fgc-on-surface-variant); }
 .fgc-kpi--danger  { border-left-color: var(--fgc-danger); }
 .fgc-kpi--danger  .fgc-kpi__value { color: var(--fgc-danger); }
@@ -400,7 +400,9 @@
   color: var(--fgc-secondary); text-transform: uppercase;
 }
 .fgc-formula {
-  font-family: "JetBrains Mono", monospace; font-size: 13px; line-height: 22px;
+  font-family: var(--font-sans); font-size: 13px; line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
   background: var(--fgc-surface-low); border: 1px solid var(--fgc-outline-variant);
   border-radius: 0.25rem; padding: 10px 12px; white-space: pre-wrap;
 }
@@ -436,7 +438,7 @@
   display: flex; flex-direction: column; overflow-y: auto;
 }
 .fgc-sidebar__brand { padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 12px; }
-.fgc-sidebar__brand-name { font-family: "Hanken Grotesk", sans-serif; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.fgc-sidebar__brand-name { font-family: var(--font-sans); font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
 .fgc-sidebar__brand-sub  { font-size: 11px; color: rgba(255,255,255,.62); }
 .fgc-sidebar__group { padding: 12px 20px 4px; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: rgba(255,255,255,.45); text-transform: uppercase; }
 .fgc-sidebar__link {
@@ -450,7 +452,7 @@
   border-left-color: #bfddfe;
 }
 .fgc-sidebar__link--disabled { color: rgba(255,255,255,.34); cursor: not-allowed; pointer-events: none; }
-.fgc-sidebar__id { margin-left: auto; font-size: 10px; color: rgba(255,255,255,.34); font-family: "JetBrains Mono", monospace; }
+.fgc-sidebar__id { margin-left: auto; font-size: 10px; color: rgba(255,255,255,.34); font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
 .fgc-sidebar__user { margin-top: auto; padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; }
 
 .fgc-header {
@@ -458,8 +460,8 @@
   background: var(--fgc-surface-lowest); border-bottom: 1px solid var(--fgc-outline-variant);
   display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px;
 }
-.fgc-header__title { font-family: "Hanken Grotesk", sans-serif; font-size: 18px; font-weight: 700; color: var(--fgc-primary); }
-.fgc-header__id { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--fgc-on-surface-variant); }
+.fgc-header__title { font-family: var(--font-sans); font-size: 18px; font-weight: 700; color: var(--fgc-primary); }
+.fgc-header__id { font-family: var(--font-sans); font-size: 11px; color: var(--fgc-on-surface-variant); font-variant-numeric: tabular-nums; }
 
 .fgc-main { margin-left: 260px; padding: 84px 24px 96px; min-height: 100vh; }
 
@@ -469,7 +471,7 @@
   padding: 8px 24px; font-size: 11px; color: var(--fgc-on-surface-variant);
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
 }
-/* §4-12 교육용 표시 — 전 화면 하단 고정 (COR-009) */
+/* 레거시 하단 안내 표시 */
 .fgc-disclaimer { font-weight: 600; color: #B45309; }
 
 /* 로그인 등 셸이 없는 화면 */
@@ -485,11 +487,24 @@
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
 }
-.fgc-mono { font-family: "JetBrains Mono", monospace; font-size: 12px; }
+.fgc-mono { font-family: var(--font-sans); font-size: 12px; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 .fgc-muted { color: var(--fgc-on-surface-variant); }
-.fgc-page-title { font-family: "Hanken Grotesk", sans-serif; font-size: 24px; font-weight: 700; line-height: 32px; color: var(--fgc-on-surface); }
+.fgc-page-title { font-family: var(--font-sans); font-size: 24px; font-weight: 700; line-height: 32px; color: var(--fgc-on-surface); }
 .fgc-page-desc  { font-size: 13px; color: var(--fgc-on-surface-variant); margin-top: 4px; }
 .fgc-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+
+/* 넓은 업무 표가 들어간 좌우 분할 화면. Grid 자식의 기본 min-width:auto가
+   내부 표의 최소 폭을 문서 전체로 전파하지 않도록 스크롤 경계를 명확히 한다. */
+.fgc-responsive-split,
+.fgc-responsive-split > * {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .fgc-responsive-split {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
 
 /* 토스트 (차단 메시지 표시용) */
 .fgc-toast-wrap { position: fixed; top: 74px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
