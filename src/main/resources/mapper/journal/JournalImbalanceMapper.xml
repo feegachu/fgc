@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalImbalanceMapper">
+    <select id="findBalanceSummary" resultType="com.susukkang.fgc.journal.dto.JournalBalanceSummary">
+        SELECT journal_header_id,
+               COALESCE(SUM(debit_amount), 0) AS debit_total,
+               COALESCE(SUM(credit_amount), 0) AS credit_total
+        FROM fgc.journal_line
+        WHERE journal_header_id = #{journalHeaderId}
+        GROUP BY journal_header_id
+    </select>
+
+    <select id="findImbalances" resultType="com.susukkang.fgc.journal.dto.LedgerImbalanceRow">
+        SELECT vw.journal_header_id, vw.journal_no, vw.status,
+               vw.debit_total, vw.credit_total, vw.difference_amount
+        FROM fgc.vw_journal_imbalance vw
+        JOIN fgc.journal_header h ON h.journal_header_id = vw.journal_header_id
+        WHERE h.validation_run_id = #{validationRunId}
+    </select>
+    
+    <select id="countImbalances" resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.vw_journal_imbalance vw
+        JOIN fgc.journal_header h ON h.journal_header_id = vw.journal_header_id
+        WHERE h.validation_run_id = #{validationRunId}
+          AND h.status &lt;&gt; 'DRAFT'
+    </select>
+
+    <select id="countJournals" resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.journal_header
+        WHERE validation_run_id = #{validationRunId}
+        AND status &lt;&gt; 'DRAFT'
+    </select>
+</mapper>
