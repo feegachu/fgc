@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-RECO-W02 대사 비교 상세 (팝업)
+  요구사항 FUN-049
+  데이터  읽기 reconciliation_result, reconciliation_match, schedule_line, transaction_attribution
+  API     GET /api/v1/reconciliations/results/{resultId}   (Ajax · 모달)
+  라우트  페이지가 아니라 프래그먼트다. RECO-W01(reco/list.html)에서 Ajax 로 불러와
+          모달로 띄운다(SIR-006 — 1차는 MPA 위주, Ajax 는 한도게이지·검증실행·대사상세만).
+          사용: ~{reco/compare-modal :: modal}
+
+  [막을 것] 이 화면에서 값을 고치지 않습니다. 보기 전용입니다.
+  [주의] 한쪽이 없는 경우(누락·중복)는 빈칸을 "—"로 두지 말고
+         "실제 없음"처럼 없다는 사실을 글자로 적습니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-RECO-W02)의 비교 카드 골격만 옮겼다.
+  페이지 셸(제목·결과 선택 셀렉트)은 버리고, 데이터 영역(요약·예상/실제·차액·관련 링크)은
+  IF-API 연동 시 서버 렌더링으로 채운다.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="modal" class="fgc-modal" style="max-width:860px">
+
+  <div class="fgc-modal__head">
+    <span class="fgc-card__title">
+      대사 비교 상세 —
+      <span class="fgc-mono" id="h-contract">—</span> ·
+      <span id="h-item">—</span> · <span id="h-inst">—</span>회차
+    </span>
+    <span id="h-type"></span>
+  </div>
+
+  <div class="fgc-modal__body">
+
+    <div class="fgc-banner fgc-banner--muted">
+      <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
+      <span>보기 전용 화면입니다. 여기서 금액이나 결과 유형을 고칠 수 없습니다.
+        고쳐야 한다면 원천(지급 건 또는 스케줄)으로 가서 바로잡고 다시 대사합니다.</span>
+    </div>
+
+    <!-- 결과 요약 -->
+    <div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px">
+      <div><div class="fgc-label">결과 ID</div><div class="fgc-mono" id="h-id">—</div></div>
+      <div><div class="fgc-label">매칭키</div><div class="fgc-mono" id="h-key" style="font-size:11px">—</div></div>
+      <div><div class="fgc-label">주 원인</div><div class="fgc-mono" id="h-reason">—</div></div>
+      <div><div class="fgc-label">차액</div><div id="h-diff">—</div></div>
+    </div>
+
+    <!-- 좌우 대조 — 예상/실제 행은 결과 조회 API 연동 시 채운다.
+         한쪽이 없으면 빈칸("—")이 아니라 "실제 없음"으로 적는다 -->
+    <div class="fgc-compare" style="margin-top:16px">
+      <section class="fgc-compare__side fgc-compare__side--expected">
+        <div class="fgc-compare__head">예상 — 우리가 계산한 스케줄 (schedule_line)</div>
+        <table class="fgc-table">
+          <tbody id="expected-body">
+            <tr><td colspan="2"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="fgc-compare__side fgc-compare__side--actual">
+        <div class="fgc-compare__head">실제 — 확정된 지급 건 (transaction_attribution)</div>
+        <table class="fgc-table">
+          <tbody id="actual-body">
+            <tr><td colspan="2"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <!-- 차액 · 판정 -->
+    <section class="fgc-card" style="margin-top:16px">
+      <div class="fgc-card__head"><span class="fgc-card__title">차액과 판정</span></div>
+      <div class="fgc-card__body">
+        <table class="fgc-table" style="font-size:13px">
+          <tbody id="diff-body">
+            <tr><td colspan="2"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          </tbody>
+        </table>
+        <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
+          <span class="material-symbols-outlined" style="font-size:18px">straighten</span>
+          <!-- 허용오차 안내 문구(FGC.NOTICE.TOLERANCE)와 건별 판정 설명은 서버 렌더링으로 채운다 -->
+          <span id="tolerance-note"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 관련 화면 바로가기 — 스케줄·지급 건·분개·예외함·계약 링크는 결과 데이터로 채운다 -->
+    <section class="fgc-card" style="margin-top:16px">
+      <div class="fgc-card__head"><span class="fgc-card__title">관련 화면 바로가기</span></div>
+      <div class="fgc-card__body" style="display:flex;gap:8px;flex-wrap:wrap" id="links"></div>
+    </section>
+
+  </div>
+</div>
+</body>
+</html>

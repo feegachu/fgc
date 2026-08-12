@@ -3,7 +3,7 @@ title: "FGC 화면정의서 v2.0"
 version: "2.0"
 status: "배포"
 effective_date: "2026-08-03"
-기준산출물: "요구사항명세서 v2.2.1 · 규제조문표 v0.2.1 · 운영정책서 v1.0 · 시드명세서 v1.0 · 스키마 v2.1.2"
+기준산출물: "요구사항명세서 v2.2.2 · 규제조문표 v0.2.1 · 운영정책서 v1.0 · 시드명세서 v1.0 · 스키마 v2.1.2"
 ---
 
 # FGC 화면정의서 v2.0
@@ -216,7 +216,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 8 | **확정 후 잠금** | `FINALIZED`(확정) 된 검증 실행의 데이터는 전 화면에서 읽기 전용 + 자물쇠 아이콘. 고치려 하면 "새 실행을 만드세요" 안내창이 뜹니다. |
 | 9 | **사유 필수** | 예외 처리·역분개·수동 조정은 **사유를 안 쓰면 저장 버튼이 눌리지 않습니다.** 저장하면 감사로그에 이전값·이후값이 자동으로 남습니다. |
 | 10 | **에러 문구 3요소** | `무엇이 · 왜 · 어떻게`. 예: "지급 확정 불가 — 1,200% 한도 초과(사용률 104.2%). 예외함에서 정정·감액·취소를 선택하세요." |
-| 11 | **개인정보** | 계약자 이름은 마스킹(`홍*동`). 주민번호는 아예 저장·표시하지 않습니다. |
+| 11 | **개인정보** | **계약자 개인정보를 아예 저장하지 않습니다**(SRC-027 D-05). 계약 식별은 계약번호(`contract_no`)로 합니다. 이름·주민번호 모두 저장·표시·전송하지 않으므로 마스킹 규칙 자체가 필요 없습니다. |
 | 12 | **교육용 표시** | 모든 화면 아래에 한 줄 고정: "교육용 프로토타입입니다. 실제 지급 결정에 사용할 수 없습니다."(COR-009) |
 
 ### 4-1. 역할 4종과 기본 권한
@@ -526,7 +526,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 데이터 출처 | 배지 | `data_origin` — 시드 / 수기 / 정규화DB |
 
 **막아야 할 것**
-- 계약자 실명 노출 금지. 마스킹 표시만 합니다.
+- 계약자 이름 열을 추가하지 마세요. **저장하지 않습니다**(SRC-027 D-05). 계약 식별은 계약번호로 합니다.
 
 **권한** 전체 조회 / `SETTLEMENT`·`GA_ADMIN`만 등록 버튼
 
@@ -1415,16 +1415,53 @@ FGC — GA 수수료 정산·검증 플랫폼
 ⑤ 확정 조건 체크리스트
 ⑥ [확정] 버튼
 
+**항목 정의 — ① 실행 헤더 · ② 진행 단계**
+
+| 항목 | 출처 | 비고 |
+|---|---|---|
+| 검증월 · 회차 | `validation_run.validation_month` · `run_no` | |
+| 실행 상태 | `validation_run.status` | `CREATED`·`RUNNING`·`COMPLETED`·`FAILED`·`FINALIZED` **5개** |
+| **진행 단계 (1~10)** | **`validation_run.current_step`** | ★ 아래 설명 |
+| 진행률 % | `current_step / 10 × 100` | 화면에서 계산 |
+| 실패 단계 | `status='FAILED'` 일 때의 `current_step` | 실패 사유는 `failure_message` |
+| 단계 이름 | **DB 아님 — 화면 상수** | `화면_MVP/assets/fgc-seed.js` 의 `validationSteps` |
+| 실행자 · 시작 · 완료 | `triggered_by` · `started_at` · `completed_at` | |
+| 확정자 · 확정시각 | `finalized_by` · `finalized_at` | |
+
+> **★ `status` 5개와 10단계는 서로 다른 축입니다.** 헷갈리기 쉬운 지점입니다.
+> `status` 는 실행의 거친 생명주기이고, `current_step` 은 그 안에서의 진행 위치입니다.
+> 둘의 관계는 DB 제약 `ck_validation_run_step` 이 강제합니다 —
+> `CREATED`=0 / `RUNNING`·`FAILED`=0~8 / `COMPLETED`=8 / `FINALIZED`=10.
+>
+> **9단계(담당자 검토)에는 별도 값이 없습니다.** `COMPLETED` + `current_step=8` 이
+> 곧 "배치 끝, 사람 검토 대기"입니다. 스텝퍼는 1~8 초록 / 9·10 회색으로 그려집니다.
+>
+> **진행률을 Spring Batch 메타테이블(`batch_step_execution`)에서 읽지 마세요.**
+> Step 8개가 10단계와 1:1이 아니고(6단계=Step 2개, 4단계=partition 2개, 7단계=2회),
+> 9·10단계는 Spring Batch 에 Step 자체가 없습니다. `validation_run` 에 `job_execution_id`
+> 도 없어 조인할 키가 없습니다. 각 Step 이 `current_step` 을 갱신하고 화면은 그것만 읽습니다.
+
 **⑤ 확정 조건 체크리스트 (운영정책서 제44조 — 6개 전부 초록이어야 확정 가능)**
 
-| # | 조건 | 확인 방법 |
+> 제44조에는 항목이 7개 적혀 있지만 마지막 `확정 사용자와 시각 기록` 은 **사전조건이 아니라
+> 확정의 사후효과**입니다(`finalized_by`·`finalized_at` 에 자동 기록). 게이트는 앞의 6개입니다.
+> **이 목록·순서를 바꾸지 마세요** — 예전에 정책서·쿡북·이 문서가 서로 다른 6개를 갖고
+> 있었습니다(SRC-027 감사). SQL 정본은 `08_화면별_SQL_쿡북_v1_0.md` IF-API-50 입니다.
+
+화면에 표시하는 문구는 아래 그대로 씁니다. **쿡북 SQL 의 `label` · MVP 목업과 문자열이 같아야 합니다**(API 가 `conditions[].label` 로 그대로 내려보냅니다).
+
+| # | 조건 (화면 표시 문구) | 확인 방법 |
 |---|---|---|
-| 1 | 실행 상태가 계산완료 | `validation_run.status = 'COMPLETED'` |
-| 2 | 차변·대변 불균형 0건 | `vw_journal_imbalance` 조회 |
-| 3 | 심각도 CRITICAL 미처리 예외 0건 | `exception_case` |
-| 4 | 정책 없음·중복 0건 | 예외 유형으로 확인 |
-| 5 | 귀속합계 오류 0건 | 지급 건 검증 |
-| 6 | 상세 합계 = 요약 합계 | 두 값을 나란히 표시 |
+| 1 | 검증 실행 상태가 계산완료(COMPLETED)인가 | `validation_run.status='COMPLETED' AND current_step=8` |
+| 2 | 원장 불균형(차변≠대변)이 0건인가 | `vw_journal_imbalance` ⋈ `journal_header` **WHERE `validation_run_id`** |
+| 3 | 심각도 긴급(CRITICAL) 미처리 예외가 0건인가 | `exception_case` — **`severity='CRITICAL'` 필터 필수** |
+| 4 | 정책 없음 · 정책 중복이 0건인가 | `exception_case.exception_type IN ('POLICY_MISSING','POLICY_DUPLICATE')` |
+| 5 | 귀속합계 오류가 0건인가 | `vw_transaction_attribution_balance` ⋈ `commission_transaction` **WHERE `settlement_month` = 검증월** |
+| 6 | 계약별 상세 합계 = 실행 요약 합계인가 | `cap_check.included_amount` vs `SUM(cap_check_detail.amount WHERE INCLUDED)` |
+
+> **2·5번은 반드시 실행 범위로 좁혀야 합니다.** 뷰를 그냥 세면 다른 실행의 불균형까지
+> 세어 확정이 영영 막힙니다. 뷰에 `validation_run_id` 가 없어 부모 테이블로 되짚어야 하고,
+> `commission_transaction` 에는 실행 연결이 아예 없어 정산월로 맞춥니다.
 
 각 항목마다 "바로가기" 링크를 붙입니다. 실패하면 어디를 고쳐야 하는지 바로 알 수 있게요.
 
@@ -1568,7 +1605,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 테이블 `clawback_case`, `recovery_transaction` / 요구사항 FUN-056
 
 ### FGC-UI-RPT-W01 · 정산·대사 보고서
-검색 결과를 엑셀·PDF로 내려받습니다. 개인정보는 마스킹합니다.
+검색 결과를 엑셀·PDF로 내려받습니다. 계약은 계약번호로 식별합니다 — 계약자 개인정보는 애초에 저장하지 않으므로 내보낼 것이 없습니다(SRC-027 D-05).
 요구사항 FUN-059
 
 ### FGC-UI-RPT-W02 · 설계사 수수료 명세
@@ -1734,7 +1771,7 @@ FUN-014·015(정책 데이터), FUN-019~024(삭제됨 — 업로드 기능), FUN
 
 | 문서 | 이 화면정의서에서 쓰인 곳 |
 |---|---|
-| FGC 요구사항명세서 v2.2.1 | 화면별 FUN-xxx |
+| FGC 요구사항명세서 v2.2.2 | 화면별 FUN-xxx |
 | FGC 규제 근거·조문표 v0.2.1 | 화면별 REG-xx |
 | FGC 가상 GA 운영정책서 v1.0 | 확정 게이트(제31조), 대사 기준(제36조), 검증 순서(제43조), 확정 조건(제44조), 계약체결비용(제45조의2) |
 | FGC 정규화 입력데이터·시드데이터 명세서 v1.0 | 역할·계정·조직·GOLDEN 시나리오 |

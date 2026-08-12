@@ -1,5 +1,6 @@
 package com.susukkang.fgc.schedule.mapper;
 
+import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.schedule.dto.*;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.apache.ibatis.annotations.Mapper;
@@ -102,5 +103,17 @@ public interface ScheduleMapper {
     ScheduleDetailResponse selectByContractIdAndPaymentStage(
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage
+    );
+    // 스케줄 ID를 통해 헤더 조회
+    ScheduleHeaderInsertDTO selectScheduleHeaderById(@Param("scheduleId") Long scheduleId);
+
+    // 스케줄 ID를 통해 기존 회차별 라인을 조회
+    List<ScheduleLineInsertDTO> selectScheduleLinesByScheduleId(@Param("scheduleId") Long scheduleId);
+
+    // 스케줄 헤더 상태 및 활성화 여부 업데이트
+    int updateScheduleHeaderStatus(
+            @Param("scheduleHeaderId") Long scheduleHeaderId,
+            @Param("scheduleHeaderStatus") ScheduleHeaderStatus scheduleHeaderStatus,
+            @Param("active") boolean active
     );
 }

@@ -27,11 +27,16 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * 설명 : 실제 PostgreSQL 정책·스케줄·준법경영비 계산 통합 테스트
  * 실제 로컬 PostgreSQL(docker-compose fgc-db)에 적용된 시드데이터(V3/V4)를 대상으로
  * CapCalculator/ProductRefundRateResolver 매퍼 SQL이 실제로 맞물려 동작하는지 검증한다.
  *
  * schedule_line 은 ScheduleGenerator(FGC-FUN-012/013/018)가 아직 없어 seed 에 없으므로,
  * 이 테스트가 직접 최소한의 예상 스케줄 1건을 만들어 넣는다. 트랜잭션은 끝나면 롤백된다.
+ *
+ * @author yslee
+ * @since 2026-08-10
+ * @version 1.2
  */
 @SpringBootTest
 @Transactional
@@ -112,6 +117,44 @@ class CapCalculatorIntegrationTest {
         Integer detailCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.cap_check_detail WHERE cap_check_id = ?",
                 Integer.class, saved.capCheckId());
+        assertThat(detailCount).isEqualTo(1);
+    }
+
+    // #76 DailyChangedContractJob이 같은 날 FAILED→RUNNING으로 재시도할 때, 이미 성공 저장된
+    // (validation_run_id, contract_id, payment_stage)를 다시 계산하려다 uq_cap_check_monthly
+    // UNIQUE 위반으로 영구히 실패하던 문제의 회귀테스트(코드리뷰로 발견·수정, 2026-08-11).
+    // insertCapCheck를 ON CONFLICT DO UPDATE로 바꿔서, 같은 실행 안에서 같은 계약·단계를
+    // 두 번 계산해도 예외 없이 최신 값으로 덮어써야 한다.
+    @Test
+    void calculateAndSaveUpsertsWithinSameValidationRunInsteadOfViolatingUniqueConstraint() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        insertOperationalScheduleWithOneBaseCommissionLine(id, LocalDate.of(2026, 7, 10));
+
+        Long validationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
+                VALUES ('2026-07-01', 9001, 'MANUAL_CONTRACT')
+                RETURNING validation_run_id
+                """, Long.class);
+
+        CapCalculationCommand command = CapCalculationCommand.dailyBatch(
+                id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10), validationRunId);
+
+        CapCheckSaveResult first = capCheckService.calculateAndSave(command);
+        // 재시도 시나리오: 같은 (validationRunId, contractId, paymentStage)를 다시 계산한다.
+        CapCheckSaveResult second = capCheckService.calculateAndSave(command);
+
+        // 새 행이 아니라 같은 행을 덮어썼어야 한다(UNIQUE 위반 없이, cap_check_id 그대로 유지).
+        assertThat(second.capCheckId()).isEqualTo(first.capCheckId());
+
+        Integer rowCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.cap_check WHERE validation_run_id = ? AND contract_id = ? AND payment_stage = 'GA_TO_FC'",
+                Integer.class, validationRunId, id);
+        assertThat(rowCount).isEqualTo(1);
+
+        // 예전 detail이 남아있지 않고 이번 재계산 결과로 정확히 교체됐어야 한다.
+        Integer detailCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.cap_check_detail WHERE cap_check_id = ?",
+                Integer.class, second.capCheckId());
         assertThat(detailCount).isEqualTo(1);
     }
 
@@ -216,7 +259,12 @@ class CapCalculatorIntegrationTest {
         Long id = contractId("FGC-FGL01-202703-0001");
 
         CapCalculationResult result = capCalculator.calculate(
-                CapCalculationCommand.realtime(id, PaymentStage.INSURER_TO_GA, LocalDate.of(2027, 3, 2)));
+                CapCalculationCommand.realtime(
+                        id,
+                        PaymentStage.INSURER_TO_GA,
+                        LocalDate.of(2027, 3, 2),
+                        new BigDecimal("3000")
+                ));
 
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");

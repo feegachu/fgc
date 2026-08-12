@@ -71,6 +71,14 @@ public class CapCheckServiceImpl implements CapCheckService {
                 .build();
         capCheckMapper.insertCapCheck(row);
 
+        // insertCapCheckDetails가 (cap_check_id, detail_seq) 기준 upsert라 자리별로 최신값을
+        // 덮어써 주지만, 이번 재계산이 이전보다 항목 수가 "줄었을" 경우 그 초과분은 upsert만으로
+        // 안 지워진다 — 그 뒷자리만 잘라낸다("지웠다 다시 넣기"가 아니라 꼬리 정리, §7-6
+        // 공통규칙 1 준수, 코드리뷰 반영 2026-08-11). 새로 INSERT된 행(재사용이 아님)이면 어차피
+        // 지울 뒷자리가 없어 안전한 no-op이다.
+        int maxDetailSeq = result.details().stream().mapToInt(CapCheckDetailLine::detailSeq).max().orElse(0);
+        capCheckMapper.pruneCapCheckDetails(row.getCapCheckId(), maxDetailSeq);
+
         if (!result.details().isEmpty()) {
             List<CapCheckDetailInsertRow> detailRows = new ArrayList<>(result.details().size());
             for (CapCheckDetailLine d : result.details()) {

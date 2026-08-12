@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-SCHE-W01 예상 스케줄 목록
+  요구사항 FUN-036 · FUN-039 · FUN-040 / REG-01 · REG-19
+  데이터  읽기 schedule_header
+  API     GET /api/v1/schedules?contractNo=&stage=&regime=&status=&purpose=
+  라우트  GET /schedules → schedule/list.html
+
+  [막을 것] 한 계약 + 한 지급단계에 사용중인 운영 스케줄은 1개만 있어야 합니다.
+            2개가 보이면 데이터 오류입니다 (부분 UNIQUE 인덱스로 막습니다).
+  [주의] 기본 검색조건은 용도 = 운영(OPERATIONAL) 입니다.
+         비교·시뮬레이션용 스케줄이 섞여 나오면 담당자가 헷갈립니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-SCHE-W01)의 정적 골격만 옮겼다.
+  데이터 영역(목록)은 IF-API-27 연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-SCHE-W01', '예상 스케줄 목록', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <h1 class="fgc-page-title">예상 스케줄 목록</h1>
+  <p class="fgc-page-desc">
+    계약별로 "회차별로 언제 얼마를 줄 예정인지"를 적어 둔 표가 어디 있는지 찾습니다.
+  </p>
+
+  <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">gavel</span>
+    <span>
+      <strong>적용 체계는 계약 체결연도만으로 정하지 않습니다.</strong>
+      상품 판매개시일 · 기초서류 버전 · 판매채널을 함께 보고 정합니다(REG-19).
+      1차에서 만드는 것은 <strong>현행 체계</strong>뿐이고,
+      4년 분급(2027~)·7년 분급(2029~)은 2차(FGC-UI-SCHE-W03)에서 같은 화면에 체계만 바꿔 붙입니다.
+    </span>
+  </div>
+
+  <!-- ① 검색 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__body fgc-toolbar">
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-no">계약번호</label>
+        <input class="fgc-input" id="f-no" type="text" placeholder="C001">
+      </div>
+      <div class="fgc-field" style="min-width:160px">
+        <label class="fgc-label" for="f-stage">지급단계</label>
+        <select class="fgc-select" id="f-stage"><option value="">전체</option>
+          <option value="INSURER_TO_GA">원수사→GA</option>
+          <option value="GA_TO_FC">GA→설계사</option>
+        </select>
+      </div>
+      <div class="fgc-field" style="min-width:160px">
+        <label class="fgc-label" for="f-regime">적용 체계</label>
+        <!-- 적용 체계 선택지는 IF-API-27 연동 시 코드 테이블로 채운다 -->
+        <select class="fgc-select" id="f-regime"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:140px">
+        <label class="fgc-label" for="f-purpose">용도</label>
+        <select class="fgc-select" id="f-purpose">
+          <option value="OPERATIONAL">운영 (기본)</option>
+          <option value="">전체</option>
+        </select>
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-status">상태</label>
+        <!-- 상태 선택지는 IF-API-27 연동 시 코드 테이블로 채운다 -->
+        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
+      </div>
+      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </button>
+    </div>
+  </section>
+
+  <!-- ② 목록 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">스케줄</span>
+      <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="fgc-table" style="min-width:1080px">
+        <thead>
+          <tr>
+            <th style="width:74px">계약번호</th>
+            <th style="width:104px">지급단계</th>
+            <th style="width:120px">적용 체계</th>
+            <th style="width:96px">용도</th>
+            <th style="width:56px">버전</th>
+            <th style="width:96px">상태</th>
+            <th style="width:70px">사용중</th>
+            <th class="fgc-th-num" style="width:70px">회차 수</th>
+            <th class="fgc-th-num" style="width:110px">예상 총액</th>
+            <th style="width:190px">정책버전</th>
+            <th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody id="list-body">
+          <tr><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
