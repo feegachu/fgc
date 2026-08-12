@@ -38,7 +38,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Override
     @Transactional
     public void createIfNecessary(CapExceptionCreateCommand command) {
-        // TODO 월 통합검증 배치 구현 시 validationRunId를 포함하여 이 메서드를 호출하도록 연결한다.
+        // TODO 1. 월 통합검증 8단계 예외 생성 구현 시 validationRunId를 포함하여 이 메서드를 호출한다.
+        // 연계 요구사항 : FGC-FUN-034, FGC-FUN-042, FGC-FUN-043
         validateCreateCommand(command);
         ExceptionType exceptionType = resolveExceptionType(command.resultStatus());
         if (exceptionType == null) return;
@@ -56,7 +57,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Override
     @Transactional
     public void resolve(CapExceptionResolveCommand command) {
-        // TODO 예외관리 API 구현 시 로그인 사용자 ID를 actionBy로 전달하여 이 메서드를 호출하도록 연결한다.
+        // TODO 2. 예외관리 API 구현 시 로그인 사용자 ID를 actionBy로 전달하여 이 메서드를 호출한다.
+        // 연계 요구사항 : FGC-FUN-052, FGC-FUN-053
         // FUN-034 한도 예외는 REJECTED를 사용하지 않고 RESOLVED만 종결 상태로 사용한다.
         validateResolveCommand(command);
         CapExceptionStatusRow exception = capExceptionMapper.selectExceptionForUpdate(command.exceptionCaseId());
