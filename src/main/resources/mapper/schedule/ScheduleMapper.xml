@@ -408,4 +408,63 @@
           AND sh.active_yn = TRUE
         ORDER BY sl.line_no
     </select>
+
+    <select id="selectScheduleHeaderById" resultType="com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO">
+        SELECT
+            schedule_header_id,
+            contract_id,
+            payment_stage,
+            policy_version_id,
+            schedule_version_no,
+            schedule_purpose,
+            scenario_code,
+            schedule_regime,
+            status,
+            active_yn,
+            generation_reason,
+            regenerated_from_id
+        FROM
+            schedule_header
+        WHERE
+            schedule_header_id = #{scheduleId}
+    </select>
+
+    <select id="selectScheduleLinesByScheduleId"
+            resultType="com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO">
+        SELECT
+            schedule_line_id,
+            schedule_header_id,
+            line_no,
+            installment_no,
+            contract_month_no,
+            due_date,
+            commission_item_id,
+            beneficiary_agent_id,
+            basis_code,
+            basis_amount,
+            calculation_type,
+            rate_pct,
+            fixed_amount,
+            rounding_scale,
+            rounding_mode,
+            expected_amount,
+            payment_condition_code,
+            line_status,
+            source_commission_rule_id
+        FROM schedule_line
+        WHERE schedule_header_id = #{scheduleId}
+        ORDER BY line_no
+    </select>
+
+    <update id="updateScheduleHeaderStatus">
+        UPDATE
+            schedule_header
+        SET
+            status = #{scheduleHeaderStatus},
+            active_yn = #{active}
+        WHERE
+            schedule_header_id = #{scheduleHeaderId}
+        AND
+            active_yn = TRUE
+    </update>
 </mapper>

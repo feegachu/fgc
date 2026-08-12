@@ -226,7 +226,7 @@ class ContractServiceTest {
                 .insurerId(1L)
                 .dataOrigin(DataOrigin.SEED)
                 .build();
-        given(contractMapper.selectById(21L)).willReturn(current);
+        given(contractMapper.selectContractById(21L)).willReturn(current);
         givenValidReferences(request);
         given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(false);
@@ -251,7 +251,7 @@ class ContractServiceTest {
                 .insurerId(request.getInsurerId())
                 .dataOrigin(DataOrigin.SEED)
                 .build();
-        given(contractMapper.selectById(21L)).willReturn(current);
+        given(contractMapper.selectContractById(21L)).willReturn(current);
         givenValidReferences(request);
         given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
 
@@ -271,7 +271,7 @@ class ContractServiceTest {
                 .insurerId(request.getInsurerId())
                 .dataOrigin(DataOrigin.SEED)
                 .build();
-        given(contractMapper.selectById(21L)).willReturn(current);
+        given(contractMapper.selectContractById(21L)).willReturn(current);
         givenValidReferences(request);
         given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(true);
@@ -285,7 +285,7 @@ class ContractServiceTest {
     @Test
     @DisplayName("존재하지 않는 계약은 수정할 수 없다")
     void updateContractRejectsMissingContract() {
-        given(contractMapper.selectById(999L)).willReturn(null);
+        given(contractMapper.selectContractById(999L)).willReturn(null);
 
         assertThatThrownBy(() -> contractService.updateContract(999L, updateRequest()))
                 .isInstanceOf(FgcBusinessException.class);
