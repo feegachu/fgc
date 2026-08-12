@@ -6,6 +6,7 @@ import com.susukkang.fgc.validation.dto.BatchWatermarkRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
 import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import com.susukkang.fgc.validation.service.ValidationRunTransitionService;
@@ -49,6 +50,8 @@ class CreateDailyRunTaskletTest {
     @Mock
     private ValidationRunBatchLifecycleService lifecycleService;
     @Mock
+    private ValidationRunBatchAuditService auditService;
+    @Mock
     private BatchWatermarkMapper batchWatermarkMapper;
 
     private CreateDailyRunTasklet tasklet;
@@ -58,7 +61,7 @@ class CreateDailyRunTaskletTest {
     void setUp() {
         tasklet = new CreateDailyRunTasklet(
                 validationRunMapper, validationRunCreateService, validationRunTransitionService,
-                lifecycleService, batchWatermarkMapper);
+                lifecycleService, auditService, batchWatermarkMapper);
 
         BatchWatermarkRow watermark = new BatchWatermarkRow();
         watermark.setJobName(DailyChangedContractJobNames.JOB_NAME);
@@ -122,6 +125,9 @@ class CreateDailyRunTaskletTest {
 
         verify(validationRunTransitionService).transition(42L, ValidationRunStatus.RUNNING);
         verify(lifecycleService, never()).start(anyLong(), any());
+        // #77: 범용 transition()은 감사로그를 안 남기므로, 재시도 사실 자체는 Tasklet이 직접
+        // 남겨야 한다 — 안 남기면 "재실행 이력이 감사 로그에 없다"는 요구사항 위반이 된다.
+        verify(auditService).recordRetried(eq(42L), any());
     }
 
     @Test

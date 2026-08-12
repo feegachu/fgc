@@ -38,6 +38,12 @@ public class ValidationRunBatchAuditServiceImpl implements ValidationRunBatchAud
         record("VALIDATION_RUN_CREATION_FAILED", "BATCH_JOB_EXECUTION", jobExecutionId, parameters, failureMessage);
     }
 
+    @Override
+    public void recordRetried(Long validationRunId, MonthlyValidationJobParameters parameters) {
+        record("VALIDATION_RUN_RETRIED", "VALIDATION_RUN", validationRunId, parameters,
+                "FAILED validation_run retried (status reverted to RUNNING)");
+    }
+
     private void record(String actionCode, String entityType, Long entityId,
                         MonthlyValidationJobParameters parameters, String reason) {
         int affected = auditLogMapper.insert(AuditLogInsertRow.builder()
