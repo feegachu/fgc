@@ -5,6 +5,8 @@ import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicyType;
+import com.susukkang.fgc.common.code.ScheduleLineStatus;
+import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
@@ -18,6 +20,7 @@ import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
 import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import org.junit.jupiter.api.Test;
@@ -85,6 +88,113 @@ class ScheduleServiceTest {
         assertThat(condition.getPurpose()).isEqualTo(SchedulePurpose.OPERATIONAL);
         verify(scheduleMapper).selectByCondition(condition, 20, 0L);
         verify(scheduleMapper).countByCondition(condition);
+    }
+
+    @Test
+    void preservesLockedLinesAndRecalculatesPlannedLinesWhenRegenerating() {
+        ScheduleLineInsertDTO confirmedOldLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(10L).lineNo(1).installmentNo(1).contractMonthNo(1).dueDate(LocalDate.of(2026, 8, 10)).commissionItemId(100L).beneficiaryAgentId(20L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("100000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("100000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.CONFIRMED).sourceCommissionRuleId(1000L).build();
+        ScheduleLineInsertDTO recalculatedFirstLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(20L).lineNo(1).installmentNo(1).contractMonthNo(1).dueDate(LocalDate.of(2026, 8, 10)).commissionItemId(100L).beneficiaryAgentId(20L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("200000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("200000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.PLANNED).sourceCommissionRuleId(2000L).build();
+        ScheduleLineInsertDTO recalculatedFutureLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(20L).lineNo(2).installmentNo(2).contractMonthNo(2).dueDate(LocalDate.of(2026, 9, 10)).commissionItemId(100L).beneficiaryAgentId(20L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("200000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("200000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.PLANNED).sourceCommissionRuleId(2000L).build();
+
+        @SuppressWarnings("unchecked")
+        List<ScheduleLineInsertDTO> mergedLines = ReflectionTestUtils.invokeMethod(scheduleService, "mergeLockedScheduleLines", List.of(confirmedOldLine), List.of(recalculatedFirstLine, recalculatedFutureLine), 30L);
+
+        assertThat(mergedLines).hasSize(2);
+        assertThat(mergedLines.get(0).getScheduleHeaderId()).isEqualTo(30L);
+        assertThat(mergedLines.get(0).getExpectedAmount()).isEqualByComparingTo("100000");
+        assertThat(mergedLines.get(0).getLineStatus()).isEqualTo(ScheduleLineStatus.CONFIRMED);
+        assertThat(mergedLines.get(1).getExpectedAmount()).isEqualByComparingTo("200000");
+        assertThat(mergedLines.get(1).getLineStatus()).isEqualTo(ScheduleLineStatus.PLANNED);
+    }
+
+    @Test
+    void preservesLockedLineWithoutDuplicatingRecalculatedLineWhenBeneficiaryChanges() {
+        ScheduleLineInsertDTO lockedLine = scheduleLine(100L, 1, 20L, ScheduleLineStatus.CONFIRMED, "100000");
+        ScheduleLineInsertDTO changedBeneficiaryLine = scheduleLine(100L, 1, 30L, ScheduleLineStatus.PLANNED, "200000");
+
+        @SuppressWarnings("unchecked")
+        List<ScheduleLineInsertDTO> mergedLines = ReflectionTestUtils.invokeMethod(scheduleService, "mergeLockedScheduleLines", List.of(lockedLine), List.of(changedBeneficiaryLine), 30L);
+
+        assertThat(mergedLines).hasSize(1);
+        assertThat(mergedLines.getFirst().getBeneficiaryAgentId()).isEqualTo(20L);
+        assertThat(mergedLines.getFirst().getExpectedAmount()).isEqualByComparingTo("100000");
+        assertThat(mergedLines.getFirst().getLineStatus()).isEqualTo(ScheduleLineStatus.CONFIRMED);
+    }
+
+    @Test
+    void preservesMultipleLockedBeneficiariesInSameItemAndInstallment() {
+        ScheduleLineInsertDTO changedLockedLine = scheduleLine(100L, 1, 20L, ScheduleLineStatus.CONFIRMED, "100000");
+        ScheduleLineInsertDTO unchangedLockedLine = scheduleLine(100L, 1, 40L, ScheduleLineStatus.CONFIRMED, "50000");
+        ScheduleLineInsertDTO changedCalculatedLine = scheduleLine(100L, 1, 30L, ScheduleLineStatus.PLANNED, "200000");
+        ScheduleLineInsertDTO unchangedCalculatedLine = scheduleLine(100L, 1, 40L, ScheduleLineStatus.PLANNED, "60000");
+
+        @SuppressWarnings("unchecked")
+        List<ScheduleLineInsertDTO> mergedLines = ReflectionTestUtils.invokeMethod(scheduleService, "mergeLockedScheduleLines", List.of(changedLockedLine, unchangedLockedLine), List.of(changedCalculatedLine, unchangedCalculatedLine), 30L);
+
+        assertThat(mergedLines).hasSize(2);
+        assertThat(mergedLines).extracting(ScheduleLineInsertDTO::getBeneficiaryAgentId).containsExactlyInAnyOrder(20L, 40L);
+        assertThat(mergedLines).allMatch(line -> line.getLineStatus() == ScheduleLineStatus.CONFIRMED);
+    }
+
+    @Test
+    void regeneratesScheduleAsNewVersionAndPreservesConfirmedLine() {
+        ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).policyVersionId(100L).scheduleVersionNo(1).status(ScheduleHeaderStatus.CONFIRMED).activeYn(true).build();
+        InsuranceContract contract = InsuranceContract.builder().contractId(20L).contractDate(LocalDate.of(2026, 8, 10)).monthlyEquivalentFirstPremium(new BigDecimal("200000")).build();
+        ResolvedCommissionRule currentRule = rule(1000L, null, 1, 2, "100.000000");
+        ResolvedCommissionPolicy currentPolicy = policy(200L, PaymentStage.INSURER_TO_GA, currentRule);
+        ScheduleLineInsertDTO confirmedLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(10L).lineNo(1).installmentNo(1).contractMonthNo(1).dueDate(LocalDate.of(2026, 8, 10)).commissionItemId(1000L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("100000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("100000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.CONFIRMED).sourceCommissionRuleId(1000L).build();
+
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(oldHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(contract);
+        given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willReturn(currentPolicy);
+        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(confirmedLine));
+        given(scheduleMapper.updateScheduleHeaderStatus(10L, ScheduleHeaderStatus.ADJUSTED, false)).willReturn(1);
+        given(scheduleMapper.selectNextScheduleVersionNo(20L, PaymentStage.INSURER_TO_GA)).willReturn(2);
+        given(scheduleMapper.insertScheduleHeader(any())).willAnswer(invocation -> {
+            ScheduleHeaderInsertDTO insertedHeader = invocation.getArgument(0);
+            ReflectionTestUtils.setField(insertedHeader, "scheduleHeaderId", 11L);
+            return 1;
+        });
+        given(scheduleMapper.insertAllScheduleLines(any())).willAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "정책 변경 반영");
+
+        assertThat(response.getScheduleHeaderId()).isEqualTo(11L);
+        assertThat(response.getVersionNo()).isEqualTo(2L);
+        verify(scheduleMapper).lockContractForScheduleGeneration(20L);
+        verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
+        ArgumentCaptor<ScheduleHeaderInsertDTO> headerCaptor = ArgumentCaptor.forClass(ScheduleHeaderInsertDTO.class);
+        verify(scheduleMapper).insertScheduleHeader(headerCaptor.capture());
+        assertThat(headerCaptor.getValue().getRegeneratedFromId()).isEqualTo(10L);
+        assertThat(headerCaptor.getValue().getGenerationReason()).isEqualTo("정책 변경 반영");
+        assertThat(headerCaptor.getValue().getStatus()).isEqualTo(ScheduleHeaderStatus.PLANNED);
+        assertThat(headerCaptor.getValue().getActiveYn()).isTrue();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ScheduleLineInsertDTO>> lineCaptor = ArgumentCaptor.forClass(List.class);
+        verify(scheduleMapper).insertAllScheduleLines(lineCaptor.capture());
+        assertThat(lineCaptor.getValue()).hasSize(2);
+        assertThat(lineCaptor.getValue().get(0).getScheduleHeaderId()).isEqualTo(11L);
+        assertThat(lineCaptor.getValue().get(0).getExpectedAmount()).isEqualByComparingTo("100000");
+        assertThat(lineCaptor.getValue().get(0).getLineStatus()).isEqualTo(ScheduleLineStatus.CONFIRMED);
+        assertThat(lineCaptor.getValue().get(1).getExpectedAmount()).isEqualByComparingTo("200000");
+        assertThat(lineCaptor.getValue().get(1).getLineStatus()).isEqualTo(ScheduleLineStatus.PLANNED);
+    }
+
+    @Test
+    void registersReviewAndPreservesExistingHeaderWhenPolicyIsMissing() {
+        assertRegenerationRegistersReview("POLICY_MISSING");
+    }
+
+    @Test
+    void registersReviewAndPreservesExistingHeaderWhenPoliciesAreDuplicated() {
+        assertRegenerationRegistersReview("POLICY_DUPLICATE");
+    }
+
+    @Test
+    void rejectsInvalidRegenerationReasonBeforeAccessingDatabase() {
+        assertThatThrownBy(() -> scheduleService.regenerateSchedules(10L, " ")).isInstanceOf(FgcBusinessException.class);
+        assertThatThrownBy(() -> scheduleService.regenerateSchedules(10L, "가".repeat(41))).isInstanceOf(FgcBusinessException.class);
+        verify(scheduleMapper, never()).selectScheduleHeaderById(any());
     }
 
     @Test
@@ -223,7 +333,7 @@ class ScheduleServiceTest {
                 rule(2000L, AgentRankCode.FC, 1, 1, "650.000000")
         );
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -314,7 +424,7 @@ class ScheduleServiceTest {
                 .rules(List.of(firstRule, overlappingRule))
                 .build();
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -337,7 +447,7 @@ class ScheduleServiceTest {
                 .contractDate(LocalDate.of(2026, 8, 10))
                 .build();
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willThrow(policyResolutionException(
@@ -383,7 +493,7 @@ class ScheduleServiceTest {
                 rule(2000L, AgentRankCode.FC, 1, 1, "100.000000")
         );
 
-        given(contractMapper.selectById(contract.getContractId())).willReturn(contract);
+        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -422,6 +532,24 @@ class ScheduleServiceTest {
         );
     }
 
+    private void assertRegenerationRegistersReview(String reason) {
+        ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).scheduleVersionNo(1).status(ScheduleHeaderStatus.CONFIRMED).activeYn(true).build();
+        InsuranceContract contract = InsuranceContract.builder().contractId(20L).build();
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(oldHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(contract);
+        given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willThrow(policyResolutionException(20L, PaymentStage.INSURER_TO_GA, reason));
+        given(scheduleMapper.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
+
+        ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "정책 변경 반영");
+
+        assertThat(response.getScheduleHeaderId()).isEqualTo(10L);
+        assertThat(response.getVersionNo()).isEqualTo(1L);
+        verify(scheduleMapper).upsertPolicyReviewCase(20L, PaymentStage.INSURER_TO_GA, reason, "수수료 정책 검토 필요 - INSURER_TO_GA", "예상 스케줄에 적용할 정책을 확정할 수 없습니다.");
+        verify(scheduleMapper, never()).updateScheduleHeaderStatus(any(), any(), any(Boolean.class));
+        verify(scheduleMapper, never()).insertScheduleHeader(any());
+        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+    }
+
     private ResolvedCommissionPolicy policy(
             Long policyVersionId,
             PaymentStage paymentStage,
@@ -433,6 +561,10 @@ class ScheduleServiceTest {
                 .paymentStage(paymentStage)
                 .rules(List.of(rule))
                 .build();
+    }
+
+    private ScheduleLineInsertDTO scheduleLine(Long commissionItemId, int installmentNo, Long beneficiaryAgentId, ScheduleLineStatus status, String expectedAmount) {
+        return ScheduleLineInsertDTO.builder().commissionItemId(commissionItemId).installmentNo(installmentNo).beneficiaryAgentId(beneficiaryAgentId).expectedAmount(new BigDecimal(expectedAmount)).lineStatus(status).build();
     }
 
     private ResolvedCommissionRule rule(

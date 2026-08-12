@@ -27,6 +27,26 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 public class SecurityConfig {
 
     /**
+     * FUN-065 지급 등록·수정·확정 API는 세션 인증과 CSRF 토큰을 함께 검증한다.
+     */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain commissionPaymentApiSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/api/v1/transactions/**")
+                // 2026-08-11 yslee - 세션 쿠키 기반 지급 API의 CSRF 보호 활성화
+                // 기존 코드: /api/** 전체에서 CSRF 검증을 비활성화
+                // 문제: 로그인 세션을 악용한 외부 사이트가 지급 등록·수정·확정 요청을 위조할 수 있음
+                // 개선: FUN-065 상태 변경 요청에 Spring Security 기본 CSRF 토큰 검증을 우선 적용
+                .csrf(Customizer.withDefaults())
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .httpBasic(Customizer.withDefaults())
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+        return http.build();
+    }
+
+    /**
      * /api/** - 미인증이면 리다이렉트 대신 항상 401을 돌려준다.
      *
      * 세션 인증을 막지 않는 이유
@@ -35,13 +55,12 @@ public class SecurityConfig {
      *  적어 두었다. 즉 화면이 세션 쿠키로 /api/** 를 Ajax 호출하는 것이 설계된 동작이다.
      *  STATELESS 를 켜면 로그인한 사용자의 화면 Ajax 가 전부 401 이 된다.
      *
-     * ⚠ CSRF 를 끈 것은 지금 /api/** 에 GET 밖에 없어서다(상태변경 엔드포인트 0개).
-     *  위와 같이 쿠키로도 인증되므로 CSRF 공격 시나리오는 성립한다.
-     *  첫 POST/PUT/DELETE 엔드포인트(TRAN-W02 지급 확정 등)를 만들기 전에 반드시
-     *  CSRF 를 다시 켜고 화면 스크립트가 X-CSRF-TOKEN 을 싣도록 바꿔야 한다.
+     * ⚠ 이 체인은 아직 CSRF 전환을 마치지 않은 나머지 /api/**의 호환용 체인이다.
+     *  FUN-065 지급 API는 위의 우선 체인에서 CSRF를 검증한다. 다른 상태 변경 API도
+     *  담당 화면이 X-CSRF-TOKEN을 전송하도록 준비한 뒤 보호 체인으로 전환해야 한다.
      */
     @Bean
-    @Order(1)
+    @Order(2)
     public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/api/**")
@@ -60,7 +79,7 @@ public class SecurityConfig {
      * 구분하면 계정 존재 여부가 새어 나간다(화면정의서 AUTH-W01 "막아야 할 것").
      */
     @Bean
-    @Order(2)
+    @Order(3)
     public SecurityFilterChain webSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth

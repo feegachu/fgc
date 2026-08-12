@@ -10,7 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * CapCalculator 순수 계산 결과. cap_check 1행 + cap_check_detail 목록에 대응하는 값을 담지만,
+ * 설명 : 한도 계산 결과와 감사 재현용 계산 스냅샷
+ * cap_check 1행 + cap_check_detail 목록에 대응하는 값을 담지만,
  * 이 자체로는 아직 저장되지 않은 상태다 — 저장은 CapCheckService(오케스트레이션 계층)의 책임이다.
  *
  * basePremiumAmount는 월납환산 초회보험료 원액이다(×12 하지 않음 — 화면정의서 CAP-W01
@@ -21,9 +22,12 @@ import java.util.Map;
  *   annualizedLimitBase = basePremiumAmount × premium_multiplier(기본 12)
  *   refund12mAmount = 80% 이상 공제 대상일 때만, annualizedLimitBase × 12차월 예상 해약환급률
  *   grossLimit = annualizedLimitBase + refund12mAmount
- *   complianceDeductionAmount = basePremiumAmount × compliance_deduction_pct (REG-10: 월납 기준
- *     초회보험료의 3% — grossLimit이 아니라 basePremiumAmount 기준. INSURER_TO_GA만 0보다 큼)
+ *   complianceDeductionAmount = min(증빙된 실제 준법경영비, basePremiumAmount × 최대 허용률)
  *   limitAmount = grossLimit - complianceDeductionAmount
+ *
+ * @author yslee
+ * @since 2026-08-10
+ * @version 1.2
  */
 public record CapCalculationResult(
         Long contractId,
