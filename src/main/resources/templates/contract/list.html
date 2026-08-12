@@ -29,7 +29,8 @@
       <button class="fgc-btn fgc-btn--ghost" data-fgc-na="목업에서는 파일을 내려받지 않습니다. 실제 개발에서는 GET /api/v1/contracts/export 로 만듭니다.">
         <span class="material-symbols-outlined" style="font-size:18px">download</span> CSV 내보내기
       </button>
-      <a class="fgc-btn fgc-btn--primary" th:href="@{/contracts/new}" style="text-decoration:none" data-fgc-action="create">
+      <!-- 등록은 SETTLEMENT (화면정의서 :531, IF-API-18). a 태그는 disabled 가 없어 숨긴다. -->
+      <a class="fgc-btn fgc-btn--primary" th:href="@{/contracts/new}" th:if="${canProcess}" style="text-decoration:none" data-fgc-action="create">
         <span class="material-symbols-outlined" style="font-size:18px">add</span> 신규 등록
       </a>
     </div>
