@@ -1,0 +1,23 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="672" height="72" viewBox="0 0 672 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Trend Plot">
+<path id="Vector" d="M0 10H672M0 36H672M0 62H672" stroke="#E4E9EF"/>
+<path id="Vector_2" d="M8 51L138 44L268 32L398 39L528 20L664 14" stroke="#214EF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M8 57L138 49L268 38L398 34L528 27L664 22" stroke="#467AA2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="Group">
+<path id="Vector_4" d="M8 54C9.65685 54 11 52.6569 11 51C11 49.3431 9.65685 48 8 48C6.34315 48 5 49.3431 5 51C5 52.6569 6.34315 54 8 54Z" fill="white" stroke="#214EF5" stroke-width="2"/>
+<path id="Vector_5" d="M138 47C139.657 47 141 45.6569 141 44C141 42.3431 139.657 41 138 41C136.343 41 135 42.3431 135 44C135 45.6569 136.343 47 138 47Z" fill="white" stroke="#214EF5" stroke-width="2"/>
+<path id="Vector_6" d="M268 35C269.657 35 271 33.6569 271 32C271 30.3431 269.657 29 268 29C266.343 29 265 30.3431 265 32C265 33.6569 266.343 35 268 35Z" fill="white" stroke="#214EF5" stroke-width="2"/>
+<path id="Vector_7" d="M398 42C399.657 42 401 40.6569 401 39C401 37.3431 399.657 36 398 36C396.343 36 395 37.3431 395 39C395 40.6569 396.343 42 398 42Z" fill="white" stroke="#214EF5" stroke-width="2"/>
+<path id="Vector_8" d="M528 23C529.657 23 531 21.6569 531 20C531 18.3431 529.657 17 528 17C526.343 17 525 18.3431 525 20C525 21.6569 526.343 23 528 23Z" fill="white" stroke="#214EF5" stroke-width="2"/>
+<path id="Vector_9" d="M664 17C665.657 17 667 15.6569 667 14C667 12.3431 665.657 11 664 11C662.343 11 661 12.3431 661 14C661 15.6569 662.343 17 664 17Z" fill="white" stroke="#214EF5" stroke-width="2"/>
+</g>
+<g id="Group_2">
+<path id="Vector_10" d="M8 60C9.65685 60 11 58.6569 11 57C11 55.3431 9.65685 54 8 54C6.34315 54 5 55.3431 5 57C5 58.6569 6.34315 60 8 60Z" fill="white" stroke="#467AA2" stroke-width="2"/>
+<path id="Vector_11" d="M138 52C139.657 52 141 50.6569 141 49C141 47.3431 139.657 46 138 46C136.343 46 135 47.3431 135 49C135 50.6569 136.343 52 138 52Z" fill="white" stroke="#467AA2" stroke-width="2"/>
+<path id="Vector_12" d="M268 41C269.657 41 271 39.6569 271 38C271 36.3431 269.657 35 268 35C266.343 35 265 36.3431 265 38C265 39.6569 266.343 41 268 41Z" fill="white" stroke="#467AA2" stroke-width="2"/>
+<path id="Vector_13" d="M398 37C399.657 37 401 35.6569 401 34C401 32.3431 399.657 31 398 31C396.343 31 395 32.3431 395 34C395 35.6569 396.343 37 398 37Z" fill="white" stroke="#467AA2" stroke-width="2"/>
+<path id="Vector_14" d="M528 30C529.657 30 531 28.6569 531 27C531 25.3431 529.657 24 528 24C526.343 24 525 25.3431 525 27C525 28.6569 526.343 30 528 30Z" fill="white" stroke="#467AA2" stroke-width="2"/>
+<path id="Vector_15" d="M664 25C665.657 25 667 23.6569 667 22C667 20.3431 665.657 19 664 19C662.343 19 661 20.3431 661 22C661 23.6569 662.343 25 664 25Z" fill="white" stroke="#467AA2" stroke-width="2"/>
+</g>
+</g>
+</svg>
