@@ -108,6 +108,23 @@ class PolicyControllerTest {
                 .andExpect(jsonPath("$.data").isEmpty());
     }
 
+    /**
+     * FGC-FUN-012·013: 상세 조회(IF-API-10)도 "전체 조회" — 인증된 4개 역할 전부 200.
+     * 목록(IF-API-09)과 별개 메서드에 각각 @PreAuthorize 가 붙으므로 라우트별로 회귀 가드를 분리한다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE"})
+    void allowsEveryAuthenticatedRoleOnPolicyDetail(String role) throws Exception {
+        given(policyQueryService.findPolicyDetail(1L)).willReturn(new PolicyDetailResponse(
+                samplePolicyVersion(), List.of(), List.of(), List.of(), List.of()));
+
+        mockMvc.perform(get("/api/v1/policies/1")
+                        .with(user("fgc-user").roles(role)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.header.policyVersionId").value(1))
+                .andExpect(jsonPath("$.error").isEmpty());
+    }
+
     @Test
     void returnsPolicyDetailWithNestedTabs() throws Exception {
         PolicyDetailResponse detail = new PolicyDetailResponse(
