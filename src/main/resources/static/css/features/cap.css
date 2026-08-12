@@ -1,0 +1,446 @@
+.cap-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.cap-section-header {
+  align-items: flex-start;
+}
+
+.cap-section-description,
+.cap-modal-subtitle {
+  margin-top: var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.cap-filter-panel,
+.cap-stage-panel {
+  border-radius: var(--radius-12);
+}
+
+.cap-filter-form {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+.cap-filter-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cap-filter-form .select-control:disabled {
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-subtle);
+}
+
+.cap-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.cap-kpi-card {
+  min-width: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cap-kpi-card[aria-pressed="true"] {
+  border-color: var(--color-action-primary);
+  box-shadow: var(--shadow-focus);
+}
+
+.cap-kpi-card:focus-visible {
+  outline: 0;
+  box-shadow: var(--shadow-focus);
+}
+
+.cap-kpi-normal {
+  border-color: var(--color-status-success-border);
+}
+
+.cap-kpi-warning {
+  border-color: var(--color-status-warning-border);
+}
+
+.cap-kpi-violation {
+  border-color: var(--color-status-error-border);
+}
+
+.cap-kpi-review {
+  border-color: var(--color-status-review-border);
+}
+
+.cap-kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.cap-kpi-value strong {
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cap-kpi-value small {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.cap-stage-panel > .cap-section-header {
+  padding-bottom: 0;
+}
+
+.cap-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+.cap-stage-card {
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-12);
+  background: var(--color-bg-surface);
+}
+
+.cap-stage-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cap-stage-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.375rem;
+}
+
+.cap-stage-code {
+  margin-top: var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+}
+
+.cap-usage-track {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+}
+
+.cap-usage-bar {
+  display: block;
+  width: var(--cap-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-status-success-solid);
+}
+
+.cap-usage-bar.is-warning {
+  background: var(--color-status-warning-solid);
+}
+
+.cap-usage-bar.is-violation {
+  background: var(--color-status-error-solid);
+}
+
+.cap-usage-bar.is-review {
+  background: var(--color-status-review-solid);
+}
+
+.cap-stage-pending-copy {
+  display: flex;
+  min-height: 7.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-5) 0;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.cap-stage-note {
+  min-height: 2.75rem;
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-8);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+}
+
+.cap-guidance {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid var(--color-status-info-border);
+  border-radius: var(--radius-12);
+  color: var(--color-status-info-text);
+  background: var(--color-status-info-bg);
+}
+
+.cap-guidance h2 {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.cap-guidance p {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.cap-guidance code {
+  font-size: 0.6875rem;
+}
+
+.cap-table-panel {
+  min-width: 0;
+}
+
+.cap-list-count {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.cap-list-count strong {
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cap-inline-message,
+.cap-detail-state {
+  display: flex;
+  min-height: 7rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  color: var(--color-text-secondary);
+  text-align: center;
+  font-size: 0.8125rem;
+}
+
+.cap-inline-message.is-error,
+.cap-detail-state.is-error {
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
+.cap-contract-table,
+.cap-agent-table {
+  table-layout: fixed;
+}
+
+.cap-contract-table {
+  min-width: 86rem;
+}
+
+.cap-agent-table {
+  min-width: 64rem;
+}
+
+.cap-col-contract { width: 8.5rem; }
+.cap-col-stage { width: 8.75rem; }
+.cap-col-date { width: 6.75rem; }
+.cap-col-money { width: 7.5rem; }
+.cap-col-deduction { width: 8.5rem; }
+.cap-col-usage { width: 11rem; }
+.cap-col-status { width: 6.5rem; }
+.cap-col-rule { width: 7rem; }
+
+.cap-contract-table th,
+.cap-contract-table td,
+.cap-agent-table th,
+.cap-agent-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cap-contract-link,
+.cap-basis-button {
+  color: var(--color-text-link);
+  font-weight: 500;
+}
+
+.cap-basis-button {
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.cap-usage-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cap-usage-track {
+  height: 0.375rem;
+}
+
+.cap-usage-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cap-stage-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.cap-stage-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-steel-500);
+}
+
+.cap-stage-dot.is-agent {
+  background: var(--color-blue-500);
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.cap-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.cap-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.cap-page-size .select-control {
+  width: 4.5rem;
+  min-width: 0;
+}
+
+.pagination {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.cap-agent-header .status-badge {
+  height: auto;
+  min-height: 1.5rem;
+  text-align: center;
+  white-space: normal;
+}
+
+.cap-detail-modal {
+  width: min(76rem, 100%);
+}
+
+.cap-detail-modal .modal-body + .modal-body {
+  padding-top: 0;
+}
+
+.cap-detail-state {
+  min-height: 15rem;
+}
+
+@media (max-width: 79.9375rem) {
+  .cap-filter-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cap-filter-contract {
+    grid-column: span 2;
+  }
+
+  .cap-filter-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 61.25rem) {
+  .cap-stage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cap-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .cap-filter-form,
+  .cap-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cap-filter-contract {
+    grid-column: auto;
+  }
+
+  .cap-filter-actions,
+  .cap-filter-actions .button {
+    width: 100%;
+  }
+
+  .cap-filter-actions .button {
+    min-width: 0;
+  }
+
+  .cap-stage-header,
+  .cap-agent-header,
+  .cap-table-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cap-stage-grid,
+  .cap-filter-form {
+    padding-right: var(--space-4);
+    padding-left: var(--space-4);
+  }
+
+  .cap-stage-card {
+    padding: var(--space-4);
+  }
+
+  .cap-guidance {
+    padding: var(--space-4);
+  }
+
+  .pagination {
+    justify-content: center;
+  }
+}
