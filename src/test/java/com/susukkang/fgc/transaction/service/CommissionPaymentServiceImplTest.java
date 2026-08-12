@@ -586,6 +586,34 @@ class CommissionPaymentServiceImplTest {
         verify(mapper, never()).confirm(any(), any(), any());
     }
 
+    // 2026-08-12 hjKang - FGC-FUN-031 합산액과 FGC-FUN-033 한도 판정의 1원 미만 경계 검증
+    // 기존 코드: 한도와 정확히 같은 금액 및 1원 초과 금액만 검증하여 한도 직전 정상 확정을 증명하지 못함
+    // 문제: 경계 비교식이 잘못 변경되면 1,199,999원도 CAP_001로 차단될 수 있음
+    // 개선: 1,200,000원 한도보다 1원 적은 산입액은 지급 확정되는지 검증
+    @Test
+    void confirmsOneWonBelowTwelveHundredPercentBoundary() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "1199999", "1199999", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(60L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+        given(mapper.confirm(101L, "boundary-below", "60")).willReturn(1);
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1199999")));
+
+        CommissionPaymentResponse response = service.confirm(101L, "boundary-below");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(response.capCheckIds()).containsExactly(60L);
+        verify(mapper).confirm(101L, "boundary-below", "60");
+    }
+
     @Test
     void confirmsAtExactTwelveHundredPercentBoundary() {
         ConfirmationData data = confirmation(

@@ -111,6 +111,50 @@ class CapIncludedAmountMapperIntegrationTest {
                 .isEqualByComparingTo(amountBeforeTest.add(new BigDecimal("101")));
     }
 
+    /**
+     * 설명 : 동일 계약과 설계사의 산입액을 지급단계별로 분리하여 합산하는지 검증한다
+     *
+     * @author hjKang
+     * @since 2026-08-12
+     */
+    @Test
+    void separatesIncludedAmountsByPaymentStage() {
+        TestReference reference = testReference();
+        BigDecimal gaToFcAmountBeforeTest = includedAmountForAgent(
+                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(
+                        reference.contractId(), PaymentStage.GA_TO_FC),
+                reference.agentId());
+        BigDecimal insurerToGaAmountBeforeTest = includedAmountForAgent(
+                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(
+                        reference.contractId(), PaymentStage.INSURER_TO_GA),
+                reference.agentId());
+
+        Long gaToFcTransactionId = insertTransaction(
+                reference, PaymentStage.GA_TO_FC, new BigDecimal("100.00"));
+        insertAttribution(gaToFcTransactionId, reference,
+                reference.contractDate(), new BigDecimal("100.00"));
+        confirmTransaction(gaToFcTransactionId);
+
+        Long insurerToGaTransactionId = insertTransaction(
+                reference, PaymentStage.INSURER_TO_GA, new BigDecimal("500000.00"));
+        insertAttribution(insurerToGaTransactionId, reference,
+                reference.contractDate(), new BigDecimal("500000.00"));
+        confirmTransaction(insurerToGaTransactionId);
+
+        sqlSession.clearCache();
+        List<CapIncludedAmountSummary> gaToFcSummaries =
+                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(
+                        reference.contractId(), PaymentStage.GA_TO_FC);
+        List<CapIncludedAmountSummary> insurerToGaSummaries =
+                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(
+                        reference.contractId(), PaymentStage.INSURER_TO_GA);
+
+        assertThat(includedAmountForAgent(gaToFcSummaries, reference.agentId()))
+                .isEqualByComparingTo(gaToFcAmountBeforeTest.add(new BigDecimal("100")));
+        assertThat(includedAmountForAgent(insurerToGaSummaries, reference.agentId()))
+                .isEqualByComparingTo(insurerToGaAmountBeforeTest.add(new BigDecimal("500000")));
+    }
+
     private BigDecimal includedAmountForAgent(List<CapIncludedAmountSummary> summaries, Long agentId) {
         return summaries.stream()
                 .filter(summary -> agentId.equals(summary.getAgentId()))
@@ -135,16 +179,20 @@ class CapIncludedAmountMapperIntegrationTest {
     }
 
     private Long insertTransaction(TestReference reference, BigDecimal amount) {
+        return insertTransaction(reference, PaymentStage.GA_TO_FC, amount);
+    }
+
+    private Long insertTransaction(TestReference reference, PaymentStage paymentStage, BigDecimal amount) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
                     payment_stage, source_type, source_business_key, recipient_agent_id,
                     commission_item_id, settlement_month, amount, cashflow_type, status
                 ) VALUES (
-                    'GA_TO_FC', 'GA_MANUAL_PAYMENT', ?, ?, ?,
+                    ?, 'GA_MANUAL_PAYMENT', ?, ?, ?,
                     date_trunc('month', ?::date)::date, ?, 'PAYMENT', 'DRAFT'
                 )
                 RETURNING commission_transaction_id
-                """, Long.class, "IT-FUN031-" + UUID.randomUUID(), reference.agentId(),
+                """, Long.class, paymentStage.name(), "IT-FUN031-" + UUID.randomUUID(), reference.agentId(),
                 reference.commissionItemId(), reference.contractDate(), amount);
     }
 
