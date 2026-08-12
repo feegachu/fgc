@@ -16,5 +16,21 @@ public enum PolicyType {
     ALLOCATION,  //안분
     REFUND_RATE, //환수율 표
     CLAWBACK, //환수
-    RECONCILIATION_TOLERANCE //조정
+    RECONCILIATION_TOLERANCE, //조정
+    SCHEDULE_ELIGIBILITY; //월중 실효·부활 시 그 달 회차 지급 여부 (V2, v2.1.3 신규)
+
+    /** SIR-008: 코드값은 항상 한글 라벨과 함께 응답한다 — 화면이 아니라 서버가 라벨을 만든다. */
+    public String label() {
+        return switch (this) {
+            case CURRENT_COMMISSION -> "현행 수수료";
+            case FOUR_YEAR_COMMISSION -> "4년 분급";
+            case SEVEN_YEAR_COMMISSION -> "7년 분급";
+            case CAP_1200 -> "1,200% 한도";
+            case ALLOCATION -> "안분";
+            case REFUND_RATE -> "예상 해약환급률표";
+            case CLAWBACK -> "환수";
+            case RECONCILIATION_TOLERANCE -> "대사 허용오차";
+            case SCHEDULE_ELIGIBILITY -> "월중 상태 처리 기준";
+        };
+    }
 }
