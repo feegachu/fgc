@@ -49,7 +49,6 @@ class ScreenViewControllerTest {
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
             "/policies,            FGC-UI-POL-W01",
-            "/contracts,           FGC-UI-CONT-W01",
             "/contracts/1,         FGC-UI-CONT-W02",
             "/contracts/new,       FGC-UI-CONT-W03",
             "/contracts/1/edit,    FGC-UI-CONT-W03",
@@ -109,11 +108,121 @@ class ScreenViewControllerTest {
                         org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
     }
 
-    /** 교육용 면책문구(COR-009)는 어느 화면에서도 빠지면 안 된다 — 대표로 한 화면만 확인. */
     @Test
-    void footer_disclaimer_present() throws Exception {
-        mvc.perform(get("/cap-checks").with(user(settleUser())))
+    void contract_detail_uses_status_event_contract_without_consumer_name() throws Exception {
+        mvc.perform(get("/contracts/1").with(user(settleUser())))
+                .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "교육용 프로토타입입니다. 실제 지급 결정에 사용할 수 없습니다.")));
+                        "/status-events")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event.newStatus")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event.sourceSystem")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-fgc-action=\"regenerate\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-label=\"스케줄 재생성, 연동 대기\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-fgc-action=\"recheck\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-label=\"한도 재검증, 연동 대기\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "timeZone: \"Asia/Seoul\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("consumerName"))));
+    }
+
+    /** 운영 프론트엔드에서는 목업의 교육용 프로토타입 문구를 노출하지 않는다. */
+    @Test
+    void prototype_disclaimer_is_not_exposed() throws Exception {
+        mvc.perform(get("/cap-checks").with(user(settleUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("교육용 프로토타입입니다"))));
+    }
+
+    private static com.susukkang.fgc.auth.dto.FgcUserDetails gaAdminUser() {
+        var view = new com.susukkang.fgc.auth.dto.AppUserView();
+        view.setUserId(3L);
+        view.setLoginId("gaadmin");
+        view.setPasswordHash("x");
+        view.setUserName("GA관리");
+        view.setRoleCode("GA_ADMIN");
+        return new com.susukkang.fgc.auth.dto.FgcUserDetails(view, true, true);
+    }
+
+    private static com.susukkang.fgc.auth.dto.FgcUserDetails adminUser() {
+        var view = new com.susukkang.fgc.auth.dto.AppUserView();
+        view.setUserId(4L);
+        view.setLoginId("admin");
+        view.setPasswordHash("x");
+        view.setUserName("시스템관리");
+        view.setRoleCode("SYSTEM_ADMIN");
+        return new com.susukkang.fgc.auth.dto.FgcUserDetails(view, true, true);
+    }
+
+    private static com.susukkang.fgc.auth.dto.FgcUserDetails userFor(String role) {
+        return switch (role) {
+            case "SETTLEMENT" -> settleUser();
+            case "GA_ADMIN" -> gaAdminUser();
+            case "SYSTEM_ADMIN" -> adminUser();
+            case "COMPLIANCE" -> complianceUser();
+            default -> throw new IllegalArgumentException(role);
+        };
+    }
+
+    /**
+     * FGC-FUN-002 인수조건: 권한 없는 역할의 직접 URL 호출은 403 으로 차단된다.
+     * 폼 라우트는 SETTLEMENT·SYSTEM_ADMIN 전용 — 인터페이스정의서 IF-API-18/19/22,
+     * 화면정의서 :590·:686 (GA_ADMIN 은 2026-08-12 교차 판정으로 제외, 근거대장 참조).
+     */
+    @ParameterizedTest(name = "{0} {1} → {2}")
+    @CsvSource({
+            "SETTLEMENT,   /contracts/new,    200",
+            "SYSTEM_ADMIN, /contracts/new,    200",
+            "GA_ADMIN,     /contracts/new,    403",
+            "COMPLIANCE,   /contracts/new,    403",
+            "SETTLEMENT,   /contracts/1/edit, 200",
+            "SYSTEM_ADMIN, /contracts/1/edit, 200",
+            "GA_ADMIN,     /contracts/1/edit, 403",
+            "COMPLIANCE,   /contracts/1/edit, 403",
+            "SETTLEMENT,   /transactions/new, 200",
+            "SYSTEM_ADMIN, /transactions/new, 200",
+            "GA_ADMIN,     /transactions/new, 403",
+            "COMPLIANCE,   /transactions/new, 403",
+    })
+    void form_route_access_by_role(String role, String route, int expected) throws Exception {
+        mvc.perform(get(route).with(user(userFor(role))))
+                .andExpect(status().is(expected));
+    }
+
+    /**
+     * FGC-FUN-002 인수조건: 권한 없는 메뉴(등록 버튼)가 숨겨진다.
+     * 등록 버튼(a 태그)은 disabled 가 안 먹혀 숨긴다 — canProcess(th:if).
+     * CONT-W01 :531 / TRAN-W01 :673. 앵커에만 있는 data-fgc-action="create" 로 판별한다.
+     */
+    @ParameterizedTest(name = "{0} {1} 등록버튼 노출={2}")
+    @CsvSource({
+            "SETTLEMENT,   /transactions, true",
+            "GA_ADMIN,     /transactions, false",
+    })
+    void register_anchor_shown_only_for_processing_roles(String role, String route, boolean visible) throws Exception {
+        var marker = org.hamcrest.Matchers.containsString("data-fgc-action=\"create\"");
+        mvc.perform(get(route).with(user(userFor(role))))
+                .andExpect(content().string(visible ? marker : org.hamcrest.Matchers.not(marker)));
+    }
+
+    /**
+     * FGC-FUN-002 — GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다(§4-1 "정책·조직 조회, 검증 실행 확정").
+     * readOnly 만 보던 시절 GA_ADMIN 에게 처리 버튼이 활성이던 회귀를 막는다 — 대표로
+     * SCHE-W02(재생성·확정, :873)와 CONT-W02(처리 버튼, IF-API-19/29/33).
+     */
+    @ParameterizedTest(name = "{0} 처리버튼 비활성")
+    @CsvSource({"/schedules/1", "/contracts/1"})
+    void process_buttons_disabled_for_ga_admin(String route) throws Exception {
+        mvc.perform(get(route).with(user(gaAdminUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("disabled=\"disabled\"")));
+        mvc.perform(get(route).with(user(adminUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
     }
 }

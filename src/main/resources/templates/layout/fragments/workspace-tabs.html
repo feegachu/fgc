@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"><body>
+<nav class="workspace-tab-bar" th:fragment="workspaceTabs(activeTabId, activeTabTitle)" aria-label="열린 업무 화면">
+  <div class="workspace-tabs" data-workspace-tabs>
+    <div class="workspace-tab is-active" th:attr="data-tab-id=${activeTabId}">
+      <a class="workspace-tab-link" href="" aria-current="page">
+        <span class="material-symbols-rounded" aria-hidden="true">description</span>
+        <span class="workspace-tab-label" th:text="${activeTabTitle}">업무 대시보드</span>
+      </a>
+      <button class="workspace-tab-close" type="button" data-action="close-workspace-tab" aria-label="현재 탭 닫기"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
+    </div>
+  </div>
+  <button class="workspace-tab-overflow" type="button" data-action="open-workspace-overflow" aria-label="열린 화면 더 보기" hidden><span class="material-symbols-rounded" aria-hidden="true">more_horiz</span></button>
+</nav>
+</body></html>

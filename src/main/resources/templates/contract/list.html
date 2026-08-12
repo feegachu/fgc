@@ -1,116 +1,64 @@
-<!DOCTYPE html>
-<!--
-  FGC-UI-CONT-W01 보험계약 목록
-  요구사항 FUN-018 (2차 확장: FUN-058 통합 검색)
-  데이터  읽기 insurance_contract, insurer, product, product_offering, agent, cap_check
-  API     GET /api/v1/contracts?page=1&size=20&insurerId=&status=&contractNo=&contractDateFrom=
-  라우트  GET /contracts → contract/list.html
-
-  [막을 것] 계약자 개인정보는 아예 저장하지 않습니다 — 계약 식별은 계약번호로 합니다 (SRC-027 D-05)
-  [주의] 목록에 보여줄 금액은 주기 보험료(premium_per_cycle_amount)가 아니라
-         월납환산 초회보험료(monthly_equivalent_first_premium)입니다. 한도 기준이 이 값입니다.
-
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-CONT-W01)의 정적 골격만 옮겼다.
-  데이터 영역(검색 선택지·목록)은 IF-API-11 연동 시 서버 렌더링으로 채운다.
--->
-<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W01', '보험계약 목록', null, null)}"
-      xmlns:th="http://www.thymeleaf.org">
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W01', '보험계약 목록', null, null)}">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="page-content contract-list-page">
+  <header class="page-header contract-page-header">
+    <div class="page-header-copy"><h1 class="page-title">보험계약 목록</h1><p class="page-description">검증의 기본 단위인 계약을 조회하고 상세 화면으로 이동합니다.</p></div>
+    <div class="page-header-actions">
+      <button class="button button-secondary" type="button" disabled title="내보내기 API 연동 대기"><span class="material-symbols-rounded" aria-hidden="true">download</span>CSV 내보내기</button>
+      <a class="button button-primary" th:href="@{/contracts/new}" th:if="${canProcess}" data-fgc-action="create"><span class="material-symbols-rounded" aria-hidden="true">add</span>신규 등록</a>
+    </div>
+  </header>
 
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div>
-      <h1 class="fgc-page-title">보험계약 목록</h1>
-      <p class="fgc-page-desc">
-        검증의 기본 단위인 <strong>계약</strong>을 찾습니다. 계약번호를 누르면 상세로 들어갑니다.
-      </p>
+  <form class="surface contract-filter-card" method="get" th:action="@{/contracts}" th:object="${condition}">
+    <div class="contract-section-header"><h2 class="surface-title">검색 조건</h2><a class="button button-ghost contract-reset-button" th:href="@{/contracts}">초기화</a></div>
+    <div class="contract-filter-grid">
+      <label class="field"><span class="field-label">계약번호</span><input class="field-control" type="text" th:field="*{contractNo}" placeholder="계약번호 입력"></label>
+      <label class="field"><span class="field-label">보험회사</span><select class="select-control" disabled title="보험회사 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
+      <label class="field"><span class="field-label">상품</span><select class="select-control" disabled title="상품 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
+      <label class="field"><span class="field-label">모집 설계사</span><select class="select-control" disabled title="설계사 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
+      <label class="field"><span class="field-label">계약일 시작</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateFrom}"></label>
+      <label class="field"><span class="field-label">계약일 끝</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateTo}"></label>
+      <label class="field"><span class="field-label">계약상태</span><select class="select-control" th:field="*{currentStatus}"><option value="">전체</option><option th:each="status : ${contractStatuses}" th:value="${status}" th:text="${contractStatusLabels[status]}">유지</option></select></label>
+      <label class="field"><span class="field-label">1,200% 판정</span><select class="select-control" th:field="*{capResultStatus}"><option value="">전체</option><option th:each="status : ${capResultStatuses}" th:value="${status}" th:text="${status.label()}">정상</option></select></label>
     </div>
-    <div style="display:flex;gap:8px">
-      <button class="fgc-btn fgc-btn--ghost" data-fgc-na="목업에서는 파일을 내려받지 않습니다. 실제 개발에서는 GET /api/v1/contracts/export 로 만듭니다.">
-        <span class="material-symbols-outlined" style="font-size:18px">download</span> CSV 내보내기
-      </button>
-      <a class="fgc-btn fgc-btn--primary" th:href="@{/contracts/new}" style="text-decoration:none" data-fgc-action="create">
-        <span class="material-symbols-outlined" style="font-size:18px">add</span> 신규 등록
-      </a>
-    </div>
-  </div>
+    <div class="contract-filter-actions"><button class="button button-primary" type="submit"><span class="material-symbols-rounded" aria-hidden="true">search</span>조회</button></div>
+  </form>
 
-  <!-- ① 검색 — 선택지(보험회사·상품·설계사·계약상태·1,200% 판정)는 IF-API-11 연동 시 서버 렌더링으로 채운다 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__body fgc-toolbar">
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-no">계약번호</label>
-        <input class="fgc-input" id="f-no" type="text" placeholder="C001">
-      </div>
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-insurer">보험회사</label>
-        <select class="fgc-select" id="f-insurer"><option value="">전체</option></select>
-      </div>
-      <div class="fgc-field" style="min-width:170px">
-        <label class="fgc-label" for="f-product">상품</label>
-        <select class="fgc-select" id="f-product"><option value="">전체</option></select>
-      </div>
-      <div class="fgc-field" style="min-width:160px">
-        <label class="fgc-label" for="f-agent">모집 설계사</label>
-        <select class="fgc-select" id="f-agent"><option value="">전체</option></select>
-      </div>
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-from">계약일 (시작)</label>
-        <input class="fgc-input" id="f-from" type="date">
-      </div>
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-to">계약일 (끝)</label>
-        <input class="fgc-input" id="f-to" type="date">
-      </div>
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-status">계약상태</label>
-        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
-      </div>
-      <div class="fgc-field" style="min-width:150px">
-        <label class="fgc-label" for="f-cap">1,200% 판정</label>
-        <select class="fgc-select" id="f-cap"><option value="">전체</option></select>
-      </div>
-      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
-        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
-      </button>
-    </div>
-  </section>
-
-  <!-- ② 결과 목록 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__head">
-      <span class="fgc-card__title">검색 결과</span>
-      <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
-    </div>
-    <div style="overflow-x:auto">
-      <table class="fgc-table" style="min-width:1080px">
-        <thead>
-          <tr>
-            <th style="width:70px">계약번호</th>
-            <th style="width:80px">보험회사</th>
-            <th>상품명</th>
-            <th style="width:92px">계약일</th>
-            <th class="fgc-th-num" style="width:150px">월납환산 초회보험료</th>
-            <th style="width:150px">모집 설계사</th>
-            <th style="width:96px">계약상태</th>
-            <th style="width:120px">1,200% 판정</th>
-            <th style="width:96px">데이터 출처</th>
+  <section class="surface contract-results-card" aria-labelledby="contract-results-title">
+    <header class="surface-header contract-results-header"><h2 id="contract-results-title" class="surface-title">검색 결과</h2><p class="contract-result-summary"><strong th:text="${contracts.totalElements()}">0</strong>건 · 한 화면 <span th:text="${contracts.size()}">20</span>행</p></header>
+    <div class="contract-table-viewport">
+      <table class="data-table contract-table">
+        <caption class="visually-hidden">보험계약 검색 결과</caption>
+        <colgroup><col class="contract-col-number"><col class="contract-col-insurer"><col class="contract-col-product"><col class="contract-col-date"><col class="contract-col-premium"><col class="contract-col-agent"><col class="contract-col-status"><col class="contract-col-cap"><col class="contract-col-origin"></colgroup>
+        <thead><tr><th scope="col">계약번호</th><th scope="col">보험회사</th><th scope="col">상품명</th><th scope="col">계약일</th><th scope="col" class="is-number">월납환산 초회보험료</th><th scope="col">모집 설계사</th><th scope="col" class="is-center">계약상태</th><th scope="col" class="is-center">1,200% 판정</th><th scope="col" class="is-center">데이터 출처</th></tr></thead>
+        <tbody>
+          <tr th:each="contract : ${contracts.content()}">
+            <td><a th:href="@{/contracts/{id}(id=${contract.contractId})}" th:text="${contract.contractNo}">-</a></td>
+            <td th:text="${contract.insurerName}">-</td><td th:text="${contract.productName}">-</td><td class="tabular-nums" th:text="${contract.contractDate}">-</td>
+            <td class="is-number tabular-nums" th:text="${#numbers.formatInteger(contract.monthlyEquivalentFirstPremium, 1, 'COMMA')} + '원'">0원</td>
+            <td th:text="${contract.agentIdName}">-</td>
+            <td class="is-center"><span class="status-badge status-badge-neutral" th:text="${contractStatusLabels[contract.contractStatus]}">-</span></td>
+            <td class="is-center"><span class="status-badge" th:if="${contract.capResultStatus != null}" th:classappend="${contract.capResultStatus.name() == 'NORMAL'} ? ' status-badge-success' : (${contract.capResultStatus.name() == 'WARNING'} ? ' status-badge-warning' : (${contract.capResultStatus.name() == 'VIOLATION'} ? ' status-badge-error' : ' status-badge-review'))" th:text="${contract.capResultStatus.label()}">-</span><span th:if="${contract.capResultStatus == null}">-</span></td>
+            <td class="is-center" th:text="${dataOriginLabels[contract.dataOrigin]}">-</td>
           </tr>
-        </thead>
-        <!-- 계약자 열은 없습니다 — 개인정보를 저장하지 않습니다 (SRC-027 D-05) -->
-        <tbody id="list-body">
-          <tr><td colspan="9"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+          <tr class="contract-empty-row" th:if="${contracts.content().isEmpty()}"><td colspan="9"><div class="empty-state" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
         </tbody>
       </table>
+      <aside class="contract-premium-help"><span class="material-symbols-rounded" aria-hidden="true">info</span><div><h3>월납환산 초회보험료</h3><p>주기 보험료를 월 기준으로 환산한 값이며 1,200% 한도 계산 기준으로 사용합니다.</p></div></aside>
     </div>
-    <div class="fgc-card__body">
-      <p class="fgc-help">
-        <strong>월납환산 초회보험료</strong>는 주기 보험료를 월 기준으로 바꾼 값입니다.
-        3개월납 30만 원이면 월납환산은 10만 원입니다. 1,200% 한도는 이 값 × 12로 계산합니다.
-      </p>
-    </div>
+    <nav class="contract-pagination" aria-label="계약 목록 페이지">
+      <span><span th:text="${contracts.page()}">1</span> / <span th:text="${contracts.totalPages() == 0 ? 1 : contracts.totalPages()}">1</span> 페이지</span>
+      <div class="pagination-controls">
+        <a class="pagination-button" th:if="${contracts.page() > 1}" th:href="@{/contracts(page=${contracts.page() - 1},size=${contracts.size()},contractNo=${condition.contractNo},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="이전 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></a>
+        <span class="pagination-button is-disabled" th:unless="${contracts.page() > 1}" aria-label="이전 페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></span>
+        <span class="pagination-button is-active" aria-current="page" th:text="${contracts.page()}">1</span>
+        <a class="pagination-button" th:if="${contracts.page() < contracts.totalPages()}" th:href="@{/contracts(page=${contracts.page() + 1},size=${contracts.size()},contractNo=${condition.contractNo},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="다음 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></a>
+        <span class="pagination-button is-disabled" th:unless="${contracts.page() < contracts.totalPages()}" aria-label="다음 페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></span>
+      </div>
+    </nav>
   </section>
-
 </main>
 </body>
 </html>

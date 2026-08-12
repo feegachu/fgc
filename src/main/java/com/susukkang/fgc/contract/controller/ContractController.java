@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 설명 : ContractController
  *
@@ -50,7 +52,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PostMapping
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
@@ -63,13 +65,12 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
     /**
-     * 설명 : 계약 상세보기 - 현재는 기본 계약정보를 반환한다.
-     *       계약상태 사건 이력은 FUN-026 2차에서 포함한다.
+     * 설명 : 계약 상세보기 - 기본 계약정보를 반환한다.
      *
      * @param id 계약Id
      * @return 계약 상세보기 응답 정보
@@ -79,6 +80,12 @@ public class ContractController {
     @GetMapping("/{id}")
     public ApiResponse<ContractDetailResponse> getContractById(@PathVariable Long id) {
         return ApiResponse.success(contractService.selectContractDetailById(id));
+    }
+
+    /** IF-API-16 계약 상태 사건과 Job별 처리 이력을 조회한다. */
+    @GetMapping("/{id}/status-events")
+    public ApiResponse<List<ContractStatusEventResponse>> getContractStatusEvents(@PathVariable Long id) {
+        return ApiResponse.success(contractService.selectStatusEventsByContractId(id));
     }
     /**
      * 계약 ID에 해당하는 운영용 예상 스케줄 헤더 목록을 조회한다.
