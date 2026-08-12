@@ -23,11 +23,6 @@ public class ScreenViewController {
         return "policy/list";
     }
 
-    @GetMapping("/contracts")
-    public String contractList() {
-        return "contract/list";
-    }
-
     @GetMapping("/contracts/new")
     public String contractNew() {
         return "contract/form";
