@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
@@ -18,6 +19,7 @@ import static org.springframework.security.test.web.servlet.response.SecurityMoc
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -170,7 +172,11 @@ class AuthLoginFlowTest {
     // 로그인 화면 자체는 익명 접근을 허용한다
     @Test
     void loginPageIsPubliclyAccessible() throws Exception {
-        mockMvc.perform(get("/login")).andExpect(status().isOk());
+        mockMvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("FGC WORKSPACE")))
+                .andExpect(content().string(containsString("/css/features/auth.css")));
+        mockMvc.perform(get("/css/features/auth.css")).andExpect(status().isOk());
     }
 
     // ★ 인수조건: 로그아웃하면 세션을 즉시 지우고, 이후 보호 URL 접근이 차단된다

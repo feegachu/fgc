@@ -61,31 +61,50 @@
 
   <div style="margin-top:16px">
     <div class="fgc-tabs" role="tablist">
-      <button class="fgc-tab" role="tab" aria-selected="true"  aria-controls="tab-version" id="p1">정책 버전</button>
-      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-rule"    id="p2">수수료 규칙</button>
-      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-cap"     id="p3">1,200% 룰셋</button>
-      <button class="fgc-tab" role="tab" aria-selected="false" aria-controls="tab-refund"  id="p4">예상 해약환급률표</button>
+      <button class="fgc-tab" type="button" role="tab" aria-selected="true"  aria-controls="tab-version" id="p1">정책 버전</button>
+      <button class="fgc-tab" type="button" role="tab" aria-selected="false" aria-controls="tab-rule"    id="p2" tabindex="-1">수수료 규칙</button>
+      <button class="fgc-tab" type="button" role="tab" aria-selected="false" aria-controls="tab-cap"     id="p3" tabindex="-1">1,200% 룰셋</button>
+      <button class="fgc-tab" type="button" role="tab" aria-selected="false" aria-controls="tab-refund"  id="p4" tabindex="-1">예상 해약환급률표</button>
     </div>
 
     <!-- 탭별 표는 정책 조회 API(GET /api/v1/policies) 연동 시 서버 렌더링으로 채운다 -->
-    <section class="fgc-tabpanel fgc-card" id="tab-version" role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem"></section>
-    <section class="fgc-tabpanel fgc-card" id="tab-rule"    role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
-    <section class="fgc-tabpanel fgc-card" id="tab-cap"     role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
-    <section class="fgc-tabpanel fgc-card" id="tab-refund"  role="tabpanel" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-version" role="tabpanel" aria-labelledby="p1" style="border-top:0;border-radius:0 0 .5rem .5rem"></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-rule"    role="tabpanel" aria-labelledby="p2" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-cap"     role="tabpanel" aria-labelledby="p3" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
+    <section class="fgc-tabpanel fgc-card" id="tab-refund"  role="tabpanel" aria-labelledby="p4" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden></section>
   </div>
 
 <!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
 <script>
-/* 탭 전환 — aria-selected 와 hidden 만 바꾼다. 표 데이터는 API 연동 시 서버 렌더링으로 채운다 */
+/* 탭 전환. 표 데이터는 API 연동 시 서버 렌더링으로 채운다. */
 (function () {
   "use strict";
-  var tabs = document.querySelectorAll(".fgc-tab");
+  var tabs = Array.from(document.querySelectorAll(".fgc-tab"));
+
+  function activateTab(tab) {
+    tabs.forEach(function (candidate) {
+      var active = candidate === tab;
+      candidate.setAttribute("aria-selected", active ? "true" : "false");
+      candidate.tabIndex = active ? 0 : -1;
+    });
+    document.querySelectorAll(".fgc-tabpanel").forEach(function (panel) {
+      panel.hidden = panel.id !== tab.getAttribute("aria-controls");
+    });
+  }
+
   tabs.forEach(function (tab) {
-    tab.addEventListener("click", function () {
-      tabs.forEach(function (t) { t.setAttribute("aria-selected", t === tab ? "true" : "false"); });
-      document.querySelectorAll(".fgc-tabpanel").forEach(function (p) {
-        p.hidden = p.id !== tab.getAttribute("aria-controls");
-      });
+    tab.addEventListener("click", function () { activateTab(tab); });
+    tab.addEventListener("keydown", function (event) {
+      var nextIndex;
+      if (event.key === "ArrowRight") nextIndex = (tabs.indexOf(tab) + 1) % tabs.length;
+      else if (event.key === "ArrowLeft") nextIndex = (tabs.indexOf(tab) - 1 + tabs.length) % tabs.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = tabs.length - 1;
+      else return;
+
+      event.preventDefault();
+      activateTab(tabs[nextIndex]);
+      tabs[nextIndex].focus();
     });
   });
 })();

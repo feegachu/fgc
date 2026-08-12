@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static com.susukkang.fgc.contract.domain.ContractStatus.ACTIVE;
@@ -182,6 +183,39 @@ class ContractControllerTest {
                         jsonPath("$.data.productName")
                                 .value("가상 건강보장보험 A")
                 );
+    }
+
+    @Test
+    @DisplayName("계약 상태 사건과 Job별 처리 이력을 조회한다")
+    void getContractStatusEventsReturnsSuccess() throws Exception {
+        OffsetDateTime effectiveAt = OffsetDateTime.parse("2026-07-15T00:00:00+09:00");
+        OffsetDateTime receivedAt = OffsetDateTime.parse("2026-07-16T06:00:00+09:00");
+        OffsetDateTime processedAt = OffsetDateTime.parse("2026-07-16T06:30:00+09:00");
+        when(contractService.selectStatusEventsByContractId(21L)).thenReturn(List.of(
+                new com.susukkang.fgc.contract.dto.ContractStatusEventResponse(
+                        2, ACTIVE, com.susukkang.fgc.contract.domain.ContractStatus.TERMINATED,
+                        effectiveAt, receivedAt,
+                        List.of(new com.susukkang.fgc.contract.dto.ContractStatusEventProcessingResponse(
+                                "DailyChangedContractJob", "SUCCEEDED", processedAt)),
+                        "INSURER_FEED", "EVENT-21-2"
+                )
+        ));
+
+        mockMvc.perform(get("/api/v1/contracts/{id}/status-events", 21L)
+                        .with(user("settlement").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].eventSeq").value(2))
+                .andExpect(jsonPath("$.data[0].previousStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[0].newStatus").value("TERMINATED"))
+                .andExpect(jsonPath("$.data[0].effectiveAt").value("2026-07-15T00:00:00+09:00"))
+                .andExpect(jsonPath("$.data[0].receivedAt").value("2026-07-16T06:00:00+09:00"))
+                .andExpect(jsonPath("$.data[0].processings[0].processingJob")
+                        .value("DailyChangedContractJob"))
+                .andExpect(jsonPath("$.data[0].processings[0].processingStatus").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data[0].processings[0].processedAt")
+                        .value("2026-07-16T06:30:00+09:00"))
+                .andExpect(jsonPath("$.data[0].sourceSystem").value("INSURER_FEED"))
+                .andExpect(jsonPath("$.data[0].sourceEventKey").value("EVENT-21-2"));
     }
 
     @Test
