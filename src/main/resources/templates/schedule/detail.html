@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-SCHE-W02 예상 스케줄 상세
+  요구사항 FUN-036(스케줄 생성) · FUN-039(상태·버전) · FUN-040(멱등성) / REG-01 · REG-19
+  데이터  읽기 schedule_header, schedule_line, commission_rule
+  API     GET  /api/v1/schedules/{id}
+          POST /api/v1/schedules/{id}/regenerate   (사유 필수 · 새 버전 생성)
+  라우트  GET /schedules/{id} → schedule/detail.html
+
+  [막을 것]
+   · 확정(CONFIRMED)된 스케줄의 금액 수정 — DB 트리거가 UPDATE 자체를 거부합니다
+   · 확정 → 예정 되돌리기 — v2.1.2 트리거가 거부합니다
+   · 기존 버전을 지우고 다시 만들기 — 감사 추적이 끊깁니다. 버전을 올리세요
+
+  [만들 때 주의]
+   ★ 줄마다 원 단위로 반올림한 다음 합계를 냅니다.
+     합계를 먼저 내고 반올림하면 대사에서 1원 차이로 전부 불일치가 납니다(허용오차 0원).
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-SCHE-W02)의 정적 골격만 옮겼다.
+  데이터 영역(헤더·회차 표·버전 비교)은 IF-API-28 연동 시 서버 렌더링으로,
+  새 버전 만들기·확정 동작은 IF-API-29 연동 시 붙인다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-SCHE-W02', '예상 스케줄 상세', '현행 예상 스케줄', '/schedules')}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <!-- 목업 head 의 화면 전용 스타일 — 셸 조각은 main 만 가져가므로 여기로 옮겼다 -->
+  <style>
+    .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 20px; }
+    .kv dt { font-size: 11px; color: #43474d; font-weight: 600; }
+    .kv dd { margin: 2px 0 0; font-size: 13px; }
+  </style>
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <h1 class="fgc-page-title">예상 스케줄 상세</h1>
+      <p class="fgc-page-desc">
+        이 계약에 대해 <strong>회차별로 언제 얼마를 줄 예정인지</strong>를 적어 둔 표입니다.
+        나중에 실제로 준 돈과 이 표를 맞춰 보는 것이 <strong>대사</strong>입니다.
+      </p>
+    </div>
+    <!-- 버튼 동작은 IF-API-28(엑셀)·IF-API-29(새 버전)·확정 API 연동 시 붙인다 -->
+    <div style="display:flex;gap:8px">
+      <button class="fgc-btn fgc-btn--ghost" data-fgc-na="목업에서는 파일을 내려받지 않습니다. 실제 개발에서는 GET /api/v1/schedules/{id}/export 로 만듭니다.">
+        <span class="material-symbols-outlined" style="font-size:18px">download</span> 엑셀 다운로드
+      </button>
+      <button class="fgc-btn fgc-btn--ghost" id="btn-regenerate" data-fgc-action="regenerate" th:disabled="${readOnly}">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 새 버전 만들기
+      </button>
+      <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${readOnly}">
+        <span class="material-symbols-outlined" style="font-size:18px">lock</span> 확정
+      </button>
+    </div>
+  </div>
+
+  <!-- ① 헤더 — 값은 IF-API-28 연동 시 서버 렌더링으로 채운다 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">스케줄 헤더 · <span class="fgc-mono" id="hdr-id">schedule_header #—</span></span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <label class="fgc-label" for="stage" style="margin:0">지급단계</label>
+        <select class="fgc-select" id="stage" style="padding:4px 8px">
+          <option value="GA_TO_FC">GA→설계사</option>
+          <option value="INSURER_TO_GA">원수사→GA</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgc-card__body">
+      <dl class="kv">
+        <div><dt>계약번호</dt><dd class="fgc-mono" id="hdr-contract">—</dd></div>
+        <div><dt>보험회사 · 상품</dt><dd id="hdr-product">—</dd></div>
+        <div><dt>지급단계</dt><dd id="hdr-stage">—</dd></div>
+        <div><dt>적용 체계 (schedule_regime)</dt><dd id="hdr-regime">—</dd></div>
+        <div><dt>용도 (schedule_purpose)</dt><dd id="hdr-purpose">—</dd></div>
+        <div><dt>버전</dt><dd id="hdr-version">—</dd></div>
+        <div><dt>상태</dt><dd id="hdr-status">—</dd></div>
+        <div><dt>사용중</dt><dd id="hdr-active">—</dd></div>
+        <div><dt>정책버전</dt><dd class="fgc-mono" id="hdr-policy">—</dd></div>
+        <div><dt>생성 사유 · 일시</dt><dd id="hdr-reason">—</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 적용 체계 안내 — 문구는 IF-API-28 연동 시 계약의 적용 체계에 맞춰 채운다 -->
+  <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
+    <span class="material-symbols-outlined" style="font-size:18px">gavel</span>
+    <span id="regime-note">
+      적용 체계는 <strong>계약 체결연도만으로 정하지 않습니다.</strong>
+      상품 판매개시일 · 기초서류 버전 · 판매채널을 함께 보고 정합니다(REG-19).
+    </span>
+  </div>
+
+  <!-- ② 회차 표 + ③ 합계 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">회차별 예상 금액</span>
+      <span class="fgc-muted" style="font-size:12px">
+        줄마다 원 단위 <span class="fgc-mono">HALF_UP</span>으로 반올림한 뒤 합계를 냅니다
+      </span>
+    </div>
+    <div style="overflow-x:auto;max-height:520px">
+      <table class="fgc-table">
+        <thead>
+          <tr>
+            <th style="width:44px">줄</th>
+            <th style="width:56px">회차</th>
+            <th style="width:70px">계약차월</th>
+            <th style="width:104px">지급예정일</th>
+            <th>수수료 항목</th>
+            <th>수령자</th>
+            <th>기준코드</th>
+            <th class="fgc-th-num">기준금액</th>
+            <th style="width:70px">계산방식</th>
+            <th class="fgc-th-num">요율</th>
+            <th class="fgc-th-num">예상금액</th>
+            <th style="width:76px">상태</th>
+          </tr>
+        </thead>
+        <tbody id="line-body">
+          <tr><td colspan="12"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="10">합계 (<span id="line-count">0</span>줄)</td>
+            <td class="fgc-td-num"><span class="fgc-amount" id="line-total">0</span></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="10" class="fgc-muted" style="font-weight:400">
+              그중 초년도(계약일부터 1주년 전날까지) 합계 — 1,200% 산입 대상
+            </td>
+            <td class="fgc-td-num"><span class="fgc-amount" id="line-first-year">0</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- ④ 버전 비교 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">버전 비교</span>
+      <span class="fgc-muted" style="font-size:12px">지난 버전은 지우지 않고 남겨 둡니다</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="fgc-table">
+        <thead>
+          <tr>
+            <th>버전</th><th>상태</th><th>사용중</th><th>정책버전</th>
+            <th>생성 사유</th><th>생성 일시</th><th class="fgc-th-num">회차 수</th><th class="fgc-th-num">예상 총액</th>
+          </tr>
+        </thead>
+        <tbody id="version-body">
+          <tr><td colspan="8"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
