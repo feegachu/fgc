@@ -52,7 +52,7 @@ public class ScheduleController {
      * @author hjKang
      * @since 2026-08-11
      */
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     @PostMapping("/{id}/regenerate")
     public ApiResponse<ScheduleRegenResponse> regenerate(
             @PathVariable Long id,
