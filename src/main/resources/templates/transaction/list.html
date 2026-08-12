@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!--
+  FGC-UI-TRAN-W01 수수료 지급 건 목록
+  요구사항 FUN-065 · FUN-031
+  데이터  읽기 commission_transaction, transaction_attribution, vw_transaction_attribution_balance
+  API     GET /api/v1/transactions?settlementMonth=&paymentStage=&status=&sourceType=
+  라우트  GET /transactions → transaction/list.html
+
+  [막을 것]
+   · 귀속행이 0건인 지급 건을 확정 상태로 만들기 — DB 트리거가 거부합니다
+   · 같은 업무키를 두 번 등록 — DB UNIQUE(source_type, source_business_key)
+  [주의] amount 는 항상 0 이상입니다. 주는 돈/빼는 돈은 cashflow_type 으로 구분하고
+         음수를 저장하지 않습니다.
+
+  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-TRAN-W01)의 정적 골격만 옮겼다.
+  데이터 영역(목록·합계)은 IF-API-20 연동 시 서버 렌더링으로 채운다.
+-->
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-TRAN-W01', '수수료 지급 건 목록', null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main class="fgc-main">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <h1 class="fgc-page-title">수수료 지급 건 목록</h1>
+      <p class="fgc-page-desc">
+        실제로 오간 돈 한 건 한 건입니다. <strong>귀속</strong> 칸이 0이면 이 돈이 어느 계약 몫인지
+        아직 안 적었다는 뜻이라 확정할 수 없습니다.
+      </p>
+    </div>
+    <a class="fgc-btn fgc-btn--primary" th:href="@{/transactions/new}" style="text-decoration:none" data-fgc-action="create">
+      <span class="material-symbols-outlined" style="font-size:18px">add</span> 신규 등록
+    </a>
+  </div>
+
+  <!-- ① 검색 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__body fgc-toolbar">
+      <div class="fgc-field" style="min-width:140px">
+        <label class="fgc-label" for="f-month">정산월</label>
+        <input class="fgc-input" id="f-month" type="month" th:value="${month}" value="2026-07">
+      </div>
+      <div class="fgc-field" style="min-width:160px">
+        <label class="fgc-label" for="f-stage">지급단계</label>
+        <select class="fgc-select" id="f-stage"><option value="">전체</option>
+          <option value="GA_TO_FC">GA→설계사</option>
+          <option value="INSURER_TO_GA">원수사→GA</option>
+        </select>
+      </div>
+      <div class="fgc-field" style="min-width:170px">
+        <label class="fgc-label" for="f-source">원천유형</label>
+        <!-- 원천유형 선택지는 IF-API-20 연동 시 코드 테이블로 채운다 -->
+        <select class="fgc-select" id="f-source"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-agent">수령 설계사</label>
+        <!-- 설계사 선택지는 IF-API-20 연동 시 채운다 -->
+        <select class="fgc-select" id="f-agent"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-item">수수료 항목</label>
+        <!-- 수수료 항목 선택지는 IF-API-20 연동 시 채운다 -->
+        <select class="fgc-select" id="f-item"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:120px">
+        <label class="fgc-label" for="f-status">상태</label>
+        <!-- 상태 선택지는 IF-API-20 연동 시 코드 테이블로 채운다 -->
+        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
+      </div>
+      <label style="display:flex;gap:5px;align-items:center;font-size:12px;padding-bottom:6px">
+        <input type="checkbox" id="f-noattr"> 귀속 0건만
+      </label>
+      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </button>
+    </div>
+  </section>
+
+  <!-- ② 목록 -->
+  <section class="fgc-card" style="margin-top:16px">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">지급 건</span>
+      <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="fgc-table" style="min-width:1140px">
+        <thead>
+          <tr>
+            <th style="width:104px">지급단계</th>
+            <th style="width:112px">원천유형</th>
+            <th style="width:150px">업무키</th>
+            <th style="width:80px">정산월</th>
+            <th style="width:140px">수령 설계사</th>
+            <th style="width:130px">수수료 항목</th>
+            <th class="fgc-th-num" style="width:100px">금액</th>
+            <th style="width:64px">흐름</th>
+            <th style="width:84px">상태</th>
+            <th style="width:96px">귀속</th>
+            <th style="width:70px"></th>
+          </tr>
+        </thead>
+        <tbody id="list-body">
+          <tr><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        </tbody>
+        <tfoot>
+          <!-- PAYMENT/DEDUCTION 분리 합계는 IF-API-20 연동 시 서버 렌더링으로 제공 -->
+          <tr>
+            <td colspan="6">금액 절대값 합계</td>
+            <td class="fgc-td-num"><span class="fgc-amount" id="sum-amount">0</span></td>
+            <td colspan="4"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="fgc-card__body">
+      <p class="fgc-help">
+        <strong>귀속</strong> 칸은 이 지급 건이 몇 개 계약에 연결됐는지입니다.
+        0이면 빨간색으로 나오고, 그 상태로는 확정할 수 없습니다.
+      </p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
