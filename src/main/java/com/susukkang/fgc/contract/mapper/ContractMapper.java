@@ -22,7 +22,7 @@ public interface ContractMapper {
             @Param("offset") int offset
     );
     // 계약Id에 따른 계약 조회
-    InsuranceContract selectById(Long id);
+    InsuranceContract selectContractById(Long id);
     // 계약Id에 따른 계약 및 상품 정보 조회
     ContractDetailResponse selectContractDetailById(Long id);
 
