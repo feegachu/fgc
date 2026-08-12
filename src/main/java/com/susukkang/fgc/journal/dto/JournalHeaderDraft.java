@@ -17,7 +17,7 @@ import java.util.List;
  * (revision 증가)는 FUN-047의 몫이라 #85 범위 밖이다.
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class JournalHeaderDraft {
     private final JournalType journalType;
     private final LocalDate journalDate;
