@@ -19,6 +19,8 @@ public interface JournalPersistenceService {
      *
      * @param draft     JournalEntryDraftService가 만든 헤더+라인 초안
      * @param createdBy 저장을 요청한 사용자/배치 주체 (audit_log.user_id로도 쓰인다)
+     * @param requestId 저장 성공 시 audit_log.request_id로 남길 요청 식별자(FUN-046 감사
+     *                   요구사항 — "원천·분개 ID·검증 실행 ID·요청 ID를 포함한 감사 로그")
      */
-    JournalHeaderRow saveDraft(JournalHeaderDraft draft, Long createdBy);
+    JournalHeaderRow saveDraft(JournalHeaderDraft draft, Long createdBy, String requestId);
 }

@@ -1,22 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<!--
-  TODO(#93): 아래 5개 SQL을 작성한다. 각 id가 어떤 SQL이어야 하는지는
-  com.susukkang.fgc.journal.mapper.JournalMapper 인터페이스의 메서드별 Javadoc에
-  전체 SQL 초안이 있다 — 그대로 옮기고 컬럼 별칭만 확인하면 된다.
-
-  <insert id="insert" parameterType="...JournalHeaderInsertRow"
-          useGeneratedKeys="true" keyProperty="journalHeaderId" keyColumn="journal_header_id">
-  <insert id="insertLine" parameterType="...JournalLineInsertRow">
-  <select id="findNextJournalSeq" resultType="int">
-  <select id="findBySourceKey" resultType="...JournalHeaderRow">
-  <select id="existsPostedForSource" resultType="boolean">
-
-  이 파일에 <insert>/<select> 엘리먼트가 아직 없으므로, JournalMapper의 메서드를
-  실제로 호출하면 "Invalid bound statement (not found)" 예외가 난다 — 서비스 구현을
-  마칠 때까지는 문제되지 않는다(JournalPersistenceServiceImpl도 아직 TODO 상태라
-  이 메서드들을 호출하지 않는다).
--->
 <mapper namespace="com.susukkang.fgc.journal.mapper.JournalMapper">
+    <!--
+      status/created_at은 컬럼 기본값(DRAFT/clock_timestamp())에 맡기고 VALUES에
+      넣지 않는다 — guard_journal_header_write가 INSERT 시 status<>'DRAFT'를 거부한다
+      (JournalHeaderInsertRow Javadoc 참고).
+    -->
+    <insert id="insert" parameterType="com.susukkang.fgc.journal.dto.JournalHeaderInsertRow"
+            useGeneratedKeys="true" keyProperty="journalHeaderId" keyColumn="journal_header_id">
+        INSERT INTO fgc.journal_header
+            (journal_no, journal_date, journal_type, source_entity_type, source_entity_id,
+             revision_no, validation_run_id, contract_id, policy_version_id,
+             correction_group_key, description, created_by)
+        VALUES
+            (#{journalNo}, #{journalDate}, #{journalType}, #{sourceEntityType}, #{sourceEntityId},
+             #{revisionNo}, #{validationRunId}, #{contractId}, #{policyVersionId},
+             #{correctionGroupKey}, #{description}, #{createdBy})
+    </insert>
 
+    <insert id="insertLine" parameterType="com.susukkang.fgc.journal.dto.JournalLineInsertRow"
+            useGeneratedKeys="true" keyProperty="journalLineId" keyColumn="journal_line_id">
+        INSERT INTO fgc.journal_line
+            (journal_header_id, line_no, journal_account_id, debit_amount, credit_amount,
+             contract_id, agent_id, payment_stage, commission_item_id, memo)
+        VALUES
+            (#{journalHeaderId}, #{lineNo}, #{journalAccountId}, #{debitAmount}, #{creditAmount},
+             #{contractId}, #{agentId}, #{paymentStage}, #{commissionItemId}, #{memo})
+    </insert>
+
+    <select id="findNextJournalSeq" resultType="int">
+        SELECT COALESCE(MAX(CAST(SUBSTRING(journal_no FROM 'JV-\d{4}-\d{2}-(\d+)$') AS int)), 0) + 1
+        FROM fgc.journal_header
+        WHERE journal_no LIKE 'JV-' || #{year} || '-' || #{month} || '-%'
+    </select>
+
+    <select id="findBySourceKey" resultType="com.susukkang.fgc.journal.dto.JournalHeaderRow">
+        SELECT journal_header_id, journal_no, journal_date, journal_type, source_entity_type,
+               source_entity_id, revision_no, validation_run_id, contract_id, policy_version_id,
+               status, description, created_by, posted_by, posted_at, created_at
+        FROM fgc.journal_header
+        WHERE journal_type = #{journalType} AND source_entity_type = #{sourceEntityType}
+        AND source_entity_id = #{sourceEntityId} AND revision_no = #{revisionNo}
+    </select>
+
+    <select id="existsPostedForSource" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM fgc.journal_header
+            WHERE journal_type = #{journalType} AND source_entity_type = #{sourceEntityType}
+            AND source_entity_id = #{sourceEntityId} AND status = 'POSTED'
+        )
+    </select>
 </mapper>
