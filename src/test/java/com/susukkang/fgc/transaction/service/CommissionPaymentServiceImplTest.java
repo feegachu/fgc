@@ -609,6 +609,9 @@ class CommissionPaymentServiceImplTest {
 
         CommissionPaymentResponse response = service.confirm(101L, "boundary-below");
 
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(mapper).insertCapCheck(captor.capture());
+        assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("1199999");
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(response.capCheckIds()).containsExactly(60L);
         verify(mapper).confirm(101L, "boundary-below", "60");
