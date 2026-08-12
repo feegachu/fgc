@@ -23,11 +23,17 @@ public class ScreenViewController {
         return "policy/list";
     }
 
+    /**
+     * CONT-W03 — 인터페이스정의서 IF-API-18/19 역할 SETTLEMENT (+SYSTEM_ADMIN 은 전부, §4-1).
+     * FGC-FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
+     */
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     @GetMapping("/contracts/new")
     public String contractNew() {
         return "contract/form";
     }
 
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     @GetMapping("/contracts/{id}/edit")
     public String contractEdit() {
         return "contract/form";
@@ -43,6 +49,8 @@ public class ScreenViewController {
         return "transaction/list";
     }
 
+    /** TRAN-W02 — 화면정의서 :686 역할 SETTLEMENT (+SYSTEM_ADMIN 은 전부, §4-1). */
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     @GetMapping("/transactions/new")
     public String transactionNew() {
         return "transaction/form";

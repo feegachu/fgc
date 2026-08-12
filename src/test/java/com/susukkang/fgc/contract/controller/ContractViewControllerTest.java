@@ -14,6 +14,8 @@ import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.service.ContractService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -29,6 +31,7 @@ import java.util.List;
 import org.mockito.ArgumentCaptor;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -48,9 +51,13 @@ class ContractViewControllerTest {
     @MockitoBean ContractService contractService;
 
     private static FgcUserDetails userDetails() {
+        return userDetails("SETTLEMENT");
+    }
+
+    private static FgcUserDetails userDetails(String role) {
         AppUserView user = new AppUserView();
         user.setUserId(1L); user.setLoginId("settle01"); user.setPasswordHash("x");
-        user.setUserName("정산담당"); user.setRoleCode("SETTLEMENT"); user.setAccountStatus("ACTIVE");
+        user.setUserName("테스트 사용자"); user.setRoleCode(role); user.setAccountStatus("ACTIVE");
         return new FgcUserDetails(user, true, true);
     }
 
@@ -76,5 +83,25 @@ class ContractViewControllerTest {
         verify(contractService).selectByCondition(captor.capture(), org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.eq(20));
         org.assertj.core.api.Assertions.assertThat(captor.getValue().getContractNo()).isEqualTo("C-2026");
         org.assertj.core.api.Assertions.assertThat(captor.getValue().getCurrentStatus()).isEqualTo(ContractStatus.ACTIVE);
+    }
+
+    @ParameterizedTest(name = "{0} 계약 등록 버튼 노출={1}")
+    @CsvSource({
+            "SETTLEMENT, true",
+            "SYSTEM_ADMIN, true",
+            "GA_ADMIN, false",
+            "COMPLIANCE, false",
+    })
+    void 처리_권한이_있는_역할에만_계약_등록_버튼을_표시한다(String role, boolean visible) throws Exception {
+        given(contractService.selectByCondition(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.eq(20)
+        )).willReturn(PageResponse.of(List.of(), 1, 20, 0, "contractId,desc"));
+
+        var marker = containsString("data-fgc-action=\"create\"");
+        mockMvc.perform(get("/contracts").with(user(userDetails(role))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(visible ? marker : not(marker)));
     }
 }

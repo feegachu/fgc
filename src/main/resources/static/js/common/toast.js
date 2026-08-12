@@ -51,4 +51,3 @@
   window.FgcUi = window.FgcUi || {};
   window.FgcUi.toast = showToast;
 })();
-

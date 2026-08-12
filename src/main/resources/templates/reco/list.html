@@ -58,10 +58,11 @@
         <label class="fgc-label" for="r-insurer">보험회사</label>
         <select class="fgc-select" id="r-insurer"><option value="">전체</option></select>
       </div>
-      <button class="fgc-btn fgc-btn--primary" id="btn-run" data-fgc-action="reconcile" th:disabled="${readOnly}">
+      <!-- 실행(IF-API-38)·일괄 생성(IF-API-42)은 SETTLEMENT — GA_ADMIN 도 비활성이어야 한다 -->
+      <button class="fgc-btn fgc-btn--primary" id="btn-run" data-fgc-action="reconcile" th:disabled="${!canProcess}">
         <span class="material-symbols-outlined" style="font-size:18px">play_arrow</span> 대사 실행
       </button>
-      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" data-fgc-action="bulk" th:disabled="${readOnly}">
+      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" data-fgc-action="bulk" th:disabled="${!canProcess}">
         <span class="material-symbols-outlined" style="font-size:18px">playlist_add</span> 불일치 예외 일괄 생성
       </button>
     </div>

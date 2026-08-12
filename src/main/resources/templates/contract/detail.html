@@ -30,13 +30,13 @@
         </div>
       </div>
       <div class="contract-summary-actions" aria-label="계약 작업">
-        <button id="contract-edit-button" class="button button-secondary" type="button" th:disabled="${readOnly}">
+        <button id="contract-edit-button" class="button button-secondary" type="button" data-fgc-action="edit" th:disabled="${!canProcess}">
           <span class="material-symbols-rounded" aria-hidden="true">edit</span>수정
         </button>
-        <button class="button button-secondary" type="button" disabled title="스케줄 재생성 API 연동 대기">
+        <button class="button button-secondary" type="button" data-fgc-action="regenerate" th:disabled="${!canProcess}">
           <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>스케줄 재생성
         </button>
-        <button class="button button-primary" type="button" disabled title="한도 재검증 API 연동 대기">
+        <button class="button button-primary" type="button" data-fgc-action="recheck" th:disabled="${!canProcess}">
           <span class="material-symbols-rounded" aria-hidden="true">speed</span>한도 재검증
         </button>
       </div>

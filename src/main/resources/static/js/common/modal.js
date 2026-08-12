@@ -87,4 +87,3 @@
   window.FgcUi = window.FgcUi || {};
   window.FgcUi.modal = { open: openModal, close: closeModal };
 })();
-
