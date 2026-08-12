@@ -5,10 +5,7 @@ import com.susukkang.fgc.schedule.code.ScheduleGenReason;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 /**
  * 예상 스케줄 헤더를 저장하기 위한 DTO.
@@ -33,6 +30,6 @@ public class ScheduleHeaderInsertDTO {
     private ScheduleRegime scheduleRegime; // 적용 체계
     private ScheduleHeaderStatus status; // 스케줄 상태
     private Boolean activeYn; // 현재 사용 여부
-    private ScheduleGenReason generationReason; // 생성 사유
+    private String generationReason; // 생성 사유
     private Long regeneratedFromId; // 재생성 원본 헤더 ID
 }

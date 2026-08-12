@@ -236,18 +236,23 @@ class ValidationRunMapperIntegrationTest {
     }
 
     @Test
-    // month/status 둘 다 null이면(조건 없음) 전체가 나오는지, count도 search 건수와 일치하는지
+    // month/status 둘 다 null이면(조건 없음) 특정 월로 좁혀지지 않고 나오는지, count도
+    // search 건수 이상인지(정확히 일치하는 걸 기대하지 않는다 — 이 클래스는 @Transactional로
+    // 자기 데이터는 롤백되지만, FINALIZED 불변성 테스트처럼 트랜잭션 없이 커밋하고 지울 수
+    // 없는 다른 테스트의 행이 같은 DB에 영구히 남을 수 있어 "전체 건수"를 정확한 값으로
+    // 단정하면 실행 순서에 따라 흔들린다 — 코드리뷰로 발견, 2026-08-11).
     void searchAndCountReturnAllRowsWhenNoFilterGiven() {
         LocalDate month = LocalDate.of(2026, 9, 1);
-        insertCreatedRun(month, 1);
+        Long firstId = insertCreatedRun(month, 1);
         // uq_validation_run_active_month 때문에 같은 달 두 번째 MONTHLY 활성 실행은 못 넣는다.
-        insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+        Long secondId = insertCreatedRun(month, 2, "MANUAL_CONTRACT");
 
-        List<ValidationRunListRow> rows = validationRunMapper.search(null, null, 0, 20);
+        List<ValidationRunListRow> rows = validationRunMapper.search(null, null, 0, 1000);
         long total = validationRunMapper.count(null, null);
 
-        assertThat(rows).hasSize(2);
-        assertThat(total).isEqualTo(2);
+        assertThat(rows).extracting(ValidationRunListRow::getValidationRunId)
+                .contains(firstId, secondId);
+        assertThat(total).isGreaterThanOrEqualTo(2);
     }
 
     @Test

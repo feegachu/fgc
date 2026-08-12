@@ -87,7 +87,8 @@
         <button class="fgc-btn fgc-btn--ghost" id="btn-refresh" style="padding:4px 10px;font-size:12px">
           <span class="material-symbols-outlined" style="font-size:16px">refresh</span> 새로고침
         </button>
-        <button class="fgc-btn fgc-btn--primary" id="btn-execute" data-fgc-action="execute" th:disabled="${readOnly}" style="padding:4px 12px;font-size:12px">
+        <!-- 실행은 SETTLEMENT (화면정의서 :1485, IF-API-48) -->
+        <button class="fgc-btn fgc-btn--primary" id="btn-execute" data-fgc-action="execute" th:disabled="${!canProcess}" style="padding:4px 12px;font-size:12px">
           <span class="material-symbols-outlined" style="font-size:16px">play_arrow</span> 실행
         </button>
       </div>
@@ -161,7 +162,8 @@
       </div>
       <!-- 확정 버튼은 체크리스트 게이트(IF-API-50) 연동 전까지 항상 비활성.
            th:disabled 를 걸면 정적 disabled 를 덮어써 활성화돼 버린다 —
-           연동 시 th:disabled="${readOnly or !checklistPassed}" 로 바꾼다. -->
+           연동 시 th:disabled="${(roleCode != 'GA_ADMIN' and roleCode != 'SYSTEM_ADMIN') or !checklistPassed}"
+           로 바꾼다. 확정 권한은 GA_ADMIN·SYSTEM_ADMIN (화면정의서 :1485, IF-API-51) — canProcess·readOnly 와 집합이 다르다. -->
       <button class="fgc-btn fgc-btn--primary" id="btn-finalize" data-fgc-action="finalize" style="padding:10px 20px" disabled>
         <span class="material-symbols-outlined" style="font-size:18px">lock</span> 확정
       </button>

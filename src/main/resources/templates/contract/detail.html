@@ -41,14 +41,16 @@
       </div>
       <div style="display:flex;gap:8px">
         <!-- a 태그에는 disabled 속성이 적용되지 않는다 — button 으로 두고,
-             IF-API-12 연동 시 /contracts/{id}/edit 이동을 붙인다. -->
-        <button class="fgc-btn fgc-btn--ghost" id="btn-edit" type="button" data-fgc-action="edit" th:disabled="${readOnly}">
+             IF-API-12 연동 시 /contracts/{id}/edit 이동을 붙인다.
+             처리(수정·재생성·재검증)는 SETTLEMENT — IF-API-19/29/33. readOnly 가 아니라
+             canProcess 를 보는 이유: GA_ADMIN 은 readOnly=false 지만 처리 권한이 없다. -->
+        <button class="fgc-btn fgc-btn--ghost" id="btn-edit" type="button" data-fgc-action="edit" th:disabled="${!canProcess}">
           <span class="material-symbols-outlined" style="font-size:18px">edit</span> 수정
         </button>
-        <button class="fgc-btn fgc-btn--ghost" id="btn-regen" data-fgc-action="regenerate" th:disabled="${readOnly}">
+        <button class="fgc-btn fgc-btn--ghost" id="btn-regen" data-fgc-action="regenerate" th:disabled="${!canProcess}">
           <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 스케줄 재생성
         </button>
-        <button class="fgc-btn fgc-btn--primary" id="btn-recheck" data-fgc-action="recheck" th:disabled="${readOnly}">
+        <button class="fgc-btn fgc-btn--primary" id="btn-recheck" data-fgc-action="recheck" th:disabled="${!canProcess}">
           <span class="material-symbols-outlined" style="font-size:18px">speed</span> 한도 재검증
         </button>
       </div>

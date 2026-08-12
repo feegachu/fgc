@@ -57,4 +57,22 @@ class ValidationRunBatchAuditServiceImplTest {
         assertThat(row.getActionCode()).isEqualTo("VALIDATION_RUN_FAILED");
         assertThat(row.getReason()).isEqualTo("Step capCheckStep failed");
     }
+
+    // #77: FAILED→RUNNING 재시도(범용 ValidationRunTransitionService 경로)는 자체적으로
+    // 감사로그를 안 남기므로, 이 메서드가 triggeredBy·requestId를 같은 방식으로 남기는지 확인한다.
+    @Test
+    void recordsRetryWithTheSameAuditContext() {
+        when(auditLogMapper.insert(org.mockito.ArgumentMatchers.any())).thenReturn(1);
+        ValidationRunBatchAuditService service = new ValidationRunBatchAuditServiceImpl(auditLogMapper);
+
+        service.recordRetried(100L, parameters);
+
+        ArgumentCaptor<AuditLogInsertRow> captor = ArgumentCaptor.forClass(AuditLogInsertRow.class);
+        verify(auditLogMapper).insert(captor.capture());
+        AuditLogInsertRow row = captor.getValue();
+        assertThat(row.getUserId()).isEqualTo(12L);
+        assertThat(row.getRequestId()).isEqualTo("request-123");
+        assertThat(row.getActionCode()).isEqualTo("VALIDATION_RUN_RETRIED");
+        assertThat(row.getEntityId()).isEqualTo("100");
+    }
 }
