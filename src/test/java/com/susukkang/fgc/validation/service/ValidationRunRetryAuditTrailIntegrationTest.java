@@ -3,11 +3,11 @@ package com.susukkang.fgc.validation.service;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,8 +24,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 남기지 않는다(범용 상태 전이라 batch 전용 lifecycleService를 거치지 않음) — 그래서
  * CreateDailyRunTasklet의 FAILED→RUNNING 재시도 분기가 auditService.recordRetried()를
  * 직접 부르지 않으면, 재시도 자체가 감사 로그에서 완전히 사라진다.
+ *
+ * @Transactional로 테스트 종료 시 자동 롤백시킨다 — audit_log는 append-only라 명시적
+ * DELETE로 정리할 수 없었지만(코드리뷰 반영), 롤백은 트리거를 거치지 않고 트랜잭션 전체를
+ * 되돌리므로 이 테스트가 남기는 audit_log 행도 함께 정리된다.
  */
 @SpringBootTest
+@Transactional
 class ValidationRunRetryAuditTrailIntegrationTest {
 
     private static final LocalDate TEST_MONTH = LocalDate.of(2031, 6, 1);
@@ -38,13 +43,6 @@ class ValidationRunRetryAuditTrailIntegrationTest {
     private ValidationRunTransitionService validationRunTransitionService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @AfterEach
-    void cleanUp() {
-        jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_month = ?", TEST_MONTH);
-        // audit_log는 append-only라 지우지 않는다 — 이 테스트가 남기는 몇 행은 다른 테스트와
-        // entity_id로 구분되어 문제가 없다.
-    }
 
     private Long insertCreatedRun(int runNo) {
         return jdbcTemplate.queryForObject("""

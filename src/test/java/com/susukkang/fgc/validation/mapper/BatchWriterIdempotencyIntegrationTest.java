@@ -1,21 +1,27 @@
 package com.susukkang.fgc.validation.mapper;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 모든 배치 Writer가 UPSERT 또는 ON CONFLICT DO NOTHING 기반으로 동작하는지,
  * 재실행 시 업무 결과가 중복 생성되지 않는지 검증
+ *
+ * contract_status_event / contract_status_event_processing은 append-only라 명시적
+ * DELETE로 정리할 수 없다(reject_update_delete 트리거) — @Transactional로 테스트 종료 시
+ * 자동 롤백시켜, 실제 계약(FGC-FGL01-202607-0001)에 테스트용 이벤트 이력이 영구히
+ * 남지 않도록 한다(코드리뷰 반영: 남은 이력은 DailyChangedContractJob의 재처리 대상
+ * 판단에 영향을 준다).
  */
 @SpringBootTest
+@Transactional
 class BatchWriterIdempotencyIntegrationTest {
 
     private static final String JOB_NAME = "TestJob";
@@ -30,18 +36,6 @@ class BatchWriterIdempotencyIntegrationTest {
     private Long contractId;
     private Long eventId;
     private Long validationRunId;
-
-    @AfterEach
-    void cleanUp() {
-        if (validationRunId != null) {
-            jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE validation_run_id = ?", validationRunId);
-            jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", validationRunId);
-        }
-        // contract_status_event / contract_status_event_processing은 append-only라
-        // UPDATE/DELETE 자체가 트리거로 막혀 있다(reject_update_delete) — 지우지 않는다.
-        // 테스트가 남기는 행은 소량이고, 다른 테스트의 조회 조건(contractId/eventId 특정)과
-        // 겹치지 않아 해가 없다.
-    }
 
     private Long seedContractId() {
         return jdbcTemplate.queryForObject(
