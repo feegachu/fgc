@@ -1,174 +1,56 @@
-<!DOCTYPE html>
-<html class="light" lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>로그인 (FGC-UI-AUTH-W01) · FGC</title>
-<!-- FUN-001 개발 순서 12 -->
-
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" th:href="@{/assets/fgc.css}">
-
-<style>
-  body { font-family: Inter, sans-serif; color: #171c1f; margin: 0; }
-  .auth-wrap { min-height: 100vh; display: grid; grid-template-columns: 1.15fr 1fr; }
-  @media (max-width: 900px) { .auth-wrap { grid-template-columns: 1fr; } .auth-brand { display: none; } }
-  .auth-brand {
-    background: linear-gradient(160deg, #00152a 0%, #102a43 100%);
-    color: #fff; padding: 56px 56px 40px; display: flex; flex-direction: column;
-  }
-  .auth-form-side { display: flex; align-items: center; justify-content: center; padding: 40px 24px; background: #f6fafe; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FGC GA 수수료 정산·검증 플랫폼 로그인">
+  <meta name="theme-color" content="#467AA2">
+  <title>로그인 | FGC</title>
+  <link rel="icon" type="image/png" th:href="@{/images/brand/favicon-32.png}">
+  <link rel="stylesheet" th:href="@{/css/common/variables.css}">
+  <link rel="stylesheet" th:href="@{/css/common/reset.css}">
+  <link rel="stylesheet" th:href="@{/css/common/components.css}">
+  <link rel="stylesheet" th:href="@{/css/features/auth.css}">
+  <script th:src="@{/js/features/auth/login.js}" defer></script>
 </head>
+<body class="auth-page">
+<main class="auth-layout">
+  <aside class="auth-brand-panel" aria-label="FGC 플랫폼 소개">
+    <div class="auth-brand-identity">
+      <img class="auth-brand-logo" th:src="@{/images/brand/logo-horizontal-white.png}" alt="FGC" width="120" height="50">
+      <p class="auth-brand-caption">GA 수수료 정산·검증 플랫폼</p>
+    </div>
+    <section class="auth-brand-message" aria-labelledby="auth-brand-title">
+      <h1 id="auth-brand-title">정산 결과를 연결하고,<br>규제를 검증합니다.</h1>
+      <p>계약·지급·대사·예외를 하나의 흐름으로 관리하고<br>모든 판정의 계산근거와 변경 이력을 끝까지 추적합니다.</p>
+    </section>
+    <ul class="auth-capability-list" aria-label="주요 기능">
+      <li class="auth-capability-item"><span class="material-symbols-rounded" aria-hidden="true">rule</span><div><strong>1,200% 한도</strong><p>계약 단위 지급률과 계산근거를 함께 확인합니다.</p></div></li>
+      <li class="auth-capability-item"><span class="material-symbols-rounded" aria-hidden="true">compare_arrows</span><div><strong>차익거래 검토</strong><p>지급 수수료와 해약환급금의 이상 징후를 선별합니다.</p></div></li>
+      <li class="auth-capability-item"><span class="material-symbols-rounded" aria-hidden="true">balance</span><div><strong>원장·대사</strong><p>예상 지급액과 실제 지급액의 차이를 추적합니다.</p></div></li>
+    </ul>
+    <footer class="auth-brand-footer"><p>접속 기록과 주요 변경 이력은 감사로그에 안전하게 남습니다.</p><p>FGC v2.0</p></footer>
+  </aside>
 
-<body>
-<!--
-  FGC-UI-AUTH-W01 로그인
-  요구사항 FUN-001(로그인·로그아웃) · FUN-002(역할 기반 접근제어) / SER-001 · SER-003
-  데이터  읽기 app_user, app_role  |  쓰기 audit_log(LOGIN_SUCCESS·LOGIN_FAIL·LOGOUT)
-  API     POST /login   POST /logout   (Spring Security 폼 로그인 — 컨트롤러 핸들러 없음)
-  [이 화면은 공통 셸(사이드바·헤더)을 쓰지 않습니다]
--->
-
-<div class="auth-wrap">
-
-  <!-- ① 시스템명 영역 -->
-  <section class="auth-brand">
-    <div style="display:flex;align-items:center;gap:14px">
-      <div style="width:48px;height:48px;border-radius:.5rem;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center">
-        <span class="material-symbols-outlined" style="font-size:26px">account_balance</span>
+  <section class="auth-surface" aria-labelledby="login-title">
+    <div class="auth-login-content">
+      <img class="auth-mobile-logo" th:src="@{/images/brand/logo-horizontal-flat.png}" alt="FGC" width="96" height="40">
+      <div class="auth-heading-anchor" aria-hidden="true"></div>
+      <header class="auth-login-header"><p class="auth-eyebrow">FGC WORKSPACE</p><h2 id="login-title">로그인</h2><p>업무 계정의 아이디와 비밀번호를 입력하세요.</p></header>
+      <div class="auth-error" role="alert" aria-live="polite" th:classappend="${param.error != null} ? ' is-visible'">
+        <span class="material-symbols-rounded" aria-hidden="true">error</span><span data-login-error-message>아이디 또는 비밀번호를 확인해 주세요.</span>
       </div>
-      <div>
-        <div style="font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:800;letter-spacing:-.02em">FGC</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.66)">GA 수수료 정산·검증 플랫폼</div>
-      </div>
-    </div>
-
-    <div style="margin-top:56px;max-width:460px">
-      <h1 style="font-family:'Hanken Grotesk',sans-serif;font-size:34px;line-height:46px;font-weight:800;margin:0">
-        검증합니다.<br>송금하지 않습니다.
-      </h1>
-      <p style="margin-top:18px;font-size:14px;line-height:24px;color:rgba(255,255,255,.74)">
-        FGC는 원수사에서 GA로, GA에서 설계사로 흘러간 돈이
-        규제와 회사 정책을 지켰는지 <strong style="color:#fff">확인만</strong> 합니다.
-        실제 이체는 하지 않습니다. <span class="fgc-mono" style="color:#bfddfe">(COR-001)</span>
-      </p>
-
-      <ul style="margin-top:32px;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px">
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:rgba(255,255,255,.82)">
-          <span class="material-symbols-outlined" style="font-size:18px;color:#86EFAC">check_circle</span>
-          <span><strong style="color:#fff">1,200%룰</strong> — 계약 1건에 첫 1년 동안 준 돈이 월보험료의 12배를 넘었는가</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:rgba(255,255,255,.82)">
-          <span class="material-symbols-outlined" style="font-size:18px;color:#86EFAC">check_circle</span>
-          <span><strong style="color:#fff">차익거래</strong> — 준 수수료 + 해약환급금이 받은 보험료보다 많아졌는가</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:rgba(255,255,255,.82)">
-          <span class="material-symbols-outlined" style="font-size:18px;color:#86EFAC">check_circle</span>
-          <span><strong style="color:#fff">원장·대사</strong> — 줄 예정이던 돈과 실제로 준 돈이 딱 맞는가</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:rgba(255,255,255,.5)">
-          <span class="material-symbols-outlined" style="font-size:18px">schedule</span>
-          <span>분급 한도 — 4년·7년에 나눠 주는 돈이 정해진 한도 안인가 <span class="fgc-badge fgc-badge--phase2">2차</span></span>
-        </li>
-      </ul>
-    </div>
-
-    <!-- ④ 푸터 (COR-009 · §4-12) -->
-    <div style="margin-top:auto;padding-top:32px;font-size:11px;color:rgba(255,255,255,.5);line-height:18px">
-      FGC v2.0 · 기준일 2026-08-03<br>
-      <span style="color:#FCD34D;font-weight:600">교육용 프로토타입입니다. 실제 지급 결정에 사용할 수 없습니다.</span>
-    </div>
-  </section>
-
-  <!-- ② 로그인 폼 -->
-  <section class="auth-form-side">
-    <div style="width:100%;max-width:400px">
-
-      <h2 class="fgc-page-title" style="font-size:22px">로그인</h2>
-      <p class="fgc-page-desc">아이디와 비밀번호를 입력하세요.</p>
-
-      <!-- th:action 이 CSRF 히든 필드를 자동으로 넣습니다 -->
-      <form method="post" th:action="@{/login}" style="margin-top:24px;display:flex;flex-direction:column;gap:16px">
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="loginId">아이디</label>
-          <!-- app_user.login_id · 문자 80자 -->
-          <input class="fgc-input" id="loginId" name="username" type="text"
-                 autocomplete="username" maxlength="80" placeholder="settle01" required>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="password">비밀번호</label>
-          <div style="position:relative">
-            <!-- 실패 후 다시 그릴 때 비밀번호는 절대 채워 넣지 않습니다 -->
-            <input class="fgc-input" id="password" name="password" type="password"
-                   autocomplete="current-password" style="width:100%;padding-right:40px" required>
-            <button type="button" id="toggle-pw" aria-label="비밀번호 보기"
-                    style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;padding:6px;cursor:pointer;color:#43474d">
-              <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- ③ 실패 안내 (빨간 글씨 1줄)
-             [막을 것] 실패 원인을 자세히 알려주면 안 됩니다.
-             "아이디가 없습니다" 같은 문구는 계정 존재 여부를 알려주는 셈이라 금지입니다.
-             아이디 없음·비밀번호 오류·잠긴 계정 모두 이 한 문구로 수렴합니다(부록 A · FGC-AUTH-001). -->
-        <p class="fgc-error" role="alert" th:if="${param.error}"
-           th:text="#{error.auth.invalidCredentials}">아이디 또는 비밀번호가 맞지 않습니다.</p>
-
-        <p class="fgc-help" role="status" th:if="${param.logout}">로그아웃되었습니다.</p>
-
-        <button class="fgc-btn fgc-btn--primary" id="login-btn" type="submit" style="padding:10px;font-size:14px">
-          <span class="material-symbols-outlined" style="font-size:18px">login</span>
-          로그인
-        </button>
+      <form class="auth-form" th:action="@{/login}" method="post" data-login-form novalidate>
+        <label class="field auth-field"><span class="field-label">아이디</span><input class="field-control auth-control" type="text" name="username" autocomplete="username" placeholder="업무 계정 아이디" required autofocus></label>
+        <label class="field auth-field"><span class="field-label">비밀번호</span><span class="auth-password-control">
+          <input class="field-control auth-control" type="password" name="password" autocomplete="current-password" placeholder="비밀번호 입력" required data-password-input>
+          <button class="icon-button auth-password-toggle" type="button" aria-label="비밀번호 표시" aria-pressed="false" data-password-toggle><span class="material-symbols-rounded" aria-hidden="true">visibility</span></button>
+        </span></label>
+        <button class="button button-primary button-large auth-submit" type="submit">로그인</button>
       </form>
-
-      <!-- 시연 계정 안내 (화면정의서 §4-1) -->
-      <div class="fgc-card" style="margin-top:28px">
-        <div class="fgc-card__head" style="padding:10px 14px">
-          <span class="fgc-card__title" style="font-size:13px">시연 계정 (역할 4종)</span>
-        </div>
-        <div class="fgc-card__body" style="padding:0">
-          <table class="fgc-table" style="font-size:12px">
-            <thead>
-              <tr><th>아이디</th><th>역할</th><th>할 수 있는 일</th></tr>
-            </thead>
-            <tbody>
-              <tr><td class="fgc-mono">admin</td><td>시스템관리자</td><td class="fgc-muted">전부</td></tr>
-              <tr><td class="fgc-mono">gaadmin</td><td>GA관리자</td><td class="fgc-muted">정책·조직 조회, 검증 확정</td></tr>
-              <tr><td class="fgc-mono">settle01</td><td>정산담당자</td><td class="fgc-muted">계약·지급 등록, 검증 실행, 예외 처리</td></tr>
-              <tr><td class="fgc-mono">audit01</td><td>준법·감사</td><td class="fgc-muted">조회만 — 모든 처리 버튼 회색</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <p class="fgc-help" style="margin-top:12px">
-        비밀번호는 시드 스크립트를 참고하세요.
-        비밀번호는 BCrypt로 저장하며 평문은 DB에 남기지 않습니다.
-      </p>
-
+      <aside class="auth-security-notice" aria-label="접속 보안 안내"><span class="material-symbols-rounded" aria-hidden="true">shield_lock</span><div><strong>안전한 접속</strong><p>30분간 사용하지 않으면 자동으로 로그아웃됩니다.</p><p>인증 실패 사유는 보안을 위해 공통 문구로 안내합니다.</p></div></aside>
     </div>
   </section>
-</div>
-
-<script>
-(function () {
-  "use strict";
-
-  /* 비밀번호 보기 토글 */
-  document.getElementById("toggle-pw").addEventListener("click", function () {
-    var pw = document.getElementById("password");
-    var on = pw.type === "password";
-    pw.type = on ? "text" : "password";
-    this.firstElementChild.textContent = on ? "visibility_off" : "visibility";
-    this.setAttribute("aria-label", on ? "비밀번호 숨기기" : "비밀번호 보기");
-  });
-})();
-</script>
+</main>
 </body>
 </html>

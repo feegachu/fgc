@@ -1,0 +1,143 @@
+@font-face {
+  font-family: "Noto Sans KR";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/noto-sans-kr-variable.ttf") format("truetype-variations");
+}
+
+@font-face {
+  font-family: "Material Symbols Rounded";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url("/fonts/material-symbols-rounded.ttf") format("truetype-variations");
+}
+
+:root {
+  color-scheme: light;
+
+  --color-blue-50: #eef4ff;
+  --color-blue-100: #d9e7ff;
+  --color-blue-500: #2f6bff;
+  --color-blue-600: #1f54e5;
+  --color-blue-700: #1a43b8;
+  --color-blue-800: #1b3b91;
+
+  --color-steel-500: #467aa2;
+  --color-steel-600: #427399;
+  --color-steel-700: #3e6b8f;
+
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+  --color-neutral-950: #020617;
+
+  --color-bg-canvas: var(--color-neutral-50);
+  --color-bg-surface: var(--color-neutral-0);
+  --color-bg-subtle: var(--color-neutral-100);
+  --color-bg-overlay: rgb(15 23 42 / 48%);
+  --color-text-primary: var(--color-neutral-900);
+  --color-text-secondary: var(--color-neutral-600);
+  --color-text-tertiary: var(--color-neutral-500);
+  --color-text-disabled: var(--color-neutral-400);
+  --color-text-inverse: var(--color-neutral-0);
+  --color-text-link: var(--color-blue-600);
+  --color-border-default: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-300);
+  --color-border-subtle: var(--color-neutral-100);
+  --color-border-focus: var(--color-blue-500);
+  --color-action-primary: var(--color-blue-600);
+  --color-action-primary-hover: var(--color-blue-700);
+  --color-action-primary-down: var(--color-blue-800);
+  --color-action-subtle: var(--color-blue-50);
+  --color-nav-bg-default: var(--color-steel-500);
+  --color-nav-bg-hover: var(--color-steel-600);
+  --color-nav-bg-active: var(--color-steel-700);
+  --color-nav-text-default: var(--color-neutral-0);
+  --color-nav-text-muted: var(--color-neutral-0);
+  --color-icon-secondary: var(--color-neutral-500);
+
+  --color-status-success-text: #15803d;
+  --color-status-success-bg: #f0fdf4;
+  --color-status-success-border: #86efac;
+  --color-status-success-solid: #218647;
+  --color-status-info-text: #2563eb;
+  --color-status-info-bg: #eff6ff;
+  --color-status-info-border: #93c5fd;
+  --color-status-info-solid: #306bec;
+  --color-status-review-text: #4f46e5;
+  --color-status-review-bg: #eef2ff;
+  --color-status-review-border: #a5b4fc;
+  --color-status-review-solid: #5a51c7;
+  --color-status-warning-text: #b45309;
+  --color-status-warning-bg: #fffbeb;
+  --color-status-warning-border: #fcd34d;
+  --color-status-warning-solid: #b85c15;
+  --color-status-risk-text: #c2410c;
+  --color-status-risk-bg: #fff7ed;
+  --color-status-risk-border: #fdba74;
+  --color-status-risk-solid: #c95117;
+  --color-status-error-text: #b91c1c;
+  --color-status-error-bg: #fef2f2;
+  --color-status-error-border: #fca5a5;
+  --color-status-error-solid: #bd2727;
+
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  --radius-0: 0;
+  --radius-3: 0.1875rem;
+  --radius-4: 0.25rem;
+  --radius-6: 0.375rem;
+  --radius-8: 0.5rem;
+  --radius-12: 0.75rem;
+  --radius-16: 1rem;
+  --radius-full: 999px;
+
+  --shadow-xs: 0 1px 2px rgb(15 23 42 / 4%);
+  --shadow-sm: 0 2px 6px rgb(15 23 42 / 6%);
+  --shadow-md: 0 8px 24px rgb(15 23 42 / 8%);
+  --shadow-focus: 0 0 0 3px rgb(47 107 255 / 18%);
+  --shadow-nav-top-separator: 0 -2px 4px rgb(15 23 42 / 12%);
+
+  --control-height-sm: 2rem;
+  --control-height-md: 2.5rem;
+  --control-height-lg: 3rem;
+  --layout-sidebar-width: 16rem;
+  --layout-sidebar-collapsed-width: 4.5rem;
+  --layout-header-height: 4rem;
+  --layout-workspace-tabs-height: 2.25rem;
+  --layout-content-max: 100rem;
+  --layout-page-padding: 1.5rem;
+  --data-table-cell-padding-x: 0.75rem;
+
+  --z-sidebar: 30;
+  --z-header: 20;
+  --z-tabs: 19;
+  --z-overlay: 80;
+  --z-modal: 90;
+  --z-toast: 100;
+
+  --font-sans: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-symbol: "Material Symbols Rounded";
+  --transition-fast: 120ms cubic-bezier(0.2, 0, 0, 1);
+  --transition-standard: 180ms cubic-bezier(0.2, 0, 0, 1);
+}

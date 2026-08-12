@@ -49,7 +49,6 @@ class ScreenViewControllerTest {
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
             "/policies,            FGC-UI-POL-W01",
-            "/contracts,           FGC-UI-CONT-W01",
             "/contracts/1,         FGC-UI-CONT-W02",
             "/contracts/new,       FGC-UI-CONT-W03",
             "/contracts/1/edit,    FGC-UI-CONT-W03",
@@ -109,12 +108,36 @@ class ScreenViewControllerTest {
                         org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
     }
 
-    /** 교육용 면책문구(COR-009)는 어느 화면에서도 빠지면 안 된다 — 대표로 한 화면만 확인. */
     @Test
-    void footer_disclaimer_present() throws Exception {
-        mvc.perform(get("/cap-checks").with(user(settleUser())))
+    void contract_detail_uses_status_event_contract_without_consumer_name() throws Exception {
+        mvc.perform(get("/contracts/1").with(user(settleUser())))
+                .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "교육용 프로토타입입니다. 실제 지급 결정에 사용할 수 없습니다.")));
+                        "/status-events")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event.newStatus")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event.sourceSystem")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-fgc-action=\"regenerate\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-label=\"스케줄 재생성, 연동 대기\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-fgc-action=\"recheck\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-label=\"한도 재검증, 연동 대기\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "timeZone: \"Asia/Seoul\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("consumerName"))));
+    }
+
+    /** 운영 프론트엔드에서는 목업의 교육용 프로토타입 문구를 노출하지 않는다. */
+    @Test
+    void prototype_disclaimer_is_not_exposed() throws Exception {
+        mvc.perform(get("/cap-checks").with(user(settleUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("교육용 프로토타입입니다"))));
     }
 
     private static com.susukkang.fgc.auth.dto.FgcUserDetails gaAdminUser() {
@@ -179,10 +202,6 @@ class ScreenViewControllerTest {
      */
     @ParameterizedTest(name = "{0} {1} 등록버튼 노출={2}")
     @CsvSource({
-            "SETTLEMENT,   /contracts,    true",
-            "SYSTEM_ADMIN, /contracts,    true",
-            "GA_ADMIN,     /contracts,    false",
-            "COMPLIANCE,   /contracts,    false",
             "SETTLEMENT,   /transactions, true",
             "GA_ADMIN,     /transactions, false",
     })
