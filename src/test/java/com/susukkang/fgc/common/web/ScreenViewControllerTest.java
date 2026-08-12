@@ -113,9 +113,11 @@ class ScreenViewControllerTest {
         mvc.perform(get("/contracts/1").with(user(settleUser())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "/api/v1/contracts/")))
+                        "/api/v1/contracts/status-events?insurerId=")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event.newStatus")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("event.sourceSystem")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("consumerName"))));
     }

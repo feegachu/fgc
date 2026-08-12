@@ -77,7 +77,10 @@ class ContractViewControllerTest {
                 .andExpect(model().attributeExists("contracts", "condition"))
                 .andExpect(content().string(containsString("FGC-UI-CONT-W01")))
                 .andExpect(content().string(containsString("C-2026-001")))
-                .andExpect(content().string(containsString("100,000원")));
+                .andExpect(content().string(containsString("100,000원")))
+                .andExpect(content().string(containsString("aria-current=\"page\"")))
+                .andExpect(content().string(containsString(
+                        "aria-label=\"다음 페이지\" aria-disabled=\"true\" tabindex=\"-1\"")));
 
         ArgumentCaptor<ContractSearchCondition> captor = ArgumentCaptor.forClass(ContractSearchCondition.class);
         verify(contractService).selectByCondition(captor.capture(), org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.eq(20));

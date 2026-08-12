@@ -71,8 +71,7 @@ class ContractServiceTest {
     @Test
     @DisplayName("계약 상태 사건에 Job별 처리 이력을 묶고 미처리는 빈 배열로 반환한다")
     void selectStatusEventsGroupsProcessingsByEvent() {
-        InsuranceContract contract = InsuranceContract.builder().contractId(21L).build();
-        given(contractMapper.selectContractById(21L)).willReturn(contract);
+        given(contractMapper.selectContractIdByBusinessKey(7L, "SHARED-001")).willReturn(21L);
 
         OffsetDateTime firstEffective = OffsetDateTime.parse("2026-07-10T00:00:00+09:00");
         OffsetDateTime secondEffective = OffsetDateTime.parse("2026-07-15T00:00:00+09:00");
@@ -90,7 +89,7 @@ class ContractServiceTest {
                         secondEffective.plusDays(1).plusHours(2))
         ));
 
-        var response = contractService.selectStatusEventsByContractId(21L);
+        var response = contractService.selectStatusEventsByBusinessKey(7L, "SHARED-001");
 
         assertThat(response).hasSize(2);
         assertThat(response.getFirst().effectiveAt()).isEqualTo(firstEffective);
@@ -98,6 +97,35 @@ class ContractServiceTest {
         assertThat(response.get(1).processings())
                 .extracting(processing -> processing.processingStatus())
                 .containsExactly("FAILED", "SUCCEEDED");
+    }
+
+    @Test
+    @DisplayName("같은 계약번호도 보험회사 업무키에 따라 서로 다른 계약 이력을 조회한다")
+    void selectStatusEventsDistinguishesSameContractNumberByInsurer() {
+        given(contractMapper.selectContractIdByBusinessKey(7L, "SHARED-001")).willReturn(21L);
+        given(contractMapper.selectContractIdByBusinessKey(8L, "SHARED-001")).willReturn(22L);
+        given(contractStatusEventMapper.selectByContractId(21L)).willReturn(List.of());
+        given(contractStatusEventMapper.selectByContractId(22L)).willReturn(List.of());
+
+        assertThat(contractService.selectStatusEventsByBusinessKey(7L, "SHARED-001")).isEmpty();
+        assertThat(contractService.selectStatusEventsByBusinessKey(8L, "SHARED-001")).isEmpty();
+
+        verify(contractStatusEventMapper).selectByContractId(21L);
+        verify(contractStatusEventMapper).selectByContractId(22L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 보험회사·계약번호 업무키는 검증 오류로 처리한다")
+    void selectStatusEventsRejectsMissingBusinessKey() {
+        given(contractMapper.selectContractIdByBusinessKey(999L, "UNKNOWN")).willReturn(null);
+
+        assertThatThrownBy(() -> contractService.selectStatusEventsByBusinessKey(999L, "UNKNOWN"))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting("field", "detail")
+                .containsExactly("contractNo", "존재하지 않는 보험계약입니다.");
+
+        verify(contractStatusEventMapper, never()).selectByContractId(any());
+        verify(contractStatusEventMapper, never()).selectProcessingsByContractId(any());
     }
 
     @Test

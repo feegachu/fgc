@@ -3,7 +3,7 @@
   FGC-UI-CONT-W02 보험계약 상세
   - 계약자명은 표시하지 않는다(SRC-027 D-05).
   - 기본정보는 GET /api/v1/contracts/{id} 응답으로 채운다.
-  - 상태이력은 GET /api/v1/contracts/{id}/status-events 응답을 수용한다.
+  - 상태이력은 GET /api/v1/contracts/status-events?insurerId={insurerId}&contractNo={contractNo} 응답을 수용한다.
     effectiveAt, receivedAt, processings[]를 사용하며 이벤트와 처리 작업을 분리해 표시한다.
   - 상태이력 기본 정렬은 효력일시 오름차순이며 도착일시 오름차순으로 전환할 수 있다.
   - 나머지 탭은 해당 API 연동 시 lazy load한다.
@@ -264,7 +264,8 @@
       var newStatus = contractStatusLabels[event.newStatus] || event.newStatus || "상태 변경";
       title.textContent = previousStatus + " → " + newStatus;
       var source = document.createElement("span");
-      source.textContent = event.sourceSystem || "계약 상태 사건";
+      var hasProcessings = Array.isArray(event.processings) && event.processings.length > 0;
+      source.textContent = (event.sourceSystem || "계약 상태 사건") + (hasProcessings ? "" : " · 처리 대기");
       header.append(title, source);
 
       var times = document.createElement("dl");
@@ -285,10 +286,8 @@
 
       var processings = document.createElement("ul");
       processings.className = "contract-processing-list";
-      if (Array.isArray(event.processings) && event.processings.length) {
+      if (hasProcessings) {
         event.processings.forEach(function (processing) { processings.append(processingRow(processing)); });
-      } else {
-        processings.append(processingRow({ processingJob: "후속 처리", processingStatus: "PENDING", processedAt: null }));
       }
 
       card.append(header, times, processings);
@@ -302,17 +301,27 @@
         return;
       }
       var sorted = statusEvents.slice().sort(function (a, b) {
-        var left = Date.parse(a[currentStatusSort] || "") || 0;
-        var right = Date.parse(b[currentStatusSort] || "") || 0;
-        return left - right;
+        var left = Date.parse(a[currentStatusSort] || "");
+        var right = Date.parse(b[currentStatusSort] || "");
+        var leftInvalid = Number.isNaN(left);
+        var rightInvalid = Number.isNaN(right);
+        if (leftInvalid !== rightInvalid) return leftInvalid ? 1 : -1;
+        if (!leftInvalid && left !== right) return left - right;
+        return (Number(a.eventSeq) || 0) - (Number(b.eventSeq) || 0);
       });
       var list = document.getElementById("contract-history-list");
       list.replaceChildren();
       sorted.forEach(function (event) { list.append(historyEvent(event)); });
     }
 
-    function loadStatusHistory(apiClient) {
-      return apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/status-events")
+    function loadStatusHistory(apiClient, insurerId, contractNo) {
+      if (insurerId == null || !contractNo) {
+        historyEmpty("상태이력을 조회할 수 없습니다.", "계약의 보험회사 또는 계약번호를 확인해 주세요.");
+        return Promise.resolve();
+      }
+      var historyPath = "/api/v1/contracts/status-events?insurerId=" + encodeURIComponent(insurerId)
+        + "&contractNo=" + encodeURIComponent(contractNo);
+      return apiClient.request(historyPath)
         .then(function (response) {
           var data = response.data;
           statusEvents = Array.isArray(data) ? data : (data && Array.isArray(data.events) ? data.events : []);
@@ -390,11 +399,15 @@
       }
 
       apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId))
-        .then(function (response) { populateContract(response.data || {}); })
+        .then(function (response) {
+          var data = response.data || {};
+          populateContract(data);
+          return loadStatusHistory(apiClient, data.insurerId, data.contractNo);
+        })
         .catch(function (error) {
           text("contract-detail-load-state", error && error.message ? error.message : "계약 정보를 불러오지 못했습니다.");
+          historyEmpty("상태이력을 조회할 수 없습니다.", "계약 기본정보를 먼저 확인해 주세요.");
         });
-      loadStatusHistory(apiClient);
     });
   })();
   </script>

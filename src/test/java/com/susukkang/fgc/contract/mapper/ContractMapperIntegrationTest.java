@@ -81,6 +81,25 @@ class ContractMapperIntegrationTest {
     }
 
     @Test
+    @DisplayName("동일 계약번호를 보험회사별 업무키로 구분해 조회한다")
+    void selectsContractIdByInsurerAndContractNumber() {
+        List<References> refs = referencesForDifferentInsurers();
+        assertThat(refs).hasSize(2);
+        String sharedContractNo = "IT-SHARED-" + UUID.randomUUID();
+        InsuranceContract first = newContract(refs.get(0), sharedContractNo);
+        InsuranceContract second = newContract(refs.get(1), sharedContractNo);
+        contractMapper.insertContract(first);
+        contractMapper.insertContract(second);
+
+        assertThat(contractMapper.selectContractIdByBusinessKey(
+                refs.get(0).insurerId(), sharedContractNo)).isEqualTo(first.getContractId());
+        assertThat(contractMapper.selectContractIdByBusinessKey(
+                refs.get(1).insurerId(), sharedContractNo)).isEqualTo(second.getContractId());
+        assertThat(contractMapper.selectContractIdByBusinessKey(
+                Long.MAX_VALUE, sharedContractNo)).isNull();
+    }
+
+    @Test
     @DisplayName("검색 조건으로 등록한 계약 목록을 조회한다")
     void selectsContractByCondition() {
         References refs = references();
@@ -138,10 +157,14 @@ class ContractMapperIntegrationTest {
     }
 
     private InsuranceContract newContract(References refs) {
+        return newContract(refs, "IT-CONTRACT-" + UUID.randomUUID());
+    }
+
+    private InsuranceContract newContract(References refs, String contractNo) {
         return InsuranceContract.builder()
                 .insurerId(refs.insurerId())
                 .productOfferingId(refs.productOfferingId())
-                .contractNo("IT-CONTRACT-" + UUID.randomUUID())
+                .contractNo(contractNo)
                 .contractDate(LocalDate.now())
                 .agentId(refs.agentId())
                 .organizationId(refs.organizationId())
@@ -155,6 +178,31 @@ class ContractMapperIntegrationTest {
                 .currentStatus(ACTIVE)
                 .dataOrigin(DataOrigin.MANUAL)
                 .build();
+    }
+
+    private List<References> referencesForDifferentInsurers() {
+        return jdbcTemplate.query("""
+                SELECT DISTINCT ON (p.insurer_id)
+                       p.insurer_id,
+                       po.product_offering_id,
+                       a.agent_id,
+                       a.organization_id
+                FROM fgc.product p
+                JOIN fgc.product_offering po ON po.product_id = p.product_id
+                CROSS JOIN LATERAL (
+                    SELECT agent_id, organization_id
+                    FROM fgc.agent
+                    ORDER BY agent_id
+                    LIMIT 1
+                ) a
+                ORDER BY p.insurer_id, po.product_offering_id
+                LIMIT 2
+                """, (resultSet, rowNumber) -> new References(
+                resultSet.getLong("insurer_id"),
+                resultSet.getLong("product_offering_id"),
+                resultSet.getLong("agent_id"),
+                resultSet.getLong("organization_id")
+        ));
     }
 
     private References references() {

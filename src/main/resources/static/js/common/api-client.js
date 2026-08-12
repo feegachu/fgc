@@ -48,6 +48,9 @@
       return response.json().catch(function () {
         throw new ApiError(null, response.headers.get("X-Request-Id"), response.status);
       }).then(function (envelope) {
+        if (envelope === null || typeof envelope !== "object") {
+          throw new ApiError(null, response.headers.get("X-Request-Id"), response.status);
+        }
         if (!response.ok || envelope.error) throw new ApiError(envelope.error, envelope.requestId, response.status);
         return envelope;
       });

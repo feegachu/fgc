@@ -98,6 +98,8 @@ class DashboardViewControllerTest {
                 // ShellAdvice 기본 기준월(fgc.demo-month)
                 .andExpect(model().attribute("month", "2026-07"))
                 .andExpect(content().string(containsString("2026-07")))
+                .andExpect(content().string(containsString(
+                        "type=\"hidden\" name=\"month\" value=\"2026-07\"")))
                 // 사이드바가 서버에서 렌더링됐는지 — 목업의 fgc-shell.js 를 대체한 부분
                 .andExpect(content().string(containsString("업무 대시보드")))
                 .andExpect(content().string(containsString("FGC-UI-DASH-W01")))
@@ -109,6 +111,8 @@ class DashboardViewControllerTest {
                 .andExpect(content().string(containsString("업무 대시보드 (FGC-UI-DASH-W01) · FGC")))
                 .andExpect(content().string(containsString("2026-07-01 · 1회차")))
                 .andExpect(content().string(containsString("8/10 단계 · 실행 gaadmin")))
+                .andExpect(content().string(containsString(
+                        "role=\"progressbar\" aria-label=\"검증 진행률\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-valuenow=\"80\"")))
                 // FUN-057 인수조건 "항목 클릭 시 해당 목록으로 이동" —
                 // 화면정의서 "③ 최근 예외 5건 목록 — 클릭하면 예외함으로 이동"
                 .andExpect(content().string(containsString("/exceptions?contractNo=C001")));

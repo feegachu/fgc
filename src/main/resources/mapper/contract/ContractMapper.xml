@@ -262,6 +262,7 @@
     <select id="selectContractDetailById"
             resultType="com.susukkang.fgc.contract.dto.ContractDetailResponse">
         SELECT
+            ic.insurer_id,
             ic.contract_no,
             p.product_name,
             ic.contract_date,
@@ -279,6 +280,12 @@
                  JOIN product p
                       ON p.product_id = po.product_id
         WHERE ic.contract_id = #{contractId}
+    </select>
+    <select id="selectContractIdByBusinessKey" resultType="long">
+        SELECT contract_id
+        FROM insurance_contract
+        WHERE insurer_id = #{insurerId}
+          AND contract_no = #{contractNo}
     </select>
     <!-- 계약 수정 -->
     <update id="updateContract"

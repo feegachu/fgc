@@ -83,9 +83,12 @@ public class ContractController {
     }
 
     /** IF-API-16 계약 상태 사건과 Job별 처리 이력을 조회한다. */
-    @GetMapping("/{id}/status-events")
-    public ApiResponse<List<ContractStatusEventResponse>> getContractStatusEvents(@PathVariable Long id) {
-        return ApiResponse.success(contractService.selectStatusEventsByContractId(id));
+    @GetMapping("/status-events")
+    public ApiResponse<List<ContractStatusEventResponse>> getContractStatusEvents(
+            @RequestParam Long insurerId,
+            @RequestParam String contractNo
+    ) {
+        return ApiResponse.success(contractService.selectStatusEventsByBusinessKey(insurerId, contractNo));
     }
     /**
      * 계약 ID에 해당하는 운영용 예상 스케줄 헤더 목록을 조회한다.

@@ -110,7 +110,7 @@
     if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
-  function closeTab(tabId, tabs, activeId) {
+  function closeTab(tabId, tabs, activeId, render) {
     var index = tabs.findIndex(function (tab) { return tab.id === tabId; });
     if (index < 0) return;
     if (tabs.length === 1 && tabId === DASHBOARD_TAB_ID) return;
@@ -123,6 +123,7 @@
     }
 
     writeTabs(tabs);
+    render(tabs, activeId);
     if (wasActive) {
       var next = tabs[Math.min(index, tabs.length - 1)];
       window.location.assign(next.href);
@@ -143,17 +144,19 @@
 
     var tabs = upsertCurrentTab(readTabs(), current);
     writeTabs(tabs);
-    renderTabs(container, tabs, current.id);
-
     var overflowButton = document.querySelector("[data-action='open-workspace-overflow']");
-    updateOverflowState(container, overflowButton);
+    function render(updatedTabs, activeId) {
+      renderTabs(container, updatedTabs, activeId);
+      updateOverflowState(container, overflowButton);
+    }
+    render(tabs, current.id);
 
     container.addEventListener("click", function (event) {
       var closeButton = event.target.closest("[data-action='close-workspace-tab']");
       if (!closeButton) return;
       event.preventDefault();
       event.stopPropagation();
-      closeTab(closeButton.dataset.tabId, tabs, current.id);
+      closeTab(closeButton.dataset.tabId, tabs, current.id, render);
     });
 
     if (overflowButton) {

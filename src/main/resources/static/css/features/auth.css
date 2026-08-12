@@ -292,7 +292,7 @@
   }
 }
 
-@media (max-height: 48rem) and (min-width: 47.51rem) {
+@media (max-height: 48rem) and (min-width: 54.01rem) {
   .auth-brand-message {
     margin-top: 4rem;
   }
@@ -313,7 +313,7 @@
   }
 }
 
-@media (max-width: 47.5rem) {
+@media (max-width: 54rem) {
   .auth-page {
     background-position: 35% center;
   }

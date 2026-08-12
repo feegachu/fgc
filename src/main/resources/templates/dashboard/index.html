@@ -8,10 +8,11 @@
   </header>
 
   <form class="dashboard-control-bar" method="get" th:action="@{/}">
+    <input type="hidden" name="month" th:value="${month}">
     <div class="dashboard-control-fields">
       <label class="dashboard-control-field"><span class="dashboard-control-label">집계 기준</span><select class="select-control" disabled><option>저장 완료 결과</option></select></label>
       <label class="dashboard-control-field"><span class="dashboard-control-label">조직 범위</span><select class="select-control" disabled><option>전체 조직</option></select></label>
-      <div class="dashboard-updated"><p class="dashboard-updated-label">집계 정산월</p><p class="dashboard-updated-value" th:text="${month} + ' · 저장 결과 기준'">2026-07 · 저장 결과 기준</p></div>
+      <div class="dashboard-updated"><p class="dashboard-updated-label">집계 정산월</p><p class="dashboard-updated-value" th:text="${month == null ? '집계월 미지정 · 저장 결과 기준' : month + ' · 저장 결과 기준'}">2026-07 · 저장 결과 기준</p></div>
     </div>
     <div class="dashboard-control-actions"><button class="button button-secondary" type="submit">새로고침</button><a class="button button-primary" th:href="@{/validation-runs}">정산 실행</a></div>
   </form>
@@ -40,7 +41,7 @@
     <aside class="dashboard-secondary-column" aria-label="마감 및 실행 현황">
       <section class="surface readiness-card" aria-labelledby="readiness-title"><div class="readiness-header"><h2 id="readiness-title" class="readiness-title">마감 준비도</h2><a class="readiness-link" th:href="@{/validation-runs}">마감 조건 보기 →</a></div><div class="readiness-value-row"><strong class="readiness-value">—</strong><span class="status-badge status-badge-neutral">집계 대기</span></div><div class="progress" role="progressbar" aria-label="마감 준비도"><span class="progress-bar" data-progress="0"></span></div><p class="readiness-meta"><span>준비도 집계 API가 아직 제공되지 않습니다.</span></p></section>
       <section class="surface run-list-card" aria-labelledby="run-list-title"><div class="run-list-header"><h2 id="run-list-title" class="run-list-title">최근 통합검증 실행</h2><a class="run-list-link" th:href="@{/validation-runs}">실행 목록 →</a></div>
-        <a class="run-row" th:each="r : ${summary.recentRuns()}" th:href="@{/validation-runs/{id}(id=${r.validationRunId()})}"><strong class="run-title" th:text="${r.validationMonth()} + ' · ' + ${r.runNo()} + '회차'">-</strong><span class="run-meta" th:text="${r.currentStep() == null ? 0 : r.currentStep()} + '/10 단계 · 실행 ' + ${r.triggeredBy()}">-</span><span class="status-badge" th:classappend="${r.status() == 'FAILED'} ? ' status-badge-error' : (${r.status() == 'FINALIZED' or r.status() == 'COMPLETED'} ? ' status-badge-success' : ' status-badge-info')" th:text="${r.status()}">-</span><span class="progress"><span class="progress-bar" th:attr="data-progress=${r.currentStep() == null ? 0 : r.currentStep() * 10}"></span></span></a>
+        <a class="run-row" th:each="r : ${summary.recentRuns()}" th:href="@{/validation-runs/{id}(id=${r.validationRunId()})}"><strong class="run-title" th:text="${r.validationMonth()} + ' · ' + ${r.runNo()} + '회차'">-</strong><span class="run-meta" th:text="${r.currentStep() == null ? 0 : r.currentStep()} + '/10 단계 · 실행 ' + ${r.triggeredBy()}">-</span><span class="status-badge" th:classappend="${r.status() == 'FAILED'} ? ' status-badge-error' : (${r.status() == 'FINALIZED' or r.status() == 'COMPLETED'} ? ' status-badge-success' : ' status-badge-info')" th:text="${r.status()}">-</span><span class="progress" role="progressbar" aria-label="검증 진행률" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${r.currentStep() == null ? 0 : r.currentStep() * 10}"><span class="progress-bar" th:attr="data-progress=${r.currentStep() == null ? 0 : r.currentStep() * 10}"></span></span></a>
         <div class="empty-state" th:if="${summary.recentRuns().isEmpty()}" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div>
       </section>
     </aside>
