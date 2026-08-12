@@ -71,7 +71,7 @@ public class ValidationRunController {
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     public ApiResponse<CreateValidationRunResponse> create(
             @RequestBody CreateValidationRunRequest request,
             @AuthenticationPrincipal FgcUserDetails principal
