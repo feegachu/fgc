@@ -1,5 +1,6 @@
 package com.susukkang.fgc.contract.service;
 
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
@@ -9,6 +10,7 @@ import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.mapper.ContractStatusEventMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,8 @@ import org.springframework.validation.annotation.Validated;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -35,6 +39,8 @@ import java.util.Objects;
 public class ContractService {
 
     private final ContractMapper contractMapper;
+    private final ContractStatusEventMapper contractStatusEventMapper;
+    private final CapCheckService capCheckService;
     private final ScheduleService scheduleService;
     /**
      * 설명 : 검색 조건에 따라 계약을 조회한다.
@@ -343,8 +349,7 @@ public class ContractService {
     }
     /**
      * 설명 : 계약 상세보기 서비스
-     *       현재는 계약 기본정보를 반환한다.
-     *       계약별 계약상태 사건 이력은 FUN-026 2차에서 포함한다.
+     *       계약 상태 사건 이력은 IF-API-16에서 별도 조회한다.
      * @param  contractId 계약 ID
      * @return 계약 기본정보
      * @author hjKang
@@ -360,12 +365,44 @@ public class ContractService {
                     "존재하지 않는 보험계약입니다."
             );
         }
-//        // TODO(FUN-026, 2차): 계약상태 사건 이력을 조회하여 상세 응답에 포함한다.
-//        List<ContractStatusEventResponse> statusEvents =
-//                contractStatusEventMapper.selectByContractId(contractId);
-//        // ContractDetail에 Build 후 반환
-//        detail.setContractStatusEventResponses(statusEvents);
         return detail;
+    }
+
+    /**
+     * IF-API-16 계약 상태 사건 이력을 효력일시 순으로 반환한다.
+     * 처리일은 사건 원본의 폐기 예정 processed_at이 아니라 Job별 처리 테이블에서 읽는다.
+     */
+    @Transactional(readOnly = true)
+    public List<ContractStatusEventResponse> selectStatusEventsByContractId(Long contractId) {
+        if (contractMapper.selectContractById(contractId) == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+
+        List<ContractStatusEventRow> events = contractStatusEventMapper.selectByContractId(contractId);
+        if (events.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, List<ContractStatusEventProcessingResponse>> processingsByEvent = new LinkedHashMap<>();
+        for (ContractStatusEventProcessingRow processing
+                : contractStatusEventMapper.selectProcessingsByContractId(contractId)) {
+            processingsByEvent
+                    .computeIfAbsent(processing.contractStatusEventId(), ignored -> new ArrayList<>())
+                    .add(processing.toResponse());
+        }
+
+        return events.stream()
+                .map(event -> new ContractStatusEventResponse(
+                        event.eventSeq(),
+                        event.previousStatus(),
+                        event.newStatus(),
+                        event.effectiveAt(),
+                        event.receivedAt(),
+                        processingsByEvent.getOrDefault(event.contractStatusEventId(), List.of()),
+                        event.sourceSystem(),
+                        event.sourceEventKey()
+                ))
+                .toList();
     }
 
     /**

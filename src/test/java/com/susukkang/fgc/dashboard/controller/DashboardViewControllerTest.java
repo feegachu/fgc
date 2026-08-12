@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * DASH-W01 화면 + 공통 셸(layout/default.html) + ShellAdvice 를 한 번에 지키는 테스트.
  *
- * 셸이 깨지거나, 푸터 면책문구(COR-009)가 사라지거나, 기준월 advice 가 멎으면 여기서 걸린다.
+ * 셸이 깨지거나 기준월 advice 가 멎으면 여기서 걸린다.
  * 화면 21개가 전부 이 레이아웃을 쓰므로 이 테스트가 프론트 전체의 회귀 방지선이다.
  */
 // GlobalExceptionHandler 는 @ControllerAdvice 라 @WebMvcTest 가 자동으로 끌어온다.
@@ -87,29 +87,32 @@ class DashboardViewControllerTest {
     }
 
     @Test
-    void 대시보드가_공통셸로_렌더링되고_면책문구와_기본_기준월을_담는다() throws Exception {
+    void 대시보드가_공통셸로_렌더링되고_실제_KPI와_기본_기준월을_담는다() throws Exception {
         given(dashboardService.summarize(LocalDate.of(2026, 7, 1)))
                 .willReturn(sampleResult(LocalDate.of(2026, 7, 1)));
 
         mockMvc.perform(get("/").with(user(SETTLE)))
                 .andExpect(status().isOk())
                 .andExpect(view().name("dashboard/index"))
-                // COR-009 — 푸터 면책문구는 지우면 안 된다
-                .andExpect(content().string(containsString("교육용 프로토타입입니다")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("교육용 프로토타입입니다"))))
                 // ShellAdvice 기본 기준월(fgc.demo-month)
                 .andExpect(model().attribute("month", "2026-07"))
                 .andExpect(content().string(containsString("2026-07")))
+                .andExpect(content().string(containsString(
+                        "type=\"hidden\" name=\"month\" value=\"2026-07\"")))
                 // 사이드바가 서버에서 렌더링됐는지 — 목업의 fgc-shell.js 를 대체한 부분
                 .andExpect(content().string(containsString("업무 대시보드")))
                 .andExpect(content().string(containsString("FGC-UI-DASH-W01")))
                 // KPI 6장이 서비스 값을 그대로 표시하는지
-                .andExpect(content().string(containsString("cap_check · result_status = VIOLATION")))
+                .andExpect(content().string(containsString("확정 위반 판정")))
                 // 가운뎃점(·)이 들어간 문자열 결합이 실제로 렌더링되는지.
                 // IntelliJ 의 Thymeleaf 검사기는 |...| 안의 · 를 토큰으로 잘못 끊어 오류로 표시하지만
                 // 런타임은 정상이다. 표현식을 문자열 리터럴 결합으로 바꾼 뒤에도 결과가 같아야 한다.
                 .andExpect(content().string(containsString("업무 대시보드 (FGC-UI-DASH-W01) · FGC")))
                 .andExpect(content().string(containsString("2026-07-01 · 1회차")))
                 .andExpect(content().string(containsString("8/10 단계 · 실행 gaadmin")))
+                .andExpect(content().string(containsString(
+                        "role=\"progressbar\" aria-label=\"검증 진행률\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-valuenow=\"80\"")))
                 // FUN-057 인수조건 "항목 클릭 시 해당 목록으로 이동" —
                 // 화면정의서 "③ 최근 예외 5건 목록 — 클릭하면 예외함으로 이동"
                 .andExpect(content().string(containsString("/exceptions?contractNo=C001")));

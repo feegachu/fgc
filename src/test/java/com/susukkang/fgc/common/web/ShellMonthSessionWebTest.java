@@ -82,17 +82,16 @@ class ShellMonthSessionWebTest {
                         "<option value=\"2026-05\" selected=\"selected\"")));
     }
 
-    /**
-     * 인라인 핸들러는 with(document) 스코프에서 돈다 — document.URL(문자열)이 전역 URL 생성자를
-     * 가려서 new URL(...) 은 "URL is not a constructor" 로 조용히 죽는다. select 가 리로드를
-     * 못 걸면 ?month= 가 서버에 닿지 않아 위 세션 테스트가 통과해도 화면에서는 기준월이 안 바뀐다.
-     */
+    /** 기준월 변경은 인라인 스크립트 대신 공통 app-shell.js의 위임 이벤트로 처리한다. */
     @Test
-    void month_select_reloads_with_unshadowed_url_constructor() throws Exception {
+    void month_select_is_connected_to_common_shell_script() throws Exception {
         stubEmptySummary();
 
         mvc.perform(get("/").with(user(settleUser())))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("new window.URL(location)")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-action=\"change-global-month\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "src=\"/js/common/app-shell.js\"")));
     }
 
     /**
