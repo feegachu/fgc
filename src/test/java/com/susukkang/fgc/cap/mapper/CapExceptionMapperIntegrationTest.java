@@ -38,13 +38,14 @@ class CapExceptionMapperIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void escalatesWarningToViolationWithoutDuplicateAndResolvesWithAction() {
+    void updatesSameViolationWithoutDuplicateAndResolvesWithAction() {
         TestReference reference = testReference();
         Long paymentId = insertDraftPayment(reference);
-        String exceptionKey = "CAP:" + paymentId + ":CAP_CHECK:" + reference.capRuleSetId();
+        String exceptionKey = "CAP_VIOLATION:null:COMMISSION_TRANSACTION:"
+                + paymentId + ":GA_TO_FC";
 
         capExceptionMapper.insertException(exception(
-                exceptionKey, paymentId, reference, ExceptionType.CAP_WARNING, ExceptionSeverity.WARNING));
+                exceptionKey, paymentId, reference, ExceptionType.CAP_VIOLATION, ExceptionSeverity.HIGH));
         capExceptionMapper.insertException(exception(
                 exceptionKey, paymentId, reference, ExceptionType.CAP_VIOLATION, ExceptionSeverity.CRITICAL));
 

@@ -8,6 +8,7 @@ import com.susukkang.fgc.cap.mapper.CapExceptionMapper;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionType;
+import com.susukkang.fgc.common.code.PaymentStage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -113,7 +114,12 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 : "1,200% 한도 사용률 주의";
 
         return CapExceptionInsertDTO.builder()
-                .exceptionKey(createExceptionKey(command.paymentId(), command.capRuleSetId()))
+                .exceptionKey(createExceptionKey(
+                        exceptionType,
+                        command.validationRunId(),
+                        command.paymentId(),
+                        command.paymentStage()
+                ))
                 .exceptionType(exceptionType)
                 .severity(severity)
                 .validationRunId(command.validationRunId())
@@ -126,8 +132,17 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 .build();
     }
 
-    private String createExceptionKey(Long paymentId, Long capRuleSetId) {
-        return "CAP:" + paymentId + ":CAP_CHECK:" + capRuleSetId;
+    private String createExceptionKey(
+            ExceptionType exceptionType,
+            Long validationRunId,
+            Long paymentId,
+            PaymentStage paymentStage
+    ) {
+        return exceptionType.name()
+                + ":" + validationRunId
+                + ":COMMISSION_TRANSACTION"
+                + ":" + paymentId
+                + ":" + paymentStage.name();
     }
 
     private String createDescription(CapExceptionCreateCommand command) {
@@ -157,6 +172,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         if (command.contractId() == null) throw new IllegalArgumentException("계약 ID가 없습니다.");
         if (command.agentId() == null) throw new IllegalArgumentException("설계사 ID가 없습니다.");
         if (command.policyVersionId() == null) throw new IllegalArgumentException("정책 버전 ID가 없습니다.");
+        if (command.paymentStage() == null) throw new IllegalArgumentException("지급 단계가 없습니다.");
         if (command.resultStatus() == null) throw new IllegalArgumentException("한도 판정 결과가 없습니다.");
         if (command.resultStatus() == CapResultStatus.WARNING
                 || command.resultStatus() == CapResultStatus.VIOLATION) {

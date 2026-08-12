@@ -62,7 +62,8 @@ class CapExceptionServiceImplTest {
 
         verify(capExceptionMapper).insertException(captor.capture());
         CapExceptionInsertDTO inserted = captor.getValue();
-        assertThat(inserted.getExceptionKey()).isEqualTo("CAP:10:CAP_CHECK:3");
+        assertThat(inserted.getExceptionKey())
+                .isEqualTo("CAP_WARNING:77:COMMISSION_TRANSACTION:10:GA_TO_FC");
         assertThat(inserted.getExceptionType()).isEqualTo(ExceptionType.CAP_WARNING);
         assertThat(inserted.getSeverity()).isEqualTo(ExceptionSeverity.WARNING);
         assertThat(inserted.getValidationRunId()).isEqualTo(77L);
@@ -73,33 +74,34 @@ class CapExceptionServiceImplTest {
     }
 
     @Test
-    void createsViolationWithSameNaturalKeyForWarningEscalation() {
+    void createsViolationWithFrozenExceptionKeyFormat() {
         ArgumentCaptor<CapExceptionInsertDTO> captor = ArgumentCaptor.forClass(CapExceptionInsertDTO.class);
 
         capExceptionService.createIfNecessary(command(CapResultStatus.VIOLATION, 10L, 3L, null));
 
         verify(capExceptionMapper).insertException(captor.capture());
-        assertThat(captor.getValue().getExceptionKey()).isEqualTo("CAP:10:CAP_CHECK:3");
+        assertThat(captor.getValue().getExceptionKey())
+                .isEqualTo("CAP_VIOLATION:null:COMMISSION_TRANSACTION:10:GA_TO_FC");
         assertThat(captor.getValue().getExceptionType()).isEqualTo(ExceptionType.CAP_VIOLATION);
         assertThat(captor.getValue().getSeverity()).isEqualTo(ExceptionSeverity.CRITICAL);
         assertThat(captor.getValue().getDescription()).contains("초과액=100");
     }
 
     @Test
-    void createsDifferentNaturalKeysForDifferentPaymentOrCapRuleSet() {
+    void createsDifferentNaturalKeysForDifferentPaymentOrValidationRun() {
         ArgumentCaptor<CapExceptionInsertDTO> captor = ArgumentCaptor.forClass(CapExceptionInsertDTO.class);
 
         capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 10L, 3L, null));
         capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 11L, 3L, null));
-        capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 10L, 4L, null));
+        capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 10L, 4L, 77L));
 
         verify(capExceptionMapper, org.mockito.Mockito.times(3)).insertException(captor.capture());
         assertThat(captor.getAllValues())
                 .extracting(CapExceptionInsertDTO::getExceptionKey)
                 .containsExactly(
-                        "CAP:10:CAP_CHECK:3",
-                        "CAP:11:CAP_CHECK:3",
-                        "CAP:10:CAP_CHECK:4"
+                        "CAP_WARNING:null:COMMISSION_TRANSACTION:10:GA_TO_FC",
+                        "CAP_WARNING:null:COMMISSION_TRANSACTION:11:GA_TO_FC",
+                        "CAP_WARNING:77:COMMISSION_TRANSACTION:10:GA_TO_FC"
                 );
     }
 
