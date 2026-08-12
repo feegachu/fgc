@@ -69,7 +69,7 @@ class ScheduleControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 재생성도 허용된다. */
+    /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 재생성도 허용된다. */
     @Test
     void allowsRegenerationForSystemAdmin() throws Exception {
         when(scheduleService.regenerateSchedules(10L, "정책 변경 반영")).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).versionNo(2L).build());

@@ -74,7 +74,7 @@ class ValidationRunControllerTest {
         return new FgcUserDetails(appUserView, true, true);
     }
 
-    /** FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 실행 생성도 허용된다. */
+    /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 실행 생성도 허용된다. */
     @Test
     void createsValidationRunForSystemAdmin() throws Exception {
         given(validationRunCreateService.create(any())).willReturn(createdRow());

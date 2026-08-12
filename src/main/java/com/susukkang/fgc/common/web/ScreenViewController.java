@@ -35,7 +35,7 @@ public class ScreenViewController {
 
     /**
      * CONT-W03 — 인터페이스정의서 IF-API-18/19 역할 SETTLEMENT (+SYSTEM_ADMIN 은 전부, §4-1).
-     * FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
+     * FGC-FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
      */
     @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
     @GetMapping("/contracts/new")

@@ -149,7 +149,7 @@ class ScreenViewControllerTest {
     }
 
     /**
-     * FUN-002 인수조건: 권한 없는 역할의 직접 URL 호출은 403 으로 차단된다.
+     * FGC-FUN-002 인수조건: 권한 없는 역할의 직접 URL 호출은 403 으로 차단된다.
      * 폼 라우트는 SETTLEMENT·SYSTEM_ADMIN 전용 — 인터페이스정의서 IF-API-18/19/22,
      * 화면정의서 :590·:686 (GA_ADMIN 은 2026-08-12 교차 판정으로 제외, 근거대장 참조).
      */
@@ -159,6 +159,7 @@ class ScreenViewControllerTest {
             "SYSTEM_ADMIN, /contracts/new,    200",
             "GA_ADMIN,     /contracts/new,    403",
             "COMPLIANCE,   /contracts/new,    403",
+            "SYSTEM_ADMIN, /contracts/1/edit, 200",
             "GA_ADMIN,     /contracts/1/edit, 403",
             "COMPLIANCE,   /contracts/1/edit, 403",
             "SETTLEMENT,   /transactions/new, 200",
