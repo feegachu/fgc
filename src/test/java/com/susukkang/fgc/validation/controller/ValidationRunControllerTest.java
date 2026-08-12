@@ -74,6 +74,25 @@ class ValidationRunControllerTest {
         return new FgcUserDetails(appUserView, true, true);
     }
 
+    /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 실행 생성도 허용된다. */
+    @Test
+    void createsValidationRunForSystemAdmin() throws Exception {
+        given(validationRunCreateService.create(any())).willReturn(createdRow());
+
+        AppUserView adminView = new AppUserView();
+        adminView.setUserId(4L);
+        adminView.setLoginId("admin");
+        adminView.setPasswordHash("{bcrypt}dummy");
+        adminView.setUserName("시스템관리자");
+        adminView.setRoleCode("SYSTEM_ADMIN");
+
+        mockMvc.perform(post("/api/v1/validation-runs")
+                        .with(user(new FgcUserDetails(adminView, true, true)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateValidationRunRequest("2026-08", "MONTHLY"))))
+                .andExpect(status().isCreated());
+    }
+
     @Test
     // 정상 요청 → 201 + validationRunId/status(CREATED) 응답 확인
     void createsValidationRunAndReturns201() throws Exception {
