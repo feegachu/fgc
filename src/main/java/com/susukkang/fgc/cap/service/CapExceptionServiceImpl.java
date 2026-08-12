@@ -1,7 +1,9 @@
 package com.susukkang.fgc.cap.service;
 
-import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapExceptionInsertDTO;
+import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
+import com.susukkang.fgc.cap.dto.CapExceptionStatusRow;
 import com.susukkang.fgc.cap.mapper.CapExceptionMapper;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
@@ -9,6 +11,8 @@ import com.susukkang.fgc.common.code.ExceptionType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
 import java.math.BigDecimal;
 
 /**
@@ -25,57 +29,61 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     private final CapExceptionMapper capExceptionMapper;
 
     /**
-     * 설명 : 1,200% 한도 계산 결과를 바탕으로 필요한 예외 건을 생성한다
+     * 설명 : 실시간·배치 한도 판정 결과가 주의 또는 위반인 경우 예외 건을 생성한다
      *
-     * @param paymentId 지급 건 ID
-     * @param agentId 설계사 ID
-     * @param result 1,200% 한도 계산 결과
+     * @param command 한도 예외 생성 명령
      * @author hjKang
      * @since 2026-08-12
      */
     @Override
     @Transactional
-    public void createIfNecessary(
-            Long paymentId,
-            Long agentId,
-            CapCalculationResult result
-    ) {
-        validateInput(paymentId, agentId, result);
+    public void createIfNecessary(CapExceptionCreateCommand command) {
+        validateCreateCommand(command);
+        ExceptionType exceptionType = resolveExceptionType(command.resultStatus());
+        if (exceptionType == null) return;
 
-        ExceptionType exceptionType = resolveExceptionType(result.resultStatus());
-
-        // 정상 또는 검토필요 결과는 FUN-034 주의·위반 예외 생성 대상이 아니다.
-        if (exceptionType == null) {
-            return;
-        }
-
-        Long policyVersionId = capExceptionMapper.selectPolicyVersionId(
-                result.capRuleSetId()
-        );
-
-        if (policyVersionId == null) {
-            throw new IllegalStateException("한도 룰셋의 정책 버전을 찾을 수 없습니다.");
-        }
-
-        CapExceptionInsertDTO exception = createExceptionDTO(
-                paymentId,
-                agentId,
-                policyVersionId,
-                exceptionType,
-                result
-        );
-
-        capExceptionMapper.insertException(exception);
+        capExceptionMapper.insertException(createExceptionDTO(command, exceptionType));
     }
 
     /**
-     * 설명 : 한도 판정 결과를 예외 유형으로 변환한다
+     * 설명 : 해결조치를 기록하고 한도 예외를 해결 완료 상태로 변경한다
      *
-     * @param resultStatus 한도 판정 결과
-     * @return 예외 유형
+     * @param command 한도 예외 해결 명령
      * @author hjKang
      * @since 2026-08-12
      */
+    @Override
+    @Transactional
+    public void resolve(CapExceptionResolveCommand command) {
+        validateResolveCommand(command);
+        CapExceptionStatusRow exception = capExceptionMapper.selectExceptionForUpdate(command.exceptionCaseId());
+        if (exception == null) throw new IllegalArgumentException("존재하지 않는 한도 예외입니다.");
+        if ("RESOLVED".equals(exception.status())) return;
+        if ("REJECTED".equals(exception.status())) throw new IllegalStateException("종결된 예외는 해결할 수 없습니다.");
+
+        if (capExceptionMapper.insertExceptionAction(command) != 1) {
+            throw new IllegalStateException("한도 예외 해결조치 저장에 실패했습니다.");
+        }
+        if (capExceptionMapper.updateExceptionResolved(command.exceptionCaseId()) != 1) {
+            throw new IllegalStateException("한도 예외 상태 변경에 실패했습니다.");
+        }
+    }
+
+    /**
+     * 설명 : 지급 건에 미해결 한도 위반 예외가 존재하는지 확인한다
+     *
+     * @param paymentId 지급 건 ID
+     * @return 미해결 한도 위반 예외 존재 여부
+     * @author hjKang
+     * @since 2026-08-12
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasUnresolvedViolation(Long paymentId) {
+        if (paymentId == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
+        return capExceptionMapper.existsUnresolvedViolation(paymentId);
+    }
+
     private ExceptionType resolveExceptionType(CapResultStatus resultStatus) {
         return switch (resultStatus) {
             case WARNING -> ExceptionType.CAP_WARNING;
@@ -84,109 +92,75 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         };
     }
 
-    /**
-     * 설명 : 한도 예외 등록 DTO를 생성한다
-     *
-     * @param paymentId 지급 건 ID
-     * @param agentId 설계사 ID
-     * @param policyVersionId 정책 버전 ID
-     * @param exceptionType 예외 유형
-     * @param result 한도 계산 결과
-     * @return 한도 예외 등록 DTO
-     * @author hjKang
-     * @since 2026-08-12
-     */
     private CapExceptionInsertDTO createExceptionDTO(
-            Long paymentId,
-            Long agentId,
-            Long policyVersionId,
-            ExceptionType exceptionType,
-            CapCalculationResult result
+            CapExceptionCreateCommand command,
+            ExceptionType exceptionType
     ) {
-        ExceptionSeverity severity =
-                exceptionType == ExceptionType.CAP_VIOLATION
-                        ? ExceptionSeverity.CRITICAL
-                        : ExceptionSeverity.WARNING;
-
-        String title =
-                exceptionType == ExceptionType.CAP_VIOLATION
-                        ? "1,200% 한도 초과"
-                        : "1,200% 한도 사용률 주의";
+        ExceptionSeverity severity = exceptionType == ExceptionType.CAP_VIOLATION
+                ? ExceptionSeverity.CRITICAL
+                : ExceptionSeverity.WARNING;
+        String title = exceptionType == ExceptionType.CAP_VIOLATION
+                ? "1,200% 한도 초과"
+                : "1,200% 한도 사용률 주의";
 
         return CapExceptionInsertDTO.builder()
-                .exceptionKey(createExceptionKey(paymentId, policyVersionId))
+                .exceptionKey(createExceptionKey(command.paymentId(), command.policyVersionId()))
                 .exceptionType(exceptionType)
                 .severity(severity)
-                .validationRunId(null)
-                .contractId(result.contractId())
-                .agentId(agentId)
-                .policyVersionId(policyVersionId)
-                .paymentId(paymentId)
+                .validationRunId(command.validationRunId())
+                .contractId(command.contractId())
+                .agentId(command.agentId())
+                .policyVersionId(command.policyVersionId())
+                .paymentId(command.paymentId())
                 .title(title)
-                .description(createDescription(result))
+                .description(createDescription(command))
                 .build();
     }
 
-    /**
-     * 설명 : 지급 건과 정책 버전을 이용하여 중복 방지용 예외 키를 생성한다
-     *
-     * @param paymentId 지급 건 ID
-     * @param policyVersionId 정책 버전 ID
-     * @return 예외 업무 고유키
-     * @author hjKang
-     * @since 2026-08-12
-     */
-    private String createExceptionKey(
-            Long paymentId,
-            Long policyVersionId
-    ) {
+    private String createExceptionKey(Long paymentId, Long policyVersionId) {
         return "CAP:" + paymentId + ":CAP_CHECK:" + policyVersionId;
     }
 
-    /**
-     * 설명 : 한도 예외의 계산 근거 설명을 생성한다
-     *
-     * @param result 한도 계산 결과
-     * @return 계산 근거 설명
-     * @author hjKang
-     * @since 2026-08-12
-     */
-    private String createDescription(CapCalculationResult result) {
-        BigDecimal exceededAmount = result.includedAmount()
-                .subtract(result.limitAmount())
+    private String createDescription(CapExceptionCreateCommand command) {
+        BigDecimal exceededAmount = command.includedAmount()
+                .subtract(command.limitAmount())
                 .max(BigDecimal.ZERO);
 
-        return "한도액=" + result.limitAmount()
-                + ", 산입액=" + result.includedAmount()
-                + ", 잔여액=" + result.remainingAmount()
-                + ", 사용률=" + result.usagePct()
+        return "지급단계=" + command.paymentStage()
+                + ", 기준일=" + command.asOfDate()
+                + ", 한도룰셋ID=" + command.capRuleSetId()
+                + ", 환급률표ID=" + command.refundRateTableId()
+                + ", 기준보험료=" + command.basePremiumAmount()
+                + ", 환급금가산액=" + command.refund12mAmount()
+                + ", 준법경영비차감액=" + command.complianceDeductionAmount()
+                + ", 한도액=" + command.limitAmount()
+                + ", 산입액=" + command.includedAmount()
+                + ", 잔여액=" + command.remainingAmount()
+                + ", 사용률=" + command.usagePct()
                 + "%, 초과액=" + exceededAmount;
     }
 
-    /**
-     * 설명 : 한도 예외 생성에 필요한 입력값을 검증한다
-     *
-     * @param paymentId 지급 건 ID
-     * @param agentId 설계사 ID
-     * @param result 한도 계산 결과
-     * @author hjKang
-     * @since 2026-08-12
-     */
-    private void validateInput(
-            Long paymentId,
-            Long agentId,
-            CapCalculationResult result) {
-        if (paymentId == null) {
-            throw new IllegalArgumentException("지급 건 ID가 없습니다.");
+    private void validateCreateCommand(CapExceptionCreateCommand command) {
+        if (command == null) throw new IllegalArgumentException("한도 예외 생성 명령이 없습니다.");
+        if (command.paymentId() == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
+        if (command.contractId() == null) throw new IllegalArgumentException("계약 ID가 없습니다.");
+        if (command.agentId() == null) throw new IllegalArgumentException("설계사 ID가 없습니다.");
+        if (command.policyVersionId() == null) throw new IllegalArgumentException("정책 버전 ID가 없습니다.");
+        if (command.resultStatus() == null) throw new IllegalArgumentException("한도 판정 결과가 없습니다.");
+        if (command.resultStatus() == CapResultStatus.WARNING
+                || command.resultStatus() == CapResultStatus.VIOLATION) {
+            if (command.limitAmount() == null || command.includedAmount() == null
+                    || command.remainingAmount() == null || command.usagePct() == null) {
+                throw new IllegalArgumentException("한도 예외 계산 근거가 없습니다.");
+            }
         }
-        if (agentId == null) {
-            throw new IllegalArgumentException("설계사 ID가 없습니다.");
-        }
-        if (result == null) {
-            throw new IllegalArgumentException("1,200% 한도 계산 결과가 없습니다.");
-        }
-        if (result.resultStatus() == null) {
-            throw new IllegalArgumentException("1,200% 한도 판정 결과가 없습니다.");
-        }
+    }
+
+    private void validateResolveCommand(CapExceptionResolveCommand command) {
+        if (command == null) throw new IllegalArgumentException("한도 예외 해결 명령이 없습니다.");
+        if (command.exceptionCaseId() == null) throw new IllegalArgumentException("예외 ID가 없습니다.");
+        if (command.actionType() == null) throw new IllegalArgumentException("해결조치 코드는 필수입니다.");
+        if (!StringUtils.hasText(command.reason())) throw new IllegalArgumentException("해결 사유는 필수입니다.");
+        if (command.actionBy() == null) throw new IllegalArgumentException("처리자 ID가 없습니다.");
     }
 }

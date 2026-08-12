@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.cap.service.CapValidatorImpl;
 import com.susukkang.fgc.common.code.AttributionMethod;
@@ -68,6 +69,8 @@ class CommissionPaymentServiceImplTest {
     private CommissionPaymentMapper mapper;
     @Mock
     private CapCalculator capCalculator;
+    @Mock
+    private CapExceptionService capExceptionService;
 
     private CommissionPaymentServiceImpl service;
 
@@ -78,7 +81,8 @@ class CommissionPaymentServiceImplTest {
                 mapper,
                 new ObjectMapper(),
                 capValidator,
-                capCalculator
+                capCalculator,
+                capExceptionService
         );
     }
 
@@ -687,7 +691,7 @@ class CommissionPaymentServiceImplTest {
         verify(mapper).insertCapCheck(captor.capture());
         assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("90");
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.WARNING);
-        verify(mapper).insertExceptionCase(any());
+        verify(capExceptionService).createIfNecessary(any());
     }
 
     // 2026-08-11 yslee - 지급 정책과 계산 정책 불일치의 업무 예외 변환 검증
@@ -785,7 +789,24 @@ class CommissionPaymentServiceImplTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
 
-        verify(mapper).insertExceptionCase(any());
+        verify(capExceptionService).createIfNecessary(any());
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    @Test
+    void blocksConfirmationWhileCapViolationExceptionIsUnresolved() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(capExceptionService.hasUnresolvedViolation(101L)).willReturn(true);
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
+
+        verify(capCalculator, never()).calculate(any());
         verify(mapper, never()).confirm(any(), any(), any());
     }
 
@@ -821,7 +842,7 @@ class CommissionPaymentServiceImplTest {
         assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("1428000");
         assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("119");
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.VIOLATION);
-        verify(mapper).insertExceptionCase(any());
+        verify(capExceptionService).createIfNecessary(any());
         verify(mapper, never()).confirm(any(), any(), any());
     }
 
