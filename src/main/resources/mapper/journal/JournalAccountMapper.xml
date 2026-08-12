@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  TODO(#93): com.susukkang.fgc.journal.mapper.JournalAccountMapper#findActiveByCode의
+  Javadoc에 전체 SQL 초안이 있다 — 그대로 옮기면 된다.
+
+  <select id="findActiveByCode" resultType="...JournalAccountRow">
+-->
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalAccountMapper">
+
+</mapper>

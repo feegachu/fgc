@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  TODO(#93): 아래 5개 SQL을 작성한다. 각 id가 어떤 SQL이어야 하는지는
+  com.susukkang.fgc.journal.mapper.JournalMapper 인터페이스의 메서드별 Javadoc에
+  전체 SQL 초안이 있다 — 그대로 옮기고 컬럼 별칭만 확인하면 된다.
+
+  <insert id="insert" parameterType="...JournalHeaderInsertRow"
+          useGeneratedKeys="true" keyProperty="journalHeaderId" keyColumn="journal_header_id">
+  <insert id="insertLine" parameterType="...JournalLineInsertRow">
+  <select id="findNextJournalSeq" resultType="int">
+  <select id="findBySourceKey" resultType="...JournalHeaderRow">
+  <select id="existsPostedForSource" resultType="boolean">
+
+  이 파일에 <insert>/<select> 엘리먼트가 아직 없으므로, JournalMapper의 메서드를
+  실제로 호출하면 "Invalid bound statement (not found)" 예외가 난다 — 서비스 구현을
+  마칠 때까지는 문제되지 않는다(JournalPersistenceServiceImpl도 아직 TODO 상태라
+  이 메서드들을 호출하지 않는다).
+-->
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalMapper">
+
+</mapper>
