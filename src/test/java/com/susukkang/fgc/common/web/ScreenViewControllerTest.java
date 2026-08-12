@@ -48,7 +48,6 @@ class ScreenViewControllerTest {
 
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
-            "/base,                FGC-UI-BASE-W01",
             "/policies,            FGC-UI-POL-W01",
             "/contracts,           FGC-UI-CONT-W01",
             "/contracts/1,         FGC-UI-CONT-W02",

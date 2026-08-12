@@ -18,11 +18,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class ScreenViewController {
 
-    @GetMapping("/base")
-    public String base() {
-        return "base/index";
-    }
-
     @GetMapping("/policies")
     public String policies() {
         return "policy/list";
