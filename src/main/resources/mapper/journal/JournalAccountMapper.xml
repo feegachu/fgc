@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalAccountMapper">
+    <select id="findActiveByCode" resultType="com.susukkang.fgc.journal.dto.JournalAccountRow">
+        SELECT journal_account_id, account_code, account_name, normal_balance, active_yn
+        FROM fgc.journal_account
+        WHERE account_code = #{accountCode} AND active_yn = true
+    </select>
+</mapper>
