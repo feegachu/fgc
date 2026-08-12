@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper">
+
+    <select id="existsActiveInsurer" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.insurer
+             WHERE insurer_id = #{insurerId}
+               AND active_yn = TRUE
+        )
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true"
+            keyProperty="reconciliationRunId" keyColumn="reconciliation_run_id">
+        INSERT INTO fgc.reconciliation_run (
+            validation_run_id,
+            settlement_month,
+            payment_stage,
+            insurer_id,
+            created_by
+        ) VALUES (
+            #{validationRunId},
+            #{settlementMonth},
+            #{paymentStage},
+            #{insurerId},
+            #{createdBy}
+        )
+    </insert>
+
+    <!-- 2026-08-12 yslee - 기존 reconciliation_run 상태전이 가드를 애플리케이션에서도 조건부 적용
+         기존 코드: 생성 서비스가 CREATED→RUNNING만 직접 갱신
+         문제: 후속 결과 저장 서비스가 완료·실패 상태를 일관되게 종결할 공통 경로가 없음
+         개선: 기존 V6 트리거 전이표에 맞춰 시작·완료·실패 UPDATE를 한 Mapper에 제공 -->
+    <update id="transitionToRunning">
+        UPDATE fgc.reconciliation_run
+           SET status = 'RUNNING',
+               started_at = clock_timestamp(),
+               completed_at = NULL
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+           AND status IN ('CREATED', 'FAILED')
+    </update>
+
+    <update id="transitionToCompleted">
+        UPDATE fgc.reconciliation_run
+           SET status = 'COMPLETED',
+               completed_at = clock_timestamp()
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+           AND status = 'RUNNING'
+    </update>
+
+    <update id="transitionToFailed">
+        UPDATE fgc.reconciliation_run
+           SET status = 'FAILED'
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+           AND status = 'RUNNING'
+    </update>
+
+    <select id="findById" resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow">
+        SELECT reconciliation_run_id AS reconciliationRunId,
+               validation_run_id AS validationRunId,
+               settlement_month AS settlementMonth,
+               payment_stage AS paymentStage,
+               insurer_id AS insurerId,
+               status,
+               started_at AS startedAt,
+               completed_at AS completedAt,
+               created_by AS createdBy,
+               created_at AS createdAt
+          FROM fgc.reconciliation_run
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+    </select>
+
+    <select id="findByNaturalKey" resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow">
+        SELECT reconciliation_run_id AS reconciliationRunId,
+               validation_run_id AS validationRunId,
+               settlement_month AS settlementMonth,
+               payment_stage AS paymentStage,
+               insurer_id AS insurerId,
+               status,
+               started_at AS startedAt,
+               completed_at AS completedAt,
+               created_by AS createdBy,
+               created_at AS createdAt
+          FROM fgc.reconciliation_run
+         WHERE settlement_month = #{settlementMonth}
+           AND payment_stage = #{paymentStage}
+           AND insurer_id = #{insurerId}
+           AND validation_run_id = #{validationRunId}
+    </select>
+
+</mapper>

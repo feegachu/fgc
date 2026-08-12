@@ -27,13 +27,17 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 public class SecurityConfig {
 
     /**
-     * FUN-065 지급 등록·수정·확정 API는 세션 인증과 CSRF 토큰을 함께 검증한다.
+     * FUN-065 지급 API와 FUN-048 대사 실행 API는 세션 인증과 CSRF 토큰을 함께 검증한다.
      */
     @Bean
     @Order(1)
-    public SecurityFilterChain commissionPaymentApiSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain protectedStateChangeApiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher("/api/v1/transactions/**")
+                // 2026-08-12 yslee - 대사 실행 상태 변경 API에 CSRF 보호 적용
+                // 기존 코드: 지급 API 경로만 CSRF 보호 체인에 포함
+                // 문제: 세션 쿠키를 사용하는 대사 실행 POST가 위조 요청에 노출
+                // 개선: IF-API-38 경로를 동일한 보호 체인에 추가
+                .securityMatcher("/api/v1/transactions/**", "/api/v1/reconciliations/**")
                 // 2026-08-11 yslee - 세션 쿠키 기반 지급 API의 CSRF 보호 활성화
                 // 기존 코드: /api/** 전체에서 CSRF 검증을 비활성화
                 // 문제: 로그인 세션을 악용한 외부 사이트가 지급 등록·수정·확정 요청을 위조할 수 있음

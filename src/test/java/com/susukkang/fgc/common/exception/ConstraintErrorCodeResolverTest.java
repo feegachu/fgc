@@ -51,4 +51,28 @@ class ConstraintErrorCodeResolverTest {
         assertThat(resolver.resolve(exception))
                 .contains(FgcErrorCode.TRAN_001);
     }
+
+    // 2026-08-12 yslee - 대사 실행 중복과 결과 그룹 중복 오류 분리 회귀 테스트
+    // 기존 코드: 대사 결과 그룹 중복 제약만 테스트
+    // 문제: uq_reconciliation_run을 결과 그룹 중복과 같은 코드로 처리하면 장애 원인을 구분하지 못함
+    // 개선: 대사 실행 업무키 제약을 FGC-RECO-002로 변환하는지 검증
+    @Test
+    void resolvesReconciliationRunConstraint() {
+        RuntimeException exception = new RuntimeException(
+                "duplicate key violates constraint uq_reconciliation_run"
+        );
+
+        assertThat(resolver.resolve(exception))
+                .contains(FgcErrorCode.RECO_002);
+    }
+
+    @Test
+    void resolvesReconciliationResultConstraint() {
+        RuntimeException exception = new RuntimeException(
+                "duplicate key violates constraint uq_reconciliation_result"
+        );
+
+        assertThat(resolver.resolve(exception))
+                .contains(FgcErrorCode.RECO_001);
+    }
 }

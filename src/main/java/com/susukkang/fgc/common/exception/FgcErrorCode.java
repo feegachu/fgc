@@ -116,6 +116,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.reconciliation.duplicateGroup"
     ),
+    RECO_002(
+            "FGC-RECO-002",
+            HttpStatus.CONFLICT,
+            "error.reconciliation.duplicateRun"
+    ),
 
     EXCP_001(
             "FGC-EXCP-001",
