@@ -38,6 +38,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Override
     @Transactional
     public void createIfNecessary(CapExceptionCreateCommand command) {
+        // TODO 월 통합검증 배치 구현 시 validationRunId를 포함하여 이 메서드를 호출하도록 연결한다.
         validateCreateCommand(command);
         ExceptionType exceptionType = resolveExceptionType(command.resultStatus());
         if (exceptionType == null) return;
@@ -55,6 +56,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Override
     @Transactional
     public void resolve(CapExceptionResolveCommand command) {
+        // TODO 예외관리 API 구현 시 로그인 사용자 ID를 actionBy로 전달하여 이 메서드를 호출하도록 연결한다.
+        // FUN-034 한도 예외는 REJECTED를 사용하지 않고 RESOLVED만 종결 상태로 사용한다.
         validateResolveCommand(command);
         CapExceptionStatusRow exception = capExceptionMapper.selectExceptionForUpdate(command.exceptionCaseId());
         if (exception == null) throw new IllegalArgumentException("존재하지 않는 한도 예외입니다.");
@@ -80,6 +83,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Override
     @Transactional(readOnly = true)
     public boolean hasUnresolvedViolation(Long paymentId) {
+        // FUN-034의 OPEN은 공통 예외 상태인 NEW와 IN_REVIEW로 해석한다.
         if (paymentId == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
         return capExceptionMapper.existsUnresolvedViolation(paymentId);
     }
