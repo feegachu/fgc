@@ -1,6 +1,5 @@
 package com.susukkang.fgc.contract.service;
 
-import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
@@ -36,7 +35,6 @@ import java.util.Objects;
 public class ContractService {
 
     private final ContractMapper contractMapper;
-    private final CapCheckService capCheckService;
     private final ScheduleService scheduleService;
     /**
      * 설명 : 검색 조건에 따라 계약을 조회한다.
@@ -384,7 +382,7 @@ public class ContractService {
     @Transactional
     public ContractResponse updateContract(Long id, ContractUpdateRequest request) {
         // 계약 Id 검증 및 계약 및 스케줄 정보 가져오기
-        InsuranceContract currentContract = contractMapper.selectById(id); //기존 계약 정보
+        InsuranceContract currentContract = contractMapper.selectContractById(id); //기존 계약 정보
 
         if (currentContract == null) {   //검증
             throw validationException(

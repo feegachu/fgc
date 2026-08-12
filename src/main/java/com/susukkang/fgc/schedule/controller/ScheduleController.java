@@ -2,12 +2,11 @@ package com.susukkang.fgc.schedule.controller;
 
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
+import com.susukkang.fgc.schedule.dto.*;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -45,12 +44,19 @@ public class ScheduleController {
         return ApiResponse.success(scheduleService.selectScheduleDetailById(scheduleHeaderId));
     }
 
-//    // 새 버전으로 재생성
-//    @PostMapping("/{scheduleId}/regenerate")
-//    public ApiResponse<ScheduleRegenerateResponse> regenerate(
-//            @PathVariable Long scheduleId,
-//            @Valid @RequestBody ScheduleRegenerateRequest request
-//    ) {
-//        return ApiResponse.success(scheduleService.regenerate(scheduleId, request));
-//    }
+    /**
+     * 설명 : 스케줄을 새 버전으로 재생성한다.
+     *
+     * @param  id 스케줄ID
+     * @return
+     * @author hjKang
+     * @since 2026-08-11
+     */
+    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PostMapping("/{id}/regenerate")
+    public ApiResponse<ScheduleRegenResponse> regenerate(
+            @PathVariable Long id,
+            @Valid @RequestBody ScheduleRegenRequest request) {
+        return ApiResponse.success(scheduleService.regenerateSchedules(id, request.getReason()));
+    }
 }

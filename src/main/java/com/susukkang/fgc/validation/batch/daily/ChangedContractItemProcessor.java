@@ -49,7 +49,7 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
                 contractId, DailyChangedContractJobNames.JOB_NAME);
 
         try {
-            InsuranceContract contract = contractMapper.selectById(contractId);
+            InsuranceContract contract = contractMapper.selectContractById(contractId);
             if (contract == null) {
                 // Reader가 목록을 뽑은 시점과 Processor가 실제로 조회하는 시점 사이에 계약이
                 // 삭제될 일은 이 도메인에서는 없지만(계약은 논리 삭제/상태변경만 함), 방어적으로

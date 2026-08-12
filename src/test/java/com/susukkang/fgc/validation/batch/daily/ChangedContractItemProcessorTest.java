@@ -71,7 +71,7 @@ class ChangedContractItemProcessorTest {
 
     @Test
     void pendingStatusEventTriggersScheduleRegenerationAndChecksBothPaymentStages() {
-        given(contractMapper.selectById(1L)).willReturn(contract(1L));
+        given(contractMapper.selectContractById(1L)).willReturn(contract(1L));
         given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of(100L));
 
@@ -95,7 +95,7 @@ class ChangedContractItemProcessorTest {
 
     @Test
     void noPendingStatusEventSkipsScheduleRegenerationButStillChecksCap() {
-        given(contractMapper.selectById(1L)).willReturn(contract(1L));
+        given(contractMapper.selectContractById(1L)).willReturn(contract(1L));
         given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of());
 
@@ -116,7 +116,7 @@ class ChangedContractItemProcessorTest {
                 .contractId(1L)
                 .updatedAt(watermark.plusHours(1))
                 .build();
-        given(contractMapper.selectById(1L)).willReturn(contract);
+        given(contractMapper.selectContractById(1L)).willReturn(contract);
         given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of());
 
@@ -128,7 +128,7 @@ class ChangedContractItemProcessorTest {
 
     @Test
     void missingContractIsTreatedAsDataQualitySkip() {
-        given(contractMapper.selectById(2L)).willReturn(null);
+        given(contractMapper.selectContractById(2L)).willReturn(null);
 
         ChangedContractResult result = processor.process(2L);
 
@@ -138,7 +138,7 @@ class ChangedContractItemProcessorTest {
 
     @Test
     void businessExceptionDuringScheduleGenerationIsTreatedAsDataQualitySkipNotStepFailure() {
-        given(contractMapper.selectById(3L)).willReturn(contract(3L));
+        given(contractMapper.selectContractById(3L)).willReturn(contract(3L));
         given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of(100L));
         willThrow(new FgcBusinessException(FgcErrorCode.CONT_001, Map.of()))
