@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.cap.mapper.CapExceptionMapper">
+    <insert id="insertException">
+        INSERT INTO exception_case (
+            exception_key,
+            exception_type,
+            severity,
+            status,
+            validation_run_id,
+            contract_id,
+            agent_id,
+            policy_version_id,
+            source_entity_type,
+            source_entity_id,
+            title,
+            description
+        )
+        VALUES (
+            #{exceptionKey},
+            #{exceptionType},
+            #{severity},
+            'NEW',
+            #{validationRunId},
+            #{contractId},
+            #{agentId},
+            #{policyVersionId},
+            'COMMISSION_TRANSACTION',
+            CAST(#{paymentId} AS varchar),
+            #{title},
+            #{description}
+        )
+        ON CONFLICT
+            (exception_key)
+        DO UPDATE
+        SET
+            title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            updated_at = clock_timestamp()
+        WHERE
+            exception_case.status IN ('NEW', 'IN_REVIEW')
+    </insert>
+</mapper>
