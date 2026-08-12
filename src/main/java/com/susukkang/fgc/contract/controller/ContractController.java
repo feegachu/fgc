@@ -1,5 +1,7 @@
 package com.susukkang.fgc.contract.controller;
 
+import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
+import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
@@ -95,4 +97,19 @@ public class ContractController {
                 scheduleService.selectByContractId(contractId, paymentStage)
         );
     }
+    /**
+     * 설명 : 계약 ID를 기준으로 차익거래 수동 검증을 실행한다.
+     * @param id 계약 ID
+     * @param request 차익거래 검증 요청 정보
+     * @return 차익거래 검증 결과
+     * @author hjKang
+     * @since 2026-08-12
+     */
+//    @PostMapping("/{id}/arbitrage-check")
+//    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+//    public ApiResponse<ReArbitrageCheckResponse> reArbitrageCheck(
+//            @PathVariable Long id,
+//            @Valid @RequestBody ReArbitrageCheckRequest request) {
+//        return ApiResponse.success(arbitrageService.reArbitrageCheck(id, request));
+//    }
 }
