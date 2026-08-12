@@ -1,21 +1,32 @@
 package com.susukkang.fgc.cap.dto;
 
-import lombok.*;
+import com.susukkang.fgc.common.code.ExceptionSeverity;
+import com.susukkang.fgc.common.code.ExceptionType;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
- * 설명 : 1200% 한도가 일정 위험 구간 이상이거나 초과하였을 경우 tb_exception_case 에 넣기위한 InsertDTO
+ * 설명 : 1,200% 한도 주의 또는 위반 예외를 exception_case 테이블에 등록하기 위한 DTO
  *
  * @author hjKang
  * @version 1.0
  * @since 2026-08-12
  */
-@Builder
 @Getter
-@Setter
-@AllArgsConstructor
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class CapExceptionInsertDTO {
-    Long exceptionCaseId; // 예외 ID
-    String exceptionKey; // 예외 Key
-    String exceptionType; // 예외 유형
+    private String exceptionKey;          // 예외 업무 고유키
+    private ExceptionType exceptionType;  // 예외 유형
+    private ExceptionSeverity severity;   // 심각도
+    private Long validationRunId;         // 배치 검증 실행 ID
+    private Long contractId;              // 관련 계약 ID
+    private Long agentId;                 // 관련 설계사 ID
+    private Long policyVersionId;         // 적용 정책 버전 ID
+    private Long paymentId;               // 관련 지급 건 ID
+    private String title;                 // 예외 제목
+    private String description;           // 예외 상세 및 계산 근거
 }

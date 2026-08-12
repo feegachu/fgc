@@ -4,8 +4,11 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.susukkang.fgc.cap.mapper.CapExceptionMapper">
+
+    <!-- 한도 주의 또는 위반 예외 건을 등록하고 진행 중인 동일 예외는 최신 내용으로 갱신한다. -->
     <insert id="insertException">
-        INSERT INTO exception_case (
+        INSERT INTO exception_case AS existing
+        (
             exception_key,
             exception_type,
             severity,
@@ -19,7 +22,8 @@
             title,
             description
         )
-        VALUES (
+        VALUES
+            (
             #{exceptionKey},
             #{exceptionType},
             #{severity},
@@ -32,15 +36,29 @@
             CAST(#{paymentId} AS varchar),
             #{title},
             #{description}
-        )
+            )
         ON CONFLICT
             (exception_key)
-        DO UPDATE
-        SET
-            title = EXCLUDED.title,
-            description = EXCLUDED.description,
-            updated_at = clock_timestamp()
-        WHERE
-            exception_case.status IN ('NEW', 'IN_REVIEW')
+            DO UPDATE
+                   SET
+                       exception_type = EXCLUDED.exception_type,
+                   severity = EXCLUDED.severity,
+                   title = EXCLUDED.title,
+                   description = EXCLUDED.description,
+                   updated_at = clock_timestamp()
+               WHERE
+                   existing.status IN ('NEW', 'IN_REVIEW')
     </insert>
+
+    <!-- 한도 룰셋 ID를 통해 적용된 정책 버전 ID를 조회한다. -->
+    <select id="selectPolicyVersionId"
+            resultType="java.lang.Long">
+        SELECT
+            policy_version_id
+        FROM
+            cap_rule_set
+        WHERE
+            cap_rule_set_id = #{capRuleSetId}
+    </select>
+
 </mapper>
