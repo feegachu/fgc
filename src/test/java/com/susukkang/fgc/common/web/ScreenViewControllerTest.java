@@ -17,11 +17,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 정적 부착 화면 18개 라우트 렌더링 스모크 — 라우트가 200 을 주고
+ * 정적 부착 화면 라우트 렌더링 스모크 — 라우트가 200 을 주고
  * 셸(page 프래그먼트)이 해당 화면 ID 를 헤더에 찍는지만 본다.
  * 실데이터 바인딩 검증은 화면별 기능 브랜치의 몫이다.
+ * (실데이터 바인딩된 화면은 도메인 뷰 컨트롤러 테스트로 이관:
+ *  DASH·BASE, POL → PolicyViewControllerTest)
  *
- * 요구사항 추적(FGC-FUN-xxx): BASE 005~009 · POL 011~013 · CONT 018 ·
+ * 요구사항 추적(FGC-FUN-xxx): CONT 018 ·
  * TRAN 065/031/033/034 · SCHE 036/039 · CAP 030/032/035 · ARB 063 ·
  * LEDG 046/047 · RECO 048~051 · EXCP 052/053 · VRUN 041~044 · AUDT 061.
  * /audit-logs 만 역할 제한(FUN-002·화면정의서 :1491)이라 별도 테스트로 뺐다.
@@ -48,7 +50,6 @@ class ScreenViewControllerTest {
 
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
-            "/policies,            FGC-UI-POL-W01",
             "/contracts/1,         FGC-UI-CONT-W02",
             "/contracts/new,       FGC-UI-CONT-W03",
             "/contracts/1/edit,    FGC-UI-CONT-W03",
@@ -132,7 +133,10 @@ class ScreenViewControllerTest {
                         org.hamcrest.Matchers.containsString("consumerName"))));
     }
 
-    /** 운영 프론트엔드에서는 목업의 교육용 프로토타입 문구를 노출하지 않는다. */
+    /**
+     * 시연 사실감을 위해 교육용 프로토타입 문구를 화면에 노출하지 않는다
+     * — 2026-08-12 팀 결정, 근거대장 "COR-009 화면 표기 개정" 기록 참조.
+     */
     @Test
     void prototype_disclaimer_is_not_exposed() throws Exception {
         mvc.perform(get("/cap-checks").with(user(settleUser())))

@@ -18,11 +18,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class ScreenViewController {
 
-    @GetMapping("/policies")
-    public String policies() {
-        return "policy/list";
-    }
-
     /**
      * CONT-W03 — 인터페이스정의서 IF-API-18/19 역할 SETTLEMENT (+SYSTEM_ADMIN 은 전부, §4-1).
      * FGC-FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
