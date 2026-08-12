@@ -9,6 +9,7 @@ import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
 import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import com.susukkang.fgc.validation.service.ValidationRunTransitionService;
@@ -32,6 +33,7 @@ public class CreateDailyRunTasklet implements Tasklet {
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunTransitionService validationRunTransitionService;
     private final ValidationRunBatchLifecycleService lifecycleService;
+    private final ValidationRunBatchAuditService auditService;
     private final BatchWatermarkMapper batchWatermarkMapper;
 
     @Override
@@ -94,6 +96,9 @@ public class CreateDailyRunTasklet implements Tasklet {
             // 사람이 쓰는 것과 같은 범용 ValidationRunTransitionService로 충분하다.
             case FAILED -> {
                 validationRunTransitionService.transition(existing.getValidationRunId(), ValidationRunStatus.RUNNING);
+                // 범용 ValidationRunTransitionService는 감사로그를 남기지 않으므로(위 주석),
+                // 재시도라는 사실 자체를 여기서 직접 남긴다 — #77 재실행 감사 추적 요구사항.
+                auditService.recordRetried(existing.getValidationRunId(), params);
                 yield existing.getValidationRunId();
             }
             case RUNNING -> existing.getValidationRunId();
