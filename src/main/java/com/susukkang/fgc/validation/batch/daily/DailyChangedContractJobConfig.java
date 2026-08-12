@@ -78,6 +78,7 @@ public class DailyChangedContractJobConfig {
                 validationRunCreateService,
                 validationRunTransitionService,
                 validationRunBatchLifecycleService,
+                validationRunBatchAuditService,
                 batchWatermarkMapper);
         return new StepBuilder("createDailyRunStep", jobRepository)
                 .tasklet(tasklet, transactionManager)
