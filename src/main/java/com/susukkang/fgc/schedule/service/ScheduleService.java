@@ -11,7 +11,6 @@ import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
-import com.susukkang.fgc.schedule.code.ScheduleGenReason;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
@@ -27,6 +26,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -155,7 +155,7 @@ public class ScheduleService {
         Long contractId = contract.getContractId();
 
         // 계약 존재 여부 확인
-        InsuranceContract savedContract = contractMapper.selectById(contractId);
+        InsuranceContract savedContract = contractMapper.selectContractById(contractId);
 
         if (savedContract == null) {   //일단 보류 001은 계약 중복 코드이므로 이따 추가함
             throw new FgcBusinessException(
@@ -183,6 +183,7 @@ public class ScheduleService {
 
         Long lockedContractId =
                 scheduleMapper.lockContractForScheduleGeneration(contractId);
+
         if (!Objects.equals(lockedContractId, contractId)) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500);
         }
@@ -297,24 +298,104 @@ public class ScheduleService {
         }
 
         ScheduleHeaderInsertDTO header =
-                createScheduleHeader(contract, policy, nextVersionNo);
-        int headerRows = scheduleMapper.insertScheduleHeader(header);
-
-        if (headerRows != 1 || header.getScheduleHeaderId() == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
-        }
-
-        List<ScheduleLineInsertDTO> lines =
-                createScheduleLines(contract, header, policy);
-        int insertedLineCount = scheduleMapper.insertAllScheduleLines(lines);
-
-        if (insertedLineCount != lines.size()) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
-        }
-
-        return new CreatedSchedule(header.getScheduleHeaderId(), insertedLineCount);
+                createScheduleHeader(contract, policy, nextVersionNo,"CONTRACT_CREATED",null);
+        return saveSchedule(contract, policy, header);
+    }
+    // 스케줄 헤더와 회차별 라인을 저장하고 저장 결과를 반환
+    private CreatedSchedule saveSchedule(InsuranceContract contract,
+                                         ResolvedCommissionPolicy policy,
+                                         ScheduleHeaderInsertDTO header) {
+        return saveSchedule(contract, policy, header, List.of());
     }
 
+    // 스케줄 헤더를 저장한 뒤 확정된 기존 회차는 보존하고 나머지 회차를 계산하여 저장
+    private CreatedSchedule saveSchedule(InsuranceContract contract,
+                                         ResolvedCommissionPolicy policy,
+                                         ScheduleHeaderInsertDTO header,
+                                         List<ScheduleLineInsertDTO> oldLines) {
+        // 새로운 스케줄 헤더 저장 및 생성된 헤더 ID 검증
+        int headerRows = scheduleMapper.insertScheduleHeader(header);
+        if (headerRows != 1 || header.getScheduleHeaderId() == null)
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        // 현재 계약과 정책을 기준으로 새로운 회차별 스케줄 라인 생성
+        List<ScheduleLineInsertDTO> lines = createScheduleLines(contract, header, policy);
+        // 확정·대사일치·조정된 기존 회차는 새 계산값 대신 기존 값과 상태를 유지
+        if (!oldLines.isEmpty()) lines = mergeLockedScheduleLines(oldLines, lines, header.getScheduleHeaderId());
+        // 새로운 스케줄 라인 일괄 저장 및 저장 건수 검증
+        int lineRows = scheduleMapper.insertAllScheduleLines(lines);
+        if (lineRows != lines.size()) throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        // 생성한 스케줄 헤더 ID와 라인 수 반환
+        return new CreatedSchedule(header.getScheduleHeaderId(), lineRows);
+    }
+
+    // 확정된 기존 회차와 새로 계산한 미래 회차를 하나의 새 스케줄 버전으로 병합
+    private List<ScheduleLineInsertDTO> mergeLockedScheduleLines(
+            List<ScheduleLineInsertDTO> oldLines,
+            List<ScheduleLineInsertDTO> calculatedLines,
+            Long newHeaderId) {
+        Map<ScheduleLineKey, ScheduleLineInsertDTO> lockedLines = new LinkedHashMap<>();
+        Map<ScheduleLineScopeKey, List<ScheduleLineInsertDTO>> lockedLinesByScope = new LinkedHashMap<>();
+        for (ScheduleLineInsertDTO oldLine : oldLines) {
+            if (isLockedLineStatus(oldLine.getLineStatus())) {
+                lockedLines.put(toScheduleLineKey(oldLine), oldLine);
+                lockedLinesByScope.computeIfAbsent(toScheduleLineScopeKey(oldLine), ignored -> new ArrayList<>()).add(oldLine);
+            }
+        }
+
+        Map<ScheduleLineKey, Boolean> calculatedLineKeys = new LinkedHashMap<>();
+        for (ScheduleLineInsertDTO calculatedLine : calculatedLines) calculatedLineKeys.put(toScheduleLineKey(calculatedLine), true);
+
+        List<ScheduleLineInsertDTO> mergedLines = new ArrayList<>();
+        int lineNo = 1;
+        for (ScheduleLineInsertDTO calculatedLine : calculatedLines) {
+            ScheduleLineInsertDTO lockedLine = lockedLines.remove(toScheduleLineKey(calculatedLine));
+            if (lockedLine != null) {
+                lockedLinesByScope.get(toScheduleLineScopeKey(lockedLine)).remove(lockedLine);
+            } else {
+                List<ScheduleLineInsertDTO> sameScopeLockedLines = lockedLinesByScope.get(toScheduleLineScopeKey(calculatedLine));
+                if (sameScopeLockedLines != null) {
+                    lockedLine = sameScopeLockedLines.stream().filter(line -> !calculatedLineKeys.containsKey(toScheduleLineKey(line))).findFirst().orElse(null);
+                    if (lockedLine != null) {
+                        sameScopeLockedLines.remove(lockedLine);
+                        lockedLines.remove(toScheduleLineKey(lockedLine));
+                    }
+                }
+            }
+            mergedLines.add(copyScheduleLine(lockedLine == null ? calculatedLine : lockedLine, newHeaderId, lineNo++));
+        }
+        for (ScheduleLineInsertDTO lockedLine : lockedLines.values()) {
+            mergedLines.add(copyScheduleLine(lockedLine, newHeaderId, lineNo++));
+        }
+        return mergedLines;
+    }
+
+    // 확정 이후 수정하면 안 되는 1차 스케줄 라인 상태인지 확인
+    private boolean isLockedLineStatus(ScheduleLineStatus status) {
+        return status == ScheduleLineStatus.CONFIRMED || status == ScheduleLineStatus.MATCHED || status == ScheduleLineStatus.ADJUSTED;
+    }
+
+    // 같은 수수료 항목·회차·수령자를 하나의 스케줄 라인 업무키로 구성
+    private ScheduleLineKey toScheduleLineKey(ScheduleLineInsertDTO line) {
+        return new ScheduleLineKey(line.getCommissionItemId(), line.getInstallmentNo(), line.getBeneficiaryAgentId());
+    }
+
+    // 수령자 변경 여부와 관계없이 같은 수수료 항목·회차를 찾는 병합 범위키 구성
+    private ScheduleLineScopeKey toScheduleLineScopeKey(ScheduleLineInsertDTO line) {
+        return new ScheduleLineScopeKey(line.getCommissionItemId(), line.getInstallmentNo());
+    }
+
+    // 기존 또는 계산된 라인을 새 헤더와 새 줄 번호에 연결하여 복사
+    private ScheduleLineInsertDTO copyScheduleLine(ScheduleLineInsertDTO source, Long newHeaderId, int lineNo) {
+        return ScheduleLineInsertDTO.builder().scheduleHeaderId(newHeaderId).lineNo(lineNo).installmentNo(source.getInstallmentNo()).contractMonthNo(source.getContractMonthNo()).dueDate(source.getDueDate()).commissionItemId(source.getCommissionItemId()).beneficiaryAgentId(source.getBeneficiaryAgentId()).basisCode(source.getBasisCode()).basisAmount(source.getBasisAmount()).calculationType(source.getCalculationType()).ratePct(source.getRatePct()).fixedAmount(source.getFixedAmount()).roundingScale(source.getRoundingScale()).roundingMode(source.getRoundingMode()).expectedAmount(source.getExpectedAmount()).paymentConditionCode(source.getPaymentConditionCode()).lineStatus(source.getLineStatus()).sourceCommissionRuleId(source.getSourceCommissionRuleId()).build();
+    }
+
+    // 스케줄 라인의 버전 간 동일성을 판별하는 업무키
+    private record ScheduleLineKey(Long commissionItemId, Integer installmentNo, Long beneficiaryAgentId) {
+    }
+
+    // 수령자가 변경된 잠금 라인과 재계산 라인을 연결하는 업무 범위키
+    private record ScheduleLineScopeKey(Long commissionItemId, Integer installmentNo) {
+    }
     /**
      * 계약 ID에 해당하는 운영용 예상 스케줄 헤더 목록을 조회한다.
      *
@@ -354,7 +435,6 @@ public class ScheduleService {
                 .lines(detail.getSchedules() == null ? List.of() : detail.getSchedules())
                 .build();
     }
-
     /** 지급단계 한 건의 스케줄 생성 결과. */
     private record CreatedSchedule(Long scheduleHeaderId, int createdLineCount) {
     }
@@ -821,9 +901,11 @@ public class ScheduleService {
     private ScheduleHeaderInsertDTO createScheduleHeader(
             InsuranceContract contract,
             ResolvedCommissionPolicy policy,
-            int scheduleVersionNo
+            int scheduleVersionNo,
+            String reason,
+            Long oldHeaderId
     ) {
-        ScheduleHeaderInsertDTO header = ScheduleHeaderInsertDTO.builder()
+        return ScheduleHeaderInsertDTO.builder()
                 .contractId(contract.getContractId())
                 .paymentStage(policy.getPaymentStage())
                 .policyVersionId(policy.getPolicyVersionId())
@@ -832,9 +914,9 @@ public class ScheduleService {
                 .scheduleRegime(determineScheduleRegime(policy))
                 .status(ScheduleHeaderStatus.PLANNED)
                 .activeYn(Boolean.TRUE)
-                .generationReason(ScheduleGenReason.CONTRACT_CREATED)
+                .generationReason(reason == null ? "CONTRACT_CREATED" : reason)
+                .regeneratedFromId(oldHeaderId)
                 .build();
-        return header;
     }
     /**
      * 설명 : 들어온 정책의 유형에 따라 매핑되어서 스케줄 헤더의 regime로 반환된다.
@@ -857,4 +939,97 @@ public class ScheduleService {
             );
         };
     }
+
+    /**
+     * 설명 : FUN-039 새 스케줄 생성 , 기존 스케줄은 유지하고 상태,활성화 여부만 변경하고 새 스케줄 헤더와 라인을 생성한다.
+     *
+     * @param  scheduleId 변경할 스케줄 ID
+     * @param  reason 변경 사유
+     * @return ScheduleRegenResponse 응답DTO
+     * @author hjKang
+     * @since 2026-08-11
+     */
+    @Transactional
+    public ScheduleRegenResponse regenerateSchedules(Long scheduleId, String reason) {
+        // 서비스 직접 호출에서도 재생성 사유의 필수값과 DB 최대 길이를 검증
+        if (reason == null || reason.isBlank())
+            throw validationException("reason", "재생성 사유는 필수입니다.");
+        if (reason.length() > 40)
+            throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
+
+        // 기존 스케줄 헤더 조회 및 존재 여부 검증
+        ScheduleHeaderInsertDTO oldHeader = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        if (oldHeader == null)
+            throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
+        // 동일 계약의 스케줄 생성 및 재생성을 직렬화
+        scheduleMapper.lockContractForScheduleGeneration(oldHeader.getContractId());
+
+        // 락 대기 중 변경됐을 가능성이 있으므로 최신 헤더 재조회
+        oldHeader = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        if (oldHeader == null)
+            throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
+        if (!Boolean.TRUE.equals(oldHeader.getActiveYn()))
+            throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+        if (oldHeader.getStatus() == ScheduleHeaderStatus.CANCELLED)
+            throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+
+        // 기존 스케줄에 연결된 계약 조회 및 존재 여부 검증
+        InsuranceContract contract = contractMapper.selectContractById(oldHeader.getContractId());
+        if (contract == null)
+            throw validationException("contractId", "존재하지 않는 계약입니다.");
+
+        // 계약과 지급단계에 현재 적용되는 수수료 정책 조회 및 검증
+        ResolvedCommissionPolicy policy = resolvePolicyOrRegisterReview(
+                oldHeader.getContractId(),
+                oldHeader.getPaymentStage()
+        );
+        if (policy == null) {
+            return ScheduleRegenResponse.builder()
+                    .scheduleHeaderId(oldHeader.getScheduleHeaderId())
+                    .versionNo(oldHeader.getScheduleVersionNo().longValue())
+                    .build();
+        }
+
+        // 확정된 과거 회차를 새 버전에서도 그대로 보존하기 위해 기존 라인을 조회
+        List<ScheduleLineInsertDTO> oldLines =
+                scheduleMapper.selectScheduleLinesByScheduleId(oldHeader.getScheduleHeaderId());
+
+        // 기존 스케줄 헤더 상태를 조정으로 변경하고 비활성화
+        int updatedRows = scheduleMapper.updateScheduleHeaderStatus(
+                oldHeader.getScheduleHeaderId(),
+                ScheduleHeaderStatus.ADJUSTED,
+                false
+        );
+
+        if (updatedRows != 1)
+            throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+
+        // 계약과 지급단계에 해당하는 다음 스케줄 버전 번호 조회
+        int nextVersionNo = scheduleMapper.selectNextScheduleVersionNo(
+                oldHeader.getContractId(),
+                oldHeader.getPaymentStage()
+        );
+
+        if (nextVersionNo < 1)
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+
+        // 현재 계약과 정책으로 새로운 스케줄 헤더 생성
+        ScheduleHeaderInsertDTO newHeader = createScheduleHeader(
+                contract,
+                policy,
+                nextVersionNo,
+                reason,
+                oldHeader.getScheduleHeaderId()
+        );
+
+        // 새 스케줄 헤더와 라인을 저장
+        saveSchedule(contract, policy, newHeader, oldLines);
+
+        // 새 스케줄 헤더 ID와 버전 번호를 응답으로 반환
+        return ScheduleRegenResponse.builder()
+                .scheduleHeaderId(newHeader.getScheduleHeaderId())
+                .versionNo(newHeader.getScheduleVersionNo().longValue())
+                .build();
+    }
+
 }
