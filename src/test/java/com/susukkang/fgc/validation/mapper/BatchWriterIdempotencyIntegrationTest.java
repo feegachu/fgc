@@ -12,12 +12,8 @@ import java.time.OffsetDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * #77 "모든 배치 Writer가 UPSERT 또는 ON CONFLICT DO NOTHING 기반으로 동작하는지" /
- * "재실행 시 업무 결과가 중복 생성되지 않는지" 검증. DailyChangedContractJob의 두 Writer
- * 매퍼(ContractStatusEventProcessingMapper, ExceptionCaseMapper)를 실제 DB로 두 번씩
- * 호출해, "같은 입력을 다시 넣어도 중복 행이 안 생긴다"를 매퍼 레벨에서 직접 증명한다 —
- * ChangedContractItemWriterTest(mock)는 매퍼가 호출되는지만 보고, 이 매퍼가 실제로 DB
- * 제약과 맞물려 멱등적인지는 증명하지 못한다.
+ * 모든 배치 Writer가 UPSERT 또는 ON CONFLICT DO NOTHING 기반으로 동작하는지,
+ * 재실행 시 업무 결과가 중복 생성되지 않는지 검증
  */
 @SpringBootTest
 class BatchWriterIdempotencyIntegrationTest {
