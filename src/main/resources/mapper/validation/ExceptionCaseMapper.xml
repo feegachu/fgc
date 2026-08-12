@@ -17,4 +17,18 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
+    <insert id="insertArbitrageCandidate">
+        INSERT INTO fgc.exception_case
+            (exception_key, exception_type, severity, status,
+             validation_run_id, contract_id, source_entity_type, source_entity_id,
+             title, description)
+        VALUES
+            (CONCAT('ARBITRAGE_CANDIDATE:', #{validationRunId},
+                    ':ARBITRAGE_CHECK:', #{arbitrageCheckId}, ':', #{paymentStage}),
+             'ARBITRAGE_CANDIDATE', 'HIGH', 'NEW',
+             #{validationRunId}, #{contractId}, 'ARBITRAGE_CHECK', CAST(#{arbitrageCheckId} AS varchar),
+             '차익거래 검토대상', #{description})
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
 </mapper>

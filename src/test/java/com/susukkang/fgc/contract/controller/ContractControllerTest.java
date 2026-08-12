@@ -19,6 +19,10 @@ import com.susukkang.fgc.contract.service.ContractService;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
+import com.susukkang.fgc.arbitrage.service.ArbitrageService;
+import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView;
+import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,6 +80,28 @@ class ContractControllerTest {
 
     @MockitoBean
     private ScheduleService scheduleService;
+
+    @MockitoBean
+    private ArbitrageService arbitrageService;
+
+    @Test
+    @DisplayName("계약별 차익거래 검증 시계열을 조회한다")
+    void getContractArbitrageChecksReturnsSuccess() throws Exception {
+        when(arbitrageService.selectByContractId(21L, PaymentStage.GA_TO_FC))
+                .thenReturn(List.of(ArbitrageCheckView.builder()
+                        .arbitrageCheckId(100L)
+                        .contractId(21L)
+                        .paymentStage(PaymentStage.GA_TO_FC)
+                        .resultStatus(ArbitrageCheckStatus.CLEAR)
+                        .build()));
+
+        mockMvc.perform(get("/api/v1/contracts/{id}/arbitrage-checks", 21L)
+                        .param("paymentStage", "GA_TO_FC")
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].arbitrageCheckId").value(100))
+                .andExpect(jsonPath("$.data[0].resultStatus").value("CLEAR"));
+    }
 
     @Test
     @DisplayName("계약 ID로 운영용 예상 스케줄 목록을 조회한다")

@@ -20,4 +20,12 @@ public interface ExceptionCaseMapper {
                                @Param("contractId") Long contractId,
                                @Param("title") String title,
                                @Param("description") String description);
+
+    /** 차익거래 후보 결과를 원천으로 중복 없는 검토 예외를 생성한다. */
+    int insertArbitrageCandidate(
+            @Param("validationRunId") Long validationRunId,
+            @Param("contractId") Long contractId,
+            @Param("arbitrageCheckId") Long arbitrageCheckId,
+            @Param("paymentStage") String paymentStage,
+            @Param("description") String description);
 }
