@@ -18,18 +18,26 @@
         WHERE h.validation_run_id = #{validationRunId}
     </select>
     
+    <!--
+      status 필터를 걸지 않는다(코드리뷰 반영) — 이전엔 status <> 'DRAFT'로 좁혔는데,
+      journalPostingStep(Step 6a)이 아직 PlaceholderStepTasklet이라 이 배치가 만든 분개는
+      전부 DRAFT로 남는다. 그 상태에서 countJournals가 DRAFT를 빼면 항상 0을 반환해
+      countImbalances도 항상 0이 되고, imbalanceCheckStep이 실제 불균형 유무와 무관하게
+      상시 통과(no-op)해 버린다. IF-BAT-01 Step6 요구사항(docs/05_인터페이스정의서_v2_0.md:504
+      "불균형이 1건이라도 있으면 Step 실패")과 화면정의서 확정조건 SQL
+      (docs/FGC_화면정의서_v2_0.md:1458, status 필터 없음)도 DRAFT 예외를 두지 않는다 —
+      findImbalances(위)와 같은 모집단(validation_run_id 전체)으로 맞춘다.
+    -->
     <select id="countImbalances" resultType="long">
         SELECT COUNT(*)
         FROM fgc.vw_journal_imbalance vw
         JOIN fgc.journal_header h ON h.journal_header_id = vw.journal_header_id
         WHERE h.validation_run_id = #{validationRunId}
-          AND h.status &lt;&gt; 'DRAFT'
     </select>
 
     <select id="countJournals" resultType="long">
         SELECT COUNT(*)
         FROM fgc.journal_header
         WHERE validation_run_id = #{validationRunId}
-        AND status &lt;&gt; 'DRAFT'
     </select>
 </mapper>
