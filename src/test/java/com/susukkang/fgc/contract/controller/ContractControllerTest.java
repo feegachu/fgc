@@ -213,6 +213,7 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.data.contractId").value(21));
     }
 
+    /** FGC-FUN-002 — SYSTEM_ADMIN 수정 허용 회귀 방지. */
     @Test
     @DisplayName("SYSTEM_ADMIN 도 보험계약을 수정할 수 있다")
     void updateContractAllowsSystemAdmin() throws Exception {

@@ -159,6 +159,7 @@ class ScreenViewControllerTest {
             "SYSTEM_ADMIN, /contracts/new,    200",
             "GA_ADMIN,     /contracts/new,    403",
             "COMPLIANCE,   /contracts/new,    403",
+            "SETTLEMENT,   /contracts/1/edit, 200",
             "SYSTEM_ADMIN, /contracts/1/edit, 200",
             "GA_ADMIN,     /contracts/1/edit, 403",
             "COMPLIANCE,   /contracts/1/edit, 403",
@@ -173,6 +174,7 @@ class ScreenViewControllerTest {
     }
 
     /**
+     * FGC-FUN-002 인수조건: 권한 없는 메뉴(등록 버튼)가 숨겨진다.
      * 등록 버튼(a 태그)은 disabled 가 안 먹혀 숨긴다 — canProcess(th:if).
      * CONT-W01 :531 / TRAN-W01 :673. 앵커에만 있는 data-fgc-action="create" 로 판별한다.
      */
@@ -192,7 +194,7 @@ class ScreenViewControllerTest {
     }
 
     /**
-     * GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다(§4-1 "정책·조직 조회, 검증 실행 확정").
+     * FGC-FUN-002 — GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다(§4-1 "정책·조직 조회, 검증 실행 확정").
      * readOnly 만 보던 시절 GA_ADMIN 에게 처리 버튼이 활성이던 회귀를 막는다 — 대표로
      * SCHE-W02(재생성·확정, :873)와 CONT-W02(처리 버튼, IF-API-19/29/33).
      */
