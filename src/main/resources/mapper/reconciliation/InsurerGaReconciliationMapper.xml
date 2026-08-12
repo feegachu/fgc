@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.reconciliation.mapper.InsurerGaReconciliationMapper">
+
+    <!-- 2026-08-12 yslee - 기존 스케줄·원장 테이블에서 보험사→GA 예상 원자행 조회
+         기존 코드: 대사 실행이 예상 스케줄을 읽는 SQL이 없음
+         문제: 비교·시뮬레이션 또는 비활성·취소 스케줄까지 섞이면 운영 예상액을 재현할 수 없음
+         개선: 활성 OPERATIONAL 보험사→GA 스케줄과 현재 POSTED 예상분개만 추적 정보로 조회 -->
+    <select id="findExpectedSources"
+            resultType="com.susukkang.fgc.reconciliation.dto.InsurerGaExpectedSourceRow">
+        SELECT sl.schedule_line_id AS scheduleLineId,
+               jh.journal_header_id AS journalHeaderId,
+               sh.contract_id AS contractId,
+               sl.commission_item_id AS commissionItemId,
+               sl.installment_no AS installmentNo,
+               sl.due_date AS dueDate,
+               sl.due_month AS dueMonth,
+               sl.expected_amount AS expectedAmount
+          FROM fgc.schedule_header sh
+          JOIN fgc.schedule_line sl
+            ON sl.schedule_header_id = sh.schedule_header_id
+          JOIN fgc.insurance_contract c
+            ON c.contract_id = sh.contract_id
+          LEFT JOIN fgc.journal_header jh
+            ON jh.journal_type = 'EXPECTED_INSURER_INCOME'
+           AND jh.source_entity_type = 'SCHEDULE_LINE'
+           AND jh.source_entity_id = CAST(sl.schedule_line_id AS varchar)
+           AND jh.status = 'POSTED'
+         WHERE sh.payment_stage = 'INSURER_TO_GA'
+           AND sh.schedule_purpose = 'OPERATIONAL'
+           AND sh.active_yn = TRUE
+           AND sh.status NOT IN ('HOLD', 'CANCELLED')
+           AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
+           AND sl.due_month = #{settlementMonth}
+           AND c.insurer_id = #{insurerId}
+         ORDER BY sh.contract_id, sl.commission_item_id, sl.due_month,
+                  sl.installment_no, sl.schedule_line_id
+    </select>
+
+    <!-- 2026-08-12 yslee - 정규화된 원수사 명세 거래·귀속행을 실제 원자행으로 조회
+         기존 코드: 파일 또는 임시 대사 테이블을 전제로 한 실제 원천 조회가 없음
+         문제: REJECTED 명세나 DRAFT·취소·타 단계 거래가 실제 지급액에 섞일 수 있음
+         개선: 기존 statement_batch/commission_transaction/transaction_attribution에서 확정 지급 원자행만 조회 -->
+    <select id="findActualSources"
+            resultType="com.susukkang.fgc.reconciliation.dto.InsurerGaActualSourceRow">
+        SELECT ta.transaction_attribution_id AS transactionAttributionId,
+               ct.commission_transaction_id AS commissionTransactionId,
+               jh.journal_header_id AS journalHeaderId,
+               ta.contract_id AS contractId,
+               ct.commission_item_id AS commissionItemId,
+               ct.settlement_month AS settlementMonth,
+               ct.due_date AS dueDate,
+               ta.attributed_amount AS actualAmount,
+               ct.source_business_key AS sourceBusinessKey,
+               ta.source_agent_code AS sourceAgentCode
+          FROM fgc.statement_batch sb
+          JOIN fgc.commission_transaction ct
+            ON ct.statement_batch_id = sb.statement_batch_id
+          JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+          LEFT JOIN fgc.journal_header jh
+            ON jh.journal_type = 'ACTUAL_INSURER_STATEMENT'
+           AND jh.source_entity_type = 'COMMISSION_TRANSACTION'
+           AND jh.source_entity_id = CAST(ct.commission_transaction_id AS varchar)
+           AND jh.status = 'POSTED'
+         WHERE sb.insurer_id = #{insurerId}
+           AND sb.settlement_month = #{settlementMonth}
+           AND sb.statement_type = 'INSURER_COMMISSION'
+           AND sb.status IN ('AVAILABLE', 'VALIDATED', 'RECONCILED')
+           AND ct.insurer_id = #{insurerId}
+           AND ct.settlement_month = #{settlementMonth}
+           AND ct.payment_stage = 'INSURER_TO_GA'
+           AND ct.source_type = 'INSURER_STATEMENT'
+           AND ct.cashflow_type = 'PAYMENT'
+           AND ct.status = 'CONFIRMED'
+           AND ta.attribution_scope = 'CONTRACT'
+         ORDER BY ta.contract_id, ct.commission_item_id,
+                  COALESCE(ct.due_date, ct.settlement_month),
+                  ct.commission_transaction_id, ta.attribution_seq
+    </select>
+
+</mapper>
