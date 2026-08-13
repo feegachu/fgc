@@ -32,9 +32,10 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
-    private final ValidationTargetSelectionService validationRunScheduleTasklet;
+    private final ValidationTargetSelectionService validationTargetSelectionService;
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
     private final ValidationRunScheduleService validationRunScheduleService;
+    private final ValidationRunCapService validationRunCapService;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
@@ -83,7 +84,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step selectTargetStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("selectTargetStep", jobRepository)
-                .tasklet(new SelectTargetTasklet(validationRunScheduleTasklet), transactionManager)
+                .tasklet(new SelectTargetTasklet(validationTargetSelectionService), transactionManager)
                 .listener(progressListener(2, false))
                 .build();
     }
@@ -95,14 +96,14 @@ public class MonthlyValidationJobConfig {
                 .listener(progressListener(3, false))
                 .build();
     }
-
+    // TODO 현준
     /**
      * capCheckStep의 실제 워크로드를 처리하는 "워커" Step
      */
     @Bean
     public Step capCheckWorkerStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("capCheckWorkerStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("④지급단계별 1,200% 검증"), transactionManager)
+                .tasklet(new CapCheckTasklet(validationRunCapService), transactionManager)
                 .build();
     }
 
@@ -151,7 +152,7 @@ public class MonthlyValidationJobConfig {
                 .listener(progressListener(7, false))
                 .build();
     }
-
+    // TODO 현준
     @Bean
     public Step exceptionGenerationStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("exceptionGenerationStep", jobRepository)

@@ -1,7 +1,11 @@
 package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
+import com.susukkang.fgc.policy.service.CommissionPolicyService;
+import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
 import com.susukkang.fgc.validation.batch.contract.ScheduleRegenerationPort;
@@ -29,6 +33,8 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
 
     private final ValidationScheduleMapper validationScheduleMapper;
     private final ScheduleService scheduleService;
+    private final CommissionPolicyService commissionPolicyService;
+    private final ScheduleMapper scheduleMapper;
     private final ExceptionCaseMapper exceptionCaseMapper;
 
     @Override
@@ -69,6 +75,12 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                 continue;
             }
 
+            ContractSkip policySkip = validatePolicies(validationRunId, contractId);
+            if (policySkip != null) {
+                skips.add(policySkip);
+                continue;
+            }
+
             InsuranceContract contract = InsuranceContract.builder()
                     .contractId(contractId)
                     .build();
@@ -76,6 +88,35 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
         }
 
         return new StepProcessingResult(statesByContract.size(), skips.size(), 0, skips);
+    }
+
+    private ContractSkip validatePolicies(Long validationRunId, Long contractId) {
+        for (PaymentStage paymentStage : PaymentStage.values()) {
+            try {
+                commissionPolicyService.resolveCurrentCommission(contractId, paymentStage);
+            } catch (FgcBusinessException exception) {
+                String reasonCode = String.valueOf(
+                        exception.getParams().getOrDefault("reason", "POLICY_MISSING"));
+                String message = "POLICY_DUPLICATE".equals(reasonCode)
+                        ? "적용 가능한 현행 수수료 정책이 중복되었습니다."
+                        : "적용 가능한 현행 수수료 정책이 없습니다.";
+                scheduleMapper.upsertPolicyReviewCase(
+                        contractId,
+                        paymentStage,
+                        reasonCode,
+                        "예상 스케줄 생성 검토 필요",
+                        message
+                );
+                exceptionCaseMapper.insertDataQualityCase(
+                        validationRunId,
+                        contractId,
+                        "예상 스케줄 정책 오류",
+                        paymentStage + ": " + message
+                );
+                return new ContractSkip(contractId, reasonCode, message);
+            }
+        }
+        return null;
     }
 
     private String findStructuralError(List<ValidationScheduleState> states) {
