@@ -21,7 +21,7 @@ class SidebarSectionStateStructureTest {
     }
 
     @Test
-    void appShellPersistsMultipleOpenSectionsForTheCurrentSession() throws IOException {
+    void appShellContainsSidebarPersistenceHooks() throws IOException {
         String appShell = resource("static/js/common/app-shell.js");
 
         assertThat(appShell)

@@ -75,15 +75,15 @@ class ShellMonthSessionWebTest {
                 .andExpect(model().attribute("month", "2026-05"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "data-value=\"2026-05\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "<span id=\"global-month-value\" data-month-selector-value>2026-05</span>")));
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*<span\\b(?=[^>]*\\bid=\"global-month-value\")(?=[^>]*\\bdata-month-selector-value\\b)[^>]*>2026-05</span>.*")));
 
         mvc.perform(get("/").session(session).with(user(settleUser())))
                 .andExpect(model().attribute("month", "2026-05"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "data-value=\"2026-05\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "<span id=\"global-month-value\" data-month-selector-value>2026-05</span>")));
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*<span\\b(?=[^>]*\\bid=\"global-month-value\")(?=[^>]*\\bdata-month-selector-value\\b)[^>]*>2026-05</span>.*")));
     }
 
     /** 기준월의 임시 선택과 확정은 공통 Month Selector와 App Shell adapter가 처리한다. */

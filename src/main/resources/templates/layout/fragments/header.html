@@ -44,6 +44,7 @@
               <button class="month-selector-cell" type="button" role="gridcell"
                       th:each="column : ${#numbers.sequence(1, 4)}"
                       th:with="monthIndex=${row * 4 + column}"
+                      tabindex="-1"
                       th:attr="data-month-index=${monthIndex},aria-label=${monthIndex + '월'},aria-selected='false'">
                 <span class="month-selector-cell-label" th:text="${monthIndex + '월'}">1월</span>
                 <span class="month-selector-cell-state" aria-hidden="true" hidden></span>

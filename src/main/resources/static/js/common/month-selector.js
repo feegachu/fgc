@@ -47,17 +47,23 @@
     var applyLabel = root.querySelector("[data-month-selector-apply-label]");
     var loadingIcon = root.querySelector(".month-selector-loading");
     var errorRegion = root.querySelector("[data-month-selector-error]");
+    var previousYearButton = root.querySelector("[data-action='previous-month-selector-year']");
+    var nextYearButton = root.querySelector("[data-action='next-month-selector-year']");
+    var cancelButton = root.querySelector("[data-action='cancel-month-selector']");
     var disabledMonths = parseDisabledMonths(root);
+    var currentMonth = actualCurrentMonth();
+    var value = MONTH_PATTERN.test(root.dataset.value || "") ? root.dataset.value : currentMonth;
     var state = {
-      value: MONTH_PATTERN.test(root.dataset.value || "") ? root.dataset.value : actualCurrentMonth(),
+      value: value,
       draftValue: null,
-      currentMonth: actualCurrentMonth(),
-      displayYear: 0,
+      currentMonth: currentMonth,
+      displayYear: Number(value.slice(0, 4)),
       open: false,
       applying: false
     };
 
-    if (!trigger || !popover || !grid || !cells.length || !applyButton) return null;
+    if (!trigger || !popover || !grid || !cells.length || !applyButton ||
+        !previousYearButton || !nextYearButton || !cancelButton) return null;
 
     function isDisabled(month) {
       return disabledMonths.indexOf(month) !== -1;
@@ -77,6 +83,7 @@
       cell.classList.toggle("is-disabled", disabled);
       cell.setAttribute("aria-selected", String(selected));
       cell.setAttribute("aria-current", current ? "date" : "false");
+      cell.tabIndex = selected && !disabled ? 0 : -1;
       cell.setAttribute("aria-label", Number(cell.dataset.monthIndex) + "월" +
         (selected ? ", 선택됨" : "") + (current ? ", 현재" : "") + (disabled ? ", 선택 불가" : ""));
 
@@ -107,7 +114,13 @@
       var selected = cells.find(function (cell) { return cell.dataset.month === state.draftValue && !cell.disabled; });
       var current = cells.find(function (cell) { return cell.dataset.month === state.currentMonth && !cell.disabled; });
       var firstEnabled = cells.find(function (cell) { return !cell.disabled; });
-      (selected || current || firstEnabled || trigger).focus();
+      var focusTarget = selected || current || firstEnabled;
+      if (!focusTarget) {
+        trigger.focus();
+        return;
+      }
+      cells.forEach(function (cell) { cell.tabIndex = cell === focusTarget ? 0 : -1; });
+      focusTarget.focus();
     }
 
     function open() {
@@ -135,12 +148,17 @@
 
     function changeYear(offset) {
       if (state.applying) return;
-      state.displayYear += offset;
+      var nextYear = state.displayYear + offset;
+      if (nextYear < 0 || nextYear > 9999) return;
+      state.displayYear = nextYear;
       render();
       var focusTarget = cells.find(function (cell) {
         return Number(cell.dataset.monthIndex) === Number((state.draftValue || state.currentMonth).slice(5, 7)) && !cell.disabled;
       });
-      if (focusTarget) focusTarget.focus();
+      if (focusTarget) {
+        cells.forEach(function (cell) { cell.tabIndex = cell === focusTarget ? 0 : -1; });
+        focusTarget.focus();
+      }
       if (typeof settings.onYearChange === "function") settings.onYearChange(state.displayYear);
     }
 
@@ -153,9 +171,9 @@
     function setApplying(applying) {
       state.applying = applying;
       trigger.disabled = applying;
-      root.querySelector("[data-action='previous-month-selector-year']").disabled = applying;
-      root.querySelector("[data-action='next-month-selector-year']").disabled = applying;
-      root.querySelector("[data-action='cancel-month-selector']").disabled = applying;
+      previousYearButton.disabled = applying;
+      nextYearButton.disabled = applying;
+      cancelButton.disabled = applying;
       render();
     }
 
@@ -194,7 +212,10 @@
       if (start < 0) return;
       var target = start + offset;
       while (target >= 0 && target < cells.length && cells[target].disabled) target += offset < 0 ? -1 : 1;
-      if (target >= 0 && target < cells.length) cells[target].focus();
+      if (target >= 0 && target < cells.length) {
+        cells.forEach(function (cell, index) { cell.tabIndex = index === target ? 0 : -1; });
+        cells[target].focus();
+      }
     }
 
     trigger.addEventListener("click", function () {
@@ -202,9 +223,9 @@
       else open();
     });
 
-    root.querySelector("[data-action='previous-month-selector-year']").addEventListener("click", function () { changeYear(-1); });
-    root.querySelector("[data-action='next-month-selector-year']").addEventListener("click", function () { changeYear(1); });
-    root.querySelector("[data-action='cancel-month-selector']").addEventListener("click", function () { close(true); });
+    previousYearButton.addEventListener("click", function () { changeYear(-1); });
+    nextYearButton.addEventListener("click", function () { changeYear(1); });
+    cancelButton.addEventListener("click", function () { close(true); });
     applyButton.addEventListener("click", apply);
 
     grid.addEventListener("click", function (event) {

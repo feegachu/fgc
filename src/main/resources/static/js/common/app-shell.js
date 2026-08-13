@@ -113,6 +113,7 @@
             try {
               if (window.FgcUi.workspaceTabs) previousTabs = window.FgcUi.workspaceTabs.applyGlobalMonth(month);
               navigateToGlobalMonth(month);
+              resolve();
             } catch (error) {
               if (window.FgcUi.workspaceTabs && previousTabs) window.FgcUi.workspaceTabs.restoreTabs(previousTabs);
               reject(error);

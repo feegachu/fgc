@@ -55,7 +55,8 @@ class PublishingTemplateStructureTest {
                 .contains("예외 현황은 조회 API 연동 대기 중입니다.");
         assertThat(resource("templates/vrun/detail.html"))
                 .contains("진행률 API 연동 대기")
-                .contains("확정 조건 API 연동 대기");
+                .contains("확정 조건 API 연동 대기")
+                .containsPattern("(?s)<button[^>]*id=\"btn-execute\"[^>]*\\bdisabled\\b[^>]*>");
     }
 
     @Test

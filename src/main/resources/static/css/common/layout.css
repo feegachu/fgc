@@ -526,6 +526,12 @@
   to { transform: rotate(360deg); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .month-selector-loading {
+    animation: none;
+  }
+}
+
 .workspace-tab-bar {
   position: fixed;
   inset: var(--layout-header-height) 0 auto var(--layout-sidebar-width);

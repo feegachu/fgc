@@ -546,5 +546,6 @@
   .publishing-page *,
   .publishing-modal * {
     animation: none !important;
+    transition: none !important;
   }
 }

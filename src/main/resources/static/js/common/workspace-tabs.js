@@ -53,7 +53,15 @@
   }
 
   function restoreTabs(tabs) {
-    writeTabs(Array.isArray(tabs) ? tabs : []);
+    var safeTabs = Array.isArray(tabs) ? tabs : [];
+    writeTabs(safeTabs);
+
+    document.querySelectorAll("[data-workspace-tabs] .workspace-tab-link").forEach(function (link) {
+      var tabElement = link.closest("[data-tab-id]");
+      var tabId = tabElement ? tabElement.dataset.tabId : null;
+      var restoredTab = safeTabs.find(function (tab) { return tab.id === tabId; });
+      if (restoredTab) link.href = restoredTab.href;
+    });
   }
 
   function getOpenTabCount() {
