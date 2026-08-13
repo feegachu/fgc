@@ -17,6 +17,9 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
+    <!-- TODO FGC-FUN-052의 실행 간 중복 방지 요구와 인터페이스 정의서의
+         exception_key 동결 규칙이 충돌한다. 중복 범위와 안정 업무키가 확정되면
+         contractId + paymentStage 기반 키 및 최신 validation_run 연결 UPSERT를 검토한다. -->
     <insert id="insertArbitrageCandidate">
         INSERT INTO fgc.exception_case
             (exception_key, exception_type, severity, status,
@@ -31,6 +34,7 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
+    <!-- 위 TODO와 동일한 키 정책을 적용한다. -->
     <insert id="insertArbitrageReviewCase">
         INSERT INTO fgc.exception_case
             (exception_key, exception_type, severity, status,
