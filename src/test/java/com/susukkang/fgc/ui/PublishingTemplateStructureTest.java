@@ -59,6 +59,14 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
+    void fixedBusinessNoticesStayAlignedWithScreenSpecification() throws IOException {
+        assertThat(resource("templates/exception/list.html"))
+                .contains("정상 건은 여기 오지 않습니다. 여기 있는 건 전부 사람이 봐야 합니다.");
+        assertThat(resource("templates/ledger/list.html"))
+                .contains("이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.");
+    }
+
+    @Test
     void productionLayoutLoadsScopedResponsivePublishingStyles() throws IOException {
         assertThat(resource("templates/layout/default.html"))
                 .contains("/css/features/publishing.css");
