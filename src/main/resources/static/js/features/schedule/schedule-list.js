@@ -2,8 +2,11 @@
   "use strict";
 
   function positivePage(value) {
-    var parsed = Number.parseInt(value, 10);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+    var text = value == null ? "" : String(value);
+    if (!/^[1-9]\d*$/.test(text)) return 1;
+
+    var parsed = Number(text);
+    return Number.isSafeInteger(parsed) ? parsed : 1;
   }
 
   function normalizePage(requestedPage, totalPages) {

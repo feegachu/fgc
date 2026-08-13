@@ -9,7 +9,9 @@ test("empty schedule result normalizes an out-of-range page to page 1", () => {
   assert.equal(normalizePage(response.page, response.totalPages), 1);
 });
 
-test("non-empty schedule result keeps valid pages and clamps to the last page", () => {
+test("FGC-QUR-001 non-empty result preserves boundaries and rejects malformed pages", () => {
+  assert.equal(normalizePage(1, 5), 1);
   assert.equal(normalizePage(2, 5), 2);
   assert.equal(normalizePage(999, 5), 5);
+  assert.equal(normalizePage("2abc", 5), 1);
 });
