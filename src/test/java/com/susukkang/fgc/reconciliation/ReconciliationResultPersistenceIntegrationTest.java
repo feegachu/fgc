@@ -125,9 +125,10 @@ class ReconciliationResultPersistenceIntegrationTest {
         ReconciliationExecutionRequest request = request(
                 runId, IDEMPOTENT_MONTH, PaymentStage.GA_TO_FC, source.insurerId());
         ReconciliationCandidate original = gaFcCandidate(source);
+        ReconciliationCandidate changed = gaFcChangedCandidate(source);
 
         persistenceService.persist(request, List.of(original));
-        persistenceService.persist(request, List.of(original));
+        persistenceService.persist(request, List.of(changed));
 
         Integer resultCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.reconciliation_result WHERE reconciliation_run_id = ?",
@@ -143,19 +144,40 @@ class ReconciliationResultPersistenceIntegrationTest {
 
         assertThat(resultCount).isEqualTo(1);
         assertThat(matchCount).isEqualTo(2);
+        StoredIdempotentResult stored = jdbcTemplate.queryForObject("""
+                SELECT expected_total_amount,
+                       detail_snapshot #>> '{expectedJournalHeaderIds,0}' AS expected_journal_id
+                  FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id = ?
+                """, (resultSet, rowNum) -> new StoredIdempotentResult(
+                resultSet.getBigDecimal("expected_total_amount"),
+                resultSet.getLong("expected_journal_id")
+        ), runId);
+        assertThat(stored).isEqualTo(new StoredIdempotentResult(new BigDecimal("1000.00"), 21L));
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT matched_amount
+                  FROM fgc.reconciliation_match match
+                  JOIN fgc.reconciliation_result result
+                    ON result.reconciliation_result_id = match.reconciliation_result_id
+                 WHERE result.reconciliation_run_id = ?
+                 ORDER BY match_seq
+                """, BigDecimal.class, runId))
+                .containsExactly(new BigDecimal("1000.00"), new BigDecimal("1000.00"));
     }
 
     @Test
-    void 치명적_매칭오류면_부분결과를_롤백하고_FAILED를_별도_기록한다() {
+    void 두번째_결과_저장오류면_첫번째_부분결과까지_롤백하고_FAILED를_별도_기록한다() {
         SourceSeed source = sourceSeed();
         Long runId = insertRunningRun(FAILED_MONTH, PaymentStage.GA_TO_FC, source.insurerId());
         ReconciliationExecutionRequest request = request(
                 runId, FAILED_MONTH, PaymentStage.GA_TO_FC, source.insurerId());
-        given(gaFcMatcher.match(request)).willThrow(new IllegalStateException("Golden 매칭 실패"));
+        given(gaFcMatcher.match(request)).willReturn(List.of(
+                gaFcCandidate(source),
+                gaFcInvalidCandidate(source)
+        ));
 
         assertThatThrownBy(() -> executionCoordinator.execute(request))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Golden 매칭 실패");
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
 
         assertThat(status(runId)).isEqualTo("FAILED");
         assertThat(jdbcTemplate.queryForObject("""
@@ -167,6 +189,13 @@ class ReconciliationResultPersistenceIntegrationTest {
                 "SELECT COUNT(*) FROM fgc.reconciliation_result WHERE reconciliation_run_id = ?",
                 Integer.class,
                 runId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.reconciliation_match match
+                  JOIN fgc.reconciliation_result result
+                    ON result.reconciliation_result_id = match.reconciliation_result_id
+                 WHERE result.reconciliation_run_id = ?
+                """, Integer.class, runId)).isZero();
     }
 
     private void assertCompletedGolden(
@@ -389,6 +418,62 @@ class ReconciliationResultPersistenceIntegrationTest {
         );
     }
 
+    private static GaFcMatchCandidate gaFcChangedCandidate(SourceSeed source) {
+        return new GaFcMatchCandidate(
+                "GOLDEN:GA_TO_FC",
+                source.contractId(),
+                source.agentId(),
+                source.agentId(),
+                source.commissionItemId(),
+                1,
+                1,
+                GA_FC_MONTH.plusDays(15),
+                GA_FC_MONTH,
+                ReconciliationResultType.AMOUNT_DIFFERENCE,
+                new BigDecimal("2000"),
+                new BigDecimal("3000"),
+                new BigDecimal("1000"),
+                "AMOUNT_DIFFERENCE",
+                List.of("AGENT_MISMATCH"),
+                List.of(source.scheduleLineId()),
+                List.of(source.attributionId()),
+                List.of(91L),
+                List.of(92L),
+                List.of(
+                        new ReconciliationMatchSource(
+                                source.scheduleLineId(), null, 91L, new BigDecimal("2000"), "EXPECTED"),
+                        new ReconciliationMatchSource(
+                                null, source.attributionId(), 92L, new BigDecimal("3000"), "ACTUAL")
+                )
+        );
+    }
+
+    private static GaFcMatchCandidate gaFcInvalidCandidate(SourceSeed source) {
+        return new GaFcMatchCandidate(
+                "GOLDEN:GA_TO_FC:INVALID",
+                source.contractId(),
+                source.agentId(),
+                source.agentId(),
+                source.commissionItemId(),
+                2,
+                2,
+                FAILED_MONTH.plusDays(14),
+                FAILED_MONTH,
+                ReconciliationResultType.MATCHED,
+                BigDecimal.ONE,
+                BigDecimal.ONE,
+                BigDecimal.ZERO,
+                "MATCHED",
+                List.of(),
+                List.of(source.scheduleLineId()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new ReconciliationMatchSource(
+                        source.scheduleLineId(), null, null, new BigDecimal("-1"), "EXPECTED"))
+        );
+    }
+
     private static List<ReconciliationMatchSource> sourceMatches(SourceSeed source) {
         return List.of(
                 new ReconciliationMatchSource(
@@ -443,5 +528,8 @@ class ReconciliationResultPersistenceIntegrationTest {
             BigDecimal matchedAmount,
             String matchRole
     ) {
+    }
+
+    private record StoredIdempotentResult(BigDecimal expectedAmount, Long expectedJournalId) {
     }
 }

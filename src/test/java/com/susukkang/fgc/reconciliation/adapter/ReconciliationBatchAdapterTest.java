@@ -21,6 +21,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -71,17 +72,25 @@ class ReconciliationBatchAdapterTest {
         ValidationStepContext context = context();
         ReconciliationExecutionRequest first = request(11L, 101L);
         ReconciliationExecutionRequest failed = request(12L, 102L);
-        ReconciliationExecutionRequest pending = request(13L, 103L);
+        ReconciliationExecutionRequest cleanupFailed = request(13L, 103L);
+        ReconciliationExecutionRequest pending = request(14L, 104L);
         given(batchRunService.prepare(context, PaymentStage.GA_TO_FC))
-                .willReturn(List.of(first, failed, pending));
+                .willReturn(List.of(first, failed, cleanupFailed, pending));
         given(executionCoordinator.execute(first)).willReturn(1L);
         given(executionCoordinator.execute(failed))
                 .willThrow(new IllegalStateException("치명적 오류"));
+        doThrow(new IllegalStateException("종결 충돌"))
+                .when(failureRecorder).record(cleanupFailed.reconciliationRunId());
 
         assertThatThrownBy(() -> adapter.reconcile(context, PaymentStage.GA_TO_FC))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("치명적 오류");
+                .hasMessage("치명적 오류")
+                .satisfies(exception -> assertThat(exception.getSuppressed())
+                        .singleElement()
+                        .isInstanceOfSatisfying(IllegalStateException.class,
+                                suppressed -> assertThat(suppressed).hasMessage("종결 충돌")));
 
+        verify(failureRecorder).record(cleanupFailed.reconciliationRunId());
         verify(failureRecorder).record(pending.reconciliationRunId());
     }
 

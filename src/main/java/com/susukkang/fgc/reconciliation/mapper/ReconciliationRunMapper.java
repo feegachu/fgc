@@ -38,5 +38,7 @@ public interface ReconciliationRunMapper {
             @Param("validationRunId") Long validationRunId
     );
 
+    Long lockValidationRun(@Param("validationRunId") Long validationRunId);
+
     List<Long> findSelectedInsurerIds(@Param("validationRunId") Long validationRunId);
 }

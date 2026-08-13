@@ -27,6 +27,9 @@ public class ReconciliationTasklet implements Tasklet {
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
         Long validationRunId = ValidationRunBatchContext.getValidationRunId(chunkContext);
+        if (validationRunId == null) {
+            throw new IllegalStateException("FGC-FUN-041 validationRunId가 실행 컨텍스트에 없습니다.");
+        }
         MonthlyValidationJobParameters parameters = MonthlyValidationJobParameters.from(
                 chunkContext.getStepContext().getStepExecution().getJobParameters());
         ValidationJobContext jobContext = new ValidationJobContext(

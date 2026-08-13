@@ -78,7 +78,7 @@ class InsurerGaReconciliationIntegrationTest {
         Long expectedJournalId = insertPostedJournal(
                 "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expectedMatched,
                 contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
-        insertPostedJournal(
+        Long missingExpectedJournalId = insertPostedJournal(
                 "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expectedMissing,
                 secondContractId, commissionItemId, "300000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
         Long actualTransactionId = id("""
@@ -123,6 +123,59 @@ class InsurerGaReconciliationIntegrationTest {
                     ON result.reconciliation_result_id = match.reconciliation_result_id
                  WHERE result.reconciliation_run_id = ?
                 """, Integer.class, reconciliationRunId)).isEqualTo(3);
+
+        ActualMissingSnapshot actualMissing = jdbcTemplate.queryForObject("""
+                SELECT reconciliation_result_id,
+                       expected_total_amount,
+                       actual_total_amount,
+                       difference_amount,
+                       detail_snapshot #>> '{expectedJournalHeaderIds,0}' AS expected_journal_id,
+                       detail_snapshot #>> '{sources,0,scheduleLineId}' AS snapshot_schedule_line_id,
+                       detail_snapshot #>> '{sources,0,matchedAmount}' AS snapshot_matched_amount,
+                       detail_snapshot #>> '{sources,0,matchRole}' AS snapshot_match_role
+                  FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id = ?
+                   AND result_type = 'ACTUAL_MISSING'
+                """, (resultSet, rowNum) -> new ActualMissingSnapshot(
+                resultSet.getLong("reconciliation_result_id"),
+                resultSet.getBigDecimal("expected_total_amount"),
+                resultSet.getBigDecimal("actual_total_amount"),
+                resultSet.getBigDecimal("difference_amount"),
+                resultSet.getLong("expected_journal_id"),
+                resultSet.getLong("snapshot_schedule_line_id"),
+                resultSet.getBigDecimal("snapshot_matched_amount"),
+                resultSet.getString("snapshot_match_role")
+        ), reconciliationRunId);
+        assertThat(actualMissing.expectedTotalAmount()).isEqualByComparingTo("300000");
+        assertThat(actualMissing.actualTotalAmount()).isZero();
+        assertThat(actualMissing.differenceAmount()).isEqualByComparingTo("-300000");
+        assertThat(actualMissing.expectedJournalId()).isEqualTo(missingExpectedJournalId);
+        assertThat(actualMissing.snapshotScheduleLineId()).isEqualTo(expectedMissing);
+        assertThat(actualMissing.snapshotMatchedAmount()).isEqualByComparingTo("300000");
+        assertThat(actualMissing.snapshotMatchRole()).isEqualTo("EXPECTED");
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.reconciliation_match
+                 WHERE reconciliation_result_id = ?
+                   AND match_seq = 1
+                   AND schedule_line_id = ?
+                   AND transaction_attribution_id IS NULL
+                   AND matched_amount = 300000
+                   AND match_role = 'EXPECTED'
+                """, Integer.class, actualMissing.reconciliationResultId(), expectedMissing)).isEqualTo(1);
+    }
+
+    private record ActualMissingSnapshot(
+            Long reconciliationResultId,
+            BigDecimal expectedTotalAmount,
+            BigDecimal actualTotalAmount,
+            BigDecimal differenceAmount,
+            Long expectedJournalId,
+            Long snapshotScheduleLineId,
+            BigDecimal snapshotMatchedAmount,
+            String snapshotMatchRole
+    ) {
     }
 
     @Test

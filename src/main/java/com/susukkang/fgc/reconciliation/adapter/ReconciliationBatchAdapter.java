@@ -36,7 +36,12 @@ public class ReconciliationBatchAdapter implements ReconciliationBatchPort {
             } catch (RuntimeException exception) {
                 // 아직 실행하지 못한 RUNNING 행도 Step 중단 상태에 맞춰 FAILED로 종결합니다.
                 for (int pending = index + 1; pending < requests.size(); pending++) {
-                    failureRecorder.record(requests.get(pending).reconciliationRunId());
+                    try {
+                        failureRecorder.record(requests.get(pending).reconciliationRunId());
+                    } catch (RuntimeException cleanupException) {
+                        // 원래 Step 실패를 보존하면서 가능한 나머지 실행의 종결은 계속 시도합니다.
+                        exception.addSuppressed(cleanupException);
+                    }
                 }
                 throw exception;
             }

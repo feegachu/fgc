@@ -33,6 +33,9 @@ public class ReconciliationBatchRunService {
             ValidationStepContext context,
             PaymentStage paymentStage
     ) {
+        if (reconciliationRunMapper.lockValidationRun(context.validationRunId()) == null) {
+            throw new IllegalStateException("FGC-FUN-041 검증 실행을 찾을 수 없습니다.");
+        }
         List<ReconciliationExecutionRequest> requests = new ArrayList<>();
         for (Long insurerId : reconciliationRunMapper.findSelectedInsurerIds(context.validationRunId())) {
             ReconciliationRunRow run = reconciliationRunMapper.findByNaturalKey(
@@ -53,9 +56,8 @@ public class ReconciliationBatchRunService {
             if ("CREATED".equals(run.getStatus()) || "FAILED".equals(run.getStatus())) {
                 lifecycleService.start(run.getReconciliationRunId());
                 requests.add(request(context, paymentStage, insurerId, run.getReconciliationRunId()));
-            } else if ("RUNNING".equals(run.getStatus())) {
-                requests.add(request(context, paymentStage, insurerId, run.getReconciliationRunId()));
             }
+            // RUNNING은 다른 실행자가 소유한 것으로 보고 건너뜁니다. 명시적인 lease 만료 모델은 아직 없습니다.
             // COMPLETED·FINALIZED는 이미 확정된 결과를 다시 쓰지 않습니다.
         }
         return List.copyOf(requests);
