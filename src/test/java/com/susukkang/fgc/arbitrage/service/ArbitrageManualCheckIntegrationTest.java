@@ -74,16 +74,13 @@ class ArbitrageManualCheckIntegrationTest {
 
     private Long insertValidationRun() {
         LocalDate month = LocalDate.of(2097, 12, 1);
-        Integer runNo = jdbcTemplate.queryForObject("""
-                SELECT COALESCE(MAX(run_no), 0) + 1
-                  FROM fgc.validation_run
-                 WHERE validation_month = ?
-                """, Integer.class, month);
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status)
-                VALUES (?, ?, 'PRE_CONFIRM', 'CREATED')
+                SELECT ?, COALESCE(MAX(run_no), 0) + 1, 'PRE_CONFIRM', 'CREATED'
+                  FROM fgc.validation_run
+                 WHERE validation_month = ?
                 RETURNING validation_run_id
-                """, Long.class, month, runNo);
+                """, Long.class, month, month);
     }
 
     private record TestReference(Long contractId, LocalDate asOfDate, Long userId) {

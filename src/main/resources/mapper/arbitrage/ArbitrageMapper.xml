@@ -32,7 +32,8 @@
     <sql id="arbitrageSearchCondition">
         <where>
             <if test="condition.month != null">
-                AND TO_CHAR(ac.as_of_date, 'YYYY-MM') = #{condition.month}
+                AND ac.as_of_date <![CDATA[ >= ]]> #{condition.monthStart}
+                AND ac.as_of_date <![CDATA[ < ]]> #{condition.nextMonthStart}
             </if>
             <if test="condition.status != null">
                 AND ac.result_status = #{condition.status}

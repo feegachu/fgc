@@ -127,18 +127,15 @@ class ArbitrageMapperIntegrationTest {
     }
 
     private Long insertValidationRun() {
-        Integer nextRunNo = jdbcTemplate.queryForObject("""
-                SELECT COALESCE(MAX(run_no), 0) + 1
-                  FROM fgc.validation_run
-                 WHERE validation_month = ?
-                """, Integer.class, TEST_MONTH.atDay(1));
-
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (
                     validation_month, run_no, run_type, status
-                ) VALUES (?, ?, 'PRE_CONFIRM', 'CREATED')
+                )
+                SELECT ?, COALESCE(MAX(run_no), 0) + 1, 'PRE_CONFIRM', 'CREATED'
+                  FROM fgc.validation_run
+                 WHERE validation_month = ?
                 RETURNING validation_run_id
-                """, Long.class, TEST_MONTH.atDay(1), nextRunNo);
+                """, Long.class, TEST_MONTH.atDay(1), TEST_MONTH.atDay(1));
     }
 
     private void insertArbitrageCheck(

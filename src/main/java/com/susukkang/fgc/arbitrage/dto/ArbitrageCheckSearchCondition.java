@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 
 /**
@@ -27,4 +28,12 @@ public class ArbitrageCheckSearchCondition {
     private ArbitrageCheckStatus status; // 판정 결과
     private PaymentStage stage; // 지급 단계
     private Long insurerId; // 보험사 ID
+
+    public LocalDate getMonthStart() {
+        return month == null ? null : month.atDay(1);
+    }
+
+    public LocalDate getNextMonthStart() {
+        return month == null ? null : month.plusMonths(1).atDay(1);
+    }
 }

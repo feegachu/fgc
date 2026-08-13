@@ -39,6 +39,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ArbitrageService {
     private static final PaymentStage REGULATORY_PAYMENT_STAGE = PaymentStage.GA_TO_FC;
+    // TODO 정책 파라미터 키와 적용 policy_version 선택 기준이 확정되면
+    // policy_parameter에서 차익거래 해약환급금 합산 기간을 조회하도록 변경한다.
+    // 현재 값은 REG-12의 계약 체결 후 3년(36개월) 기준을 따른다.
     private static final int REFUND_ADDITION_LAST_MONTH = 36;
 
     private final ArbitrageMapper arbitrageMapper;
@@ -140,7 +143,7 @@ public class ArbitrageService {
         if (validationRunMapper.updateCurrentStep(run.getValidationRunId(), 5) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
 
-        ArbitrageCheckInsertDTO row = calculateAndSave(
+        ArbitrageCheckInsertDTO row = executeArbitrageCheck(
                 run.getValidationRunId(), contractId, request);
 
         // 수동 검증 실행 완료 처리
@@ -176,14 +179,14 @@ public class ArbitrageService {
             throw validationException("contractId", "contractId는 1 이상이어야 합니다.");
         if (asOfDate == null)
             throw validationException("asOfDate", "검증 기준일은 필수입니다.");
-        return calculateAndSave(
+        return executeArbitrageCheck(
                 validationRunId,
                 contractId,
                 new ReArbitrageCheckRequest(asOfDate, "월 통합검증")
         );
     }
 
-    private ArbitrageCheckInsertDTO calculateAndSave(
+    private ArbitrageCheckInsertDTO executeArbitrageCheck(
             Long validationRunId,
             Long contractId,
             ReArbitrageCheckRequest request) {

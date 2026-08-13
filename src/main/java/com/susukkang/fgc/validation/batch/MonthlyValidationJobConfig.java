@@ -3,6 +3,7 @@ package com.susukkang.fgc.validation.batch;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
 import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.LedgerImbalanceCheckTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
@@ -141,7 +142,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step imbalanceCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("imbalanceCheckStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("⑥균형검사"), transactionManager)
+                .tasklet(new LedgerImbalanceCheckTasklet(ledgerImbalanceCheckPort), transactionManager)
                 .listener(progressListener(6, false))
                 .build();
     }
