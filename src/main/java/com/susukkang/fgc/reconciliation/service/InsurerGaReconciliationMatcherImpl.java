@@ -6,6 +6,7 @@ import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaExpectedSourceRow;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaMatchCandidate;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
 import com.susukkang.fgc.reconciliation.mapper.InsurerGaReconciliationMapper;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -193,8 +194,41 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 distinctLongs(expectedSources.stream().map(InsurerGaExpectedSourceRow::getScheduleLineId).toList()),
                 distinctLongs(actualSources.stream().map(InsurerGaActualSourceRow::getTransactionAttributionId).toList()),
                 distinctLongs(expectedSources.stream().map(InsurerGaExpectedSourceRow::getJournalHeaderId).toList()),
-                distinctLongs(actualSources.stream().map(InsurerGaActualSourceRow::getJournalHeaderId).toList())
+                distinctLongs(actualSources.stream().map(InsurerGaActualSourceRow::getJournalHeaderId).toList()),
+                sourceMatches(expectedSources, actualSources)
         );
+    }
+
+    // 2026-08-14 hjKang - 결과 저장용 원자행 금액과 원장 추적정보 보존
+    // 기존 코드: 후보에 원천 ID 목록과 합계만 있어 reconciliation_match.matched_amount를 재현할 수 없음
+    // 문제: 상세 화면과 감사 추적에서 어느 원자행이 얼마를 구성했는지 확인할 수 없음
+    // 개선: 예상행과 실제행을 ID 순서로 고정하고 행별 원 단위 금액·원장 ID·역할을 함께 전달
+    private static List<ReconciliationMatchSource> sourceMatches(
+            List<InsurerGaExpectedSourceRow> expectedSources,
+            List<InsurerGaActualSourceRow> actualSources
+    ) {
+        List<ReconciliationMatchSource> matches = new ArrayList<>();
+        expectedSources.stream()
+                .sorted(Comparator.comparing(InsurerGaExpectedSourceRow::getScheduleLineId))
+                .map(source -> new ReconciliationMatchSource(
+                        source.getScheduleLineId(),
+                        null,
+                        source.getJournalHeaderId(),
+                        MoneyUtil.roundWon(source.getExpectedAmount()),
+                        "EXPECTED"
+                ))
+                .forEach(matches::add);
+        actualSources.stream()
+                .sorted(Comparator.comparing(InsurerGaActualSourceRow::getTransactionAttributionId))
+                .map(source -> new ReconciliationMatchSource(
+                        null,
+                        source.getTransactionAttributionId(),
+                        source.getJournalHeaderId(),
+                        MoneyUtil.roundWon(source.getActualAmount()),
+                        "ACTUAL"
+                ))
+                .forEach(matches::add);
+        return List.copyOf(matches);
     }
 
     private ReconciliationResultType classify(

@@ -6,6 +6,7 @@ import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.GaFcActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcExpectedSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcMatchCandidate;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
 import com.susukkang.fgc.reconciliation.mapper.GaFcReconciliationMapper;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -168,8 +169,41 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                 distinctLongs(expectedSources.stream().map(GaFcExpectedSourceRow::getScheduleLineId).toList()),
                 distinctLongs(actualSources.stream().map(GaFcActualSourceRow::getTransactionAttributionId).toList()),
                 distinctLongs(expectedSources.stream().map(GaFcExpectedSourceRow::getJournalHeaderId).toList()),
-                distinctLongs(actualSources.stream().map(GaFcActualSourceRow::getJournalHeaderId).toList())
+                distinctLongs(actualSources.stream().map(GaFcActualSourceRow::getJournalHeaderId).toList()),
+                sourceMatches(expectedSources, actualSources)
         );
+    }
+
+    // 2026-08-14 hjKang - GA→FC 원자행별 비교금액과 원장 추적정보 보존
+    // 기존 코드: 저장 단계가 예상·실제 원천 ID만 받고 각 행의 금액과 분개 ID는 알 수 없음
+    // 문제: reconciliation_match와 detail_snapshot만으로 결과 합계를 재검산할 수 없음
+    // 개선: 결정적인 원천 ID 순서로 행별 HALF_UP 금액·분개 ID·역할을 전달
+    private static List<ReconciliationMatchSource> sourceMatches(
+            List<GaFcExpectedSourceRow> expectedSources,
+            List<GaFcActualSourceRow> actualSources
+    ) {
+        List<ReconciliationMatchSource> matches = new ArrayList<>();
+        expectedSources.stream()
+                .sorted(Comparator.comparing(GaFcExpectedSourceRow::getScheduleLineId))
+                .map(source -> new ReconciliationMatchSource(
+                        source.getScheduleLineId(),
+                        null,
+                        source.getJournalHeaderId(),
+                        MoneyUtil.roundWon(source.getExpectedAmount()),
+                        "EXPECTED"
+                ))
+                .forEach(matches::add);
+        actualSources.stream()
+                .sorted(Comparator.comparing(GaFcActualSourceRow::getTransactionAttributionId))
+                .map(source -> new ReconciliationMatchSource(
+                        null,
+                        source.getTransactionAttributionId(),
+                        source.getJournalHeaderId(),
+                        MoneyUtil.roundWon(source.getActualAmount()),
+                        "ACTUAL"
+                ))
+                .forEach(matches::add);
+        return List.copyOf(matches);
     }
 
     private ReconciliationResultType classify(

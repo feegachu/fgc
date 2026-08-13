@@ -51,7 +51,8 @@
 
     <update id="transitionToFailed">
         UPDATE fgc.reconciliation_run
-           SET status = 'FAILED'
+           SET status = 'FAILED',
+               completed_at = clock_timestamp()
          WHERE reconciliation_run_id = #{reconciliationRunId}
            AND status = 'RUNNING'
     </update>
@@ -87,6 +88,16 @@
            AND payment_stage = #{paymentStage}
            AND insurer_id = #{insurerId}
            AND validation_run_id = #{validationRunId}
+    </select>
+
+    <select id="findSelectedInsurerIds" resultType="long">
+        SELECT DISTINCT contract.insurer_id
+          FROM fgc.validation_target target
+          JOIN fgc.insurance_contract contract
+            ON contract.contract_id = target.contract_id
+         WHERE target.validation_run_id = #{validationRunId}
+           AND target.selection_status = 'SELECTED'
+         ORDER BY contract.insurer_id
     </select>
 
 </mapper>

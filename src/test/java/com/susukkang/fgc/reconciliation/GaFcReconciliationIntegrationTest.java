@@ -5,6 +5,7 @@ import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.GaFcMatchCandidate;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.service.GaFcReconciliationMatcher;
+import com.susukkang.fgc.reconciliation.service.ReconciliationResultPersistenceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,9 @@ class GaFcReconciliationIntegrationTest {
 
     @Autowired
     private GaFcReconciliationMatcher matcher;
+
+    @Autowired
+    private ReconciliationResultPersistenceService persistenceService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -89,8 +93,10 @@ class GaFcReconciliationIntegrationTest {
                 1, "111000", "CONFIRMED", "INSURER-TO-GA-EXCLUDED",
                 "INSURER_TO_GA", "INSURER_STATEMENT");
 
-        List<GaFcMatchCandidate> results = matcher.match(new ReconciliationExecutionRequest(
-                99L, 88L, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null));
+        Long reconciliationRunId = insertRunningReconciliationRun(insurerId, PaymentStage.GA_TO_FC);
+        ReconciliationExecutionRequest executionRequest = new ReconciliationExecutionRequest(
+                reconciliationRunId, null, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null);
+        List<GaFcMatchCandidate> results = matcher.match(executionRequest);
 
         assertThat(results).hasSize(1);
         GaFcMatchCandidate result = results.getFirst();
@@ -105,6 +111,20 @@ class GaFcReconciliationIntegrationTest {
                 .doesNotContain(draft.attributionId(), insurerToGaConfirmed.attributionId());
         assertThat(result.expectedJournalHeaderIds()).containsExactly(expectedJournalId);
         assertThat(result.actualJournalHeaderIds()).containsExactly(actualJournalId);
+
+        // FGC-FUN-048-04: FUN-048-03 실제 후보의 비교금액·원천행·원장 snapshot 저장을 검증한다.
+        persistenceService.persist(executionRequest, results);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.reconciliation_result WHERE reconciliation_run_id = ?",
+                Integer.class,
+                reconciliationRunId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.reconciliation_match match
+                  JOIN fgc.reconciliation_result result
+                    ON result.reconciliation_result_id = match.reconciliation_result_id
+                 WHERE result.reconciliation_run_id = ?
+                """, Integer.class, reconciliationRunId)).isEqualTo(2);
     }
 
     // 2026-08-13 yslee - DB 원천의 수취 설계사·회차 비교 불가 상태 검증
@@ -331,6 +351,20 @@ class GaFcReconciliationIntegrationTest {
 
     private Long id(String sql, Object... args) {
         return jdbcTemplate.queryForObject(sql, Long.class, args);
+    }
+
+    private Long insertRunningReconciliationRun(Long insurerId, PaymentStage paymentStage) {
+        Long runId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (settlement_month, payment_stage, insurer_id)
+                VALUES (?, ?, ?)
+                RETURNING reconciliation_run_id
+                """, Long.class, TEST_MONTH, paymentStage.name(), insurerId);
+        jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_run
+                   SET status = 'RUNNING', started_at = clock_timestamp()
+                 WHERE reconciliation_run_id = ?
+                """, runId);
+        return runId;
     }
 
     private record PaymentInsert(Long transactionId, Long attributionId) {
