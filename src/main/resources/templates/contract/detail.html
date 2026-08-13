@@ -365,6 +365,14 @@
           next.focus();
         });
       });
+
+      var requestedTab = new URLSearchParams(window.location.search).get("tab");
+      var requestedTabElement = requestedTab
+        ? document.getElementById("contract-tab-" + requestedTab)
+        : null;
+      if (requestedTabElement && requestedTabElement.classList.contains("contract-detail-tab")) {
+        activateTab(requestedTabElement);
+      }
     }
 
     function initializeSort() {
