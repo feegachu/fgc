@@ -27,7 +27,7 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-VRUN-W02', '월 통합검증 상세·확정', '월 통합검증 실행 목록', '/validation-runs')}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="fgc-main publishing-page publishing-page-detail publishing-page-validation-detail">
 
   <style>
     .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 20px; }
@@ -35,7 +35,7 @@
     .kv dd { margin: 2px 0 0; font-size: 13px; }
   </style>
 
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+  <div class="publishing-page-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
       <h1 class="fgc-page-title">월 통합검증 상세 · 확정</h1>
       <p class="fgc-page-desc">
@@ -43,10 +43,12 @@
         문제가 있는 건만 예외함으로 보냅니다.
       </p>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div class="publishing-inline-controls" style="display:flex;gap:8px;align-items:center">
       <label class="fgc-label" for="pick-run" style="margin:0">실행</label>
       <!-- 실행 선택지는 validation_run 목록으로 서버 렌더링해 채운다 -->
-      <select class="fgc-select" id="pick-run"></select>
+      <select class="fgc-select" id="pick-run">
+        <option value="">실행 목록 연동 대기</option>
+      </select>
     </div>
   </div>
 
@@ -63,7 +65,7 @@
   <section class="fgc-card" style="margin-top:16px">
     <div class="fgc-card__head">
       <span class="fgc-card__title">실행 <span class="fgc-mono" id="hdr-id">—</span></span>
-      <span id="hdr-status"></span>
+      <span id="hdr-status" class="fgc-badge fgc-badge--neutral">연동 대기</span>
     </div>
     <div class="fgc-card__body">
       <dl class="kv">
@@ -96,7 +98,9 @@
     <div class="fgc-card__body">
       <!-- 진행률은 운영정책서 제43조 모델(current_step, 9단계는 저장하지 않음)을 따른다. batch_step_execution 에서 역산하지 않는다. -->
       <!-- 스텝 칸은 IF-API(진행률 폴링) 연동 시 서버 렌더링으로 채운다 -->
-      <div class="fgc-stepper" id="stepper"></div>
+      <div class="fgc-stepper" id="stepper">
+        <div class="fgc-empty publishing-empty-state">진행률 API 연동 대기</div>
+      </div>
       <div class="fgc-banner fgc-banner--muted" style="margin-top:16px">
         <span class="material-symbols-outlined" style="font-size:18px">engineering</span>
         <span>
@@ -132,7 +136,12 @@
     <!-- ④ 결과 요약 4블록 — 1,200%·차익거래·원장·대사 집계는 IF-API 연동 시 채운다 -->
     <section class="fgc-card">
       <div class="fgc-card__head"><span class="fgc-card__title">④ 결과 요약</span></div>
-      <div class="fgc-card__body" style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="result-blocks"></div>
+      <div class="fgc-card__body" style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="result-blocks">
+        <div class="publishing-result-placeholder"><strong>1,200%</strong><span>집계 연동 대기</span></div>
+        <div class="publishing-result-placeholder"><strong>차익거래</strong><span>집계 연동 대기</span></div>
+        <div class="publishing-result-placeholder"><strong>원장</strong><span>집계 연동 대기</span></div>
+        <div class="publishing-result-placeholder"><strong>대사</strong><span>집계 연동 대기</span></div>
+      </div>
     </section>
   </div>
 
@@ -140,9 +149,11 @@
   <section class="fgc-card" style="margin-top:16px">
     <div class="fgc-card__head">
       <span class="fgc-card__title">⑤ 확정 조건 (운영정책서 제44조 · 6개 전부 통과해야 함)</span>
-      <span id="cond-summary" class="fgc-muted" style="font-size:12px"></span>
+      <span id="cond-summary" class="fgc-muted" style="font-size:12px">연동 대기</span>
     </div>
-    <div class="fgc-card__body" id="cond-body"></div>
+    <div class="fgc-card__body" id="cond-body">
+      <div class="fgc-empty publishing-empty-state">확정 조건 API 연동 대기</div>
+    </div>
   </section>
 
   <!-- ⑥ 확정 -->
