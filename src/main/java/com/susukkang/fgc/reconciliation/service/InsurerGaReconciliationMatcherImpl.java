@@ -348,10 +348,16 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources
     ) {
+        // 2026-08-13 yslee - 예상 설계사 식별값 누락 시 검토필요 판정 적용
+        // 기존 코드: 실제 원수사 설계사코드의 매핑 실패·중복 여부만 확인
+        // 문제: expectedAgentId가 없으면 비교 기준이 없는데도 정상 매핑된 실제 설계사와 AGENT_MISMATCH로 확정됨
+        // 개선: 예상·실제 원천이 모두 있을 때 예상 설계사 누락도 식별 불가로 보고 REVIEW_REQUIRED 게이트에 포함
         return !expectedSources.isEmpty()
                 && !actualSources.isEmpty()
-                && actualSources.stream().anyMatch(source -> source.getActualAgentId() == null
-                || !Objects.equals(source.getActualAgentMappingCount(), 1));
+                && (expectedSources.stream().anyMatch(source -> source.getExpectedAgentId() == null)
+                    || actualSources.stream().anyMatch(source ->
+                        source.getActualAgentId() == null
+                                || !Objects.equals(source.getActualAgentMappingCount(), 1)));
     }
 
     private static String recipientKey(

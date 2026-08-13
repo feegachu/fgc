@@ -191,6 +191,25 @@ class InsurerGaReconciliationMatcherImplTest {
         assertThat(result.actualSourceAgentCode()).isEqualTo("INSURER-FC-502");
     }
 
+    // 2026-08-13 yslee - 예상 설계사 식별값 누락 시 검토필요 회귀 테스트 추가
+    // 기존 코드: 실제 설계사가 정상 매핑되면 누락된 예상 설계사와 비교해 AGENT_MISMATCH로 판정
+    // 문제: 비교 기준이 없는 상태를 확정 불일치로 분류하여 수동 확인이 필요한 원천 오류를 숨김
+    // 개선: expectedAgentId가 없으면 실제 매핑이 정상이어도 REVIEW_REQUIRED로 분류되는지 검증
+    @Test
+    void 예상_설계사_식별값이_없으면_실제_매핑이_정상이어도_REVIEW_REQUIRED다() {
+        InsurerGaExpectedSourceRow expected = expected(11L, 1, "650000", null);
+        expected.setExpectedAgentId(null);
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L)).willReturn(List.of(expected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(actual(21L, "650000", null)));
+
+        InsurerGaMatchCandidate result = matcher.match(request()).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(result.expectedAgentId()).isNull();
+        assertThat(result.actualAgentId()).isEqualTo(501L);
+    }
+
     @Test
     void 같은_월이어도_지급예정일이_다르면_정확일치로_합치지_않는다() {
         InsurerGaActualSourceRow actual = actual(21L, "650000", null);
