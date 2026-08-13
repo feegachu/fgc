@@ -1,169 +1,197 @@
-<!DOCTYPE html>
+<!doctype html>
 <!--
-  FGC-UI-CAP-W01 1,200% 한도 검증 현황  ★ 규제 검증의 중심 화면
-  요구사항 FUN-030 · FUN-032 · FUN-034 / REG-08 · 09 · 10 · 23
-  데이터  읽기 cap_check, cap_rule_set, insurance_contract, vw_latest_cap_check
-  API     GET /api/v1/cap-checks?month=&stage=&status=&insurerId=&contractNo=
-  라우트  GET /cap-checks → cap/list.html (화면정의서 5-2)
+  FGC-UI-CAP-W01 1,200% 한도 검증 현황
+  현재 연결 API: GET /api/v1/cap-checks?month=&stage=&status=&insurerId=&contractNo=&page=&size=
 
-  ★★ 절대 규칙 ★★
-   1) 게이지는 지급단계별로 반드시 2개를 따로 그립니다.
-        원수사→GA (INSURER_TO_GA)  ·  GA→설계사 (GA_TO_FC)
-      둘은 서로 다른 규제입니다. 절대 합산하지 않습니다.
-   2) 준법경영비 3% 공제는 원수사→GA 단계에만 적용합니다(REG-10).
-      GA→설계사 게이지에는 공제란 자체를 그리지 않습니다. DB CHECK 로도 0이 강제됩니다.
-   3) 규제 판정 단위는 "계약 1건"입니다.
-      설계사별·지점별 합계는 규제 판정이 아니라 모니터링 지표일 뿐이므로 라벨을 반드시 붙입니다.
-   4) 화면에서 판정을 바꾸지 않습니다. 저장된 result_status 를 그대로 씁니다.
-
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-CAP-W01)의 정적 골격만 옮겼다.
-  데이터 영역(게이지·요약카드·목록)은 IF-API-30 연동 시 서버 렌더링으로 채운다.
+  현재 응답의 summary와 content만 연결한다. 아직 응답에 없는 지급단계별·설계사별 집계는
+  페이징된 content로 다시 계산하지 않고 연동 대기로 표시한다. 저장된 resultStatus를 그대로
+  표시하며 CAP-W02는 현재 상세 API를 사용하는 팝업으로 유지한다.
 -->
-<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CAP-W01', '1,200% 한도 검증 현황', null, null)}"
-      xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CAP-W01', '1,200% 한도 검증 현황', null, null)}">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="page-content cap-page" th:attr="data-initial-month=${month}">
+  <header class="page-header">
+    <div class="page-header-copy">
+      <h1 class="page-title">1,200% 한도 검증 현황</h1>
+      <p class="page-description">계약 단위 한도 판정과 지급단계별 사용 현황을 확인합니다.</p>
+    </div>
+  </header>
 
-  <h1 class="fgc-page-title">1,200% 한도 검증 현황</h1>
-  <p class="fgc-page-desc">
-    계약 1건에 대해 <strong>첫 1년 동안 준 돈</strong>이 월납환산 초회보험료의 <strong>12배</strong>를 넘었는지 봅니다.
-    넘으면 위반입니다. 일시적으로 넘긴 시점이 있어도 위반입니다.
-  </p>
-
-  <!-- 공식 안내 -->
-  <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
-    <span class="material-symbols-outlined" style="font-size:18px">function</span>
-    <span>
-      <span class="fgc-mono">한도 = 월납환산 초회보험료 × 12 ( + 12차월 예상 해약환급금 ) ( − 준법경영비 공제 )</span><br>
-      <span class="fgc-mono">사용률 = 산입금액 ÷ 한도 × 100</span> ·
-      90% 이상이면 <strong>주의</strong>, 100%를 넘으면 <strong>위반</strong>입니다.
-      배수 12와 주의 기준 90%는 코드가 아니라 룰셋(<span class="fgc-mono">cap_rule_set</span>)에서 읽습니다.
-    </span>
-  </div>
-
-  <!-- 지급단계 2개 게이지 — IF-API-30 연동 시 서버 렌더링으로 채운다 -->
-  <section style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px" id="stage-grid"></section>
-
-  <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
-    <span class="material-symbols-outlined" style="font-size:18px">warning</span>
-    <span>
-      <strong>위 두 게이지를 더하지 마세요.</strong>
-      원수사→GA와 GA→설계사는 서로 다른 규제이고 기준도 다릅니다.
-      하나로 합쳐 보여주면 둘 다 틀린 숫자가 됩니다(규제조문표 §0.3 금지사항 ③).
-    </span>
-  </div>
-
-  <!-- ① 검색 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__body fgc-toolbar">
-      <div class="fgc-field" style="min-width:140px">
-        <label class="fgc-label" for="f-month">정산월</label>
-        <input class="fgc-input" id="f-month" type="month" th:value="${month}" value="2026-07">
+  <section class="surface cap-filter-panel" aria-labelledby="cap-filter-title">
+    <header class="surface-header cap-section-header">
+      <div>
+        <h2 id="cap-filter-title" class="surface-title">검색 조건</h2>
+        <p class="cap-section-description">기준월과 계약 조건으로 저장된 판정 결과를 조회합니다.</p>
       </div>
-      <div class="fgc-field" style="min-width:170px">
-        <label class="fgc-label" for="f-stage">지급단계</label>
-        <select class="fgc-select" id="f-stage">
-          <option value="">전체 (단계별로 행이 나뉩니다)</option>
-          <option value="GA_TO_FC">GA→설계사</option>
-          <option value="INSURER_TO_GA">원수사→GA</option>
+    </header>
+    <form id="cap-search-form" class="cap-filter-form">
+      <div class="field cap-filter-month">
+        <label class="field-label" for="cap-month">기준월</label>
+        <input class="field-control" id="cap-month" name="month" type="month">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cap-stage">지급단계</label>
+        <select class="select-control" id="cap-stage" name="stage">
+          <option value="">전체</option>
+          <option value="INSURER_TO_GA">원수사 → GA</option>
+          <option value="GA_TO_FC">GA → 설계사</option>
         </select>
       </div>
-      <div class="fgc-field" style="min-width:150px">
-        <label class="fgc-label" for="f-status">판정</label>
-        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
+      <div class="field">
+        <label class="field-label" for="cap-status">판정</label>
+        <select class="select-control" id="cap-status" name="status">
+          <option value="">전체</option>
+          <option value="NORMAL">정상</option>
+          <option value="WARNING">주의</option>
+          <option value="VIOLATION">위반</option>
+          <option value="REVIEW_REQUIRED">검토필요</option>
+        </select>
       </div>
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-insurer">보험회사</label>
-        <select class="fgc-select" id="f-insurer"><option value="">전체</option></select>
+      <div class="field">
+        <label class="field-label" for="cap-insurer">보험회사</label>
+        <select class="select-control" id="cap-insurer" name="insurerId" disabled aria-describedby="cap-insurer-help">
+          <option value="">기준정보 연동 대기</option>
+        </select>
+        <span id="cap-insurer-help" class="field-helper">보험회사 조회 API 연결 후 사용할 수 있습니다.</span>
       </div>
-      <div class="fgc-field" style="min-width:120px">
-        <label class="fgc-label" for="f-contract">계약번호</label>
-        <input class="fgc-input" id="f-contract" type="text" placeholder="C004">
+      <div class="field">
+        <label class="field-label" for="cap-organization">조직</label>
+        <select class="select-control" id="cap-organization" name="organizationId" disabled aria-describedby="cap-organization-help">
+          <option value="">기준정보 연동 대기</option>
+        </select>
+        <span id="cap-organization-help" class="field-helper">조직 조회 API 연결 후 사용할 수 있습니다.</span>
       </div>
-      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
-        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
-      </button>
+      <div class="field cap-filter-contract">
+        <label class="field-label" for="cap-contract-no">계약번호</label>
+        <input class="field-control" id="cap-contract-no" name="contractNo" type="search" placeholder="계약번호 입력" autocomplete="off">
+      </div>
+      <div class="cap-filter-actions">
+        <button class="button button-secondary" id="cap-reset" type="button">
+          <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+          초기화
+        </button>
+        <button class="button button-primary" type="submit">
+          <span class="material-symbols-outlined" aria-hidden="true">search</span>
+          조회
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section id="cap-kpi-grid" class="cap-kpi-grid" aria-label="판정별 건수">
+    <button class="kpi-card cap-kpi-card cap-kpi-normal" type="button" data-cap-status="NORMAL" aria-pressed="false">
+      <span class="kpi-label">정상</span><span class="cap-kpi-value"><strong data-kpi-value="NORMAL">0</strong><small>건</small></span><span class="kpi-comparison">저장 판정 정상</span>
+    </button>
+    <button class="kpi-card cap-kpi-card cap-kpi-warning" type="button" data-cap-status="WARNING" aria-pressed="false">
+      <span class="kpi-label">주의</span><span class="cap-kpi-value"><strong data-kpi-value="WARNING">0</strong><small>건</small></span><span class="kpi-comparison">저장 판정 주의</span>
+    </button>
+    <button class="kpi-card cap-kpi-card cap-kpi-violation" type="button" data-cap-status="VIOLATION" aria-pressed="false">
+      <span class="kpi-label">위반</span><span class="cap-kpi-value"><strong data-kpi-value="VIOLATION">0</strong><small>건</small></span><span class="kpi-comparison">저장 판정 위반</span>
+    </button>
+    <button class="kpi-card cap-kpi-card cap-kpi-review" type="button" data-cap-status="REVIEW_REQUIRED" aria-pressed="false">
+      <span class="kpi-label">검토필요</span><span class="cap-kpi-value"><strong data-kpi-value="REVIEW_REQUIRED">0</strong><small>건</small></span><span class="kpi-comparison">추가 확인 필요</span>
+    </button>
+  </section>
+
+  <section class="surface cap-stage-panel" aria-labelledby="cap-stage-title">
+    <header class="surface-header cap-section-header cap-stage-header">
+      <div>
+        <h2 id="cap-stage-title" class="surface-title">지급단계별 Stage Gauges</h2>
+        <p class="cap-section-description">서로 다른 규제이므로 두 단계를 합산하지 않습니다.</p>
+      </div>
+      <span class="status-badge status-badge-neutral">전체 검색범위 집계</span>
+    </header>
+    <div id="cap-stage-grid" class="cap-stage-grid" aria-live="polite">
+      <article class="cap-stage-card cap-stage-card-pending">
+        <header class="cap-stage-card-header"><div><h3 class="cap-stage-title">원수사→GA</h3><p class="cap-stage-code">INSURER_TO_GA</p></div><span class="status-badge status-badge-neutral">연동 대기</span></header>
+        <div class="cap-stage-pending-copy"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span><p>전체 검색범위 Stage 집계 API가 아직 제공되지 않습니다.</p></div>
+        <p class="cap-stage-note">준법경영비 공제는 이 단계에만 적용됩니다.</p>
+      </article>
+      <article class="cap-stage-card cap-stage-card-pending">
+        <header class="cap-stage-card-header"><div><h3 class="cap-stage-title">GA→설계사</h3><p class="cap-stage-code">GA_TO_FC</p></div><span class="status-badge status-badge-neutral">연동 대기</span></header>
+        <div class="cap-stage-pending-copy"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span><p>전체 검색범위 Stage 집계 API가 아직 제공되지 않습니다.</p></div>
+        <p class="cap-stage-note">준법경영비 공제를 적용하지 않습니다.</p>
+      </article>
     </div>
   </section>
 
-  <!-- ② 요약 카드 4장 — IF-API-30 연동 시 채운다 -->
-  <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px"
-           id="summary-cards"></section>
-
-  <!-- ③ 계약별 목록 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__head">
-      <span class="fgc-card__title">계약별 판정 목록</span>
-      <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+  <section class="cap-guidance" aria-labelledby="cap-guidance-title">
+    <span class="material-symbols-outlined" aria-hidden="true">verified_user</span>
+    <div>
+      <h2 id="cap-guidance-title">계산 기준</h2>
+      <p><strong>한도 = 월납환산 초회보험료 × 12 + 12차월 예상 해약환급금 − 준법경영비 공제</strong></p>
+      <p>준법경영비 공제는 원수사 → GA에만 적용합니다. GA → 설계사에는 적용하지 않습니다. 판정 색상은 저장된 <code>resultStatus</code>를 사용합니다.</p>
     </div>
-    <div style="overflow-x:auto">
-      <table class="fgc-table" style="min-width:1180px">
-        <thead>
-          <tr>
-            <th style="width:66px">계약</th>
-            <th style="width:110px">지급단계</th>
-            <th style="width:92px">기준일</th>
-            <th class="fgc-th-num" style="width:100px">기준 보험료</th>
-            <th class="fgc-th-num" style="width:100px">환급금 가산</th>
-            <th class="fgc-th-num" style="width:110px">준법경영비 공제</th>
-            <th class="fgc-th-num" style="width:100px">한도</th>
-            <th class="fgc-th-num" style="width:100px">산입금액</th>
-            <th class="fgc-th-num" style="width:100px">잔여</th>
-            <th style="width:190px">사용률</th>
-            <th style="width:120px">판정</th>
-            <th style="width:126px">룰셋</th>
-          </tr>
-        </thead>
-        <tbody id="list-body">
-          <tr><td colspan="12"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
-        </tbody>
+  </section>
+
+  <section class="surface cap-table-panel" aria-labelledby="cap-contract-list-title">
+    <header class="surface-header cap-section-header">
+      <div>
+        <h2 id="cap-contract-list-title" class="surface-title">계약별 판정 목록</h2>
+        <p class="cap-section-description">규제 판정 단위는 계약 1건입니다.</p>
+      </div>
+      <span class="cap-list-count"><strong id="cap-total-count">0</strong>건</span>
+    </header>
+    <div id="cap-list-message" class="cap-inline-message" role="status" aria-live="polite">판정 목록을 불러오는 중입니다.</div>
+    <div id="cap-contract-table-wrap" class="data-table-viewport cap-contract-table-wrap" hidden>
+      <table class="data-table cap-contract-table">
+        <caption class="visually-hidden">계약별 1,200% 한도 판정 목록</caption>
+        <colgroup>
+          <col class="cap-col-contract"><col class="cap-col-stage"><col class="cap-col-date">
+          <col class="cap-col-money"><col class="cap-col-money"><col class="cap-col-deduction">
+          <col class="cap-col-money"><col class="cap-col-money"><col class="cap-col-money">
+          <col class="cap-col-usage"><col class="cap-col-status"><col class="cap-col-rule">
+        </colgroup>
+        <thead><tr>
+          <th scope="col">계약번호</th><th scope="col">지급단계</th><th scope="col">기준일</th>
+          <th scope="col" class="text-right">기준 보험료</th><th scope="col" class="text-right">환급금 가산</th><th scope="col" class="text-right">준법경영비 공제</th>
+          <th scope="col" class="text-right">한도</th><th scope="col" class="text-right">산입금액</th><th scope="col" class="text-right">잔여</th>
+          <th scope="col">사용률</th><th scope="col" class="text-center">판정</th><th scope="col">룰셋</th>
+        </tr></thead>
+        <tbody id="cap-contract-body"></tbody>
+      </table>
+    </div>
+    <footer class="cap-table-footer">
+      <label class="cap-page-size" for="cap-page-size">페이지당
+        <select id="cap-page-size" class="select-control" aria-label="페이지당 표시 건수">
+          <option value="10">10</option><option value="20" selected>20</option><option value="50">50</option>
+        </select>
+      </label>
+      <nav id="cap-pagination" class="pagination" aria-label="계약 목록 페이지"></nav>
+    </footer>
+  </section>
+
+  <section class="surface cap-table-panel" aria-labelledby="cap-agent-title">
+    <header class="surface-header cap-section-header cap-agent-header">
+      <div>
+        <h2 id="cap-agent-title" class="surface-title">설계사별 모니터링 지표</h2>
+        <p class="cap-section-description">GA → 설계사 지급단계만 집계합니다.</p>
+      </div>
+      <span class="status-badge status-badge-neutral">모니터링 지표 · 규제 판정 아님</span>
+    </header>
+    <div id="cap-agent-message" class="cap-inline-message">전체 검색범위 설계사 집계 API 연동 대기 · 현재 페이지 목록으로 합산하지 않습니다.</div>
+    <div id="cap-agent-table-wrap" class="data-table-viewport cap-agent-table-wrap" hidden>
+      <table class="data-table cap-agent-table">
+        <caption class="visually-hidden">설계사별 GA에서 설계사 단계 모니터링 지표</caption>
+        <colgroup><col><col><col><col><col><col></colgroup>
+        <thead><tr><th scope="col">설계사</th><th scope="col">소속</th><th scope="col" class="text-right">계약 수</th><th scope="col" class="text-right">한도 합계</th><th scope="col" class="text-right">산입 합계</th><th scope="col">사용률</th></tr></thead>
+        <tbody id="cap-agent-body"></tbody>
       </table>
     </div>
   </section>
 
-  <!-- 모니터링 지표 (규제 판정 아님) -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__head">
-      <span class="fgc-card__title">설계사별 합계</span>
-      <span class="fgc-badge fgc-badge--neutral">모니터링 지표 — 규제 판정이 아닙니다</span>
-    </div>
-    <div class="fgc-card__body" style="padding-bottom:0">
-      <div class="fgc-banner fgc-banner--muted">
-        <span class="material-symbols-outlined" style="font-size:18px">info</span>
-        <span>
-          1,200%룰은 <strong>계약 1건 단위</strong>로 판단합니다.
-          아래 설계사별 합계는 회사 내부에서 흐름을 보려고 만든 참고 수치이며,
-          이것으로 위반 여부를 판정하지 않습니다.
-        </span>
-      </div>
-    </div>
-    <div style="overflow-x:auto">
-      <table class="fgc-table">
-        <thead>
-          <tr><th>설계사</th><th>소속</th><th class="fgc-th-num">계약 수</th>
-              <th class="fgc-th-num">한도 합계</th><th class="fgc-th-num">산입 합계</th>
-              <th class="fgc-th-num">평균 사용률</th></tr>
-        </thead>
-        <tbody id="agent-body">
-          <tr><td colspan="6"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-<!-- 스크립트는 main 안에 둔다 — 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
-<script>
-/* 화면 폭이 좁으면 게이지 2장을 세로로 — 데이터 렌더링은 IF-API-30 연동 시 추가 */
-(function () {
-  "use strict";
-  function reflow() {
-    document.getElementById("stage-grid").style.gridTemplateColumns =
-      window.innerWidth < 980 ? "1fr" : "1fr 1fr";
-  }
-  reflow();
-  window.addEventListener("resize", reflow);
-})();
-</script>
+  <div class="modal-backdrop" data-modal="cap-detail" data-close-on-backdrop="true" hidden aria-hidden="true">
+    <section class="modal modal-large cap-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cap-detail-title">
+      <header class="modal-header">
+        <div><h2 id="cap-detail-title" class="modal-title">1,200% 계산근거</h2><p class="cap-modal-subtitle">검증 당시 저장된 스냅샷</p></div>
+        <button class="icon-button" type="button" data-modal-close aria-label="팝업 닫기" data-modal-initial-focus><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+      </header>
+      <div id="cap-detail-state" class="modal-body cap-detail-state">계산근거를 불러오는 중입니다.</div>
+      <div id="cap-detail-content" class="modal-body" hidden th:insert="~{cap/detail-modal :: modal}"></div>
+      <footer class="modal-footer"><button class="button button-secondary" type="button" data-modal-close>닫기</button></footer>
+    </section>
+  </div>
 </main>
 </body>
 </html>
