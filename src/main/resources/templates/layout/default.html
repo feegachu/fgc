@@ -26,6 +26,7 @@
   <header th:replace="~{layout/fragments/header :: header(${title}, ${parentTitle}, ${parentHref})}"></header>
   <nav th:replace="~{layout/fragments/workspace-tabs :: workspaceTabs(${screenId}, ${title})}"></nav>
   <div class="app-main"><th:block th:replace="${content}"></th:block></div>
+  <!-- 교육용 면책 문구는 시연 사실감을 위해 화면에 표기하지 않는다 — 2026-08-12 팀 결정, 근거대장 COR-009 개정 기록 -->
   <footer class="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
   <div id="toast-region" class="toast-region" role="region" aria-label="알림" aria-live="polite"></div>
   <div id="modal-root"></div>
