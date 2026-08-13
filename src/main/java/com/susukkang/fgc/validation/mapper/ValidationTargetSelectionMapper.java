@@ -16,6 +16,7 @@ import java.time.LocalDate;
 public interface ValidationTargetSelectionMapper {
     int insertTargets(
             @Param("validationRunId") Long validationRunId,
-            @Param("validationMonth") LocalDate validationMonth
+            @Param("validationMonth") LocalDate validationMonth,
+            @Param("asOfDate") LocalDate asOfDate
     );
 }

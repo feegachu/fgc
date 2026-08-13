@@ -43,6 +43,7 @@ public class ValidationTargetSelectionService {
 
         return validationTargetSelectionMapper.insertTargets(
                 validationRunId,
+                validationMonth,
                 asOfDate
         );
     }

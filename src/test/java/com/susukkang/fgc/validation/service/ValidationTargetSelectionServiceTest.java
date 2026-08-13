@@ -30,14 +30,15 @@ class ValidationTargetSelectionServiceTest {
 
     @Test
     void selectsTargetsUsingLastDayOfValidationMonth() {
-        when(validationTargetSelectionMapper.insertTargets(118L, LocalDate.of(2026, 8, 31)))
+        when(validationTargetSelectionMapper.insertTargets(
+                118L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)))
                 .thenReturn(15);
 
         int selectedCount = service.selectTargets(118L, LocalDate.of(2026, 8, 1));
 
         assertThat(selectedCount).isEqualTo(15);
         verify(validationTargetSelectionMapper)
-                .insertTargets(118L, LocalDate.of(2026, 8, 31));
+                .insertTargets(118L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
     }
 
     @Test
@@ -45,7 +46,7 @@ class ValidationTargetSelectionServiceTest {
         service.selectTargets(118L, LocalDate.of(2028, 2, 1));
 
         verify(validationTargetSelectionMapper)
-                .insertTargets(118L, LocalDate.of(2028, 2, 29));
+                .insertTargets(118L, LocalDate.of(2028, 2, 1), LocalDate.of(2028, 2, 29));
     }
 
     @Test
@@ -54,7 +55,7 @@ class ValidationTargetSelectionServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("월 통합검증 실행 ID가 없습니다.");
 
-        verify(validationTargetSelectionMapper, never()).insertTargets(null, LocalDate.of(2026, 8, 31));
+        verify(validationTargetSelectionMapper, never()).insertTargets(null, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
     }
 
     @Test
@@ -63,6 +64,6 @@ class ValidationTargetSelectionServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("검증 대상 월이 없습니다.");
 
-        verify(validationTargetSelectionMapper, never()).insertTargets(118L, null);
+        verify(validationTargetSelectionMapper, never()).insertTargets(118L, null, null);
     }
 }
