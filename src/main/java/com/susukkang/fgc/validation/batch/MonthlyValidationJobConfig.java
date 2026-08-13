@@ -2,10 +2,7 @@ package com.susukkang.fgc.validation.batch;
 
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
-import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
-import com.susukkang.fgc.validation.batch.tasklet.LedgerImbalanceCheckTasklet;
-import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
-import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.*;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -40,7 +37,6 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
     private final ValidationTargetSelectionService validationTargetSelectionService;
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
-    private final ValidationTargetSelectionService validationTargetSelectionService;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
