@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * 설명 : 대사 Step이 필수 실행 컨텍스트 누락을 명확하게 차단하는지 검증한다.
+ * FGC-FUN-041: 대사 Step이 필수 실행 컨텍스트 누락을 명확하게 차단하는지 검증한다.
  *
  * @author hjKang
  * @since 2026-08-14

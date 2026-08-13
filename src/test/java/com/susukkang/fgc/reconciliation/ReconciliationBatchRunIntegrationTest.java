@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 설명 : Step 7 대사 실행 준비의 동시 소유권과 자연키 멱등성을 PostgreSQL에서 검증한다.
+ * FGC-FUN-048-04: Step 7 대사 실행 준비의 동시 소유권과 자연키 멱등성을 PostgreSQL에서 검증한다.
  *
  * @author hjKang
  * @since 2026-08-14

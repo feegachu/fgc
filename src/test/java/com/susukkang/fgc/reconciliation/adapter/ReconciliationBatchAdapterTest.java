@@ -26,7 +26,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 /**
- * 설명 : Step 7 대사 어댑터의 처리건수와 치명적 실패 종결 테스트
+ * FGC-FUN-048-04: Step 7 대사 어댑터의 처리·skip 건수와 치명적 실패 종결을 검증한다.
  *
  * @author hjKang
  * @since 2026-08-14
