@@ -86,15 +86,37 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 .map(InsurerGaActualSourceRow::getActualAmount)
                 .map(MoneyUtil::roundWon)
                 .reduce(ZERO, BigDecimal::add);
-        boolean hasMissingInstallment = expectedSources.stream()
+        boolean hasMissingExpectedInstallment = expectedSources.stream()
                 .anyMatch(source -> source.getInstallmentNo() == null);
-        List<Integer> installments = expectedSources.stream()
+        boolean hasMissingActualInstallment = actualSources.stream()
+                .anyMatch(source -> source.getActualInstallmentNo() == null);
+        List<Integer> expectedInstallments = expectedSources.stream()
                 .map(InsurerGaExpectedSourceRow::getInstallmentNo)
                 .filter(Objects::nonNull)
                 .distinct()
                 .sorted()
                 .toList();
-        Integer installmentNo = installments.size() == 1 ? installments.getFirst() : null;
+        List<Integer> actualInstallments = actualSources.stream()
+                .map(InsurerGaActualSourceRow::getActualInstallmentNo)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+        Integer installmentNo = singleValue(expectedInstallments);
+        Integer actualInstallmentNo = singleValue(actualInstallments);
+        boolean hasBothSources = !expectedSources.isEmpty() && !actualSources.isEmpty();
+        // 2026-08-13 yslee - 실제 명세 회차의 누락·불일치 판정 분리
+        // 기존 코드: 예상 회차만 확인해 모호한 경우 REVIEW_REQUIRED, 실제 회차 불일치 판정 경로는 없음
+        // 문제: REC-07의 예상 13회차·실제 14회차가 INSTALLMENT_MISMATCH로 산출되지 않음
+        // 개선: 회차 누락·복수값은 REVIEW_REQUIRED, 양쪽 단일 회차가 다르면 INSTALLMENT_MISMATCH로 구분
+        boolean installmentResolutionIssue = hasBothSources
+                && (hasMissingExpectedInstallment
+                || hasMissingActualInstallment
+                || expectedInstallments.size() != 1
+                || actualInstallments.size() != 1);
+        boolean installmentMismatch = hasBothSources
+                && !installmentResolutionIssue
+                && !Objects.equals(installmentNo, actualInstallmentNo);
         List<Long> expectedAgentIds = distinctLongs(expectedSources.stream()
                 .map(InsurerGaExpectedSourceRow::getExpectedAgentId)
                 .toList());
@@ -120,8 +142,8 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         ReconciliationResultType resultType = classify(
                 expectedSources,
                 actualSources,
-                installments,
-                hasMissingInstallment,
+                installmentResolutionIssue,
+                installmentMismatch,
                 agentResolutionIssue,
                 agentMismatch,
                 expectedTotal,
@@ -131,8 +153,8 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 resultType,
                 expectedSources,
                 actualSources,
-                installments,
-                hasMissingInstallment,
+                installmentResolutionIssue,
+                installmentMismatch,
                 agentResolutionIssue,
                 agentMismatch,
                 expectedTotal,
@@ -148,6 +170,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                         request,
                         key,
                         installmentNo,
+                        actualInstallmentNo,
                         expectedAgentId,
                         actualAgentId,
                         actualSourceAgentCode
@@ -158,6 +181,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 actualSourceAgentCode,
                 key.commissionItemId(),
                 installmentNo,
+                actualInstallmentNo,
                 key.dueDate(),
                 key.dueMonth(),
                 resultType,
@@ -176,8 +200,8 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
     private ReconciliationResultType classify(
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
-            List<Integer> installments,
-            boolean hasMissingInstallment,
+            boolean installmentResolutionIssue,
+            boolean installmentMismatch,
             boolean agentResolutionIssue,
             boolean agentMismatch,
             BigDecimal expectedTotal,
@@ -186,8 +210,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         if (actualSources.stream().anyMatch(source -> source.getDueDate() == null)) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
-        if (hasMissingInstallment
-                || (!expectedSources.isEmpty() && !actualSources.isEmpty() && installments.size() != 1)) {
+        if (installmentResolutionIssue) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
         if (agentResolutionIssue) {
@@ -202,6 +225,9 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         if (actualSources.isEmpty()) {
             return ReconciliationResultType.ACTUAL_MISSING;
         }
+        if (installmentMismatch) {
+            return ReconciliationResultType.INSTALLMENT_MISMATCH;
+        }
         if (agentMismatch) {
             return ReconciliationResultType.AGENT_MISMATCH;
         }
@@ -214,17 +240,15 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             ReconciliationResultType primary,
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
-            List<Integer> installments,
-            boolean hasMissingInstallment,
+            boolean installmentResolutionIssue,
+            boolean installmentMismatch,
             boolean agentResolutionIssue,
             boolean agentMismatch,
             BigDecimal expectedTotal,
             BigDecimal actualTotal
     ) {
         List<String> reasons = new ArrayList<>();
-        boolean installmentMismatch = hasMissingInstallment
-                || (!expectedSources.isEmpty() && !actualSources.isEmpty() && installments.size() != 1);
-        if (installmentMismatch) {
+        if (installmentResolutionIssue || installmentMismatch) {
             reasons.add(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
         } else if (expectedSources.size() > 1 || actualSources.size() > 1) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
@@ -296,6 +320,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             ReconciliationExecutionRequest request,
             BaseMatchKey key,
             Integer installmentNo,
+            Integer actualInstallmentNo,
             Long expectedAgentId,
             Long actualAgentId,
             String actualSourceAgentCode
@@ -307,7 +332,8 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 String.valueOf(key.contractId()),
                 String.valueOf(key.commissionItemId()),
                 recipientKey(expectedAgentId, actualAgentId, actualSourceAgentCode),
-                installmentNo == null ? "NA" : String.valueOf(installmentNo),
+                "E" + Objects.toString(installmentNo, "NA")
+                        + "-A" + Objects.toString(actualInstallmentNo, "NA"),
                 key.dueDate() == null ? "NA" : DateTimeFormatter.BASIC_ISO_DATE.format(key.dueDate())
         );
     }

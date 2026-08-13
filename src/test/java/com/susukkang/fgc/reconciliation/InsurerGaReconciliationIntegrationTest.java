@@ -193,6 +193,41 @@ class InsurerGaReconciliationIntegrationTest {
         assertThat(result.actualSourceAgentCode()).isEqualTo(otherSourceAgentCode);
     }
 
+    // 2026-08-13 yslee - PostgreSQL 실제 원천 회차 불일치 시나리오 추가
+    // 기존 코드: commission_transaction에 실제 회차가 없어 REC-07을 통합 환경에서 재현할 수 없음
+    // 문제: 예상 13회차·실제 14회차가 REVIEW_REQUIRED로만 남아 회차 불일치 건수 집계가 누락됨
+    // 개선: 정규화된 실제 회차를 조회해 INSTALLMENT_MISMATCH와 양쪽 비교값을 검증
+    @Test
+    void 예상_13회차와_실제_14회차를_INSTALLMENT_MISMATCH로_저장할_후보를_만든다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", insurerId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1");
+        Long contractAgentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+        String sourceAgentCode = insertAgentInsurerCode(insurerId, contractAgentId, "INSTALLMENT-MISMATCH");
+
+        Long expected = insertSchedule(
+                contractId, policyVersionId, commissionItemId, "650000", true, "OPERATIONAL", 13);
+        Long statementBatchId = insertStatementBatch(
+                insurerId, TEST_MONTH, "VALIDATED", "INSTALLMENT-MISMATCH");
+        Long actual = insertActual(
+                statementBatchId, insurerId, contractId, commissionItemId,
+                TEST_MONTH, "650000", "INSTALLMENT-MISMATCH", sourceAgentCode, 14);
+        insertPostedJournal(
+                "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expected,
+                contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
+        insertPostedJournal(
+                "ACTUAL_INSURER_STATEMENT", "COMMISSION_TRANSACTION", transactionId(actual),
+                contractId, commissionItemId, "650000", "ACTUAL_RECEIVABLE", "ACTUAL_INCOME");
+
+        InsurerGaMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
+                99L, 88L, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null)).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.INSTALLMENT_MISMATCH);
+        assertThat(result.installmentNo()).isEqualTo(13);
+        assertThat(result.actualInstallmentNo()).isEqualTo(14);
+    }
+
     private Long insertSchedule(
             Long contractId,
             Long policyVersionId,
@@ -251,16 +286,32 @@ class InsurerGaReconciliationIntegrationTest {
             String suffix,
             String sourceAgentCode
     ) {
+        return insertActual(
+                statementBatchId, insurerId, contractId, commissionItemId,
+                month, amount, suffix, sourceAgentCode, 1);
+    }
+
+    private Long insertActual(
+            Long statementBatchId,
+            Long insurerId,
+            Long contractId,
+            Long commissionItemId,
+            LocalDate month,
+            String amount,
+            String suffix,
+            String sourceAgentCode,
+            Integer installmentNo
+    ) {
         Long transactionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
                     statement_batch_id, payment_stage, source_type, source_business_key,
-                    insurer_id, commission_item_id, settlement_month, due_date,
+                    insurer_id, commission_item_id, installment_no, settlement_month, due_date,
                     amount, cashflow_type, status
-                ) VALUES (?, 'INSURER_TO_GA', 'INSURER_STATEMENT', ?, ?, ?, ?, ?, ?, 'PAYMENT', 'DRAFT')
+                ) VALUES (?, 'INSURER_TO_GA', 'INSURER_STATEMENT', ?, ?, ?, ?, ?, ?, ?, 'PAYMENT', 'DRAFT')
                 RETURNING commission_transaction_id
                 """, Long.class,
                 statementBatchId, "IT-048-02:" + suffix, insurerId, commissionItemId,
-                month, month.plusDays(14), new BigDecimal(amount)
+                installmentNo, month, month.plusDays(14), new BigDecimal(amount)
         );
         Long attributionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.transaction_attribution (

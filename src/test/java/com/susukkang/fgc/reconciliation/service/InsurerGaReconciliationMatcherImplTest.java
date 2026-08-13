@@ -154,6 +154,41 @@ class InsurerGaReconciliationMatcherImplTest {
                 .containsExactly(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
     }
 
+    // 2026-08-13 yslee - 예상·실제 회차 불일치 주 결과유형 회귀 테스트 추가
+    // 기존 코드: 실제 원천 회차가 없어 회차 관련 결과는 REVIEW_REQUIRED의 보조 사유로만 기록
+    // 문제: REC-07 예상 13회차·실제 14회차가 INSTALLMENT_MISMATCH로 집계되지 않음
+    // 개선: 양쪽 단일 회차가 명확하고 서로 다르면 INSTALLMENT_MISMATCH를 주 결과로 검증
+    @Test
+    void 예상_13회차와_실제_14회차는_INSTALLMENT_MISMATCH다() {
+        InsurerGaActualSourceRow actual = actual(21L, "650000", null);
+        actual.setActualInstallmentNo(14);
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L))
+                .willReturn(List.of(expected(11L, 13, "650000", null)));
+        given(reconciliationMapper.findActualSources(MONTH, 3L)).willReturn(List.of(actual));
+
+        InsurerGaMatchCandidate result = matcher.match(request()).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.INSTALLMENT_MISMATCH);
+        assertThat(result.installmentNo()).isEqualTo(13);
+        assertThat(result.actualInstallmentNo()).isEqualTo(14);
+        assertThat(result.matchGroupKey()).contains("E13-A14");
+    }
+
+    @Test
+    void 실제_회차가_없으면_불일치로_단정하지_않고_REVIEW_REQUIRED다() {
+        InsurerGaActualSourceRow actual = actual(21L, "650000", null);
+        actual.setActualInstallmentNo(null);
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L))
+                .willReturn(List.of(expected(11L, 13, "650000", null)));
+        given(reconciliationMapper.findActualSources(MONTH, 3L)).willReturn(List.of(actual));
+
+        InsurerGaMatchCandidate result = matcher.match(request()).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(result.installmentNo()).isEqualTo(13);
+        assertThat(result.actualInstallmentNo()).isNull();
+    }
+
     @Test
     void 상세행_금액은_합산_전에_원단위_HALF_UP으로_반올림한다() {
         given(reconciliationMapper.findExpectedSources(MONTH, 3L))
@@ -234,7 +269,7 @@ class InsurerGaReconciliationMatcherImplTest {
         InsurerGaMatchCandidate result = matcher.match(request()).getFirst();
 
         assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
-        assertThat(result.matchGroupKey()).endsWith(":NA:NA");
+        assertThat(result.matchGroupKey()).endsWith(":ENA-A1:NA");
     }
 
     @Test
@@ -283,6 +318,7 @@ class InsurerGaReconciliationMatcherImplTest {
         row.setActualAgentId(501L);
         row.setActualAgentMappingCount(1);
         row.setCommissionItemId(200L);
+        row.setActualInstallmentNo(1);
         row.setSettlementMonth(MONTH);
         row.setDueDate(MONTH.plusDays(14));
         row.setActualAmount(new BigDecimal(amount));

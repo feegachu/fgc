@@ -25,6 +25,7 @@ public record InsurerGaMatchCandidate(
         String actualSourceAgentCode,
         Long commissionItemId,
         Integer installmentNo,
+        Integer actualInstallmentNo,
         LocalDate dueDate,
         LocalDate dueMonth,
         ReconciliationResultType resultType,

@@ -58,6 +58,7 @@
                    ELSE 0
                END AS actualAgentMappingCount,
                ct.commission_item_id AS commissionItemId,
+               ct.installment_no AS actualInstallmentNo,
                ct.settlement_month AS settlementMonth,
                ct.due_date AS dueDate,
                ta.attributed_amount AS actualAmount,

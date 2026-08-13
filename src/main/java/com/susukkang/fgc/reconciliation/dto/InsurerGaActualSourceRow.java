@@ -28,6 +28,11 @@ public class InsurerGaActualSourceRow {
     private Long actualAgentId;
     private Integer actualAgentMappingCount;
     private Long commissionItemId;
+    // 2026-08-13 yslee - 실제 원수사 명세 회차 비교값 추가
+    // 기존 코드: 실제 명세 DTO에 회차가 없어 예상 회차와의 일치 여부를 판정할 수 없음
+    // 문제: 실제 14회차가 예상 13회차와 달라도 REVIEW_REQUIRED로만 남아 INSTALLMENT_MISMATCH 인수조건 미충족
+    // 개선: 정규화된 commission_transaction.installment_no를 실제 회차로 전달
+    private Integer actualInstallmentNo;
     private LocalDate settlementMonth;
     private LocalDate dueDate;
     private BigDecimal actualAmount;
