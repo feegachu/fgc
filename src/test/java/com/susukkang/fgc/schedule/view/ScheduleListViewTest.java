@@ -36,6 +36,7 @@ class ScheduleListViewTest {
     @Autowired
     private MockMvc mockMvc;
 
+    // FGC-FUN-036·039·040 / REG-01·19
     @Test
     void rendersScheduleListWithApiFiltersAndFeatureAssets() throws Exception {
         mockMvc.perform(get("/schedules").with(user(settlementUser())))

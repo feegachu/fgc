@@ -1,6 +1,22 @@
 (function () {
   "use strict";
 
+  function positivePage(value) {
+    var parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+  }
+
+  function normalizePage(requestedPage, totalPages) {
+    var parsedTotalPages = Number.parseInt(totalPages, 10);
+    var lastPage = Number.isInteger(parsedTotalPages) && parsedTotalPages > 0 ? parsedTotalPages : 1;
+    return Math.min(positivePage(requestedPage), lastPage);
+  }
+
+  if (typeof module === "object" && module.exports) {
+    module.exports = { normalizePage: normalizePage };
+    return;
+  }
+
   var form = document.querySelector("[data-schedule-filter-form]");
   var resetButton = document.querySelector("[data-schedule-filter-reset]");
   var table = document.querySelector("[data-schedule-table]");
@@ -68,11 +84,6 @@
 
   function allowedValue(name, value, fallback) {
     return ALLOWED[name].indexOf(value) >= 0 ? value : fallback;
-  }
-
-  function positivePage(value) {
-    var parsed = Number.parseInt(value, 10);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
   }
 
   function stateFromUrl() {
@@ -377,8 +388,10 @@
         if (!isPageResponse(envelope.data)) throw new apiClient.ApiError(null, envelope.requestId, 200);
 
         var pageData = envelope.data;
-        if (pageData.totalPages > 0 && pageData.page > pageData.totalPages) {
-          currentState.page = pageData.totalPages;
+        var normalizedPage = normalizePage(pageData.page, pageData.totalPages);
+        pageData.page = normalizedPage;
+        if (currentState.page !== normalizedPage) {
+          currentState.page = normalizedPage;
           updateBrowserUrl(currentState, true);
           load(currentState);
           return;

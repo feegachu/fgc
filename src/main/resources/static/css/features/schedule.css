@@ -234,6 +234,12 @@
   cursor: not-allowed;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .schedule-loading-block {
+    animation: none;
+  }
+}
+
 @keyframes schedule-shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
