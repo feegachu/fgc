@@ -149,7 +149,7 @@
   var DETAIL_TABS = ["tab-rule", "tab-cap", "tab-refund"];
   var selected = null;   // { id, code, versionNo }
   var detail = null;     // 선택 정책의 IF-API-10 응답 data 캐시 (탭 3개가 1회 호출을 공유)
-  var loading = false;
+  var loadingFor = null; // 요청 중인 selected 참조 — 선택이 바뀐 뒤 도착한 늦은 응답을 버리는 기준
 
   function esc(value) {
     return String(value == null ? "" : value)
@@ -195,7 +195,7 @@
           + "<td>" + esc(CALC[r.calculationType] || r.calculationType) + "</td>"
           + "<td class='fgc-mono'>" + esc(r.basisCode) + "</td>"
           + "<td class='fgc-td-num fgc-rate'>" + dash(r.ratePct) + "</td>"
-          + "<td class='fgc-td-num fgc-num'>" + (r.fixedAmount == null ? "-" : Number(r.fixedAmount).toLocaleString()) + "</td>"
+          + "<td class='fgc-td-num fgc-num'>" + (r.fixedAmount == null ? "-" : Number(r.fixedAmount).toLocaleString("ko-KR")) + "</td>"
           + "</tr>";
     }).join("");
     if (!rows) return "<div class='fgc-empty'>이 정책에는 수수료 규칙이 없습니다.</div>";
@@ -247,8 +247,8 @@
     if (!tables.length) return "<div class='fgc-empty'>이 정책에는 예상 해약환급률표가 없습니다.</div>";
     return tables.map(function (t) {
       var lineRows = (t.lines || []).map(function (l) {
-        /* 12차월 값은 1,200% 한도 가산에 쓰인다(REG-08) — 목업의 강조 배지 유지 */
-        var mark = l.contractMonthNo === 12
+        /* 12차월 값은 표준해약공제액 80% 이상 공제 대상 표에서만 1,200% 한도에 합산된다(REG-08) */
+        var mark = (l.contractMonthNo === 12 && t.standardDeduction80Yn)
             ? " <span class='fgc-badge fgc-badge--warning'>1,200% 한도 가산에 쓰는 값</span>" : "";
         return "<tr><td class='fgc-td-num'>" + esc(l.contractMonthNo) + "차월</td>"
             + "<td class='fgc-td-num fgc-rate'>" + esc(l.refundRatePct) + "%" + "</td>"
@@ -277,22 +277,25 @@
 
   function ensureDetail() {
     if (!selected) { setDetailState("정책 버전 탭에서 정책을 선택하세요."); return; }
-    if (detail || loading) return;
+    if (detail || loadingFor === selected) return;
     var apiClient = window.FgcUi && window.FgcUi.apiClient;
     if (!apiClient) { setDetailState("공통 API 클라이언트를 불러오지 못했습니다."); return; }
-    loading = true;
+    var current = selected;
+    loadingFor = current;
     setDetailState("불러오는 중…");
-    apiClient.request("/api/v1/policies/" + encodeURIComponent(selected.id))
+    apiClient.request("/api/v1/policies/" + encodeURIComponent(current.id))
         .then(function (response) {
+          if (loadingFor !== current) return; // 다른 정책이 선택된 뒤 도착한 응답 — 버린다
           detail = response.data || {};
           renderDetail();
         })
         .catch(function (error) {
+          if (loadingFor !== current) return;
           var message = error && error.message ? error.message : "정책 상세를 불러오지 못했습니다.";
           setDetailState(message);
           if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(message, "error");
         })
-        .finally(function () { loading = false; });
+        .finally(function () { if (loadingFor === current) loadingFor = null; });
   }
 
   function selectRow(row) {

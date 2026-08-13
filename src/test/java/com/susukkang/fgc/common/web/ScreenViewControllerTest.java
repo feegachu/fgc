@@ -21,7 +21,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 셸(page 프래그먼트)이 해당 화면 ID 를 헤더에 찍는지만 본다.
  * 실데이터 바인딩 검증은 화면별 기능 브랜치의 몫이다.
  * (실데이터 바인딩된 화면은 도메인 뷰 컨트롤러 테스트로 이관:
- *  DASH·BASE, POL → PolicyViewControllerTest)
+ *  DASH → DashboardViewControllerTest, BASE → BaseViewControllerTest,
+ *  POL → PolicyViewControllerTest)
  *
  * 요구사항 추적(FGC-FUN-xxx): CONT 018 ·
  * TRAN 065/031/033/034 · SCHE 036/039 · CAP 030/032/035 · ARB 063 ·

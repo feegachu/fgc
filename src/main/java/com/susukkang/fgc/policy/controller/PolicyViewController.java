@@ -33,6 +33,7 @@ public class PolicyViewController {
     ) {
         LocalDate effectiveAsOf = asOf != null ? asOf : DateUtil.parseSettlementMonth(month);
         model.addAttribute("asOf", effectiveAsOf);
+        // type·status 필터 없음(null) — POL-W01 은 기준일의 전체 유형·전체 상태를 한 표로 본다
         model.addAttribute("policyVersions",
                 policyQueryService.findPolicyVersions(null, effectiveAsOf, null));
         return "policy/list";
