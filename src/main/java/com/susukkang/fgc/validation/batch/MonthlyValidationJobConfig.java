@@ -1,11 +1,14 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
 import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.SelectTargetTasklet;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationTargetSelectionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -83,7 +86,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step selectTargetStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("selectTargetStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("②계약·상품버전·환급률표 선별"), transactionManager)
+                .tasklet(new SelectTargetTasklet(validationTargetSelectionService), transactionManager)
                 .listener(progressListener(2, false))
                 .build();
     }
@@ -95,7 +98,6 @@ public class MonthlyValidationJobConfig {
                 .listener(progressListener(3, false))
                 .build();
     }
-
     /**
      * capCheckStep의 실제 워크로드를 처리하는 "워커" Step
      */
