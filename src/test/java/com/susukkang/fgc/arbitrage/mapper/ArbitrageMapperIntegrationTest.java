@@ -57,6 +57,7 @@ class ArbitrageMapperIntegrationTest {
 
         ArbitrageCheckSearchCondition condition = condition(
                 TEST_MONTH, null, PaymentStage.GA_TO_FC, reference.insurerId());
+        condition.setContractNo(reference.contractNo());
 
         List<ArbitrageCheckView> items = arbitrageMapper.selectByCondition(condition, 0, 20);
         ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
@@ -112,18 +113,19 @@ class ArbitrageMapperIntegrationTest {
             ArbitrageCheckStatus status,
             PaymentStage stage,
             Long insurerId) {
-        return new ArbitrageCheckSearchCondition(month, status, stage, insurerId);
+        return new ArbitrageCheckSearchCondition(month, status, stage, insurerId, null);
     }
 
     private TestReference testReference() {
         return jdbcTemplate.queryForObject("""
-                SELECT c.contract_id, c.insurer_id
+                SELECT c.contract_id, c.insurer_id, c.contract_no
                   FROM fgc.insurance_contract c
                  ORDER BY c.contract_id
                  LIMIT 1
                 """, (resultSet, rowNum) -> new TestReference(
                 resultSet.getLong("contract_id"),
-                resultSet.getLong("insurer_id")));
+                resultSet.getLong("insurer_id"),
+                resultSet.getString("contract_no")));
     }
 
     private Long insertValidationRun() {
@@ -172,6 +174,6 @@ class ArbitrageMapperIntegrationTest {
         );
     }
 
-    private record TestReference(Long contractId, Long insurerId) {
+    private record TestReference(Long contractId, Long insurerId, String contractNo) {
     }
 }

@@ -28,6 +28,7 @@ public class ArbitrageCheckSearchCondition {
     private ArbitrageCheckStatus status; // 판정 결과
     private PaymentStage stage; // 지급 단계
     private Long insurerId; // 보험사 ID
+    private String contractNo; // 계약번호
 
     public LocalDate getMonthStart() {
         return month == null ? null : month.atDay(1);

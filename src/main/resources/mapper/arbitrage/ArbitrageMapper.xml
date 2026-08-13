@@ -44,6 +44,9 @@
             <if test="condition.insurerId != null">
                 AND c.insurer_id = #{condition.insurerId}
             </if>
+            <if test="condition.contractNo != null and condition.contractNo != ''">
+                AND c.contract_no = #{condition.contractNo}
+            </if>
         </where>
     </sql>
 
