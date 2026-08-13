@@ -131,15 +131,15 @@ public class ContractController {
      * 설명 : 계약과 지급단계의 기준일별 차익거래 검증 결과를 조회한다.
      *
      * @param id 계약 ID
-     * @param paymentStage 지급 단계
      * @return 기준일별 차익거래 검증 결과
      * @author hjKang
      * @since 2026-08-12
      */
     @GetMapping("/{id}/arbitrage-checks")
     public ApiResponse<List<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView>> getArbitrageChecks(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "GA_TO_FC") PaymentStage paymentStage) {
-        return ApiResponse.success(arbitrageService.selectByContractId(id, paymentStage));
+            @PathVariable Long id) {
+        return ApiResponse.success(
+                arbitrageService.selectByContractId(id, PaymentStage.GA_TO_FC)
+        );
     }
 }

@@ -96,7 +96,6 @@ class ContractControllerTest {
                         .build()));
 
         mockMvc.perform(get("/api/v1/contracts/{id}/arbitrage-checks", 21L)
-                        .param("paymentStage", "GA_TO_FC")
                         .with(user("admin").roles("GA_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].arbitrageCheckId").value(100))
