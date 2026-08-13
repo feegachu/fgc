@@ -95,6 +95,9 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
             CommissionPaymentStatus status = CommissionPaymentStatus.valueOf(first.getStatus());
             PaymentStage paymentStage = PaymentStage.valueOf(first.getPaymentStage());
 
+            // JournalBalanceSummary.differenceAmount()(차변·대변 불균형 감지용, 항상 0이어야
+            // 정상이라 크기만 중요해 abs()를 씌움)와 달리, 여기는 "귀속이 지급액보다 많은지
+            // 적은지" 방향이 화면에 의미가 있는 값이라 부호를 그대로 유지한다(코드리뷰 반영).
             BigDecimal differenceAmount = first.getAmount().subtract(first.getTransactionAttributedTotal());
 
             // 지급 건 + 귀속 합계 + 차액 + 귀속행 리스트를 하나의 응답으로 조립
