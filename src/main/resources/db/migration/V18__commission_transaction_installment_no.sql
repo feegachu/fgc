@@ -8,7 +8,7 @@ ALTER TABLE fgc.commission_transaction
 
 ALTER TABLE fgc.commission_transaction
     ADD CONSTRAINT ck_commission_transaction_installment_no
-    CHECK (installment_no IS NULL OR installment_no > 0);
+    CHECK (installment_no IS NULL OR installment_no > 0) NOT VALID;
 
 COMMENT ON COLUMN fgc.commission_transaction.installment_no IS
     '정규화된 실제 원수사 명세 또는 지급 건의 회차. 원천에 회차가 없으면 NULL이며 대사에서 REVIEW_REQUIRED로 처리';
