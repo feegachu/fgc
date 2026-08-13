@@ -128,6 +128,8 @@ class ScreenViewControllerTest {
                         "aria-label=\"한도 재검증, 연동 대기\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "timeZone: \"Asia/Seoul\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "new URLSearchParams(window.location.search).get(\"tab\")")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
@@ -143,6 +145,23 @@ class ScreenViewControllerTest {
         mvc.perform(get("/cap-checks").with(user(settleUser())))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("교육용 프로토타입입니다"))));
+    }
+
+    /** FGC-FUN-030 / REG-08 — 현재 제공 API만 연결하고 미제공 전체범위 집계를 만들지 않는다. */
+    @Test
+    void cap_screen_uses_only_available_api_data_and_marks_pending_aggregates() throws Exception {
+        mvc.perform(get("/cap-checks").with(user(settleUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "/js/features/cap/cap-list.js")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "id=\"cap-insurer\" name=\"insurerId\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "id=\"cap-organization\" name=\"organizationId\" disabled")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "전체 검색범위 Stage 집계 API가 아직 제공되지 않습니다.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "현재 페이지 목록으로 합산하지 않습니다.")));
     }
 
     private static com.susukkang.fgc.auth.dto.FgcUserDetails gaAdminUser() {
