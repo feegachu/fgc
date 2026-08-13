@@ -7,8 +7,8 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * journal_header 1행 조회 결과(#93). saveDraft()의 반환값이자, 원천·개정번호 기준
- * 중복 저장 방지를 위한 기존 행 조회(findBySourceKey)에도 쓰인다.
+ * journal_header 1행 조회 결과
+ * saveDraft()의 반환값이자, 원천·개정번호 기준 중복 저장 방지를 위한 기존 행 조회(findBySourceKey)에도 씀
  */
 @Getter
 @Setter

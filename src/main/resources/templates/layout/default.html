@@ -18,6 +18,7 @@
   <link rel="stylesheet" th:href="@{/css/common/utilities.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-DASH-W01'}" th:href="@{/css/features/dashboard.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CONT-')}" th:href="@{/css/features/contract.css}">
+  <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CAP-')}" th:href="@{/css/features/cap.css}">
 </head>
 <body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">
   <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
@@ -35,5 +36,6 @@
   <script th:src="@{/js/common/toast.js}" defer></script>
   <script th:src="@{/js/common/api-client.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-DASH-W01'}" th:src="@{/js/features/dashboard/dashboard.js}" defer></script>
+  <script th:if="${screenId == 'FGC-UI-CAP-W01'}" th:src="@{/js/features/cap/cap-list.js}" defer></script>
 </body>
 </html>

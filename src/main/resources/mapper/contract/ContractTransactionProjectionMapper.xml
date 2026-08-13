@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.contract.mapper.ContractTransactionProjectionMapper">
+    <!--
+      transaction_attributed_total: 이 지급 건(commission_transaction) 전체의 귀속 합계다
+      (계약으로 좁히지 않고 모든 attribution_scope를 합산)
+    -->
+    <select id="findTransactionAttributionsByContractId" resultType="com.susukkang.fgc.contract.dto.ContractTransactionAttributionRow">
+        SELECT ct.commission_transaction_id, ct.settlement_month, ct.payment_stage,
+               ct.amount, ct.status, ct.source_type,
+               ta.transaction_attribution_id, ta.attributed_amount, ta.attribution_date,
+               ta.inclusion_status_snapshot AS inclusion_status,
+               ag.agent_id, ag.agent_name, ag.agent_code,
+               (SELECT COALESCE(SUM(ta2.attributed_amount), 0)
+                  FROM fgc.transaction_attribution ta2
+                 WHERE ta2.commission_transaction_id = ct.commission_transaction_id
+               ) AS transaction_attributed_total
+        FROM fgc.transaction_attribution ta
+        JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
+        LEFT JOIN fgc.agent ag ON ag.agent_id = ta.agent_id
+        WHERE ta.contract_id = #{contractId}
+        ORDER BY ct.commission_transaction_id, ta.attribution_seq
+    </select>
+
+    <!-- CONT-W02 탭6 "지급·대사" -->
+    <select id="findReconciliationResultsByContractId" resultType="com.susukkang.fgc.contract.dto.ContractReconciliationRow">
+        SELECT reconciliation_result_id, match_group_key, result_type,
+               expected_total_amount, actual_total_amount, difference_amount,
+               primary_reason_code, installment_no, commission_item_id, created_at
+        FROM fgc.reconciliation_result
+        WHERE contract_id = #{contractId}
+        ORDER BY created_at DESC, reconciliation_result_id DESC
+    </select>
+</mapper>
