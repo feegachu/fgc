@@ -19,6 +19,7 @@ import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -35,6 +36,7 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -99,6 +101,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 문제: 부모 지급 건의 FOR UPDATE 잠금과 FK 검사가 충돌하고 이슈 #14의 동일 트랜잭션 조건을 위반
     // 개선: 같은 계약 행 잠금과 멱등키를 포함해 점검·예외·상태 처리를 한 트랜잭션에서 수행
     @Transactional(noRollbackFor = CommissionPaymentConfirmationRejectedException.class)
+    // FUN-002(#82) — 컨트롤러(@PreAuthorize)를 우회하는 호출 경로가 생겨도 지급 확정만은
+    // 서비스 계층에서 한 번 더 막는다. @EnableMethodSecurity는 SecurityConfig에 이미 켜져 있다.
+    @PreAuthorize(Roles.CAN_PROCESS)
     public CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey) {
         // 2026-08-11 yslee - 운영정책서 제31조의 확정 게이트 6단계 순서를 코드에 명시
         // 기존 코드: 실제 확정 로직은 정책 순서를 따르지만 단계별 주석이 없어 문서와 코드의 대응 확인이 어려움

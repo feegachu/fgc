@@ -362,4 +362,40 @@ class ContractControllerTest {
                         )))
                 .andExpect(status().isForbidden());
     }
+
+    /** FUN-002(#82) — COMPLIANCE는 §4-1 "조회만"이라 계약 생성·수정 모두 403이어야 한다. */
+    @Test
+    @DisplayName("준법·감사는 보험계약을 생성할 수 없다")
+    void createContractRejectsComplianceUser() throws Exception {
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                createRequest()
+                        )))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("준법·감사는 보험계약을 수정할 수 없다")
+    void updateContractRejectsComplianceUser() throws Exception {
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                updateRequest()
+                        )))
+                .andExpect(status().isForbidden());
+    }
+
+    /** FUN-002(#82) — 차익거래 수동 검증도 CAN_PROCESS(SETTLEMENT·SYSTEM_ADMIN) 전용이다. */
+    @Test
+    @DisplayName("준법·감사는 차익거래 수동 검증을 실행할 수 없다")
+    void reArbitrageCheckRejectsComplianceUser() throws Exception {
+        mockMvc.perform(post("/api/v1/contracts/{id}/arbitrage-check", 21L)
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"asOfDate\":\"2026-08-13\",\"reason\":\"정기 점검\"}"))
+                .andExpect(status().isForbidden());
+    }
 }
