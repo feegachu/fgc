@@ -75,7 +75,7 @@ public class JournalSearchController {
             try {
                 JournalType.valueOf(journalType);
             } catch (IllegalArgumentException e){
-                throw new FgcBusinessException(FgcErrorCode.COMMON_002, "journalType", Map.of("field", "journalType"), null);
+                throw new FgcBusinessException(FgcErrorCode.COMMON_002, "type", Map.of("field", "type"), null);
             }
         }
 
