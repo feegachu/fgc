@@ -2,10 +2,7 @@ package com.susukkang.fgc.validation.batch;
 
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
-import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
-import com.susukkang.fgc.validation.batch.tasklet.LedgerImbalanceCheckTasklet;
-import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
-import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.*;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -126,7 +123,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step arbitrageCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("arbitrageCheckStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("⑤차익거래 검증"), transactionManager)
+                .tasklet(new ArbitrageCheckTasklet(arbitrageCheckBatchPort), transactionManager)
                 .listener(progressListener(5, false))
                 .build();
     }
