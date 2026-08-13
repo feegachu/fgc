@@ -25,4 +25,7 @@ public class ContractTransactionAttributionRow {
     private Long agentId;
     private String agentName;
     private String agentCode;
+    // 이 지급 건 전체(계약 무관)의 귀속 합계 — differenceAmount 계산용(코드리뷰 반영,
+    // Mapper XML의 상관 서브쿼리 주석 참고). attributedAmount 합계(이 계약 몫)와는 다르다.
+    private BigDecimal transactionAttributedTotal;
 }

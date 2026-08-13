@@ -88,9 +88,13 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
             CommissionPaymentStatus status = CommissionPaymentStatus.valueOf(first.getStatus());
             PaymentStage paymentStage = PaymentStage.valueOf(first.getPaymentStage());
 
-            // "귀속 합계와 지급 금액의 차액" — 지급액에서 귀속 합계를 뺀 값(부호 유지,
-            // 초과/부족 방향을 화면에서 구분할 수 있게 abs()를 씌우지 않는다)
-            BigDecimal differenceAmount = first.getAmount().subtract(attributionTotal);
+            // "귀속 합계와 지급 금액의 차액" — attributionTotal(이 계약 몫만)이 아니라
+            // transactionAttributedTotal(이 지급 건 전체, 계약 무관)을 amount와 비교해야
+            // 한다. 정착지원금·공통비처럼 지급 건 하나가 여러 계약에 나뉘어 귀속되는 게
+            // 정상이라, 이 계약 몫만으로 차액을 내면 정상 귀속 건도 큰 미귀속처럼
+            // 잘못 표시된다(코드리뷰 반영 — Mapper XML의 서브쿼리 주석 참고).
+            // 부호는 유지한다(초과/부족 방향을 화면에서 구분할 수 있게 abs()를 씌우지 않는다).
+            BigDecimal differenceAmount = first.getAmount().subtract(first.getTransactionAttributedTotal());
 
             // 지급 건 + 귀속 합계 + 차액 + 귀속행 리스트를 하나의 응답으로 조립
             result.add(ContractTransactionResponse.builder()

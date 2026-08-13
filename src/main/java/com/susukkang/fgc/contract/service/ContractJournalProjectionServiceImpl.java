@@ -74,7 +74,13 @@ public class ContractJournalProjectionServiceImpl implements ContractJournalProj
             // 상태 코드(DRAFT/POSTED/REVERSED)를 화면 표시 라벨로 변환
             JournalHeaderStatus status = JournalHeaderStatus.valueOf(first.getStatus());
             // 지급단계도 같은 방식으로 라벨을 만든다 — journal_line.payment_stage는
-            // nullable이라 null 방어(ContractJournalLineResponse.from()과 같은 처리)
+            // nullable이라 null 방어(ContractJournalLineResponse.from()과 같은 처리).
+            // 첫 라인 값을 헤더 대표값으로 쓴다 — 현재 구현된 4개 분개유형
+            // (JournalEntryDraftServiceImpl)은 실제로 한 헤더의 모든 라인이 같은
+            // payment_stage를 갖지만, DB 제약으로 강제되는 건 아니다(V1__baseline_v2_1_2.sql:
+            // 1243). ADJUSTMENT/CLAWBACK/RECOVERY/REVERSAL(2차, 아직 미구현) 유형이
+            // 라인마다 다른 payment_stage를 가질 수 있다면 이 가정이 깨진다 — 그 유형을
+            // 구현할 때 재검토 필요(코드리뷰 반영).
             PaymentStage paymentStage = first.getPaymentStage() == null
                     ? null : PaymentStage.valueOf(first.getPaymentStage());
 
