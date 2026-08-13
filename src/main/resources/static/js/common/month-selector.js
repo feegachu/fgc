@@ -149,7 +149,7 @@
     function changeYear(offset) {
       if (state.applying) return;
       var nextYear = state.displayYear + offset;
-      if (nextYear < 0 || nextYear > 9999) return;
+      if (nextYear < 1 || nextYear > 9999) return;
       state.displayYear = nextYear;
       render();
       var focusTarget = cells.find(function (cell) {

@@ -31,7 +31,7 @@ class GlobalMonthSelectorStructureTest {
     void componentKeepsDraftSeparateUntilApplyAndSupportsDismissal() throws IOException {
         assertThat(resource("static/js/common/month-selector.js"))
                 .contains("displayYear: Number(value.slice(0, 4))")
-                .contains("nextYear < 0 || nextYear > 9999")
+                .contains("nextYear < 1 || nextYear > 9999")
                 .contains("previousYearButton")
                 .contains("nextYearButton")
                 .contains("cancelButton")
