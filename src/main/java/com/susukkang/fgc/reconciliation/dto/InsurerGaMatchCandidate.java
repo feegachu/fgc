@@ -16,6 +16,13 @@ import java.util.List;
 public record InsurerGaMatchCandidate(
         String matchGroupKey,
         Long contractId,
+        // 2026-08-13 yslee - FUN-048-04 저장 대상의 설계사 추적 필드 추가
+        // 기존 코드: 후보 DTO에 예상·실제 설계사와 원수사 코드가 없어 reconciliation_result에 저장 불가
+        // 문제: AGENT_MISMATCH 결과의 원천 식별값을 후속 저장 단계에서 재현할 수 없음
+        // 개선: 예상·실제 내부 설계사 ID와 실제 원수사 코드를 후보에 보존
+        Long expectedAgentId,
+        Long actualAgentId,
+        String actualSourceAgentCode,
         Long commissionItemId,
         Integer installmentNo,
         LocalDate dueDate,

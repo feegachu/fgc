@@ -132,6 +132,63 @@ class InsurerGaReconciliationMatcherImplTest {
         assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
         assertThat(result.installmentNo()).isNull();
         assertThat(result.scheduleLineIds()).containsExactly(11L, 12L);
+        assertThat(result.secondaryReasonCodes())
+                .containsExactly(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
+    }
+
+    // 2026-08-13 yslee - 미확정 회차와 행별 반올림 회귀 검증
+    // 기존 코드: null 회차가 정렬 중 예외를 내거나 금액이 같으면 MATCHED로 처리될 수 있었음
+    // 문제: 회차 정확일치와 상세행 단위 HALF_UP 규칙을 테스트가 보장하지 못함
+    // 개선: null 회차는 REVIEW_REQUIRED, 0.5원 상세행은 1원으로 반올림된 금액으로 판정
+    @Test
+    void 예상_회차가_null이면_금액이_같아도_REVIEW_REQUIRED다() {
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L))
+                .willReturn(List.of(expected(11L, null, "650000", null)));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(actual(21L, "650000", null)));
+
+        InsurerGaMatchCandidate result = matcher.match(request()).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(result.secondaryReasonCodes())
+                .containsExactly(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
+    }
+
+    @Test
+    void 상세행_금액은_합산_전에_원단위_HALF_UP으로_반올림한다() {
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L))
+                .willReturn(List.of(expected(11L, 1, "0.5", null)));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(actual(21L, "1", null)));
+
+        InsurerGaMatchCandidate result = matcher.match(request()).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.MATCHED);
+        assertThat(result.expectedTotalAmount()).isEqualByComparingTo("1");
+        assertThat(result.actualTotalAmount()).isEqualByComparingTo("1");
+        assertThat(result.differenceAmount()).isEqualByComparingTo("0");
+    }
+
+    // 2026-08-13 yslee - 원수사 설계사코드 정규화 결과의 수취인 불일치 판정 검증
+    // 기존 코드: 실제 sourceAgentCode와 정규화된 agent_id를 읽고도 판정에 사용하지 않음
+    // 문제: 다른 설계사의 동일 금액 명세가 MATCHED로 숨겨질 수 있음
+    // 개선: 예상 계약 설계사와 실제 원수사코드 매핑 설계사가 다르면 AGENT_MISMATCH로 분류
+    @Test
+    void 예상과_실제_설계사가_다르면_금액이_같아도_AGENT_MISMATCH다() {
+        InsurerGaActualSourceRow actual = actual(21L, "650000", null);
+        actual.setActualAgentId(502L);
+        actual.setActualAgentMappingCount(1);
+        actual.setSourceAgentCode("INSURER-FC-502");
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L))
+                .willReturn(List.of(expected(11L, 1, "650000", null)));
+        given(reconciliationMapper.findActualSources(MONTH, 3L)).willReturn(List.of(actual));
+
+        InsurerGaMatchCandidate result = matcher.match(request()).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.AGENT_MISMATCH);
+        assertThat(result.expectedAgentId()).isEqualTo(501L);
+        assertThat(result.actualAgentId()).isEqualTo(502L);
+        assertThat(result.actualSourceAgentCode()).isEqualTo("INSURER-FC-502");
     }
 
     @Test
@@ -177,7 +234,7 @@ class InsurerGaReconciliationMatcherImplTest {
 
     private static InsurerGaExpectedSourceRow expected(
             Long scheduleLineId,
-            int installmentNo,
+            Integer installmentNo,
             String amount,
             Long journalHeaderId
     ) {
@@ -185,6 +242,7 @@ class InsurerGaReconciliationMatcherImplTest {
         row.setScheduleLineId(scheduleLineId);
         row.setJournalHeaderId(journalHeaderId);
         row.setContractId(100L);
+        row.setExpectedAgentId(501L);
         row.setCommissionItemId(200L);
         row.setInstallmentNo(installmentNo);
         row.setDueDate(MONTH.plusDays(14));
@@ -203,11 +261,14 @@ class InsurerGaReconciliationMatcherImplTest {
         row.setCommissionTransactionId(attributionId + 1000);
         row.setJournalHeaderId(journalHeaderId);
         row.setContractId(100L);
+        row.setActualAgentId(501L);
+        row.setActualAgentMappingCount(1);
         row.setCommissionItemId(200L);
         row.setSettlementMonth(MONTH);
         row.setDueDate(MONTH.plusDays(14));
         row.setActualAmount(new BigDecimal(amount));
         row.setSourceBusinessKey("INSURER:TEST:" + attributionId);
+        row.setSourceAgentCode("INSURER-FC-501");
         return row;
     }
 }

@@ -2,15 +2,16 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.susukkang.fgc.reconciliation.mapper.InsurerGaReconciliationMapper">
 
-    <!-- 2026-08-12 yslee - 기존 스케줄·원장 테이블에서 보험사→GA 예상 원자행 조회
+    <!-- 2026-08-13 yslee - 기존 스케줄·원장 테이블에서 보험사→GA 예상 원자행 조회
          기존 코드: 대사 실행이 예상 스케줄을 읽는 SQL이 없음
-         문제: 비교·시뮬레이션 또는 비활성·취소 스케줄까지 섞이면 운영 예상액을 재현할 수 없음
-         개선: 활성 OPERATIONAL 보험사→GA 스케줄과 현재 POSTED 예상분개만 추적 정보로 조회 -->
+         문제: 비교·시뮬레이션 또는 비활성·취소 스케줄과 POSTED 분개가 없는 행은 원장 대사 근거가 될 수 없음
+         개선: 활성 OPERATIONAL 보험사→GA 스케줄 중 POSTED 예상분개가 있는 행과 계약 모집 설계사를 조회 -->
     <select id="findExpectedSources"
             resultType="com.susukkang.fgc.reconciliation.dto.InsurerGaExpectedSourceRow">
         SELECT sl.schedule_line_id AS scheduleLineId,
                jh.journal_header_id AS journalHeaderId,
                sh.contract_id AS contractId,
+               c.agent_id AS expectedAgentId,
                sl.commission_item_id AS commissionItemId,
                sl.installment_no AS installmentNo,
                sl.due_date AS dueDate,
@@ -21,7 +22,7 @@
             ON sl.schedule_header_id = sh.schedule_header_id
           JOIN fgc.insurance_contract c
             ON c.contract_id = sh.contract_id
-          LEFT JOIN fgc.journal_header jh
+          JOIN fgc.journal_header jh
             ON jh.journal_type = 'EXPECTED_INSURER_INCOME'
            AND jh.source_entity_type = 'SCHEDULE_LINE'
            AND jh.source_entity_id = CAST(sl.schedule_line_id AS varchar)
@@ -37,16 +38,25 @@
                   sl.installment_no, sl.schedule_line_id
     </select>
 
-    <!-- 2026-08-12 yslee - 정규화된 원수사 명세 거래·귀속행을 실제 원자행으로 조회
+    <!-- 2026-08-13 yslee - 정규화된 원수사 명세 거래·귀속행을 실제 원자행으로 조회
          기존 코드: 파일 또는 임시 대사 테이블을 전제로 한 실제 원천 조회가 없음
-         문제: REJECTED 명세나 DRAFT·취소·타 단계 거래가 실제 지급액에 섞일 수 있음
-         개선: 기존 statement_batch/commission_transaction/transaction_attribution에서 확정 지급 원자행만 조회 -->
+         문제: POSTED 실제분개가 없거나 원수사 설계사코드가 정규화되지 않은 행은 원장·수취인 대사를 재현할 수 없음
+         개선: POSTED 실제분개가 있는 확정 지급 원자행과 유효기간 내 원수사 설계사코드의 내부 agent_id를 조회 -->
     <select id="findActualSources"
             resultType="com.susukkang.fgc.reconciliation.dto.InsurerGaActualSourceRow">
         SELECT ta.transaction_attribution_id AS transactionAttributionId,
                ct.commission_transaction_id AS commissionTransactionId,
                jh.journal_header_id AS journalHeaderId,
                ta.contract_id AS contractId,
+               CASE
+                   WHEN ta.source_agent_code IS NOT NULL THEN aic.agent_id
+                   ELSE ta.agent_id
+               END AS actualAgentId,
+               CASE
+                   WHEN ta.source_agent_code IS NOT NULL THEN aic.mapping_count
+                   WHEN ta.agent_id IS NOT NULL THEN 1
+                   ELSE 0
+               END AS actualAgentMappingCount,
                ct.commission_item_id AS commissionItemId,
                ct.settlement_month AS settlementMonth,
                ct.due_date AS dueDate,
@@ -58,11 +68,23 @@
             ON ct.statement_batch_id = sb.statement_batch_id
           JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
-          LEFT JOIN fgc.journal_header jh
+          JOIN fgc.journal_header jh
             ON jh.journal_type = 'ACTUAL_INSURER_STATEMENT'
            AND jh.source_entity_type = 'COMMISSION_TRANSACTION'
-           AND jh.source_entity_id = CAST(ct.commission_transaction_id AS varchar)
-           AND jh.status = 'POSTED'
+            AND jh.source_entity_id = CAST(ct.commission_transaction_id AS varchar)
+            AND jh.status = 'POSTED'
+          LEFT JOIN LATERAL (
+              SELECT CASE
+                         WHEN COUNT(DISTINCT code.agent_id) = 1 THEN MIN(code.agent_id)
+                     END AS agent_id,
+                     COUNT(*)::integer AS mapping_count
+                FROM fgc.agent_insurer_code code
+               WHERE code.insurer_id = ct.insurer_id
+                 AND code.insurer_agent_code = ta.source_agent_code
+                 AND code.code_status IN ('ACTIVE', 'REPRESENTATIVE')
+                 AND code.effective_from &lt;= ta.attribution_date
+                 AND (code.effective_to IS NULL OR code.effective_to &gt;= ta.attribution_date)
+          ) aic ON TRUE
          WHERE sb.insurer_id = #{insurerId}
            AND sb.settlement_month = #{settlementMonth}
            AND sb.statement_type = 'INSURER_COMMISSION'

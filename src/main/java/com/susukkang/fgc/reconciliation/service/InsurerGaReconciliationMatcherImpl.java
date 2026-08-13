@@ -1,6 +1,7 @@
 package com.susukkang.fgc.reconciliation.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaExpectedSourceRow;
@@ -73,18 +74,44 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources
     ) {
+        // 2026-08-13 yslee - 대사 상세행 반올림과 수취인·회차 데이터 품질 판정 적용
+        // 기존 코드: numeric 원천값을 그대로 합산하고 회차·수취인 식별값의 누락과 불일치를 판정하지 않음
+        // 문제: 행별 HALF_UP 결과와 합계가 달라지거나 미확정 회차·다른 설계사가 정상일치로 처리될 수 있음
+        // 개선: 상세행을 원 단위 반올림한 뒤 합산하고 회차 및 정규화된 설계사 식별값을 별도 판정
         BigDecimal expectedTotal = expectedSources.stream()
                 .map(InsurerGaExpectedSourceRow::getExpectedAmount)
+                .map(MoneyUtil::roundWon)
                 .reduce(ZERO, BigDecimal::add);
         BigDecimal actualTotal = actualSources.stream()
                 .map(InsurerGaActualSourceRow::getActualAmount)
+                .map(MoneyUtil::roundWon)
                 .reduce(ZERO, BigDecimal::add);
+        boolean hasMissingInstallment = expectedSources.stream()
+                .anyMatch(source -> source.getInstallmentNo() == null);
         List<Integer> installments = expectedSources.stream()
                 .map(InsurerGaExpectedSourceRow::getInstallmentNo)
+                .filter(Objects::nonNull)
                 .distinct()
                 .sorted()
                 .toList();
         Integer installmentNo = installments.size() == 1 ? installments.getFirst() : null;
+        List<Long> expectedAgentIds = distinctLongs(expectedSources.stream()
+                .map(InsurerGaExpectedSourceRow::getExpectedAgentId)
+                .toList());
+        List<Long> actualAgentIds = distinctLongs(actualSources.stream()
+                .map(InsurerGaActualSourceRow::getActualAgentId)
+                .toList());
+        List<String> actualSourceAgentCodes = distinctStrings(actualSources.stream()
+                .map(InsurerGaActualSourceRow::getSourceAgentCode)
+                .toList());
+        boolean agentResolutionIssue = hasAgentResolutionIssue(expectedSources, actualSources);
+        boolean agentMismatch = hasAgentMismatch(
+                expectedSources,
+                actualSources,
+                expectedAgentIds,
+                actualAgentIds,
+                actualSourceAgentCodes
+        );
 
         // 2026-08-12 yslee - 실제 명세에 회차 컬럼이 없는 기존 정규화 모델의 안전한 매칭 경계 적용
         // 기존 코드: 실제 명세의 회차를 임의 계산하거나 JSON 키에서 읽는 규칙이 없음
@@ -94,6 +121,9 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 expectedSources,
                 actualSources,
                 installments,
+                hasMissingInstallment,
+                agentResolutionIssue,
+                agentMismatch,
                 expectedTotal,
                 actualTotal
         );
@@ -101,13 +131,31 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 resultType,
                 expectedSources,
                 actualSources,
+                installments,
+                hasMissingInstallment,
+                agentResolutionIssue,
+                agentMismatch,
                 expectedTotal,
                 actualTotal
         );
 
+        Long expectedAgentId = singleValue(expectedAgentIds);
+        Long actualAgentId = singleValue(actualAgentIds);
+        String actualSourceAgentCode = singleValue(actualSourceAgentCodes);
+
         return new InsurerGaMatchCandidate(
-                matchGroupKey(request, key, installmentNo),
+                matchGroupKey(
+                        request,
+                        key,
+                        installmentNo,
+                        expectedAgentId,
+                        actualAgentId,
+                        actualSourceAgentCode
+                ),
                 key.contractId(),
+                expectedAgentId,
+                actualAgentId,
+                actualSourceAgentCode,
                 key.commissionItemId(),
                 installmentNo,
                 key.dueDate(),
@@ -129,13 +177,20 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
             List<Integer> installments,
+            boolean hasMissingInstallment,
+            boolean agentResolutionIssue,
+            boolean agentMismatch,
             BigDecimal expectedTotal,
             BigDecimal actualTotal
     ) {
         if (actualSources.stream().anyMatch(source -> source.getDueDate() == null)) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
-        if (!expectedSources.isEmpty() && !actualSources.isEmpty() && installments.size() != 1) {
+        if (hasMissingInstallment
+                || (!expectedSources.isEmpty() && !actualSources.isEmpty() && installments.size() != 1)) {
+            return ReconciliationResultType.REVIEW_REQUIRED;
+        }
+        if (agentResolutionIssue) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
         if (expectedSources.size() > 1 || actualSources.size() > 1) {
@@ -147,6 +202,9 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         if (actualSources.isEmpty()) {
             return ReconciliationResultType.ACTUAL_MISSING;
         }
+        if (agentMismatch) {
+            return ReconciliationResultType.AGENT_MISMATCH;
+        }
         return tolerancePolicy.matches(expectedTotal, actualTotal)
                 ? ReconciliationResultType.MATCHED
                 : ReconciliationResultType.AMOUNT_DIFFERENCE;
@@ -156,12 +214,25 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             ReconciliationResultType primary,
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
+            List<Integer> installments,
+            boolean hasMissingInstallment,
+            boolean agentResolutionIssue,
+            boolean agentMismatch,
             BigDecimal expectedTotal,
             BigDecimal actualTotal
     ) {
         List<String> reasons = new ArrayList<>();
-        if (expectedSources.size() > 1 || actualSources.size() > 1) {
+        boolean installmentMismatch = hasMissingInstallment
+                || (!expectedSources.isEmpty() && !actualSources.isEmpty() && installments.size() != 1);
+        if (installmentMismatch) {
+            reasons.add(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
+        } else if (expectedSources.size() > 1 || actualSources.size() > 1) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
+        }
+        if (agentResolutionIssue) {
+            reasons.add(ReconciliationResultType.REVIEW_REQUIRED.name());
+        } else if (agentMismatch) {
+            reasons.add(ReconciliationResultType.AGENT_MISMATCH.name());
         }
         if (expectedSources.isEmpty()) {
             reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
@@ -224,7 +295,10 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
     private static String matchGroupKey(
             ReconciliationExecutionRequest request,
             BaseMatchKey key,
-            Integer installmentNo
+            Integer installmentNo,
+            Long expectedAgentId,
+            Long actualAgentId,
+            String actualSourceAgentCode
     ) {
         return String.join(":",
                 PaymentStage.INSURER_TO_GA.name(),
@@ -232,6 +306,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 MONTH_FORMATTER.format(key.dueMonth()),
                 String.valueOf(key.contractId()),
                 String.valueOf(key.commissionItemId()),
+                recipientKey(expectedAgentId, actualAgentId, actualSourceAgentCode),
                 installmentNo == null ? "NA" : String.valueOf(installmentNo),
                 key.dueDate() == null ? "NA" : DateTimeFormatter.BASIC_ISO_DATE.format(key.dueDate())
         );
@@ -239,6 +314,58 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
 
     private static List<Long> distinctLongs(List<Long> values) {
         return values.stream().filter(Objects::nonNull).distinct().sorted().toList();
+    }
+
+    private static List<String> distinctStrings(List<String> values) {
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private static boolean hasAgentMismatch(
+            List<InsurerGaExpectedSourceRow> expectedSources,
+            List<InsurerGaActualSourceRow> actualSources,
+            List<Long> expectedAgentIds,
+            List<Long> actualAgentIds,
+            List<String> actualSourceAgentCodes
+    ) {
+        if (expectedSources.isEmpty() || actualSources.isEmpty()) {
+            return false;
+        }
+        if (expectedAgentIds.isEmpty() && actualAgentIds.isEmpty() && actualSourceAgentCodes.isEmpty()) {
+            return false;
+        }
+        return expectedAgentIds.size() != 1
+                || actualAgentIds.size() != 1
+                || !expectedAgentIds.getFirst().equals(actualAgentIds.getFirst());
+    }
+
+    private static boolean hasAgentResolutionIssue(
+            List<InsurerGaExpectedSourceRow> expectedSources,
+            List<InsurerGaActualSourceRow> actualSources
+    ) {
+        return !expectedSources.isEmpty()
+                && !actualSources.isEmpty()
+                && actualSources.stream().anyMatch(source -> source.getActualAgentId() == null
+                || !Objects.equals(source.getActualAgentMappingCount(), 1));
+    }
+
+    private static String recipientKey(
+            Long expectedAgentId,
+            Long actualAgentId,
+            String actualSourceAgentCode
+    ) {
+        return "E" + Objects.toString(expectedAgentId, "NA")
+                + "-A" + Objects.toString(actualAgentId, "NA")
+                + "-S" + Objects.toString(actualSourceAgentCode, "NA");
+    }
+
+    private static <T> T singleValue(List<T> values) {
+        return values.size() == 1 ? values.getFirst() : null;
     }
 
     private record BaseMatchKey(Long contractId, Long commissionItemId, LocalDate dueMonth, LocalDate dueDate) {

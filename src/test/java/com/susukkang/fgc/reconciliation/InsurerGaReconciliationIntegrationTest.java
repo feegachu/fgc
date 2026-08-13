@@ -45,6 +45,8 @@ class InsurerGaReconciliationIntegrationTest {
         Long otherContractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", otherInsurerId);
         Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
         Long commissionItemId = id("SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1");
+        Long contractAgentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+        String sourceAgentCode = insertAgentInsurerCode(insurerId, contractAgentId, "MATCHED");
 
         Long expectedMatched = insertSchedule(contractId, policyVersionId, commissionItemId, "650000", true, "OPERATIONAL", 1);
         Long expectedMissing = insertSchedule(secondContractId, policyVersionId, commissionItemId, "300000", true, "OPERATIONAL", 2);
@@ -54,25 +56,27 @@ class InsurerGaReconciliationIntegrationTest {
 
         Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "VALIDATED", "VALID");
         Long actualMatched = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
-                TEST_MONTH, "650000", "MATCHED");
+                TEST_MONTH, "650000", "MATCHED", sourceAgentCode);
 
         Long nextMonthBatchId = insertStatementBatch(insurerId, TEST_MONTH.plusMonths(1), "VALIDATED", "NEXT-MONTH");
         Long nextMonthActual = insertActual(nextMonthBatchId, insurerId, contractId, commissionItemId,
-                TEST_MONTH.plusMonths(1), "100000", "NEXT-MONTH");
+                TEST_MONTH.plusMonths(1), "100000", "NEXT-MONTH", sourceAgentCode);
 
         Long rejectedBatchId = insertStatementBatch(insurerId, TEST_MONTH, "REJECTED", "REJECTED");
         insertActual(rejectedBatchId, insurerId, contractId, commissionItemId,
-                TEST_MONTH, "650000", "REJECTED");
+                TEST_MONTH, "650000", "REJECTED", sourceAgentCode);
         Long otherInsurerBatchId = insertStatementBatch(otherInsurerId, TEST_MONTH, "VALIDATED", "OTHER-INSURER");
         insertActual(otherInsurerBatchId, otherInsurerId, otherContractId, commissionItemId,
-                TEST_MONTH, "999000", "OTHER-INSURER");
-        Long agentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+                TEST_MONTH, "999000", "OTHER-INSURER", null);
         Long gaToFcActual = insertGaToFcActual(
-                statementBatchId, insurerId, contractId, agentId, commissionItemId, "650000");
+                statementBatchId, insurerId, contractId, contractAgentId, commissionItemId, "650000");
 
         Long expectedJournalId = insertPostedJournal(
                 "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expectedMatched,
                 contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
+        insertPostedJournal(
+                "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expectedMissing,
+                secondContractId, commissionItemId, "300000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
         Long actualTransactionId = id("""
                 SELECT commission_transaction_id
                   FROM fgc.transaction_attribution
@@ -107,12 +111,23 @@ class InsurerGaReconciliationIntegrationTest {
         Long contractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", insurerId);
         Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
         Long commissionItemId = id("SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1");
+        Long contractAgentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+        String sourceAgentCode = insertAgentInsurerCode(insurerId, contractAgentId, "DUPLICATE");
         Long expected = insertSchedule(contractId, policyVersionId, commissionItemId, "650000", true, "OPERATIONAL", 1);
         Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "AVAILABLE", "DUPLICATE");
         Long first = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
-                TEST_MONTH, "300000", "DUP-1");
+                TEST_MONTH, "300000", "DUP-1", sourceAgentCode);
         Long second = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
-                TEST_MONTH, "350000", "DUP-2");
+                TEST_MONTH, "350000", "DUP-2", sourceAgentCode);
+        insertPostedJournal(
+                "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expected,
+                contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
+        insertPostedJournal(
+                "ACTUAL_INSURER_STATEMENT", "COMMISSION_TRANSACTION", transactionId(first),
+                contractId, commissionItemId, "300000", "ACTUAL_RECEIVABLE", "ACTUAL_INCOME");
+        insertPostedJournal(
+                "ACTUAL_INSURER_STATEMENT", "COMMISSION_TRANSACTION", transactionId(second),
+                contractId, commissionItemId, "350000", "ACTUAL_RECEIVABLE", "ACTUAL_INCOME");
 
         InsurerGaMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
                 99L, 88L, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null)).getFirst();
@@ -122,6 +137,60 @@ class InsurerGaReconciliationIntegrationTest {
         assertThat(result.actualTotalAmount()).isEqualByComparingTo("650000");
         assertThat(result.scheduleLineIds()).containsExactly(expected);
         assertThat(result.transactionAttributionIds()).containsExactly(first, second);
+    }
+
+    // 2026-08-13 yslee - POSTED 분개와 원수사 설계사코드 매핑 대사 조건 검증
+    // 기존 코드: LEFT JOIN으로 분개가 없는 원천행도 대사에 포함되고 설계사코드는 판정에서 제외됨
+    // 문제: 원장 추적이 불가능한 결과와 다른 설계사의 동일 금액 결과가 MATCHED로 저장될 수 있음
+    // 개선: POSTED 분개 없는 행은 제외하고 유효한 코드 매핑이 다른 경우 AGENT_MISMATCH로 판정
+    @Test
+    void POSTED_분개가_없는_예상과_실제_원천은_대사대상에서_제외한다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", insurerId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1");
+        Long contractAgentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+        String sourceAgentCode = insertAgentInsurerCode(insurerId, contractAgentId, "NO-JOURNAL");
+
+        insertSchedule(contractId, policyVersionId, commissionItemId, "650000", true, "OPERATIONAL", 1);
+        Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "VALIDATED", "NO-JOURNAL");
+        insertActual(statementBatchId, insurerId, contractId, commissionItemId,
+                TEST_MONTH, "650000", "NO-JOURNAL", sourceAgentCode);
+
+        List<InsurerGaMatchCandidate> results = matcher.match(new ReconciliationExecutionRequest(
+                99L, 88L, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null));
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    void 실제_원수사코드가_다른_설계사로_매핑되면_AGENT_MISMATCH다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", insurerId);
+        Long expectedAgentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+        Long otherAgentId = id("SELECT agent_id FROM fgc.agent WHERE agent_id <> ? ORDER BY agent_id LIMIT 1", expectedAgentId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1");
+        String otherSourceAgentCode = insertAgentInsurerCode(insurerId, otherAgentId, "AGENT-MISMATCH");
+
+        Long expected = insertSchedule(contractId, policyVersionId, commissionItemId, "650000", true, "OPERATIONAL", 1);
+        Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "VALIDATED", "AGENT-MISMATCH");
+        Long actual = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
+                TEST_MONTH, "650000", "AGENT-MISMATCH", otherSourceAgentCode);
+        insertPostedJournal(
+                "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expected,
+                contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
+        insertPostedJournal(
+                "ACTUAL_INSURER_STATEMENT", "COMMISSION_TRANSACTION", transactionId(actual),
+                contractId, commissionItemId, "650000", "ACTUAL_RECEIVABLE", "ACTUAL_INCOME");
+
+        InsurerGaMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
+                99L, 88L, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null)).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.AGENT_MISMATCH);
+        assertThat(result.expectedAgentId()).isEqualTo(expectedAgentId);
+        assertThat(result.actualAgentId()).isEqualTo(otherAgentId);
+        assertThat(result.actualSourceAgentCode()).isEqualTo(otherSourceAgentCode);
     }
 
     private Long insertSchedule(
@@ -179,7 +248,8 @@ class InsurerGaReconciliationIntegrationTest {
             Long commissionItemId,
             LocalDate month,
             String amount,
-            String suffix
+            String suffix,
+            String sourceAgentCode
     ) {
         Long transactionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
@@ -195,17 +265,37 @@ class InsurerGaReconciliationIntegrationTest {
         Long attributionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.transaction_attribution (
                     commission_transaction_id, attribution_seq, attribution_scope, contract_id,
-                    attribution_date, attribution_month, attributed_amount,
+                    source_agent_code, attribution_date, attribution_month, attributed_amount,
                     inclusion_status_snapshot, attribution_method
-                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, 'INCLUDED', 'DIRECT')
+                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, ?, 'INCLUDED', 'DIRECT')
                 RETURNING transaction_attribution_id
-                """, Long.class, transactionId, contractId, month.plusDays(14), month, new BigDecimal(amount));
+                """, Long.class, transactionId, contractId, sourceAgentCode,
+                month.plusDays(14), month, new BigDecimal(amount));
         jdbcTemplate.update("""
                 UPDATE fgc.commission_transaction
                    SET status = 'CONFIRMED'
                  WHERE commission_transaction_id = ?
                 """, transactionId);
         return attributionId;
+    }
+
+    private Long transactionId(Long attributionId) {
+        return id("""
+                SELECT commission_transaction_id
+                  FROM fgc.transaction_attribution
+                 WHERE transaction_attribution_id = ?
+                """, attributionId);
+    }
+
+    private String insertAgentInsurerCode(Long insurerId, Long agentId, String suffix) {
+        String sourceAgentCode = "IT-048-02-" + suffix + "-" + agentId;
+        jdbcTemplate.update("""
+                INSERT INTO fgc.agent_insurer_code (
+                    insurer_id, agent_id, insurer_agent_code, code_status,
+                    effective_from, effective_to, source_ref
+                ) VALUES (?, ?, ?, 'ACTIVE', ?, NULL, 'IT-048-02')
+                """, insurerId, agentId, sourceAgentCode, TEST_MONTH);
+        return sourceAgentCode;
     }
 
     private Long insertGaToFcActual(
