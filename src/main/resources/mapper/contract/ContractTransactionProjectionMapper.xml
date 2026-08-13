@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.contract.mapper.ContractTransactionProjectionMapper">
+    <select id="findTransactionAttributionsByContractId" resultType="com.susukkang.fgc.contract.dto.ContractTransactionAttributionRow">
+        SELECT ct.commission_transaction_id, ct.settlement_month, ct.payment_stage,
+               ct.amount, ct.status, ct.source_type,
+               ta.transaction_attribution_id, ta.attributed_amount, ta.attribution_date,
+               ta.inclusion_status_snapshot AS inclusion_status,
+               ag.agent_id, ag.agent_name, ag.agent_code
+        FROM fgc.transaction_attribution ta
+        JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
+        LEFT JOIN fgc.agent ag ON ag.agent_id = ta.agent_id
+        WHERE ta.contract_id = #{contractId}
+        ORDER BY ct.commission_transaction_id, ta.attribution_seq
+    </select>
+</mapper>
