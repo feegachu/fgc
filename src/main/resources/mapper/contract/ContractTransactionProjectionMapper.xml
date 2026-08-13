@@ -3,13 +3,7 @@
 <mapper namespace="com.susukkang.fgc.contract.mapper.ContractTransactionProjectionMapper">
     <!--
       transaction_attributed_total: 이 지급 건(commission_transaction) 전체의 귀속 합계다
-      (계약으로 좁히지 않고 모든 attribution_scope를 합산) — 정착지원금·공통비 귀속은
-      지급 건 하나가 여러 계약에 나뉘어 귀속되는 게 정상이라(예: 2,400,000원이 5개
-      계약에 300,000/300,000/600,000/900,000/300,000으로 귀속), 이 계약 하나에 필터링된
-      attributed_amount 합계만으로 ct.amount와 차액을 내면 실제로는 정상 귀속인 지급
-      건도 큰 미귀속 차액이 있는 것처럼 잘못 계산된다(코드리뷰 반영). 서비스 계층은
-      이 값으로 differenceAmount를 계산하고, "attributions" 목록 자체는 여전히 이
-      계약(#{contractId}) 몫만 보여준다.
+      (계약으로 좁히지 않고 모든 attribution_scope를 합산)
     -->
     <select id="findTransactionAttributionsByContractId" resultType="com.susukkang.fgc.contract.dto.ContractTransactionAttributionRow">
         SELECT ct.commission_transaction_id, ct.settlement_month, ct.payment_stage,
@@ -26,5 +20,15 @@
         LEFT JOIN fgc.agent ag ON ag.agent_id = ta.agent_id
         WHERE ta.contract_id = #{contractId}
         ORDER BY ct.commission_transaction_id, ta.attribution_seq
+    </select>
+
+    <!-- CONT-W02 탭6 "지급·대사" -->
+    <select id="findReconciliationResultsByContractId" resultType="com.susukkang.fgc.contract.dto.ContractReconciliationRow">
+        SELECT reconciliation_result_id, match_group_key, result_type,
+               expected_total_amount, actual_total_amount, difference_amount,
+               primary_reason_code, installment_no, commission_item_id, created_at
+        FROM fgc.reconciliation_result
+        WHERE contract_id = #{contractId}
+        ORDER BY created_at DESC, reconciliation_result_id DESC
     </select>
 </mapper>

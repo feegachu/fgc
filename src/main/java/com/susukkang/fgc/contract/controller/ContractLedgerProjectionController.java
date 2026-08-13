@@ -2,7 +2,7 @@ package com.susukkang.fgc.contract.controller;
 
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.contract.dto.ContractJournalResponse;
-import com.susukkang.fgc.contract.dto.ContractTransactionResponse;
+import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import com.susukkang.fgc.contract.service.ContractJournalProjectionService;
 import com.susukkang.fgc.contract.service.ContractTransactionProjectionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +29,7 @@ public class ContractLedgerProjectionController {
     }
 
     @GetMapping("/{id}/transactions")
-    public ApiResponse<List<ContractTransactionResponse>> getContractTransactions(@PathVariable Long id) {
+    public ApiResponse<ContractTransactionTabResponse> getContractTransactions(@PathVariable Long id) {
         return ApiResponse.success(contractTransactionProjectionService.findTransactionsByContractId(id));
     }
 }

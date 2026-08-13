@@ -2,11 +2,14 @@ package com.susukkang.fgc.contract.service;
 
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.contract.dto.ContractReconciliationResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionResponse;
+import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -46,10 +49,11 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
     void contractWithNoAttributedTransactionsReturnsEmptyList() {
         Long emptyContractId = contractId("FGC-FGL01-202703-0001");
 
-        List<ContractTransactionResponse> result =
+        ContractTransactionTabResponse response =
                 contractTransactionProjectionService.findTransactionsByContractId(emptyContractId);
 
-        assertThat(result).isEmpty();
+        assertThat(response.transactions()).isEmpty();
+        assertThat(response.reconciliations()).isEmpty();
     }
 
     @Test
@@ -57,7 +61,7 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
         Long contractId = contractId("FGC-FGL01-202607-0001");
 
         List<ContractTransactionResponse> result =
-                contractTransactionProjectionService.findTransactionsByContractId(contractId);
+                contractTransactionProjectionService.findTransactionsByContractId(contractId).transactions();
 
         // 시드 데이터: commission_transaction 7건, 각각 attribution 1건씩 100% 귀속
         // (transaction_attribution.attributed_amount == commission_transaction.amount).
@@ -89,7 +93,7 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
         Long contractId = contractId("FGC-FGL01-202607-0005");
 
         List<ContractTransactionResponse> result =
-                contractTransactionProjectionService.findTransactionsByContractId(contractId);
+                contractTransactionProjectionService.findTransactionsByContractId(contractId).transactions();
 
         ContractTransactionResponse splitTransaction = result.stream()
                 .filter(r -> r.getCommissionTransactionId() == 37L)
@@ -103,5 +107,39 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
         // 하지만 차액은 지급 건 전체 기준으로 0이어야 한다 — 고치기 전 코드였다면
         // 210,000 - 105,000 = 105,000으로 잘못 나왔을 것이다.
         assertThat(splitTransaction.getDifferenceAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // 시드 데이터에는 reconciliation_result가 하나도 없어서, 여기서만 CREATED 상태의
+    // reconciliation_run + reconciliation_result 1건을 만들어 확인한다. 클래스 전체가
+    // @Transactional이 아니라 이 테스트에만 걸어서 커밋 없이 롤백으로 정리한다
+    // (FinalizedValidationRunImmutabilityIntegrationTest와 같은 패턴).
+    @Test
+    @Transactional
+    void reconciliationResultsForContractAreIncludedInResponse() {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+
+        Long runId = jdbcTemplate.queryForObject(
+                """
+                INSERT INTO fgc.reconciliation_run (settlement_month, payment_stage, status)
+                VALUES ('2026-07-01', 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO fgc.reconciliation_result
+                    (reconciliation_run_id, match_group_key, contract_id, result_type,
+                     expected_total_amount, actual_total_amount, difference_amount, primary_reason_code)
+                VALUES (?, 'test-match-group', ?, 'AMOUNT_DIFFERENCE', 100000, 90000, 10000, 'TEST_REASON')
+                """, runId, contractId);
+
+        ContractTransactionTabResponse response =
+                contractTransactionProjectionService.findTransactionsByContractId(contractId);
+
+        assertThat(response.reconciliations()).hasSize(1);
+        ContractReconciliationResponse reconciliation = response.reconciliations().get(0);
+        assertThat(reconciliation.resultType().name()).isEqualTo("AMOUNT_DIFFERENCE");
+        assertThat(reconciliation.resultTypeLabel()).isEqualTo("금액 차이");
+        assertThat(reconciliation.differenceAmount()).isEqualByComparingTo(BigDecimal.valueOf(10000));
     }
 }

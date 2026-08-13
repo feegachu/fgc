@@ -1,17 +1,16 @@
 package com.susukkang.fgc.contract.service;
 
-import com.susukkang.fgc.contract.dto.ContractTransactionResponse;
-
-import java.util.List;
+import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 
 /**
- * 계약 상세 화면(CONT-W02)의 지급 건 탭
+ * 계약 상세 화면(CONT-W02)의 지급·대사 탭(탭6). 지급 건(commission_transaction+
+ * transaction_attribution)과 대사 결과(reconciliation_result)를 함께 돌려준다
  */
 public interface ContractTransactionProjectionService {
 
     /**
-     * contractId에 귀속된 모든 지급 건(DRAFT/CONFIRMED/CANCELLED 전부)을 지급 건 단위로 묶어 돌려준다
-     * 귀속된 지급 건이 없으면 빈 리스트를 돌려준다
+     * contractId 기준 지급 건 목록(DRAFT/CONFIRMED/CANCELLED 전부, 귀속행 없으면 빈 리스트)과
+     * 대사 결과 목록(없으면 빈 리스트)을 함께 조회한다.
      */
-    List<ContractTransactionResponse> findTransactionsByContractId(Long contractId);
+    ContractTransactionTabResponse findTransactionsByContractId(Long contractId);
 }

@@ -5,9 +5,11 @@ import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.contract.dto.ContractReconciliationResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionAttributionResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionAttributionRow;
 import com.susukkang.fgc.contract.dto.ContractTransactionResponse;
+import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.contract.mapper.ContractTransactionProjectionMapper;
 import org.springframework.stereotype.Service;
@@ -19,8 +21,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 계약 상세 화면(CONT-W02) 지급 건 탭 — commission_transaction/transaction_attribution을
- * 계약 기준으로 조회해 지급 건 단위로 묶어 돌려주는 조회 전용 서비스.
+ * 계약 상세 화면(CONT-W02) 지급·대사 탭 — commission_transaction/transaction_attribution을
+ * 계약 기준으로 조회해 지급 건 단위로 묶고, reconciliation_result도 함께 조회하는 조회 전용 서비스.
  */
 @Service
 public class ContractTransactionProjectionServiceImpl implements ContractTransactionProjectionService {
@@ -36,7 +38,7 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
     }
 
     @Override
-    public List<ContractTransactionResponse> findTransactionsByContractId(Long contractId) {
+    public ContractTransactionTabResponse findTransactionsByContractId(Long contractId) {
         // 1. 계약 존재 확인
         if (contractMapper.selectContractById(contractId) == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", contractId));
@@ -46,9 +48,15 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
         List<ContractTransactionAttributionRow> rows =
                 contractTransactionProjectionMapper.findTransactionAttributionsByContractId(contractId);
 
-        // 3. 귀속된 지급 건이 없으면 빈 목록 반환 — 오류 아님
+        // 2-1. 이 계약의 대사 결과 목록도 함께 조회(reconciliation_result, 최신순)
+        List<ContractReconciliationResponse> reconciliations =
+                contractTransactionProjectionMapper.findReconciliationResultsByContractId(contractId).stream()
+                        .map(ContractReconciliationResponse::from)
+                        .toList();
+
+        // 3. 귀속된 지급 건이 없으면 지급 건 목록은 빈 리스트로 반환 — 오류 아님
         if (rows.isEmpty()) {
-            return List.of();
+            return new ContractTransactionTabResponse(List.of(), reconciliations);
         }
 
         // 4. 귀속행들을 commissionTransactionId 기준으로 묶는다 — 지급 건 하나가
@@ -77,12 +85,6 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
                         .inclusionStatus(row.getInclusionStatus())
                         .inclusionStatusLabel(inclusionStatus.label())
                         .agentId(row.getAgentId())
-                        // 마스킹하지 않는다(코드리뷰 반영) — 화면정의서 §4-11 개인정보
-                        // 규칙은 "계약자" 전용이고 설계사명 마스킹 근거가 없다. 오히려
-                        // GET /api/v1/base/agents와 CONT-W03 "모집 설계사"는 agent_name을
-                        // 원문 그대로 노출한다 — 여기만 마스킹하면 같은 데이터가 화면마다
-                        // 다르게 보이는 불일치가 생긴다. 실제 마스킹 정책이 정해지면 그때
-                        // PersonalInfoMasker를 다시 적용한다.
                         .agentName(row.getAgentName())
                         .agentCode(row.getAgentCode())
                         .build());
@@ -93,12 +95,6 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
             CommissionPaymentStatus status = CommissionPaymentStatus.valueOf(first.getStatus());
             PaymentStage paymentStage = PaymentStage.valueOf(first.getPaymentStage());
 
-            // "귀속 합계와 지급 금액의 차액" — attributionTotal(이 계약 몫만)이 아니라
-            // transactionAttributedTotal(이 지급 건 전체, 계약 무관)을 amount와 비교해야
-            // 한다. 정착지원금·공통비처럼 지급 건 하나가 여러 계약에 나뉘어 귀속되는 게
-            // 정상이라, 이 계약 몫만으로 차액을 내면 정상 귀속 건도 큰 미귀속처럼
-            // 잘못 표시된다(코드리뷰 반영 — Mapper XML의 서브쿼리 주석 참고).
-            // 부호는 유지한다(초과/부족 방향을 화면에서 구분할 수 있게 abs()를 씌우지 않는다).
             BigDecimal differenceAmount = first.getAmount().subtract(first.getTransactionAttributedTotal());
 
             // 지급 건 + 귀속 합계 + 차액 + 귀속행 리스트를 하나의 응답으로 조립
@@ -117,7 +113,7 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
                     .build());
         }
 
-        // 6. 지급 건 등장 순서(Mapper 정렬 그대로) 그대로 반환
-        return result;
+        // 6. 지급 건 등장 순서(Mapper 정렬 그대로)와 대사 결과를 함께 반환
+        return new ContractTransactionTabResponse(result, reconciliations);
     }
 }
