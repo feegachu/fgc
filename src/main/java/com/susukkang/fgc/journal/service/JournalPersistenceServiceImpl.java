@@ -87,12 +87,7 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
             journalAccountIds.add(account.getJournalAccountId());
         }
 
-        // 3-1. 차변·대변 합계 검증(FGC-FUN-046 인수조건 — "차변합계와 대변합계가
-        // 일치하지 않으면 저장·확정이 거절된다") — 저장 시점부터 강제해야 한다. DB
-        // 트리거(guard_journal_header_write)는 POSTED 전환 시점에만 균형을 검사하므로
-        // (V1__baseline_v2_1_2.sql:1349-1356), DRAFT 저장 자체는 막지 못한다. #85
-        // JournalEntryDraftService가 만든 draft는 항상 균형이지만, saveDraft는 어떤
-        // JournalHeaderDraft든 받는 공개 API라 여기서도 검증해야 한다.
+        // 3-1. 차변·대변 합계 검증
         BigDecimal debitTotal = draft.getLines().stream()
                 .map(JournalLineDraft::getDebitAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal creditTotal = draft.getLines().stream()
@@ -154,10 +149,6 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
         String year = String.valueOf(draft.getJournalDate().getYear());
         String month = String.format("%02d", draft.getJournalDate().getMonthValue());
         int seq = journalMapper.findNextJournalSeq(year, month);
-        // String.format("%04d", seq)는 seq>=10000이어도 자르지 않고 자릿수를 그냥
-        // 늘려버린다 — "4자리 일련번호" 형식이 조용히 깨지는 걸 막기 위해 상한을 명시적으로
-        // 검사한다(#93 코드리뷰 반영). 월 1만 건은 정상 업무량을 크게 벗어나는 수치라
-        // 도달하면 채번 정책 자체를 재검토해야 하는 운영 이슈로 본다.
         if (seq > MAX_MONTHLY_SEQ) {
             throw new IllegalStateException(
                     "journal_no 월간 일련번호 상한(" + MAX_MONTHLY_SEQ + ") 초과 — year=" + year
