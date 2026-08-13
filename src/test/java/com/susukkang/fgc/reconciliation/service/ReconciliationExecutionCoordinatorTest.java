@@ -16,7 +16,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 
 /**
- * 설명 : 대사 실행 실패와 FAILED 상태 기록 실패의 예외 보존을 검증한다.
+ * FGC-FUN-048-04: 대사 실행 실패와 FAILED 상태 기록 실패의 예외 보존을 검증한다.
  *
  * @author hjKang
  * @since 2026-08-14
