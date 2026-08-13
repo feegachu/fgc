@@ -16,6 +16,7 @@
   <link rel="stylesheet" th:href="@{/css/common/layout.css}">
   <link rel="stylesheet" th:href="@{/css/common/components.css}">
   <link rel="stylesheet" th:href="@{/css/common/utilities.css}">
+  <link rel="stylesheet" th:href="@{/css/features/publishing.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-DASH-W01'}" th:href="@{/css/features/dashboard.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CONT-')}" th:href="@{/css/features/contract.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CAP-')}" th:href="@{/css/features/cap.css}">
@@ -32,6 +33,7 @@
   <div id="toast-region" class="toast-region" role="region" aria-label="알림" aria-live="polite"></div>
   <div id="modal-root"></div>
   <script th:src="@{/js/common/workspace-tabs.js}" defer></script>
+  <script th:src="@{/js/common/month-selector.js}" defer></script>
   <script th:src="@{/js/common/app-shell.js}" defer></script>
   <script th:src="@{/js/common/modal.js}" defer></script>
   <script th:src="@{/js/common/toast.js}" defer></script>

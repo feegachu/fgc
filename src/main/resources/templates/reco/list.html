@@ -22,7 +22,7 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-RECO-W01', '대사 실행·결과', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-reconciliation">
 
   <h1 class="fgc-page-title">대사 실행 · 결과</h1>
   <p class="fgc-page-desc">
@@ -77,7 +77,13 @@
 
   <!-- ② 실행 요약 — 대상·일치·불일치·일치율·차액 카드는 IF-API 연동 시 채운다 -->
   <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px"
-           id="summary-cards"></section>
+           id="summary-cards">
+    <div class="fgc-kpi"><div class="fgc-kpi__label">대상</div><div class="fgc-kpi__value">—</div></div>
+    <div class="fgc-kpi fgc-kpi--success"><div class="fgc-kpi__label">일치</div><div class="fgc-kpi__value">—</div></div>
+    <div class="fgc-kpi fgc-kpi--danger"><div class="fgc-kpi__label">불일치</div><div class="fgc-kpi__value">—</div></div>
+    <div class="fgc-kpi fgc-kpi--warning"><div class="fgc-kpi__label">일치율</div><div class="fgc-kpi__value">—</div></div>
+    <div class="fgc-kpi"><div class="fgc-kpi__label">차액 합계</div><div class="fgc-kpi__value">—</div></div>
+  </section>
 
   <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1fr;gap:16px">
 
@@ -85,7 +91,7 @@
     <section class="fgc-card">
       <div class="fgc-card__head">
         <span class="fgc-card__title">③ 대사 결과</span>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div class="publishing-inline-controls" style="display:flex;gap:8px;align-items:center">
           <label class="fgc-label" for="f-type" style="margin:0">결과 유형</label>
           <select class="fgc-select" id="f-type" style="padding:4px 8px"><option value="">전체 (11종)</option></select>
           <label style="display:flex;gap:4px;align-items:center;font-size:12px">
