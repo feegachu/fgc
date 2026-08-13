@@ -18,7 +18,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 설명 : 실제 PostgreSQL에서 GA→FC 대사 원천 필터와 매칭 결과를 검증
+ * 설명 : FGC-FUN-048-03 실제 PostgreSQL에서 GA→FC 대사 원천 필터와 매칭 결과를 검증
  *
  * @author yslee
  * @since 2026-08-13
@@ -74,6 +74,21 @@ class GaFcReconciliationIntegrationTest {
                 contractId, agentId, commissionItemId, "777000",
                 "CONFIRMED_PAYOUT_EXPENSE", "CONFIRMED_PAYOUT_PAYABLE");
 
+        // 2026-08-13 yslee - FGC-FUN-048-03 원천 조회 제외 조건 회귀 검증
+        // 기존 코드: DRAFT 지급 제외만 검증해 스케줄 활성·목적·지급단계 필터 회귀를 발견하지 못함
+        // 문제: 비활성·비운영 스케줄이나 다른 지급단계의 확정 건이 같은 매칭 그룹에 섞일 수 있음
+        // 개선: 각 제외 원천을 같은 키로 적재하고 결과 식별자에 포함되지 않는지 검증
+        Long inactiveScheduleLineId = insertSchedule(
+                contractId, policyVersionId, commissionItemId, agentId,
+                1, "888000", "OPERATIONAL", null, false, 901);
+        Long comparisonScheduleLineId = insertSchedule(
+                contractId, policyVersionId, commissionItemId, agentId,
+                1, "999000", "COMPARISON", "IT-048-03-COMPARISON", true, 902);
+        PaymentInsert insurerToGaConfirmed = insertPayment(
+                contractId, policyVersionId, commissionItemId, agentId,
+                1, "111000", "CONFIRMED", "INSURER-TO-GA-EXCLUDED",
+                "INSURER_TO_GA", "INSURER_STATEMENT");
+
         List<GaFcMatchCandidate> results = matcher.match(new ReconciliationExecutionRequest(
                 99L, 88L, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null));
 
@@ -83,8 +98,11 @@ class GaFcReconciliationIntegrationTest {
         assertThat(result.expectedAgentId()).isEqualTo(agentId);
         assertThat(result.actualAgentId()).isEqualTo(agentId);
         assertThat(result.scheduleLineIds()).containsExactly(scheduleLineId);
+        assertThat(result.scheduleLineIds())
+                .doesNotContain(inactiveScheduleLineId, comparisonScheduleLineId);
         assertThat(result.transactionAttributionIds()).containsExactly(confirmed.attributionId());
-        assertThat(result.transactionAttributionIds()).doesNotContain(draft.attributionId());
+        assertThat(result.transactionAttributionIds())
+                .doesNotContain(draft.attributionId(), insurerToGaConfirmed.attributionId());
         assertThat(result.expectedJournalHeaderIds()).containsExactly(expectedJournalId);
         assertThat(result.actualJournalHeaderIds()).containsExactly(actualJournalId);
     }
@@ -173,13 +191,32 @@ class GaFcReconciliationIntegrationTest {
             int installmentNo,
             String amount
     ) {
+        return insertSchedule(
+                contractId, policyVersionId, commissionItemId, agentId,
+                installmentNo, amount, "OPERATIONAL", null, true, 300 + installmentNo);
+    }
+
+    private Long insertSchedule(
+            Long contractId,
+            Long policyVersionId,
+            Long commissionItemId,
+            Long agentId,
+            int installmentNo,
+            String amount,
+            String schedulePurpose,
+            String scenarioCode,
+            boolean active,
+            int scheduleVersionNo
+    ) {
         Long headerId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.schedule_header (
                     contract_id, payment_stage, policy_version_id, schedule_version_no,
-                    schedule_purpose, schedule_regime, active_yn
-                ) VALUES (?, 'GA_TO_FC', ?, ?, 'OPERATIONAL', 'CURRENT', TRUE)
+                    schedule_purpose, scenario_code, schedule_regime, active_yn
+                ) VALUES (?, 'GA_TO_FC', ?, ?, ?, ?, 'CURRENT', ?)
                 RETURNING schedule_header_id
-                """, Long.class, contractId, policyVersionId, 300 + installmentNo);
+                """, Long.class,
+                contractId, policyVersionId, scheduleVersionNo,
+                schedulePurpose, scenarioCode, active);
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.schedule_line (
                     schedule_header_id, line_no, installment_no, contract_month_no, due_date,
@@ -203,14 +240,33 @@ class GaFcReconciliationIntegrationTest {
             String status,
             String suffix
     ) {
+        return insertPayment(
+                contractId, policyVersionId, commissionItemId, agentId,
+                installmentNo, amount, status, suffix,
+                "GA_TO_FC", "GA_MANUAL_PAYMENT");
+    }
+
+    private PaymentInsert insertPayment(
+            Long contractId,
+            Long policyVersionId,
+            Long commissionItemId,
+            Long agentId,
+            Integer installmentNo,
+            String amount,
+            String status,
+            String suffix,
+            String paymentStage,
+            String sourceType
+    ) {
         Long transactionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
                     payment_stage, source_type, source_business_key, source_contract_id,
                     recipient_agent_id, commission_item_id, policy_version_id, installment_no,
                     settlement_month, due_date, amount, cashflow_type, status
-                ) VALUES ('GA_TO_FC', 'GA_MANUAL_PAYMENT', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYMENT', 'DRAFT')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYMENT', 'DRAFT')
                 RETURNING commission_transaction_id
                 """, Long.class,
+                paymentStage, sourceType,
                 "IT-048-03:" + suffix, contractId, agentId, commissionItemId, policyVersionId,
                 installmentNo, TEST_MONTH, TEST_MONTH.plusDays(14), new BigDecimal(amount));
         Long attributionId = jdbcTemplate.queryForObject("""

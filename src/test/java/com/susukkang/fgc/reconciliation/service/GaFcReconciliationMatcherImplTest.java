@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 /**
- * 설명 : GA→FC 예상 스케줄·확정 지급 건 매칭 단위 테스트
+ * 설명 : FGC-FUN-048-03 GA→FC 예상 스케줄·확정 지급 건 매칭 단위 테스트
  *
  * @author yslee
  * @since 2026-08-13
@@ -163,6 +163,12 @@ class GaFcReconciliationMatcherImplTest {
         GaFcMatchCandidate result = matcher.match(request()).getFirst();
 
         assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        // 2026-08-13 yslee - 설계사 식별 불가 원인의 보조 사유 회귀 검증
+        // 기존 코드: REVIEW_REQUIRED 주 결과만 확인해 구체적인 검토 원인 소실을 발견하지 못함
+        // 문제: 후속 FUN-048-04 저장 단계에서 설계사 문제를 추적할 수 없음
+        // 개선: 보조 사유에 AGENT_MISMATCH가 남는지 함께 검증
+        assertThat(result.secondaryReasonCodes())
+                .containsExactly(ReconciliationResultType.AGENT_MISMATCH.name());
     }
 
     @Test

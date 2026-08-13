@@ -225,9 +225,11 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         } else if (expectedSources.size() > 1 || actualSources.size() > 1) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
         }
-        if (agentResolutionIssue) {
-            reasons.add(ReconciliationResultType.REVIEW_REQUIRED.name());
-        } else if (agentMismatch) {
+        // 2026-08-13 yslee - FGC-FUN-048-03 설계사 식별 불가 보조 사유 보존
+        // 기존 코드: 식별 불가 시 주 결과와 같은 REVIEW_REQUIRED를 보조 사유로 추가
+        // 문제: 주 결과와 같은 사유를 제거하는 후처리로 설계사 검토 사유가 사라짐
+        // 개선: 식별 불가와 명시적 불일치 모두 AGENT_MISMATCH를 보조 사유로 보존
+        if (agentResolutionIssue || agentMismatch) {
             reasons.add(ReconciliationResultType.AGENT_MISMATCH.name());
         }
         if (expectedSources.isEmpty()) {
