@@ -1,106 +1,149 @@
-<!DOCTYPE html>
-<!--
-  FGC-UI-SCHE-W01 예상 스케줄 목록
-  요구사항 FUN-036 · FUN-039 · FUN-040 / REG-01 · REG-19
-  데이터  읽기 schedule_header
-  API     GET /api/v1/schedules?contractNo=&stage=&regime=&status=&purpose=
-  라우트  GET /schedules → schedule/list.html
-
-  [막을 것] 한 계약 + 한 지급단계에 사용중인 운영 스케줄은 1개만 있어야 합니다.
-            2개가 보이면 데이터 오류입니다 (부분 UNIQUE 인덱스로 막습니다).
-  [주의] 기본 검색조건은 용도 = 운영(OPERATIONAL) 입니다.
-         비교·시뮬레이션용 스케줄이 섞여 나오면 담당자가 헷갈립니다.
-
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-SCHE-W01)의 정적 골격만 옮겼다.
-  데이터 영역(목록)은 IF-API-27 연동 시 서버 렌더링으로 채운다.
--->
-<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-SCHE-W01', '예상 스케줄 목록', null, null)}"
-      xmlns:th="http://www.thymeleaf.org">
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-SCHE-W01', '예상 스케줄 목록', null, null)}">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="page-content schedule-list-page">
+  <header class="page-header schedule-page-header">
+    <div class="page-header-copy">
+      <h1 class="page-title">예상 스케줄 목록</h1>
+      <p class="page-description">계약별 지급 방향과 적용 정책에 따라 생성된 예상 지급 계획을 조회합니다.</p>
+    </div>
+  </header>
 
-  <h1 class="fgc-page-title">예상 스케줄 목록</h1>
-  <p class="fgc-page-desc">
-    계약별로 "회차별로 언제 얼마를 줄 예정인지"를 적어 둔 표가 어디 있는지 찾습니다.
-  </p>
+  <aside class="schedule-guidance" aria-labelledby="schedule-guidance-title">
+    <span class="material-symbols-rounded" aria-hidden="true">gavel</span>
+    <div>
+      <h2 id="schedule-guidance-title">적용 체계는 계약 체결연도만으로 정하지 않습니다</h2>
+      <p>상품 판매개시일, 기초서류 버전과 판매채널을 함께 반영합니다. 운영 스케줄이 기본으로 조회되며 비교·시뮬레이션 스케줄은 용도를 선택해 구분합니다.</p>
+    </div>
+  </aside>
 
-  <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
-    <span class="material-symbols-outlined" style="font-size:18px">gavel</span>
-    <span>
-      <strong>적용 체계는 계약 체결연도만으로 정하지 않습니다.</strong>
-      상품 판매개시일 · 기초서류 버전 · 판매채널을 함께 보고 정합니다(REG-19).
-      1차에서 만드는 것은 <strong>현행 체계</strong>뿐이고,
-      4년 분급(2027~)·7년 분급(2029~)은 2차(FGC-UI-SCHE-W03)에서 같은 화면에 체계만 바꿔 붙입니다.
-    </span>
-  </div>
-
-  <!-- ① 검색 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__body fgc-toolbar">
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-no">계약번호</label>
-        <input class="fgc-input" id="f-no" type="text" placeholder="C001">
-      </div>
-      <div class="fgc-field" style="min-width:160px">
-        <label class="fgc-label" for="f-stage">지급단계</label>
-        <select class="fgc-select" id="f-stage"><option value="">전체</option>
+  <form class="surface schedule-filter-card" method="get" action="/schedules" data-schedule-filter-form>
+    <input type="hidden" name="month" th:value="${month}">
+    <header class="schedule-section-header">
+      <h2 class="surface-title">검색 조건</h2>
+      <button class="button button-ghost schedule-reset-button" type="reset" data-schedule-filter-reset>초기화</button>
+    </header>
+    <div class="schedule-filter-grid">
+      <label class="field">
+        <span class="field-label">계약번호</span>
+        <input class="field-control" type="search" name="contractNo" placeholder="계약번호 입력" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">지급단계</span>
+        <select class="select-control" name="stage">
+          <option value="">전체</option>
           <option value="INSURER_TO_GA">원수사→GA</option>
           <option value="GA_TO_FC">GA→설계사</option>
         </select>
-      </div>
-      <div class="fgc-field" style="min-width:160px">
-        <label class="fgc-label" for="f-regime">적용 체계</label>
-        <!-- 적용 체계 선택지는 IF-API-27 연동 시 코드 테이블로 채운다 -->
-        <select class="fgc-select" id="f-regime"><option value="">전체</option></select>
-      </div>
-      <div class="fgc-field" style="min-width:140px">
-        <label class="fgc-label" for="f-purpose">용도</label>
-        <select class="fgc-select" id="f-purpose">
-          <option value="OPERATIONAL">운영 (기본)</option>
+      </label>
+      <label class="field">
+        <span class="field-label">적용 체계</span>
+        <select class="select-control" name="regime">
           <option value="">전체</option>
+          <option value="CURRENT">현행</option>
+          <option value="FOUR_YEAR_2027">4년 분급(2027)</option>
+          <option value="SEVEN_YEAR_2029">7년 분급(2029)</option>
+          <option value="TM_SPECIAL">TM 특례</option>
         </select>
-      </div>
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-status">상태</label>
-        <!-- 상태 선택지는 IF-API-27 연동 시 코드 테이블로 채운다 -->
-        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
-      </div>
-      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
-        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </label>
+      <label class="field">
+        <span class="field-label">용도</span>
+        <select class="select-control" name="purpose">
+          <option value="OPERATIONAL" selected>운영</option>
+          <option value="COMPARISON">비교</option>
+          <option value="SIMULATION">시뮬레이션</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">상태</span>
+        <select class="select-control" name="status">
+          <option value="">전체</option>
+          <option value="PLANNED">예정</option>
+          <option value="CONFIRMED">확정</option>
+          <option value="MATCHED">대사일치</option>
+          <option value="ADJUSTED">조정완료</option>
+          <option value="HOLD">보류</option>
+          <option value="CANCELLED">취소</option>
+          <option value="RESTARTED">재개</option>
+        </select>
+      </label>
+    </div>
+    <div class="schedule-filter-actions">
+      <button class="button button-primary" type="submit">
+        <span class="material-symbols-rounded" aria-hidden="true">search</span>
+        조회
       </button>
     </div>
-  </section>
+  </form>
 
-  <!-- ② 목록 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__head">
-      <span class="fgc-card__title">스케줄</span>
-      <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+  <section class="surface schedule-results-card" aria-labelledby="schedule-results-title">
+    <header class="surface-header schedule-results-header">
+      <h2 id="schedule-results-title" class="surface-title">스케줄</h2>
+      <p class="schedule-result-summary" aria-live="polite">
+        <strong data-schedule-result-count>0</strong>건 · 한 화면 <span data-schedule-page-size>20</span>행
+      </p>
+    </header>
+
+    <div class="schedule-data-warning" role="alert" data-schedule-data-warning hidden>
+      <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+      <p>같은 계약과 지급단계에 사용 중인 운영 스케줄이 중복되었습니다. 데이터 확인이 필요합니다.</p>
     </div>
-    <div style="overflow-x:auto">
-      <table class="fgc-table" style="min-width:1080px">
+
+    <div class="data-table-viewport schedule-table-viewport">
+      <table class="data-table schedule-table" aria-describedby="schedule-results-title" data-schedule-table aria-busy="true">
+        <caption class="visually-hidden">예상 지급 스케줄 검색 결과</caption>
+        <colgroup>
+          <col class="schedule-col-contract">
+          <col class="schedule-col-stage">
+          <col class="schedule-col-regime">
+          <col class="schedule-col-purpose">
+          <col class="schedule-col-version">
+          <col class="schedule-col-status">
+          <col class="schedule-col-active">
+          <col class="schedule-col-lines">
+          <col class="schedule-col-total">
+          <col class="schedule-col-policy">
+          <col class="schedule-col-action">
+        </colgroup>
         <thead>
-          <tr>
-            <th style="width:74px">계약번호</th>
-            <th style="width:104px">지급단계</th>
-            <th style="width:120px">적용 체계</th>
-            <th style="width:96px">용도</th>
-            <th style="width:56px">버전</th>
-            <th style="width:96px">상태</th>
-            <th style="width:70px">사용중</th>
-            <th class="fgc-th-num" style="width:70px">회차 수</th>
-            <th class="fgc-th-num" style="width:110px">예상 총액</th>
-            <th style="width:190px">정책버전</th>
-            <th style="width:80px"></th>
-          </tr>
+        <tr>
+          <th scope="col">계약번호</th>
+          <th scope="col">지급단계</th>
+          <th scope="col">적용 체계</th>
+          <th scope="col">용도</th>
+          <th scope="col" class="is-center">버전</th>
+          <th scope="col" class="is-center">상태</th>
+          <th scope="col" class="is-center">사용중</th>
+          <th scope="col" class="is-number">회차 수</th>
+          <th scope="col" class="is-number">예상 총액</th>
+          <th scope="col">정책버전</th>
+          <th scope="col" class="is-center">상세</th>
+        </tr>
         </thead>
-        <tbody id="list-body">
-          <tr><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        <tbody data-schedule-list-body>
+        <tr class="schedule-state-row">
+          <td colspan="11">
+            <div class="schedule-initial-state" role="status">스케줄을 불러오는 중입니다.</div>
+          </td>
+        </tr>
         </tbody>
       </table>
     </div>
-  </section>
 
+    <nav class="schedule-pagination" aria-label="예상 스케줄 목록 페이지" data-schedule-pagination hidden>
+      <span><span data-schedule-current-page>1</span> / <span data-schedule-total-pages>1</span> 페이지</span>
+      <div class="pagination-controls">
+        <button class="pagination-button" type="button" aria-label="이전 페이지" data-schedule-page-prev>
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+        </button>
+        <span class="pagination-button is-active" aria-current="page" data-schedule-page-number>1</span>
+        <button class="pagination-button" type="button" aria-label="다음 페이지" data-schedule-page-next>
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+        </button>
+      </div>
+    </nav>
+  </section>
 </main>
 </body>
 </html>
