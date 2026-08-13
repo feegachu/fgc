@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.validation.mapper.ValidationTargetSelectionMapper">
+
+    <insert id="insertTargets">
+        INSERT INTO validation_target (
+            validation_run_id,
+            contract_id,
+            product_offering_id,
+            refund_rate_table_id,
+            selection_status,
+            selection_reason,
+            snapshot
+        )
+        SELECT
+            #{validationRunId},
+            ic.contract_id,
+            ic.product_offering_id,
+            rrt.refund_rate_table_id,
+            CASE
+                WHEN rrt.refund_rate_table_id IS NULL THEN 'REVIEW_REQUIRED'
+                ELSE 'SELECTED'
+            END,
+            CASE
+                WHEN rrt.refund_rate_table_id IS NULL THEN '예상 해약환급률표 없음'
+                ELSE '월 통합검증 대상'
+            END,
+            jsonb_build_object(
+                'validationMonth', #{validationMonth},
+                'contractDate', ic.contract_date,
+                'contractStatus', ic.current_status,
+                'insurerId', ic.insurer_id,
+                'paymentTermMonths', ic.payment_term_months,
+                'channelCode', po.channel_code
+            )
+        FROM insurance_contract ic
+        JOIN product_offering po
+          ON po.product_offering_id = ic.product_offering_id
+        LEFT JOIN refund_rate_table rrt
+          ON rrt.insurer_id = ic.insurer_id
+         AND rrt.product_id = po.product_id
+         AND rrt.payment_term_months = ic.payment_term_months
+         AND rrt.channel_code = po.channel_code
+         AND rrt.effective_from <![CDATA[ <= ]]> #{validationMonth}
+         AND (
+             rrt.effective_to IS NULL
+             OR rrt.effective_to <![CDATA[ >= ]]> #{validationMonth}
+         )
+        WHERE ic.current_status = 'ACTIVE'
+          AND ic.contract_date <![CDATA[ <= ]]> #{validationMonth}
+        ON CONFLICT (validation_run_id, contract_id)
+        DO NOTHING
+    </insert>
+
+</mapper>
