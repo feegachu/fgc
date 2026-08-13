@@ -22,4 +22,15 @@ public enum PolicyStatus {
             case RETIRED -> "종료";
         };
     }
+
+    /** POL-W01 상태 배지 (목업 fgc-seed 매핑 그대로). */
+    public String badgeClass() {
+        return switch (this) {
+            case DRAFT -> "fgc-badge--neutral";
+            case REVIEW -> "fgc-badge--progress";
+            case APPROVED -> "fgc-badge--warning";
+            case ACTIVE -> "fgc-badge--normal";
+            case RETIRED -> "fgc-badge--review";
+        };
+    }
 }
