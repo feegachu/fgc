@@ -146,4 +146,266 @@
             cr.commission_rule_id ASC
     </select>
 
+
+    <!-- ================================================================
+         이하 IF-API-09·10 조회 전용 (FGC-FUN-012·013, POL-W01)
+         SQL 은 08_화면별_SQL_쿡북 4-3장 기반.
+         쿡북 대비 보정: asOf 유효기간 술어 추가(화면정의서 POL-W01),
+         policy_version_id 추가(상세 링크), 환급률표 조회 신규.
+         ================================================================ -->
+
+    <!-- 정책 버전 목록·상세 헤더 매핑. text[] 컬럼은 읽기 전용 TypeHandler 로 List 변환 -->
+    <resultMap id="policyVersionRowMap"
+               type="com.susukkang.fgc.policy.dto.PolicyVersionRow">
+        <id property="policyVersionId" column="policy_version_id"/>
+        <result property="policyCode" column="policy_code"/>
+        <result property="policyName" column="policy_name"/>
+        <result property="policyType" column="policy_type"/>
+        <result property="sourceClass" column="source_class"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="status" column="status"/>
+        <result property="effectiveFrom" column="effective_from"/>
+        <result property="effectiveTo" column="effective_to"/>
+        <result property="regulationRefs" column="regulation_refs"
+                typeHandler="com.susukkang.fgc.policy.mapper.TextArrayTypeHandler"/>
+        <result property="sourceRefs" column="source_refs"
+                typeHandler="com.susukkang.fgc.policy.mapper.TextArrayTypeHandler"/>
+        <result property="createdBy" column="created_by_login"/>
+        <result property="approvedBy" column="approved_by_login"/>
+        <result property="approvedAt" column="approved_at"/>
+    </resultMap>
+
+    <sql id="policyVersionColumns">
+        pv.policy_version_id,
+        pv.policy_code,
+        pv.policy_name,
+        pv.policy_type,
+        pv.source_class,
+        pv.version_no,
+        pv.status,
+        pv.effective_from,
+        pv.effective_to,
+        pv.regulation_refs,
+        pv.source_refs,
+        cb.login_id AS created_by_login,
+        ab.login_id AS approved_by_login,
+        pv.approved_at
+    </sql>
+
+    <!-- IF-API-09: 정책 버전 목록. 필터 3개 전부 선택 -->
+    <select id="selectPolicyVersions" resultMap="policyVersionRowMap">
+        SELECT
+            <include refid="policyVersionColumns"/>
+        FROM
+            fgc.policy_version pv
+        LEFT JOIN
+            fgc.app_user cb ON cb.user_id = pv.created_by
+        LEFT JOIN
+            fgc.app_user ab ON ab.user_id = pv.approved_by
+        <where>
+            <if test="type != null">
+                AND pv.policy_type = #{type}
+            </if>
+            <if test="status != null">
+                AND pv.status = #{status}
+            </if>
+            <!-- 기준일 필터 — 화면정의서 POL-W01: 정책은 "오늘"이 아니라 계약일 기준으로 고르는 경우가 많다 -->
+            <if test="asOf != null">
+                AND pv.effective_from <![CDATA[ <= ]]> #{asOf}
+                AND (pv.effective_to IS NULL OR pv.effective_to <![CDATA[ >= ]]> #{asOf})
+            </if>
+        </where>
+        ORDER BY
+            pv.policy_code,
+            pv.version_no
+    </select>
+
+    <!-- IF-API-10: 정책 버전 상세 헤더 1건 -->
+    <select id="selectPolicyVersionById" resultMap="policyVersionRowMap">
+        SELECT
+            <include refid="policyVersionColumns"/>
+        FROM
+            fgc.policy_version pv
+        LEFT JOIN
+            fgc.app_user cb ON cb.user_id = pv.created_by
+        LEFT JOIN
+            fgc.app_user ab ON ab.user_id = pv.approved_by
+        WHERE
+            pv.policy_version_id = #{policyVersionId}
+    </select>
+
+    <!-- 수수료 규칙 탭 매핑 -->
+    <resultMap id="commissionRuleRowMap"
+               type="com.susukkang.fgc.policy.dto.CommissionRuleRow">
+        <id property="commissionRuleId" column="commission_rule_id"/>
+        <result property="paymentStage" column="payment_stage"/>
+        <result property="insurerName" column="insurer_name"/>
+        <result property="productName" column="product_name"/>
+        <result property="agentRankCode" column="agent_rank_code"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="feeComponentType" column="fee_component_type"/>
+        <result property="installmentFrom" column="installment_from"/>
+        <result property="installmentTo" column="installment_to"/>
+        <result property="calculationType" column="calculation_type"/>
+        <result property="basisCode" column="basis_code"/>
+        <result property="ratePct" column="rate_pct"/>
+        <result property="fixedAmount" column="fixed_amount"/>
+        <result property="priorityNo" column="priority_no"/>
+    </resultMap>
+
+    <!-- IF-API-10: 수수료 규칙 탭. 보험사·상품이 NULL 이면 전체 적용 규칙 -->
+    <select id="selectCommissionRules" resultMap="commissionRuleRowMap">
+        SELECT
+            cr.commission_rule_id,
+            cr.payment_stage,
+            i.insurer_name,
+            p.product_name,
+            cr.agent_rank_code,
+            ci.item_code,
+            ci.item_name,
+            cr.fee_component_type,
+            cr.installment_from,
+            cr.installment_to,
+            cr.calculation_type,
+            cr.basis_code,
+            cr.rate_pct,
+            cr.fixed_amount,
+            cr.priority_no
+        FROM
+            fgc.commission_rule cr
+        JOIN
+            fgc.commission_item ci ON ci.commission_item_id = cr.commission_item_id
+        LEFT JOIN
+            fgc.insurer i ON i.insurer_id = cr.insurer_id
+        LEFT JOIN
+            fgc.product_offering po ON po.product_offering_id = cr.product_offering_id
+        LEFT JOIN
+            fgc.product p ON p.product_id = po.product_id
+        WHERE
+            cr.policy_version_id = #{policyVersionId}
+        ORDER BY
+            cr.payment_stage,
+            cr.installment_from,
+            cr.rate_pct DESC NULLS LAST,
+            cr.commission_rule_id
+    </select>
+
+    <!-- 1,200% 룰셋 탭 매핑 — 룰셋 1행에 항목 판정 N행 중첩 -->
+    <resultMap id="capRuleSetRowMap"
+               type="com.susukkang.fgc.policy.dto.CapRuleSetRow">
+        <id property="capRuleSetId" column="cap_rule_set_id"/>
+        <result property="paymentStage" column="payment_stage"/>
+        <result property="contractDateFrom" column="contract_date_from"/>
+        <result property="contractDateTo" column="contract_date_to"/>
+        <result property="firstYearMonths" column="first_year_months"/>
+        <result property="premiumMultiplier" column="premium_multiplier"/>
+        <result property="complianceDeductionPct" column="compliance_deduction_pct"/>
+        <result property="refundAdditionCondition" column="refund_addition_condition"/>
+        <result property="warningUsagePct" column="warning_usage_pct"/>
+        <collection property="items"
+                    ofType="com.susukkang.fgc.policy.dto.CapRuleItemRow">
+            <id property="capRuleItemId" column="cap_rule_item_id"/>
+            <result property="itemCode" column="item_code"/>
+            <result property="itemName" column="item_name"/>
+            <result property="inclusionStatus" column="inclusion_status"/>
+            <result property="exclusionType" column="exclusion_type"/>
+            <result property="evidenceRequiredYn" column="evidence_required_yn"/>
+            <result property="attributionMethod" column="attribution_method"/>
+            <result property="decisionReason" column="decision_reason"/>
+        </collection>
+    </resultMap>
+
+    <!-- IF-API-10: 1,200% 룰셋 탭. 정책버전당 지급단계·적용범위별 복수 룰셋 가능 -->
+    <select id="selectCapRuleSets" resultMap="capRuleSetRowMap">
+        SELECT
+            crs.cap_rule_set_id,
+            crs.payment_stage,
+            crs.contract_date_from,
+            crs.contract_date_to,
+            crs.first_year_months,
+            crs.premium_multiplier,
+            crs.compliance_deduction_pct,
+            crs.refund_addition_condition,
+            crs.warning_usage_pct,
+            cri.cap_rule_item_id,
+            ci.item_code,
+            ci.item_name,
+            cri.inclusion_status,
+            cri.exclusion_type,
+            cri.evidence_required_yn,
+            cri.attribution_method,
+            cri.decision_reason
+        FROM
+            fgc.cap_rule_set crs
+        LEFT JOIN
+            fgc.cap_rule_item cri ON cri.cap_rule_set_id = crs.cap_rule_set_id
+        LEFT JOIN
+            fgc.commission_item ci ON ci.commission_item_id = cri.commission_item_id
+        WHERE
+            crs.policy_version_id = #{policyVersionId}
+        ORDER BY
+            crs.payment_stage,
+            crs.cap_rule_set_id,
+            ci.item_code
+    </select>
+
+    <!-- 예상 해약환급률표 탭 매핑 — 표 1행에 차월 라인 N행 중첩 -->
+    <resultMap id="refundRateTableRowMap"
+               type="com.susukkang.fgc.policy.dto.RefundRateTableRow">
+        <id property="refundRateTableId" column="refund_rate_table_id"/>
+        <result property="insurerName" column="insurer_name"/>
+        <result property="productName" column="product_name"/>
+        <result property="paymentTermMonths" column="payment_term_months"/>
+        <result property="channelCode" column="channel_code"/>
+        <result property="averageDeclaredRatePct" column="average_declared_rate_pct"/>
+        <result property="standardDeduction80Yn" column="standard_deduction_80_yn"/>
+        <result property="effectiveFrom" column="effective_from"/>
+        <result property="effectiveTo" column="effective_to"/>
+        <result property="sourceProductCode" column="source_product_code"/>
+        <result property="sourceDocumentRef" column="source_document_ref"/>
+        <collection property="lines"
+                    ofType="com.susukkang.fgc.policy.dto.RefundRateLineRow">
+            <id property="contractMonthNo" column="contract_month_no"/>
+            <result property="refundRatePct" column="refund_rate_pct"/>
+        </collection>
+    </resultMap>
+
+    <!--
+        IF-API-10: 예상 해약환급률표 탭.
+        조인은 보험사·상품·납입기간·채널 기준 — product_offering_id 는 대표 예시라 조인에 쓰지 않는다(쿡북).
+    -->
+    <select id="selectRefundRateTables" resultMap="refundRateTableRowMap">
+        SELECT
+            rrt.refund_rate_table_id,
+            i.insurer_name,
+            p.product_name,
+            rrt.payment_term_months,
+            rrt.channel_code,
+            rrt.average_declared_rate_pct,
+            rrt.standard_deduction_80_yn,
+            rrt.effective_from,
+            rrt.effective_to,
+            rrt.source_product_code,
+            rrt.source_document_ref,
+            rrl.contract_month_no,
+            rrl.refund_rate_pct
+        FROM
+            fgc.refund_rate_table rrt
+        JOIN
+            fgc.insurer i ON i.insurer_id = rrt.insurer_id
+        JOIN
+            fgc.product p ON p.product_id = rrt.product_id
+        LEFT JOIN
+            fgc.refund_rate_line rrl ON rrl.refund_rate_table_id = rrt.refund_rate_table_id
+        WHERE
+            rrt.policy_version_id = #{policyVersionId}
+        ORDER BY
+            i.insurer_name,
+            p.product_name,
+            rrt.payment_term_months,
+            rrt.refund_rate_table_id,
+            rrl.contract_month_no
+    </select>
+
 </mapper>

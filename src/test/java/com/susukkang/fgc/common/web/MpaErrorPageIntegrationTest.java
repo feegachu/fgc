@@ -63,7 +63,7 @@ class MpaErrorPageIntegrationTest {
                 // 자리표시자가 그대로 남아 있으면 치환이 안 된 것이다.
                 // 템플릿 주석에도 {requestId} 가 나오므로 문장째로 본다.
                 .doesNotContain("요청번호 {requestId}")
-                .contains("교육용 프로토타입입니다");           // 셸까지 끝까지 렌더링됨
+                .contains("수수료 정산·검증 Workspace");         // 셸까지 끝까지 렌더링됨
     }
 
     @Test
@@ -74,7 +74,7 @@ class MpaErrorPageIntegrationTest {
         assertThat(response.headers().firstValue("Content-Type").orElse("")).startsWith("text/html");
         assertThat(response.body())
                 .contains("404 · 찾을 수 없음")                    // error/404.html
-                .contains("교육용 프로토타입입니다")                  // 셸 레이아웃까지 렌더링됨
+                .contains("수수료 정산·검증 Workspace")              // 셸 레이아웃까지 렌더링됨
                 .doesNotContain("FGC-COMMON-004");                // JSON 봉투가 아니다
     }
 }
