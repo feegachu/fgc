@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -65,6 +66,32 @@ class ReconciliationBatchAdapterTest {
 
         assertThat(result.processedCount()).isEqualTo(5);
         assertThat(result.failureCount()).isZero();
+    }
+
+    @Test
+    void 보험회사별_데이터오류는_선택계약을_skip하고_다음_보험사를_계속_처리한다() {
+        ValidationStepContext context = context();
+        ReconciliationExecutionRequest failed = request(11L, 101L);
+        ReconciliationExecutionRequest next = request(12L, 102L);
+        given(batchRunService.prepare(context, PaymentStage.GA_TO_FC))
+                .willReturn(List.of(failed, next));
+        given(executionCoordinator.execute(failed))
+                .willThrow(new DataIntegrityViolationException("원천 데이터 오류"));
+        given(batchRunService.findSelectedContractIds(77L, 101L))
+                .willReturn(List.of(1001L, 1002L));
+        given(executionCoordinator.execute(next)).willReturn(3L);
+
+        StepProcessingResult result = adapter.reconcile(context, PaymentStage.GA_TO_FC);
+
+        assertThat(result.processedCount()).isEqualTo(3);
+        assertThat(result.skippedCount()).isEqualTo(2);
+        assertThat(result.failureCount()).isZero();
+        assertThat(result.skips())
+                .extracting(skip -> skip.contractId() + ":" + skip.reasonCode())
+                .containsExactly(
+                        "1001:RECONCILIATION_FAILED",
+                        "1002:RECONCILIATION_FAILED");
+        verify(executionCoordinator).execute(next);
     }
 
     @Test

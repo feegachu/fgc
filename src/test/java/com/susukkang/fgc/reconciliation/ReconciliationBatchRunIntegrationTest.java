@@ -61,7 +61,7 @@ class ReconciliationBatchRunIntegrationTest {
         Long userId = jdbcTemplate.queryForObject(
                 "SELECT user_id FROM fgc.app_user WHERE login_id = 'settle01'", Long.class);
         ContractTarget target = jdbcTemplate.queryForObject("""
-                SELECT contract.contract_id, contract.product_offering_id
+                SELECT contract.contract_id, contract.product_offering_id, contract.insurer_id
                   FROM fgc.insurance_contract contract
                   JOIN fgc.insurer insurer ON insurer.insurer_id = contract.insurer_id
                  WHERE insurer.active_yn = TRUE
@@ -69,7 +69,8 @@ class ReconciliationBatchRunIntegrationTest {
                  LIMIT 1
                 """, (resultSet, rowNum) -> new ContractTarget(
                 resultSet.getLong("contract_id"),
-                resultSet.getLong("product_offering_id")));
+                resultSet.getLong("product_offering_id"),
+                resultSet.getLong("insurer_id")));
         int runNo = Math.abs(UUID.randomUUID().hashCode() % 1_000_000) + 100_000;
         validationRunId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (
@@ -89,6 +90,8 @@ class ReconciliationBatchRunIntegrationTest {
                     validation_run_id, contract_id, product_offering_id, selection_status
                 ) VALUES (?, ?, ?, 'SELECTED')
                 """, validationRunId, target.contractId(), target.productOfferingId());
+        assertThat(batchRunService.findSelectedContractIds(validationRunId, target.insurerId()))
+                .containsExactly(target.contractId());
 
         ValidationStepContext context = new ValidationStepContext(
                 validationRunId,
@@ -137,6 +140,6 @@ class ReconciliationBatchRunIntegrationTest {
         }, executor);
     }
 
-    private record ContractTarget(Long contractId, Long productOfferingId) {
+    private record ContractTarget(Long contractId, Long productOfferingId, Long insurerId) {
     }
 }

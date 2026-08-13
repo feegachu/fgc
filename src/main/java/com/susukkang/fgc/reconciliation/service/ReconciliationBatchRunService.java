@@ -63,6 +63,11 @@ public class ReconciliationBatchRunService {
         return List.copyOf(requests);
     }
 
+    @Transactional(readOnly = true)
+    public List<Long> findSelectedContractIds(Long validationRunId, Long insurerId) {
+        return List.copyOf(reconciliationRunMapper.findSelectedContractIds(validationRunId, insurerId));
+    }
+
     private static ReconciliationExecutionRequest request(
             ValidationStepContext context,
             PaymentStage paymentStage,

@@ -103,6 +103,20 @@
          ORDER BY contract.insurer_id
     </select>
 
+    <select id="findSelectedContractIds" resultType="long">
+        SELECT target.contract_id
+          FROM fgc.validation_target target
+          JOIN fgc.insurance_contract contract
+            ON contract.contract_id = target.contract_id
+          JOIN fgc.insurer insurer
+            ON insurer.insurer_id = contract.insurer_id
+         WHERE target.validation_run_id = #{validationRunId}
+           AND target.selection_status = 'SELECTED'
+           AND contract.insurer_id = #{insurerId}
+           AND insurer.active_yn = TRUE
+         ORDER BY target.contract_id
+    </select>
+
     <!-- 같은 validation_run의 Step 7 준비를 직렬화해 RUNNING 실행의 중복 소유를 막는다. -->
     <select id="lockValidationRun" resultType="long">
         SELECT validation_run_id

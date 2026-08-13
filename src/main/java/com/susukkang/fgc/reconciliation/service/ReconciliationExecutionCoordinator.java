@@ -22,7 +22,11 @@ public class ReconciliationExecutionCoordinator {
         try {
             return executionService.execute(request);
         } catch (RuntimeException exception) {
-            failureRecorder.record(request.reconciliationRunId());
+            try {
+                failureRecorder.record(request.reconciliationRunId());
+            } catch (RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
             throw exception;
         }
     }
