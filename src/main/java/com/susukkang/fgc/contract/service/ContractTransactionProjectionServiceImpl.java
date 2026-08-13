@@ -5,7 +5,6 @@ import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
-import com.susukkang.fgc.common.util.PersonalInfoMasker;
 import com.susukkang.fgc.contract.dto.ContractTransactionAttributionResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionAttributionRow;
 import com.susukkang.fgc.contract.dto.ContractTransactionResponse;
@@ -78,7 +77,13 @@ public class ContractTransactionProjectionServiceImpl implements ContractTransac
                         .inclusionStatus(row.getInclusionStatus())
                         .inclusionStatusLabel(inclusionStatus.label())
                         .agentId(row.getAgentId())
-                        .agentName(PersonalInfoMasker.maskName(row.getAgentName()))
+                        // 마스킹하지 않는다(코드리뷰 반영) — 화면정의서 §4-11 개인정보
+                        // 규칙은 "계약자" 전용이고 설계사명 마스킹 근거가 없다. 오히려
+                        // GET /api/v1/base/agents와 CONT-W03 "모집 설계사"는 agent_name을
+                        // 원문 그대로 노출한다 — 여기만 마스킹하면 같은 데이터가 화면마다
+                        // 다르게 보이는 불일치가 생긴다. 실제 마스킹 정책이 정해지면 그때
+                        // PersonalInfoMasker를 다시 적용한다.
+                        .agentName(row.getAgentName())
                         .agentCode(row.getAgentCode())
                         .build());
                 attributionTotal = attributionTotal.add(row.getAttributedAmount());

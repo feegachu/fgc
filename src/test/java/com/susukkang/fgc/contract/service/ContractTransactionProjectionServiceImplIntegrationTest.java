@@ -53,7 +53,7 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
     }
 
     @Test
-    void seededTransactionsAreGroupedWithFullyAttributedZeroDifferenceAndMaskedAgentNames() {
+    void seededTransactionsAreGroupedWithFullyAttributedZeroDifferenceAndUnmaskedAgentNames() {
         Long contractId = contractId("FGC-FGL01-202607-0001");
 
         List<ContractTransactionResponse> result =
@@ -70,12 +70,12 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
             assertThat(r.getDifferenceAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         });
 
-        // 시드 설계사 이름(김정산·정팀장·한지사·서본부)이 원문 그대로 노출되면 안 된다 —
-        // PersonalInfoMasker.maskName()을 거쳐야 한다("홍길동" 규칙과 같은 첫+*+끝 형태).
+        // 설계사명은 마스킹하지 않는다(코드리뷰 반영 — 화면정의서에 설계사명 마스킹
+        // 근거가 없고, 다른 화면(agents API·CONT-W03)은 원문을 그대로 노출한다).
+        // 시드 이름 중 하나(김정산)가 원문 그대로 나오는지 확인.
         assertThat(result).flatExtracting(ContractTransactionResponse::getAttributions)
                 .extracting("agentName")
-                .allSatisfy(name -> assertThat((String) name)
-                        .doesNotContain("김정산", "정팀장", "한지사", "서본부"));
+                .contains("김정산");
     }
 
     @Test
