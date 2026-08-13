@@ -4,8 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * journal_account 1행 조회 결과(#93). JournalAccountCode(enum, #85)로 활성 계정과목을
- * 찾을 때 쓴다 — journalAccountId가 journal_line.journal_account_id FK에 들어간다.
+ * journal_account 1행 조회 결과(#93). JournalAccountCode로 활성 계정과목을 찾을 때 씀
  */
 @Getter
 @Setter
