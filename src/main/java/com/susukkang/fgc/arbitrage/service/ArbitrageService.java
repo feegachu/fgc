@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.SurrenderValueSourceType;
 import com.susukkang.fgc.common.code.ValidationRunType;
@@ -250,9 +251,32 @@ public class ArbitrageService {
                     REGULATORY_PAYMENT_STAGE.name(),
                     decision.reason()
             );
+        } else if (row.getResultStatus() == ArbitrageCheckStatus.REVIEW_REQUIRED) {
+            ExceptionType exceptionType = reviewExceptionType(decision.reason());
+            exceptionCaseMapper.insertArbitrageReviewCase(
+                    exceptionType.name(),
+                    validationRunId,
+                    contractId,
+                    row.getArbitrageCheckId(),
+                    REGULATORY_PAYMENT_STAGE.name(),
+                    "차익거래 검증 자료 확인 필요",
+                    decision.reason()
+            );
         }
 
         return row;
+    }
+
+    private ExceptionType reviewExceptionType(String reason) {
+        if (reason == null)
+            return ExceptionType.DATA_QUALITY;
+        if (reason.contains("환급률표 후보가 없습니다") || reason.contains("환급률표 ID가 없습니다"))
+            return ExceptionType.REFUND_TABLE_MISSING;
+        if (reason.contains("상품코드") || reason.contains("환급률표가 일치하지 않습니다"))
+            return ExceptionType.PRODUCT_CODE_MISMATCH;
+        if (reason.contains("여러 건"))
+            return ExceptionType.POLICY_DUPLICATE;
+        return ExceptionType.DATA_QUALITY;
     }
 
     private CalculationDecision calculateDecision(

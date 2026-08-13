@@ -28,4 +28,14 @@ public interface ExceptionCaseMapper {
             @Param("arbitrageCheckId") Long arbitrageCheckId,
             @Param("paymentStage") String paymentStage,
             @Param("description") String description);
+
+    /** 차익거래 검증의 자료 부족·정합성 오류를 검토 예외로 생성한다. */
+    int insertArbitrageReviewCase(
+            @Param("exceptionType") String exceptionType,
+            @Param("validationRunId") Long validationRunId,
+            @Param("contractId") Long contractId,
+            @Param("arbitrageCheckId") Long arbitrageCheckId,
+            @Param("paymentStage") String paymentStage,
+            @Param("title") String title,
+            @Param("description") String description);
 }

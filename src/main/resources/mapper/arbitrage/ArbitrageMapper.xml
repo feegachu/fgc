@@ -278,6 +278,21 @@
             #{resultStatus},
             #{calculationSnapshot}::jsonb
         )
+        ON CONFLICT ON CONSTRAINT uq_arbitrage_check
+        DO UPDATE SET
+            contract_month_no = EXCLUDED.contract_month_no,
+            cumulative_paid_premium = EXCLUDED.cumulative_paid_premium,
+            paid_commission_amount = EXCLUDED.paid_commission_amount,
+            planned_commission_amount = EXCLUDED.planned_commission_amount,
+            included_surrender_value_amount = EXCLUDED.included_surrender_value_amount,
+            refund_addition_applied_yn = EXCLUDED.refund_addition_applied_yn,
+            surrender_value_source_type = EXCLUDED.surrender_value_source_type,
+            net_difference_amount = EXCLUDED.net_difference_amount,
+            refund_rate_table_id = EXCLUDED.refund_rate_table_id,
+            standard_deduction_80_yn = EXCLUDED.standard_deduction_80_yn,
+            result_status = EXCLUDED.result_status,
+            calculation_snapshot = EXCLUDED.calculation_snapshot
+        RETURNING arbitrage_check_id
     </insert>
 
     <!-- 계약 상세 화면에서 지급단계별 기준일 시계열을 조회한다. -->

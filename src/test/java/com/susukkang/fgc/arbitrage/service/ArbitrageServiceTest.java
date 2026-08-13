@@ -130,6 +130,10 @@ class ArbitrageServiceTest {
         );
 
         assertThat(response.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
+        verify(exceptionCaseMapper).insertArbitrageReviewCase(
+                "DATA_QUALITY", 101L, 10L, 201L, "GA_TO_FC",
+                "차익거래 검증 자료 확인 필요",
+                "기준일 이하 계약 금융 스냅샷이 없습니다.");
     }
 
     private ArbitrageCalculationSource calculationSource(
