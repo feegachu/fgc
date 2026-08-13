@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.validation.mapper.ValidationScheduleMapper">
+
+    <select id="selectScheduleStates"
+            resultType="com.susukkang.fgc.validation.dto.ValidationScheduleState">
+        WITH payment_stage AS (
+            SELECT unnest(ARRAY['INSURER_TO_GA', 'GA_TO_FC']) AS payment_stage
+        ),
+        line_summary AS (
+            SELECT schedule_header_id,
+                   COUNT(*) AS line_count,
+                   COUNT(DISTINCT ROW(
+                       installment_no,
+                       contract_month_no,
+                       commission_item_id,
+                       beneficiary_agent_id
+                   )) AS distinct_line_count,
+                   COALESCE(SUM(expected_amount), 0) AS total_amount
+              FROM schedule_line
+             GROUP BY schedule_header_id
+        )
+        SELECT vt.contract_id,
+               ps.payment_stage,
+               MIN(sh.schedule_header_id) AS schedule_header_id,
+               MIN(sh.policy_version_id) AS policy_version_id,
+               MIN(sh.schedule_version_no) AS schedule_version,
+               MIN(sh.status) AS schedule_status,
+               COUNT(sh.schedule_header_id) AS active_header_count,
+               COALESCE(SUM(ls.line_count), 0) AS line_count,
+               COALESCE(SUM(ls.distinct_line_count), 0) AS distinct_line_count,
+               COALESCE(SUM(ls.total_amount), 0) AS total_amount
+          FROM validation_target vt
+         CROSS JOIN payment_stage ps
+          LEFT JOIN schedule_header sh
+            ON sh.contract_id = vt.contract_id
+           AND sh.payment_stage = ps.payment_stage
+           AND sh.schedule_purpose = 'OPERATIONAL'
+           AND sh.active_yn = true
+          LEFT JOIN line_summary ls
+            ON ls.schedule_header_id = sh.schedule_header_id
+         WHERE vt.validation_run_id = #{validationRunId}
+           AND vt.selection_status = 'SELECTED'
+         GROUP BY vt.validation_target_id, vt.contract_id, ps.payment_stage
+         ORDER BY vt.validation_target_id, ps.payment_stage
+    </select>
+
+</mapper>
