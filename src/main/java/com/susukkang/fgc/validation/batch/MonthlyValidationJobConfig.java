@@ -32,7 +32,7 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
-    private final ValidationTargetSelectionService validationTargetSelectionService;
+    private final ValidationTargetSelectionService validationRunScheduleTasklet;
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
     private final ValidationRunScheduleService validationRunScheduleService;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
@@ -83,7 +83,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step selectTargetStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("selectTargetStep", jobRepository)
-                .tasklet(new SelectTargetTasklet(validationTargetSelectionService), transactionManager)
+                .tasklet(new SelectTargetTasklet(validationRunScheduleTasklet), transactionManager)
                 .listener(progressListener(2, false))
                 .build();
     }
