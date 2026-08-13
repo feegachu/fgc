@@ -3,10 +3,7 @@ package com.susukkang.fgc.validation.batch;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
 import com.susukkang.fgc.validation.batch.tasklet.*;
-import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
-import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
-import com.susukkang.fgc.validation.service.ValidationRunCreateService;
-import com.susukkang.fgc.validation.service.ValidationTargetSelectionService;
+import com.susukkang.fgc.validation.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -35,8 +32,9 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
-    private final ValidationTargetSelectionService validationTargetSelectionService;
+    private final ValidationTargetSelectionService validationRunScheduleTasklet;
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
+    private final ValidationRunScheduleService validationRunScheduleService;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
@@ -85,7 +83,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step selectTargetStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("selectTargetStep", jobRepository)
-                .tasklet(new SelectTargetTasklet(validationTargetSelectionService), transactionManager)
+                .tasklet(new SelectTargetTasklet(validationRunScheduleTasklet), transactionManager)
                 .listener(progressListener(2, false))
                 .build();
     }
@@ -93,7 +91,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step regenerateScheduleStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("regenerateScheduleStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("③현행 예상 스케줄 생성·재검증"), transactionManager)
+                .tasklet(new ScheduleCheckTasklet(validationRunScheduleService), transactionManager)
                 .listener(progressListener(3, false))
                 .build();
     }
