@@ -1,8 +1,10 @@
 package com.susukkang.fgc.validation.batch;
 
-import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
-import com.susukkang.fgc.validation.batch.tasklet.*;
+import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.LedgerImbalanceCheckTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -35,6 +37,7 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
+    private final ValidationTargetSelectionService validationTargetSelectionService;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
@@ -83,7 +86,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step selectTargetStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("selectTargetStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("②계약·상품버전·환급률표 선별"), transactionManager)
+                .tasklet(new SelectTargetTasklet(validationTargetSelectionService), transactionManager)
                 .listener(progressListener(2, false))
                 .build();
     }
@@ -139,7 +142,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step imbalanceCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("imbalanceCheckStep", jobRepository)
-                .tasklet(new LedgerImbalanceCheckTasklet(ledgerImbalanceCheckPort), transactionManager)
+                .tasklet(new PlaceholderStepTasklet("⑥균형검사"), transactionManager)
                 .listener(progressListener(6, false))
                 .build();
     }
