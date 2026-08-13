@@ -26,7 +26,7 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-TRAN-W02', '지급 건 등록·귀속·확정', '수수료 지급 건', '/transactions')}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="fgc-main publishing-page publishing-page-form publishing-page-transaction-form">
 
   <!-- 목업 head 의 화면 전용 스타일 — 셸 조각은 main 만 가져가므로 여기로 옮겼다 -->
   <style>
@@ -43,7 +43,7 @@
     .attr-table input, .attr-table select { width: 100%; font-size: 12px; padding: 4px 6px; }
   </style>
 
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+  <div class="publishing-page-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
       <h1 class="fgc-page-title">지급 건 등록 · 귀속 · 확정</h1>
       <p class="fgc-page-desc">
