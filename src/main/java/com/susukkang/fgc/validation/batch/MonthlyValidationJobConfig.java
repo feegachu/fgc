@@ -1,10 +1,11 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
 import com.susukkang.fgc.validation.batch.tasklet.CreateRunTasklet;
+import com.susukkang.fgc.validation.batch.tasklet.LedgerImbalanceCheckTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.PlaceholderStepTasklet;
 import com.susukkang.fgc.validation.batch.tasklet.ReconciliationPlaceholderTasklet;
-import com.susukkang.fgc.validation.batch.tasklet.SelectTargetTasklet;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -37,6 +38,8 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
+    private final ValidationTargetSelectionService validationTargetSelectionService;
+    private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
     private final ValidationTargetSelectionService validationTargetSelectionService;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
@@ -98,6 +101,7 @@ public class MonthlyValidationJobConfig {
                 .listener(progressListener(3, false))
                 .build();
     }
+
     /**
      * capCheckStep의 실제 워크로드를 처리하는 "워커" Step
      */
@@ -125,7 +129,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step arbitrageCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("arbitrageCheckStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("⑤차익거래 검증"), transactionManager)
+                .tasklet(new ArbitrageCheckTasklet(arbitrageCheckBatchPort), transactionManager)
                 .listener(progressListener(5, false))
                 .build();
     }

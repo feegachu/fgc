@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper">
+
+    <!-- 차익거래 검증 결과를 화면 조회 DTO에 매핑한다. -->
+    <resultMap id="arbitrageCheckViewMap"
+               type="com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView">
+        <id property="arbitrageCheckId" column="arbitrage_check_id"/>
+        <result property="contractId" column="contract_id"/>
+        <result property="contractNo" column="contract_no"/>
+        <result property="paymentStage" column="payment_stage"/>
+        <result property="asOfDate" column="as_of_date"/>
+        <result property="contractMonthNo" column="contract_month_no"/>
+        <result property="cumulativePaidPremium" column="cumulative_paid_premium"/>
+        <result property="paidCommissionAmount" column="paid_commission_amount"/>
+        <result property="plannedCommissionAmount" column="planned_commission_amount"/>
+        <result property="includedSurrenderValueAmount"
+                column="included_surrender_value_amount"/>
+        <result property="netDifferenceAmount" column="net_difference_amount"/>
+        <result property="refundAdditionAppliedYn"
+                column="refund_addition_applied_yn"/>
+        <result property="surrenderValueSourceType"
+                column="surrender_value_source_type"/>
+        <result property="resultStatus" column="result_status"/>
+        <result property="decisionReason" column="decision_reason"/>
+    </resultMap>
+
+    <!-- 목록과 요약 조회에 동일한 검색 조건을 적용한다. -->
+    <sql id="arbitrageSearchCondition">
+        <where>
+            <if test="condition.month != null">
+                AND ac.as_of_date <![CDATA[ >= ]]> #{condition.monthStart}
+                AND ac.as_of_date <![CDATA[ < ]]> #{condition.nextMonthStart}
+            </if>
+            <if test="condition.status != null">
+                AND ac.result_status = #{condition.status}
+            </if>
+            <if test="condition.stage != null">
+                AND ac.payment_stage = #{condition.stage}
+            </if>
+            <if test="condition.insurerId != null">
+                AND c.insurer_id = #{condition.insurerId}
+            </if>
+            <if test="condition.contractNo != null and condition.contractNo != ''">
+                AND c.contract_no = #{condition.contractNo}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 검색 조건에 해당하는 차익거래 검증 결과 목록을 조회한다. -->
+    <select id="selectByCondition"
+            resultMap="arbitrageCheckViewMap">
+        SELECT
+            ac.arbitrage_check_id,
+            ac.contract_id,
+            c.contract_no,
+            ac.payment_stage,
+            ac.as_of_date,
+            ac.contract_month_no,
+            ac.cumulative_paid_premium,
+            ac.paid_commission_amount,
+            ac.planned_commission_amount,
+            ac.included_surrender_value_amount,
+            ac.net_difference_amount,
+            ac.refund_addition_applied_yn,
+            ac.surrender_value_source_type,
+            ac.result_status,
+            ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
+        FROM
+            arbitrage_check ac
+        JOIN
+            insurance_contract c
+        ON
+            c.contract_id = ac.contract_id
+        <include refid="arbitrageSearchCondition"/>
+        ORDER BY
+            ac.arbitrage_check_id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <!-- 검색 조건에 해당하는 차익거래 검증 결과의 판정별 건수를 조회한다. -->
+    <select id="arbitrageCheckSummary"
+            resultType="com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSummary">
+        SELECT
+            COUNT(*) FILTER (WHERE ac.result_status = 'CLEAR') AS clear_count,
+            COUNT(*) FILTER (WHERE ac.result_status = 'CANDIDATE') AS candidate_count,
+            COUNT(*) FILTER (WHERE ac.result_status = 'REVIEW_REQUIRED') AS review_required_count
+        FROM
+            arbitrage_check ac
+        JOIN
+            insurance_contract c
+        ON
+            c.contract_id = ac.contract_id
+        <include refid="arbitrageSearchCondition"/>
+    </select>
+
+    <!-- 계약과 기준일에 해당하는 계약 정보 및 최신 금융 스냅샷을 조회한다. -->
+    <select id="selectCalculationSource"
+            resultType="com.susukkang.fgc.arbitrage.dto.ArbitrageCalculationSource">
+        SELECT
+            c.contract_id,
+            c.contract_date,
+            c.insurer_id,
+            p.product_id,
+            c.product_offering_id,
+            c.payment_term_months,
+            po.channel_code,
+            po.standard_deduction_80_yn,
+            c.standard_surrender_deduction_amount,
+            fs.as_of_date AS snapshot_as_of_date,
+            fs.contract_month_no,
+            fs.cumulative_paid_premium,
+            fs.surrender_value,
+            fs.surrender_value_type,
+            fs.refund_rate_table_id AS snapshot_refund_rate_table_id
+        FROM
+            insurance_contract c
+        JOIN
+            product_offering po
+        ON
+            po.product_offering_id = c.product_offering_id
+        JOIN
+            product p
+        ON
+            p.product_id = po.product_id
+        LEFT JOIN LATERAL (
+            SELECT
+                cfs.as_of_date,
+                cfs.contract_month_no,
+                cfs.cumulative_paid_premium,
+                cfs.surrender_value,
+                cfs.surrender_value_type,
+                cfs.refund_rate_table_id
+            FROM
+                contract_financial_snapshot cfs
+            WHERE
+                cfs.contract_id = c.contract_id
+            AND
+                cfs.as_of_date <![CDATA[ <= ]]> #{asOfDate}
+            ORDER BY
+                cfs.as_of_date DESC,
+                CASE WHEN cfs.surrender_value_type = 'ACTUAL' THEN 0 ELSE 1 END,
+                cfs.contract_financial_snapshot_id DESC
+            LIMIT 1
+        ) fs ON true
+        WHERE
+            c.contract_id = #{contractId}
+    </select>
+
+    <!-- 계약에 귀속된 기준일 이하 확정 PAYMENT에서 DEDUCTION을 차감한 순액을 조회한다. -->
+    <select id="sumConfirmedCommissionAmount"
+            resultType="com.susukkang.fgc.arbitrage.dto.ConfirmedCommissionSummary">
+        SELECT
+            COALESCE(SUM(CASE WHEN ct.cashflow_type = 'PAYMENT'
+                THEN ROUND(ta.attributed_amount, 0) ELSE 0 END), 0) AS confirmed_payment_amount,
+            COALESCE(SUM(CASE WHEN ct.cashflow_type = 'DEDUCTION'
+                THEN ROUND(ta.attributed_amount, 0) ELSE 0 END), 0) AS confirmed_deduction_amount,
+            COALESCE(SUM(
+                CASE
+                    WHEN ct.cashflow_type = 'DEDUCTION'
+                        THEN -ROUND(ta.attributed_amount, 0)
+                    ELSE ROUND(ta.attributed_amount, 0)
+                END
+            ), 0) AS paid_commission_amount
+        FROM
+            transaction_attribution ta
+        JOIN
+            commission_transaction ct
+        ON
+            ct.commission_transaction_id = ta.commission_transaction_id
+        WHERE
+            ta.contract_id = #{contractId}
+        AND
+            ct.payment_stage = #{paymentStage}
+        AND
+            ct.status = 'CONFIRMED'
+        AND
+            ta.attribution_date <![CDATA[ <= ]]> #{asOfDate}
+    </select>
+
+    <!-- 계약의 활성 운영 스케줄에 남은 모든 PLANNED 지급예정 수수료를 조회한다. -->
+    <select id="sumPlannedCommissionAmount" resultType="java.math.BigDecimal">
+        SELECT
+            COALESCE(SUM(ROUND(sl.expected_amount, 0)), 0)
+        FROM
+            schedule_header sh
+        JOIN
+            schedule_line sl
+        ON
+            sl.schedule_header_id = sh.schedule_header_id
+        WHERE
+            sh.contract_id = #{contractId}
+        AND
+            sh.payment_stage = #{paymentStage}
+        AND
+            sh.active_yn = true
+        AND
+            sh.schedule_purpose = 'OPERATIONAL'
+        AND
+            sl.line_status = 'PLANNED'
+    </select>
+
+    <!-- 계약 상품·납입기간·채널·계약일과 계약차월에 적용 가능한 환급률표 후보를 조회한다. -->
+    <select id="selectRefundRateCandidates"
+            resultType="com.susukkang.fgc.arbitrage.dto.ArbitrageRefundRateCandidate">
+        SELECT
+            rrt.refund_rate_table_id,
+            rrl.refund_rate_pct
+        FROM
+            refund_rate_table rrt
+        JOIN
+            refund_rate_line rrl
+        ON
+            rrl.refund_rate_table_id = rrt.refund_rate_table_id
+        WHERE
+            rrt.insurer_id = #{source.insurerId}
+        AND
+            rrt.product_id = #{source.productId}
+        AND
+            rrt.payment_term_months = #{source.paymentTermMonths}
+        AND
+            rrt.channel_code = #{source.channelCode}
+        AND
+            (rrt.product_offering_id IS NULL
+                OR rrt.product_offering_id = #{source.productOfferingId})
+        AND
+            rrt.standard_deduction_80_yn = true
+        AND
+            rrt.effective_from <![CDATA[ <= ]]> #{source.contractDate}
+        AND
+            (rrt.effective_to IS NULL OR rrt.effective_to <![CDATA[ >= ]]> #{source.contractDate})
+        AND
+            rrl.contract_month_no = #{source.contractMonthNo}
+        ORDER BY
+            CASE WHEN rrt.product_offering_id IS NOT NULL THEN 0 ELSE 1 END,
+            rrt.effective_from DESC,
+            rrt.refund_rate_table_id DESC
+    </select>
+
+    <!-- 차익거래 검증 결과를 저장하고 생성된 ID를 DTO에 설정한다. -->
+    <insert id="insertArbitrageCheck"
+            useGeneratedKeys="true"
+            keyProperty="arbitrageCheckId"
+            keyColumn="arbitrage_check_id">
+        INSERT INTO arbitrage_check (
+            validation_run_id,
+            contract_id,
+            payment_stage,
+            as_of_date,
+            contract_month_no,
+            cumulative_paid_premium,
+            paid_commission_amount,
+            planned_commission_amount,
+            included_surrender_value_amount,
+            refund_addition_applied_yn,
+            surrender_value_source_type,
+            net_difference_amount,
+            refund_rate_table_id,
+            standard_deduction_80_yn,
+            result_status,
+            calculation_snapshot
+        ) VALUES (
+            #{validationRunId},
+            #{contractId},
+            #{paymentStage},
+            #{asOfDate},
+            #{contractMonthNo},
+            #{cumulativePaidPremium},
+            #{paidCommissionAmount},
+            #{plannedCommissionAmount},
+            #{includedSurrenderValueAmount},
+            #{refundAdditionAppliedYn},
+            #{surrenderValueSourceType},
+            #{netDifferenceAmount},
+            #{refundRateTableId},
+            #{standardDeduction80Yn},
+            #{resultStatus},
+            #{calculationSnapshot}::jsonb
+        )
+        ON CONFLICT ON CONSTRAINT uq_arbitrage_check
+        DO UPDATE SET
+            contract_month_no = EXCLUDED.contract_month_no,
+            cumulative_paid_premium = EXCLUDED.cumulative_paid_premium,
+            paid_commission_amount = EXCLUDED.paid_commission_amount,
+            planned_commission_amount = EXCLUDED.planned_commission_amount,
+            included_surrender_value_amount = EXCLUDED.included_surrender_value_amount,
+            refund_addition_applied_yn = EXCLUDED.refund_addition_applied_yn,
+            surrender_value_source_type = EXCLUDED.surrender_value_source_type,
+            net_difference_amount = EXCLUDED.net_difference_amount,
+            refund_rate_table_id = EXCLUDED.refund_rate_table_id,
+            standard_deduction_80_yn = EXCLUDED.standard_deduction_80_yn,
+            result_status = EXCLUDED.result_status,
+            calculation_snapshot = EXCLUDED.calculation_snapshot
+        RETURNING arbitrage_check_id
+    </insert>
+
+    <!-- 계약 상세 화면에서 지급단계별 기준일 시계열을 조회한다. -->
+    <select id="selectByContractId" resultMap="arbitrageCheckViewMap">
+        SELECT
+            ac.arbitrage_check_id,
+            ac.contract_id,
+            c.contract_no,
+            ac.payment_stage,
+            ac.as_of_date,
+            ac.contract_month_no,
+            ac.cumulative_paid_premium,
+            ac.paid_commission_amount,
+            ac.planned_commission_amount,
+            ac.included_surrender_value_amount,
+            ac.net_difference_amount,
+            ac.refund_addition_applied_yn,
+            ac.surrender_value_source_type,
+            ac.result_status,
+            ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
+        FROM
+            arbitrage_check ac
+        JOIN
+            insurance_contract c
+        ON
+            c.contract_id = ac.contract_id
+        WHERE
+            ac.contract_id = #{contractId}
+        AND
+            ac.payment_stage = #{paymentStage}
+        ORDER BY
+            ac.as_of_date ASC,
+            ac.arbitrage_check_id ASC
+    </select>
+
+    <select id="selectSelectedContractIds" resultType="long">
+        SELECT
+            vt.contract_id
+        FROM
+            validation_target vt
+        WHERE
+            vt.validation_run_id = #{validationRunId}
+        AND
+            vt.selection_status = 'SELECTED'
+        ORDER BY
+            vt.contract_id
+    </select>
+</mapper>
