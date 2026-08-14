@@ -58,6 +58,15 @@ class CapCalculatorIntegrationTest {
     }
 
     private void insertOperationalScheduleWithOneBaseCommissionLine(Long contractId, LocalDate contractDate) {
+        insertOperationalScheduleWithBaseCommissionLines(
+                contractId, contractDate, new BigDecimal("650000"));
+    }
+
+    private Long insertOperationalScheduleWithBaseCommissionLines(
+            Long contractId,
+            LocalDate contractDate,
+            BigDecimal... expectedAmounts
+    ) {
         Long policyVersionId = jdbcTemplate.queryForObject(
                 "SELECT policy_version_id FROM fgc.policy_version WHERE policy_code='GA-CUR-2026-V1' AND status='ACTIVE'",
                 Long.class);
@@ -76,12 +85,18 @@ class CapCalculatorIntegrationTest {
                 RETURNING schedule_header_id
                 """, Long.class, contractId, policyVersionId);
 
-        jdbcTemplate.update("""
-                INSERT INTO fgc.schedule_line
-                    (schedule_header_id, line_no, installment_no, contract_month_no, due_date,
-                     commission_item_id, basis_code, basis_amount, calculation_type, rate_pct, expected_amount)
-                VALUES (?, 1, 1, 1, ?, ?, 'MONTHLY_EQUIVALENT_FIRST_PREMIUM', 100000, 'RATE', 650.000000, 650000)
-                """, scheduleHeaderId, contractDate, baseCommissionItemId);
+        for (int i = 0; i < expectedAmounts.length; i++) {
+            int sequence = i + 1;
+            jdbcTemplate.update("""
+                    INSERT INTO fgc.schedule_line
+                        (schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                         commission_item_id, basis_code, basis_amount, calculation_type, rate_pct, expected_amount)
+                    VALUES (?, ?, ?, ?, ?, ?, 'MONTHLY_EQUIVALENT_FIRST_PREMIUM',
+                            100000, 'RATE', 100.000000, ?)
+                    """, scheduleHeaderId, sequence, sequence, sequence,
+                    contractDate.plusMonths(i), baseCommissionItemId, expectedAmounts[i]);
+        }
+        return scheduleHeaderId;
     }
 
     // C001(일반계약)은 기본한도 1,200,000원에 산입액이 반영된다
@@ -100,6 +115,78 @@ class CapCalculatorIntegrationTest {
         assertThat(result.includedAmount()).isEqualByComparingTo("650000");
         assertThat(result.remainingAmount()).isEqualByComparingTo("550000");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
+    }
+
+    // FUN-030, REG-08: 1,200% 직전·정확·초과 결과가 cap_check에 올바르게 저장되는지 검증한다.
+    @Test
+    void classifiesAmountsImmediatelyBelowAtAndAboveTheTwelveHundredPercentLimit() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        Long scheduleHeaderId = insertOperationalScheduleWithBaseCommissionLines(
+                id, LocalDate.of(2026, 7, 10), new BigDecimal("1199999"));
+        CapCalculationCommand command = CapCalculationCommand.realtime(
+                id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
+
+        CapCheckSaveResult belowSaved = capCheckService.calculateAndSave(command);
+        CapCalculationResult below = belowSaved.result();
+        assertThat(below.includedAmount()).isEqualByComparingTo("1199999");
+        assertThat(below.resultStatus()).isNotEqualTo(CapResultStatus.VIOLATION);
+        assertThat(savedResultStatus(belowSaved.capCheckId())).isNotEqualTo("VIOLATION");
+
+        jdbcTemplate.update(
+                "UPDATE fgc.schedule_line SET expected_amount = 1200000 WHERE schedule_header_id = ?",
+                scheduleHeaderId);
+        CapCheckSaveResult exactlyAtSaved = capCheckService.calculateAndSave(command);
+        CapCalculationResult exactlyAt = exactlyAtSaved.result();
+        assertThat(exactlyAt.includedAmount()).isEqualByComparingTo("1200000");
+        assertThat(exactlyAt.resultStatus()).isNotEqualTo(CapResultStatus.VIOLATION);
+        assertThat(savedResultStatus(exactlyAtSaved.capCheckId())).isNotEqualTo("VIOLATION");
+
+        jdbcTemplate.update(
+                "UPDATE fgc.schedule_line SET expected_amount = 1200001 WHERE schedule_header_id = ?",
+                scheduleHeaderId);
+        CapCheckSaveResult aboveSaved = capCheckService.calculateAndSave(command);
+        CapCalculationResult above = aboveSaved.result();
+        assertThat(above.includedAmount()).isEqualByComparingTo("1200001");
+        assertThat(above.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        assertThat(savedResultStatus(aboveSaved.capCheckId())).isEqualTo("VIOLATION");
+    }
+
+    // FUN-030: 계약 12개월 차는 포함하고 13개월 차는 첫해 한도에서 제외한다.
+    @Test
+    void includesMonthTwelveAndExcludesMonthThirteenFromTheFirstYearAmount() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        Long scheduleHeaderId = insertOperationalScheduleWithBaseCommissionLines(
+                id,
+                LocalDate.of(2026, 7, 10),
+                new BigDecimal("600000"),
+                new BigDecimal("700000"));
+        jdbcTemplate.update("""
+                UPDATE fgc.schedule_line
+                   SET contract_month_no = 12, due_date = DATE '2027-06-10'
+                 WHERE schedule_header_id = ? AND line_no = 1
+                """, scheduleHeaderId);
+        jdbcTemplate.update("""
+                UPDATE fgc.schedule_line
+                   SET contract_month_no = 13, due_date = DATE '2027-07-10'
+                 WHERE schedule_header_id = ? AND line_no = 2
+                """, scheduleHeaderId);
+
+        CapCalculationResult result = capCalculator.calculate(
+                CapCalculationCommand.realtime(
+                        id, PaymentStage.GA_TO_FC, LocalDate.of(2027, 7, 10)));
+
+        assertThat(result.includedAmount()).isEqualByComparingTo("600000");
+        assertThat(result.details())
+                .extracting(detail -> detail.contractMonthNo())
+                .containsExactly(12);
+    }
+
+    private String savedResultStatus(Long capCheckId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT result_status FROM fgc.cap_check WHERE cap_check_id = ?",
+                String.class,
+                capCheckId
+        );
     }
 
     // CapCheckService.calculateAndSave()는 계산 결과를 cap_check/cap_check_detail에 저장한다

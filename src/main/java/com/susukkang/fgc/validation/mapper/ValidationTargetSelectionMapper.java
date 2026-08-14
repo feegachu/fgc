@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 설명 : ValidationTargetSelectionMapper
@@ -19,4 +20,6 @@ public interface ValidationTargetSelectionMapper {
             @Param("validationMonth") LocalDate validationMonth,
             @Param("asOfDate") LocalDate asOfDate
     );
+
+    List<Long> selectSelectedContractIds(@Param("validationRunId") Long validationRunId);
 }
