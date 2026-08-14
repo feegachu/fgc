@@ -325,6 +325,7 @@ class InsurerGaReconciliationMatcherImplTest {
 
         assertThat(reviewRequired.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
         assertThat(reviewRequired.transactionAttributionIds()).containsExactly(21L);
+        assertThat(reviewRequired.secondaryReasonCodes()).isEmpty();
         assertThat(results).extracting(InsurerGaMatchCandidate::resultType)
                 .doesNotContain(ReconciliationResultType.MATCHED);
     }
