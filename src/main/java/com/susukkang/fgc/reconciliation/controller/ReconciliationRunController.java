@@ -10,6 +10,10 @@ import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunCommand;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunRequest;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationResultSearchResponse;
+import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
+import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +23,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -42,6 +49,7 @@ import java.util.Map;
 public class ReconciliationRunController {
 
     private final ReconciliationRunService reconciliationRunService;
+    private final ReconciliationResultQueryService reconciliationResultQueryService;
 
     @Operation(summary = "대사 실행 생성 (IF-API-38)")
     @PostMapping
@@ -63,6 +71,36 @@ public class ReconciliationRunController {
         );
         ReconciliationRunRow created = reconciliationRunService.create(command);
         return ApiResponse.success(CreateReconciliationRunResponse.from(created));
+    }
+
+    @Operation(summary = "대사 결과 목록 조회 (IF-API-40)")
+    @GetMapping("/{reconciliationRunId}/results")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ReconciliationResultSearchResponse> searchResults(
+            @PathVariable long reconciliationRunId,
+            @RequestParam(required = false) String resultType,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort
+    ) {
+        if (resultType != null) {
+            try {
+                ReconciliationResultType.valueOf(resultType);
+            } catch (IllegalArgumentException exception) {
+                invalid("resultType");
+            }
+        }
+        return ApiResponse.success(reconciliationResultQueryService.search(
+                reconciliationRunId, resultType, page, size, sort));
+    }
+
+    @Operation(summary = "대사 결과 상세 조회 (IF-API-41)")
+    @GetMapping("/results/{reconciliationResultId}")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ReconciliationResultDetailResponse> getResult(
+            @PathVariable long reconciliationResultId
+    ) {
+        return ApiResponse.success(reconciliationResultQueryService.get(reconciliationResultId));
     }
 
     private static LocalDate parseSettlementMonth(String value) {

@@ -97,6 +97,7 @@
            AND ct.cashflow_type = 'PAYMENT'
            AND ct.status = 'CONFIRMED'
            AND ta.attribution_scope = 'CONTRACT'
+           AND ta.inclusion_status_snapshot = 'INCLUDED'
          ORDER BY ta.contract_id, ct.commission_item_id,
                   COALESCE(ct.due_date, ct.settlement_month),
                   ct.commission_transaction_id, ta.attribution_seq

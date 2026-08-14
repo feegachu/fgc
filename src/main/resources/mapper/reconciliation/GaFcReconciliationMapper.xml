@@ -70,6 +70,7 @@
            AND ct.cashflow_type = 'PAYMENT'
            AND ct.status = 'CONFIRMED'
            AND ta.attribution_scope = 'CONTRACT'
+           AND ta.inclusion_status_snapshot = 'INCLUDED'
            AND ta.attribution_month = #{settlementMonth}
            AND c.insurer_id = #{insurerId}
          ORDER BY ta.contract_id, ct.commission_item_id,
