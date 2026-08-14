@@ -1,0 +1,116 @@
+package com.susukkang.fgc.cap.service;
+
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.common.code.CapCheckKind;
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
+import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
+import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
+import com.susukkang.fgc.validation.mapper.ValidationTargetSelectionMapper;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class CapCheckBatchAdapterTest {
+
+    @Mock ValidationTargetSelectionMapper validationMapper;
+    @Mock CapCheckBatchItemService itemService;
+
+    @Test
+    void processesEverySelectedContractWithPartitionStageAndMonthEnd() {
+        given(validationMapper.selectSelectedContractIds(118L))
+                .willReturn(List.of(10L, 20L));
+        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(validationMapper, itemService);
+
+        StepProcessingResult result = adapter.check(
+                context(118L, LocalDate.of(2026, 8, 1)),
+                PaymentStage.GA_TO_FC);
+
+        ArgumentCaptor<CapCalculationCommand> captor =
+                ArgumentCaptor.forClass(CapCalculationCommand.class);
+        verify(itemService, times(2)).process(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(CapCalculationCommand::contractId)
+                .containsExactly(10L, 20L);
+        assertThat(captor.getAllValues()).allSatisfy(command -> {
+            assertThat(command.paymentStage()).isEqualTo(PaymentStage.GA_TO_FC);
+            assertThat(command.asOfDate()).isEqualTo(LocalDate.of(2026, 8, 31));
+            assertThat(command.checkKind()).isEqualTo(CapCheckKind.MONTHLY);
+            assertThat(command.validationRunId()).isEqualTo(118L);
+        });
+        assertThat(result.processedCount()).isEqualTo(2);
+        assertThat(result.skippedCount()).isZero();
+        assertThat(result.failureCount()).isZero();
+        assertThat(result.skips()).isEmpty();
+    }
+
+    @Test
+    void skipsOnlyContractThatRaisesBusinessException() {
+        given(validationMapper.selectSelectedContractIds(118L))
+                .willReturn(List.of(10L, 20L));
+        doThrow(new FgcBusinessException(
+                FgcErrorCode.COMMON_002,
+                "contractId",
+                Map.of("contractId", 10L),
+                "검증 데이터가 부족합니다."))
+                .when(itemService).process(argThat(command -> command.contractId().equals(10L)));
+        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(validationMapper, itemService);
+
+        StepProcessingResult result = adapter.check(
+                context(118L, LocalDate.of(2026, 8, 1)),
+                PaymentStage.INSURER_TO_GA);
+
+        assertThat(result.processedCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(1);
+        assertThat(result.failureCount()).isZero();
+        assertThat(result.skips()).singleElement().satisfies(skip -> {
+            assertThat(skip.contractId()).isEqualTo(10L);
+            assertThat(skip.reasonCode()).isEqualTo("CAP_CHECK_FAILED");
+        });
+        verify(itemService).process(argThat(command -> command.contractId().equals(20L)));
+    }
+
+    @Test
+    void propagatesUnexpectedSystemFailure() {
+        given(validationMapper.selectSelectedContractIds(118L))
+                .willReturn(List.of(10L));
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(itemService).process(argThat(command -> command.contractId().equals(10L)));
+        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(validationMapper, itemService);
+
+        assertThatThrownBy(() -> adapter.check(
+                context(118L, LocalDate.of(2026, 8, 1)),
+                PaymentStage.GA_TO_FC))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("database unavailable");
+    }
+
+    private ValidationStepContext context(Long validationRunId, LocalDate validationMonth) {
+        return new ValidationStepContext(
+                validationRunId,
+                new ValidationJobContext(
+                        validationMonth,
+                        1L,
+                        ValidationRunType.MONTHLY,
+                        1L,
+                        "req-cap-check"));
+    }
+}
