@@ -76,6 +76,7 @@ class ReconciliationReasonClassifierTest {
         assertThat(result.secondaryReasonCodes()).isEmpty();
     }
 
+    // FGC-FUN-049: 분개 증거가 없는 일치 후보는 자동 확정하지 않는다.
     @Test
     void 분개_증거가_없는_MATCHED_후보는_UNKNOWN_사유의_REVIEW_REQUIRED로_남긴다() {
         ReconciliationCandidate candidate = candidate(
