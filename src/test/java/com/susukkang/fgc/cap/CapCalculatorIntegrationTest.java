@@ -117,6 +117,7 @@ class CapCalculatorIntegrationTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
     }
 
+    // FUN-030, REG-08: 1,200% 직전·정확·초과 결과가 cap_check에 올바르게 저장되는지 검증한다.
     @Test
     void classifiesAmountsImmediatelyBelowAtAndAboveTheTwelveHundredPercentLimit() {
         Long id = contractId("FGC-FGL01-202607-0001");
@@ -125,25 +126,32 @@ class CapCalculatorIntegrationTest {
         CapCalculationCommand command = CapCalculationCommand.realtime(
                 id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
 
-        CapCalculationResult below = capCalculator.calculate(command);
+        CapCheckSaveResult belowSaved = capCheckService.calculateAndSave(command);
+        CapCalculationResult below = belowSaved.result();
         assertThat(below.includedAmount()).isEqualByComparingTo("1199999");
         assertThat(below.resultStatus()).isNotEqualTo(CapResultStatus.VIOLATION);
+        assertThat(savedResultStatus(belowSaved.capCheckId())).isNotEqualTo("VIOLATION");
 
         jdbcTemplate.update(
                 "UPDATE fgc.schedule_line SET expected_amount = 1200000 WHERE schedule_header_id = ?",
                 scheduleHeaderId);
-        CapCalculationResult exactlyAt = capCalculator.calculate(command);
+        CapCheckSaveResult exactlyAtSaved = capCheckService.calculateAndSave(command);
+        CapCalculationResult exactlyAt = exactlyAtSaved.result();
         assertThat(exactlyAt.includedAmount()).isEqualByComparingTo("1200000");
         assertThat(exactlyAt.resultStatus()).isNotEqualTo(CapResultStatus.VIOLATION);
+        assertThat(savedResultStatus(exactlyAtSaved.capCheckId())).isNotEqualTo("VIOLATION");
 
         jdbcTemplate.update(
                 "UPDATE fgc.schedule_line SET expected_amount = 1200001 WHERE schedule_header_id = ?",
                 scheduleHeaderId);
-        CapCalculationResult above = capCalculator.calculate(command);
+        CapCheckSaveResult aboveSaved = capCheckService.calculateAndSave(command);
+        CapCalculationResult above = aboveSaved.result();
         assertThat(above.includedAmount()).isEqualByComparingTo("1200001");
         assertThat(above.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        assertThat(savedResultStatus(aboveSaved.capCheckId())).isEqualTo("VIOLATION");
     }
 
+    // FUN-030: 계약 12개월 차는 포함하고 13개월 차는 첫해 한도에서 제외한다.
     @Test
     void includesMonthTwelveAndExcludesMonthThirteenFromTheFirstYearAmount() {
         Long id = contractId("FGC-FGL01-202607-0001");
@@ -171,6 +179,14 @@ class CapCalculatorIntegrationTest {
         assertThat(result.details())
                 .extracting(detail -> detail.contractMonthNo())
                 .containsExactly(12);
+    }
+
+    private String savedResultStatus(Long capCheckId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT result_status FROM fgc.cap_check WHERE cap_check_id = ?",
+                String.class,
+                capCheckId
+        );
     }
 
     // CapCheckService.calculateAndSave()는 계산 결과를 cap_check/cap_check_detail에 저장한다

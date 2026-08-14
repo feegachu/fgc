@@ -323,7 +323,13 @@
                       AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
                ), 0) AS existing_included_amount,
                (
-                   SELECT SUM(compliance_ta.attributed_amount)
+                    SELECT SUM(
+                               CASE
+                                   WHEN compliance_ct.cashflow_type = 'DEDUCTION'
+                                       THEN -ROUND(compliance_ta.attributed_amount, 0)
+                                   ELSE ROUND(compliance_ta.attributed_amount, 0)
+                               END
+                           )
                      FROM fgc.transaction_attribution compliance_ta
                      JOIN fgc.commission_transaction compliance_ct
                        ON compliance_ct.commission_transaction_id = compliance_ta.commission_transaction_id

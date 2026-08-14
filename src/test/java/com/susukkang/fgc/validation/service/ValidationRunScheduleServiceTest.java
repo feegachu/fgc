@@ -23,6 +23,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -95,6 +96,29 @@ class ValidationRunScheduleServiceTest {
                 10L, PaymentStage.INSURER_TO_GA, "POLICY_MISSING",
                 "예상 스케줄 생성 검토 필요", "적용 가능한 현행 수수료 정책이 없습니다.");
         verify(itemService, never()).process(any());
+    }
+
+    @Test
+    void continuesWithNextContractWhenOneScheduleRegenerationFails() {
+        given(validationScheduleMapper.selectScheduleStates(118L))
+                .willReturn(List.of(
+                        validState(10L, PaymentStage.INSURER_TO_GA),
+                        validState(10L, PaymentStage.GA_TO_FC),
+                        validState(20L, PaymentStage.INSURER_TO_GA),
+                        validState(20L, PaymentStage.GA_TO_FC)));
+        doThrow(new FgcBusinessException(FgcErrorCode.COMMON_002))
+                .when(itemService).process(10L);
+
+        StepProcessingResult result = service.validateContractSchedules(118L);
+
+        assertThat(result.processedCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(1);
+        assertThat(result.skips()).singleElement().satisfies(skip -> {
+            assertThat(skip.contractId()).isEqualTo(10L);
+            assertThat(skip.reasonCode()).isEqualTo("SCHEDULE_REGENERATION_FAILED");
+        });
+        verify(itemService).process(10L);
+        verify(itemService).process(20L);
     }
 
     private ValidationScheduleState validState(Long contractId, PaymentStage paymentStage) {
