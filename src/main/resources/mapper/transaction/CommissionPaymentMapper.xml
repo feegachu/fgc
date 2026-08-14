@@ -310,7 +310,13 @@
                crs.premium_multiplier,
                crs.warning_usage_pct,
                COALESCE((
-                   SELECT SUM(other_ta.attributed_amount)
+                   SELECT SUM(
+                              CASE
+                                  WHEN other_ct.cashflow_type = 'DEDUCTION'
+                                      THEN -ROUND(other_ta.attributed_amount, 0)
+                                  ELSE ROUND(other_ta.attributed_amount, 0)
+                              END
+                          )
                      FROM fgc.transaction_attribution other_ta
                      JOIN fgc.commission_transaction other_ct
                        ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
