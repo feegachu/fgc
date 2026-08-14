@@ -60,7 +60,7 @@ class InsurerGaReconciliationIntegrationTest {
 
         Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "VALIDATED", "VALID");
         Long actualMatched = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
-                TEST_MONTH, "650000", "MATCHED", sourceAgentCode, 1, "EXCLUDED");
+                TEST_MONTH, "650000", "MATCHED", sourceAgentCode, 1, "EXCLUDED", TEST_MONTH.plusDays(14));
 
         Long nextMonthBatchId = insertStatementBatch(insurerId, TEST_MONTH.plusMonths(1), "VALIDATED", "NEXT-MONTH");
         Long nextMonthActual = insertActual(nextMonthBatchId, insurerId, contractId, commissionItemId,
@@ -301,6 +301,64 @@ class InsurerGaReconciliationIntegrationTest {
         assertThat(result.actualInstallmentNo()).isEqualTo(14);
     }
 
+    // 2026-08-14 yslee - FUN-050 보험사→GA 0원·정확 일자 경계값 검증
+    // 기존 코드: 동일 값 정상 일치와 회차 불일치만 PostgreSQL 통합 환경에서 검증
+    // 문제: 1원·1일 차이가 원수사 명세 조회 이후 정상 일치로 처리될 위험이 있음
+    // 개선: 실제 원수사 명세·분개 원천으로 금액과 날짜 경계를 검증
+    @Test
+    void FUN_050_실제_원수사_금액이_1원_작으면_AMOUNT_DIFFERENCE다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", insurerId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1");
+        Long contractAgentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+        String sourceAgentCode = insertAgentInsurerCode(insurerId, contractAgentId, "FUN-050-AMOUNT");
+
+        Long expected = insertSchedule(contractId, policyVersionId, commissionItemId, "650000", true, "OPERATIONAL", 1);
+        Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "VALIDATED", "FUN-050-AMOUNT");
+        Long actual = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
+                TEST_MONTH, "649999", "FUN-050-AMOUNT", sourceAgentCode);
+        insertPostedJournal(
+                "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expected,
+                contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
+        insertPostedJournal(
+                "ACTUAL_INSURER_STATEMENT", "COMMISSION_TRANSACTION", transactionId(actual),
+                contractId, commissionItemId, "649999", "ACTUAL_RECEIVABLE", "ACTUAL_INCOME");
+
+        InsurerGaMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
+                50L, null, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null)).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.AMOUNT_DIFFERENCE);
+        assertThat(result.differenceAmount()).isEqualByComparingTo("-1");
+    }
+
+    @Test
+    void FUN_050_원수사_지급일이_하루_다르면_정확일치로_합치지_않는다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", insurerId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1");
+        Long contractAgentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+        String sourceAgentCode = insertAgentInsurerCode(insurerId, contractAgentId, "FUN-050-DATE");
+
+        Long expected = insertSchedule(contractId, policyVersionId, commissionItemId, "650000", true, "OPERATIONAL", 1);
+        Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "VALIDATED", "FUN-050-DATE");
+        Long actual = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
+                TEST_MONTH, "650000", "FUN-050-DATE", sourceAgentCode, TEST_MONTH.plusDays(15));
+        insertPostedJournal(
+                "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expected,
+                contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
+        insertPostedJournal(
+                "ACTUAL_INSURER_STATEMENT", "COMMISSION_TRANSACTION", transactionId(actual),
+                contractId, commissionItemId, "650000", "ACTUAL_RECEIVABLE", "ACTUAL_INCOME");
+
+        List<InsurerGaMatchCandidate> results = matcher.match(new ReconciliationExecutionRequest(
+                50L, null, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null));
+
+        assertThat(results).extracting(InsurerGaMatchCandidate::resultType)
+                .containsExactly(ReconciliationResultType.ACTUAL_MISSING, ReconciliationResultType.EXPECTED_MISSING);
+    }
+
     private Long insertSchedule(
             Long contractId,
             Long policyVersionId,
@@ -361,7 +419,7 @@ class InsurerGaReconciliationIntegrationTest {
     ) {
         return insertActual(
                 statementBatchId, insurerId, contractId, commissionItemId,
-                month, amount, suffix, sourceAgentCode, 1, "INCLUDED");
+                month, amount, suffix, sourceAgentCode, 1, "INCLUDED", month.plusDays(14));
     }
 
     private Long insertActual(
@@ -377,7 +435,23 @@ class InsurerGaReconciliationIntegrationTest {
     ) {
         return insertActual(
                 statementBatchId, insurerId, contractId, commissionItemId,
-                month, amount, suffix, sourceAgentCode, installmentNo, "INCLUDED");
+                month, amount, suffix, sourceAgentCode, installmentNo, "INCLUDED", month.plusDays(14));
+    }
+
+    private Long insertActual(
+            Long statementBatchId,
+            Long insurerId,
+            Long contractId,
+            Long commissionItemId,
+            LocalDate month,
+            String amount,
+            String suffix,
+            String sourceAgentCode,
+            LocalDate dueDate
+    ) {
+        return insertActual(
+                statementBatchId, insurerId, contractId, commissionItemId,
+                month, amount, suffix, sourceAgentCode, 1, "INCLUDED", dueDate);
     }
 
     private Long insertActual(
@@ -390,7 +464,8 @@ class InsurerGaReconciliationIntegrationTest {
             String suffix,
             String sourceAgentCode,
             Integer installmentNo,
-            String inclusionStatus
+            String inclusionStatus,
+            LocalDate dueDate
     ) {
         Long transactionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
@@ -401,7 +476,7 @@ class InsurerGaReconciliationIntegrationTest {
                 RETURNING commission_transaction_id
                 """, Long.class,
                 statementBatchId, "IT-048-02:" + suffix, insurerId, commissionItemId,
-                installmentNo, month, month.plusDays(14), new BigDecimal(amount)
+                installmentNo, month, dueDate, new BigDecimal(amount)
         );
         Long attributionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.transaction_attribution (
@@ -413,7 +488,7 @@ class InsurerGaReconciliationIntegrationTest {
                           'DIRECT')
                 RETURNING transaction_attribution_id
                 """, Long.class, transactionId, contractId, sourceAgentCode,
-                month.plusDays(14), month, new BigDecimal(amount), inclusionStatus, inclusionStatus);
+                dueDate, month, new BigDecimal(amount), inclusionStatus, inclusionStatus);
         jdbcTemplate.update("""
                 UPDATE fgc.commission_transaction
                    SET status = 'CONFIRMED'
