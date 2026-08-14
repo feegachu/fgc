@@ -32,6 +32,10 @@ class CapCheckMapperIntegrationTest {
         insertEvidence(contract, PaymentStage.GA_TO_FC, "DEDUCTION", new BigDecimal("3.50"),
                 contract.contractDate().plusMonths(2), "EVIDENCE-3");
 
+        // 초년도 마지막 날은 포함한다.
+        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("5.50"),
+                contract.contractDate().plusMonths(12).minusDays(1), "LAST-DAY-FIRST-YEAR");
+
         // 다른 지급 단계, 1주년 당일, 증빙 없는 행은 집계에서 제외한다.
         insertEvidence(contract, PaymentStage.INSURER_TO_GA, "PAYMENT", new BigDecimal("100.00"),
                 contract.contractDate(), "OTHER-STAGE");
@@ -43,7 +47,7 @@ class CapCheckMapperIntegrationTest {
         BigDecimal amount = capCheckMapper.selectComplianceEvidenceAmount(
                 contract.contractId(), PaymentStage.GA_TO_FC);
 
-        assertThat(amount).isEqualByComparingTo("18"); // ROUND(10.5)+ROUND(10.5)-ROUND(3.5)
+        assertThat(amount).isEqualByComparingTo("24"); // ROUND(10.5)+ROUND(10.5)-ROUND(3.5)+ROUND(5.5)
     }
 
     @Test
