@@ -331,6 +331,32 @@ class InsurerGaReconciliationMatcherImplTest {
     }
 
     @Test
+    void 서로_다른_실제일이_같은_예상일_허용범위에_들면_합산하지_않고_REVIEW_REQUIRED다() {
+        InsurerGaExpectedSourceRow expected = expected(11L, 1, "650000", null);
+        expected.setDueDate(MONTH.plusDays(15));
+        InsurerGaActualSourceRow firstActual = actual(21L, "325000", null);
+        firstActual.setDueDate(MONTH.plusDays(14));
+        InsurerGaActualSourceRow secondActual = actual(22L, "325000", null);
+        secondActual.setDueDate(MONTH.plusDays(16));
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L)).willReturn(List.of(expected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(firstActual, secondActual));
+        InsurerGaReconciliationMatcherImpl tolerantMatcher = new InsurerGaReconciliationMatcherImpl(
+                reconciliationMapper, oneDayTolerancePolicy());
+
+        List<InsurerGaMatchCandidate> reviewCandidates = tolerantMatcher.match(request()).stream()
+                .filter(candidate -> candidate.resultType() == ReconciliationResultType.REVIEW_REQUIRED)
+                .toList();
+
+        assertThat(reviewCandidates).hasSize(2).allSatisfy(candidate -> {
+            assertThat(candidate.transactionAttributionIds()).hasSize(1);
+            assertThat(candidate.secondaryReasonCodes()).isEmpty();
+        });
+        assertThat(reviewCandidates).flatExtracting(InsurerGaMatchCandidate::transactionAttributionIds)
+                .containsExactlyInAnyOrder(21L, 22L);
+    }
+
+    @Test
     void GA_TO_FC_요청은_FUN_048_02_범위가_아니므로_거절한다() {
         ReconciliationExecutionRequest wrongStage = new ReconciliationExecutionRequest(
                 7L, 9L, MONTH, PaymentStage.GA_TO_FC, 3L, 5L);

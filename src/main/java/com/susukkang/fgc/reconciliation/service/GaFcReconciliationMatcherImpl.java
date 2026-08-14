@@ -319,19 +319,28 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         List<BaseMatchKey> orderedExpectedKeys = expectedKeys.stream().sorted(BaseMatchKey.ORDER).toList();
         Map<BaseMatchKey, List<GaFcActualSourceRow>> aligned = new LinkedHashMap<>();
         Set<BaseMatchKey> ambiguousKeys = new LinkedHashSet<>();
-        actualGroups.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey(BaseMatchKey.ORDER))
-                .forEach(entry -> {
-                    List<BaseMatchKey> candidates = orderedExpectedKeys.stream()
-                            .filter(expectedKey -> expectedKey.sameDimensions(entry.getKey()))
-                            .filter(expectedKey -> datesMatch(expectedKey.dueDate(), entry.getKey().dueDate()))
-                            .toList();
-                    BaseMatchKey alignedKey = candidates.size() == 1 ? candidates.getFirst() : entry.getKey();
-                    if (candidates.size() > 1) {
-                        ambiguousKeys.add(alignedKey);
-                    }
-                    aligned.computeIfAbsent(alignedKey, ignored -> new ArrayList<>()).addAll(entry.getValue());
-                });
+        Map<BaseMatchKey, List<BaseMatchKey>> candidatesByActualKey = new LinkedHashMap<>();
+        Map<BaseMatchKey, Integer> uniqueTargetCounts = new LinkedHashMap<>();
+        actualGroups.keySet().stream().sorted(BaseMatchKey.ORDER).forEach(actualKey -> {
+            List<BaseMatchKey> candidates = orderedExpectedKeys.stream()
+                    .filter(expectedKey -> expectedKey.sameDimensions(actualKey))
+                    .filter(expectedKey -> datesMatch(expectedKey.dueDate(), actualKey.dueDate()))
+                    .toList();
+            candidatesByActualKey.put(actualKey, candidates);
+            if (candidates.size() == 1) {
+                uniqueTargetCounts.merge(candidates.getFirst(), 1, Integer::sum);
+            }
+        });
+        actualGroups.entrySet().stream().sorted(Map.Entry.comparingByKey(BaseMatchKey.ORDER)).forEach(entry -> {
+            List<BaseMatchKey> candidates = candidatesByActualKey.get(entry.getKey());
+            boolean oneToOne = candidates.size() == 1
+                    && uniqueTargetCounts.getOrDefault(candidates.getFirst(), 0) == 1;
+            BaseMatchKey alignedKey = oneToOne ? candidates.getFirst() : entry.getKey();
+            if (candidates.size() > 1 || (candidates.size() == 1 && !oneToOne)) {
+                ambiguousKeys.add(alignedKey);
+            }
+            aligned.computeIfAbsent(alignedKey, ignored -> new ArrayList<>()).addAll(entry.getValue());
+        });
         return new ActualGroupAlignment(aligned, ambiguousKeys);
     }
 

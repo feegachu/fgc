@@ -242,6 +242,32 @@ class GaFcReconciliationMatcherImplTest {
     }
 
     @Test
+    void 서로_다른_실제일이_같은_예상일_허용범위에_들면_합산하지_않고_REVIEW_REQUIRED다() {
+        GaFcExpectedSourceRow expected = expected(11L, 501L, 1, "650000", null);
+        expected.setDueDate(MONTH.plusDays(15));
+        GaFcActualSourceRow firstActual = actual(21L, 501L, 1, "325000", null);
+        firstActual.setDueDate(MONTH.plusDays(14));
+        GaFcActualSourceRow secondActual = actual(22L, 501L, 1, "325000", null);
+        secondActual.setDueDate(MONTH.plusDays(16));
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L)).willReturn(List.of(expected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(firstActual, secondActual));
+        GaFcReconciliationMatcherImpl tolerantMatcher = new GaFcReconciliationMatcherImpl(
+                reconciliationMapper, oneDayTolerancePolicy());
+
+        List<GaFcMatchCandidate> reviewCandidates = tolerantMatcher.match(request()).stream()
+                .filter(candidate -> candidate.resultType() == ReconciliationResultType.REVIEW_REQUIRED)
+                .toList();
+
+        assertThat(reviewCandidates).hasSize(2).allSatisfy(candidate -> {
+            assertThat(candidate.transactionAttributionIds()).hasSize(1);
+            assertThat(candidate.secondaryReasonCodes()).isEmpty();
+        });
+        assertThat(reviewCandidates).flatExtracting(GaFcMatchCandidate::transactionAttributionIds)
+                .containsExactlyInAnyOrder(21L, 22L);
+    }
+
+    @Test
     void 상세행은_합산_전에_원단위_HALF_UP으로_반올림한다() {
         given(reconciliationMapper.findExpectedSources(MONTH, 3L))
                 .willReturn(List.of(expected(11L, 501L, 1, "0.5", null)));
