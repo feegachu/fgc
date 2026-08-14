@@ -108,4 +108,26 @@ class BatchWriterIdempotencyIntegrationTest {
                 Integer.class, validationRunId, contractId);
         assertThat(count).isEqualTo(1);
     }
+
+    @Test
+    void insertCapCheckFailureIsIdempotentPerRunContractAndPaymentStage() {
+        contractId = seedContractId();
+        validationRunId = seedValidationRun();
+
+        exceptionCaseMapper.insertCapCheckFailure(
+                validationRunId, contractId, "GA_TO_FC", "first failure");
+        exceptionCaseMapper.insertCapCheckFailure(
+                validationRunId, contractId, "GA_TO_FC", "retry failure");
+        exceptionCaseMapper.insertCapCheckFailure(
+                validationRunId, contractId, "INSURER_TO_GA", "other stage failure");
+
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.exception_case
+                 WHERE validation_run_id = ?
+                   AND contract_id = ?
+                   AND exception_key LIKE 'DATA_QUALITY:%'
+                """, Integer.class, validationRunId, contractId);
+        assertThat(count).isEqualTo(2);
+    }
 }

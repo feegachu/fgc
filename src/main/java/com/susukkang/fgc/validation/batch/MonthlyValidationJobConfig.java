@@ -1,12 +1,11 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
+import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
 import com.susukkang.fgc.validation.batch.tasklet.*;
-import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
-import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
-import com.susukkang.fgc.validation.service.ValidationRunCreateService;
-import com.susukkang.fgc.validation.service.ValidationTargetSelectionService;
+import com.susukkang.fgc.validation.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -35,8 +34,10 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
-    private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
     private final ValidationTargetSelectionService validationTargetSelectionService;
+    private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
+    private final ValidationRunScheduleService validationRunScheduleService;
+    private final CapCheckBatchPort capCheckBatchPort;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
@@ -93,18 +94,8 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step regenerateScheduleStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("regenerateScheduleStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("③현행 예상 스케줄 생성·재검증"), transactionManager)
+                .tasklet(new ScheduleCheckTasklet(validationRunScheduleService), transactionManager)
                 .listener(progressListener(3, false))
-                .build();
-    }
-
-    /**
-     * capCheckStep의 실제 워크로드를 처리하는 "워커" Step
-     */
-    @Bean
-    public Step capCheckWorkerStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
-        return new StepBuilder("capCheckWorkerStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("④지급단계별 1,200% 검증"), transactionManager)
                 .build();
     }
 
@@ -118,6 +109,15 @@ public class MonthlyValidationJobConfig {
                 .step(capCheckWorkerStep)
                 .taskExecutor(new SyncTaskExecutor())
                 .listener(progressListener(4, false))
+                .build();
+    }
+    /**
+     * capCheckStep의 실제 워크로드를 처리하는 "워커" Step
+     */
+    @Bean
+    public Step capCheckWorkerStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("capCheckWorkerStep", jobRepository)
+                .tasklet(new CapCheckTasklet(capCheckBatchPort), transactionManager)
                 .build();
     }
 
@@ -153,7 +153,7 @@ public class MonthlyValidationJobConfig {
                 .listener(progressListener(7, false))
                 .build();
     }
-
+    // TODO FUN-052 예소
     @Bean
     public Step exceptionGenerationStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("exceptionGenerationStep", jobRepository)
