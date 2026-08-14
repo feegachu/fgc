@@ -92,6 +92,7 @@ class ReconciliationResultQueryServiceTest {
         var response = service.get(77L);
 
         assertThat(response.resultTypeLabel()).isNotBlank();
+        assertThat(response.primaryReasonCode()).isEqualTo("UNKNOWN");
         assertThat(response.primaryReason().label()).isEqualTo("분류 불가");
         assertThat(response.secondaryReasons()).extracting("code")
                 .containsExactly("AMOUNT_DIFFERENCE", "AGENT_MISMATCH");

@@ -22,6 +22,7 @@ public record ReconciliationResultListItemResponse(
         BigDecimal differenceAmount,
         String resultType,
         String resultTypeLabel,
+        String primaryReasonCode,
         ReconciliationReasonResponse primaryReason,
         List<ReconciliationReasonResponse> secondaryReasons,
         OffsetDateTime createdAt
@@ -37,6 +38,7 @@ public record ReconciliationResultListItemResponse(
                 row.getActualSourceAgentCode(), row.getExpectedTotalAmount(), row.getActualTotalAmount(),
                 row.getDifferenceAmount(), row.getResultType(),
                 ReconciliationReasonCode.resultTypeLabel(row.getResultType()),
+                row.getPrimaryReasonCode(),
                 ReconciliationReasonResponse.from(row.getPrimaryReasonCode()),
                 reasonResponses(row.getSecondaryReasonCodesCsv()), row.getCreatedAt());
     }

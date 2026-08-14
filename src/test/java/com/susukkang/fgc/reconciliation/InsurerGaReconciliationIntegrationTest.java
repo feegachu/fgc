@@ -60,7 +60,7 @@ class InsurerGaReconciliationIntegrationTest {
 
         Long statementBatchId = insertStatementBatch(insurerId, TEST_MONTH, "VALIDATED", "VALID");
         Long actualMatched = insertActual(statementBatchId, insurerId, contractId, commissionItemId,
-                TEST_MONTH, "650000", "MATCHED", sourceAgentCode);
+                TEST_MONTH, "650000", "MATCHED", sourceAgentCode, 1, "EXCLUDED");
 
         Long nextMonthBatchId = insertStatementBatch(insurerId, TEST_MONTH.plusMonths(1), "VALIDATED", "NEXT-MONTH");
         Long nextMonthActual = insertActual(nextMonthBatchId, insurerId, contractId, commissionItemId,
@@ -361,7 +361,7 @@ class InsurerGaReconciliationIntegrationTest {
     ) {
         return insertActual(
                 statementBatchId, insurerId, contractId, commissionItemId,
-                month, amount, suffix, sourceAgentCode, 1);
+                month, amount, suffix, sourceAgentCode, 1, "INCLUDED");
     }
 
     private Long insertActual(
@@ -374,6 +374,23 @@ class InsurerGaReconciliationIntegrationTest {
             String suffix,
             String sourceAgentCode,
             Integer installmentNo
+    ) {
+        return insertActual(
+                statementBatchId, insurerId, contractId, commissionItemId,
+                month, amount, suffix, sourceAgentCode, installmentNo, "INCLUDED");
+    }
+
+    private Long insertActual(
+            Long statementBatchId,
+            Long insurerId,
+            Long contractId,
+            Long commissionItemId,
+            LocalDate month,
+            String amount,
+            String suffix,
+            String sourceAgentCode,
+            Integer installmentNo,
+            String inclusionStatus
     ) {
         Long transactionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
@@ -390,11 +407,13 @@ class InsurerGaReconciliationIntegrationTest {
                 INSERT INTO fgc.transaction_attribution (
                     commission_transaction_id, attribution_seq, attribution_scope, contract_id,
                     source_agent_code, attribution_date, attribution_month, attributed_amount,
-                    inclusion_status_snapshot, attribution_method
-                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, ?, 'INCLUDED', 'DIRECT')
+                    inclusion_status_snapshot, exclusion_type_snapshot, attribution_method
+                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, ?, ?,
+                          CASE WHEN ? = 'EXCLUDED' THEN 'COMPLIANCE_3PCT' ELSE NULL END,
+                          'DIRECT')
                 RETURNING transaction_attribution_id
                 """, Long.class, transactionId, contractId, sourceAgentCode,
-                month.plusDays(14), month, new BigDecimal(amount));
+                month.plusDays(14), month, new BigDecimal(amount), inclusionStatus, inclusionStatus);
         jdbcTemplate.update("""
                 UPDATE fgc.commission_transaction
                    SET status = 'CONFIRMED'

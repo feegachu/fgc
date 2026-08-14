@@ -27,6 +27,7 @@ public record ReconciliationResultDetailResponse(
         BigDecimal differenceAmount,
         String resultType,
         String resultTypeLabel,
+        String primaryReasonCode,
         ReconciliationReasonResponse primaryReason,
         List<ReconciliationReasonResponse> secondaryReasons,
         List<Match> matches,
@@ -49,6 +50,7 @@ public record ReconciliationResultDetailResponse(
                 row.getActualSourceAgentCode(), row.getExpectedTotalAmount(), row.getActualTotalAmount(),
                 row.getDifferenceAmount(), row.getResultType(),
                 ReconciliationReasonCode.resultTypeLabel(row.getResultType()),
+                row.getPrimaryReasonCode(),
                 ReconciliationReasonResponse.from(row.getPrimaryReasonCode()),
                 ReconciliationResultListItemResponse.reasonResponses(row.getSecondaryReasonCodesCsv()),
                 matches.stream().map(Match::from).toList(), detailSnapshot, row.getCreatedAt());
