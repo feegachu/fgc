@@ -63,6 +63,9 @@ public class CapCheckBatchAdapter implements CapCheckBatchPort {
         List<ContractSkip> skips = new ArrayList<>();
 
         for (Long contractId : contractIds) {
+            if (!capCheckMapper.existsApplicableRuleSet(contractId, paymentStage)) {
+                continue;
+            }
             try {
                 BigDecimal complianceEvidenceAmount =
                         capCheckMapper.selectComplianceEvidenceAmount(

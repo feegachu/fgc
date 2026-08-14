@@ -88,4 +88,9 @@ public interface CapCheckMapper {
     BigDecimal selectComplianceEvidenceAmount(
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage);
+
+    /** 계약 체결일·상품·채널 기준으로 해당 지급 단계에 적용 가능한 활성 Cap 룰이 있는지 확인한다. */
+    boolean existsApplicableRuleSet(
+            @Param("contractId") Long contractId,
+            @Param("paymentStage") PaymentStage paymentStage);
 }

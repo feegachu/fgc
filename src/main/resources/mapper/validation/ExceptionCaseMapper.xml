@@ -26,7 +26,7 @@
              validation_run_id, contract_id, source_entity_type, source_entity_id,
              title, description)
         VALUES
-            (CONCAT('CAP_CHECK_FAILED:', #{validationRunId},
+            (CONCAT('DATA_QUALITY:', #{validationRunId},
                     ':INSURANCE_CONTRACT:', #{contractId}, ':', #{paymentStage}),
              'DATA_QUALITY', 'WARNING', 'NEW',
              #{validationRunId}, #{contractId}, 'INSURANCE_CONTRACT', CAST(#{contractId} AS varchar),

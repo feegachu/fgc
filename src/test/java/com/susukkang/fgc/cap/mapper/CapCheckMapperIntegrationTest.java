@@ -58,6 +58,22 @@ class CapCheckMapperIntegrationTest {
                 contract.contractId(), PaymentStage.GA_TO_FC)).isNull();
     }
 
+    // REG-19: GA_TO_FC 룰 시행일 이전 계약은 실패가 아니라 해당 단계 검증 미적용이다.
+    @Test
+    void distinguishesContractsBeforeAndAfterGaToFcRuleEffectiveDate() {
+        Long beforeEffectiveDate = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL02-202605-0001'",
+                Long.class);
+        Long afterEffectiveDate = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL01-202607-0001'",
+                Long.class);
+
+        assertThat(capCheckMapper.existsApplicableRuleSet(
+                beforeEffectiveDate, PaymentStage.GA_TO_FC)).isFalse();
+        assertThat(capCheckMapper.existsApplicableRuleSet(
+                afterEffectiveDate, PaymentStage.GA_TO_FC)).isTrue();
+    }
+
     private TestContract insertTestContract() {
         String contractNo = "IT-CAP-EVIDENCE-" + UUID.randomUUID();
         return jdbcTemplate.queryForObject("""

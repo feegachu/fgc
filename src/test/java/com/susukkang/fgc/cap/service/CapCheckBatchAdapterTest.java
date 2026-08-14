@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -42,6 +43,10 @@ class CapCheckBatchAdapterTest {
     void processesEverySelectedContractWithPartitionStageAndMonthEnd() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L, 20L));
+        given(capCheckMapper.existsApplicableRuleSet(10L, PaymentStage.GA_TO_FC))
+                .willReturn(true);
+        given(capCheckMapper.existsApplicableRuleSet(20L, PaymentStage.GA_TO_FC))
+                .willReturn(true);
         given(capCheckMapper.selectComplianceEvidenceAmount(10L, PaymentStage.GA_TO_FC))
                 .willReturn(new BigDecimal("30000"));
         given(capCheckMapper.selectComplianceEvidenceAmount(20L, PaymentStage.GA_TO_FC))
@@ -78,6 +83,10 @@ class CapCheckBatchAdapterTest {
     void skipsOnlyContractThatRaisesBusinessException() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L, 20L));
+        given(capCheckMapper.existsApplicableRuleSet(10L, PaymentStage.INSURER_TO_GA))
+                .willReturn(true);
+        given(capCheckMapper.existsApplicableRuleSet(20L, PaymentStage.INSURER_TO_GA))
+                .willReturn(true);
         doThrow(new FgcBusinessException(
                 FgcErrorCode.COMMON_002,
                 "contractId",
@@ -111,6 +120,8 @@ class CapCheckBatchAdapterTest {
     void propagatesUnexpectedSystemFailure() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L));
+        given(capCheckMapper.existsApplicableRuleSet(10L, PaymentStage.GA_TO_FC))
+                .willReturn(true);
         doThrow(new IllegalStateException("database unavailable"))
                 .when(itemService).process(argThat(command -> command.contractId().equals(10L)));
         CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(
@@ -121,6 +132,29 @@ class CapCheckBatchAdapterTest {
                 PaymentStage.GA_TO_FC))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("database unavailable");
+    }
+
+    @Test
+    void ignoresContractWhenNoRuleAppliesToPaymentStage() {
+        given(validationMapper.selectSelectedContractIds(118L))
+                .willReturn(List.of(10L));
+        given(capCheckMapper.existsApplicableRuleSet(10L, PaymentStage.GA_TO_FC))
+                .willReturn(false);
+        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(
+                validationMapper, capCheckMapper, itemService, failureRecordService);
+
+        StepProcessingResult result = adapter.check(
+                context(118L, LocalDate.of(2026, 8, 1)),
+                PaymentStage.GA_TO_FC);
+
+        assertThat(result.processedCount()).isZero();
+        assertThat(result.skippedCount()).isZero();
+        assertThat(result.skips()).isEmpty();
+        verify(capCheckMapper, never()).selectComplianceEvidenceAmount(
+                10L, PaymentStage.GA_TO_FC);
+        verify(itemService, never()).process(argThat(command -> command.contractId().equals(10L)));
+        verify(failureRecordService, never()).record(
+                118L, 10L, PaymentStage.GA_TO_FC, "FGC-COMMON-500");
     }
 
     private ValidationStepContext context(Long validationRunId, LocalDate validationMonth) {

@@ -126,7 +126,7 @@ class BatchWriterIdempotencyIntegrationTest {
                   FROM fgc.exception_case
                  WHERE validation_run_id = ?
                    AND contract_id = ?
-                   AND exception_key LIKE 'CAP_CHECK_FAILED:%'
+                   AND exception_key LIKE 'DATA_QUALITY:%'
                 """, Integer.class, validationRunId, contractId);
         assertThat(count).isEqualTo(2);
     }

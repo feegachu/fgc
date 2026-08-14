@@ -243,4 +243,26 @@
           AND ta.attribution_date >= c.contract_date
           AND ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
     </select>
+
+    <select id="existsApplicableRuleSet" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.insurance_contract c
+              JOIN fgc.product_offering po
+                ON po.product_offering_id = c.product_offering_id
+              JOIN fgc.product p
+                ON p.product_id = po.product_id
+              JOIN fgc.cap_rule_set crs
+                ON crs.payment_stage = #{paymentStage}
+               AND crs.contract_date_from &lt;= c.contract_date
+               AND (crs.contract_date_to IS NULL OR crs.contract_date_to >= c.contract_date)
+               AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
+               AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
+               AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+              JOIN fgc.policy_version pv
+                ON pv.policy_version_id = crs.policy_version_id
+               AND pv.status = 'ACTIVE'
+             WHERE c.contract_id = #{contractId}
+        )
+    </select>
 </mapper>
