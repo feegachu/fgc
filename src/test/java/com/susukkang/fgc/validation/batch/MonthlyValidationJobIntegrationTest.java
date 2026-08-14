@@ -63,6 +63,16 @@ class MonthlyValidationJobIntegrationTest {
     @AfterEach
     void cleanUp() {
         createdValidationRunIds.forEach(id -> {
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.cap_check_detail
+                     WHERE cap_check_id IN (
+                         SELECT cap_check_id
+                           FROM fgc.cap_check
+                          WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.cap_check WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
             jdbcTemplate.update(

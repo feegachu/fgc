@@ -6,9 +6,11 @@ import com.susukkang.fgc.cap.dto.CapCheckInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckRow;
 import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
+import com.susukkang.fgc.common.code.PaymentStage;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -73,5 +75,17 @@ public interface CapCheckMapper {
      * 조회한다. 없으면 null.
      */
     CapCheckRow findById(@Param("capCheckId") Long capCheckId);
-
+    
+    /**
+     * 설명 : DB에 이미 저장된 준법감시 증빙 대상 금액을 조회
+     *
+     * @param  contractId 계약 ID
+     * @param paymentStage 지급 단계
+     * @return 준법감시 증빙 대상 금액
+     * @author hjKang
+     * @since 2026-08-14
+     */
+    BigDecimal selectComplianceEvidenceAmount(
+            @Param("contractId") Long contractId,
+            @Param("paymentStage") PaymentStage paymentStage);
 }

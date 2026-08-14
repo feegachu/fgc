@@ -8,6 +8,7 @@ import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.JobExecution;
@@ -42,7 +43,15 @@ class ScheduleCheckTaskletTest {
 
         assertThat(status).isEqualTo(RepeatStatus.FINISHED);
         assertThat(testContext.contribution().getWriteCount()).isEqualTo(3);
-        verify(scheduleRegenerationPort).regenerateSchedules(any(ValidationStepContext.class));
+        ArgumentCaptor<ValidationStepContext> contextCaptor =
+                ArgumentCaptor.forClass(ValidationStepContext.class);
+        verify(scheduleRegenerationPort).regenerateSchedules(contextCaptor.capture());
+        assertThat(contextCaptor.getValue().validationRunId()).isEqualTo(118L);
+        assertThat(contextCaptor.getValue().job().validationMonth())
+                .isEqualTo(java.time.LocalDate.of(2026, 8, 1));
+        assertThat(contextCaptor.getValue().job().runNo()).isEqualTo(1L);
+        assertThat(contextCaptor.getValue().job().requestId())
+                .isEqualTo("req-schedule-check");
     }
 
     @Test

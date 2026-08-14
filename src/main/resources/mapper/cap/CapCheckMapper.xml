@@ -221,4 +221,20 @@
          ORDER BY ccd.detail_seq
     </select>
 
+    <select id="selectComplianceEvidenceAmount"
+            resultType="java.math.BigDecimal">
+        SELECT SUM(ta.attributed_amount)
+        FROM fgc.transaction_attribution ta
+        JOIN fgc.commission_transaction ct
+        ON ct.commission_transaction_id = ta.commission_transaction_id
+        JOIN fgc.insurance_contract c
+        ON c.contract_id = ta.contract_id
+        WHERE ta.contract_id = #{contractId}
+        AND ta.exclusion_type_snapshot = 'COMPLIANCE_3PCT'
+        AND NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL
+        AND ct.payment_stage = #{paymentStage}
+        AND ct.status = 'CONFIRMED'
+        AND ta.attribution_date >= c.contract_date
+        AND ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
+    </select>
 </mapper>

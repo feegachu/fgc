@@ -42,12 +42,22 @@ public class ScheduleCheckTasklet implements Tasklet {
                 parameters.requestId());
 
         var result = scheduleRegenerationPort.regenerateSchedules(
-                new ValidationStepContext(validationRunId, jobContext));
+                new ValidationStepContext(validationRunId, jobContext)
+        );
+
+        contribution.incrementWriteCount(result.processedCount());
+
+        for (long i = 0; i < result.skippedCount(); i++) {
+            contribution.incrementProcessSkipCount();
+        }
+
         if (result.skippedCount() > DEFAULT_SKIP_LIMIT) {
             throw new SkipLimitExceededException(
-                    "regenerateScheduleStep", result.skippedCount(), DEFAULT_SKIP_LIMIT);
+                    "regenerateScheduleStep",
+                    result.skippedCount(),
+                    DEFAULT_SKIP_LIMIT
+            );
         }
-        contribution.incrementWriteCount(result.processedCount() - result.skippedCount());
 
         return RepeatStatus.FINISHED;
     }

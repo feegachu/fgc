@@ -6,7 +6,6 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
-import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.dto.ValidationScheduleState;
 import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
@@ -31,10 +30,10 @@ import static org.mockito.Mockito.verify;
 class ValidationRunScheduleServiceTest {
 
     @Mock ValidationScheduleMapper validationScheduleMapper;
-    @Mock ScheduleService scheduleService;
     @Mock CommissionPolicyService commissionPolicyService;
     @Mock ScheduleMapper scheduleMapper;
     @Mock ExceptionCaseMapper exceptionCaseMapper;
+    @Mock ScheduleRegenerationBatchItemService itemService;
 
     private ValidationRunScheduleService service;
 
@@ -42,10 +41,10 @@ class ValidationRunScheduleServiceTest {
     void setUp() {
         service = new ValidationRunScheduleService(
                 validationScheduleMapper,
-                scheduleService,
                 commissionPolicyService,
                 scheduleMapper,
-                exceptionCaseMapper);
+                exceptionCaseMapper,
+                itemService);
     }
 
     @Test
@@ -58,7 +57,7 @@ class ValidationRunScheduleServiceTest {
 
         assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.skippedCount()).isZero();
-        verify(scheduleService).generateSchedules(any());
+        verify(itemService).process(10L);
     }
 
     @Test
@@ -75,7 +74,7 @@ class ValidationRunScheduleServiceTest {
         verify(exceptionCaseMapper).insertDataQualityCase(
                 118L, 10L, "예상 스케줄 정합성 오류",
                 "GA_TO_FC 활성 OPERATIONAL 스케줄 헤더가 중복되었습니다.");
-        verify(scheduleService, never()).generateSchedules(any());
+        verify(itemService, never()).process(any());
     }
 
     @Test
@@ -95,7 +94,7 @@ class ValidationRunScheduleServiceTest {
         verify(scheduleMapper).upsertPolicyReviewCase(
                 10L, PaymentStage.INSURER_TO_GA, "POLICY_MISSING",
                 "예상 스케줄 생성 검토 필요", "적용 가능한 현행 수수료 정책이 없습니다.");
-        verify(scheduleService, never()).generateSchedules(any());
+        verify(itemService, never()).process(any());
     }
 
     private ValidationScheduleState validState(Long contractId, PaymentStage paymentStage) {

@@ -19,8 +19,8 @@
                        commission_item_id,
                        beneficiary_agent_id
                    )) AS distinct_line_count,
-                   COALESCE(SUM(expected_amount), 0) AS total_amount
-              FROM schedule_line
+                   COALESCE(SUM(ROUND(expected_amount, 0)), 0) AS total_amount
+              FROM fgc.schedule_line
              GROUP BY schedule_header_id
         )
         SELECT vt.contract_id,
@@ -33,9 +33,9 @@
                COALESCE(SUM(ls.line_count), 0) AS line_count,
                COALESCE(SUM(ls.distinct_line_count), 0) AS distinct_line_count,
                COALESCE(SUM(ls.total_amount), 0) AS total_amount
-          FROM validation_target vt
+          FROM fgc.validation_target vt
          CROSS JOIN payment_stage ps
-          LEFT JOIN schedule_header sh
+          LEFT JOIN fgc.schedule_header sh
             ON sh.contract_id = vt.contract_id
            AND sh.payment_stage = ps.payment_stage
            AND sh.schedule_purpose = 'OPERATIONAL'

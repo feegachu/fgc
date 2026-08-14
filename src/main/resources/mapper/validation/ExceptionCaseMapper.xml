@@ -20,6 +20,20 @@
     <!-- TODO FGC-FUN-052의 실행 간 중복 방지 요구와 인터페이스 정의서의
          exception_key 동결 규칙이 충돌한다. 중복 범위와 안정 업무키가 확정되면
          contractId + paymentStage 기반 키 및 최신 validation_run 연결 UPSERT를 검토한다. -->
+    <insert id="insertCapCheckFailure">
+        INSERT INTO fgc.exception_case
+            (exception_key, exception_type, severity, status,
+             validation_run_id, contract_id, source_entity_type, source_entity_id,
+             title, description)
+        VALUES
+            (CONCAT('CAP_CHECK_FAILED:', #{validationRunId},
+                    ':INSURANCE_CONTRACT:', #{contractId}, ':', #{paymentStage}),
+             'DATA_QUALITY', 'WARNING', 'NEW',
+             #{validationRunId}, #{contractId}, 'INSURANCE_CONTRACT', CAST(#{contractId} AS varchar),
+             CONCAT('1,200% 한도 검증 실패 - ', #{paymentStage}), #{description})
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
     <insert id="insertArbitrageCandidate">
         INSERT INTO fgc.exception_case
             (exception_key, exception_type, severity, status,

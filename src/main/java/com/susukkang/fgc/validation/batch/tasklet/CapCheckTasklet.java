@@ -4,6 +4,7 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.validation.batch.PaymentStagePartitioner;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
 import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
+import com.susukkang.fgc.validation.batch.contract.SkipLimitExceededException;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
@@ -22,6 +23,7 @@ import org.springframework.batch.repeat.RepeatStatus;
  */
 @RequiredArgsConstructor
 public class CapCheckTasklet implements Tasklet {
+    private static final long DEFAULT_SKIP_LIMIT = 100L;
 
     private final CapCheckBatchPort capCheckBatchPort;
 
@@ -60,6 +62,19 @@ public class CapCheckTasklet implements Tasklet {
         );
 
         contribution.incrementWriteCount(result.processedCount());
+
+        for (long i = 0; i < result.skippedCount(); i++) {
+            contribution.incrementProcessSkipCount();
+        }
+
+        if (result.skippedCount() > DEFAULT_SKIP_LIMIT) {
+            throw new SkipLimitExceededException(
+                    "capCheckStep",
+                    paymentStage,
+                    result.skippedCount(),
+                    DEFAULT_SKIP_LIMIT
+            );
+        }
 
         return RepeatStatus.FINISHED;
     }

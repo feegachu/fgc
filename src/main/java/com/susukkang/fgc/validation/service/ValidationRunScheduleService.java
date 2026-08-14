@@ -3,7 +3,6 @@ package com.susukkang.fgc.validation.service;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
-import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
@@ -32,10 +31,10 @@ import java.util.Map;
 public class ValidationRunScheduleService implements ScheduleRegenerationPort {
 
     private final ValidationScheduleMapper validationScheduleMapper;
-    private final ScheduleService scheduleService;
     private final CommissionPolicyService commissionPolicyService;
     private final ScheduleMapper scheduleMapper;
     private final ExceptionCaseMapper exceptionCaseMapper;
+    private final ScheduleRegenerationBatchItemService itemService;
 
     @Override
     public StepProcessingResult regenerateSchedules(ValidationStepContext context) {
@@ -61,6 +60,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
         }
 
         List<ContractSkip> skips = new ArrayList<>();
+        long processedCount = 0;
         for (Map.Entry<Long, List<ValidationScheduleState>> entry : statesByContract.entrySet()) {
             Long contractId = entry.getKey();
             String invalidReason = findStructuralError(entry.getValue());
@@ -81,13 +81,23 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                 continue;
             }
 
-            InsuranceContract contract = InsuranceContract.builder()
-                    .contractId(contractId)
-                    .build();
-            scheduleService.generateSchedules(contract);
+
+            try {
+                itemService.process(contractId);
+                processedCount++;
+            } catch (FgcBusinessException exception) {
+                skips.add(new ContractSkip(
+                        contractId,
+                        "SCHEDULE_REGENERATION_FAILED",
+                        exception.getMessage()
+                ));
+            }
         }
 
-        return new StepProcessingResult(statesByContract.size(), skips.size(), 0, skips);
+        return new StepProcessingResult(
+                processedCount,
+                skips.size(),
+                0, skips);
     }
 
     private ContractSkip validatePolicies(Long validationRunId, Long contractId) {

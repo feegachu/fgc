@@ -1,6 +1,7 @@
 package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -12,6 +13,7 @@ import com.susukkang.fgc.validation.mapper.ValidationTargetSelectionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +29,9 @@ import java.util.List;
 @Service
 public class CapCheckBatchAdapter implements CapCheckBatchPort {
     private final ValidationTargetSelectionMapper validationMapper;
+    private final CapCheckMapper capCheckMapper;
     private final CapCheckBatchItemService itemService;
+    private final CapCheckFailureRecordService failureRecordService;
     /**
      * 설명 : 배치 검증을 할 떄 들어오는 StepContext에서 계약 정보를 받아 1200%한도를 검증하는 메서드
      *
@@ -60,13 +64,20 @@ public class CapCheckBatchAdapter implements CapCheckBatchPort {
 
         for (Long contractId : contractIds) {
             try {
+                BigDecimal complianceEvidenceAmount =
+                        capCheckMapper.selectComplianceEvidenceAmount(
+                                contractId,
+                                paymentStage
+                        );
+
                 CapCalculationCommand command =
                         new CapCalculationCommand(
                                 contractId,
                                 paymentStage,
                                 asOfDate,
                                 CapCheckKind.MONTHLY,
-                                validationRunId
+                                validationRunId,
+                                complianceEvidenceAmount
                         );
 
                 itemService.process(command);
@@ -75,11 +86,20 @@ public class CapCheckBatchAdapter implements CapCheckBatchPort {
 
             } catch (FgcBusinessException exception) {
                 // 해당 계약만 실패 목록에 기록하고 다음 계약 진행
+
+                failureRecordService.record(
+                        validationRunId,
+                        contractId,
+                        paymentStage,
+                        exception.getMessage()
+                );
                 skips.add(new ContractSkip(
                         contractId,
                         "CAP_CHECK_FAILED",
                         exception.getMessage()
                 ));
+
+
             }
         }
 

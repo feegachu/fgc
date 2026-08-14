@@ -1,6 +1,7 @@
 package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ValidationRunType;
@@ -16,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -32,13 +34,20 @@ import static org.mockito.Mockito.verify;
 class CapCheckBatchAdapterTest {
 
     @Mock ValidationTargetSelectionMapper validationMapper;
+    @Mock CapCheckMapper capCheckMapper;
     @Mock CapCheckBatchItemService itemService;
+    @Mock CapCheckFailureRecordService failureRecordService;
 
     @Test
     void processesEverySelectedContractWithPartitionStageAndMonthEnd() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L, 20L));
-        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(validationMapper, itemService);
+        given(capCheckMapper.selectComplianceEvidenceAmount(10L, PaymentStage.GA_TO_FC))
+                .willReturn(new BigDecimal("30000"));
+        given(capCheckMapper.selectComplianceEvidenceAmount(20L, PaymentStage.GA_TO_FC))
+                .willReturn(new BigDecimal("50000"));
+        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(
+                validationMapper, capCheckMapper, itemService, failureRecordService);
 
         StepProcessingResult result = adapter.check(
                 context(118L, LocalDate.of(2026, 8, 1)),
@@ -50,6 +59,9 @@ class CapCheckBatchAdapterTest {
         assertThat(captor.getAllValues())
                 .extracting(CapCalculationCommand::contractId)
                 .containsExactly(10L, 20L);
+        assertThat(captor.getAllValues())
+                .extracting(CapCalculationCommand::complianceEvidenceAmount)
+                .containsExactly(new BigDecimal("30000"), new BigDecimal("50000"));
         assertThat(captor.getAllValues()).allSatisfy(command -> {
             assertThat(command.paymentStage()).isEqualTo(PaymentStage.GA_TO_FC);
             assertThat(command.asOfDate()).isEqualTo(LocalDate.of(2026, 8, 31));
@@ -72,7 +84,8 @@ class CapCheckBatchAdapterTest {
                 Map.of("contractId", 10L),
                 "검증 데이터가 부족합니다."))
                 .when(itemService).process(argThat(command -> command.contractId().equals(10L)));
-        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(validationMapper, itemService);
+        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(
+                validationMapper, capCheckMapper, itemService, failureRecordService);
 
         StepProcessingResult result = adapter.check(
                 context(118L, LocalDate.of(2026, 8, 1)),
@@ -85,6 +98,12 @@ class CapCheckBatchAdapterTest {
             assertThat(skip.contractId()).isEqualTo(10L);
             assertThat(skip.reasonCode()).isEqualTo("CAP_CHECK_FAILED");
         });
+        verify(failureRecordService).record(
+                118L,
+                10L,
+                PaymentStage.INSURER_TO_GA,
+                "FGC-COMMON-002"
+        );
         verify(itemService).process(argThat(command -> command.contractId().equals(20L)));
     }
 
@@ -94,7 +113,8 @@ class CapCheckBatchAdapterTest {
                 .willReturn(List.of(10L));
         doThrow(new IllegalStateException("database unavailable"))
                 .when(itemService).process(argThat(command -> command.contractId().equals(10L)));
-        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(validationMapper, itemService);
+        CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(
+                validationMapper, capCheckMapper, itemService, failureRecordService);
 
         assertThatThrownBy(() -> adapter.check(
                 context(118L, LocalDate.of(2026, 8, 1)),
