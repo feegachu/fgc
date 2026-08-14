@@ -77,6 +77,20 @@ class ReconciliationReasonClassifierTest {
     }
 
     @Test
+    void 분개_증거가_없는_MATCHED_후보는_UNKNOWN_사유의_REVIEW_REQUIRED로_남긴다() {
+        ReconciliationCandidate candidate = candidate(
+                ReconciliationResultType.MATCHED, "MATCHED", List.of());
+        ReconciliationClassificationContext context = new ReconciliationClassificationContext();
+        context.setMissingJournalEvidence(true);
+
+        ReconciliationClassification result = classifier.classify(candidate, context);
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(result.primaryReasonCode()).isEqualTo("UNKNOWN");
+        assertThat(result.secondaryReasonCodes()).isEmpty();
+    }
+
+    @Test
     void 같은_입력은_반복해도_완전히_같은_결과를_만든다() {
         ReconciliationCandidate candidate = candidate(
                 ReconciliationResultType.REVIEW_REQUIRED,

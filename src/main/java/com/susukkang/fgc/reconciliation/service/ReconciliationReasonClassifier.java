@@ -75,5 +75,8 @@ public class ReconciliationReasonClassifier {
         if (context.isOrganizationMismatch()) {
             signals.add(ReconciliationReasonCode.ORGANIZATION_MISMATCH);
         }
+        if (context.isMissingJournalEvidence()) {
+            signals.add(ReconciliationReasonCode.UNKNOWN);
+        }
     }
 }

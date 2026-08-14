@@ -88,7 +88,7 @@
                    SELECT 1
                      FROM fgc.insurance_contract contract
                     WHERE contract.contract_id = #{contractId}
-                      AND contract.current_status IN ('CANCELLED', 'TERMINATED', 'MATURED')
+                      AND contract.current_status IN ('CANCELLED', 'TERMINATED', 'MATURED', 'LAPSED')
                ) AS invalidContractPayment,
                CASE
                    WHEN CAST(#{expectedAgentId} AS bigint) IS NULL

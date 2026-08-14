@@ -11,4 +11,5 @@ public class ReconciliationClassificationContext {
     private boolean organizationMismatch;
     private boolean policyVersionError;
     private boolean journalImbalance;
+    private boolean missingJournalEvidence;
 }

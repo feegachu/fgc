@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationCandidate;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationClassification;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationClassificationContext;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchInsertRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultInsertRow;
@@ -80,15 +81,15 @@ public class ReconciliationResultPersistenceService {
                 .distinct()
                 .sorted()
                 .toList();
-        ReconciliationClassification classification = reasonClassifier.classify(
-                candidate,
-                reconciliationResultMapper.findClassificationContext(
-                        candidate.contractId(),
-                        candidate.expectedAgentId(),
-                        candidate.actualAgentId(),
-                        journalHeaderIds
-                )
+        ReconciliationClassificationContext context = reconciliationResultMapper.findClassificationContext(
+                candidate.contractId(),
+                candidate.expectedAgentId(),
+                candidate.actualAgentId(),
+                journalHeaderIds
         );
+        context.setMissingJournalEvidence(candidate.sourceMatches().stream()
+                .anyMatch(source -> source.journalHeaderId() == null));
+        ReconciliationClassification classification = reasonClassifier.classify(candidate, context);
         row.setReconciliationRunId(request.reconciliationRunId());
         row.setMatchGroupKey(candidate.matchGroupKey());
         row.setContractId(candidate.contractId());

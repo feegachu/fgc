@@ -193,14 +193,24 @@ class GaFcReconciliationIntegrationTest {
                 contractId, policyVersionId, commissionItemId, agentId,
                 1, "650000", "CONFIRMED", "NO-JOURNAL");
 
-        GaFcMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
-                99L, 88L, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null)).getFirst();
+        Long reconciliationRunId = insertRunningReconciliationRun(insurerId, PaymentStage.GA_TO_FC);
+        ReconciliationExecutionRequest request = new ReconciliationExecutionRequest(
+                reconciliationRunId, null, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null);
+        GaFcMatchCandidate result = matcher.match(request).getFirst();
 
         assertThat(result.resultType()).isEqualTo(ReconciliationResultType.MATCHED);
         assertThat(result.scheduleLineIds()).containsExactly(scheduleLineId);
         assertThat(result.transactionAttributionIds()).containsExactly(confirmed.attributionId());
         assertThat(result.expectedJournalHeaderIds()).isEmpty();
         assertThat(result.actualJournalHeaderIds()).isEmpty();
+
+        persistenceService.persist(request, List.of(result));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT result_type || ':' || primary_reason_code
+                  FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id = ?
+                """, String.class, reconciliationRunId))
+                .isEqualTo("REVIEW_REQUIRED:UNKNOWN");
     }
 
     private Long insertSchedule(
