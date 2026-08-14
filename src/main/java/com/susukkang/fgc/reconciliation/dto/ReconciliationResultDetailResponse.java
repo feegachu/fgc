@@ -59,18 +59,26 @@ public record ReconciliationResultDetailResponse(
             String matchRole,
             Long scheduleLineId,
             Long transactionAttributionId,
+            Long commissionTransactionId,
             Long journalHeaderId,
             Long contractId,
             Long agentId,
             Long commissionItemId,
             Integer installmentNo,
+            LocalDate dueDate,
+            BigDecimal basisAmount,
+            BigDecimal ratePct,
+            LocalDate attributionDate,
+            LocalDate settlementMonth,
             LocalDate referenceDate,
             BigDecimal matchedAmount
     ) {
         static Match from(ReconciliationMatchDetailRow row) {
             return new Match(row.getMatchSeq(), row.getMatchRole(), row.getScheduleLineId(),
-                    row.getTransactionAttributionId(), row.getJournalHeaderId(), row.getContractId(),
-                    row.getAgentId(), row.getCommissionItemId(), row.getInstallmentNo(),
+                    row.getTransactionAttributionId(), row.getCommissionTransactionId(),
+                    row.getJournalHeaderId(), row.getContractId(), row.getAgentId(),
+                    row.getCommissionItemId(), row.getInstallmentNo(), row.getDueDate(),
+                    row.getBasisAmount(), row.getRatePct(), row.getAttributionDate(), row.getSettlementMonth(),
                     row.getReferenceDate(), row.getMatchedAmount());
         }
     }

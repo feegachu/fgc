@@ -239,11 +239,17 @@
                match.match_role AS matchRole,
                match.schedule_line_id AS scheduleLineId,
                match.transaction_attribution_id AS transactionAttributionId,
+               transaction.commission_transaction_id AS commissionTransactionId,
                COALESCE(expected_journal.journal_header_id, actual_journal.journal_header_id) AS journalHeaderId,
                COALESCE(schedule.contract_id, attribution.contract_id) AS contractId,
                COALESCE(line.beneficiary_agent_id, attribution.agent_id, transaction.recipient_agent_id) AS agentId,
                COALESCE(line.commission_item_id, transaction.commission_item_id) AS commissionItemId,
                COALESCE(line.installment_no, transaction.installment_no) AS installmentNo,
+               line.due_date AS dueDate,
+               line.basis_amount AS basisAmount,
+               line.rate_pct AS ratePct,
+               attribution.attribution_date AS attributionDate,
+               transaction.settlement_month AS settlementMonth,
                COALESCE(line.due_date, attribution.attribution_date) AS referenceDate,
                match.matched_amount AS matchedAmount
           FROM fgc.reconciliation_match match

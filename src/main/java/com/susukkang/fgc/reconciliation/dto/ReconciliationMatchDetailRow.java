@@ -14,11 +14,17 @@ public class ReconciliationMatchDetailRow {
     private String matchRole;
     private Long scheduleLineId;
     private Long transactionAttributionId;
+    private Long commissionTransactionId;
     private Long journalHeaderId;
     private Long contractId;
     private Long agentId;
     private Long commissionItemId;
     private Integer installmentNo;
+    private LocalDate dueDate;
+    private BigDecimal basisAmount;
+    private BigDecimal ratePct;
+    private LocalDate attributionDate;
+    private LocalDate settlementMonth;
     private LocalDate referenceDate;
     private BigDecimal matchedAmount;
 }
