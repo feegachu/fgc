@@ -53,8 +53,9 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                 request.settlementMonth(), request.insurerId());
 
         Map<BaseMatchKey, List<GaFcExpectedSourceRow>> expectedByKey = groupExpected(expectedSources);
-        Map<BaseMatchKey, List<GaFcActualSourceRow>> actualByKey = alignActualGroups(
+        ActualGroupAlignment actualAlignment = alignActualGroups(
                 expectedByKey.keySet(), groupActual(actualSources));
+        Map<BaseMatchKey, List<GaFcActualSourceRow>> actualByKey = actualAlignment.groups();
         Set<BaseMatchKey> keys = new LinkedHashSet<>();
         keys.addAll(expectedByKey.keySet());
         keys.addAll(actualByKey.keySet());
@@ -65,7 +66,8 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                         request,
                         key,
                         expectedByKey.getOrDefault(key, List.of()),
-                        actualByKey.getOrDefault(key, List.of())
+                        actualByKey.getOrDefault(key, List.of()),
+                        actualAlignment.ambiguousKeys().contains(key)
                 ))
                 .toList();
     }
@@ -74,7 +76,8 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
             ReconciliationExecutionRequest request,
             BaseMatchKey key,
             List<GaFcExpectedSourceRow> expectedSources,
-            List<GaFcActualSourceRow> actualSources
+            List<GaFcActualSourceRow> actualSources,
+            boolean ambiguousDateResolutionIssue
     ) {
         // 2026-08-13 yslee - 지급 스케줄·귀속행별 원 단위 반올림 후 합산
         // 기존 코드: GA→FC 예상·실제 지급을 비교하는 계산 경로가 없음
@@ -103,7 +106,8 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         // 기존 코드: 실제 지급예정일 null만 검토 대상으로 처리하고 예상 지급예정일 null은 누락으로 분리
         // 문제: 비교 기준이 없는 예상 원천이 ACTUAL_MISSING으로 확정되어 대사 집계를 왜곡할 수 있음
         // 개선: 예상·실제 어느 쪽이든 지급예정일이 없으면 REVIEW_REQUIRED 게이트를 우선 적용
-        boolean dateResolutionIssue = expectedSources.stream().anyMatch(source -> source.getDueDate() == null)
+        boolean dateResolutionIssue = ambiguousDateResolutionIssue
+                || expectedSources.stream().anyMatch(source -> source.getDueDate() == null)
                 || actualSources.stream().anyMatch(source -> source.getDueDate() == null);
 
         // 2026-08-13 yslee - 회차·수취 설계사 비교 불가능 상태와 실제 불일치 상태 분리
@@ -306,25 +310,29 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
 
     // 2026-08-14 yslee - FGC-FUN-050 허용오차 정책을 날짜 그룹 정렬에 적용
     // 기존 코드: 예정일을 BaseMatchKey에서 직접 비교해 날짜 정책을 확장할 수 없음
-    // 문제: 향후 비영 날짜 허용오차를 도입해도 같은 비교 그룹으로 합쳐지지 않음
-    // 개선: 동일 계약·수수료 항목·월의 실제 그룹을 TolerancePolicy 날짜 판정으로 정렬
-    private Map<BaseMatchKey, List<GaFcActualSourceRow>> alignActualGroups(
+    // 문제: 비영 정책에서 복수 예상일이 허용 범위에 들면 첫 키를 임의 선택해 잘못 일치시킬 수 있음
+    // 개선: 날짜 후보가 정확히 하나일 때만 정렬하고 복수 후보 키는 REVIEW_REQUIRED로 전달
+    private ActualGroupAlignment alignActualGroups(
             Set<BaseMatchKey> expectedKeys,
             Map<BaseMatchKey, List<GaFcActualSourceRow>> actualGroups
     ) {
         List<BaseMatchKey> orderedExpectedKeys = expectedKeys.stream().sorted(BaseMatchKey.ORDER).toList();
         Map<BaseMatchKey, List<GaFcActualSourceRow>> aligned = new LinkedHashMap<>();
+        Set<BaseMatchKey> ambiguousKeys = new LinkedHashSet<>();
         actualGroups.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey(BaseMatchKey.ORDER))
                 .forEach(entry -> {
-                    BaseMatchKey alignedKey = orderedExpectedKeys.stream()
+                    List<BaseMatchKey> candidates = orderedExpectedKeys.stream()
                             .filter(expectedKey -> expectedKey.sameDimensions(entry.getKey()))
                             .filter(expectedKey -> datesMatch(expectedKey.dueDate(), entry.getKey().dueDate()))
-                            .findFirst()
-                            .orElse(entry.getKey());
+                            .toList();
+                    BaseMatchKey alignedKey = candidates.size() == 1 ? candidates.getFirst() : entry.getKey();
+                    if (candidates.size() > 1) {
+                        ambiguousKeys.add(alignedKey);
+                    }
                     aligned.computeIfAbsent(alignedKey, ignored -> new ArrayList<>()).addAll(entry.getValue());
                 });
-        return aligned;
+        return new ActualGroupAlignment(aligned, ambiguousKeys);
     }
 
     private boolean datesMatch(LocalDate expectedDate, LocalDate actualDate) {
@@ -400,6 +408,12 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
 
     private static <T> T singleValue(List<T> values) {
         return values.size() == 1 ? values.getFirst() : null;
+    }
+
+    private record ActualGroupAlignment(
+            Map<BaseMatchKey, List<GaFcActualSourceRow>> groups,
+            Set<BaseMatchKey> ambiguousKeys
+    ) {
     }
 
     private record BaseMatchKey(Long contractId, Long commissionItemId, LocalDate dueMonth, LocalDate dueDate) {

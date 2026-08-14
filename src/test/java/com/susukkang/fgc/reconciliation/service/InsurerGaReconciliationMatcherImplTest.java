@@ -300,6 +300,35 @@ class InsurerGaReconciliationMatcherImplTest {
                         ReconciliationResultType.EXPECTED_MISSING);
     }
 
+    // 2026-08-14 yslee - FGC-FUN-050 비영 날짜 정책의 복수 후보 안전성 검증
+    // 기존 코드: 허용 범위에 예상일이 둘이면 정렬상 첫 키에 실제 원천을 임의 연결
+    // 문제: 비교 기준을 확정할 수 없는 원수사 명세가 MATCHED로 숨겨질 수 있음
+    // 개선: 복수 날짜 후보에 걸친 실제 원천은 별도 REVIEW_REQUIRED 후보로 보존
+    @Test
+    void 날짜_허용범위에_예상일이_둘이면_임의_매칭하지_않고_REVIEW_REQUIRED다() {
+        InsurerGaExpectedSourceRow firstExpected = expected(11L, 1, "650000", null);
+        InsurerGaExpectedSourceRow secondExpected = expected(12L, 2, "650000", null);
+        secondExpected.setDueDate(MONTH.plusDays(16));
+        InsurerGaActualSourceRow actual = actual(21L, "650000", null);
+        actual.setDueDate(MONTH.plusDays(15));
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L))
+                .willReturn(List.of(firstExpected, secondExpected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L)).willReturn(List.of(actual));
+        InsurerGaReconciliationMatcherImpl tolerantMatcher = new InsurerGaReconciliationMatcherImpl(
+                reconciliationMapper, oneDayTolerancePolicy());
+
+        List<InsurerGaMatchCandidate> results = tolerantMatcher.match(request());
+        InsurerGaMatchCandidate reviewRequired = results.stream()
+                .filter(candidate -> MONTH.plusDays(15).equals(candidate.dueDate()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(reviewRequired.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(reviewRequired.transactionAttributionIds()).containsExactly(21L);
+        assertThat(results).extracting(InsurerGaMatchCandidate::resultType)
+                .doesNotContain(ReconciliationResultType.MATCHED);
+    }
+
     @Test
     void GA_TO_FC_요청은_FUN_048_02_범위가_아니므로_거절한다() {
         ReconciliationExecutionRequest wrongStage = new ReconciliationExecutionRequest(
@@ -312,6 +341,25 @@ class InsurerGaReconciliationMatcherImplTest {
 
     private static ReconciliationExecutionRequest request() {
         return new ReconciliationExecutionRequest(7L, 9L, MONTH, PaymentStage.INSURER_TO_GA, 3L, 5L);
+    }
+
+    private static TolerancePolicy oneDayTolerancePolicy() {
+        return new TolerancePolicy() {
+            @Override
+            public boolean matchesAmount(BigDecimal expectedAmount, BigDecimal actualAmount) {
+                return expectedAmount.compareTo(actualAmount) == 0;
+            }
+
+            @Override
+            public boolean matchesDate(LocalDate expectedDate, LocalDate actualDate) {
+                return Math.abs(expectedDate.toEpochDay() - actualDate.toEpochDay()) <= 1;
+            }
+
+            @Override
+            public boolean matchesInstallment(Integer expectedInstallment, Integer actualInstallment) {
+                return expectedInstallment.equals(actualInstallment);
+            }
+        };
     }
 
     private static InsurerGaExpectedSourceRow expected(
