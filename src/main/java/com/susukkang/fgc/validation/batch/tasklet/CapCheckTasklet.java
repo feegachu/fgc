@@ -1,22 +1,18 @@
 package com.susukkang.fgc.validation.batch.tasklet;
 
-import com.susukkang.fgc.cap.dto.CapCalculationCommand;
-import com.susukkang.fgc.cap.dto.CapCalculationResult;
-import com.susukkang.fgc.cap.service.CapCalculator;
-import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.validation.batch.PaymentStagePartitioner;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
+import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
+import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
+import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
+import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
+import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
-import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-
 /**
  * 설명 : CapCheckTasklet
  *
@@ -26,24 +22,45 @@ import java.time.LocalDate;
  */
 @RequiredArgsConstructor
 public class CapCheckTasklet implements Tasklet {
-    private CapCalculator capCalculator;
+
+    private final CapCheckBatchPort capCheckBatchPort;
+
     @Override
-    public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+    public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext ) {
+        Long validationRunId =
+                ValidationRunBatchContext.getValidationRunId(chunkContext);
 
-        Long validationRunId = ValidationRunBatchContext.getValidationRunId(chunkContext);
-
-        CapCalculationCommand command =
-                new CapCalculationCommand(
-                        contractId,
-                        paymentStage,
-                        asOfDate,
-                        checkKind,
-                        validationRunId,
-                        complianceEvidenceAmount
+        MonthlyValidationJobParameters parameters =
+                MonthlyValidationJobParameters.from(
+                        chunkContext.getStepContext()
+                                .getStepExecution()
+                                .getJobParameters()
                 );
-        JobExecution jobExecution = chunkContext.getStepContext().getStepExecution().getJobExecution();
-        CapCalculationResult result = capCalculator.calculate(command);
-        capService.checkCap(jobExecution.getJobParameters(contract));
+
+        String paymentStageValue =
+                chunkContext.getStepContext()
+                        .getStepExecution()
+                        .getExecutionContext()
+                        .getString(PaymentStagePartitioner.PAYMENT_STAGE_KEY);
+
+        PaymentStage paymentStage =
+                PaymentStage.valueOf(paymentStageValue);
+
+        ValidationJobContext jobContext = new ValidationJobContext(
+                parameters.validationMonth(),
+                parameters.runNo(),
+                parameters.runType(),
+                parameters.triggeredBy(),
+                parameters.requestId()
+        );
+
+        StepProcessingResult result = capCheckBatchPort.check(
+                new ValidationStepContext(validationRunId, jobContext),
+                paymentStage
+        );
+
+        contribution.incrementWriteCount(result.processedCount());
+
         return RepeatStatus.FINISHED;
     }
 }

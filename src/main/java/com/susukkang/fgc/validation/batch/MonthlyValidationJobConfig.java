@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
+import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
 import com.susukkang.fgc.validation.batch.tasklet.*;
 import com.susukkang.fgc.validation.service.*;
@@ -35,7 +37,7 @@ public class MonthlyValidationJobConfig {
     private final ValidationTargetSelectionService validationTargetSelectionService;
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
     private final ValidationRunScheduleService validationRunScheduleService;
-    private final ValidationRunCapService validationRunCapService;
+    private final CapCheckBatchPort capCheckBatchPort;
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
@@ -96,16 +98,6 @@ public class MonthlyValidationJobConfig {
                 .listener(progressListener(3, false))
                 .build();
     }
-    // TODO 현준
-    /**
-     * capCheckStep의 실제 워크로드를 처리하는 "워커" Step
-     */
-    @Bean
-    public Step capCheckWorkerStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
-        return new StepBuilder("capCheckWorkerStep", jobRepository)
-                .tasklet(new CapCheckTasklet(validationRunCapService), transactionManager)
-                .build();
-    }
 
     /**
      * capCheckStep "매니저"
@@ -117,6 +109,15 @@ public class MonthlyValidationJobConfig {
                 .step(capCheckWorkerStep)
                 .taskExecutor(new SyncTaskExecutor())
                 .listener(progressListener(4, false))
+                .build();
+    }
+    /**
+     * capCheckStep의 실제 워크로드를 처리하는 "워커" Step
+     */
+    @Bean
+    public Step capCheckWorkerStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("capCheckWorkerStep", jobRepository)
+                .tasklet(new CapCheckTasklet(capCheckBatchPort), transactionManager)
                 .build();
     }
 
