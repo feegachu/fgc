@@ -99,6 +99,13 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         Integer actualInstallmentNo = singleValue(actualInstallments);
         boolean hasBothSources = !expectedSources.isEmpty() && !actualSources.isEmpty();
 
+        // 2026-08-14 yslee - FGC-FUN-050 지급예정일 식별 불가 상태를 누락 판정과 분리
+        // 기존 코드: 실제 지급예정일 null만 검토 대상으로 처리하고 예상 지급예정일 null은 누락으로 분리
+        // 문제: 비교 기준이 없는 예상 원천이 ACTUAL_MISSING으로 확정되어 대사 집계를 왜곡할 수 있음
+        // 개선: 예상·실제 어느 쪽이든 지급예정일이 없으면 REVIEW_REQUIRED 게이트를 우선 적용
+        boolean dateResolutionIssue = expectedSources.stream().anyMatch(source -> source.getDueDate() == null)
+                || actualSources.stream().anyMatch(source -> source.getDueDate() == null);
+
         // 2026-08-13 yslee - 회차·수취 설계사 비교 불가능 상태와 실제 불일치 상태 분리
         // 기존 코드: 지급 건의 회차·수취인 값이 없을 때 임의 추정하거나 불일치로 단정할 수 있음
         // 문제: 비교 기준이 없는 데이터가 확정 불일치 건수에 포함되면 FUN-048 대사 집계가 왜곡됨
@@ -132,6 +139,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         ReconciliationResultType resultType = classify(
                 expectedSources,
                 actualSources,
+                dateResolutionIssue,
                 installmentResolutionIssue,
                 installmentMismatch,
                 agentResolutionIssue,
@@ -143,6 +151,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                 resultType,
                 expectedSources,
                 actualSources,
+                dateResolutionIssue,
                 installmentResolutionIssue,
                 installmentMismatch,
                 agentResolutionIssue,
@@ -210,6 +219,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
     private ReconciliationResultType classify(
             List<GaFcExpectedSourceRow> expectedSources,
             List<GaFcActualSourceRow> actualSources,
+            boolean dateResolutionIssue,
             boolean installmentResolutionIssue,
             boolean installmentMismatch,
             boolean agentResolutionIssue,
@@ -217,7 +227,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
             BigDecimal expectedTotal,
             BigDecimal actualTotal
     ) {
-        if (actualSources.stream().anyMatch(source -> source.getDueDate() == null)) {
+        if (dateResolutionIssue) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
         if (installmentResolutionIssue || agentResolutionIssue) {
@@ -247,6 +257,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
             ReconciliationResultType primary,
             List<GaFcExpectedSourceRow> expectedSources,
             List<GaFcActualSourceRow> actualSources,
+            boolean dateResolutionIssue,
             boolean installmentResolutionIssue,
             boolean installmentMismatch,
             boolean agentResolutionIssue,
@@ -268,12 +279,14 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         if (agentResolutionIssue || agentMismatch) {
             reasons.add(ReconciliationResultType.AGENT_MISMATCH.name());
         }
-        if (expectedSources.isEmpty()) {
-            reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
-        } else if (actualSources.isEmpty()) {
-            reasons.add(ReconciliationResultType.ACTUAL_MISSING.name());
-        } else if (!tolerancePolicy.matchesAmount(expectedTotal, actualTotal)) {
-            reasons.add(ReconciliationResultType.AMOUNT_DIFFERENCE.name());
+        if (!dateResolutionIssue) {
+            if (expectedSources.isEmpty()) {
+                reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
+            } else if (actualSources.isEmpty()) {
+                reasons.add(ReconciliationResultType.ACTUAL_MISSING.name());
+            } else if (!tolerancePolicy.matchesAmount(expectedTotal, actualTotal)) {
+                reasons.add(ReconciliationResultType.AMOUNT_DIFFERENCE.name());
+            }
         }
         return reasons.stream().filter(reason -> !reason.equals(primary.name())).distinct().toList();
     }
@@ -291,7 +304,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         return grouped;
     }
 
-    // 2026-08-14 yslee - FUN-050 허용오차 정책을 날짜 그룹 정렬에 적용
+    // 2026-08-14 yslee - FGC-FUN-050 허용오차 정책을 날짜 그룹 정렬에 적용
     // 기존 코드: 예정일을 BaseMatchKey에서 직접 비교해 날짜 정책을 확장할 수 없음
     // 문제: 향후 비영 날짜 허용오차를 도입해도 같은 비교 그룹으로 합쳐지지 않음
     // 개선: 동일 계약·수수료 항목·월의 실제 그룹을 TolerancePolicy 날짜 판정으로 정렬

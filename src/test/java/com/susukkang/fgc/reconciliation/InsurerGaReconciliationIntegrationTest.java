@@ -301,7 +301,7 @@ class InsurerGaReconciliationIntegrationTest {
         assertThat(result.actualInstallmentNo()).isEqualTo(14);
     }
 
-    // 2026-08-14 yslee - FUN-050 보험사→GA 0원·정확 일자 경계값 검증
+    // 2026-08-14 yslee - FGC-FUN-050 보험사→GA 0원·정확 일자 경계값 검증
     // 기존 코드: 동일 값 정상 일치와 회차 불일치만 PostgreSQL 통합 환경에서 검증
     // 문제: 1원·1일 차이가 원수사 명세 조회 이후 정상 일치로 처리될 위험이 있음
     // 개선: 실제 원수사 명세·분개 원천으로 금액과 날짜 경계를 검증

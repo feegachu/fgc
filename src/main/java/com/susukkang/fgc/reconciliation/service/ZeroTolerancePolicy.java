@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.util.Objects;
 
 /**
- * 설명 : FUN-050 1차 고정 허용오차 정책
+ * 설명 : FGC-FUN-050 1차 고정 허용오차 정책
  *
  * 0원·정확 날짜·정확 회차만 일치한다.
  *

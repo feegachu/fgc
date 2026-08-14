@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 설명 : FUN-050 대사 금액·날짜·회차 허용오차 판정 계약
+ * 설명 : FGC-FUN-050 대사 금액·날짜·회차 허용오차 판정 계약
  *
  * 비교 기준을 확정할 수 없는 null·복수값 입력은 엔진에서 먼저 검토 대상으로 분류한다.
  *

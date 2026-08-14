@@ -107,6 +107,13 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         Integer installmentNo = singleValue(expectedInstallments);
         Integer actualInstallmentNo = singleValue(actualInstallments);
         boolean hasBothSources = !expectedSources.isEmpty() && !actualSources.isEmpty();
+
+        // 2026-08-14 yslee - FGC-FUN-050 지급예정일 식별 불가 상태를 누락 판정과 분리
+        // 기존 코드: 실제 지급예정일 null만 검토 대상으로 처리하고 예상 지급예정일 null은 누락으로 분리
+        // 문제: 비교 기준이 없는 예상 원천이 ACTUAL_MISSING으로 확정되어 대사 집계를 왜곡할 수 있음
+        // 개선: 예상·실제 어느 쪽이든 지급예정일이 없으면 REVIEW_REQUIRED 게이트를 우선 적용
+        boolean dateResolutionIssue = expectedSources.stream().anyMatch(source -> source.getDueDate() == null)
+                || actualSources.stream().anyMatch(source -> source.getDueDate() == null);
         // 2026-08-13 yslee - 실제 명세 회차의 누락·불일치 판정 분리
         // 기존 코드: 예상 회차만 확인해 모호한 경우 REVIEW_REQUIRED, 실제 회차 불일치 판정 경로는 없음
         // 문제: REC-07의 예상 13회차·실제 14회차가 INSTALLMENT_MISMATCH로 산출되지 않음
@@ -144,6 +151,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         ReconciliationResultType resultType = classify(
                 expectedSources,
                 actualSources,
+                dateResolutionIssue,
                 installmentResolutionIssue,
                 installmentMismatch,
                 agentResolutionIssue,
@@ -155,6 +163,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 resultType,
                 expectedSources,
                 actualSources,
+                dateResolutionIssue,
                 installmentResolutionIssue,
                 installmentMismatch,
                 agentResolutionIssue,
@@ -235,6 +244,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
     private ReconciliationResultType classify(
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
+            boolean dateResolutionIssue,
             boolean installmentResolutionIssue,
             boolean installmentMismatch,
             boolean agentResolutionIssue,
@@ -242,7 +252,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             BigDecimal expectedTotal,
             BigDecimal actualTotal
     ) {
-        if (actualSources.stream().anyMatch(source -> source.getDueDate() == null)) {
+        if (dateResolutionIssue) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
         if (installmentResolutionIssue) {
@@ -275,6 +285,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             ReconciliationResultType primary,
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
+            boolean dateResolutionIssue,
             boolean installmentResolutionIssue,
             boolean installmentMismatch,
             boolean agentResolutionIssue,
@@ -294,12 +305,14 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         } else if (agentMismatch) {
             reasons.add(ReconciliationResultType.AGENT_MISMATCH.name());
         }
-        if (expectedSources.isEmpty()) {
-            reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
-        } else if (actualSources.isEmpty()) {
-            reasons.add(ReconciliationResultType.ACTUAL_MISSING.name());
-        } else if (!tolerancePolicy.matchesAmount(expectedTotal, actualTotal)) {
-            reasons.add(ReconciliationResultType.AMOUNT_DIFFERENCE.name());
+        if (!dateResolutionIssue) {
+            if (expectedSources.isEmpty()) {
+                reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
+            } else if (actualSources.isEmpty()) {
+                reasons.add(ReconciliationResultType.ACTUAL_MISSING.name());
+            } else if (!tolerancePolicy.matchesAmount(expectedTotal, actualTotal)) {
+                reasons.add(ReconciliationResultType.AMOUNT_DIFFERENCE.name());
+            }
         }
         return reasons.stream().filter(reason -> !reason.equals(primary.name())).distinct().toList();
     }
@@ -317,7 +330,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         return grouped;
     }
 
-    // 2026-08-14 yslee - FUN-050 허용오차 정책을 날짜 그룹 정렬에 적용
+    // 2026-08-14 yslee - FGC-FUN-050 허용오차 정책을 날짜 그룹 정렬에 적용
     // 기존 코드: 예정일을 BaseMatchKey에서 직접 비교해 날짜 정책을 확장할 수 없음
     // 문제: 향후 비영 날짜 허용오차를 도입해도 같은 비교 그룹으로 합쳐지지 않음
     // 개선: 동일 계약·수수료 항목·월의 실제 그룹을 TolerancePolicy 날짜 판정으로 정렬

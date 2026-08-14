@@ -274,6 +274,32 @@ class InsurerGaReconciliationMatcherImplTest {
         assertThat(result.matchGroupKey()).endsWith(":ENA-A1:NA");
     }
 
+    // 2026-08-14 yslee - FGC-FUN-050 예상 지급예정일 누락 회귀 검증
+    // 기존 코드: 예상 지급예정일 null 그룹을 실제 명세와 분리한 뒤 ACTUAL_MISSING으로 확정
+    // 문제: 비교 기준이 없는 원천을 누락으로 집계해 수동 검토 대상이 사라짐
+    // 개선: null 날짜 예상 원천 후보는 REVIEW_REQUIRED이고 누락 보조 사유를 남기지 않는지 검증
+    @Test
+    void 예상_지급예정일이_없으면_ACTUAL_MISSING으로_단정하지_않고_REVIEW_REQUIRED다() {
+        InsurerGaExpectedSourceRow expected = expected(11L, 1, "650000", null);
+        expected.setDueDate(null);
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L)).willReturn(List.of(expected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(actual(21L, "650000", null)));
+
+        List<InsurerGaMatchCandidate> results = matcher.match(request());
+        InsurerGaMatchCandidate reviewRequired = results.stream()
+                .filter(candidate -> candidate.dueDate() == null)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(reviewRequired.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(reviewRequired.secondaryReasonCodes()).isEmpty();
+        assertThat(results).extracting(InsurerGaMatchCandidate::resultType)
+                .containsExactlyInAnyOrder(
+                        ReconciliationResultType.REVIEW_REQUIRED,
+                        ReconciliationResultType.EXPECTED_MISSING);
+    }
+
     @Test
     void GA_TO_FC_요청은_FUN_048_02_범위가_아니므로_거절한다() {
         ReconciliationExecutionRequest wrongStage = new ReconciliationExecutionRequest(

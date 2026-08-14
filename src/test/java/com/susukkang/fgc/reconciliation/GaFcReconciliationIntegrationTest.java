@@ -225,7 +225,7 @@ class GaFcReconciliationIntegrationTest {
                 .isEqualTo("REVIEW_REQUIRED:UNKNOWN");
     }
 
-    // 2026-08-14 yslee - FUN-050 GA→FC 0원·정확 일자·정확 회차 경계값 검증
+    // 2026-08-14 yslee - FGC-FUN-050 GA→FC 0원·정확 일자·정확 회차 경계값 검증
     // 기존 코드: 동일 값 정상 일치와 일부 단위 경계만 검증
     // 문제: 실제 PostgreSQL 원천 조회에서 1원·1일·1회차 차이가 정상 일치로 처리될 위험이 있음
     // 개선: 각 경계 차이를 실제 원천 데이터로 생성해 불일치 유형과 비교값을 검증
