@@ -40,7 +40,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
 
     private final GaFcReconciliationMapper reconciliationMapper;
-    private final ReconciliationAmountTolerancePolicy tolerancePolicy;
+    private final TolerancePolicy tolerancePolicy;
 
     @Override
     @Transactional(readOnly = true)
@@ -53,7 +53,8 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                 request.settlementMonth(), request.insurerId());
 
         Map<BaseMatchKey, List<GaFcExpectedSourceRow>> expectedByKey = groupExpected(expectedSources);
-        Map<BaseMatchKey, List<GaFcActualSourceRow>> actualByKey = groupActual(actualSources);
+        Map<BaseMatchKey, List<GaFcActualSourceRow>> actualByKey = alignActualGroups(
+                expectedByKey.keySet(), groupActual(actualSources));
         Set<BaseMatchKey> keys = new LinkedHashSet<>();
         keys.addAll(expectedByKey.keySet());
         keys.addAll(actualByKey.keySet());
@@ -109,7 +110,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                 || actualInstallments.size() != 1);
         boolean installmentMismatch = hasBothSources
                 && !installmentResolutionIssue
-                && !Objects.equals(installmentNo, actualInstallmentNo);
+                && !tolerancePolicy.matchesInstallment(installmentNo, actualInstallmentNo);
 
         List<Long> expectedAgentIds = distinctLongs(expectedSources.stream()
                 .map(GaFcExpectedSourceRow::getExpectedAgentId)
@@ -237,7 +238,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         if (agentMismatch) {
             return ReconciliationResultType.AGENT_MISMATCH;
         }
-        return tolerancePolicy.matches(expectedTotal, actualTotal)
+        return tolerancePolicy.matchesAmount(expectedTotal, actualTotal)
                 ? ReconciliationResultType.MATCHED
                 : ReconciliationResultType.AMOUNT_DIFFERENCE;
     }
@@ -271,7 +272,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
             reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
         } else if (actualSources.isEmpty()) {
             reasons.add(ReconciliationResultType.ACTUAL_MISSING.name());
-        } else if (!tolerancePolicy.matches(expectedTotal, actualTotal)) {
+        } else if (!tolerancePolicy.matchesAmount(expectedTotal, actualTotal)) {
             reasons.add(ReconciliationResultType.AMOUNT_DIFFERENCE.name());
         }
         return reasons.stream().filter(reason -> !reason.equals(primary.name())).distinct().toList();
@@ -288,6 +289,35 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                     ignored -> new ArrayList<>()).add(row);
         }
         return grouped;
+    }
+
+    // 2026-08-14 yslee - FUN-050 허용오차 정책을 날짜 그룹 정렬에 적용
+    // 기존 코드: 예정일을 BaseMatchKey에서 직접 비교해 날짜 정책을 확장할 수 없음
+    // 문제: 향후 비영 날짜 허용오차를 도입해도 같은 비교 그룹으로 합쳐지지 않음
+    // 개선: 동일 계약·수수료 항목·월의 실제 그룹을 TolerancePolicy 날짜 판정으로 정렬
+    private Map<BaseMatchKey, List<GaFcActualSourceRow>> alignActualGroups(
+            Set<BaseMatchKey> expectedKeys,
+            Map<BaseMatchKey, List<GaFcActualSourceRow>> actualGroups
+    ) {
+        List<BaseMatchKey> orderedExpectedKeys = expectedKeys.stream().sorted(BaseMatchKey.ORDER).toList();
+        Map<BaseMatchKey, List<GaFcActualSourceRow>> aligned = new LinkedHashMap<>();
+        actualGroups.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(BaseMatchKey.ORDER))
+                .forEach(entry -> {
+                    BaseMatchKey alignedKey = orderedExpectedKeys.stream()
+                            .filter(expectedKey -> expectedKey.sameDimensions(entry.getKey()))
+                            .filter(expectedKey -> datesMatch(expectedKey.dueDate(), entry.getKey().dueDate()))
+                            .findFirst()
+                            .orElse(entry.getKey());
+                    aligned.computeIfAbsent(alignedKey, ignored -> new ArrayList<>()).addAll(entry.getValue());
+                });
+        return aligned;
+    }
+
+    private boolean datesMatch(LocalDate expectedDate, LocalDate actualDate) {
+        return expectedDate != null
+                && actualDate != null
+                && tolerancePolicy.matchesDate(expectedDate, actualDate);
     }
 
     private static Map<BaseMatchKey, List<GaFcActualSourceRow>> groupActual(
@@ -365,5 +395,11 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                 .thenComparing(BaseMatchKey::commissionItemId)
                 .thenComparing(BaseMatchKey::dueMonth)
                 .thenComparing(BaseMatchKey::dueDate, Comparator.nullsLast(Comparator.naturalOrder()));
+
+        private boolean sameDimensions(BaseMatchKey other) {
+            return contractId.equals(other.contractId)
+                    && commissionItemId.equals(other.commissionItemId)
+                    && dueMonth.equals(other.dueMonth);
+        }
     }
 }

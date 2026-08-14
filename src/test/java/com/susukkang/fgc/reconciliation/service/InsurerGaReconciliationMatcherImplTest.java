@@ -42,7 +42,7 @@ class InsurerGaReconciliationMatcherImplTest {
     void setUp() {
         matcher = new InsurerGaReconciliationMatcherImpl(
                 reconciliationMapper,
-                new ZeroAmountTolerancePolicy()
+                new ZeroTolerancePolicy()
         );
     }
 

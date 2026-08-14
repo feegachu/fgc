@@ -42,7 +42,7 @@ class GaFcReconciliationMatcherImplTest {
     void setUp() {
         matcher = new GaFcReconciliationMatcherImpl(
                 reconciliationMapper,
-                new ZeroAmountTolerancePolicy()
+                new ZeroTolerancePolicy()
         );
     }
 
