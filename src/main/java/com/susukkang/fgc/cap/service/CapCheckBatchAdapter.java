@@ -4,7 +4,6 @@ import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
-import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
@@ -28,7 +27,7 @@ import java.util.List;
 @Service
 public class CapCheckBatchAdapter implements CapCheckBatchPort {
     private final ValidationTargetSelectionMapper validationMapper;
-    private final CapCheckService capCheckService;
+    private final CapCheckBatchItemService itemService;
     /**
      * 설명 : 배치 검증을 할 떄 들어오는 StepContext에서 계약 정보를 받아 1200%한도를 검증하는 메서드
      *
@@ -61,16 +60,16 @@ public class CapCheckBatchAdapter implements CapCheckBatchPort {
 
         for (Long contractId : contractIds) {
             try {
-                capCheckService.calculateAndSave(
+                CapCalculationCommand command =
                         new CapCalculationCommand(
                                 contractId,
                                 paymentStage,
                                 asOfDate,
                                 CapCheckKind.MONTHLY,
                                 validationRunId
-                        )
-                );
+                        );
 
+                itemService.process(command);
                 // 해당 계약의 계산 및 저장 성공
                 processedCount++;
 
