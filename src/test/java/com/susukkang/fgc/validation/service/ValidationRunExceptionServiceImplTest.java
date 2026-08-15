@@ -29,11 +29,12 @@ class ValidationRunExceptionServiceImplTest {
         given(exceptionCaseMapper.insertFromCapChecks(validationRunId)).willReturn(2L);
         given(exceptionCaseMapper.insertFromArbitrageChecks(validationRunId)).willReturn(3L);
         given(exceptionCaseMapper.insertFromReconciliationResults(validationRunId)).willReturn(4L);
+        given(exceptionCaseMapper.insertFromJournalImbalances(validationRunId)).willReturn(5L);
 
         StepProcessingResult result = new ValidationRunExceptionServiceImpl(exceptionCaseMapper)
                 .generate(context(validationRunId));
 
-        assertThat(result.processedCount()).isEqualTo(9L);
+        assertThat(result.processedCount()).isEqualTo(14L);
         assertThat(result.skippedCount()).isZero();
         assertThat(result.failureCount()).isZero();
         assertThat(result.skips()).isEmpty();
@@ -42,6 +43,7 @@ class ValidationRunExceptionServiceImplTest {
         calls.verify(exceptionCaseMapper).insertFromCapChecks(validationRunId);
         calls.verify(exceptionCaseMapper).insertFromArbitrageChecks(validationRunId);
         calls.verify(exceptionCaseMapper).insertFromReconciliationResults(validationRunId);
+        calls.verify(exceptionCaseMapper).insertFromJournalImbalances(validationRunId);
     }
 
     @Test

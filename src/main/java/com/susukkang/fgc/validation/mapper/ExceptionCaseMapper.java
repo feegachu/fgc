@@ -60,4 +60,6 @@ public interface ExceptionCaseMapper {
     long insertFromArbitrageChecks(@Param("validationRunId") Long validationRunId);
     // 대사 일치 관련
     long insertFromReconciliationResults(@Param("validationRunId") Long validationRunId);
+    // 검증원장 차변·대변 불균형 관련
+    long insertFromJournalImbalances(@Param("validationRunId") Long validationRunId);
 }

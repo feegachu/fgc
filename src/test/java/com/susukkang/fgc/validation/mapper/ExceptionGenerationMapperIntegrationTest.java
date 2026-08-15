@@ -25,7 +25,7 @@ class ExceptionGenerationMapperIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void createsCapArbitrageAndReconciliationExceptionsIdempotently() {
+    void createsAllValidationExceptionsIdempotently() {
         List<Long> contractIds = jdbcTemplate.queryForList("""
                 SELECT contract_id
                   FROM fgc.insurance_contract
@@ -38,15 +38,18 @@ class ExceptionGenerationMapperIntegrationTest {
         insertCapChecks(validationRunId, contractIds);
         insertArbitrageChecks(validationRunId, contractIds.get(0));
         insertReconciliationResults(validationRunId, contractIds.get(0));
+        insertJournalImbalance(validationRunId, contractIds.get(0));
 
         long capCreated = exceptionCaseMapper.insertFromCapChecks(validationRunId);
         long arbitrageCreated = exceptionCaseMapper.insertFromArbitrageChecks(validationRunId);
         long reconciliationCreated =
                 exceptionCaseMapper.insertFromReconciliationResults(validationRunId);
+        long journalCreated = exceptionCaseMapper.insertFromJournalImbalances(validationRunId);
 
         assertThat(capCreated).isEqualTo(2L);
         assertThat(arbitrageCreated).isEqualTo(3L);
         assertThat(reconciliationCreated).isEqualTo(2L);
+        assertThat(journalCreated).isEqualTo(1L);
 
         List<Map<String, Object>> exceptions = jdbcTemplate.queryForList("""
                 SELECT exception_type, severity, source_entity_type
@@ -55,7 +58,7 @@ class ExceptionGenerationMapperIntegrationTest {
                  ORDER BY exception_type
                 """, validationRunId);
 
-        assertThat(exceptions).hasSize(7);
+        assertThat(exceptions).hasSize(8);
         assertThat(exceptions).extracting(row -> row.get("exception_type"))
                 .containsExactlyInAnyOrder(
                         "CAP_VIOLATION",
@@ -63,6 +66,7 @@ class ExceptionGenerationMapperIntegrationTest {
                         "ARBITRAGE_CANDIDATE",
                         "REFUND_TABLE_MISSING",
                         "PRODUCT_CODE_MISMATCH",
+                        "JOURNAL_IMBALANCE",
                         "RECONCILIATION_MISMATCH",
                         "RECONCILIATION_MISMATCH");
         assertThat(exceptions)
@@ -75,12 +79,13 @@ class ExceptionGenerationMapperIntegrationTest {
         assertThat(exceptionCaseMapper.insertFromCapChecks(validationRunId)).isZero();
         assertThat(exceptionCaseMapper.insertFromArbitrageChecks(validationRunId)).isZero();
         assertThat(exceptionCaseMapper.insertFromReconciliationResults(validationRunId)).isZero();
+        assertThat(exceptionCaseMapper.insertFromJournalImbalances(validationRunId)).isZero();
 
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.exception_case WHERE validation_run_id = ?",
                 Integer.class,
                 validationRunId);
-        assertThat(count).isEqualTo(7);
+        assertThat(count).isEqualTo(8);
     }
 
     private Long insertValidationRun() {
@@ -203,5 +208,40 @@ class ExceptionGenerationMapperIntegrationTest {
                 """, reconciliationRunId, matchGroupKey, contractId,
                 resultType, expectedAmount, actualAmount,
                 expectedAmount - actualAmount, resultType);
+    }
+
+    private void insertJournalImbalance(Long validationRunId, Long contractId) {
+        Long journalHeaderId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.journal_header (
+                    journal_no, journal_date, journal_type,
+                    source_entity_type, source_entity_id,
+                    validation_run_id, contract_id, status
+                ) VALUES (?, ?, 'EXPECTED_FC_PAYOUT',
+                          'VALIDATION_RUN', ?, ?, ?, 'DRAFT')
+                RETURNING journal_header_id
+                """, Long.class,
+                "TEST-IMBALANCE-" + validationRunId,
+                TEST_MONTH,
+                String.valueOf(validationRunId),
+                validationRunId,
+                contractId);
+
+        List<Long> accountIds = jdbcTemplate.queryForList("""
+                SELECT journal_account_id
+                  FROM fgc.journal_account
+                 ORDER BY journal_account_id
+                 LIMIT 2
+                """, Long.class);
+        assertThat(accountIds).hasSize(2);
+
+        jdbcTemplate.update("""
+                INSERT INTO fgc.journal_line (
+                    journal_header_id, line_no, journal_account_id,
+                    debit_amount, credit_amount, contract_id
+                ) VALUES (?, 1, ?, 100000, 0, ?),
+                         (?, 2, ?, 0, 90000, ?)
+                """,
+                journalHeaderId, accountIds.get(0), contractId,
+                journalHeaderId, accountIds.get(1), contractId);
     }
 }
