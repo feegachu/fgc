@@ -155,7 +155,6 @@ public class MonthlyValidationJobConfig {
                 .listener(progressListener(7, false))
                 .build();
     }
-    // TODO FUN-052 예소
     @Bean
     public Step exceptionGenerationStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("exceptionGenerationStep", jobRepository)

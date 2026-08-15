@@ -45,4 +45,19 @@ public interface ExceptionCaseMapper {
             @Param("paymentStage") String paymentStage,
             @Param("title") String title,
             @Param("description") String description);
+
+    /**
+     * 설명 : 예외건 처리를 위해 만든 메서드들
+     *
+     * @param  validationRunId 배치 실행 ID
+     * @return 처리된 건수
+     * @author hjKang
+     * @since 2026-08-15
+     */
+    // Cap 1200%관련
+    long insertFromCapChecks(@Param("validationRunId") Long validationRunId);
+    // 차익거래 관련
+    long insertFromArbitrageChecks(@Param("validationRunId") Long validationRunId);
+    // 대사 일치 관련
+    long insertFromReconciliationResults(@Param("validationRunId") Long validationRunId);
 }
