@@ -49,7 +49,7 @@
           <ul class="sidebar-subnav">
             <li><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-BASE-')} ? ' is-active'" th:href="@{/base}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-BASE-')} ? 'page' : null">기준정보</a></li>
             <li><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-POL-')} ? ' is-active'" th:href="@{/policies}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-POL-')} ? 'page' : null">정책·룰셋</a></li>
-            <li th:if="${roleCode == 'COMPLIANCE' or roleCode == 'SYSTEM_ADMIN'}"><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? ' is-active'" th:href="@{/audit-logs}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? 'page' : null">감사로그</a></li>
+            <li th:if="${canViewAuditLog}"><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? ' is-active'" th:href="@{/audit-logs}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? 'page' : null">감사로그</a></li>
           </ul>
         </details>
       </li>

@@ -22,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +51,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest
 @Transactional
+// FUN-002(#82) — confirm()에 @PreAuthorize(Roles.CAN_PROCESS)가 붙은 뒤로 서비스를 직접 호출하는
+// 이 통합 테스트에도 SecurityContext가 필요하다. 지급 확정은 SETTLEMENT가 소유하는 동작이다.
+@WithMockUser(roles = "SETTLEMENT")
 class CommissionPaymentIntegrationTest {
 
     @Autowired
@@ -399,7 +404,10 @@ class CommissionPaymentIntegrationTest {
 
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        // @WithMockUser는 메인 스레드의 SecurityContext(ThreadLocal)만 채운다. 워커 스레드가
+        // confirm()을 직접 호출하므로 제출 시점의 SecurityContext를 감싸 넘겨준다.
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(
+                Executors.newFixedThreadPool(2));
         try {
             Future<String> firstResult = executor.submit(() -> confirmOutcome(
                     first.paymentId(), "IT-LOCK-A-" + runId, ready, start
