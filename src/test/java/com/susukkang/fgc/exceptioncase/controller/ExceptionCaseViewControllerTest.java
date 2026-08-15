@@ -138,6 +138,20 @@ class ExceptionCaseViewControllerTest {
     }
 
     @Test
+    void 공백만_있는_상태값은_전체가_아니라_미지원으로_보고_기본_OPEN으로_되돌린다() throws Exception {
+        // 명시적 빈 문자열("전체")과 달리 공백은 select 가 만들 수 없는 오타성 입력이다 —
+        // 조용히 전체 조회로 새지 않게 한다.
+        given(mapper.findCases(anyList())).willReturn(List.of());
+        given(mapper.countByStatuses(anyList())).willReturn(0L);
+
+        mockMvc.perform(get("/exceptions").param("status", " ").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("statusFilter", "OPEN"));
+
+        verify(mapper).findCases(List.of(NEW, IN_REVIEW));
+    }
+
+    @Test
     void 미지원_상태값은_400이_아니라_기본_OPEN으로_되돌린다() throws Exception {
         // ShellAdvice 의 month 와 같은 정책 — select 가 보내는 값이라 조용히 복구한다
         given(mapper.findCases(anyList())).willReturn(List.of());

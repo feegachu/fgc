@@ -35,14 +35,15 @@ public enum ExceptionStatus {
      * 화면 필터값 → DB 상태값 목록. 변환은 여기 한 곳에서만 한다(#83).
      *
      * <ul>
-     *   <li>빈 값(전체) → 빈 목록(필터 없음)</li>
+     *   <li>빈 값(전체) → 빈 목록(필터 없음). 명시적 빈 문자열만이다 —
+     *       공백만 있는 값은 select 가 만들 수 없는 오타성 입력이라 미지원으로 취급한다</li>
      *   <li>{@code OPEN} → NEW + IN_REVIEW</li>
      *   <li>실제 상태 코드 → 그 코드 1개</li>
      *   <li>그 밖의 값 → {@link IllegalArgumentException}</li>
      * </ul>
      */
     public static List<ExceptionStatus> dbStatuses(String filter) {
-        if (filter == null || filter.isBlank()) {
+        if (filter == null || filter.isEmpty()) {
             return List.of();
         }
         if (OPEN_FILTER.equals(filter)) {
