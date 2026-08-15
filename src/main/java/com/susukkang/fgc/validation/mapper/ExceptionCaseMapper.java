@@ -21,6 +21,13 @@ public interface ExceptionCaseMapper {
                                @Param("title") String title,
                                @Param("description") String description);
 
+    /** 월 검증의 계약별 1,200% 계산 실패를 지급 단계별로 멱등 기록한다. */
+    int insertCapCheckFailure(
+            @Param("validationRunId") Long validationRunId,
+            @Param("contractId") Long contractId,
+            @Param("paymentStage") String paymentStage,
+            @Param("description") String description);
+
     /** 차익거래 후보 결과를 원천으로 중복 없는 검토 예외를 생성한다. */
     int insertArbitrageCandidate(
             @Param("validationRunId") Long validationRunId,
