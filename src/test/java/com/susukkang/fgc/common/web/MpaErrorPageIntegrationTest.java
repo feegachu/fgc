@@ -4,11 +4,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
+import java.net.CookieManager;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -64,6 +69,62 @@ class MpaErrorPageIntegrationTest {
                 // 템플릿 주석에도 {requestId} 가 나오므로 문장째로 본다.
                 .doesNotContain("요청번호 {requestId}")
                 .contains("수수료 정산·검증 Workspace");         // 셸까지 끝까지 렌더링됨
+    }
+
+    /**
+     * FUN-002(#82) 인수조건 — 권한 없는 화면 URL 직접 호출은 403 + error/403.html 렌더링.
+     *
+     * SecurityConfig 의 GET /audit-logs 규칙은 필터 단계에서 sendError(403)로 거부하고,
+     * 그 뒤의 ERROR 디스패치(/error → error/403.html)는 MockMvc 가 타지 않아 실제 포트로 본다.
+     * 시드(V3)의 settle01(SETTLEMENT)은 AUDT-W01(COMPLIANCE·SYSTEM_ADMIN 전용)을 못 본다.
+     *
+     * 로그인이 audit_log 에 LOGIN_SUCCESS 한 행을 남긴다 — 실제 로그인과 같은 경로라 무해하고,
+     * RANDOM_PORT 는 서버 스레드가 따로 돌아 @Transactional 롤백으로 지울 수도 없다.
+     */
+    @Test
+    void forbidden_screen_url_renders_403_page_not_menu_hiding() throws Exception {
+        HttpClient client = HttpClient.newBuilder().cookieHandler(new CookieManager()).build();
+        String base = "http://localhost:" + port;
+
+        // 1) 로그인 화면에서 CSRF 토큰을 꺼낸다 (세션 쿠키는 CookieManager 가 들고 간다)
+        HttpResponse<String> loginPage = client.send(
+                HttpRequest.newBuilder().uri(URI.create(base + "/login")).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+        Matcher csrf = Pattern.compile("name=\"_csrf\"[^>]*value=\"([^\"]+)\"").matcher(loginPage.body());
+        assertThat(csrf.find()).as("로그인 폼의 _csrf hidden input").isTrue();
+
+        // 2) settle01 로 폼 로그인 — 성공하면 defaultSuccessUrl("/") 로 302
+        HttpResponse<String> login = client.send(
+                HttpRequest.newBuilder().uri(URI.create(base + "/login"))
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "username=settle01&password=" + URLEncoder.encode("fgc1234!", UTF_8)
+                                        + "&_csrf=" + URLEncoder.encode(csrf.group(1), UTF_8)))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(login.statusCode()).isEqualTo(302);
+        assertThat(login.headers().firstValue("Location").orElse(""))
+                .as("로그인 성공 리다이렉트 — /login?error 면 자격증명·CSRF 문제")
+                .endsWith("/");
+
+        // 3) 감사로그 화면 직접 호출 — 메뉴 숨김이 아니라 서버가 403 화면으로 막아야 한다
+        HttpResponse<String> response = getHtmlWith(client, "/audit-logs");
+
+        assertThat(response.statusCode()).isEqualTo(403);
+        assertThat(response.headers().firstValue("Content-Type").orElse("")).startsWith("text/html");
+        assertThat(response.body())
+                .contains("403 · 권한 없음")                       // error/403.html
+                .contains("이 작업을 할 권한이 없습니다.")            // error.auth.forbidden 이 실제로 풀렸다
+                .contains("수수료 정산·검증 Workspace");             // 셸 레이아웃까지 렌더링됨
+    }
+
+    private HttpResponse<String> getHtmlWith(HttpClient client, String path) throws Exception {
+        return client.send(
+                HttpRequest.newBuilder()
+                        .uri(URI.create("http://localhost:" + port + path))
+                        .header("Accept", "text/html")
+                        .GET().build(),
+                HttpResponse.BodyHandlers.ofString());
     }
 
     @Test
