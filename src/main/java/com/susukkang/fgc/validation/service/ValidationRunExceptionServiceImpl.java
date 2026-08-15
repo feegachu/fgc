@@ -29,6 +29,7 @@ public class ValidationRunExceptionServiceImpl implements ExceptionGenerationPor
         createdCount += exceptionMapper.insertFromCapChecks(validationRunId);
         createdCount += exceptionMapper.insertFromArbitrageChecks(validationRunId);
         createdCount += exceptionMapper.insertFromReconciliationResults(validationRunId);
+        createdCount += exceptionMapper.insertFromJournalImbalances(validationRunId);
 
         return StepProcessingResult.success(createdCount);
     }

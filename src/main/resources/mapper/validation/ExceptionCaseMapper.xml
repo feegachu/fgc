@@ -83,7 +83,7 @@
                         END,
                     ':',
                     cc.validation_run_id,
-                    ':cap_check:',
+                    ':CAP_CHECK:',
                     cc.cap_check_id,
                     ':',
                     cc.payment_stage
@@ -198,7 +198,7 @@
         SELECT
             CONCAT(
                 'RECONCILIATION_MISMATCH:', rrn.validation_run_id,
-                ':reconciliation_result:', rr.reconciliation_result_id
+                ':RECONCILIATION_RESULT:', rr.reconciliation_result_id
             ),
             'RECONCILIATION_MISMATCH',
             CASE rr.result_type
@@ -224,6 +224,38 @@
             ON rrn.reconciliation_run_id = rr.reconciliation_run_id
         WHERE rrn.validation_run_id = #{validationRunId}
           AND rr.result_type &lt;&gt; 'MATCHED'
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
+    <insert id="insertFromJournalImbalances">
+        INSERT INTO fgc.exception_case (
+            exception_key, exception_type, severity, status,
+            validation_run_id, contract_id, source_entity_type, source_entity_id,
+            title, description
+        )
+        SELECT
+            CONCAT(
+                'JOURNAL_IMBALANCE:', h.validation_run_id,
+                ':JOURNAL_HEADER:', vw.journal_header_id
+            ),
+            'JOURNAL_IMBALANCE',
+            'CRITICAL',
+            'NEW',
+            h.validation_run_id,
+            h.contract_id,
+            'JOURNAL_HEADER',
+            CAST(vw.journal_header_id AS varchar),
+            '검증원장 차변·대변 불균형',
+            CONCAT(
+                '분개번호=', vw.journal_no,
+                ', 차변합계=', vw.debit_total,
+                ', 대변합계=', vw.credit_total,
+                ', 차액=', vw.difference_amount
+            )
+        FROM fgc.vw_journal_imbalance vw
+        INNER JOIN fgc.journal_header h
+            ON h.journal_header_id = vw.journal_header_id
+        WHERE h.validation_run_id = #{validationRunId}
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 </mapper>
