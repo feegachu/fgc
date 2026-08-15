@@ -86,16 +86,21 @@
     <div class="fgc-card__head">
       <span class="fgc-card__title">진행 단계 (운영정책서 제43조)</span>
       <div style="display:flex;gap:8px">
-        <button class="fgc-btn fgc-btn--ghost" id="btn-refresh" style="padding:4px 10px;font-size:12px">
+        <button class="fgc-btn fgc-btn--ghost" id="btn-refresh" type="button" disabled
+                aria-describedby="validation-actions-pending" style="padding:4px 10px;font-size:12px">
           <span class="material-symbols-outlined" style="font-size:16px">refresh</span> 새로고침
         </button>
         <!-- 실행은 SETTLEMENT (화면정의서 :1485, IF-API-48) -->
-        <button class="fgc-btn fgc-btn--primary" id="btn-execute" data-fgc-action="execute" style="padding:4px 12px;font-size:12px" disabled>
+        <button class="fgc-btn fgc-btn--primary" id="btn-execute" type="button" data-fgc-action="execute" disabled
+                aria-describedby="validation-actions-pending" style="padding:4px 12px;font-size:12px">
           <span class="material-symbols-outlined" style="font-size:16px">play_arrow</span> 실행
         </button>
       </div>
     </div>
     <div class="fgc-card__body">
+      <p class="fgc-help" id="validation-actions-pending" style="margin:0 0 12px">
+        진행률 새로고침과 실행은 API 연동 대기입니다.
+      </p>
       <!-- 진행률은 운영정책서 제43조 모델(current_step, 9단계는 저장하지 않음)을 따른다. batch_step_execution 에서 역산하지 않는다. -->
       <!-- 스텝 칸은 IF-API(진행률 폴링) 연동 시 서버 렌더링으로 채운다 -->
       <div class="fgc-stepper" id="stepper">
@@ -161,7 +166,8 @@
     <div class="fgc-card__body" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
       <div style="max-width:640px">
         <div style="font-weight:700;font-size:14px">⑥ 확정 (FINALIZED)</div>
-        <p class="fgc-help" style="margin-top:4px">
+        <p class="fgc-help" id="finalize-actions-pending" style="margin-top:4px">
+          확정 조건 확인과 확정 작업은 API 연동 대기입니다.<br>
           확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 <strong>잠깁니다</strong>.
           <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요.
           확정 권한은 <span class="fgc-mono">GA_ADMIN</span> · <span class="fgc-mono">SYSTEM_ADMIN</span> 에게만 있습니다.
@@ -175,7 +181,8 @@
            th:disabled 를 걸면 정적 disabled 를 덮어써 활성화돼 버린다 —
            연동 시 th:disabled="${(roleCode != 'GA_ADMIN' and roleCode != 'SYSTEM_ADMIN') or !checklistPassed}"
            로 바꾼다. 확정 권한은 GA_ADMIN·SYSTEM_ADMIN (화면정의서 :1485, IF-API-51) — canProcess·readOnly 와 집합이 다르다. -->
-      <button class="fgc-btn fgc-btn--primary" id="btn-finalize" data-fgc-action="finalize" style="padding:10px 20px" disabled>
+      <button class="fgc-btn fgc-btn--primary" id="btn-finalize" type="button" data-fgc-action="finalize" disabled
+              aria-describedby="finalize-actions-pending" style="padding:10px 20px">
         <span class="material-symbols-outlined" style="font-size:18px">lock</span> 확정
       </button>
     </div>
