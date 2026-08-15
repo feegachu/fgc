@@ -132,6 +132,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (capExceptionService.hasUnresolvedViolation(paymentId)) {
             throw new CommissionPaymentConfirmationRejectedException(FgcErrorCode.CAP_003);
         }
+
         requireDraft(attributions.get(0));
         mapper.lockAttributedContracts(paymentId);
         validateConfirmationRequiredValues(attributions);
