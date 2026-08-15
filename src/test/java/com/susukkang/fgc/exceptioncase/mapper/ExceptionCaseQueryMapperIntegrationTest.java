@@ -3,6 +3,7 @@ package com.susukkang.fgc.exceptioncase.mapper;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.dashboard.mapper.DashboardMapper;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,5 +81,34 @@ class ExceptionCaseQueryMapperIntegrationTest {
     void 미처리_건수는_대시보드_KPI_집계와_일치한다() {
         long screen = mapper.countByStatuses(ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER));
         assertThat(screen).isEqualTo(dashboardMapper.countOpenException());
+    }
+
+    /** IF-API-43: 새 검색 DTO와 페이징 SQL이 OPEN 묶음 및 유형 조건을 함께 적용한다. */
+    @Test
+    void API_검색은_조건과_페이징을_적용한다() {
+        ExceptionCaseSearchDTO criteria = ExceptionCaseSearchDTO.builder()
+                .type(com.susukkang.fgc.common.code.ExceptionType.DATA_QUALITY)
+                .status(ExceptionStatus.OPEN_FILTER)
+                .build();
+
+        var rows = mapper.search(
+                criteria,
+                ExceptionStatus.dbStatuses(criteria.getStatus()),
+                0,
+                100);
+
+        assertThat(rows.stream().map(row -> row.title()).filter(t -> t.endsWith(suffix)))
+                .containsExactlyInAnyOrder("IT 신규-" + suffix, "IT 검토중-" + suffix);
+        assertThat(mapper.count(criteria, ExceptionStatus.dbStatuses(criteria.getStatus())))
+                .isGreaterThanOrEqualTo(2L);
+        assertThat(mapper.countOpenByType()).isNotEmpty();
+
+        List<Long> caseIds = jdbcTemplate.queryForList("""
+                SELECT exception_case_id
+                  FROM fgc.exception_case
+                 WHERE source_entity_type = 'IT'
+                   AND source_entity_id = ?
+                """, Long.class, suffix);
+        assertThat(mapper.findActionsByCaseIds(caseIds)).isEmpty();
     }
 }
