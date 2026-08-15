@@ -9,6 +9,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PendingActionButtonStructureTest {
 
+    /**
+     * FGC-FUN-065, FGC-FUN-031, FGC-FUN-033, FGC-FUN-034 /
+     * REG-08, REG-09, REG-11, REG-20, REG-21
+     */
     @Test
     void transactionActionsStayDisabledUntilFrontendApiIntegration() throws IOException {
         String template = resource("templates/transaction/form.html");
@@ -20,6 +24,7 @@ class PendingActionButtonStructureTest {
         assertThat(template).contains("지급 등록 작업은 API 화면 연동 대기입니다.");
     }
 
+    /** FGC-FUN-036, FGC-FUN-039, FGC-FUN-040 / REG-01, REG-19 */
     @Test
     void scheduleActionsStayDisabledUntilFrontendApiIntegration() throws IOException {
         String template = resource("templates/schedule/detail.html");
@@ -30,6 +35,7 @@ class PendingActionButtonStructureTest {
         assertThat(template).contains("다운로드·새 버전 생성·확정 작업은 API 화면 연동 대기입니다.");
     }
 
+    /** FGC-FUN-048, FGC-FUN-049, FGC-FUN-050, FGC-FUN-051, FGC-FUN-052 */
     @Test
     void reconciliationActionsStayDisabledUntilApiIntegration() throws IOException {
         String template = resource("templates/reco/list.html");
@@ -39,6 +45,7 @@ class PendingActionButtonStructureTest {
         assertThat(template).contains("대사 실행과 불일치 예외 일괄 생성은 API 연동 대기입니다.");
     }
 
+    /** FGC-FUN-041, FGC-FUN-042, FGC-FUN-043, FGC-FUN-044 */
     @Test
     void validationRunActionsStayDisabledUntilFrontendApiIntegration() throws IOException {
         String listTemplate = resource("templates/vrun/list.html");

@@ -96,7 +96,10 @@ class ScreenViewControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** RECO-W01 처리 버튼은 API 연동 전까지 권한과 관계없이 활성화하지 않는다. */
+    /**
+     * FGC-FUN-048, FGC-FUN-052 — RECO-W01 처리 버튼은 API 연동 전까지
+     * 권한과 관계없이 활성화하지 않는다.
+     */
     @Test
     void reconciliation_actions_disabled_for_all_roles_while_api_pending() throws Exception {
         var disabledRunButton = org.hamcrest.Matchers.matchesPattern(
@@ -246,7 +249,10 @@ class ScreenViewControllerTest {
                         org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
     }
 
-    /** SCHE-W02 작업 버튼은 프론트 API 연동 전까지 권한과 관계없이 활성화하지 않는다. */
+    /**
+     * FGC-FUN-036, FGC-FUN-039, FGC-FUN-040 / REG-01, REG-19 —
+     * SCHE-W02 작업 버튼은 프론트 API 연동 전까지 권한과 관계없이 활성화하지 않는다.
+     */
     @Test
     void schedule_actions_disabled_for_all_roles_while_api_pending() throws Exception {
         var disabledRegenerateButton = org.hamcrest.Matchers.matchesPattern(
