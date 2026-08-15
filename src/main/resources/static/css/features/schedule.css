@@ -258,6 +258,10 @@
 }
 
 @media (max-width: 47.9375rem) {
+  .schedule-page-header {
+    align-items: stretch;
+  }
+
   .schedule-filter-grid {
     grid-template-columns: 1fr;
   }

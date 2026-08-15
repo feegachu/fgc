@@ -4,17 +4,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
 import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import com.susukkang.fgc.common.code.ExclusionType;
+import com.susukkang.fgc.common.code.ExceptionSeverity;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -31,6 +36,7 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -59,6 +65,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
     private final CapCalculator capCalculator;
+    private final CapExceptionService capExceptionService;
 
     @Override
     @Transactional
@@ -94,6 +101,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 문제: 부모 지급 건의 FOR UPDATE 잠금과 FK 검사가 충돌하고 이슈 #14의 동일 트랜잭션 조건을 위반
     // 개선: 같은 계약 행 잠금과 멱등키를 포함해 점검·예외·상태 처리를 한 트랜잭션에서 수행
     @Transactional(noRollbackFor = CommissionPaymentConfirmationRejectedException.class)
+    // FUN-002(#82) — 컨트롤러(@PreAuthorize)를 우회하는 호출 경로가 생겨도 지급 확정만은
+    // 서비스 계층에서 한 번 더 막는다. @EnableMethodSecurity는 SecurityConfig에 이미 켜져 있다.
+    @PreAuthorize(Roles.CAN_PROCESS)
     public CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey) {
         // 2026-08-11 yslee - 운영정책서 제31조의 확정 게이트 6단계 순서를 코드에 명시
         // 기존 코드: 실제 확정 로직은 정책 순서를 따르지만 단계별 주석이 없어 문서와 코드의 대응 확인이 어려움
@@ -109,6 +119,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 && normalizedIdempotencyKey.equals(first.confirmIdempotencyKey())) {
             return requirePayment(paymentId, mapper.findCapCheckIds(paymentId));
         }
+
+        /**
+         * @author hjKang
+         * @since 2026-08-12
+         *
+         * 2026-08-12 - 미해결 한도 위반 예외 지급확정 차단
+         * 기존 코드: 재검증 결과만으로 지급확정 가능 여부를 판단
+         * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
+         * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
+         */
+        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+            throw new CommissionPaymentConfirmationRejectedException(FgcErrorCode.CAP_003);
+        }
+
         requireDraft(attributions.get(0));
         mapper.lockAttributedContracts(paymentId);
         validateConfirmationRequiredValues(attributions);
@@ -147,11 +171,31 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             mapper.insertCapCheckDetail(check);
             capCheckIds.add(check.getCapCheckId());
 
+            /**
+             * @author hjKang
+             * @since 2026-08-12
+             *
+             * 2026-08-12 - FUN-034 한도 예외 생성 서비스 연결
+             * 기존 코드: 지급확정 서비스가 WARNING·VIOLATION 예외를 직접 저장
+             * 문제: 실시간과 배치가 서로 다른 자연키와 저장 로직을 사용할 수 있음
+             * 개선: 최종 한도 판정 결과를 공통 CapExceptionService에 전달하여 멱등 저장
+             */
+            capExceptionService.createIfNecessary(capExceptionCommand(data, check));
+
+            /**
+             * @author hjKang
+             * @since 2026-08-12
+             *
+             * 2026-08-12 - 예외 유형과 심각도 공통 enum 적용
+             * 기존 코드: 예외 유형과 심각도를 문자열 리터럴로 전달
+             * 문제: DB 허용값 오타를 컴파일 시점에 확인할 수 없음
+             * 개선: ExceptionType과 ExceptionSeverity의 name()을 사용하여 DB 코드값을 통일
+             */
             if (check.getResultStatus() == CapResultStatus.REVIEW_REQUIRED) {
                 rejectWithException(
                         data,
-                        "CAP_REVIEW_REQUIRED",
-                        "HIGH",
+                        ExceptionType.CAP_REVIEW_REQUIRED.name(),
+                        ExceptionSeverity.HIGH.name(),
                         "산입 판단 검토 필요",
                         "검토필요 귀속행 또는 준법경영비 증빙을 확인해야 합니다.",
                         FgcErrorCode.CAP_002,
@@ -159,25 +203,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 );
             }
             if (check.getResultStatus() == CapResultStatus.VIOLATION) {
-                mapper.insertExceptionCase(exceptionCommand(
-                        data,
-                        "CAP_VIOLATION",
-                        "CRITICAL",
-                        "1,200% 한도 초과",
-                        "후보 지급 건을 포함하면 계약별 한도를 초과합니다."
-                ));
                 throw new CommissionPaymentConfirmationRejectedException(
                         FgcErrorCode.CAP_001,
                         Map.of("n", check.getUsagePct())
-                );
-            }
-            if (check.getResultStatus() == CapResultStatus.WARNING) {
-                saveException(
-                        data,
-                        "CAP_WARNING",
-                        "WARNING",
-                        "1,200% 한도 경고",
-                        "후보 지급 건을 포함한 사용률이 경고 기준 이상입니다."
                 );
             }
         }
@@ -677,6 +705,42 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .candidateAmount(data.attributedAmount())
                 .decisionReason(rule.decisionReason())
                 .evidenceRef(data.evidenceRef())
+                .build();
+    }
+
+    /**
+     * 설명 : 지급확정의 최종 한도 판정 결과를 예외 생성 명령으로 변환한다
+     *
+     * @param data 지급확정 대상 귀속 정보
+     * @param check 최종 한도 점검 결과
+     * @return 한도 예외 생성 명령
+     * @author hjKang
+     * @since 2026-08-12
+     */
+    private CapExceptionCreateCommand capExceptionCommand(
+            ConfirmationData data,
+            CapCheckCommand check
+    ) {
+        return CapExceptionCreateCommand.builder()
+                .paymentId(data.paymentId())
+                .contractId(data.contractId())
+                .agentId(data.agentId())
+                .policyVersionId(data.policyVersionId())
+                .validationRunId(null)
+                .paymentStage(data.paymentStage())
+                .asOfDate(check.getAsOfDate())
+                .capCheckId(check.getCapCheckId())
+                .capRuleSetId(check.getCapRuleSetId())
+                .refundRateTableId(check.getRefundRateTableId())
+                .basePremiumAmount(check.getBasePremiumAmount())
+                .refund12mAmount(check.getRefund12mAmount())
+                .complianceDeductionAmount(check.getComplianceDeductionAmount())
+                .limitAmount(check.getLimitAmount())
+                .includedAmount(check.getIncludedAmount())
+                .remainingAmount(check.getRemainingAmount())
+                .usagePct(check.getUsagePct())
+                .resultStatus(check.getResultStatus())
+                .calculationSnapshot(check.getCalculationSnapshotJson())
                 .build();
     }
 

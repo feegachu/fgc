@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.contract.mapper.ContractJournalProjectionMapper">
+    <select id="findJournalLinesByContractId" resultType="com.susukkang.fgc.contract.dto.ContractJournalLineRow">
+        SELECT h.journal_header_id, h.journal_no, h.journal_date, h.journal_type,
+               h.source_entity_type, h.source_entity_id, h.revision_no,
+               h.policy_version_id, h.validation_run_id, h.status, h.description,
+               l.line_no, a.account_code, a.account_name,
+               l.debit_amount, l.credit_amount, l.agent_id, l.payment_stage,
+               l.commission_item_id, l.memo
+        FROM fgc.journal_header h
+        JOIN fgc.journal_line l ON l.journal_header_id = h.journal_header_id
+        JOIN fgc.journal_account a ON a.journal_account_id = l.journal_account_id
+        WHERE h.contract_id = #{contractId}
+        ORDER BY h.journal_header_id, l.line_no
+    </select>
+</mapper>

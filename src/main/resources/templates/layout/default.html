@@ -16,9 +16,11 @@
   <link rel="stylesheet" th:href="@{/css/common/layout.css}">
   <link rel="stylesheet" th:href="@{/css/common/components.css}">
   <link rel="stylesheet" th:href="@{/css/common/utilities.css}">
+  <link rel="stylesheet" th:href="@{/css/features/publishing.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-DASH-W01'}" th:href="@{/css/features/dashboard.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CONT-')}" th:href="@{/css/features/contract.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-SCHE-W01'}" th:href="@{/css/features/schedule.css}">
+  <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CAP-')}" th:href="@{/css/features/cap.css}">
 </head>
 <body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">
   <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
@@ -27,15 +29,18 @@
   <header th:replace="~{layout/fragments/header :: header(${title}, ${parentTitle}, ${parentHref})}"></header>
   <nav th:replace="~{layout/fragments/workspace-tabs :: workspaceTabs(${screenId}, ${title})}"></nav>
   <div class="app-main"><th:block th:replace="${content}"></th:block></div>
+  <!-- 교육용 면책 문구는 시연 사실감을 위해 화면에 표기하지 않는다 — 2026-08-12 팀 결정, 근거대장 COR-009 개정 기록 -->
   <footer class="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
   <div id="toast-region" class="toast-region" role="region" aria-label="알림" aria-live="polite"></div>
   <div id="modal-root"></div>
   <script th:src="@{/js/common/workspace-tabs.js}" defer></script>
+  <script th:src="@{/js/common/month-selector.js}" defer></script>
   <script th:src="@{/js/common/app-shell.js}" defer></script>
   <script th:src="@{/js/common/modal.js}" defer></script>
   <script th:src="@{/js/common/toast.js}" defer></script>
   <script th:src="@{/js/common/api-client.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-DASH-W01'}" th:src="@{/js/features/dashboard/dashboard.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-SCHE-W01'}" th:src="@{/js/features/schedule/schedule-list.js}" defer></script>
+  <script th:if="${screenId == 'FGC-UI-CAP-W01'}" th:src="@{/js/features/cap/cap-list.js}" defer></script>
 </body>
 </html>

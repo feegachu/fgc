@@ -74,22 +74,32 @@ class ShellMonthSessionWebTest {
         mvc.perform(get("/").param("month", "2026-05").session(session).with(user(settleUser())))
                 .andExpect(model().attribute("month", "2026-05"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "<option value=\"2026-05\" selected=\"selected\"")));
+                        "data-value=\"2026-05\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*<span\\b(?=[^>]*\\bid=\"global-month-value\")(?=[^>]*\\bdata-month-selector-value\\b)[^>]*>2026-05</span>.*")));
 
         mvc.perform(get("/").session(session).with(user(settleUser())))
                 .andExpect(model().attribute("month", "2026-05"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "<option value=\"2026-05\" selected=\"selected\"")));
+                        "data-value=\"2026-05\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*<span\\b(?=[^>]*\\bid=\"global-month-value\")(?=[^>]*\\bdata-month-selector-value\\b)[^>]*>2026-05</span>.*")));
     }
 
-    /** 기준월 변경은 인라인 스크립트 대신 공통 app-shell.js의 위임 이벤트로 처리한다. */
+    /** 기준월의 임시 선택과 확정은 공통 Month Selector와 App Shell adapter가 처리한다. */
     @Test
-    void month_select_is_connected_to_common_shell_script() throws Exception {
+    void month_selector_is_connected_to_common_shell_scripts() throws Exception {
         stubEmptySummary();
 
         mvc.perform(get("/").with(user(settleUser())))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "data-action=\"change-global-month\"")))
+                        "data-month-selector")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-haspopup=\"dialog\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "aria-expanded=\"false\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "src=\"/js/common/month-selector.js\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "src=\"/js/common/app-shell.js\"")));
     }

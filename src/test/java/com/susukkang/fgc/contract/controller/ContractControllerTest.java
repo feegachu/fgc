@@ -19,6 +19,10 @@ import com.susukkang.fgc.contract.service.ContractService;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
+import com.susukkang.fgc.arbitrage.service.ArbitrageService;
+import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView;
+import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,6 +80,27 @@ class ContractControllerTest {
 
     @MockitoBean
     private ScheduleService scheduleService;
+
+    @MockitoBean
+    private ArbitrageService arbitrageService;
+
+    @Test
+    @DisplayName("계약별 차익거래 검증 시계열을 조회한다")
+    void getContractArbitrageChecksReturnsSuccess() throws Exception {
+        when(arbitrageService.selectByContractId(21L, PaymentStage.GA_TO_FC))
+                .thenReturn(List.of(ArbitrageCheckView.builder()
+                        .arbitrageCheckId(100L)
+                        .contractId(21L)
+                        .paymentStage(PaymentStage.GA_TO_FC)
+                        .resultStatus(ArbitrageCheckStatus.CLEAR)
+                        .build()));
+
+        mockMvc.perform(get("/api/v1/contracts/{id}/arbitrage-checks", 21L)
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].arbitrageCheckId").value(100))
+                .andExpect(jsonPath("$.data[0].resultStatus").value("CLEAR"));
+    }
 
     @Test
     @DisplayName("계약 ID로 운영용 예상 스케줄 목록을 조회한다")
@@ -335,6 +360,48 @@ class ContractControllerTest {
                         .content(objectMapper.writeValueAsString(
                                 updateRequest()
                         )))
+                .andExpect(status().isForbidden());
+    }
+
+    /**
+     * FUN-002(#82) — COMPLIANCE는 §4-1 "조회만"이라 계약 생성·수정 모두 403이어야 한다.
+     * 이 거부는 SecurityConfig 굵은 규칙(필터 단계)에서 나므로, ApiResponse 봉투는
+     * 컨트롤러 advice 가 아니라 apiAccessDeniedHandler 가 써 준다 — 봉투까지 확인한다.
+     */
+    @Test
+    @DisplayName("준법·감사는 보험계약을 생성할 수 없다")
+    void createContractRejectsComplianceUser() throws Exception {
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                createRequest()
+                        )))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("준법·감사는 보험계약을 수정할 수 없다")
+    void updateContractRejectsComplianceUser() throws Exception {
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                updateRequest()
+                        )))
+                .andExpect(status().isForbidden());
+    }
+
+    /** FUN-002(#82) — 차익거래 수동 검증도 CAN_PROCESS(SETTLEMENT·SYSTEM_ADMIN) 전용이다. */
+    @Test
+    @DisplayName("준법·감사는 차익거래 수동 검증을 실행할 수 없다")
+    void reArbitrageCheckRejectsComplianceUser() throws Exception {
+        mockMvc.perform(post("/api/v1/contracts/{id}/arbitrage-check", 21L)
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"asOfDate\":\"2026-08-13\",\"reason\":\"정기 점검\"}"))
                 .andExpect(status().isForbidden());
     }
 }

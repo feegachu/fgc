@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.susukkang.fgc.cap.mapper.CapExceptionMapper">
+
+    <!-- 한도 주의 또는 위반 예외 건을 등록하고 진행 중인 동일 예외는 최신 내용으로 갱신한다. -->
+    <insert id="insertException">
+        INSERT INTO exception_case AS existing
+        (
+            exception_key,
+            exception_type,
+            severity,
+            status,
+            validation_run_id,
+            contract_id,
+            agent_id,
+            policy_version_id,
+            source_entity_type,
+            source_entity_id,
+            title,
+            description
+        )
+        VALUES
+            (
+            #{exceptionKey},
+            #{exceptionType},
+            #{severity},
+            'NEW',
+            #{validationRunId},
+            #{contractId},
+            #{agentId},
+            #{policyVersionId},
+            'COMMISSION_TRANSACTION',
+            CAST(#{paymentId} AS varchar),
+            #{title},
+            #{description}
+            )
+        ON CONFLICT
+            (exception_key)
+            DO UPDATE
+        SET
+            exception_type = EXCLUDED.exception_type,
+            severity = EXCLUDED.severity,
+            validation_run_id = COALESCE(EXCLUDED.validation_run_id, existing.validation_run_id),
+            contract_id = EXCLUDED.contract_id,
+            agent_id = EXCLUDED.agent_id,
+            title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            updated_at = clock_timestamp()
+               WHERE
+                   existing.status IN ('NEW', 'IN_REVIEW')
+    </insert>
+
+    <!-- 한도 예외 해결 전 현재 상태를 잠금 조회한다. -->
+    <select id="selectExceptionForUpdate"
+            resultType="com.susukkang.fgc.cap.dto.CapExceptionStatusRow">
+        SELECT
+            exception_case_id,
+            status
+        FROM
+            exception_case
+        WHERE
+            exception_case_id = #{exceptionCaseId}
+        AND
+            exception_type IN ('CAP_WARNING', 'CAP_VIOLATION')
+        FOR UPDATE
+    </select>
+
+    <!-- 해결조치 코드를 필수로 포함하여 예외 처리 이력을 추가한다. -->
+    <insert id="insertExceptionAction">
+        INSERT INTO exception_action
+        (
+            exception_case_id,
+            action_seq,
+            from_status,
+            to_status,
+            action_type,
+            reason,
+            evidence_ref,
+            action_by
+        )
+        SELECT
+            #{exceptionCaseId},
+            COALESCE(MAX(action_seq), 0) + 1,
+            ec.status,
+            'RESOLVED',
+            #{actionType},
+            #{reason},
+            #{evidenceRef},
+            #{actionBy}
+        FROM
+            exception_case ec
+        LEFT JOIN
+            exception_action ea
+        ON
+            ea.exception_case_id = ec.exception_case_id
+        WHERE
+            ec.exception_case_id = #{exceptionCaseId}
+        GROUP BY
+            ec.status
+    </insert>
+
+    <!-- 해결조치가 저장된 한도 예외를 해결 완료 상태로 변경한다. -->
+    <update id="updateExceptionResolved">
+        UPDATE
+            exception_case
+        SET
+            status = 'RESOLVED',
+            resolved_at = clock_timestamp(),
+            updated_at = clock_timestamp()
+        WHERE
+            exception_case_id = #{exceptionCaseId}
+        AND
+            status IN ('NEW', 'IN_REVIEW')
+    </update>
+
+    <!-- 지급 건에 해결되지 않은 한도 위반 예외가 존재하는지 확인한다.
+         IN ('NEW','IN_REVIEW') 는 미처리(OPEN) 묶음 — 정의는 ExceptionStatus 를 따른다(#83). -->
+    <select id="existsUnresolvedViolation"
+            resultType="boolean">
+        SELECT
+            EXISTS
+            (
+                SELECT
+                    1
+                FROM
+                    exception_case
+                WHERE
+                    source_entity_type = 'COMMISSION_TRANSACTION'
+                AND
+                    source_entity_id = CAST(#{paymentId} AS varchar)
+                AND
+                    exception_type = 'CAP_VIOLATION'
+                AND
+                    status IN ('NEW', 'IN_REVIEW')
+            )
+    </select>
+
+</mapper>

@@ -1,5 +1,10 @@
 package com.susukkang.fgc.contract.controller;
 
+import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
+import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
+import com.susukkang.fgc.arbitrage.service.ArbitrageService;
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
@@ -9,6 +14,7 @@ import com.susukkang.fgc.schedule.service.ScheduleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +32,7 @@ import java.util.List;
 public class ContractController {
     private final ContractService contractService;
     private final ScheduleService scheduleService;
+    private final ArbitrageService arbitrageService;
 
     /**
      * 설명 : 검색 조건에 따라 보험계약 목록을 조회한다.
@@ -52,7 +59,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
@@ -65,7 +72,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
@@ -100,6 +107,40 @@ public class ContractController {
     ) {
         return ApiResponse.success(
                 scheduleService.selectByContractId(contractId, paymentStage)
+        );
+    }
+    /**
+     * 설명 : 계약 ID를 기준으로 차익거래 수동 검증을 실행한다.
+     * @param id 계약 ID
+     * @param request 차익거래 검증 요청 정보
+     * @return 차익거래 검증 결과
+     * @author hjKang
+     * @since 2026-08-12
+     */
+    @PostMapping("/{id}/arbitrage-check")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<ReArbitrageCheckResponse> reArbitrageCheck(
+            @PathVariable Long id,
+            @Valid @RequestBody ReArbitrageCheckRequest request,
+            @AuthenticationPrincipal FgcUserDetails principal) {
+        return ApiResponse.success(
+                arbitrageService.reArbitrageCheck(id, request, principal.getUserId())
+        );
+    }
+
+    /**
+     * 설명 : 계약과 지급단계의 기준일별 차익거래 검증 결과를 조회한다.
+     *
+     * @param id 계약 ID
+     * @return 기준일별 차익거래 검증 결과
+     * @author hjKang
+     * @since 2026-08-12
+     */
+    @GetMapping("/{id}/arbitrage-checks")
+    public ApiResponse<List<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView>> getArbitrageChecks(
+            @PathVariable Long id) {
+        return ApiResponse.success(
+                arbitrageService.selectByContractId(id, PaymentStage.GA_TO_FC)
         );
     }
 }

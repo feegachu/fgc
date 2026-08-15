@@ -62,8 +62,22 @@ class MonthlyValidationJobIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        createdValidationRunIds.forEach(id -> jdbcTemplate.update(
-                "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", id));
+        createdValidationRunIds.forEach(id -> {
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.cap_check_detail
+                     WHERE cap_check_id IN (
+                         SELECT cap_check_id
+                           FROM fgc.cap_check
+                          WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.cap_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", id);
+        });
     }
 
     // JobRepository 메타테이블은 이 테스트가 지우지 않는다(validation_run만 지운다) — 그래서
@@ -90,11 +104,24 @@ class MonthlyValidationJobIntegrationTest {
     }
 
     @Test
-    void blocksPlaceholderExecutionAndDoesNotCompleteTheValidationRun() throws Exception {
+    /**
+     * @author hjKang
+     * @since 2026-08-13
+     *
+     * 2026-08-13 - 대상 선별 Step 구현에 따른 월 통합검증 실행 흐름 검증 변경
+     * 기존 코드: createRunStep 완료 후 selectTargetStep의 Placeholder에서 실행이 실패했다.
+     * 문제: selectTargetStep이 실제 구현으로 교체되어 기존 완료 Step 기대값과 일치하지 않았다.
+     * 개선: 대상 선별 Step 완료 후 다음 미구현 Step에서 실행이 차단되는지 검증한다.
+     */
+    void completesImplementedStepsAndBlocksAtJournalPlaceholder() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
         long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
 
         JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters("req-1", runNo));
+
+        Long validationRunId = ValidationRunBatchContext.getValidationRunId(jobExecution.getExecutionContext());
+        assertThat(validationRunId).isNotNull();
+        createdValidationRunIds.add(validationRunId);
 
         assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.FAILED);
 
@@ -103,17 +130,24 @@ class MonthlyValidationJobIntegrationTest {
                 .map(StepExecution::getStepName)
                 .collect(Collectors.toSet());
 
-        assertThat(completedStepNames).containsExactly("createRunStep");
+        assertThat(completedStepNames).contains(
+                "createRunStep",
+                "selectTargetStep",
+                "regenerateScheduleStep",
+                "capCheckStep",
+                "arbitrageCheckStep"
+        );
 
         // capCheckStep은 INSURER_TO_GA/GA_TO_FC 2개 파티션 워커로 나뉘어 실행돼야 한다.
         long capCheckWorkerCount = jobExecution.getStepExecutions().stream()
                 .filter(se -> se.getStepName().startsWith("capCheckWorkerStep"))
                 .count();
-        assertThat(capCheckWorkerCount).isZero();
+        assertThat(capCheckWorkerCount).isEqualTo(2);
 
-        Long validationRunId = ValidationRunBatchContext.getValidationRunId(jobExecution.getExecutionContext());
-        assertThat(validationRunId).isNotNull();
-        createdValidationRunIds.add(validationRunId);
+        assertThat(jobExecution.getStepExecutions())
+                .filteredOn(step -> step.getStatus() == BatchStatus.FAILED)
+                .extracting(StepExecution::getStepName)
+                .containsExactly("journalPostingStep");
 
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
         assertThat(row.getStatus()).isEqualTo("FAILED");
@@ -124,11 +158,21 @@ class MonthlyValidationJobIntegrationTest {
     }
 
     @Test
+    /**
+     * @author hjKang
+     * @since 2026-08-13
+     *
+     * 2026-08-13 - 잘못된 파라미터 실행의 데이터 생성 여부 검증 범위 보완
+     * 기존 코드: 동일 검증월의 validation_run 전체가 비어 있는지 확인했다.
+     * 문제: 다른 테스트나 기존 데이터가 같은 검증월을 사용하면 테스트가 독립적으로 동작하지 않았다.
+     * 개선: 이번 테스트에서 사용한 고유 실행 번호에 해당하는 행만 생성되지 않았는지 확인한다.
+     */
     void rejectsInvalidJobParametersBeforeCreatingAnyRun() {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
+        long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
         JobParameters invalidParams = new JobParametersBuilder()
                 .addString("validationMonth", "2031/03")
-                .addLong("runNo", 1L)
+                .addLong("runNo", runNo)
                 .addString("runType", "MONTHLY")
                 .addLong("triggeredBy", 3L)
                 .addString("requestId", "req-invalid")
@@ -139,7 +183,9 @@ class MonthlyValidationJobIntegrationTest {
                 () -> jobLauncherTestUtils.launchJob(invalidParams));
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT 1 FROM fgc.validation_run WHERE validation_month = ?", TEST_MONTH);
+                "SELECT 1 FROM fgc.validation_run WHERE validation_month = ? AND run_no = ?",
+                TEST_MONTH,
+                runNo);
         assertThat(rows).isEmpty();
     }
 }

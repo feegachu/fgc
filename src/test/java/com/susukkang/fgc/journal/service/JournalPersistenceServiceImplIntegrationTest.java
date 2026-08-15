@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,16 +24,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * #93 "정상 저장, 라인 저장 실패 롤백, 중복 원천, 비활성 계정과목" 테스트(이슈 To-do).
  *
- * 클래스에 @Transactional을 붙여도 journal_header/journal_line/audit_log는 자동
- * 롤백되지 않는다 — JournalPersistenceServiceImpl.saveDraft()의 실제 저장은
- * REQUIRES_NEW로 별도 트랜잭션에서 커밋되므로, 이 테스트 트랜잭션이 롤백돼도 그 커밋은
- * 그대로 남는다(코드리뷰 반영). 그래서 @AfterEach에서 description 마커로 직접
- * DELETE한다 — journal_account.active_yn UPDATE만 REQUIRES_NEW를 타지 않는 일반
- * 쿼리라 @Transactional 롤백으로 정리된다. audit_log는 append-only라 지우지
- * 않는다(다른 통합테스트와 같은 관례 — request_id로 구분되어 해가 없다).
+ * 클래스에 @Transactional을 붙이지 않는다(코드리뷰 반영 — 이전에는 붙어 있었는데,
+ * 그러면 @AfterEach의 정리 DELETE까지 테스트 트랜잭션에 같이 묶여서 테스트 종료 시
+ * 롤백돼 버렸다. saveDraft()의 실제 저장은 REQUIRES_NEW로 커밋되니, 정리 DELETE도
+ * 똑같이 진짜로 커밋돼야 짝이 맞는다 — @Transactional을 빼면 각 jdbcTemplate 호출이
+ * 자동커밋되어 @AfterEach가 실제로 지운다). 이 버그 때문에 매 테스트 실행마다
+ * FGC-FGL01-202607-0001에 분개가 계속 쌓이고 있었다(#108 작업 중 발견, 확인 시점
+ * 기준 30건 누적 — 수동으로 정리함).
  */
 @SpringBootTest
-@Transactional
 class JournalPersistenceServiceImplIntegrationTest {
 
     private static final String TEST_MARKER = "#93 통합테스트";
@@ -56,6 +54,11 @@ class JournalPersistenceServiceImplIntegrationTest {
                 )
                 """, TEST_MARKER);
         jdbcTemplate.update("DELETE FROM fgc.journal_header WHERE description = ?", TEST_MARKER);
+        // inactiveAccountCodeIsRejectedBeforeAnyInsert()가 비활성화시킨 계정과목을
+        // 되돌린다 — @Transactional이 없으니 더는 자동 롤백되지 않는다. 그 테스트가 안
+        // 돌았어도 이미 true인 값을 다시 true로 세팅할 뿐이라 항상 실행해도 안전하다.
+        jdbcTemplate.update("UPDATE fgc.journal_account SET active_yn = true WHERE account_code = ?",
+                JournalAccountCode.EXPECTED_RECEIVABLE.name());
     }
 
     private Long contractId() {
@@ -168,8 +171,8 @@ class JournalPersistenceServiceImplIntegrationTest {
 
     @Test
     void inactiveAccountCodeIsRejectedBeforeAnyInsert() {
-        // @Transactional 테스트라 이 UPDATE도 테스트 종료 시 자동 롤백된다 —
-        // 다른 테스트나 실제 데이터에 영향을 주지 않는다.
+        // @AfterEach의 cleanUp()이 이 UPDATE를 되돌린다(더는 @Transactional 자동
+        // 롤백에 기대지 않는다).
         jdbcTemplate.update("UPDATE fgc.journal_account SET active_yn = false WHERE account_code = ?",
                 JournalAccountCode.EXPECTED_RECEIVABLE.name());
 

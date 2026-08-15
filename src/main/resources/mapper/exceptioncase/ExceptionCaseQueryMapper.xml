@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper">
+
+    <!-- 빈 목록 = 상태 필터 없음(전체). OPEN → NEW+IN_REVIEW 변환은
+         ExceptionStatus.dbStatuses() 한 곳에서 끝났다 — 여기서는 받은 값만 IN 으로 건다(#83). -->
+    <sql id="statusFilter">
+        <if test="statuses != null and !statuses.isEmpty()">
+            WHERE ec.status IN
+            <foreach item="s" collection="statuses" open="(" separator="," close=")">#{s}</foreach>
+        </if>
+    </sql>
+
+    <!-- ponytail: 페이징 없음 — 시연 데이터 규모라 전량 렌더링. IF-API-43 전체 구현 때 페이지네이션 추가 -->
+    <select id="findCases" resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow">
+        SELECT ec.exception_case_id   AS exceptionCaseId,
+               ec.exception_type      AS exceptionType,
+               ec.severity,
+               ic.contract_no         AS contractNo,
+               ec.title,
+               ec.status,
+               au.login_id            AS assignedTo,
+               ec.created_at          AS createdAt,
+               ec.source_entity_type  AS sourceEntityType,
+               ec.source_entity_id    AS sourceEntityId
+          FROM fgc.exception_case ec
+          LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
+          LEFT JOIN fgc.app_user au ON au.user_id = ec.assigned_to
+        <include refid="statusFilter"/>
+         ORDER BY CASE ec.severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'WARNING' THEN 2 ELSE 3 END,
+                  ec.created_at DESC, ec.exception_case_id DESC
+    </select>
+
+    <select id="countByStatuses" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.exception_case ec
+        <include refid="statusFilter"/>
+    </select>
+</mapper>

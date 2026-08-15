@@ -179,6 +179,25 @@ class AuthLoginFlowTest {
         mockMvc.perform(get("/css/features/auth.css")).andExpect(status().isOk());
     }
 
+    /**
+     * FUN-002(#82) — SecurityConfig 의 POST /** 굵은 규칙은 COMPLIANCE 를 배제하지만,
+     * POST /logout 은 LogoutFilter 가 AuthorizationFilter 앞단이라 로그아웃은 막히지 않아야 한다.
+     * PR #145 리뷰 요구사항 1(COMPLIANCE 계정 로그아웃 확인)의 자동화.
+     */
+    @Test
+    void complianceUserCanStillLogoutDespiteBulkPostRule() throws Exception {
+        MockHttpSession session = (MockHttpSession) mockMvc
+                .perform(formLogin().user("audit01").password(DEMO_PASSWORD))
+                .andExpect(authenticated().withUsername("audit01").withRoles("COMPLIANCE"))
+                .andReturn()
+                .getRequest()
+                .getSession(false);
+
+        mockMvc.perform(post("/logout").session(session).with(csrf()))
+                .andExpect(unauthenticated())
+                .andExpect(redirectedUrl("/login?logout"));
+    }
+
     // ★ 인수조건: 로그아웃하면 세션을 즉시 지우고, 이후 보호 URL 접근이 차단된다
     @Test
     void logoutClearsSessionAndBlocksProtectedUrl() throws Exception {

@@ -3,6 +3,7 @@ HELP.md
 
 # Gradle
 .gradle/
+.gradle-user/
 .gradle-codex/
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -95,3 +96,6 @@ src/fgc/
 CLAUDE.md
 .agents/
 skill-observations/
+graphify-out/
+.grok/
+files/

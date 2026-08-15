@@ -1,8 +1,11 @@
 package com.susukkang.fgc.transaction;
 
+import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
+import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import com.susukkang.fgc.common.code.ExclusionType;
+import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -19,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,10 +51,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest
 @Transactional
+// FUN-002(#82) — confirm()에 @PreAuthorize(Roles.CAN_PROCESS)가 붙은 뒤로 서비스를 직접 호출하는
+// 이 통합 테스트에도 SecurityContext가 필요하다. 지급 확정은 SETTLEMENT가 소유하는 동작이다.
+@WithMockUser(roles = "SETTLEMENT")
 class CommissionPaymentIntegrationTest {
 
     @Autowired
     private CommissionPaymentService commissionPaymentService;
+
+    @Autowired
+    private CapExceptionService capExceptionService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -393,7 +404,10 @@ class CommissionPaymentIntegrationTest {
 
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        // @WithMockUser는 메인 스레드의 SecurityContext(ThreadLocal)만 채운다. 워커 스레드가
+        // confirm()을 직접 호출하므로 제출 시점의 SecurityContext를 감싸 넘겨준다.
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(
+                Executors.newFixedThreadPool(2));
         try {
             Future<String> firstResult = executor.submit(() -> confirmOutcome(
                     first.paymentId(), "IT-LOCK-A-" + runId, ready, start
@@ -521,6 +535,31 @@ class CommissionPaymentIntegrationTest {
                  )
                    AND transaction_attribution_id IS NOT NULL
                 """, Integer.class, created.paymentId())).isZero();
+
+        /**
+         * @author hjKang
+         * @since 2026-08-12
+         *
+         * 2026-08-12 - FUN-034 해결조치 후 지급확정 재시도
+         * 기존 코드: DRAFT 금액 수정만으로 과거 한도 위반 예외가 해결된 것으로 간주
+         * 문제: 해결조치 코드 없이 미해결 예외를 우회하여 지급확정할 수 있음
+         * 개선: CORRECT 해결조치와 처리 근거를 저장해 예외를 RESOLVED로 변경한 뒤 재확정
+         */
+        capExceptionService.resolve(CapExceptionResolveCommand.builder()
+                .exceptionCaseId(jdbcTemplate.queryForObject("""
+                        SELECT exception_case_id
+                          FROM fgc.exception_case
+                         WHERE source_entity_type = 'COMMISSION_TRANSACTION'
+                           AND source_entity_id = ?
+                           AND exception_type = 'CAP_VIOLATION'
+                        """, Long.class, String.valueOf(created.paymentId())))
+                .actionType(ExceptionActionType.CORRECT)
+                .reason("DRAFT 지급액과 귀속금액 정정 완료")
+                .evidenceRef("IT-FUN034-CORRECT")
+                .actionBy(jdbcTemplate.queryForObject(
+                        "SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1",
+                        Long.class))
+                .build());
 
         String idempotencyKey = "IT-IDEM-RECOVER-" + runId;
         CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
