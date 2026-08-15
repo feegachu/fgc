@@ -108,12 +108,15 @@ class MonthlyValidationJobIntegrationTest {
      * @author hjKang
      * @since 2026-08-13
      *
-     * 2026-08-13 - 대상 선별 Step 구현에 따른 월 통합검증 실행 흐름 검증 변경
-     * 기존 코드: createRunStep 완료 후 selectTargetStep의 Placeholder에서 실행이 실패했다.
-     * 문제: selectTargetStep이 실제 구현으로 교체되어 기존 완료 Step 기대값과 일치하지 않았다.
-     * 개선: 대상 선별 Step 완료 후 다음 미구현 Step에서 실행이 차단되는지 검증한다.
+     * 2026-08-15 - #142 journalPostingStep·imbalanceCheckStep 구현에 따른 차단 지점 변경
+     * 기존 코드: arbitrageCheckStep 완료 후 journalPostingStep의 Placeholder에서 실행이 실패했다.
+     * 문제: journalPostingStep·imbalanceCheckStep이 실제 구현으로 교체되어 기존 완료 Step
+     *       기대값과 일치하지 않았다. TEST_MONTH(2031-03)에는 대상 schedule_line·
+     *       commission_transaction이 없어 journalPostingStep은 0건 처리로 정상 완료되고,
+     *       imbalanceCheckStep도 검사할 분개가 0건이라 정상 완료된다.
+     * 개선: 두 Step 완료 후 다음 미구현 Step(reconciliationStep)에서 실행이 차단되는지 검증한다.
      */
-    void completesImplementedStepsAndBlocksAtJournalPlaceholder() throws Exception {
+    void completesImplementedStepsAndBlocksAtReconciliationPlaceholder() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
         long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
 
@@ -135,7 +138,9 @@ class MonthlyValidationJobIntegrationTest {
                 "selectTargetStep",
                 "regenerateScheduleStep",
                 "capCheckStep",
-                "arbitrageCheckStep"
+                "arbitrageCheckStep",
+                "journalPostingStep",
+                "imbalanceCheckStep"
         );
 
         // capCheckStep은 INSURER_TO_GA/GA_TO_FC 2개 파티션 워커로 나뉘어 실행돼야 한다.
@@ -147,7 +152,7 @@ class MonthlyValidationJobIntegrationTest {
         assertThat(jobExecution.getStepExecutions())
                 .filteredOn(step -> step.getStatus() == BatchStatus.FAILED)
                 .extracting(StepExecution::getStepName)
-                .containsExactly("journalPostingStep");
+                .containsExactly("reconciliationStep");
 
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
         assertThat(row.getStatus()).isEqualTo("FAILED");

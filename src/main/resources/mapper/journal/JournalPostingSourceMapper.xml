@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalPostingSourceMapper">
+
+    <select id="findExpectedInsurerIncomeSources" resultType="com.susukkang.fgc.journal.dto.ScheduleJournalSourceRow">
+        SELECT sl.schedule_line_id, sh.contract_id, sh.policy_version_id, sl.commission_item_id,
+               NULL AS beneficiary_agent_id, sl.due_date AS journal_date, sl.expected_amount AS amount,
+               '예상 수입 스케줄 ' || sl.installment_no || '회차' AS description
+        FROM fgc.schedule_line sl
+        JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+        JOIN fgc.validation_target vt ON vt.contract_id = sh.contract_id
+        WHERE vt.validation_run_id = #{validationRunId}
+          AND vt.selection_status = 'SELECTED'
+          AND sh.payment_stage = 'INSURER_TO_GA'
+          AND sh.active_yn = true
+          AND sh.schedule_purpose = 'OPERATIONAL'
+          AND sl.due_month = #{validationMonth}
+          AND sl.line_status &lt;&gt; 'CANCELLED'
+        ORDER BY sl.schedule_line_id
+    </select>
+
+    <select id="findExpectedFcPayoutSources" resultType="com.susukkang.fgc.journal.dto.ScheduleJournalSourceRow">
+        SELECT sl.schedule_line_id, sh.contract_id, sh.policy_version_id, sl.commission_item_id,
+               sl.beneficiary_agent_id, sl.due_date AS journal_date, sl.expected_amount AS amount,
+               '예상 지급 스케줄 ' || sl.installment_no || '회차' AS description
+        FROM fgc.schedule_line sl
+        JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+        JOIN fgc.validation_target vt ON vt.contract_id = sh.contract_id
+        WHERE vt.validation_run_id = #{validationRunId}
+          AND vt.selection_status = 'SELECTED'
+          AND sh.payment_stage = 'GA_TO_FC'
+          AND sh.active_yn = true
+          AND sh.schedule_purpose = 'OPERATIONAL'
+          AND sl.due_month = #{validationMonth}
+          AND sl.line_status &lt;&gt; 'CANCELLED'
+          AND sl.beneficiary_agent_id IS NOT NULL
+        ORDER BY sl.schedule_line_id
+    </select>
+
+    <!--
+      contractId는 transaction_attribution이 아니라 commission_transaction.source_contract_id를
+      쓴다 — V9__commission_payment_natural_key.sql이 "이 거래가 어떤 계약 건인지"의
+      자연키로 이미 이 컬럼을 두었고(컬럼 코멘트: "원계약이 없으면 실제 귀속계약을 사용"),
+      CommissionPaymentMapper.xml도 같은 컬럼으로 원계약을 조회한다(주석: "자연키의 기준인
+      commission_transaction.source_contract_id를 조회"). 여러 계약에 나뉘어 배분된 거래를
+      transaction_attribution으로 되짚어 대표 계약을 추정할 필요가 없다.
+    -->
+    <select id="findActualInsurerStatementSources" resultType="com.susukkang.fgc.journal.dto.TransactionJournalSourceRow">
+        SELECT ct.commission_transaction_id, ct.source_contract_id AS contract_id,
+               ct.policy_version_id, ct.commission_item_id,
+               NULL AS beneficiary_agent_id,
+               COALESCE(ct.paid_on, ct.due_date, ct.settlement_month) AS journal_date,
+               ct.amount, '실제 명세 ' || ct.source_business_key AS description
+        FROM fgc.commission_transaction ct
+        JOIN fgc.validation_target vt ON vt.contract_id = ct.source_contract_id
+        WHERE vt.validation_run_id = #{validationRunId}
+          AND vt.selection_status = 'SELECTED'
+          AND ct.payment_stage = 'INSURER_TO_GA'
+          AND ct.source_type = 'INSURER_STATEMENT'
+          AND ct.status = 'CONFIRMED'
+          AND ct.settlement_month = #{validationMonth}
+        ORDER BY ct.commission_transaction_id
+    </select>
+
+    <!--
+      source_type을 GA_MANUAL_PAYMENT/GA_CONFIRMED_PAYMENT로 좁힌다 — ADJUSTMENT·
+      ALLOCATION_POOL·CLAWBACK·RECOVERY는 2차 분개유형(JournalType.java 주석,
+      운영정책서 제38조 "2차에서 ADJUSTMENT, CLAWBACK, RECOVERY를 활성화한다")과 개념이
+      겹쳐 CONFIRMED_FC_PAYOUT으로 잘못 표시하면 안 된다.
+    -->
+    <select id="findConfirmedFcPayoutSources" resultType="com.susukkang.fgc.journal.dto.TransactionJournalSourceRow">
+        SELECT ct.commission_transaction_id, ct.source_contract_id AS contract_id,
+               ct.policy_version_id, ct.commission_item_id,
+               ct.recipient_agent_id AS beneficiary_agent_id,
+               COALESCE(ct.paid_on, ct.due_date, ct.settlement_month) AS journal_date,
+               ct.amount, '확정 지급 건 ' || ct.source_business_key AS description
+        FROM fgc.commission_transaction ct
+        JOIN fgc.validation_target vt ON vt.contract_id = ct.source_contract_id
+        WHERE vt.validation_run_id = #{validationRunId}
+          AND vt.selection_status = 'SELECTED'
+          AND ct.payment_stage = 'GA_TO_FC'
+          AND ct.source_type IN ('GA_MANUAL_PAYMENT', 'GA_CONFIRMED_PAYMENT')
+          AND ct.status = 'CONFIRMED'
+          AND ct.settlement_month = #{validationMonth}
+          AND ct.recipient_agent_id IS NOT NULL
+        ORDER BY ct.commission_transaction_id
+    </select>
+</mapper>
