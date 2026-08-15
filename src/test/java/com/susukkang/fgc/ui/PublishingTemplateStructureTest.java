@@ -15,6 +15,7 @@ class PublishingTemplateStructureTest {
             "templates/contract/form.html",
             "templates/transaction/list.html",
             "templates/transaction/form.html",
+            "templates/schedule/list.html",
             "templates/schedule/detail.html",
             "templates/arbitrage/list.html",
             "templates/ledger/list.html",
