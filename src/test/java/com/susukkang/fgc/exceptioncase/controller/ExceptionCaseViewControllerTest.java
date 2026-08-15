@@ -25,7 +25,6 @@ import static com.susukkang.fgc.common.code.ExceptionStatus.IN_REVIEW;
 import static com.susukkang.fgc.common.code.ExceptionStatus.NEW;
 import static com.susukkang.fgc.common.code.ExceptionStatus.RESOLVED;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -78,35 +77,48 @@ class ExceptionCaseViewControllerTest {
             12L, "OTHER", "INFO", null, "원천 미상 예외", "NEW", null,
             OffsetDateTime.parse("2026-07-02T09:00:00+09:00"), "LEGACY_SOURCE", "9");
 
+    private static final ExceptionCaseListRow ARBITRAGE_ROW = new ExceptionCaseListRow(
+            13L, "ARBITRAGE_CANDIDATE", "HIGH", "C002", "차익거래 후보", "NEW", null,
+            OffsetDateTime.parse("2026-07-11T09:00:00+09:00"), "ARBITRAGE_CHECK", "3");
+
+    /** FGC-FUN-052/053 — 워크큐 기본 화면. 묶음 필터 OPEN 의 서버 해석(#83)이 조회 기준이 된다. */
     @Test
     void 필터_없이_열면_기본값_OPEN이_NEW와_IN_REVIEW로_풀려_조회된다() throws Exception {
-        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of(OPEN_ROW));
-        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(1L);
+        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of(OPEN_ROW, ARBITRAGE_ROW));
+        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(2L);
 
         mockMvc.perform(get("/exceptions").with(user(SETTLE)))
                 .andExpect(status().isOk())
                 .andExpect(view().name("exception/list"))
                 .andExpect(model().attribute("statusFilter", "OPEN"))
+                // FGC-FUN-057 인수조건 "건수 일치" — 배너 건수는 KPI 와 같은 기준으로 계산된다
+                .andExpect(model().attribute("openCount", 2L))
                 // 셸 + 화면 ID + 목록 실데이터 렌더링
                 .andExpect(content().string(containsString("FGC-UI-EXCP-W01")))
                 .andExpect(content().string(containsString("1200% 한도 초과")))
                 .andExpect(content().string(containsString("미배정")))
-                // 참조 컬럼은 원천 화면 링크 (화면정의서 :1349 "만들 때 주의")
+                // FGC-FUN-052(원천 연결) — 참조 컬럼은 원천 화면 링크 (화면정의서 :1349 "만들 때 주의")
                 .andExpect(content().string(containsString("href=\"/transactions\"")))
                 .andExpect(content().string(containsString("COMMISSION_TRANSACTION:77")))
+                .andExpect(content().string(containsString("href=\"/arbitrage-checks\"")))
+                .andExpect(content().string(containsString("ARBITRAGE_CHECK:3")))
                 // 미처리 배너 건수 — 대시보드 KPI(countOpenException)와 같은 기준
                 .andExpect(content().string(containsString("건이 처리를 기다립니다")))
                 // 상태 select 는 OPEN 이 선택된 채로 돌아온다
                 .andExpect(content().string(containsString("<option value=\"OPEN\" selected=\"selected\">")));
 
         verify(mapper).findCases(List.of(NEW, IN_REVIEW));
+        verify(mapper).countByStatuses(List.of(NEW, IN_REVIEW));
     }
 
-    /** 대시보드 '미처리 예외' KPI 카드 링크(@{/exceptions(status='OPEN',month=...)}) 경로. */
+    /**
+     * FGC-FUN-057 인수조건 "항목 클릭 시 해당 목록으로 이동" —
+     * 대시보드 '미처리 예외' KPI 카드 링크(@{/exceptions(status='OPEN',month=...)}) 경로.
+     */
     @Test
     void 대시보드_카드가_보낸_OPEN과_month가_그대로_적용된다() throws Exception {
-        given(mapper.findCases(anyList())).willReturn(List.of(OPEN_ROW));
-        given(mapper.countByStatuses(anyList())).willReturn(1L);
+        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of(OPEN_ROW));
+        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(1L);
 
         mockMvc.perform(get("/exceptions").param("status", "OPEN").param("month", "2026-05")
                         .with(user(SETTLE)))
@@ -118,25 +130,29 @@ class ExceptionCaseViewControllerTest {
         verify(mapper).findCases(List.of(NEW, IN_REVIEW));
     }
 
+    /** FGC-FUN-053 상태값(RESOLVED 등 실제 코드) 필터 — 묶음 해석 없이 그 값 하나로만 조회한다. */
     @Test
     void 실제_상태코드_필터는_그_값_하나로만_조회된다() throws Exception {
         given(mapper.findCases(List.of(RESOLVED))).willReturn(List.of(RESOLVED_ROW));
-        given(mapper.countByStatuses(anyList())).willReturn(0L);
+        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(2L);
 
         mockMvc.perform(get("/exceptions").param("status", "RESOLVED").with(user(SETTLE)))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("statusFilter", "RESOLVED"))
+                // FGC-FUN-057 — 배너의 미처리 건수는 목록 필터와 무관하게 항상 KPI 와 같은 OPEN 기준
+                .andExpect(model().attribute("openCount", 2L))
                 .andExpect(content().string(containsString("필수값 누락")))
                 .andExpect(content().string(containsString("href=\"/contracts/5\"")))
                 .andExpect(content().string(containsString("<option value=\"RESOLVED\" selected=\"selected\">")));
 
         verify(mapper).findCases(List.of(RESOLVED));
+        verify(mapper).countByStatuses(List.of(NEW, IN_REVIEW));
     }
 
     @Test
     void 빈_상태값은_필터_없음_전체_조회다() throws Exception {
         given(mapper.findCases(List.of())).willReturn(List.of(OPEN_ROW, RESOLVED_ROW, UNKNOWN_SOURCE_ROW));
-        given(mapper.countByStatuses(anyList())).willReturn(1L);
+        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(1L);
 
         mockMvc.perform(get("/exceptions").param("status", "").with(user(SETTLE)))
                 .andExpect(status().isOk())
@@ -153,8 +169,8 @@ class ExceptionCaseViewControllerTest {
     void 공백만_있는_상태값은_전체가_아니라_미지원으로_보고_기본_OPEN으로_되돌린다() throws Exception {
         // 명시적 빈 문자열("전체")과 달리 공백은 select 가 만들 수 없는 오타성 입력이다 —
         // 조용히 전체 조회로 새지 않게 한다.
-        given(mapper.findCases(anyList())).willReturn(List.of());
-        given(mapper.countByStatuses(anyList())).willReturn(0L);
+        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of());
+        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(0L);
 
         mockMvc.perform(get("/exceptions").param("status", " ").with(user(SETTLE)))
                 .andExpect(status().isOk())
@@ -166,8 +182,8 @@ class ExceptionCaseViewControllerTest {
     @Test
     void 미지원_상태값은_400이_아니라_기본_OPEN으로_되돌린다() throws Exception {
         // ShellAdvice 의 month 와 같은 정책 — select 가 보내는 값이라 조용히 복구한다
-        given(mapper.findCases(anyList())).willReturn(List.of());
-        given(mapper.countByStatuses(anyList())).willReturn(0L);
+        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of());
+        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(0L);
 
         mockMvc.perform(get("/exceptions").param("status", "NOPE").with(user(SETTLE)))
                 .andExpect(status().isOk())
