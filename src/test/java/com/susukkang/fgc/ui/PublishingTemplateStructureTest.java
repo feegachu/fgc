@@ -51,8 +51,10 @@ class PublishingTemplateStructureTest {
     void apiDeferredScreensExposeExplicitPendingStatesWithoutSeedData() throws IOException {
         assertThat(resource("templates/arbitrage/list.html"))
                 .contains("조회 API 연동 대기");
+        // EXCP-W01 은 #83 에서 안내 배너·상태 필터·목록이 서버 렌더링으로 바인딩됐다 —
+        // 아직 미연동인 유형별 요약카드만 대기 상태를 명시한다.
         assertThat(resource("templates/exception/list.html"))
-                .contains("예외 현황은 조회 API 연동 대기 중입니다.");
+                .contains("유형별 미처리 집계 API 연동 대기");
         assertThat(resource("templates/vrun/detail.html"))
                 .contains("진행률 API 연동 대기")
                 .contains("확정 조건 API 연동 대기")
