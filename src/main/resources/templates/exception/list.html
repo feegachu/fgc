@@ -13,9 +13,11 @@
    · 처리 이력 수정·삭제 — append-only 입니다
    · 같은 원천에 예외 중복 생성 — exception_key UNIQUE 로 재실행해도 1건입니다
 
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-EXCP-W01)의 정적 골격만 옮겼다.
-  데이터 영역(안내 배너·유형별 요약카드·목록·처리 패널·처리 이력)은
-  예외 조회 API(GET /api/v1/exceptions) 연동 시 서버 렌더링으로 채운다.
+  [부분 바인딩 단계] 안내 배너·상태 필터·목록은 ExceptionCaseViewController 가
+  서버 렌더링으로 채운다(#83). 상태 select 의 OPEN(미처리)은 exception_case.status 에
+  없는 화면 묶음값이라 서버(ExceptionStatus.dbStatuses)가 NEW+IN_REVIEW 로 풀어 조회한다.
+  유형별 요약카드·유형/심각도/담당자/계약번호 필터·처리 패널·처리 이력은
+  IF-API-43/44 전체 연동 시 채운다.
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-EXCP-W01', '예외함', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
@@ -27,10 +29,11 @@
 
   <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
     <span class="material-symbols-outlined" style="font-size:18px">inbox</span>
-    <!-- 미처리 건수 안내 문구 — 예외 조회 API 연동 시 서버 렌더링으로 채운다 -->
     <span>
       <strong>정상 건은 여기 오지 않습니다. 여기 있는 건 전부 사람이 봐야 합니다.</strong>
-      <span id="notice-exception">현재 예외 현황은 조회 API 연동 대기 중입니다.</span>
+      <!-- 대시보드 '미처리 예외' KPI 카드(DashboardMapper.countOpenException)와 같은
+           기준(NEW+IN_REVIEW, 월 필터 없음)이라 카드 건수와 항상 일치한다 -->
+      <span id="notice-exception">미처리(신규 + 검토중) <strong th:text="${openCount}">0</strong>건이 처리를 기다립니다.</span>
     </span>
   </div>
 
@@ -40,36 +43,41 @@
     <div class="fgc-empty publishing-empty-state">유형별 미처리 집계 API 연동 대기</div>
   </section>
 
-  <!-- ② 검색 -->
+  <!-- ② 검색 — 상태 필터만 서버 연동(#83). OPEN 은 화면 묶음값이고 서버가
+       NEW+IN_REVIEW 로 푼다. 나머지 필터는 IF-API-43 전체 연동 시 활성화한다. -->
   <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__body fgc-toolbar">
+    <form class="fgc-card__body fgc-toolbar" method="get" th:action="@{/exceptions}">
       <div class="fgc-field" style="min-width:190px">
         <label class="fgc-label" for="f-type">예외 유형</label>
-        <select class="fgc-select" id="f-type"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-type" disabled aria-label="예외 유형, 연동 대기"><option value="">전체</option></select>
       </div>
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-severity">심각도</label>
-        <select class="fgc-select" id="f-severity"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-severity" disabled aria-label="심각도, 연동 대기"><option value="">전체</option></select>
       </div>
       <div class="fgc-field" style="min-width:140px">
         <label class="fgc-label" for="f-status">상태</label>
-        <select class="fgc-select" id="f-status">
-          <option value="OPEN">미처리 (신규 + 검토중)</option>
-          <option value="">전체</option>
+        <select class="fgc-select" id="f-status" name="status" onchange="this.form.submit()">
+          <option value="OPEN" th:selected="${statusFilter == 'OPEN'}">미처리 (신규 + 검토중)</option>
+          <option value="" th:selected="${statusFilter == ''}">전체</option>
+          <option value="NEW" th:selected="${statusFilter == 'NEW'}">신규</option>
+          <option value="IN_REVIEW" th:selected="${statusFilter == 'IN_REVIEW'}">검토중</option>
+          <option value="RESOLVED" th:selected="${statusFilter == 'RESOLVED'}">해결</option>
+          <option value="REJECTED" th:selected="${statusFilter == 'REJECTED'}">오탐·반려</option>
         </select>
       </div>
       <div class="fgc-field" style="min-width:140px">
         <label class="fgc-label" for="f-assignee">담당자</label>
-        <select class="fgc-select" id="f-assignee"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-assignee" disabled aria-label="담당자, 연동 대기"><option value="">전체</option></select>
       </div>
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="f-contract">계약번호</label>
-        <input class="fgc-input" id="f-contract" type="text" placeholder="C004">
+        <input class="fgc-input" id="f-contract" type="text" placeholder="C004" disabled aria-label="계약번호, 연동 대기">
       </div>
-      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+      <a class="fgc-btn fgc-btn--ghost" id="f-reset" th:href="@{/exceptions}">
         <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
-      </button>
-    </div>
+      </a>
+    </form>
   </section>
 
   <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.5fr 1fr;gap:16px" id="work-grid">
@@ -78,7 +86,7 @@
     <section class="fgc-card">
       <div class="fgc-card__head">
         <span class="fgc-card__title">예외 목록</span>
-        <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+        <span class="fgc-muted" style="font-size:12px"><span id="row-count" th:text="${cases.size()}">0</span>건</span>
       </div>
       <div style="overflow-x:auto">
         <table class="fgc-table">
@@ -96,7 +104,18 @@
             </tr>
           </thead>
           <tbody id="list-body">
-            <tr><td colspan="9"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr th:each="c : ${cases}">
+              <td class="fgc-mono" th:text="${c.exceptionCaseId()}">-</td>
+              <td th:text="${c.exceptionType()}">-</td>
+              <td th:text="${c.severity()}">-</td>
+              <td class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</td>
+              <td th:text="${c.title()}">-</td>
+              <td th:text="${c.status()}">-</td>
+              <td th:text="${c.assignedTo()} ?: '미배정'">-</td>
+              <td class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
+              <td class="fgc-mono" th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</td>
+            </tr>
+            <tr th:if="${cases.isEmpty()}"><td colspan="9"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
           </tbody>
         </table>
       </div>

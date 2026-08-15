@@ -53,6 +53,8 @@
           FROM fgc.vw_journal_imbalance
     </select>
 
+    <!-- IN ('NEW','IN_REVIEW') 는 미처리(OPEN) 묶음 — 정의는 ExceptionStatus 를 따른다(#83).
+         예외함 미처리 건수와의 일치는 ExceptionCaseQueryMapperIntegrationTest 가 지킨다. -->
     <select id="countOpenException" resultType="long">
         SELECT COUNT(*)
           FROM fgc.exception_case
