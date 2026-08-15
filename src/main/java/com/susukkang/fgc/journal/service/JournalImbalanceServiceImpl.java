@@ -27,9 +27,11 @@ public class JournalImbalanceServiceImpl implements JournalImbalanceService {
             throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
         }
 
+        // 목록과 건수를 같은 결과에서 계산한다 — 페이징이 없는 API라 별도 COUNT 쿼리를
+        // 또 던지면 그 사이 커밋된 변경 때문에 rows.size()와 totalCount가 어긋날 수 있다
+        // (기본 READ_COMMITTED에서 두 SELECT가 서로 다른 스냅샷을 볼 수 있음, 코드리뷰 반영).
         List<LedgerImbalanceRow> rows = journalImbalanceMapper.findImbalances(validationRunId);
-        long totalCount = journalImbalanceMapper.countImbalances(validationRunId);
 
-        return JournalImbalanceSearchResponse.of(rows, totalCount);
+        return JournalImbalanceSearchResponse.of(rows, rows.size());
     }
 }
