@@ -67,11 +67,16 @@ class ExceptionCaseViewControllerTest {
 
     private static final ExceptionCaseListRow OPEN_ROW = new ExceptionCaseListRow(
             10L, "CAP_VIOLATION", "CRITICAL", "C001", "1200% 한도 초과", "NEW", null,
-            OffsetDateTime.parse("2026-07-10T09:00:00+09:00"), "CAP_CHECK", "77");
+            OffsetDateTime.parse("2026-07-10T09:00:00+09:00"), "COMMISSION_TRANSACTION", "77");
 
     private static final ExceptionCaseListRow RESOLVED_ROW = new ExceptionCaseListRow(
             11L, "DATA_QUALITY", "WARNING", null, "필수값 누락", "RESOLVED", "settle01",
             OffsetDateTime.parse("2026-07-01T09:00:00+09:00"), "INSURANCE_CONTRACT", "5");
+
+    /** 원천 화면 라우트가 아직 없는 유형 — 참조 컬럼이 링크 없이 텍스트로만 나와야 한다. */
+    private static final ExceptionCaseListRow UNKNOWN_SOURCE_ROW = new ExceptionCaseListRow(
+            12L, "OTHER", "INFO", null, "원천 미상 예외", "NEW", null,
+            OffsetDateTime.parse("2026-07-02T09:00:00+09:00"), "LEGACY_SOURCE", "9");
 
     @Test
     void 필터_없이_열면_기본값_OPEN이_NEW와_IN_REVIEW로_풀려_조회된다() throws Exception {
@@ -86,6 +91,9 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("FGC-UI-EXCP-W01")))
                 .andExpect(content().string(containsString("1200% 한도 초과")))
                 .andExpect(content().string(containsString("미배정")))
+                // 참조 컬럼은 원천 화면 링크 (화면정의서 :1349 "만들 때 주의")
+                .andExpect(content().string(containsString("href=\"/transactions\"")))
+                .andExpect(content().string(containsString("COMMISSION_TRANSACTION:77")))
                 // 미처리 배너 건수 — 대시보드 KPI(countOpenException)와 같은 기준
                 .andExpect(content().string(containsString("건이 처리를 기다립니다")))
                 // 상태 select 는 OPEN 이 선택된 채로 돌아온다
@@ -119,6 +127,7 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("statusFilter", "RESOLVED"))
                 .andExpect(content().string(containsString("필수값 누락")))
+                .andExpect(content().string(containsString("href=\"/contracts/5\"")))
                 .andExpect(content().string(containsString("<option value=\"RESOLVED\" selected=\"selected\">")));
 
         verify(mapper).findCases(List.of(RESOLVED));
@@ -126,13 +135,16 @@ class ExceptionCaseViewControllerTest {
 
     @Test
     void 빈_상태값은_필터_없음_전체_조회다() throws Exception {
-        given(mapper.findCases(List.of())).willReturn(List.of(OPEN_ROW, RESOLVED_ROW));
+        given(mapper.findCases(List.of())).willReturn(List.of(OPEN_ROW, RESOLVED_ROW, UNKNOWN_SOURCE_ROW));
         given(mapper.countByStatuses(anyList())).willReturn(1L);
 
         mockMvc.perform(get("/exceptions").param("status", "").with(user(SETTLE)))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("statusFilter", ""))
-                .andExpect(content().string(containsString("<option value=\"\" selected=\"selected\">")));
+                .andExpect(content().string(containsString("<option value=\"\" selected=\"selected\">")))
+                // 라우트가 없는 원천 유형은 링크 없이 텍스트로만 표시된다
+                .andExpect(content().string(containsString("LEGACY_SOURCE:9")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("LEGACY_SOURCE:9</a>"))));
 
         verify(mapper).findCases(List.<ExceptionStatus>of());
     }

@@ -113,7 +113,13 @@
               <td th:text="${c.status()}">-</td>
               <td th:text="${c.assignedTo()} ?: '미배정'">-</td>
               <td class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
-              <td class="fgc-mono" th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</td>
+              <!-- 참조 = 원천 화면 링크 (화면정의서 :1349 "만들 때 주의") — 라우트가 없는 원천 유형은 텍스트로만 -->
+              <td class="fgc-mono">
+                <a th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}"
+                   th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</a>
+                <span th:if="${c.sourceLink() == null}"
+                      th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
+              </td>
             </tr>
             <tr th:if="${cases.isEmpty()}"><td colspan="9"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
           </tbody>
