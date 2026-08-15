@@ -2,9 +2,13 @@
   "use strict";
 
   // 로그아웃 직후든 세션 만료든, 로그인 화면은 미인증 상태에서만 뜬다.
-  // 이전 세션의 워크스페이스 탭이 다음 로그인까지 남아있지 않도록 여기서 지운다.
-  // (fgc.workspace-tabs.v1 은 common/workspace-tabs.js STORAGE_KEY와 같은 값)
-  sessionStorage.removeItem("fgc.workspace-tabs.v1");
+  // 이전 사용자의 UI 상태(워크스페이스 탭 fgc.workspace-tabs.v1, 사이드바 펼침
+  // fgc.sidebar.open-sections.v1 등)가 다음 로그인까지 남지 않도록 fgc.* 키를 전부 지운다.
+  // 키를 하나씩 나열하면 새 키가 생길 때마다 여기도 같이 고쳐야 해서 접두사로 쓸어낸다.
+  for (let i = sessionStorage.length - 1; i >= 0; i--) {
+    const key = sessionStorage.key(i);
+    if (key && key.startsWith("fgc.")) sessionStorage.removeItem(key);
+  }
 
   const form = document.querySelector("[data-login-form]");
   const passwordInput = document.querySelector("[data-password-input]");
