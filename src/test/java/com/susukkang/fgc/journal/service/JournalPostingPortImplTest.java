@@ -110,7 +110,8 @@ class JournalPostingPortImplTest {
     }
 
     @Test
-    // 재실행 멱등성: saveDraft가 이미 POSTED인 기존 행을 그대로 돌려주면 markPosted를 다시 부르지 않는다
+    // 재실행 멱등성: saveDraft가 이미 POSTED인 기존 행을 그대로 돌려주면 markPosted를 다시 부르지 않고,
+    // postedJournalCount(신규 기표)가 아니라 skippedCount(ALREADY_POSTED)로 집계한다(코드리뷰 반영)
     void rerunSkipsMarkPostedWhenAlreadyPosted() {
         given(sourceMapper.findExpectedInsurerIncomeSources(any(), any())).willReturn(List.of(scheduleRow(1L)));
         given(sourceMapper.findExpectedFcPayoutSources(any(), any())).willReturn(List.of());
@@ -122,7 +123,12 @@ class JournalPostingPortImplTest {
 
         JournalPostingResult result = port().post(newContext(42L));
 
-        assertThat(result.postedJournalCount()).isEqualTo(1);
+        assertThat(result.postedJournalCount()).isZero();
+        assertThat(result.skippedCount()).isEqualTo(1);
+        assertThat(result.skips()).singleElement().satisfies(skip -> {
+            assertThat(skip.contractId()).isEqualTo(10L);
+            assertThat(skip.reasonCode()).isEqualTo("ALREADY_POSTED");
+        });
         verify(journalMapper, never()).markPosted(any(), any());
     }
 

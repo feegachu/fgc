@@ -44,10 +44,7 @@ class JournalPostingPortImplIntegrationTest {
     private final String keyPrefix = "TEST-142-" + System.nanoTime() + "-";
     private final List<Long> createdValidationRunIds = new ArrayList<>();
     private final List<Long> createdScheduleHeaderIds = new ArrayList<>();
-    private final List<DeactivatedSchedule> deactivatedSchedules = new ArrayList<>();
-
-    private record DeactivatedSchedule(Long contractId, String paymentStage) {
-    }
+    private final List<Long> deactivatedScheduleHeaderIds = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {
@@ -82,12 +79,12 @@ class JournalPostingPortImplIntegrationTest {
                 jdbcTemplate.update(
                         "DELETE FROM fgc.schedule_header WHERE schedule_header_id = ?", scheduleHeaderId);
             }
-            for (DeactivatedSchedule deactivated : deactivatedSchedules) {
-                jdbcTemplate.update("""
-                        UPDATE fgc.schedule_header SET active_yn = true
-                         WHERE contract_id = ? AND payment_stage = ?
-                           AND schedule_purpose = 'OPERATIONAL' AND active_yn = false
-                        """, deactivated.contractId(), deactivated.paymentStage());
+            // 이 테스트가 비활성화시킨 "그 행"만 정확히 되살린다 — contract_id·payment_stage로만
+            // 되짚으면 원래부터 비활성이던 이전 버전 스케줄까지 함께 활성화돼 버린다(코드리뷰 반영).
+            for (Long scheduleHeaderId : deactivatedScheduleHeaderIds) {
+                jdbcTemplate.update(
+                        "UPDATE fgc.schedule_header SET active_yn = true WHERE schedule_header_id = ?",
+                        scheduleHeaderId);
             }
             for (Long runId : createdValidationRunIds) {
                 jdbcTemplate.update("DELETE FROM fgc.validation_target WHERE validation_run_id = ?", runId);
@@ -142,12 +139,15 @@ class JournalPostingPortImplIntegrationTest {
 
     private Long insertScheduleLine(Long contractId, String paymentStage, Long policyVersionId,
                                      Long commissionItemId, Long beneficiaryAgentId, LocalDate dueDate) {
-        int deactivated = jdbcTemplate.update("""
-                UPDATE fgc.schedule_header SET active_yn = false
+        List<Long> previousActiveIds = jdbcTemplate.queryForList("""
+                SELECT schedule_header_id FROM fgc.schedule_header
                  WHERE contract_id = ? AND payment_stage = ? AND schedule_purpose = 'OPERATIONAL' AND active_yn = true
-                """, contractId, paymentStage);
-        if (deactivated > 0) {
-            deactivatedSchedules.add(new DeactivatedSchedule(contractId, paymentStage));
+                """, Long.class, contractId, paymentStage);
+        if (!previousActiveIds.isEmpty()) {
+            Long previousActiveId = previousActiveIds.get(0);
+            jdbcTemplate.update(
+                    "UPDATE fgc.schedule_header SET active_yn = false WHERE schedule_header_id = ?", previousActiveId);
+            deactivatedScheduleHeaderIds.add(previousActiveId);
         }
         Long scheduleHeaderId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.schedule_header (
@@ -265,10 +265,14 @@ class JournalPostingPortImplIntegrationTest {
         selectContract(validationRunId, contractId, productOfferingId);
         insertScheduleLine(contractId, "INSURER_TO_GA", policyVersionId, commissionItemId, null, dueDate);
 
-        journalPostingPort.post(newContext(validationRunId, VALIDATION_MONTH));
+        JournalPostingResult firstRun = journalPostingPort.post(newContext(validationRunId, VALIDATION_MONTH));
         JournalPostingResult secondRun = journalPostingPort.post(newContext(validationRunId, VALIDATION_MONTH));
 
-        assertThat(secondRun.postedJournalCount()).isEqualTo(1);
+        assertThat(firstRun.postedJournalCount()).isEqualTo(1);
+        assertThat(firstRun.skippedCount()).isZero();
+        // 재실행은 새로 기표한 게 없다 — postedJournalCount는 0이고, 이미 처리된 원천은 skip으로 집계된다
+        assertThat(secondRun.postedJournalCount()).isZero();
+        assertThat(secondRun.skippedCount()).isEqualTo(1);
         Long journalCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.journal_header WHERE validation_run_id = ?", Long.class, validationRunId);
         assertThat(journalCount).isEqualTo(1L);
