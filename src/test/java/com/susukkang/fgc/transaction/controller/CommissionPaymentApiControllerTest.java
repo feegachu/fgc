@@ -206,12 +206,15 @@ class CommissionPaymentApiControllerTest {
     // FUN-002(#82) — COMPLIANCE는 §4-1 "조회만"이라 등록·수정·확정 전부 403이어야 한다.
     @Test
     void rejectsCreateUpdateAndConfirmForComplianceRole() throws Exception {
+        // 필터 단계 거부도 ApiResponse 봉투로 나가야 한다(apiAccessDeniedHandler, 이슈 #82 인수조건)
         mockMvc.perform(post("/api/v1/transactions")
                         .with(user("comp01").roles("COMPLIANCE"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCreateJson()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"))
+                .andExpect(jsonPath("$.data").doesNotExist());
 
         mockMvc.perform(put("/api/v1/transactions/101")
                         .with(user("comp01").roles("COMPLIANCE"))

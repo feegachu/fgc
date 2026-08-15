@@ -363,7 +363,11 @@ class ContractControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** FUN-002(#82) — COMPLIANCE는 §4-1 "조회만"이라 계약 생성·수정 모두 403이어야 한다. */
+    /**
+     * FUN-002(#82) — COMPLIANCE는 §4-1 "조회만"이라 계약 생성·수정 모두 403이어야 한다.
+     * 이 거부는 SecurityConfig 굵은 규칙(필터 단계)에서 나므로, ApiResponse 봉투는
+     * 컨트롤러 advice 가 아니라 apiAccessDeniedHandler 가 써 준다 — 봉투까지 확인한다.
+     */
     @Test
     @DisplayName("준법·감사는 보험계약을 생성할 수 없다")
     void createContractRejectsComplianceUser() throws Exception {
@@ -373,7 +377,9 @@ class ContractControllerTest {
                         .content(objectMapper.writeValueAsString(
                                 createRequest()
                         )))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"))
+                .andExpect(jsonPath("$.data").doesNotExist());
     }
 
     @Test

@@ -30,6 +30,13 @@ public final class Roles {
             "hasAnyRole('" + COMPLIANCE + "','" + SYSTEM_ADMIN + "')";
 
     /**
+     * "전체 조회" API용(기준정보 등). 사실상 authenticated()와 같지만, 역할 4종을 명시해
+     * 새 역할이 추가될 때 조회 범위를 다시 판단하도록 강제한다.
+     */
+    public static final String ANY_ROLE = "hasAnyRole('" + SYSTEM_ADMIN + "','" + GA_ADMIN
+            + "','" + SETTLEMENT + "','" + COMPLIANCE + "')";
+
+    /**
      * SecurityConfig 의 URL 단위 굵은 규칙에 쓴다. COMPLIANCE 는 역할 정의(§4-1)상 "조회만"이라
      * 상태를 바꾸는 요청(POST/PUT/DELETE/PATCH)에서는 화면·API 종류를 가리지 않고 항상 배제된다.
      */

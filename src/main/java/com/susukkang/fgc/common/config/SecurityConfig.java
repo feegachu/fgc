@@ -1,17 +1,21 @@
 package com.susukkang.fgc.common.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.security.Roles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 // FUN-001 개발 순서 1
@@ -29,11 +33,31 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 public class SecurityConfig {
 
     /**
+     * FUN-002(#82) — 필터 단계(아래 URL 굵은 규칙·CSRF)에서 거부된 /api/** 요청도 컨트롤러
+     * @PreAuthorize 거부와 같은 ApiResponse 봉투(FGC-AUTH-003)로 나가게 한다.
+     * 기본 핸들러는 sendError(403) → Boot 기본 오류 JSON이라 인터페이스정의서 3-3의
+     * 봉투 규칙(이슈 #82 인수조건 "403 + ApiResponse 오류 봉투")을 깬다.
+     * 매핑을 복사하지 않고 GlobalExceptionHandler.handleAccessDenied 를 그대로 재사용한다.
+     */
+    @Bean
+    public AccessDeniedHandler apiAccessDeniedHandler(
+            GlobalExceptionHandler globalExceptionHandler, ObjectMapper objectMapper) {
+        return (request, response, exception) -> {
+            var entity = globalExceptionHandler.handleAccessDenied(exception);
+            response.setStatus(entity.getStatusCode().value());
+            response.setCharacterEncoding("UTF-8");
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            objectMapper.writeValue(response.getWriter(), entity.getBody());
+        };
+    }
+
+    /**
      * FUN-065 지급 등록·수정·확정 API는 세션 인증과 CSRF 토큰을 함께 검증한다.
      */
     @Bean
     @Order(1)
-    public SecurityFilterChain commissionPaymentApiSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain commissionPaymentApiSecurityFilterChain(
+            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler) throws Exception {
         http
                 .securityMatcher("/api/v1/transactions/**")
                 // 2026-08-11 yslee - 세션 쿠키 기반 지급 API의 CSRF 보호 활성화
@@ -52,8 +76,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(
-                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(apiAccessDeniedHandler));
         return http.build();
     }
 
@@ -72,7 +97,8 @@ public class SecurityConfig {
      */
     @Bean
     @Order(2)
-    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain apiSecurityFilterChain(
+            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler) throws Exception {
         http
                 .securityMatcher("/api/**")
                 .csrf(csrf -> csrf.disable())
@@ -88,8 +114,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(
-                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(apiAccessDeniedHandler));
         return http.build();
     }
 
