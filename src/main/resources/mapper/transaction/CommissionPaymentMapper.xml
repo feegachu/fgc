@@ -237,8 +237,8 @@
          ORDER BY ta.attribution_seq
     </select>
 
-    <select id="findConfirmationDataForUpdate"
-            resultType="com.susukkang.fgc.transaction.domain.ConfirmationData">
+    <!-- 2026-08-16 yslee - IF-API-24 사전검증(무잠금)과 확정(FOR UPDATE)이 같은 SELECT를 공유 -->
+    <sql id="confirmationDataSelect">
         SELECT ct.commission_transaction_id AS payment_id,
                ct.status,
                ct.amount,
@@ -280,7 +280,29 @@
             ON ta.commission_transaction_id = ct.commission_transaction_id
          WHERE ct.commission_transaction_id = #{paymentId}
          ORDER BY ta.attribution_seq
-         FOR UPDATE OF ct
+    </sql>
+
+    <select id="findConfirmationDataForUpdate"
+            resultType="com.susukkang.fgc.transaction.domain.ConfirmationData">
+        <include refid="confirmationDataSelect"/>
+        FOR UPDATE OF ct
+    </select>
+
+    <!-- IF-API-24 사전검증 전용 무잠금 조회 — 미리보기가 확정과 행 잠금을 다투지 않는다 -->
+    <select id="findConfirmationData"
+            resultType="com.susukkang.fgc.transaction.domain.ConfirmationData">
+        <include refid="confirmationDataSelect"/>
+    </select>
+
+    <!-- IF-API-24 capPreview 표시용 귀속 계약번호 조회 -->
+    <select id="findAttributedContractNumbers"
+            resultType="com.susukkang.fgc.transaction.domain.AttributedContractNo">
+        SELECT DISTINCT ta.contract_id,
+               c.contract_no
+          FROM fgc.transaction_attribution ta
+          JOIN fgc.insurance_contract c
+            ON c.contract_id = ta.contract_id
+         WHERE ta.commission_transaction_id = #{paymentId}
     </select>
 
     <!-- 2026-08-11 yslee - 동일 계약의 여러 DRAFT 확정을 계약 행 기준으로 직렬화 -->
@@ -310,7 +332,13 @@
                crs.premium_multiplier,
                crs.warning_usage_pct,
                COALESCE((
-                   SELECT SUM(other_ta.attributed_amount)
+                   SELECT SUM(
+                              CASE
+                                  WHEN other_ct.cashflow_type = 'DEDUCTION'
+                                      THEN -ROUND(other_ta.attributed_amount, 0)
+                                  ELSE ROUND(other_ta.attributed_amount, 0)
+                              END
+                          )
                      FROM fgc.transaction_attribution other_ta
                      JOIN fgc.commission_transaction other_ct
                        ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
@@ -323,7 +351,13 @@
                       AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
                ), 0) AS existing_included_amount,
                (
-                   SELECT SUM(compliance_ta.attributed_amount)
+                    SELECT SUM(
+                               CASE
+                                   WHEN compliance_ct.cashflow_type = 'DEDUCTION'
+                                       THEN -ROUND(compliance_ta.attributed_amount, 0)
+                                   ELSE ROUND(compliance_ta.attributed_amount, 0)
+                               END
+                           )
                      FROM fgc.transaction_attribution compliance_ta
                      JOIN fgc.commission_transaction compliance_ct
                        ON compliance_ct.commission_transaction_id = compliance_ta.commission_transaction_id

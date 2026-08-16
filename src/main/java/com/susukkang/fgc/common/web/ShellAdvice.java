@@ -1,6 +1,7 @@
 package com.susukkang.fgc.common.web;
 
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.security.Roles;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,7 +85,7 @@ public class ShellAdvice {
      */
     @ModelAttribute("readOnly")
     public boolean readOnly(Authentication authentication) {
-        return "COMPLIANCE".equals(roleCode(authentication));
+        return Roles.COMPLIANCE.equals(roleCode(authentication));
     }
 
     /**
@@ -95,7 +96,14 @@ public class ShellAdvice {
     @ModelAttribute("canProcess")
     public boolean canProcess(Authentication authentication) {
         String role = roleCode(authentication);
-        return "SETTLEMENT".equals(role) || "SYSTEM_ADMIN".equals(role);
+        return Roles.SETTLEMENT.equals(role) || Roles.SYSTEM_ADMIN.equals(role);
+    }
+
+    /** AUDT-W01 감사로그 메뉴 노출 기준. sidebar.html 이 역할 문자열을 직접 비교하지 않도록 한다. */
+    @ModelAttribute("canViewAuditLog")
+    public boolean canViewAuditLog(Authentication authentication) {
+        String role = roleCode(authentication);
+        return Roles.COMPLIANCE.equals(role) || Roles.SYSTEM_ADMIN.equals(role);
     }
 
     /** 셸 헤더·사이드바의 역할 배지. messages.properties 의 role.{code} 키로 라벨을 찾는다. */
@@ -103,7 +111,7 @@ public class ShellAdvice {
     public String roleCode(Authentication authentication) {
         return authentication != null && authentication.getPrincipal() instanceof FgcUserDetails user
                 ? user.getRoleCode()
-                : "COMPLIANCE";
+                : Roles.COMPLIANCE;
     }
 
     /**

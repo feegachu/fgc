@@ -6,5 +6,13 @@ package com.susukkang.fgc.journal.domain;
  */
 public enum NormalBalance {
     DEBIT,
-    CREDIT
+    CREDIT;
+
+    /** 운영정책서 제39조 "최소 계정과목" 표(docs/FGC_가상_GA_운영정책서_v1_0.md:881-890)와 일치시킨다. */
+    public String label() {
+        return switch (this) {
+            case DEBIT -> "차변";
+            case CREDIT -> "대변";
+        };
+    }
 }

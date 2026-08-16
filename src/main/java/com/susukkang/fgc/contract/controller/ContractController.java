@@ -4,6 +4,7 @@ import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.arbitrage.service.ArbitrageService;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
@@ -58,7 +59,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
@@ -71,7 +72,7 @@ public class ContractController {
      * @since 2026-08-05
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
@@ -117,7 +118,7 @@ public class ContractController {
      * @since 2026-08-12
      */
     @PostMapping("/{id}/arbitrage-check")
-    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<ReArbitrageCheckResponse> reArbitrageCheck(
             @PathVariable Long id,
             @Valid @RequestBody ReArbitrageCheckRequest request,

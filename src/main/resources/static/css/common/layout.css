@@ -262,6 +262,7 @@
   padding: 0 var(--space-6);
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
+  overflow: visible;
 }
 
 .app-header-title {
@@ -307,6 +308,228 @@
   font-size: 0.75rem;
   line-height: 1.125rem;
   white-space: nowrap;
+}
+
+.month-selector {
+  position: relative;
+}
+
+.month-selector-trigger {
+  display: flex;
+  width: 6.5rem;
+  height: var(--control-height-sm);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 0.625rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  white-space: nowrap;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.month-selector-trigger:hover {
+  border-color: var(--color-border-strong);
+}
+
+.month-selector-trigger:focus-visible,
+.month-selector.is-open .month-selector-trigger {
+  border-width: 1.5px;
+  border-color: var(--color-border-focus);
+  outline: 0;
+  box-shadow: var(--shadow-focus);
+}
+
+.month-selector-chevron {
+  color: var(--color-text-secondary);
+  font-size: 1.25rem;
+}
+
+.month-selector.is-open .month-selector-chevron {
+  transform: rotate(180deg);
+}
+
+.month-selector-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  width: 22.5rem;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-12);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.month-selector-popover[hidden] {
+  display: none;
+}
+
+.month-selector-year-navigation {
+  display: flex;
+  height: var(--control-height-sm);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.month-selector-year {
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5rem;
+}
+
+.month-selector-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.month-selector-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.month-selector-cell {
+  display: flex;
+  min-width: 0;
+  height: 3rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-8);
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.month-selector-cell:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+
+.month-selector-cell.is-selected {
+  border-color: var(--color-action-primary);
+  color: var(--color-text-inverse);
+  background: var(--color-action-primary);
+  font-weight: 700;
+}
+
+.month-selector-cell.is-current {
+  border-color: var(--color-border-focus);
+}
+
+.month-selector-cell.is-selected.is-current {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.month-selector-cell:disabled,
+.month-selector-cell.is-disabled {
+  border-color: transparent;
+  color: var(--color-text-disabled);
+  background: var(--color-bg-subtle);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.month-selector-cell:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.month-selector-cell-state {
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 0.875rem;
+}
+
+.month-selector-cell.is-current:not(.is-selected) .month-selector-cell-state {
+  color: var(--color-text-secondary);
+}
+
+.month-selector-scope {
+  display: grid;
+  min-height: 4rem;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-focus);
+  border-radius: var(--radius-8);
+  color: var(--color-text-link);
+  background: var(--color-action-subtle);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.month-selector-scope .material-symbols-rounded {
+  font-size: 1.25rem;
+}
+
+.month-selector-scope strong {
+  font-weight: 500;
+}
+
+.month-selector-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.month-selector-selection {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  white-space: nowrap;
+}
+
+.month-selector-selection strong {
+  font-weight: 500;
+}
+
+.month-selector-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.month-selector-actions .button {
+  min-width: 6rem;
+}
+
+.month-selector-actions .button-primary[aria-busy="true"] {
+  color: var(--color-text-inverse);
+  background: var(--color-action-primary);
+}
+
+.month-selector-loading {
+  font-size: 0.875rem;
+  animation: month-selector-spin 800ms linear infinite;
+}
+
+@keyframes month-selector-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .month-selector-loading {
+    animation: none;
+  }
 }
 
 .workspace-tab-bar {
@@ -749,6 +972,23 @@
   .app-header-field-label,
   .app-header-role.status-badge {
     display: none;
+  }
+
+  .month-selector-popover {
+    position: fixed;
+    inset: auto var(--space-4) var(--space-4);
+    width: auto;
+    max-height: calc(100dvh - var(--space-8));
+    overflow-y: auto;
+  }
+
+  .month-selector-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .month-selector-actions .button {
+    flex: 1;
   }
 
   .workspace-tab-bar {

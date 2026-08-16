@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.mapper;
 
+import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
 import com.susukkang.fgc.transaction.domain.CommissionItemReference;
@@ -68,6 +69,11 @@ public interface CommissionPaymentMapper {
     List<CommissionPaymentAttributionRow> findAttributions(@Param("paymentId") Long paymentId);
 
     List<ConfirmationData> findConfirmationDataForUpdate(@Param("paymentId") Long paymentId);
+
+    // IF-API-24 사전검증 전용 무잠금 조회 — 같은 SELECT의 FOR UPDATE 없는 버전
+    List<ConfirmationData> findConfirmationData(@Param("paymentId") Long paymentId);
+
+    List<AttributedContractNo> findAttributedContractNumbers(@Param("paymentId") Long paymentId);
 
     List<Long> lockAttributedContracts(@Param("paymentId") Long paymentId);
 
