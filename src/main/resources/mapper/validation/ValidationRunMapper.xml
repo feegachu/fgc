@@ -21,6 +21,29 @@
     </select>
 
     <!--
+      IF-API-51 확정 직렬화 기준 행. 확정 서비스는 이 잠금을 먼저 얻고 체크리스트를 재계산한다.
+      동일 실행에 대한 확정 요청은 여기서 순서가 정해지므로 상태·멱등키 판단이 한 트랜잭션 안에서 일관된다.
+    -->
+    <select id="findByIdForUpdate" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
+        SELECT validation_run_id AS validationRunId,
+               validation_month AS validationMonth,
+               run_no AS runNo,
+               run_type AS runType,
+               status,
+               current_step AS currentStep,
+               started_at AS startedAt,
+               completed_at AS completedAt,
+               finalized_at AS finalizedAt,
+               triggered_by AS triggeredBy,
+               finalized_by AS finalizedBy,
+               failure_message AS failureMessage,
+               created_at AS createdAt
+          FROM fgc.validation_run
+         WHERE validation_run_id = #{validationRunId}
+         FOR UPDATE
+    </select>
+
+    <!--
       IF-API-50 / FUN-044-01
       한 SELECT의 MVCC 스냅샷에서 6개 실패 건수를 함께 읽어 조건별 조회 시점 차이를 없앤다.
       전표·예외·한도는 validation_run_id 범위, 귀속합계는 문서 정의대로 validation_month 범위다.
@@ -71,6 +94,42 @@
           FROM fgc.validation_run vr
          WHERE vr.validation_run_id = #{validationRunId}
     </select>
+
+    <!-- API 응답의 finalizedBy는 내부 user_id가 아니라 화면 표시용 login_id를 반환한다. -->
+    <select id="findFinalizationById"
+            resultType="com.susukkang.fgc.validation.dto.FinalizedValidationRunRow">
+        SELECT vr.validation_run_id AS validationRunId,
+               vr.status,
+               vr.finalized_at AS finalizedAt,
+               u.login_id AS finalizedBy,
+               vr.finalize_idempotency_key AS finalizeIdempotencyKey
+          FROM fgc.validation_run vr
+          LEFT JOIN fgc.app_user u ON u.user_id = vr.finalized_by
+         WHERE vr.validation_run_id = #{validationRunId}
+    </select>
+
+    <!-- 선택 멱등키는 한 validation_run에만 귀속된다. UNIQUE 인덱스 전에 친절한 오류를 만들기 위한 조회다. -->
+    <select id="findValidationRunIdByFinalizeIdempotencyKey" resultType="long">
+        SELECT validation_run_id
+          FROM fgc.validation_run
+         WHERE finalize_idempotency_key = #{idempotencyKey}
+    </select>
+
+    <!--
+      상태와 단계를 WHERE 절에 함께 둬 서비스 사전 조회 이후의 경합도 최종적으로 차단한다.
+      확정 메타데이터는 상태 전이와 같은 UPDATE에 기록되어 부분 확정 상태를 만들지 않는다.
+    -->
+    <update id="finalizeIfCompleted">
+        UPDATE fgc.validation_run
+           SET status = 'FINALIZED',
+               current_step = 10,
+               finalized_at = clock_timestamp(),
+               finalized_by = #{finalizedBy},
+               finalize_idempotency_key = #{idempotencyKey}
+         WHERE validation_run_id = #{validationRunId}
+           AND status = 'COMPLETED'
+           AND current_step = 8
+    </update>
 
     <select id="findByMonthAndRunNo" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
         SELECT validation_run_id AS validationRunId,

@@ -2,6 +2,7 @@ package com.susukkang.fgc.validation.mapper;
 
 import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
+import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import org.apache.ibatis.annotations.Mapper;
@@ -16,8 +17,22 @@ public interface ValidationRunMapper {
     /** validation_run_id 단건 조회. 없으면 null. */
     ValidationRunRow findById(@Param("validationRunId") Long validationRunId);
 
+    /** 확정 트랜잭션 동안 결과 writer와 직렬화하기 위한 validation_run 행 잠금 조회. */
+    ValidationRunRow findByIdForUpdate(@Param("validationRunId") Long validationRunId);
+
     /** 운영정책서 제44조 여섯 확정 조건의 실패 건수를 한 스냅샷에서 조회한다. */
     FinalizeChecklistCounts findFinalizeChecklistCounts(@Param("validationRunId") Long validationRunId);
+
+    /** 성공한 확정 응답 또는 동일 멱등키 재요청 응답을 위한 결과 조회. */
+    FinalizedValidationRunRow findFinalizationById(@Param("validationRunId") Long validationRunId);
+
+    /** 멱등키가 다른 실행에서 이미 사용됐는지 사전 확인한다. */
+    Long findValidationRunIdByFinalizeIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
+
+    /** COMPLETED/8을 FINALIZED/10으로 바꾸며 확정 메타데이터를 원자적으로 기록한다. */
+    int finalizeIfCompleted(@Param("validationRunId") Long validationRunId,
+                            @Param("finalizedBy") Long finalizedBy,
+                            @Param("idempotencyKey") String idempotencyKey);
 
     /**
      * (validationMonth, runNo) 복합 유니크 키로 단건 조회. 없으면 null.
