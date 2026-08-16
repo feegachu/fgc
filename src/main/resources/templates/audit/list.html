@@ -5,16 +5,13 @@
   데이터  읽기 audit_log  (UPDATE · DELETE 를 DB 트리거가 거부하는 append-only 테이블)
   API     GET /api/v1/audit-logs?entityType=&entityId=&userId=&action=&from=&to=
   권한    COMPLIANCE(준법·감사) · SYSTEM_ADMIN
-  라우트  GET /audit-logs → audit/list.html
+  라우트  GET /audit-logs → audit/list.html (AuditLogViewController 서버 렌더링, Ajax 없음)
 
   [막을 것] 수정 · 삭제 버튼 자체를 만들지 않습니다.
             감사로그를 고칠 수 있으면 감사로그가 아닙니다.
   [주의] before_value / after_value 는 JSON 입니다.
-         전부 늘어놓지 말고 바뀐 칸만 노랗게 강조합니다.
-
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-AUDT-W01)의 정적 골격만 옮겼다.
-  데이터 영역(필터 선택지·목록·변경 내용 비교)은
-  감사로그 조회 API(GET /api/v1/audit-logs) 연동 시 서버 렌더링으로 채운다.
+         전부 늘어놓지 말고 바뀐 칸만 노랗게 강조합니다 (DiffEntry.changed).
+  행 선택은 selected 파라미터로 같은 검색조건을 유지한 채 재요청합니다 (§4-1 공통 규칙 7).
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-AUDT-W01', '감사로그 조회', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
@@ -36,37 +33,59 @@
     </span>
   </div>
 
-  <!-- ① 검색 -->
+  <!-- ① 검색 — GET 폼이라 검색조건이 URL 에 남는다 (§4-1 공통 규칙 7) -->
   <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__body fgc-toolbar">
+    <form class="fgc-card__body fgc-toolbar" method="get" th:action="@{/audit-logs}">
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="f-from">발생 시각 (시작)</label>
-        <input class="fgc-input" id="f-from" type="date" value="2026-07-01">
+        <input class="fgc-input" id="f-from" name="from" type="date" th:value="${form.from}">
       </div>
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="f-to">발생 시각 (끝)</label>
-        <input class="fgc-input" id="f-to" type="date" value="2026-08-31">
+        <input class="fgc-input" id="f-to" name="to" type="date" th:value="${form.to}">
       </div>
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-user">행위자</label>
-        <select class="fgc-select" id="f-user"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-user" name="userId">
+          <option value="">전체</option>
+          <option th:each="user : ${auditUsers}"
+                  th:value="${user.userId}"
+                  th:text="${user.loginId}"
+                  th:selected="${user.userId == form.userId}">settle01</option>
+        </select>
       </div>
       <div class="fgc-field" style="min-width:180px">
         <label class="fgc-label" for="f-action">행위 종류</label>
-        <select class="fgc-select" id="f-action"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-action" name="action">
+          <option value="">전체</option>
+          <option th:each="code : ${actionCodes}"
+                  th:value="${code}"
+                  th:text="${code}"
+                  th:selected="${code == form.action}">PAYMENT_CONFIRMED</option>
+        </select>
       </div>
       <div class="fgc-field" style="min-width:180px">
         <label class="fgc-label" for="f-entity">대상 종류</label>
-        <select class="fgc-select" id="f-entity"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-entity" name="entityType">
+          <option value="">전체</option>
+          <option th:each="type : ${entityTypes}"
+                  th:value="${type}"
+                  th:text="${type}"
+                  th:selected="${type == form.entityType}">COMMISSION_PAYMENT</option>
+        </select>
       </div>
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-eid">대상 ID</label>
-        <input class="fgc-input" id="f-eid" type="text" placeholder="4104">
+        <input class="fgc-input" id="f-eid" name="entityId" type="text" placeholder="4104"
+               th:value="${form.entityId}">
       </div>
-      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
-        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      <button class="fgc-btn fgc-btn--primary" type="submit">
+        <span class="material-symbols-outlined" style="font-size:18px">search</span> 조회
       </button>
-    </div>
+      <a class="fgc-btn fgc-btn--ghost" id="f-reset" th:href="@{/audit-logs}">
+        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+      </a>
+    </form>
   </section>
 
   <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.5fr 1fr;gap:16px" id="audit-grid">
@@ -75,7 +94,7 @@
     <section class="fgc-card">
       <div class="fgc-card__head">
         <span class="fgc-card__title">감사 기록</span>
-        <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+        <span class="fgc-muted" style="font-size:12px"><span id="row-count" th:text="${logs.totalElements}">0</span>건 · 한 화면 20행</span>
       </div>
       <div style="overflow-x:auto">
         <table class="fgc-table">
@@ -92,27 +111,84 @@
             </tr>
           </thead>
           <tbody id="list-body">
-            <tr><td colspan="8"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr th:if="${logs.content.isEmpty()}">
+              <td colspan="8"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td>
+            </tr>
+            <tr th:each="row : ${logs.content}"
+                th:style="${selectedLog != null and row.auditLogId == selectedLog.auditLogId} ? 'background:#eef4ff'">
+              <td>
+                <a class="fgc-mono" style="text-decoration:underline"
+                   th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${logs.page},selected=${row.auditLogId})}"
+                   th:text="${#temporals.format(row.occurredAt, 'yyyy-MM-dd HH:mm:ss')}">2026-08-16 10:00:00</a>
+              </td>
+              <td th:text="${row.userLoginId} ?: 'BATCH'">settle01</td>
+              <td class="fgc-mono" th:text="${row.actionCode}">PAYMENT_CONFIRMED</td>
+              <td class="fgc-mono" th:text="${row.entityType}">COMMISSION_PAYMENT</td>
+              <td class="fgc-mono" th:text="${row.entityId}">42</td>
+              <td th:text="${row.reason}"></td>
+              <td class="fgc-mono" th:text="${row.policyVersionId}"></td>
+              <td class="fgc-mono" th:text="${row.requestId}">20260816-1a2b3c</td>
+            </tr>
           </tbody>
         </table>
       </div>
+      <div class="fgc-card__body" style="display:flex;gap:8px;align-items:center;justify-content:flex-end"
+           th:if="${logs.totalPages > 1}">
+        <a class="fgc-btn fgc-btn--ghost" th:if="${logs.page > 1}"
+           th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${logs.page - 1})}">이전</a>
+        <span class="fgc-muted" style="font-size:12px"
+              th:text="${logs.page} + ' / ' + ${logs.totalPages}">1 / 1</span>
+        <a class="fgc-btn fgc-btn--ghost" th:if="${logs.page < logs.totalPages}"
+           th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${logs.page + 1})}">다음</a>
+      </div>
     </section>
 
-    <!-- ③ 변경 내용 비교 -->
+    <!-- ③ 변경 내용 비교 — 서버가 계산한 DiffEntry 를 렌더링, 바뀐 칸만 노랗게 -->
     <section class="fgc-card" style="align-self:start">
       <div class="fgc-card__head">
         <span class="fgc-card__title">변경 내용 비교</span>
         <span class="fgc-muted" style="font-size:11px">바뀐 칸만 노랗게</span>
       </div>
       <div class="fgc-card__body" id="diff-body">
-        <p class="fgc-muted" style="font-size:13px;margin:0">왼쪽 목록에서 한 건을 고르세요.</p>
+        <p class="fgc-muted" style="font-size:13px;margin:0" th:if="${selectedLog == null}">왼쪽 목록에서 한 건을 고르세요.</p>
+        <div th:if="${selectedLog != null}">
+          <p class="fgc-muted" style="font-size:12px;margin:0 0 8px">
+            <span class="fgc-mono" th:text="${selectedLog.actionCode}">PAYMENT_CONFIRMED</span> ·
+            <span class="fgc-mono" th:text="${selectedLog.entityType + ' #' + selectedLog.entityId}">COMMISSION_PAYMENT #42</span>
+          </p>
+          <div style="overflow-x:auto">
+            <table class="fgc-table">
+              <thead>
+                <tr>
+                  <th style="width:130px">항목</th>
+                  <th>이전값</th>
+                  <th>이후값</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr th:if="${diffEntries.isEmpty()}">
+                  <td colspan="3"><div class="fgc-empty">기록된 변경 전·후 값이 없습니다.</div></td>
+                </tr>
+                <tr th:each="entry : ${diffEntries}">
+                  <td class="fgc-mono" th:text="${entry.field}">status</td>
+                  <td class="fgc-mono" style="word-break:break-all"
+                      th:style="${entry.changed} ? 'background:#fff3bf;word-break:break-all'"
+                      th:text="${entry.before}">DRAFT</td>
+                  <td class="fgc-mono" style="word-break:break-all"
+                      th:style="${entry.changed} ? 'background:#fff3bf;word-break:break-all'"
+                      th:text="${entry.after}">CONFIRMED</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
   </div>
 
 <!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
 <script>
-/* 화면 폭이 좁으면 목록·비교 패널을 세로로 — 데이터 렌더링은 API 연동 시 추가 */
+/* 화면 폭이 좁으면 목록·비교 패널을 세로로 — 데이터는 전부 서버 렌더링이라 JS 는 레이아웃만 만진다 */
 (function () {
   "use strict";
   function reflow() {

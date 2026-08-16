@@ -1,4 +1,5 @@
 package com.susukkang.fgc.contract.service;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.domain.DataOrigin;
@@ -64,6 +65,9 @@ class ContractServiceTest {
 
     @Mock
     private ScheduleService scheduleService;
+
+    @Mock
+    private AuditLogService auditLogService;
 
     @InjectMocks
     private ContractService contractService;

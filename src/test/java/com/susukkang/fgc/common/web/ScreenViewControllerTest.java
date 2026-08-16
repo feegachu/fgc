@@ -81,20 +81,8 @@ class ScreenViewControllerTest {
         return new com.susukkang.fgc.auth.dto.FgcUserDetails(view, true, true);
     }
 
-    /** AUDT-W01(FUN-061)은 COMPLIANCE·SYSTEM_ADMIN 전용 — 화면정의서 :1530. */
-    @Test
-    void audit_log_screen_renders_for_compliance() throws Exception {
-        mvc.perform(get("/audit-logs").with(user(complianceUser())))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("FGC-UI-AUDT-W01")));
-    }
-
-    /** FUN-002 인수조건: 권한 없는 역할의 직접 URL 호출은 403 으로 차단된다. */
-    @Test
-    void audit_log_screen_forbidden_for_settlement() throws Exception {
-        mvc.perform(get("/audit-logs").with(user(settleUser())))
-                .andExpect(status().isForbidden());
-    }
+    // AUDT-W01(/audit-logs) 스모크·역할 테스트는 데이터 바인딩 이관과 함께
+    // audit.controller.AuditLogViewControllerTest 로 옮겼다 (FUN-061).
 
     /**
      * COMPLIANCE "모든 처리 버튼 회색"(화면정의서 :229) — readOnly 모델값이 아니라

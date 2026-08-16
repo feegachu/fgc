@@ -2,6 +2,7 @@ package com.susukkang.fgc.transaction.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
@@ -64,12 +65,20 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
+    // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
+    // after JSON 에 지급단계·포함/제외 판단·정착지원금 귀속·배부정책·증빙(REG-20·22)을 함께 담는다.
+    private static final String AUDIT_ENTITY_TYPE = "COMMISSION_PAYMENT";
+    private static final String AUDIT_PAYMENT_CREATED = "PAYMENT_CREATED";
+    private static final String AUDIT_PAYMENT_UPDATED = "PAYMENT_UPDATED";
+    private static final String AUDIT_PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
+
     private final CommissionPaymentMapper mapper;
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
     private final CapCalculator capCalculator;
     private final CapExceptionService capExceptionService;
     private final FgcMessageResolver messageResolver;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -77,6 +86,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         PreparedPayment prepared = commandFrom(request);
         mapper.insertTransaction(prepared.payment());
         persistAttributions(prepared.payment().getPaymentId(), prepared.attributions());
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_PAYMENT_CREATED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(prepared.payment().getPaymentId()))
+                .after(paymentAuditValue(prepared))
+                .policyVersionId(prepared.payment().getPolicyVersionId())
+                .build());
         return requirePayment(prepared.payment().getPaymentId());
     }
 
@@ -96,6 +112,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         mapper.detachPreConfirmDetails(paymentId);
         mapper.deleteAttributions(paymentId);
         persistAttributions(paymentId, prepared.attributions());
+        // before 는 수정 전 잠금 조회(current)를 그대로 사용한다 — 추가 쿼리 없음
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_PAYMENT_UPDATED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(paymentId))
+                .before(Map.of("confirmationData", current))
+                .after(paymentAuditValue(prepared))
+                .policyVersionId(prepared.payment().getPolicyVersionId())
+                .build());
         return requirePayment(paymentId);
     }
 
@@ -142,6 +167,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         failFirst(requiredValueFailures(attributions));
 
         List<Long> capCheckIds = new ArrayList<>();
+        List<CapCheckCommand> capChecks = new ArrayList<>();
 
         // 2026-08-10 yslee - 지급 건의 모든 계약별 귀속행을 독립 검증
         // 기존 코드: attribution_seq=1인 단일 귀속행만 FUN-033 검증
@@ -178,6 +204,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             mapper.insertCapCheck(check);
             mapper.insertCapCheckDetail(check);
             capCheckIds.add(check.getCapCheckId());
+            capChecks.add(check);
 
             /**
              * @author hjKang
@@ -199,6 +226,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (mapper.confirm(paymentId, normalizedIdempotencyKey, capCheckIdsCsv) != 1) {
             throw new FgcBusinessException(FgcErrorCode.TRAN_005);
         }
+        // 확정 거절(CommissionPaymentConfirmationRejectedException)은 여기 도달 전에 던져지므로
+        // 감사행이 남지 않는 게 의도다 — 거절 근거는 exception_case 가 보존한다.
+        Map<String, Object> confirmedValue = new LinkedHashMap<>();
+        confirmedValue.put("status", CommissionPaymentStatus.CONFIRMED);
+        confirmedValue.put("idempotencyKey", normalizedIdempotencyKey);
+        confirmedValue.put("capChecks", capChecks.stream().map(this::capCheckAuditSummary).toList());
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_PAYMENT_CONFIRMED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(paymentId))
+                .before(Map.of("status", CommissionPaymentStatus.DRAFT))
+                .after(confirmedValue)
+                .policyVersionId(first.policyVersionId())
+                .build());
         return requirePayment(paymentId, capCheckIds);
     }
 
@@ -343,6 +384,27 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .title(title)
                 .description(description)
                 .build();
+    }
+
+    /** 등록·수정 감사행의 after 값 — 지급 본문과 귀속행(포함/제외 판단·귀속방식·배부정책·증빙) 전체 스냅샷. */
+    private Map<String, Object> paymentAuditValue(PreparedPayment prepared) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("payment", prepared.payment());
+        value.put("attributions", prepared.attributions());
+        return value;
+    }
+
+    /** 확정 감사행의 1,200% 판정 요약 — 계산 상세는 cap_check.calculation_snapshot 이 보존한다. */
+    private Map<String, Object> capCheckAuditSummary(CapCheckCommand check) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("capCheckId", check.getCapCheckId());
+        summary.put("contractId", check.getContractId());
+        summary.put("paymentStage", check.getPaymentStage());
+        summary.put("resultStatus", check.getResultStatus());
+        summary.put("usagePct", check.getUsagePct());
+        summary.put("limitAmount", check.getLimitAmount());
+        summary.put("includedAmount", check.getIncludedAmount());
+        return summary;
     }
 
     /*

@@ -92,13 +92,5 @@ public class ScreenViewController {
         return "vrun/detail";
     }
 
-    /**
-     * AUDT-W01 은 다른 1차 화면과 달리 "전체 조회"가 아니다 — 화면정의서 :1530 권한
-     * COMPLIANCE·SYSTEM_ADMIN. FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
-     */
-    @PreAuthorize(Roles.CAN_VIEW_AUDIT_LOG)
-    @GetMapping("/audit-logs")
-    public String auditLogList() {
-        return "audit/list";
-    }
+    // AUDT-W01(/audit-logs)은 데이터 바인딩과 함께 audit.controller.AuditLogViewController 로 이관했다.
 }

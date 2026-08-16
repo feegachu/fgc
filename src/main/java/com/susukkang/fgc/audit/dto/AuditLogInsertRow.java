@@ -23,4 +23,5 @@ public class AuditLogInsertRow {
     private final String reason;
     private final String requestId;
     private final String clientIp;
+    private final Long policyVersionId;
 }
