@@ -206,6 +206,34 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
                 .hasMessageContaining("immutable");
     }
 
+    @Test
+    void correctionForSameMonthCreatesNextRunNumberWithoutChangingFinalizedRun() {
+        validationRunId = createFinalizedValidationRun();
+        Integer previousRunNo = jdbcTemplate.queryForObject(
+                "SELECT run_no FROM fgc.validation_run WHERE validation_run_id = ?",
+                Integer.class, validationRunId);
+        Integer nextRunNo = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(MAX(run_no), 0) + 1
+                  FROM fgc.validation_run
+                 WHERE validation_month = DATE '2031-05-01'
+                """, Integer.class);
+
+        // 정정은 확정본을 되돌리는 UPDATE가 아니라 같은 월의 새 실행으로 남겨 이력 재현성을 보장한다.
+        Long newRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
+                VALUES (DATE '2031-05-01', ?, 'PRE_CONFIRM')
+                RETURNING validation_run_id
+                """, Long.class, nextRunNo);
+
+        assertThat(nextRunNo).isGreaterThan(previousRunNo);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.validation_run WHERE validation_run_id = ?",
+                String.class, validationRunId)).isEqualTo("FINALIZED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.validation_run WHERE validation_run_id = ?",
+                String.class, newRunId)).isEqualTo("CREATED");
+    }
+
     private Long createCompletedReconciliationRun(Long runId) {
         Long reconciliationRunId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.reconciliation_run (

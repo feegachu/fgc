@@ -99,6 +99,22 @@ class ValidationRunFinalizationServiceImplTest {
     }
 
     @Test
+    void concurrentSameKeyRequestRecoversOriginalResultWhenConditionalUpdateLosesRace() {
+        when(validationRunMapper.findByIdForUpdate(44L)).thenReturn(run("COMPLETED", 8));
+        when(validationRunMapper.findFinalizeChecklistCounts(44L)).thenReturn(passingCounts());
+        // UPDATE 0건은 잠금 획득 전 다른 요청이 동일 실행을 먼저 확정한 경합 결과를 모델링한다.
+        when(validationRunMapper.finalizeIfCompleted(44L, 7L, "finalize-44")).thenReturn(0);
+        when(validationRunMapper.findFinalizationById(44L)).thenReturn(finalized("finalize-44"));
+
+        FinalizeValidationRunResponse response = service.finalizeRun(44L, 7L, "finalize-44");
+
+        assertThat(response.status()).isEqualTo("FINALIZED");
+        assertThat(response.finalizedAt()).isEqualTo(
+                OffsetDateTime.parse("2026-08-16T12:34:56+09:00"));
+        verify(auditLogMapper, never()).insert(any());
+    }
+
+    @Test
     void differentKeyCannotMutateFinalizedRun() {
         when(validationRunMapper.findByIdForUpdate(44L)).thenReturn(run("FINALIZED", 10));
         when(validationRunMapper.findFinalizationById(44L)).thenReturn(finalized("first-key"));
