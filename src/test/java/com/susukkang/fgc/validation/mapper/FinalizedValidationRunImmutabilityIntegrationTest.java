@@ -138,4 +138,91 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
                 "DELETE FROM fgc.cap_check WHERE cap_check_id=?", capCheckId))
                 .isInstanceOf(DataAccessException.class);
     }
+
+    @Test
+    void updatingReconciliationResultUnderFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        Long reconciliationResultId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_result (
+                    reconciliation_run_id, match_group_key, result_type,
+                    expected_total_amount, actual_total_amount, difference_amount
+                ) VALUES (?, ?, 'MATCHED', 100, 100, 0)
+                RETURNING reconciliation_result_id
+                """, Long.class, reconciliationRunId, "FUN044-RECO-" + validationRunId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_result
+                   SET detail_snapshot = '{"tampered":true}'::jsonb
+                 WHERE reconciliation_result_id = ?
+                """, reconciliationResultId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
+    void updatingReconciliationRunUnderFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_run
+                   SET completed_at = clock_timestamp()
+                 WHERE reconciliation_run_id = ?
+                """, reconciliationRunId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
+    void updatingCapDetailUnderFinalizedRunIsRejectedByDbTrigger() {
+        validationRunId = createRunningValidationRun();
+        capCheckId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.cap_check (
+                    validation_run_id, contract_id, payment_stage, cap_rule_set_id, check_kind,
+                    as_of_date, base_premium_amount, limit_amount, included_amount,
+                    remaining_amount, result_status
+                ) VALUES (?, ?, 'GA_TO_FC', ?, 'MONTHLY', ?, 100000, 1200000, 100, 1199900, 'NORMAL')
+                RETURNING cap_check_id
+                """, Long.class, validationRunId, contractId(), capRuleSetId(), LocalDate.of(2031, 5, 10));
+        Long commissionItemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1",
+                Long.class);
+        Long detailId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.cap_check_detail (
+                    cap_check_id, detail_seq, commission_item_id, classification_snapshot,
+                    amount, decision_reason, item_code, item_name
+                ) SELECT ?, 1, commission_item_id, 'INCLUDED', 100, 'test', item_code, item_name
+                    FROM fgc.commission_item WHERE commission_item_id = ?
+                RETURNING cap_check_detail_id
+                """, Long.class, capCheckId, commissionItemId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE fgc.cap_check_detail SET amount = 200 WHERE cap_check_detail_id = ?", detailId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("immutable");
+    }
+
+    private Long createCompletedReconciliationRun(Long runId) {
+        Long reconciliationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (
+                    validation_run_id, settlement_month, payment_stage, status
+                ) VALUES (?, DATE '2031-05-01', 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class, runId);
+        jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_run
+                   SET status = 'RUNNING', started_at = clock_timestamp()
+                 WHERE reconciliation_run_id = ?
+                """, reconciliationRunId);
+        jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_run
+                   SET status = 'COMPLETED', completed_at = clock_timestamp()
+                 WHERE reconciliation_run_id = ?
+                """, reconciliationRunId);
+        return reconciliationRunId;
+    }
 }
