@@ -6,6 +6,8 @@ import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
@@ -28,6 +30,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -99,7 +102,7 @@ class ExceptionCaseControllerTest {
     void rejectsActionForReadOnlyRole() throws Exception {
         ExceptionActionRequest request = new ExceptionActionRequest(
                 com.susukkang.fgc.common.code.ExceptionActionType.START_REVIEW,
-                "검토를 시작합니다.", null);
+                "검토를 시작합니다.", "DOC-1");
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
                         .with(user(principal(3L, "audit01", "COMPLIANCE")))
@@ -112,13 +115,37 @@ class ExceptionCaseControllerTest {
 
     @Test
     void rejectsActionWhenReasonIsBlank() throws Exception {
-        String request = "{\"actionType\":\"START_REVIEW\",\"reason\":\" \"}";
+        String request = """
+                {"actionType":"START_REVIEW","reason":" ","evidenceRef":"DOC-1"}
+                """;
+        willThrow(new FgcBusinessException(FgcErrorCode.EXCP_001))
+                .given(exceptionCaseService)
+                .action(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
                         .with(user(principal(1L, "settle01", "SETTLEMENT")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-EXCP-001"));
+
+        verify(exceptionCaseService).action(
+                eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
+    }
+
+    @Test
+    void rejectsActionWhenEvidenceRefIsBlank() throws Exception {
+        String request = """
+                {"actionType":"START_REVIEW","reason":"검토를 시작합니다.","evidenceRef":" "}
+                """;
+
+        mockMvc.perform(post("/api/v1/exceptions/10/actions")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("evidenceRef"));
 
         verify(exceptionCaseService, never()).action(any(), any(), any(), any());
     }

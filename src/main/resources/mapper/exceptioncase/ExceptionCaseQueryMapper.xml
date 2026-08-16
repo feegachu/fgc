@@ -134,7 +134,4 @@
          GROUP BY exception_type
          ORDER BY exception_type
     </select>
-    <select id="selectById" resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow">
-
-    </select>
 </mapper>

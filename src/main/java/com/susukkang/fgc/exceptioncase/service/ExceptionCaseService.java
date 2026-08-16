@@ -1,5 +1,7 @@
 package com.susukkang.fgc.exceptioncase.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
@@ -33,6 +35,7 @@ public class ExceptionCaseService {
     private final ExceptionCaseQueryMapper exceptionCaseQueryMapper;
     private final ExceptionCaseActionMapper exceptionCaseActionMapper;
     private final AuditLogMapper auditLogMapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * 조건에 맞는 예외 한 페이지와 각 예외의 처리 이력을 조회한다.
@@ -116,8 +119,12 @@ public class ExceptionCaseService {
             Long exceptionCaseId,
             ExceptionActionRequest request,
             Long actionUserId,
-            String actionUserLoginId
-    ) {
+            String actionUserLoginId) {
+
+        if (request.reason() == null || request.reason().isBlank()) {
+            throw new FgcBusinessException(FgcErrorCode.EXCP_001);
+        }
+
         // 1. 동시에 같은 예외를 처리하지 못하도록 행 잠금
         ExceptionCaseActionTarget target =
                 exceptionCaseActionMapper.findByIdForUpdate(exceptionCaseId);
@@ -189,6 +196,10 @@ public class ExceptionCaseService {
                         .entityType("EXCEPTION_CASE")
                         .entityId(String.valueOf(exceptionCaseId))
                         .userId(actionUserId)
+                        .beforeValue(toJson(new ExceptionAuditValue(
+                                fromStatus, target.assignedTo(), null, null)))
+                        .afterValue(toJson(new ExceptionAuditValue(
+                                toStatus, assignedTo, actionType, request.evidenceRef())))
                         .reason(request.reason())
                         .requestId(RequestIdContext.current())
                         .clientIp(null)
@@ -213,5 +224,21 @@ public class ExceptionCaseService {
 
     private boolean isClosed(ExceptionStatus status) {
         return status == ExceptionStatus.RESOLVED || status == ExceptionStatus.REJECTED;
+    }
+
+    private String toJson(ExceptionAuditValue value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("예외 처리 감사값 직렬화에 실패했습니다.", exception);
+        }
+    }
+
+    private record ExceptionAuditValue(
+            ExceptionStatus status,
+            Long assignedTo,
+            ExceptionActionType actionType,
+            String evidenceRef
+    ) {
     }
 }
