@@ -36,7 +36,7 @@
 
   <!-- ① 검색 -->
   <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__body fgc-toolbar">
+    <form class="fgc-card__body fgc-toolbar" data-transaction-filter-form>
       <div class="fgc-field" style="min-width:140px">
         <label class="fgc-label" for="f-month">정산월</label>
         <input class="fgc-input" id="f-month" type="month" th:value="${month}" value="2026-07">
@@ -74,7 +74,10 @@
       <button class="fgc-btn fgc-btn--ghost" id="f-reset">
         <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
       </button>
-    </div>
+      <button class="fgc-btn fgc-btn--primary" type="submit">
+        <span class="material-symbols-outlined" style="font-size:18px">search</span> 조회
+      </button>
+    </form>
   </section>
 
   <!-- ② 목록 -->
@@ -119,6 +122,18 @@
         0이면 빨간색으로 나오고, 그 상태로는 확정할 수 없습니다.
       </p>
     </div>
+    <nav class="schedule-pagination" aria-label="수수료 지급 건 목록 페이지" data-transaction-pagination hidden>
+      <span><span data-transaction-current-page>1</span> / <span data-transaction-total-pages>1</span> 페이지</span>
+      <div class="pagination-controls">
+        <button class="pagination-button" type="button" aria-label="이전 페이지" data-transaction-page-prev>
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+        </button>
+        <span class="pagination-button is-active" aria-current="page" data-transaction-page-number>1</span>
+        <button class="pagination-button" type="button" aria-label="다음 페이지" data-transaction-page-next>
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+        </button>
+      </div>
+    </nav>
   </section>
 
 </main>
