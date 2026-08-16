@@ -1,15 +1,21 @@
 package com.susukkang.fgc.common.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
+import com.susukkang.fgc.common.security.Roles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 // FUN-001 개발 순서 1
@@ -27,22 +33,56 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 public class SecurityConfig {
 
     /**
-     * FUN-065 지급 등록·수정·확정 API는 세션 인증과 CSRF 토큰을 함께 검증한다.
+     * FUN-002(#82) — 필터 단계(아래 URL 굵은 규칙·CSRF)에서 거부된 /api/** 요청도 컨트롤러
+     * @PreAuthorize 거부와 같은 ApiResponse 봉투(FGC-AUTH-003)로 나가게 한다.
+     * 기본 핸들러는 sendError(403) → Boot 기본 오류 JSON이라 인터페이스정의서 3-3의
+     * 봉투 규칙(이슈 #82 인수조건 "403 + ApiResponse 오류 봉투")을 깬다.
+     * 매핑을 복사하지 않고 GlobalExceptionHandler.handleAccessDenied 를 그대로 재사용한다.
+     */
+    @Bean
+    public AccessDeniedHandler apiAccessDeniedHandler(
+            GlobalExceptionHandler globalExceptionHandler, ObjectMapper objectMapper) {
+        return (request, response, exception) -> {
+            var entity = globalExceptionHandler.handleAccessDenied(exception);
+            response.setStatus(entity.getStatusCode().value());
+            response.setCharacterEncoding("UTF-8");
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            objectMapper.writeValue(response.getWriter(), entity.getBody());
+        };
+    }
+
+    /**
+     * FUN-065 지급 API와 FUN-048 대사 실행 API는 세션 인증과 CSRF 토큰을 함께 검증한다.
      */
     @Bean
     @Order(1)
-    public SecurityFilterChain commissionPaymentApiSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain protectedStateChangeApiSecurityFilterChain(
+            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler) throws Exception {
         http
-                .securityMatcher("/api/v1/transactions/**")
+                // 2026-08-12 yslee - 대사 실행 상태 변경 API에 CSRF 보호 적용
+                // 기존 코드: 지급 API 경로만 CSRF 보호 체인에 포함
+                // 문제: 세션 쿠키를 사용하는 대사 실행 POST가 위조 요청에 노출
+                // 개선: IF-API-38 경로를 동일한 보호 체인에 추가
+                .securityMatcher("/api/v1/transactions/**", "/api/v1/reconciliations/**")
                 // 2026-08-11 yslee - 세션 쿠키 기반 지급 API의 CSRF 보호 활성화
                 // 기존 코드: /api/** 전체에서 CSRF 검증을 비활성화
                 // 문제: 로그인 세션을 악용한 외부 사이트가 지급 등록·수정·확정 요청을 위조할 수 있음
                 // 개선: FUN-065 상태 변경 요청에 Spring Security 기본 CSRF 토큰 검증을 우선 적용
                 .csrf(Customizer.withDefaults())
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                        // FUN-002(#82) — COMPLIANCE는 역할 정의(§4-1)상 "조회만". 컨트롤러
+                        // @PreAuthorize를 빠뜨려도 최소한 이 굵은 규칙이 COMPLIANCE의 상태 변경
+                        // 요청을 막는다. 세분화된 역할 구분(SETTLEMENT vs GA_ADMIN 등)은
+                        // 여전히 컨트롤러 @PreAuthorize가 담당한다.
+                        .requestMatchers(HttpMethod.POST, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.PUT, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(
-                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(apiAccessDeniedHandler));
         return http.build();
     }
 
@@ -61,14 +101,26 @@ public class SecurityConfig {
      */
     @Bean
     @Order(2)
-    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain apiSecurityFilterChain(
+            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler) throws Exception {
         http
                 .securityMatcher("/api/**")
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                        // 감사로그 API(IF-API-52)는 아직 미구현이지만 구현 시점에 바로
+                        // 적용되도록 선제 등록한다.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/audit-logs/**")
+                        .hasAnyRole(Roles.COMPLIANCE, Roles.SYSTEM_ADMIN)
+                        // FUN-002(#82) 굵은 규칙 — protectedStateChangeApiSecurityFilterChain 주석 참고.
+                        .requestMatchers(HttpMethod.POST, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.PUT, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(
-                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(apiAccessDeniedHandler));
         return http.build();
     }
 
@@ -85,6 +137,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/assets/**", "/css/**", "/js/**",
                                 "/images/**", "/fonts/**", "/favicon.ico", "/error").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/audit-logs")
+                        .hasAnyRole(Roles.COMPLIANCE, Roles.SYSTEM_ADMIN)
+                        // FUN-002(#82) 굵은 규칙 — protectedStateChangeApiSecurityFilterChain 주석 참고.
+                        .requestMatchers(HttpMethod.POST, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.PUT, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
+                        .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")

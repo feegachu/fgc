@@ -162,6 +162,18 @@ class ValidationRunControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    /** FUN-002(#82) — COMPLIANCE는 §4-1 "조회만"이라 검증 실행 생성도 403이어야 한다. */
+    @Test
+    void returns403ForComplianceRole() throws Exception {
+        CreateValidationRunRequest request = new CreateValidationRunRequest("2026-08", "MONTHLY");
+
+        mockMvc.perform(post("/api/v1/validation-runs")
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     // Service가 VRUN_001(FgcBusinessException)을 던지면 409로 매핑되는지
     void returns409WhenServiceThrowsAlreadyRunning() throws Exception {

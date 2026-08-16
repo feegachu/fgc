@@ -14,6 +14,7 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
+import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -49,6 +53,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest
 @Transactional
+// FUN-002(#82) — confirm()에 @PreAuthorize(Roles.CAN_PROCESS)가 붙은 뒤로 서비스를 직접 호출하는
+// 이 통합 테스트에도 SecurityContext가 필요하다. 지급 확정은 SETTLEMENT가 소유하는 동작이다.
+@WithMockUser(roles = "SETTLEMENT")
 class CommissionPaymentIntegrationTest {
 
     @Autowired
@@ -111,6 +118,75 @@ class CommissionPaymentIntegrationTest {
                  LIMIT 1
                 """, LocalDate.class, created.paymentId()))
                 .isEqualTo(LocalDate.of(2026, 7, 31));
+    }
+
+    // IF-API-24 (FGC-FUN-033) — 사전검증 미리보기는 호출 전후 DB 상태가 동일해야 한다
+    // (지급 건 상태·updated_at·cap_check·exception_case 무변화, 기록 생성은 확정 경로 전용)
+    @Test
+    void precheckLeavesDatabaseUntouched() {
+        CommissionPaymentResponse created = commissionPaymentService.create(request(
+                "IT-FUN033-" + UUID.randomUUID()
+        ));
+        OffsetDateTime updatedAtBefore = jdbcTemplate.queryForObject("""
+                SELECT updated_at
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, OffsetDateTime.class, created.paymentId());
+
+        TransactionPrecheckResponse response = commissionPaymentService.precheck(created.paymentId());
+
+        assertThat(response.confirmable()).isTrue();
+        assertThat(response.blockers()).isEmpty();
+        assertThat(response.capPreview()).isNotEmpty();
+        assertThat(response.capPreview().get(0).capCheckId()).isNull();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT status
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, String.class, created.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT updated_at
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, OffsetDateTime.class, created.paymentId())).isEqualTo(updatedAtBefore);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                """, Integer.class, created.paymentId())).isZero();
+        // source_entity 기준 집계 — saveException·CapExceptionService 두 저장 경로를 모두 잡는다
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.exception_case
+                 WHERE source_entity_type = 'COMMISSION_TRANSACTION'
+                   AND source_entity_id = CAST(? AS varchar)
+                """, Integer.class, created.paymentId())).isZero();
+    }
+
+    // IF-API-24 완료 조건 — precheck의 판정과 같은 지급 건 confirm 판정이 일치한다
+    @Test
+    void precheckVerdictMatchesConfirmOnRealData() {
+        CommissionPaymentResponse created = commissionPaymentService.create(request(
+                "IT-FUN033-MATCH-" + UUID.randomUUID()
+        ));
+
+        TransactionPrecheckResponse preview = commissionPaymentService.precheck(created.paymentId());
+        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
+                created.paymentId(),
+                "IT-FUN033-CONFIRM-" + created.paymentId()
+        );
+
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        BigDecimal confirmedUsagePct = jdbcTemplate.queryForObject("""
+                SELECT usage_pct
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                 ORDER BY cap_check_id DESC
+                 LIMIT 1
+                """, BigDecimal.class, created.paymentId());
+        assertThat(preview.capPreview().get(0).usagePct())
+                .isEqualTo(confirmedUsagePct.toPlainString());
     }
 
     // 2026-08-11 yslee - 귀속행 입력 전 DRAFT의 PostgreSQL 저장·확정 경계 검증
@@ -399,7 +475,10 @@ class CommissionPaymentIntegrationTest {
 
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        // @WithMockUser는 메인 스레드의 SecurityContext(ThreadLocal)만 채운다. 워커 스레드가
+        // confirm()을 직접 호출하므로 제출 시점의 SecurityContext를 감싸 넘겨준다.
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(
+                Executors.newFixedThreadPool(2));
         try {
             Future<String> firstResult = executor.submit(() -> confirmOutcome(
                     first.paymentId(), "IT-LOCK-A-" + runId, ready, start

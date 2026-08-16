@@ -7,6 +7,7 @@ import com.susukkang.fgc.cap.dto.CapExceptionStatusRow;
 import com.susukkang.fgc.cap.mapper.CapExceptionMapper;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.util.Set;
 
 /**
  * 설명 : 한도 검증 결과가 주의 또는 위반인 경우 중복 없는 한도 예외 건을 생성하는 서비스 구현체
@@ -66,7 +66,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         CapExceptionStatusRow exception = capExceptionMapper.selectExceptionForUpdate(command.exceptionCaseId());
         if (exception == null) throw new IllegalArgumentException("존재하지 않는 한도 예외입니다.");
         if ("RESOLVED".equals(exception.status())) return;
-        if (!Set.of("NEW", "IN_REVIEW").contains(exception.status())) {
+        // 미처리(OPEN = NEW + IN_REVIEW) 정의는 ExceptionStatus 한 곳만 쓴다(#83).
+        if (!ExceptionStatus.isOpen(exception.status())) {
             throw new IllegalStateException("해결할 수 없는 예외 상태입니다.");
         }
 
@@ -89,7 +90,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Override
     @Transactional(readOnly = true)
     public boolean hasUnresolvedViolation(Long paymentId) {
-        // FUN-034의 OPEN은 공통 예외 상태인 NEW와 IN_REVIEW로 해석한다.
+        // FUN-034의 OPEN은 공통 예외 상태인 NEW와 IN_REVIEW로 해석한다(정의: ExceptionStatus).
+        // SQL 은 CapExceptionMapper.existsUnresolvedViolation 의 IN ('NEW','IN_REVIEW') — 같은 정의.
         if (paymentId == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
         return capExceptionMapper.existsUnresolvedViolation(paymentId);
     }

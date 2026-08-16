@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.reconciliation.mapper.ReconciliationResultMapper">
+
+    <!-- FUN-048-04: 기존 결과를 삭제·재작성하지 않고 실행+매칭키 UNIQUE로 멱등 저장 -->
+    <insert id="insertResult" useGeneratedKeys="true"
+            keyProperty="reconciliationResultId" keyColumn="reconciliation_result_id">
+        INSERT INTO fgc.reconciliation_result (
+            reconciliation_run_id,
+            match_group_key,
+            contract_id,
+            expected_agent_id,
+            actual_agent_id,
+            actual_source_agent_code,
+            commission_item_id,
+            installment_no,
+            result_type,
+            expected_total_amount,
+            actual_total_amount,
+            difference_amount,
+            primary_reason_code,
+            secondary_reason_codes,
+            detail_snapshot
+        ) VALUES (
+            #{reconciliationRunId},
+            #{matchGroupKey},
+            #{contractId},
+            #{expectedAgentId},
+            #{actualAgentId},
+            #{actualSourceAgentCode},
+            #{commissionItemId},
+            #{installmentNo},
+            #{resultType},
+            #{expectedTotalAmount},
+            #{actualTotalAmount},
+            #{differenceAmount},
+            #{primaryReasonCode},
+            <choose>
+                <when test="secondaryReasonCodes != null and !secondaryReasonCodes.isEmpty()">
+                    ARRAY[
+                    <foreach collection="secondaryReasonCodes" item="reason" separator=",">
+                        #{reason}
+                    </foreach>
+                    ]::text[]
+                </when>
+                <otherwise>ARRAY[]::text[]</otherwise>
+            </choose>,
+            CAST(#{detailSnapshotJson} AS jsonb)
+        )
+        ON CONFLICT ON CONSTRAINT uq_reconciliation_result DO NOTHING
+    </insert>
+
+    <select id="findResultId" resultType="long">
+        SELECT reconciliation_result_id
+          FROM fgc.reconciliation_result
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+           AND match_group_key = #{matchGroupKey}
+    </select>
+
+    <insert id="insertMatch">
+        INSERT INTO fgc.reconciliation_match (
+            reconciliation_result_id,
+            match_seq,
+            schedule_line_id,
+            transaction_attribution_id,
+            matched_amount,
+            match_role
+        ) VALUES (
+            #{reconciliationResultId},
+            #{matchSeq},
+            #{scheduleLineId},
+            #{transactionAttributionId},
+            #{matchedAmount},
+            #{matchRole}
+        )
+        ON CONFLICT ON CONSTRAINT uq_reconciliation_match DO NOTHING
+    </insert>
+
+    <select id="countByRunId" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.reconciliation_result
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+    </select>
+
+    <select id="findClassificationContext"
+            resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationClassificationContext">
+        SELECT EXISTS (
+                   SELECT 1
+                     FROM fgc.insurance_contract contract
+                    WHERE contract.contract_id = #{contractId}
+                      AND contract.current_status IN ('CANCELLED', 'TERMINATED', 'MATURED', 'LAPSED')
+               ) AS invalidContractPayment,
+               CASE
+                   WHEN CAST(#{expectedAgentId} AS bigint) IS NULL
+                     OR CAST(#{actualAgentId} AS bigint) IS NULL THEN FALSE
+                   ELSE COALESCE((
+                       SELECT expected.organization_id &lt;&gt; actual.organization_id
+                         FROM fgc.agent expected, fgc.agent actual
+                        WHERE expected.agent_id = #{expectedAgentId}
+                          AND actual.agent_id = #{actualAgentId}
+                   ), FALSE)
+               END AS organizationMismatch,
+               <choose>
+                   <when test="journalHeaderIds != null and !journalHeaderIds.isEmpty()">
+                       (SELECT COUNT(DISTINCT header.policy_version_id) &gt; 1
+                          FROM fgc.journal_header header
+                         WHERE header.journal_header_id IN
+                         <foreach collection="journalHeaderIds" item="id" open="(" separator="," close=")">
+                             #{id}
+                         </foreach>
+                           AND header.policy_version_id IS NOT NULL)
+                   </when>
+                   <otherwise>FALSE</otherwise>
+               </choose> AS policyVersionError,
+               <choose>
+                   <when test="journalHeaderIds != null and !journalHeaderIds.isEmpty()">
+                       EXISTS (
+                           SELECT 1
+                             FROM fgc.vw_journal_imbalance imbalance
+                            WHERE imbalance.journal_header_id IN
+                            <foreach collection="journalHeaderIds" item="id" open="(" separator="," close=")">
+                                #{id}
+                            </foreach>
+                       )
+                   </when>
+                   <otherwise>FALSE</otherwise>
+               </choose> AS journalImbalance
+    </select>
+
+    <sql id="resultProjectionJoins">
+          FROM fgc.reconciliation_result result
+          LEFT JOIN fgc.insurance_contract contract ON contract.contract_id = result.contract_id
+          LEFT JOIN fgc.commission_item item ON item.commission_item_id = result.commission_item_id
+          LEFT JOIN fgc.agent expected_agent ON expected_agent.agent_id = result.expected_agent_id
+          LEFT JOIN fgc.organization expected_org
+            ON expected_org.organization_id = expected_agent.organization_id
+          LEFT JOIN fgc.agent actual_agent ON actual_agent.agent_id = result.actual_agent_id
+          LEFT JOIN fgc.organization actual_org
+            ON actual_org.organization_id = actual_agent.organization_id
+    </sql>
+
+    <select id="findResults"
+            resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationResultListRow">
+        SELECT result.reconciliation_result_id AS reconciliationResultId,
+               contract.contract_no AS contractNo,
+               item.item_code AS commissionItemCode,
+               item.item_name AS commissionItemName,
+               result.installment_no AS installmentNo,
+               expected_agent.agent_id AS expectedAgentId,
+               expected_agent.agent_code AS expectedAgentCode,
+               expected_agent.agent_name AS expectedAgentName,
+               expected_org.organization_name AS expectedOrganizationName,
+               actual_agent.agent_id AS actualAgentId,
+               actual_agent.agent_code AS actualAgentCode,
+               actual_agent.agent_name AS actualAgentName,
+               actual_org.organization_name AS actualOrganizationName,
+               result.actual_source_agent_code AS actualSourceAgentCode,
+               result.expected_total_amount AS expectedTotalAmount,
+               result.actual_total_amount AS actualTotalAmount,
+               result.difference_amount AS differenceAmount,
+               result.result_type AS resultType,
+               result.primary_reason_code AS primaryReasonCode,
+               array_to_string(result.secondary_reason_codes, ',') AS secondaryReasonCodesCsv,
+               result.created_at AS createdAt
+        <include refid="resultProjectionJoins"/>
+         WHERE result.reconciliation_run_id = #{reconciliationRunId}
+        <if test="resultType != null">
+           AND result.result_type = #{resultType}
+        </if>
+        ORDER BY result.created_at
+        <choose>
+            <when test="sortDirection == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>,
+        result.reconciliation_result_id
+        <choose>
+            <when test="sortDirection == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countResults" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.reconciliation_result result
+         WHERE result.reconciliation_run_id = #{reconciliationRunId}
+        <if test="resultType != null">
+           AND result.result_type = #{resultType}
+        </if>
+    </select>
+
+    <select id="findSummary"
+            resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationSummaryRow">
+        SELECT result_count AS resultCount,
+               matched_count AS matchedCount,
+               exception_count AS exceptionCount,
+               expected_total AS expectedTotal,
+               actual_total AS actualTotal,
+               difference_total AS differenceTotal
+          FROM fgc.vw_reconciliation_summary
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+    </select>
+
+    <select id="findDetail"
+            resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailRow">
+        SELECT result.reconciliation_result_id AS reconciliationResultId,
+               result.reconciliation_run_id AS reconciliationRunId,
+               result.match_group_key AS matchGroupKey,
+               result.contract_id AS contractId,
+               contract.contract_no AS contractNo,
+               result.commission_item_id AS commissionItemId,
+               item.item_code AS commissionItemCode,
+               item.item_name AS commissionItemName,
+               result.installment_no AS installmentNo,
+               expected_agent.agent_id AS expectedAgentId,
+               expected_agent.agent_code AS expectedAgentCode,
+               expected_agent.agent_name AS expectedAgentName,
+               expected_org.organization_name AS expectedOrganizationName,
+               actual_agent.agent_id AS actualAgentId,
+               actual_agent.agent_code AS actualAgentCode,
+               actual_agent.agent_name AS actualAgentName,
+               actual_org.organization_name AS actualOrganizationName,
+               result.actual_source_agent_code AS actualSourceAgentCode,
+               result.expected_total_amount AS expectedTotalAmount,
+               result.actual_total_amount AS actualTotalAmount,
+               result.difference_amount AS differenceAmount,
+               result.result_type AS resultType,
+               result.primary_reason_code AS primaryReasonCode,
+               array_to_string(result.secondary_reason_codes, ',') AS secondaryReasonCodesCsv,
+               result.detail_snapshot::text AS detailSnapshotJson,
+               result.created_at AS createdAt
+        <include refid="resultProjectionJoins"/>
+         WHERE result.reconciliation_result_id = #{reconciliationResultId}
+    </select>
+
+    <select id="findMatches"
+            resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationMatchDetailRow">
+        SELECT match.match_seq AS matchSeq,
+               match.match_role AS matchRole,
+               match.schedule_line_id AS scheduleLineId,
+               match.transaction_attribution_id AS transactionAttributionId,
+               transaction.commission_transaction_id AS commissionTransactionId,
+               COALESCE(expected_journal.journal_header_id, actual_journal.journal_header_id) AS journalHeaderId,
+               COALESCE(schedule.contract_id, attribution.contract_id) AS contractId,
+               COALESCE(line.beneficiary_agent_id, attribution.agent_id, transaction.recipient_agent_id) AS agentId,
+               COALESCE(line.commission_item_id, transaction.commission_item_id) AS commissionItemId,
+               COALESCE(line.installment_no, transaction.installment_no) AS installmentNo,
+               line.due_date AS dueDate,
+               line.basis_amount AS basisAmount,
+               line.rate_pct AS ratePct,
+               attribution.attribution_date AS attributionDate,
+               transaction.settlement_month AS settlementMonth,
+               COALESCE(line.due_date, attribution.attribution_date) AS referenceDate,
+               match.matched_amount AS matchedAmount
+          FROM fgc.reconciliation_match match
+          JOIN fgc.reconciliation_result result
+            ON result.reconciliation_result_id = match.reconciliation_result_id
+          JOIN fgc.reconciliation_run run
+            ON run.reconciliation_run_id = result.reconciliation_run_id
+          LEFT JOIN fgc.schedule_line line ON line.schedule_line_id = match.schedule_line_id
+          LEFT JOIN fgc.schedule_header schedule ON schedule.schedule_header_id = line.schedule_header_id
+          LEFT JOIN fgc.journal_header expected_journal
+           ON expected_journal.source_entity_type = 'SCHEDULE_LINE'
+           AND expected_journal.source_entity_id = CAST(line.schedule_line_id AS varchar)
+           AND expected_journal.status = 'POSTED'
+           AND expected_journal.journal_type = CASE run.payment_stage
+                   WHEN 'INSURER_TO_GA' THEN 'EXPECTED_INSURER_INCOME'
+                   ELSE 'EXPECTED_FC_PAYOUT'
+               END
+          LEFT JOIN fgc.transaction_attribution attribution
+            ON attribution.transaction_attribution_id = match.transaction_attribution_id
+          LEFT JOIN fgc.commission_transaction transaction
+            ON transaction.commission_transaction_id = attribution.commission_transaction_id
+          LEFT JOIN fgc.journal_header actual_journal
+           ON actual_journal.source_entity_type = 'COMMISSION_TRANSACTION'
+           AND actual_journal.source_entity_id = CAST(transaction.commission_transaction_id AS varchar)
+           AND actual_journal.status = 'POSTED'
+           AND actual_journal.journal_type = CASE run.payment_stage
+                   WHEN 'INSURER_TO_GA' THEN 'ACTUAL_INSURER_STATEMENT'
+                   ELSE 'CONFIRMED_FC_PAYOUT'
+               END
+         WHERE match.reconciliation_result_id = #{reconciliationResultId}
+         ORDER BY match.match_seq
+    </select>
+
+</mapper>

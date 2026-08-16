@@ -1,5 +1,6 @@
 package com.susukkang.fgc.schedule.controller;
 
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.schedule.dto.*;
@@ -52,7 +53,7 @@ public class ScheduleController {
      * @author hjKang
      * @since 2026-08-11
      */
-    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     @PostMapping("/{id}/regenerate")
     public ApiResponse<ScheduleRegenResponse> regenerate(
             @PathVariable Long id,
