@@ -14,8 +14,9 @@
           AND sh.payment_stage = 'INSURER_TO_GA'
           AND sh.active_yn = true
           AND sh.schedule_purpose = 'OPERATIONAL'
+          AND sh.status NOT IN ('HOLD', 'CANCELLED')
           AND sl.due_month = #{validationMonth}
-          AND sl.line_status &lt;&gt; 'CANCELLED'
+          AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
         ORDER BY sl.schedule_line_id
     </select>
 
@@ -31,8 +32,9 @@
           AND sh.payment_stage = 'GA_TO_FC'
           AND sh.active_yn = true
           AND sh.schedule_purpose = 'OPERATIONAL'
+          AND sh.status NOT IN ('HOLD', 'CANCELLED')
           AND sl.due_month = #{validationMonth}
-          AND sl.line_status &lt;&gt; 'CANCELLED'
+          AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
           AND sl.beneficiary_agent_id IS NOT NULL
         ORDER BY sl.schedule_line_id
     </select>

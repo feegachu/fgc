@@ -30,11 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * IF-BAT-01 MonthlyValidationJob(#57) 골격 통합테스트. 실제 JobRepository/DB로 Job 전체를
- * 한 번 돌려서 "①createRunStep은 정상 완료되고, 아직 실제 포트 구현이 없는 ②~⑧ 자리에서
- * Job이 FAILED로 멈추며 validation_run도 FAILED로 남는지"를 검증한다(#60에서 각 Step이
- * MonthlyValidationStepCoordinator의 포트를 실제 구현으로 갈아끼우면, 이 테스트도 정상 완료
- * 경로(COMPLETED)를 검증하도록 갱신해야 한다). 지금 이 테스트는 로직의 정확성이 아니라
- * 배선(순서·파티션·진행상황 기록·실패 전파)이 맞는지만 본다.
+ * 한 번 돌려서 "9개 Step이 순서대로·파티션까지 정상 배선돼 있고, 대상 데이터가 없는 달에는
+ * 전부 정상 완료되어 validation_run도 COMPLETED로 남는지"를 검증한다(#60에서 모든 Step의
+ * 포트가 실제 구현으로 교체되며 갱신됨 — 그 전에는 미구현 Placeholder Step에서 실패로
+ * 멈추는 경로를 검증했다). 지금 이 테스트는 로직의 정확성이 아니라 배선(순서·파티션·
+ * 진행상황 기록·완료 전파)이 맞는지만 본다.
  *
  * @Transactional을 안 쓴다: Spring Batch가 Step마다 자기 트랜잭션을 커밋해야 JobRepository가
  * 다음 Step에서 이전 상태를 볼 수 있다 — 테스트를 하나의 롤백 트랜잭션으로 감싸면 그 커밋이
@@ -108,15 +108,17 @@ class MonthlyValidationJobIntegrationTest {
      * @author hjKang
      * @since 2026-08-13
      *
-     * 2026-08-15 - #142 journalPostingStep·imbalanceCheckStep 구현에 따른 차단 지점 변경
-     * 기존 코드: arbitrageCheckStep 완료 후 journalPostingStep의 Placeholder에서 실행이 실패했다.
-     * 문제: journalPostingStep·imbalanceCheckStep이 실제 구현으로 교체되어 기존 완료 Step
-     *       기대값과 일치하지 않았다. TEST_MONTH(2031-03)에는 대상 schedule_line·
-     *       commission_transaction이 없어 journalPostingStep은 0건 처리로 정상 완료되고,
-     *       imbalanceCheckStep도 검사할 분개가 0건이라 정상 완료된다.
-     * 개선: 두 Step 완료 후 다음 미구현 Step(reconciliationStep)에서 실행이 차단되는지 검증한다.
+     * 2026-08-16 - #142 reconciliationStep·exceptionGenerationStep 구현에 따른 완료 경로 변경
+     * 기존 코드: journalPostingStep·imbalanceCheckStep 완료 후 미구현 Placeholder였던
+     *       reconciliationStep에서 실행이 실패하는 것을 검증했다.
+     * 문제: develop 병합으로 reconciliationStep(ReconciliationTasklet)·exceptionGenerationStep
+     *       (ExceptionGenerationTasklet)이 모두 실제 구현으로 교체돼 더 이상 무조건 실패하지
+     *       않는다. TEST_MONTH(2031-03)에는 대상 데이터가 없어 두 Step 모두 0건 처리로 정상
+     *       완료되고, Job 전체가 COMPLETED로 끝난다.
+     * 개선: 9개 Step 전부가 COMPLETED로 끝나고 validation_run도 COMPLETED로 전이하는 정상
+     *       완료 경로를 검증하도록 갱신한다(클래스 Javadoc에서 예고한 #60 갱신 지점).
      */
-    void completesImplementedStepsAndBlocksAtReconciliationPlaceholder() throws Exception {
+    void completesAllStepsWhenNoTargetDataExists() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
         long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
 
@@ -126,7 +128,7 @@ class MonthlyValidationJobIntegrationTest {
         assertThat(validationRunId).isNotNull();
         createdValidationRunIds.add(validationRunId);
 
-        assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
 
         Set<String> completedStepNames = jobExecution.getStepExecutions().stream()
                 .filter(se -> se.getStatus() == BatchStatus.COMPLETED)
@@ -140,7 +142,9 @@ class MonthlyValidationJobIntegrationTest {
                 "capCheckStep",
                 "arbitrageCheckStep",
                 "journalPostingStep",
-                "imbalanceCheckStep"
+                "imbalanceCheckStep",
+                "reconciliationStep",
+                "exceptionGenerationStep"
         );
 
         // capCheckStep은 INSURER_TO_GA/GA_TO_FC 2개 파티션 워커로 나뉘어 실행돼야 한다.
@@ -151,15 +155,14 @@ class MonthlyValidationJobIntegrationTest {
 
         assertThat(jobExecution.getStepExecutions())
                 .filteredOn(step -> step.getStatus() == BatchStatus.FAILED)
-                .extracting(StepExecution::getStepName)
-                .containsExactly("reconciliationStep");
+                .isEmpty();
 
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
-        assertThat(row.getStatus()).isEqualTo("FAILED");
+        assertThat(row.getStatus()).isEqualTo("COMPLETED");
         assertThat(row.getValidationMonth()).isEqualTo(TEST_MONTH);
         assertThat(row.getRunNo()).isEqualTo(Math.toIntExact(runNo));
         assertThat(row.getStartedAt()).isNotNull();
-        assertThat(row.getCompletedAt()).isNull();
+        assertThat(row.getCompletedAt()).isNotNull();
     }
 
     @Test
