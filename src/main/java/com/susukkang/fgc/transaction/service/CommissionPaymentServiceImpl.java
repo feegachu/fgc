@@ -211,9 +211,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     public TransactionPrecheckResponse precheck(Long paymentId) {
         List<ConfirmationData> attributions = requireConfirmationData(paymentId, false);
         ConfirmationData first = attributions.get(0);
-        // 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005로 먼저 끊는다. confirm은 CAP_003 검사가
-        // 순서상 앞이지만 precheck에서 CAP_003은 던지지 않고 수집하는 사유라, 순서를 맞춰도
-        // 비DRAFT 응답은 409로 같다 — DRAFT 건에서는 두 경로의 게이트 판정이 동일하다.
+        // [의도된 차이] 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005(409)로 먼저 끊는다.
+        // 그래서 "비DRAFT + 미해결 CAP_VIOLATION" 엣지케이스는 confirm=CAP_003(422) / precheck=TRAN_005(409)로
+        // 갈리며, 이는 수용한다: precheck에서 CAP_003은 던지지 않고 blockers로 수집하는 사유라 검사 순서를
+        // confirm과 맞춰도 비DRAFT 응답은 409 그대로이고, 완전 일치의 유일한 방법(CAP_003을 422로 던지기)은
+        // IF-API-24의 "차단 사유는 200 + blockers[]" 계약을 깬다. "판정 일치" 원칙의 범위는 DRAFT 건의
+        // 게이트 판정이며, DRAFT 건에서는 두 경로가 같은 판정 메서드로 항상 같은 결과를 낸다.
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
