@@ -67,6 +67,7 @@
           AND vt.selection_status = 'SELECTED'
           AND ct.payment_stage = 'INSURER_TO_GA'
           AND ct.source_type = 'INSURER_STATEMENT'
+          AND ct.cashflow_type = 'PAYMENT'
           AND ct.status = 'CONFIRMED'
           AND ct.settlement_month = #{validationMonth}
           AND NOT EXISTS (
@@ -83,6 +84,11 @@
       운영정책서 제38조 "2차에서 ADJUSTMENT, CLAWBACK, RECOVERY를 활성화한다")과 개념이
       겹쳐 CONFIRMED_FC_PAYOUT으로 잘못 표시하면 안 된다. contractId 연결 방식은 위
       findActualInsurerStatementSources 주석 참고.
+      cashflow_type = 'PAYMENT'도 함께 건다 — GA_MANUAL_PAYMENT API의 validateCashflowType은
+      요청값이 항목의 cashflow_type과 일치하는지만 검사할 뿐 DEDUCTION(클로백·환수 항목)을
+      막지 않는다. source_type만으로는 이 DEDUCTION 건을 걸러내지 못해 대사 Mapper
+      (InsurerGaReconciliationMapper·GaFcReconciliationMapper)와 동일하게 명시적으로 제외한다
+      (코드리뷰로 발견).
     -->
     <select id="findConfirmedFcPayoutSources" resultType="com.susukkang.fgc.journal.dto.TransactionJournalSourceRow">
         SELECT ct.commission_transaction_id, ta.contract_id, ct.policy_version_id, ct.commission_item_id,
@@ -98,6 +104,7 @@
           AND vt.selection_status = 'SELECTED'
           AND ct.payment_stage = 'GA_TO_FC'
           AND ct.source_type IN ('GA_MANUAL_PAYMENT', 'GA_CONFIRMED_PAYMENT')
+          AND ct.cashflow_type = 'PAYMENT'
           AND ct.status = 'CONFIRMED'
           AND ct.settlement_month = #{validationMonth}
           AND ct.recipient_agent_id IS NOT NULL
