@@ -127,11 +127,21 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.reconciliation.duplicateGroup"
     ),
+    RECO_002(
+            "FGC-RECO-002",
+            HttpStatus.CONFLICT,
+            "error.reconciliation.duplicateRun"
+    ),
 
     EXCP_001(
             "FGC-EXCP-001",
             HttpStatus.BAD_REQUEST,
             "error.exception.reasonRequired"
+    ),
+    EXCP_003(
+            "FGC-EXCP-003",
+            HttpStatus.CONFLICT,
+            "error.exception.invalidTransition"
     ),
 
     AUDT_001(

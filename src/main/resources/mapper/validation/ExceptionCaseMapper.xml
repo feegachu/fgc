@@ -48,7 +48,6 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
-    <!-- 위 TODO와 동일한 키 정책을 적용한다. -->
     <insert id="insertArbitrageReviewCase">
         INSERT INTO fgc.exception_case
             (exception_key, exception_type, severity, status,
@@ -63,4 +62,200 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
+    <insert id="insertFromCapChecks">
+        INSERT INTO fgc.exception_case (
+            exception_key,
+            exception_type,
+            severity,
+            status,
+            validation_run_id,
+            contract_id,
+            source_entity_type,
+            source_entity_id,
+            title,
+            description
+        )
+        SELECT
+            CONCAT(
+                    CASE cc.result_status
+                        WHEN 'VIOLATION' THEN 'CAP_VIOLATION'
+                        WHEN 'REVIEW_REQUIRED' THEN 'CAP_REVIEW_REQUIRED'
+                        END,
+                    ':',
+                    cc.validation_run_id,
+                    ':CAP_CHECK:',
+                    cc.cap_check_id,
+                    ':',
+                    cc.payment_stage
+            ),
+            CASE cc.result_status
+                WHEN 'VIOLATION' THEN 'CAP_VIOLATION'
+                WHEN 'REVIEW_REQUIRED' THEN 'CAP_REVIEW_REQUIRED'
+                END,
+            CASE cc.result_status
+                WHEN 'VIOLATION' THEN 'CRITICAL'
+                WHEN 'REVIEW_REQUIRED' THEN 'WARNING'
+                END,
+            'NEW',
+            cc.validation_run_id,
+            cc.contract_id,
+            'CAP_CHECK',
+            CAST(cc.cap_check_id AS varchar),
+            CASE cc.result_status
+                WHEN 'VIOLATION' THEN '1,200% 한도 초과'
+                WHEN 'REVIEW_REQUIRED' THEN '1,200% 한도 검토 필요'
+                END,
+            CONCAT(
+                    '지급단계=', cc.payment_stage,
+                    ', 한도액=', cc.limit_amount,
+                    ', 산입액=', cc.included_amount,
+                    ', 사용률=', COALESCE(CAST(cc.usage_pct AS varchar), '-')
+            )
+        FROM
+            fgc.cap_check cc
+        WHERE
+            cc.validation_run_id = #{validationRunId}
+        AND
+            cc.result_status IN ('VIOLATION', 'REVIEW_REQUIRED')
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
+    <insert id="insertFromArbitrageChecks">
+        INSERT INTO fgc.exception_case (
+            exception_key, exception_type, severity, status,
+            validation_run_id, contract_id, source_entity_type, source_entity_id,
+            title, description
+        )
+        SELECT
+            CONCAT(
+                CASE
+                    WHEN ac.result_status = 'CANDIDATE' THEN 'ARBITRAGE_CANDIDATE'
+                    WHEN COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                            LIKE '%환급률표 후보가 없습니다%'
+                      OR COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                            LIKE '%환급률표 ID가 없습니다%'
+                        THEN 'REFUND_TABLE_MISSING'
+                    WHEN COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                            LIKE '%상품코드%'
+                      OR COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                            LIKE '%환급률표가 일치하지 않습니다%'
+                        THEN 'PRODUCT_CODE_MISMATCH'
+                    WHEN COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                            LIKE '%여러 건%'
+                        THEN 'POLICY_DUPLICATE'
+                    ELSE 'DATA_QUALITY'
+                END,
+                ':', ac.validation_run_id,
+                ':ARBITRAGE_CHECK:', ac.arbitrage_check_id,
+                ':', ac.payment_stage
+            ),
+            CASE
+                WHEN ac.result_status = 'CANDIDATE' THEN 'ARBITRAGE_CANDIDATE'
+                WHEN COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                        LIKE '%환급률표 후보가 없습니다%'
+                  OR COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                        LIKE '%환급률표 ID가 없습니다%'
+                    THEN 'REFUND_TABLE_MISSING'
+                WHEN COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                        LIKE '%상품코드%'
+                  OR COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                        LIKE '%환급률표가 일치하지 않습니다%'
+                    THEN 'PRODUCT_CODE_MISMATCH'
+                WHEN COALESCE(ac.calculation_snapshot ->> 'decisionReason', '')
+                        LIKE '%여러 건%'
+                    THEN 'POLICY_DUPLICATE'
+                ELSE 'DATA_QUALITY'
+            END,
+            CASE ac.result_status
+                WHEN 'CANDIDATE' THEN 'HIGH'
+                WHEN 'REVIEW_REQUIRED' THEN 'WARNING'
+            END,
+            'NEW',
+            ac.validation_run_id,
+            ac.contract_id,
+            'ARBITRAGE_CHECK',
+            CAST(ac.arbitrage_check_id AS varchar),
+            CASE ac.result_status
+                WHEN 'CANDIDATE' THEN '차익거래 검토대상'
+                WHEN 'REVIEW_REQUIRED' THEN '차익거래 검증 자료 확인 필요'
+            END,
+            COALESCE(
+                ac.calculation_snapshot ->> 'decisionReason',
+                CONCAT('지급단계=', ac.payment_stage, ', 순차액=', ac.net_difference_amount)
+            )
+        FROM fgc.arbitrage_check ac
+        WHERE ac.validation_run_id = #{validationRunId}
+          AND ac.result_status IN ('CANDIDATE', 'REVIEW_REQUIRED')
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
+    <insert id="insertFromReconciliationResults">
+        INSERT INTO fgc.exception_case (
+            exception_key, exception_type, severity, status,
+            validation_run_id, contract_id, source_entity_type, source_entity_id,
+            title, description
+        )
+        SELECT
+            CONCAT(
+                'RECONCILIATION_MISMATCH:', rrn.validation_run_id,
+                ':RECONCILIATION_RESULT:', rr.reconciliation_result_id
+            ),
+            'RECONCILIATION_MISMATCH',
+            CASE rr.result_type
+                WHEN 'REVIEW_REQUIRED' THEN 'WARNING'
+                ELSE 'HIGH'
+            END,
+            'NEW',
+            rrn.validation_run_id,
+            rr.contract_id,
+            'RECONCILIATION_RESULT',
+            CAST(rr.reconciliation_result_id AS varchar),
+            '대사 불일치',
+            CONCAT(
+                '지급단계=', rrn.payment_stage,
+                ', 결과유형=', rr.result_type,
+                ', 예상금액=', rr.expected_total_amount,
+                ', 실제금액=', rr.actual_total_amount,
+                ', 차액=', rr.difference_amount,
+                ', 주원인=', COALESCE(rr.primary_reason_code, '-')
+            )
+        FROM fgc.reconciliation_result rr
+        INNER JOIN fgc.reconciliation_run rrn
+            ON rrn.reconciliation_run_id = rr.reconciliation_run_id
+        WHERE rrn.validation_run_id = #{validationRunId}
+          AND rr.result_type &lt;&gt; 'MATCHED'
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
+    <insert id="insertFromJournalImbalances">
+        INSERT INTO fgc.exception_case (
+            exception_key, exception_type, severity, status,
+            validation_run_id, contract_id, source_entity_type, source_entity_id,
+            title, description
+        )
+        SELECT
+            CONCAT(
+                'JOURNAL_IMBALANCE:', h.validation_run_id,
+                ':JOURNAL_HEADER:', vw.journal_header_id
+            ),
+            'JOURNAL_IMBALANCE',
+            'CRITICAL',
+            'NEW',
+            h.validation_run_id,
+            h.contract_id,
+            'JOURNAL_HEADER',
+            CAST(vw.journal_header_id AS varchar),
+            '검증원장 차변·대변 불균형',
+            CONCAT(
+                '분개번호=', vw.journal_no,
+                ', 차변합계=', vw.debit_total,
+                ', 대변합계=', vw.credit_total,
+                ', 차액=', vw.difference_amount
+            )
+        FROM fgc.vw_journal_imbalance vw
+        INNER JOIN fgc.journal_header h
+            ON h.journal_header_id = vw.journal_header_id
+        WHERE h.validation_run_id = #{validationRunId}
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
 </mapper>

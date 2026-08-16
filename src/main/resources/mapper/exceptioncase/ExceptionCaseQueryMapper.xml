@@ -37,4 +37,101 @@
           FROM fgc.exception_case ec
         <include refid="statusFilter"/>
     </select>
+
+    <!-- IF-API-43의 전체 검색조건. WHERE 1=1로 시작해 선택된 조건만 안전하게 덧붙인다. -->
+    <sql id="searchFilters">
+        <if test="criteria.type != null">
+            AND ec.exception_type = #{criteria.type}
+        </if>
+        <if test="criteria.severity != null">
+            AND ec.severity = #{criteria.severity}
+        </if>
+        <if test="statuses != null and !statuses.isEmpty()">
+            AND ec.status IN
+            <foreach item="status" collection="statuses" open="(" separator="," close=")">
+                #{status}
+            </foreach>
+        </if>
+        <choose>
+            <when test="criteria.unassignedOnly">
+                AND ec.assigned_to IS NULL
+            </when>
+            <when test="criteria.assignee != null">
+                AND ec.assigned_to = #{criteria.assignee}
+            </when>
+        </choose>
+        <if test="criteria.contractNo != null and !criteria.contractNo.isBlank()">
+            AND ic.contract_no ILIKE CONCAT('%', #{criteria.contractNo}, '%')
+        </if>
+    </sql>
+
+    <select id="search" resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow">
+        SELECT ec.exception_case_id  AS exceptionCaseId,
+               ec.exception_key      AS exceptionKey,
+               ec.exception_type     AS exceptionType,
+               ec.severity,
+               ec.status,
+               ec.title,
+               ec.description,
+               ic.contract_no        AS contractNo,
+               ag.agent_name         AS agentName,
+               ec.assigned_to        AS assignedTo,
+               assignee.login_id     AS assigneeLoginId,
+               ec.source_entity_type AS sourceEntityType,
+               ec.source_entity_id   AS sourceEntityId,
+               ec.created_at         AS createdAt
+          FROM fgc.exception_case ec
+          LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
+          LEFT JOIN fgc.agent ag ON ag.agent_id = ec.agent_id
+          LEFT JOIN fgc.app_user assignee ON assignee.user_id = ec.assigned_to
+         WHERE 1 = 1
+        <include refid="searchFilters"/>
+         ORDER BY CASE ec.severity
+                    WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1
+                    WHEN 'WARNING' THEN 2 ELSE 3
+                  END,
+                  ec.created_at DESC,
+                  ec.exception_case_id DESC
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.exception_case ec
+          LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
+         WHERE 1 = 1
+        <include refid="searchFilters"/>
+    </select>
+
+    <select id="findActionsByCaseIds"
+            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionActionRow">
+        SELECT ea.exception_action_id AS exceptionActionId,
+               ea.exception_case_id   AS exceptionCaseId,
+               ea.action_seq          AS actionSeq,
+               ea.from_status         AS fromStatus,
+               ea.to_status           AS toStatus,
+               ea.action_type         AS actionType,
+               ea.reason,
+               ea.evidence_ref        AS evidenceRef,
+               ea.action_by           AS actionBy,
+               actor.login_id         AS actionByLoginId,
+               ea.action_at           AS actionAt
+          FROM fgc.exception_action ea
+          JOIN fgc.app_user actor ON actor.user_id = ea.action_by
+         WHERE ea.exception_case_id IN
+        <foreach item="id" collection="exceptionCaseIds" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+         ORDER BY ea.exception_case_id, ea.action_seq
+    </select>
+
+    <select id="countOpenByType"
+            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryRow">
+        SELECT exception_type AS exceptionType,
+               COUNT(*)       AS count
+          FROM fgc.exception_case
+         WHERE status IN ('NEW', 'IN_REVIEW')
+         GROUP BY exception_type
+         ORDER BY exception_type
+    </select>
 </mapper>
