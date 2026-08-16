@@ -158,6 +158,24 @@ class ExceptionCaseControllerTest {
     }
 
     @Test
+    void rejectsActionWhenReasonExceedsAuditLogLimit() throws Exception {
+        ExceptionActionRequest request = new ExceptionActionRequest(
+                com.susukkang.fgc.common.code.ExceptionActionType.START_REVIEW,
+                "가".repeat(1001),
+                null);
+
+        mockMvc.perform(post("/api/v1/exceptions/10/actions")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("reason"));
+
+        verify(exceptionCaseService, never()).action(any(), any(), any(), any());
+    }
+
+    @Test
     void returns401WhenUnauthenticated() throws Exception {
         mockMvc.perform(get("/api/v1/exceptions"))
                 .andExpect(status().isUnauthorized());
