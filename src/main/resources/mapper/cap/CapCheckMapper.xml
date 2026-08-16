@@ -128,7 +128,8 @@
     </select>
 
     <!--
-      CAP-W01은 계약 단위 판정 화면이므로 같은 검색월 안에서 계약·지급단계별 최신 저장 결과만 사용한다.
+      CAP-W01은 계약 단위 판정 화면이므로 계약·지급단계·판정월별 최신 저장 결과만 사용한다.
+      month가 지정되면 해당 월의 최신 결과만, 생략되면 각 월의 최신 결과를 남겨 월별 이력을 보존한다.
       status/stage는 latest 선정 뒤에 적용해야 과거 상태가 현재 결과인 것처럼 다시 노출되지 않는다.
     -->
     <sql id="latestScopedCapChecks">
@@ -150,7 +151,8 @@
                    cc.result_status,
                    cc.cap_rule_set_id,
                    ROW_NUMBER() OVER (
-                       PARTITION BY cc.contract_id, cc.payment_stage
+                       PARTITION BY cc.contract_id, cc.payment_stage,
+                                    date_trunc('month', cc.as_of_date)
                        ORDER BY cc.checked_at DESC, cc.cap_check_id DESC
                    ) AS latest_rank
               FROM fgc.cap_check cc

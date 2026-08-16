@@ -149,6 +149,34 @@ class CapCheckMapperIntegrationTest {
         });
     }
 
+    // FGC-FUN-032: month를 생략하면 월별 최신 판정 이력은 유지하고 같은 달의 재검증만 최신 1건으로 접는다.
+    @Test
+    void searchWithoutMonthKeepsLatestResultForEachMonth() {
+        TestContract contract = insertTestContract();
+
+        insertCapCheck(contract, PaymentStage.GA_TO_FC, LocalDate.of(2035, 1, 31),
+                "1000", "200", "0", "20.000000", "NORMAL",
+                OffsetDateTime.parse("2035-01-31T01:00:00Z"));
+        insertCapCheck(contract, PaymentStage.GA_TO_FC, LocalDate.of(2035, 1, 31),
+                "1000", "900", "0", "90.000000", "WARNING",
+                OffsetDateTime.parse("2035-01-31T02:00:00Z"));
+        insertCapCheck(contract, PaymentStage.GA_TO_FC, LocalDate.of(2035, 2, 28),
+                "1000", "1100", "0", "110.000000", "VIOLATION",
+                OffsetDateTime.parse("2035-02-28T01:00:00Z"));
+
+        List<CapCheckListRow> rows = capCheckMapper.search(
+                null, PaymentStage.GA_TO_FC.name(), null,
+                null, null, contract.contractNo(), 0, 20);
+
+        assertThat(rows).extracting(CapCheckListRow::getAsOfDate)
+                .containsExactly(LocalDate.of(2035, 2, 28), LocalDate.of(2035, 1, 31));
+        assertThat(rows).extracting(CapCheckListRow::getResultStatus)
+                .containsExactly("VIOLATION", "WARNING");
+        assertThat(capCheckMapper.count(
+                null, PaymentStage.GA_TO_FC.name(), null,
+                null, null, contract.contractNo())).isEqualTo(2);
+    }
+
     private TestContract insertTestContract() {
         String contractNo = "IT-CAP-EVIDENCE-" + UUID.randomUUID();
         return jdbcTemplate.queryForObject("""

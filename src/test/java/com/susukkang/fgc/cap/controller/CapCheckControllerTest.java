@@ -90,6 +90,13 @@ class CapCheckControllerTest {
         insurerStage.setWorstContractNo("C004");
         insurerStage.setWorstUsagePct(new BigDecimal("104.166667"));
 
+        CapStageSummaryRow agentStage = new CapStageSummaryRow();
+        agentStage.setPaymentStage("GA_TO_FC");
+        agentStage.setLimitAmountTotal(BigDecimal.ZERO);
+        agentStage.setIncludedAmountTotal(BigDecimal.ZERO);
+        agentStage.setComplianceDeductionAmountTotal(BigDecimal.ZERO);
+        agentStage.setUsagePct(new BigDecimal("0.000000"));
+
         CapAgentSummaryRow agent = new CapAgentSummaryRow();
         agent.setAgentId(11L);
         agent.setAgentCode("FC-001");
@@ -104,7 +111,7 @@ class CapCheckControllerTest {
 
         CapCheckSearchResult searchResult = new CapCheckSearchResult(
                 new CapCheckSummary(3, 1, 1, 0),
-                List.of(insurerStage),
+                List.of(insurerStage, agentStage),
                 List.of(agent),
                 PageResponse.of(List.of(sampleListRow(CapResultStatus.NORMAL)), 1, 20, 1, "asOfDate,desc"));
         given(capCheckService.search(any(), anyInt(), anyInt())).willReturn(searchResult);
@@ -113,9 +120,12 @@ class CapCheckControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.summary.normal").value(3))
                 .andExpect(jsonPath("$.data.summary.violation").value(1))
+                .andExpect(jsonPath("$.data.stageSummary.length()").value(2))
                 .andExpect(jsonPath("$.data.stageSummary[0].paymentStage").value("INSURER_TO_GA"))
                 .andExpect(jsonPath("$.data.stageSummary[0].complianceDeductionAmountTotal").value(30000))
                 .andExpect(jsonPath("$.data.stageSummary[0].usagePct").value("75.000000"))
+                .andExpect(jsonPath("$.data.stageSummary[1].paymentStage").value("GA_TO_FC"))
+                .andExpect(jsonPath("$.data.stageSummary[1].complianceDeductionAmountTotal").value(0))
                 .andExpect(jsonPath("$.data.agentSummary[0].agentName").value("김설계"))
                 .andExpect(jsonPath("$.data.agentSummary[0].organizationName").value("서울지점"))
                 .andExpect(jsonPath("$.data.agentSummary[0].usagePct").value("54.166667"))
