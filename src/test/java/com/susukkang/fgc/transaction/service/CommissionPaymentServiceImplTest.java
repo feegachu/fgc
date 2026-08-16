@@ -16,6 +16,8 @@ import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.exception.FgcMessageResolver;
+import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
 import com.susukkang.fgc.transaction.domain.CommissionItemReference;
@@ -29,6 +31,7 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
+import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -77,12 +81,17 @@ class CommissionPaymentServiceImplTest {
     @BeforeEach
     void setUp() {
         CapValidator capValidator = new CapValidatorImpl();
+        // 실제 메시지 카탈로그를 사용해 precheck blockers 문구가 confirm 오류 문구와 같은지 검증한다
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("messages");
+        messageSource.setDefaultEncoding("UTF-8");
         service = new CommissionPaymentServiceImpl(
                 mapper,
                 new ObjectMapper(),
                 capValidator,
                 capCalculator,
-                capExceptionService
+                capExceptionService,
+                new FgcMessageResolver(messageSource)
         );
     }
 
@@ -1180,6 +1189,222 @@ class CommissionPaymentServiceImplTest {
                 "DIRECT",
                 "EVIDENCE",
                 method
+        );
+    }
+
+    /*
+     * IF-API-24 (FGC-FUN-033) — 지급 전 한도 사전검증 미리보기.
+     * precheck는 confirm과 같은 판정 메서드를 재사용하되 아무것도 저장하지 않는다.
+     */
+
+    @Test
+    void precheckPassesCleanDraftWithoutSaving() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isTrue();
+        assertThat(response.blockers()).isEmpty();
+        assertThat(response.capPreview()).hasSize(1);
+        TransactionPrecheckResponse.CapPreviewItem item = response.capPreview().get(0);
+        assertThat(item.contractNo()).isEqualTo("CT-2026-0003");
+        assertThat(item.paymentStage()).isEqualTo(PaymentStage.GA_TO_FC);
+        assertThat(item.limitAmount()).isEqualTo(1200000L);
+        assertThat(item.existingIncludedAmount()).isZero();
+        assertThat(item.candidateAmount()).isEqualTo(500000L);
+        assertThat(item.includedAmount()).isEqualTo(500000L);
+        assertThat(item.remainingAmount()).isEqualTo(700000L);
+        assertThat(item.usagePct()).isEqualTo("41.666667");
+        assertThat(item.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
+        assertThat(item.capCheckId()).isNull();
+        assertPrecheckSavesNothing();
+    }
+
+    // REG-08 — 한도 초과 건은 blockers에 FGC-CAP-001과 사용률이 포함되고, 그래도 아무것도 저장하지 않는다
+    @Test
+    void precheckReportsCapExceededWithoutSaving() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "1300000", "1300000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers()).hasSize(1);
+        assertThat(response.blockers().get(0).code()).isEqualTo("FGC-CAP-001");
+        assertThat(response.blockers().get(0).message()).contains("108.333333");
+        assertThat(response.capPreview()).hasSize(1);
+        assertThat(response.capPreview().get(0).resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        assertThat(response.capPreview().get(0).usagePct()).isEqualTo("108.333333");
+        assertPrecheckSavesNothing();
+    }
+
+    // 같은 지급 건에 대해 precheck의 판정과 confirm의 차단 판정이 일치해야 한다 (FGC-FUN-033 완료 조건)
+    @Test
+    void precheckVerdictMatchesConfirmRejection() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "1300000", "1300000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(56L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+
+        TransactionPrecheckResponse preview = service.precheck(101L);
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode().getCode())
+                                .isEqualTo(preview.blockers().get(0).code()));
+
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(mapper).insertCapCheck(captor.capture());
+        assertThat(preview.capPreview().get(0).usagePct())
+                .isEqualTo(captor.getValue().getUsagePct().toPlainString());
+    }
+
+    // 제31조 게이트 ② — 귀속행 없는 DRAFT는 FGC-TRAN-002 blocker로 표시된다
+    @Test
+    void precheckReportsMissingAttributionBlocker() {
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(emptyDraftConfirmation()));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers())
+                .extracting(TransactionPrecheckResponse.Blocker::code)
+                .containsExactly("FGC-TRAN-002");
+        assertThat(response.capPreview()).isEmpty();
+        verify(capCalculator, never()).calculate(any());
+        assertPrecheckSavesNothing();
+    }
+
+    // 제31조 게이트 ③·④ — 귀속합계 불일치와 REVIEW_REQUIRED 귀속을 한 번에 전부 수집한다 (fail-fast 아님)
+    @Test
+    void precheckCollectsMultipleBlockers() {
+        ConfirmationData data = withPaymentAmount(confirmation(
+                201L, 3L, "400000", "400000", InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, AttributionMethod.MANUAL_REVIEW, "EVIDENCE"
+        ), "500000");
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers())
+                .extracting(TransactionPrecheckResponse.Blocker::code)
+                .contains("FGC-TRAN-003", "FGC-CAP-002");
+        assertPrecheckSavesNothing();
+    }
+
+    // 미해결 CAP_VIOLATION 예외가 남아 있으면 FGC-CAP-003 blocker로 표시된다
+    @Test
+    void precheckReportsUnresolvedViolationBlocker() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capExceptionService.hasUnresolvedViolation(101L)).willReturn(true);
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers())
+                .extracting(TransactionPrecheckResponse.Blocker::code)
+                .contains("FGC-CAP-003");
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void precheckRejectsNonDraftPayment() {
+        ConfirmationData confirmed = withStatus(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        ), CommissionPaymentStatus.CONFIRMED);
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(confirmed));
+
+        assertThatThrownBy(() -> service.precheck(101L))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.TRAN_005));
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void precheckRejectsUnknownPayment() {
+        given(mapper.findConfirmationData(999L)).willReturn(List.of());
+
+        assertThatThrownBy(() -> service.precheck(999L))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.COMMON_002));
+    }
+
+    /** precheck의 무저장·무잠금 계약 — 확정 경로 전용 부작용이 하나도 호출되지 않아야 한다. */
+    private void assertPrecheckSavesNothing() {
+        verify(mapper, never()).insertCapCheck(any());
+        verify(mapper, never()).insertCapCheckDetail(any());
+        verify(mapper, never()).insertExceptionCase(any());
+        verify(mapper, never()).confirm(any(), any(), any());
+        verify(mapper, never()).lockAttributedContracts(any());
+        verify(mapper, never()).findConfirmationDataForUpdate(any());
+        verify(capExceptionService, never()).createIfNecessary(any());
+    }
+
+    private ConfirmationData withPaymentAmount(ConfirmationData data, String paymentAmount) {
+        return new ConfirmationData(
+                data.paymentId(),
+                data.status(),
+                new BigDecimal(paymentAmount),
+                data.attributedAmount(),
+                data.totalAttributedAmount(),
+                data.confirmIdempotencyKey(),
+                data.attributionDate(),
+                data.attributionMonth(),
+                data.transactionAttributionId(),
+                data.contractId(),
+                data.agentId(),
+                data.paymentStage(),
+                data.commissionItemId(),
+                data.itemCode(),
+                data.itemName(),
+                data.policyVersionId(),
+                data.inclusionDecisionStatus(),
+                data.exclusionType(),
+                data.inclusionDecisionReason(),
+                data.allocationBasis(),
+                data.evidenceRef(),
+                data.attributionMethod()
         );
     }
 
