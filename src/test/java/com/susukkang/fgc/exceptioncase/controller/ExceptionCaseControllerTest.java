@@ -134,20 +134,27 @@ class ExceptionCaseControllerTest {
     }
 
     @Test
-    void rejectsActionWhenEvidenceRefIsBlank() throws Exception {
+    void acceptsActionWhenEvidenceRefIsMissing() throws Exception {
         String request = """
-                {"actionType":"START_REVIEW","reason":"검토를 시작합니다.","evidenceRef":" "}
+                {"actionType":"START_REVIEW","reason":"검토를 시작합니다."}
                 """;
+        ExceptionActionResponse response = new ExceptionActionResponse(
+                null, 1, ExceptionStatus.NEW, ExceptionStatus.IN_REVIEW,
+                "START_REVIEW", "검토를 시작합니다.", null,
+                1L, "settle01", OffsetDateTime.now());
+        given(exceptionCaseService.action(eq(10L), any(ExceptionActionRequest.class),
+                eq(1L), eq("settle01"))).willReturn(response);
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
                         .with(user(principal(1L, "settle01", "SETTLEMENT")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
-                .andExpect(jsonPath("$.error.field").value("evidenceRef"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actionSeq").value(1))
+                .andExpect(jsonPath("$.data.evidenceRef").doesNotExist());
 
-        verify(exceptionCaseService, never()).action(any(), any(), any(), any());
+        verify(exceptionCaseService).action(
+                eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
     }
 
     @Test
