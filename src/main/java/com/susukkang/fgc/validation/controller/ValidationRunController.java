@@ -14,6 +14,7 @@ import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.CreateValidationRunResponse;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
+import com.susukkang.fgc.validation.dto.FinalizeValidationRunResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunDetailResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunExecuteResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
@@ -42,6 +43,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -262,5 +264,36 @@ public class ValidationRunController {
             @PathVariable("id") Long validationRunId
     ) {
         return ApiResponse.success(validationRunFinalizationService.getChecklist(validationRunId));
+    }
+
+    @Operation(
+            summary = "검증 실행 확정 (IF-API-51)",
+            description = "6개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. "
+                    + "이는 검증 결과 잠금이며 실제 송금·법정 회계마감이 아니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "확정 성공 또는 동일 멱등키 재요청",
+                    content = @Content(schema = @Schema(implementation = FinalizeValidationRunResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "Idempotency-Key 형식 오류 (FGC-COMMON-002)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "422", description = "확정 조건 미충족 (FGC-VRUN-002)")
+    })
+    @PostMapping("/{id}/finalize")
+    @PreAuthorize(Roles.CAN_FINALIZE_VALIDATION)
+    public ApiResponse<FinalizeValidationRunResponse> finalizeRun(
+            @PathVariable("id") Long validationRunId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @AuthenticationPrincipal FgcUserDetails principal
+    ) {
+        return ApiResponse.success(validationRunFinalizationService.finalizeRun(
+                validationRunId, principal.getUserId(), idempotencyKey));
     }
 }
