@@ -50,6 +50,10 @@
                 AND ic.agent_id = #{condition.agentId}
             </if>
 
+            <if test="condition.orgId != null">
+                AND ic.organization_id = #{condition.orgId}
+            </if>
+
             <if test="condition.capResultStatus != null">
                 AND cc.result_status = #{condition.capResultStatus}
             </if>
@@ -109,6 +113,10 @@
 
             <if test="agentId != null">
                 AND ic.agent_id = #{agentId}
+            </if>
+
+            <if test="orgId != null">
+                AND ic.organization_id = #{orgId}
             </if>
 
             <if test="capResultStatus != null">
