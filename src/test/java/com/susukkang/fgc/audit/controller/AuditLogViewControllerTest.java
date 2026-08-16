@@ -197,7 +197,7 @@ class AuditLogViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("DRAFT")))
                 .andExpect(content().string(containsString("CONFIRMED")))
-                .andExpect(content().string(containsString("background:#fff3bf")));
+                .andExpect(content().string(containsString("audit-diff-cell-changed")));
     }
 
     /** 중첩 객체는 리프 경로 단위로 비교한다 — payment/attributions 가 통째로 한 칸이 되면 "바뀐 칸만 노랗게"가 무의미하다. */
@@ -216,7 +216,7 @@ class AuditLogViewControllerTest {
                 // 변경 없는 payment.status·attributions[0].contractId 행은 칠하지 않는다
                 .andExpect(result -> {
                     String html = result.getResponse().getContentAsString();
-                    long highlightedCells = Pattern.compile("background:#fff3bf")
+                    long highlightedCells = Pattern.compile("audit-diff-cell-changed")
                             .matcher(html).results().count();
                     assertThat(highlightedCells).isEqualTo(2);
                 });

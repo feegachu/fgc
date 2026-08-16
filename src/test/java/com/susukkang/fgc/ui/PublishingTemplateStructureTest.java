@@ -82,6 +82,24 @@ class PublishingTemplateStructureTest {
                 .contains("@media (prefers-reduced-motion: reduce)");
     }
 
+    @Test
+    void auditListUsesCommonComponentsWithoutInlinePresentation() throws IOException {
+        assertThat(resource("templates/audit/list.html"))
+                .contains("class=\"page-header\"")
+                .contains("class=\"filter-bar audit-filter-bar\"")
+                .contains("class=\"button button-primary\"")
+                .contains("class=\"surface audit-list-panel\"")
+                .contains("class=\"data-table-viewport\"")
+                .contains("class=\"data-table audit-log-table\"")
+                .contains("class=\"empty-state audit-empty-state\"")
+                .doesNotContain("style=")
+                .doesNotContain("<style>")
+                .doesNotContain("<script>");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/audit.css");
+    }
+
     private static String resource(String path) throws IOException {
         try (var input = PublishingTemplateStructureTest.class.getClassLoader().getResourceAsStream(path)) {
             assertThat(input).as(path).isNotNull();
