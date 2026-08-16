@@ -42,18 +42,25 @@
     </div>
     <!-- 버튼 동작은 IF-API-28(엑셀)·IF-API-29(새 버전)·확정 API 연동 시 붙인다 -->
     <div class="publishing-inline-controls" style="display:flex;gap:8px">
-      <button class="fgc-btn fgc-btn--ghost" data-fgc-na="목업에서는 파일을 내려받지 않습니다. 실제 개발에서는 GET /api/v1/schedules/{id}/export 로 만듭니다.">
+      <button class="fgc-btn fgc-btn--ghost" id="btn-export" type="button" disabled
+              aria-describedby="schedule-actions-pending">
         <span class="material-symbols-outlined" style="font-size:18px">download</span> 엑셀 다운로드
       </button>
       <!-- 재생성·확정은 SETTLEMENT (화면정의서 :873, IF-API-29) — GA_ADMIN 도 비활성이어야 한다 -->
-      <button class="fgc-btn fgc-btn--ghost" id="btn-regenerate" data-fgc-action="regenerate" th:disabled="${!canProcess}">
+      <button class="fgc-btn fgc-btn--ghost" id="btn-regenerate" type="button" data-fgc-action="regenerate" disabled
+              aria-describedby="schedule-actions-pending">
         <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 새 버전 만들기
       </button>
-      <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${!canProcess}">
+      <button class="fgc-btn fgc-btn--primary" id="btn-confirm" type="button" data-fgc-action="confirm" disabled
+              aria-describedby="schedule-actions-pending">
         <span class="material-symbols-outlined" style="font-size:18px">lock</span> 확정
       </button>
     </div>
   </div>
+
+  <p class="fgc-help" id="schedule-actions-pending" style="margin:8px 0 0;text-align:right">
+    다운로드·새 버전 생성·확정 작업은 API 화면 연동 대기입니다.
+  </p>
 
   <!-- ① 헤더 — 값은 IF-API-28 연동 시 서버 렌더링으로 채운다 -->
   <section class="fgc-card" style="margin-top:16px">

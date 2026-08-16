@@ -85,16 +85,17 @@ class ScreenViewControllerTest {
     // audit.controller.AuditLogViewControllerTest 로 옮겼다 (FUN-061).
 
     /**
-     * COMPLIANCE "모든 처리 버튼 회색"(화면정의서 :229) — readOnly 모델값이 아니라
-     * 실제 렌더링(th:disabled)을 본다. 대표로 RECO-W01 의 처리 버튼 2개.
+     * FGC-FUN-048, FGC-FUN-052 — RECO-W01 처리 버튼은 API 연동 전까지
+     * 권한과 관계없이 활성화하지 않는다.
      */
     @Test
-    void process_buttons_disabled_for_compliance_but_not_settlement() throws Exception {
+    void reconciliation_actions_disabled_for_all_roles_while_api_pending() throws Exception {
+        var disabledRunButton = org.hamcrest.Matchers.matchesPattern(
+                "(?s).*<button[^>]*id=\"btn-run\"[^>]*\\bdisabled\\b[^>]*>.*");
         mvc.perform(get("/reconciliations").with(user(complianceUser())))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("disabled=\"disabled\"")));
+                .andExpect(content().string(disabledRunButton));
         mvc.perform(get("/reconciliations").with(user(settleUser())))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
+                .andExpect(content().string(disabledRunButton));
     }
 
     @Test
@@ -225,15 +226,28 @@ class ScreenViewControllerTest {
     /**
      * FGC-FUN-002 — GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다(§4-1 "정책·조직 조회, 검증 실행 확정").
      * readOnly 만 보던 시절 GA_ADMIN 에게 처리 버튼이 활성이던 회귀를 막는다 — 대표로
-     * SCHE-W02(재생성·확정, :873)와 CONT-W02(처리 버튼, IF-API-19/29/33).
+     * CONT-W02 처리 버튼(IF-API-19/29/33).
      */
-    @ParameterizedTest(name = "{0} 처리버튼 비활성")
-    @CsvSource({"/schedules/1", "/contracts/1"})
-    void process_buttons_disabled_for_ga_admin(String route) throws Exception {
-        mvc.perform(get(route).with(user(gaAdminUser())))
+    @Test
+    void contract_process_buttons_disabled_for_ga_admin() throws Exception {
+        mvc.perform(get("/contracts/1").with(user(gaAdminUser())))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("disabled=\"disabled\"")));
-        mvc.perform(get(route).with(user(adminUser())))
+        mvc.perform(get("/contracts/1").with(user(adminUser())))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
+    }
+
+    /**
+     * FGC-FUN-036, FGC-FUN-039, FGC-FUN-040 / REG-01, REG-19 —
+     * SCHE-W02 작업 버튼은 프론트 API 연동 전까지 권한과 관계없이 활성화하지 않는다.
+     */
+    @Test
+    void schedule_actions_disabled_for_all_roles_while_api_pending() throws Exception {
+        var disabledRegenerateButton = org.hamcrest.Matchers.matchesPattern(
+                "(?s).*<button[^>]*id=\"btn-regenerate\"[^>]*\\bdisabled\\b[^>]*>.*");
+        mvc.perform(get("/schedules/1").with(user(gaAdminUser())))
+                .andExpect(content().string(disabledRegenerateButton));
+        mvc.perform(get("/schedules/1").with(user(adminUser())))
+                .andExpect(content().string(disabledRegenerateButton));
     }
 }

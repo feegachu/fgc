@@ -50,11 +50,14 @@
         </select>
       </div>
       <!-- 실행 생성은 SETTLEMENT (화면정의서 :1379, IF-API-45) -->
-      <button class="fgc-btn fgc-btn--primary" id="btn-create" data-fgc-action="create" th:disabled="${!canProcess}">
+      <button class="fgc-btn fgc-btn--primary" id="btn-create" type="button" data-fgc-action="create" disabled
+              aria-describedby="create-hint">
         <span class="material-symbols-outlined" style="font-size:18px">add</span> 실행 생성
       </button>
       <!-- 생성 가능 여부(같은 달 진행 중 월간 실행 존재)는 서버 렌더링으로 판정해 채운다 -->
-      <p class="fgc-help" id="create-hint" style="margin:0;padding-bottom:6px">같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.</p>
+      <p class="fgc-help" id="create-hint" style="margin:0;padding-bottom:6px">
+        실행 생성은 API 화면 연동 대기입니다. 같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.
+      </p>
     </div>
   </section>
 

@@ -146,7 +146,8 @@
       <section class="fgc-card">
         <div class="fgc-card__head">
           <span class="fgc-card__title">② 귀속행 — 이 돈이 어느 계약 몫인가</span>
-          <button class="fgc-btn fgc-btn--ghost" id="btn-add-attr" style="padding:4px 10px;font-size:12px">
+          <button class="fgc-btn fgc-btn--ghost" id="btn-add-attr" type="button" disabled
+                  aria-describedby="transaction-actions-pending" style="padding:4px 10px;font-size:12px">
             <span class="material-symbols-outlined" style="font-size:16px">add</span> 귀속행 추가
           </button>
         </div>
@@ -223,16 +224,20 @@
       <!-- ④ 버튼 — 동작은 IF-API-22(저장)·24(사전검증)·25(확정) 연동 시 붙인다 -->
       <section class="fgc-card">
         <div class="fgc-card__body" style="display:flex;flex-direction:column;gap:8px">
-          <button class="fgc-btn fgc-btn--ghost" id="btn-save" data-fgc-action="save" th:disabled="${readOnly}">
+          <button class="fgc-btn fgc-btn--ghost" id="btn-save" type="button" data-fgc-action="save" disabled
+                  aria-describedby="transaction-actions-pending">
             <span class="material-symbols-outlined" style="font-size:18px">save</span> 임시저장 (검증 없음)
           </button>
-          <button class="fgc-btn fgc-btn--ghost" id="btn-precheck" data-fgc-action="precheck" th:disabled="${readOnly}">
+          <button class="fgc-btn fgc-btn--ghost" id="btn-precheck" type="button" data-fgc-action="precheck" disabled
+                  aria-describedby="transaction-actions-pending">
             <span class="material-symbols-outlined" style="font-size:18px">calculate</span> 사전검증
           </button>
-          <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${readOnly}">
+          <button class="fgc-btn fgc-btn--primary" id="btn-confirm" type="button" data-fgc-action="confirm" disabled
+                  aria-describedby="transaction-actions-pending">
             <span class="material-symbols-outlined" style="font-size:18px">verified</span> 확정
           </button>
-          <p class="fgc-help" style="margin:4px 0 0">
+          <p class="fgc-help" id="transaction-actions-pending" style="margin:4px 0 0">
+            지급 등록 작업은 API 화면 연동 대기입니다.<br>
             확정은 6단계를 <strong>전부</strong> 통과해야 합니다.
             한 단계라도 걸리면 상태가 바뀌지 않습니다.
           </p>
