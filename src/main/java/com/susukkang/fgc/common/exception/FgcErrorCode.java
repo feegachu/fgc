@@ -133,6 +133,11 @@ public enum FgcErrorCode {
             HttpStatus.BAD_REQUEST,
             "error.exception.reasonRequired"
     ),
+    EXCP_003(
+            "FGC-EXCP-003",
+            HttpStatus.CONFLICT,
+            "error.exception.invalidTransition"
+    ),
 
     AUDT_001(
             "FGC-AUDT-001",

@@ -176,6 +176,29 @@ class ExceptionCaseControllerTest {
     }
 
     @Test
+    void returns409WhenActionConflictsWithCurrentStatus() throws Exception {
+        ExceptionActionRequest request = new ExceptionActionRequest(
+                com.susukkang.fgc.common.code.ExceptionActionType.RESOLVE,
+                "현재 상태에서 해결을 요청합니다.",
+                null);
+        willThrow(new FgcBusinessException(
+                FgcErrorCode.EXCP_003,
+                java.util.Map.of("status", "NEW", "actionType", "RESOLVE")))
+                .given(exceptionCaseService)
+                .action(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
+
+        mockMvc.perform(post("/api/v1/exceptions/10/actions")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("FGC-EXCP-003"));
+
+        verify(exceptionCaseService).action(
+                eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
+    }
+
+    @Test
     void returns401WhenUnauthenticated() throws Exception {
         mockMvc.perform(get("/api/v1/exceptions"))
                 .andExpect(status().isUnauthorized());

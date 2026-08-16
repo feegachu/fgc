@@ -208,7 +208,7 @@ class ExceptionCaseActionServiceIntegrationTest {
                 .isInstanceOf(FgcBusinessException.class)
                 .satisfies(exception -> assertThat(
                         ((FgcBusinessException) exception).getErrorCode())
-                        .isEqualTo(FgcErrorCode.COMMON_002));
+                        .isEqualTo(FgcErrorCode.EXCP_003));
 
         assertThat(currentStatus(exceptionCaseId)).isEqualTo("NEW");
         assertThat(actionCount(exceptionCaseId)).isZero();

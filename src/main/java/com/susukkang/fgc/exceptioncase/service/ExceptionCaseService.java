@@ -143,7 +143,13 @@ public class ExceptionCaseService {
 
         // 2. 현재 상태에서 가능한 조치인지 검증
         if (!actionType.supports(fromStatus)) {
-            throw invalidField("actionType");
+            throw new FgcBusinessException(
+                    FgcErrorCode.EXCP_003,
+                    Map.of(
+                            "status", fromStatus.name(),
+                            "actionType", actionType.name()
+                    )
+            );
         }
 
         ExceptionStatus toStatus =
