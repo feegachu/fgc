@@ -25,8 +25,14 @@ public class ArbitrageCheckTasklet implements Tasklet {
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
         Long validationRunId = ValidationRunBatchContext.getValidationRunId(chunkContext);
-        MonthlyValidationJobParameters parameters = MonthlyValidationJobParameters.from(
-                chunkContext.getStepContext().getStepExecution().getJobParameters());
+        MonthlyValidationJobParameters parameters =
+                MonthlyValidationJobParameters.
+                        from(
+                                chunkContext
+                                        .getStepContext()
+                                        .getStepExecution()
+                                        .getJobParameters()
+                        );
         ValidationJobContext jobContext = new ValidationJobContext(
                 parameters.validationMonth(),
                 parameters.runNo(),
