@@ -135,6 +135,29 @@ class AuditLogViewControllerTest {
                 .andExpect(content().string(containsString("background:#fff3bf")));
     }
 
+    /** 한쪽이 JSON 객체가 아니면(파싱 실패 포함) 필드 비교 대신 원문 한 줄 비교 — 원문이 diff 에서 사라지면 안 된다. */
+    @Test
+    void falls_back_to_raw_comparison_when_before_is_not_a_json_object() throws Exception {
+        stubSearch(List.of(log(1L, "settle01",
+                "not-a-json-object",
+                "{\"status\":\"CONFIRMED\"}")));
+        mvc.perform(get("/audit-logs").param("selected", "1").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("not-a-json-object")))
+                .andExpect(content().string(containsString("{&quot;status&quot;:&quot;CONFIRMED&quot;}")));
+    }
+
+    @Test
+    void falls_back_to_raw_comparison_when_after_is_not_a_json_object() throws Exception {
+        stubSearch(List.of(log(1L, "settle01",
+                "{\"status\":\"DRAFT\"}",
+                "[1,2,3]")));
+        mvc.perform(get("/audit-logs").param("selected", "1").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("{&quot;status&quot;:&quot;DRAFT&quot;}")))
+                .andExpect(content().string(containsString("[1,2,3]")));
+    }
+
     /** 화면정의서 "막아야 할 것": 수정·삭제 버튼 자체를 만들지 않는다 — 안내 배너만 있고 버튼은 없다. */
     @Test
     void never_renders_mutation_buttons() throws Exception {

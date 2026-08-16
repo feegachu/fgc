@@ -112,12 +112,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         mapper.detachPreConfirmDetails(paymentId);
         mapper.deleteAttributions(paymentId);
         persistAttributions(paymentId, prepared.attributions());
-        // before 는 수정 전 잠금 조회(current)를 그대로 사용한다 — 추가 쿼리 없음
+        // before 는 수정 전 잠금 조회(current)를 after 와 같은 payment/attributions 구조로
+        // 재구성해 diff 화면에서 필드끼리 나란히 비교되게 한다 — 추가 쿼리 없음
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_UPDATED)
                 .entityType(AUDIT_ENTITY_TYPE)
                 .entityId(String.valueOf(paymentId))
-                .before(Map.of("confirmationData", current))
+                .before(confirmationAuditValue(current))
                 .after(paymentAuditValue(prepared))
                 .policyVersionId(prepared.payment().getPolicyVersionId())
                 .build());
@@ -391,6 +392,43 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("payment", prepared.payment());
         value.put("attributions", prepared.attributions());
+        return value;
+    }
+
+    /** 수정 감사행의 before 값 — 수정 전 잠금 조회 행을 after 와 같은 payment/attributions 구조로 편다. */
+    private Map<String, Object> confirmationAuditValue(List<ConfirmationData> rows) {
+        ConfirmationData first = rows.get(0);
+        Map<String, Object> payment = new LinkedHashMap<>();
+        payment.put("status", first.status());
+        payment.put("amount", first.amount());
+        payment.put("paymentStage", first.paymentStage());
+        payment.put("commissionItemId", first.commissionItemId());
+        payment.put("itemCode", first.itemCode());
+        payment.put("policyVersionId", first.policyVersionId());
+
+        List<Map<String, Object>> attributions = new ArrayList<>();
+        for (ConfirmationData row : rows) {
+            if (row.transactionAttributionId() == null) {
+                continue; // 귀속 전 DRAFT — 본문만 저장된 상태
+            }
+            Map<String, Object> attribution = new LinkedHashMap<>();
+            attribution.put("transactionAttributionId", row.transactionAttributionId());
+            attribution.put("contractId", row.contractId());
+            attribution.put("amount", row.attributedAmount());
+            attribution.put("attributionDate", row.attributionDate());
+            attribution.put("attributionMonth", row.attributionMonth());
+            attribution.put("attributionMethod", row.attributionMethod());
+            attribution.put("inclusionDecisionStatus", row.inclusionDecisionStatus());
+            attribution.put("exclusionType", row.exclusionType());
+            attribution.put("inclusionDecisionReason", row.inclusionDecisionReason());
+            attribution.put("allocationBasis", row.allocationBasis());
+            attribution.put("evidenceRef", row.evidenceRef());
+            attributions.add(attribution);
+        }
+
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("payment", payment);
+        value.put("attributions", attributions);
         return value;
     }
 

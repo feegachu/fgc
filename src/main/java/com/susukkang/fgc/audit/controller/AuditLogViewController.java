@@ -92,16 +92,19 @@ public class AuditLogViewController {
 
     /**
      * before/after JSON 을 최상위 키 기준으로 나란히 비교한다.
-     * JSON 객체가 아니면(스칼라·배열·파싱 실패) 원문 한 줄로 비교한다 — 감사행은 이미 저장된
-     * 증거라 여기서 예외를 던져 화면을 깨뜨리지 않는다.
+     * 값이 있는 쪽이 하나라도 JSON 객체가 아니면(스칼라·배열·파싱 실패) 필드 비교 대신
+     * 원문 한 줄 비교로 되돌린다 — 파싱 실패를 "값 없음"으로 취급하면 그쪽 원문이 diff 에서
+     * 사라진다. 감사행은 이미 저장된 증거라 여기서 예외를 던져 화면을 깨뜨리지 않는다.
      */
     private List<DiffEntry> diff(String beforeJson, String afterJson) {
-        Map<String, Object> before = parseObject(beforeJson);
-        Map<String, Object> after = parseObject(afterJson);
-        if (before == null && after == null) {
-            if (beforeJson == null && afterJson == null) {
-                return List.of();
-            }
+        boolean beforePresent = beforeJson != null && !beforeJson.isBlank();
+        boolean afterPresent = afterJson != null && !afterJson.isBlank();
+        if (!beforePresent && !afterPresent) {
+            return List.of();
+        }
+        Map<String, Object> before = beforePresent ? parseObject(beforeJson) : null;
+        Map<String, Object> after = afterPresent ? parseObject(afterJson) : null;
+        if ((beforePresent && before == null) || (afterPresent && after == null)) {
             return List.of(new DiffEntry("value", beforeJson, afterJson,
                     !Objects.equals(beforeJson, afterJson)));
         }
