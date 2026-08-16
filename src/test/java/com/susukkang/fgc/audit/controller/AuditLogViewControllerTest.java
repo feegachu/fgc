@@ -135,6 +135,21 @@ class AuditLogViewControllerTest {
                 .andExpect(content().string(containsString("background:#fff3bf")));
     }
 
+    /** 중첩 객체는 리프 경로 단위로 비교한다 — payment/attributions 가 통째로 한 칸이 되면 "바뀐 칸만 노랗게"가 무의미하다. */
+    @Test
+    void renders_field_level_diff_for_nested_payment_values() throws Exception {
+        stubSearch(List.of(log(1L, "settle01",
+                "{\"payment\":{\"amount\":500000,\"status\":\"DRAFT\"},\"attributions\":[{\"contractId\":3}]}",
+                "{\"payment\":{\"amount\":700000,\"status\":\"DRAFT\"},\"attributions\":[{\"contractId\":3}]}")));
+        mvc.perform(get("/audit-logs").param("selected", "1").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("payment.amount")))
+                .andExpect(content().string(containsString("attributions[0].contractId")))
+                .andExpect(content().string(containsString("500000")))
+                .andExpect(content().string(containsString("700000")))
+                .andExpect(content().string(containsString("background:#fff3bf")));
+    }
+
     /** 한쪽이 JSON 객체가 아니면(파싱 실패 포함) 필드 비교 대신 원문 한 줄 비교 — 원문이 diff 에서 사라지면 안 된다. */
     @Test
     void falls_back_to_raw_comparison_when_before_is_not_a_json_object() throws Exception {

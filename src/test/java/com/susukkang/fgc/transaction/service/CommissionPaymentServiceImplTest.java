@@ -1134,17 +1134,19 @@ class CommissionPaymentServiceImplTest {
         AuditLogService.AuditEvent event = captor.getValue();
         assertThat(event.actionCode()).isEqualTo("PAYMENT_UPDATED");
         assertThat(event.entityId()).isEqualTo("101");
-        // before 는 after 와 같은 payment/attributions 구조 — diff 화면에서 필드끼리 비교된다
+        // before/after 모두 같은 조회 DTO(Row) 기반 payment/attributions 구조 —
+        // 스키마가 일치해야 diff 화면이 필드 단위로 비교된다
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> before = (java.util.Map<String, Object>) event.before();
         assertThat(before).containsKeys("payment", "attributions");
-        @SuppressWarnings("unchecked")
-        java.util.Map<String, Object> beforePayment = (java.util.Map<String, Object>) before.get("payment");
-        assertThat(beforePayment.get("status")).isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat(((CommissionPaymentRow) before.get("payment")).status())
+                .isEqualTo(CommissionPaymentStatus.DRAFT);
         assertThat((List<?>) before.get("attributions")).hasSize(1);
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> after = (java.util.Map<String, Object>) event.after();
         assertThat(after).containsKeys("payment", "attributions");
+        assertThat(after.get("payment")).isInstanceOf(CommissionPaymentRow.class);
+        assertThat(before.get("payment").getClass()).isEqualTo(after.get("payment").getClass());
     }
 
     /** 확정 감사행의 after 에는 1,200% 판정 요약(capChecks)이 담긴다 — REG-22·포함/제외 판단 근거. */

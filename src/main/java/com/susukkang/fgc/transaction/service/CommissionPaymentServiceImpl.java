@@ -28,6 +28,7 @@ import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
 import com.susukkang.fgc.transaction.domain.CommissionItemReference;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionCommand;
+import com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionRow;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentCommand;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
@@ -85,15 +86,18 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     public CommissionPaymentResponse create(CommissionPaymentCreateRequest request) {
         PreparedPayment prepared = commandFrom(request);
         mapper.insertTransaction(prepared.payment());
-        persistAttributions(prepared.payment().getPaymentId(), prepared.attributions());
+        Long paymentId = prepared.payment().getPaymentId();
+        persistAttributions(paymentId, prepared.attributions());
+        CommissionPaymentRow afterRow = requireRow(paymentId);
+        List<CommissionPaymentAttributionRow> afterAttributions = mapper.findAttributions(paymentId);
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_CREATED)
                 .entityType(AUDIT_ENTITY_TYPE)
-                .entityId(String.valueOf(prepared.payment().getPaymentId()))
-                .after(paymentAuditValue(prepared))
+                .entityId(String.valueOf(paymentId))
+                .after(paymentAuditValue(afterRow, afterAttributions))
                 .policyVersionId(prepared.payment().getPolicyVersionId())
                 .build());
-        return requirePayment(prepared.payment().getPaymentId());
+        return afterRow.toResponse(afterAttributions, List.of());
     }
 
     @Override
@@ -104,6 +108,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     ) {
         List<ConfirmationData> current = requireConfirmationData(paymentId);
         requireDraft(current.get(0));
+        // before 스냅샷 — FOR UPDATE 잠금 이후, 수정 전 본문·귀속행을 after 와 같은 조회
+        // DTO(Row)로 확보한다. 두 스냅샷이 같은 스키마여야 diff 화면이 필드 단위로 비교된다.
+        CommissionPaymentRow beforeRow = requireRow(paymentId);
+        List<CommissionPaymentAttributionRow> beforeAttributions = mapper.findAttributions(paymentId);
 
         PreparedPayment prepared = commandFrom(paymentId, request);
         if (mapper.updateTransaction(prepared.payment()) != 1) {
@@ -112,17 +120,17 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         mapper.detachPreConfirmDetails(paymentId);
         mapper.deleteAttributions(paymentId);
         persistAttributions(paymentId, prepared.attributions());
-        // before 는 수정 전 잠금 조회(current)를 after 와 같은 payment/attributions 구조로
-        // 재구성해 diff 화면에서 필드끼리 나란히 비교되게 한다 — 추가 쿼리 없음
+        CommissionPaymentRow afterRow = requireRow(paymentId);
+        List<CommissionPaymentAttributionRow> afterAttributions = mapper.findAttributions(paymentId);
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_UPDATED)
                 .entityType(AUDIT_ENTITY_TYPE)
                 .entityId(String.valueOf(paymentId))
-                .before(confirmationAuditValue(current))
-                .after(paymentAuditValue(prepared))
+                .before(paymentAuditValue(beforeRow, beforeAttributions))
+                .after(paymentAuditValue(afterRow, afterAttributions))
                 .policyVersionId(prepared.payment().getPolicyVersionId())
                 .build());
-        return requirePayment(paymentId);
+        return afterRow.toResponse(afterAttributions, List.of());
     }
 
     @Override
@@ -387,45 +395,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .build();
     }
 
-    /** 등록·수정 감사행의 after 값 — 지급 본문과 귀속행(포함/제외 판단·귀속방식·배부정책·증빙) 전체 스냅샷. */
-    private Map<String, Object> paymentAuditValue(PreparedPayment prepared) {
-        Map<String, Object> value = new LinkedHashMap<>();
-        value.put("payment", prepared.payment());
-        value.put("attributions", prepared.attributions());
-        return value;
-    }
-
-    /** 수정 감사행의 before 값 — 수정 전 잠금 조회 행을 after 와 같은 payment/attributions 구조로 편다. */
-    private Map<String, Object> confirmationAuditValue(List<ConfirmationData> rows) {
-        ConfirmationData first = rows.get(0);
-        Map<String, Object> payment = new LinkedHashMap<>();
-        payment.put("status", first.status());
-        payment.put("amount", first.amount());
-        payment.put("paymentStage", first.paymentStage());
-        payment.put("commissionItemId", first.commissionItemId());
-        payment.put("itemCode", first.itemCode());
-        payment.put("policyVersionId", first.policyVersionId());
-
-        List<Map<String, Object>> attributions = new ArrayList<>();
-        for (ConfirmationData row : rows) {
-            if (row.transactionAttributionId() == null) {
-                continue; // 귀속 전 DRAFT — 본문만 저장된 상태
-            }
-            Map<String, Object> attribution = new LinkedHashMap<>();
-            attribution.put("transactionAttributionId", row.transactionAttributionId());
-            attribution.put("contractId", row.contractId());
-            attribution.put("amount", row.attributedAmount());
-            attribution.put("attributionDate", row.attributionDate());
-            attribution.put("attributionMonth", row.attributionMonth());
-            attribution.put("attributionMethod", row.attributionMethod());
-            attribution.put("inclusionDecisionStatus", row.inclusionDecisionStatus());
-            attribution.put("exclusionType", row.exclusionType());
-            attribution.put("inclusionDecisionReason", row.inclusionDecisionReason());
-            attribution.put("allocationBasis", row.allocationBasis());
-            attribution.put("evidenceRef", row.evidenceRef());
-            attributions.add(attribution);
-        }
-
+    /**
+     * 등록·수정 감사행의 before/after 값 — 지급 본문과 귀속행(포함/제외 판단·귀속방식·배부정책·
+     * 증빙) 전체 스냅샷. 두 스냅샷 모두 같은 조회 DTO(Row)를 직렬화하므로 필드 스키마가 항상
+     * 일치한다 — 스키마가 다르면 diff 화면이 전 필드를 변경으로 오인한다(화면정의서 :1537).
+     */
+    private Map<String, Object> paymentAuditValue(
+            CommissionPaymentRow payment,
+            List<CommissionPaymentAttributionRow> attributions
+    ) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("payment", payment);
         value.put("attributions", attributions);
@@ -1168,11 +1146,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private CommissionPaymentResponse requirePayment(Long paymentId, List<Long> capCheckIds) {
+        return requireRow(paymentId).toResponse(mapper.findAttributions(paymentId), capCheckIds);
+    }
+
+    private CommissionPaymentRow requireRow(Long paymentId) {
         CommissionPaymentRow payment = mapper.findById(paymentId);
         if (payment == null) {
             invalid("paymentId", "지급 건을 찾을 수 없습니다.");
         }
-        return payment.toResponse(mapper.findAttributions(paymentId), capCheckIds);
+        return payment;
     }
 
     private void requireAgent(Long agentId) {
