@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.base.mapper.InsurerMapper">
+
+    <sql id="insurerSearchConditions">
+        1 = 1
+        <if test="keyword != null">
+            AND (
+                LOWER(i.insurer_code) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                OR LOWER(i.insurer_name) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+            )
+        </if>
+    </sql>
+
+    <select id="selectInsurers"
+            resultType="com.susukkang.fgc.base.dto.InsurerRow">
+        SELECT i.insurer_id AS insurerId,
+               i.insurer_code AS insurerCode,
+               i.insurer_name AS insurerName,
+               i.insurer_type AS insurerType,
+               i.active_yn AS activeYn
+          FROM fgc.insurer i
+         WHERE <include refid="insurerSearchConditions"/>
+         ORDER BY i.insurer_code ASC
+         LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countInsurers" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.insurer i
+         WHERE <include refid="insurerSearchConditions"/>
+    </select>
+
+</mapper>
