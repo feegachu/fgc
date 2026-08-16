@@ -77,6 +77,7 @@ class CommissionPaymentServiceImplTest {
     private CapExceptionService capExceptionService;
 
     private CommissionPaymentServiceImpl service;
+    private FgcMessageResolver messageResolver;
 
     @BeforeEach
     void setUp() {
@@ -85,13 +86,14 @@ class CommissionPaymentServiceImplTest {
         ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
         messageSource.setBasename("messages");
         messageSource.setDefaultEncoding("UTF-8");
+        messageResolver = new FgcMessageResolver(messageSource);
         service = new CommissionPaymentServiceImpl(
                 mapper,
                 new ObjectMapper(),
                 capValidator,
                 capCalculator,
                 capExceptionService,
-                new FgcMessageResolver(messageSource)
+                messageResolver
         );
     }
 
@@ -1274,9 +1276,13 @@ class CommissionPaymentServiceImplTest {
         TransactionPrecheckResponse preview = service.precheck(101L);
 
         assertThatThrownBy(() -> service.confirm(101L, null))
-                .isInstanceOfSatisfying(FgcBusinessException.class,
-                        exception -> assertThat(exception.getErrorCode().getCode())
-                                .isEqualTo(preview.blockers().get(0).code()));
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode().getCode())
+                            .isEqualTo(preview.blockers().get(0).code());
+                    // blocker 문구 == confirm 실패 응답이 렌더링할 문구 (같은 카탈로그·같은 파라미터)
+                    assertThat(messageResolver.resolve(exception.getErrorCode(), exception.getParams()))
+                            .isEqualTo(preview.blockers().get(0).message());
+                });
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
         verify(mapper).insertCapCheck(captor.capture());
@@ -1284,7 +1290,7 @@ class CommissionPaymentServiceImplTest {
                 .isEqualTo(captor.getValue().getUsagePct().toPlainString());
     }
 
-    // 제31조 게이트 ② — 귀속행 없는 DRAFT는 FGC-TRAN-002 blocker로 표시된다
+    // FGC-FUN-033 · 제31조 게이트 ② — 귀속행 없는 DRAFT는 FGC-TRAN-002 blocker로 표시된다
     @Test
     void precheckReportsMissingAttributionBlocker() {
         given(mapper.findConfirmationData(101L)).willReturn(List.of(emptyDraftConfirmation()));
@@ -1300,7 +1306,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
-    // 제31조 게이트 ③·④ — 귀속합계 불일치와 REVIEW_REQUIRED 귀속을 한 번에 전부 수집한다 (fail-fast 아님)
+    // FGC-FUN-033 · 제31조 게이트 ③·④ — 귀속합계 불일치와 REVIEW_REQUIRED 귀속을 한 번에 전부 수집한다 (fail-fast 아님)
     @Test
     void precheckCollectsMultipleBlockers() {
         ConfirmationData data = withPaymentAmount(confirmation(
@@ -1324,7 +1330,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
-    // 미해결 CAP_VIOLATION 예외가 남아 있으면 FGC-CAP-003 blocker로 표시된다
+    // FGC-FUN-033·FGC-FUN-034 연계 — 미해결 CAP_VIOLATION 예외가 남아 있으면 FGC-CAP-003 blocker로 표시된다
     @Test
     void precheckReportsUnresolvedViolationBlocker() {
         ConfirmationData data = confirmation(
@@ -1354,7 +1360,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
-    // 분류정책이 없는 귀속행은 FGC-CAP-002 blocker로 표시되고 preview 행·한도 계산은 생략된다
+    // FGC-FUN-033 — 분류정책이 없는 귀속행은 FGC-CAP-002 blocker로 표시되고 preview 행·한도 계산은 생략된다
     @Test
     void precheckReportsMissingCapRuleAndSkipsPreview() {
         ConfirmationData data = confirmation(
@@ -1377,6 +1383,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
+    // IF-API-24 — 비DRAFT는 미리보기 대상이 아니라 FGC-TRAN-005(409)로 거부된다
     @Test
     void precheckRejectsNonDraftPayment() {
         ConfirmationData confirmed = withStatus(confirmation(
@@ -1392,6 +1399,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
+    // IF-API-24 — 미존재 지급 건은 FGC-COMMON-002(400), 이 경로에서도 아무것도 저장하지 않는다
     @Test
     void precheckRejectsUnknownPayment() {
         given(mapper.findConfirmationData(999L)).willReturn(List.of());
@@ -1400,6 +1408,44 @@ class CommissionPaymentServiceImplTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(FgcErrorCode.COMMON_002));
+        assertPrecheckSavesNothing();
+    }
+
+    // FGC-FUN-033 — 정책 드리프트: 귀속 스냅샷(INCLUDED)과 룰 현재 판정(EXCLUDED)이 어긋나면
+    // preview 판정은 검토필요로 강제되고 CAP-002 blocker가 수집된다 (게이지 "정상" 오인 방지 —
+    // confirm은 이 행에서 계산에 도달하지 못하므로 NORMAL 게이지는 확정 경로에 존재하지 않는 값)
+    @Test
+    void precheckForcesReviewRequiredWhenRuleDisagreesWithSnapshot() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(new CapRuleSnapshot(
+                31L,
+                41L,
+                InclusionDecisionStatus.EXCLUDED,
+                "정책 변경으로 제외",
+                new BigDecimal("100000"),
+                new BigDecimal("12"),
+                new BigDecimal("90"),
+                BigDecimal.ZERO,
+                null
+        ));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers())
+                .extracting(TransactionPrecheckResponse.Blocker::code)
+                .containsExactly("FGC-CAP-002");
+        assertThat(response.capPreview()).hasSize(1);
+        assertThat(response.capPreview().get(0).resultStatus())
+                .isEqualTo(CapResultStatus.REVIEW_REQUIRED);
+        assertPrecheckSavesNothing();
     }
 
     /** precheck의 무저장·무잠금 계약 — 확정 경로 전용 부작용이 하나도 호출되지 않아야 한다. */

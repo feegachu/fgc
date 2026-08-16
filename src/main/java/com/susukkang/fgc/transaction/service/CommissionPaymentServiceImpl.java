@@ -271,6 +271,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         actualValidation,
                         rule.warningUsagePct()
                 );
+                // 룰 판정 불일치·룰셋 불일치(CAP_002) 행은 confirm이 계산에 도달하지 못하는 행이다.
+                // CapValidator는 귀속 스냅샷만 보므로 정책 드리프트 시 NORMAL로 계산될 수 있는데,
+                // 게이지 수치는 참고용으로 남기되 판정만은 검토필요로 강제해 "정상" 오인을 막는다.
+                if (ruleFailure != null || consistencyFailure != null) {
+                    validation = new CapValidationResult(
+                            validation.limitAmount(),
+                            validation.candidateIncludedAmount(),
+                            validation.includedAmount(),
+                            validation.remainingAmount(),
+                            validation.usagePct(),
+                            CapResultStatus.REVIEW_REQUIRED
+                    );
+                }
                 CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
                 previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
                         check,
