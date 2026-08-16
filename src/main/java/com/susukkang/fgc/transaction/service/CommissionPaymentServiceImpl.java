@@ -305,6 +305,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                             paymentLevel ? null : failure.data().transactionAttributionId()
                     );
                 })
+                // 같은 근본 원인(예: REVIEW_REQUIRED)이 여러 게이트에서 재검출되면 code·message·ID가
+                // 전부 같은 Blocker가 반복된다 — record 값 동등성으로 같은 사유는 한 줄로 접는다
+                .distinct()
                 .toList();
     }
 

@@ -1316,9 +1316,11 @@ class CommissionPaymentServiceImplTest {
         TransactionPrecheckResponse response = service.precheck(101L);
 
         assertThat(response.confirmable()).isFalse();
+        // REVIEW_REQUIRED는 귀속행 상태·룰 불일치·병합 판정 세 게이트에서 재검출되지만
+        // 같은 사유는 blockers에 한 번만 나타나야 한다 (중복 접기)
         assertThat(response.blockers())
                 .extracting(TransactionPrecheckResponse.Blocker::code)
-                .contains("FGC-TRAN-003", "FGC-CAP-002");
+                .containsExactly("FGC-TRAN-003", "FGC-CAP-002");
         assertPrecheckSavesNothing();
     }
 
