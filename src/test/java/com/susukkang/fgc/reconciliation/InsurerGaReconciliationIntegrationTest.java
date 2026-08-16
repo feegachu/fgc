@@ -5,6 +5,7 @@ import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaMatchCandidate;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.service.InsurerGaReconciliationMatcher;
+import com.susukkang.fgc.reconciliation.service.ReconciliationResultPersistenceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,9 @@ class InsurerGaReconciliationIntegrationTest {
 
     @Autowired
     private InsurerGaReconciliationMatcher matcher;
+
+    @Autowired
+    private ReconciliationResultPersistenceService persistenceService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -74,7 +78,7 @@ class InsurerGaReconciliationIntegrationTest {
         Long expectedJournalId = insertPostedJournal(
                 "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expectedMatched,
                 contractId, commissionItemId, "650000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
-        insertPostedJournal(
+        Long missingExpectedJournalId = insertPostedJournal(
                 "EXPECTED_INSURER_INCOME", "SCHEDULE_LINE", expectedMissing,
                 secondContractId, commissionItemId, "300000", "EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
         Long actualTransactionId = id("""
@@ -86,8 +90,10 @@ class InsurerGaReconciliationIntegrationTest {
                 "ACTUAL_INSURER_STATEMENT", "COMMISSION_TRANSACTION", actualTransactionId,
                 contractId, commissionItemId, "650000", "ACTUAL_RECEIVABLE", "ACTUAL_INCOME");
 
-        List<InsurerGaMatchCandidate> results = matcher.match(new ReconciliationExecutionRequest(
-                99L, 88L, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null));
+        Long reconciliationRunId = insertRunningReconciliationRun(insurerId, PaymentStage.INSURER_TO_GA);
+        ReconciliationExecutionRequest executionRequest = new ReconciliationExecutionRequest(
+                reconciliationRunId, null, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null);
+        List<InsurerGaMatchCandidate> results = matcher.match(executionRequest);
 
         assertThat(results).hasSize(2);
         assertThat(results).anySatisfy(result -> {
@@ -103,6 +109,73 @@ class InsurerGaReconciliationIntegrationTest {
         });
         assertThat(results).flatExtracting(InsurerGaMatchCandidate::transactionAttributionIds)
                 .doesNotContain(nextMonthActual, gaToFcActual);
+
+        // FGC-FUN-048-04: FUN-048-02가 만든 실제 후보를 결과·원천 연결 테이블까지 저장한다.
+        persistenceService.persist(executionRequest, results);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.reconciliation_result WHERE reconciliation_run_id = ?",
+                Integer.class,
+                reconciliationRunId)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.reconciliation_match match
+                  JOIN fgc.reconciliation_result result
+                    ON result.reconciliation_result_id = match.reconciliation_result_id
+                 WHERE result.reconciliation_run_id = ?
+                """, Integer.class, reconciliationRunId)).isEqualTo(3);
+
+        ActualMissingSnapshot actualMissing = jdbcTemplate.queryForObject("""
+                SELECT reconciliation_result_id,
+                       expected_total_amount,
+                       actual_total_amount,
+                       difference_amount,
+                       detail_snapshot #>> '{expectedJournalHeaderIds,0}' AS expected_journal_id,
+                       detail_snapshot #>> '{sources,0,scheduleLineId}' AS snapshot_schedule_line_id,
+                       detail_snapshot #>> '{sources,0,matchedAmount}' AS snapshot_matched_amount,
+                       detail_snapshot #>> '{sources,0,matchRole}' AS snapshot_match_role
+                  FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id = ?
+                   AND result_type = 'ACTUAL_MISSING'
+                """, (resultSet, rowNum) -> new ActualMissingSnapshot(
+                resultSet.getLong("reconciliation_result_id"),
+                resultSet.getBigDecimal("expected_total_amount"),
+                resultSet.getBigDecimal("actual_total_amount"),
+                resultSet.getBigDecimal("difference_amount"),
+                resultSet.getLong("expected_journal_id"),
+                resultSet.getLong("snapshot_schedule_line_id"),
+                resultSet.getBigDecimal("snapshot_matched_amount"),
+                resultSet.getString("snapshot_match_role")
+        ), reconciliationRunId);
+        assertThat(actualMissing.expectedTotalAmount()).isEqualByComparingTo("300000");
+        assertThat(actualMissing.actualTotalAmount()).isZero();
+        assertThat(actualMissing.differenceAmount()).isEqualByComparingTo("-300000");
+        assertThat(actualMissing.expectedJournalId()).isEqualTo(missingExpectedJournalId);
+        assertThat(actualMissing.snapshotScheduleLineId()).isEqualTo(expectedMissing);
+        assertThat(actualMissing.snapshotMatchedAmount()).isEqualByComparingTo("300000");
+        assertThat(actualMissing.snapshotMatchRole()).isEqualTo("EXPECTED");
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.reconciliation_match
+                 WHERE reconciliation_result_id = ?
+                   AND match_seq = 1
+                   AND schedule_line_id = ?
+                   AND transaction_attribution_id IS NULL
+                   AND matched_amount = 300000
+                   AND match_role = 'EXPECTED'
+                """, Integer.class, actualMissing.reconciliationResultId(), expectedMissing)).isEqualTo(1);
+    }
+
+    private record ActualMissingSnapshot(
+            Long reconciliationResultId,
+            BigDecimal expectedTotalAmount,
+            BigDecimal actualTotalAmount,
+            BigDecimal differenceAmount,
+            Long expectedJournalId,
+            Long snapshotScheduleLineId,
+            BigDecimal snapshotMatchedAmount,
+            String snapshotMatchRole
+    ) {
     }
 
     @Test
@@ -426,5 +499,19 @@ class InsurerGaReconciliationIntegrationTest {
 
     private Long id(String sql, Object... args) {
         return jdbcTemplate.queryForObject(sql, Long.class, args);
+    }
+
+    private Long insertRunningReconciliationRun(Long insurerId, PaymentStage paymentStage) {
+        Long runId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (settlement_month, payment_stage, insurer_id)
+                VALUES (?, ?, ?)
+                RETURNING reconciliation_run_id
+                """, Long.class, TEST_MONTH, paymentStage.name(), insurerId);
+        jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_run
+                   SET status = 'RUNNING', started_at = clock_timestamp()
+                 WHERE reconciliation_run_id = ?
+                """, runId);
+        return runId;
     }
 }

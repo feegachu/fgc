@@ -5,6 +5,7 @@ import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.ExceptionGenerationPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
+import com.susukkang.fgc.validation.batch.contract.ReconciliationBatchPort;
 import com.susukkang.fgc.validation.batch.tasklet.*;
 import com.susukkang.fgc.validation.service.*;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class MonthlyValidationJobConfig {
     // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
     // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
+    private final ReconciliationBatchPort reconciliationBatchPort;
 
     @Bean
     public Job monthlyValidationJob(JobRepository jobRepository,
@@ -151,7 +153,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step reconciliationStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("reconciliationStep", jobRepository)
-                .tasklet(new ReconciliationPlaceholderTasklet(), transactionManager)
+                .tasklet(new ReconciliationTasklet(reconciliationBatchPort), transactionManager)
                 .listener(progressListener(7, false))
                 .build();
     }

@@ -32,13 +32,15 @@ public record GaFcMatchCandidate(
         List<Long> scheduleLineIds,
         List<Long> transactionAttributionIds,
         List<Long> expectedJournalHeaderIds,
-        List<Long> actualJournalHeaderIds
-) {
+        List<Long> actualJournalHeaderIds,
+        List<ReconciliationMatchSource> sourceMatches
+) implements ReconciliationCandidate {
     public GaFcMatchCandidate {
         secondaryReasonCodes = List.copyOf(secondaryReasonCodes);
         scheduleLineIds = List.copyOf(scheduleLineIds);
         transactionAttributionIds = List.copyOf(transactionAttributionIds);
         expectedJournalHeaderIds = List.copyOf(expectedJournalHeaderIds);
         actualJournalHeaderIds = List.copyOf(actualJournalHeaderIds);
+        sourceMatches = List.copyOf(sourceMatches);
     }
 }

@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 설명 : 대사 실행 생성 및 상태 전이 Mapper
@@ -35,5 +36,14 @@ public interface ReconciliationRunMapper {
             @Param("paymentStage") PaymentStage paymentStage,
             @Param("insurerId") Long insurerId,
             @Param("validationRunId") Long validationRunId
+    );
+
+    Long lockValidationRun(@Param("validationRunId") Long validationRunId);
+
+    List<Long> findSelectedInsurerIds(@Param("validationRunId") Long validationRunId);
+
+    List<Long> findSelectedContractIds(
+            @Param("validationRunId") Long validationRunId,
+            @Param("insurerId") Long insurerId
     );
 }

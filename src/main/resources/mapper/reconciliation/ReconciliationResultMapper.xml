@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.reconciliation.mapper.ReconciliationResultMapper">
+
+    <!-- FUN-048-04: 기존 결과를 삭제·재작성하지 않고 실행+매칭키 UNIQUE로 멱등 저장 -->
+    <insert id="insertResult" useGeneratedKeys="true"
+            keyProperty="reconciliationResultId" keyColumn="reconciliation_result_id">
+        INSERT INTO fgc.reconciliation_result (
+            reconciliation_run_id,
+            match_group_key,
+            contract_id,
+            expected_agent_id,
+            actual_agent_id,
+            actual_source_agent_code,
+            commission_item_id,
+            installment_no,
+            result_type,
+            expected_total_amount,
+            actual_total_amount,
+            difference_amount,
+            primary_reason_code,
+            secondary_reason_codes,
+            detail_snapshot
+        ) VALUES (
+            #{reconciliationRunId},
+            #{matchGroupKey},
+            #{contractId},
+            #{expectedAgentId},
+            #{actualAgentId},
+            #{actualSourceAgentCode},
+            #{commissionItemId},
+            #{installmentNo},
+            #{resultType},
+            #{expectedTotalAmount},
+            #{actualTotalAmount},
+            #{differenceAmount},
+            #{primaryReasonCode},
+            <choose>
+                <when test="secondaryReasonCodes != null and !secondaryReasonCodes.isEmpty()">
+                    ARRAY[
+                    <foreach collection="secondaryReasonCodes" item="reason" separator=",">
+                        #{reason}
+                    </foreach>
+                    ]::text[]
+                </when>
+                <otherwise>ARRAY[]::text[]</otherwise>
+            </choose>,
+            CAST(#{detailSnapshotJson} AS jsonb)
+        )
+        ON CONFLICT ON CONSTRAINT uq_reconciliation_result DO NOTHING
+    </insert>
+
+    <select id="findResultId" resultType="long">
+        SELECT reconciliation_result_id
+          FROM fgc.reconciliation_result
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+           AND match_group_key = #{matchGroupKey}
+    </select>
+
+    <insert id="insertMatch">
+        INSERT INTO fgc.reconciliation_match (
+            reconciliation_result_id,
+            match_seq,
+            schedule_line_id,
+            transaction_attribution_id,
+            matched_amount,
+            match_role
+        ) VALUES (
+            #{reconciliationResultId},
+            #{matchSeq},
+            #{scheduleLineId},
+            #{transactionAttributionId},
+            #{matchedAmount},
+            #{matchRole}
+        )
+        ON CONFLICT ON CONSTRAINT uq_reconciliation_match DO NOTHING
+    </insert>
+
+    <select id="countByRunId" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.reconciliation_result
+         WHERE reconciliation_run_id = #{reconciliationRunId}
+    </select>
+
+</mapper>
