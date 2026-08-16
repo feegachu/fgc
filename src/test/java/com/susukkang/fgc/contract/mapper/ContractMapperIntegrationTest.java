@@ -99,8 +99,9 @@ class ContractMapperIntegrationTest {
     }
 
     @Test
-    @DisplayName("조직 ID 검색 조건으로 계약 목록과 건수를 거른다")
+    @DisplayName("조직 ID 검색 조건으로 계약 목록과 건수를 거른다 (IF-API-11)")
     void selectsContractByOrgId() {
+        // FGC-UI-CONT-W01 검색 조건 '조직' — FGC-FUN-018 화면의 기본 필터, 조직 필터 명세는 FGC-FUN-058(2차 통합검색)
         References refs = references();
         InsuranceContract contract = newContract(refs);
         contractMapper.insertContract(contract);

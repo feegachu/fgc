@@ -165,6 +165,12 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.totalPages").value(1));
+
+        // orgId는 선택 파라미터 — 미전달 시 검색 조건에 null로 바인딩된다 (IF-API-11)
+        ArgumentCaptor<ContractSearchCondition> captor =
+                ArgumentCaptor.forClass(ContractSearchCondition.class);
+        verify(contractService).selectByCondition(captor.capture(), eq(1), eq(20));
+        assertThat(captor.getValue().getOrgId()).isNull();
     }
     @Test
     @DisplayName("orgId 요청 파라미터가 계약 목록 검색 조건에 바인딩된다")
