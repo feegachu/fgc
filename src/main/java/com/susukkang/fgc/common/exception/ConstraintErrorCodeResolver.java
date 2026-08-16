@@ -99,6 +99,14 @@ public class ConstraintErrorCodeResolver {
                 "uq_reconciliation_result",
                 FgcErrorCode.RECO_001
         );
+        // 2026-08-12 yslee - 대사 실행 중복과 결과 그룹 중복 오류를 분리
+        // 기존 코드: 대사 결과 그룹 중복 제약만 FGC-RECO-001로 변환
+        // 문제: 실행 업무키 중복까지 같은 코드로 처리하면 사용자의 중복 요청과 결과 저장 결함을 구분할 수 없음
+        // 개선: uq_reconciliation_run은 실행 중복 전용 FGC-RECO-002·409로 변환
+        mappings.put(
+                "uq_reconciliation_run",
+                FgcErrorCode.RECO_002
+        );
         // 활성 MONTHLY 중복(진짜 업무 규칙 위반)과 run_no 채번 충돌(단순 경합)을 구분해야
         // ValidationRunCreateServiceImpl이 후자만 재시도할 수 있다 — 값 자체는 둘 다
         // VRUN_001·409로 같지만, 이름을 정확히 등록해 두 제약 사이 접두어 겹침으로

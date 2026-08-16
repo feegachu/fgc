@@ -99,6 +99,26 @@ class ContractMapperIntegrationTest {
     }
 
     @Test
+    @DisplayName("조직 ID 검색 조건으로 계약 목록과 건수를 거른다 (IF-API-11)")
+    void selectsContractByOrgId() {
+        // FGC-UI-CONT-W01 검색 조건 '조직' — FGC-FUN-018 화면의 기본 필터, 조직 필터 명세는 FGC-FUN-058(2차 통합검색)
+        References refs = references();
+        InsuranceContract contract = newContract(refs);
+        contractMapper.insertContract(contract);
+        ContractSearchCondition condition = new ContractSearchCondition();
+        condition.setContractNo(contract.getContractNo());
+        condition.setOrgId(refs.organizationId());
+
+        assertThat(contractMapper.selectByCondition(condition, 20, 0)).hasSize(1);
+        assertThat(contractMapper.countByCondition(condition)).isEqualTo(1);
+
+        // 존재하지 않는 조직으로 검색하면 걸러진다
+        condition.setOrgId(-1L);
+        assertThat(contractMapper.selectByCondition(condition, 20, 0)).isEmpty();
+        assertThat(contractMapper.countByCondition(condition)).isZero();
+    }
+
+    @Test
     @DisplayName("계약을 수정하면 계약번호는 유지되고 수정값이 반영된다")
     void updatesContractIncludingContractNumber() {
         References refs = references();

@@ -25,6 +25,7 @@ import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -39,8 +40,10 @@ import java.util.List;
 
 import static com.susukkang.fgc.contract.domain.ContractStatus.ACTIVE;
 import static com.susukkang.fgc.contract.domain.PaymentCycleCode.MONTHLY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -162,7 +165,33 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.totalPages").value(1));
+
+        // orgId는 선택 파라미터 — 미전달 시 검색 조건에 null로 바인딩된다 (IF-API-11)
+        ArgumentCaptor<ContractSearchCondition> captor =
+                ArgumentCaptor.forClass(ContractSearchCondition.class);
+        verify(contractService).selectByCondition(captor.capture(), eq(1), eq(20));
+        assertThat(captor.getValue().getOrgId()).isNull();
     }
+    @Test
+    @DisplayName("orgId 요청 파라미터가 계약 목록 검색 조건에 바인딩된다")
+    void getContractsBindsOrgIdCondition() throws Exception {
+        // IF-API-11 · #168 — 조직(orgId) 검색 조건 API 계약 테스트
+        when(contractService.selectByCondition(
+                any(ContractSearchCondition.class), eq(1), eq(20)
+        )).thenReturn(PageResponse.of(List.of(), 1, 20, 0, "contractId,desc"));
+
+        mockMvc.perform(get("/api/v1/contracts")
+                        .param("orgId", "7")
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+
+        ArgumentCaptor<ContractSearchCondition> captor =
+                ArgumentCaptor.forClass(ContractSearchCondition.class);
+        verify(contractService).selectByCondition(captor.capture(), eq(1), eq(20));
+        assertThat(captor.getValue().getOrgId()).isEqualTo(7L);
+    }
+
     @Test
     @DisplayName("보험계약 상세정보를 조회한다")
     void getContractDetailReturnsSuccess() throws Exception {

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseActionMapper">
+
+    <!-- 같은 예외의 상태와 action_seq를 두 요청이 동시에 바꾸지 못하도록 행을 잠근다. -->
+    <select id="findByIdForUpdate"
+            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget">
+        SELECT exception_case_id AS exceptionCaseId,
+               status,
+               assigned_to       AS assignedTo
+          FROM fgc.exception_case
+         WHERE exception_case_id = #{exceptionCaseId}
+           FOR UPDATE
+    </select>
+
+    <!-- 부모 exception_case 잠금을 획득한 트랜잭션 안에서 호출하므로 MAX+1 경쟁이 없다. -->
+    <select id="findNextActionSeq" resultType="int">
+        SELECT COALESCE(MAX(action_seq), 0) + 1
+          FROM fgc.exception_action
+         WHERE exception_case_id = #{exceptionCaseId}
+    </select>
+
+    <insert id="insertAction">
+        INSERT INTO fgc.exception_action (
+            exception_case_id, action_seq, from_status, to_status,
+            action_type, reason, evidence_ref, action_by, action_at
+        ) VALUES (
+            #{exceptionCaseId}, #{actionSeq}, #{fromStatus}, #{toStatus},
+            #{actionType}, #{reason}, #{evidenceRef}, #{actionBy}, #{actionAt}
+        )
+    </insert>
+
+    <!-- exception_case에는 현재 상태만 저장하고 모든 변경 이력은 exception_action에 남긴다. -->
+    <update id="updateCaseAfterAction">
+        UPDATE fgc.exception_case
+           SET status = #{status},
+               assigned_to = #{assignedTo},
+               resolved_at = #{resolvedAt}
+         WHERE exception_case_id = #{exceptionCaseId}
+    </update>
+</mapper>
