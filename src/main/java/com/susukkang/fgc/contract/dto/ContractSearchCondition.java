@@ -25,6 +25,7 @@ public class ContractSearchCondition {
     private Long insurerId; //보험사 ID
     private Long productOfferingId; //상품
     private Long agentId; //FC ID
+    private Long orgId; //조직 ID (IF-API-11, 계약 당시 소속 조직 기준)
     private CapResultStatus capResultStatus; //1,200% 한도 판정
     private ContractStatus currentStatus; //계약상태
     private LocalDate contractDateFrom; //계약일 시작

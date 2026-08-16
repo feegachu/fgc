@@ -2,6 +2,10 @@ package com.susukkang.fgc.exceptioncase.mapper;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -21,4 +25,23 @@ public interface ExceptionCaseQueryMapper {
     List<ExceptionCaseListRow> findCases(@Param("statuses") List<ExceptionStatus> statuses);
 
     long countByStatuses(@Param("statuses") List<ExceptionStatus> statuses);
+
+    /** IF-API-43 검색조건에 맞는 현재 페이지의 예외를 조회한다. */
+    List<ExceptionCaseSearchRow> search(
+            @Param("criteria") ExceptionCaseSearchDTO criteria,
+            @Param("statuses") List<ExceptionStatus> statuses,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    /** search와 동일한 조건의 전체 건수를 조회한다. */
+    long count(
+            @Param("criteria") ExceptionCaseSearchDTO criteria,
+            @Param("statuses") List<ExceptionStatus> statuses);
+
+    /** 현재 페이지 예외들의 처리 이력을 한 번에 조회하여 N+1 쿼리를 방지한다. */
+    List<ExceptionActionRow> findActionsByCaseIds(
+            @Param("exceptionCaseIds") List<Long> exceptionCaseIds);
+
+    /** 화면 상단 유형별 미처리(NEW+IN_REVIEW) 요약 카드 집계. */
+    List<ExceptionTypeSummaryRow> countOpenByType();
 }

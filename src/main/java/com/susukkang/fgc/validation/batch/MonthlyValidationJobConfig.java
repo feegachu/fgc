@@ -3,7 +3,10 @@ package com.susukkang.fgc.validation.batch;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
+import com.susukkang.fgc.validation.batch.contract.JournalPostingPort;
+import com.susukkang.fgc.validation.batch.contract.ExceptionGenerationPort;
 import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceCheckPort;
+import com.susukkang.fgc.validation.batch.contract.ReconciliationBatchPort;
 import com.susukkang.fgc.validation.batch.tasklet.*;
 import com.susukkang.fgc.validation.service.*;
 import lombok.RequiredArgsConstructor;
@@ -38,9 +41,10 @@ public class MonthlyValidationJobConfig {
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
     private final ValidationRunScheduleService validationRunScheduleService;
     private final CapCheckBatchPort capCheckBatchPort;
-    // #98: imbalanceCheckStep(⑥균형검사)이 쓴다. journalPostingStep(⑥기표)은 아직
-    // JournalPostingPort 구현체가 없어 PlaceholderStepTasklet 그대로 둔다.
+    private final JournalPostingPort journalPostingPort;
+    private final ExceptionGenerationPort exceptionGenerationPort;
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
+    private final ReconciliationBatchPort reconciliationBatchPort;
 
     @Bean
     public Job monthlyValidationJob(JobRepository jobRepository,
@@ -133,7 +137,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step journalPostingStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("journalPostingStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("⑥검증원장 기표"), transactionManager)
+                .tasklet(new JournalPostingTasklet(journalPostingPort), transactionManager)
                 .listener(progressListener(6, false))
                 .build();
     }
@@ -141,7 +145,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step imbalanceCheckStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("imbalanceCheckStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("⑥균형검사"), transactionManager)
+                .tasklet(new LedgerImbalanceCheckTasklet(ledgerImbalanceCheckPort), transactionManager)
                 .listener(progressListener(6, false))
                 .build();
     }
@@ -149,15 +153,14 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step reconciliationStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("reconciliationStep", jobRepository)
-                .tasklet(new ReconciliationPlaceholderTasklet(), transactionManager)
+                .tasklet(new ReconciliationTasklet(reconciliationBatchPort), transactionManager)
                 .listener(progressListener(7, false))
                 .build();
     }
-    // TODO FUN-052 예소
     @Bean
     public Step exceptionGenerationStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("exceptionGenerationStep", jobRepository)
-                .tasklet(new PlaceholderStepTasklet("⑧예외 생성"), transactionManager)
+                .tasklet(new ExceptionGenerationTasklet(exceptionGenerationPort), transactionManager)
                 .listener(progressListener(8, false))
                 .build();
     }
