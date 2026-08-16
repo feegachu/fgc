@@ -18,6 +18,7 @@
       <label class="field"><span class="field-label">보험회사</span><select class="select-control" disabled title="보험회사 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
       <label class="field"><span class="field-label">상품</span><select class="select-control" disabled title="상품 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
       <label class="field"><span class="field-label">모집 설계사</span><select class="select-control" disabled title="설계사 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
+      <label class="field"><span class="field-label">조직</span><select class="select-control" disabled title="조직 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
       <label class="field"><span class="field-label">계약일 시작</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateFrom}"></label>
       <label class="field"><span class="field-label">계약일 끝</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateTo}"></label>
       <label class="field"><span class="field-label">계약상태</span><select class="select-control" th:field="*{currentStatus}"><option value="">전체</option><option th:each="status : ${contractStatuses}" th:value="${status}" th:text="${contractStatusLabels[status]}">유지</option></select></label>
