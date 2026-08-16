@@ -5,9 +5,12 @@ import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
+import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -124,5 +127,30 @@ public class CommissionPaymentApiController {
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
         return ApiResponse.success(commissionPaymentService.confirm(paymentId, idempotencyKey));
+    }
+
+    @Operation(
+            summary = "지급 전 한도 사전검증 미리보기 (IF-API-24)",
+            description = "저장·상태 변경 없이 DRAFT 지급 건을 제31조 확정 게이트로 검사해 "
+                    + "계약·지급단계별 1,200% 게이지(capPreview)와 확정 차단 사유(blockers)를 반환합니다. "
+                    + "차단 사유가 있어도 200으로 응답합니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "사전검증 결과 (차단 사유가 있어도 200 + blockers[])",
+                    content = @Content(schema = @Schema(implementation = TransactionPrecheckResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "지급 건 없음 (FGC-COMMON-002)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "DRAFT 상태가 아님 (FGC-TRAN-005)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "정산담당자 권한 없음")
+    })
+    @PostMapping("/{paymentId}/precheck")
+    public ApiResponse<TransactionPrecheckResponse> precheck(
+            @Parameter(description = "지급 건 ID", required = true)
+            @PathVariable Long paymentId
+    ) {
+        return ApiResponse.success(commissionPaymentService.precheck(paymentId));
     }
 }
