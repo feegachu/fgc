@@ -11,9 +11,12 @@
     -->
     <insert id="insert">
         INSERT INTO fgc.audit_log (
-            user_id, action_code, entity_type, entity_id, reason, request_id, client_ip
+            user_id, action_code, entity_type, entity_id,
+            before_value, after_value, reason, request_id, client_ip
         ) VALUES (
-            #{userId}, #{actionCode}, #{entityType}, #{entityId}, #{reason}, #{requestId}, #{clientIp}::inet
+            #{userId}, #{actionCode}, #{entityType}, #{entityId},
+            #{beforeValue}::jsonb, #{afterValue}::jsonb,
+            #{reason}, #{requestId}, #{clientIp}::inet
         )
     </insert>
 

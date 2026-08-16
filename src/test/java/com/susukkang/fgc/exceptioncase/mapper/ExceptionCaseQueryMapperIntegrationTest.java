@@ -3,6 +3,7 @@ package com.susukkang.fgc.exceptioncase.mapper;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.dashboard.mapper.DashboardMapper;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,22 +35,52 @@ class ExceptionCaseQueryMapperIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     private String suffix;
+    private String contractNo;
+    private Long contractId;
 
     @BeforeEach
     void insertFixtures() {
         suffix = UUID.randomUUID().toString().substring(0, 8);
+        contractNo = "IT-EXCP-" + suffix;
+        contractId = insertContract(contractNo);
         insertCase("NEW", "CRITICAL", "IT 신규-" + suffix);
         insertCase("IN_REVIEW", "WARNING", "IT 검토중-" + suffix);
         insertCase("RESOLVED", "INFO", "IT 해결-" + suffix);
     }
 
+    private Long insertContract(String uniqueContractNo) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.insurance_contract (
+                    insurer_id, product_offering_id, contract_no, contract_date,
+                    agent_id, organization_id, premium_per_cycle_amount,
+                    first_premium_amount, monthly_equivalent_first_premium,
+                    premium_conversion_rule_code, payment_cycle_code,
+                    payment_term_months, current_status, data_origin
+                )
+                SELECT insurer_id, product_offering_id, ?, contract_date,
+                       agent_id, organization_id, premium_per_cycle_amount,
+                       first_premium_amount, monthly_equivalent_first_premium,
+                       premium_conversion_rule_code, payment_cycle_code,
+                       payment_term_months, 'ACTIVE', 'MANUAL'
+                  FROM fgc.insurance_contract
+                 ORDER BY contract_id
+                 LIMIT 1
+                RETURNING contract_id
+                """, Long.class, uniqueContractNo);
+    }
+
     private void insertCase(String status, String severity, String title) {
+        insertCase("DATA_QUALITY", status, severity, title);
+    }
+
+    private void insertCase(String exceptionType, String status, String severity, String title) {
         jdbcTemplate.update("""
                 INSERT INTO fgc.exception_case
                        (exception_key, exception_type, severity, status,
-                        source_entity_type, source_entity_id, title)
-                VALUES (?, 'DATA_QUALITY', ?, ?, 'IT', ?, ?)
-                """, "IT:" + suffix + ":" + status, severity, status, suffix, title);
+                        source_entity_type, source_entity_id, title, contract_id)
+                VALUES (?, ?, ?, ?, 'IT', ?, ?, ?)
+                """, "IT:" + suffix + ":" + exceptionType + ":" + status,
+                exceptionType, severity, status, suffix, title, contractId);
     }
 
     private List<String> myTitles(List<ExceptionCaseListRow> rows) {
@@ -80,5 +111,38 @@ class ExceptionCaseQueryMapperIntegrationTest {
     void 미처리_건수는_대시보드_KPI_집계와_일치한다() {
         long screen = mapper.countByStatuses(ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER));
         assertThat(screen).isEqualTo(dashboardMapper.countOpenException());
+    }
+
+    /** IF-API-43: 새 검색 DTO와 페이징 SQL이 OPEN 묶음 및 유형 조건을 함께 적용한다. */
+    @Test
+    void API_검색은_조건과_페이징을_적용한다() {
+        // 같은 계약의 OPEN 상태지만 유형이 다른 방해 데이터를 두어 type 조건 누락도 검출한다.
+        insertCase("OTHER", "NEW", "INFO", "IT 다른유형-" + suffix);
+
+        ExceptionCaseSearchDTO criteria = ExceptionCaseSearchDTO.builder()
+                .type(com.susukkang.fgc.common.code.ExceptionType.DATA_QUALITY)
+                .status(ExceptionStatus.OPEN_FILTER)
+                .contractNo(contractNo)
+                .build();
+
+        var rows = mapper.search(
+                criteria,
+                ExceptionStatus.dbStatuses(criteria.getStatus()),
+                0,
+                100);
+
+        assertThat(rows.stream().map(row -> row.title()).filter(t -> t.endsWith(suffix)))
+                .containsExactlyInAnyOrder("IT 신규-" + suffix, "IT 검토중-" + suffix);
+        assertThat(mapper.count(criteria, ExceptionStatus.dbStatuses(criteria.getStatus())))
+                .isEqualTo(2L);
+        assertThat(mapper.countOpenByType()).isNotEmpty();
+
+        List<Long> caseIds = jdbcTemplate.queryForList("""
+                SELECT exception_case_id
+                  FROM fgc.exception_case
+                 WHERE source_entity_type = 'IT'
+                   AND source_entity_id = ?
+                """, Long.class, suffix);
+        assertThat(mapper.findActionsByCaseIds(caseIds)).isEmpty();
     }
 }
