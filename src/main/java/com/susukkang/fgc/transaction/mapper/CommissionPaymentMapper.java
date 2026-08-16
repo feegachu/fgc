@@ -11,6 +11,8 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentListResponse;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentSearchCondition;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -26,6 +28,14 @@ import java.util.List;
  */
 @Mapper
 public interface CommissionPaymentMapper {
+
+    List<CommissionPaymentListResponse> selectByCondition(
+            @Param("condition") CommissionPaymentSearchCondition condition,
+            @Param("size") int size,
+            @Param("offset") long offset
+    );
+
+    long countByCondition(@Param("condition") CommissionPaymentSearchCondition condition);
 
     boolean existsAgent(@Param("agentId") Long agentId);
 

@@ -22,6 +22,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.MoneyUtil;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -32,11 +33,7 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
-import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
+import com.susukkang.fgc.transaction.dto.*;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -301,6 +298,41 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 previews,
                 toBlockers(failures),
                 failures.isEmpty()
+        );
+    }
+
+    @Override
+    public PageResponse<CommissionPaymentListResponse> search(CommissionPaymentSearchCondition condition, int page, int size) {
+        if (page < 1) {
+            throw validationException("page", "page는 1 이상이어야 합니다.");
+        }
+        if (size < 1 || size > 100) {
+            throw validationException("size", "size는 1 이상 100 이하여야 합니다.");
+        }
+        if (condition == null) {
+            condition = new CommissionPaymentSearchCondition();
+        }
+        if (StringUtils.hasText(condition.getSettlementMonth())) {
+            try {
+                YearMonth.parse(condition.getSettlementMonth());
+            } catch (RuntimeException exception) {
+                throw validationException("settlementMonth", "정산월은 yyyy-MM 형식이어야 합니다.");
+            }
+        }
+
+        long offset = (long) (page - 1) * size;
+        List<CommissionPaymentListResponse> content = mapper.selectByCondition(condition, size, offset);
+        long totalElements = mapper.countByCondition(condition);
+
+        return PageResponse.of(content, page, size, totalElements, "commissionTransactionId,desc");
+    }
+
+    private FgcBusinessException validationException(String field, String detail) {
+        return new FgcBusinessException(
+                FgcErrorCode.COMMON_002,
+                field,
+                Map.of("field", field),
+                detail
         );
     }
 

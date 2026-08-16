@@ -4,6 +4,110 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper">
 
+    <sql id="transactionSearchWhere">
+        <where>
+            <if test="condition.settlementMonth != null and condition.settlementMonth != ''">
+                AND ct.settlement_month = CAST(CONCAT(#{condition.settlementMonth}, '-01') AS date)
+            </if>
+            <if test="condition.paymentStage != null">
+                AND ct.payment_stage = #{condition.paymentStage}
+            </if>
+            <if test="condition.status != null">
+                AND ct.status = #{condition.status}
+            </if>
+            <if test="condition.sourceType != null and condition.sourceType != ''">
+                AND ct.source_type = #{condition.sourceType}
+            </if>
+            <if test="condition.insurerId != null">
+                AND COALESCE(ct.insurer_id, source_contract.insurer_id) = #{condition.insurerId}
+            </if>
+            <if test="condition.contractNo != null and condition.contractNo != ''">
+                AND (
+                    source_contract.contract_no ILIKE CONCAT('%', #{condition.contractNo}, '%')
+                    OR EXISTS (
+                        SELECT 1
+                          FROM fgc.transaction_attribution filter_ta
+                          JOIN fgc.insurance_contract filter_contract
+                            ON filter_contract.contract_id = filter_ta.contract_id
+                         WHERE filter_ta.commission_transaction_id = ct.commission_transaction_id
+                           AND filter_contract.contract_no ILIKE CONCAT('%', #{condition.contractNo}, '%')
+                    )
+                )
+            </if>
+            <if test="condition.agentId != null">
+                AND ct.recipient_agent_id = #{condition.agentId}
+            </if>
+            <if test="condition.commissionItemId != null">
+                AND ct.commission_item_id = #{condition.commissionItemId}
+            </if>
+            <if test="condition.noAttributionOnly != null and condition.noAttributionOnly">
+                AND NOT EXISTS (
+                    SELECT 1
+                      FROM fgc.transaction_attribution noattr_ta
+                     WHERE noattr_ta.commission_transaction_id = ct.commission_transaction_id
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectByCondition"
+            resultType="com.susukkang.fgc.transaction.dto.CommissionPaymentListResponse">
+        SELECT ct.commission_transaction_id,
+               ct.payment_stage,
+               CASE ct.payment_stage
+                   WHEN 'INSURER_TO_GA' THEN '원수사→GA'
+                   WHEN 'GA_TO_FC' THEN 'GA→설계사'
+               END AS payment_stage_label,
+               ct.source_type,
+               CASE ct.source_type
+                   WHEN 'INSURER_STATEMENT' THEN '원수사 명세'
+                   WHEN 'GA_MANUAL_PAYMENT' THEN 'GA 수기지급'
+                   WHEN 'GA_CONFIRMED_PAYMENT' THEN 'GA 확정지급'
+                   WHEN 'ADJUSTMENT' THEN '조정'
+                   WHEN 'ALLOCATION_POOL' THEN '공통비 풀'
+                   WHEN 'CLAWBACK' THEN '환수'
+                   WHEN 'RECOVERY' THEN '회수'
+               END AS source_type_label,
+               ct.source_business_key,
+               ct.settlement_month,
+               ct.recipient_agent_id,
+               agent.agent_name AS recipient_agent_name,
+               ct.commission_item_id,
+               item.item_code AS commission_item_code,
+               item.item_name AS commission_item_name,
+               ct.amount,
+               ct.cashflow_type,
+               CASE ct.cashflow_type WHEN 'PAYMENT' THEN '지급' WHEN 'DEDUCTION' THEN '차감' END
+                   AS cashflow_type_label,
+               ct.status,
+               CASE ct.status WHEN 'DRAFT' THEN '작성중' WHEN 'CONFIRMED' THEN '확정' WHEN 'CANCELLED' THEN '취소' END
+                   AS status_label,
+               COUNT(attribution.transaction_attribution_id)::integer AS attribution_count,
+               ct.amount - COALESCE(SUM(attribution.attributed_amount), 0) AS difference_amount
+          FROM fgc.commission_transaction ct
+          JOIN fgc.commission_item item
+            ON item.commission_item_id = ct.commission_item_id
+          LEFT JOIN fgc.agent agent
+            ON agent.agent_id = ct.recipient_agent_id
+          LEFT JOIN fgc.insurance_contract source_contract
+            ON source_contract.contract_id = ct.source_contract_id
+          LEFT JOIN fgc.transaction_attribution attribution
+            ON attribution.commission_transaction_id = ct.commission_transaction_id
+        <include refid="transactionSearchWhere"/>
+         GROUP BY ct.commission_transaction_id, agent.agent_name, item.item_code, item.item_name
+         ORDER BY ct.commission_transaction_id DESC
+         LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.commission_transaction ct
+          LEFT JOIN fgc.insurance_contract source_contract
+            ON source_contract.contract_id = ct.source_contract_id
+        <include refid="transactionSearchWhere"/>
+    </select>
+
     <select id="existsAgent" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
