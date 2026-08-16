@@ -64,7 +64,19 @@ class GaFcReconciliationIntegrationTest {
 
         PaymentInsert confirmed = insertPayment(
                 contractId, policyVersionId, commissionItemId, agentId,
-                1, "650000", "CONFIRMED", "MATCHED");
+                1, "650000", "DRAFT", "MATCHED");
+        // FGC-FUN-048: 규제 한도 산입 제외도 실제 확정 지급 원천에는 포함한다.
+        jdbcTemplate.update("""
+                UPDATE fgc.transaction_attribution
+                   SET inclusion_status_snapshot = 'EXCLUDED',
+                       exclusion_type_snapshot = 'COMPLIANCE_3PCT'
+                 WHERE transaction_attribution_id = ?
+                """, confirmed.attributionId());
+        jdbcTemplate.update("""
+                UPDATE fgc.commission_transaction
+                   SET status = 'CONFIRMED'
+                 WHERE commission_transaction_id = ?
+                """, confirmed.transactionId());
         Long actualJournalId = insertPostedJournal(
                 "CONFIRMED_FC_PAYOUT", "COMMISSION_TRANSACTION", confirmed.transactionId(),
                 contractId, agentId, commissionItemId, "650000",
@@ -193,14 +205,24 @@ class GaFcReconciliationIntegrationTest {
                 contractId, policyVersionId, commissionItemId, agentId,
                 1, "650000", "CONFIRMED", "NO-JOURNAL");
 
-        GaFcMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
-                99L, 88L, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null)).getFirst();
+        Long reconciliationRunId = insertRunningReconciliationRun(insurerId, PaymentStage.GA_TO_FC);
+        ReconciliationExecutionRequest request = new ReconciliationExecutionRequest(
+                reconciliationRunId, null, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null);
+        GaFcMatchCandidate result = matcher.match(request).getFirst();
 
         assertThat(result.resultType()).isEqualTo(ReconciliationResultType.MATCHED);
         assertThat(result.scheduleLineIds()).containsExactly(scheduleLineId);
         assertThat(result.transactionAttributionIds()).containsExactly(confirmed.attributionId());
         assertThat(result.expectedJournalHeaderIds()).isEmpty();
         assertThat(result.actualJournalHeaderIds()).isEmpty();
+
+        persistenceService.persist(request, List.of(result));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT result_type || ':' || primary_reason_code
+                  FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id = ?
+                """, String.class, reconciliationRunId))
+                .isEqualTo("REVIEW_REQUIRED:UNKNOWN");
     }
 
     private Long insertSchedule(

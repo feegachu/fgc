@@ -256,7 +256,8 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         List<String> reasons = new ArrayList<>();
         if (installmentResolutionIssue || installmentMismatch) {
             reasons.add(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
-        } else if (expectedSources.size() > 1 || actualSources.size() > 1) {
+        }
+        if (expectedSources.size() > 1 || actualSources.size() > 1) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
         }
         // 2026-08-13 yslee - FGC-FUN-048-03 설계사 식별 불가 보조 사유 보존

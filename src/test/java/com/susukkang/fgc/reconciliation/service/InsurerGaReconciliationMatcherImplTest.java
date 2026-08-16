@@ -133,7 +133,9 @@ class InsurerGaReconciliationMatcherImplTest {
         assertThat(result.installmentNo()).isNull();
         assertThat(result.scheduleLineIds()).containsExactly(11L, 12L);
         assertThat(result.secondaryReasonCodes())
-                .containsExactly(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
+                .containsExactly(
+                        ReconciliationResultType.INSTALLMENT_MISMATCH.name(),
+                        ReconciliationResultType.DUPLICATE.name());
     }
 
     // 2026-08-13 yslee - 미확정 회차와 행별 반올림 회귀 검증

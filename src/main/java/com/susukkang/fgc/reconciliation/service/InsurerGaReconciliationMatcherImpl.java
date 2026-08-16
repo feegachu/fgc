@@ -284,7 +284,8 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         List<String> reasons = new ArrayList<>();
         if (installmentResolutionIssue || installmentMismatch) {
             reasons.add(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
-        } else if (expectedSources.size() > 1 || actualSources.size() > 1) {
+        }
+        if (expectedSources.size() > 1 || actualSources.size() > 1) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
         }
         if (agentResolutionIssue) {

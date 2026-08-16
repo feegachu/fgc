@@ -10,6 +10,7 @@ import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunRequest;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunService;
+import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,6 +52,9 @@ class ReconciliationRunControllerTest {
 
     @MockitoBean
     private ReconciliationRunService reconciliationRunService;
+
+    @MockitoBean
+    private ReconciliationResultQueryService reconciliationResultQueryService;
 
     @Test
     void 유효한_요청은_RUNNING_대사실행을_생성한다() throws Exception {
@@ -131,6 +136,21 @@ class ReconciliationRunControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void invalidResultTypeReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/reconciliations/41/results")
+                        .with(user(principal("COMPLIANCE")))
+                        .queryParam("resultType", "UNKNOWN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("resultType"));
+    }
+
+    @Test
+    void unauthenticatedUserCannotReadResultDetail() throws Exception {
+        mockMvc.perform(get("/api/v1/reconciliations/results/99"))
+                .andExpect(status().isUnauthorized());
     }
 
     private static CreateReconciliationRunRequest validRequest() {

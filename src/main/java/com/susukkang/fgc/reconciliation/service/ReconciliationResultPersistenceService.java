@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationCandidate;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationClassification;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationClassificationContext;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchInsertRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultInsertRow;
@@ -13,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * 설명 : FUN-048-04 대사 후보·비교값·원천 추적정보 저장 서비스
@@ -27,6 +30,7 @@ public class ReconciliationResultPersistenceService {
 
     private final ReconciliationResultMapper reconciliationResultMapper;
     private final ObjectMapper objectMapper;
+    private final ReconciliationReasonClassifier reasonClassifier;
 
     public long persist(
             ReconciliationExecutionRequest request,
@@ -71,6 +75,21 @@ public class ReconciliationResultPersistenceService {
             ReconciliationCandidate candidate
     ) {
         ReconciliationResultInsertRow row = new ReconciliationResultInsertRow();
+        List<Long> journalHeaderIds = Stream.concat(
+                        candidate.expectedJournalHeaderIds().stream(),
+                        candidate.actualJournalHeaderIds().stream())
+                .distinct()
+                .sorted()
+                .toList();
+        ReconciliationClassificationContext context = reconciliationResultMapper.findClassificationContext(
+                candidate.contractId(),
+                candidate.expectedAgentId(),
+                candidate.actualAgentId(),
+                journalHeaderIds
+        );
+        context.setMissingJournalEvidence(candidate.sourceMatches().stream()
+                .anyMatch(source -> source.journalHeaderId() == null));
+        ReconciliationClassification classification = reasonClassifier.classify(candidate, context);
         row.setReconciliationRunId(request.reconciliationRunId());
         row.setMatchGroupKey(candidate.matchGroupKey());
         row.setContractId(candidate.contractId());
@@ -79,12 +98,12 @@ public class ReconciliationResultPersistenceService {
         row.setActualSourceAgentCode(candidate.actualSourceAgentCode());
         row.setCommissionItemId(candidate.commissionItemId());
         row.setInstallmentNo(candidate.installmentNo());
-        row.setResultType(candidate.resultType().name());
+        row.setResultType(classification.resultType().name());
         row.setExpectedTotalAmount(candidate.expectedTotalAmount());
         row.setActualTotalAmount(candidate.actualTotalAmount());
         row.setDifferenceAmount(candidate.differenceAmount());
-        row.setPrimaryReasonCode(candidate.primaryReasonCode());
-        row.setSecondaryReasonCodes(candidate.secondaryReasonCodes());
+        row.setPrimaryReasonCode(classification.primaryReasonCode());
+        row.setSecondaryReasonCodes(classification.secondaryReasonCodes());
         row.setDetailSnapshotJson(writeSnapshot(request.paymentStage(), candidate));
         return row;
     }
