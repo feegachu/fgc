@@ -154,10 +154,12 @@ class CommissionPaymentIntegrationTest {
                   FROM fgc.cap_check
                  WHERE candidate_transaction_id = ?
                 """, Integer.class, created.paymentId())).isZero();
+        // source_entity 기준 집계 — saveException·CapExceptionService 두 저장 경로를 모두 잡는다
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                   FROM fgc.exception_case
-                 WHERE exception_key LIKE 'PRE_CONFIRM:' || ? || ':%'
+                 WHERE source_entity_type = 'COMMISSION_TRANSACTION'
+                   AND source_entity_id = CAST(? AS varchar)
                 """, Integer.class, created.paymentId())).isZero();
     }
 

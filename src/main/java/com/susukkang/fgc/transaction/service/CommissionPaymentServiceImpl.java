@@ -211,6 +211,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     public TransactionPrecheckResponse precheck(Long paymentId) {
         List<ConfirmationData> attributions = requireConfirmationData(paymentId, false);
         ConfirmationData first = attributions.get(0);
+        // 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005로 먼저 끊는다. confirm은 CAP_003 검사가
+        // 순서상 앞이지만 precheck에서 CAP_003은 던지지 않고 수집하는 사유라, 순서를 맞춰도
+        // 비DRAFT 응답은 409로 같다 — DRAFT 건에서는 두 경로의 게이트 판정이 동일하다.
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
@@ -237,12 +240,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         data.transactionAttributionId()
                 );
                 GateFailure ruleFailure = capRuleFailure(rule, data);
-                if (rule == null) {
-                    failures.add(ruleFailure);
-                    continue;
-                }
                 if (ruleFailure != null) {
                     failures.add(ruleFailure);
+                }
+                if (rule == null) {
+                    continue;
                 }
                 CapCalculationResult calculation = calculateLimit(
                         data.contractId(),

@@ -9,6 +9,8 @@ import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
@@ -200,6 +202,27 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(jsonPath("$.data.capPreview[0].capCheckId")
                         .value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.data.blockers[0].code").value("FGC-CAP-001"));
+    }
+
+    // IF-API-24 문서 계약 — 지급 건 없음 400(FGC-COMMON-002), 비DRAFT 409(FGC-TRAN-005)
+    @Test
+    void mapsPrecheckBusinessErrorsToDocumentedStatuses() throws Exception {
+        given(commissionPaymentService.precheck(404L))
+                .willThrow(new FgcBusinessException(FgcErrorCode.COMMON_002));
+        given(commissionPaymentService.precheck(409L))
+                .willThrow(new FgcBusinessException(FgcErrorCode.TRAN_005));
+
+        mockMvc.perform(post("/api/v1/transactions/404/precheck")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+
+        mockMvc.perform(post("/api/v1/transactions/409/precheck")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("FGC-TRAN-005"));
     }
 
     @Test

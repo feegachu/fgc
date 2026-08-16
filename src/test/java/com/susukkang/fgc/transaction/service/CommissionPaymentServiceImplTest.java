@@ -1345,6 +1345,29 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
+    // 분류정책이 없는 귀속행은 FGC-CAP-002 blocker로 표시되고 preview 행·한도 계산은 생략된다
+    @Test
+    void precheckReportsMissingCapRuleAndSkipsPreview() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(null);
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers())
+                .extracting(TransactionPrecheckResponse.Blocker::code)
+                .containsExactly("FGC-CAP-002");
+        assertThat(response.capPreview()).isEmpty();
+        verify(capCalculator, never()).calculate(any());
+        assertPrecheckSavesNothing();
+    }
+
     @Test
     void precheckRejectsNonDraftPayment() {
         ConfirmationData confirmed = withStatus(confirmation(
