@@ -42,8 +42,8 @@ public class CapCheckController {
 
     @Operation(
             summary = "1,200% 한도 판정 목록 조회 (IF-API-30)",
-            description = "정산월·지급단계·판정·보험회사·계약번호로 검색하고, 요약 카드 4장(정상/주의/위반/검토필요)과 "
-                    + "함께 페이징된 목록을 돌려준다."
+            description = "정산월·지급단계·판정·보험회사·조직·계약번호로 검색하고, 요약 카드 4장과 "
+                    + "지급단계별·설계사별 전체 검색범위 집계 및 페이징된 목록을 돌려준다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -62,6 +62,7 @@ public class CapCheckController {
             @Parameter(description = "지급단계") @RequestParam(required = false) PaymentStage stage,
             @Parameter(description = "판정") @RequestParam(required = false) CapResultStatus status,
             @Parameter(description = "보험회사 ID") @RequestParam(required = false) Long insurerId,
+            @Parameter(description = "계약 소속 조직 ID") @RequestParam(required = false) Long organizationId,
             @Parameter(description = "계약번호") @RequestParam(required = false) String contractNo,
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size
@@ -71,6 +72,7 @@ public class CapCheckController {
                 stage == null ? null : stage.name(),
                 status == null ? null : status.name(),
                 insurerId,
+                organizationId,
                 contractNo);
 
         return ApiResponse.success(CapCheckSearchResponse.from(capCheckService.search(criteria, page, size)));

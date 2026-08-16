@@ -12,6 +12,8 @@ import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
+import com.susukkang.fgc.cap.dto.CapAgentSummaryRow;
+import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
@@ -303,17 +305,49 @@ class CapCheckServiceImplTest {
         normalCount.setCount(3);
 
         CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(
-                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, null);
+                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, 21L, null);
         when(capCheckMapper.search(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
-                criteria.insurerId(), criteria.contractNo(), 0, 20)).thenReturn(List.of(row));
+                criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), 0, 20)).thenReturn(List.of(row));
         when(capCheckMapper.count(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
-                criteria.insurerId(), criteria.contractNo())).thenReturn(1L);
+                criteria.insurerId(), criteria.organizationId(), criteria.contractNo())).thenReturn(1L);
         when(capCheckMapper.summarize(criteria.month(), criteria.paymentStage(),
-                criteria.insurerId(), criteria.contractNo())).thenReturn(List.of(normalCount));
+                criteria.insurerId(), criteria.organizationId(), criteria.contractNo())).thenReturn(List.of(normalCount));
+
+        CapStageSummaryRow agentStage = new CapStageSummaryRow();
+        agentStage.setPaymentStage("GA_TO_FC");
+        agentStage.setContractCount(1);
+        agentStage.setLimitAmountTotal(new BigDecimal("1200000"));
+        agentStage.setIncludedAmountTotal(new BigDecimal("650000"));
+        agentStage.setComplianceDeductionAmountTotal(BigDecimal.ZERO);
+        agentStage.setUsagePct(new BigDecimal("54.166667"));
+        when(capCheckMapper.summarizeByStage(criteria.month(), criteria.insurerId(),
+                criteria.organizationId(), criteria.contractNo())).thenReturn(List.of(agentStage));
+
+        CapAgentSummaryRow agent = new CapAgentSummaryRow();
+        agent.setAgentId(11L);
+        agent.setAgentCode("FC-001");
+        agent.setAgentName("김설계");
+        agent.setOrganizationId(21L);
+        agent.setOrganizationCode("BR-001");
+        agent.setOrganizationName("서울지점");
+        agent.setContractCount(1);
+        agent.setLimitAmountTotal(new BigDecimal("1200000"));
+        agent.setIncludedAmountTotal(new BigDecimal("650000"));
+        agent.setUsagePct(new BigDecimal("54.166667"));
+        when(capCheckMapper.summarizeByAgent(criteria.month(), criteria.insurerId(),
+                criteria.organizationId(), criteria.contractNo())).thenReturn(List.of(agent));
 
         CapCheckSearchResult result = capCheckService.search(criteria, 1, 20);
 
         assertThat(result.summary().normal()).isEqualTo(3);
+        assertThat(result.stageSummary()).hasSize(2);
+        assertThat(result.stageSummary().get(0).getPaymentStage()).isEqualTo("INSURER_TO_GA");
+        assertThat(result.stageSummary().get(0).getContractCount()).isZero();
+        assertThat(result.stageSummary().get(1).getPaymentStage()).isEqualTo("GA_TO_FC");
+        assertThat(result.stageSummary().get(1).getUsagePct()).isEqualByComparingTo("54.166667");
+        assertThat(result.agentSummary()).singleElement()
+                .extracting(CapAgentSummaryRow::getAgentCode)
+                .isEqualTo("FC-001");
         assertThat(result.page().content()).hasSize(1);
         assertThat(result.page().totalElements()).isEqualTo(1);
         assertThat(result.page().content().get(0).getContractNo()).isEqualTo("C001");
@@ -321,7 +355,7 @@ class CapCheckServiceImplTest {
 
     @Test
     void searchRejectsPageBelowOne() {
-        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null);
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null, null);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> capCheckService.search(criteria, 0, 20))
                 .isInstanceOf(FgcBusinessException.class)
@@ -331,7 +365,7 @@ class CapCheckServiceImplTest {
 
     @Test
     void searchRejectsSizeBelowOne() {
-        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null);
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null, null);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> capCheckService.search(criteria, 1, 0))
                 .isInstanceOf(FgcBusinessException.class)
@@ -341,7 +375,7 @@ class CapCheckServiceImplTest {
 
     @Test
     void searchRejectsSizeAboveOneHundred() {
-        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null);
+        CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(null, null, null, null, null, null);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> capCheckService.search(criteria, 1, 101))
                 .isInstanceOf(FgcBusinessException.class)
