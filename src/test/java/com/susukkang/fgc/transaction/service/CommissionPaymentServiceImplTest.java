@@ -1342,6 +1342,13 @@ class CommissionPaymentServiceImplTest {
         assertThat(response.blockers())
                 .extracting(TransactionPrecheckResponse.Blocker::code)
                 .contains("FGC-CAP-003");
+        // 지급 건 단위 판정이라 특정 계약·귀속행을 가리키면 안 된다 (엉뚱한 예외 건 안내 방지)
+        TransactionPrecheckResponse.Blocker violation = response.blockers().stream()
+                .filter(blocker -> "FGC-CAP-003".equals(blocker.code()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(violation.contractId()).isNull();
+        assertThat(violation.transactionAttributionId()).isNull();
         assertPrecheckSavesNothing();
     }
 
