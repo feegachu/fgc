@@ -2,6 +2,7 @@ package com.susukkang.fgc.transaction.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.AttributionMethod;
+import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
@@ -12,6 +13,7 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionResponse;
+import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -178,6 +180,47 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(jsonPath("$.data.capCheckIds[0]").value(55));
     }
 
+    // IF-API-24 (FGC-FUN-033) — 사전검증 미리보기는 차단 사유가 있어도 200 + blockers[]로 응답한다
+    @Test
+    void settlementRolePrechecksPayment() throws Exception {
+        given(commissionPaymentService.precheck(101L)).willReturn(precheckResponse());
+
+        mockMvc.perform(post("/api/v1/transactions/101/precheck")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentId").value(101))
+                .andExpect(jsonPath("$.data.confirmable").value(false))
+                // SIR-008 — 금액은 JSON 숫자, 사용률은 문자열, 코드에는 한글 라벨 동봉
+                .andExpect(jsonPath("$.data.capPreview[0].limitAmount").value(1200000))
+                .andExpect(jsonPath("$.data.capPreview[0].usagePct").value("108.333333"))
+                .andExpect(jsonPath("$.data.capPreview[0].paymentStageLabel")
+                        .value(PaymentStage.GA_TO_FC.label()))
+                // 저장하지 않으므로 capCheckId는 항상 null
+                .andExpect(jsonPath("$.data.capPreview[0].capCheckId")
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.blockers[0].code").value("FGC-CAP-001"));
+    }
+
+    @Test
+    void rejectsPrecheckWithoutCsrfToken() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions/101/precheck")
+                        .with(user("settlement01").roles("SETTLEMENT")))
+                .andExpect(status().isForbidden());
+
+        verify(commissionPaymentService, never()).precheck(any());
+    }
+
+    // IF-API-24 완료 조건 — 비로그인은 401
+    @Test
+    void rejectsUnauthenticatedPrecheck() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions/101/precheck")
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized());
+
+        verify(commissionPaymentService, never()).precheck(any());
+    }
+
     @Test
     void rejectsNonSettlementRole() throws Exception {
         mockMvc.perform(post("/api/v1/transactions")
@@ -198,6 +241,11 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/transactions/101/confirm")
+                        .with(user("ga-admin").roles("GA_ADMIN"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/transactions/101/precheck")
                         .with(user("ga-admin").roles("GA_ADMIN"))
                         .with(csrf()))
                 .andExpect(status().isForbidden());
@@ -224,6 +272,11 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/transactions/101/confirm")
+                        .with(user("comp01").roles("COMPLIANCE"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/transactions/101/precheck")
                         .with(user("comp01").roles("COMPLIANCE"))
                         .with(csrf()))
                 .andExpect(status().isForbidden());
@@ -297,6 +350,39 @@ class CommissionPaymentApiControllerTest {
                 }
         );
         return objectMapper.writeValueAsString(values);
+    }
+
+    private TransactionPrecheckResponse precheckResponse() {
+        return new TransactionPrecheckResponse(
+                101L,
+                List.of(new TransactionPrecheckResponse.CapPreviewItem(
+                        3L,
+                        "CT-2026-0003",
+                        PaymentStage.GA_TO_FC,
+                        PaymentStage.GA_TO_FC.label(),
+                        LocalDate.of(2026, 7, 3),
+                        100000L,
+                        0L,
+                        0L,
+                        1200000L,
+                        0L,
+                        1300000L,
+                        1300000L,
+                        -100000L,
+                        "108.333333",
+                        CapResultStatus.VIOLATION,
+                        CapResultStatus.VIOLATION.label(),
+                        31L,
+                        null
+                )),
+                List.of(new TransactionPrecheckResponse.Blocker(
+                        "FGC-CAP-001",
+                        "지급 확정 불가 — 1,200% 한도 초과(사용률 108.333333%). 예외함에서 정정·감액·취소를 선택하세요.",
+                        3L,
+                        201L
+                )),
+                false
+        );
     }
 
     private CommissionPaymentResponse response(CommissionPaymentStatus status) {
