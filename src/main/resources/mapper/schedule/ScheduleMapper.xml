@@ -464,4 +464,28 @@
         AND
             active_yn = TRUE
     </update>
+
+    <!--
+      @author hjKang
+      @since 2026-08-16
+
+      2026-08-16 - 스케줄 확정 상태 전이 추가
+      기존 코드: 스케줄 재생성을 위한 헤더 상태 변경만 존재했다.
+      문제: 상세 화면에서 확정해도 헤더와 회차가 PLANNED로 남아 확정 후 변경 방지 트리거가 적용되지 않았다.
+      개선: 헤더가 PLANNED인 동안 회차를 먼저 확정하고, 활성 헤더를 CONFIRMED로 전환한다.
+    -->
+    <update id="confirmPlannedScheduleLines">
+        UPDATE schedule_line
+           SET line_status = 'CONFIRMED'
+         WHERE schedule_header_id = #{scheduleHeaderId}
+           AND line_status = 'PLANNED'
+    </update>
+
+    <update id="confirmScheduleHeader">
+        UPDATE schedule_header
+           SET status = 'CONFIRMED'
+         WHERE schedule_header_id = #{scheduleHeaderId}
+           AND status = 'PLANNED'
+           AND active_yn = TRUE
+    </update>
 </mapper>

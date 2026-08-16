@@ -181,6 +181,61 @@ class ScheduleServiceTest {
     }
 
     @Test
+    void confirmsActivePlannedScheduleAndItsLines() {
+        ScheduleHeaderInsertDTO plannedHeader = ScheduleHeaderInsertDTO.builder()
+                .scheduleHeaderId(10L)
+                .contractId(20L)
+                .status(ScheduleHeaderStatus.PLANNED)
+                .activeYn(true)
+                .build();
+        ScheduleDetailResponse confirmedDetail = ScheduleDetailResponse.builder()
+                .header(ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(10L)
+                        .status(ScheduleHeaderStatus.CONFIRMED)
+                        .build())
+                .schedules(List.of())
+                .build();
+
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
+        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
+
+        ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
+
+        assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
+        verify(scheduleMapper).lockContractForScheduleGeneration(20L);
+        verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
+        verify(scheduleMapper).confirmPlannedScheduleLines(10L);
+        verify(scheduleMapper).confirmScheduleHeader(10L);
+    }
+
+    @Test
+    void confirmsAlreadyConfirmedScheduleIdempotently() {
+        ScheduleHeaderInsertDTO confirmedHeader = ScheduleHeaderInsertDTO.builder()
+                .scheduleHeaderId(10L)
+                .contractId(20L)
+                .status(ScheduleHeaderStatus.CONFIRMED)
+                .activeYn(true)
+                .build();
+        ScheduleDetailResponse detail = ScheduleDetailResponse.builder()
+                .header(ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(10L)
+                        .status(ScheduleHeaderStatus.CONFIRMED)
+                        .build())
+                .schedules(List.of())
+                .build();
+
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(confirmedHeader);
+        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(detail);
+
+        ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
+
+        assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
+        verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
+        verify(scheduleMapper, never()).confirmScheduleHeader(any());
+    }
+
+    @Test
     void registersReviewAndPreservesExistingHeaderWhenPolicyIsMissing() {
         assertRegenerationRegistersReview("POLICY_MISSING");
     }

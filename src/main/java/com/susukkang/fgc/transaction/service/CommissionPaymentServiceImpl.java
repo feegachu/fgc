@@ -23,6 +23,7 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -67,6 +68,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final CapCalculator capCalculator;
     private final CapExceptionService capExceptionService;
     private final FgcMessageResolver messageResolver;
+    private final CommissionPolicyService commissionPolicyService;
 
     @Override
     @Transactional
@@ -455,10 +457,22 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         validateCashflowType(cashflowType, item);
         validatePaymentEvidence(evidenceRef, attributionRequests);
         validateAttributionMethodCompatibility(item.itemCode(), attributionRequests);
-        validatePolicyVersion(policyVersionId);
         if (sourceContractId != null) {
             requireContract(sourceContractId, "contractId");
         }
+
+        Long policyContractId = sourceContractId != null
+                ? sourceContractId
+                : attributionRequests.stream()
+                .map(CommissionPaymentAttributionRequest::contractId)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        Long effectivePolicyVersionId = resolvePolicyVersionId(
+                policyVersionId,
+                policyContractId,
+                paymentStage
+        );
 
         List<CommissionPaymentAttributionCommand> attributions = new ArrayList<>(attributionRequests.size());
         for (int index = 0; index < attributionRequests.size(); index++) {
@@ -469,7 +483,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     agentId,
                     settlementMonth,
                     paymentStage,
-                    policyVersionId,
+                    effectivePolicyVersionId,
                     attributionRequests.get(index)
             ));
         }
@@ -489,7 +503,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .agentId(agentId)
                 .commissionItemId(item.commissionItemId())
                 .paymentStage(paymentStage)
-                .policyVersionId(policyVersionId)
+                .policyVersionId(effectivePolicyVersionId)
                 .settlementMonth(settlementMonth)
                 .dueDate(dueDate)
                 .amount(MoneyUtil.roundWon(amount))
@@ -499,6 +513,40 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .naturalContractId(naturalContractId)
                 .build();
         return new PreparedPayment(payment, attributions);
+    }
+
+    /**
+     * @author hjKang
+     * @since 2026-08-16
+     *
+     * 2026-08-16 - 지급 건의 적용 정책 버전 자동 결정
+     * 기존 코드: 화면에서 전달받은 allocationPolicyVersion 값만 검증하고 그대로 저장했다.
+     * 문제: 지급 등록 화면이 정책 버전을 전달하지 않으면 지급 건과 귀속행의 정책 버전이 null로 저장되어 사전검증이 증빙 누락으로 잘못 차단되었다.
+     * 개선: 요청 정책 버전이 없으면 지급 건 또는 귀속행의 계약과 지급단계를 기준으로 현행 수수료 정책 버전을 조회하여 저장한다.
+     */
+    private Long resolvePolicyVersionId(
+            Long requestedPolicyVersionId,
+            Long contractId,
+            com.susukkang.fgc.common.code.PaymentStage paymentStage
+    ) {
+        if (requestedPolicyVersionId != null) {
+            validatePolicyVersion(requestedPolicyVersionId);
+            return requestedPolicyVersionId;
+        }
+        if (contractId == null) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "allocationPolicyVersion",
+                    Map.of("field", "allocationPolicyVersion"),
+                    null
+            );
+        }
+
+        Long resolvedPolicyVersionId = commissionPolicyService
+                .resolveCurrentCommission(contractId, paymentStage)
+                .getPolicyVersionId();
+        validatePolicyVersion(resolvedPolicyVersionId);
+        return resolvedPolicyVersionId;
     }
 
     // 2026-08-11 yslee - 지급 건 본문의 제외 증빙 참조를 화면·DB 계약에 맞게 검증
@@ -774,15 +822,24 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
 
+        /*
+         * @author hjKang
+         * @since 2026-08-16
+         *
+         * 2026-08-16 - 정책 버전 누락과 증빙 누락 오류 구분
+         * 기존 코드: 정책 버전 누락에도 증빙 필수 오류(TRAN_004)를 반환했다.
+         * 문제: 산입 귀속행처럼 증빙이 필요 없는 건도 증빙 누락으로 안내되어 실제 차단 원인을 확인할 수 없었다.
+         * 개선: 정책 버전 누락을 별도의 데이터 품질 오류로 분류하고 입력값 오류(COMMON_002)로 안내한다.
+         */
         if (first.policyVersionId() == null) {
             failures.add(new GateFailure(
                     first,
-                    "ALLOCATION_EVIDENCE_MISSING",
+                    "POLICY_VERSION_MISSING",
                     "HIGH",
                     "정책 버전 누락",
                     "확정하려면 적용 정책 버전이 필요합니다.",
-                    FgcErrorCode.TRAN_004,
-                    Map.of()
+                    FgcErrorCode.COMMON_002,
+                    Map.of("field", "allocationPolicyVersion")
             ));
         }
         return failures;

@@ -4,16 +4,25 @@
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
   var main = document.getElementById("main-content");
   var lineBody = document.getElementById("line-body");
+  var confirmButton = document.getElementById("btn-confirm");
+  var regenerateButton = document.getElementById("btn-regenerate");
+  var regenerateReason = document.getElementById("regenerate-reason");
+  var regenerateSubmit = document.getElementById("btn-regenerate-submit");
 
   if (!main || !lineBody || !apiClient) return;
 
   var scheduleHeaderId = main.dataset.scheduleHeaderId || idFromPath();
+  var canProcess = confirmButton ? !confirmButton.disabled : false;
   if (!scheduleHeaderId) {
     renderError("스케줄 ID를 확인할 수 없습니다.");
     return;
   }
 
   load();
+  if (confirmButton) confirmButton.addEventListener("click", confirmSchedule);
+  if (regenerateButton) regenerateButton.addEventListener("click", regenerateSchedule);
+  if (regenerateReason) regenerateReason.addEventListener("input", updateRegenerateSubmit);
+  if (regenerateSubmit) regenerateSubmit.addEventListener("click", submitRegeneration);
 
   function idFromPath() {
     var matched = window.location.pathname.match(/^\/schedules\/(\d+)\/?$/);
@@ -57,6 +66,78 @@
       stage.value = header.paymentStage;
       stage.disabled = true;
     }
+    if (confirmButton) {
+      confirmButton.disabled = !canProcess || header.status !== "PLANNED" || header.activeYn !== true;
+      confirmButton.title = header.status === "CONFIRMED" ? "이미 확정된 스케줄입니다." : "";
+    }
+    if (regenerateButton) {
+      regenerateButton.disabled = !canProcess || header.activeYn !== true || header.status === "CANCELLED";
+    }
+  }
+
+  function confirmSchedule() {
+    if (!confirmButton || confirmButton.disabled) return;
+
+    confirmButton.disabled = true;
+    apiClient.request("/api/v1/schedules/" + encodeURIComponent(scheduleHeaderId) + "/confirm", {
+      method: "POST"
+    }).then(function (envelope) {
+      var detail = envelope && envelope.data;
+      if (!detail || !detail.header) throw new Error("Invalid schedule confirmation response");
+      renderHeader(detail.header);
+      renderLines(Array.isArray(detail.schedules) ? detail.schedules : []);
+      toast("스케줄을 확정했습니다. 이제 금액을 고칠 수 없습니다. 바꾸려면 새 버전을 만드세요.", "success", 4500);
+    }).catch(function (error) {
+      console.error(error);
+      toast(error && error.message ? error.message : "예상 스케줄을 확정하지 못했습니다.", "error", 5000);
+      confirmButton.disabled = false;
+    });
+  }
+
+  function regenerateSchedule() {
+    if (!regenerateButton || regenerateButton.disabled) return;
+    if (regenerateReason) regenerateReason.value = "";
+    updateRegenerateSubmit();
+    if (window.FgcUi && window.FgcUi.modal) window.FgcUi.modal.open("schedule-regenerate");
+  }
+
+  function updateRegenerateSubmit() {
+    if (!regenerateSubmit) return;
+    var reason = regenerateReason ? regenerateReason.value.trim() : "";
+    regenerateSubmit.disabled = !reason || reason.length > 40;
+  }
+
+  function submitRegeneration() {
+    if (!regenerateSubmit || regenerateSubmit.disabled) return;
+    var reason = regenerateReason ? regenerateReason.value.trim() : "";
+    if (!reason) {
+      toast("재생성 사유를 입력하세요.", "error", 4000);
+      return;
+    }
+    if (reason.length > 40) {
+      toast("재생성 사유는 40자 이하여야 합니다.", "error", 4000);
+      return;
+    }
+
+    regenerateButton.disabled = true;
+    regenerateSubmit.disabled = true;
+    apiClient.request("/api/v1/schedules/" + encodeURIComponent(scheduleHeaderId) + "/regenerate", {
+      method: "POST",
+      body: { reason: reason }
+    }).then(function (envelope) {
+      var result = envelope && envelope.data;
+      if (!result || !result.scheduleHeaderId) throw new Error("Invalid schedule regeneration response");
+      if (window.FgcUi && window.FgcUi.modal) window.FgcUi.modal.close("schedule-regenerate");
+      toast("새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.", "success", 3500);
+      window.setTimeout(function () {
+        window.location.assign("/schedules/" + encodeURIComponent(result.scheduleHeaderId));
+      }, 700);
+    }).catch(function (error) {
+      console.error(error);
+      toast(error && error.message ? error.message : "새 스케줄 버전을 만들지 못했습니다.", "error", 5000);
+      regenerateButton.disabled = false;
+      updateRegenerateSubmit();
+    });
   }
 
   function renderLines(lines) {
@@ -185,5 +266,11 @@
 
   function clear(element) {
     while (element.firstChild) element.removeChild(element.firstChild);
+  }
+
+  function toast(message, tone, duration) {
+    if (window.FgcUi && typeof window.FgcUi.toast === "function") {
+      window.FgcUi.toast(message, tone, duration);
+    }
   }
 })();

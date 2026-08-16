@@ -60,4 +60,23 @@ public class ScheduleController {
             @Valid @RequestBody ScheduleRegenRequest request) {
         return ApiResponse.success(scheduleService.regenerateSchedules(id, request.getReason()));
     }
+
+    /**
+     * 설명 : 예정 스케줄을 확정하여 회차별 예상 금액을 잠근다.
+     *
+     * @param id 스케줄 헤더 ID
+     * @return 확정된 스케줄 상세
+     * @author hjKang
+     * @since 2026-08-16
+     *
+     * 2026-08-16 - 예상 스케줄 확정 API 추가
+     * 기존 코드: 상세 화면에 확정 버튼만 있고 상태를 변경할 API가 없었다.
+     * 문제: PLANNED 스케줄을 CONFIRMED로 전환할 수 없어 DB의 확정 후 불변성 규칙을 사용할 수 없었다.
+     * 개선: 정산 권한 사용자가 활성 예정 스케줄을 확정할 수 있는 API를 제공한다.
+     */
+    @PreAuthorize(Roles.CAN_PROCESS)
+    @PostMapping("/{id}/confirm")
+    public ApiResponse<ScheduleDetailResponse> confirm(@PathVariable Long id) {
+        return ApiResponse.success(scheduleService.confirmSchedule(id));
+    }
 }

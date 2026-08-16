@@ -1032,4 +1032,44 @@ public class ScheduleService {
                 .build();
     }
 
+    /**
+     * 설명 : 활성 예정 스케줄의 헤더와 회차를 확정하여 변경할 수 없게 한다.
+     *
+     * @param scheduleId 스케줄 헤더 ID
+     * @return 확정된 스케줄 상세
+     * @author hjKang
+     * @since 2026-08-16
+     *
+     * 2026-08-16 - 예상 스케줄 확정 및 잠금 구현
+     * 기존 코드: DB에는 확정 스케줄 변경 방지 트리거가 있지만 PLANNED를 CONFIRMED로 전환하는 서비스가 없었다.
+     * 문제: 화면의 확정 버튼으로 계산 근거를 고정할 수 없고 동시에 확정·재생성하면 상태가 충돌할 수 있었다.
+     * 개선: 계약 행 잠금으로 상태 전이를 직렬화하고 회차를 먼저 확정한 뒤 헤더를 확정하여 DB 불변성 규칙을 활성화한다.
+     */
+    @Transactional
+    public ScheduleDetailResponse confirmSchedule(Long scheduleId) {
+        ScheduleHeaderInsertDTO header = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        if (header == null) {
+            throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
+        }
+
+        scheduleMapper.lockContractForScheduleGeneration(header.getContractId());
+        header = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        if (header == null) {
+            throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
+        }
+        if (header.getStatus() == ScheduleHeaderStatus.CONFIRMED) {
+            return selectScheduleDetailById(scheduleId);
+        }
+        if (!Boolean.TRUE.equals(header.getActiveYn())
+                || header.getStatus() != ScheduleHeaderStatus.PLANNED) {
+            throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+        }
+
+        scheduleMapper.confirmPlannedScheduleLines(scheduleId);
+        if (scheduleMapper.confirmScheduleHeader(scheduleId) != 1) {
+            throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+        }
+        return selectScheduleDetailById(scheduleId);
+    }
+
 }

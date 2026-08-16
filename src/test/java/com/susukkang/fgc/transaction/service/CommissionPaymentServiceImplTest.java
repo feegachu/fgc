@@ -17,6 +17,8 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
+import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
+import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -75,6 +77,8 @@ class CommissionPaymentServiceImplTest {
     private CapCalculator capCalculator;
     @Mock
     private CapExceptionService capExceptionService;
+    @Mock
+    private CommissionPolicyService commissionPolicyService;
 
     private CommissionPaymentServiceImpl service;
     private FgcMessageResolver messageResolver;
@@ -93,8 +97,44 @@ class CommissionPaymentServiceImplTest {
                 capValidator,
                 capCalculator,
                 capExceptionService,
-                messageResolver
+                messageResolver,
+                commissionPolicyService
         );
+    }
+
+    @Test
+    void resolvesCurrentPolicyWhenRequestOmitsPolicyVersion() {
+        stubReferences(3L, 9L);
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        given(commissionPolicyService.resolveCurrentCommission(3L, PaymentStage.GA_TO_FC))
+                .willReturn(ResolvedCommissionPolicy.builder().policyVersionId(3L).build());
+
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.APPROVED_ALLOCATION)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                source.amount(),
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                null,
+                source.attributions(),
+                source.evidenceRef(),
+                source.note()
+        );
+
+        service.create(request);
+
+        ArgumentCaptor<CommissionPaymentCommand> captor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(captor.capture());
+        assertThat(captor.getValue().getPolicyVersionId()).isEqualTo(3L);
     }
 
     @Test

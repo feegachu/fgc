@@ -5,6 +5,8 @@ import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,34 @@ class ScheduleControllerTest {
 
     @MockitoBean
     private ScheduleService scheduleService;
+
+    @Test
+    void confirmsPlannedSchedule() throws Exception {
+        when(scheduleService.confirmSchedule(10L)).thenReturn(
+                ScheduleDetailResponse.builder()
+                        .header(ScheduleHeaderResponse.builder()
+                                .scheduleHeaderId(10L)
+                                .status(com.susukkang.fgc.common.code.ScheduleHeaderStatus.CONFIRMED)
+                                .build())
+                        .schedules(java.util.List.of())
+                        .build()
+        );
+
+        mockMvc.perform(post("/api/v1/schedules/{id}/confirm", 10L)
+                        .with(user("settlement").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.header.scheduleHeaderId").value(10))
+                .andExpect(jsonPath("$.data.header.status").value("CONFIRMED"));
+
+        verify(scheduleService).confirmSchedule(10L);
+    }
+
+    @Test
+    void rejectsConfirmationWithoutSettlementRole() throws Exception {
+        mockMvc.perform(post("/api/v1/schedules/{id}/confirm", 10L)
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void regeneratesScheduleWithReason() throws Exception {

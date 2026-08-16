@@ -486,14 +486,25 @@
             ON po.product_offering_id = c.product_offering_id
           JOIN fgc.product p
             ON p.product_id = po.product_id
+          <!--
+            @author hjKang
+            @since 2026-08-16
+
+            2026-08-16 - 지급 정책과 1,200% 한도 정책의 조회 기준 분리
+            기존 코드: commission_transaction.policy_version_id와 cap_rule_set.policy_version_id가 같은 룰셋만 조회했다.
+            문제: 지급 건에는 현행 수수료 정책(GA-CUR)이 저장되지만 한도 룰셋은 별도 규제 정책(REG-CAP)에 속하므로 정상 수수료 항목도 룰셋을 찾지 못해 검토필요로 차단되었다.
+            개선: CapCalculator와 동일하게 활성 상태의 한도 룰셋 중 지급단계·계약일·보험사·상품군·채널 조건이 맞는 룰셋을 조회한다.
+          -->
           JOIN fgc.cap_rule_set crs
-            ON crs.policy_version_id = ct.policy_version_id
-           AND crs.payment_stage = ct.payment_stage
+            ON crs.payment_stage = ct.payment_stage
            AND c.contract_date &gt;= crs.contract_date_from
            AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
            AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
            AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
            AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+          JOIN fgc.policy_version cap_pv
+            ON cap_pv.policy_version_id = crs.policy_version_id
+           AND cap_pv.status = 'ACTIVE'
           JOIN fgc.cap_rule_item cri
             ON cri.cap_rule_set_id = crs.cap_rule_set_id
            AND cri.commission_item_id = ct.commission_item_id
@@ -501,6 +512,7 @@
          ORDER BY (crs.insurer_id IS NOT NULL) DESC,
                   (crs.product_group_code IS NOT NULL) DESC,
                   (crs.channel_code IS NOT NULL) DESC,
+                  crs.contract_date_from DESC,
                   crs.cap_rule_set_id DESC
          LIMIT 1
     </select>

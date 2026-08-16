@@ -6,6 +6,8 @@ import java.time.LocalDate;
 
 @Schema(description = "수수료 항목 기준정보")
 public record CommissionItemResponse(
+        @Schema(description = "수수료 항목 ID", example = "1")
+        Long commissionItemId,
         @Schema(description = "수수료 항목 코드", example = "BASE_COMMISSION")
         String itemCode,
         @Schema(description = "수수료 항목명", example = "FC 기본수수료")
@@ -19,4 +21,15 @@ public record CommissionItemResponse(
         @Schema(description = "사용 종료일. 종료일이 없으면 null", example = "2026-12-31", nullable = true)
         LocalDate effectiveTo
 ) {
+    /** 기존 호출부 호환용 생성자. 신규 API 응답은 mapper가 commissionItemId를 채운다. */
+    public CommissionItemResponse(
+            String itemCode,
+            String itemName,
+            String cashflowType,
+            String itemCategory,
+            LocalDate effectiveFrom,
+            LocalDate effectiveTo
+    ) {
+        this(null, itemCode, itemName, cashflowType, itemCategory, effectiveFrom, effectiveTo);
+    }
 }

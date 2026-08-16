@@ -5,6 +5,7 @@
   데이터  읽기 schedule_header, schedule_line, commission_rule
   API     GET  /api/v1/schedules/{id}
           POST /api/v1/schedules/{id}/regenerate   (사유 필수 · 새 버전 생성)
+          POST /api/v1/schedules/{id}/confirm      (예정 스케줄 확정·잠금)
   라우트  GET /schedules/{id} → schedule/detail.html
 
   [막을 것]
@@ -55,6 +56,33 @@
         <span class="material-symbols-outlined" style="font-size:18px">lock</span> 확정
       </button>
     </div>
+  </div>
+
+  <div class="modal-backdrop" data-modal="schedule-regenerate" data-close-on-backdrop="true"
+       hidden aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true"
+             aria-labelledby="schedule-regenerate-title"
+             aria-describedby="schedule-regenerate-description"
+             style="width:min(480px, 100%)">
+      <header class="modal-header">
+        <h2 id="schedule-regenerate-title" class="modal-title">새 버전 만들기</h2>
+      </header>
+      <div class="modal-body">
+        <p id="schedule-regenerate-description" style="margin:0 0 18px;line-height:1.65">
+          기존 스케줄은 그대로 두고 버전 번호를 올린 새 스케줄을 만듭니다.
+          지난 버전을 지우지 않으므로 당시 금액의 근거도 계속 확인할 수 있습니다.
+        </p>
+        <label class="fgc-label fgc-label--required" for="regenerate-reason">생성 사유</label>
+        <textarea class="textarea-control" id="regenerate-reason" maxlength="40" rows="4"
+                  data-modal-initial-focus
+                  placeholder="예) 2026-07 정책버전 개정 반영"></textarea>
+        <p class="fgc-muted" style="margin:8px 0 0;font-size:12px">감사로그에 이전값·이후값과 함께 남습니다. (40자 이내)</p>
+      </div>
+      <footer class="modal-footer">
+        <button class="fgc-btn fgc-btn--ghost" type="button" data-modal-close>취소</button>
+        <button class="fgc-btn fgc-btn--primary" id="btn-regenerate-submit" type="button" disabled>새 버전 만들기</button>
+      </footer>
+    </section>
   </div>
 
   <!-- ① 헤더 — 값은 IF-API-28 연동 시 서버 렌더링으로 채운다 -->

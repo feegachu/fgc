@@ -107,6 +107,12 @@ public interface ScheduleMapper {
     // 스케줄 ID를 통해 헤더 조회
     ScheduleHeaderInsertDTO selectScheduleHeaderById(@Param("scheduleId") Long scheduleId);
 
+    /** 예정 상태인 회차를 확정 상태로 변경한다. */
+    int confirmPlannedScheduleLines(@Param("scheduleHeaderId") Long scheduleHeaderId);
+
+    /** 활성 예정 스케줄 헤더를 확정한다. */
+    int confirmScheduleHeader(@Param("scheduleHeaderId") Long scheduleHeaderId);
+
     // 스케줄 ID를 통해 기존 회차별 라인을 조회
     List<ScheduleLineInsertDTO> selectScheduleLinesByScheduleId(@Param("scheduleId") Long scheduleId);
 
