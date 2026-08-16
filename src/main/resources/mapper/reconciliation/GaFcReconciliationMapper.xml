@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.reconciliation.mapper.GaFcReconciliationMapper">
+
+    <!-- 2026-08-13 yslee - GA→FC 운영 스케줄의 예상 지급 원자행 조회 -->
+    <!-- 기존 코드: 보험사→GA 예상 수입 스케줄만 대사 원천으로 조회 -->
+    <!-- 문제: GA→FC 예상 지급과 확정 지급 건을 비교할 원천이 없어 FUN-048의 두 번째 방향을 실행할 수 없음 -->
+    <!-- 개선: 활성 OPERATIONAL GA→FC 스케줄을 조회하고 POSTED 예상지급 분개는 존재할 때 추적 ID로 연결 -->
+    <select id="findExpectedSources"
+            resultType="com.susukkang.fgc.reconciliation.dto.GaFcExpectedSourceRow">
+        SELECT sl.schedule_line_id AS scheduleLineId,
+               jh.journal_header_id AS journalHeaderId,
+               sh.contract_id AS contractId,
+               sl.beneficiary_agent_id AS expectedAgentId,
+               sl.commission_item_id AS commissionItemId,
+               sl.installment_no AS installmentNo,
+               sl.due_date AS dueDate,
+               sl.due_month AS dueMonth,
+               sl.expected_amount AS expectedAmount
+          FROM fgc.schedule_header sh
+          JOIN fgc.schedule_line sl
+            ON sl.schedule_header_id = sh.schedule_header_id
+          JOIN fgc.insurance_contract c
+            ON c.contract_id = sh.contract_id
+          LEFT JOIN fgc.journal_header jh
+            ON jh.journal_type = 'EXPECTED_FC_PAYOUT'
+           AND jh.source_entity_type = 'SCHEDULE_LINE'
+           AND jh.source_entity_id = CAST(sl.schedule_line_id AS varchar)
+           AND jh.status = 'POSTED'
+         WHERE sh.payment_stage = 'GA_TO_FC'
+           AND sh.schedule_purpose = 'OPERATIONAL'
+           AND sh.active_yn = TRUE
+           AND sh.status NOT IN ('HOLD', 'CANCELLED')
+           AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
+           AND sl.due_month = #{settlementMonth}
+           AND c.insurer_id = #{insurerId}
+         ORDER BY sh.contract_id, sl.commission_item_id, sl.due_month,
+                  sl.installment_no, sl.schedule_line_id
+    </select>
+
+    <!-- 2026-08-13 yslee - FUN-065 확정 지급 건의 계약귀속 원자행 조회 -->
+    <!-- 기존 코드: 원수사 명세 거래만 실제 대사 원천으로 조회 -->
+    <!-- 문제: GA→FC 지급 건의 수취 설계사·회차·귀속금액을 예상 스케줄과 비교할 수 없음 -->
+    <!-- 개선: 특정 원천유형을 하드코딩하지 않고 GA→FC CONFIRMED PAYMENT를 조회하며 POSTED 확정지급 분개는 선택 연결 -->
+    <select id="findActualSources"
+            resultType="com.susukkang.fgc.reconciliation.dto.GaFcActualSourceRow">
+        SELECT ta.transaction_attribution_id AS transactionAttributionId,
+               ct.commission_transaction_id AS commissionTransactionId,
+               jh.journal_header_id AS journalHeaderId,
+               ta.contract_id AS contractId,
+               ct.recipient_agent_id AS actualAgentId,
+               ct.commission_item_id AS commissionItemId,
+               ct.installment_no AS actualInstallmentNo,
+               ct.settlement_month AS settlementMonth,
+               ct.due_date AS dueDate,
+               ta.attributed_amount AS actualAmount,
+               ct.source_business_key AS sourceBusinessKey
+          FROM fgc.commission_transaction ct
+          JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+          JOIN fgc.insurance_contract c
+            ON c.contract_id = ta.contract_id
+          LEFT JOIN fgc.journal_header jh
+            ON jh.journal_type = 'CONFIRMED_FC_PAYOUT'
+           AND jh.source_entity_type = 'COMMISSION_TRANSACTION'
+           AND jh.source_entity_id = CAST(ct.commission_transaction_id AS varchar)
+           AND jh.status = 'POSTED'
+         WHERE ct.payment_stage = 'GA_TO_FC'
+           AND ct.settlement_month = #{settlementMonth}
+           AND ct.cashflow_type = 'PAYMENT'
+           AND ct.status = 'CONFIRMED'
+           AND ta.attribution_scope = 'CONTRACT'
+           AND ta.attribution_month = #{settlementMonth}
+           AND c.insurer_id = #{insurerId}
+         ORDER BY ta.contract_id, ct.commission_item_id,
+                  COALESCE(ct.due_date, ct.settlement_month),
+                  ct.commission_transaction_id, ta.attribution_seq
+    </select>
+
+</mapper>
