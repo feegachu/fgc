@@ -21,7 +21,7 @@
       <label class="field"><span class="field-label">조직</span><select class="select-control" disabled title="조직 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
       <label class="field"><span class="field-label">계약일 시작</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateFrom}"></label>
       <label class="field"><span class="field-label">계약일 끝</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateTo}"></label>
-      <label class="field"><span class="field-label">계약상태</span><select class="select-control" th:field="*{currentStatus}"><option value="">전체</option><option th:each="status : ${contractStatuses}" th:value="${status}" th:text="${contractStatusLabels[status]}">유지</option></select></label>
+      <label class="field"><span class="field-label">계약상태</span><select class="select-control" th:field="*{currentStatus}"><option value="">전체</option><option th:each="status : ${contractStatuses}" th:value="${status}" th:text="${status.label()}">정상</option></select></label>
       <label class="field"><span class="field-label">1,200% 판정</span><select class="select-control" th:field="*{capResultStatus}"><option value="">전체</option><option th:each="status : ${capResultStatuses}" th:value="${status}" th:text="${status.label()}">정상</option></select></label>
     </div>
     <div class="contract-filter-actions"><button class="button button-primary" type="submit"><span class="material-symbols-rounded" aria-hidden="true">search</span>조회</button></div>
@@ -40,7 +40,7 @@
             <td th:text="${contract.insurerName}">-</td><td th:text="${contract.productName}">-</td><td class="tabular-nums" th:text="${contract.contractDate}">-</td>
             <td class="is-number tabular-nums" th:text="${#numbers.formatInteger(contract.monthlyEquivalentFirstPremium, 1, 'COMMA')} + '원'">0원</td>
             <td th:text="${contract.agentIdName}">-</td>
-            <td class="is-center"><span class="status-badge status-badge-neutral" th:text="${contractStatusLabels[contract.contractStatus]}">-</span></td>
+            <td class="is-center"><span class="status-badge status-badge-neutral" th:text="${contract.contractStatus.label()}">-</span></td>
             <td class="is-center"><span class="status-badge" th:if="${contract.capResultStatus != null}" th:classappend="${contract.capResultStatus.name() == 'NORMAL'} ? ' status-badge-success' : (${contract.capResultStatus.name() == 'WARNING'} ? ' status-badge-warning' : (${contract.capResultStatus.name() == 'VIOLATION'} ? ' status-badge-error' : ' status-badge-review'))" th:text="${contract.capResultStatus.label()}">-</span><span th:if="${contract.capResultStatus == null}">-</span></td>
             <td class="is-center" th:text="${dataOriginLabels[contract.dataOrigin]}">-</td>
           </tr>
