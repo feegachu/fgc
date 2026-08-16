@@ -32,6 +32,43 @@
     }
   }
 
+  function hrefWithGlobalMonth(href, month) {
+    var url = new URL(href, window.location.origin);
+    url.searchParams.set("month", month);
+    url.searchParams.delete("page");
+    return url.pathname + url.search + url.hash;
+  }
+
+  function applyGlobalMonth(month) {
+    var previousTabs = readTabs();
+    var updatedTabs = previousTabs.map(function (tab) {
+      return Object.assign({}, tab, { href: hrefWithGlobalMonth(tab.href, month) });
+    });
+    writeTabs(updatedTabs);
+
+    document.querySelectorAll("[data-workspace-tabs] .workspace-tab-link").forEach(function (link) {
+      link.href = hrefWithGlobalMonth(link.getAttribute("href"), month);
+    });
+    return previousTabs;
+  }
+
+  function restoreTabs(tabs) {
+    var safeTabs = Array.isArray(tabs) ? tabs : [];
+    writeTabs(safeTabs);
+
+    document.querySelectorAll("[data-workspace-tabs] .workspace-tab-link").forEach(function (link) {
+      var tabElement = link.closest("[data-tab-id]");
+      var tabId = tabElement ? tabElement.dataset.tabId : null;
+      var restoredTab = safeTabs.find(function (tab) { return tab.id === tabId; });
+      if (restoredTab) link.href = restoredTab.href;
+    });
+  }
+
+  function getOpenTabCount() {
+    var renderedTabs = document.querySelectorAll("[data-workspace-tabs] .workspace-tab");
+    return renderedTabs.length || readTabs().length || 1;
+  }
+
   function currentTab() {
     var body = document.body;
     var id = body.dataset.workspaceTabId;
@@ -175,4 +212,11 @@
   } else {
     initWorkspaceTabs();
   }
+
+  window.FgcUi = window.FgcUi || {};
+  window.FgcUi.workspaceTabs = {
+    applyGlobalMonth: applyGlobalMonth,
+    getOpenTabCount: getOpenTabCount,
+    restoreTabs: restoreTabs
+  };
 })();

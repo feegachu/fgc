@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalSearchMapper">
+    <!-- from은 시작일이라 journal_date >= #{from}, to는 종료일이라 <= #{to}다(반대로 걸면
+         범위가 항상 비어 있게 된다). -->
+    <sql id="searchWhere">
+        <where>
+            <if test="from != null">
+                AND h.journal_date >= #{from}
+            </if>
+            <if test="to != null">
+                AND h.journal_date &lt;= #{to}
+            </if>
+            <if test="journalType != null">
+                AND h.journal_type = #{journalType}
+            </if>
+            <if test="contractId != null">
+                AND h.contract_id = #{contractId}
+            </if>
+            <if test="status != null">
+                AND h.status = #{status}
+            </if>
+            <!-- accountCode는 journal_line 쪽 컬럼이라 JOIN하면 라인 수만큼 헤더가 중복된다.
+                 EXISTS로 "그 계정을 쓰는 라인이 있는지"만 확인해 헤더 1건당 결과 1행을 유지한다. -->
+            <if test="accountCode != null">
+                AND EXISTS (
+                    SELECT 1 FROM fgc.journal_line l2
+                    JOIN fgc.journal_account a2 ON a2.journal_account_id = l2.journal_account_id
+                    WHERE l2.journal_header_id = h.journal_header_id
+                    AND a2.account_code = #{accountCode}
+                )
+            </if>
+        </where>
+    </sql>
+
+    <!-- 차변/대변 합계는 JOIN이 아니라 correlated subquery로 뽑는다 — JOIN으로 raw journal_line을
+         묶으면 라인 수만큼 헤더 행이 중복돼 SUM이 아니라 그냥 나열이 되어 버린다. -->
+    <select id="search" resultType="com.susukkang.fgc.journal.dto.JournalListRow">
+        SELECT h.journal_header_id, h.journal_no, h.journal_date, h.journal_type,
+               h.source_entity_type, h.source_entity_id, h.contract_id,
+               c.contract_no AS contractNo, h.status,
+               (SELECT COALESCE(SUM(l.debit_amount), 0) FROM fgc.journal_line l
+                 WHERE l.journal_header_id = h.journal_header_id) AS debitTotal,
+               (SELECT COALESCE(SUM(l.credit_amount), 0) FROM fgc.journal_line l
+                 WHERE l.journal_header_id = h.journal_header_id) AS creditTotal,
+               h.reversal_of_id AS reversalOfId, rev.journal_no AS reversalOfJournalNo,
+               creator.login_id AS createdBy, poster.login_id AS postedBy,
+               h.posted_at AS postedAt, h.created_at AS createdAt
+        FROM fgc.journal_header h
+        LEFT JOIN fgc.insurance_contract c ON c.contract_id = h.contract_id
+        LEFT JOIN fgc.journal_header rev ON rev.journal_header_id = h.reversal_of_id
+        LEFT JOIN fgc.app_user creator ON creator.user_id = h.created_by
+        LEFT JOIN fgc.app_user poster ON poster.user_id = h.posted_by
+        <include refid="searchWhere"/>
+        ORDER BY h.journal_date DESC, h.journal_header_id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.journal_header h
+        <include refid="searchWhere"/>
+    </select>
+</mapper>

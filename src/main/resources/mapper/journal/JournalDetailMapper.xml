@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalDetailMapper">
+    <!--
+      creator/poster: created_by/posted_by(user_id)를 화면에 바로 쓸 수 있는 login_id로
+      바꿔준다 — LEFT JOIN인 이유는 posted_by가 DRAFT 상태에서는 NULL이라서다.
+
+      rev/successor: journal_header를 두 방향으로 자기참조한다. rev는 "이 분개가 역분개일 때
+      가리키는 원분개"(h.reversal_of_id), successor는 "이 분개를 나중에 역분개한 후속
+      분개"(반대 방향 — 다른 행의 reversal_of_id가 이 헤더를 가리키는 경우)다. successor
+      조인이 여러 행을 만들지 않을까 걱정할 수 있는데, journal_header에는
+      uq_journal_single_reversal 부분 유니크 인덱스(reversal_of_id가 NULL이 아닌 행에서
+      reversal_of_id 유일)가 있어 원분개 하나당 역분개는 최대 1건이다 — 그래서 이 LEFT JOIN은
+      항상 결과를 1행으로 유지한다.
+    -->
+    <select id="findHeaderById" resultType="com.susukkang.fgc.journal.dto.JournalDetailHeaderRow">
+        SELECT h.journal_header_id, h.journal_no, h.journal_date, h.journal_type,
+               h.source_entity_type, h.source_entity_id, h.revision_no,
+               h.contract_id, c.contract_no AS contractNo,
+               h.validation_run_id, h.policy_version_id, h.correction_group_key,
+               h.status, h.description,
+               creator.login_id AS createdBy, h.created_at AS createdAt,
+               poster.login_id AS postedBy, h.posted_at AS postedAt,
+               h.reversal_of_id AS reversalOfId, rev.journal_no AS reversalOfJournalNo,
+               successor.journal_header_id AS reversedByJournalHeaderId,
+               successor.journal_no AS reversedByJournalNo
+        FROM fgc.journal_header h
+        LEFT JOIN fgc.insurance_contract c ON c.contract_id = h.contract_id
+        LEFT JOIN fgc.app_user creator ON creator.user_id = h.created_by
+        LEFT JOIN fgc.app_user poster ON poster.user_id = h.posted_by
+        LEFT JOIN fgc.journal_header rev ON rev.journal_header_id = h.reversal_of_id
+        LEFT JOIN fgc.journal_header successor ON successor.reversal_of_id = h.journal_header_id
+        WHERE h.journal_header_id = #{journalHeaderId}
+    </select>
+
+    <!-- ag/ci 모두 LEFT JOIN이다 — 정산검증용 라인(정책/조정성 라인 등) 중에는 agent_id·
+         commission_item_id가 없는 라인도 있다. commission_item을 조인해 item_name까지
+         내려주는 건 ScheduleMapper.xml/CommissionPaymentMapper.xml의 기존 관례와 같다 —
+         화면에 ID만 보여줄 수는 없다. -->
+    <select id="findLinesByHeaderId" resultType="com.susukkang.fgc.journal.dto.JournalDetailLineRow">
+        SELECT l.line_no, a.account_code, a.account_name, a.normal_balance,
+               l.debit_amount, l.credit_amount, l.contract_id,
+               l.agent_id, ag.agent_name, l.payment_stage,
+               l.commission_item_id, ci.item_name AS commissionItemName, l.memo
+        FROM fgc.journal_line l
+        JOIN fgc.journal_account a ON a.journal_account_id = l.journal_account_id
+        LEFT JOIN fgc.agent ag ON ag.agent_id = l.agent_id
+        LEFT JOIN fgc.commission_item ci ON ci.commission_item_id = l.commission_item_id
+        WHERE l.journal_header_id = #{journalHeaderId}
+        ORDER BY l.line_no
+    </select>
+</mapper>

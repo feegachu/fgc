@@ -253,7 +253,7 @@ exception_action
 | `SYSTEM_ADMIN` | 시스템관리자 |
 | `GA_ADMIN` | GA관리자 |
 | `SETTLEMENT` | 정산담당자 |
-| `COMPLIANCE` | 준법·감사 조회자 |
+| `COMPLIANCE` | 준법·감사 |
 
 ### GOLDEN 사용자
 
