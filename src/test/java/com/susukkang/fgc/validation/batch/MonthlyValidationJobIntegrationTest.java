@@ -63,6 +63,16 @@ class MonthlyValidationJobIntegrationTest {
     @AfterEach
     void cleanUp() {
         createdValidationRunIds.forEach(id -> {
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.cap_check_detail
+                     WHERE cap_check_id IN (
+                         SELECT cap_check_id
+                           FROM fgc.cap_check
+                          WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.cap_check WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
@@ -103,7 +113,7 @@ class MonthlyValidationJobIntegrationTest {
      * 문제: selectTargetStep이 실제 구현으로 교체되어 기존 완료 Step 기대값과 일치하지 않았다.
      * 개선: 대상 선별 Step 완료 후 다음 미구현 Step에서 실행이 차단되는지 검증한다.
      */
-    void completesTargetSelectionAndBlocksAtNextPlaceholder() throws Exception {
+    void completesImplementedStepsAndBlocksAtJournalPlaceholder() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
         long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
 
@@ -120,16 +130,24 @@ class MonthlyValidationJobIntegrationTest {
                 .map(StepExecution::getStepName)
                 .collect(Collectors.toSet());
 
-        assertThat(completedStepNames).containsExactlyInAnyOrder(
+        assertThat(completedStepNames).contains(
                 "createRunStep",
-                "selectTargetStep"
+                "selectTargetStep",
+                "regenerateScheduleStep",
+                "capCheckStep",
+                "arbitrageCheckStep"
         );
 
         // capCheckStep은 INSURER_TO_GA/GA_TO_FC 2개 파티션 워커로 나뉘어 실행돼야 한다.
         long capCheckWorkerCount = jobExecution.getStepExecutions().stream()
                 .filter(se -> se.getStepName().startsWith("capCheckWorkerStep"))
                 .count();
-        assertThat(capCheckWorkerCount).isZero();
+        assertThat(capCheckWorkerCount).isEqualTo(2);
+
+        assertThat(jobExecution.getStepExecutions())
+                .filteredOn(step -> step.getStatus() == BatchStatus.FAILED)
+                .extracting(StepExecution::getStepName)
+                .containsExactly("journalPostingStep");
 
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
         assertThat(row.getStatus()).isEqualTo("FAILED");

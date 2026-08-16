@@ -69,6 +69,13 @@ class ScheduleControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    /** FUN-002(#82) — COMPLIANCE는 §4-1 "조회만"이라 재생성도 403이어야 한다. */
+    @Test
+    void rejectsRegenerationForComplianceRole() throws Exception {
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("comp01").roles("COMPLIANCE")).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
+                .andExpect(status().isForbidden());
+    }
+
     /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 재생성도 허용된다. */
     @Test
     void allowsRegenerationForSystemAdmin() throws Exception {

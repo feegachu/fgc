@@ -22,12 +22,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 실데이터 바인딩 검증은 화면별 기능 브랜치의 몫이다.
  * (실데이터 바인딩된 화면은 도메인 뷰 컨트롤러 테스트로 이관:
  *  DASH → DashboardViewControllerTest, BASE → BaseViewControllerTest,
- *  POL → PolicyViewControllerTest)
+ *  POL → PolicyViewControllerTest, EXCP → ExceptionCaseViewControllerTest)
  *
  * 요구사항 추적(FGC-FUN-xxx): CONT 018 ·
  * TRAN 065/031/033/034 · SCHE 036/039 · CAP 030/032/035 · ARB 063 ·
- * LEDG 046/047 · RECO 048~051 · EXCP 052/053 · VRUN 041~044 · AUDT 061.
- * /audit-logs 만 역할 제한(FUN-002·화면정의서 :1491)이라 별도 테스트로 뺐다.
+ * LEDG 046/047 · RECO 048~051 · VRUN 041~044 · AUDT 061.
+ * /audit-logs 만 역할 제한(FUN-002·화면정의서 :1530)이라 별도 테스트로 뺐다.
  */
 @WebMvcTest(ScreenViewController.class)
 @Import({ShellAdvice.class, SecurityConfig.class, MessageSourceAutoConfiguration.class,
@@ -62,7 +62,6 @@ class ScreenViewControllerTest {
             "/arbitrage-checks,    FGC-UI-ARB-W01",
             "/journals,            FGC-UI-LEDG-W01",
             "/reconciliations,     FGC-UI-RECO-W01",
-            "/exceptions,          FGC-UI-EXCP-W01",
             "/validation-runs,     FGC-UI-VRUN-W01",
             "/validation-runs/1,   FGC-UI-VRUN-W02",
     })
@@ -82,7 +81,7 @@ class ScreenViewControllerTest {
         return new com.susukkang.fgc.auth.dto.FgcUserDetails(view, true, true);
     }
 
-    /** AUDT-W01(FUN-061)은 COMPLIANCE·SYSTEM_ADMIN 전용 — 화면정의서 :1491. */
+    /** AUDT-W01(FUN-061)은 COMPLIANCE·SYSTEM_ADMIN 전용 — 화면정의서 :1530. */
     @Test
     void audit_log_screen_renders_for_compliance() throws Exception {
         mvc.perform(get("/audit-logs").with(user(complianceUser())))

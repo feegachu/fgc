@@ -17,7 +17,7 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-VRUN-W01', '월 통합검증 실행 목록', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-validation-list">
 
   <h1 class="fgc-page-title">월 통합검증 실행 목록</h1>
   <p class="fgc-page-desc">
@@ -62,7 +62,7 @@
   <section class="fgc-card" style="margin-top:16px">
     <div class="fgc-card__head">
       <span class="fgc-card__title">② 실행 목록</span>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div class="publishing-inline-controls" style="display:flex;gap:8px;align-items:center">
         <label class="fgc-label" for="f-status" style="margin:0">상태</label>
         <select class="fgc-select" id="f-status" style="padding:4px 8px"><option value="">전체</option></select>
       </div>

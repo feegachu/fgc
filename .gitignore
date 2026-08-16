@@ -97,3 +97,5 @@ CLAUDE.md
 .agents/
 skill-observations/
 graphify-out/
+.grok/
+files/

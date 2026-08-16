@@ -16,8 +16,10 @@
   <link rel="stylesheet" th:href="@{/css/common/layout.css}">
   <link rel="stylesheet" th:href="@{/css/common/components.css}">
   <link rel="stylesheet" th:href="@{/css/common/utilities.css}">
+  <link rel="stylesheet" th:href="@{/css/features/publishing.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-DASH-W01'}" th:href="@{/css/features/dashboard.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CONT-')}" th:href="@{/css/features/contract.css}">
+  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-SCHE-W01'}" th:href="@{/css/features/schedule.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CAP-')}" th:href="@{/css/features/cap.css}">
 </head>
 <body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">
@@ -32,11 +34,13 @@
   <div id="toast-region" class="toast-region" role="region" aria-label="알림" aria-live="polite"></div>
   <div id="modal-root"></div>
   <script th:src="@{/js/common/workspace-tabs.js}" defer></script>
+  <script th:src="@{/js/common/month-selector.js}" defer></script>
   <script th:src="@{/js/common/app-shell.js}" defer></script>
   <script th:src="@{/js/common/modal.js}" defer></script>
   <script th:src="@{/js/common/toast.js}" defer></script>
   <script th:src="@{/js/common/api-client.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-DASH-W01'}" th:src="@{/js/features/dashboard/dashboard.js}" defer></script>
+  <script th:if="${screenId == 'FGC-UI-SCHE-W01'}" th:src="@{/js/features/schedule/schedule-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-CAP-W01'}" th:src="@{/js/features/cap/cap-list.js}" defer></script>
 </body>
 </html>

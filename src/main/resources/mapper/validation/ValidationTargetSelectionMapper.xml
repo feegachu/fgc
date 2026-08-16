@@ -108,4 +108,17 @@
         DO NOTHING
     </insert>
 
+    <select id="selectSelectedContractIds"
+            resultType="java.lang.Long">
+        SELECT
+            contract_id
+        FROM
+            validation_target
+        WHERE
+            validation_run_id = #{validationRunId}
+        AND
+            selection_status = 'SELECTED'
+        ORDER BY
+            contract_id
+    </select>
 </mapper>

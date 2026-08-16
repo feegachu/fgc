@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -71,7 +72,7 @@ public class ValidationRunController {
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<CreateValidationRunResponse> create(
             @RequestBody CreateValidationRunRequest request,
             @AuthenticationPrincipal FgcUserDetails principal

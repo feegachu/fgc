@@ -13,6 +13,9 @@
     <a class="kpi-card kpi-card-warning" th:href="@{/arbitrage-checks(status='CANDIDATE',month=${month})}"><div class="kpi-card-header"><span class="kpi-label">차익거래 검토대상</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.arbitrageCandidate()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">위반 확정 아님</span></div></a>
     <a class="kpi-card kpi-card-risk" th:href="@{/reconciliations(onlyMismatch=true,month=${month})}"><div class="kpi-card-header"><span class="kpi-label">대사 불일치</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.reconMismatch()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">허용오차 0원</span></div></a>
     <a class="kpi-card" th:classappend="${summary.journalImbalance() == 0} ? ' kpi-card-success' : ' kpi-card-error'" th:href="@{/journals(imbalanceOnly=true,month=${month})}"><div class="kpi-card-header"><span class="kpi-label">원장 불균형</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.journalImbalance()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">기표 전 0건 필수</span></div></a>
+    <!-- OPEN 은 exception_case.status 값이 아니라 EXCP-W01 과 공유하는 화면 묶음 필터다(= NEW + IN_REVIEW).
+         ExceptionCaseViewController 가 ExceptionStatus.dbStatuses() 로 풀어서 조회하므로(#83)
+         이 링크는 그대로 둔다 — NEW/IN_REVIEW 로 바꾸면 예외함 상태 select 어휘와 어긋난다. -->
     <a class="kpi-card" th:href="@{/exceptions(status='OPEN',month=${month})}"><div class="kpi-card-header"><span class="kpi-label">미처리 예외</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.openException()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">신규 + 검토중</span></div></a>
   </section>
 
