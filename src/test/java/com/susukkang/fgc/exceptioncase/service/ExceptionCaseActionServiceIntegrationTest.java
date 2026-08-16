@@ -139,6 +139,82 @@ class ExceptionCaseActionServiceIntegrationTest {
                 "NEW", "NEW", "ASSIGN", "DOC-ASSIGN-001", String.valueOf(userId)));
     }
 
+    /** FGC-FUN-053: 실제 이연 조치는 검토중 예외를 해결 상태로 닫는다. */
+    @Test
+    void 이연은_검토중에서만_허용되고_해결상태로_전이한다() {
+        assertThat(ExceptionActionType.DEFER.supports(ExceptionStatus.NEW)).isFalse();
+        assertThat(ExceptionActionType.DEFER.supports(ExceptionStatus.IN_REVIEW)).isTrue();
+
+        Long userId = firstUserId();
+        String loginId = loginIdOf(userId);
+        Long exceptionCaseId = insertNewCase();
+
+        exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "이연 여부를 검토합니다.", "DOC-DEFER-REVIEW"),
+                userId,
+                loginId);
+        var deferred = exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.DEFER, "실제 지급을 미래 회차로 이연합니다.", "DOC-DEFER-001"),
+                userId,
+                loginId);
+
+        assertThat(deferred.fromStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        assertThat(deferred.toStatus()).isEqualTo(ExceptionStatus.RESOLVED);
+        assertThat(currentStatus(exceptionCaseId)).isEqualTo("RESOLVED");
+    }
+
+    /** FGC-FUN-053: REJECT 해결조치는 검토중 예외를 반려 상태로 닫는다. */
+    @Test
+    void 반려는_검토중에서_REJECTED로_전이한다() {
+        Long userId = firstUserId();
+        String loginId = loginIdOf(userId);
+        Long exceptionCaseId = insertNewCase();
+
+        exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "반려 여부를 검토합니다.", "DOC-REJECT-REVIEW"),
+                userId,
+                loginId);
+        var rejected = exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.REJECT, "검토 결과 반려합니다.", "DOC-REJECT-001"),
+                userId,
+                loginId);
+
+        assertThat(rejected.fromStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        assertThat(rejected.toStatus()).isEqualTo(ExceptionStatus.REJECTED);
+        assertThat(currentStatus(exceptionCaseId)).isEqualTo("REJECTED");
+    }
+
+    /** FGC-FUN-053·FGC-QUR-001: 허용되지 않은 전이는 어떤 이력도 남기지 않는다. */
+    @Test
+    void 신규상태에서_해결조치를_요청하면_이력과_감사로그를_남기지_않는다() {
+        Long userId = firstUserId();
+        String loginId = loginIdOf(userId);
+        Long exceptionCaseId = insertNewCase();
+
+        assertThatThrownBy(() -> exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.RESOLVE, "검토 없이 해결할 수 없습니다.", "DOC-INVALID-001"),
+                userId,
+                loginId))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception -> assertThat(
+                        ((FgcBusinessException) exception).getErrorCode())
+                        .isEqualTo(FgcErrorCode.COMMON_002));
+
+        assertThat(currentStatus(exceptionCaseId)).isEqualTo("NEW");
+        assertThat(actionCount(exceptionCaseId)).isZero();
+        assertThat(auditCount(exceptionCaseId)).isZero();
+    }
+
     @Test
     void 처리사유가_공백이면_EXCP_001을_반환한다() {
         assertThatThrownBy(() -> exceptionCaseService.action(
@@ -161,6 +237,42 @@ class ExceptionCaseActionServiceIntegrationTest {
                 ) VALUES (?, 'DATA_QUALITY', 'WARNING', 'NEW', 'IT', ?, '처리 테스트')
                 RETURNING exception_case_id
                 """, Long.class, "IT-ACTION:" + suffix, suffix);
+    }
+
+    private Long firstUserId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1", Long.class);
+    }
+
+    private String loginIdOf(Long userId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT login_id FROM fgc.app_user WHERE user_id = ?", String.class, userId);
+    }
+
+    private String currentStatus(Long exceptionCaseId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.exception_case WHERE exception_case_id = ?",
+                String.class,
+                exceptionCaseId);
+    }
+
+    private int actionCount(Long exceptionCaseId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.exception_action WHERE exception_case_id = ?",
+                Integer.class,
+                exceptionCaseId);
+        return count == null ? 0 : count;
+    }
+
+    private int auditCount(Long exceptionCaseId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.audit_log
+                 WHERE entity_type = 'EXCEPTION_CASE'
+                   AND entity_id = ?
+                   AND action_code = 'EXCEPTION_ACTION'
+                """, Integer.class, String.valueOf(exceptionCaseId));
+        return count == null ? 0 : count;
     }
 
     private record AuditValues(

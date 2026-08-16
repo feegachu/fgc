@@ -23,11 +23,11 @@ public enum ExceptionActionType {
     /** 현재 예외 상태에서 이 조치를 수행할 수 있는지 검사한다. 종결 상태는 재처리하지 않는다. */
     public boolean supports(ExceptionStatus currentStatus) {
         return switch (this) {
-            case ASSIGN, COMMENT, DEFER ->
+            case ASSIGN, COMMENT ->
                     currentStatus == ExceptionStatus.NEW
                             || currentStatus == ExceptionStatus.IN_REVIEW;
             case START_REVIEW -> currentStatus == ExceptionStatus.NEW;
-            case CORRECT, REDUCE, CANCEL, RECONCILE_AGAIN,
+            case CORRECT, REDUCE, CANCEL, DEFER, RECONCILE_AGAIN,
                     FALSE_POSITIVE, RESOLVE, REJECT ->
                     currentStatus == ExceptionStatus.IN_REVIEW;
         };
@@ -39,9 +39,9 @@ public enum ExceptionActionType {
             throw new IllegalStateException("현재 상태에서는 해당 예외 조치를 수행할 수 없습니다.");
         }
         return switch (this) {
-            case ASSIGN, COMMENT, DEFER -> currentStatus;
+            case ASSIGN, COMMENT -> currentStatus;
             case START_REVIEW -> ExceptionStatus.IN_REVIEW;
-            case CORRECT, REDUCE, CANCEL, RECONCILE_AGAIN, RESOLVE ->
+            case CORRECT, REDUCE, CANCEL, DEFER, RECONCILE_AGAIN, RESOLVE ->
                     ExceptionStatus.RESOLVED;
             case FALSE_POSITIVE, REJECT -> ExceptionStatus.REJECTED;
         };
