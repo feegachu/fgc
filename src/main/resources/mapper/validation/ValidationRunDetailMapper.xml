@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.validation.mapper.ValidationRunDetailMapper">
+
+    <select id="findHeaderById" resultType="com.susukkang.fgc.validation.dto.ValidationRunListRow">
+        SELECT vr.validation_run_id AS validationRunId,
+               vr.validation_month AS validationMonth,
+               vr.run_no AS runNo,
+               vr.run_type AS runType,
+               vr.status,
+               vr.current_step AS currentStep,
+               triggered.login_id AS triggeredBy,
+               vr.started_at AS startedAt,
+               vr.completed_at AS completedAt,
+               finalized.login_id AS finalizedBy,
+               vr.finalized_at AS finalizedAt,
+               vr.failure_message AS failureMessage
+        FROM fgc.validation_run vr
+        LEFT JOIN fgc.app_user triggered ON triggered.user_id = vr.triggered_by
+        LEFT JOIN fgc.app_user finalized ON finalized.user_id = vr.finalized_by
+        WHERE vr.validation_run_id = #{validationRunId}
+    </select>
+
+    <select id="findTargets" resultType="com.susukkang.fgc.validation.dto.ValidationTargetListRow">
+        SELECT vt.validation_target_id AS validationTargetId,
+               ic.contract_no          AS contractNo,
+               vt.selection_status     AS selectionStatus,
+               p.product_name          AS productName,
+               po.offering_version     AS offeringVersion,
+               vt.refund_rate_table_id AS refundRateTableId,
+               vt.selection_reason     AS selectionReason
+          FROM fgc.validation_target vt
+          JOIN fgc.insurance_contract ic ON ic.contract_id = vt.contract_id
+          JOIN fgc.product_offering po   ON po.product_offering_id = vt.product_offering_id
+          JOIN fgc.product p             ON p.product_id = po.product_id
+         WHERE vt.validation_run_id = #{validationRunId}
+         ORDER BY CASE vt.selection_status
+                      WHEN 'REVIEW_REQUIRED' THEN 0
+                      WHEN 'EXCLUDED' THEN 1
+                      ELSE 2
+                  END,
+                  vt.validation_target_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 원장은 vw_journal_imbalance에 실행 컬럼이 없어 journal_header로 스코프한다.
+         대사는 commission_transaction과 달리 reconciliation_run에 validation_run_id가 있어
+         그 경유로 좁힌다 — 뷰·결과를 그냥 세면 다른 실행 것까지 섞인다(화면정의서 :1462). -->
+    <select id="summarize" resultType="com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow">
+        SELECT
+          (SELECT COUNT(*) FROM fgc.validation_target
+            WHERE validation_run_id = #{validationRunId} AND selection_status = 'SELECTED')        AS targetSelectedCount,
+          (SELECT COUNT(*) FROM fgc.validation_target
+            WHERE validation_run_id = #{validationRunId} AND selection_status = 'EXCLUDED')        AS targetExcludedCount,
+          (SELECT COUNT(*) FROM fgc.validation_target
+            WHERE validation_run_id = #{validationRunId} AND selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount,
+          (SELECT COUNT(*) FROM fgc.cap_check
+            WHERE validation_run_id = #{validationRunId})                                          AS capCheckedCount,
+          (SELECT COUNT(*) FROM fgc.cap_check
+            WHERE validation_run_id = #{validationRunId} AND result_status = 'VIOLATION')          AS capViolationCount,
+          (SELECT COUNT(*) FROM fgc.cap_check
+            WHERE validation_run_id = #{validationRunId} AND result_status = 'WARNING')            AS capWarningCount,
+          (SELECT COUNT(*) FROM fgc.cap_check
+            WHERE validation_run_id = #{validationRunId} AND result_status = 'REVIEW_REQUIRED')    AS capReviewRequiredCount,
+          (SELECT COUNT(*) FROM fgc.arbitrage_check
+            WHERE validation_run_id = #{validationRunId})                                          AS arbitrageCheckedCount,
+          (SELECT COUNT(*) FROM fgc.arbitrage_check
+            WHERE validation_run_id = #{validationRunId} AND result_status = 'CANDIDATE')          AS arbitrageCandidateCount,
+          (SELECT COUNT(*) FROM fgc.arbitrage_check
+            WHERE validation_run_id = #{validationRunId} AND result_status = 'REVIEW_REQUIRED')    AS arbitrageReviewRequiredCount,
+          (SELECT COUNT(*) FROM fgc.journal_header
+            WHERE validation_run_id = #{validationRunId})                                          AS journalCount,
+          (SELECT COUNT(*) FROM fgc.journal_header jh
+             JOIN fgc.vw_journal_imbalance vji ON vji.journal_header_id = jh.journal_header_id
+            WHERE jh.validation_run_id = #{validationRunId})                                       AS journalImbalanceCount,
+          (SELECT COUNT(*) FROM fgc.reconciliation_result rr
+             JOIN fgc.reconciliation_run recon ON recon.reconciliation_run_id = rr.reconciliation_run_id
+            WHERE recon.validation_run_id = #{validationRunId})                                    AS reconciliationResultCount,
+          (SELECT COUNT(*) FROM fgc.reconciliation_result rr
+             JOIN fgc.reconciliation_run recon ON recon.reconciliation_run_id = rr.reconciliation_run_id
+            WHERE recon.validation_run_id = #{validationRunId}
+              AND rr.result_type &lt;&gt; 'MATCHED')                                                AS reconciliationMismatchCount
+    </select>
+
+</mapper>

@@ -49,4 +49,10 @@ public class ValidationRunSearchServiceImpl implements ValidationRunSearchServic
         // 4) PageResponse로 조립
          return PageResponse.of(rows, page, size, total, "validationMonth,desc");
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsActiveMonthlyRun(java.time.LocalDate validationMonth) {
+        return validationRunMapper.existsActiveMonthlyRun(validationMonth);
+    }
 }

@@ -51,9 +51,15 @@ class ValidationRunControllerTest {
     @MockitoBean
     private ValidationRunCreateService validationRunCreateService;
 
-    // 컨트롤러 생성자가 두 서비스를 다 필요로 하므로 이 테스트에서 안 쓰더라도 빈으로 있어야 한다
+    // 컨트롤러 생성자가 서비스 4개를 다 필요로 하므로 이 테스트에서 안 쓰더라도 빈으로 있어야 한다
     @MockitoBean
     private ValidationRunSearchService validationRunSearchService;
+
+    @MockitoBean
+    private com.susukkang.fgc.validation.service.ValidationRunDetailService validationRunDetailService;
+
+    @MockitoBean
+    private com.susukkang.fgc.validation.service.ValidationRunExecuteService validationRunExecuteService;
 
     private ValidationRunRow createdRow() {
         ValidationRunRow row = new ValidationRunRow();
