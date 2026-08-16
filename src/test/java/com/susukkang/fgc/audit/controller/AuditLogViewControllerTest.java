@@ -17,14 +17,20 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.regex.Pattern;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -95,11 +101,70 @@ class AuditLogViewControllerTest {
                 .andExpect(content().string(containsString("FGC-UI-AUDT-W01")));
     }
 
+    @Test
+    void audit_log_screen_renders_for_system_admin() throws Exception {
+        stubSearch(List.of());
+        mvc.perform(get("/audit-logs").with(user(userWithRole(4L, "admin", "SYSTEM_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("FGC-UI-AUDT-W01")));
+    }
+
     /** FUN-002 인수조건: 권한 없는 역할의 직접 URL 호출은 403 으로 차단된다. */
     @Test
     void audit_log_screen_forbidden_for_settlement() throws Exception {
         mvc.perform(get("/audit-logs").with(user(userWithRole(1L, "settle01", "SETTLEMENT"))))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * MPA 는 GlobalExceptionHandler(@RestController 한정) 밖 — 사용자가 폼으로 만들 수 있는
+     * 시작일 > 종료일 입력이 업무 예외로 500 화면에 떨어지지 않고 조용히 정상화되어야 한다.
+     */
+    @Test
+    void swaps_inverted_date_range_instead_of_error_page() throws Exception {
+        stubSearch(List.of());
+        mvc.perform(get("/audit-logs")
+                        .param("from", "2026-08-16")
+                        .param("to", "2026-08-01")
+                        .with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("FGC-UI-AUDT-W01")));
+        verify(auditLogQueryService).search(isNull(), isNull(), isNull(), isNull(),
+                eq(LocalDate.parse("2026-08-01")), eq(LocalDate.parse("2026-08-16")), eq(1), eq(20));
+    }
+
+    @Test
+    void clamps_invalid_page_to_first_page() throws Exception {
+        stubSearch(List.of());
+        mvc.perform(get("/audit-logs").param("page", "0").with(user(complianceUser())))
+                .andExpect(status().isOk());
+        verify(auditLogQueryService).search(isNull(), isNull(), isNull(), isNull(),
+                isNull(), isNull(), eq(1), eq(20));
+    }
+
+    /** 검색조건이 서비스로 그대로 전달되고, 20행을 넘으면 페이지 이동이 렌더링된다 (§4-1 공통 규칙 7). */
+    @Test
+    void passes_filters_to_service_and_renders_pagination() throws Exception {
+        stubSearch(List.of());
+        given(auditLogQueryService.search(
+                eq("COMMISSION_PAYMENT"), eq("42"), eq(12L), eq("PAYMENT_CONFIRMED"),
+                eq(LocalDate.parse("2026-08-01")), eq(LocalDate.parse("2026-08-16")), eq(2), eq(20)))
+                .willReturn(PageResponse.of(
+                        List.of(log(21L, "settle01", null, null)), 2, 20, 50, "occurredAt,desc"));
+
+        mvc.perform(get("/audit-logs")
+                        .param("entityType", "COMMISSION_PAYMENT")
+                        .param("entityId", "42")
+                        .param("userId", "12")
+                        .param("action", "PAYMENT_CONFIRMED")
+                        .param("from", "2026-08-01")
+                        .param("to", "2026-08-16")
+                        .param("page", "2")
+                        .with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("2 / 3")))
+                .andExpect(content().string(containsString("이전")))
+                .andExpect(content().string(containsString("다음")));
     }
 
     @Test
@@ -147,7 +212,14 @@ class AuditLogViewControllerTest {
                 .andExpect(content().string(containsString("attributions[0].contractId")))
                 .andExpect(content().string(containsString("500000")))
                 .andExpect(content().string(containsString("700000")))
-                .andExpect(content().string(containsString("background:#fff3bf")));
+                // 변경된 payment.amount 의 이전·이후 두 칸만 노랗다 —
+                // 변경 없는 payment.status·attributions[0].contractId 행은 칠하지 않는다
+                .andExpect(result -> {
+                    String html = result.getResponse().getContentAsString();
+                    long highlightedCells = Pattern.compile("background:#fff3bf")
+                            .matcher(html).results().count();
+                    assertThat(highlightedCells).isEqualTo(2);
+                });
     }
 
     /** 한쪽이 JSON 객체가 아니면(파싱 실패 포함) 필드 비교 대신 원문 한 줄 비교 — 원문이 diff 에서 사라지면 안 된다. */

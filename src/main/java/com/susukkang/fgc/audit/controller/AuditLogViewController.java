@@ -55,6 +55,17 @@ public class AuditLogViewController {
             @RequestParam(required = false) Long selected,
             Model model
     ) {
+        // MPA @Controller 는 GlobalExceptionHandler(@RestController 한정) 밖이라 업무 예외가
+        // 그대로 일반 500 화면이 된다. 사용자가 폼·URL 로 만들 수 있는 잘못된 값은
+        // ExceptionCaseViewController 의 status 처럼 조용히 정상값으로 되돌려, "MPA 는 업무
+        // 예외를 던지지 않는다"는 GlobalExceptionHandler 의 전제를 지킨다.
+        if (from != null && to != null && from.isAfter(to)) {
+            LocalDate swap = from;
+            from = to;
+            to = swap;
+        }
+        page = Math.max(1, Math.min(page, Integer.MAX_VALUE / PAGE_SIZE));
+
         PageResponse<AuditLogResponse> logs =
                 auditLogQueryService.search(entityType, entityId, userId, action, from, to, page, PAGE_SIZE);
 
