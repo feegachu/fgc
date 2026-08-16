@@ -39,12 +39,15 @@ jobs:
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
-
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
-
+          #
+          # 아래 설정은 Gradle 테스트 명령을 "미리 허용(allow)"해서,
+          # Claude가 매번 승인을 기다리지 않고 바로 ./gradlew test 를 실행하게 합니다.
+          # - Bash(./gradlew test)     : ./gradlew test  (옵션 없는 그대로의 명령)
+          # - Bash(./gradlew test:*)   : ./gradlew test  뒤에 옵션이 붙는 경우 (예: --info, --stacktrace)
+          claude_args: '--allowed-tools "Bash(./gradlew test),Bash(./gradlew test:*)"'
