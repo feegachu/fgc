@@ -38,8 +38,7 @@
                 LIKE CONCAT('%', #{condition.contractNo}, '%')
             </if>
 
-            <if test="condition.stage != null
-                      and condition.stage != ''">
+            <if test="condition.stage != null">
                 AND sh.payment_stage = #{condition.stage}
             </if>
 
@@ -47,13 +46,11 @@
                 AND sh.schedule_regime = #{condition.regime}
             </if>
 
-            <if test="condition.purpose != null
-                      and condition.purpose != ''">
+            <if test="condition.purpose != null">
                 AND sh.schedule_purpose = #{condition.purpose}
             </if>
 
-            <if test="condition.status != null
-                      and condition.status != ''">
+            <if test="condition.status != null">
                 AND sh.status = #{condition.status}
             </if>
         </where>
@@ -84,8 +81,7 @@
                 LIKE CONCAT('%', #{condition.contractNo}, '%')
             </if>
 
-            <if test="condition.stage != null
-                      and condition.stage != ''">
+            <if test="condition.stage != null">
                 AND sh.payment_stage = #{condition.stage}
             </if>
 
@@ -93,13 +89,11 @@
                 AND sh.schedule_regime = #{condition.regime}
             </if>
 
-            <if test="condition.purpose != null
-                      and condition.purpose != ''">
+            <if test="condition.purpose != null">
                 AND sh.schedule_purpose = #{condition.purpose}
             </if>
 
-            <if test="condition.status != null
-                      and condition.status != ''">
+            <if test="condition.status != null">
                 AND sh.status = #{condition.status}
             </if>
         </where>

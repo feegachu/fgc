@@ -1,6 +1,9 @@
 package com.susukkang.fgc.contract.service;
 
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
@@ -39,6 +42,7 @@ import java.util.Objects;
 public class ContractService {
 
     private final ContractMapper contractMapper;
+    private final CapCheckMapper capCheckMapper;
     private final ContractStatusEventMapper contractStatusEventMapper;
     private final CapCheckService capCheckService;
     private final ScheduleService scheduleService;
@@ -149,14 +153,31 @@ public class ContractService {
         ScheduleGenerationResult scheduleResult =
                 scheduleService.generateSchedules(insuranceContract);
 
-        /*
-         * TODO(FUN-030, REG-08~11)
-         * 계약 저장 및 예상 스케줄 생성 완료 후 다음 양방향 1,200% 한도 검증을 수행한다.
-         * 1. 보험회사 → GA (PaymentStage.INSURER_TO_GA)
-         * 2. GA → FC     (PaymentStage.GA_TO_FC)
-         * 각 단계별 CapCalculationCommand를 생성하여
-         * capCheckService.calculateAndSave()를 호출한다.
-         */
+        // FUN-030: 계약 저장 및 예상 스케줄 생성 후 양방향 1,200% 한도 검증
+        Long contractId = insuranceContract.getContractId();
+
+        for (PaymentStage paymentStage : PaymentStage.values()) {
+            BigDecimal complianceEvidenceAmount = null;
+
+            // 준법경영비 공제는 보험회사 → GA 단계에만 적용
+            if (paymentStage == PaymentStage.INSURER_TO_GA) {
+                complianceEvidenceAmount =
+                        capCheckMapper.selectComplianceEvidenceAmount(
+                                contractId,
+                                paymentStage
+                        );
+            }
+
+            CapCalculationCommand command =
+                    CapCalculationCommand.realtime(
+                            contractId,
+                            paymentStage,
+                            request.getContractDate(),
+                            complianceEvidenceAmount
+                    );
+
+            capCheckService.calculateAndSave(command);
+        }
 
         // TODO(FUN-026, 2차): 계약 생성 상태 사건 이력을 등록한다.
 
