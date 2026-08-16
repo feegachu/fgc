@@ -20,342 +20,133 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-POL-W01', '정책·룰셋 조회', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
-
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div>
-      <h1 class="fgc-page-title">정책 · 룰셋 조회</h1>
-      <p class="fgc-page-desc">
+<main id="main-content" class="page-content publishing-page publishing-page-list policy-page">
+  <header class="page-header policy-page-header">
+    <div class="page-header-copy">
+      <h1 class="page-title">정책 · 룰셋 조회</h1>
+      <p class="page-description">
         수수료를 얼마나 줄지, 무엇을 1,200% 한도에 넣을지를 정해 둔 <strong>규칙표</strong>입니다.
         계산에 쓰이는 모든 숫자는 코드가 아니라 여기서 읽습니다(COR-004).
       </p>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <label class="fgc-label" for="as-of" style="margin:0">적용 기준일</label>
+    <div class="field policy-date-field">
+      <label class="field-label" for="as-of">적용 기준일</label>
       <!-- 기준일 변경은 MPA 전체 리로드(SIR-006) — 서버가 유효기간으로 다시 거른다 -->
-      <input class="fgc-input" id="as-of" type="date" th:value="${asOf}" value="2026-07-01" style="padding:5px 8px">
+      <input class="field-control" id="as-of" type="date" th:value="${asOf}" value="2026-07-01">
     </div>
-  </div>
+  </header>
 
-  <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
-    <span class="material-symbols-outlined" style="font-size:18px">event</span>
-    <span>
-      <strong>기준일을 "오늘"로 잡으면 안 되는 경우가 많습니다.</strong>
-      1,200%룰과 차익거래는 <strong>계약 체결일</strong> 기준으로 정책을 고르고,
-      분급 체계는 <strong>상품 판매개시일·기초서류 버전</strong> 기준으로 고릅니다(REG-19).
-      두 기준을 섞으면 전혀 다른 요율이 적용됩니다.
-    </span>
-  </div>
+  <aside class="guidance guidance-warning" aria-labelledby="policy-date-guidance-title">
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">event</span>
+    <div>
+      <h2 id="policy-date-guidance-title" class="guidance-title">기준일을 “오늘”로 잡으면 안 되는 경우가 많습니다</h2>
+      <p class="guidance-copy">
+        1,200%룰과 차익거래는 <strong>계약 체결일</strong> 기준으로 정책을 고르고,
+        분급 체계는 <strong>상품 판매개시일·기초서류 버전</strong> 기준으로 고릅니다(REG-19).
+        두 기준을 섞으면 전혀 다른 요율이 적용됩니다.
+      </p>
+    </div>
+  </aside>
 
-  <div class="fgc-banner fgc-banner--muted" style="margin-top:10px">
-    <span class="material-symbols-outlined" style="font-size:18px">palette</span>
-    <span>
-      출처 색: <span class="fgc-badge fgc-badge--src-regulatory">규제</span>
-      <span class="fgc-badge fgc-badge--src-insurer">보험사 규칙</span>
-      <span class="fgc-badge fgc-badge--src-ga">회사 정책</span>
-      <span class="fgc-badge fgc-badge--src-assumption">프로젝트 가정</span>
-      — <strong>주황색(프로젝트 가정)은 실제 규정이 아니라 우리가 임시로 정한 값</strong>이라는 뜻입니다.
-      발표 때 이 값을 법정 기준처럼 말하면 안 됩니다.
-    </span>
-  </div>
+  <aside class="guidance guidance-neutral policy-source-guidance" aria-labelledby="policy-source-guidance-title">
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">palette</span>
+    <div>
+      <h2 id="policy-source-guidance-title" class="guidance-title">정책 출처 구분</h2>
+      <p class="guidance-copy policy-source-copy">
+        <span class="fgc-badge fgc-badge--src-regulatory">규제</span>
+        <span class="fgc-badge fgc-badge--src-insurer">보험사 규칙</span>
+        <span class="fgc-badge fgc-badge--src-ga">회사 정책</span>
+        <span class="fgc-badge fgc-badge--src-assumption">프로젝트 가정</span>
+        <span><strong>프로젝트 가정은 실제 규정이 아니라 임시로 정한 값</strong>이며 법정 기준으로 사용하지 않습니다.</span>
+      </p>
+    </div>
+  </aside>
 
-  <div style="margin-top:16px">
-    <div class="fgc-tabs" role="tablist">
-      <button class="fgc-tab" type="button" role="tab" aria-selected="true"  aria-controls="tab-version" id="p1">정책 버전</button>
-      <button class="fgc-tab" type="button" role="tab" aria-selected="false" aria-controls="tab-rule"    id="p2" tabindex="-1">수수료 규칙</button>
-      <button class="fgc-tab" type="button" role="tab" aria-selected="false" aria-controls="tab-cap"     id="p3" tabindex="-1">1,200% 룰셋</button>
-      <button class="fgc-tab" type="button" role="tab" aria-selected="false" aria-controls="tab-refund"  id="p4" tabindex="-1">예상 해약환급률표</button>
+  <div class="policy-tabs">
+    <div class="tab-list" role="tablist" aria-label="정책 상세 구분">
+      <button class="tab-button" type="button" role="tab" aria-selected="true"  aria-controls="tab-version" id="p1" data-policy-tab>정책 버전</button>
+      <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-rule"    id="p2" tabindex="-1" data-policy-tab>수수료 규칙</button>
+      <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-cap"     id="p3" tabindex="-1" data-policy-tab>1,200% 룰셋</button>
+      <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-refund"  id="p4" tabindex="-1" data-policy-tab>예상 해약환급률표</button>
     </div>
 
     <!-- 탭1 정책 버전 — 서버 렌더 (IF-API-09 데이터). 행 클릭으로 상세 대상 정책을 고른다 -->
-    <section class="fgc-tabpanel fgc-card" id="tab-version" role="tabpanel" aria-labelledby="p1" style="border-top:0;border-radius:0 0 .5rem .5rem">
-      <div class="fgc-card__head">
-        <span class="fgc-card__title">정책 버전</span>
-        <span class="fgc-muted" style="font-size:12px"
-              th:text="|기준일 ${asOf} &middot; ${#lists.size(policyVersions)}건 &middot; 행을 클릭하면 나머지 탭에서 그 정책의 상세를 봅니다|">0건</span>
+    <section class="surface tab-panel policy-tab-panel" id="tab-version" role="tabpanel" aria-labelledby="p1" data-policy-panel>
+      <header class="surface-header policy-panel-header">
+        <h2 class="surface-title">정책 버전</h2>
+        <p class="policy-panel-caption"
+           th:text="|기준일 ${asOf} &middot; ${#lists.size(policyVersions)}건 &middot; 행을 선택하면 나머지 탭에서 상세를 확인할 수 있습니다|">0건</p>
+      </header>
+      <div class="data-table-viewport policy-version-table-viewport">
+        <table class="data-table policy-version-table">
+          <caption class="visually-hidden">적용 기준일의 정책 버전 목록</caption>
+          <colgroup>
+            <col class="policy-col-code"><col class="policy-col-name"><col class="policy-col-type">
+            <col class="policy-col-source"><col class="policy-col-version"><col class="policy-col-date">
+            <col class="policy-col-date"><col class="policy-col-status"><col class="policy-col-reference">
+          </colgroup>
+          <thead>
+          <tr>
+            <th scope="col">정책코드</th><th scope="col">정책이름</th><th scope="col">유형</th><th scope="col">출처분류</th>
+            <th scope="col" class="is-number">버전</th><th scope="col">적용 시작</th><th scope="col">적용 종료</th><th scope="col">상태</th><th scope="col">근거</th>
+          </tr>
+          </thead>
+          <tbody>
+          <!-- 근거(REG) 미기재 행은 회색 + "근거 미기재" — 화면정의서 POL-W01 표시 규칙 -->
+          <tr th:each="v : ${policyVersions}"
+              class="policy-row"
+              th:classappend="${#lists.isEmpty(v.regulationRefs())} ? 'policy-row-missing-reference' : ''"
+              th:data-policy-version-id="${v.policyVersionId()}"
+              th:data-policy-code="${v.policyCode()}"
+              th:data-version-no="${v.versionNo()}"
+              data-policy-row tabindex="0" aria-selected="false">
+            <td class="tabular-nums" th:text="${v.policyCode()}">REG-CAP-GA-2026-V1</td>
+            <td th:text="${v.policyName()}">정책 이름</td>
+            <td th:text="${v.policyTypeLabel()}">1,200% 한도</td>
+            <td><span class="fgc-badge" th:classappend="${v.sourceClass().badgeClass()}"
+                      th:text="${v.sourceClassLabel()}">규제</span></td>
+            <td class="is-number tabular-nums" th:text="|v${v.versionNo()}|">v1</td>
+            <td class="tabular-nums" th:text="${v.effectiveFrom()}">2026-07-01</td>
+            <td class="tabular-nums" th:text="${v.effectiveTo()} ?: '계속'">계속</td>
+            <td><span class="fgc-badge" th:classappend="${v.status().badgeClass()}"
+                      th:text="${v.statusLabel()}">적용중</span></td>
+            <td>
+              <span th:if="${#lists.isEmpty(v.regulationRefs())}" class="fgc-badge fgc-badge--review">근거 미기재</span>
+              <span th:unless="${#lists.isEmpty(v.regulationRefs())}" class="tabular-nums"
+                    th:text="${#strings.listJoin(v.regulationRefs(), ' · ')}">REG-08 · REG-09</span>
+            </td>
+          </tr>
+          <tr class="policy-state-row" th:if="${#lists.isEmpty(policyVersions)}">
+            <td colspan="9"><div class="empty-state policy-empty-state">기준일에 적용되는 정책 버전이 없습니다. 기준일을 바꿔 보세요.</div></td>
+          </tr>
+          </tbody>
+        </table>
       </div>
-      <table class="fgc-table">
-        <thead>
-        <tr>
-          <th>정책코드</th><th>정책이름</th><th>유형</th><th>출처분류</th>
-          <th class="fgc-th-num">버전</th><th>적용 시작</th><th>적용 종료</th><th>상태</th><th>근거</th>
-        </tr>
-        </thead>
-        <tbody>
-        <!-- 근거(REG) 미기재 행은 회색 + "근거 미기재" — 화면정의서 POL-W01 표시 규칙 -->
-        <tr th:each="v : ${policyVersions}"
-            class="fgc-policy-row"
-            th:data-policy-version-id="${v.policyVersionId()}"
-            th:data-policy-code="${v.policyCode()}"
-            th:data-version-no="${v.versionNo()}"
-            th:style="${#lists.isEmpty(v.regulationRefs())} ? 'color:#74777e;cursor:pointer' : 'cursor:pointer'">
-          <td class="fgc-mono" th:text="${v.policyCode()}">REG-CAP-GA-2026-V1</td>
-          <td th:text="${v.policyName()}">정책 이름</td>
-          <td th:text="${v.policyTypeLabel()}">1,200% 한도</td>
-          <td><span class="fgc-badge" th:classappend="${v.sourceClass().badgeClass()}"
-                    th:text="${v.sourceClassLabel()}">규제</span></td>
-          <td class="fgc-td-num fgc-mono" th:text="|v${v.versionNo()}|">v1</td>
-          <td class="fgc-mono" th:text="${v.effectiveFrom()}">2026-07-01</td>
-          <td class="fgc-mono" th:text="${v.effectiveTo()} ?: '계속'">계속</td>
-          <td><span class="fgc-badge" th:classappend="${v.status().badgeClass()}"
-                    th:text="${v.statusLabel()}">적용중</span></td>
-          <td>
-            <span th:if="${#lists.isEmpty(v.regulationRefs())}" class="fgc-badge fgc-badge--review">근거 미기재</span>
-            <span th:unless="${#lists.isEmpty(v.regulationRefs())}" class="fgc-mono"
-                  th:text="${#strings.listJoin(v.regulationRefs(), ' · ')}">REG-08 · REG-09</span>
-          </td>
-        </tr>
-        <tr th:if="${#lists.isEmpty(policyVersions)}">
-          <td colspan="9"><div class="fgc-empty">기준일에 적용되는 정책 버전이 없습니다. 기준일을 바꿔 보세요.</div></td>
-        </tr>
-        </tbody>
-      </table>
     </section>
 
     <!-- 탭2~4 — 선택된 정책의 상세를 탭 클릭 시 IF-API-10 Ajax 로 채운다 -->
-    <section class="fgc-tabpanel fgc-card" id="tab-rule" role="tabpanel" aria-labelledby="p2" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden>
-      <div class="fgc-card__head">
-        <span class="fgc-card__title">수수료 규칙</span>
-        <span class="fgc-muted" style="font-size:12px" data-selected-policy></span>
-      </div>
-      <div data-detail-body><div class="fgc-empty" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
+    <section class="surface tab-panel policy-tab-panel" id="tab-rule" role="tabpanel" aria-labelledby="p2" data-policy-panel hidden>
+      <header class="surface-header policy-panel-header">
+        <h2 class="surface-title">수수료 규칙</h2>
+        <p class="policy-panel-caption" data-selected-policy></p>
+      </header>
+      <div class="policy-detail-body" data-detail-body><div class="empty-state policy-empty-state" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
     </section>
-    <section class="fgc-tabpanel fgc-card" id="tab-cap" role="tabpanel" aria-labelledby="p3" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden>
-      <div class="fgc-card__head">
-        <span class="fgc-card__title">1,200% 룰셋</span>
-        <span class="fgc-muted" style="font-size:12px" data-selected-policy></span>
-      </div>
-      <div data-detail-body><div class="fgc-empty" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
+    <section class="surface tab-panel policy-tab-panel" id="tab-cap" role="tabpanel" aria-labelledby="p3" data-policy-panel hidden>
+      <header class="surface-header policy-panel-header">
+        <h2 class="surface-title">1,200% 룰셋</h2>
+        <p class="policy-panel-caption" data-selected-policy></p>
+      </header>
+      <div class="policy-detail-body" data-detail-body><div class="empty-state policy-empty-state" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
     </section>
-    <section class="fgc-tabpanel fgc-card" id="tab-refund" role="tabpanel" aria-labelledby="p4" style="border-top:0;border-radius:0 0 .5rem .5rem" hidden>
-      <div class="fgc-card__head">
-        <span class="fgc-card__title">예상 해약환급률표</span>
-        <span class="fgc-muted" style="font-size:12px" data-selected-policy></span>
-      </div>
-      <div data-detail-body><div class="fgc-empty" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
+    <section class="surface tab-panel policy-tab-panel" id="tab-refund" role="tabpanel" aria-labelledby="p4" data-policy-panel hidden>
+      <header class="surface-header policy-panel-header">
+        <h2 class="surface-title">예상 해약환급률표</h2>
+        <p class="policy-panel-caption" data-selected-policy></p>
+      </header>
+      <div class="policy-detail-body" data-detail-body><div class="empty-state policy-empty-state" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
     </section>
   </div>
-
-<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
-<style>
-  .fgc-policy-row.is-selected td { background: rgba(29, 78, 216, .08); }
-</style>
-<script>
-/* 탭 전환 + 정책 선택 + IF-API-10 상세 Ajax (인터페이스정의서 §5-2·§5-3).
-   조회 전용 화면 — 수정·등록 UI 를 만들지 않는다(1차, POL-W02 는 2차). */
-(function () {
-  "use strict";
-  var tabs = Array.from(document.querySelectorAll(".fgc-tab"));
-  var DETAIL_TABS = ["tab-rule", "tab-cap", "tab-refund"];
-  var selected = null;   // { id, code, versionNo }
-  var detail = null;     // 선택 정책의 IF-API-10 응답 data 캐시 (탭 3개가 1회 호출을 공유)
-  var loadingFor = null; // 요청 중인 selected 참조 — 선택이 바뀐 뒤 도착한 늦은 응답을 버리는 기준
-
-  function esc(value) {
-    return String(value == null ? "" : value)
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-  function dash(value) { return value == null || value === "" ? "-" : esc(value); }
-
-  /* 심층 항목 코드의 화면 라벨 — IF-API-10 은 심층 코드에 라벨을 싣지 않는다(#106 결정).
-     목업 fgc-seed 의 판정 배지 매핑을 그대로 옮겼다. */
-  var INCLUSION = {
-    INCLUDED: ["산입", "fgc-badge--normal"],
-    EXCLUDED: ["제외", "fgc-badge--neutral"],
-    REVIEW_REQUIRED: ["검토 필요", "fgc-badge--review"]
-  };
-  var CALC = { RATE: "요율", FIXED: "정액" };
-
-  function inclusionBadge(code) {
-    var m = INCLUSION[code] || [code, "fgc-badge--neutral"];
-    return "<span class='fgc-badge " + m[1] + "' title='" + esc(code) + "'>" + esc(m[0]) + "</span>";
-  }
-
-  function setDetailState(message) {
-    document.querySelectorAll("[data-detail-body]").forEach(function (body) {
-      body.innerHTML = "<div class='fgc-empty' data-detail-state>" + esc(message) + "</div>";
-    });
-  }
-  function setSelectedCaption() {
-    var text = selected ? "선택 정책: " + selected.code + " v" + selected.versionNo : "";
-    document.querySelectorAll("[data-selected-policy]").forEach(function (el) { el.textContent = text; });
-  }
-
-  function renderRules(rules) {
-    /* 컬럼은 화면정의서 :473 동결 목록 그대로 — 지급단계·보험사·상품·직급·항목·회차구간·계산방식·기준코드·요율/정액 */
-    var rows = rules.map(function (r) {
-      return "<tr>"
-          + "<td>" + esc(r.paymentStageLabel) + "</td>"
-          + "<td>" + (r.insurerName == null ? "전체" : esc(r.insurerName)) + "</td>"
-          + "<td>" + (r.productName == null ? "전체" : esc(r.productName)) + "</td>"
-          + "<td class='fgc-mono'>" + dash(r.agentRankCode) + "</td>"
-          + "<td>" + esc(r.itemName) + "</td>"
-          + "<td class='fgc-mono'>" + esc(r.installmentFrom) + "~" + esc(r.installmentTo) + "회차</td>"
-          + "<td>" + esc(CALC[r.calculationType] || r.calculationType) + "</td>"
-          + "<td class='fgc-mono'>" + esc(r.basisCode) + "</td>"
-          + "<td class='fgc-td-num fgc-rate'>" + dash(r.ratePct) + "</td>"
-          + "<td class='fgc-td-num fgc-num'>" + (r.fixedAmount == null ? "-" : Number(r.fixedAmount).toLocaleString("ko-KR")) + "</td>"
-          + "</tr>";
-    }).join("");
-    if (!rows) return "<div class='fgc-empty'>이 정책에는 수수료 규칙이 없습니다.</div>";
-    return "<table class='fgc-table'><thead><tr>"
-        + "<th>지급단계</th><th>보험사</th><th>상품</th><th>직급</th><th>수수료 항목</th>"
-        + "<th>회차 구간</th><th>계산방식</th><th>기준코드</th>"
-        + "<th class='fgc-th-num'>요율(%)</th><th class='fgc-th-num'>정액(원)</th>"
-        + "</tr></thead><tbody>" + rows + "</tbody></table>";
-  }
-
-  function renderCapSets(sets) {
-    if (!sets.length) return "<div class='fgc-empty'>이 정책에는 1,200% 룰셋이 없습니다.</div>";
-    var head = "<table class='fgc-table'><thead><tr>"
-        + "<th>지급단계</th><th>계약일 범위</th><th class='fgc-th-num'>초년도 개월</th>"
-        + "<th class='fgc-th-num'>배수</th><th class='fgc-th-num'>준법경영비 공제율(%)</th>"
-        + "<th class='fgc-th-num'>주의 기준(%)</th><th>환급금 가산 조건</th>"
-        + "</tr></thead><tbody>"
-        + sets.map(function (s) {
-          return "<tr>"
-              + "<td>" + esc(s.paymentStageLabel) + "</td>"
-              + "<td class='fgc-mono'>" + esc(s.contractDateFrom) + " ~ " + (s.contractDateTo == null ? "계속" : esc(s.contractDateTo)) + "</td>"
-              + "<td class='fgc-td-num'>" + esc(s.firstYearMonths) + "</td>"
-              + "<td class='fgc-td-num fgc-rate'>" + esc(s.premiumMultiplier) + "</td>"
-              + "<td class='fgc-td-num fgc-rate'>" + esc(s.complianceDeductionPct) + "</td>"
-              + "<td class='fgc-td-num fgc-rate'>" + esc(s.warningUsagePct) + "</td>"
-              + "<td class='fgc-mono'>" + esc(s.refundAdditionCondition) + "</td>"
-              + "</tr>";
-        }).join("") + "</tbody></table>";
-    var items = sets.map(function (s) {
-      var itemRows = (s.items || []).map(function (i) {
-        return "<tr>"
-            + "<td>" + esc(i.itemName) + "</td>"
-            + "<td>" + inclusionBadge(i.inclusionStatus) + "</td>"
-            + "<td class='fgc-mono'>" + dash(i.exclusionType) + "</td>"
-            + "<td class='fgc-mono'>" + esc(i.attributionMethod) + "</td>"
-            + "<td>" + esc(i.decisionReason) + "</td>"
-            + "</tr>";
-      }).join("");
-      if (!itemRows) return "";
-      return "<h3 style='font-size:13px;margin:16px 0 6px'>항목별 산입 판정 — " + esc(s.paymentStageLabel) + "</h3>"
-          + "<table class='fgc-table'><thead><tr>"
-          + "<th>수수료 항목</th><th>판정</th><th>제외 유형</th><th>귀속 방법</th><th>판단 이유 (필수 저장값)</th>"
-          + "</tr></thead><tbody>" + itemRows + "</tbody></table>";
-    }).join("");
-    return head + items;
-  }
-
-  function renderRefundTables(tables) {
-    if (!tables.length) return "<div class='fgc-empty'>이 정책에는 예상 해약환급률표가 없습니다.</div>";
-    return tables.map(function (t) {
-      var lineRows = (t.lines || []).map(function (l) {
-        /* 12차월 값은 표준해약공제액 80% 이상 공제 대상 표에서만 1,200% 한도에 합산된다(REG-08) */
-        var mark = (l.contractMonthNo === 12 && t.standardDeduction80Yn)
-            ? " <span class='fgc-badge fgc-badge--warning'>1,200% 한도 가산에 쓰는 값</span>" : "";
-        return "<tr><td class='fgc-td-num'>" + esc(l.contractMonthNo) + "차월</td>"
-            + "<td class='fgc-td-num fgc-rate'>" + esc(l.refundRatePct) + "%" + "</td>"
-            + "<td>" + mark + "</td></tr>";
-      }).join("");
-      return "<h3 style='font-size:13px;margin:16px 0 6px'>"
-          + esc(t.insurerName) + " · " + esc(t.productName)
-          + " · 납입 " + esc(t.paymentTermMonths) + "개월 · 채널 " + esc(t.channelCode) + "</h3>"
-          + "<table class='fgc-table' style='margin-bottom:8px'><tbody>"
-          + "<tr><td class='fgc-muted'>표준해약공제액 80% 이상 공제 대상</td><td>" + (t.standardDeduction80Yn ? "예" : "아니오") + "</td>"
-          + "<td class='fgc-muted'>적용 기간</td><td class='fgc-mono'>" + esc(t.effectiveFrom) + " ~ " + (t.effectiveTo == null ? "계속" : esc(t.effectiveTo)) + "</td></tr>"
-          + "<tr><td class='fgc-muted'>표 버전(원천 상품코드)</td><td class='fgc-mono'>" + esc(t.sourceProductCode) + "</td>"
-          + "<td class='fgc-muted'>원천 문서</td><td>" + esc(t.sourceDocumentRef) + "</td></tr>"
-          + "</tbody></table>"
-          + "<table class='fgc-table'><thead><tr><th class='fgc-th-num'>차월</th>"
-          + "<th class='fgc-th-num'>예상 해약환급률(%)</th><th>비고</th></tr></thead>"
-          + "<tbody>" + lineRows + "</tbody></table>";
-    }).join("");
-  }
-
-  function renderDetail() {
-    document.querySelector("#tab-rule [data-detail-body]").innerHTML = renderRules(detail.commissionRules || []);
-    document.querySelector("#tab-cap [data-detail-body]").innerHTML = renderCapSets(detail.capRuleSets || []);
-    document.querySelector("#tab-refund [data-detail-body]").innerHTML = renderRefundTables(detail.refundRateTables || []);
-  }
-
-  function ensureDetail() {
-    if (!selected) { setDetailState("정책 버전 탭에서 정책을 선택하세요."); return; }
-    if (detail || loadingFor === selected) return;
-    var apiClient = window.FgcUi && window.FgcUi.apiClient;
-    if (!apiClient) { setDetailState("공통 API 클라이언트를 불러오지 못했습니다."); return; }
-    var current = selected;
-    loadingFor = current;
-    setDetailState("불러오는 중…");
-    apiClient.request("/api/v1/policies/" + encodeURIComponent(current.id))
-        .then(function (response) {
-          if (loadingFor !== current) return; // 다른 정책이 선택된 뒤 도착한 응답 — 버린다
-          detail = response.data || {};
-          renderDetail();
-        })
-        .catch(function (error) {
-          if (loadingFor !== current) return;
-          var message = error && error.message ? error.message : "정책 상세를 불러오지 못했습니다.";
-          setDetailState(message);
-          if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(message, "error");
-        })
-        .finally(function () { if (loadingFor === current) loadingFor = null; });
-  }
-
-  function selectRow(row) {
-    document.querySelectorAll(".fgc-policy-row").forEach(function (candidate) {
-      candidate.classList.toggle("is-selected", candidate === row);
-    });
-    selected = {
-      id: row.getAttribute("data-policy-version-id"),
-      code: row.getAttribute("data-policy-code"),
-      versionNo: row.getAttribute("data-version-no")
-    };
-    detail = null;
-    setSelectedCaption();
-    setDetailState("탭을 클릭하면 이 정책의 상세를 불러옵니다.");
-    var activeTab = tabs.find(function (t) { return t.getAttribute("aria-selected") === "true"; });
-    if (activeTab && DETAIL_TABS.indexOf(activeTab.getAttribute("aria-controls")) >= 0) ensureDetail();
-  }
-
-  document.querySelectorAll(".fgc-policy-row").forEach(function (row) {
-    row.addEventListener("click", function () { selectRow(row); });
-  });
-
-  function activateTab(tab) {
-    tabs.forEach(function (candidate) {
-      var active = candidate === tab;
-      candidate.setAttribute("aria-selected", active ? "true" : "false");
-      candidate.tabIndex = active ? 0 : -1;
-    });
-    document.querySelectorAll(".fgc-tabpanel").forEach(function (panel) {
-      panel.hidden = panel.id !== tab.getAttribute("aria-controls");
-    });
-    if (DETAIL_TABS.indexOf(tab.getAttribute("aria-controls")) >= 0) ensureDetail();
-  }
-
-  tabs.forEach(function (tab) {
-    tab.addEventListener("click", function () { activateTab(tab); });
-    tab.addEventListener("keydown", function (event) {
-      var nextIndex;
-      if (event.key === "ArrowRight") nextIndex = (tabs.indexOf(tab) + 1) % tabs.length;
-      else if (event.key === "ArrowLeft") nextIndex = (tabs.indexOf(tab) - 1 + tabs.length) % tabs.length;
-      else if (event.key === "Home") nextIndex = 0;
-      else if (event.key === "End") nextIndex = tabs.length - 1;
-      else return;
-
-      event.preventDefault();
-      activateTab(tabs[nextIndex]);
-      tabs[nextIndex].focus();
-    });
-  });
-
-  /* 기준일 변경 → MPA 전체 리로드 (SIR-006) */
-  document.getElementById("as-of").addEventListener("change", function () {
-    if (this.value) window.location.assign("/policies?asOf=" + encodeURIComponent(this.value));
-  });
-
-  /* 첫 행 자동 선택 — 목업은 고정 데이터라 선택 장치가 없었으므로 첫 정책을 기본 선택한다 */
-  var firstRow = document.querySelector(".fgc-policy-row");
-  if (firstRow) selectRow(firstRow);
-})();
-</script>
 </main>
 </body>
 </html>

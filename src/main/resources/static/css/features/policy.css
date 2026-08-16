@@ -1,0 +1,179 @@
+.policy-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.policy-page-header {
+  align-items: flex-end;
+}
+
+.policy-date-field {
+  width: 11rem;
+  flex: 0 0 auto;
+  gap: var(--space-1);
+}
+
+.policy-date-field .field-label {
+  color: var(--color-text-secondary);
+}
+
+.policy-source-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.policy-source-copy > :last-child {
+  flex: 1 1 24rem;
+}
+
+.policy-tabs,
+.policy-tab-panel,
+.policy-detail-body {
+  min-width: 0;
+}
+
+.policy-panel-header {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.policy-panel-caption {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-align: right;
+}
+
+.policy-version-table {
+  min-width: 76rem;
+}
+
+.policy-col-code { width: 12.5rem; }
+.policy-col-name { width: 15rem; }
+.policy-col-type { width: 9rem; }
+.policy-col-source { width: 7.5rem; }
+.policy-col-version { width: 4.5rem; }
+.policy-col-date { width: 7.5rem; }
+.policy-col-status { width: 6rem; }
+.policy-col-reference { width: 11.5rem; }
+
+.policy-row {
+  cursor: pointer;
+}
+
+.policy-row:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.policy-row-missing-reference td {
+  color: var(--color-text-tertiary);
+}
+
+.policy-state-row:hover {
+  background: var(--color-bg-surface);
+}
+
+.policy-state-row td {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+}
+
+.policy-empty-state {
+  min-height: 12rem;
+}
+
+.policy-empty-state.is-error {
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
+.policy-detail-table-viewport + .policy-detail-title,
+.policy-refund-metadata + .policy-detail-table-viewport {
+  margin-top: var(--space-2);
+}
+
+.policy-detail-title {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  color: var(--color-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-wrap: pretty;
+}
+
+.policy-rule-table {
+  min-width: 72rem;
+}
+
+.policy-cap-table {
+  min-width: 68rem;
+}
+
+.policy-cap-item-table {
+  min-width: 58rem;
+}
+
+.policy-refund-table {
+  min-width: 42rem;
+}
+
+.policy-refund-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0 var(--space-4);
+}
+
+.policy-refund-metadata > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-8);
+  background: var(--color-bg-subtle);
+}
+
+.policy-refund-metadata dt {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+}
+
+.policy-refund-metadata dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 63.9375rem) {
+  .policy-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: var(--space-2);
+  }
+
+  .policy-panel-caption {
+    text-align: left;
+  }
+
+  .policy-refund-metadata {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .policy-date-field {
+    width: 100%;
+  }
+
+  .policy-refund-metadata > div {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}

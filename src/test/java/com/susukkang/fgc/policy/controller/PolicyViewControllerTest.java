@@ -74,6 +74,8 @@ class PolicyViewControllerTest {
                 .andExpect(content().string(containsString("REG-CAP-GA-2026-V1")))
                 .andExpect(content().string(containsString("fgc-badge--src-regulatory")))
                 .andExpect(content().string(containsString("REG-08 · REG-09")))
+                .andExpect(content().string(containsString("data-table-viewport")))
+                .andExpect(content().string(containsString("data-policy-tab")))
                 // 요율 수정 UI 금지 — 화면정의서 POL-W01 "막아야 할 것" (1차 조회 전용)
                 .andExpect(content().string(not(containsString(">수정</button>"))))
                 .andExpect(content().string(not(containsString(">등록</button>"))))
@@ -90,7 +92,7 @@ class PolicyViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("근거 미기재")))
                 .andExpect(content().string(containsString("fgc-badge--src-assumption")))
-                .andExpect(content().string(containsString("color:#74777e")));
+                .andExpect(content().string(containsString("policy-row-missing-reference")));
     }
 
     /** 화면정의서 :499 — 기준일을 조회 조건에 꼭 넣는다. ?asOf= 가 정산월 기본값을 덮어쓴다. */

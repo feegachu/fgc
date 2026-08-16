@@ -17,6 +17,7 @@ class PublishingTemplateStructureTest {
             "templates/transaction/form.html",
             "templates/schedule/list.html",
             "templates/schedule/detail.html",
+            "templates/policy/list.html",
             "templates/arbitrage/list.html",
             "templates/ledger/list.html",
             "templates/reco/list.html",
@@ -80,6 +81,26 @@ class PublishingTemplateStructureTest {
                 .contains("@media (max-width: 63.9375rem)")
                 .contains("@media (max-width: 47.9375rem)")
                 .contains("@media (prefers-reduced-motion: reduce)");
+    }
+
+    @Test
+    void policyListUsesCommonComponentsWithoutInlinePresentation() throws IOException {
+        assertThat(resource("templates/policy/list.html"))
+                .contains("class=\"page-header policy-page-header\"")
+                .contains("class=\"field policy-date-field\"")
+                .contains("class=\"guidance guidance-warning\"")
+                .contains("class=\"tab-list\"")
+                .contains("class=\"surface tab-panel policy-tab-panel\"")
+                .contains("class=\"data-table-viewport policy-version-table-viewport\"")
+                .contains("class=\"data-table policy-version-table\"")
+                .contains("class=\"empty-state policy-empty-state\"")
+                .doesNotContain("style=")
+                .doesNotContain("<style>")
+                .doesNotContain("<script>");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/policy.css")
+                .contains("/js/features/policy/policy-list.js");
     }
 
     private static String resource(String path) throws IOException {
