@@ -3,7 +3,9 @@ package com.susukkang.fgc.common.web;
 import com.susukkang.fgc.common.security.Roles;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * 1차 21면 중 아직 실데이터 바인딩 전인 화면들의 정적 라우팅.
@@ -46,7 +48,8 @@ public class ScreenViewController {
     }
 
     @GetMapping("/schedules/{id}")
-    public String scheduleDetail() {
+    public String scheduleDetail(@PathVariable Long id, Model model) {
+        model.addAttribute("id", id);
         return "schedule/detail";
     }
 

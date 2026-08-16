@@ -23,7 +23,9 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-SCHE-W02', '예상 스케줄 상세', '현행 예상 스케줄', '/schedules')}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-detail publishing-page-schedule-detail">
+<main id="main-content"
+      class="fgc-main publishing-page publishing-page-detail publishing-page-schedule-detail"
+      th:attr="data-schedule-header-id=${id}">
 
   <!-- 목업 head 의 화면 전용 스타일 — 셸 조각은 main 만 가져가므로 여기로 옮겼다 -->
   <style>

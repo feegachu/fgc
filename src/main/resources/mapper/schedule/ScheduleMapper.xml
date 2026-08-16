@@ -104,6 +104,9 @@
     <resultMap id="scheduleDetailResultMap"
                type="com.susukkang.fgc.schedule.dto.ScheduleDetailResponse">
 
+        <!-- selectOne이 라인 수만큼 루트 객체를 만들지 않도록 상세 헤더를 루트 식별자로 묶는다. -->
+        <id property="scheduleHeaderId" column="schedule_header_id"/>
+
         <!-- 스케줄 헤더 한 건 -->
         <association property="header"
                      javaType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
