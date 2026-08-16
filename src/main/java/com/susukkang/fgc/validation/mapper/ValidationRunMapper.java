@@ -1,6 +1,7 @@
 package com.susukkang.fgc.validation.mapper;
 
 import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import org.apache.ibatis.annotations.Mapper;
@@ -14,6 +15,9 @@ public interface ValidationRunMapper {
 
     /** validation_run_id 단건 조회. 없으면 null. */
     ValidationRunRow findById(@Param("validationRunId") Long validationRunId);
+
+    /** 운영정책서 제44조 여섯 확정 조건의 실패 건수를 한 스냅샷에서 조회한다. */
+    FinalizeChecklistCounts findFinalizeChecklistCounts(@Param("validationRunId") Long validationRunId);
 
     /**
      * (validationMonth, runNo) 복합 유니크 키로 단건 조회. 없으면 null.

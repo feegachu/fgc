@@ -12,11 +12,13 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.CreateValidationRunResponse;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchResponse;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +31,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,6 +54,7 @@ public class ValidationRunController {
 
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunSearchService validationRunSearchService;
+    private final ValidationRunFinalizationService validationRunFinalizationService;
 
     @Operation(
             summary = "검증 실행 생성 (IF-API-45)",
@@ -155,4 +159,26 @@ public class ValidationRunController {
         // 4) 응답 변환
         return ApiResponse.success(ValidationRunSearchResponse.from(pageResponse));
     }
+
+    @Operation(
+            summary = "검증 실행 확정 체크리스트 조회 (IF-API-50)",
+            description = "운영정책서 제44조의 확정 전 필수조건 6개를 문서 순서와 문구 그대로 반환한다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = FinalizeChecklistResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "검증 실행 없음 (FGC-COMMON-004)")
+    })
+    @GetMapping("/{id}/finalize-checklist")
+    @PreAuthorize(Roles.ANY_ROLE)
+    public ApiResponse<FinalizeChecklistResponse> getFinalizeChecklist(
+            @PathVariable("id") Long validationRunId
+    ) {
+        return ApiResponse.success(validationRunFinalizationService.getChecklist(validationRunId));
+    }
+
 }

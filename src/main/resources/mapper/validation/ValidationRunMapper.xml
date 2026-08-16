@@ -20,6 +20,58 @@
          WHERE validation_run_id = #{validationRunId}
     </select>
 
+    <!--
+      IF-API-50 / FUN-044-01
+      한 SELECT의 MVCC 스냅샷에서 6개 실패 건수를 함께 읽어 조건별 조회 시점 차이를 없앤다.
+      전표·예외·한도는 validation_run_id 범위, 귀속합계는 문서 정의대로 validation_month 범위다.
+      서비스는 이 집계값을 0건 여부로만 판정하고 화면 문구와 이동 링크를 조립한다.
+    -->
+    <select id="findFinalizeChecklistCounts"
+            resultType="com.susukkang.fgc.validation.dto.FinalizeChecklistCounts">
+        SELECT vr.validation_run_id AS validationRunId,
+               vr.validation_month AS validationMonth,
+               CASE WHEN vr.status = 'COMPLETED' AND vr.current_step = 8 THEN 0 ELSE 1 END
+                   AS incompleteRunCount,
+               (SELECT COUNT(*)
+                  FROM fgc.vw_journal_imbalance imbalance
+                  JOIN fgc.journal_header header
+                    ON header.journal_header_id = imbalance.journal_header_id
+                 WHERE header.validation_run_id = vr.validation_run_id)
+                   AS journalImbalanceCount,
+               (SELECT COUNT(*)
+                  FROM fgc.exception_case exception
+                 WHERE exception.validation_run_id = vr.validation_run_id
+                   AND exception.severity = 'CRITICAL'
+                   AND exception.status IN ('NEW', 'IN_REVIEW'))
+                   AS unresolvedCriticalExceptionCount,
+               (SELECT COUNT(*)
+                  FROM fgc.exception_case exception
+                 WHERE exception.validation_run_id = vr.validation_run_id
+                   AND exception.exception_type IN ('POLICY_MISSING', 'POLICY_DUPLICATE')
+                   AND exception.status IN ('NEW', 'IN_REVIEW'))
+                   AS unresolvedPolicyExceptionCount,
+               (SELECT COUNT(*)
+                  FROM fgc.vw_transaction_attribution_balance balance
+                  JOIN fgc.commission_transaction ct
+                    ON ct.commission_transaction_id = balance.commission_transaction_id
+                 WHERE ct.settlement_month = vr.validation_month)
+                   AS attributionImbalanceCount,
+               (SELECT COUNT(*)
+                  FROM (
+                       SELECT cc.cap_check_id
+                         FROM fgc.cap_check cc
+                         LEFT JOIN fgc.cap_check_detail detail
+                           ON detail.cap_check_id = cc.cap_check_id
+                          AND detail.classification_snapshot = 'INCLUDED'
+                        WHERE cc.validation_run_id = vr.validation_run_id
+                        GROUP BY cc.cap_check_id, cc.included_amount
+                       HAVING cc.included_amount &lt;&gt; COALESCE(SUM(detail.amount), 0)
+                  ) mismatch)
+                   AS capDetailMismatchCount
+          FROM fgc.validation_run vr
+         WHERE vr.validation_run_id = #{validationRunId}
+    </select>
+
     <select id="findByMonthAndRunNo" resultType="com.susukkang.fgc.validation.dto.ValidationRunRow">
         SELECT validation_run_id AS validationRunId,
                validation_month  AS validationMonth,
