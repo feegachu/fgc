@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -45,11 +46,17 @@ public class ArbitrageService {
     // 현재 값은 REG-12의 계약 체결 후 3년(36개월) 기준을 따른다.
     private static final int REFUND_ADDITION_LAST_MONTH = 36;
 
+    // FUN-061 — 수동 재검증은 사용자가 촉발하는 상태 변경이라 같은 트랜잭션에서 감사행을 남긴다.
+    // 월 통합검증 경유(checkInExistingRun)는 배치의 VALIDATION_RUN_* 감사가 이미 커버하므로 제외.
+    private static final String AUDIT_ENTITY_TYPE = "ARBITRAGE_CHECK";
+    private static final String AUDIT_ARBITRAGE_RECHECKED = "ARBITRAGE_RECHECKED";
+
     private final ArbitrageMapper arbitrageMapper;
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunMapper validationRunMapper;
     private final ExceptionCaseMapper exceptionCaseMapper;
     private final ObjectMapper objectMapper;
+    private final AuditLogService auditLogService;
 
     /**
      * 설명 : 검색 조건에 해당하는 차익거래 검증 결과 요약과 페이징 목록을 조회한다.
@@ -150,6 +157,22 @@ public class ArbitrageService {
         // 수동 검증 실행 완료 처리
         if (validationRunMapper.transitionToCompleted(run.getValidationRunId()) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
+
+        Map<String, Object> auditValue = new LinkedHashMap<>();
+        auditValue.put("validationRunId", run.getValidationRunId());
+        auditValue.put("contractId", contractId);
+        auditValue.put("paymentStage", REGULATORY_PAYMENT_STAGE);
+        auditValue.put("asOfDate", request.getAsOfDate());
+        auditValue.put("resultStatus", row.getResultStatus());
+        auditValue.put("netDifferenceAmount", row.getNetDifferenceAmount());
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_ARBITRAGE_RECHECKED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(row.getArbitrageCheckId()))
+                .userId(triggeredBy)
+                .after(auditValue)
+                .reason(request.getReason())
+                .build());
 
         // 생성된 검증 결과 ID와 판정 및 실행 ID 반환
         return ReArbitrageCheckResponse.builder()

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- FUN-061 IF-API-52 감사로그 조회. INSERT 는 AuditLogMapper.xml(append-only) 에만 둔다. -->
+<mapper namespace="com.susukkang.fgc.audit.mapper.AuditLogQueryMapper">
+
+    <sql id="auditLogSearchConditions">
+        1 = 1
+        <if test="c.entityType != null">
+            AND al.entity_type = #{c.entityType}
+        </if>
+        <if test="c.entityId != null">
+            AND al.entity_id = #{c.entityId}
+        </if>
+        <if test="c.userId != null">
+            AND al.user_id = #{c.userId}
+        </if>
+        <if test="c.action != null">
+            AND al.action_code = #{c.action}
+        </if>
+        <if test="c.from != null">
+            AND al.occurred_at &gt;= #{c.from}
+        </if>
+        <if test="c.toExclusive != null">
+            AND al.occurred_at &lt; #{c.toExclusive}
+        </if>
+    </sql>
+
+    <!-- before/after 는 jsonb 라 ::text 캐스트 없이는 String 프로젝션에 매핑되지 않는다 (CapCheckMapper 선례). -->
+    <select id="selectAuditLogs" resultType="com.susukkang.fgc.audit.dto.AuditLogRow">
+        SELECT al.audit_log_id       AS auditLogId,
+               al.occurred_at        AS occurredAt,
+               al.user_id            AS userId,
+               u.login_id            AS userLoginId,
+               al.action_code        AS actionCode,
+               al.entity_type        AS entityType,
+               al.entity_id          AS entityId,
+               al.before_value::text AS beforeValue,
+               al.after_value::text  AS afterValue,
+               al.reason             AS reason,
+               al.request_id         AS requestId,
+               al.policy_version_id  AS policyVersionId
+          FROM fgc.audit_log al
+          LEFT JOIN fgc.app_user u ON u.user_id = al.user_id
+         WHERE <include refid="auditLogSearchConditions"/>
+         ORDER BY al.occurred_at DESC, al.audit_log_id DESC
+         LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countAuditLogs" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.audit_log al
+         WHERE <include refid="auditLogSearchConditions"/>
+    </select>
+
+    <select id="selectDistinctActionCodes" resultType="string">
+        SELECT DISTINCT action_code
+          FROM fgc.audit_log
+         ORDER BY action_code
+    </select>
+
+    <select id="selectDistinctEntityTypes" resultType="string">
+        SELECT DISTINCT entity_type
+          FROM fgc.audit_log
+         ORDER BY entity_type
+    </select>
+
+    <select id="selectAuditUsers" resultType="com.susukkang.fgc.audit.dto.AuditUserRow">
+        SELECT DISTINCT al.user_id AS userId,
+               u.login_id          AS loginId
+          FROM fgc.audit_log al
+          JOIN fgc.app_user u ON u.user_id = al.user_id
+         ORDER BY u.login_id
+    </select>
+
+</mapper>
