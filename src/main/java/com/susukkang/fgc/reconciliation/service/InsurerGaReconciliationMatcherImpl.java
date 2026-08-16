@@ -40,7 +40,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
 
     private final InsurerGaReconciliationMapper reconciliationMapper;
-    private final ReconciliationAmountTolerancePolicy tolerancePolicy;
+    private final TolerancePolicy tolerancePolicy;
 
     @Override
     @Transactional(readOnly = true)
@@ -53,7 +53,9 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 request.settlementMonth(), request.insurerId());
 
         Map<BaseMatchKey, List<InsurerGaExpectedSourceRow>> expectedByKey = groupExpected(expectedSources);
-        Map<BaseMatchKey, List<InsurerGaActualSourceRow>> actualByKey = groupActual(actualSources);
+        ActualGroupAlignment actualAlignment = alignActualGroups(
+                expectedByKey.keySet(), groupActual(actualSources));
+        Map<BaseMatchKey, List<InsurerGaActualSourceRow>> actualByKey = actualAlignment.groups();
         Set<BaseMatchKey> keys = new LinkedHashSet<>();
         keys.addAll(expectedByKey.keySet());
         keys.addAll(actualByKey.keySet());
@@ -64,7 +66,8 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                         request,
                         key,
                         expectedByKey.getOrDefault(key, List.of()),
-                        actualByKey.getOrDefault(key, List.of())
+                        actualByKey.getOrDefault(key, List.of()),
+                        actualAlignment.ambiguousKeys().contains(key)
                 ))
                 .toList();
     }
@@ -73,7 +76,8 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             ReconciliationExecutionRequest request,
             BaseMatchKey key,
             List<InsurerGaExpectedSourceRow> expectedSources,
-            List<InsurerGaActualSourceRow> actualSources
+            List<InsurerGaActualSourceRow> actualSources,
+            boolean ambiguousDateResolutionIssue
     ) {
         // 2026-08-13 yslee - 대사 상세행 반올림과 수취인·회차 데이터 품질 판정 적용
         // 기존 코드: numeric 원천값을 그대로 합산하고 회차·수취인 식별값의 누락과 불일치를 판정하지 않음
@@ -106,6 +110,14 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         Integer installmentNo = singleValue(expectedInstallments);
         Integer actualInstallmentNo = singleValue(actualInstallments);
         boolean hasBothSources = !expectedSources.isEmpty() && !actualSources.isEmpty();
+
+        // 2026-08-14 yslee - FGC-FUN-050 지급예정일 식별 불가 상태를 누락 판정과 분리
+        // 기존 코드: 실제 지급예정일 null만 검토 대상으로 처리하고 예상 지급예정일 null은 누락으로 분리
+        // 문제: 비교 기준이 없는 예상 원천이 ACTUAL_MISSING으로 확정되어 대사 집계를 왜곡할 수 있음
+        // 개선: 예상·실제 어느 쪽이든 지급예정일이 없으면 REVIEW_REQUIRED 게이트를 우선 적용
+        boolean dateResolutionIssue = ambiguousDateResolutionIssue
+                || expectedSources.stream().anyMatch(source -> source.getDueDate() == null)
+                || actualSources.stream().anyMatch(source -> source.getDueDate() == null);
         // 2026-08-13 yslee - 실제 명세 회차의 누락·불일치 판정 분리
         // 기존 코드: 예상 회차만 확인해 모호한 경우 REVIEW_REQUIRED, 실제 회차 불일치 판정 경로는 없음
         // 문제: REC-07의 예상 13회차·실제 14회차가 INSTALLMENT_MISMATCH로 산출되지 않음
@@ -117,7 +129,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 || actualInstallments.size() != 1);
         boolean installmentMismatch = hasBothSources
                 && !installmentResolutionIssue
-                && !Objects.equals(installmentNo, actualInstallmentNo);
+                && !tolerancePolicy.matchesInstallment(installmentNo, actualInstallmentNo);
         List<Long> expectedAgentIds = distinctLongs(expectedSources.stream()
                 .map(InsurerGaExpectedSourceRow::getExpectedAgentId)
                 .toList());
@@ -143,6 +155,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         ReconciliationResultType resultType = classify(
                 expectedSources,
                 actualSources,
+                dateResolutionIssue,
                 installmentResolutionIssue,
                 installmentMismatch,
                 agentResolutionIssue,
@@ -154,6 +167,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                 resultType,
                 expectedSources,
                 actualSources,
+                dateResolutionIssue,
                 installmentResolutionIssue,
                 installmentMismatch,
                 agentResolutionIssue,
@@ -234,6 +248,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
     private ReconciliationResultType classify(
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
+            boolean dateResolutionIssue,
             boolean installmentResolutionIssue,
             boolean installmentMismatch,
             boolean agentResolutionIssue,
@@ -241,7 +256,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             BigDecimal expectedTotal,
             BigDecimal actualTotal
     ) {
-        if (actualSources.stream().anyMatch(source -> source.getDueDate() == null)) {
+        if (dateResolutionIssue) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
         if (installmentResolutionIssue) {
@@ -265,7 +280,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         if (agentMismatch) {
             return ReconciliationResultType.AGENT_MISMATCH;
         }
-        return tolerancePolicy.matches(expectedTotal, actualTotal)
+        return tolerancePolicy.matchesAmount(expectedTotal, actualTotal)
                 ? ReconciliationResultType.MATCHED
                 : ReconciliationResultType.AMOUNT_DIFFERENCE;
     }
@@ -274,6 +289,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
             ReconciliationResultType primary,
             List<InsurerGaExpectedSourceRow> expectedSources,
             List<InsurerGaActualSourceRow> actualSources,
+            boolean dateResolutionIssue,
             boolean installmentResolutionIssue,
             boolean installmentMismatch,
             boolean agentResolutionIssue,
@@ -293,12 +309,14 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         } else if (agentMismatch) {
             reasons.add(ReconciliationResultType.AGENT_MISMATCH.name());
         }
-        if (expectedSources.isEmpty()) {
-            reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
-        } else if (actualSources.isEmpty()) {
-            reasons.add(ReconciliationResultType.ACTUAL_MISSING.name());
-        } else if (!tolerancePolicy.matches(expectedTotal, actualTotal)) {
-            reasons.add(ReconciliationResultType.AMOUNT_DIFFERENCE.name());
+        if (!dateResolutionIssue) {
+            if (expectedSources.isEmpty()) {
+                reasons.add(ReconciliationResultType.EXPECTED_MISSING.name());
+            } else if (actualSources.isEmpty()) {
+                reasons.add(ReconciliationResultType.ACTUAL_MISSING.name());
+            } else if (!tolerancePolicy.matchesAmount(expectedTotal, actualTotal)) {
+                reasons.add(ReconciliationResultType.AMOUNT_DIFFERENCE.name());
+            }
         }
         return reasons.stream().filter(reason -> !reason.equals(primary.name())).distinct().toList();
     }
@@ -314,6 +332,48 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
                     .add(row);
         }
         return grouped;
+    }
+
+    // 2026-08-14 yslee - FGC-FUN-050 허용오차 정책을 날짜 그룹 정렬에 적용
+    // 기존 코드: 예정일을 BaseMatchKey에서 직접 비교해 날짜 정책을 확장할 수 없음
+    // 문제: 비영 정책에서 복수 예상일이 허용 범위에 들면 첫 키를 임의 선택해 잘못 일치시킬 수 있음
+    // 개선: 날짜 후보가 정확히 하나일 때만 정렬하고 복수 후보 키는 REVIEW_REQUIRED로 전달
+    private ActualGroupAlignment alignActualGroups(
+            Set<BaseMatchKey> expectedKeys,
+            Map<BaseMatchKey, List<InsurerGaActualSourceRow>> actualGroups
+    ) {
+        List<BaseMatchKey> orderedExpectedKeys = expectedKeys.stream().sorted(BaseMatchKey.ORDER).toList();
+        Map<BaseMatchKey, List<InsurerGaActualSourceRow>> aligned = new LinkedHashMap<>();
+        Set<BaseMatchKey> ambiguousKeys = new LinkedHashSet<>();
+        Map<BaseMatchKey, List<BaseMatchKey>> candidatesByActualKey = new LinkedHashMap<>();
+        Map<BaseMatchKey, Integer> uniqueTargetCounts = new LinkedHashMap<>();
+        actualGroups.keySet().stream().sorted(BaseMatchKey.ORDER).forEach(actualKey -> {
+            List<BaseMatchKey> candidates = orderedExpectedKeys.stream()
+                    .filter(expectedKey -> expectedKey.sameDimensions(actualKey))
+                    .filter(expectedKey -> datesMatch(expectedKey.dueDate(), actualKey.dueDate()))
+                    .toList();
+            candidatesByActualKey.put(actualKey, candidates);
+            if (candidates.size() == 1) {
+                uniqueTargetCounts.merge(candidates.getFirst(), 1, Integer::sum);
+            }
+        });
+        actualGroups.entrySet().stream().sorted(Map.Entry.comparingByKey(BaseMatchKey.ORDER)).forEach(entry -> {
+            List<BaseMatchKey> candidates = candidatesByActualKey.get(entry.getKey());
+            boolean oneToOne = candidates.size() == 1
+                    && uniqueTargetCounts.getOrDefault(candidates.getFirst(), 0) == 1;
+            BaseMatchKey alignedKey = oneToOne ? candidates.getFirst() : entry.getKey();
+            if (candidates.size() > 1 || (candidates.size() == 1 && !oneToOne)) {
+                ambiguousKeys.add(alignedKey);
+            }
+            aligned.computeIfAbsent(alignedKey, ignored -> new ArrayList<>()).addAll(entry.getValue());
+        });
+        return new ActualGroupAlignment(aligned, ambiguousKeys);
+    }
+
+    private boolean datesMatch(LocalDate expectedDate, LocalDate actualDate) {
+        return expectedDate != null
+                && actualDate != null
+                && tolerancePolicy.matchesDate(expectedDate, actualDate);
     }
 
     private static Map<BaseMatchKey, List<InsurerGaActualSourceRow>> groupActual(
@@ -435,11 +495,23 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         return values.size() == 1 ? values.getFirst() : null;
     }
 
+    private record ActualGroupAlignment(
+            Map<BaseMatchKey, List<InsurerGaActualSourceRow>> groups,
+            Set<BaseMatchKey> ambiguousKeys
+    ) {
+    }
+
     private record BaseMatchKey(Long contractId, Long commissionItemId, LocalDate dueMonth, LocalDate dueDate) {
         private static final Comparator<BaseMatchKey> ORDER = Comparator
                 .comparing(BaseMatchKey::contractId)
                 .thenComparing(BaseMatchKey::commissionItemId)
                 .thenComparing(BaseMatchKey::dueMonth)
                 .thenComparing(BaseMatchKey::dueDate, Comparator.nullsLast(Comparator.naturalOrder()));
+
+        private boolean sameDimensions(BaseMatchKey other) {
+            return contractId.equals(other.contractId)
+                    && commissionItemId.equals(other.commissionItemId)
+                    && dueMonth.equals(other.dueMonth);
+        }
     }
 }

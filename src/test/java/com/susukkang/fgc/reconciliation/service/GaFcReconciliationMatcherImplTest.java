@@ -42,7 +42,7 @@ class GaFcReconciliationMatcherImplTest {
     void setUp() {
         matcher = new GaFcReconciliationMatcherImpl(
                 reconciliationMapper,
-                new ZeroAmountTolerancePolicy()
+                new ZeroTolerancePolicy()
         );
     }
 
@@ -185,6 +185,88 @@ class GaFcReconciliationMatcherImplTest {
                 .containsExactly(ReconciliationResultType.ACTUAL_MISSING, ReconciliationResultType.EXPECTED_MISSING);
     }
 
+    // 2026-08-14 yslee - FGC-FUN-050 예상 지급예정일 누락 회귀 검증
+    // 기존 코드: 예상 지급예정일 null 그룹을 실제 지급 건과 분리한 뒤 ACTUAL_MISSING으로 확정
+    // 문제: 비교 기준이 없는 원천을 누락으로 집계해 수동 검토 대상이 사라짐
+    // 개선: null 날짜 예상 원천 후보는 REVIEW_REQUIRED이고 누락 보조 사유를 남기지 않는지 검증
+    @Test
+    void 예상_지급예정일이_없으면_ACTUAL_MISSING으로_단정하지_않고_REVIEW_REQUIRED다() {
+        GaFcExpectedSourceRow expected = expected(11L, 501L, 1, "650000", null);
+        expected.setDueDate(null);
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L)).willReturn(List.of(expected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(actual(21L, 501L, 1, "650000", null)));
+
+        List<GaFcMatchCandidate> results = matcher.match(request());
+        GaFcMatchCandidate reviewRequired = results.stream()
+                .filter(candidate -> candidate.dueDate() == null)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(reviewRequired.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(reviewRequired.secondaryReasonCodes()).isEmpty();
+        assertThat(results).extracting(GaFcMatchCandidate::resultType)
+                .containsExactlyInAnyOrder(
+                        ReconciliationResultType.REVIEW_REQUIRED,
+                        ReconciliationResultType.EXPECTED_MISSING);
+    }
+
+    // 2026-08-14 yslee - FGC-FUN-050 비영 날짜 정책의 복수 후보 안전성 검증
+    // 기존 코드: 허용 범위에 예상일이 둘이면 정렬상 첫 키에 실제 원천을 임의 연결
+    // 문제: 비교 기준을 확정할 수 없는 실제 지급이 MATCHED로 숨겨질 수 있음
+    // 개선: 복수 날짜 후보에 걸친 실제 원천은 별도 REVIEW_REQUIRED 후보로 보존
+    @Test
+    void 날짜_허용범위에_예상일이_둘이면_임의_매칭하지_않고_REVIEW_REQUIRED다() {
+        GaFcExpectedSourceRow firstExpected = expected(11L, 501L, 1, "650000", null);
+        GaFcExpectedSourceRow secondExpected = expected(12L, 501L, 2, "650000", null);
+        secondExpected.setDueDate(MONTH.plusDays(16));
+        GaFcActualSourceRow actual = actual(21L, 501L, 1, "650000", null);
+        actual.setDueDate(MONTH.plusDays(15));
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L))
+                .willReturn(List.of(firstExpected, secondExpected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L)).willReturn(List.of(actual));
+        GaFcReconciliationMatcherImpl tolerantMatcher = new GaFcReconciliationMatcherImpl(
+                reconciliationMapper, oneDayTolerancePolicy());
+
+        List<GaFcMatchCandidate> results = tolerantMatcher.match(request());
+        GaFcMatchCandidate reviewRequired = results.stream()
+                .filter(candidate -> MONTH.plusDays(15).equals(candidate.dueDate()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(reviewRequired.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(reviewRequired.transactionAttributionIds()).containsExactly(21L);
+        assertThat(reviewRequired.secondaryReasonCodes()).isEmpty();
+        assertThat(results).extracting(GaFcMatchCandidate::resultType)
+                .doesNotContain(ReconciliationResultType.MATCHED);
+    }
+
+    @Test
+    void 서로_다른_실제일이_같은_예상일_허용범위에_들면_합산하지_않고_REVIEW_REQUIRED다() {
+        GaFcExpectedSourceRow expected = expected(11L, 501L, 1, "650000", null);
+        expected.setDueDate(MONTH.plusDays(15));
+        GaFcActualSourceRow firstActual = actual(21L, 501L, 1, "325000", null);
+        firstActual.setDueDate(MONTH.plusDays(14));
+        GaFcActualSourceRow secondActual = actual(22L, 501L, 1, "325000", null);
+        secondActual.setDueDate(MONTH.plusDays(16));
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L)).willReturn(List.of(expected));
+        given(reconciliationMapper.findActualSources(MONTH, 3L))
+                .willReturn(List.of(firstActual, secondActual));
+        GaFcReconciliationMatcherImpl tolerantMatcher = new GaFcReconciliationMatcherImpl(
+                reconciliationMapper, oneDayTolerancePolicy());
+
+        List<GaFcMatchCandidate> reviewCandidates = tolerantMatcher.match(request()).stream()
+                .filter(candidate -> candidate.resultType() == ReconciliationResultType.REVIEW_REQUIRED)
+                .toList();
+
+        assertThat(reviewCandidates).hasSize(2).allSatisfy(candidate -> {
+            assertThat(candidate.transactionAttributionIds()).hasSize(1);
+            assertThat(candidate.secondaryReasonCodes()).isEmpty();
+        });
+        assertThat(reviewCandidates).flatExtracting(GaFcMatchCandidate::transactionAttributionIds)
+                .containsExactlyInAnyOrder(21L, 22L);
+    }
+
     @Test
     void 상세행은_합산_전에_원단위_HALF_UP으로_반올림한다() {
         given(reconciliationMapper.findExpectedSources(MONTH, 3L))
@@ -211,6 +293,25 @@ class GaFcReconciliationMatcherImplTest {
 
     private static ReconciliationExecutionRequest request() {
         return new ReconciliationExecutionRequest(7L, 9L, MONTH, PaymentStage.GA_TO_FC, 3L, 5L);
+    }
+
+    private static TolerancePolicy oneDayTolerancePolicy() {
+        return new TolerancePolicy() {
+            @Override
+            public boolean matchesAmount(BigDecimal expectedAmount, BigDecimal actualAmount) {
+                return expectedAmount.compareTo(actualAmount) == 0;
+            }
+
+            @Override
+            public boolean matchesDate(LocalDate expectedDate, LocalDate actualDate) {
+                return Math.abs(expectedDate.toEpochDay() - actualDate.toEpochDay()) <= 1;
+            }
+
+            @Override
+            public boolean matchesInstallment(Integer expectedInstallment, Integer actualInstallment) {
+                return expectedInstallment.equals(actualInstallment);
+            }
+        };
     }
 
     private static GaFcExpectedSourceRow expected(

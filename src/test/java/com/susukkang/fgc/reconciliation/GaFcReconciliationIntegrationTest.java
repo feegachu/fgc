@@ -103,7 +103,7 @@ class GaFcReconciliationIntegrationTest {
         PaymentInsert insurerToGaConfirmed = insertPayment(
                 contractId, policyVersionId, commissionItemId, agentId,
                 1, "111000", "CONFIRMED", "INSURER-TO-GA-EXCLUDED",
-                "INSURER_TO_GA", "INSURER_STATEMENT");
+                "INSURER_TO_GA", "INSURER_STATEMENT", TEST_MONTH.plusDays(14));
 
         Long reconciliationRunId = insertRunningReconciliationRun(insurerId, PaymentStage.GA_TO_FC);
         ReconciliationExecutionRequest executionRequest = new ReconciliationExecutionRequest(
@@ -225,6 +225,92 @@ class GaFcReconciliationIntegrationTest {
                 .isEqualTo("REVIEW_REQUIRED:UNKNOWN");
     }
 
+    // 2026-08-14 yslee - FGC-FUN-050 GA→FC 0원·정확 일자·정확 회차 경계값 검증
+    // 기존 코드: 동일 값 정상 일치와 일부 단위 경계만 검증
+    // 문제: 실제 PostgreSQL 원천 조회에서 1원·1일·1회차 차이가 정상 일치로 처리될 위험이 있음
+    // 개선: 각 경계 차이를 실제 원천 데이터로 생성해 불일치 유형과 비교값을 검증
+    @Test
+    void FUN_050_실제_지급액이_1원_작으면_AMOUNT_DIFFERENCE다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1",
+                insurerId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("""
+                SELECT commission_item_id
+                  FROM fgc.commission_item
+                 WHERE cashflow_type = 'PAYMENT'
+                 ORDER BY commission_item_id
+                 LIMIT 1
+                """);
+        Long agentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+
+        insertSchedule(contractId, policyVersionId, commissionItemId, agentId, 1, "650000");
+        insertPayment(contractId, policyVersionId, commissionItemId, agentId,
+                1, "649999", "CONFIRMED", "FUN-050-AMOUNT");
+
+        GaFcMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
+                50L, null, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null)).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.AMOUNT_DIFFERENCE);
+        assertThat(result.differenceAmount()).isEqualByComparingTo("-1");
+    }
+
+    @Test
+    void FUN_050_지급예정일이_하루_다르면_정확일치로_합치지_않는다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1",
+                insurerId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("""
+                SELECT commission_item_id
+                  FROM fgc.commission_item
+                 WHERE cashflow_type = 'PAYMENT'
+                 ORDER BY commission_item_id
+                 LIMIT 1
+                """);
+        Long agentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+
+        insertSchedule(contractId, policyVersionId, commissionItemId, agentId, 1, "650000");
+        insertPayment(contractId, policyVersionId, commissionItemId, agentId,
+                1, "650000", "CONFIRMED", "FUN-050-DATE", TEST_MONTH.plusDays(15));
+
+        List<GaFcMatchCandidate> results = matcher.match(new ReconciliationExecutionRequest(
+                50L, null, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null));
+
+        assertThat(results).extracting(GaFcMatchCandidate::resultType)
+                .containsExactly(ReconciliationResultType.ACTUAL_MISSING, ReconciliationResultType.EXPECTED_MISSING);
+    }
+
+    @Test
+    void FUN_050_회차가_하나_다르면_INSTALLMENT_MISMATCH다() {
+        Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
+        Long contractId = id(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1",
+                insurerId);
+        Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
+        Long commissionItemId = id("""
+                SELECT commission_item_id
+                  FROM fgc.commission_item
+                 WHERE cashflow_type = 'PAYMENT'
+                 ORDER BY commission_item_id
+                 LIMIT 1
+                """);
+        Long agentId = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", contractId);
+
+        insertSchedule(contractId, policyVersionId, commissionItemId, agentId, 13, "650000");
+        insertPayment(contractId, policyVersionId, commissionItemId, agentId,
+                14, "650000", "CONFIRMED", "FUN-050-INSTALLMENT");
+
+        GaFcMatchCandidate result = matcher.match(new ReconciliationExecutionRequest(
+                50L, null, TEST_MONTH, PaymentStage.GA_TO_FC, insurerId, null)).getFirst();
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.INSTALLMENT_MISMATCH);
+        assertThat(result.installmentNo()).isEqualTo(13);
+        assertThat(result.actualInstallmentNo()).isEqualTo(14);
+    }
+
     private Long insertSchedule(
             Long contractId,
             Long policyVersionId,
@@ -285,7 +371,24 @@ class GaFcReconciliationIntegrationTest {
         return insertPayment(
                 contractId, policyVersionId, commissionItemId, agentId,
                 installmentNo, amount, status, suffix,
-                "GA_TO_FC", "GA_MANUAL_PAYMENT");
+                "GA_TO_FC", "GA_MANUAL_PAYMENT", TEST_MONTH.plusDays(14));
+    }
+
+    private PaymentInsert insertPayment(
+            Long contractId,
+            Long policyVersionId,
+            Long commissionItemId,
+            Long agentId,
+            Integer installmentNo,
+            String amount,
+            String status,
+            String suffix,
+            LocalDate dueDate
+    ) {
+        return insertPayment(
+                contractId, policyVersionId, commissionItemId, agentId,
+                installmentNo, amount, status, suffix,
+                "GA_TO_FC", "GA_MANUAL_PAYMENT", dueDate);
     }
 
     private PaymentInsert insertPayment(
@@ -298,7 +401,8 @@ class GaFcReconciliationIntegrationTest {
             String status,
             String suffix,
             String paymentStage,
-            String sourceType
+            String sourceType,
+            LocalDate dueDate
     ) {
         Long transactionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
@@ -310,7 +414,7 @@ class GaFcReconciliationIntegrationTest {
                 """, Long.class,
                 paymentStage, sourceType,
                 "IT-048-03:" + suffix, contractId, agentId, commissionItemId, policyVersionId,
-                installmentNo, TEST_MONTH, TEST_MONTH.plusDays(14), new BigDecimal(amount));
+                installmentNo, TEST_MONTH, dueDate, new BigDecimal(amount));
         Long attributionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.transaction_attribution (
                     commission_transaction_id, attribution_seq, attribution_scope, contract_id,
@@ -319,7 +423,7 @@ class GaFcReconciliationIntegrationTest {
                 ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, 'INCLUDED', 'DIRECT')
                 RETURNING transaction_attribution_id
                 """, Long.class,
-                transactionId, contractId, TEST_MONTH.plusDays(14), TEST_MONTH, new BigDecimal(amount));
+                transactionId, contractId, dueDate, TEST_MONTH, new BigDecimal(amount));
         if ("CONFIRMED".equals(status)) {
             jdbcTemplate.update("""
                     UPDATE fgc.commission_transaction
