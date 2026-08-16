@@ -22,4 +22,12 @@ public interface JournalMapper {
     boolean existsPostedForSource(@Param("journalType") String journalType,
                                    @Param("sourceEntityType") String sourceEntityType,
                                    @Param("sourceEntityId") String sourceEntityId);
+
+    /**
+     * DRAFT -> POSTED 전이. guard_journal_header_write가 차변합계=대변합계>0을 강제하므로
+     * 불균형 초안은 여기서 DataIntegrityViolationException으로 거절된다.
+     *
+     * @return 반영된 행 수. 0이면 이미 POSTED/REVERSED였거나(WHERE status='DRAFT' 불일치) 존재하지 않음.
+     */
+    int markPosted(@Param("journalHeaderId") Long journalHeaderId, @Param("postedBy") Long postedBy);
 }
