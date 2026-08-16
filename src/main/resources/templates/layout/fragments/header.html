@@ -12,12 +12,66 @@
     </div>
   </div>
   <div class="app-header-actions">
-    <label class="app-header-field" for="global-settlement-month">
-      <span class="app-header-field-label">기준 정산월</span>
-      <select id="global-settlement-month" class="select-control tabular-nums" name="month" data-action="change-global-month" aria-label="기준 정산월">
-        <option th:each="m : ${monthOptions}" th:value="${m}" th:text="${m}" th:selected="${m == month}">2026-07</option>
-      </select>
-    </label>
+    <div class="app-header-field">
+      <span class="app-header-field-label" id="global-month-label">기준 정산월</span>
+      <div class="month-selector"
+           data-month-selector
+           data-disabled-months="[]"
+           th:attr="data-value=${month}">
+        <button class="month-selector-trigger tabular-nums" id="global-settlement-month" type="button"
+                data-action="toggle-month-selector" aria-haspopup="dialog" aria-expanded="false"
+                aria-controls="global-month-popover" aria-labelledby="global-month-label global-month-value">
+          <span id="global-month-value" data-month-selector-value th:text="${month}">2026-07</span>
+          <span class="material-symbols-rounded month-selector-chevron" aria-hidden="true">expand_more</span>
+        </button>
+
+        <div class="month-selector-popover" id="global-month-popover" role="dialog" aria-modal="false"
+             aria-labelledby="global-month-dialog-title" aria-describedby="global-month-scope-notice" hidden>
+          <div class="month-selector-year-navigation">
+            <button class="icon-button" type="button" data-action="previous-month-selector-year"
+                    aria-label="이전 연도" title="이전 연도">
+              <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+            </button>
+            <strong class="month-selector-year tabular-nums" id="global-month-dialog-title" data-month-selector-year>2026년</strong>
+            <button class="icon-button" type="button" data-action="next-month-selector-year"
+                    aria-label="다음 연도" title="다음 연도">
+              <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+            </button>
+          </div>
+
+          <div class="month-selector-grid" role="grid" aria-label="정산월 선택" data-month-selector-grid>
+            <div class="month-selector-row" role="row" th:each="row : ${#numbers.sequence(0, 2)}">
+              <button class="month-selector-cell" type="button" role="gridcell"
+                      th:each="column : ${#numbers.sequence(1, 4)}"
+                      th:with="monthIndex=${row * 4 + column}"
+                      tabindex="-1"
+                      th:attr="data-month-index=${monthIndex},aria-label=${monthIndex + '월'},aria-selected='false'">
+                <span class="month-selector-cell-label" th:text="${monthIndex + '월'}">1월</span>
+                <span class="month-selector-cell-state" aria-hidden="true" hidden></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="month-selector-scope" id="global-month-scope-notice">
+            <span class="material-symbols-rounded" aria-hidden="true">info</span>
+            <p>적용하면 열린 업무 탭 <strong data-month-selector-tab-count>1</strong>개의 조회 기준이<br>
+              <strong data-month-selector-scope-value>2026년 7월</strong>로 변경됩니다.</p>
+          </div>
+
+          <div class="month-selector-footer">
+            <p class="month-selector-selection">선택&nbsp; · &nbsp;<strong data-month-selector-draft-value>2026년 7월</strong></p>
+            <div class="month-selector-actions">
+              <button class="button button-secondary" type="button" data-action="cancel-month-selector">취소</button>
+              <button class="button button-primary" type="button" data-action="apply-month-selector">
+                <span class="material-symbols-rounded month-selector-loading" aria-hidden="true" hidden>progress_activity</span>
+                <span data-month-selector-apply-label>적용</span>
+              </button>
+            </div>
+          </div>
+          <p class="visually-hidden" role="alert" data-month-selector-error></p>
+        </div>
+      </div>
+    </div>
     <span class="status-badge status-badge-neutral app-header-role" th:title="#{'role.' + ${roleCode} + '.desc'}" th:text="#{'role.' + ${roleCode}}">역할</span>
   </div>
 </header>

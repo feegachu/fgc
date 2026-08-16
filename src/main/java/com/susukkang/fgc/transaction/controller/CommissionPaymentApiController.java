@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.controller;
 
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
@@ -41,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 // 기존 코드: SETTLEMENT만 허용하여 모든 기능 권한을 가진 SYSTEM_ADMIN도 접근 차단
 // 문제: 인터페이스 정의서의 SYSTEM_ADMIN 전부 권한과 FUN-065 API 인가가 불일치
 // 개선: SETTLEMENT 업무권한을 유지하면서 SYSTEM_ADMIN의 전체관리 권한도 허용
-@PreAuthorize("hasAnyRole('SETTLEMENT', 'SYSTEM_ADMIN')")
+@PreAuthorize(Roles.CAN_PROCESS)
 public class CommissionPaymentApiController {
 
     private final CommissionPaymentService commissionPaymentService;
