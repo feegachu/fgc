@@ -62,7 +62,8 @@ public class CapCheckController {
             @Parameter(description = "지급단계") @RequestParam(required = false) PaymentStage stage,
             @Parameter(description = "판정") @RequestParam(required = false) CapResultStatus status,
             @Parameter(description = "보험회사 ID") @RequestParam(required = false) Long insurerId,
-            @Parameter(description = "계약 소속 조직 ID") @RequestParam(required = false) Long organizationId,
+            @Parameter(description = "계약 소속 조직 ID")
+            @RequestParam(name = "orgId", required = false) Long organizationId,
             @Parameter(description = "계약번호") @RequestParam(required = false) String contractNo,
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size

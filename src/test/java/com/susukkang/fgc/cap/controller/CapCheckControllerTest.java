@@ -129,7 +129,7 @@ class CapCheckControllerTest {
     }
 
     @Test
-    void searchBindsOrganizationIdIntoCriteria() throws Exception {
+    void searchBindsOrgIdIntoOrganizationCriteria() throws Exception {
         given(capCheckService.search(any(), anyInt(), anyInt())).willReturn(
                 new CapCheckSearchResult(
                         new CapCheckSummary(0, 0, 0, 0),
@@ -138,7 +138,7 @@ class CapCheckControllerTest {
                         PageResponse.of(List.of(), 1, 20, 0, "asOfDate,desc")));
 
         mockMvc.perform(get("/api/v1/cap-checks")
-                        .param("organizationId", "21")
+                        .param("orgId", "21")
                         .with(user("settle01").roles("SETTLEMENT")))
                 .andExpect(status().isOk());
 
