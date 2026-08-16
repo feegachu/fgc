@@ -24,7 +24,7 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ARB-W01', '차익거래 검증', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
+<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-arbitrage">
 
   <h1 class="fgc-page-title">차익거래 검증</h1>
   <p class="fgc-page-desc">
@@ -88,7 +88,23 @@
 
   <!-- ② 요약 카드 3장 — 차익거래 조회 API 연동 시 서버 렌더링으로 채운다 -->
   <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px"
-           id="summary-cards"></section>
+           id="summary-cards">
+    <div class="fgc-kpi fgc-kpi--success">
+      <div class="fgc-kpi__label">이상없음</div>
+      <div class="fgc-kpi__value">—</div>
+      <div class="fgc-kpi__sub">조회 API 연동 대기</div>
+    </div>
+    <div class="fgc-kpi fgc-kpi--warning">
+      <div class="fgc-kpi__label">검토대상</div>
+      <div class="fgc-kpi__value">—</div>
+      <div class="fgc-kpi__sub">조회 API 연동 대기</div>
+    </div>
+    <div class="fgc-kpi fgc-kpi--closed">
+      <div class="fgc-kpi__label">자료부족</div>
+      <div class="fgc-kpi__value">—</div>
+      <div class="fgc-kpi__sub">조회 API 연동 대기</div>
+    </div>
+  </section>
 
   <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.25fr 1fr;gap:16px" id="arb-grid">
 

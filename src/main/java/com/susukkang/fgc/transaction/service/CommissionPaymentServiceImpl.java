@@ -19,7 +19,10 @@ import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.exception.FgcMessageResolver;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.MoneyUtil;
+import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
 import com.susukkang.fgc.transaction.domain.CommissionItemReference;
@@ -33,8 +36,10 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
+import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -64,6 +69,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final CapValidator capValidator;
     private final CapCalculator capCalculator;
     private final CapExceptionService capExceptionService;
+    private final FgcMessageResolver messageResolver;
 
     @Override
     @Transactional
@@ -99,6 +105,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 문제: 부모 지급 건의 FOR UPDATE 잠금과 FK 검사가 충돌하고 이슈 #14의 동일 트랜잭션 조건을 위반
     // 개선: 같은 계약 행 잠금과 멱등키를 포함해 점검·예외·상태 처리를 한 트랜잭션에서 수행
     @Transactional(noRollbackFor = CommissionPaymentConfirmationRejectedException.class)
+    // FUN-002(#82) — 컨트롤러(@PreAuthorize)를 우회하는 호출 경로가 생겨도 지급 확정만은
+    // 서비스 계층에서 한 번 더 막는다. @EnableMethodSecurity는 SecurityConfig에 이미 켜져 있다.
+    @PreAuthorize(Roles.CAN_PROCESS)
     public CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey) {
         // 2026-08-11 yslee - 운영정책서 제31조의 확정 게이트 6단계 순서를 코드에 명시
         // 기존 코드: 실제 확정 로직은 정책 순서를 따르지만 단계별 주석이 없어 문서와 코드의 대응 확인이 어려움
@@ -125,11 +134,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
         if (capExceptionService.hasUnresolvedViolation(paymentId)) {
-            throw new CommissionPaymentConfirmationRejectedException(FgcErrorCode.CAP_003);
+            failFirst(unresolvedViolationFailure(first));
         }
+
         requireDraft(attributions.get(0));
         mapper.lockAttributedContracts(paymentId);
-        validateConfirmationRequiredValues(attributions);
+        failFirst(requiredValueFailures(attributions));
 
         List<Long> capCheckIds = new ArrayList<>();
 
@@ -138,15 +148,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 문제: 다중 계약 배부 시 두 번째 이후 귀속금액이 한도 판정에서 누락
         // 개선: 귀속행별 정책·한도·증빙 공제를 계산하고 하나라도 실패하면 확정을 차단
         for (ConfirmationData data : attributions) {
-            validateAttributionForConfirmation(data);
-            CapRuleSnapshot rule = requireCapRule(paymentId, data);
+            failFirst(attributionFailures(data));
+            CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
+                    paymentId,
+                    data.transactionAttributionId()
+            );
+            failFirst(capRuleFailure(rule, data));
             CapCalculationResult calculation = calculateLimit(
                     data.contractId(),
                     data.paymentStage(),
                     data.attributionDate(),
                     rule.complianceEvidenceAmount()
             );
-            validateRuleConsistency(rule, calculation, data);
+            failFirst(ruleConsistencyFailure(rule, calculation, data));
 
             CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                     calculation.limitAmount(),
@@ -176,32 +190,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
              */
             capExceptionService.createIfNecessary(capExceptionCommand(data, check));
 
-            /**
-             * @author hjKang
-             * @since 2026-08-12
-             *
-             * 2026-08-12 - 예외 유형과 심각도 공통 enum 적용
-             * 기존 코드: 예외 유형과 심각도를 문자열 리터럴로 전달
-             * 문제: DB 허용값 오타를 컴파일 시점에 확인할 수 없음
-             * 개선: ExceptionType과 ExceptionSeverity의 name()을 사용하여 DB 코드값을 통일
-             */
-            if (check.getResultStatus() == CapResultStatus.REVIEW_REQUIRED) {
-                rejectWithException(
-                        data,
-                        ExceptionType.CAP_REVIEW_REQUIRED.name(),
-                        ExceptionSeverity.HIGH.name(),
-                        "산입 판단 검토 필요",
-                        "검토필요 귀속행 또는 준법경영비 증빙을 확인해야 합니다.",
-                        FgcErrorCode.CAP_002,
-                        Map.of()
-                );
-            }
-            if (check.getResultStatus() == CapResultStatus.VIOLATION) {
-                throw new CommissionPaymentConfirmationRejectedException(
-                        FgcErrorCode.CAP_001,
-                        Map.of("n", check.getUsagePct())
-                );
-            }
+            failFirst(capResultFailure(data, check));
         }
 
         String capCheckIdsCsv = capCheckIds.stream()
@@ -211,6 +200,128 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             throw new FgcBusinessException(FgcErrorCode.TRAN_005);
         }
         return requirePayment(paymentId, capCheckIds);
+    }
+
+    @Override
+    // 2026-08-16 yslee - IF-API-24 지급 전 한도 사전검증 미리보기 (FGC-FUN-033)
+    // confirm()과 같은 판정 메서드·계산 엔진(REALTIME)을 재사용하되 아무것도 저장하지 않는다.
+    // cap_check·exception_case 기록 생성은 확정(IF-API-25) 경로 전용이며(운영정책서 제31조),
+    // confirm은 첫 실패에서 차단하지만 미리보기는 모든 차단 사유를 blockers[]로 수집한다.
+    @Transactional(readOnly = true)
+    public TransactionPrecheckResponse precheck(Long paymentId) {
+        List<ConfirmationData> attributions = requireConfirmationData(paymentId, false);
+        ConfirmationData first = attributions.get(0);
+        // [의도된 차이] 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005(409)로 먼저 끊는다.
+        // 그래서 "비DRAFT + 미해결 CAP_VIOLATION" 엣지케이스는 confirm=CAP_003(422) / precheck=TRAN_005(409)로
+        // 갈리며, 이는 수용한다: precheck에서 CAP_003은 던지지 않고 blockers로 수집하는 사유라 검사 순서를
+        // confirm과 맞춰도 비DRAFT 응답은 409 그대로이고, 완전 일치의 유일한 방법(CAP_003을 422로 던지기)은
+        // IF-API-24의 "차단 사유는 200 + blockers[]" 계약을 깬다. "판정 일치" 원칙의 범위는 DRAFT 건의
+        // 게이트 판정이며, DRAFT 건에서는 두 경로가 같은 판정 메서드로 항상 같은 결과를 낸다.
+        requireDraft(first);
+
+        List<GateFailure> failures = new ArrayList<>();
+        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+            failures.add(unresolvedViolationFailure(first));
+        }
+        failures.addAll(requiredValueFailures(attributions));
+
+        List<TransactionPrecheckResponse.CapPreviewItem> previews = new ArrayList<>();
+        if (first.totalAttributedAmount() != null) {
+            Map<Long, String> contractNos = mapper.findAttributedContractNumbers(paymentId)
+                    .stream()
+                    .collect(Collectors.toMap(
+                            AttributedContractNo::contractId,
+                            AttributedContractNo::contractNo
+                    ));
+            for (ConfirmationData data : attributions) {
+                failures.addAll(attributionFailures(data));
+                if (data.contractId() == null || data.attributedAmount() == null) {
+                    continue;
+                }
+                CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
+                        paymentId,
+                        data.transactionAttributionId()
+                );
+                GateFailure ruleFailure = capRuleFailure(rule, data);
+                if (ruleFailure != null) {
+                    failures.add(ruleFailure);
+                }
+                if (rule == null) {
+                    continue;
+                }
+                CapCalculationResult calculation = calculateLimit(
+                        data.contractId(),
+                        data.paymentStage(),
+                        data.attributionDate(),
+                        rule.complianceEvidenceAmount()
+                );
+                GateFailure consistencyFailure = ruleConsistencyFailure(rule, calculation, data);
+                if (consistencyFailure != null) {
+                    failures.add(consistencyFailure);
+                }
+                CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
+                        calculation.limitAmount(),
+                        rule.warningUsagePct(),
+                        rule.existingIncludedAmount(),
+                        data.attributedAmount(),
+                        data.inclusionDecisionStatus()
+                ));
+                CapValidationResult validation = mergeScheduleAndActualValidation(
+                        calculation,
+                        actualValidation,
+                        rule.warningUsagePct()
+                );
+                // 룰 판정 불일치·룰셋 불일치(CAP_002) 행은 confirm이 계산에 도달하지 못하는 행이다.
+                // CapValidator는 귀속 스냅샷만 보므로 정책 드리프트 시 NORMAL로 계산될 수 있는데,
+                // 게이지 수치는 참고용으로 남기되 판정만은 검토필요로 강제해 "정상" 오인을 막는다.
+                if (ruleFailure != null || consistencyFailure != null) {
+                    validation = new CapValidationResult(
+                            validation.limitAmount(),
+                            validation.candidateIncludedAmount(),
+                            validation.includedAmount(),
+                            validation.remainingAmount(),
+                            validation.usagePct(),
+                            CapResultStatus.REVIEW_REQUIRED
+                    );
+                }
+                CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
+                previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
+                        check,
+                        rule,
+                        contractNos.get(data.contractId())
+                ));
+                GateFailure resultFailure = capResultFailure(data, check);
+                if (resultFailure != null) {
+                    failures.add(resultFailure);
+                }
+            }
+        }
+        return new TransactionPrecheckResponse(
+                paymentId,
+                previews,
+                toBlockers(failures),
+                failures.isEmpty()
+        );
+    }
+
+    private List<TransactionPrecheckResponse.Blocker> toBlockers(List<GateFailure> failures) {
+        return failures.stream()
+                .map(failure -> {
+                    // CAP_003(미해결 위반)은 hasUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
+                    // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 예외 건을
+                    // 찾게 되므로 계약·귀속행 ID를 비운다
+                    boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
+                    return new TransactionPrecheckResponse.Blocker(
+                            failure.errorCode().getCode(),
+                            messageResolver.resolve(failure.errorCode(), failure.params()),
+                            paymentLevel ? null : failure.data().contractId(),
+                            paymentLevel ? null : failure.data().transactionAttributionId()
+                    );
+                })
+                // 같은 근본 원인(예: REVIEW_REQUIRED)이 여러 게이트에서 재검출되면 code·message·ID가
+                // 전부 같은 Blocker가 반복된다 — record 값 동등성으로 같은 사유는 한 줄로 접는다
+                .distinct()
+                .toList();
     }
 
     private ExceptionCaseCommand exceptionCommand(
@@ -554,10 +665,56 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         mapper.insertAttributions(attributions);
     }
 
-    private void validateConfirmationRequiredValues(List<ConfirmationData> attributions) {
+    /**
+     * 확정 게이트 판정 실패 서술자. confirm()은 첫 실패에서 예외 이력을 남기고 차단하며(failFirst),
+     * precheck는 같은 판정 메서드의 결과를 저장 없이 전부 수집한다 — 두 경로의 판정 일치 보장.
+     * exceptionType이 null이면 exception_case를 저장하지 않고 차단만 한다 (CAP_001·CAP_003 경로).
+     */
+    private record GateFailure(
+            ConfirmationData data,
+            String exceptionType,
+            String severity,
+            String title,
+            String description,
+            FgcErrorCode errorCode,
+            Map<String, Object> params
+    ) {}
+
+    private void failFirst(GateFailure failure) {
+        if (failure != null) {
+            failFirst(List.of(failure));
+        }
+    }
+
+    private void failFirst(List<GateFailure> failures) {
+        if (failures.isEmpty()) {
+            return;
+        }
+        GateFailure failure = failures.get(0);
+        if (failure.exceptionType() != null) {
+            saveException(
+                    failure.data(),
+                    failure.exceptionType(),
+                    failure.severity(),
+                    failure.title(),
+                    failure.description()
+            );
+        }
+        throw new CommissionPaymentConfirmationRejectedException(
+                failure.errorCode(),
+                failure.params()
+        );
+    }
+
+    private GateFailure unresolvedViolationFailure(ConfirmationData first) {
+        return new GateFailure(first, null, null, null, null, FgcErrorCode.CAP_003, Map.of());
+    }
+
+    private List<GateFailure> requiredValueFailures(List<ConfirmationData> attributions) {
+        List<GateFailure> failures = new ArrayList<>();
         ConfirmationData first = attributions.get(0);
         if (first.totalAttributedAmount() == null) {
-            rejectWithException(
+            failures.add(new GateFailure(
                     first,
                     "DATA_QUALITY",
                     "HIGH",
@@ -565,14 +722,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "지급 건을 확정하려면 하나 이상의 귀속행이 필요합니다.",
                     FgcErrorCode.TRAN_002,
                     Map.of()
-            );
-        }
-
-        if (first.amount().compareTo(first.totalAttributedAmount()) != 0) {
+            ));
+        } else if (first.amount().compareTo(first.totalAttributedAmount()) != 0) {
             BigDecimal difference = first.amount()
                     .subtract(first.totalAttributedAmount())
                     .abs();
-            rejectWithException(
+            failures.add(new GateFailure(
                     first,
                     "DATA_QUALITY",
                     "HIGH",
@@ -584,11 +739,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                             "b", first.amount(),
                             "c", difference
                     )
-            );
+            ));
         }
 
         if (first.policyVersionId() == null) {
-            rejectWithException(
+            failures.add(new GateFailure(
                     first,
                     "ALLOCATION_EVIDENCE_MISSING",
                     "HIGH",
@@ -596,15 +751,17 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "확정하려면 적용 정책 버전이 필요합니다.",
                     FgcErrorCode.TRAN_004,
                     Map.of()
-            );
+            ));
         }
+        return failures;
     }
 
-    private void validateAttributionForConfirmation(ConfirmationData data) {
+    private List<GateFailure> attributionFailures(ConfirmationData data) {
+        List<GateFailure> failures = new ArrayList<>();
         if (data.attributedAmount() == null
                 || (data.contractId() == null
                 && data.attributionMethod() != AttributionMethod.NEWCOMER_NON_CONTRACT)) {
-            rejectWithException(
+            failures.add(new GateFailure(
                     data,
                     "DATA_QUALITY",
                     "HIGH",
@@ -612,11 +769,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "계약 귀속행에는 귀속계약이 필요합니다.",
                     FgcErrorCode.TRAN_002,
                     Map.of()
-            );
+            ));
         }
         if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
                 || data.contractId() == null) {
-            rejectWithException(
+            failures.add(new GateFailure(
                     data,
                     "CAP_REVIEW_REQUIRED",
                     "HIGH",
@@ -624,7 +781,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "검토필요 또는 비계약 귀속행은 자동 확정할 수 없습니다.",
                     FgcErrorCode.CAP_002,
                     Map.of()
-            );
+            ));
         }
         // 2026-08-11 yslee - 배부 방식 전체의 확정 전 배부근거 검증
         // 기존 코드: APPROVED_ALLOCATION만 배부기준을 요구하고 정착지원금 월배부·이월배부는 누락
@@ -634,7 +791,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 || data.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 || data.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD;
         if (allocationBasisRequired && !StringUtils.hasText(data.allocationBasis())) {
-            rejectWithException(
+            failures.add(new GateFailure(
                     data,
                     "ALLOCATION_EVIDENCE_MISSING",
                     "HIGH",
@@ -642,12 +799,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "배부 귀속행에는 배부기준이 필요합니다.",
                     FgcErrorCode.TRAN_004,
                     Map.of()
-            );
+            ));
         }
         if (data.inclusionDecisionStatus() == InclusionDecisionStatus.EXCLUDED
                 && (data.exclusionType() == ExclusionType.NONE
                 || !StringUtils.hasText(data.evidenceRef()))) {
-            rejectWithException(
+            failures.add(new GateFailure(
                     data,
                     "ALLOCATION_EVIDENCE_MISSING",
                     "HIGH",
@@ -655,8 +812,32 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "산입 제외 건에는 증빙 참조 정보가 필요합니다.",
                     FgcErrorCode.TRAN_004,
                     Map.of()
+            ));
+        }
+        return failures;
+    }
+
+    // 2026-08-12 hjKang - 예외 유형과 심각도 공통 enum 적용 (ExceptionType·ExceptionSeverity의 name() 사용)
+    private GateFailure capResultFailure(ConfirmationData data, CapCheckCommand check) {
+        if (check.getResultStatus() == CapResultStatus.REVIEW_REQUIRED) {
+            return new GateFailure(
+                    data,
+                    ExceptionType.CAP_REVIEW_REQUIRED.name(),
+                    ExceptionSeverity.HIGH.name(),
+                    "산입 판단 검토 필요",
+                    "검토필요 귀속행 또는 준법경영비 증빙을 확인해야 합니다.",
+                    FgcErrorCode.CAP_002,
+                    Map.of()
             );
         }
+        if (check.getResultStatus() == CapResultStatus.VIOLATION) {
+            return new GateFailure(
+                    data, null, null, null, null,
+                    FgcErrorCode.CAP_001,
+                    Map.of("n", check.getUsagePct())
+            );
+        }
+        return null;
     }
 
     private CapCheckCommand buildCapCheck(
@@ -800,13 +981,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         ));
     }
 
-    private void validateRuleConsistency(
+    private GateFailure ruleConsistencyFailure(
             CapRuleSnapshot rule,
             CapCalculationResult calculation,
             ConfirmationData data
     ) {
         if (!rule.capRuleSetId().equals(calculation.capRuleSetId())) {
-            rejectWithException(
+            return new GateFailure(
                     data,
                     "CAP_RULE_MISMATCH",
                     "HIGH",
@@ -816,15 +997,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     Map.of()
             );
         }
+        return null;
     }
 
-    private CapRuleSnapshot requireCapRule(Long paymentId, ConfirmationData data) {
-        CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
-                paymentId,
-                data.transactionAttributionId()
-        );
+    private GateFailure capRuleFailure(CapRuleSnapshot rule, ConfirmationData data) {
         if (rule == null) {
-            rejectWithException(
+            return new GateFailure(
                     data,
                     "POLICY_MISSING",
                     "HIGH",
@@ -836,7 +1014,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
         if (rule.ruleInclusionStatus() != data.inclusionDecisionStatus()
                 || rule.ruleInclusionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED) {
-            rejectWithException(
+            return new GateFailure(
                     data,
                     "CAP_REVIEW_REQUIRED",
                     "HIGH",
@@ -846,20 +1024,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     Map.of()
             );
         }
-        return rule;
-    }
-
-    private void rejectWithException(
-            ConfirmationData data,
-            String exceptionType,
-            String severity,
-            String title,
-            String description,
-            FgcErrorCode errorCode,
-            Map<String, Object> params
-    ) {
-        saveException(data, exceptionType, severity, title, description);
-        throw new CommissionPaymentConfirmationRejectedException(errorCode, params);
+        return null;
     }
 
     private void saveException(
@@ -885,7 +1050,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private List<ConfirmationData> requireConfirmationData(Long paymentId) {
-        List<ConfirmationData> data = mapper.findConfirmationDataForUpdate(paymentId);
+        return requireConfirmationData(paymentId, true);
+    }
+
+    private List<ConfirmationData> requireConfirmationData(Long paymentId, boolean forUpdate) {
+        List<ConfirmationData> data = forUpdate
+                ? mapper.findConfirmationDataForUpdate(paymentId)
+                : mapper.findConfirmationData(paymentId);
         if (data == null || data.isEmpty()) {
             invalid("paymentId", "지급 건을 찾을 수 없습니다.");
         }

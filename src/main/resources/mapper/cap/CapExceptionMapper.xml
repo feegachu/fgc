@@ -116,7 +116,8 @@
             status IN ('NEW', 'IN_REVIEW')
     </update>
 
-    <!-- 지급 건에 해결되지 않은 한도 위반 예외가 존재하는지 확인한다. -->
+    <!-- 지급 건에 해결되지 않은 한도 위반 예외가 존재하는지 확인한다.
+         IN ('NEW','IN_REVIEW') 는 미처리(OPEN) 묶음 — 정의는 ExceptionStatus 를 따른다(#83). -->
     <select id="existsUnresolvedViolation"
             resultType="boolean">
         SELECT

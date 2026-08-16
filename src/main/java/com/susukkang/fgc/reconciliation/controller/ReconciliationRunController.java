@@ -4,6 +4,7 @@ import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunCommand;
@@ -54,7 +55,7 @@ public class ReconciliationRunController {
     @Operation(summary = "대사 실행 생성 (IF-API-38)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('SETTLEMENT')")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<CreateReconciliationRunResponse> create(
             @Valid @RequestBody CreateReconciliationRunRequest request,
             @AuthenticationPrincipal FgcUserDetails principal

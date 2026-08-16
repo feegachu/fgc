@@ -14,7 +14,7 @@
     <ul class="sidebar-nav-list">
       <li><a class="sidebar-nav-link" th:classappend="${screenId == 'FGC-UI-DASH-W01'} ? ' is-active'" th:href="@{/}" th:attr="aria-current=${screenId == 'FGC-UI-DASH-W01'} ? 'page' : null"><span class="material-symbols-rounded" aria-hidden="true">dashboard</span><span class="sidebar-nav-label">업무 대시보드</span></a></li>
       <li>
-        <details class="sidebar-nav-details" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-CONT-') or #strings.startsWith(screenId, 'FGC-UI-TRAN-') or #strings.startsWith(screenId, 'FGC-UI-SCHE-')} ? 'open' : null">
+        <details class="sidebar-nav-details" data-sidebar-section="contracts" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-CONT-') or #strings.startsWith(screenId, 'FGC-UI-TRAN-') or #strings.startsWith(screenId, 'FGC-UI-SCHE-')} ? 'open' : null">
           <summary class="sidebar-nav-summary"><span class="material-symbols-rounded" aria-hidden="true">payments</span><span class="sidebar-nav-label">계약·지급</span><span></span><span class="material-symbols-rounded sidebar-nav-chevron" aria-hidden="true">chevron_right</span></summary>
           <ul class="sidebar-subnav">
             <li><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-CONT-')} ? ' is-active'" th:href="@{/contracts}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-CONT-')} ? 'page' : null">보험계약</a></li>
@@ -24,7 +24,7 @@
         </details>
       </li>
       <li>
-        <details class="sidebar-nav-details" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-CAP-') or #strings.startsWith(screenId, 'FGC-UI-ARB-') or #strings.startsWith(screenId, 'FGC-UI-VRUN-')} ? 'open' : null">
+        <details class="sidebar-nav-details" data-sidebar-section="compliance" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-CAP-') or #strings.startsWith(screenId, 'FGC-UI-ARB-') or #strings.startsWith(screenId, 'FGC-UI-VRUN-')} ? 'open' : null">
           <summary class="sidebar-nav-summary"><span class="material-symbols-rounded" aria-hidden="true">fact_check</span><span class="sidebar-nav-label">규제 검증</span><span></span><span class="material-symbols-rounded sidebar-nav-chevron" aria-hidden="true">chevron_right</span></summary>
           <ul class="sidebar-subnav">
             <li><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-CAP-')} ? ' is-active'" th:href="@{/cap-checks}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-CAP-')} ? 'page' : null">1,200% 한도 검증</a></li>
@@ -34,7 +34,7 @@
         </details>
       </li>
       <li>
-        <details class="sidebar-nav-details" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-LEDG-') or #strings.startsWith(screenId, 'FGC-UI-RECO-')} ? 'open' : null">
+        <details class="sidebar-nav-details" data-sidebar-section="ledger" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-LEDG-') or #strings.startsWith(screenId, 'FGC-UI-RECO-')} ? 'open' : null">
           <summary class="sidebar-nav-summary"><span class="material-symbols-rounded" aria-hidden="true">menu_book</span><span class="sidebar-nav-label">원장·대사</span><span></span><span class="material-symbols-rounded sidebar-nav-chevron" aria-hidden="true">chevron_right</span></summary>
           <ul class="sidebar-subnav">
             <li><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-LEDG-')} ? ' is-active'" th:href="@{/journals}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-LEDG-')} ? 'page' : null">검증원장</a></li>
@@ -44,12 +44,12 @@
       </li>
       <li><a class="sidebar-nav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-EXCP-')} ? ' is-active'" th:href="@{/exceptions}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-EXCP-')} ? 'page' : null"><span class="material-symbols-rounded" aria-hidden="true">inbox</span><span class="sidebar-nav-label">예외</span></a></li>
       <li class="sidebar-nav-section">
-        <details class="sidebar-nav-details" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-BASE-') or #strings.startsWith(screenId, 'FGC-UI-POL-') or #strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? 'open' : null">
+        <details class="sidebar-nav-details" data-sidebar-section="admin" th:attr="open=${#strings.startsWith(screenId, 'FGC-UI-BASE-') or #strings.startsWith(screenId, 'FGC-UI-POL-') or #strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? 'open' : null">
           <summary class="sidebar-nav-summary"><span class="material-symbols-rounded" aria-hidden="true">settings</span><span class="sidebar-nav-label">관리</span><span></span><span class="material-symbols-rounded sidebar-nav-chevron" aria-hidden="true">chevron_right</span></summary>
           <ul class="sidebar-subnav">
             <li><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-BASE-')} ? ' is-active'" th:href="@{/base}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-BASE-')} ? 'page' : null">기준정보</a></li>
             <li><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-POL-')} ? ' is-active'" th:href="@{/policies}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-POL-')} ? 'page' : null">정책·룰셋</a></li>
-            <li th:if="${roleCode == 'COMPLIANCE' or roleCode == 'SYSTEM_ADMIN'}"><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? ' is-active'" th:href="@{/audit-logs}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? 'page' : null">감사로그</a></li>
+            <li th:if="${canViewAuditLog}"><a class="sidebar-subnav-link" th:classappend="${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? ' is-active'" th:href="@{/audit-logs}" th:attr="aria-current=${#strings.startsWith(screenId, 'FGC-UI-AUDT-')} ? 'page' : null">감사로그</a></li>
           </ul>
         </details>
       </li>

@@ -11,6 +11,7 @@ import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunRequest;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -61,6 +62,25 @@ class ReconciliationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/reconciliations")
                         .with(user(principal("SETTLEMENT")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.reconciliationRunId").value(41))
+                .andExpect(jsonPath("$.data.status").value("RUNNING"));
+    }
+
+    /**
+     * FGC-FUN-002 / IF-API-38 — 인터페이스정의서 §2-1의 SYSTEM_ADMIN "전부" 권한을 보장한다.
+     * 역할 열의 SETTLEMENT는 SETTLEMENT와 SYSTEM_ADMIN을 함께 뜻하므로 두 역할 모두 처리 권한이 있다.
+     */
+    @Test
+    @DisplayName("SYSTEM_ADMIN도 CSRF 토큰으로 대사 실행을 생성할 수 있다")
+    void 시스템관리자는_RUNNING_대사실행을_생성한다() throws Exception {
+        given(reconciliationRunService.create(any())).willReturn(createdRow());
+
+        mockMvc.perform(post("/api/v1/reconciliations")
+                        .with(user(principal("SYSTEM_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest())))
