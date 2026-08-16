@@ -82,11 +82,6 @@ public class ScreenViewController {
         return "reco/list";
     }
 
-    @GetMapping("/exceptions")
-    public String exceptionList() {
-        return "exception/list";
-    }
-
     @GetMapping("/validation-runs")
     public String validationRunList() {
         return "vrun/list";
