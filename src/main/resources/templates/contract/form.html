@@ -79,14 +79,14 @@
 
         <div class="fgc-field">
           <label class="fgc-label fgc-label--required" for="contractNo">계약번호</label>
-          <input class="fgc-input" id="contractNo" type="text" maxlength="80" placeholder="C007" required>
+          <input class="fgc-input" id="contractNo" name="contractNo" type="text" maxlength="80" placeholder="C007" required>
           <span class="fgc-help">같은 보험회사 안에서 중복될 수 없습니다.</span>
           <span class="fgc-error" id="err-contractNo" hidden></span>
         </div>
 
         <div class="fgc-field">
           <label class="fgc-label fgc-label--required" for="contractDate">계약일 (계약 체결일)</label>
-          <input class="fgc-input" id="contractDate" type="date" required>
+          <input class="fgc-input" id="contractDate" name="contractDate" type="date" required>
           <span class="fgc-help">
             미래 날짜는 넣을 수 없습니다. 1,200%룰과 차익거래는 <strong>이 날짜</strong>를 기준으로 판단합니다(REG-19). 분급 체계·수수료율은 상품 판매개시일·기초서류 버전 기준으로 별도로 정해집니다(REG-19).
           </span>
@@ -121,7 +121,7 @@
       <div class="fgc-card__body form-grid">
         <div class="fgc-field">
           <label class="fgc-label fgc-label--required" for="agent">모집 설계사</label>
-          <select class="fgc-select" id="agent" required>
+          <select class="fgc-select" id="agent" name="agentId" required>
             <option value="">선택하세요</option>
           </select>
           <span class="fgc-help">agent 테이블. 이 계약을 처음 체결한 설계사입니다.</span>
@@ -130,6 +130,7 @@
         <div class="fgc-field">
           <label class="fgc-label" for="org">소속 조직</label>
           <input class="fgc-input" id="org" type="text" readonly placeholder="설계사를 선택하면 자동으로 채워집니다">
+          <input id="organizationId" name="organizationId" type="hidden">
           <span class="fgc-help">설계사의 현재 소속을 따라갑니다. 직접 고치지 않습니다.</span>
         </div>
       </div>
@@ -174,13 +175,13 @@
 
         <div class="fgc-field">
           <label class="fgc-label fgc-label--required" for="firstPremium">초회 보험료 (원)</label>
-          <input class="fgc-input fgc-num" id="firstPremium" type="number" min="0" step="1" value="100000" required>
+          <input class="fgc-input fgc-num" id="firstPremium" name="firstPremiumAmount" type="number" min="1" step="1" value="100000" required>
           <span class="fgc-help">계약하고 처음 낸 보험료.</span>
         </div>
 
         <div class="fgc-field">
           <label class="fgc-label fgc-label--required" for="monthlyEquiv">월납환산 초회보험료 (원)</label>
-          <input class="fgc-input fgc-num" id="monthlyEquiv" name="monthlyEquivalentFirstPremium" type="number" min="0" step="1" value="100000" required>
+          <input class="fgc-input fgc-num" id="monthlyEquiv" name="monthlyEquivalentFirstPremium" type="number" min="1" step="1" value="100000" required>
           <span class="fgc-help" style="color:#B45309;font-weight:600">
             ★ 1,200% 한도는 이 값 × 12로 계산됩니다. 주기 보험료가 아니라 <strong>월로 환산한 값</strong>입니다.
           </span>
@@ -188,12 +189,12 @@
 
         <div class="fgc-field">
           <label class="fgc-label fgc-label--required" for="termMonths">납입기간 (개월)</label>
-          <input class="fgc-input fgc-num" id="termMonths" type="number" min="1" step="1" value="240" required>
+          <input class="fgc-input fgc-num" id="termMonths" name="paymentTermMonths" type="number" min="1" step="1" value="240" required>
         </div>
 
         <div class="fgc-field">
           <label class="fgc-label" for="stdDeduction">표준해약공제액 (원)</label>
-          <input class="fgc-input fgc-num" id="stdDeduction" type="number" min="0" step="1" placeholder="해당 상품만 입력">
+          <input class="fgc-input fgc-num" id="stdDeduction" name="standardSurrenderDeductionAmount" type="number" min="0" step="1" placeholder="해당 상품만 입력">
           <span class="fgc-help">
             <span class="fgc-evidence">표준해약공제액의 80% 이상<span class="fgc-evidence__tip">
             표준해약공제액을 80% 이상 공제하는 상품은 1,200% 한도에 12차월 예상 해약환급금을 더해서 봅니다(REG-08).
