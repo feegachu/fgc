@@ -166,6 +166,44 @@ class CommissionPaymentServiceImplTest {
                 .containsExactly(new BigDecimal("300000"), new BigDecimal("200000"));
     }
 
+    @Test
+    void createsNonContractNewcomerSupportDraftWithoutContractOrPolicyVersion() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "NEWCOMER_SUPPORT", "PAYMENT"));
+        stubInsertAndResponse(List.of(new CommissionPaymentAttributionRow(
+                1, null, LocalDate.of(2026, 7, 3), LocalDate.of(2026, 7, 1),
+                new BigDecimal("300000"), InclusionDecisionStatus.EXCLUDED,
+                ExclusionType.NEW_AGENT_SUPPORT, "신인활동지원비", "신인 지원", "EVIDENCE",
+                AttributionMethod.NEWCOMER_NON_CONTRACT
+        )));
+
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                "GA_MANUAL_PAYMENT", "GA-2026-07-NEW-001", null, 7L, 11L,
+                new BigDecimal("300000"), LocalDate.of(2026, 7, 1), "PAYMENT",
+                LocalDate.of(2026, 7, 25), PaymentStage.GA_TO_FC, null,
+                List.of(new CommissionPaymentAttributionRequest(
+                        null, LocalDate.of(2026, 7, 3), new BigDecimal("300000"),
+                        InclusionDecisionStatus.EXCLUDED, ExclusionType.NEW_AGENT_SUPPORT,
+                        "신인활동지원비", "신인 지원", "EVIDENCE",
+                        AttributionMethod.NEWCOMER_NON_CONTRACT
+                )), "EVIDENCE", "신인 지원 지급"
+        );
+
+        service.create(request);
+
+        ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getSourceContractId()).isNull();
+        assertThat(paymentCaptor.getValue().getPolicyVersionId()).isNull();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionPaymentAttributionCommand>> attributionCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mapper).insertAttributions(attributionCaptor.capture());
+        assertThat(attributionCaptor.getValue().get(0).getContractId()).isNull();
+        assertThat(attributionCaptor.getValue().get(0).getAttributionScope()).isEqualTo("AGENT");
+    }
+
     // 2026-08-11 yslee - 귀속행 입력 전 지급 본문 DRAFT 저장 검증
     // 기존 코드: 빈 귀속 목록을 MyBatis 일괄 INSERT로 전달
     // 문제: 귀속 작업 전 임시저장이 SQL 오류로 실패

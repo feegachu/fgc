@@ -189,6 +189,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 개선: 귀속행별 정책·한도·증빙 공제를 계산하고 하나라도 실패하면 확정을 차단
         for (ConfirmationData data : attributions) {
             failFirst(attributionFailures(data));
+            if (isNonContractNewcomerAttribution(data)) {
+                continue;
+            }
             CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
                     paymentId,
                     data.transactionAttributionId()
@@ -553,11 +556,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .filter(java.util.Objects::nonNull)
                 .findFirst()
                 .orElse(null);
-        Long effectivePolicyVersionId = resolvePolicyVersionId(
-                policyVersionId,
-                policyContractId,
-                paymentStage
-        );
+        boolean nonContractNewcomerPayment = !attributionRequests.isEmpty()
+                && attributionRequests.stream()
+                .allMatch(request -> request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT);
+        Long effectivePolicyVersionId = nonContractNewcomerPayment
+                && policyContractId == null
+                && policyVersionId == null
+                ? null
+                : resolvePolicyVersionId(policyVersionId, policyContractId, paymentStage);
 
         List<CommissionPaymentAttributionCommand> attributions = new ArrayList<>(attributionRequests.size());
         for (int index = 0; index < attributionRequests.size(); index++) {
@@ -916,7 +922,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 문제: 산입 귀속행처럼 증빙이 필요 없는 건도 증빙 누락으로 안내되어 실제 차단 원인을 확인할 수 없었다.
          * 개선: 정책 버전 누락을 별도의 데이터 품질 오류로 분류하고 입력값 오류(COMMON_002)로 안내한다.
          */
-        if (first.policyVersionId() == null) {
+        if (first.policyVersionId() == null && !isNonContractNewcomerAttribution(first)) {
             failures.add(new GateFailure(
                     first,
                     "POLICY_VERSION_MISSING",
@@ -932,9 +938,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private List<GateFailure> attributionFailures(ConfirmationData data) {
         List<GateFailure> failures = new ArrayList<>();
+        boolean nonContractNewcomer = isNonContractNewcomerAttribution(data);
         if (data.attributedAmount() == null
                 || (data.contractId() == null
-                && data.attributionMethod() != AttributionMethod.NEWCOMER_NON_CONTRACT)) {
+                && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
                     "DATA_QUALITY",
@@ -946,7 +953,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
-                || data.contractId() == null) {
+                || (data.contractId() == null && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
                     "CAP_REVIEW_REQUIRED",
@@ -989,6 +996,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         return failures;
+    }
+
+    private boolean isNonContractNewcomerAttribution(ConfirmationData data) {
+        return data.contractId() == null
+                && data.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT;
     }
 
     // 2026-08-12 hjKang - 예외 유형과 심각도 공통 enum 적용 (ExceptionType·ExceptionSeverity의 name() 사용)

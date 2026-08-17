@@ -44,7 +44,8 @@
     });
   });
   cashflow.addEventListener("change", filterCommissionItemsByCashflow);
-  recipient.addEventListener("change", updateAttributionAgentLabels);
+  item.addEventListener("change", syncAttributionModeForSelectedItem);
+  recipient.addEventListener("change", handleRecipientChange);
 
   loadContracts()
     .then(function () {
@@ -85,8 +86,9 @@
       });
   }
 
-  function loadContracts() {
-    return apiClient.request("/api/v1/contracts?page=1&size=100")
+  function loadContracts(agentId) {
+    var query = "?page=1&size=100" + (agentId ? "&agentId=" + encodeURIComponent(agentId) : "");
+    return apiClient.request("/api/v1/contracts" + query)
       .then(function (envelope) {
         contracts = envelope && envelope.data && Array.isArray(envelope.data.content)
           ? envelope.data.content
@@ -118,6 +120,7 @@
       });
     fillOptions(item, options, "수수료 항목을 선택하세요");
     item.value = selected;
+    syncAttributionModeForSelectedItem();
   }
 
   function loadDraft(id) {
@@ -140,16 +143,20 @@
           (draft.attributions || []).forEach(function (attribution) {
             addAttributionRow();
             var row = attrBody.lastElementChild;
-            row.querySelector("[data-contract-id]").value = String(attribution.contractId);
+            row.querySelector("[data-contract-id]").value = attribution.contractId == null
+              ? "" : String(attribution.contractId);
             row.querySelector("[data-attr-date]").value = attribution.attributionDate || "";
             row.querySelector("[data-attr-month]").value = attribution.attributionMonth || "";
             row.querySelector("[data-attr-amount]").value = attribution.amount;
-            row.querySelector("[data-inclusion]").value = attribution.inclusionDecisionStatus;
-            row.querySelector("[data-inclusion]").dispatchEvent(new Event("change"));
-            row.querySelector("[data-exclusion]").value = attribution.exclusionType || "NONE";
+            setInclusionDecision(
+              row.querySelector("[data-inclusion]"),
+              attribution.inclusionDecisionStatus,
+              attribution.exclusionType
+            );
             row.querySelector("[data-attr-method]").value = attribution.attributionMethod;
             row.querySelector("[data-allocation-basis]").value = attribution.allocationBasis || "";
             row.querySelector("[data-attr-evidence]").value = attribution.evidenceRef || "";
+            applyAttributionMode(row);
           });
           if (!attrBody.querySelector("[data-attr-row]")) addAttributionRow();
           document.getElementById("tx-status").textContent = "작성중 · #" + id;
@@ -167,7 +174,8 @@
     row.dataset.attrRow = "";
 
     appendTextCell(row, attributionSequence);
-    appendTextCell(row, "계약");
+    var scopeCell = appendTextCell(row, "계약");
+    scopeCell.dataset.attributionScope = "";
     row.appendChild(controlCell(contractSelect()));
     appendAgentCell(row);
     row.appendChild(controlCell(input("date", monthFirstDay(), "data-attr-date")));
@@ -197,7 +205,11 @@
       var monthInput = row.querySelector("[data-attr-month]");
       monthInput.value = event.target.value ? event.target.value.slice(0, 7) + "-01" : "";
     });
+    row.querySelector("[data-attr-method]").addEventListener("change", function () {
+      applyAttributionMode(row);
+    });
     attrBody.appendChild(row);
+    applyAttributionMode(row);
     updateAttributionSummary();
   }
 
@@ -221,24 +233,32 @@
   }
 
   function inclusionControls() {
-    var wrapper = document.createElement("div");
     var decision = document.createElement("select");
     decision.dataset.inclusion = "";
-    fillOptions(decision, [["INCLUDED", "산입"], ["EXCLUDED", "제외"], ["REVIEW_REQUIRED", "검토필요"]]);
-    var exclusion = document.createElement("select");
-    exclusion.dataset.exclusion = "";
-    fillOptions(exclusion, [
-      ["NONE", "제외유형 없음"], ["VOICE_RECORDING", "녹취"], ["BROADCAST", "방송"],
-      ["NEW_AGENT_SUPPORT", "신인 지원"], ["COMPLIANCE_3PCT", "준법경영비"]
+    fillOptions(decision, [
+      ["INCLUDED", "산입"],
+      ["REVIEW_REQUIRED", "검토필요"],
+      ["EXCLUDED:VOICE_RECORDING", "제외 · 녹취"],
+      ["EXCLUDED:BROADCAST", "제외 · 방송"],
+      ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"],
+      ["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]
     ]);
-    exclusion.hidden = true;
-    decision.addEventListener("change", function () {
-      exclusion.hidden = decision.value !== "EXCLUDED";
-      if (exclusion.hidden) exclusion.value = "NONE";
-    });
-    wrapper.appendChild(decision);
-    wrapper.appendChild(exclusion);
-    return wrapper;
+    return decision;
+  }
+
+  function setInclusionDecision(select, inclusionStatus, exclusionType) {
+    var value = inclusionStatus === "EXCLUDED"
+      ? "EXCLUDED:" + (exclusionType || "VOICE_RECORDING")
+      : inclusionStatus;
+    select.value = value;
+  }
+
+  function parseInclusionDecision(value) {
+    var parts = value.split(":");
+    return {
+      inclusionStatus: parts[0],
+      exclusionType: parts.length > 1 ? parts[1] : "NONE"
+    };
   }
 
   function methodSelect() {
@@ -250,6 +270,93 @@
       ["MANUAL_REVIEW", "수기 검토"], ["NEWCOMER_NON_CONTRACT", "신인 비계약"]
     ]);
     return select;
+  }
+
+  function selectedCommissionItem() {
+    var items = [];
+    try { items = JSON.parse(item.dataset.items || "[]"); } catch (ignored) { items = []; }
+    return items.find(function (entry) {
+      return String(entry.commissionItemId) === item.value;
+    }) || null;
+  }
+
+  function isNewcomerSupportSelected() {
+    var selected = selectedCommissionItem();
+    return selected && selected.itemCode === "NEWCOMER_SUPPORT";
+  }
+
+  function syncAttributionModeForSelectedItem() {
+    attrBody.querySelectorAll("[data-attr-row]").forEach(applyAttributionMode);
+  }
+
+  function applyAttributionMode(row) {
+    var newcomerSupport = isNewcomerSupportSelected();
+    var scope = row.querySelector("[data-attribution-scope]");
+    var contract = row.querySelector("[data-contract-id]");
+    var method = row.querySelector("[data-attr-method]");
+    var decision = row.querySelector("[data-inclusion]");
+    var evidence = row.querySelector("[data-attr-evidence]");
+    var contractCell = contract.parentElement;
+    var noContract = contractCell.querySelector("[data-no-contract]");
+    var previousDecision = decision.value;
+
+    if (!noContract) {
+      noContract = document.createElement("span");
+      noContract.dataset.noContract = "";
+      noContract.className = "fgc-muted";
+      noContract.textContent = "계약 없음";
+      noContract.hidden = true;
+      contractCell.appendChild(noContract);
+    }
+
+    scope.textContent = newcomerSupport ? "설계사" : "계약";
+    contract.hidden = newcomerSupport;
+    contract.disabled = newcomerSupport;
+    noContract.hidden = !newcomerSupport;
+    var newcomerOption = method.querySelector('option[value="NEWCOMER_NON_CONTRACT"]');
+    if (newcomerOption) newcomerOption.disabled = !newcomerSupport;
+    if (newcomerSupport) {
+      contract.value = "";
+      method.value = "NEWCOMER_NON_CONTRACT";
+      method.disabled = true;
+      fillOptions(decision, [
+        ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"],
+        ["REVIEW_REQUIRED", "검토필요"]
+      ]);
+      decision.value = previousDecision === "REVIEW_REQUIRED"
+        ? "REVIEW_REQUIRED" : "EXCLUDED:NEW_AGENT_SUPPORT";
+      evidence.placeholder = "신인 지원 증빙을 입력하세요";
+      return;
+    }
+
+    if (method.value === "NEWCOMER_NON_CONTRACT") method.value = "DIRECT";
+    method.disabled = false;
+    fillOptions(decision, [
+      ["INCLUDED", "산입"],
+      ["REVIEW_REQUIRED", "검토필요"],
+      ["EXCLUDED:VOICE_RECORDING", "제외 · 녹취"],
+      ["EXCLUDED:BROADCAST", "제외 · 방송"],
+      ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"],
+      ["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]
+    ]);
+    decision.value = Array.from(decision.options).some(function (option) {
+      return option.value === previousDecision;
+    }) ? previousDecision : "INCLUDED";
+    evidence.placeholder = "증빙 입력";
+  }
+
+  function handleRecipientChange() {
+    clearAttributionsForRecipientChange();
+    loadContracts(recipient.value);
+  }
+
+  function clearAttributionsForRecipientChange() {
+    if (!attrBody.querySelector("[data-attr-row]")) return;
+    clear(attrBody);
+    attributionSequence = 0;
+    renderEmptyAttributions();
+    updateAttributionSummary();
+    toast("수령 설계사가 변경되어 기존 귀속행을 비웠습니다. 계약을 다시 선택하세요.", "warning", 5000);
   }
 
   function save() {
@@ -448,17 +555,18 @@
     var contract = row.querySelector("[data-contract-id]");
     var date = row.querySelector("[data-attr-date]");
     var attrAmount = row.querySelector("[data-attr-amount]");
-    requireValue(contract, "귀속 계약"); requireValue(date, "귀속일"); requireValue(attrAmount, "귀속금액");
-    var decision = row.querySelector("[data-inclusion]").value;
-    var exclusion = row.querySelector("[data-exclusion]").value;
+    var newcomerSupport = isNewcomerSupportSelected();
+    if (!newcomerSupport) requireValue(contract, "귀속 계약");
+    requireValue(date, "귀속일"); requireValue(attrAmount, "귀속금액");
+    var decision = parseInclusionDecision(row.querySelector("[data-inclusion]").value);
     var rowEvidence = blankToNull(row.querySelector("[data-attr-evidence]").value);
-    if (decision === "EXCLUDED" && (exclusion === "NONE" || !rowEvidence)) {
+    if ((decision.inclusionStatus === "EXCLUDED" || newcomerSupport) && !rowEvidence) {
       throw new Error("제외 귀속행은 제외유형과 증빙을 입력해야 합니다.");
     }
     return {
-      contractId: Number(contract.value), attributionDate: date.value,
-      amount: Number(attrAmount.value), inclusionDecisionStatus: decision,
-      exclusionType: exclusion, inclusionDecisionReason: decisionReason(decision),
+      contractId: newcomerSupport ? null : Number(contract.value), attributionDate: date.value,
+      amount: Number(attrAmount.value), inclusionDecisionStatus: decision.inclusionStatus,
+      exclusionType: decision.exclusionType, inclusionDecisionReason: decisionReason(decision),
       allocationBasis: blankToNull(row.querySelector("[data-allocation-basis]").value),
       evidenceRef: rowEvidence, attributionMethod: row.querySelector("[data-attr-method]").value
     };
@@ -494,7 +602,14 @@
   }
   function monthFirstDay() { return settlementMonth.value ? settlementMonth.value + "-01" : ""; }
   function decisionReason(decision) {
-    return { INCLUDED: "화면에서 산입으로 지정", EXCLUDED: "화면에서 제외로 지정", REVIEW_REQUIRED: "화면에서 검토필요로 지정" }[decision];
+    var labels = {
+      VOICE_RECORDING: "녹취 관련 비용",
+      BROADCAST: "방송 관련 비용",
+      NEW_AGENT_SUPPORT: "신인활동지원비",
+      COMPLIANCE_3PCT: "준법경영비"
+    };
+    if (decision.inclusionStatus === "EXCLUDED") return "한도 제외: " + labels[decision.exclusionType];
+    return { INCLUDED: "화면에서 산입으로 지정", REVIEW_REQUIRED: "화면에서 검토필요로 지정" }[decision.inclusionStatus];
   }
 
   function generateBusinessKey() {
@@ -518,7 +633,7 @@
   function input(type, value, marker) { var control = document.createElement("input"); control.type = type; control.value = value; if (marker) control.setAttribute(marker, ""); if (type === "number") { control.min = "0"; control.step = "1"; } return control; }
   function readonlyInput(value) { var control = input("text", value, "data-attr-month"); control.readOnly = true; return control; }
   function controlCell(control) { var cell = document.createElement("td"); cell.appendChild(control); return cell; }
-  function appendTextCell(row, value) { var cell = document.createElement("td"); cell.textContent = value; row.appendChild(cell); }
+  function appendTextCell(row, value) { var cell = document.createElement("td"); cell.textContent = value; row.appendChild(cell); return cell; }
   function renumberRows() { attrBody.querySelectorAll("[data-attr-row]").forEach(function (row, index) { row.firstElementChild.textContent = index + 1; }); }
   function renderEmptyAttributions() { var row = document.createElement("tr"); var cell = document.createElement("td"); var empty = document.createElement("div"); cell.colSpan = 12; empty.className = "fgc-empty"; empty.textContent = "귀속행을 추가하세요."; cell.appendChild(empty); row.appendChild(cell); attrBody.appendChild(row); }
   function requireValue(control, label) { if (!control.value || (control.type === "number" && number(control.value) < 0)) { control.focus(); throw new Error(label + "을(를) 확인하세요."); } }
