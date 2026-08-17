@@ -64,6 +64,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
+    @Override
+    @Transactional(readOnly = true)
+    public CommissionPaymentResponse get(Long paymentId) {
+        return requirePayment(paymentId, mapper.findCapCheckIds(paymentId));
+    }
+
     // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
     // after JSON 에 지급단계·포함/제외 판단·정착지원금 귀속·배부정책·증빙(REG-20·22)을 함께 담는다.
     private static final String AUDIT_ENTITY_TYPE = "COMMISSION_PAYMENT";

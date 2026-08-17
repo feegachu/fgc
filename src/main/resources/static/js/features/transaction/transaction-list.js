@@ -218,6 +218,9 @@
   function rebuildOptions(select, values, selected) {
     clear(select);
     addOption(select, "", "전체");
+    if (selected && !Object.prototype.hasOwnProperty.call(values, selected)) {
+      addOption(select, selected, selected);
+    }
     Object.keys(values).sort(function (a, b) { return values[a].localeCompare(values[b], "ko"); })
       .forEach(function (key) { addOption(select, key, values[key]); });
     select.value = selected;

@@ -1,8 +1,10 @@
 package com.susukkang.fgc.contract.service;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
@@ -338,8 +340,15 @@ class ContractServiceTest {
         ContractResponse response = contractService.updateContract(21L, request);
 
         assertThat(response.getScheduleHeaderIds()).containsExactly(101L, 102L);
+        assertThat(response.getRegeneratedScheduleIds()).containsExactly(101L, 102L);
         verify(scheduleService).regenerateContractSchedules(21L, "CONTRACT_UPDATED");
-        verify(capCheckService, org.mockito.Mockito.times(2)).calculateAndSave(any());
+        ArgumentCaptor<CapCalculationCommand> capCaptor = ArgumentCaptor.forClass(CapCalculationCommand.class);
+        verify(capCheckService, org.mockito.Mockito.times(2)).calculateAndSave(capCaptor.capture());
+        assertThat(capCaptor.getAllValues())
+                .extracting(CapCalculationCommand::paymentStage)
+                .containsExactly(PaymentStage.INSURER_TO_GA, PaymentStage.GA_TO_FC);
+        verify(capCheckMapper).selectComplianceEvidenceAmount(21L, PaymentStage.INSURER_TO_GA);
+        verify(capCheckMapper, never()).selectComplianceEvidenceAmount(21L, PaymentStage.GA_TO_FC);
     }
 
     @Test

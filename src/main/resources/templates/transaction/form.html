@@ -225,13 +225,13 @@
       <!-- ④ 버튼 — 동작은 IF-API-22(저장)·24(사전검증)·25(확정) 연동 시 붙인다 -->
       <section class="fgc-card">
         <div class="fgc-card__body" style="display:flex;flex-direction:column;gap:8px">
-          <button class="fgc-btn fgc-btn--ghost" id="btn-save" data-fgc-action="save" th:disabled="${readOnly}">
+          <button type="button" class="fgc-btn fgc-btn--ghost" id="btn-save" data-fgc-action="save" th:disabled="${!canProcess}">
             <span class="material-symbols-outlined" style="font-size:18px">save</span> 임시저장 (검증 없음)
           </button>
-          <button class="fgc-btn fgc-btn--ghost" id="btn-precheck" data-fgc-action="precheck" th:disabled="${readOnly}">
+          <button type="button" class="fgc-btn fgc-btn--ghost" id="btn-precheck" data-fgc-action="precheck" th:disabled="${!canProcess}">
             <span class="material-symbols-outlined" style="font-size:18px">calculate</span> 사전검증
           </button>
-          <button class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${readOnly}">
+          <button type="button" class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${!canProcess}">
             <span class="material-symbols-outlined" style="font-size:18px">verified</span> 확정
           </button>
           <p class="fgc-help" style="margin:4px 0 0">

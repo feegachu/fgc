@@ -1,6 +1,12 @@
 package com.susukkang.fgc.schedule.service;
 
 import com.susukkang.fgc.base.mapper.AgentMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -45,6 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -63,6 +70,15 @@ class ScheduleServiceTest {
     @Mock
     private AgentMapper agentMapper;
 
+    @Mock
+    private CapCheckService capCheckService;
+
+    @Mock
+    private CapCheckMapper capCheckMapper;
+
+    @Mock
+    private AuditLogService auditLogService;
+
     @InjectMocks
     private ScheduleService scheduleService;
 
@@ -74,6 +90,10 @@ class ScheduleServiceTest {
                 .thenReturn(1);
         lenient().when(scheduleMapper.selectActiveOperationalPolicyVersionId(any(), any()))
                 .thenReturn(null);
+        CapCalculationResult result = mock(CapCalculationResult.class);
+        lenient().when(result.resultStatus()).thenReturn(CapResultStatus.NORMAL);
+        lenient().when(capCheckService.calculateAndSave(any()))
+                .thenReturn(new CapCheckSaveResult(1L, result));
     }
 
     @Test
@@ -185,6 +205,8 @@ class ScheduleServiceTest {
         ScheduleHeaderInsertDTO plannedHeader = ScheduleHeaderInsertDTO.builder()
                 .scheduleHeaderId(10L)
                 .contractId(20L)
+                .paymentStage(PaymentStage.GA_TO_FC)
+                .policyVersionId(30L)
                 .status(ScheduleHeaderStatus.PLANNED)
                 .activeYn(true)
                 .build();
@@ -197,6 +219,9 @@ class ScheduleServiceTest {
                 .build();
 
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
+                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(scheduleMapper.confirmPlannedScheduleLines(10L)).willReturn(2);
         given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
         given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
 

@@ -61,6 +61,12 @@ public class CommissionPaymentApiController {
         );
     }
 
+    @GetMapping("/{paymentId}")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<CommissionPaymentResponse> get(@PathVariable Long paymentId) {
+        return ApiResponse.success(commissionPaymentService.get(paymentId));
+    }
+
     // 2026-08-07 yslee - 지급 건 API의 성공·실패 계약을 Swagger 응답 명세로 보강
     // 기존 코드: 작업 요약만 표시되어 자연키 중복·증빙 누락·한도 초과 응답을 구분하기 어려움
     // 문제: API 사용자가 상태 코드별 업무 오류를 별도 Markdown 문서 없이 확인할 수 없음

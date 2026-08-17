@@ -52,13 +52,14 @@ function loadOfferings(insurerId, selectedId) {
     if (!apiClient) return Promise.resolve();
     offeringSelect.disabled = true;
     offeringSelect.innerHTML = '<option value="">상품을 불러오는 중입니다.</option>';
-    apiClient.request("/api/v1/base/products?insurerId=" + encodeURIComponent(insurerId)
+    return apiClient.request("/api/v1/base/products?insurerId=" + encodeURIComponent(insurerId)
         + "&asOf=" + encodeURIComponent(referenceDate()) + "&page=1&size=100")
         .then(function (envelope) { renderOfferings(pageContent(envelope), selectedId); })
         .catch(function (error) {
             offeringSelect.innerHTML = '<option value="">상품을 불러오지 못했습니다.</option>';
             showError(error);
-        });
+        })
+        .finally(updateSaveButton);
 }
 
 function loadAgents(selectedId) {

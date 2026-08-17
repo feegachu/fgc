@@ -1,4 +1,4 @@
----
+.\gradlew.bat clean test---
 title: "FGC 화면정의서 v2.0"
 version: "2.0"
 status: "배포"
@@ -876,7 +876,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `schedule_header`, `schedule_line`, `commission_rule`
-- API: `GET /api/v1/schedules/{id}`, `POST /api/v1/schedules/{id}/regenerate`
+- API: `GET /api/v1/schedules/{id}`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 

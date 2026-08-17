@@ -1,6 +1,11 @@
 package com.susukkang.fgc.schedule.service;
 
 import com.susukkang.fgc.base.mapper.AgentMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -39,6 +44,9 @@ public class ScheduleService {
     private final ScheduleMapper scheduleMapper;
     private final ContractMapper contractMapper;
     private final AgentMapper agentMapper;
+    private final CapCheckService capCheckService;
+    private final CapCheckMapper capCheckMapper;
+    private final AuditLogService auditLogService;
 
     /**
      * 설명 : 검색 조건에 따라 스케줄 헤더를 조회한다.
@@ -1091,11 +1099,38 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
         }
 
-        scheduleMapper.confirmPlannedScheduleLines(scheduleId);
+        InsuranceContract contract = contractMapper.selectContractById(header.getContractId());
+        if (contract == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+        BigDecimal evidenceAmount = header.getPaymentStage() == PaymentStage.INSURER_TO_GA
+                ? capCheckMapper.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
+                : null;
+        CapCheckSaveResult capCheck = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
+                header.getContractId(), header.getPaymentStage(), contract.getContractDate(), evidenceAmount));
+        if (capCheck.result().resultStatus() == CapResultStatus.VIOLATION) {
+            throw new FgcBusinessException(FgcErrorCode.CAP_001);
+        }
+        if (capCheck.result().resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
+            throw new FgcBusinessException(FgcErrorCode.CAP_002);
+        }
+
+        if (scheduleMapper.confirmPlannedScheduleLines(scheduleId) < 1) {
+            throw validationException("scheduleId", "확정할 예정 회차가 없습니다.");
+        }
         if (scheduleMapper.confirmScheduleHeader(scheduleId) != 1) {
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
         }
-        return selectScheduleDetailById(scheduleId);
+        ScheduleDetailResponse confirmed = selectScheduleDetailById(scheduleId);
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode("SCHEDULE_CONFIRMED")
+                .entityType("SCHEDULE")
+                .entityId(String.valueOf(scheduleId))
+                .before(header)
+                .after(confirmed)
+                .policyVersionId(header.getPolicyVersionId())
+                .build());
+        return confirmed;
     }
 
 }

@@ -544,6 +544,7 @@ public class ContractService {
         return ContractResponse.builder()
                 .contractId(id)
                 .scheduleHeaderIds(scheduleHeaderIds)
+                .regeneratedScheduleIds(scheduleHeaderIds)
                 .build();
     }
 

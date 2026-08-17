@@ -12,6 +12,8 @@ import com.susukkang.fgc.transaction.dto.*;
  */
 public interface CommissionPaymentService {
 
+    CommissionPaymentResponse get(Long paymentId);
+
     CommissionPaymentResponse create(CommissionPaymentCreateRequest request);
 
     CommissionPaymentResponse update(Long paymentId, CommissionPaymentUpdateRequest request);

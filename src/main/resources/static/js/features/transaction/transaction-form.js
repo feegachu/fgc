@@ -10,7 +10,7 @@
   var contracts = [];
   var attributionSequence = 0;
   var saving = false;
-  var paymentId = null;
+  var paymentId = new URLSearchParams(window.location.search).get("id");
 
   var stage = document.getElementById("stage");
   var sourceType = document.getElementById("sourceType");
@@ -29,7 +29,7 @@
 
   fillOptions(sourceType, SOURCE_TYPES, "원천유형을 선택하세요");
   fillOptions(recipient, [], "설계사를 불러오는 중입니다.");
-  if (!bizKey.value) bizKey.value = generateBusinessKey();
+  if (!paymentId && !bizKey.value) bizKey.value = generateBusinessKey();
 
   addButton.addEventListener("click", addAttributionRow);
   saveButton.addEventListener("click", save);
@@ -46,16 +46,15 @@
   cashflow.addEventListener("change", filterCommissionItemsByCashflow);
   recipient.addEventListener("change", updateAttributionAgentLabels);
 
-  loadContracts();
-  loadAgents();
-  loadCommissionItems();
-  addAttributionRow();
+  Promise.all([loadContracts(), loadAgents(), loadCommissionItems()])
+    .then(function () { return paymentId ? loadDraft(paymentId) : addAttributionRow(); })
+    .catch(function (error) { showError(error, "지급 건 화면을 초기화하지 못했습니다."); });
 
   function loadAgents() {
     var asOf = monthFirstDay();
-    if (!asOf) return;
+    if (!asOf) return Promise.resolve();
     recipient.disabled = true;
-    apiClient.request("/api/v1/base/agents?asOf=" + encodeURIComponent(asOf) + "&page=1&size=100")
+    return apiClient.request("/api/v1/base/agents?asOf=" + encodeURIComponent(asOf) + "&page=1&size=100")
       .then(function (envelope) {
         var rows = envelope && envelope.data && Array.isArray(envelope.data.content)
           ? envelope.data.content
@@ -83,7 +82,7 @@
   }
 
   function loadContracts() {
-    apiClient.request("/api/v1/contracts?page=1&size=100")
+    return apiClient.request("/api/v1/contracts?page=1&size=100")
       .then(function (envelope) {
         contracts = envelope && envelope.data && Array.isArray(envelope.data.content)
           ? envelope.data.content
@@ -95,8 +94,8 @@
 
   function loadCommissionItems() {
     var asOf = monthFirstDay();
-    if (!asOf) return;
-    apiClient.request("/api/v1/base/commission-items?asOf=" + encodeURIComponent(asOf))
+    if (!asOf) return Promise.resolve();
+    return apiClient.request("/api/v1/base/commission-items?asOf=" + encodeURIComponent(asOf))
       .then(function (envelope) {
         var items = envelope && Array.isArray(envelope.data) ? envelope.data : [];
         item.dataset.items = JSON.stringify(items);
@@ -115,6 +114,44 @@
       });
     fillOptions(item, options, "수수료 항목을 선택하세요");
     item.value = selected;
+  }
+
+  function loadDraft(id) {
+    return apiClient.request("/api/v1/transactions/" + encodeURIComponent(id))
+      .then(function (envelope) {
+        var draft = envelope && envelope.data;
+        if (!draft || draft.status !== "DRAFT") throw new Error("수정 가능한 지급 초안이 아닙니다.");
+        stage.value = draft.paymentStage || "";
+        sourceType.value = draft.sourceType || "";
+        bizKey.value = draft.sourceBusinessKey || "";
+        settlementMonth.value = String(draft.settlementMonth || "").slice(0, 7);
+        recipient.value = draft.agentId == null ? "" : String(draft.agentId);
+        cashflow.value = draft.cashflowType || "PAYMENT";
+        filterCommissionItemsByCashflow();
+        item.value = draft.commissionItemId == null ? "" : String(draft.commissionItemId);
+        amount.value = draft.amount == null ? "" : draft.amount;
+        evidence.value = draft.evidenceRef || "";
+        clear(attrBody);
+        (draft.attributions || []).forEach(function (attribution) {
+          addAttributionRow();
+          var row = attrBody.lastElementChild;
+          row.querySelector("[data-contract-id]").value = String(attribution.contractId);
+          row.querySelector("[data-attr-date]").value = attribution.attributionDate || "";
+          row.querySelector("[data-attr-month]").value = attribution.attributionMonth || "";
+          row.querySelector("[data-attr-amount]").value = attribution.amount;
+          row.querySelector("[data-inclusion]").value = attribution.inclusionDecisionStatus;
+          row.querySelector("[data-inclusion]").dispatchEvent(new Event("change"));
+          row.querySelector("[data-exclusion]").value = attribution.exclusionType || "NONE";
+          row.querySelector("[data-attr-method]").value = attribution.attributionMethod;
+          row.querySelector("[data-allocation-basis]").value = attribution.allocationBasis || "";
+          row.querySelector("[data-attr-evidence]").value = attribution.evidenceRef || "";
+        });
+        if (!attrBody.querySelector("[data-attr-row]")) addAttributionRow();
+        document.getElementById("tx-status").textContent = "작성중 · #" + id;
+        saveButton.textContent = "수정 저장";
+        updateAttributionAgentLabels();
+        updateAttributionSummary();
+      });
   }
 
   function addAttributionRow() {
@@ -216,7 +253,9 @@
 
     saving = true;
     saveButton.disabled = true;
-    apiClient.request("/api/v1/transactions", { method: "POST", body: payload })
+    var editing = Boolean(paymentId);
+    var path = editing ? "/api/v1/transactions/" + encodeURIComponent(paymentId) : "/api/v1/transactions";
+    apiClient.request(path, { method: editing ? "PUT" : "POST", body: payload })
       .then(function (envelope) {
         paymentId = envelope.data && envelope.data.commissionTransactionId;
         document.getElementById("tx-status").textContent = "작성중 · #" + paymentId;
@@ -343,7 +382,7 @@
     confirmButton.disabled = true;
     apiClient.request("/api/v1/transactions/" + encodeURIComponent(paymentId) + "/confirm", {
       method: "POST",
-      idempotencyKey: "TRAN-CONFIRM-" + paymentId + "-" + Date.now()
+      idempotencyKey: "TRAN-CONFIRM-" + paymentId
     }).then(function () {
       document.getElementById("tx-status").textContent = "확정 · #" + paymentId;
       toast("수수료 지급 건을 확정했습니다.", "success", 3000);
