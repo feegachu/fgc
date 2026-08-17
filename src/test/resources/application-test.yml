@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:17:///fgc?TC_DAEMON=true&currentSchema=fgc
+    username: fgc
+    password: fgc_test_only
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/demo

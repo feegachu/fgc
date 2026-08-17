@@ -1,14 +1,14 @@
 package com.susukkang.fgc.exceptioncase.controller;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
+import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-
-import java.util.List;
 
 /**
  * FGC-UI-EXCP-W01 예외함 화면 (FUN-052·053).
@@ -28,28 +28,43 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExceptionCaseViewController {
 
-    private final ExceptionCaseQueryMapper exceptionCaseQueryMapper;
+    private static final int PAGE_SIZE = 20;
+
+    private final ExceptionCaseService exceptionCaseService;
 
     @GetMapping("/exceptions")
-    public String list(@RequestParam(required = false) String status, Model model) {
+    public String list(
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") int page,
+            Model model
+    ) {
         // defaultValue 는 빈 문자열(status= → "전체")까지 OPEN 으로 덮어쓰므로 쓰지 않는다 —
         // 파라미터가 아예 없을 때만 워크큐 기본값(미처리)으로 연다.
         if (status == null) {
             status = ExceptionStatus.OPEN_FILTER;
         }
-        List<ExceptionStatus> statuses;
         try {
-            statuses = ExceptionStatus.dbStatuses(status);
+            ExceptionStatus.dbStatuses(status);
         } catch (IllegalArgumentException e) {
             // ShellAdvice 의 month 처럼 조용히 기본 필터로 되돌린다 — 화면 select 가
             // 보내는 값이라 사용자가 직접 칠 일이 없고, 워크큐 기본값은 미처리다.
             status = ExceptionStatus.OPEN_FILTER;
-            statuses = ExceptionStatus.dbStatuses(status);
         }
+
+        page = Math.max(1, Math.min(page, Integer.MAX_VALUE / PAGE_SIZE));
+        ExceptionCaseSearchDTO criteria = ExceptionCaseSearchDTO.builder().status(status).build();
+        ExceptionCaseSearchResponse cases = exceptionCaseService.search(criteria, page, PAGE_SIZE);
+        if (cases.totalPages() > 0 && page > cases.totalPages()) {
+            page = cases.totalPages();
+            cases = exceptionCaseService.search(criteria, page, PAGE_SIZE);
+        }
+
         model.addAttribute("statusFilter", status);
-        model.addAttribute("cases", exceptionCaseQueryMapper.findCases(statuses));
-        model.addAttribute("openCount", exceptionCaseQueryMapper.countByStatuses(
-                ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER)));
+        model.addAttribute("cases", cases.content());
+        model.addAttribute("casePage", cases);
+        model.addAttribute("openCount", cases.summary().stream()
+                .mapToLong(summary -> summary.count())
+                .sum());
         return "exception/list";
     }
 }

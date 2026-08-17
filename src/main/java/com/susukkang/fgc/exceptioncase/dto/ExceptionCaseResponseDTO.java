@@ -3,6 +3,7 @@ package com.susukkang.fgc.exceptioncase.dto;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
+import com.susukkang.fgc.common.util.DateUtil;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -41,7 +42,17 @@ public record ExceptionCaseResponseDTO(
                 ExceptionStatus.valueOf(row.status()),
                 row.title(), row.description(), row.contractNo(), row.agentName(),
                 row.assignedTo(), row.assigneeLoginId(), row.sourceEntityType(),
-                row.sourceEntityId(), row.createdAt(), actions
+                row.sourceEntityId(), DateUtil.toSeoul(row.createdAt()), actions
         );
+    }
+
+    /** 예외의 원천 업무 화면이 제공되는 경우 바로 이동할 링크를 반환한다. */
+    public String sourceLink() {
+        return switch (sourceEntityType) {
+            case "INSURANCE_CONTRACT" -> "/contracts/" + sourceEntityId;
+            case "ARBITRAGE_CHECK" -> "/arbitrage-checks";
+            case "COMMISSION_TRANSACTION" -> "/transactions";
+            default -> null;
+        };
     }
 }

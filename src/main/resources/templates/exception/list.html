@@ -13,11 +13,9 @@
    · 처리 이력 수정·삭제 — append-only 입니다
    · 같은 원천에 예외 중복 생성 — exception_key UNIQUE 로 재실행해도 1건입니다
 
-  [부분 바인딩 단계] 안내 배너·상태 필터·목록은 ExceptionCaseViewController 가
-  서버 렌더링으로 채운다(#83). 상태 select 의 OPEN(미처리)은 exception_case.status 에
-  없는 화면 묶음값이라 서버(ExceptionStatus.dbStatuses)가 NEW+IN_REVIEW 로 풀어 조회한다.
-  유형별 요약카드·유형/심각도/담당자/계약번호 필터·처리 패널·처리 이력은
-  IF-API-43/44 전체 연동 시 채운다.
+  상태 select 의 OPEN(미처리)은 exception_case.status 에 없는 화면 묶음값이라
+  서버(ExceptionStatus.dbStatuses)가 NEW+IN_REVIEW 로 풀어 조회한다. 목록은 20행씩
+  서버 페이징하고, 현재 페이지의 상세·처리 이력은 행 선택 시 즉시 표시한다.
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-EXCP-W01', '예외함', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
@@ -37,10 +35,15 @@
     </span>
   </div>
 
-  <!-- ① 유형별 미처리 요약 — 예외 조회 API 연동 시 서버 렌더링으로 채운다 -->
-  <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px"
-           id="summary-cards" aria-label="유형별 미처리 요약">
-    <div class="fgc-empty publishing-empty-state">유형별 미처리 집계 API 연동 대기</div>
+  <!-- ① 유형별 미처리 요약 -->
+  <section class="exception-summary-grid" id="summary-cards" aria-label="유형별 미처리 요약">
+    <article class="fgc-card" th:each="summary : ${casePage.summary()}">
+      <div class="fgc-card__body">
+        <span class="fgc-muted" style="font-size:12px" th:text="${summary.type()}">예외 유형</span>
+        <strong style="display:block;margin-top:4px;font-size:20px" th:text="|${summary.count()}건|">0건</strong>
+      </div>
+    </article>
+    <div class="fgc-empty publishing-empty-state" th:if="${casePage.summary().isEmpty()}">미처리 예외가 없습니다.</div>
   </section>
 
   <!-- ② 검색 — 상태 필터만 서버 연동(#83). OPEN 은 화면 묶음값이고 서버가
@@ -80,23 +83,25 @@
     </form>
   </section>
 
-  <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.5fr 1fr;gap:16px" id="work-grid">
+  <div class="exception-work-grid" id="work-grid">
 
     <!-- ③ 목록 -->
     <section class="fgc-card">
       <div class="fgc-card__head">
         <span class="fgc-card__title">예외 목록</span>
-        <span class="fgc-muted" style="font-size:12px"><span id="row-count" th:text="${cases.size()}">0</span>건</span>
+        <span class="fgc-muted" style="font-size:12px">
+          <span id="row-count" th:text="${casePage.totalElements()}">0</span>건
+        </span>
       </div>
-      <div style="overflow-x:auto">
-        <table class="fgc-table">
+      <div class="exception-table-viewport">
+        <table class="fgc-table exception-table">
           <thead>
             <tr>
               <th style="width:56px">번호</th>
               <th style="width:150px">유형</th>
               <th style="width:74px">심각도</th>
               <th style="width:70px">계약</th>
-              <th>내용</th>
+              <th class="exception-title-cell">내용</th>
               <th style="width:86px">상태</th>
               <th style="width:84px">담당자</th>
               <th style="width:106px">발생</th>
@@ -104,14 +109,16 @@
             </tr>
           </thead>
           <tbody id="list-body">
-            <tr th:each="c : ${cases}">
+            <tr class="exception-row" th:each="c : ${cases}"
+                tabindex="0" aria-controls="detail-body history-body" aria-selected="false"
+                th:attr="data-exception-id=${c.exceptionCaseId()}">
               <td class="fgc-mono" th:text="${c.exceptionCaseId()}">-</td>
-              <td th:text="${c.exceptionType()}">-</td>
+              <td th:text="${c.type()}">-</td>
               <td th:text="${c.severity()}">-</td>
               <td class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</td>
-              <td th:text="${c.title()}">-</td>
+              <td class="exception-title-cell" th:text="${c.title()}">-</td>
               <td th:text="${c.status()}">-</td>
-              <td th:text="${c.assignedTo()} ?: '미배정'">-</td>
+              <td th:text="${c.assigneeLoginId()} ?: '미배정'">-</td>
               <td class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
               <!-- 참조 = 원천 화면 링크 (화면정의서 :1349 "만들 때 주의") — 라우트가 없는 원천 유형은 텍스트로만 -->
               <td class="fgc-mono">
@@ -125,10 +132,38 @@
           </tbody>
         </table>
       </div>
+      <nav class="exception-pagination" aria-label="예외 목록 페이지">
+        <span>
+          <span th:text="${casePage.page()}">1</span> /
+          <span th:text="${casePage.totalPages() == 0 ? 1 : casePage.totalPages()}">1</span> 페이지
+        </span>
+        <div class="pagination-controls">
+          <a class="pagination-button" th:if="${casePage.page() > 1}"
+             th:href="@{/exceptions(status=${statusFilter}, month=${month}, page=${casePage.page() - 1})}"
+             aria-label="이전 페이지">
+            <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+          </a>
+          <span class="pagination-button is-disabled" th:unless="${casePage.page() > 1}"
+                aria-label="이전 페이지" aria-disabled="true" tabindex="-1">
+            <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+          </span>
+          <span class="pagination-button is-active" aria-current="page"
+                th:text="${casePage.page()}">1</span>
+          <a class="pagination-button" th:if="${casePage.page() < casePage.totalPages()}"
+             th:href="@{/exceptions(status=${statusFilter}, month=${month}, page=${casePage.page() + 1})}"
+             aria-label="다음 페이지">
+            <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+          </a>
+          <span class="pagination-button is-disabled" th:unless="${casePage.page() < casePage.totalPages()}"
+                aria-label="다음 페이지" aria-disabled="true" tabindex="-1">
+            <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+          </span>
+        </div>
+      </nav>
     </section>
 
     <!-- ④ 처리 패널 + ⑤ 이력 -->
-    <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="exception-side-panels">
 
       <section class="fgc-card">
         <div class="fgc-card__head">
@@ -152,19 +187,41 @@
     </div>
   </div>
 
-<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
-<script>
-/* 화면 폭이 좁으면 목록·처리 패널을 세로로 — 데이터 렌더링은 API 연동 시 추가 */
-(function () {
-  "use strict";
-  function reflow() {
-    document.getElementById("work-grid").style.gridTemplateColumns =
-      window.innerWidth < 1200 ? "1fr" : "1.5fr 1fr";
-  }
-  reflow();
-  window.addEventListener("resize", reflow);
-})();
-</script>
+  <!-- 현재 페이지 데이터만 template으로 보관해 행 선택 시 추가 요청 없이 상세·이력을 표시한다. -->
+  <th:block th:each="c : ${cases}">
+    <template th:id="|exception-detail-${c.exceptionCaseId()}|">
+      <dl class="exception-detail-grid">
+        <div><dt>예외 번호</dt><dd class="fgc-mono" th:text="${c.exceptionCaseId()}">-</dd></div>
+        <div><dt>상태</dt><dd th:text="${c.status()}">-</dd></div>
+        <div><dt>유형</dt><dd th:text="${c.type()}">-</dd></div>
+        <div><dt>심각도</dt><dd th:text="${c.severity()}">-</dd></div>
+        <div><dt>계약번호</dt><dd class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</dd></div>
+        <div><dt>담당자</dt><dd th:text="${c.assigneeLoginId()} ?: '미배정'">-</dd></div>
+        <div><dt>설계사</dt><dd th:text="${c.agentName()} ?: '-'">-</dd></div>
+        <div><dt>발생</dt><dd class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</dd></div>
+        <div class="exception-detail-wide"><dt>제목</dt><dd th:text="${c.title()}">-</dd></div>
+        <div class="exception-detail-wide"><dt>설명</dt><dd th:text="${c.description()}">-</dd></div>
+        <div class="exception-detail-wide"><dt>참조</dt><dd class="fgc-mono">
+          <a th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}"
+             th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</a>
+          <span th:if="${c.sourceLink() == null}"
+                th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
+        </dd></div>
+      </dl>
+    </template>
+    <template th:id="|exception-history-${c.exceptionCaseId()}|">
+      <ol class="exception-history-list" th:if="${!c.actions().isEmpty()}">
+        <li class="exception-history-item" th:each="action : ${c.actions()}">
+          <strong th:text="|${action.actionSeq()}. ${action.actionType()}|">1. 조치</strong>
+          <span class="fgc-muted"> · <span th:text="${action.fromStatus()}">이전 상태</span> → <span th:text="${action.toStatus()}">현재 상태</span></span>
+          <p style="margin:4px 0 0" th:text="${action.reason()}">사유</p>
+          <small class="fgc-muted"><span th:text="${action.actionByLoginId()}">처리자</span> · <span th:text="${#temporals.format(action.actionAt(), 'yyyy-MM-dd HH:mm')}">처리 시각</span></small>
+        </li>
+      </ol>
+      <p class="fgc-muted" style="font-size:13px;margin:0" th:if="${c.actions().isEmpty()}">처리 이력이 없습니다.</p>
+    </template>
+  </th:block>
+
 </main>
 </body>
 </html>

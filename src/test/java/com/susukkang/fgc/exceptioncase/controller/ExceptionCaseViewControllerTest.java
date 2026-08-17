@@ -2,13 +2,17 @@ package com.susukkang.fgc.exceptioncase.controller;
 
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.ShellAdvice;
-import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseResponseDTO;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryResponse;
+import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -21,10 +25,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.OffsetDateTime;
 import java.util.List;
 
-import static com.susukkang.fgc.common.code.ExceptionStatus.IN_REVIEW;
-import static com.susukkang.fgc.common.code.ExceptionStatus.NEW;
-import static com.susukkang.fgc.common.code.ExceptionStatus.RESOLVED;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -34,11 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-/**
- * EXCP-W01 예외함 — 화면 필터 status=OPEN(묶음값)을 서버가 NEW+IN_REVIEW 로
- * 풀어서 조회하는지(#83) 를 OPEN / 개별 상태값 / 필터 없음 3가지 경로로 지킨다.
- * FUN-057 인수조건 "카드 클릭 → 목록 이동 + 검색조건 자동 적용"(화면정의서 :405)의 수신부.
- */
+/** FGC-FUN-052/053/057 예외함의 필터, 페이지네이션, 행 선택용 상세 데이터 렌더링을 검증한다. */
 @WebMvcTest(ExceptionCaseViewController.class)
 @Import({ExceptionCaseViewController.class, ShellAdvice.class, GlobalExceptionHandler.class,
         FgcMessageResolver.class, ConstraintErrorCodeResolver.class, MessageSourceAutoConfiguration.class})
@@ -49,7 +48,101 @@ class ExceptionCaseViewControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private ExceptionCaseQueryMapper mapper;
+    private ExceptionCaseService service;
+
+    private static final FgcUserDetails SETTLE = principal("settle01", "정산담당", "SETTLEMENT");
+
+    @Test
+    void defaultsToOpenAndRendersPagedRowsWithSelectableDetails() throws Exception {
+        ExceptionCaseResponseDTO row = row(10L, ExceptionStatus.NEW,
+                "COMMISSION_TRANSACTION", "77", "1200% 한도 초과");
+        given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(row), 1, 20, 21, 21));
+
+        mockMvc.perform(get("/exceptions").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("exception/list"))
+                .andExpect(model().attribute("statusFilter", "OPEN"))
+                .andExpect(model().attribute("openCount", 21L))
+                .andExpect(content().string(containsString("data-exception-id=\"10\"")))
+                .andExpect(content().string(containsString("id=\"exception-detail-10\"")))
+                .andExpect(content().string(containsString("id=\"exception-history-10\"")))
+                .andExpect(content().string(containsString("href=\"/transactions\"")))
+                .andExpect(content().string(containsString("page=2")))
+                .andExpect(content().string(containsString("/js/features/exception/exception-list.js")))
+                .andExpect(content().string(containsString("/css/features/exception.css")));
+    }
+
+    @Test
+    void dashboardOpenFilterAndMonthArePreserved() throws Exception {
+        given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions")
+                        .param("status", "OPEN").param("month", "2026-05")
+                        .with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("month", "2026-05"))
+                .andExpect(model().attribute("statusFilter", "OPEN"));
+    }
+
+    @Test
+    void actualStatusAndRequestedPageAreForwarded() throws Exception {
+        given(service.search(argThat(c -> "RESOLVED".equals(c.getStatus())), eq(2), eq(20)))
+                .willReturn(response(List.of(row(11L, ExceptionStatus.RESOLVED,
+                        "INSURANCE_CONTRACT", "5", "필수값 누락")), 2, 20, 21, 3));
+
+        mockMvc.perform(get("/exceptions")
+                        .param("status", "RESOLVED").param("page", "2")
+                        .with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("statusFilter", "RESOLVED"))
+                .andExpect(content().string(containsString("필수값 누락")))
+                .andExpect(content().string(containsString("href=\"/contracts/5\"")));
+    }
+
+    @Test
+    void explicitEmptyStatusMeansAllStatuses() throws Exception {
+        given(service.search(argThat(c -> "".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions").param("status", "").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("statusFilter", ""));
+    }
+
+    @Test
+    void unsupportedStatusFallsBackToOpen() throws Exception {
+        given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions").param("status", "NOPE").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("statusFilter", "OPEN"));
+
+        verify(service).search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20));
+    }
+
+    private static ExceptionCaseSearchResponse response(
+            List<ExceptionCaseResponseDTO> content, int page, int size, long total, long openCount
+    ) {
+        List<ExceptionTypeSummaryResponse> summary = openCount == 0
+                ? List.of()
+                : List.of(new ExceptionTypeSummaryResponse(ExceptionType.DATA_QUALITY, openCount));
+        int totalPages = total == 0 ? 0 : (int) ((total + size - 1) / size);
+        return new ExceptionCaseSearchResponse(
+                summary, content, page, size, total, totalPages,
+                "severity,asc,createdAt,desc");
+    }
+
+    private static ExceptionCaseResponseDTO row(
+            long id, ExceptionStatus status, String sourceType, String sourceId, String title
+    ) {
+        return new ExceptionCaseResponseDTO(
+                id, "KEY-" + id, ExceptionType.DATA_QUALITY, ExceptionSeverity.WARNING,
+                status, title, "상세 설명", "C001", "김정산", null, null,
+                sourceType, sourceId, OffsetDateTime.parse("2026-07-10T09:00:00+09:00"), List.of());
+    }
 
     private static FgcUserDetails principal(String loginId, String userName, String roleCode) {
         AppUserView view = new AppUserView();
@@ -60,135 +153,5 @@ class ExceptionCaseViewControllerTest {
         view.setRoleCode(roleCode);
         view.setAccountStatus("ACTIVE");
         return new FgcUserDetails(view, true, true);
-    }
-
-    private static final FgcUserDetails SETTLE = principal("settle01", "정산담당", "SETTLEMENT");
-
-    private static final ExceptionCaseListRow OPEN_ROW = new ExceptionCaseListRow(
-            10L, "CAP_VIOLATION", "CRITICAL", "C001", "1200% 한도 초과", "NEW", null,
-            OffsetDateTime.parse("2026-07-10T09:00:00+09:00"), "COMMISSION_TRANSACTION", "77");
-
-    private static final ExceptionCaseListRow RESOLVED_ROW = new ExceptionCaseListRow(
-            11L, "DATA_QUALITY", "WARNING", null, "필수값 누락", "RESOLVED", "settle01",
-            OffsetDateTime.parse("2026-07-01T09:00:00+09:00"), "INSURANCE_CONTRACT", "5");
-
-    /** 원천 화면 라우트가 아직 없는 유형 — 참조 컬럼이 링크 없이 텍스트로만 나와야 한다. */
-    private static final ExceptionCaseListRow UNKNOWN_SOURCE_ROW = new ExceptionCaseListRow(
-            12L, "OTHER", "INFO", null, "원천 미상 예외", "NEW", null,
-            OffsetDateTime.parse("2026-07-02T09:00:00+09:00"), "LEGACY_SOURCE", "9");
-
-    private static final ExceptionCaseListRow ARBITRAGE_ROW = new ExceptionCaseListRow(
-            13L, "ARBITRAGE_CANDIDATE", "HIGH", "C002", "차익거래 후보", "NEW", null,
-            OffsetDateTime.parse("2026-07-11T09:00:00+09:00"), "ARBITRAGE_CHECK", "3");
-
-    /** FGC-FUN-052/053 — 워크큐 기본 화면. 묶음 필터 OPEN 의 서버 해석(#83)이 조회 기준이 된다. */
-    @Test
-    void 필터_없이_열면_기본값_OPEN이_NEW와_IN_REVIEW로_풀려_조회된다() throws Exception {
-        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of(OPEN_ROW, ARBITRAGE_ROW));
-        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(2L);
-
-        mockMvc.perform(get("/exceptions").with(user(SETTLE)))
-                .andExpect(status().isOk())
-                .andExpect(view().name("exception/list"))
-                .andExpect(model().attribute("statusFilter", "OPEN"))
-                // FGC-FUN-057 인수조건 "건수 일치" — 배너 건수는 KPI 와 같은 기준으로 계산된다
-                .andExpect(model().attribute("openCount", 2L))
-                // 셸 + 화면 ID + 목록 실데이터 렌더링
-                .andExpect(content().string(containsString("FGC-UI-EXCP-W01")))
-                .andExpect(content().string(containsString("1200% 한도 초과")))
-                .andExpect(content().string(containsString("미배정")))
-                // FGC-FUN-052(원천 연결) — 참조 컬럼은 원천 화면 링크 (화면정의서 :1349 "만들 때 주의")
-                .andExpect(content().string(containsString("href=\"/transactions\"")))
-                .andExpect(content().string(containsString("COMMISSION_TRANSACTION:77")))
-                .andExpect(content().string(containsString("href=\"/arbitrage-checks\"")))
-                .andExpect(content().string(containsString("ARBITRAGE_CHECK:3")))
-                // 미처리 배너 건수 — 대시보드 KPI(countOpenException)와 같은 기준
-                .andExpect(content().string(containsString("건이 처리를 기다립니다")))
-                // 상태 select 는 OPEN 이 선택된 채로 돌아온다
-                .andExpect(content().string(containsString("<option value=\"OPEN\" selected=\"selected\">")));
-
-        verify(mapper).findCases(List.of(NEW, IN_REVIEW));
-        verify(mapper).countByStatuses(List.of(NEW, IN_REVIEW));
-    }
-
-    /**
-     * FGC-FUN-057 인수조건 "항목 클릭 시 해당 목록으로 이동" —
-     * 대시보드 '미처리 예외' KPI 카드 링크(@{/exceptions(status='OPEN',month=...)}) 경로.
-     */
-    @Test
-    void 대시보드_카드가_보낸_OPEN과_month가_그대로_적용된다() throws Exception {
-        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of(OPEN_ROW));
-        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(1L);
-
-        mockMvc.perform(get("/exceptions").param("status", "OPEN").param("month", "2026-05")
-                        .with(user(SETTLE)))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("statusFilter", "OPEN"))
-                // month 는 예외 검색조건이 아니라 셸 기준월 — ShellAdvice 가 반영한다
-                .andExpect(model().attribute("month", "2026-05"));
-
-        verify(mapper).findCases(List.of(NEW, IN_REVIEW));
-    }
-
-    /** FGC-FUN-053 상태값(RESOLVED 등 실제 코드) 필터 — 묶음 해석 없이 그 값 하나로만 조회한다. */
-    @Test
-    void 실제_상태코드_필터는_그_값_하나로만_조회된다() throws Exception {
-        given(mapper.findCases(List.of(RESOLVED))).willReturn(List.of(RESOLVED_ROW));
-        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(2L);
-
-        mockMvc.perform(get("/exceptions").param("status", "RESOLVED").with(user(SETTLE)))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("statusFilter", "RESOLVED"))
-                // FGC-FUN-057 — 배너의 미처리 건수는 목록 필터와 무관하게 항상 KPI 와 같은 OPEN 기준
-                .andExpect(model().attribute("openCount", 2L))
-                .andExpect(content().string(containsString("필수값 누락")))
-                .andExpect(content().string(containsString("href=\"/contracts/5\"")))
-                .andExpect(content().string(containsString("<option value=\"RESOLVED\" selected=\"selected\">")));
-
-        verify(mapper).findCases(List.of(RESOLVED));
-        verify(mapper).countByStatuses(List.of(NEW, IN_REVIEW));
-    }
-
-    @Test
-    void 빈_상태값은_필터_없음_전체_조회다() throws Exception {
-        given(mapper.findCases(List.of())).willReturn(List.of(OPEN_ROW, RESOLVED_ROW, UNKNOWN_SOURCE_ROW));
-        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(1L);
-
-        mockMvc.perform(get("/exceptions").param("status", "").with(user(SETTLE)))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("statusFilter", ""))
-                .andExpect(content().string(containsString("<option value=\"\" selected=\"selected\">")))
-                // 라우트가 없는 원천 유형은 링크 없이 텍스트로만 표시된다
-                .andExpect(content().string(containsString("LEGACY_SOURCE:9")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("LEGACY_SOURCE:9</a>"))));
-
-        verify(mapper).findCases(List.<ExceptionStatus>of());
-    }
-
-    @Test
-    void 공백만_있는_상태값은_전체가_아니라_미지원으로_보고_기본_OPEN으로_되돌린다() throws Exception {
-        // 명시적 빈 문자열("전체")과 달리 공백은 select 가 만들 수 없는 오타성 입력이다 —
-        // 조용히 전체 조회로 새지 않게 한다.
-        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of());
-        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(0L);
-
-        mockMvc.perform(get("/exceptions").param("status", " ").with(user(SETTLE)))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("statusFilter", "OPEN"));
-
-        verify(mapper).findCases(List.of(NEW, IN_REVIEW));
-    }
-
-    @Test
-    void 미지원_상태값은_400이_아니라_기본_OPEN으로_되돌린다() throws Exception {
-        // ShellAdvice 의 month 와 같은 정책 — select 가 보내는 값이라 조용히 복구한다
-        given(mapper.findCases(List.of(NEW, IN_REVIEW))).willReturn(List.of());
-        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(0L);
-
-        mockMvc.perform(get("/exceptions").param("status", "NOPE").with(user(SETTLE)))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("statusFilter", "OPEN"));
-
-        verify(mapper).findCases(List.of(NEW, IN_REVIEW));
     }
 }

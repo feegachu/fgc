@@ -2,6 +2,7 @@ package com.susukkang.fgc.validation.dto;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.common.util.DateUtil;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -32,7 +33,8 @@ public record ValidationRunItemResponse(
         return new ValidationRunItemResponse(
                 row.getValidationRunId(), row.getValidationMonth(), row.getRunNo(),
                 runType, runType.label(), status, status.label(), row.getCurrentStep(),
-                row.getTriggeredBy(), row.getStartedAt(), row.getCompletedAt(),
-                row.getFinalizedBy(), row.getFinalizedAt(), row.getFailureMessage());
+                row.getTriggeredBy(), DateUtil.toSeoul(row.getStartedAt()),
+                DateUtil.toSeoul(row.getCompletedAt()), row.getFinalizedBy(),
+                DateUtil.toSeoul(row.getFinalizedAt()), row.getFailureMessage());
     }
 }
