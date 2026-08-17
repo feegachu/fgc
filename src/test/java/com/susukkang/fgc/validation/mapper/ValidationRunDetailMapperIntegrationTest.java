@@ -49,7 +49,11 @@ class ValidationRunDetailMapperIntegrationTest {
     }
 
     // guard_run_lifecycle(V7)이 INSERT 시 CREATED만 허용한다 — 상태는 UPDATE로 전이시킨다.
+    // 지원 밖 상태(FAILED 등)를 조용히 RUNNING 으로 남기지 않도록 명시적으로 거부한다.
     private Long insertValidationRun(LocalDate month, int runNo, String status) {
+        if (!List.of("CREATED", "RUNNING", "COMPLETED").contains(status)) {
+            throw new IllegalArgumentException("이 헬퍼는 CREATED/RUNNING/COMPLETED 만 지원: " + status);
+        }
         Long id = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status)
                 VALUES (?, ?, 'MONTHLY', 'CREATED')
@@ -170,6 +174,12 @@ class ValidationRunDetailMapperIntegrationTest {
         assertThat(targets.get(0).getProductName()).isNotBlank();
         assertThat(targets.get(0).getOfferingVersion()).isNotBlank();
         assertThat(targets.get(0).getSelectionReason()).isEqualTo("환급률표 누락");
+
+        // LIMIT 경계 — 잘려도 우선순위(검토필요 먼저)는 유지된다
+        List<ValidationTargetListRow> limited = mapper.findTargets(runId, 2);
+        assertThat(limited).hasSize(2);
+        assertThat(limited.get(0).getSelectionStatus()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(limited.get(1).getSelectionStatus()).isEqualTo("EXCLUDED");
     }
 
     @Test

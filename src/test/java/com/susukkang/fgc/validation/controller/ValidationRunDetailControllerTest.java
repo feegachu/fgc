@@ -44,8 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * IF-API-47(상세)·48(실행)·49(진행률) 웹 슬라이스 — 인증/인가, 상태코드, envelope 매핑만 검증.
- * 서비스는 mock (ValidationRunControllerTest와 같은 패턴).
+ * FGC-FUN-042·043 — IF-API-47(상세)·48(실행)·49(진행률) 웹 슬라이스.
+ * 인증/인가, 상태코드, envelope 매핑만 검증. 서비스는 mock (ValidationRunControllerTest와 같은 패턴).
  */
 @WebMvcTest(ValidationRunController.class)
 @Import({ValidationRunController.class, GlobalExceptionHandler.class, FgcMessageResolver.class,
@@ -237,6 +237,33 @@ class ValidationRunDetailControllerTest {
                 .andExpect(jsonPath("$.data.status").value("FAILED"))
                 .andExpect(jsonPath("$.data.failedStep").value(6))
                 .andExpect(jsonPath("$.data.failureMessage").value("원장 불균형 1건"));
+    }
+
+    /** 진행률 경계 — CREATED/0→0%, COMPLETED/8→80%, FINALIZED/10→100% (제43조 current_step/10). */
+    @Test
+    void progressCoversBoundaryPercentages() throws Exception {
+        ValidationRunRow created = createdRow(); // CREATED, currentStep 0
+
+        ValidationRunRow completed = createdRow();
+        completed.setStatus("COMPLETED");
+        completed.setCurrentStep(8);
+
+        ValidationRunRow finalized = createdRow();
+        finalized.setStatus("FINALIZED");
+        finalized.setCurrentStep(10);
+
+        given(validationRunDetailService.progress(100L)).willReturn(
+                ValidationRunProgressResponse.from(created),
+                ValidationRunProgressResponse.from(completed),
+                ValidationRunProgressResponse.from(finalized));
+
+        mockMvc.perform(get("/api/v1/validation-runs/100/progress").with(user(settlementPrincipal())))
+                .andExpect(jsonPath("$.data.progressPct").value(0))
+                .andExpect(jsonPath("$.data.failedStep").doesNotExist());
+        mockMvc.perform(get("/api/v1/validation-runs/100/progress").with(user(settlementPrincipal())))
+                .andExpect(jsonPath("$.data.progressPct").value(80));
+        mockMvc.perform(get("/api/v1/validation-runs/100/progress").with(user(settlementPrincipal())))
+                .andExpect(jsonPath("$.data.progressPct").value(100));
     }
 
     @Test

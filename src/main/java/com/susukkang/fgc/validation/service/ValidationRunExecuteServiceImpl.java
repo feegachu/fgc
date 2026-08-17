@@ -42,7 +42,13 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
                 validationRunId, executedBy, requestId);
 
         // join하지 않는다 — IF-API-48은 202 즉시 반환, 진행은 IF-API-49 폴링이 본다.
-        monthlyValidationJobTrigger.launch(row, requestId);
+        try {
+            monthlyValidationJobTrigger.launch(row, requestId);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // 트리거 대기열 포화(AbortPolicy) — 500 대신 재시도 안내가 있는 409 로 돌려준다.
+            // VRUN_005("다시 조회 후 시도하세요")가 기존 코드 중 재시도 의미에 가장 가깝다.
+            throw new FgcBusinessException(FgcErrorCode.VRUN_005);
+        }
         return row;
     }
 }

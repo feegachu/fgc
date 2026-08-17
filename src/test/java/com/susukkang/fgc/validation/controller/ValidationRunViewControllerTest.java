@@ -237,6 +237,40 @@ class ValidationRunViewControllerTest {
                         "(?s).*<button[^>]*id=\"btn-execute\"[^>]*\\bdisabled\\b[^>]*>.*")));
     }
 
+    /**
+     * stepClass 경계 고정 — current_step 은 "마지막으로 끝난 단계"라 RUNNING 이면 다음 칸이
+     * 진행 중이고, 9단계(사람 검토)는 배치 칸이 아니라 RUNNING/8 에서도 running 이 아니다.
+     * FINALIZED 는 ck_validation_run_step 이 10 을 강제하므로 전 칸 done.
+     */
+    @Test
+    void stepClassesFollowStatusAndCurrentStepBoundaries() throws Exception {
+        String done = "fgc-stepper__step--done";
+        String running = "fgc-stepper__step--running";
+        String failed = "fgc-stepper__step--failed";
+        given(validationRunSearchService.search(any(), anyInt(), anyInt()))
+                .willReturn(pageOf(listRow("RUNNING", 4)));
+
+        given(validationRunDetailService.detail(100L)).willReturn(detailResponse("RUNNING", 4));
+        mvc.perform(get("/validation-runs/100").with(user(settleUser())))
+                .andExpect(model().attribute("stepClasses", org.hamcrest.Matchers.contains(
+                        done, done, done, done, running, "", "", "", "", "")));
+
+        given(validationRunDetailService.detail(100L)).willReturn(detailResponse("RUNNING", 8));
+        mvc.perform(get("/validation-runs/100").with(user(settleUser())))
+                .andExpect(model().attribute("stepClasses", org.hamcrest.Matchers.contains(
+                        done, done, done, done, done, done, done, done, "", "")));
+
+        given(validationRunDetailService.detail(100L)).willReturn(detailResponse("FAILED", 6));
+        mvc.perform(get("/validation-runs/100").with(user(settleUser())))
+                .andExpect(model().attribute("stepClasses", org.hamcrest.Matchers.contains(
+                        done, done, done, done, done, failed, "", "", "", "")));
+
+        given(validationRunDetailService.detail(100L)).willReturn(detailResponse("FINALIZED", 10));
+        mvc.perform(get("/validation-runs/100").with(user(settleUser())))
+                .andExpect(model().attribute("stepClasses", org.hamcrest.Matchers.contains(
+                        done, done, done, done, done, done, done, done, done, done)));
+    }
+
     @Test
     void detailReturns404WhenRunMissing() throws Exception {
         given(validationRunDetailService.detail(999L))

@@ -4,6 +4,7 @@ import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.DateUtil;
@@ -141,8 +142,12 @@ public class ValidationRunViewController {
         try {
             detail = validationRunDetailService.detail(id);
         } catch (FgcBusinessException e) {
-            // 없는 리소스는 필터값 정상화 대상이 아니다 — 404 로 응답한다.
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            // 없는 리소스는 필터값 정상화 대상이 아니다 — COMMON_004 만 404 로 바꾸고,
+            // 다른 업무 예외는 삼키지 않는다(원인 보존).
+            if (e.getErrorCode() == FgcErrorCode.COMMON_004) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, null, e);
+            }
+            throw e;
         }
 
         // pick-run 선택지 — 최근 실행 20건이면 화면 목적(빠른 이동)에 충분
@@ -171,6 +176,8 @@ public class ValidationRunViewController {
         if ("FAILED".equals(status) && stepNo == currentStep) {
             return "fgc-stepper__step--failed";
         }
+        // FINALIZED 는 ck_validation_run_step 이 current_step=10 을 강제하므로
+        // 10칸 전부 done 이 곧 데이터 사실이다(조건을 currentStep 과 무관하게 둔 이유).
         if ("FINALIZED".equals(status)) {
             return "fgc-stepper__step--done";
         }

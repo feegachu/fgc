@@ -62,7 +62,8 @@ class PendingActionButtonStructureTest {
         assertThat(template)
                 .containsPattern("(?s)<button(?=[^>]*\\bid=\"" + id + "\")"
                         + "(?=[^>]*\\btype=\"button\")"
-                        + "(?=[^>]*\\bdisabled\\b)"
+                        // 공백 선행을 요구해 aria-disabled 의 부분 문자열 "disabled" 오탐을 막는다
+                        + "(?=[^>]*\\sdisabled\\b)"
                         + "(?=[^>]*\\baria-describedby=\"" + descriptionId + "\")[^>]*>")
                 .contains("id=\"" + descriptionId + "\"");
     }

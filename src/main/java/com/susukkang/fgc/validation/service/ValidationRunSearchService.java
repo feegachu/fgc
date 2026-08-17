@@ -4,6 +4,8 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
 
+import java.time.LocalDate;
+
 /**
  * FGC-FUN-041 월 통합검증 실행 목록 조회
  */
@@ -19,5 +21,5 @@ public interface ValidationRunSearchService {
      * validationMonth에 활성(CREATED·RUNNING) MONTHLY 실행이 있는지 —
      * VRUN-W01 생성 버튼 비활성 판정용(화면정의서 :1379)
      */
-    boolean existsActiveMonthlyRun(java.time.LocalDate validationMonth);
+    boolean existsActiveMonthlyRun(LocalDate validationMonth);
 }

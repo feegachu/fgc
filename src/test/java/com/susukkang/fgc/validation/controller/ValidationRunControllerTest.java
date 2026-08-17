@@ -12,6 +12,8 @@ import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationRunDetailService;
+import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,10 +58,10 @@ class ValidationRunControllerTest {
     private ValidationRunSearchService validationRunSearchService;
 
     @MockitoBean
-    private com.susukkang.fgc.validation.service.ValidationRunDetailService validationRunDetailService;
+    private ValidationRunDetailService validationRunDetailService;
 
     @MockitoBean
-    private com.susukkang.fgc.validation.service.ValidationRunExecuteService validationRunExecuteService;
+    private ValidationRunExecuteService validationRunExecuteService;
 
     private ValidationRunRow createdRow() {
         ValidationRunRow row = new ValidationRunRow();

@@ -8,6 +8,8 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationRunDetailService;
+import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,10 +54,10 @@ class ValidationRunSearchControllerTest {
     private ValidationRunSearchService validationRunSearchService;
 
     @MockitoBean
-    private com.susukkang.fgc.validation.service.ValidationRunDetailService validationRunDetailService;
+    private ValidationRunDetailService validationRunDetailService;
 
     @MockitoBean
-    private com.susukkang.fgc.validation.service.ValidationRunExecuteService validationRunExecuteService;
+    private ValidationRunExecuteService validationRunExecuteService;
 
     private ValidationRunListRow sampleRow() {
         ValidationRunListRow row = new ValidationRunListRow();

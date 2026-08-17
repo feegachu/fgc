@@ -67,7 +67,9 @@
       .then(function (envelope) {
         var progress = envelope.data;
         renderProgress(progress);
-        if (progress.status !== "RUNNING") {
+        // execute 직후엔 배치가 아직 안 떠서 CREATED 가 조회될 수 있다 — 종료 상태
+        // (COMPLETED/FAILED/FINALIZED)에서만 폴링을 멈추고 리로드한다.
+        if (progress.status !== "RUNNING" && progress.status !== "CREATED") {
           window.clearInterval(pollTimer);
           pollTimer = null;
           window.location.reload();

@@ -27,8 +27,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * MonthlyValidationJobTrigger — JobParameters가 행 값 그대로 구성되는지(멱등 계약,
- * 배치_Step_협업계약 §7-4)와 기동 직전 상태 재확인(중복 클릭 봉쇄)을 검증한다.
+ * FGC-FUN-042·043 — MonthlyValidationJobTrigger.
+ * JobParameters가 행 값 그대로 구성되는지(멱등 계약, 배치_Step_협업계약 §7-4)와
+ * 기동 직전 상태 재확인(중복 클릭 봉쇄)을 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class MonthlyValidationJobTriggerTest {

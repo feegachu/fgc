@@ -98,4 +98,17 @@ class ValidationRunExecuteServiceImplTest {
         // JobParameters는 트리거가 행 값으로 만든다 — 실행자(9L)가 아닌 행이 그대로 전달되는지
         verify(monthlyValidationJobTrigger).launch(created, "req-1");
     }
+
+    /** 트리거 대기열 포화(AbortPolicy) — 500 이 아니라 재시도 안내가 있는 VRUN_005(409)로 매핑된다. */
+    @Test
+    void mapsExecutorRejectionToVrun005() {
+        ValidationRunRow created = row("CREATED");
+        given(validationRunMapper.findById(100L)).willReturn(created);
+        given(monthlyValidationJobTrigger.launch(created, "req-1"))
+                .willThrow(new java.util.concurrent.RejectedExecutionException("queue full"));
+
+        assertThatThrownBy(() -> service.execute(100L, 1L, "req-1"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_005));
+    }
 }

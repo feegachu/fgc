@@ -40,10 +40,10 @@ public class MonthlyValidationJobTrigger {
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);
         executor.setQueueCapacity(10);
-        // 대기열(10)까지 찬 뒤엔 새 launch 요청을 호출자 스레드에서 그대로 실행한다 —
-        // 예외를 던져 요청을 그냥 버리는 것(AbortPolicy)보다, 느리더라도 실행은 되게 하는
-        // 편이 배치 트리거 성격에 맞다.
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        // 대기열(10)까지 찬 뒤엔 즉시 거부한다(AbortPolicy). CallerRunsPolicy 를 쓰면 넘친
+        // 실행이 HTTP 호출자 스레드에서 동기로 돌아 IF-API-48 의 "202 즉시 반환" 계약이
+        // 깨진다 — 거부는 ValidationRunExecuteServiceImpl 이 VRUN_005(재시도 안내)로 바꾼다.
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.initialize();
         return executor;
     }
