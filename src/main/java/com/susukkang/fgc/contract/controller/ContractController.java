@@ -63,7 +63,7 @@ public class ContractController {
      */
     @PostMapping
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
+    public ApiResponse<ContractCreateResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
     /**
@@ -76,7 +76,7 @@ public class ContractController {
      */
     @PutMapping("/{id}")
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
+    public ApiResponse<ContractUpdateResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
     /**

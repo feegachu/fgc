@@ -51,6 +51,10 @@ public interface ScheduleMapper {
             @Param("scheduleHeaderId") Long scheduleHeaderId
     );
 
+    List<ScheduleHeaderResponse> selectVersionsByScheduleHeaderId(
+            @Param("scheduleHeaderId") Long scheduleHeaderId
+    );
+
     /**
      * 설명 : 스케줄 라인 목록을 schedule_line에 일괄 저장한다.
      * @param scheduleLineList 스케줄 라인 목록

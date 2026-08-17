@@ -250,10 +250,12 @@ class ScreenViewControllerTest {
     @Test
     void schedule_actions_enabled_only_for_processing_roles() throws Exception {
         var disabledRegenerateButton = org.hamcrest.Matchers.matchesPattern(
-                "(?s).*<button[^>]*id=\"btn-regenerate\"[^>]*\\bdisabled\\b[^>]*>.*");
+                "(?s).*<button(?=[^>]*id=\"btn-regenerate\")(?=[^>]*\\bdisabled\\b)[^>]*>.*");
         mvc.perform(get("/schedules/1").with(user(gaAdminUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"btn-regenerate\"")))
                 .andExpect(content().string(disabledRegenerateButton));
         mvc.perform(get("/schedules/1").with(user(adminUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"btn-regenerate\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(disabledRegenerateButton)));
     }
 }

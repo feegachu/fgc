@@ -8,6 +8,7 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
@@ -114,7 +115,7 @@ public class ContractService {
      * @since 2026-08-05
      */
     @Transactional
-    public ContractResponse createContract(ContractCreateRequest request) {
+    public ContractCreateResponse createContract(ContractCreateRequest request) {
         validateInput(request); //검증
 
         // 납입 주기 -> 환산 코드 결정
@@ -164,6 +165,9 @@ public class ContractService {
         Long contractId = insuranceContract.getContractId();
 
         for (PaymentStage paymentStage : PaymentStage.values()) {
+            if (!scheduleService.hasActiveOperationalSchedule(contractId, paymentStage)) {
+                continue;
+            }
             BigDecimal complianceEvidenceAmount = null;
 
             // 준법경영비 공제는 보험회사 → GA 단계에만 적용
@@ -183,7 +187,7 @@ public class ContractService {
                             complianceEvidenceAmount
                     );
 
-            capCheckService.calculateAndSave(command);
+            calculateCapCheckOrRegisterReview(contractId, paymentStage, command);
         }
 
         // TODO(FUN-026, 2차): 계약 생성 상태 사건 이력을 등록한다.
@@ -195,7 +199,7 @@ public class ContractService {
                 .after(insuranceContract)
                 .build());
 
-        return ContractResponse.builder()
+        return ContractCreateResponse.builder()
                 .contractId(insuranceContract.getContractId())
                 .scheduleHeaderIds(scheduleResult.scheduleHeaderIds())
                 .build();
@@ -223,7 +227,7 @@ public class ContractService {
     }
 
     private void validateContractDate(ContractInput request) {
-        if (request.getContractDate().isAfter(LocalDate.now())) {
+        if (request.getContractDate().isAfter(LocalDate.now(DateUtil.SEOUL_ZONE))) {
             throw new FgcBusinessException(
                     FgcErrorCode.CONT_002,
                     "contractDate",
@@ -291,7 +295,7 @@ public class ContractService {
                             "contractNo",
                             request.getContractNo()
                     ),
-                    "이미 등록된 계약번호입니다."
+                    "이미 계약이 존재합니다."
             );
         }
     }
@@ -451,7 +455,7 @@ public class ContractService {
      * @since 2026-08-05
      */
     @Transactional
-    public ContractResponse updateContract(Long id, ContractUpdateRequest request) {
+    public ContractUpdateResponse updateContract(Long id, ContractUpdateRequest request) {
         // 계약 Id 검증 및 계약 및 스케줄 정보 가져오기
         InsuranceContract currentContract = contractMapper.selectContractById(id); //기존 계약 정보
 
@@ -510,6 +514,9 @@ public class ContractService {
             );
 
             for (PaymentStage paymentStage : PaymentStage.values()) {
+                if (!scheduleService.hasActiveOperationalSchedule(id, paymentStage)) {
+                    continue;
+                }
                 BigDecimal complianceEvidenceAmount = null;
                 if (paymentStage == PaymentStage.INSURER_TO_GA) {
                     complianceEvidenceAmount =
@@ -522,7 +529,7 @@ public class ContractService {
                         request.getContractDate(),
                         complianceEvidenceAmount
                 );
-                capCheckService.calculateAndSave(command);
+                calculateCapCheckOrRegisterReview(id, paymentStage, command);
             }
         }
 
@@ -541,9 +548,8 @@ public class ContractService {
                 .after(updatedContract)
                 .build());
 
-        return ContractResponse.builder()
+        return ContractUpdateResponse.builder()
                 .contractId(id)
-                .scheduleHeaderIds(scheduleHeaderIds)
                 .regeneratedScheduleIds(scheduleHeaderIds)
                 .build();
     }
@@ -565,6 +571,27 @@ public class ContractService {
                         current.getStandardSurrenderDeductionAmount(),
                         updated.getStandardSurrenderDeductionAmount()
                 );
+    }
+
+    private void calculateCapCheckOrRegisterReview(
+            Long contractId,
+            PaymentStage paymentStage,
+            CapCalculationCommand command
+    ) {
+        try {
+            capCheckService.calculateAndSave(command);
+        } catch (FgcBusinessException exception) {
+            if (exception.getErrorCode() != FgcErrorCode.CAP_004) {
+                throw exception;
+            }
+            scheduleService.registerCapRuleReview(
+                    contractId,
+                    paymentStage,
+                    exception.getDetail() == null
+                            ? "적용 가능한 1,200% 룰셋이 없습니다."
+                            : exception.getDetail()
+            );
+        }
     }
 
     private boolean moneyChanged(BigDecimal current, BigDecimal updated) {
@@ -620,7 +647,7 @@ public class ContractService {
         )) {
             throw validationException(
                     "contractNo",
-                    "해당 보험사에 이미 등록된 계약번호입니다."
+                    "이미 계약이 존재합니다."
             );
         }
     }

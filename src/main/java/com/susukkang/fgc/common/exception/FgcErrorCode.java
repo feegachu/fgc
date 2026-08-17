@@ -19,6 +19,11 @@ public enum FgcErrorCode {
             HttpStatus.UNPROCESSABLE_ENTITY,
             "error.cap.unresolvedViolation"
     ),
+    CAP_004(
+            "FGC-CAP-004",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.cap.ruleMissing"
+    ),
 
     TRAN_001(
             "FGC-TRAN-001",
@@ -71,6 +76,16 @@ public enum FgcErrorCode {
             "FGC-SCHE-002",
             HttpStatus.CONFLICT,
             "error.schedule.confirmedImmutable"
+    ),
+    SCHE_003(
+            "FGC-SCHE-003",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.schedule.capExceeded"
+    ),
+    SCHE_004(
+            "FGC-SCHE-004",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.schedule.capReviewRequired"
     ),
 
     VRUN_001(

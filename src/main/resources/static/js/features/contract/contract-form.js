@@ -35,6 +35,31 @@ function pageContent(envelope) {
         : [];
 }
 
+function loadAllPages(path, parameters) {
+    var pageSize = 100;
+
+    function requestPage(page) {
+        var query = new URLSearchParams(parameters || {});
+        query.set("page", String(page));
+        query.set("size", String(pageSize));
+        return apiClient.request(path + "?" + query.toString());
+    }
+
+    return requestPage(1).then(function (firstEnvelope) {
+        var firstPage = firstEnvelope && firstEnvelope.data ? firstEnvelope.data : {};
+        var totalPages = Math.max(1, Number(firstPage.totalPages) || 1);
+        var requests = [];
+        for (var page = 2; page <= totalPages; page += 1) {
+            requests.push(requestPage(page));
+        }
+        return Promise.all(requests).then(function (remainingEnvelopes) {
+            return remainingEnvelopes.reduce(function (all, envelope) {
+                return all.concat(pageContent(envelope));
+            }, pageContent(firstEnvelope));
+        });
+    });
+}
+
 function referenceDate() {
     var value = document.getElementById("contractDate").value;
     return value || todayText();
@@ -43,8 +68,8 @@ function referenceDate() {
 function loadInsurers(selectedId) {
     if (!apiClient) return Promise.resolve();
     insurerSelect.disabled = true;
-    return apiClient.request("/api/v1/base/insurers?page=1&size=100")
-        .then(function (envelope) { renderInsurers(pageContent(envelope), selectedId); })
+    return loadAllPages("/api/v1/base/insurers")
+        .then(function (insurers) { renderInsurers(insurers, selectedId); })
         .catch(function (error) { showError(error); });
 }
 
@@ -52,9 +77,11 @@ function loadOfferings(insurerId, selectedId) {
     if (!apiClient) return Promise.resolve();
     offeringSelect.disabled = true;
     offeringSelect.innerHTML = '<option value="">상품을 불러오는 중입니다.</option>';
-    return apiClient.request("/api/v1/base/products?insurerId=" + encodeURIComponent(insurerId)
-        + "&asOf=" + encodeURIComponent(referenceDate()) + "&page=1&size=100")
-        .then(function (envelope) { renderOfferings(pageContent(envelope), selectedId); })
+    return loadAllPages("/api/v1/base/products", {
+        insurerId: insurerId,
+        asOf: referenceDate()
+    })
+        .then(function (offerings) { renderOfferings(offerings, selectedId); })
         .catch(function (error) {
             offeringSelect.innerHTML = '<option value="">상품을 불러오지 못했습니다.</option>';
             showError(error);
@@ -65,9 +92,8 @@ function loadOfferings(insurerId, selectedId) {
 function loadAgents(selectedId) {
     if (!apiClient) return Promise.resolve();
     agentSelect.disabled = true;
-    return apiClient.request("/api/v1/base/agents?asOf=" + encodeURIComponent(referenceDate())
-        + "&page=1&size=100")
-        .then(function (envelope) { renderAgents(pageContent(envelope), selectedId); })
+    return loadAllPages("/api/v1/base/agents", { asOf: referenceDate() })
+        .then(function (agents) { renderAgents(agents, selectedId); })
         .catch(function (error) { showError(error); });
 }
 
@@ -270,7 +296,9 @@ function requestBody() {
 function showError(error) {
     var message = error && error.message ? error.message : "계약을 저장하지 못했습니다.";
     var field = error && (error.field || (error.params && error.params.field));
-    if (field) {
+    if (error && error.code === "FGC-CONT-001") {
+        message = "이미 계약이 존재합니다.";
+    } else if (field) {
         message = "입력값을 확인하세요: " + field;
     } else {
         message = message.replace("({field})", "");

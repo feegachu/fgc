@@ -1,4 +1,4 @@
-.\gradlew.bat clean test---
+---
 title: "FGC 화면정의서 v2.0"
 version: "2.0"
 status: "배포"

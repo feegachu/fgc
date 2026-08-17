@@ -141,6 +141,13 @@ public class ScheduleService {
 
         return detail ;
     }
+
+    public List<ScheduleHeaderResponse> selectScheduleVersions(Long scheduleHeaderId) {
+        if (scheduleHeaderId == null) {
+            throw validationException("scheduleHeaderId", "스케줄 헤더 ID는 필수입니다.");
+        }
+        return scheduleMapper.selectVersionsByScheduleHeaderId(scheduleHeaderId);
+    }
     /**
      * 설명 : 계약 ID에 따라 회차별 스케줄을 자동 생성한다
      * @param contract 계약 class
@@ -992,6 +999,14 @@ public class ScheduleService {
                 oldHeader.getPaymentStage()
         );
         if (policy == null) {
+            int updatedRows = scheduleMapper.updateScheduleHeaderStatus(
+                    oldHeader.getScheduleHeaderId(),
+                    ScheduleHeaderStatus.ADJUSTED,
+                    false
+            );
+            if (updatedRows != 1) {
+                throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+            }
             return ScheduleRegenResponse.builder()
                     .scheduleHeaderId(oldHeader.getScheduleHeaderId())
                     .versionNo(oldHeader.getScheduleVersionNo().longValue())
@@ -1057,13 +1072,38 @@ public class ScheduleService {
 
             ScheduleRegenResponse regenerated =
                     regenerateSchedules(activeSchedule.getScheduleHeaderId(), reason);
-            regeneratedHeaderIds.add(regenerated.getScheduleHeaderId());
+            if (!Objects.equals(activeSchedule.getScheduleHeaderId(), regenerated.getScheduleHeaderId())) {
+                regeneratedHeaderIds.add(regenerated.getScheduleHeaderId());
+            }
         }
 
         InsuranceContract contract = contractMapper.selectContractById(contractId);
         ScheduleGenerationResult missingSchedules = generateSchedules(contract);
         regeneratedHeaderIds.addAll(missingSchedules.scheduleHeaderIds());
         return regeneratedHeaderIds;
+    }
+
+    public boolean hasActiveOperationalSchedule(Long contractId, PaymentStage paymentStage) {
+        ScheduleDetailResponse active =
+                scheduleMapper.selectByContractIdAndPaymentStage(contractId, paymentStage);
+        return active != null && active.getScheduleHeaderId() != null;
+    }
+
+    public void registerCapRuleReview(
+            Long contractId,
+            PaymentStage paymentStage,
+            String description
+    ) {
+        int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+                contractId,
+                paymentStage,
+                "CAP_RULE_MISSING",
+                "1,200% 룰셋 검토 필요 - " + paymentStage.name(),
+                description
+        );
+        if (affectedRows != 1) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        }
     }
 
     /**
@@ -1109,10 +1149,10 @@ public class ScheduleService {
         CapCheckSaveResult capCheck = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
                 header.getContractId(), header.getPaymentStage(), contract.getContractDate(), evidenceAmount));
         if (capCheck.result().resultStatus() == CapResultStatus.VIOLATION) {
-            throw new FgcBusinessException(FgcErrorCode.CAP_001);
+            throw new FgcBusinessException(FgcErrorCode.SCHE_003);
         }
         if (capCheck.result().resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
-            throw new FgcBusinessException(FgcErrorCode.CAP_002);
+            throw new FgcBusinessException(FgcErrorCode.SCHE_004);
         }
 
         if (scheduleMapper.confirmPlannedScheduleLines(scheduleId) < 1) {

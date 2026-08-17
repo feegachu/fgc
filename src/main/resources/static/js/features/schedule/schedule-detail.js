@@ -4,6 +4,7 @@
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
   var main = document.getElementById("main-content");
   var lineBody = document.getElementById("line-body");
+  var versionBody = document.getElementById("version-body");
   var confirmButton = document.getElementById("btn-confirm");
   var regenerateButton = document.getElementById("btn-regenerate");
   var regenerateReason = document.getElementById("regenerate-reason");
@@ -37,6 +38,7 @@
         if (!detail || !detail.header) throw new Error("Invalid schedule detail response");
         renderHeader(detail.header);
         renderLines(Array.isArray(detail.schedules) ? detail.schedules : []);
+        loadVersions();
       })
       .catch(function (error) {
         console.error(error);
@@ -86,6 +88,7 @@
       if (!detail || !detail.header) throw new Error("Invalid schedule confirmation response");
       renderHeader(detail.header);
       renderLines(Array.isArray(detail.schedules) ? detail.schedules : []);
+      loadVersions();
       toast("스케줄을 확정했습니다. 이제 금액을 고칠 수 없습니다. 바꾸려면 새 버전을 만드세요.", "success", 4500);
     }).catch(function (error) {
       console.error(error);
@@ -171,6 +174,67 @@
       lineBody.appendChild(row);
     });
     updateTotals(lines.length, total, firstYear);
+  }
+
+  function loadVersions() {
+    if (!versionBody) return;
+    renderVersionMessage("버전 이력을 불러오는 중입니다.", false);
+    apiClient.request("/api/v1/schedules/" + encodeURIComponent(scheduleHeaderId) + "/versions")
+      .then(function (envelope) {
+        renderVersions(envelope && Array.isArray(envelope.data) ? envelope.data : []);
+      })
+      .catch(function (error) {
+        console.error(error);
+        renderVersionMessage(error && error.message
+          ? error.message
+          : "버전 이력을 불러오지 못했습니다.", true);
+      });
+  }
+
+  function renderVersions(versions) {
+    clear(versionBody);
+    if (versions.length === 0) {
+      renderVersionMessage("같은 계약의 스케줄 버전이 없습니다.", false);
+      return;
+    }
+    versions.forEach(function (version) {
+      var row = document.createElement("tr");
+      if (String(version.scheduleHeaderId) === String(scheduleHeaderId)) row.style.fontWeight = "700";
+
+      var versionCell = document.createElement("td");
+      var link = document.createElement("a");
+      link.href = "/schedules/" + encodeURIComponent(version.scheduleHeaderId);
+      link.textContent = version.scheduleVersionNo == null ? "—" : "v" + version.scheduleVersionNo;
+      versionCell.appendChild(link);
+      row.appendChild(versionCell);
+
+      appendCell(row, label({
+        PLANNED: "예정", CONFIRMED: "확정", MATCHED: "매칭", ADJUSTED: "조정",
+        HOLD: "보류", CANCELLED: "취소", RESTARTED: "재개"
+      }, version.status));
+      appendCell(row, version.activeYn === true ? "사용중" : "미사용");
+      appendCell(row, version.policyVersionLabel);
+      appendCell(row, version.generationReason);
+      appendCell(row, formatDateTime(version.generatedAt));
+      appendNumberCell(row, formatNumber(version.lineCount));
+      appendMoneyCell(row, version.expectedTotal);
+      versionBody.appendChild(row);
+    });
+  }
+
+  function renderVersionMessage(message, error) {
+    if (!versionBody) return;
+    clear(versionBody);
+    var row = document.createElement("tr");
+    var cell = document.createElement("td");
+    var content = document.createElement("div");
+    cell.colSpan = 8;
+    content.className = "fgc-empty";
+    content.textContent = message;
+    if (error) content.style.color = "#d92d20";
+    cell.appendChild(content);
+    row.appendChild(cell);
+    versionBody.appendChild(row);
   }
 
   function renderLoading() {

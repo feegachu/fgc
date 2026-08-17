@@ -62,7 +62,6 @@ public class CommissionPaymentApiController {
     }
 
     @GetMapping("/{paymentId}")
-    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<CommissionPaymentResponse> get(@PathVariable Long paymentId) {
         return ApiResponse.success(commissionPaymentService.get(paymentId));
     }

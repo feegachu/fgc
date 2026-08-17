@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,6 +34,30 @@ class ScheduleControllerTest {
 
     @MockitoBean
     private ScheduleService scheduleService;
+
+    @Test
+    void returnsScheduleVersionsForSameContractAndStage() throws Exception {
+        when(scheduleService.selectScheduleVersions(10L)).thenReturn(java.util.List.of(
+                ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(11L)
+                        .scheduleVersionNo(2)
+                        .activeYn(true)
+                        .build(),
+                ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(10L)
+                        .scheduleVersionNo(1)
+                        .activeYn(false)
+                        .build()
+        ));
+
+        mockMvc.perform(get("/api/v1/schedules/{id}/versions", 10L)
+                        .with(user("viewer").roles("COMPLIANCE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].scheduleHeaderId").value(11))
+                .andExpect(jsonPath("$.data[1].scheduleVersionNo").value(1));
+
+        verify(scheduleService).selectScheduleVersions(10L);
+    }
 
     @Test
     void confirmsPlannedSchedule() throws Exception {

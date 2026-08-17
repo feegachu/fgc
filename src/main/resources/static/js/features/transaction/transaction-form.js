@@ -46,8 +46,12 @@
   cashflow.addEventListener("change", filterCommissionItemsByCashflow);
   recipient.addEventListener("change", updateAttributionAgentLabels);
 
-  Promise.all([loadContracts(), loadAgents(), loadCommissionItems()])
-    .then(function () { return paymentId ? loadDraft(paymentId) : addAttributionRow(); })
+  loadContracts()
+    .then(function () {
+      if (paymentId) return loadDraft(paymentId);
+      return Promise.all([loadAgents(), loadCommissionItems()])
+        .then(function () { addAttributionRow(); });
+    })
     .catch(function (error) { showError(error, "지급 건 화면을 초기화하지 못했습니다."); });
 
   function loadAgents() {
@@ -125,32 +129,34 @@
         sourceType.value = draft.sourceType || "";
         bizKey.value = draft.sourceBusinessKey || "";
         settlementMonth.value = String(draft.settlementMonth || "").slice(0, 7);
-        recipient.value = draft.agentId == null ? "" : String(draft.agentId);
         cashflow.value = draft.cashflowType || "PAYMENT";
-        filterCommissionItemsByCashflow();
-        item.value = draft.commissionItemId == null ? "" : String(draft.commissionItemId);
-        amount.value = draft.amount == null ? "" : draft.amount;
-        evidence.value = draft.evidenceRef || "";
-        clear(attrBody);
-        (draft.attributions || []).forEach(function (attribution) {
-          addAttributionRow();
-          var row = attrBody.lastElementChild;
-          row.querySelector("[data-contract-id]").value = String(attribution.contractId);
-          row.querySelector("[data-attr-date]").value = attribution.attributionDate || "";
-          row.querySelector("[data-attr-month]").value = attribution.attributionMonth || "";
-          row.querySelector("[data-attr-amount]").value = attribution.amount;
-          row.querySelector("[data-inclusion]").value = attribution.inclusionDecisionStatus;
-          row.querySelector("[data-inclusion]").dispatchEvent(new Event("change"));
-          row.querySelector("[data-exclusion]").value = attribution.exclusionType || "NONE";
-          row.querySelector("[data-attr-method]").value = attribution.attributionMethod;
-          row.querySelector("[data-allocation-basis]").value = attribution.allocationBasis || "";
-          row.querySelector("[data-attr-evidence]").value = attribution.evidenceRef || "";
+        return Promise.all([loadAgents(), loadCommissionItems()]).then(function () {
+          recipient.value = draft.agentId == null ? "" : String(draft.agentId);
+          filterCommissionItemsByCashflow();
+          item.value = draft.commissionItemId == null ? "" : String(draft.commissionItemId);
+          amount.value = draft.amount == null ? "" : draft.amount;
+          evidence.value = draft.evidenceRef || "";
+          clear(attrBody);
+          (draft.attributions || []).forEach(function (attribution) {
+            addAttributionRow();
+            var row = attrBody.lastElementChild;
+            row.querySelector("[data-contract-id]").value = String(attribution.contractId);
+            row.querySelector("[data-attr-date]").value = attribution.attributionDate || "";
+            row.querySelector("[data-attr-month]").value = attribution.attributionMonth || "";
+            row.querySelector("[data-attr-amount]").value = attribution.amount;
+            row.querySelector("[data-inclusion]").value = attribution.inclusionDecisionStatus;
+            row.querySelector("[data-inclusion]").dispatchEvent(new Event("change"));
+            row.querySelector("[data-exclusion]").value = attribution.exclusionType || "NONE";
+            row.querySelector("[data-attr-method]").value = attribution.attributionMethod;
+            row.querySelector("[data-allocation-basis]").value = attribution.allocationBasis || "";
+            row.querySelector("[data-attr-evidence]").value = attribution.evidenceRef || "";
+          });
+          if (!attrBody.querySelector("[data-attr-row]")) addAttributionRow();
+          document.getElementById("tx-status").textContent = "작성중 · #" + id;
+          saveButton.textContent = "수정 저장";
+          updateAttributionAgentLabels();
+          updateAttributionSummary();
         });
-        if (!attrBody.querySelector("[data-attr-row]")) addAttributionRow();
-        document.getElementById("tx-status").textContent = "작성중 · #" + id;
-        saveButton.textContent = "수정 저장";
-        updateAttributionAgentLabels();
-        updateAttributionSummary();
       });
   }
 

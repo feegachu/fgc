@@ -12,7 +12,8 @@ import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
-import com.susukkang.fgc.contract.dto.ContractResponse;
+import com.susukkang.fgc.contract.dto.ContractCreateResponse;
+import com.susukkang.fgc.contract.dto.ContractUpdateResponse;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.service.ContractService;
@@ -293,14 +294,19 @@ class ContractControllerTest {
     @DisplayName("보험계약을 생성한다")
     void createContractReturnsSuccess() throws Exception {
         when(contractService.createContract(any(ContractCreateRequest.class)))
-                .thenReturn(ContractResponse.builder().contractId(21L).build());
+                .thenReturn(ContractCreateResponse.builder()
+                        .contractId(21L)
+                        .scheduleHeaderIds(java.util.List.of(101L, 102L))
+                        .build());
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("settlement").roles("SETTLEMENT"))
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.contractId").value(21));
+                .andExpect(jsonPath("$.data.contractId").value(21))
+                .andExpect(jsonPath("$.data.scheduleHeaderIds[0]").value(101))
+                .andExpect(jsonPath("$.data.regeneratedScheduleIds").doesNotExist());
     }
 
     /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 계약 등록·수정도 허용된다. */
@@ -308,7 +314,7 @@ class ContractControllerTest {
     @DisplayName("SYSTEM_ADMIN 도 보험계약을 생성할 수 있다")
     void createContractAllowsSystemAdmin() throws Exception {
         when(contractService.createContract(any(ContractCreateRequest.class)))
-                .thenReturn(ContractResponse.builder().contractId(21L).build());
+                .thenReturn(ContractCreateResponse.builder().contractId(21L).build());
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("admin").roles("SYSTEM_ADMIN"))
@@ -325,14 +331,19 @@ class ContractControllerTest {
         when(contractService.updateContract(
                 eq(21L),
                 any(ContractUpdateRequest.class)
-        )).thenReturn(ContractResponse.builder().contractId(21L).build());
+        )).thenReturn(ContractUpdateResponse.builder()
+                .contractId(21L)
+                .regeneratedScheduleIds(java.util.List.of(201L, 202L))
+                .build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("admin").roles("SYSTEM_ADMIN"))
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.contractId").value(21));
+                .andExpect(jsonPath("$.data.contractId").value(21))
+                .andExpect(jsonPath("$.data.regeneratedScheduleIds[0]").value(201))
+                .andExpect(jsonPath("$.data.scheduleHeaderIds").doesNotExist());
     }
 
     @Test
@@ -341,7 +352,7 @@ class ContractControllerTest {
         when(contractService.updateContract(
                 eq(21L),
                 any(ContractUpdateRequest.class)
-        )).thenReturn(ContractResponse.builder().contractId(21L).build());
+        )).thenReturn(ContractUpdateResponse.builder().contractId(21L).build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("settlement").roles("SETTLEMENT"))
