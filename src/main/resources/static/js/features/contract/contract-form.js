@@ -3,38 +3,7 @@ var offeringSelect = document.getElementById("offering");
 var agentSelect = document.getElementById("agent");
 var organizationInput = document.getElementById("org");
 var organizationIdInput = document.getElementById("organizationId");
-
-// TODO: IF-API-05~07 기준정보 API가 구현되면 아래 임시 fixture를 제거한다.
-// 값은 로컬 demo DB의 실제 PK이므로 계약 생성 요청의 FK 검증을 통과할 수 있다.
-var TEMP_INSURERS = [
-    { insurerId: 1, insurerCode: "FGL01", insurerName: "미래가상생명" },
-    { insurerId: 2, insurerCode: "FGL02", insurerName: "한빛가상생명" },
-    { insurerId: 3, insurerCode: "FGL03", insurerName: "새봄가상생명" },
-    { insurerId: 4, insurerCode: "FGL04", insurerName: "온누리가상생명" },
-    { insurerId: 5, insurerCode: "FGN01", insurerName: "안전가상손해보험" },
-    { insurerId: 6, insurerCode: "FGN02", insurerName: "믿음가상손해보험" }
-];
-
-var TEMP_OFFERINGS = [
-    { productOfferingId: 1, insurerId: 1, productName: "가상 건강보장보험 A", offeringVersion: "2026-CURRENT-A" },
-    { productOfferingId: 2, insurerId: 2, productName: "가상 저해지 건강보험 B", offeringVersion: "2026-CURRENT-B" },
-    { productOfferingId: 3, insurerId: 2, productName: "가상 저해지 건강보험 B", offeringVersion: "2026-H1-B" },
-    { productOfferingId: 4, insurerId: 3, productName: "가상 경영인정기보험", offeringVersion: "2026-CURRENT-A" },
-    { productOfferingId: 5, insurerId: 5, productName: "가상 장기상해보험 A", offeringVersion: "2026-CURRENT-A" },
-    { productOfferingId: 6, insurerId: 2, productName: "가상 저해지 건강보험 B", offeringVersion: "2027-FOUR-YEAR" },
-    { productOfferingId: 7, insurerId: 3, productName: "가상 경영인정기보험", offeringVersion: "2026-TM-A" },
-    { productOfferingId: 8, insurerId: 4, productName: "가상 연금저축보험", offeringVersion: "2026-CURRENT-A" }
-];
-
-var TEMP_AGENTS = [
-    { agentId: 1, agentCode: "A-DH-001", agentName: "서본부", organizationId: 4, organizationName: "동부본부" },
-    { agentId: 2, agentCode: "A-BM-001", agentName: "한지사", organizationId: 6, organizationName: "강동지사" },
-    { agentId: 3, agentCode: "A-FC-004", agentName: "최해촉", organizationId: 7, organizationName: "마포1팀" },
-    { agentId: 4, agentCode: "A-FC-003", agentName: "박신인", organizationId: 8, organizationName: "강동2팀" },
-    { agentId: 5, agentCode: "A-TL-001", agentName: "정팀장", organizationId: 9, organizationName: "강동1팀" },
-    { agentId: 6, agentCode: "A-FC-002", agentName: "이보험", organizationId: 9, organizationName: "강동1팀" },
-    { agentId: 7, agentCode: "A-FC-001", agentName: "김정산", organizationId: 9, organizationName: "강동1팀" }
-];
+var apiClient = window.FgcUi && window.FgcUi.apiClient;
 
 insurerSelect.addEventListener("change", function () {
     var insurerId = insurerSelect.value;
@@ -47,9 +16,7 @@ insurerSelect.addEventListener("change", function () {
         return;
     }
 
-    renderOfferings(TEMP_OFFERINGS.filter(function (offering) {
-        return String(offering.insurerId) === String(insurerId);
-    }));
+    loadOfferings(insurerId);
 });
 
 agentSelect.addEventListener("change", function () {
@@ -58,29 +25,74 @@ agentSelect.addEventListener("change", function () {
     organizationIdInput.value = option ? option.dataset.organizationId || "" : "";
 });
 
-function renderInsurers() {
+function pageContent(envelope) {
+    return envelope && envelope.data && Array.isArray(envelope.data.content)
+        ? envelope.data.content
+        : [];
+}
+
+function referenceDate() {
+    var value = document.getElementById("contractDate").value;
+    return value || todayText();
+}
+
+function loadInsurers() {
+    if (!apiClient) return;
+    insurerSelect.disabled = true;
+    apiClient.request("/api/v1/base/insurers?page=1&size=100")
+        .then(function (envelope) { renderInsurers(pageContent(envelope)); })
+        .catch(function (error) { showError(error); });
+}
+
+function loadOfferings(insurerId) {
+    if (!apiClient) return;
+    offeringSelect.disabled = true;
+    offeringSelect.innerHTML = '<option value="">상품을 불러오는 중입니다.</option>';
+    apiClient.request("/api/v1/base/products?insurerId=" + encodeURIComponent(insurerId)
+        + "&asOf=" + encodeURIComponent(referenceDate()) + "&page=1&size=100")
+        .then(function (envelope) { renderOfferings(pageContent(envelope)); })
+        .catch(function (error) {
+            offeringSelect.innerHTML = '<option value="">상품을 불러오지 못했습니다.</option>';
+            showError(error);
+        });
+}
+
+function loadAgents() {
+    if (!apiClient) return;
+    agentSelect.disabled = true;
+    apiClient.request("/api/v1/base/agents?asOf=" + encodeURIComponent(referenceDate())
+        + "&page=1&size=100")
+        .then(function (envelope) { renderAgents(pageContent(envelope)); })
+        .catch(function (error) { showError(error); });
+}
+
+function renderInsurers(insurers) {
     insurerSelect.replaceChildren();
     var placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.textContent = "보험회사를 선택하세요";
     insurerSelect.appendChild(placeholder);
 
-    TEMP_INSURERS.forEach(function (insurer) {
+    insurers.forEach(function (insurer) {
         var option = document.createElement("option");
         option.value = insurer.insurerId;
         option.textContent = insurer.insurerCode + " · " + insurer.insurerName;
+        option.disabled = insurer.activeYn === false;
         insurerSelect.appendChild(option);
     });
+    insurerSelect.disabled = false;
 }
 
-function renderAgents() {
+function renderAgents(agents) {
     agentSelect.replaceChildren();
     var placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.textContent = "설계사를 선택하세요";
     agentSelect.appendChild(placeholder);
 
-    TEMP_AGENTS.forEach(function (agent) {
+    agents.filter(function (agent) {
+        return agent.activeYn !== false && agent.agentStatus === "ACTIVE";
+    }).forEach(function (agent) {
         var option = document.createElement("option");
         option.value = agent.agentId;
         option.textContent = agent.agentCode + " · " + agent.agentName;
@@ -88,10 +100,8 @@ function renderAgents() {
         option.dataset.organizationName = agent.organizationName;
         agentSelect.appendChild(option);
     });
+    agentSelect.disabled = false;
 }
-
-renderInsurers();
-renderAgents();
 
 function renderOfferings(offerings) {
     offeringSelect.replaceChildren();
@@ -163,7 +173,6 @@ var contractForm = document.querySelector("[data-contract-form]");
 var saveButton = document.getElementById("save-btn");
 var saveHint = document.getElementById("save-hint");
 var contractDateInput = document.getElementById("contractDate");
-var apiClient = window.FgcUi && window.FgcUi.apiClient;
 var submitting = false;
 
 function todayText() {
@@ -224,6 +233,10 @@ function showError(error) {
 
 if (contractForm && saveButton && saveHint) {
     contractDateInput.max = todayText();
+    contractDateInput.addEventListener("change", function () {
+        loadAgents();
+        if (insurerSelect.value) loadOfferings(insurerSelect.value);
+    });
     contractForm.addEventListener("input", updateSaveButton);
     contractForm.addEventListener("change", updateSaveButton);
     contractForm.addEventListener("submit", function (event) {
@@ -252,5 +265,7 @@ if (contractForm && saveButton && saveHint) {
             showError(error);
         });
     });
+    loadInsurers();
+    loadAgents();
     updateSaveButton();
 }

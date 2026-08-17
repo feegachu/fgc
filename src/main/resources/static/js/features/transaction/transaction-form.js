@@ -5,15 +5,7 @@
   var main = document.querySelector("[data-transaction-form]");
   if (!apiClient || !main) return;
 
-  var AGENTS = [
-    { id: 1, code: "A-DH-001", name: "서본부" },
-    { id: 2, code: "A-BM-001", name: "한지사" },
-    { id: 3, code: "A-FC-004", name: "최해촉" },
-    { id: 4, code: "A-FC-003", name: "박신인" },
-    { id: 5, code: "A-TL-001", name: "정팀장" },
-    { id: 6, code: "A-FC-002", name: "이보험" },
-    { id: 7, code: "A-FC-001", name: "김정산" }
-  ];
+  var AGENTS = [];
   var SOURCE_TYPES = [["GA_MANUAL_PAYMENT", "GA 수기지급"]];
   var contracts = [];
   var attributionSequence = 0;
@@ -36,9 +28,7 @@
   var confirmButton = document.getElementById("btn-confirm");
 
   fillOptions(sourceType, SOURCE_TYPES, "원천유형을 선택하세요");
-  fillOptions(recipient, AGENTS.map(function (agent) {
-    return [String(agent.id), agent.code + " " + agent.name];
-  }), "수령 설계사를 선택하세요");
+  fillOptions(recipient, [], "설계사를 불러오는 중입니다.");
   if (!bizKey.value) bizKey.value = generateBusinessKey();
 
   addButton.addEventListener("click", addAttributionRow);
@@ -47,16 +37,50 @@
   confirmButton.addEventListener("click", confirmPayment);
   amount.addEventListener("input", updateAttributionSummary);
   settlementMonth.addEventListener("change", function () {
+    loadAgents();
     loadCommissionItems();
     attrBody.querySelectorAll("[data-attr-date]").forEach(function (input) {
       if (!input.value) input.value = monthFirstDay();
     });
   });
   cashflow.addEventListener("change", filterCommissionItemsByCashflow);
+  recipient.addEventListener("change", updateAttributionAgentLabels);
 
   loadContracts();
+  loadAgents();
   loadCommissionItems();
   addAttributionRow();
+
+  function loadAgents() {
+    var asOf = monthFirstDay();
+    if (!asOf) return;
+    recipient.disabled = true;
+    apiClient.request("/api/v1/base/agents?asOf=" + encodeURIComponent(asOf) + "&page=1&size=100")
+      .then(function (envelope) {
+        var rows = envelope && envelope.data && Array.isArray(envelope.data.content)
+          ? envelope.data.content
+          : [];
+        AGENTS = rows.filter(function (agent) {
+          return agent.activeYn !== false && agent.agentStatus === "ACTIVE";
+        }).map(function (agent) {
+          return {
+            id: agent.agentId,
+            code: agent.agentCode,
+            name: agent.agentName,
+            organizationId: agent.organizationId,
+            organizationName: agent.organizationName
+          };
+        });
+        fillOptions(recipient, AGENTS.map(function (agent) {
+          return [String(agent.id), agent.code + " " + agent.name];
+        }), "수령 설계사를 선택하세요");
+        recipient.disabled = false;
+      })
+      .catch(function (error) {
+        fillOptions(recipient, [], "설계사를 불러오지 못했습니다.");
+        showError(error, "설계사 목록을 불러오지 못했습니다.");
+      });
+  }
 
   function loadContracts() {
     apiClient.request("/api/v1/contracts?page=1&size=100")
@@ -102,7 +126,7 @@
     appendTextCell(row, attributionSequence);
     appendTextCell(row, "계약");
     row.appendChild(controlCell(contractSelect()));
-    appendTextCell(row, selectedAgentLabel());
+    appendAgentCell(row);
     row.appendChild(controlCell(input("date", monthFirstDay(), "data-attr-date")));
     row.appendChild(controlCell(readonlyInput(monthFirstDay())));
     row.appendChild(controlCell(input("number", suggestedAmount(), "data-attr-amount")));
@@ -411,6 +435,17 @@
   function selectedAgentLabel() {
     var option = recipient.options[recipient.selectedIndex];
     return option && option.value ? option.textContent : "—";
+  }
+  function appendAgentCell(row) {
+    var cell = document.createElement("td");
+    cell.dataset.attrAgent = "";
+    cell.textContent = selectedAgentLabel();
+    row.appendChild(cell);
+  }
+  function updateAttributionAgentLabels() {
+    attrBody.querySelectorAll("[data-attr-agent]").forEach(function (cell) {
+      cell.textContent = selectedAgentLabel();
+    });
   }
   function monthFirstDay() { return settlementMonth.value ? settlementMonth.value + "-01" : ""; }
   function decisionReason(decision) {
