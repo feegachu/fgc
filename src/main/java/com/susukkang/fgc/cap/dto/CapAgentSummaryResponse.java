@@ -13,7 +13,11 @@ public record CapAgentSummaryResponse(
         long contractCount,
         long limitAmountTotal,
         long includedAmountTotal,
-        String usagePct
+        String usagePct,
+        long violationCount,
+        long warningCount,
+        String worstContractNo,
+        String worstUsagePct
 ) {
     public static CapAgentSummaryResponse from(CapAgentSummaryRow row) {
         return new CapAgentSummaryResponse(
@@ -26,6 +30,10 @@ public record CapAgentSummaryResponse(
                 row.getContractCount(),
                 DisplayFormat.won(row.getLimitAmountTotal()),
                 DisplayFormat.won(row.getIncludedAmountTotal()),
-                DisplayFormat.rate(row.getUsagePct()));
+                DisplayFormat.rate(row.getUsagePct()),
+                row.getViolationCount(),
+                row.getWarningCount(),
+                row.getWorstContractNo(),
+                DisplayFormat.rate(row.getWorstUsagePct()));
     }
 }

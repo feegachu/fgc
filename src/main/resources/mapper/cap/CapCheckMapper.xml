@@ -234,11 +234,19 @@
         <include refid="latestScopedCapChecks"/>
         SELECT payment_stage AS paymentStage,
                COUNT(*) AS contractCount,
-               COALESCE(SUM(limit_amount), 0) AS limitAmountTotal,
-               COALESCE(SUM(included_amount), 0) AS includedAmountTotal,
-               COALESCE(SUM(compliance_deduction_amount), 0) AS complianceDeductionAmountTotal,
-               CASE WHEN COALESCE(SUM(limit_amount), 0) = 0 THEN 0.000000::numeric(12,6)
-                    ELSE ROUND(SUM(included_amount) * 100 / SUM(limit_amount), 6)
+               COALESCE(SUM(ROUND(limit_amount, 0)), 0) AS limitAmountTotal,
+               COALESCE(SUM(ROUND(included_amount, 0)), 0) AS includedAmountTotal,
+               COALESCE(SUM(
+                   CASE WHEN payment_stage = 'INSURER_TO_GA'
+                        THEN ROUND(compliance_deduction_amount, 0)
+                        ELSE 0
+                   END
+               ), 0) AS complianceDeductionAmountTotal,
+               CASE WHEN COALESCE(SUM(ROUND(limit_amount, 0)), 0) = 0
+                    THEN 0.000000::numeric(12,6)
+                    ELSE ROUND(
+                        SUM(ROUND(included_amount, 0)) * 100 /
+                        SUM(ROUND(limit_amount, 0)), 6)
                END AS usagePct,
                COUNT(*) FILTER (WHERE result_status = 'VIOLATION') AS violationCount,
                COUNT(*) FILTER (WHERE result_status = 'WARNING') AS warningCount,
@@ -274,18 +282,41 @@
                o.organization_code AS organizationCode,
                o.organization_name AS organizationName,
                COUNT(*) AS contractCount,
-               COALESCE(SUM(lcc.limit_amount), 0) AS limitAmountTotal,
-               COALESCE(SUM(lcc.included_amount), 0) AS includedAmountTotal,
-               CASE WHEN COALESCE(SUM(lcc.limit_amount), 0) = 0 THEN 0.000000::numeric(12,6)
-                    ELSE ROUND(SUM(lcc.included_amount) * 100 / SUM(lcc.limit_amount), 6)
-               END AS usagePct
+               COALESCE(SUM(ROUND(lcc.limit_amount, 0)), 0) AS limitAmountTotal,
+               COALESCE(SUM(ROUND(lcc.included_amount, 0)), 0) AS includedAmountTotal,
+               CASE WHEN COALESCE(SUM(ROUND(lcc.limit_amount, 0)), 0) = 0
+                    THEN 0.000000::numeric(12,6)
+                    ELSE ROUND(
+                        SUM(ROUND(lcc.included_amount, 0)) * 100 /
+                        SUM(ROUND(lcc.limit_amount, 0)), 6)
+               END AS usagePct,
+               COUNT(*) FILTER (WHERE lcc.result_status = 'VIOLATION') AS violationCount,
+               COUNT(*) FILTER (WHERE lcc.result_status = 'WARNING') AS warningCount,
+               (ARRAY_AGG(lcc.contract_no ORDER BY
+                    CASE lcc.result_status
+                        WHEN 'VIOLATION' THEN 4
+                        WHEN 'WARNING' THEN 3
+                        WHEN 'REVIEW_REQUIRED' THEN 2
+                        ELSE 1
+                    END DESC,
+                    lcc.usage_pct DESC NULLS LAST,
+                    lcc.cap_check_id DESC))[1] AS worstContractNo,
+               (ARRAY_AGG(lcc.usage_pct ORDER BY
+                    CASE lcc.result_status
+                        WHEN 'VIOLATION' THEN 4
+                        WHEN 'WARNING' THEN 3
+                        WHEN 'REVIEW_REQUIRED' THEN 2
+                        ELSE 1
+                    END DESC,
+                    lcc.usage_pct DESC NULLS LAST,
+                    lcc.cap_check_id DESC))[1] AS worstUsagePct
           FROM latest_cap_check lcc
           JOIN fgc.agent a ON a.agent_id = lcc.agent_id
           JOIN fgc.organization o ON o.organization_id = lcc.organization_id
          WHERE lcc.payment_stage = 'GA_TO_FC'
          GROUP BY a.agent_id, a.agent_code, a.agent_name,
                   o.organization_id, o.organization_code, o.organization_name
-         ORDER BY SUM(lcc.included_amount) DESC, a.agent_code
+         ORDER BY SUM(ROUND(lcc.included_amount, 0)) DESC, a.agent_code
     </select>
 
     <!--

@@ -80,6 +80,7 @@ class CapCheckMapperIntegrationTest {
                 afterEffectiveDate, PaymentStage.GA_TO_FC)).isTrue();
     }
 
+    // FGC-FUN-032: 조직 필터와 전체 검색범위 집계에서도 계약별 최신 판정을 보존한다.
     @Test
     void capDashboardAggregatesLatestResultsAcrossFullOrganizationScope() {
         TestContract first = insertTestContract();
@@ -146,7 +147,29 @@ class CapCheckMapperIntegrationTest {
             assertThat(agent.getLimitAmountTotal()).isEqualByComparingTo("1000");
             assertThat(agent.getIncludedAmountTotal()).isEqualByComparingTo("900");
             assertThat(agent.getUsagePct()).isEqualByComparingTo("90.000000");
+            assertThat(agent.getViolationCount()).isZero();
+            assertThat(agent.getWarningCount()).isEqualTo(1);
+            assertThat(agent.getWorstContractNo()).isEqualTo(first.contractNo());
+            assertThat(agent.getWorstUsagePct()).isEqualByComparingTo("90.000000");
         });
+
+        assertThat(capCheckMapper.count(
+                LocalDate.of(2035, 1, 1), null, null,
+                null, null, null)).isEqualTo(3);
+
+        List<CapCheckStatusCount> fullScopeKpis = capCheckMapper.summarize(
+                LocalDate.of(2035, 1, 1), null,
+                null, null, null);
+        assertThat(fullScopeKpis).extracting(CapCheckStatusCount::getResultStatus)
+                .containsExactlyInAnyOrder("NORMAL", "WARNING", "VIOLATION");
+
+        List<CapStageSummaryRow> fullScopeStages = capCheckMapper.summarizeByStage(
+                LocalDate.of(2035, 1, 1), null, null, null);
+        assertThat(stage(fullScopeStages, PaymentStage.GA_TO_FC).getContractCount()).isEqualTo(2);
+        assertThat(stage(fullScopeStages, PaymentStage.GA_TO_FC).getIncludedAmountTotal())
+                .isEqualByComparingTo("1900");
+        assertThat(capCheckMapper.summarizeByAgent(
+                LocalDate.of(2035, 1, 1), null, null, null)).hasSize(2);
     }
 
     // FGC-FUN-032: month를 생략하면 월별 최신 판정 이력은 유지하고 같은 달의 재검증만 최신 1건으로 접는다.
@@ -175,6 +198,62 @@ class CapCheckMapperIntegrationTest {
         assertThat(capCheckMapper.count(
                 null, PaymentStage.GA_TO_FC.name(), null,
                 null, null, contract.contractNo())).isEqualTo(2);
+
+        List<CapCheckStatusCount> kpis = capCheckMapper.summarize(
+                null, PaymentStage.GA_TO_FC.name(),
+                null, null, contract.contractNo());
+        assertThat(kpis).extracting(CapCheckStatusCount::getResultStatus)
+                .containsExactlyInAnyOrder("WARNING", "VIOLATION");
+
+        List<CapStageSummaryRow> stages = capCheckMapper.summarizeByStage(
+                null, null, null, contract.contractNo());
+        CapStageSummaryRow agentStage = stage(stages, PaymentStage.GA_TO_FC);
+        assertThat(agentStage.getContractCount()).isEqualTo(2);
+        assertThat(agentStage.getLimitAmountTotal()).isEqualByComparingTo("2000");
+        assertThat(agentStage.getIncludedAmountTotal()).isEqualByComparingTo("2000");
+        assertThat(agentStage.getWarningCount()).isEqualTo(1);
+        assertThat(agentStage.getViolationCount()).isEqualTo(1);
+
+        assertThat(capCheckMapper.summarizeByAgent(
+                null, null, null, contract.contractNo())).singleElement().satisfies(agent -> {
+                    assertThat(agent.getContractCount()).isEqualTo(2);
+                    assertThat(agent.getLimitAmountTotal()).isEqualByComparingTo("2000");
+                    assertThat(agent.getIncludedAmountTotal()).isEqualByComparingTo("2000");
+                    assertThat(agent.getWarningCount()).isEqualTo(1);
+                    assertThat(agent.getViolationCount()).isEqualTo(1);
+                    assertThat(agent.getWorstContractNo()).isEqualTo(contract.contractNo());
+                    assertThat(agent.getWorstUsagePct()).isEqualByComparingTo("110.000000");
+                });
+    }
+
+    // 운영정책 §17조의2: 저장 금액이 소수여도 상세 결과를 원 단위로 반올림한 뒤 합산한다.
+    @Test
+    void aggregatesRoundedCapCheckAmountsBeforeCalculatingUsageRate() {
+        TestContract first = insertTestContract();
+        TestContract second = insertTestContract();
+        LocalDate asOfDate = LocalDate.of(2035, 3, 31);
+
+        insertCapCheck(first, PaymentStage.GA_TO_FC, asOfDate,
+                "10.50", "5.50", "0", "52.380952", "NORMAL",
+                OffsetDateTime.parse("2035-03-31T01:00:00Z"));
+        insertCapCheck(second, PaymentStage.GA_TO_FC, asOfDate,
+                "10.50", "5.50", "0", "52.380952", "NORMAL",
+                OffsetDateTime.parse("2035-03-31T02:00:00Z"));
+
+        CapStageSummaryRow stage = stage(capCheckMapper.summarizeByStage(
+                LocalDate.of(2035, 3, 1), null, first.organizationId(), null), PaymentStage.GA_TO_FC);
+        assertThat(stage.getLimitAmountTotal()).isEqualByComparingTo("22");
+        assertThat(stage.getIncludedAmountTotal()).isEqualByComparingTo("12");
+        assertThat(stage.getUsagePct()).isEqualByComparingTo("54.545455");
+
+        assertThat(capCheckMapper.summarizeByAgent(
+                LocalDate.of(2035, 3, 1), null, first.organizationId(), null))
+                .singleElement()
+                .satisfies(agent -> {
+                    assertThat(agent.getLimitAmountTotal()).isEqualByComparingTo("22");
+                    assertThat(agent.getIncludedAmountTotal()).isEqualByComparingTo("12");
+                    assertThat(agent.getUsagePct()).isEqualByComparingTo("54.545455");
+                });
     }
 
     private TestContract insertTestContract() {

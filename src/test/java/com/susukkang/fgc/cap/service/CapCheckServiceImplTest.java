@@ -334,6 +334,10 @@ class CapCheckServiceImplTest {
         agent.setLimitAmountTotal(new BigDecimal("1200000"));
         agent.setIncludedAmountTotal(new BigDecimal("650000"));
         agent.setUsagePct(new BigDecimal("54.166667"));
+        agent.setViolationCount(1);
+        agent.setWarningCount(0);
+        agent.setWorstContractNo("C004");
+        agent.setWorstUsagePct(new BigDecimal("104.166667"));
         when(capCheckMapper.summarizeByAgent(criteria.month(), criteria.insurerId(),
                 criteria.organizationId(), criteria.contractNo())).thenReturn(List.of(agent));
 
@@ -346,8 +350,11 @@ class CapCheckServiceImplTest {
         assertThat(result.stageSummary().get(1).getPaymentStage()).isEqualTo("GA_TO_FC");
         assertThat(result.stageSummary().get(1).getUsagePct()).isEqualByComparingTo("54.166667");
         assertThat(result.agentSummary()).singleElement()
-                .extracting(CapAgentSummaryRow::getAgentCode)
-                .isEqualTo("FC-001");
+                .satisfies(summary -> {
+                    assertThat(summary.getAgentCode()).isEqualTo("FC-001");
+                    assertThat(summary.getViolationCount()).isEqualTo(1);
+                    assertThat(summary.getWorstContractNo()).isEqualTo("C004");
+                });
         assertThat(result.page().content()).hasSize(1);
         assertThat(result.page().totalElements()).isEqualTo(1);
         assertThat(result.page().content().get(0).getContractNo()).isEqualTo("C001");

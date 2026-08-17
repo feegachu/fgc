@@ -19,4 +19,8 @@ public class CapAgentSummaryRow {
     private BigDecimal limitAmountTotal;
     private BigDecimal includedAmountTotal;
     private BigDecimal usagePct;
+    private long violationCount;
+    private long warningCount;
+    private String worstContractNo;
+    private BigDecimal worstUsagePct;
 }
