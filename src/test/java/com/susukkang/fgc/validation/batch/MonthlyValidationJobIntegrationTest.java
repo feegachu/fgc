@@ -67,8 +67,10 @@ class MonthlyValidationJobIntegrationTest {
     //       실제로 대상이 선정되어 arbitrage_check·journal·reconciliation·exception_case가
     //       생성되고 validation_run DELETE가 FK 위반으로 실패했다.
     // 개선: validation_run을 참조하는 자식(손자 포함)을 FK 순서대로 전부 지운다.
-    //       스케줄(schedule_header/line)은 실행 FK가 없는 계약 단위 재생성이라 지우지 않는다
-    //       — 재실행 시 멱등 재생성되는 실제 배치의 부수효과와 같다.
+    //       스케줄(schedule_header/line)은 실행 FK가 없지만, 이 실행의 대상 계약에 재생성된
+    //       채로 남기면 자기 스케줄을 직접 넣는 다른 통합테스트(CapCalculator·Reconciliation
+    //       계열)와 활성 OPERATIONAL 부분 UNIQUE가 실행 순서에 따라 충돌한다 — 대상 계약
+    //       기준으로 함께 지운다(validation_target 삭제보다 먼저).
     @AfterEach
     void cleanUp() {
         createdValidationRunIds.forEach(id -> {
@@ -123,6 +125,22 @@ class MonthlyValidationJobIntegrationTest {
                     "DELETE FROM fgc.maintenance_check WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.contract_status_event_processing WHERE validation_run_id = ?", id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.schedule_line
+                     WHERE schedule_header_id IN (
+                         SELECT sh.schedule_header_id
+                           FROM fgc.schedule_header sh
+                          WHERE sh.contract_id IN (
+                              SELECT contract_id FROM fgc.validation_target WHERE validation_run_id = ?
+                          )
+                     )
+                    """, id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.schedule_header
+                     WHERE contract_id IN (
+                         SELECT contract_id FROM fgc.validation_target WHERE validation_run_id = ?
+                     )
+                    """, id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
@@ -168,13 +186,14 @@ class MonthlyValidationJobIntegrationTest {
      * 개선: 9개 Step 전부가 COMPLETED로 끝나고 validation_run도 COMPLETED로 전이하는 정상
      *       완료 경로를 검증하도록 갱신한다(클래스 Javadoc에서 예고한 #60 갱신 지점).
      *
-     * 2026-08-17 - 대상 선별 상품코드 비교 수정에 따른 전제 갱신
+     * 2026-08-17 - 대상 선별(FUN-042) 상품코드 비교 수정에 따른 전제 갱신
      * 기존 코드: "TEST_MONTH에는 대상 데이터가 없다"는 전제로 0건 완료 경로를 검증했다.
      * 문제: 그 0건은 실은 선별 SQL이 insurer_product_code와 비교하던 버그로 전 계약이
      *       REVIEW_REQUIRED가 된 결과였다. 표준상품코드 비교로 고치면 2031-03 asOfDate에도
      *       시드 계약이 선정되어 하위 Step들이 실제 결과를 만든다.
-     * 개선: 같은 실행이 "시드 데이터를 실제로 검증하며" 9개 Step 전부 COMPLETED로 끝나는
-     *       경로를 검증한다(메서드명 갱신). 생성물 정리는 확장된 cleanUp이 담당한다.
+     * 개선: 같은 실행이 "시드 데이터를 실제로 검증하며" 9개 Step 전부 COMPLETED로 끝나고,
+     *       Batch 완료 상태만이 아니라 실제 처리 결과(SELECTED 대상·하위 검증 산출물)까지
+     *       남는지 검증한다(메서드명 갱신). 생성물 정리는 확장된 cleanUp이 담당한다.
      */
     void completesAllStepsAgainstSeedData() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
@@ -221,6 +240,22 @@ class MonthlyValidationJobIntegrationTest {
         assertThat(row.getRunNo()).isEqualTo(Math.toIntExact(runNo));
         assertThat(row.getStartedAt()).isNotNull();
         assertThat(row.getCompletedAt()).isNotNull();
+
+        // Batch COMPLETED만으로는 "빈 실행"과 구분이 안 된다 — 선별이 실제로 시드 계약을
+        // 선정했고(FUN-042), 하위 Step이 이 실행 스코프의 산출물을 남겼는지까지 본다.
+        // (선별이 전 계약을 REVIEW_REQUIRED로 흘려보내던 상품코드 비교 버그의 회귀 방지)
+        long selectedTargets = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.validation_target WHERE validation_run_id = ? AND selection_status = 'SELECTED'",
+                Long.class, validationRunId);
+        assertThat(selectedTargets).isPositive();
+        long reconciliationRuns = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.reconciliation_run WHERE validation_run_id = ?",
+                Long.class, validationRunId);
+        assertThat(reconciliationRuns).isPositive();
+        long arbitrageChecks = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.arbitrage_check WHERE validation_run_id = ?",
+                Long.class, validationRunId);
+        assertThat(arbitrageChecks).isPositive();
     }
 
     @Test

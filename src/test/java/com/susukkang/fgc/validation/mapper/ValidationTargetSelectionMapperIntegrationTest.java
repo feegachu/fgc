@@ -19,7 +19,7 @@ class ValidationTargetSelectionMapperIntegrationTest {
     @Autowired JdbcTemplate jdbcTemplate;
 
     /**
-     * 데모 시드 기준 회귀 — insertTargets가 환급률표의 source_product_code(표준상품코드,
+     * FUN-042 데모 시드 기준 회귀 — insertTargets가 환급률표의 source_product_code(표준상품코드,
      * 시드데이터 명세서 §환급률표 필수 조합)를 product.standard_product_code와 비교해야 한다.
      * 보험사 상품코드(insurer_product_code)와 비교하던 버그에서는 전 계약이
      * "상품코드 불일치" REVIEW_REQUIRED로 빠져 하위 검증이 전부 비었다(대시보드 0건의 원인).
@@ -44,10 +44,19 @@ class ValidationTargetSelectionMapperIntegrationTest {
                  WHERE validation_run_id = ? AND selection_status = 'SELECTED'
                    AND refund_rate_table_id IS NULL
                 """, Long.class, runId);
+        // 판정에 실제로 쓴 코드가 snapshot 증거로 남아야 한다 — 키 교체(insurerProductCode
+        // → standardProductCode)가 되돌아가면 여기서 잡힌다.
+        long withoutStandardCodeEvidence = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.validation_target
+                 WHERE validation_run_id = ?
+                   AND (snapshot ->> 'standardProductCode' IS NULL
+                        OR snapshot ->> 'insurerProductCode' IS NOT NULL)
+                """, Long.class, runId);
 
         assertThat(selected).isPositive();          // 시드의 정상 시나리오 계약이 선정돼야 한다
         assertThat(productCodeMismatch).isZero();   // 시드 정본 코드 체계에서 불일치는 없어야 한다
         assertThat(selectedWithoutTable).isZero();  // 선정 건은 환급률표가 반드시 배정된다
+        assertThat(withoutStandardCodeEvidence).isZero();
     }
 
     @Test
