@@ -21,6 +21,7 @@ import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.arbitrage.service.ArbitrageService;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +87,22 @@ class ContractControllerTest {
 
     @MockitoBean
     private ArbitrageService arbitrageService;
+
+    @MockitoBean
+    private CapCheckService capCheckService;
+
+    @Test
+    @DisplayName("계약별 지급단계 최신 1,200% 판정을 조회한다")
+    void getContractCapChecksReturnsSuccess() throws Exception {
+        when(capCheckService.findLatest(eq(21L), any(PaymentStage.class)))
+                .thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/v1/contracts/{id}/cap-checks", 21L)
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
 
     @Test
     @DisplayName("계약별 차익거래 검증 시계열을 조회한다")

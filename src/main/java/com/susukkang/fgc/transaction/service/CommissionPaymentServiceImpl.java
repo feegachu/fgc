@@ -562,7 +562,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     agentId,
                     settlementMonth,
                     paymentStage,
-                    policyVersionId,
+                    effectivePolicyVersionId,
                     attributionRequests.get(index)
             ));
         }
@@ -582,7 +582,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .agentId(agentId)
                 .commissionItemId(item.commissionItemId())
                 .paymentStage(paymentStage)
-                .policyVersionId(policyVersionId)
+                .policyVersionId(effectivePolicyVersionId)
                 .settlementMonth(settlementMonth)
                 .dueDate(dueDate)
                 .amount(MoneyUtil.roundWon(amount))

@@ -11,14 +11,14 @@
     </div>
   </header>
 
-  <form class="surface contract-filter-card" method="get" th:action="@{/contracts}" th:object="${condition}">
+  <form id="contract-filter-form" class="surface contract-filter-card" method="get" th:action="@{/contracts}" th:object="${condition}">
     <div class="contract-section-header"><h2 class="surface-title">검색 조건</h2><a class="button button-ghost contract-reset-button" th:href="@{/contracts}">초기화</a></div>
     <div class="contract-filter-grid">
       <label class="field"><span class="field-label">계약번호</span><input class="field-control" type="text" th:field="*{contractNo}" placeholder="계약번호 입력"></label>
-      <label class="field"><span class="field-label">보험회사</span><select class="select-control" disabled title="보험회사 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
-      <label class="field"><span class="field-label">상품</span><select class="select-control" disabled title="상품 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
-      <label class="field"><span class="field-label">모집 설계사</span><select class="select-control" disabled title="설계사 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
-      <label class="field"><span class="field-label">조직</span><select class="select-control" disabled title="조직 조회 API 연동 대기"><option>기준정보 연동 대기</option></select></label>
+      <label class="field"><span class="field-label">보험회사</span><select id="filter-insurer" class="select-control" th:field="*{insurerId}" disabled><option value="">불러오는 중</option></select></label>
+      <label class="field"><span class="field-label">상품</span><select id="filter-product" class="select-control" th:field="*{productOfferingId}" disabled><option value="">보험회사를 선택하세요</option></select></label>
+      <label class="field"><span class="field-label">모집 설계사</span><select id="filter-agent" class="select-control" th:field="*{agentId}" disabled><option value="">불러오는 중</option></select></label>
+      <label class="field"><span class="field-label">조직</span><select id="filter-organization" class="select-control" th:field="*{orgId}" disabled><option value="">불러오는 중</option></select></label>
       <label class="field"><span class="field-label">계약일 시작</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateFrom}"></label>
       <label class="field"><span class="field-label">계약일 끝</span><input class="field-control tabular-nums" type="date" th:field="*{contractDateTo}"></label>
       <label class="field"><span class="field-label">계약상태</span><select class="select-control" th:field="*{currentStatus}"><option value="">전체</option><option th:each="status : ${contractStatuses}" th:value="${status}" th:text="${status.label()}">정상</option></select></label>
@@ -52,10 +52,10 @@
     <nav class="contract-pagination" aria-label="계약 목록 페이지">
       <span><span th:text="${contracts.page()}">1</span> / <span th:text="${contracts.totalPages() == 0 ? 1 : contracts.totalPages()}">1</span> 페이지</span>
       <div class="pagination-controls">
-        <a class="pagination-button" th:if="${contracts.page() > 1}" th:href="@{/contracts(page=${contracts.page() - 1},size=${contracts.size()},contractNo=${condition.contractNo},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="이전 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></a>
+        <a class="pagination-button" th:if="${contracts.page() > 1}" th:href="@{/contracts(page=${contracts.page() - 1},size=${contracts.size()},contractNo=${condition.contractNo},insurerId=${condition.insurerId},productOfferingId=${condition.productOfferingId},agentId=${condition.agentId},orgId=${condition.orgId},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="이전 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></a>
         <span class="pagination-button is-disabled" th:unless="${contracts.page() > 1}" aria-label="이전 페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></span>
         <span class="pagination-button is-active" aria-current="page" th:text="${contracts.page()}">1</span>
-        <a class="pagination-button" th:if="${contracts.page() < contracts.totalPages()}" th:href="@{/contracts(page=${contracts.page() + 1},size=${contracts.size()},contractNo=${condition.contractNo},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="다음 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></a>
+        <a class="pagination-button" th:if="${contracts.page() < contracts.totalPages()}" th:href="@{/contracts(page=${contracts.page() + 1},size=${contracts.size()},contractNo=${condition.contractNo},insurerId=${condition.insurerId},productOfferingId=${condition.productOfferingId},agentId=${condition.agentId},orgId=${condition.orgId},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="다음 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></a>
         <span class="pagination-button is-disabled" th:unless="${contracts.page() < contracts.totalPages()}" aria-label="다음 페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></span>
       </div>
     </nav>

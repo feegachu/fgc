@@ -3,6 +3,8 @@ package com.susukkang.fgc.contract.controller;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.arbitrage.service.ArbitrageService;
+import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
@@ -33,6 +35,7 @@ public class ContractController {
     private final ContractService contractService;
     private final ScheduleService scheduleService;
     private final ArbitrageService arbitrageService;
+    private final CapCheckService capCheckService;
 
     /**
      * 설명 : 검색 조건에 따라 보험계약 목록을 조회한다.
@@ -107,6 +110,17 @@ public class ContractController {
     ) {
         return ApiResponse.success(
                 scheduleService.selectByContractId(contractId, paymentStage)
+        );
+    }
+
+    /** IF-API-14 계약 상세 탭용 지급단계별 최신 1,200% 판정 조회. */
+    @GetMapping("/{id}/cap-checks")
+    public ApiResponse<List<CapCheckSaveResult>> getContractCapChecks(@PathVariable Long id) {
+        return ApiResponse.success(
+                java.util.Arrays.stream(PaymentStage.values())
+                        .map(stage -> capCheckService.findLatest(id, stage))
+                        .flatMap(java.util.Optional::stream)
+                        .toList()
         );
     }
     /**
