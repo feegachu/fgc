@@ -51,7 +51,7 @@
         <option th:each="opt : ${runOptions.content()}"
                 th:value="${opt.validationRunId()}"
                 th:selected="${opt.validationRunId() == detail.header().validationRunId()}"
-                th:text="|${#temporals.format(opt.validationMonth(), 'yyyy-MM')} · ${opt.runNo()}회차 · ${opt.statusLabel()}|">
+                th:text="${#temporals.format(opt.validationMonth(), 'yyyy-MM')} + ' · ' + ${opt.runNo()} + '회차 · ' + ${opt.statusLabel()}">
           2026-07 · 1회차 · 생성됨</option>
       </select>
     </div>
@@ -93,7 +93,7 @@
                       ? ${#temporals.format(detail.header().completedAt(), 'yyyy-MM-dd HH:mm')} : '—'">—</dd></div>
         <div><dt>확정자 · 확정시각</dt><dd class="fgc-mono" id="hdr-finalized"
              th:text="${detail.header().finalizedAt() != null}
-                      ? |${detail.header().finalizedBy()} · ${#temporals.format(detail.header().finalizedAt(), 'yyyy-MM-dd HH:mm')}| : '—'">—</dd></div>
+                      ? ${detail.header().finalizedBy()} + ' · ' + ${#temporals.format(detail.header().finalizedAt(), 'yyyy-MM-dd HH:mm')} : '—'">—</dd></div>
       </dl>
       <p class="fgc-error" id="hdr-failure" style="margin-top:10px"
          th:hidden="${st != 'FAILED'}" th:text="${detail.header().failureMessage()}"></p>
@@ -153,7 +153,7 @@
       <div class="fgc-card__head">
         <span class="fgc-card__title">③ 대상 선별 결과</span>
         <span class="fgc-muted" style="font-size:11px"
-              th:text="|선정 ${detail.targetSummary().selectedCount()} · 제외 ${detail.targetSummary().excludedCount()} · 검토필요 ${detail.targetSummary().reviewRequiredCount()}|">validation_target</span>
+              th:text="'선정 ' + ${detail.targetSummary().selectedCount()} + ' · 제외 ' + ${detail.targetSummary().excludedCount()} + ' · 검토필요 ' + ${detail.targetSummary().reviewRequiredCount()}">validation_target</span>
       </div>
       <div style="overflow-x:auto">
         <table class="fgc-table">
@@ -192,19 +192,19 @@
         <th:block th:unless="${st == 'CREATED'}">
           <div class="publishing-result-placeholder">
             <strong>1,200%</strong>
-            <span th:text="|검사 ${detail.capSummary().checkedCount()}건 · 위반 ${detail.capSummary().violationCount()} · 주의 ${detail.capSummary().warningCount()} · 검토 ${detail.capSummary().reviewRequiredCount()}|">-</span>
+            <span th:text="'검사 ' + ${detail.capSummary().checkedCount()} + '건 · 위반 ' + ${detail.capSummary().violationCount()} + ' · 주의 ' + ${detail.capSummary().warningCount()} + ' · 검토 ' + ${detail.capSummary().reviewRequiredCount()}">-</span>
           </div>
           <div class="publishing-result-placeholder">
             <strong>차익거래</strong>
-            <span th:text="|검사 ${detail.arbitrageSummary().checkedCount()}건 · 검토대상 ${detail.arbitrageSummary().candidateCount()} · 검토 ${detail.arbitrageSummary().reviewRequiredCount()}|">-</span>
+            <span th:text="'검사 ' + ${detail.arbitrageSummary().checkedCount()} + '건 · 검토대상 ' + ${detail.arbitrageSummary().candidateCount()} + ' · 검토 ' + ${detail.arbitrageSummary().reviewRequiredCount()}">-</span>
           </div>
           <div class="publishing-result-placeholder">
             <strong>원장</strong>
-            <span th:text="|분개 ${detail.ledgerSummary().journalCount()}건 · 불균형 ${detail.ledgerSummary().imbalanceCount()}|">-</span>
+            <span th:text="'분개 ' + ${detail.ledgerSummary().journalCount()} + '건 · 불균형 ' + ${detail.ledgerSummary().imbalanceCount()}">-</span>
           </div>
           <div class="publishing-result-placeholder">
             <strong>대사</strong>
-            <span th:text="|결과 ${detail.reconciliationSummary().resultCount()}건 · 불일치 ${detail.reconciliationSummary().mismatchCount()}|">-</span>
+            <span th:text="'결과 ' + ${detail.reconciliationSummary().resultCount()} + '건 · 불일치 ' + ${detail.reconciliationSummary().mismatchCount()}">-</span>
           </div>
         </th:block>
       </div>

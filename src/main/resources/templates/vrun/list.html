@@ -126,7 +126,7 @@
                 th:text="${run.completedAt() != null} ? ${#temporals.format(run.completedAt(), 'MM-dd HH:mm')} : '—'">—</td>
             <td class="fgc-mono"
                 th:text="${run.finalizedAt() != null}
-                         ? |${run.finalizedBy()} · ${#temporals.format(run.finalizedAt(), 'MM-dd HH:mm')}| : '—'">—</td>
+                         ? ${run.finalizedBy()} + ' · ' + ${#temporals.format(run.finalizedAt(), 'MM-dd HH:mm')} : '—'">—</td>
             <td>
               <span class="fgc-error" th:if="${run.status().name() == 'FAILED'}"
                     th:text="${run.failureMessage()}">실패 사유</span>
