@@ -31,8 +31,24 @@ public class ScheduleReviewService {
             PaymentStage paymentStage,
             String description
     ) {
+        registerCapReviewAfterRollback(
+                contractId,
+                paymentStage,
+                "POLICY_MISSING",
+                "1,200% 룰셋 검토 필요 - " + paymentStage.name(),
+                description
+        );
+    }
+
+    public void registerCapReviewAfterRollback(
+            Long contractId,
+            PaymentStage paymentStage,
+            String exceptionType,
+            String title,
+            String description
+    ) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            persistCapRuleReview(contractId, paymentStage, description);
+            persistCapReview(contractId, paymentStage, exceptionType, title, description);
             return;
         }
 
@@ -40,23 +56,25 @@ public class ScheduleReviewService {
             @Override
             public void afterCompletion(int status) {
                 if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
-                    persistCapRuleReview(contractId, paymentStage, description);
+                    persistCapReview(contractId, paymentStage, exceptionType, title, description);
                 }
             }
         });
     }
 
-    private void persistCapRuleReview(
+    private void persistCapReview(
             Long contractId,
             PaymentStage paymentStage,
+            String exceptionType,
+            String title,
             String description
     ) {
         requiresNewTransaction.executeWithoutResult(status -> {
             int affectedRows = scheduleMapper.upsertPolicyReviewCase(
                     contractId,
                     paymentStage,
-                    "CAP_RULE_MISSING",
-                    "1,200% 룰셋 검토 필요 - " + paymentStage.name(),
+                    exceptionType,
+                    title,
                     description
             );
             if (affectedRows != 1) {

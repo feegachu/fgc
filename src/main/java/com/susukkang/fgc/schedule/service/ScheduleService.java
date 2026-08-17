@@ -1169,9 +1169,23 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.SCHE_004);
         }
         if (capCheck.result().resultStatus() == CapResultStatus.VIOLATION) {
+            scheduleReviewService.registerCapReviewAfterRollback(
+                    header.getContractId(),
+                    header.getPaymentStage(),
+                    "CAP_VIOLATION",
+                    "1,200% 한도 초과 - " + header.getPaymentStage().name(),
+                    "1,200% 한도 초과로 스케줄 확정을 차단했습니다."
+            );
             throw new FgcBusinessException(FgcErrorCode.SCHE_003);
         }
         if (capCheck.result().resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
+            scheduleReviewService.registerCapReviewAfterRollback(
+                    header.getContractId(),
+                    header.getPaymentStage(),
+                    "CAP_REVIEW_REQUIRED",
+                    "1,200% 한도 검토 필요 - " + header.getPaymentStage().name(),
+                    "한도 판정에 추가 검토가 필요해 스케줄 확정을 차단했습니다."
+            );
             throw new FgcBusinessException(FgcErrorCode.SCHE_004);
         }
 

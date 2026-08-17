@@ -16,6 +16,8 @@
   var fields = {
     month: document.getElementById("f-month"),
     stage: document.getElementById("f-stage"),
+    insurer: document.getElementById("f-insurer"),
+    contractNo: document.getElementById("f-contract-no"),
     source: document.getElementById("f-source"),
     agent: document.getElementById("f-agent"),
     item: document.getElementById("f-item"),
@@ -36,6 +38,7 @@
   ]);
   addOptions(fields.status, [["DRAFT", "작성중"], ["CONFIRMED", "확정"], ["CANCELLED", "취소"]]);
   applyState();
+  loadInsurers();
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
@@ -61,6 +64,8 @@
     return {
       settlementMonth: params.get("settlementMonth") || "",
       paymentStage: params.get("paymentStage") || "",
+      insurerId: params.get("insurerId") || "",
+      contractNo: params.get("contractNo") || "",
       sourceType: params.get("sourceType") || "",
       agentId: params.get("agentId") || "",
       commissionItemId: params.get("commissionItemId") || "",
@@ -74,6 +79,7 @@
   function applyState() {
     if (state.settlementMonth) fields.month.value = state.settlementMonth;
     fields.stage.value = state.paymentStage;
+    fields.contractNo.value = state.contractNo;
     fields.source.value = state.sourceType;
     fields.status.value = state.status;
     fields.noAttribution.checked = state.noAttributionOnly;
@@ -83,6 +89,8 @@
     return {
       settlementMonth: fields.month.value,
       paymentStage: fields.stage.value,
+      insurerId: fields.insurer.value,
+      contractNo: fields.contractNo.value.trim(),
       sourceType: fields.source.value,
       agentId: fields.agent.value,
       commissionItemId: fields.item.value,
@@ -203,6 +211,30 @@
   function updateUrl() {
     var query = apiPath().split("?")[1];
     window.history.replaceState(null, "", window.location.pathname + (query ? "?" + query : ""));
+  }
+
+  function loadInsurers() {
+    fields.insurer.disabled = true;
+    apiClient.request("/api/v1/base/insurers?page=1&size=100")
+      .then(function (envelope) {
+        var rows = envelope && envelope.data && Array.isArray(envelope.data.content)
+          ? envelope.data.content : [];
+        clear(fields.insurer);
+        addOption(fields.insurer, "", "전체");
+        if (state.insurerId && !rows.some(function (row) {
+          return String(row.insurerId) === String(state.insurerId);
+        })) {
+          addOption(fields.insurer, state.insurerId, state.insurerId);
+        }
+        rows.forEach(function (row) {
+          addOption(fields.insurer, row.insurerId, row.insurerCode + " · " + row.insurerName);
+        });
+        fields.insurer.value = state.insurerId;
+      })
+      .catch(function () {
+        fields.insurer.title = "보험회사 목록을 불러오지 못했습니다.";
+      })
+      .finally(function () { fields.insurer.disabled = false; });
   }
 
   function rememberFilterOptions(item) {

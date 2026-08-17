@@ -293,6 +293,28 @@ class ScheduleServiceTest {
     }
 
     @Test
+    void registersViolationReviewAndBlocksConfirmationWhenCapIsExceeded() {
+        assertConfirmationBlockedWithCapReview(
+                CapResultStatus.VIOLATION,
+                FgcErrorCode.SCHE_003,
+                "CAP_VIOLATION",
+                "1,200% 한도 초과 - GA_TO_FC",
+                "1,200% 한도 초과로 스케줄 확정을 차단했습니다."
+        );
+    }
+
+    @Test
+    void registersReviewRequiredCaseAndBlocksConfirmationWhenCapNeedsReview() {
+        assertConfirmationBlockedWithCapReview(
+                CapResultStatus.REVIEW_REQUIRED,
+                FgcErrorCode.SCHE_004,
+                "CAP_REVIEW_REQUIRED",
+                "1,200% 한도 검토 필요 - GA_TO_FC",
+                "한도 판정에 추가 검토가 필요해 스케줄 확정을 차단했습니다."
+        );
+    }
+
+    @Test
     void registersReviewAndDeactivatesExistingHeaderWhenPolicyIsMissing() {
         assertRegenerationRegistersReview("POLICY_MISSING");
     }
@@ -654,6 +676,37 @@ class ScheduleServiceTest {
                 ),
                 "예상 스케줄에 적용할 정책을 확정할 수 없습니다."
         );
+    }
+
+    private void assertConfirmationBlockedWithCapReview(
+            CapResultStatus resultStatus,
+            FgcErrorCode expectedErrorCode,
+            String exceptionType,
+            String title,
+            String description
+    ) {
+        ScheduleHeaderInsertDTO plannedHeader = ScheduleHeaderInsertDTO.builder()
+                .scheduleHeaderId(10L)
+                .contractId(20L)
+                .paymentStage(PaymentStage.GA_TO_FC)
+                .status(ScheduleHeaderStatus.PLANNED)
+                .activeYn(true)
+                .build();
+        CapCalculationResult result = mock(CapCalculationResult.class);
+        given(result.resultStatus()).willReturn(resultStatus);
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
+                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(capCheckService.calculateAndSave(any())).willReturn(new CapCheckSaveResult(1L, result));
+
+        assertThatThrownBy(() -> scheduleService.confirmSchedule(10L))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(expectedErrorCode));
+
+        verify(scheduleReviewService).registerCapReviewAfterRollback(
+                20L, PaymentStage.GA_TO_FC, exceptionType, title, description);
+        verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
+        verify(scheduleMapper, never()).confirmScheduleHeader(any());
     }
 
     private void assertRegenerationRegistersReview(String reason) {

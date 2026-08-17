@@ -58,7 +58,7 @@
     setText("hdr-regime", label({ CURRENT: "현행", FOUR_YEAR: "4년 분급", SEVEN_YEAR: "7년 분급" }, header.scheduleRegime));
     setText("hdr-purpose", label({ OPERATIONAL: "운영", SIMULATION: "비교·시뮬레이션" }, header.schedulePurpose));
     setText("hdr-version", header.scheduleVersionNo == null ? "—" : "v" + header.scheduleVersionNo);
-    setText("hdr-status", label({ PLANNED: "예정", CONFIRMED: "확정", SUPERSEDED: "대체됨", CANCELLED: "취소" }, header.status));
+    setText("hdr-status", label({ PLANNED: "예정", CONFIRMED: "확정", MATCHED: "대사일치", ADJUSTED: "조정" }, header.status));
     setText("hdr-active", header.activeYn === true ? "사용중" : "미사용");
     setText("hdr-policy", header.policyVersionLabel);
     setText("hdr-reason", join(header.generationReason, formatDateTime(header.generatedAt)));
@@ -170,7 +170,7 @@
       appendCell(row, label({ RATE: "요율", FIXED: "정액" }, line.calculationType));
       appendNumberCell(row, line.ratePct == null ? "—" : formatNumber(line.ratePct) + "%");
       appendMoneyCell(row, line.expectedAmount);
-      appendCell(row, label({ PLANNED: "예정", CONFIRMED: "확정", PAID: "지급", CANCELLED: "취소", ADJUSTED: "조정" }, line.lineStatus));
+      appendCell(row, label({ PLANNED: "예정", CONFIRMED: "확정", MATCHED: "대사일치", ADJUSTED: "조정" }, line.lineStatus));
       lineBody.appendChild(row);
     });
     updateTotals(lines.length, total, firstYear);

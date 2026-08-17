@@ -3,7 +3,7 @@
   FGC-UI-TRAN-W01 수수료 지급 건 목록
   요구사항 FUN-065 · FUN-031
   데이터  읽기 commission_transaction, transaction_attribution, vw_transaction_attribution_balance
-  API     GET /api/v1/transactions?settlementMonth=&paymentStage=&status=&sourceType=
+  API     GET /api/v1/transactions?settlementMonth=&paymentStage=&insurerId=&contractNo=&agentId=&commissionItemId=&status=&sourceType=&noAttributionOnly=
   라우트  GET /transactions → transaction/list.html
 
   [막을 것]
@@ -47,6 +47,14 @@
           <option value="GA_TO_FC">GA→설계사</option>
           <option value="INSURER_TO_GA">원수사→GA</option>
         </select>
+      </div>
+      <div class="fgc-field" style="min-width:170px">
+        <label class="fgc-label" for="f-insurer">보험회사</label>
+        <select class="fgc-select" id="f-insurer"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:160px">
+        <label class="fgc-label" for="f-contract-no">계약번호</label>
+        <input class="fgc-input" id="f-contract-no" type="search" placeholder="계약번호 입력" autocomplete="off">
       </div>
       <div class="fgc-field" style="min-width:170px">
         <label class="fgc-label" for="f-source">원천유형</label>
