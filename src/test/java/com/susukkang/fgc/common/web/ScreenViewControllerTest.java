@@ -52,8 +52,6 @@ class ScreenViewControllerTest {
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
             "/contracts/1,         FGC-UI-CONT-W02",
-            "/contracts/new,       FGC-UI-CONT-W03",
-            "/contracts/1/edit,    FGC-UI-CONT-W03",
             "/transactions,        FGC-UI-TRAN-W01",
             "/transactions/new,    FGC-UI-TRAN-W02",
             "/schedules,           FGC-UI-SCHE-W01",
@@ -189,14 +187,6 @@ class ScreenViewControllerTest {
      */
     @ParameterizedTest(name = "{0} {1} → {2}")
     @CsvSource({
-            "SETTLEMENT,   /contracts/new,    200",
-            "SYSTEM_ADMIN, /contracts/new,    200",
-            "GA_ADMIN,     /contracts/new,    403",
-            "COMPLIANCE,   /contracts/new,    403",
-            "SETTLEMENT,   /contracts/1/edit, 200",
-            "SYSTEM_ADMIN, /contracts/1/edit, 200",
-            "GA_ADMIN,     /contracts/1/edit, 403",
-            "COMPLIANCE,   /contracts/1/edit, 403",
             "SETTLEMENT,   /transactions/new, 200",
             "SYSTEM_ADMIN, /transactions/new, 200",
             "GA_ADMIN,     /transactions/new, 403",

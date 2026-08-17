@@ -82,6 +82,27 @@ class PublishingTemplateStructureTest {
                 .contains("@media (prefers-reduced-motion: reduce)");
     }
 
+    @Test
+    void contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior() throws IOException {
+        assertThat(resource("templates/contract/form.html"))
+                .contains("name=\"premiumPerCycleAmount\"")
+                .contains("value=\"SINGLE\"")
+                .contains("data-field-error=\"organizationId\"")
+                .doesNotContain("style=\"")
+                .doesNotContain("onclick=")
+                .doesNotContain("<script>");
+
+        assertThat(resource("static/js/features/contract/contract-api.js"))
+                .contains("getProductOfferings")
+                .contains("createContract")
+                .contains("updateContract")
+                .doesNotContain("fetch(");
+        assertThat(resource("static/js/features/contract/contract-form.js"))
+                .contains("window.FgcUi.contractApi")
+                .contains("error.field")
+                .doesNotContain("fetch(");
+    }
+
     private static String resource(String path) throws IOException {
         try (var input = PublishingTemplateStructureTest.class.getClassLoader().getResourceAsStream(path)) {
             assertThat(input).as(path).isNotNull();
