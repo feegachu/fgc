@@ -379,6 +379,7 @@ class ContractControllerTest {
                 any(ContractUpdateRequest.class)
         )).thenReturn(ContractUpdateResponse.builder()
                 .contractId(21L)
+                .scheduleHeaderIds(java.util.List.of(201L, 202L))
                 .regeneratedScheduleIds(java.util.List.of(201L, 202L))
                 .build());
 
@@ -388,8 +389,9 @@ class ContractControllerTest {
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.contractId").value(21))
+                .andExpect(jsonPath("$.data.scheduleHeaderIds[0]").value(201))
                 .andExpect(jsonPath("$.data.regeneratedScheduleIds[0]").value(201))
-                .andExpect(jsonPath("$.data.scheduleHeaderIds").doesNotExist());
+                .andExpect(jsonPath("$.data.scheduleHeaderIds[1]").value(202));
     }
 
     @Test

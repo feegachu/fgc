@@ -159,7 +159,7 @@
             <result property="generatedAt" column="generated_at"/>
         </association>
 
-        <collection property="schedules"
+        <collection property="lines"
                     ofType="com.susukkang.fgc.schedule.dto.ScheduleLineResponse">
             <id property="lineNo" column="line_no"/>
             <result property="installmentNo" column="installment_no"/>
@@ -172,7 +172,7 @@
             <result property="calculationType" column="calculation_type"/>
             <result property="ratePct" column="rate_pct"/>
             <result property="expectedAmount" column="expected_amount"/>
-            <result property="status" column="line_status"/>
+            <result property="lineStatus" column="line_status"/>
             <result property="ruleRef" column="source_commission_rule_id"/>
         </collection>
     </resultMap>

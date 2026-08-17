@@ -92,7 +92,7 @@
 
   function showError(error, fallbackMessage) {
     var message = error && error.message ? error.message : fallbackMessage;
-    if (error && error.code === "FGC-CONT-001") message = "이미 계약이 존재합니다.";
+    if (error && error.code === "FGC-CONT-001") message = "저장 불가 — 이미 등록된 계약번호입니다.";
     if (error && error.field && Object.prototype.hasOwnProperty.call(elements, error.field)) {
       setFieldError(error.field, message);
       var target = elements[error.field];

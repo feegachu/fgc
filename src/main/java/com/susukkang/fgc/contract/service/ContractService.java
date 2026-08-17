@@ -289,7 +289,7 @@ public class ContractService {
                             "contractNo",
                             request.getContractNo()
                     ),
-                    "이미 계약이 존재합니다."
+                    "저장 불가 — 이미 등록된 계약번호입니다."
             );
         }
     }
@@ -490,6 +490,7 @@ public class ContractService {
 
         return ContractUpdateResponse.builder()
                 .contractId(id)
+                .scheduleHeaderIds(scheduleHeaderIds)
                 .regeneratedScheduleIds(scheduleHeaderIds)
                 .build();
     }
@@ -587,7 +588,7 @@ public class ContractService {
         )) {
             throw validationException(
                     "contractNo",
-                    "이미 계약이 존재합니다."
+                    "저장 불가 — 이미 등록된 계약번호입니다."
             );
         }
     }

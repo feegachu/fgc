@@ -22,5 +22,5 @@ public class ScheduleDetailResponse {
     @JsonIgnore
     private Long scheduleHeaderId;
     private ScheduleHeaderResponse header; // 스케줄 헤더
-    private List<ScheduleLineResponse> schedules; // 회차별 예상 스케줄 목록
+    private List<ScheduleLineResponse> lines; // 회차별 예상 스케줄 목록
 }

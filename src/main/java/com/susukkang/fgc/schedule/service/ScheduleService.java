@@ -480,7 +480,7 @@ public class ScheduleService {
 
         return ContractScheduleResponse.builder()
                 .headers(List.of(detail.getHeader()))
-                .lines(detail.getSchedules() == null ? List.of() : detail.getSchedules())
+                .lines(detail.getLines() == null ? List.of() : detail.getLines())
                 .build();
     }
     /** 지급단계 한 건의 스케줄 생성 결과. */

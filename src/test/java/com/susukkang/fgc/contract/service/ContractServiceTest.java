@@ -354,6 +354,7 @@ class ContractServiceTest {
         ContractUpdateResponse response = contractService.updateContract(21L, request);
 
         assertThat(response.regeneratedScheduleIds()).containsExactly(101L, 102L);
+        assertThat(response.scheduleHeaderIds()).containsExactly(101L, 102L);
         verify(scheduleService).regenerateContractSchedules(21L, "CONTRACT_UPDATED");
         ArgumentCaptor<CapCalculationCommand> capCaptor = ArgumentCaptor.forClass(CapCalculationCommand.class);
         verify(capCheckService, org.mockito.Mockito.times(2)).calculateAndSave(capCaptor.capture());

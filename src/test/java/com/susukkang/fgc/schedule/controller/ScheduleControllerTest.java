@@ -7,6 +7,7 @@ import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,7 +68,10 @@ class ScheduleControllerTest {
                                 .scheduleHeaderId(10L)
                                 .status(com.susukkang.fgc.common.code.ScheduleHeaderStatus.CONFIRMED)
                                 .build())
-                        .schedules(java.util.List.of())
+                        .lines(java.util.List.of(ScheduleLineResponse.builder()
+                                .lineNo(1)
+                                .lineStatus("CONFIRMED")
+                                .build()))
                         .build()
         );
 
@@ -75,7 +79,10 @@ class ScheduleControllerTest {
                         .with(user("settlement").roles("SETTLEMENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.header.scheduleHeaderId").value(10))
-                .andExpect(jsonPath("$.data.header.status").value("CONFIRMED"));
+                .andExpect(jsonPath("$.data.header.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.lines[0].lineNo").value(1))
+                .andExpect(jsonPath("$.data.lines[0].lineStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.schedules").doesNotExist());
 
         verify(scheduleService).confirmSchedule(10L);
     }

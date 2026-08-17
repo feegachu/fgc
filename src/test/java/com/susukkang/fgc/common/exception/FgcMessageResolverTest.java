@@ -18,7 +18,7 @@ class FgcMessageResolverTest {
         String message = resolver.resolve(FgcErrorCode.CONT_001, Map.of());
 
         assertThat(message)
-                .isEqualTo("이미 계약이 존재합니다.");
+                .isEqualTo("저장 불가 — 이미 등록된 계약번호입니다.");
     }
 
     @Test

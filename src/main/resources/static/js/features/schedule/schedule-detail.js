@@ -37,7 +37,7 @@
         var detail = envelope && envelope.data;
         if (!detail || !detail.header) throw new Error("Invalid schedule detail response");
         renderHeader(detail.header);
-        renderLines(Array.isArray(detail.schedules) ? detail.schedules : []);
+        renderLines(Array.isArray(detail.lines) ? detail.lines : []);
         loadVersions();
       })
       .catch(function (error) {
@@ -87,7 +87,7 @@
       var detail = envelope && envelope.data;
       if (!detail || !detail.header) throw new Error("Invalid schedule confirmation response");
       renderHeader(detail.header);
-      renderLines(Array.isArray(detail.schedules) ? detail.schedules : []);
+      renderLines(Array.isArray(detail.lines) ? detail.lines : []);
       loadVersions();
       toast("스케줄을 확정했습니다. 이제 금액을 고칠 수 없습니다. 바꾸려면 새 버전을 만드세요.", "success", 4500);
     }).catch(function (error) {
@@ -170,7 +170,7 @@
       appendCell(row, label({ RATE: "요율", FIXED: "정액" }, line.calculationType));
       appendNumberCell(row, line.ratePct == null ? "—" : formatNumber(line.ratePct) + "%");
       appendMoneyCell(row, line.expectedAmount);
-      appendCell(row, label({ PLANNED: "예정", CONFIRMED: "확정", PAID: "지급", CANCELLED: "취소", ADJUSTED: "조정" }, line.status));
+      appendCell(row, label({ PLANNED: "예정", CONFIRMED: "확정", PAID: "지급", CANCELLED: "취소", ADJUSTED: "조정" }, line.lineStatus));
       lineBody.appendChild(row);
     });
     updateTotals(lines.length, total, firstYear);

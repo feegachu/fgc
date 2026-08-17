@@ -218,7 +218,7 @@ class ScheduleServiceTest {
                         .scheduleHeaderId(10L)
                         .status(ScheduleHeaderStatus.CONFIRMED)
                         .build())
-                .schedules(List.of())
+                .lines(List.of())
                 .build();
 
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
@@ -250,7 +250,7 @@ class ScheduleServiceTest {
                         .scheduleHeaderId(10L)
                         .status(ScheduleHeaderStatus.CONFIRMED)
                         .build())
-                .schedules(List.of())
+                .lines(List.of())
                 .build();
 
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(confirmedHeader);
@@ -314,7 +314,7 @@ class ScheduleServiceTest {
         Long contractId = 10L;
         ScheduleDetailResponse detail = ScheduleDetailResponse.builder()
                 .header(ScheduleHeaderResponse.builder().scheduleHeaderId(100L).build())
-                .schedules(List.of())
+                .lines(List.of())
                 .build();
         given(scheduleMapper.selectByContractIdAndPaymentStage(
                 contractId, PaymentStage.INSURER_TO_GA))
