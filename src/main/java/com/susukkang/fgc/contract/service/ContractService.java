@@ -502,18 +502,29 @@ public class ContractService {
                     FgcErrorCode.COMMON_500
             );
         }
-        /*
-         * TODO(FUN-036)
-         * 기존 활성 스케줄을 비활성화하고
-         * 새 버전의 스케줄 헤더 및 라인을 생성한다.
-         */
+        List<Long> scheduleHeaderIds = List.of();
+        if (hasScheduleImpactingChanges(currentContract, updatedContract)) {
+            scheduleHeaderIds = scheduleService.regenerateContractSchedules(
+                    id,
+                    "CONTRACT_UPDATED"
+            );
 
-        /*
-         * TODO(FUN-030, REG-08~11)
-         * FUN-036에서 새 스케줄 생성이 끝난 다음
-         * 보험회사 → GA와 GA → FC를 구분하여 각각
-         * capCheckService.calculateAndSave()를 호출한다.
-         */
+            for (PaymentStage paymentStage : PaymentStage.values()) {
+                BigDecimal complianceEvidenceAmount = null;
+                if (paymentStage == PaymentStage.INSURER_TO_GA) {
+                    complianceEvidenceAmount =
+                            capCheckMapper.selectComplianceEvidenceAmount(id, paymentStage);
+                }
+
+                CapCalculationCommand command = CapCalculationCommand.realtime(
+                        id,
+                        paymentStage,
+                        request.getContractDate(),
+                        complianceEvidenceAmount
+                );
+                capCheckService.calculateAndSave(command);
+            }
+        }
 
         /*
          * TODO(FUN-026, 2차)
@@ -532,8 +543,34 @@ public class ContractService {
 
         return ContractResponse.builder()
                 .contractId(id)
-                .scheduleHeaderIds(List.of())
+                .scheduleHeaderIds(scheduleHeaderIds)
                 .build();
+    }
+
+    private boolean hasScheduleImpactingChanges(
+            InsuranceContract current,
+            InsuranceContract updated
+    ) {
+        return !Objects.equals(current.getProductOfferingId(), updated.getProductOfferingId())
+                || !Objects.equals(current.getContractDate(), updated.getContractDate())
+                || !Objects.equals(current.getPaymentCycleCode(), updated.getPaymentCycleCode())
+                || moneyChanged(current.getFirstPremiumAmount(), updated.getFirstPremiumAmount())
+                || moneyChanged(
+                        current.getMonthlyEquivalentFirstPremium(),
+                        updated.getMonthlyEquivalentFirstPremium()
+                )
+                || !Objects.equals(current.getPaymentTermMonths(), updated.getPaymentTermMonths())
+                || moneyChanged(
+                        current.getStandardSurrenderDeductionAmount(),
+                        updated.getStandardSurrenderDeductionAmount()
+                );
+    }
+
+    private boolean moneyChanged(BigDecimal current, BigDecimal updated) {
+        if (current == null || updated == null) {
+            return current != updated;
+        }
+        return current.compareTo(updated) != 0;
     }
     /**
      * 설명 : 수정 요청 값을 검증하는 함수

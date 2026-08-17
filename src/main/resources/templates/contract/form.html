@@ -35,7 +35,8 @@
 
   <div class="publishing-page-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <h1 class="fgc-page-title">보험계약 등록</h1>
+      <h1 class="fgc-page-title" id="contract-form-title"
+          th:text="${mode == 'edit' ? '보험계약 수정' : '보험계약 등록'}">보험계약 등록</h1>
       <p class="fgc-page-desc">
         계약을 저장하면 <strong>같은 순간에 예상 스케줄(회차별로 언제 얼마를 줄 예정인지)이 자동으로 만들어집니다.</strong>
         계약만 저장되고 스케줄이 없는 상태는 생기지 않습니다.
@@ -49,6 +50,7 @@
   <!-- 폼 전송(POST · IF-API-18)은 다음 단계에서 th:action/th:object 로 연결한다. 지금은 정적 골격만. -->
   <form id="contract-form"
         data-contract-form
+        th:attr="data-mode=${mode},data-contract-id=${contractId}"
         style="margin-top:20px;display:flex;flex-direction:column;gap:16px"
         novalidate>
 
@@ -232,7 +234,8 @@
            th:disabled="${readOnly or !formValid}" 로 두 조건을 합친다. -->
       <button class="fgc-btn fgc-btn--primary" id="save-btn" type="submit" data-fgc-action="save" disabled>
         <span class="material-symbols-outlined" style="font-size:18px">save</span>
-        저장하고 예상 스케줄 만들기
+        <span id="save-button-label"
+              th:text="${mode == 'edit' ? '계약 수정' : '저장하고 예상 스케줄 만들기'}">저장하고 예상 스케줄 만들기</span>
       </button>
     </div>
 

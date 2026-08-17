@@ -4,6 +4,10 @@ var agentSelect = document.getElementById("agent");
 var organizationInput = document.getElementById("org");
 var organizationIdInput = document.getElementById("organizationId");
 var apiClient = window.FgcUi && window.FgcUi.apiClient;
+var contractForm = document.querySelector("[data-contract-form]");
+var formMode = contractForm ? contractForm.dataset.mode : "create";
+var editingContractId = contractForm ? contractForm.dataset.contractId : "";
+var editingContract = null;
 
 insurerSelect.addEventListener("change", function () {
     var insurerId = insurerSelect.value;
@@ -36,37 +40,37 @@ function referenceDate() {
     return value || todayText();
 }
 
-function loadInsurers() {
-    if (!apiClient) return;
+function loadInsurers(selectedId) {
+    if (!apiClient) return Promise.resolve();
     insurerSelect.disabled = true;
-    apiClient.request("/api/v1/base/insurers?page=1&size=100")
-        .then(function (envelope) { renderInsurers(pageContent(envelope)); })
+    return apiClient.request("/api/v1/base/insurers?page=1&size=100")
+        .then(function (envelope) { renderInsurers(pageContent(envelope), selectedId); })
         .catch(function (error) { showError(error); });
 }
 
-function loadOfferings(insurerId) {
-    if (!apiClient) return;
+function loadOfferings(insurerId, selectedId) {
+    if (!apiClient) return Promise.resolve();
     offeringSelect.disabled = true;
     offeringSelect.innerHTML = '<option value="">상품을 불러오는 중입니다.</option>';
     apiClient.request("/api/v1/base/products?insurerId=" + encodeURIComponent(insurerId)
         + "&asOf=" + encodeURIComponent(referenceDate()) + "&page=1&size=100")
-        .then(function (envelope) { renderOfferings(pageContent(envelope)); })
+        .then(function (envelope) { renderOfferings(pageContent(envelope), selectedId); })
         .catch(function (error) {
             offeringSelect.innerHTML = '<option value="">상품을 불러오지 못했습니다.</option>';
             showError(error);
         });
 }
 
-function loadAgents() {
-    if (!apiClient) return;
+function loadAgents(selectedId) {
+    if (!apiClient) return Promise.resolve();
     agentSelect.disabled = true;
-    apiClient.request("/api/v1/base/agents?asOf=" + encodeURIComponent(referenceDate())
+    return apiClient.request("/api/v1/base/agents?asOf=" + encodeURIComponent(referenceDate())
         + "&page=1&size=100")
-        .then(function (envelope) { renderAgents(pageContent(envelope)); })
+        .then(function (envelope) { renderAgents(pageContent(envelope), selectedId); })
         .catch(function (error) { showError(error); });
 }
 
-function renderInsurers(insurers) {
+function renderInsurers(insurers, selectedId) {
     insurerSelect.replaceChildren();
     var placeholder = document.createElement("option");
     placeholder.value = "";
@@ -78,12 +82,13 @@ function renderInsurers(insurers) {
         option.value = insurer.insurerId;
         option.textContent = insurer.insurerCode + " · " + insurer.insurerName;
         option.disabled = insurer.activeYn === false;
+        option.selected = String(insurer.insurerId) === String(selectedId || "");
         insurerSelect.appendChild(option);
     });
     insurerSelect.disabled = false;
 }
 
-function renderAgents(agents) {
+function renderAgents(agents, selectedId) {
     agentSelect.replaceChildren();
     var placeholder = document.createElement("option");
     placeholder.value = "";
@@ -98,12 +103,18 @@ function renderAgents(agents) {
         option.textContent = agent.agentCode + " · " + agent.agentName;
         option.dataset.organizationId = agent.organizationId;
         option.dataset.organizationName = agent.organizationName;
+        option.selected = String(agent.agentId) === String(selectedId || "");
         agentSelect.appendChild(option);
     });
     agentSelect.disabled = false;
+    if (selectedId) {
+        var selected = agentSelect.selectedOptions[0];
+        organizationInput.value = selected ? selected.dataset.organizationName || "" : "";
+        organizationIdInput.value = selected ? selected.dataset.organizationId || "" : "";
+    }
 }
 
-function renderOfferings(offerings) {
+function renderOfferings(offerings, selectedId) {
     offeringSelect.replaceChildren();
 
     var placeholder = document.createElement("option");
@@ -117,6 +128,7 @@ function renderOfferings(offerings) {
         option.value = offering.productOfferingId;
         option.textContent =
             offering.productName + " · " + offering.offeringVersion;
+        option.selected = String(offering.productOfferingId) === String(selectedId || "");
 
         offeringSelect.appendChild(option);
     });
@@ -169,7 +181,6 @@ if (paymentCycleSelect && premiumPerCycleInput && monthlyEquivalentInput) {
     updatePremiums();
 }
 
-var contractForm = document.querySelector("[data-contract-form]");
 var saveButton = document.getElementById("save-btn");
 var saveHint = document.getElementById("save-hint");
 var contractDateInput = document.getElementById("contractDate");
@@ -197,6 +208,45 @@ function updateSaveButton() {
 
 function optionalNumber(input) {
     return input.value === "" ? null : Number(input.value);
+}
+
+function setValue(id, value) {
+    var element = document.getElementById(id);
+    if (element) element.value = value == null ? "" : String(value);
+}
+
+function populateContract(contract) {
+    setValue("contractNo", contract.contractNo);
+    setValue("contractDate", contract.contractDate);
+    setValue("status", contract.contractStatus);
+    setValue("cycle", contract.paymentCycleCode);
+    setValue("premiumPerCycle", contract.premiumPerCycleAmount);
+    setValue("firstPremium", contract.firstPremiumAmount);
+    setValue("monthlyEquiv", contract.monthlyEquivalentFirstPremium);
+    setValue("termMonths", contract.paymentTermMonths);
+    setValue("stdDeduction", contract.standardSurrenderDeductionAmount);
+    organizationIdInput.value = contract.organizationId == null ? "" : String(contract.organizationId);
+    updatePremiums();
+}
+
+function initializeEditForm() {
+    if (formMode !== "edit" || !editingContractId) return Promise.resolve(false);
+    return apiClient.request("/api/v1/contracts/" + encodeURIComponent(editingContractId))
+        .then(function (envelope) {
+            editingContract = envelope.data || {};
+            populateContract(editingContract);
+            return Promise.all([
+                loadInsurers(editingContract.insurerId),
+                loadAgents(editingContract.agentId)
+            ]);
+        })
+        .then(function () {
+            return loadOfferings(editingContract.insurerId, editingContract.productOfferingId);
+        })
+        .then(function () {
+            updateSaveButton();
+            return true;
+        });
 }
 
 function requestBody() {
@@ -250,22 +300,31 @@ if (contractForm && saveButton && saveHint) {
 
         submitting = true;
         updateSaveButton();
-        apiClient.request("/api/v1/contracts", {
-            method: "POST",
+        var requestUrl = formMode === "edit"
+            ? "/api/v1/contracts/" + encodeURIComponent(editingContractId)
+            : "/api/v1/contracts";
+        apiClient.request(requestUrl, {
+            method: formMode === "edit" ? "PUT" : "POST",
             body: requestBody()
         }).then(function (envelope) {
             var data = envelope.data || {};
             var scheduleIds = Array.isArray(data.scheduleHeaderIds) ? data.scheduleHeaderIds : [];
-            window.location.assign(scheduleIds.length > 0
-                ? "/schedules/" + encodeURIComponent(scheduleIds[0])
-                : "/contracts/" + encodeURIComponent(data.contractId));
+            window.location.assign(formMode === "edit"
+                ? "/contracts/" + encodeURIComponent(data.contractId || editingContractId)
+                : scheduleIds.length > 0
+                    ? "/schedules/" + encodeURIComponent(scheduleIds[0])
+                    : "/contracts/" + encodeURIComponent(data.contractId));
         }).catch(function (error) {
             submitting = false;
             updateSaveButton();
             showError(error);
         });
     });
-    loadInsurers();
-    loadAgents();
+    if (formMode === "edit") {
+        initializeEditForm().catch(showError);
+    } else {
+        loadInsurers();
+        loadAgents();
+    }
     updateSaveButton();
 }

@@ -1033,6 +1033,32 @@ public class ScheduleService {
     }
 
     /**
+     * 계약의 스케줄 산정 정보가 변경됐을 때 활성 운영 스케줄을 지급단계별로 재생성한다.
+     * 활성 스케줄이 없는 지급단계는 일반 생성 경로에서 보완한다.
+     */
+    @Transactional
+    public List<Long> regenerateContractSchedules(Long contractId, String reason) {
+        List<Long> regeneratedHeaderIds = new ArrayList<>();
+
+        for (PaymentStage paymentStage : PaymentStage.values()) {
+            ScheduleDetailResponse activeSchedule =
+                    scheduleMapper.selectByContractIdAndPaymentStage(contractId, paymentStage);
+            if (activeSchedule == null || activeSchedule.getScheduleHeaderId() == null) {
+                continue;
+            }
+
+            ScheduleRegenResponse regenerated =
+                    regenerateSchedules(activeSchedule.getScheduleHeaderId(), reason);
+            regeneratedHeaderIds.add(regenerated.getScheduleHeaderId());
+        }
+
+        InsuranceContract contract = contractMapper.selectContractById(contractId);
+        ScheduleGenerationResult missingSchedules = generateSchedules(contract);
+        regeneratedHeaderIds.addAll(missingSchedules.scheduleHeaderIds());
+        return regeneratedHeaderIds;
+    }
+
+    /**
      * 설명 : 활성 예정 스케줄의 헤더와 회차를 확정하여 변경할 수 없게 한다.
      *
      * @param scheduleId 스케줄 헤더 ID

@@ -1,5 +1,7 @@
 package com.susukkang.fgc.contract.service;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.domain.DataOrigin;
@@ -65,6 +67,12 @@ class ContractServiceTest {
 
     @Mock
     private ScheduleService scheduleService;
+
+    @Mock
+    private CapCheckMapper capCheckMapper;
+
+    @Mock
+    private CapCheckService capCheckService;
 
     @Mock
     private AuditLogService auditLogService;
@@ -302,6 +310,36 @@ class ContractServiceTest {
 
         verify(contractMapper, never()).existsContractNo(any(), any());
         verify(contractMapper).updateContract(any(InsuranceContract.class));
+    }
+
+    @Test
+    @DisplayName("스케줄 산정 정보가 변경되면 스케줄 재생성과 한도 재검증을 수행한다")
+    void updateContractRegeneratesSchedulesAndRechecksCapWhenScheduleInputChanges() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = InsuranceContract.builder()
+                .contractId(21L)
+                .contractNo(request.getContractNo())
+                .insurerId(request.getInsurerId())
+                .productOfferingId(request.getProductOfferingId())
+                .contractDate(request.getContractDate())
+                .paymentCycleCode(request.getPaymentCycleCode())
+                .firstPremiumAmount(new BigDecimal("90000"))
+                .monthlyEquivalentFirstPremium(new BigDecimal("90000"))
+                .paymentTermMonths(request.getPaymentTermMonths())
+                .standardSurrenderDeductionAmount(request.getStandardSurrenderDeductionAmount())
+                .dataOrigin(DataOrigin.SEED)
+                .build();
+        given(contractMapper.selectContractById(21L)).willReturn(current);
+        givenValidReferences(request);
+        given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
+        given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
+                .willReturn(List.of(101L, 102L));
+
+        ContractResponse response = contractService.updateContract(21L, request);
+
+        assertThat(response.getScheduleHeaderIds()).containsExactly(101L, 102L);
+        verify(scheduleService).regenerateContractSchedules(21L, "CONTRACT_UPDATED");
+        verify(capCheckService, org.mockito.Mockito.times(2)).calculateAndSave(any());
     }
 
     @Test

@@ -25,6 +25,10 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 @AllArgsConstructor
 public class ContractDetailResponse {
+    private Long insurerId;
+    private Long productOfferingId;
+    private Long agentId;
+    private Long organizationId;
     //기본 정보 탭
     private String contractNo; //계약번호
     private String productName; //상품명
