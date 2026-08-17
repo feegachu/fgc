@@ -1,6 +1,7 @@
 package com.susukkang.fgc.transaction.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.service.CapCalculator;
@@ -78,6 +79,8 @@ class CommissionPaymentServiceImplTest {
     @Mock
     private CapExceptionService capExceptionService;
     @Mock
+    private AuditLogService auditLogService;
+    @Mock
     private CommissionPolicyService commissionPolicyService;
 
     private CommissionPaymentServiceImpl service;
@@ -98,6 +101,7 @@ class CommissionPaymentServiceImplTest {
                 capCalculator,
                 capExceptionService,
                 messageResolver,
+                auditLogService,
                 commissionPolicyService
         );
     }
@@ -1124,6 +1128,124 @@ class CommissionPaymentServiceImplTest {
         assertThat(transactional).isNotNull();
         assertThat(transactional.noRollbackFor())
                 .containsExactly(CommissionPaymentConfirmationRejectedException.class);
+    }
+
+    // FUN-061·운영정책서 제51조 — 지급 건 등록·수정·확정은 같은 트랜잭션에서 감사행을 남긴다.
+    // 감사행 저장 자체(clamp·직렬화·실패 전파)는 AuditLogServiceTest, DB 왕복은
+    // AuditLogQueryMapperIntegrationTest 가 검증하므로 여기서는 호출 계약만 본다.
+    @Test
+    void recordsPaymentCreatedAuditWithAttributionSnapshot() {
+        stubReferences(3L);
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+
+        service.create(createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.APPROVED_ALLOCATION))));
+
+        ArgumentCaptor<AuditLogService.AuditEvent> captor =
+                ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(captor.capture());
+        AuditLogService.AuditEvent event = captor.getValue();
+        assertThat(event.actionCode()).isEqualTo("PAYMENT_CREATED");
+        assertThat(event.entityType()).isEqualTo("COMMISSION_PAYMENT");
+        assertThat(event.entityId()).isEqualTo("101");
+        assertThat(event.policyVersionId()).isEqualTo(3L);
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> after = (java.util.Map<String, Object>) event.after();
+        assertThat(after).containsKeys("payment", "attributions");
+    }
+
+    @Test
+    void recordsPaymentUpdatedAuditWithBeforeSnapshot() {
+        stubReferences(3L, 9L);
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        )));
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 9L, "500000")));
+        given(mapper.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
+
+        service.update(101L, updateRequest(List.of(
+                attribution(9L, "500000", AttributionMethod.APPROVED_ALLOCATION))));
+
+        ArgumentCaptor<AuditLogService.AuditEvent> captor =
+                ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(captor.capture());
+        AuditLogService.AuditEvent event = captor.getValue();
+        assertThat(event.actionCode()).isEqualTo("PAYMENT_UPDATED");
+        assertThat(event.entityId()).isEqualTo("101");
+        // before/after 모두 같은 조회 DTO(Row) 기반 payment/attributions 구조 —
+        // 스키마가 일치해야 diff 화면이 필드 단위로 비교된다
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> before = (java.util.Map<String, Object>) event.before();
+        assertThat(before).containsKeys("payment", "attributions");
+        assertThat(((CommissionPaymentRow) before.get("payment")).status())
+                .isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat((List<?>) before.get("attributions")).hasSize(1);
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> after = (java.util.Map<String, Object>) event.after();
+        assertThat(after).containsKeys("payment", "attributions");
+        assertThat(after.get("payment")).isInstanceOf(CommissionPaymentRow.class);
+        assertThat(before.get("payment").getClass()).isEqualTo(after.get("payment").getClass());
+    }
+
+    /** 확정 감사행의 after 에는 1,200% 판정 요약(capChecks)이 담긴다 — REG-22·포함/제외 판단 근거. */
+    @Test
+    void recordsPaymentConfirmedAuditWithCapCheckSummaries() {
+        List<ConfirmationData> data = List.of(
+                confirmation(201L, 3L, "300000", "500000", InclusionDecisionStatus.INCLUDED,
+                        ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION, "EVIDENCE-1"),
+                confirmation(202L, 9L, "200000", "500000", InclusionDecisionStatus.INCLUDED,
+                        ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION, "EVIDENCE-2")
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(data);
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(mapper.findCapRuleSnapshot(101L, 202L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L), capCalculation(9L));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(55L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+        given(mapper.confirm(101L, null, "55,55")).willReturn(1);
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(mapper.findAttributions(101L)).willReturn(List.of(
+                attributionRow(1, 3L, "300000"),
+                attributionRow(2, 9L, "200000")
+        ));
+
+        service.confirm(101L, null);
+
+        ArgumentCaptor<AuditLogService.AuditEvent> captor =
+                ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(captor.capture());
+        AuditLogService.AuditEvent event = captor.getValue();
+        assertThat(event.actionCode()).isEqualTo("PAYMENT_CONFIRMED");
+        assertThat(event.entityId()).isEqualTo("101");
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> after = (java.util.Map<String, Object>) event.after();
+        assertThat(after.get("status")).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat((List<?>) after.get("capChecks")).hasSize(2);
+    }
+
+    /** 멱등키 재요청은 상태 변경이 아니므로 감사행을 다시 남기지 않는다. */
+    @Test
+    void doesNotRecordAuditOnIdempotentReconfirm() {
+        ConfirmationData confirmed = withConfirmationState(
+                confirmation(
+                        201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                        ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+                ),
+                CommissionPaymentStatus.CONFIRMED,
+                "confirm-101"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmed));
+        given(mapper.findCapCheckIds(101L)).willReturn(List.of(55L));
+        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "500000")));
+
+        service.confirm(101L, "confirm-101");
+
+        verify(auditLogService, never()).record(any());
     }
 
     private void stubReferences(Long... contractIds) {

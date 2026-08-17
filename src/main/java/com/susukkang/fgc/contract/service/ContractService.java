@@ -2,6 +2,7 @@ package com.susukkang.fgc.contract.service;
 
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -41,11 +42,17 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class ContractService {
 
+    // FUN-061·운영정책서 제51조 "계약·상태 사건" — 등록·수정과 같은 트랜잭션에서 감사행을 남긴다.
+    private static final String AUDIT_ENTITY_TYPE = "CONTRACT";
+    private static final String AUDIT_CONTRACT_CREATED = "CONTRACT_CREATED";
+    private static final String AUDIT_CONTRACT_UPDATED = "CONTRACT_UPDATED";
+
     private final ContractMapper contractMapper;
     private final CapCheckMapper capCheckMapper;
     private final ContractStatusEventMapper contractStatusEventMapper;
     private final CapCheckService capCheckService;
     private final ScheduleService scheduleService;
+    private final AuditLogService auditLogService;
     /**
      * 설명 : 검색 조건에 따라 계약을 조회한다.
      * 검색 조건과 현재 페이지 , 최대 계약수를 받아
@@ -181,6 +188,12 @@ public class ContractService {
 
         // TODO(FUN-026, 2차): 계약 생성 상태 사건 이력을 등록한다.
 
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_CONTRACT_CREATED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(insuranceContract.getContractId()))
+                .after(insuranceContract)
+                .build());
 
         return ContractResponse.builder()
                 .contractId(insuranceContract.getContractId())
@@ -508,6 +521,14 @@ public class ContractService {
          * request.getContractStatus()가 다른 경우
          * 계약상태 사건 이력을 등록한다.
          */
+
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_CONTRACT_UPDATED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(id))
+                .before(currentContract)
+                .after(updatedContract)
+                .build());
 
         return ContractResponse.builder()
                 .contractId(id)
