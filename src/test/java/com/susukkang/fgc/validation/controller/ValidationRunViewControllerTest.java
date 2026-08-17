@@ -238,8 +238,8 @@ class ValidationRunViewControllerTest {
     }
 
     /**
-     * stepClass 경계 고정 — current_step 은 "마지막으로 끝난 단계"라 RUNNING 이면 다음 칸이
-     * 진행 중이고, 9단계(사람 검토)는 배치 칸이 아니라 RUNNING/8 에서도 running 이 아니다.
+     * FGC-FUN-043 — stepClass 경계 고정. current_step 은 "마지막으로 끝난 단계"라 RUNNING 이면
+     * 다음 칸이 진행 중이고, 9단계(사람 검토)는 배치 칸이 아니라 RUNNING/8 에서도 running 이 아니다.
      * FINALIZED 는 ck_validation_run_step 이 10 을 강제하므로 전 칸 done.
      */
     @Test
