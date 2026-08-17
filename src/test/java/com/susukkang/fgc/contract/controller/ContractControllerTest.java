@@ -198,8 +198,17 @@ class ContractControllerTest {
         ContractDetailResponse detail =
                 ContractDetailResponse.builder()
                         .contractNo("TEST-20260806-001")
+                        .contractId(21L)
+                        .insurerId(1L)
+                        .insurerName("미래가상생명")
+                        .productOfferingId(3L)
                         .productName("가상 건강보장보험 A")
+                        .offeringVersion("2026-A")
                         .contractDate(LocalDate.of(2026, 8, 6))
+                        .agentId(4L)
+                        .agentName("김설계")
+                        .organizationId(5L)
+                        .organizationName("서울지사")
                         .premiumPerCycleAmount(
                                 new BigDecimal("100000")
                         )
@@ -236,7 +245,11 @@ class ContractControllerTest {
                 .andExpect(
                         jsonPath("$.data.productName")
                                 .value("가상 건강보장보험 A")
-                );
+                )
+                .andExpect(jsonPath("$.data.insurerId").value(1))
+                .andExpect(jsonPath("$.data.productOfferingId").value(3))
+                .andExpect(jsonPath("$.data.agentId").value(4))
+                .andExpect(jsonPath("$.data.organizationId").value(5));
     }
 
     @Test
@@ -284,6 +297,39 @@ class ContractControllerTest {
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.contractId").value(21));
+    }
+
+    @Test
+    @DisplayName("일시납과 0원 경계값으로 보험계약을 생성할 수 있다")
+    void createContractAcceptsSinglePaymentAndZeroPremiums() throws Exception {
+        ContractCreateRequest request = createRequest();
+        request.setPaymentCycleCode(com.susukkang.fgc.contract.domain.PaymentCycleCode.SINGLE);
+        request.setPremiumPerCycleAmount(BigDecimal.ZERO);
+        request.setFirstPremiumAmount(BigDecimal.ZERO);
+        request.setMonthlyEquivalentFirstPremium(BigDecimal.ZERO);
+        when(contractService.createContract(any(ContractCreateRequest.class)))
+                .thenReturn(ContractResponse.builder().contractId(21L).build());
+
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("settlement").roles("SETTLEMENT"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contractId").value(21));
+    }
+
+    @Test
+    @DisplayName("주기 보험료가 없으면 계약 생성을 거절한다")
+    void createContractRejectsMissingPremiumPerCycle() throws Exception {
+        ContractCreateRequest request = createRequest();
+        request.setPremiumPerCycleAmount(null);
+
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("settlement").roles("SETTLEMENT"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("premiumPerCycleAmount"));
     }
 
     /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 계약 등록·수정도 허용된다. */
@@ -346,6 +392,7 @@ class ContractControllerTest {
                 MONTHLY,
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
+                new BigDecimal("100000"),
                 120,
                 new BigDecimal("50000")
         );
@@ -361,6 +408,7 @@ class ContractControllerTest {
                 1L,
                 4L,
                 MONTHLY,
+                new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 120,

@@ -60,12 +60,15 @@ class AuditCoverageIntegrationTest {
                 PaymentCycleCode.MONTHLY,
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
+                new BigDecimal("100000"),
                 120,
                 BigDecimal.ZERO
         );
 
         ContractResponse created = contractService.createContract(createRequest);
 
+        assertThat(created.getScheduleHeaderIds()).hasSize(2);
+        assertThat(realtimeCapCheckCount(created.getContractId())).isEqualTo(2);
         assertThat(auditCount("CONTRACT_CREATED", "CONTRACT", String.valueOf(created.getContractId())))
                 .isEqualTo(1);
         String afterValue = jdbcTemplate.queryForObject("""
@@ -85,11 +88,17 @@ class AuditCoverageIntegrationTest {
                 PaymentCycleCode.MONTHLY,
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
+                new BigDecimal("100000"),
                 120,
                 BigDecimal.ZERO
         );
 
-        contractService.updateContract(created.getContractId(), updateRequest);
+        ContractResponse updated = contractService.updateContract(created.getContractId(), updateRequest);
+
+        assertThat(updated.getRegeneratedScheduleIds()).hasSize(2);
+        assertThat(updated.getRegeneratedScheduleIds())
+                .doesNotContainAnyElementsOf(created.getScheduleHeaderIds());
+        assertThat(realtimeCapCheckCount(created.getContractId())).isEqualTo(4);
 
         Map<String, Object> updatedAudit = jdbcTemplate.queryForMap("""
                 SELECT before_value::text AS before_value, after_value::text AS after_value
@@ -98,6 +107,16 @@ class AuditCoverageIntegrationTest {
                 """, String.valueOf(created.getContractId()));
         assertThat((String) updatedAudit.get("before_value")).contains("ACTIVE");
         assertThat((String) updatedAudit.get("after_value")).contains("LAPSED");
+    }
+
+    private int realtimeCapCheckCount(Long contractId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.cap_check
+                 WHERE contract_id = ?
+                   AND check_kind = 'REALTIME'
+                """, Integer.class, contractId);
+        return count == null ? 0 : count;
     }
 
     // ARBITRAGE_RECHECKED 는 실DB 통합으로 검증하지 않는다 — 검증 실행 생성이

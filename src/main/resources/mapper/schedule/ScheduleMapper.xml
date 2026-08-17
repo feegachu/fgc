@@ -357,6 +357,15 @@
           AND active_yn = TRUE
     </update>
 
+    <select id="selectActiveOperationalScheduleIds" resultType="long">
+        SELECT schedule_header_id
+        FROM fgc.schedule_header
+        WHERE contract_id = #{contractId}
+          AND schedule_purpose = 'OPERATIONAL'
+          AND active_yn = TRUE
+        ORDER BY payment_stage
+    </select>
+
     <!-- 계약 ID를 기준으로 활성 운영 스케줄 헤더 목록을 조회한다. -->
     <select id="selectByContractIdAndPaymentStage"
             resultMap="scheduleDetailResultMap">
