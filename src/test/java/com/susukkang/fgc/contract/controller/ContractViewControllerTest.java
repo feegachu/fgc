@@ -3,6 +3,7 @@ package com.susukkang.fgc.contract.controller;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.CapResultStatus;
+import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
@@ -42,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(ContractViewController.class)
-@Import({ContractViewController.class, ShellAdvice.class, GlobalExceptionHandler.class,
+@Import({ContractViewController.class, ShellAdvice.class, SecurityConfig.class, GlobalExceptionHandler.class,
         FgcMessageResolver.class, ConstraintErrorCodeResolver.class, MessageSourceAutoConfiguration.class})
 @TestPropertySource(properties = "fgc.demo-month=2026-07")
 class ContractViewControllerTest {
@@ -59,6 +60,40 @@ class ContractViewControllerTest {
         user.setUserId(1L); user.setLoginId("settle01"); user.setPasswordHash("x");
         user.setUserName("테스트 사용자"); user.setRoleCode(role); user.setAccountStatus("ACTIVE");
         return new FgcUserDetails(user, true, true);
+    }
+
+    @Test
+    void 계약_등록_화면은_생성모드와_전용_스크립트를_렌더링한다() throws Exception {
+        mockMvc.perform(get("/contracts/new").with(user(userDetails("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contract/form"))
+                .andExpect(model().attribute("isEditMode", false))
+                .andExpect(content().string(containsString("data-mode=\"create\"")))
+                .andExpect(content().string(containsString("/js/features/contract/contract-api.js")))
+                .andExpect(content().string(containsString("/js/features/contract/contract-form.js")));
+    }
+
+    @Test
+    void 계약_수정_화면은_계약_ID를_화면에_전달한다() throws Exception {
+        mockMvc.perform(get("/contracts/{id}/edit", 21L).with(user(userDetails("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contract/form"))
+                .andExpect(model().attribute("isEditMode", true))
+                .andExpect(model().attribute("contractId", 21L))
+                .andExpect(content().string(containsString("data-mode=\"edit\"")))
+                .andExpect(content().string(containsString("data-contract-id=\"21\"")));
+    }
+
+    @ParameterizedTest(name = "{0} 계약 폼 접근={1}")
+    @CsvSource({
+            "SETTLEMENT, 200",
+            "SYSTEM_ADMIN, 200",
+            "GA_ADMIN, 403",
+            "COMPLIANCE, 403"
+    })
+    void 처리_권한이_있는_역할만_계약_폼에_접근한다(String role, int expectedStatus) throws Exception {
+        mockMvc.perform(get("/contracts/new").with(user(userDetails(role))))
+                .andExpect(status().is(expectedStatus));
     }
 
     @Test

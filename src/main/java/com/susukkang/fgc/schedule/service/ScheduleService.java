@@ -221,6 +221,38 @@ public class ScheduleService {
     }
 
     /**
+     * 계약 수정 결과를 반영해 활성 운영 스케줄을 지급단계별 새 버전으로 만든다.
+     * 기존 버전과 확정된 회차는 {@link #regenerateSchedules(Long, String)}의 규칙대로 보존하며,
+     * 기존 스케줄이 없던 지급단계도 현재 정책을 기준으로 다시 생성 시도한다.
+     */
+    @Transactional
+    public List<Long> regenerateContractSchedules(Long contractId, String reason) {
+        if (contractId == null) {
+            throw validationException("contractId", "계약 ID가 존재하지 않습니다.");
+        }
+
+        List<Long> activeScheduleIds =
+                scheduleMapper.selectActiveOperationalScheduleIds(contractId);
+        List<Long> regeneratedScheduleIds = new ArrayList<>();
+
+        for (Long activeScheduleId : activeScheduleIds) {
+            ScheduleRegenResponse response = regenerateSchedules(activeScheduleId, reason);
+            if (!Objects.equals(activeScheduleId, response.getScheduleHeaderId())) {
+                regeneratedScheduleIds.add(response.getScheduleHeaderId());
+            }
+        }
+
+        InsuranceContract updatedContract = contractMapper.selectContractById(contractId);
+        if (updatedContract == null) {
+            throw validationException("contractId", "존재하지 않는 계약입니다.");
+        }
+
+        ScheduleGenerationResult missingStageResult = generateSchedules(updatedContract);
+        regeneratedScheduleIds.addAll(missingStageResult.scheduleHeaderIds());
+        return List.copyOf(regeneratedScheduleIds);
+    }
+
+    /**
      * 설명 : 지급단계에 적용할 정책을 조회한다. 정책이 없거나 복수로 선택된 경우에는
      * 해당 지급단계의 스케줄 생성을 건너뛰고 exception_case에 검토 건을 등록한다.
      * 그 외의 정책·시스템 오류는 정상 실패 처리를 위해 상위로 전달한다.
@@ -1053,34 +1085,6 @@ public class ScheduleService {
                 .scheduleHeaderId(newHeader.getScheduleHeaderId())
                 .versionNo(newHeader.getScheduleVersionNo().longValue())
                 .build();
-    }
-
-    /**
-     * 계약의 스케줄 산정 정보가 변경됐을 때 활성 운영 스케줄을 지급단계별로 재생성한다.
-     * 활성 스케줄이 없는 지급단계는 일반 생성 경로에서 보완한다.
-     */
-    @Transactional
-    public List<Long> regenerateContractSchedules(Long contractId, String reason) {
-        List<Long> regeneratedHeaderIds = new ArrayList<>();
-
-        for (PaymentStage paymentStage : PaymentStage.values()) {
-            ScheduleDetailResponse activeSchedule =
-                    scheduleMapper.selectByContractIdAndPaymentStage(contractId, paymentStage);
-            if (activeSchedule == null || activeSchedule.getScheduleHeaderId() == null) {
-                continue;
-            }
-
-            ScheduleRegenResponse regenerated =
-                    regenerateSchedules(activeSchedule.getScheduleHeaderId(), reason);
-            if (!Objects.equals(activeSchedule.getScheduleHeaderId(), regenerated.getScheduleHeaderId())) {
-                regeneratedHeaderIds.add(regenerated.getScheduleHeaderId());
-            }
-        }
-
-        InsuranceContract contract = contractMapper.selectContractById(contractId);
-        ScheduleGenerationResult missingSchedules = generateSchedules(contract);
-        regeneratedHeaderIds.addAll(missingSchedules.scheduleHeaderIds());
-        return regeneratedHeaderIds;
     }
 
     public boolean hasActiveOperationalSchedule(Long contractId, PaymentStage paymentStage) {

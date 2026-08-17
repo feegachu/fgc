@@ -28,7 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
@@ -51,6 +50,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -209,14 +209,11 @@ class ContractServiceTest {
 
     @ParameterizedTest
     @MethodSource("premiumConversionCases")
-    @DisplayName("납입주기에 따라 주기별 보험료와 환산 코드를 계산한다")
-    void createContractCalculatesPremiumByPaymentCycle(
-            PaymentCycleCode paymentCycleCode,
-            String expectedPremiumPerCycleAmount,
-            PremiumConversionRuleCode expectedRuleCode
-    ) {
+    @DisplayName("지원 납입주기에서 화면의 주기 보험료를 그대로 저장한다")
+    void createContractKeepsDirectPremiumByPaymentCycle(PaymentCycleCode paymentCycleCode) {
         ContractCreateRequest request = createRequest();
         request.setPaymentCycleCode(paymentCycleCode);
+        request.setPremiumPerCycleAmount(new BigDecimal("275000"));
         givenValidReferences(request);
         given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(false);
@@ -227,6 +224,8 @@ class ContractServiceTest {
         });
         given(scheduleService.generateSchedules(any(InsuranceContract.class)))
                 .willReturn(new ScheduleGenerationResult(List.of(100L, 101L), 3));
+        given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.INSURER_TO_GA)).willReturn(true);
+        given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.GA_TO_FC)).willReturn(true);
 
         ContractCreateResponse response = contractService.createContract(request);
 
@@ -235,20 +234,26 @@ class ContractServiceTest {
         InsuranceContract saved = captor.getValue();
         assertThat(saved.getMonthlyEquivalentFirstPremium()).isEqualByComparingTo("100000");
         assertThat(saved.getPremiumPerCycleAmount())
-                .isEqualByComparingTo(expectedPremiumPerCycleAmount);
-        assertThat(saved.getPremiumConversionRuleCode()).isEqualTo(expectedRuleCode);
+                .isEqualByComparingTo("275000");
+        assertThat(saved.getPremiumConversionRuleCode()).isEqualTo(PremiumConversionRuleCode.DIRECT_INPUT);
         assertThat(saved.getDataOrigin()).isEqualTo(DataOrigin.MANUAL);
         assertThat(response.contractId()).isEqualTo(21L);
         assertThat(response.scheduleHeaderIds()).containsExactly(100L, 101L);
         verify(scheduleService).generateSchedules(saved);
+        ArgumentCaptor<CapCalculationCommand> capCaptor =
+                ArgumentCaptor.forClass(CapCalculationCommand.class);
+        verify(capCheckService, times(2)).calculateAndSave(capCaptor.capture());
+        assertThat(capCaptor.getAllValues())
+                .extracting(CapCalculationCommand::paymentStage)
+                .containsExactly(PaymentStage.INSURER_TO_GA, PaymentStage.GA_TO_FC);
     }
 
     @ParameterizedTest
     @EnumSource(
             value = PaymentCycleCode.class,
-            names = {"SINGLE", "OTHER"}
+            names = {"OTHER"}
     )
-    @DisplayName("역산을 지원하지 않는 납입주기는 계약 생성을 거절한다")
+    @DisplayName("화면에서 지원하지 않는 기타 납입주기는 계약 생성을 거절한다")
     void createContractRejectsUnsupportedPaymentCycle(PaymentCycleCode paymentCycleCode) {
         ContractCreateRequest request = createRequest();
         request.setPaymentCycleCode(paymentCycleCode);
@@ -287,6 +292,8 @@ class ContractServiceTest {
         given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(false);
         given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
+        given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
+                .willReturn(List.of(200L, 201L));
 
         ContractUpdateResponse response = contractService.updateContract(21L, request);
 
@@ -310,6 +317,8 @@ class ContractServiceTest {
         given(contractMapper.selectContractById(21L)).willReturn(current);
         givenValidReferences(request);
         given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
+        given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
+                .willReturn(List.of(200L, 201L));
 
         contractService.updateContract(21L, request);
 
@@ -437,28 +446,13 @@ class ContractServiceTest {
         )).willReturn(true);
     }
 
-    private static Stream<Arguments> premiumConversionCases() {
+    private static Stream<PaymentCycleCode> premiumConversionCases() {
         return Stream.of(
-                Arguments.of(
-                        PaymentCycleCode.MONTHLY,
-                        "100000",
-                        PremiumConversionRuleCode.MONTHLY_AS_IS
-                ),
-                Arguments.of(
-                        PaymentCycleCode.QUARTERLY,
-                        "300000",
-                        PremiumConversionRuleCode.MONTHLY_TO_QUARTERLY_X3
-                ),
-                Arguments.of(
-                        PaymentCycleCode.SEMI_ANNUAL,
-                        "600000",
-                        PremiumConversionRuleCode.MONTHLY_TO_SEMI_ANNUAL_X6
-                ),
-                Arguments.of(
-                        PaymentCycleCode.ANNUAL,
-                        "1200000",
-                        PremiumConversionRuleCode.MONTHLY_TO_ANNUAL_X12
-                )
+                PaymentCycleCode.MONTHLY,
+                PaymentCycleCode.QUARTERLY,
+                PaymentCycleCode.SEMI_ANNUAL,
+                PaymentCycleCode.ANNUAL,
+                PaymentCycleCode.SINGLE
         );
     }
 
@@ -466,6 +460,7 @@ class ContractServiceTest {
         return new ContractCreateRequest(
                 1L, "TEST-001", 1L, LocalDate.now(), ACTIVE,
                 1L, 4L, MONTHLY,
+                new BigDecimal("100000"),
                 new BigDecimal("100000"), new BigDecimal("100000"),
                 120, new BigDecimal("50000")
         );
@@ -481,6 +476,7 @@ class ContractServiceTest {
                 1L,
                 4L,
                 MONTHLY,
+                new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 120,

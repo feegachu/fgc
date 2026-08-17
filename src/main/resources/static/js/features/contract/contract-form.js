@@ -1,359 +1,369 @@
-var insurerSelect = document.getElementById("insurer");
-var offeringSelect = document.getElementById("offering");
-var agentSelect = document.getElementById("agent");
-var organizationInput = document.getElementById("org");
-var organizationIdInput = document.getElementById("organizationId");
-var apiClient = window.FgcUi && window.FgcUi.apiClient;
-var contractForm = document.querySelector("[data-contract-form]");
-var formMode = contractForm ? contractForm.dataset.mode : "create";
-var editingContractId = contractForm ? contractForm.dataset.contractId : "";
-var editingContract = null;
+(function () {
+  "use strict";
 
-insurerSelect.addEventListener("change", function () {
-    var insurerId = insurerSelect.value;
+  var form = document.querySelector("#contract-form");
+  if (!form) return;
 
-    offeringSelect.disabled = true;
+  var contractApi = window.FgcUi && window.FgcUi.contractApi;
+  if (!contractApi) return;
 
-    if (!insurerId) {
-        offeringSelect.innerHTML =
-            '<option value="">보험회사를 먼저 선택하세요</option>';
-        return;
+  var elements = {
+    insurerId: document.querySelector("#insurer-id"),
+    productOfferingId: document.querySelector("#product-offering-id"),
+    contractNo: document.querySelector("#contract-no"),
+    contractDate: document.querySelector("#contract-date"),
+    contractStatus: document.querySelector("#contract-status"),
+    agentId: document.querySelector("#agent-id"),
+    organizationId: document.querySelector("#organization-id"),
+    organizationName: document.querySelector("#organization-name"),
+    paymentCycleCode: document.querySelector("#payment-cycle-code"),
+    premiumPerCycleAmount: document.querySelector("#premium-per-cycle-amount"),
+    firstPremiumAmount: document.querySelector("#first-premium-amount"),
+    monthlyEquivalentFirstPremium: document.querySelector("#monthly-equivalent-first-premium"),
+    paymentTermMonths: document.querySelector("#payment-term-months"),
+    standardSurrenderDeductionAmount: document.querySelector("#standard-surrender-deduction-amount")
+  };
+  var saveButton = document.querySelector("#contract-save-button");
+  var saveHint = document.querySelector("#contract-save-hint");
+  var errorSummary = document.querySelector("#contract-form-error-summary");
+  var errorMessage = document.querySelector("#contract-form-error-message");
+  var requestIdMessage = document.querySelector("#contract-form-request-id");
+  var isEditMode = form.dataset.mode === "edit";
+  var contractId = form.dataset.contractId || null;
+  var isInitializing = true;
+  var isLoadingProducts = false;
+  var isLoadingAgents = false;
+  var isSubmitting = false;
+  var productRequestSequence = 0;
+  var agentRequestSequence = 0;
+
+  function today() {
+    var date = new Date();
+    var localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 10);
+  }
+
+  function pageContent(pageResponse) {
+    return pageResponse && Array.isArray(pageResponse.content) ? pageResponse.content : [];
+  }
+
+  function replaceOptions(select, placeholder, items, optionFactory) {
+    select.replaceChildren();
+    var placeholderOption = document.createElement("option");
+    placeholderOption.value = "";
+    placeholderOption.textContent = placeholder;
+    select.appendChild(placeholderOption);
+    items.forEach(function (item) { select.appendChild(optionFactory(item)); });
+  }
+
+  function option(value, label) {
+    var item = document.createElement("option");
+    item.value = String(value);
+    item.textContent = label;
+    return item;
+  }
+
+  function ensureOption(select, value, label) {
+    if (value === null || value === undefined || value === "") return;
+    var stringValue = String(value);
+    var exists = Array.from(select.options).some(function (item) { return item.value === stringValue; });
+    if (!exists) select.appendChild(option(stringValue, label || stringValue));
+    select.value = stringValue;
+  }
+
+  function setFieldError(field, message) {
+    var fieldContainer = document.querySelector('[data-field="' + field + '"]');
+    var fieldError = document.querySelector('[data-field-error="' + field + '"]');
+    if (fieldContainer) fieldContainer.classList.toggle("is-error", Boolean(message));
+    if (fieldError) fieldError.textContent = message || "";
+  }
+
+  function clearFieldError(field) {
+    setFieldError(field, "");
+  }
+
+  function clearErrors() {
+    Object.keys(elements).forEach(clearFieldError);
+    errorSummary.hidden = true;
+    errorMessage.textContent = "";
+    requestIdMessage.hidden = true;
+    requestIdMessage.textContent = "";
+  }
+
+  function showError(error, fallbackMessage) {
+    var message = error && error.message ? error.message : fallbackMessage;
+    if (error && error.code === "FGC-CONT-001") message = "이미 계약이 존재합니다.";
+    if (error && error.field && Object.prototype.hasOwnProperty.call(elements, error.field)) {
+      setFieldError(error.field, message);
+      var target = elements[error.field];
+      if (target && target.type !== "hidden") target.focus();
+    }
+    errorMessage.textContent = message;
+    if (error && error.requestId) {
+      requestIdMessage.textContent = "요청 ID: " + error.requestId;
+      requestIdMessage.hidden = false;
+    }
+    errorSummary.hidden = false;
+    errorSummary.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function setOrganizationFromAgent() {
+    var selected = elements.agentId.selectedOptions[0];
+    elements.organizationId.value = selected ? selected.dataset.organizationId || "" : "";
+    elements.organizationName.value = selected ? selected.dataset.organizationName || "" : "";
+    clearFieldError("agentId");
+    clearFieldError("organizationId");
+    updateSaveState();
+  }
+
+  function updateSaveState() {
+    var requiredElements = [
+      elements.insurerId,
+      elements.productOfferingId,
+      elements.contractNo,
+      elements.contractDate,
+      elements.contractStatus,
+      elements.agentId,
+      elements.paymentCycleCode,
+      elements.premiumPerCycleAmount,
+      elements.firstPremiumAmount,
+      elements.monthlyEquivalentFirstPremium,
+      elements.paymentTermMonths
+    ];
+    var hasRequiredValues = requiredElements.every(function (element) {
+      return element && element.value !== "" && element.checkValidity();
+    }) && elements.organizationId.value !== "" && form.checkValidity();
+    var isBusy = isInitializing || isLoadingProducts || isLoadingAgents || isSubmitting;
+    saveButton.disabled = !hasRequiredValues || isBusy;
+
+    if (isSubmitting) saveHint.textContent = "계약과 스케줄을 저장하고 있습니다.";
+    else if (isInitializing || isLoadingProducts || isLoadingAgents) saveHint.textContent = "기준정보를 불러오는 중입니다.";
+    else if (hasRequiredValues) saveHint.textContent = "저장할 준비가 되었습니다.";
+    else saveHint.textContent = "필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.";
+  }
+
+  function loadInsurers(selectedId, fallbackLabel) {
+    elements.insurerId.disabled = true;
+    return contractApi.getInsurers().then(function (envelope) {
+      var insurers = pageContent(envelope.data);
+      replaceOptions(elements.insurerId, "보험회사를 선택하세요", insurers, function (insurer) {
+        var item = option(insurer.insurerId, insurer.insurerName + " (" + insurer.insurerCode + ")");
+        item.disabled = insurer.activeYn === false && String(insurer.insurerId) !== String(selectedId || "");
+        return item;
+      });
+      ensureOption(elements.insurerId, selectedId, fallbackLabel);
+      elements.insurerId.disabled = false;
+    });
+  }
+
+  function loadProducts(selectedId, fallbackLabel) {
+    var insurerId = elements.insurerId.value;
+    var contractDate = elements.contractDate.value;
+    var requestSequence = ++productRequestSequence;
+    elements.productOfferingId.value = "";
+    elements.productOfferingId.disabled = true;
+
+    if (!insurerId || !contractDate) {
+      replaceOptions(elements.productOfferingId, "보험회사와 계약일을 먼저 선택하세요", [], option);
+      isLoadingProducts = false;
+      updateSaveState();
+      return Promise.resolve();
     }
 
-    loadOfferings(insurerId);
-});
+    isLoadingProducts = true;
+    replaceOptions(elements.productOfferingId, "상품 판매버전을 불러오는 중...", [], option);
+    updateSaveState();
+    return contractApi.getProductOfferings(insurerId, contractDate).then(function (envelope) {
+      if (requestSequence !== productRequestSequence) return;
+      var products = pageContent(envelope.data);
+      replaceOptions(elements.productOfferingId,
+        products.length ? "상품 판매버전을 선택하세요" : "판매 가능한 상품이 없습니다.",
+        products,
+        function (product) {
+          return option(product.productOfferingId, product.productName + " · " + product.offeringVersion);
+        });
+      ensureOption(elements.productOfferingId, selectedId, fallbackLabel);
+      elements.productOfferingId.disabled = products.length === 0 && !selectedId;
+    }).catch(function (error) {
+      if (requestSequence !== productRequestSequence) return;
+      replaceOptions(elements.productOfferingId, "상품을 불러오지 못했습니다.", [], option);
+      showError(error, "상품 판매버전을 불러오지 못했습니다.");
+    }).finally(function () {
+      if (requestSequence === productRequestSequence) {
+        isLoadingProducts = false;
+        updateSaveState();
+      }
+    });
+  }
 
-agentSelect.addEventListener("change", function () {
-    var option = agentSelect.selectedOptions[0];
-    organizationInput.value = option ? option.dataset.organizationName || "" : "";
-    organizationIdInput.value = option ? option.dataset.organizationId || "" : "";
-});
+  function loadAgents(selectedId, fallbackAgent) {
+    var contractDate = elements.contractDate.value;
+    var requestSequence = ++agentRequestSequence;
+    elements.agentId.value = "";
+    elements.organizationId.value = "";
+    elements.organizationName.value = "";
+    elements.agentId.disabled = true;
 
-function pageContent(envelope) {
-    return envelope && envelope.data && Array.isArray(envelope.data.content)
-        ? envelope.data.content
-        : [];
-}
-
-function loadAllPages(path, parameters) {
-    var pageSize = 100;
-
-    function requestPage(page) {
-        var query = new URLSearchParams(parameters || {});
-        query.set("page", String(page));
-        query.set("size", String(pageSize));
-        return apiClient.request(path + "?" + query.toString());
+    if (!contractDate) {
+      replaceOptions(elements.agentId, "계약일을 먼저 선택하세요", [], option);
+      isLoadingAgents = false;
+      updateSaveState();
+      return Promise.resolve();
     }
 
-    return requestPage(1).then(function (firstEnvelope) {
-        var firstPage = firstEnvelope && firstEnvelope.data ? firstEnvelope.data : {};
-        var totalPages = Math.max(1, Number(firstPage.totalPages) || 1);
-        var requests = [];
-        for (var page = 2; page <= totalPages; page += 1) {
-            requests.push(requestPage(page));
+    isLoadingAgents = true;
+    replaceOptions(elements.agentId, "설계사를 불러오는 중...", [], option);
+    updateSaveState();
+    return contractApi.getAgents(contractDate).then(function (envelope) {
+      if (requestSequence !== agentRequestSequence) return;
+      var agents = pageContent(envelope.data);
+      replaceOptions(elements.agentId,
+        agents.length ? "모집 설계사를 선택하세요" : "선택 가능한 설계사가 없습니다.",
+        agents,
+        function (agent) {
+          var item = option(agent.agentId, agent.agentName + " (" + agent.agentCode + ")");
+          item.dataset.organizationId = agent.organizationId;
+          item.dataset.organizationName = agent.organizationName;
+          return item;
+        });
+      if (selectedId) {
+        ensureOption(elements.agentId, selectedId,
+          fallbackAgent ? fallbackAgent.agentName : String(selectedId));
+        var selected = elements.agentId.selectedOptions[0];
+        if (fallbackAgent && selected) {
+          selected.dataset.organizationId = fallbackAgent.organizationId;
+          selected.dataset.organizationName = fallbackAgent.organizationName;
         }
-        return Promise.all(requests).then(function (remainingEnvelopes) {
-            return remainingEnvelopes.reduce(function (all, envelope) {
-                return all.concat(pageContent(envelope));
-            }, pageContent(firstEnvelope));
-        });
+        setOrganizationFromAgent();
+      }
+      elements.agentId.disabled = agents.length === 0 && !selectedId;
+    }).catch(function (error) {
+      if (requestSequence !== agentRequestSequence) return;
+      replaceOptions(elements.agentId, "설계사를 불러오지 못했습니다.", [], option);
+      showError(error, "모집 설계사를 불러오지 못했습니다.");
+    }).finally(function () {
+      if (requestSequence === agentRequestSequence) {
+        isLoadingAgents = false;
+        updateSaveState();
+      }
     });
-}
+  }
 
-function referenceDate() {
-    var value = document.getElementById("contractDate").value;
-    return value || todayText();
-}
+  function fillContract(contract) {
+    elements.contractNo.value = contract.contractNo || "";
+    elements.contractDate.value = contract.contractDate || "";
+    elements.contractStatus.value = contract.contractStatus || "ACTIVE";
+    elements.paymentCycleCode.value = contract.paymentCycleCode || "MONTHLY";
+    elements.premiumPerCycleAmount.value = contract.premiumPerCycleAmount ?? "";
+    elements.firstPremiumAmount.value = contract.firstPremiumAmount ?? "";
+    elements.monthlyEquivalentFirstPremium.value = contract.monthlyEquivalentFirstPremium ?? "";
+    elements.paymentTermMonths.value = contract.paymentTermMonths ?? "";
+    elements.standardSurrenderDeductionAmount.value = contract.standardSurrenderDeductionAmount ?? "";
+  }
 
-function loadInsurers(selectedId) {
-    if (!apiClient) return Promise.resolve();
-    insurerSelect.disabled = true;
-    return loadAllPages("/api/v1/base/insurers")
-        .then(function (insurers) { renderInsurers(insurers, selectedId); })
-        .catch(function (error) { showError(error); });
-}
+  function initializeCreateForm() {
+    elements.contractDate.value = today();
+    return Promise.all([loadInsurers(), loadAgents()]);
+  }
 
-function loadOfferings(insurerId, selectedId) {
-    if (!apiClient) return Promise.resolve();
-    offeringSelect.disabled = true;
-    offeringSelect.innerHTML = '<option value="">상품을 불러오는 중입니다.</option>';
-    return loadAllPages("/api/v1/base/products", {
-        insurerId: insurerId,
-        asOf: referenceDate()
-    })
-        .then(function (offerings) { renderOfferings(offerings, selectedId); })
-        .catch(function (error) {
-            offeringSelect.innerHTML = '<option value="">상품을 불러오지 못했습니다.</option>';
-            showError(error);
-        })
-        .finally(updateSaveButton);
-}
-
-function loadAgents(selectedId) {
-    if (!apiClient) return Promise.resolve();
-    agentSelect.disabled = true;
-    return loadAllPages("/api/v1/base/agents", { asOf: referenceDate() })
-        .then(function (agents) { renderAgents(agents, selectedId); })
-        .catch(function (error) { showError(error); });
-}
-
-function renderInsurers(insurers, selectedId) {
-    insurerSelect.replaceChildren();
-    var placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "보험회사를 선택하세요";
-    insurerSelect.appendChild(placeholder);
-
-    insurers.forEach(function (insurer) {
-        var option = document.createElement("option");
-        option.value = insurer.insurerId;
-        option.textContent = insurer.insurerCode + " · " + insurer.insurerName;
-        option.disabled = insurer.activeYn === false;
-        option.selected = String(insurer.insurerId) === String(selectedId || "");
-        insurerSelect.appendChild(option);
+  function initializeEditForm() {
+    if (!contractId) return Promise.reject(new Error("수정할 계약 ID가 없습니다."));
+    return contractApi.getContract(contractId).then(function (envelope) {
+      var contract = envelope.data;
+      fillContract(contract);
+      return loadInsurers(contract.insurerId, contract.insurerName).then(function () {
+        return Promise.all([
+          loadProducts(contract.productOfferingId,
+            contract.productName + (contract.offeringVersion ? " · " + contract.offeringVersion : "")),
+          loadAgents(contract.agentId, {
+            agentName: contract.agentName,
+            organizationId: contract.organizationId,
+            organizationName: contract.organizationName
+          })
+        ]);
+      });
     });
-    insurerSelect.disabled = false;
-}
+  }
 
-function renderAgents(agents, selectedId) {
-    agentSelect.replaceChildren();
-    var placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "설계사를 선택하세요";
-    agentSelect.appendChild(placeholder);
+  function numberValue(element) {
+    return element.value === "" ? null : Number(element.value);
+  }
 
-    agents.filter(function (agent) {
-        return agent.activeYn !== false && agent.agentStatus === "ACTIVE";
-    }).forEach(function (agent) {
-        var option = document.createElement("option");
-        option.value = agent.agentId;
-        option.textContent = agent.agentCode + " · " + agent.agentName;
-        option.dataset.organizationId = agent.organizationId;
-        option.dataset.organizationName = agent.organizationName;
-        option.selected = String(agent.agentId) === String(selectedId || "");
-        agentSelect.appendChild(option);
-    });
-    agentSelect.disabled = false;
-    if (selectedId) {
-        var selected = agentSelect.selectedOptions[0];
-        organizationInput.value = selected ? selected.dataset.organizationName || "" : "";
-        organizationIdInput.value = selected ? selected.dataset.organizationId || "" : "";
-    }
-}
-
-function renderOfferings(offerings, selectedId) {
-    offeringSelect.replaceChildren();
-
-    var placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "상품을 선택하세요";
-    offeringSelect.appendChild(placeholder);
-
-    offerings.forEach(function (offering) {
-        var option = document.createElement("option");
-
-        option.value = offering.productOfferingId;
-        option.textContent =
-            offering.productName + " · " + offering.offeringVersion;
-        option.selected = String(offering.productOfferingId) === String(selectedId || "");
-
-        offeringSelect.appendChild(option);
-    });
-
-    offeringSelect.disabled = offerings.length === 0;
-}
-
-var paymentCycleSelect = document.getElementById("cycle");
-var premiumPerCycleInput = document.getElementById("premiumPerCycle");
-var monthlyEquivalentInput = document.getElementById("monthlyEquiv");
-var limitFormula = document.getElementById("limit-formula");
-var limitPreview = document.getElementById("limit-preview");
-
-var PAYMENT_CYCLE_MONTHS = {
-    MONTHLY: 1,
-    QUARTERLY: 3,
-    SEMI_ANNUAL: 6,
-    ANNUAL: 12
-};
-
-function parseWon(value) {
-    var amount = Number(value);
-    return Number.isFinite(amount) && amount >= 0 ? amount : 0;
-}
-
-function formatWon(value) {
-    return Math.round(value).toLocaleString("ko-KR");
-}
-
-function updatePremiums() {
-    var monthlyEquivalent = parseWon(monthlyEquivalentInput.value);
-    var cycleMonths = PAYMENT_CYCLE_MONTHS[paymentCycleSelect.value];
-
-    // 일시납·기타는 정해진 월 환산 배수가 없으므로 기존 주기 보험료를 유지한다.
-    if (cycleMonths) {
-        premiumPerCycleInput.value = String(Math.round(monthlyEquivalent * cycleMonths));
-    }
-
-    if (limitFormula) {
-        limitFormula.textContent = formatWon(monthlyEquivalent) + " × 12";
-    }
-    if (limitPreview) {
-        limitPreview.textContent = formatWon(monthlyEquivalent * 12);
-    }
-}
-
-if (paymentCycleSelect && premiumPerCycleInput && monthlyEquivalentInput) {
-    paymentCycleSelect.addEventListener("change", updatePremiums);
-    monthlyEquivalentInput.addEventListener("input", updatePremiums);
-    updatePremiums();
-}
-
-var saveButton = document.getElementById("save-btn");
-var saveHint = document.getElementById("save-hint");
-var contractDateInput = document.getElementById("contractDate");
-var submitting = false;
-
-function todayText() {
-    var now = new Date();
-    var local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    return local.toISOString().slice(0, 10);
-}
-
-function isFormReady() {
-    return contractForm.checkValidity() && organizationIdInput.value !== "";
-}
-
-function updateSaveButton() {
-    var ready = isFormReady();
-    saveButton.disabled = submitting || !ready;
-    saveHint.textContent = submitting
-        ? "계약과 예상 스케줄을 저장하고 있습니다."
-        : ready
-            ? "저장하면 예상 스케줄이 같은 트랜잭션에서 생성됩니다."
-            : "필수 항목(*)을 모두 채우면 저장 버튼이 켜집니다.";
-}
-
-function optionalNumber(input) {
-    return input.value === "" ? null : Number(input.value);
-}
-
-function setValue(id, value) {
-    var element = document.getElementById(id);
-    if (element) element.value = value == null ? "" : String(value);
-}
-
-function populateContract(contract) {
-    setValue("contractNo", contract.contractNo);
-    setValue("contractDate", contract.contractDate);
-    setValue("status", contract.contractStatus);
-    setValue("cycle", contract.paymentCycleCode);
-    setValue("premiumPerCycle", contract.premiumPerCycleAmount);
-    setValue("firstPremium", contract.firstPremiumAmount);
-    setValue("monthlyEquiv", contract.monthlyEquivalentFirstPremium);
-    setValue("termMonths", contract.paymentTermMonths);
-    setValue("stdDeduction", contract.standardSurrenderDeductionAmount);
-    organizationIdInput.value = contract.organizationId == null ? "" : String(contract.organizationId);
-    updatePremiums();
-}
-
-function initializeEditForm() {
-    if (formMode !== "edit" || !editingContractId) return Promise.resolve(false);
-    return apiClient.request("/api/v1/contracts/" + encodeURIComponent(editingContractId))
-        .then(function (envelope) {
-            editingContract = envelope.data || {};
-            populateContract(editingContract);
-            return Promise.all([
-                loadInsurers(editingContract.insurerId),
-                loadAgents(editingContract.agentId)
-            ]);
-        })
-        .then(function () {
-            return loadOfferings(editingContract.insurerId, editingContract.productOfferingId);
-        })
-        .then(function () {
-            updateSaveButton();
-            return true;
-        });
-}
-
-function requestBody() {
+  function requestBody() {
     return {
-        insurerId: Number(insurerSelect.value),
-        contractNo: document.getElementById("contractNo").value.trim(),
-        productOfferingId: Number(offeringSelect.value),
-        contractDate: contractDateInput.value,
-        contractStatus: document.getElementById("status").value,
-        agentId: Number(agentSelect.value),
-        organizationId: Number(organizationIdInput.value),
-        paymentCycleCode: paymentCycleSelect.value,
-        firstPremiumAmount: Number(document.getElementById("firstPremium").value),
-        monthlyEquivalentFirstPremium: Number(monthlyEquivalentInput.value),
-        paymentTermMonths: Number(document.getElementById("termMonths").value),
-        standardSurrenderDeductionAmount: optionalNumber(document.getElementById("stdDeduction"))
+      insurerId: Number(elements.insurerId.value),
+      productOfferingId: Number(elements.productOfferingId.value),
+      contractNo: elements.contractNo.value.trim(),
+      contractDate: elements.contractDate.value,
+      contractStatus: elements.contractStatus.value,
+      agentId: Number(elements.agentId.value),
+      organizationId: Number(elements.organizationId.value),
+      paymentCycleCode: elements.paymentCycleCode.value,
+      premiumPerCycleAmount: numberValue(elements.premiumPerCycleAmount),
+      firstPremiumAmount: numberValue(elements.firstPremiumAmount),
+      monthlyEquivalentFirstPremium: numberValue(elements.monthlyEquivalentFirstPremium),
+      paymentTermMonths: numberValue(elements.paymentTermMonths),
+      standardSurrenderDeductionAmount: numberValue(elements.standardSurrenderDeductionAmount)
     };
-}
+  }
 
-function showError(error) {
-    var message = error && error.message ? error.message : "계약을 저장하지 못했습니다.";
-    var field = error && (error.field || (error.params && error.params.field));
-    if (error && error.code === "FGC-CONT-001") {
-        message = "이미 계약이 존재합니다.";
-    } else if (field) {
-        message = "입력값을 확인하세요: " + field;
-    } else {
-        message = message.replace("({field})", "");
+  function handleReferenceChange(event) {
+    clearFieldError(event.target.name);
+    if (event.target === elements.insurerId) loadProducts();
+    if (event.target === elements.contractDate) {
+      clearFieldError("productOfferingId");
+      clearFieldError("agentId");
+      clearFieldError("organizationId");
+      loadProducts();
+      loadAgents();
     }
-    if (window.FgcUi && window.FgcUi.toast) {
-        window.FgcUi.toast(message, "error");
-    } else {
-        saveHint.textContent = message;
-    }
-}
+    if (event.target === elements.agentId) setOrganizationFromAgent();
+    updateSaveState();
+  }
 
-if (contractForm && saveButton && saveHint) {
-    contractDateInput.max = todayText();
-    contractDateInput.addEventListener("change", function () {
-        loadAgents();
-        if (insurerSelect.value) loadOfferings(insurerSelect.value);
+  function handleInput(event) {
+    clearFieldError(event.target.name);
+    updateSaveState();
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    clearErrors();
+    updateSaveState();
+    if (saveButton.disabled) {
+      form.reportValidity();
+      showError(null, "필수 항목과 입력 범위를 확인해 주세요.");
+      return;
+    }
+
+    isSubmitting = true;
+    saveButton.classList.add("is-loading");
+    updateSaveState();
+    var operation = isEditMode
+      ? contractApi.updateContract(contractId, requestBody())
+      : contractApi.createContract(requestBody());
+
+    operation.then(function (envelope) {
+      window.location.assign("/contracts/" + encodeURIComponent(envelope.data.contractId));
+    }).catch(function (error) {
+      showError(error, "보험계약을 저장하지 못했습니다.");
+    }).finally(function () {
+      isSubmitting = false;
+      saveButton.classList.remove("is-loading");
+      updateSaveState();
     });
-    contractForm.addEventListener("input", updateSaveButton);
-    contractForm.addEventListener("change", updateSaveButton);
-    contractForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        if (!isFormReady()) {
-            contractForm.reportValidity();
-            updateSaveButton();
-            return;
-        }
-        if (!apiClient || submitting) return;
+  }
 
-        submitting = true;
-        updateSaveButton();
-        var requestUrl = formMode === "edit"
-            ? "/api/v1/contracts/" + encodeURIComponent(editingContractId)
-            : "/api/v1/contracts";
-        apiClient.request(requestUrl, {
-            method: formMode === "edit" ? "PUT" : "POST",
-            body: requestBody()
-        }).then(function (envelope) {
-            var data = envelope.data || {};
-            var scheduleIds = Array.isArray(data.scheduleHeaderIds) ? data.scheduleHeaderIds : [];
-            window.location.assign(formMode === "edit"
-                ? "/contracts/" + encodeURIComponent(data.contractId || editingContractId)
-                : scheduleIds.length > 0
-                    ? "/schedules/" + encodeURIComponent(scheduleIds[0])
-                    : "/contracts/" + encodeURIComponent(data.contractId));
-        }).catch(function (error) {
-            submitting = false;
-            updateSaveButton();
-            showError(error);
-        });
-    });
-    if (formMode === "edit") {
-        initializeEditForm().catch(showError);
-    } else {
-        loadInsurers();
-        loadAgents();
-    }
-    updateSaveButton();
-}
+  elements.contractDate.max = today();
+  form.addEventListener("input", handleInput);
+  form.addEventListener("change", handleReferenceChange);
+  form.addEventListener("submit", handleSubmit);
+
+  var initialization = isEditMode ? initializeEditForm() : initializeCreateForm();
+  initialization.catch(function (error) {
+    showError(error, "계약 입력 화면을 준비하지 못했습니다.");
+  }).finally(function () {
+    isInitializing = false;
+    updateSaveState();
+  });
+})();

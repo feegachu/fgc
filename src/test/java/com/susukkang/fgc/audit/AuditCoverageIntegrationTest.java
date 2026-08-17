@@ -60,12 +60,15 @@ class AuditCoverageIntegrationTest {
                 PaymentCycleCode.MONTHLY,
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
+                new BigDecimal("100000"),
                 120,
                 BigDecimal.ZERO
         );
 
         ContractCreateResponse created = contractService.createContract(createRequest);
 
+        assertThat(created.scheduleHeaderIds()).hasSize(2);
+        assertThat(realtimeCapCheckCount(created.contractId())).isEqualTo(2);
         assertThat(auditCount("CONTRACT_CREATED", "CONTRACT", String.valueOf(created.contractId())))
                 .isEqualTo(1);
         String afterValue = jdbcTemplate.queryForObject("""
@@ -85,6 +88,7 @@ class AuditCoverageIntegrationTest {
                 PaymentCycleCode.MONTHLY,
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
+                new BigDecimal("100000"),
                 120,
                 BigDecimal.ZERO
         );
@@ -98,6 +102,16 @@ class AuditCoverageIntegrationTest {
                 """, String.valueOf(created.contractId()));
         assertThat((String) updatedAudit.get("before_value")).contains("ACTIVE");
         assertThat((String) updatedAudit.get("after_value")).contains("LAPSED");
+    }
+
+    private int realtimeCapCheckCount(Long contractId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.cap_check
+                 WHERE contract_id = ?
+                   AND check_kind = 'REALTIME'
+                """, Integer.class, contractId);
+        return count == null ? 0 : count;
     }
 
     // ARBITRAGE_RECHECKED 는 실DB 통합으로 검증하지 않는다 — 검증 실행 생성이

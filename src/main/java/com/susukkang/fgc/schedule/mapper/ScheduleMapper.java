@@ -104,6 +104,9 @@ public interface ScheduleMapper {
             @Param("paymentStage") PaymentStage paymentStage
     );
 
+    /** 계약 수정 시 새 버전으로 교체할 활성 운영 스케줄 ID를 조회한다. */
+    List<Long> selectActiveOperationalScheduleIds(@Param("contractId") Long contractId);
+
     ScheduleDetailResponse selectByContractIdAndPaymentStage(
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage
