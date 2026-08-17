@@ -501,6 +501,8 @@ public class ContractService {
     ) {
         return !Objects.equals(current.getProductOfferingId(), updated.getProductOfferingId())
                 || !Objects.equals(current.getContractDate(), updated.getContractDate())
+                || !Objects.equals(current.getAgentId(), updated.getAgentId())
+                || !Objects.equals(current.getOrganizationId(), updated.getOrganizationId())
                 || !Objects.equals(current.getPaymentCycleCode(), updated.getPaymentCycleCode())
                 || moneyChanged(current.getFirstPremiumAmount(), updated.getFirstPremiumAmount())
                 || moneyChanged(

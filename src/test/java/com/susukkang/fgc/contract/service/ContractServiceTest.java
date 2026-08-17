@@ -366,6 +366,24 @@ class ContractServiceTest {
     }
 
     @Test
+    @DisplayName("모집설계사가 변경되면 수령자를 다시 계산하도록 스케줄을 재생성한다")
+    void updateContractRegeneratesSchedulesWhenAgentChanges() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = contractMatching(request, 99L, request.getOrganizationId());
+
+        assertScheduleRegeneratedForRecipientChange(request, current);
+    }
+
+    @Test
+    @DisplayName("조직이 변경되면 관리자 수령자를 다시 계산하도록 스케줄을 재생성한다")
+    void updateContractRegeneratesSchedulesWhenOrganizationChanges() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = contractMatching(request, request.getAgentId(), 99L);
+
+        assertScheduleRegeneratedForRecipientChange(request, current);
+    }
+
+    @Test
     void updateContractRegistersReviewWhenCapRuleIsMissing() {
         ContractUpdateRequest request = updateRequest();
         InsuranceContract current = InsuranceContract.builder()
@@ -427,6 +445,47 @@ class ContractServiceTest {
 
         assertThatThrownBy(() -> contractService.updateContract(999L, updateRequest()))
                 .isInstanceOf(FgcBusinessException.class);
+    }
+
+    private void assertScheduleRegeneratedForRecipientChange(
+            ContractUpdateRequest request,
+            InsuranceContract current
+    ) {
+        given(contractMapper.selectContractById(21L)).willReturn(current);
+        givenValidReferences(request);
+        given(contractMapper.updateContract(any(InsuranceContract.class))).willReturn(1);
+        given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
+                .willReturn(List.of(101L, 102L));
+
+        ContractUpdateResponse response = contractService.updateContract(21L, request);
+
+        assertThat(response.scheduleHeaderIds()).containsExactly(101L, 102L);
+        assertThat(response.regeneratedScheduleIds()).containsExactly(101L, 102L);
+        verify(scheduleService).regenerateContractSchedules(21L, "CONTRACT_UPDATED");
+    }
+
+    private InsuranceContract contractMatching(
+            ContractUpdateRequest request,
+            Long agentId,
+            Long organizationId
+    ) {
+        return InsuranceContract.builder()
+                .contractId(21L)
+                .contractNo(request.getContractNo())
+                .insurerId(request.getInsurerId())
+                .productOfferingId(request.getProductOfferingId())
+                .contractDate(request.getContractDate())
+                .currentStatus(request.getContractStatus())
+                .agentId(agentId)
+                .organizationId(organizationId)
+                .paymentCycleCode(request.getPaymentCycleCode())
+                .premiumPerCycleAmount(request.getPremiumPerCycleAmount())
+                .firstPremiumAmount(request.getFirstPremiumAmount())
+                .monthlyEquivalentFirstPremium(request.getMonthlyEquivalentFirstPremium())
+                .paymentTermMonths(request.getPaymentTermMonths())
+                .standardSurrenderDeductionAmount(request.getStandardSurrenderDeductionAmount())
+                .dataOrigin(DataOrigin.SEED)
+                .build();
     }
 
     private void givenValidReferences(ContractInput request) {
