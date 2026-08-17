@@ -19,18 +19,25 @@ class ValidationTargetSelectionMapperIntegrationTest {
     @Autowired JdbcTemplate jdbcTemplate;
 
     /**
-     * FUN-042 데모 시드 기준 회귀 — insertTargets가 환급률표의 source_product_code(표준상품코드,
+     * FGC-FUN-042 데모 시드 기준 회귀 — insertTargets가 환급률표의 source_product_code(표준상품코드,
      * 시드데이터 명세서 §환급률표 필수 조합)를 product.standard_product_code와 비교해야 한다.
      * 보험사 상품코드(insurer_product_code)와 비교하던 버그에서는 전 계약이
      * "상품코드 불일치" REVIEW_REQUIRED로 빠져 하위 검증이 전부 비었다(대시보드 0건의 원인).
      */
     @Test
-    void insertTargetsSelectsSeedContractsByStandardProductCode() {
-        Long runId = insertValidationRun(LocalDate.of(2098, 1, 1));
+    void fgcFun042InsertTargetsSelectsSeedContractsByStandardProductCode() {
+        LocalDate validationMonth = LocalDate.of(2026, 7, 1);
+        Long runId = insertValidationRun(validationMonth);
 
-        int inserted = mapper.insertTargets(runId, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
+        int inserted = mapper.insertTargets(runId, validationMonth, LocalDate.of(2026, 7, 31));
 
         assertThat(inserted).isPositive();
+        List<String> selectedContractNos = jdbcTemplate.queryForList("""
+                SELECT ic.contract_no
+                  FROM fgc.validation_target vt
+                  JOIN fgc.insurance_contract ic ON ic.contract_id = vt.contract_id
+                 WHERE vt.validation_run_id = ? AND vt.selection_status = 'SELECTED'
+                """, String.class, runId);
         long selected = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM fgc.validation_target
                  WHERE validation_run_id = ? AND selection_status = 'SELECTED'
@@ -53,6 +60,13 @@ class ValidationTargetSelectionMapperIntegrationTest {
                         OR snapshot ->> 'insurerProductCode' IS NOT NULL)
                 """, Long.class, runId);
 
+        assertThat(selectedContractNos).containsExactlyInAnyOrder(
+                "FGC-FGL01-202607-0001",
+                "FGC-FGL01-202607-0002",
+                "FGC-FGL01-202607-0003",
+                "FGC-FGL01-202607-0004",
+                "FGC-FGL01-202607-0005",
+                "FGC-FGL02-202605-0001");
         assertThat(selected).isPositive();          // 시드의 정상 시나리오 계약이 선정돼야 한다
         assertThat(productCodeMismatch).isZero();   // 시드 정본 코드 체계에서 불일치는 없어야 한다
         assertThat(selectedWithoutTable).isZero();  // 선정 건은 환급률표가 반드시 배정된다
