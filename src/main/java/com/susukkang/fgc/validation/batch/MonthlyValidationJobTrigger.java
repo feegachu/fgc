@@ -87,6 +87,10 @@ public class MonthlyValidationJobTrigger {
     private JobExecution runOrWrap(Long validationRunId, JobParameters jobParameters) {
         // 단일 스레드 executor 안에서 상태를 재확인한다 — API guard(CREATED)와 이 재확인
         // 사이에 끼어든 중복 클릭은 여기서 걸러져 배치 메타에 쓰레기 FAILED 실행을 남기지 않는다.
+        // 의도된 절충: 거의 동시의 두 요청이 둘 다 202를 받을 수 있고, 진 쪽은 여기서 예외로
+        // 끝나 호출자에게 별도 에러가 가지 않는다 — 202는 "수락"의 약속일 뿐이고 화면 진실은
+        // IF-API-49 폴링이 보여주므로 사용자 관점의 결과는 동일하다(§3-2 VRUN-005 비고 참조).
+        // 원자적 클레임(조건부 UPDATE)은 배치 리스너의 transitionToRunning이 최종 방어한다.
         ValidationRunRow fresh = validationRunMapper.findById(validationRunId);
         if (fresh == null || !ValidationRunStatus.CREATED.name().equals(fresh.getStatus())) {
             throw new IllegalStateException("validation_run " + validationRunId + " 은 이미 기동됨(status="
