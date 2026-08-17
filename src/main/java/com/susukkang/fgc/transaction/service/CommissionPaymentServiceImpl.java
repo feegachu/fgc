@@ -18,6 +18,7 @@ import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
@@ -536,7 +537,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 개선: 요청 항목 ID·현금흐름을 교차 검증하고 지급액·귀속액은 HALF_UP 원 단위로 정규화
         validateSourceType(sourceType);
         validateMonthStart(settlementMonth);
-        requireAgent(agentId);
+        validateRecipientAgent(paymentStage, agentId);
         CommissionItemReference item = requireCommissionItem(
                 commissionItemId,
                 settlementMonth
@@ -544,6 +545,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         validateCashflowType(cashflowType, item);
         validatePaymentEvidence(evidenceRef, attributionRequests);
         validateAttributionMethodCompatibility(item.itemCode(), attributionRequests);
+        validateAttributionMethodsForPaymentStage(paymentStage, attributionRequests);
         validatePolicyVersion(policyVersionId);
         if (sourceContractId != null) {
             requireContract(sourceContractId, "contractId");
@@ -571,9 +573,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     paymentId,
                     index + 1,
                     sourceContractId,
-                    agentId,
-                    settlementMonth,
-                    paymentStage,
+                agentId,
+                settlementMonth,
+                paymentStage,
                     effectivePolicyVersionId,
                     attributionRequests.get(index)
             ));
@@ -672,6 +674,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 agentId,
                 settlementMonth,
                 request.attributionDate(),
+                paymentStage,
                 request.attributionMethod()
         );
         Long allocationPolicyId = resolveAllocationPolicy(
@@ -708,6 +711,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long agentId,
             LocalDate settlementMonth,
             LocalDate attributionDate,
+            PaymentStage paymentStage,
             AttributionMethod attributionMethod
     ) {
         if (attributionMethod == AttributionMethod.NEWCOMER_NON_CONTRACT) {
@@ -725,7 +729,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
 
         ContractReference target = requireContract(targetId, "attributedContractId");
-        if (!target.agentId().equals(agentId)) {
+        if (paymentStage == PaymentStage.GA_TO_FC && !target.agentId().equals(agentId)) {
             invalid("attributedContractId", "귀속계약의 설계사가 지급 대상 설계사와 다릅니다.");
         }
 
@@ -790,6 +794,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     ) {
         ExclusionType exclusionType = normalizeExclusionType(request.exclusionType());
         if (request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
+            if (paymentStage == PaymentStage.INSURER_TO_GA) {
+                invalid("attributionMethod", "원수사→GA 지급 건에는 신인 비계약 귀속을 사용할 수 없습니다.");
+            }
             if (request.inclusionDecisionStatus() == InclusionDecisionStatus.INCLUDED) {
                 invalid("inclusionDecisionStatus", "비계약 선지급 건은 산입 확정 상태로 저장할 수 없습니다.");
             }
@@ -1268,6 +1275,32 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private void requireAgent(Long agentId) {
         if (!mapper.existsAgent(agentId)) {
             invalid("agentId", "설계사를 찾을 수 없습니다.");
+        }
+    }
+
+    private void validateRecipientAgent(PaymentStage paymentStage, Long agentId) {
+        if (paymentStage == PaymentStage.GA_TO_FC) {
+            requireAgent(agentId);
+            return;
+        }
+        if (agentId != null) {
+            invalid("agentId", "원수사→GA 지급 건에는 수령 설계사를 지정할 수 없습니다.");
+        }
+    }
+
+    private void validateAttributionMethodsForPaymentStage(
+            PaymentStage paymentStage,
+            List<CommissionPaymentAttributionRequest> attributions
+    ) {
+        if (paymentStage != PaymentStage.INSURER_TO_GA) {
+            return;
+        }
+        for (CommissionPaymentAttributionRequest attribution : attributions) {
+            if (attribution.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || attribution.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD
+                    || attribution.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
+                invalid("attributionMethod", "원수사→GA 지급 건에는 설계사 지원 귀속방식을 사용할 수 없습니다.");
+            }
         }
     }
 

@@ -33,7 +33,7 @@ public record CommissionPaymentCreateRequest(
         @NotBlank @Pattern(regexp = "GA_MANUAL_PAYMENT") String sourceType,
         @NotBlank @Size(max = 160) String sourceBusinessKey,
         Long contractId,
-        @NotNull Long agentId,
+        Long agentId,
         @NotNull @Positive Long commissionItemId,
         @NotNull @DecimalMin("0.00") @Digits(integer = 13, fraction = 2) BigDecimal amount,
         @NotNull LocalDate settlementMonth,

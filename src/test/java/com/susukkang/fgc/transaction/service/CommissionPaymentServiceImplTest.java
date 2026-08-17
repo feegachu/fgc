@@ -204,6 +204,31 @@ class CommissionPaymentServiceImplTest {
         assertThat(attributionCaptor.getValue().get(0).getAttributionScope()).isEqualTo("AGENT");
     }
 
+    @Test
+    void createsInsurerToGaDraftWithoutRecipientAgent() {
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.existsPolicyVersion(3L)).willReturn(true);
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), null,
+                source.commissionItemId(), source.amount(), source.settlementMonth(),
+                source.cashflowType(), source.scheduledPaymentDate(), PaymentStage.INSURER_TO_GA,
+                source.allocationPolicyVersion(), source.attributions(), source.evidenceRef(), source.note()
+        );
+
+        service.create(request);
+
+        ArgumentCaptor<CommissionPaymentCommand> captor = ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(captor.capture());
+        assertThat(captor.getValue().getAgentId()).isNull();
+    }
+
     // 2026-08-11 yslee - 귀속행 입력 전 지급 본문 DRAFT 저장 검증
     // 기존 코드: 빈 귀속 목록을 MyBatis 일괄 INSERT로 전달
     // 문제: 귀속 작업 전 임시저장이 SQL 오류로 실패

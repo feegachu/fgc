@@ -26,6 +26,8 @@
   var saveButton = document.getElementById("btn-save");
   var precheckButton = document.getElementById("btn-precheck");
   var confirmButton = document.getElementById("btn-confirm");
+  var recipientField = document.getElementById("recipient-field");
+  var previousPaymentStage = stage.value;
 
   fillOptions(sourceType, SOURCE_TYPES, "원천유형을 선택하세요");
   fillOptions(recipient, [], "설계사를 불러오는 중입니다.");
@@ -44,6 +46,7 @@
     });
   });
   cashflow.addEventListener("change", filterCommissionItemsByCashflow);
+  stage.addEventListener("change", handlePaymentStageChange);
   item.addEventListener("change", syncAttributionModeForSelectedItem);
   recipient.addEventListener("change", handleRecipientChange);
 
@@ -51,7 +54,7 @@
     .then(function () {
       if (paymentId) return loadDraft(paymentId);
       return Promise.all([loadAgents(), loadCommissionItems()])
-        .then(function () { addAttributionRow(); });
+        .then(function () { syncPaymentStageUi(); addAttributionRow(); });
     })
     .catch(function (error) { showError(error, "지급 건 화면을 초기화하지 못했습니다."); });
 
@@ -114,7 +117,10 @@
     var items = [];
     try { items = JSON.parse(item.dataset.items || "[]"); } catch (ignored) { items = []; }
     var selected = item.value;
-    var options = items.filter(function (entry) { return entry.cashflowType === cashflow.value; })
+    var options = items.filter(function (entry) {
+      return entry.cashflowType === cashflow.value
+        && (!isInsurerToGa() || entry.itemCode !== "NEWCOMER_SUPPORT");
+    })
       .map(function (entry) {
         return [String(entry.commissionItemId), entry.itemCode + " · " + entry.itemName];
       });
@@ -161,6 +167,8 @@
           if (!attrBody.querySelector("[data-attr-row]")) addAttributionRow();
           document.getElementById("tx-status").textContent = "작성중 · #" + id;
           saveButton.textContent = "수정 저장";
+          syncPaymentStageUi();
+          previousPaymentStage = stage.value;
           updateAttributionAgentLabels();
           updateAttributionSummary();
         });
@@ -282,7 +290,31 @@
 
   function isNewcomerSupportSelected() {
     var selected = selectedCommissionItem();
-    return selected && selected.itemCode === "NEWCOMER_SUPPORT";
+    return !isInsurerToGa() && selected && selected.itemCode === "NEWCOMER_SUPPORT";
+  }
+
+  function isInsurerToGa() { return stage.value === "INSURER_TO_GA"; }
+
+  function handlePaymentStageChange() {
+    if (stage.value === previousPaymentStage) return;
+    clear(attrBody);
+    attributionSequence = 0;
+    renderEmptyAttributions();
+    item.value = "";
+    recipient.value = "";
+    previousPaymentStage = stage.value;
+    syncPaymentStageUi();
+    updateAttributionSummary();
+    toast("지급단계가 변경되어 수수료 항목과 귀속행을 초기화했습니다.", "warning", 5000);
+  }
+
+  function syncPaymentStageUi() {
+    var insurerToGa = isInsurerToGa();
+    recipientField.hidden = insurerToGa;
+    recipient.disabled = insurerToGa;
+    if (insurerToGa) recipient.value = "";
+    filterCommissionItemsByCashflow();
+    syncAttributionModeForSelectedItem();
   }
 
   function syncAttributionModeForSelectedItem() {
@@ -315,6 +347,11 @@
     noContract.hidden = !newcomerSupport;
     var newcomerOption = method.querySelector('option[value="NEWCOMER_NON_CONTRACT"]');
     if (newcomerOption) newcomerOption.disabled = !newcomerSupport;
+    ["SETTLEMENT_SUPPORT_MONTHLY", "FIRST_CONTRACT_CARRY_FORWARD"].forEach(function (value) {
+      var option = method.querySelector('option[value="' + value + '"]');
+      if (option) option.disabled = isInsurerToGa();
+      if (isInsurerToGa() && method.value === value) method.value = "DIRECT";
+    });
     if (newcomerSupport) {
       contract.value = "";
       method.value = "NEWCOMER_NON_CONTRACT";
@@ -339,8 +376,10 @@
       ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"],
       ["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]
     ]);
+    var newAgentExclusion = decision.querySelector('option[value="EXCLUDED:NEW_AGENT_SUPPORT"]');
+    if (newAgentExclusion) newAgentExclusion.disabled = isInsurerToGa();
     decision.value = Array.from(decision.options).some(function (option) {
-      return option.value === previousDecision;
+      return option.value === previousDecision && !option.disabled;
     }) ? previousDecision : "INCLUDED";
     evidence.placeholder = "증빙 입력";
   }
@@ -529,7 +568,8 @@
 
   function buildPayload() {
     requireValue(sourceType, "원천유형"); requireValue(bizKey, "업무키");
-    requireValue(settlementMonth, "정산월"); requireValue(recipient, "수령 설계사");
+    requireValue(settlementMonth, "정산월");
+    if (!isInsurerToGa()) requireValue(recipient, "수령 설계사");
     requireValue(item, "수수료 항목"); requireValue(amount, "금액");
     var attributions = Array.from(attrBody.querySelectorAll("[data-attr-row]")).map(attributionPayload);
     if (attributions.length === 0) throw new Error("귀속행을 하나 이상 추가하세요.");
@@ -537,7 +577,7 @@
       sourceType: sourceType.value,
       sourceBusinessKey: bizKey.value.trim(),
       contractId: attributions[0].contractId,
-      agentId: Number(recipient.value),
+      agentId: isInsurerToGa() ? null : Number(recipient.value),
       commissionItemId: Number(item.value),
       amount: Number(amount.value),
       settlementMonth: monthFirstDay(),
