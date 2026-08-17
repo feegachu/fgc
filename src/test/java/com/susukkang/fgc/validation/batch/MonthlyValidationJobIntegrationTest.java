@@ -60,9 +60,51 @@ class MonthlyValidationJobIntegrationTest {
 
     private final List<Long> createdValidationRunIds = new ArrayList<>();
 
+    // 2026-08-17 - 대상 선별 상품코드 비교 수정에 따른 정리 범위 확장
+    // 기존 코드: cap_check(_detail)·validation_target·validation_run만 지웠다.
+    // 문제: 선별 SQL이 insurer_product_code와 비교하던 버그로 전 계약이 REVIEW_REQUIRED가 되어
+    //       하위 Step이 결과를 만들지 않았기에 그 정리로 충분했지만, 표준상품코드 비교로 고치자
+    //       실제로 대상이 선정되어 arbitrage_check·journal·reconciliation·exception_case가
+    //       생성되고 validation_run DELETE가 FK 위반으로 실패했다.
+    // 개선: validation_run을 참조하는 자식(손자 포함)을 FK 순서대로 전부 지운다.
+    //       스케줄(schedule_header/line)은 실행 FK가 없는 계약 단위 재생성이라 지우지 않는다
+    //       — 재실행 시 멱등 재생성되는 실제 배치의 부수효과와 같다.
     @AfterEach
     void cleanUp() {
         createdValidationRunIds.forEach(id -> {
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.exception_action
+                     WHERE exception_case_id IN (
+                         SELECT exception_case_id FROM fgc.exception_case WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.exception_case WHERE validation_run_id = ?", id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.reconciliation_match
+                     WHERE reconciliation_result_id IN (
+                         SELECT rr.reconciliation_result_id
+                           FROM fgc.reconciliation_result rr
+                           JOIN fgc.reconciliation_run r ON r.reconciliation_run_id = rr.reconciliation_run_id
+                          WHERE r.validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.reconciliation_result
+                     WHERE reconciliation_run_id IN (
+                         SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.reconciliation_run WHERE validation_run_id = ?", id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.journal_line
+                     WHERE journal_header_id IN (
+                         SELECT journal_header_id FROM fgc.journal_header WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.journal_header WHERE validation_run_id = ?", id);
             jdbcTemplate.update("""
                     DELETE FROM fgc.cap_check_detail
                      WHERE cap_check_id IN (
@@ -73,6 +115,14 @@ class MonthlyValidationJobIntegrationTest {
                     """, id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.cap_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.arbitrage_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.acquisition_cost_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.maintenance_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.contract_status_event_processing WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
@@ -117,8 +167,16 @@ class MonthlyValidationJobIntegrationTest {
      *       완료되고, Job 전체가 COMPLETED로 끝난다.
      * 개선: 9개 Step 전부가 COMPLETED로 끝나고 validation_run도 COMPLETED로 전이하는 정상
      *       완료 경로를 검증하도록 갱신한다(클래스 Javadoc에서 예고한 #60 갱신 지점).
+     *
+     * 2026-08-17 - 대상 선별 상품코드 비교 수정에 따른 전제 갱신
+     * 기존 코드: "TEST_MONTH에는 대상 데이터가 없다"는 전제로 0건 완료 경로를 검증했다.
+     * 문제: 그 0건은 실은 선별 SQL이 insurer_product_code와 비교하던 버그로 전 계약이
+     *       REVIEW_REQUIRED가 된 결과였다. 표준상품코드 비교로 고치면 2031-03 asOfDate에도
+     *       시드 계약이 선정되어 하위 Step들이 실제 결과를 만든다.
+     * 개선: 같은 실행이 "시드 데이터를 실제로 검증하며" 9개 Step 전부 COMPLETED로 끝나는
+     *       경로를 검증한다(메서드명 갱신). 생성물 정리는 확장된 cleanUp이 담당한다.
      */
-    void completesAllStepsWhenNoTargetDataExists() throws Exception {
+    void completesAllStepsAgainstSeedData() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
         long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
 
