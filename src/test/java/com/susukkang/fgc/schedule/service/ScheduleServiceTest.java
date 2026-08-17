@@ -79,6 +79,9 @@ class ScheduleServiceTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private ScheduleReviewService scheduleReviewService;
+
     @InjectMocks
     private ScheduleService scheduleService;
 
@@ -256,6 +259,35 @@ class ScheduleServiceTest {
         ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
 
         assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
+        verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
+        verify(scheduleMapper, never()).confirmScheduleHeader(any());
+    }
+
+    @Test
+    void registersReviewAfterRollbackAndBlocksConfirmationWhenCapRuleIsMissing() {
+        ScheduleHeaderInsertDTO plannedHeader = ScheduleHeaderInsertDTO.builder()
+                .scheduleHeaderId(10L)
+                .contractId(20L)
+                .paymentStage(PaymentStage.GA_TO_FC)
+                .status(ScheduleHeaderStatus.PLANNED)
+                .activeYn(true)
+                .build();
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
+                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(capCheckService.calculateAndSave(any())).willThrow(new FgcBusinessException(
+                FgcErrorCode.CAP_004,
+                "paymentStage",
+                Map.of("contractId", 20L),
+                "적용 가능한 1,200% 룰셋이 없습니다."
+        ));
+
+        assertThatThrownBy(() -> scheduleService.confirmSchedule(10L))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.SCHE_004));
+
+        verify(scheduleReviewService).registerCapRuleReviewAfterRollback(
+                20L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 룰셋이 없습니다.");
         verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
         verify(scheduleMapper, never()).confirmScheduleHeader(any());
     }

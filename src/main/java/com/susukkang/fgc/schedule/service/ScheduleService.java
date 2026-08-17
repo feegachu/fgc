@@ -47,6 +47,7 @@ public class ScheduleService {
     private final CapCheckService capCheckService;
     private final CapCheckMapper capCheckMapper;
     private final AuditLogService auditLogService;
+    private final ScheduleReviewService scheduleReviewService;
 
     /**
      * 설명 : 검색 조건에 따라 스케줄 헤더를 조회한다.
@@ -1150,8 +1151,23 @@ public class ScheduleService {
         BigDecimal evidenceAmount = header.getPaymentStage() == PaymentStage.INSURER_TO_GA
                 ? capCheckMapper.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
                 : null;
-        CapCheckSaveResult capCheck = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
-                header.getContractId(), header.getPaymentStage(), contract.getContractDate(), evidenceAmount));
+        CapCheckSaveResult capCheck;
+        try {
+            capCheck = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
+                    header.getContractId(), header.getPaymentStage(), contract.getContractDate(), evidenceAmount));
+        } catch (FgcBusinessException exception) {
+            if (exception.getErrorCode() != FgcErrorCode.CAP_004) {
+                throw exception;
+            }
+            scheduleReviewService.registerCapRuleReviewAfterRollback(
+                    header.getContractId(),
+                    header.getPaymentStage(),
+                    exception.getDetail() == null
+                            ? "적용 가능한 1,200% 룰셋이 없습니다."
+                            : exception.getDetail()
+            );
+            throw new FgcBusinessException(FgcErrorCode.SCHE_004);
+        }
         if (capCheck.result().resultStatus() == CapResultStatus.VIOLATION) {
             throw new FgcBusinessException(FgcErrorCode.SCHE_003);
         }

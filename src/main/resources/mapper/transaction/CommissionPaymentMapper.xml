@@ -509,9 +509,10 @@
             ON cri.cap_rule_set_id = crs.cap_rule_set_id
            AND cri.commission_item_id = ct.commission_item_id
          WHERE ct.commission_transaction_id = #{paymentId}
-         ORDER BY (crs.insurer_id IS NOT NULL) DESC,
-                  (crs.product_group_code IS NOT NULL) DESC,
-                  (crs.channel_code IS NOT NULL) DESC,
+         ORDER BY
+               (CASE WHEN crs.insurer_id IS NOT NULL THEN 1 ELSE 0 END
+              + CASE WHEN crs.product_group_code IS NOT NULL THEN 1 ELSE 0 END
+              + CASE WHEN crs.channel_code IS NOT NULL THEN 1 ELSE 0 END) DESC,
                   crs.contract_date_from DESC,
                   crs.cap_rule_set_id DESC
          LIMIT 1
