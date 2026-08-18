@@ -59,6 +59,11 @@ class PublishingTemplateStructureTest {
                 .contains("pagination-button is-active")
                 .contains("exception-detail-")
                 .doesNotContain("유형별 미처리 집계 API 연동 대기");
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/exception.css")
+                .containsPattern("(?s)<script[^>]*th:src=\"@\\{/js/features/exception/exception-list\\.js}\"[^>]*\\bdefer\\b[^>]*>");
+        assertThat(resource("static/js/features/exception/exception-list.js"))
+                .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a\"\\)\\) return;.*?event\\.preventDefault\\(\\)");
         // VRUN-W02 는 #188 에서 헤더·스텝퍼·실행(IF-API-48·49)이 연동됐다 — 아직 미연동인
         // 확정 체크리스트(IF-API-50/51, #172~#175)만 대기 상태를 유지하고, 확정 버튼은
         // 체크리스트 게이트 연동 전까지 정적 disabled 다.

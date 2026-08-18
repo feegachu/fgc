@@ -32,6 +32,7 @@
     });
     row.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.target.closest("a")) return;
       event.preventDefault();
       selectRow(row);
     });

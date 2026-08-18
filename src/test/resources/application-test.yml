@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:tc:postgresql:17:///fgc?TC_DAEMON=true&currentSchema=fgc
+    url: jdbc:tc:postgresql:17:///fgc?currentSchema=fgc
     username: fgc
     password: fgc_test_only
   flyway:

@@ -1,5 +1,6 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
+import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.util.DateUtil;
 
@@ -26,5 +27,17 @@ public record ExceptionActionResponse(
                 row.evidenceRef(), row.actionBy(), row.actionByLoginId(),
                 DateUtil.toSeoul(row.actionAt())
         );
+    }
+
+    public String actionTypeLabel() {
+        return ExceptionActionType.valueOf(actionType).label();
+    }
+
+    public String fromStatusLabel() {
+        return fromStatus == null ? "-" : fromStatus.label();
+    }
+
+    public String toStatusLabel() {
+        return toStatus.label();
     }
 }

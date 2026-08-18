@@ -9,6 +9,7 @@ import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.ShellAdvice;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseResponseDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryResponse;
@@ -54,8 +55,12 @@ class ExceptionCaseViewControllerTest {
 
     @Test
     void defaultsToOpenAndRendersPagedRowsWithSelectableDetails() throws Exception {
-        ExceptionCaseResponseDTO row = row(10L, ExceptionStatus.NEW,
-                "COMMISSION_TRANSACTION", "77", "1200% 한도 초과");
+        ExceptionCaseResponseDTO row = row(10L, ExceptionStatus.IN_REVIEW,
+                "COMMISSION_TRANSACTION", "77", "1200% 한도 초과", List.of(
+                        new ExceptionActionResponse(
+                                1L, 1, ExceptionStatus.NEW, ExceptionStatus.IN_REVIEW,
+                                "START_REVIEW", "검토 시작", null, 1L, "settle01",
+                                OffsetDateTime.parse("2026-07-10T09:00:00+09:00"))));
         given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
                 .willReturn(response(List.of(row), 1, 20, 21, 21));
 
@@ -69,6 +74,9 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("id=\"exception-history-10\"")))
                 .andExpect(content().string(containsString("href=\"/transactions\"")))
                 .andExpect(content().string(containsString("page=2")))
+                .andExpect(content().string(containsString("데이터 품질")))
+                .andExpect(content().string(containsString("1. 검토 시작")))
+                .andExpect(content().string(containsString("<span>신규</span> → <span>검토중</span>")))
                 .andExpect(content().string(containsString("/js/features/exception/exception-list.js")))
                 .andExpect(content().string(containsString("/css/features/exception.css")));
     }
@@ -88,17 +96,22 @@ class ExceptionCaseViewControllerTest {
 
     @Test
     void actualStatusAndRequestedPageAreForwarded() throws Exception {
-        given(service.search(argThat(c -> "RESOLVED".equals(c.getStatus())), eq(2), eq(20)))
+        given(service.search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(9), eq(20)))
+                .willReturn(response(List.of(), 9, 20, 21, 3));
+        given(service.search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(2), eq(20)))
                 .willReturn(response(List.of(row(11L, ExceptionStatus.RESOLVED,
                         "INSURANCE_CONTRACT", "5", "필수값 누락")), 2, 20, 21, 3));
 
         mockMvc.perform(get("/exceptions")
-                        .param("status", "RESOLVED").param("page", "2")
+                        .param("status", "RESOLVED").param("page", "9")
                         .with(user(SETTLE)))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("statusFilter", "RESOLVED"))
                 .andExpect(content().string(containsString("필수값 누락")))
                 .andExpect(content().string(containsString("href=\"/contracts/5\"")));
+
+        verify(service).search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(9), eq(20));
+        verify(service).search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(2), eq(20));
     }
 
     @Test
@@ -138,10 +151,17 @@ class ExceptionCaseViewControllerTest {
     private static ExceptionCaseResponseDTO row(
             long id, ExceptionStatus status, String sourceType, String sourceId, String title
     ) {
+        return row(id, status, sourceType, sourceId, title, List.of());
+    }
+
+    private static ExceptionCaseResponseDTO row(
+            long id, ExceptionStatus status, String sourceType, String sourceId, String title,
+            List<ExceptionActionResponse> actions
+    ) {
         return new ExceptionCaseResponseDTO(
                 id, "KEY-" + id, ExceptionType.DATA_QUALITY, ExceptionSeverity.WARNING,
                 status, title, "상세 설명", "C001", "김정산", null, null,
-                sourceType, sourceId, OffsetDateTime.parse("2026-07-10T09:00:00+09:00"), List.of());
+                sourceType, sourceId, OffsetDateTime.parse("2026-07-10T09:00:00+09:00"), actions);
     }
 
     private static FgcUserDetails principal(String loginId, String userName, String roleCode) {
