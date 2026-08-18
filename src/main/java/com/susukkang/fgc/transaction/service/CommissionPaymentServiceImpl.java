@@ -1065,9 +1065,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ConfirmationData data
     ) {
         if (!rule.capRuleSetId().equals(calculation.capRuleSetId())) {
+            // "CAP_RULE_MISMATCH"는 V23_1(exception_case_exception_type_check 재정의)에서
+            // exception_type 허용 목록에서 빠지고 CAP_REVIEW_REQUIRED로 흡수됐다 — 그 값을
+            // 계속 쓰면 CHECK 제약 위반으로 저장 자체가 실패한다.
             return new GateFailure(
                     data,
-                    "CAP_RULE_MISMATCH",
+                    "CAP_REVIEW_REQUIRED",
                     "HIGH",
                     "한도 정책 불일치",
                     "지급 정책과 한도 계산 정책이 서로 다릅니다.",
