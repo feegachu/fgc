@@ -18,8 +18,8 @@
 
   [실행 시점] 실효·해지·금액 변경이 생긴 즉시 + 일일 변경분 배치 + 월 전체 배치
 
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-ARB-W01)의 정적 골격만 옮겼다.
-  데이터 영역(요약카드·목록·상세 패널)은 차익거래 조회 API 연동 시 서버 렌더링으로 채운다.
+  [연동 범위] 차익거래 조회 API로 요약카드·목록·상세 패널을 Ajax로 채우고,
+  수동 재검증 실행 후 목록을 다시 조회한다.
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ARB-W01', '차익거래 검증', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
@@ -87,7 +87,7 @@
     </div>
   </section>
 
-  <!-- ② 요약 카드 3장 — 차익거래 조회 API 연동 시 서버 렌더링으로 채운다 -->
+  <!-- ② 요약 카드 3장 — 차익거래 조회 API 응답으로 Ajax 렌더링 -->
   <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px"
            id="summary-cards">
     <div class="fgc-kpi fgc-kpi--success">
