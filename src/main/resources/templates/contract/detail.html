@@ -33,8 +33,8 @@
         <button id="contract-edit-button" class="button button-secondary" type="button" data-fgc-action="edit" th:disabled="${!canProcess}">
           <span class="material-symbols-rounded" aria-hidden="true">edit</span>수정
         </button>
-        <button class="button button-secondary" type="button" data-fgc-action="regenerate" disabled
-                title="연동 대기" aria-label="스케줄 재생성, 연동 대기">
+        <button id="contract-schedule-regenerate-button" class="button button-secondary" type="button" data-fgc-action="regenerate" th:disabled="${!canProcess}"
+                aria-label="스케줄 재생성">
           <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>스케줄 재생성
         </button>
         <button id="contract-cap-recheck-button" class="button button-primary" type="button" data-fgc-action="recheck" th:disabled="${!canProcess}"
@@ -441,6 +441,25 @@
               if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(error && error.message ? error.message : "한도 재검증에 실패했습니다.", "error");
             })
             .finally(function () { capRecheckButton.disabled = false; });
+        });
+      }
+
+      var scheduleRegenerateButton = document.getElementById("contract-schedule-regenerate-button");
+      if (scheduleRegenerateButton && !scheduleRegenerateButton.disabled) {
+        scheduleRegenerateButton.addEventListener("click", function () {
+          scheduleRegenerateButton.disabled = true;
+          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/schedules/regenerate", { method: "POST" })
+            .then(function () {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast("예상 스케줄을 새 버전으로 재생성했습니다.", "success");
+              var schedulesPanel = document.getElementById("contract-panel-schedules");
+              var schedulesTab = document.getElementById("contract-tab-schedules");
+              if (schedulesPanel) schedulesPanel.dataset.loaded = "false";
+              if (schedulesTab) schedulesTab.click();
+            })
+            .catch(function (error) {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(error && error.message ? error.message : "스케줄 재생성에 실패했습니다.", "error");
+            })
+            .finally(function () { scheduleRegenerateButton.disabled = false; });
         });
       }
 

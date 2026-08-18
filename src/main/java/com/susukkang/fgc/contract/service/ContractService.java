@@ -423,6 +423,15 @@ public class ContractService {
         return results;
     }
 
+    /** 계약 상세에서 양 지급단계의 운영 스케줄을 새 버전으로 재생성한다. */
+    @Transactional
+    public List<Long> regenerateSchedules(Long contractId) {
+        if (contractMapper.selectContractById(contractId) == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+        return scheduleService.regenerateContractSchedules(contractId, "CONTRACT_DETAIL_MANUAL");
+    }
+
     /**
      * 설명 : 계약 수정
      * 요청한 Request 검증 및 해당 계약 ID를 수정한다.
