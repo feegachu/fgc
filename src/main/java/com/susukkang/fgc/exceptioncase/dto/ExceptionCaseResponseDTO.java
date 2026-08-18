@@ -65,6 +65,7 @@ public record ExceptionCaseResponseDTO(
         if (reasonCode == null || reasonCode.isBlank()) return "-";
         return switch (reasonCode) {
             case "CAP_RULE_MISMATCH" -> "한도 정책 불일치";
+            case "CAP_LIMIT_WARNING" -> "1,200% 한도 주의";
             case "CAP_LIMIT_VIOLATION" -> "1,200% 한도 초과";
             case "CAP_CALCULATION_REVIEW_REQUIRED" -> "한도 계산 검토 필요";
             case "ARBITRAGE_LIMIT_EXCEEDED" -> "차익거래 검토대상";
@@ -80,7 +81,15 @@ public record ExceptionCaseResponseDTO(
             case "EXPECTED_MISSING" -> "예상 지급 없음";
             case "DUPLICATE" -> "대사 대상 중복";
             case "AMOUNT_DIFFERENCE" -> "금액 불일치";
-            default -> reasonCode;
+            // PRE_CONFIRM 실시간 경로는 상위 유형명을 그대로 상세 원인으로 저장한다
+            // (CommissionPaymentServiceImpl.exceptionReasonCode) — 유형 한글 라벨로 보여 준다.
+            default -> {
+                try {
+                    yield ExceptionType.valueOf(reasonCode).label();
+                } catch (IllegalArgumentException unknownCode) {
+                    yield reasonCode;
+                }
+            }
         };
     }
 
