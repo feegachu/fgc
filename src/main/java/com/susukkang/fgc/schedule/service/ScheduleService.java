@@ -1032,14 +1032,6 @@ public class ScheduleService {
                 oldHeader.getPaymentStage()
         );
         if (policy == null) {
-            int updatedRows = scheduleMapper.updateScheduleHeaderStatus(
-                    oldHeader.getScheduleHeaderId(),
-                    ScheduleHeaderStatus.ADJUSTED,
-                    false
-            );
-            if (updatedRows != 1) {
-                throw new FgcBusinessException(FgcErrorCode.SCHE_001);
-            }
             return ScheduleRegenResponse.builder()
                     .scheduleHeaderId(oldHeader.getScheduleHeaderId())
                     .versionNo(oldHeader.getScheduleVersionNo().longValue())

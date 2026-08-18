@@ -315,12 +315,12 @@ class ScheduleServiceTest {
     }
 
     @Test
-    void registersReviewAndDeactivatesExistingHeaderWhenPolicyIsMissing() {
+    void registersReviewAndKeepsExistingHeaderWhenPolicyIsMissing() {
         assertRegenerationRegistersReview("POLICY_MISSING");
     }
 
     @Test
-    void registersReviewAndDeactivatesExistingHeaderWhenPoliciesAreDuplicated() {
+    void registersReviewAndKeepsExistingHeaderWhenPoliciesAreDuplicated() {
         assertRegenerationRegistersReview("POLICY_DUPLICATE");
     }
 
@@ -716,14 +716,13 @@ class ScheduleServiceTest {
         given(contractMapper.selectContractById(20L)).willReturn(contract);
         given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willThrow(policyResolutionException(20L, PaymentStage.INSURER_TO_GA, reason));
         given(scheduleMapper.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
-        given(scheduleMapper.updateScheduleHeaderStatus(10L, ScheduleHeaderStatus.ADJUSTED, false)).willReturn(1);
 
         ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "정책 변경 반영");
 
         assertThat(response.getScheduleHeaderId()).isEqualTo(10L);
         assertThat(response.getVersionNo()).isEqualTo(1L);
         verify(scheduleMapper).upsertPolicyReviewCase(20L, PaymentStage.INSURER_TO_GA, reason, "수수료 정책 검토 필요 - INSURER_TO_GA", "예상 스케줄에 적용할 정책을 확정할 수 없습니다.");
-        verify(scheduleMapper).updateScheduleHeaderStatus(10L, ScheduleHeaderStatus.ADJUSTED, false);
+        verify(scheduleMapper, never()).updateScheduleHeaderStatus(any(), any(), any());
         verify(scheduleMapper, never()).insertScheduleHeader(any());
         verify(scheduleMapper, never()).insertAllScheduleLines(any());
     }

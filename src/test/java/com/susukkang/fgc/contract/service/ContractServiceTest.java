@@ -384,6 +384,20 @@ class ContractServiceTest {
     }
 
     @Test
+    @DisplayName("보험회사가 변경되면 적용 정책을 다시 계산하도록 스케줄을 재생성한다")
+    void updateContractRegeneratesSchedulesWhenInsurerChanges() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = contractMatching(
+                request,
+                99L,
+                request.getAgentId(),
+                request.getOrganizationId()
+        );
+
+        assertScheduleRegeneratedForRecipientChange(request, current);
+    }
+
+    @Test
     void updateContractRegistersReviewWhenCapRuleIsMissing() {
         ContractUpdateRequest request = updateRequest();
         InsuranceContract current = InsuranceContract.builder()
@@ -469,10 +483,19 @@ class ContractServiceTest {
             Long agentId,
             Long organizationId
     ) {
+        return contractMatching(request, request.getInsurerId(), agentId, organizationId);
+    }
+
+    private InsuranceContract contractMatching(
+            ContractUpdateRequest request,
+            Long insurerId,
+            Long agentId,
+            Long organizationId
+    ) {
         return InsuranceContract.builder()
                 .contractId(21L)
                 .contractNo(request.getContractNo())
-                .insurerId(request.getInsurerId())
+                .insurerId(insurerId)
                 .productOfferingId(request.getProductOfferingId())
                 .contractDate(request.getContractDate())
                 .currentStatus(request.getContractStatus())

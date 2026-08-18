@@ -499,7 +499,8 @@ public class ContractService {
             InsuranceContract current,
             InsuranceContract updated
     ) {
-        return !Objects.equals(current.getProductOfferingId(), updated.getProductOfferingId())
+        return !Objects.equals(current.getInsurerId(), updated.getInsurerId())
+                || !Objects.equals(current.getProductOfferingId(), updated.getProductOfferingId())
                 || !Objects.equals(current.getContractDate(), updated.getContractDate())
                 || !Objects.equals(current.getAgentId(), updated.getAgentId())
                 || !Objects.equals(current.getOrganizationId(), updated.getOrganizationId())
