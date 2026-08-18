@@ -134,6 +134,9 @@ class ReconciliationRunHistoryMapperIntegrationTest {
     void searchOrdersByCreatedAtWithDirectionAndAppliesLimitOffset() {
         // 같은 정산월·지급단계·보험회사·월 검증 실행 조합은 uq_reconciliation_run
         // UNIQUE 제약에 걸리므로(V1:1444-1445) 보험회사를 다르게 해서 두 행을 만든다.
+        // TEST_MONTH+GA_TO_FC 조합은 이 테스트 메서드 안에서 이 두 건뿐이다(클래스가
+        // @Transactional이라 메서드마다 별도 트랜잭션으로 롤백되므로 다른 테스트의
+        // 데이터가 섞이지 않는다) — 그래서 순서/페이지를 정확한 값으로 검증할 수 있다.
         Long insurerA = insertInsurer("FUN051-6A");
         Long insurerB = insertInsurer("FUN051-6B");
         Long runOlder = insertReconciliationRun("GA_TO_FC", insurerA, null);
@@ -143,16 +146,27 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         List<ReconciliationRunHistoryRow> ascRows = mapper.search(TEST_MONTH, "GA_TO_FC", "asc", 0, 100);
 
         assertThat(descRows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
-                .contains(runNewer, runOlder);
+                .containsExactly(runNewer, runOlder);
         assertThat(ascRows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
-                .contains(runOlder, runNewer);
+                .containsExactly(runOlder, runNewer);
 
+        // offset=0,limit=1은 desc 정렬의 첫 번째 행(runNewer)만, offset=1,limit=1은
+        // 두 번째 행(runOlder)만 돌려줘야 한다 — 둘 다 확인해야 LIMIT/OFFSET이 실제로
+        // 적용되는지 검증된다.
         List<ReconciliationRunHistoryRow> firstPage = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 0, 1);
-        assertThat(firstPage).hasSize(1);
+        List<ReconciliationRunHistoryRow> secondPage = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 1, 1);
+        assertThat(firstPage).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
+                .containsExactly(runNewer);
+        assertThat(secondPage).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
+                .containsExactly(runOlder);
     }
 
     @Test
     void countMatchesSearchFilters() {
+        // TEST_MONTH+GA_TO_FC 조합은 이 테스트 메서드 안에서 1건, 전체(지급단계 무관)는
+        // 2건뿐이다(위 테스트와 같은 이유로 메서드 간 데이터가 섞이지 않는다) — 그래서
+        // ">="가 아니라 정확한 기대값으로 검증한다. ">="였다면 필터가 전혀 안 걸려도
+        // (예: WHERE 절이 통째로 빠져도) 통과했을 것이다.
         Long insurerId = insertInsurer("FUN051-7");
         insertReconciliationRun("GA_TO_FC", insurerId, null);
         insertReconciliationRun("INSURER_TO_GA", insurerId, null);
@@ -160,7 +174,7 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         long gaToFcCount = mapper.count(TEST_MONTH, "GA_TO_FC");
         long allCount = mapper.count(TEST_MONTH, null);
 
-        assertThat(gaToFcCount).isGreaterThanOrEqualTo(1);
-        assertThat(allCount).isGreaterThanOrEqualTo(gaToFcCount);
+        assertThat(gaToFcCount).isEqualTo(1);
+        assertThat(allCount).isEqualTo(2);
     }
 }
