@@ -48,6 +48,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
@@ -722,7 +724,8 @@ class ScheduleServiceTest {
         assertThat(response.getScheduleHeaderId()).isEqualTo(10L);
         assertThat(response.getVersionNo()).isEqualTo(1L);
         verify(scheduleMapper).upsertPolicyReviewCase(20L, PaymentStage.INSURER_TO_GA, reason, "수수료 정책 검토 필요 - INSURER_TO_GA", "예상 스케줄에 적용할 정책을 확정할 수 없습니다.");
-        verify(scheduleMapper, never()).updateScheduleHeaderStatus(any(), any(), any());
+        verify(scheduleMapper, never()).updateScheduleHeaderStatus(
+                anyLong(), any(ScheduleHeaderStatus.class), anyBoolean());
         verify(scheduleMapper, never()).insertScheduleHeader(any());
         verify(scheduleMapper, never()).insertAllScheduleLines(any());
     }
