@@ -157,7 +157,7 @@ public class ScheduleService {
      * @author hjKang
      * @since 2026-08-10
      */
-    @Transactional
+    @Transactional(noRollbackFor = ScheduleConfirmationRejectedException.class)
     public ScheduleGenerationResult generateSchedules(InsuranceContract contract) {
         // 입력값 검증
         if (contract == null || contract.getContractId() == null) {
@@ -1163,30 +1163,32 @@ public class ScheduleService {
             if (exception.getErrorCode() != FgcErrorCode.CAP_004) {
                 throw exception;
             }
-            scheduleReviewService.registerCapRuleReviewAfterRollback(
+            scheduleReviewService.registerCapReviewBeforeCommit(
                     header.getContractId(),
                     header.getPaymentStage(),
+                    "POLICY_MISSING",
+                    "1,200% 룰셋 검토 필요 - " + header.getPaymentStage().name(),
                     exception.getDetail() == null
                             ? "적용 가능한 1,200% 룰셋이 없습니다."
                             : exception.getDetail()
             );
-            throw new FgcBusinessException(FgcErrorCode.SCHE_004);
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_004);
         }
         if (capCheck.result().resultStatus() == CapResultStatus.VIOLATION) {
-            scheduleReviewService.registerCapReviewAfterRollback(
+            scheduleReviewService.registerCapReviewBeforeCommit(
                     header.getContractId(),
                     header.getPaymentStage(),
                     "CAP_VIOLATION",
                     "1,200% 한도 초과 - " + header.getPaymentStage().name(),
                     "1,200% 한도 초과로 스케줄 확정을 차단했습니다."
             );
-            throw new FgcBusinessException(FgcErrorCode.SCHE_003);
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_003);
         }
         if (capCheck.result().resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
             Map<String, Object> calculationSnapshot = capCheck.result().calculationSnapshot();
             boolean refundTableMissing = calculationSnapshot != null
                     && Boolean.TRUE.equals(calculationSnapshot.get("refundTableMissing"));
-            scheduleReviewService.registerCapReviewAfterRollback(
+            scheduleReviewService.registerCapReviewBeforeCommit(
                     header.getContractId(),
                     header.getPaymentStage(),
                     refundTableMissing ? ExceptionType.REFUND_TABLE_MISSING.name() : "CAP_REVIEW_REQUIRED",
@@ -1197,7 +1199,7 @@ public class ScheduleService {
                             ? "계약 조건에 적용할 12차월 예상 해약환급률표가 없어 스케줄 확정을 차단했습니다."
                             : "한도 판정에 추가 검토가 필요해 스케줄 확정을 차단했습니다."
             );
-            throw new FgcBusinessException(FgcErrorCode.SCHE_004);
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_004);
         }
 
         List<ScheduleLineInsertDTO> lines = scheduleMapper.selectScheduleLinesByScheduleId(scheduleId);

@@ -62,6 +62,29 @@ public class ScheduleReviewService {
         });
     }
 
+    /**
+     * 확정 게이트 거절 시 계산근거와 함께 현재 트랜잭션에 검토 케이스를 남긴다.
+     * 이 경로는 ScheduleConfirmationRejectedException의 noRollbackFor와 짝을 이룬다.
+     */
+    public void registerCapReviewBeforeCommit(
+            Long contractId,
+            PaymentStage paymentStage,
+            String exceptionType,
+            String title,
+            String description
+    ) {
+        int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+                contractId,
+                paymentStage,
+                exceptionType,
+                title,
+                description
+        );
+        if (affectedRows != 1) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        }
+    }
+
     private void persistCapReview(
             Long contractId,
             PaymentStage paymentStage,

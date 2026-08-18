@@ -113,7 +113,7 @@ class CommissionPaymentServiceImplTest {
         given(mapper.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
-        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 3)))
+        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
                 .willReturn(4L);
         given(mapper.existsPolicyVersion(4L)).willReturn(true);
         given(mapper.findAllocationPolicyId(4L, "DIRECT")).willReturn(77L);
@@ -252,7 +252,7 @@ class CommissionPaymentServiceImplTest {
         given(mapper.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
-        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 3)))
+        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
                 .willThrow(new FgcBusinessException(
                         FgcErrorCode.COMMON_002,
                         "allocationPolicyVersion",
@@ -1735,7 +1735,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
-    // FGC-FUN-033 — 분류정책이 없는 귀속행은 FGC-CAP-002 blocker로 표시되고 preview 행·한도 계산은 생략된다
+    // FGC-FUN-033 — 적용 활성 룰셋 자체가 없으면 CAP_004 blocker로 표시되고 preview 행·한도 계산은 생략된다
     @Test
     void precheckReportsMissingCapRuleAndSkipsPreview() {
         ConfirmationData data = confirmation(
@@ -1750,6 +1750,28 @@ class CommissionPaymentServiceImplTest {
         TransactionPrecheckResponse response = service.precheck(101L);
 
         assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers())
+                .extracting(TransactionPrecheckResponse.Blocker::code)
+                .containsExactly("FGC-CAP-004");
+        assertThat(response.capPreview()).isEmpty();
+        verify(capCalculator, never()).calculate(any());
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void precheckReportsCap002WhenRuleSetExistsButCommissionItemIsUnclassified() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(null);
+        given(mapper.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
         assertThat(response.blockers())
                 .extracting(TransactionPrecheckResponse.Blocker::code)
                 .containsExactly("FGC-CAP-002");

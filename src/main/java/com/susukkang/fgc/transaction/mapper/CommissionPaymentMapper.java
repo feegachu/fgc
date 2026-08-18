@@ -98,6 +98,15 @@ public interface CommissionPaymentMapper {
             @Param("transactionAttributionId") Long transactionAttributionId
     );
 
+    /**
+     * 귀속 계약·지급단계에 적용 가능한 활성 1,200% 룰셋의 존재 여부를 확인한다.
+     * 수수료 항목(cap_rule_item) 미분류와 룰셋 자체 부재(CAP_004)를 구분하기 위한 조회다.
+     */
+    boolean existsApplicableCapRuleSet(
+            @Param("paymentId") Long paymentId,
+            @Param("transactionAttributionId") Long transactionAttributionId
+    );
+
     void insertCapCheck(CapCheckCommand command);
 
     void insertCapCheckDetail(CapCheckCommand command);

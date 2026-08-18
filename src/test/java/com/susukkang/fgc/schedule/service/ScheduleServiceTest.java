@@ -325,8 +325,9 @@ class ScheduleServiceTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.SCHE_004));
 
-        verify(scheduleReviewService).registerCapRuleReviewAfterRollback(
-                20L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 룰셋이 없습니다.");
+        verify(scheduleReviewService).registerCapReviewBeforeCommit(
+                20L, PaymentStage.GA_TO_FC, "POLICY_MISSING",
+                "1,200% 룰셋 검토 필요 - GA_TO_FC", "적용 가능한 1,200% 룰셋이 없습니다.");
         verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
         verify(scheduleMapper, never()).confirmScheduleHeader(any());
     }
@@ -374,7 +375,7 @@ class ScheduleServiceTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.SCHE_004));
 
-        verify(scheduleReviewService).registerCapReviewAfterRollback(
+        verify(scheduleReviewService).registerCapReviewBeforeCommit(
                 20L,
                 PaymentStage.GA_TO_FC,
                 "REFUND_TABLE_MISSING",
@@ -772,7 +773,7 @@ class ScheduleServiceTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(expectedErrorCode));
 
-        verify(scheduleReviewService).registerCapReviewAfterRollback(
+        verify(scheduleReviewService).registerCapReviewBeforeCommit(
                 20L, PaymentStage.GA_TO_FC, exceptionType, title, description);
         verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
         verify(scheduleMapper, never()).confirmScheduleHeader(any());

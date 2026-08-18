@@ -201,7 +201,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     paymentId,
                     data.transactionAttributionId()
             );
-            failFirst(capRuleFailure(rule, data));
+            boolean applicableCapRuleSetExists = mapper.existsApplicableCapRuleSet(
+                    paymentId,
+                    data.transactionAttributionId()
+            );
+            failFirst(capRuleFailure(rule, data, applicableCapRuleSetExists));
             CapCalculationResult calculation = calculateLimit(
                     data.contractId(),
                     data.paymentStage(),
@@ -313,7 +317,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         paymentId,
                         data.transactionAttributionId()
                 );
-                GateFailure ruleFailure = capRuleFailure(rule, data);
+                boolean applicableCapRuleSetExists = mapper.existsApplicableCapRuleSet(
+                        paymentId,
+                        data.transactionAttributionId()
+                );
+                GateFailure ruleFailure = capRuleFailure(rule, data, applicableCapRuleSetExists);
                 if (ruleFailure != null) {
                     failures.add(ruleFailure);
                 }
@@ -563,18 +571,22 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             requireContract(sourceContractId, "contractId");
         }
 
-        Long policyContractId = sourceContractId != null
+        boolean nonContractNewcomerPayment = !attributionRequests.isEmpty()
+                && attributionRequests.stream()
+                .allMatch(request -> request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT);
+        boolean approvedAllocationPayment = attributionRequests.stream()
+                .anyMatch(request -> request.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION);
+        // 승인배부는 여러 계약에 배부될 수 있다. 귀속행 첫 계약의 계약일을 정책 기준으로 쓰면
+        // 요청 배열 순서에 따라 정책 버전이 바뀌므로, 정산월을 기준으로 별도 해석한다.
+        Long policyContractId = approvedAllocationPayment
+                ? null
+                : sourceContractId != null
                 ? sourceContractId
                 : attributionRequests.stream()
                 .map(CommissionPaymentAttributionRequest::contractId)
                 .filter(java.util.Objects::nonNull)
                 .findFirst()
                 .orElse(null);
-        boolean nonContractNewcomerPayment = !attributionRequests.isEmpty()
-                && attributionRequests.stream()
-                .allMatch(request -> request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT);
-        boolean approvedAllocationPayment = attributionRequests.stream()
-                .anyMatch(request -> request.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION);
         Long effectivePolicyVersionId = nonContractNewcomerPayment
                 && policyContractId == null
                 && policyVersionId == null
@@ -583,7 +595,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         policyVersionId,
                         policyContractId,
                         paymentStage,
-                        approvedAllocationPayment
+                        approvedAllocationPayment,
+                        settlementMonth
                 );
 
         List<CommissionPaymentAttributionCommand> attributions = new ArrayList<>(attributionRequests.size());
@@ -642,25 +655,24 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long requestedPolicyVersionId,
             Long contractId,
             com.susukkang.fgc.common.code.PaymentStage paymentStage,
-            boolean approvedAllocationPayment
+            boolean approvedAllocationPayment,
+            LocalDate settlementMonth
     ) {
         if (requestedPolicyVersionId != null) {
             validatePolicyVersion(requestedPolicyVersionId);
             return requestedPolicyVersionId;
         }
-        if (contractId == null) {
-            // 귀속 전 DRAFT에는 정책을 고를 계약이 없을 수 있다.
-            // 저장은 허용하고 확정 게이트(POLICY_VERSION_MISSING)에서 차단한다.
-            return null;
-        }
-
         try {
             Long resolvedPolicyVersionId;
             if (approvedAllocationPayment) {
-                ContractReference contract = requireContract(contractId, "attributedContractId");
                 resolvedPolicyVersionId = commissionPolicyService
-                        .resolveCurrentAllocationPolicyVersion(contract.contractDate());
+                        .resolveCurrentAllocationPolicyVersion(settlementMonth);
             } else {
+                if (contractId == null) {
+                    // 귀속 전 DRAFT에는 정책을 고를 계약이 없을 수 있다.
+                    // 저장은 허용하고 확정 게이트(POLICY_VERSION_MISSING)에서 차단한다.
+                    return null;
+                }
                 resolvedPolicyVersionId = commissionPolicyService
                         .resolveCurrentCommission(contractId, paymentStage)
                         .getPolicyVersionId();
@@ -1272,15 +1284,22 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return null;
     }
 
-    private GateFailure capRuleFailure(CapRuleSnapshot rule, ConfirmationData data) {
+    private GateFailure capRuleFailure(
+            CapRuleSnapshot rule,
+            ConfirmationData data,
+            boolean applicableCapRuleSetExists
+    ) {
         if (rule == null) {
+            boolean missingRuleSet = !applicableCapRuleSetExists;
             return new GateFailure(
                     data,
-                    "POLICY_MISSING",
+                    missingRuleSet ? "POLICY_MISSING" : "CAP_ITEM_UNCLASSIFIED",
                     "HIGH",
-                    "확정 검증 정책 누락",
-                    "귀속행에 적용할 1,200% 분류정책을 찾을 수 없습니다.",
-                    FgcErrorCode.CAP_002,
+                    missingRuleSet ? "1,200% 룰셋 누락" : "한도 산입 항목 미분류",
+                    missingRuleSet
+                            ? "적용 가능한 활성 1,200% 룰셋이 없습니다."
+                            : "적용 룰셋에 해당 수수료 항목의 산입 기준이 없습니다.",
+                    missingRuleSet ? FgcErrorCode.CAP_004 : FgcErrorCode.CAP_002,
                     Map.of()
             );
         }

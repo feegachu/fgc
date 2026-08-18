@@ -533,6 +533,34 @@
          LIMIT 1
     </select>
 
+    <!-- 룰셋 부재(CAP_004)와 수수료 항목 미분류(CAP_002)를 구분한다. -->
+    <select id="existsApplicableCapRuleSet" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.commission_transaction ct
+              JOIN fgc.transaction_attribution ta
+                ON ta.commission_transaction_id = ct.commission_transaction_id
+               AND ta.transaction_attribution_id = #{transactionAttributionId}
+              JOIN fgc.insurance_contract c
+                ON c.contract_id = ta.contract_id
+              JOIN fgc.product_offering po
+                ON po.product_offering_id = c.product_offering_id
+              JOIN fgc.product p
+                ON p.product_id = po.product_id
+              JOIN fgc.cap_rule_set crs
+                ON crs.payment_stage = ct.payment_stage
+               AND c.contract_date &gt;= crs.contract_date_from
+               AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
+               AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
+               AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
+               AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+              JOIN fgc.policy_version cap_pv
+                ON cap_pv.policy_version_id = crs.policy_version_id
+               AND cap_pv.status = 'ACTIVE'
+             WHERE ct.commission_transaction_id = #{paymentId}
+        )
+    </select>
+
     <insert id="insertCapCheck"
             useGeneratedKeys="true"
             keyProperty="capCheckId"
