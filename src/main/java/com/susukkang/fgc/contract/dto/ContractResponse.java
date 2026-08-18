@@ -20,4 +20,5 @@ import java.util.List;
 public class ContractResponse {
     private Long contractId;
     private List<Long> scheduleHeaderIds;
+    private List<Long> regeneratedScheduleIds;
 }

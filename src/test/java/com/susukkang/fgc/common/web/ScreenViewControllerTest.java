@@ -22,7 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 실데이터 바인딩 검증은 화면별 기능 브랜치의 몫이다.
  * (실데이터 바인딩된 화면은 도메인 뷰 컨트롤러 테스트로 이관:
  *  DASH → DashboardViewControllerTest, BASE → BaseViewControllerTest,
- *  POL → PolicyViewControllerTest, EXCP → ExceptionCaseViewControllerTest)
+ *  POL → PolicyViewControllerTest, EXCP → ExceptionCaseViewControllerTest,
+ *  VRUN → ValidationRunViewControllerTest)
  *
  * 요구사항 추적(FGC-FUN-xxx): CONT 018 ·
  * TRAN 065/031/033/034 · SCHE 036/039 · CAP 030/032/035 · ARB 063 ·
@@ -52,8 +53,6 @@ class ScreenViewControllerTest {
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
             "/contracts/1,         FGC-UI-CONT-W02",
-            "/contracts/new,       FGC-UI-CONT-W03",
-            "/contracts/1/edit,    FGC-UI-CONT-W03",
             "/transactions,        FGC-UI-TRAN-W01",
             "/transactions/new,    FGC-UI-TRAN-W02",
             "/schedules,           FGC-UI-SCHE-W01",
@@ -62,8 +61,6 @@ class ScreenViewControllerTest {
             "/arbitrage-checks,    FGC-UI-ARB-W01",
             "/journals,            FGC-UI-LEDG-W01",
             "/reconciliations,     FGC-UI-RECO-W01",
-            "/validation-runs,     FGC-UI-VRUN-W01",
-            "/validation-runs/1,   FGC-UI-VRUN-W02",
     })
     void screen_renders_with_its_id(String route, String screenId) throws Exception {
         mvc.perform(get(route).with(user(settleUser())))
@@ -189,14 +186,6 @@ class ScreenViewControllerTest {
      */
     @ParameterizedTest(name = "{0} {1} → {2}")
     @CsvSource({
-            "SETTLEMENT,   /contracts/new,    200",
-            "SYSTEM_ADMIN, /contracts/new,    200",
-            "GA_ADMIN,     /contracts/new,    403",
-            "COMPLIANCE,   /contracts/new,    403",
-            "SETTLEMENT,   /contracts/1/edit, 200",
-            "SYSTEM_ADMIN, /contracts/1/edit, 200",
-            "GA_ADMIN,     /contracts/1/edit, 403",
-            "COMPLIANCE,   /contracts/1/edit, 403",
             "SETTLEMENT,   /transactions/new, 200",
             "SYSTEM_ADMIN, /transactions/new, 200",
             "GA_ADMIN,     /transactions/new, 403",

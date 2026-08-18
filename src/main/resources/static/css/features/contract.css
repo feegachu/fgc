@@ -32,6 +32,11 @@
   margin-top: 0.25rem;
 }
 
+.contract-request-id {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
 .contract-form-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.03fr);
@@ -197,6 +202,17 @@
   color: var(--color-text-tertiary);
   font-size: 0.75rem;
   line-height: 1.125rem;
+}
+
+.contract-save-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-link);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
 }
 
 .contract-atomic-guidance {

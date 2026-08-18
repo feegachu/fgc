@@ -155,6 +155,15 @@ class ContractMapperIntegrationTest {
                 contractMapper.selectContractDetailById(contract.getContractId());
         assertThat(detail.getContractNo()).isEqualTo(changedContractNo);
         assertThat(detail.getContractStatus()).isEqualTo(TERMINATED);
+        assertThat(detail.getContractId()).isEqualTo(contract.getContractId());
+        assertThat(detail.getInsurerId()).isEqualTo(refs.insurerId());
+        assertThat(detail.getProductOfferingId()).isEqualTo(refs.productOfferingId());
+        assertThat(detail.getAgentId()).isEqualTo(refs.agentId());
+        assertThat(detail.getOrganizationId()).isEqualTo(refs.organizationId());
+        assertThat(detail.getInsurerName()).isNotBlank();
+        assertThat(detail.getProductName()).isNotBlank();
+        assertThat(detail.getAgentName()).isNotBlank();
+        assertThat(detail.getOrganizationName()).isNotBlank();
     }
 
     private InsuranceContract newContract(References refs) {

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -26,6 +27,7 @@ public class ContractCreateRequest implements ContractInput {
     @NotNull
     private Long insurerId; //보험회사
     @NotBlank
+    @Size(max = 80)
     private String contractNo; //계약번호
     @NotNull
     private Long productOfferingId; //상품판매버전
@@ -43,10 +45,13 @@ public class ContractCreateRequest implements ContractInput {
     @NotNull
     private PaymentCycleCode paymentCycleCode; //납입주기
     @NotNull
-    @Positive
+    @PositiveOrZero
+    private BigDecimal premiumPerCycleAmount; //주기 보험료
+    @NotNull
+    @PositiveOrZero
     private BigDecimal firstPremiumAmount; //초회 보험료
     @NotNull
-    @Positive
+    @PositiveOrZero
     private BigDecimal monthlyEquivalentFirstPremium; //월납 환산 보험료
     @NotNull
     @Positive
