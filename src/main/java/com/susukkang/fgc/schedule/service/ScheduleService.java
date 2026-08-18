@@ -157,7 +157,7 @@ public class ScheduleService {
      * @author hjKang
      * @since 2026-08-10
      */
-    @Transactional(noRollbackFor = ScheduleConfirmationRejectedException.class)
+    @Transactional
     public ScheduleGenerationResult generateSchedules(InsuranceContract contract) {
         // 입력값 검증
         if (contract == null || contract.getContractId() == null) {
@@ -1128,7 +1128,7 @@ public class ScheduleService {
      * 문제: 화면의 확정 버튼으로 계산 근거를 고정할 수 없고 동시에 확정·재생성하면 상태가 충돌할 수 있었다.
      * 개선: 계약 행 잠금으로 상태 전이를 직렬화하고 회차를 먼저 확정한 뒤 헤더를 확정하여 DB 불변성 규칙을 활성화한다.
      */
-    @Transactional
+    @Transactional(noRollbackFor = ScheduleConfirmationRejectedException.class)
     public ScheduleDetailResponse confirmSchedule(Long scheduleId) {
         ScheduleHeaderInsertDTO header = scheduleMapper.selectScheduleHeaderById(scheduleId);
         if (header == null) {
