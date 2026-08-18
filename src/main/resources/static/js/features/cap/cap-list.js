@@ -10,6 +10,7 @@
     stage: document.getElementById("cap-stage"),
     status: document.getElementById("cap-status"),
     insurerId: document.getElementById("cap-insurer"),
+    orgId: document.getElementById("cap-organization"),
     contractNo: document.getElementById("cap-contract-no"),
     size: document.getElementById("cap-page-size")
   };
@@ -79,7 +80,7 @@
 
   function queryFromLocation() {
     var params = new URLSearchParams(window.location.search);
-    ["month", "stage", "status", "contractNo"].forEach(function (key) {
+    ["month", "stage", "status", "insurerId", "orgId", "contractNo"].forEach(function (key) {
       if (!params.has(key) || !controls[key]) return;
       controls[key].value = params.get(key);
     });
@@ -90,7 +91,7 @@
 
   function currentParams() {
     var params = new URLSearchParams();
-    ["month", "stage", "status", "insurerId", "contractNo"].forEach(function (key) {
+    ["month", "stage", "status", "insurerId", "orgId", "contractNo"].forEach(function (key) {
       if (!controls[key] || controls[key].disabled) return;
       var value = controls[key].value.trim();
       if (value) params.set(key, value);
@@ -105,8 +106,78 @@
     window.history.replaceState(null, "", url);
   }
 
+  function asOfDate() {
+    if (controls.month.value) return controls.month.value + "-01";
+    var today = new Date();
+    return new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+
+  function content(envelope) {
+    return envelope && envelope.data && Array.isArray(envelope.data.content) ? envelope.data.content : [];
+  }
+
+  function setOptions(select, rows, valueKey, label) {
+    var selectedValue = select.value;
+    select.replaceChildren();
+    var all = document.createElement("option");
+    all.value = "";
+    all.textContent = "전체";
+    select.appendChild(all);
+    rows.forEach(function (row) {
+      var option = document.createElement("option");
+      option.value = String(row[valueKey]);
+      option.textContent = label(row);
+      option.disabled = row.activeYn === false;
+      select.appendChild(option);
+    });
+    select.value = selectedValue;
+    select.disabled = false;
+  }
+
+  function setReferenceLoadError(select, label, error) {
+    select.replaceChildren();
+    var option = document.createElement("option");
+    option.value = "";
+    option.textContent = label + " 목록을 불러오지 못했습니다.";
+    select.appendChild(option);
+    select.disabled = true;
+    if (window.FgcUi && window.FgcUi.toast) {
+      window.FgcUi.toast(error && error.message ? error.message : label + " 조회 실패", "error");
+    }
+  }
+
+  function loadInsurers() {
+    controls.insurerId.disabled = true;
+    return window.FgcUi.apiClient.request("/api/v1/base/insurers?page=1&size=100")
+      .then(function (envelope) {
+        setOptions(controls.insurerId, content(envelope), "insurerId", function (row) {
+          return row.insurerCode + " · " + row.insurerName;
+        });
+      })
+      .catch(function (error) { setReferenceLoadError(controls.insurerId, "보험회사", error); });
+  }
+
+  function loadOrganizations() {
+    controls.orgId.disabled = true;
+    return window.FgcUi.apiClient.request("/api/v1/base/organizations?asOf=" + encodeURIComponent(asOfDate()) + "&page=1&size=100")
+      .then(function (envelope) {
+        setOptions(controls.orgId, content(envelope), "organizationId", function (row) {
+          return row.organizationCode + " · " + row.organizationName;
+        });
+      })
+      .catch(function (error) { setReferenceLoadError(controls.orgId, "조직", error); });
+  }
+
+  function loadReferenceData() {
+    return Promise.all([loadInsurers(), loadOrganizations()]);
+  }
+
   function setLoading() {
     document.getElementById("cap-kpi-grid").setAttribute("aria-busy", "true");
+    document.getElementById("cap-stage-grid").setAttribute("aria-busy", "true");
+    document.getElementById("cap-agent-message").textContent = "설계사별 모니터링 지표를 불러오는 중입니다.";
+    document.getElementById("cap-agent-message").hidden = false;
+    document.getElementById("cap-agent-table-wrap").hidden = true;
     document.getElementById("cap-list-message").className = "cap-inline-message";
     document.getElementById("cap-list-message").textContent = "판정 목록을 불러오는 중입니다.";
     document.getElementById("cap-list-message").hidden = false;
@@ -126,6 +197,10 @@
       value.textContent = "—";
     });
     document.getElementById("cap-kpi-grid").setAttribute("aria-busy", "false");
+    document.getElementById("cap-stage-grid").setAttribute("aria-busy", "false");
+    document.getElementById("cap-agent-message").textContent = "설계사별 모니터링 지표를 불러오지 못했습니다.";
+    document.getElementById("cap-agent-message").hidden = false;
+    document.getElementById("cap-agent-table-wrap").hidden = true;
     document.getElementById("cap-pagination").replaceChildren();
   }
 
@@ -185,6 +260,62 @@
     renderPagination(data.page, data.totalPages);
   }
 
+  function stageStatus(stage) {
+    if (!stage.contractCount) return { label: "대상 없음", className: "status-badge-neutral", progressClass: "" };
+    if (stage.violationCount > 0) return { label: "위반 " + number(stage.violationCount) + "건", className: "status-badge-error", progressClass: "is-violation" };
+    if (stage.warningCount > 0) return { label: "주의 " + number(stage.warningCount) + "건", className: "status-badge-warning", progressClass: "is-warning" };
+    return { label: "정상", className: "status-badge-success", progressClass: "" };
+  }
+
+  function stageCard(stage) {
+    var isAgent = stage.paymentStage === "GA_TO_FC";
+    var status = stageStatus(stage);
+    var deduction = isAgent ? "적용하지 않음" : won(stage.complianceDeductionAmountTotal);
+    var worst = stage.worstContractNo
+      ? "최고 사용률 " + escapeHtml(stage.worstContractNo) + " · " + escapeHtml(percent(stage.worstUsagePct))
+      : "판정 대상 계약이 없습니다.";
+    return '<article class="cap-stage-card">' +
+      '<header class="cap-stage-card-header"><div><h3 class="cap-stage-title">' + escapeHtml(stage.paymentStageLabel) + '</h3><p class="cap-stage-code">' + escapeHtml(stage.paymentStage) + '</p></div><span class="status-badge ' + status.className + '">' + status.label + '</span></header>' +
+      '<div class="cap-stage-metrics"><div><span>계약 수</span><strong>' + number(stage.contractCount) + '건</strong></div><div><span>한도 합계</span><strong>' + won(stage.limitAmountTotal) + '</strong></div><div><span>산입 합계</span><strong>' + won(stage.includedAmountTotal) + '</strong></div></div>' +
+      '<div class="cap-stage-usage"><div><span>사용률</span><strong>' + escapeHtml(percent(stage.usagePct)) + '</strong></div><span class="cap-usage-track"><span class="cap-usage-bar ' + status.progressClass + '" style="--cap-progress:' + visualWidth(stage.usagePct) + '"></span></span></div>' +
+      '<p class="cap-stage-note">' + (isAgent ? "준법경영비 공제를 적용하지 않습니다." : "준법경영비 공제 합계 " + deduction) + '<br>' + worst + '</p></article>';
+  }
+
+  function renderStageSummary(rows) {
+    var grid = document.getElementById("cap-stage-grid");
+    grid.setAttribute("aria-busy", "false");
+    if (!rows || !rows.length) {
+      grid.innerHTML = '<div class="cap-inline-message">조건에 맞는 지급단계별 집계가 없습니다.</div>';
+      return;
+    }
+    grid.innerHTML = rows.map(stageCard).join("");
+  }
+
+  function agentRow(agent) {
+    var organization = [agent.organizationCode, agent.organizationName].filter(Boolean).join(" · ") || "—";
+    return "<tr>" +
+      '<td><strong>' + escapeHtml(agent.agentName || "—") + '</strong><br><small>' + escapeHtml(agent.agentCode || "") + '</small></td>' +
+      '<td>' + escapeHtml(organization) + '</td>' +
+      '<td class="text-right tabular-nums">' + number(agent.contractCount) + '건</td>' +
+      '<td class="text-right tabular-nums">' + won(agent.limitAmountTotal) + '</td>' +
+      '<td class="text-right tabular-nums">' + won(agent.includedAmountTotal) + '</td>' +
+      '<td><div class="cap-usage-cell"><span class="cap-usage-track"><span class="cap-usage-bar" style="--cap-progress:' + visualWidth(agent.usagePct) + '"></span></span><span class="cap-usage-value">' + escapeHtml(percent(agent.usagePct)) + '</span></div></td></tr>';
+  }
+
+  function renderAgentSummary(rows) {
+    var message = document.getElementById("cap-agent-message");
+    var tableWrap = document.getElementById("cap-agent-table-wrap");
+    if (!rows || !rows.length) {
+      message.textContent = "조건에 맞는 GA → 설계사 단계 모니터링 대상이 없습니다.";
+      message.hidden = false;
+      tableWrap.hidden = true;
+      return;
+    }
+    document.getElementById("cap-agent-body").innerHTML = rows.map(agentRow).join("");
+    message.hidden = true;
+    tableWrap.hidden = false;
+  }
+
   function pageButton(label, page, options) {
     var button = document.createElement("button");
     button.type = "button";
@@ -217,7 +348,9 @@
 
   function render(data) {
     renderKpis(data.summary);
+    renderStageSummary(data.stageSummary);
     renderContracts(data);
+    renderAgentSummary(data.agentSummary);
   }
 
   function load() {
@@ -324,14 +457,14 @@
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     state.page = 1;
-    load();
+    loadReferenceData().then(load);
   });
   document.getElementById("cap-reset").addEventListener("click", function () {
     form.reset();
     controls.month.value = root.dataset.initialMonth || "";
     controls.size.value = "20";
     state.page = 1;
-    load();
+    loadReferenceData().then(load);
   });
   controls.status.addEventListener("change", function () {
     document.querySelectorAll("[data-cap-status]").forEach(function (button) {
@@ -355,5 +488,5 @@
   });
 
   queryFromLocation();
-  load();
+  loadReferenceData().then(load);
 })();

@@ -146,9 +146,9 @@ class ScreenViewControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "/js/features/cap/cap-list.js")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id=\"cap-insurer\" name=\"insurerId\" disabled")))
+                        "id=\"cap-insurer\" name=\"insurerId\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id=\"cap-organization\" name=\"organizationId\" disabled")))
+                        "id=\"cap-organization\" name=\"orgId\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "전체 검색범위 Stage 집계 API가 아직 제공되지 않습니다.")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(

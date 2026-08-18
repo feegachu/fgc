@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   FGC-UI-CAP-W01 1,200% 한도 검증 현황
-  현재 연결 API: GET /api/v1/cap-checks?month=&stage=&status=&insurerId=&contractNo=&page=&size=
+  현재 연결 API: GET /api/v1/cap-checks?month=&stage=&status=&insurerId=&orgId=&contractNo=&page=&size=
 
   현재 응답의 summary와 content만 연결한다. 아직 응답에 없는 지급단계별·설계사별 집계는
   페이징된 content로 다시 계산하지 않고 연동 대기로 표시한다. 저장된 resultStatus를 그대로
@@ -51,16 +51,14 @@
       <div class="field">
         <label class="field-label" for="cap-insurer">보험회사</label>
         <select class="select-control" id="cap-insurer" name="insurerId" disabled aria-describedby="cap-insurer-help">
-          <option value="">기준정보 연동 대기</option>
+          <option value="">불러오는 중</option>
         </select>
-        <span id="cap-insurer-help" class="field-helper">보험회사 조회 API 연결 후 사용할 수 있습니다.</span>
       </div>
       <div class="field">
         <label class="field-label" for="cap-organization">조직</label>
-        <select class="select-control" id="cap-organization" name="organizationId" disabled aria-describedby="cap-organization-help">
-          <option value="">기준정보 연동 대기</option>
+        <select class="select-control" id="cap-organization" name="orgId" disabled aria-describedby="cap-organization-help">
+          <option value="">불러오는 중</option>
         </select>
-        <span id="cap-organization-help" class="field-helper">조직 조회 API 연결 후 사용할 수 있습니다.</span>
       </div>
       <div class="field cap-filter-contract">
         <label class="field-label" for="cap-contract-no">계약번호</label>
