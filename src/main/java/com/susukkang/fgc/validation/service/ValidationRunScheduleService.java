@@ -4,6 +4,7 @@ import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
+import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
@@ -83,7 +84,13 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
 
 
             try {
-                itemService.process(contractId);
+                ScheduleGenerationResult result = itemService.process(contractId);
+                // FGC-FUN-043 결과 집계 — 이번 실행이 만든 헤더만 validation_run_id로
+                // 표시한다. itemService.process()는 REQUIRES_NEW로 이미 커밋했으니 그
+                // 헤더 ID들만 이어서 UPDATE하면 된다(새 헤더가 없으면 빈 목록이라 no-op).
+                if (!result.scheduleHeaderIds().isEmpty()) {
+                    scheduleMapper.linkHeadersToValidationRun(result.scheduleHeaderIds(), validationRunId);
+                }
                 processedCount++;
             } catch (FgcBusinessException exception) {
                 skips.add(new ContractSkip(

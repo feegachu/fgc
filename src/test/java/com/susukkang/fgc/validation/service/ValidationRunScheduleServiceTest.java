@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
+import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.dto.ValidationScheduleState;
@@ -53,12 +54,30 @@ class ValidationRunScheduleServiceTest {
         given(validationScheduleMapper.selectScheduleStates(118L))
                 .willReturn(List.of(validState(10L, PaymentStage.INSURER_TO_GA),
                         validState(10L, PaymentStage.GA_TO_FC)));
+        given(itemService.process(10L))
+                .willReturn(new ScheduleGenerationResult(List.of(200L, 201L), 24));
 
         StepProcessingResult result = service.validateContractSchedules(118L);
 
         assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.skippedCount()).isZero();
         verify(itemService).process(10L);
+        // FGC-FUN-043 — 새로 만든 헤더는 이 실행에 연결돼야 화면 집계에서 잡힌다.
+        verify(scheduleMapper).linkHeadersToValidationRun(List.of(200L, 201L), 118L);
+    }
+
+    @Test
+    void doesNotLinkHeadersWhenRegenerationCreatesNothingNew() {
+        // 활성 스케줄이 이미 있어 generateSchedules()가 새 헤더를 안 만드는 경우 —
+        // linkHeadersToValidationRun 호출 자체가 없어야 한다(빈 IN절 UPDATE 방지).
+        given(validationScheduleMapper.selectScheduleStates(118L))
+                .willReturn(List.of(validState(10L, PaymentStage.INSURER_TO_GA)));
+        given(itemService.process(10L))
+                .willReturn(new ScheduleGenerationResult(List.of(), 0));
+
+        service.validateContractSchedules(118L);
+
+        verify(scheduleMapper, never()).linkHeadersToValidationRun(any(), any());
     }
 
     @Test
@@ -108,6 +127,8 @@ class ValidationRunScheduleServiceTest {
                         validState(20L, PaymentStage.GA_TO_FC)));
         doThrow(new FgcBusinessException(FgcErrorCode.COMMON_002))
                 .when(itemService).process(10L);
+        given(itemService.process(20L))
+                .willReturn(new ScheduleGenerationResult(List.of(202L), 12));
 
         StepProcessingResult result = service.validateContractSchedules(118L);
 

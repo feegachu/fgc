@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.validation.dto.AgentCapMonitoringRow;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow;
 import com.susukkang.fgc.validation.dto.ValidationTargetListRow;
@@ -25,4 +26,11 @@ public interface ValidationRunDetailMapper {
 
     /** ③건수 + ④결과 요약 4블록을 한 번에 집계 */
     ValidationRunResultSummaryRow summarize(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * FGC-FUN-043 "설계사·조직 합계는 모니터링 지표로만 사용" — cap_check를 설계사별로
+     * 묶어 참고용 건수만 돌려준다. 계약별 result_status는 이 집계와 무관하게 그대로
+     * 유지된다(변경·덮어쓰기 없음).
+     */
+    List<AgentCapMonitoringRow> summarizeCapByAgent(@Param("validationRunId") Long validationRunId);
 }

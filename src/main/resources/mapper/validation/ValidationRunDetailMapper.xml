@@ -53,7 +53,10 @@
                cc.capCheckedCount, cc.capViolationCount, cc.capWarningCount, cc.capReviewRequiredCount,
                ac.arbitrageCheckedCount, ac.arbitrageCandidateCount, ac.arbitrageReviewRequiredCount,
                jh.journalCount, jh.journalImbalanceCount,
-               rr.reconciliationResultCount, rr.reconciliationMismatchCount
+               rr.reconciliationResultCount, rr.reconciliationMismatchCount,
+               sh.scheduleGeneratedCount,
+               rr.reconciliationMatchedCount, rr.reconciliationMismatchedCount,
+               rr.reconciliationUnmatchedCount, rr.reconciliationDifferenceAmountTotal
           FROM (SELECT COUNT(*) FILTER (WHERE selection_status = 'SELECTED')        AS targetSelectedCount,
                        COUNT(*) FILTER (WHERE selection_status = 'EXCLUDED')        AS targetExcludedCount,
                        COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
@@ -75,11 +78,43 @@
                        FROM fgc.journal_header j
                        LEFT JOIN fgc.vw_journal_imbalance vji ON vji.journal_header_id = j.journal_header_id
                       WHERE j.validation_run_id = #{validationRunId}) jh
-         CROSS JOIN (SELECT COUNT(r.reconciliation_result_id)                       AS reconciliationResultCount,
-                            COUNT(*) FILTER (WHERE r.result_type &lt;&gt; 'MATCHED') AS reconciliationMismatchCount
+         <!-- 대사 3분류(FUN-043) — 누락(EXPECTED_MISSING/ACTUAL_MISSING)만 UNMATCHED,
+              그 외 MATCHED가 아닌 나머지 전부(AMOUNT_DIFFERENCE·DUPLICATE·AGENT_MISMATCH·
+              INSTALLMENT_MISMATCH·INVALID_CONTRACT_PAYMENT·POLICY_VERSION_ERROR·
+              JOURNAL_IMBALANCE·REVIEW_REQUIRED)는 MISMATCHED로 묶는다 — 양쪽 다 있지만
+              값/상태가 안 맞는 것과 아예 상대편이 없는 것을 구분하려는 목적이다. 차액
+              합계는 MATCHED가 아닌 모든 행(대사가 안 맞아 영향이 있는 행)만 더한다. -->
+         CROSS JOIN (SELECT COUNT(r.reconciliation_result_id)                                    AS reconciliationResultCount,
+                            COUNT(*) FILTER (WHERE r.result_type &lt;&gt; 'MATCHED')              AS reconciliationMismatchCount,
+                            COUNT(*) FILTER (WHERE r.result_type = 'MATCHED')                     AS reconciliationMatchedCount,
+                            COUNT(*) FILTER (WHERE r.result_type NOT IN
+                                ('MATCHED', 'EXPECTED_MISSING', 'ACTUAL_MISSING'))                AS reconciliationMismatchedCount,
+                            COUNT(*) FILTER (WHERE r.result_type IN
+                                ('EXPECTED_MISSING', 'ACTUAL_MISSING'))                            AS reconciliationUnmatchedCount,
+                            COALESCE(SUM(r.difference_amount) FILTER (WHERE r.result_type &lt;&gt; 'MATCHED'), 0)
+                                                                                                    AS reconciliationDifferenceAmountTotal
                        FROM fgc.reconciliation_run recon
                        LEFT JOIN fgc.reconciliation_result r ON r.reconciliation_run_id = recon.reconciliation_run_id
                       WHERE recon.validation_run_id = #{validationRunId}) rr
+         CROSS JOIN (SELECT COUNT(*) AS scheduleGeneratedCount
+                       FROM fgc.schedule_header
+                      WHERE validation_run_id = #{validationRunId}) sh
+    </select>
+
+    <!-- 설계사 단위 모니터링 참고용 집계 — 계약별 cap_check.result_status는 건드리지 않는다. -->
+    <select id="summarizeCapByAgent" resultType="com.susukkang.fgc.validation.dto.AgentCapMonitoringRow">
+        SELECT ag.agent_id                                                    AS agentId,
+               ag.agent_name                                                  AS agentName,
+               COUNT(*)                                                       AS checkedCount,
+               COUNT(*) FILTER (WHERE cc.result_status = 'VIOLATION')         AS violationCount,
+               COUNT(*) FILTER (WHERE cc.result_status = 'WARNING')           AS warningCount,
+               COUNT(*) FILTER (WHERE cc.result_status = 'REVIEW_REQUIRED')   AS reviewRequiredCount
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+          JOIN fgc.agent ag ON ag.agent_id = ic.agent_id
+         WHERE cc.validation_run_id = #{validationRunId}
+         GROUP BY ag.agent_id, ag.agent_name
+         ORDER BY ag.agent_id
     </select>
 
 </mapper>
