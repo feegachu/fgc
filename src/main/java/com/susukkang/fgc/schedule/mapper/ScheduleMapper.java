@@ -65,6 +65,16 @@ public interface ScheduleMapper {
     int insertAllScheduleLines(@Param("lines") List<ScheduleLineInsertDTO> scheduleLineList);
 
     /**
+     * FGC-FUN-043 결과 집계 — 월 검증 배치가 생성·재생성한 스케줄 헤더를 그 실행에
+     * 연결한다(schedule_header.validation_run_id, V21). 계약 생성·정책 변경 등 검증
+     * 실행과 무관한 경로로 만든 헤더는 이 메서드를 거치지 않아 NULL로 남는다.
+     *
+     * @return 갱신된 헤더 수
+     */
+    int linkHeadersToValidationRun(@Param("scheduleHeaderIds") List<Long> scheduleHeaderIds,
+                                    @Param("validationRunId") Long validationRunId);
+
+    /**
      * 정책 미존재·중복으로 스케줄을 생성하지 못한 지급단계를 검토 예외 큐에 등록한다.
      * 동일 계약·지급단계·예외유형은 한 건으로 유지한다.
      *

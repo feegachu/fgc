@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.dto;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -31,7 +32,18 @@ public record ValidationRunDetailResponse(
     public record LedgerSummary(long journalCount, long imbalanceCount) {
     }
 
-    /** ④-4 대사 — reconciliation_result 집계 */
-    public record ReconciliationSummary(long resultCount, long mismatchCount) {
+    /**
+     * ④-4 대사 — reconciliation_result 집계. matchedCount/mismatchedCount/unmatchedCount는
+     * FGC-FUN-043 확대 요구사항인 MATCHED/MISMATCHED/UNMATCHED 3분류다(mismatchCount는
+     * 기존 필드로 MATCHED가 아닌 전체를 뜻해 하위호환을 위해 남겨 둔다 — mismatchedCount
+     * + unmatchedCount와 같아야 한다).
+     */
+    public record ReconciliationSummary(
+            long resultCount,
+            long mismatchCount,
+            long matchedCount,
+            long mismatchedCount,
+            long unmatchedCount,
+            BigDecimal differenceAmountTotal) {
     }
 }
