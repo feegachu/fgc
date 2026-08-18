@@ -1,21 +1,6 @@
 (function () {
   "use strict";
 
-  var tabs = Array.from(document.querySelectorAll("[data-policy-tab]"));
-  if (!tabs.length) return;
-
-  var detailTabs = ["tab-rule", "tab-cap", "tab-refund"];
-  var selected = null;
-  var detail = null;
-  var loadingFor = null;
-
-  var inclusion = {
-    INCLUDED: ["산입", "status-badge-success"],
-    EXCLUDED: ["제외", "status-badge-neutral"],
-    REVIEW_REQUIRED: ["검토 필요", "status-badge-review"]
-  };
-  var calculationType = { RATE: "요율", FIXED: "정액" };
-
   function escapeHtml(value) {
     return String(value == null ? "" : value)
         .replace(/&/g, "&amp;")
@@ -28,6 +13,40 @@
   function dash(value) {
     return value == null || value === "" ? "-" : escapeHtml(value);
   }
+
+  function formatNumber(value, options) {
+    if (value == null || value === "" || (typeof value === "string" && value.trim() === "")) return "-";
+    var parsed = Number(value);
+    if (!isFinite(parsed)) return "-";
+    return escapeHtml(parsed.toLocaleString("ko-KR", options));
+  }
+
+  function formatRange(from, to) {
+    if (formatNumber(from) === "-" && formatNumber(to) === "-") return "-";
+    return formatNumber(from, { maximumFractionDigits: 0 })
+        + " ~ " + formatNumber(to, { maximumFractionDigits: 0 }) + "회차";
+  }
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { formatNumber: formatNumber, formatRange: formatRange };
+    return;
+  }
+
+  var tabs = Array.from(document.querySelectorAll("[data-policy-tab]"));
+  if (!tabs.length) return;
+
+  var detailTabs = ["tab-rule", "tab-cap", "tab-refund"];
+  var selected = null;
+  var detail = null;
+  var loadingFor = null;
+  var detailAbortController = null;
+
+  var inclusion = {
+    INCLUDED: ["산입", "status-badge-success"],
+    EXCLUDED: ["제외", "status-badge-neutral"],
+    REVIEW_REQUIRED: ["검토 필요", "status-badge-review"]
+  };
+  var calculationType = { RATE: "요율", FIXED: "정액" };
 
   function emptyState(message, isError) {
     return "<div class='empty-state policy-empty-state"
@@ -70,11 +89,11 @@
           + "<td>" + (rule.productName == null ? "전체" : escapeHtml(rule.productName)) + "</td>"
           + "<td class='tabular-nums'>" + dash(rule.agentRankCode) + "</td>"
           + "<td>" + escapeHtml(rule.itemName) + "</td>"
-          + "<td class='tabular-nums'>" + escapeHtml(rule.installmentFrom) + "~" + escapeHtml(rule.installmentTo) + "회차</td>"
+          + "<td class='tabular-nums'>" + formatRange(rule.installmentFrom, rule.installmentTo) + "</td>"
           + "<td>" + escapeHtml(calculationType[rule.calculationType] || rule.calculationType) + "</td>"
           + "<td class='tabular-nums'>" + escapeHtml(rule.basisCode) + "</td>"
-          + "<td class='is-number tabular-nums'>" + dash(rule.ratePct) + "</td>"
-          + "<td class='is-number tabular-nums'>" + (rule.fixedAmount == null ? "-" : Number(rule.fixedAmount).toLocaleString("ko-KR")) + "</td>"
+          + "<td class='is-number tabular-nums'>" + formatNumber(rule.ratePct, { maximumFractionDigits: 6 }) + "</td>"
+          + "<td class='is-number tabular-nums'>" + formatNumber(rule.fixedAmount, { maximumFractionDigits: 0 }) + "</td>"
           + "</tr>";
     }).join("");
 
@@ -162,9 +181,15 @@
   }
 
   function renderDetail() {
-    document.querySelector("#tab-rule [data-detail-body]").innerHTML = renderRules(detail.commissionRules || []);
-    document.querySelector("#tab-cap [data-detail-body]").innerHTML = renderCapSets(detail.capRuleSets || []);
-    document.querySelector("#tab-refund [data-detail-body]").innerHTML = renderRefundTables(detail.refundRateTables || []);
+    var targets = [
+      ["#tab-rule [data-detail-body]", renderRules(detail.commissionRules || [])],
+      ["#tab-cap [data-detail-body]", renderCapSets(detail.capRuleSets || [])],
+      ["#tab-refund [data-detail-body]", renderRefundTables(detail.refundRateTables || [])]
+    ];
+    targets.forEach(function (target) {
+      var body = document.querySelector(target[0]);
+      if (body) body.innerHTML = target[1];
+    });
   }
 
   function ensureDetail() {
@@ -182,8 +207,12 @@
 
     var current = selected;
     loadingFor = current;
+    detailAbortController = new AbortController();
+    var requestController = detailAbortController;
     setDetailState("불러오는 중…", false);
-    apiClient.request("/api/v1/policies/" + encodeURIComponent(current.id))
+    apiClient.request("/api/v1/policies/" + encodeURIComponent(current.id), {
+      signal: requestController.signal
+    })
         .then(function (response) {
           if (loadingFor !== current) return;
           detail = response.data || {};
@@ -191,12 +220,14 @@
         })
         .catch(function (error) {
           if (loadingFor !== current) return;
+          if (error && error.name === "AbortError") return;
           var message = error && error.message ? error.message : "정책 상세를 불러오지 못했습니다.";
           setDetailState(message, true);
           if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(message, "error");
         })
         .finally(function () {
           if (loadingFor === current) loadingFor = null;
+          if (detailAbortController === requestController) detailAbortController = null;
         });
   }
 
@@ -204,8 +235,12 @@
     document.querySelectorAll("[data-policy-row]").forEach(function (candidate) {
       var isSelected = candidate === row;
       candidate.classList.toggle("is-selected", isSelected);
-      candidate.setAttribute("aria-selected", isSelected ? "true" : "false");
+      var selector = candidate.querySelector("[data-policy-select]");
+      if (selector) selector.checked = isSelected;
     });
+    if (detailAbortController) detailAbortController.abort();
+    detailAbortController = null;
+    loadingFor = null;
     selected = {
       id: row.getAttribute("data-policy-version-id"),
       code: row.getAttribute("data-policy-code"),
@@ -221,13 +256,13 @@
   }
 
   document.querySelectorAll("[data-policy-row]").forEach(function (row) {
-    row.addEventListener("click", function () {
+    var selector = row.querySelector("[data-policy-select]");
+    row.addEventListener("click", function (event) {
+      if (event.target === selector) return;
       selectRow(row);
     });
-    row.addEventListener("keydown", function (event) {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      selectRow(row);
+    if (selector) selector.addEventListener("change", function () {
+      if (selector.checked) selectRow(row);
     });
   });
 

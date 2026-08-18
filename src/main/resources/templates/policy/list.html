@@ -81,12 +81,13 @@
         <table class="data-table policy-version-table">
           <caption class="visually-hidden">적용 기준일의 정책 버전 목록</caption>
           <colgroup>
-            <col class="policy-col-code"><col class="policy-col-name"><col class="policy-col-type">
+            <col class="policy-col-select"><col class="policy-col-code"><col class="policy-col-name"><col class="policy-col-type">
             <col class="policy-col-source"><col class="policy-col-version"><col class="policy-col-date">
             <col class="policy-col-date"><col class="policy-col-status"><col class="policy-col-reference">
           </colgroup>
           <thead>
           <tr>
+            <th scope="col"><span class="visually-hidden">선택</span></th>
             <th scope="col">정책코드</th><th scope="col">정책이름</th><th scope="col">유형</th><th scope="col">출처분류</th>
             <th scope="col" class="is-number">버전</th><th scope="col">적용 시작</th><th scope="col">적용 종료</th><th scope="col">상태</th><th scope="col">근거</th>
           </tr>
@@ -99,7 +100,13 @@
               th:data-policy-version-id="${v.policyVersionId()}"
               th:data-policy-code="${v.policyCode()}"
               th:data-version-no="${v.versionNo()}"
-              data-policy-row tabindex="0" aria-selected="false">
+              data-policy-row>
+            <td class="policy-select-cell">
+              <input type="radio" name="policy-version-selection" class="policy-row-select"
+                     th:value="${v.policyVersionId()}"
+                     th:aria-label="|${v.policyName()} v${v.versionNo()} 선택|"
+                     data-policy-select>
+            </td>
             <td class="tabular-nums" th:text="${v.policyCode()}">REG-CAP-GA-2026-V1</td>
             <td th:text="${v.policyName()}">정책 이름</td>
             <td th:text="${v.policyTypeLabel()}">1,200% 한도</td>
@@ -117,7 +124,7 @@
             </td>
           </tr>
           <tr class="policy-state-row" th:if="${#lists.isEmpty(policyVersions)}">
-            <td colspan="9"><div class="empty-state policy-empty-state">기준일에 적용되는 정책 버전이 없습니다. 기준일을 바꿔 보세요.</div></td>
+            <td colspan="10"><div class="empty-state policy-empty-state">기준일에 적용되는 정책 버전이 없습니다. 기준일을 바꿔 보세요.</div></td>
           </tr>
           </tbody>
         </table>
@@ -125,21 +132,21 @@
     </section>
 
     <!-- 탭2~4 — 선택된 정책의 상세를 탭 클릭 시 IF-API-10 Ajax 로 채운다 -->
-    <section class="surface tab-panel policy-tab-panel" id="tab-rule" role="tabpanel" aria-labelledby="p2" data-policy-panel hidden>
+    <section class="surface tab-panel policy-tab-panel" id="tab-rule" role="tabpanel" aria-labelledby="p2" tabindex="0" data-policy-panel hidden>
       <header class="surface-header policy-panel-header">
         <h2 class="surface-title">수수료 규칙</h2>
         <p class="policy-panel-caption" data-selected-policy></p>
       </header>
       <div class="policy-detail-body" data-detail-body><div class="empty-state policy-empty-state" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
     </section>
-    <section class="surface tab-panel policy-tab-panel" id="tab-cap" role="tabpanel" aria-labelledby="p3" data-policy-panel hidden>
+    <section class="surface tab-panel policy-tab-panel" id="tab-cap" role="tabpanel" aria-labelledby="p3" tabindex="0" data-policy-panel hidden>
       <header class="surface-header policy-panel-header">
         <h2 class="surface-title">1,200% 룰셋</h2>
         <p class="policy-panel-caption" data-selected-policy></p>
       </header>
       <div class="policy-detail-body" data-detail-body><div class="empty-state policy-empty-state" data-detail-state>정책 버전 탭에서 정책을 선택하세요.</div></div>
     </section>
-    <section class="surface tab-panel policy-tab-panel" id="tab-refund" role="tabpanel" aria-labelledby="p4" data-policy-panel hidden>
+    <section class="surface tab-panel policy-tab-panel" id="tab-refund" role="tabpanel" aria-labelledby="p4" tabindex="0" data-policy-panel hidden>
       <header class="surface-header policy-panel-header">
         <h2 class="surface-title">예상 해약환급률표</h2>
         <p class="policy-panel-caption" data-selected-policy></p>

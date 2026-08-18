@@ -84,6 +84,7 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
+    // FGC-UI-POL-W01: 정책 목록은 공통 컴포넌트와 화면 전용 정적 리소스만 사용한다.
     void policyListUsesCommonComponentsWithoutInlinePresentation() throws IOException {
         assertThat(resource("templates/policy/list.html"))
                 .contains("class=\"page-header policy-page-header\"")
@@ -93,14 +94,33 @@ class PublishingTemplateStructureTest {
                 .contains("class=\"surface tab-panel policy-tab-panel\"")
                 .contains("class=\"data-table-viewport policy-version-table-viewport\"")
                 .contains("class=\"data-table policy-version-table\"")
+                .contains("type=\"radio\" name=\"policy-version-selection\"")
+                .contains("data-policy-select")
+                .contains("colspan=\"10\"")
                 .contains("class=\"empty-state policy-empty-state\"")
+                .doesNotContain("data-policy-row tabindex=")
+                .doesNotContain("data-policy-row aria-selected=")
                 .doesNotContain("style=")
-                .doesNotContain("<style>")
-                .doesNotContain("<script>");
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("static/js/features/policy/policy-list.js"))
+                .contains("new AbortController()")
+                .contains("signal: requestController.signal")
+                .contains("detailAbortController.abort()")
+                .contains("selector.addEventListener(\"change\"")
+                .doesNotContain("candidate.setAttribute(\"aria-selected\", isSelected");
 
         assertThat(resource("templates/layout/default.html"))
-                .contains("/css/features/policy.css")
-                .contains("/js/features/policy/policy-list.js");
+                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-POL-W01'\\}\"[^>]*th:href=\"@\\{/css/features/policy\\.css\\}\"[^>]*>")
+                .containsPattern("(?s)<script[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-POL-W01'\\}\"[^>]*th:src=\"@\\{/js/features/policy/policy-list\\.js\\}\"[^>]*>");
+
+        assertThat(resource("static/css/features/policy.css"))
+                .contains(".policy-page")
+                .contains(".policy-version-table");
+        assertThat(resource("static/js/features/policy/policy-list.js"))
+                .contains("[data-policy-tab]")
+                .contains("[data-detail-body]");
     }
 
     private static String resource(String path) throws IOException {
