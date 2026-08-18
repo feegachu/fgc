@@ -197,6 +197,6 @@
   function link(label, href) { var anchor = document.createElement("a"); anchor.textContent = label; anchor.href = href; return anchor; }
   function value(input) { return input === null || input === undefined || input === "" ? "—" : String(input); }
   function money(input) { var number = Number(input); return Number.isFinite(number) ? number.toLocaleString("ko-KR") + "원" : "—"; }
-  function percent(input) { var number = Number(input); return Number.isFinite(number) ? number.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) + "%" : "—"; }
+  function percent(input) { var number = Number(input); return Number.isFinite(number) ? number.toLocaleString("ko-KR", { maximumFractionDigits: 6 }) + "%" : "—"; }
   function stageLabel(stage) { return stage === "INSURER_TO_GA" ? "원수사→GA" : stage === "GA_TO_FC" ? "GA→설계사" : value(stage); }
 })();

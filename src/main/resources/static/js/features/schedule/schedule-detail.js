@@ -168,7 +168,7 @@
       appendCell(row, line.basisCode);
       appendMoneyCell(row, line.basisAmount);
       appendCell(row, label({ RATE: "요율", FIXED: "정액" }, line.calculationType));
-      appendNumberCell(row, line.ratePct == null ? "—" : formatNumber(line.ratePct) + "%");
+      appendNumberCell(row, line.ratePct == null ? "—" : formatRate(line.ratePct) + "%");
       appendMoneyCell(row, line.expectedAmount);
       appendCell(row, label({ PLANNED: "예정", CONFIRMED: "확정", MATCHED: "대사일치", ADJUSTED: "조정" }, line.lineStatus));
       lineBody.appendChild(row);
@@ -312,6 +312,13 @@
 
   function formatNumber(content) {
     return new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 4 }).format(number(content));
+  }
+
+  function formatRate(content) {
+    return new Intl.NumberFormat("ko-KR", {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4
+    }).format(number(content));
   }
 
   function formatDate(content) {
