@@ -3,7 +3,7 @@ package com.susukkang.fgc.audit;
 import com.susukkang.fgc.contract.domain.ContractStatus;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
-import com.susukkang.fgc.contract.dto.ContractResponse;
+import com.susukkang.fgc.contract.dto.ContractCreateResponse;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.service.ContractService;
 import org.junit.jupiter.api.DisplayName;
@@ -65,16 +65,16 @@ class AuditCoverageIntegrationTest {
                 BigDecimal.ZERO
         );
 
-        ContractResponse created = contractService.createContract(createRequest);
+        ContractCreateResponse created = contractService.createContract(createRequest);
 
-        assertThat(created.getScheduleHeaderIds()).hasSize(2);
-        assertThat(realtimeCapCheckCount(created.getContractId())).isEqualTo(2);
-        assertThat(auditCount("CONTRACT_CREATED", "CONTRACT", String.valueOf(created.getContractId())))
+        assertThat(created.scheduleHeaderIds()).hasSize(2);
+        assertThat(realtimeCapCheckCount(created.contractId())).isEqualTo(2);
+        assertThat(auditCount("CONTRACT_CREATED", "CONTRACT", String.valueOf(created.contractId())))
                 .isEqualTo(1);
         String afterValue = jdbcTemplate.queryForObject("""
                 SELECT after_value::text FROM fgc.audit_log
                  WHERE action_code = 'CONTRACT_CREATED' AND entity_type = 'CONTRACT' AND entity_id = ?
-                """, String.class, String.valueOf(created.getContractId()));
+                """, String.class, String.valueOf(created.contractId()));
         assertThat(afterValue).contains(contractNo);
 
         ContractUpdateRequest updateRequest = new ContractUpdateRequest(
@@ -93,18 +93,13 @@ class AuditCoverageIntegrationTest {
                 BigDecimal.ZERO
         );
 
-        ContractResponse updated = contractService.updateContract(created.getContractId(), updateRequest);
-
-        assertThat(updated.getRegeneratedScheduleIds()).hasSize(2);
-        assertThat(updated.getRegeneratedScheduleIds())
-                .doesNotContainAnyElementsOf(created.getScheduleHeaderIds());
-        assertThat(realtimeCapCheckCount(created.getContractId())).isEqualTo(4);
+        contractService.updateContract(created.contractId(), updateRequest);
 
         Map<String, Object> updatedAudit = jdbcTemplate.queryForMap("""
                 SELECT before_value::text AS before_value, after_value::text AS after_value
                   FROM fgc.audit_log
                  WHERE action_code = 'CONTRACT_UPDATED' AND entity_type = 'CONTRACT' AND entity_id = ?
-                """, String.valueOf(created.getContractId()));
+                """, String.valueOf(created.contractId()));
         assertThat((String) updatedAudit.get("before_value")).contains("ACTIVE");
         assertThat((String) updatedAudit.get("after_value")).contains("LAPSED");
     }

@@ -134,10 +134,16 @@
          ) ex
     </select>
 
-    <!-- 설계사 단위 모니터링 참고용 집계 — 계약별 cap_check.result_status는 건드리지 않는다. -->
+    <!-- 설계사 단위 모니터링 참고용 집계 — 계약별 cap_check.result_status는 건드리지 않는다.
+         payment_stage로 반드시 나눈다(코드리뷰 반영) — 원수사→GA와 GA→설계사 1,200%는
+         계산 규칙이 다른 별도 게이지라 합치면 안 된다(docs/07_규제조문표_v0.2.1.md
+         절대 금지사항). cap_check가 (validation_run_id, contract_id, payment_stage)로
+         유일해서(uq_cap_check_monthly) 같은 계약이 두 지급단계 행을 동시에 가질 수
+         있다 — GROUP BY에서 빠지면 그 두 행이 하나로 합산된다. -->
     <select id="summarizeCapByAgent" resultType="com.susukkang.fgc.validation.dto.AgentCapMonitoringRow">
         SELECT ag.agent_id                                                    AS agentId,
                ag.agent_name                                                  AS agentName,
+               cc.payment_stage                                               AS paymentStage,
                COUNT(*)                                                       AS checkedCount,
                COUNT(*) FILTER (WHERE cc.result_status = 'VIOLATION')         AS violationCount,
                COUNT(*) FILTER (WHERE cc.result_status = 'WARNING')           AS warningCount,
@@ -146,8 +152,8 @@
           JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
           JOIN fgc.agent ag ON ag.agent_id = ic.agent_id
          WHERE cc.validation_run_id = #{validationRunId}
-         GROUP BY ag.agent_id, ag.agent_name
-         ORDER BY ag.agent_id
+         GROUP BY ag.agent_id, ag.agent_name, cc.payment_stage
+         ORDER BY ag.agent_id, cc.payment_stage
     </select>
 
 </mapper>

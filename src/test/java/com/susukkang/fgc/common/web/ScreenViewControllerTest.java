@@ -1,6 +1,8 @@
 package com.susukkang.fgc.common.web;
 
 import com.susukkang.fgc.common.config.SecurityConfig;
+import com.susukkang.fgc.contract.controller.ContractViewController;
+import com.susukkang.fgc.contract.service.ContractService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -9,6 +11,7 @@ import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfigura
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -30,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * LEDG 046/047 · RECO 048~051 · VRUN 041~044 · AUDT 061.
  * /audit-logs 만 역할 제한(FUN-002·화면정의서 :1530)이라 별도 테스트로 뺐다.
  */
-@WebMvcTest(ScreenViewController.class)
+@WebMvcTest({ScreenViewController.class, ContractViewController.class})
 @Import({ShellAdvice.class, SecurityConfig.class, MessageSourceAutoConfiguration.class,
         com.susukkang.fgc.common.exception.FgcMessageResolver.class,
         com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver.class})
@@ -39,6 +42,9 @@ class ScreenViewControllerTest {
 
     @Autowired
     MockMvc mvc;
+
+    @MockitoBean
+    ContractService contractService;
 
     private static com.susukkang.fgc.auth.dto.FgcUserDetails settleUser() {
         var view = new com.susukkang.fgc.auth.dto.AppUserView();
@@ -228,15 +234,17 @@ class ScreenViewControllerTest {
 
     /**
      * FGC-FUN-036, FGC-FUN-039, FGC-FUN-040 / REG-01, REG-19 —
-     * SCHE-W02 작업 버튼은 프론트 API 연동 전까지 권한과 관계없이 활성화하지 않는다.
+     * SCHE-W02 작업 버튼은 API와 같은 CAN_PROCESS 권한에서만 활성화한다.
      */
     @Test
-    void schedule_actions_disabled_for_all_roles_while_api_pending() throws Exception {
+    void schedule_actions_enabled_only_for_processing_roles() throws Exception {
         var disabledRegenerateButton = org.hamcrest.Matchers.matchesPattern(
-                "(?s).*<button[^>]*id=\"btn-regenerate\"[^>]*\\bdisabled\\b[^>]*>.*");
+                "(?s).*<button(?=[^>]*id=\"btn-regenerate\")(?=[^>]*\\bdisabled\\b)[^>]*>.*");
         mvc.perform(get("/schedules/1").with(user(gaAdminUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"btn-regenerate\"")))
                 .andExpect(content().string(disabledRegenerateButton));
         mvc.perform(get("/schedules/1").with(user(adminUser())))
-                .andExpect(content().string(disabledRegenerateButton));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"btn-regenerate\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(disabledRegenerateButton)));
     }
 }

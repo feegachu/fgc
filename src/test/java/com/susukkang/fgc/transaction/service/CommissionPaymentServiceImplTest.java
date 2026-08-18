@@ -18,6 +18,7 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
+import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -78,6 +79,8 @@ class CommissionPaymentServiceImplTest {
     private CapExceptionService capExceptionService;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private CommissionPolicyService commissionPolicyService;
 
     private CommissionPaymentServiceImpl service;
     private FgcMessageResolver messageResolver;
@@ -97,8 +100,51 @@ class CommissionPaymentServiceImplTest {
                 capCalculator,
                 capExceptionService,
                 messageResolver,
-                auditLogService
+                auditLogService,
+                commissionPolicyService
         );
+    }
+
+    @Test
+    void resolvesAllocationPolicyWhenApprovedAllocationOmitsPolicyVersion() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
+                .willReturn(4L);
+        given(mapper.existsPolicyVersion(4L)).willReturn(true);
+        given(mapper.findAllocationPolicyId(4L, "DIRECT")).willReturn(77L);
+
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.APPROVED_ALLOCATION)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                source.amount(),
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                null,
+                source.attributions(),
+                source.evidenceRef(),
+                source.note()
+        );
+
+        service.create(request);
+
+        ArgumentCaptor<CommissionPaymentCommand> captor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(captor.capture());
+        assertThat(captor.getValue().getPolicyVersionId()).isEqualTo(4L);
+        verify(commissionPolicyService, never()).resolveCurrentCommission(any(Long.class), any(PaymentStage.class));
     }
 
     @Test
@@ -126,6 +172,139 @@ class CommissionPaymentServiceImplTest {
                 .containsExactly(new BigDecimal("300000"), new BigDecimal("200000"));
     }
 
+    @Test
+    void createsNonContractNewcomerSupportDraftWithoutContractOrPolicyVersion() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "NEWCOMER_SUPPORT", "PAYMENT"));
+        stubInsertAndResponse(List.of(new CommissionPaymentAttributionRow(
+                1, null, LocalDate.of(2026, 7, 3), LocalDate.of(2026, 7, 1),
+                new BigDecimal("300000"), InclusionDecisionStatus.EXCLUDED,
+                ExclusionType.NEW_AGENT_SUPPORT, "신인활동지원비", "신인 지원", "EVIDENCE",
+                AttributionMethod.NEWCOMER_NON_CONTRACT
+        )));
+
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                "GA_MANUAL_PAYMENT", "GA-2026-07-NEW-001", null, 7L, 11L,
+                new BigDecimal("300000"), LocalDate.of(2026, 7, 1), "PAYMENT",
+                LocalDate.of(2026, 7, 25), PaymentStage.GA_TO_FC, null,
+                List.of(new CommissionPaymentAttributionRequest(
+                        null, LocalDate.of(2026, 7, 3), new BigDecimal("300000"),
+                        InclusionDecisionStatus.EXCLUDED, ExclusionType.NEW_AGENT_SUPPORT,
+                        "신인활동지원비", "신인 지원", "EVIDENCE",
+                        AttributionMethod.NEWCOMER_NON_CONTRACT
+                )), "EVIDENCE", "신인 지원 지급"
+        );
+
+        service.create(request);
+
+        ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getSourceContractId()).isNull();
+        assertThat(paymentCaptor.getValue().getPolicyVersionId()).isNull();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionPaymentAttributionCommand>> attributionCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mapper).insertAttributions(attributionCaptor.capture());
+        assertThat(attributionCaptor.getValue().get(0).getContractId()).isNull();
+        assertThat(attributionCaptor.getValue().get(0).getAttributionScope()).isEqualTo("AGENT");
+    }
+
+    @Test
+    void savesDraftWhenAutomaticCommissionPolicyResolutionFails() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        given(commissionPolicyService.resolveCurrentCommission(3L, PaymentStage.GA_TO_FC))
+                .willThrow(new FgcBusinessException(
+                        FgcErrorCode.COMMON_002,
+                        "commissionPolicy",
+                        Map.of("reason", "POLICY_MISSING"),
+                        "계약에 적용할 현행 수수료 정책이 없습니다."
+                ));
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), source.agentId(),
+                source.commissionItemId(), source.amount(), source.settlementMonth(), source.cashflowType(),
+                source.scheduledPaymentDate(), source.paymentStage(), null, source.attributions(),
+                source.evidenceRef(), source.note()
+        );
+
+        CommissionPaymentResponse response = service.create(request);
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        ArgumentCaptor<CommissionPaymentCommand> captor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(captor.capture());
+        assertThat(captor.getValue().getPolicyVersionId()).isNull();
+    }
+
+    @Test
+    void savesApprovedAllocationDraftWithPendingPolicyResolution() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
+                .willThrow(new FgcBusinessException(
+                        FgcErrorCode.COMMON_002,
+                        "allocationPolicyVersion",
+                        Map.of("reason", "POLICY_MISSING"),
+                        "계약에 적용할 현행 배부 정책이 없습니다."
+                ));
+
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.APPROVED_ALLOCATION)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), source.agentId(),
+                source.commissionItemId(), source.amount(), source.settlementMonth(), source.cashflowType(),
+                source.scheduledPaymentDate(), source.paymentStage(), null, source.attributions(),
+                source.evidenceRef(), source.note()
+        );
+
+        service.create(request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionPaymentAttributionCommand>> captor = ArgumentCaptor.forClass(List.class);
+        verify(mapper).insertAttributions(captor.capture());
+        CommissionPaymentAttributionCommand saved = captor.getValue().get(0);
+        assertThat(saved.getAllocationPolicyId()).isNull();
+        assertThat(saved.getAllocationBasisJson()).contains("\"policyVersionResolutionPending\":true");
+    }
+
+    @Test
+    void createsInsurerToGaDraftWithoutRecipientAgent() {
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.existsPolicyVersion(3L)).willReturn(true);
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), null,
+                source.commissionItemId(), source.amount(), source.settlementMonth(),
+                source.cashflowType(), source.scheduledPaymentDate(), PaymentStage.INSURER_TO_GA,
+                source.allocationPolicyVersion(), source.attributions(), source.evidenceRef(), source.note()
+        );
+
+        service.create(request);
+
+        ArgumentCaptor<CommissionPaymentCommand> captor = ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(captor.capture());
+        assertThat(captor.getValue().getAgentId()).isNull();
+    }
+
     // 2026-08-11 yslee - 귀속행 입력 전 지급 본문 DRAFT 저장 검증
     // 기존 코드: 빈 귀속 목록을 MyBatis 일괄 INSERT로 전달
     // 문제: 귀속 작업 전 임시저장이 SQL 오류로 실패
@@ -140,6 +319,30 @@ class CommissionPaymentServiceImplTest {
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         assertThat(response.attributions()).isEmpty();
         verify(mapper).insertTransaction(any());
+        verify(mapper, never()).insertAttributions(anyList());
+    }
+
+    @Test
+    void createsDraftWithoutContractOrAttributionsWhenPolicyVersionIsUnresolved() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        stubInsertAndResponse(List.of());
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                "GA_MANUAL_PAYMENT", "GA-2026-07-DRAFT-001", null, 7L, 11L,
+                new BigDecimal("100000"), LocalDate.of(2026, 7, 1), "PAYMENT",
+                LocalDate.of(2026, 7, 25), PaymentStage.GA_TO_FC, null,
+                List.of(), null, "귀속 전 임시저장"
+        );
+
+        CommissionPaymentResponse response = service.create(request);
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getSourceContractId()).isNull();
+        assertThat(paymentCaptor.getValue().getPolicyVersionId()).isNull();
         verify(mapper, never()).insertAttributions(anyList());
     }
 
@@ -548,6 +751,40 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void blocksNonContractNewcomerSupportWhenRecipientIsNotEligible() {
+        ConfirmationData newcomer = confirmation(
+                201L, null, "500000", "500000", InclusionDecisionStatus.EXCLUDED,
+                ExclusionType.NEW_AGENT_SUPPORT, AttributionMethod.NEWCOMER_NON_CONTRACT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
+        given(mapper.existsEligibleNewcomerSupportAgent(7L, LocalDate.of(2026, 7, 3))).willReturn(false);
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+
+        verify(mapper).insertExceptionCase(any());
+        verify(mapper, never()).findCapRuleSnapshot(any(), any());
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    @Test
+    void blocksConfirmationWithTransactionPolicyVersionErrorWhenPolicyIsMissing() {
+        ConfirmationData withoutPolicy = withPolicyVersion(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        ), null);
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(withoutPolicy));
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_007));
+
+        verify(mapper).insertExceptionCase(any());
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    @Test
     void confirmsEveryAttributionAfterFun033Validation() {
         List<ConfirmationData> data = List.of(
                 confirmation(201L, 3L, "300000", "500000", InclusionDecisionStatus.INCLUDED,
@@ -657,6 +894,22 @@ class CommissionPaymentServiceImplTest {
 
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(response.capCheckIds()).containsExactly(61L);
+    }
+
+    @Test
+    void blocksConfirmationWhenAttributionDatePrecedesContractDate() {
+        ConfirmationData data = withContractDate(confirmation(
+                201L, 3L, "100000", "100000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        ), LocalDate.of(2026, 7, 4));
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+
+        assertThatThrownBy(() -> service.confirm(101L, "before-contract"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_008));
+
+        verify(mapper, never()).findCapRuleSnapshot(any(), any());
+        verify(mapper, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -1483,7 +1736,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
-    // FGC-FUN-033 — 분류정책이 없는 귀속행은 FGC-CAP-002 blocker로 표시되고 preview 행·한도 계산은 생략된다
+    // FGC-FUN-033 — 적용 활성 룰셋 자체가 없으면 CAP_004 blocker로 표시되고 preview 행·한도 계산은 생략된다
     @Test
     void precheckReportsMissingCapRuleAndSkipsPreview() {
         ConfirmationData data = confirmation(
@@ -1498,6 +1751,28 @@ class CommissionPaymentServiceImplTest {
         TransactionPrecheckResponse response = service.precheck(101L);
 
         assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers())
+                .extracting(TransactionPrecheckResponse.Blocker::code)
+                .containsExactly("FGC-CAP-004");
+        assertThat(response.capPreview()).isEmpty();
+        verify(capCalculator, never()).calculate(any());
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void precheckReportsCap002WhenRuleSetExistsButCommissionItemIsUnclassified() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(mapper.findAttributedContractNumbers(101L))
+                .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(null);
+        given(mapper.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
         assertThat(response.blockers())
                 .extracting(TransactionPrecheckResponse.Blocker::code)
                 .containsExactly("FGC-CAP-002");
@@ -1609,6 +1884,17 @@ class CommissionPaymentServiceImplTest {
         );
     }
 
+    private ConfirmationData withPolicyVersion(ConfirmationData data, Long policyVersionId) {
+        return new ConfirmationData(
+                data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(),
+                data.attributionMonth(), data.transactionAttributionId(), data.contractId(), data.agentId(),
+                data.paymentStage(), data.commissionItemId(), data.itemCode(), data.itemName(), policyVersionId,
+                data.inclusionDecisionStatus(), data.exclusionType(), data.inclusionDecisionReason(),
+                data.allocationBasis(), data.evidenceRef(), data.attributionMethod()
+        );
+    }
+
     private ConfirmationData confirmation(
             Long attributionId,
             Long contractId,
@@ -1661,6 +1947,18 @@ class CommissionPaymentServiceImplTest {
 
     private ConfirmationData withStatus(ConfirmationData data, CommissionPaymentStatus status) {
         return withConfirmationState(data, status, data.confirmIdempotencyKey());
+    }
+
+    private ConfirmationData withContractDate(ConfirmationData data, LocalDate contractDate) {
+        return new ConfirmationData(
+                data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(),
+                data.attributionMonth(), data.transactionAttributionId(), data.contractId(), data.agentId(),
+                data.paymentStage(), data.commissionItemId(), data.itemCode(), data.itemName(),
+                data.policyVersionId(), data.inclusionDecisionStatus(), data.exclusionType(),
+                data.inclusionDecisionReason(), data.allocationBasis(), data.evidenceRef(),
+                data.attributionMethod(), contractDate
+        );
     }
 
     private ConfirmationData withAllocationBasis(ConfirmationData data, String allocationBasis) {
