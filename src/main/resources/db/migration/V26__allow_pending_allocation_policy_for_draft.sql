@@ -85,3 +85,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- CREATE OR REPLACE로 함수 수준 설정이 초기화되므로 search_path를 다시 고정한다.
+ALTER FUNCTION fgc.guard_commission_transaction_write()
+    SET search_path = fgc, pg_temp;
