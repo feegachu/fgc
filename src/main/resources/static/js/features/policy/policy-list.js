@@ -21,6 +21,25 @@
     return escapeHtml(parsed.toLocaleString("ko-KR", options));
   }
 
+  function formatRate(value) {
+    if (value == null || value === "" || (typeof value === "string" && value.trim() === "")) return "-";
+
+    var normalized = String(value).trim();
+    if (!/^[+-]?\d+(?:\.\d+)?$/.test(normalized)) return "-";
+
+    var sign = "";
+    if (normalized.charAt(0) === "-" || normalized.charAt(0) === "+") {
+      sign = normalized.charAt(0) === "-" ? "-" : "";
+      normalized = normalized.slice(1);
+    }
+
+    var parts = normalized.split(".");
+    var integerPart = parts[0].replace(/^0+(?=\d)/, "");
+    var fractionPart = ((parts[1] || "") + "0000").slice(0, 4);
+    var groupedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return escapeHtml(sign + groupedInteger + "." + fractionPart);
+  }
+
   function formatRange(from, to) {
     if (formatNumber(from) === "-" && formatNumber(to) === "-") return "-";
     return formatNumber(from, { maximumFractionDigits: 0 })
@@ -28,7 +47,7 @@
   }
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { formatNumber: formatNumber, formatRange: formatRange };
+    module.exports = { formatNumber: formatNumber, formatRate: formatRate, formatRange: formatRange };
     return;
   }
 
@@ -92,7 +111,7 @@
           + "<td class='tabular-nums'>" + formatRange(rule.installmentFrom, rule.installmentTo) + "</td>"
           + "<td>" + escapeHtml(calculationType[rule.calculationType] || rule.calculationType) + "</td>"
           + "<td class='tabular-nums'>" + escapeHtml(rule.basisCode) + "</td>"
-          + "<td class='is-number tabular-nums'>" + formatNumber(rule.ratePct, { maximumFractionDigits: 6 }) + "</td>"
+          + "<td class='is-number tabular-nums'>" + formatRate(rule.ratePct) + "</td>"
           + "<td class='is-number tabular-nums'>" + formatNumber(rule.fixedAmount, { maximumFractionDigits: 0 }) + "</td>"
           + "</tr>";
     }).join("");
