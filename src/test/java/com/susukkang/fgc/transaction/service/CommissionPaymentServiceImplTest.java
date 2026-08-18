@@ -245,6 +245,42 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void savesApprovedAllocationDraftWithPendingPolicyResolution() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 3)))
+                .willThrow(new FgcBusinessException(
+                        FgcErrorCode.COMMON_002,
+                        "allocationPolicyVersion",
+                        Map.of("reason", "POLICY_MISSING"),
+                        "계약에 적용할 현행 배부 정책이 없습니다."
+                ));
+
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.APPROVED_ALLOCATION)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), source.agentId(),
+                source.commissionItemId(), source.amount(), source.settlementMonth(), source.cashflowType(),
+                source.scheduledPaymentDate(), source.paymentStage(), null, source.attributions(),
+                source.evidenceRef(), source.note()
+        );
+
+        service.create(request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionPaymentAttributionCommand>> captor = ArgumentCaptor.forClass(List.class);
+        verify(mapper).insertAttributions(captor.capture());
+        CommissionPaymentAttributionCommand saved = captor.getValue().get(0);
+        assertThat(saved.getAllocationPolicyId()).isNull();
+        assertThat(saved.getAllocationBasisJson()).contains("\"policyVersionResolutionPending\":true");
+    }
+
+    @Test
     void createsInsurerToGaDraftWithoutRecipientAgent() {
         given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));

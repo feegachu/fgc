@@ -600,15 +600,20 @@
     requireValue(date, "귀속일"); requireValue(attrAmount, "귀속금액");
     var decision = parseInclusionDecision(row.querySelector("[data-inclusion]").value);
     var rowEvidence = blankToNull(row.querySelector("[data-attr-evidence]").value);
+    var attributionMethod = row.querySelector("[data-attr-method]").value;
+    var allocationBasis = blankToNull(row.querySelector("[data-allocation-basis]").value);
     if ((decision.inclusionStatus === "EXCLUDED" || newcomerSupport) && !rowEvidence) {
       throw new Error("제외 귀속행은 제외유형과 증빙을 입력해야 합니다.");
+    }
+    if (attributionMethod === "APPROVED_ALLOCATION" && !allocationBasis) {
+      throw new Error("승인 배부에는 배부정책을 입력해야 합니다.");
     }
     return {
       contractId: newcomerSupport ? null : Number(contract.value), attributionDate: date.value,
       amount: Number(attrAmount.value), inclusionDecisionStatus: decision.inclusionStatus,
       exclusionType: decision.exclusionType, inclusionDecisionReason: decisionReason(decision),
-      allocationBasis: blankToNull(row.querySelector("[data-allocation-basis]").value),
-      evidenceRef: rowEvidence, attributionMethod: row.querySelector("[data-attr-method]").value
+      allocationBasis: allocationBasis,
+      evidenceRef: rowEvidence, attributionMethod: attributionMethod
     };
   }
 

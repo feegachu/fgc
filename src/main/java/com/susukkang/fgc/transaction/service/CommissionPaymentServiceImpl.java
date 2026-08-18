@@ -737,7 +737,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .allocationBasisJson(allocationSnapshot(
                         sourceContractId,
                         request.allocationBasis(),
-                        request.inclusionDecisionReason()
+                        request.inclusionDecisionReason(),
+                        request.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION
+                                && policyVersionId == null
                 ))
                 .evidenceRef(request.evidenceRef())
                 .build();
@@ -1451,12 +1453,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private String allocationSnapshot(
             Long sourceContractId,
             String allocationBasis,
-            String inclusionReason
+            String inclusionReason,
+            boolean policyVersionResolutionPending
     ) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("sourceContractId", sourceContractId);
         snapshot.put("allocationBasis", allocationBasis);
         snapshot.put("inclusionDecisionReason", inclusionReason);
+        if (policyVersionResolutionPending) {
+            snapshot.put("policyVersionResolutionPending", true);
+        }
         return json(snapshot);
     }
 
