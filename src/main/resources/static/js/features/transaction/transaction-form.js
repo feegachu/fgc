@@ -718,7 +718,11 @@
   function renumberRows() { attrBody.querySelectorAll("[data-attr-row]").forEach(function (row, index) { row.firstElementChild.textContent = index + 1; }); }
   function renderEmptyAttributions() { var row = document.createElement("tr"); var cell = document.createElement("td"); var empty = document.createElement("div"); cell.colSpan = 12; empty.className = "fgc-empty"; empty.textContent = "귀속행을 추가하세요."; cell.appendChild(empty); row.appendChild(cell); attrBody.appendChild(row); }
   function requireValue(control, label) { if (!control.value || (control.type === "number" && number(control.value) < 0)) { control.focus(); throw new Error(label + "을(를) 확인하세요."); } }
-  function showError(error, fallback) { var message = error && error.message ? error.message : fallback; if (error && error.field) message += " (" + error.field + ")"; window.alert(message); }
+  function showError(error, fallback) {
+    var message = error && (error.detail || error.message) ? (error.detail || error.message) : fallback;
+    if (error && error.field && !error.detail) message += " (" + error.field + ")";
+    toast(message, "error", 8000);
+  }
   function blankToNull(value) { var trimmed = String(value || "").trim(); return trimmed || null; }
   function number(value) { var parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
   function money(value) { return new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(number(value)) + "원"; }
