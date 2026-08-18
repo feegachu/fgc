@@ -97,7 +97,7 @@ class ValidationRunDetailControllerTest {
                 new ValidationRunDetailResponse.CapSummary(6, 1, 2, 0),
                 new ValidationRunDetailResponse.ArbitrageSummary(3, 1, 0),
                 new ValidationRunDetailResponse.LedgerSummary(4, 0),
-                new ValidationRunDetailResponse.ReconciliationSummary(8, 2));
+                new ValidationRunDetailResponse.ReconciliationSummary(8, 2, 6, 2, 0, java.math.BigDecimal.valueOf(15000)));
     }
 
     private ValidationRunRow createdRow() {

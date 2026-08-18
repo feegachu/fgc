@@ -4,7 +4,6 @@ import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
-import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
@@ -84,13 +83,12 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
 
 
             try {
-                ScheduleGenerationResult result = itemService.process(contractId);
-                // FGC-FUN-043 결과 집계 — 이번 실행이 만든 헤더만 validation_run_id로
-                // 표시한다. itemService.process()는 REQUIRES_NEW로 이미 커밋했으니 그
-                // 헤더 ID들만 이어서 UPDATE하면 된다(새 헤더가 없으면 빈 목록이라 no-op).
-                if (!result.scheduleHeaderIds().isEmpty()) {
-                    scheduleMapper.linkHeadersToValidationRun(result.scheduleHeaderIds(), validationRunId);
-                }
+                // FGC-FUN-043 결과 집계 — validation_run_id 연결은 itemService.process()
+                // 안에서 생성과 같은 REQUIRES_NEW 트랜잭션으로 함께 처리된다(코드리뷰 반영).
+                // 여기서 별도로 UPDATE를 걸면 이 바깥 트랜잭션이 나중에(다른 계약 처리 중)
+                // 롤백될 때 헤더는 이미 커밋된 채 연결만 풀려 validation_run_id=NULL로
+                // 남는 문제가 있었다.
+                itemService.process(contractId, validationRunId);
                 processedCount++;
             } catch (FgcBusinessException exception) {
                 skips.add(new ContractSkip(
