@@ -1181,7 +1181,15 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.SCHE_004);
         }
 
-        if (scheduleMapper.confirmPlannedScheduleLines(scheduleId) < 1) {
+        List<ScheduleLineInsertDTO> lines = scheduleMapper.selectScheduleLinesByScheduleId(scheduleId);
+        if (lines.isEmpty()) {
+            throw validationException("scheduleId", "확정할 예정 회차가 없습니다.");
+        }
+        boolean hasPlannedLine = lines.stream()
+                .anyMatch(line -> line.getLineStatus() == ScheduleLineStatus.PLANNED);
+        if (hasPlannedLine) {
+            scheduleMapper.confirmPlannedScheduleLines(scheduleId);
+        } else if (lines.stream().anyMatch(line -> !isLockedLineStatus(line.getLineStatus()))) {
             throw validationException("scheduleId", "확정할 예정 회차가 없습니다.");
         }
         if (scheduleMapper.confirmScheduleHeader(scheduleId) != 1) {

@@ -226,6 +226,8 @@ class ScheduleServiceTest {
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
         given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
                 .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
+                ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.PLANNED).build()));
         given(scheduleMapper.confirmPlannedScheduleLines(10L)).willReturn(2);
         given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
         given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
@@ -236,6 +238,41 @@ class ScheduleServiceTest {
         verify(scheduleMapper).lockContractForScheduleGeneration(20L);
         verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
         verify(scheduleMapper).confirmPlannedScheduleLines(10L);
+        verify(scheduleMapper).confirmScheduleHeader(10L);
+    }
+
+    @Test
+    void confirmsHeaderWhenRegeneratedScheduleContainsOnlyLockedLines() {
+        ScheduleHeaderInsertDTO plannedHeader = ScheduleHeaderInsertDTO.builder()
+                .scheduleHeaderId(10L)
+                .contractId(20L)
+                .paymentStage(PaymentStage.GA_TO_FC)
+                .policyVersionId(30L)
+                .status(ScheduleHeaderStatus.PLANNED)
+                .activeYn(true)
+                .build();
+        ScheduleDetailResponse confirmedDetail = ScheduleDetailResponse.builder()
+                .header(ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(10L)
+                        .status(ScheduleHeaderStatus.CONFIRMED)
+                        .build())
+                .lines(List.of())
+                .build();
+
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
+                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
+                ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.CONFIRMED).build(),
+                ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.MATCHED).build(),
+                ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.ADJUSTED).build()));
+        given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
+        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
+
+        ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
+
+        assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
+        verify(scheduleMapper, never()).confirmPlannedScheduleLines(10L);
         verify(scheduleMapper).confirmScheduleHeader(10L);
     }
 
