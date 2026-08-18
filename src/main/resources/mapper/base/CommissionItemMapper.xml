@@ -6,7 +6,8 @@
 
     <select id="findEffectiveItems"
             resultType="com.susukkang.fgc.base.dto.CommissionItemResponse">
-        SELECT item_code AS itemCode,
+        SELECT commission_item_id AS commissionItemId,
+               item_code AS itemCode,
                item_name AS itemName,
                cashflow_type AS cashflowType,
                item_category AS itemCategory,

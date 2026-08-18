@@ -14,29 +14,53 @@
     return query.toString();
   }
 
+  function getAllPages(path, parameters) {
+    var pageSize = 100;
+    function requestPage(page) {
+      var query = Object.assign({}, parameters || {}, { page: page, size: pageSize });
+      return apiClient().request(path + "?" + queryString(query));
+    }
+    return requestPage(1).then(function (firstEnvelope) {
+      var firstPage = firstEnvelope.data || {};
+      var requests = [];
+      for (var page = 2; page <= (Number(firstPage.totalPages) || 1); page += 1) {
+        requests.push(requestPage(page));
+      }
+      return Promise.all(requests).then(function (remaining) {
+        var content = Array.isArray(firstPage.content) ? firstPage.content.slice() : [];
+        remaining.forEach(function (envelope) {
+          if (envelope.data && Array.isArray(envelope.data.content)) {
+            content = content.concat(envelope.data.content);
+          }
+        });
+        return Object.assign({}, firstEnvelope, {
+          data: Object.assign({}, firstPage, { content: content })
+        });
+      });
+    });
+  }
+
   function getInsurers() {
-    return apiClient().request("/api/v1/base/insurers?" + queryString({ page: 1, size: 100 }));
+    return getAllPages("/api/v1/base/insurers");
   }
 
   function getProductOfferings(insurerId, asOf) {
-    return apiClient().request("/api/v1/base/products?" + queryString({
+    return getAllPages("/api/v1/base/products", {
       insurerId: insurerId,
-      asOf: asOf,
-      page: 1,
-      size: 100
-    }));
+      asOf: asOf
+    });
   }
 
   function getAgents(asOf) {
-    return apiClient().request("/api/v1/base/agents?" + queryString({
-      asOf: asOf,
-      page: 1,
-      size: 100
-    }));
+    return getAllPages("/api/v1/base/agents", { asOf: asOf });
   }
 
   function getContract(contractId) {
     return apiClient().request("/api/v1/contracts/" + encodeURIComponent(contractId));
+  }
+
+  function getCapChecks(contractId) {
+    return apiClient().request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/cap-checks");
   }
 
   function createContract(contract) {
@@ -56,6 +80,7 @@
     getProductOfferings: getProductOfferings,
     getAgents: getAgents,
     getContract: getContract,
+    getCapChecks: getCapChecks,
     createContract: createContract,
     updateContract: updateContract
   };

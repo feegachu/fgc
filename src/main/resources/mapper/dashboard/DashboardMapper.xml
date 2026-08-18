@@ -8,12 +8,19 @@
       봐도 그 계약의 7월 VIOLATION이 사라진다(8월 행만 남고 필터에서 걸러짐).
       기준월로 먼저 좁히고 그 안에서만 최신을 고르도록 순서를 바꾼다
     -->
+    <!--
+      as_of_date::timestamp로 명시 캐스팅한다 — 캐스팅 없이 date_trunc(text, date)를 쓰면
+      PostgreSQL이 STABLE인 date_trunc(text, timestamptz) 오버로드를 골라(타임존에 따라
+      결과가 달라질 수 있어 IMMUTABLE이 아니다) 표현식 인덱스(ix_cap_check_month_latest,
+      V23)를 못 만든다. ::timestamp로 고정하면 IMMUTABLE 오버로드가 선택되고, 인덱스
+      정의의 표현식과 문자 그대로 일치해야 플래너가 인덱스를 쓴다.
+    -->
     <select id="countCapViolation" resultType="long">
         SELECT COUNT(*)
           FROM (
               SELECT DISTINCT ON (contract_id, payment_stage) result_status
                 FROM fgc.cap_check
-               WHERE date_trunc('month', as_of_date) = date_trunc('month', #{month}::date)
+               WHERE date_trunc('month', as_of_date::timestamp) = date_trunc('month', #{month}::date::timestamp)
                ORDER BY contract_id, payment_stage, checked_at DESC, cap_check_id DESC
           ) AS latest_in_month
          WHERE result_status = 'VIOLATION'
@@ -24,7 +31,7 @@
           FROM (
               SELECT DISTINCT ON (contract_id, payment_stage) result_status
                 FROM fgc.cap_check
-               WHERE date_trunc('month', as_of_date) = date_trunc('month', #{month}::date)
+               WHERE date_trunc('month', as_of_date::timestamp) = date_trunc('month', #{month}::date::timestamp)
                ORDER BY contract_id, payment_stage, checked_at DESC, cap_check_id DESC
           ) AS latest_in_month
          WHERE result_status = 'WARNING'

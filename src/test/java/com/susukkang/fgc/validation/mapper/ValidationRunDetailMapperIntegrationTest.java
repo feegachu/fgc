@@ -350,10 +350,12 @@ class ValidationRunDetailMapperIntegrationTest {
 
         List<AgentCapMonitoringRow> byAgent = mapper.summarizeCapByAgent(runId);
 
-        // 두 계약이 같은 설계사 소속이면 모니터링 집계는 하나로 묶인다(참고용 합계일 뿐).
+        // 두 계약이 같은 설계사 소속이면(같은 지급단계라는 전제 하에) 모니터링 집계는
+        // 하나로 묶인다(참고용 합계일 뿐).
         if (sameAgentId.equals(agentId(c2))) {
             assertThat(byAgent).singleElement().satisfies(row -> {
                 assertThat(row.getAgentId()).isEqualTo(sameAgentId);
+                assertThat(row.getPaymentStage()).isEqualTo("INSURER_TO_GA");
                 assertThat(row.getCheckedCount()).isEqualTo(2);
                 assertThat(row.getViolationCount()).isEqualTo(1);
                 assertThat(row.getWarningCount()).isEqualTo(1);
@@ -373,6 +375,35 @@ class ValidationRunDetailMapperIntegrationTest {
                 String.class, runId, c2);
         assertThat(c1Status).isEqualTo("VIOLATION");
         assertThat(c2Status).isEqualTo("WARNING");
+    }
+
+    @Test
+    void summarizeCapByAgentKeepsInsurerToGaAndGaToFcAsSeparateGauges() {
+        // 코드리뷰 반영 회귀 테스트 — REG-08 "1,200% 게이지 2개(원수사→GA / GA→설계사)는
+        // 절대 합치지 않는다"(docs/07_규제조문표_v0.2.1.md). 같은 계약(=같은 설계사)이
+        // 두 지급단계에 각각 cap_check를 가질 수 있는데, payment_stage로 나누지 않으면
+        // 이 두 행이 하나의 checkedCount/violationCount로 잘못 합쳐진다.
+        Long runId = insertValidationRun(LocalDate.of(2031, 12, 1), 1, "RUNNING");
+        Long c1 = contractId("FGC-FGL01-202607-0001");
+
+        insertCapCheck(runId, c1, "INSURER_TO_GA", "VIOLATION");
+        insertCapCheck(runId, c1, "GA_TO_FC", "NORMAL");
+
+        List<AgentCapMonitoringRow> byAgent = mapper.summarizeCapByAgent(runId);
+
+        assertThat(byAgent).hasSize(2);
+        assertThat(byAgent).filteredOn(row -> row.getPaymentStage().equals("INSURER_TO_GA"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.getCheckedCount()).isEqualTo(1);
+                    assertThat(row.getViolationCount()).isEqualTo(1);
+                });
+        assertThat(byAgent).filteredOn(row -> row.getPaymentStage().equals("GA_TO_FC"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.getCheckedCount()).isEqualTo(1);
+                    assertThat(row.getViolationCount()).isZero();
+                });
     }
 
     @Test

@@ -1,9 +1,15 @@
 package com.susukkang.fgc.schedule.service;
 
 import com.susukkang.fgc.base.mapper.AgentMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
@@ -39,6 +45,10 @@ public class ScheduleService {
     private final ScheduleMapper scheduleMapper;
     private final ContractMapper contractMapper;
     private final AgentMapper agentMapper;
+    private final CapCheckService capCheckService;
+    private final CapCheckMapper capCheckMapper;
+    private final AuditLogService auditLogService;
+    private final ScheduleReviewService scheduleReviewService;
 
     /**
      * 설명 : 검색 조건에 따라 스케줄 헤더를 조회한다.
@@ -132,6 +142,13 @@ public class ScheduleService {
         // 스케줄 상태 조정 버전 가져오기
 
         return detail ;
+    }
+
+    public List<ScheduleHeaderResponse> selectScheduleVersions(Long scheduleHeaderId) {
+        if (scheduleHeaderId == null) {
+            throw validationException("scheduleHeaderId", "스케줄 헤더 ID는 필수입니다.");
+        }
+        return scheduleMapper.selectVersionsByScheduleHeaderId(scheduleHeaderId);
     }
     /**
      * 설명 : 계약 ID에 따라 회차별 스케줄을 자동 생성한다
@@ -464,7 +481,7 @@ public class ScheduleService {
 
         return ContractScheduleResponse.builder()
                 .headers(List.of(detail.getHeader()))
-                .lines(detail.getSchedules() == null ? List.of() : detail.getSchedules())
+                .lines(detail.getLines() == null ? List.of() : detail.getLines())
                 .build();
     }
     /** 지급단계 한 건의 스케줄 생성 결과. */
@@ -903,14 +920,25 @@ public class ScheduleService {
                     FgcErrorCode.COMMON_002,
                     "beneficiaryAgentId",
                     Map.of(
+                            "field", "beneficiaryAgentId",
                             "contractDate", contractDate,
                             "organizationId", organizationId,
                             "agentRankCode", agentRankCode.name()
                     ),
-                    "조직과 직급에 해당하는 활성 설계사를 찾을 수 없습니다."
+                    "계약일 기준 소속 조직 및 상위 조직에서 " + agentRankLabel(agentRankCode)
+                            + " 수령자를 찾을 수 없습니다. 조직 계층과 설계사 배정을 확인하세요."
             );
         }
         return agentId;
+    }
+
+    private String agentRankLabel(AgentRankCode agentRankCode) {
+        return switch (agentRankCode) {
+            case FC -> "설계사";
+            case TEAM_LEADER -> "팀장";
+            case BRANCH_MANAGER -> "지사장";
+            case DIVISION_HEAD -> "본부장";
+        };
     }
     /**
      * 설명 : 계약 정보와 지급 회차를 통해서 계약차월을 계산한다.
@@ -1062,6 +1090,142 @@ public class ScheduleService {
                 .scheduleHeaderId(newHeader.getScheduleHeaderId())
                 .versionNo(newHeader.getScheduleVersionNo().longValue())
                 .build();
+    }
+
+    public boolean hasActiveOperationalSchedule(Long contractId, PaymentStage paymentStage) {
+        ScheduleDetailResponse active =
+                scheduleMapper.selectByContractIdAndPaymentStage(contractId, paymentStage);
+        return active != null && active.getScheduleHeaderId() != null;
+    }
+
+    public void registerCapRuleReview(
+            Long contractId,
+            PaymentStage paymentStage,
+            String description
+    ) {
+        int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+                contractId,
+                paymentStage,
+                "POLICY_MISSING",
+                "1,200% 룰셋 검토 필요 - " + paymentStage.name(),
+                description
+        );
+        if (affectedRows != 1) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        }
+    }
+
+    /**
+     * 설명 : 활성 예정 스케줄의 헤더와 회차를 확정하여 변경할 수 없게 한다.
+     *
+     * @param scheduleId 스케줄 헤더 ID
+     * @return 확정된 스케줄 상세
+     * @author hjKang
+     * @since 2026-08-16
+     *
+     * 2026-08-16 - 예상 스케줄 확정 및 잠금 구현
+     * 기존 코드: DB에는 확정 스케줄 변경 방지 트리거가 있지만 PLANNED를 CONFIRMED로 전환하는 서비스가 없었다.
+     * 문제: 화면의 확정 버튼으로 계산 근거를 고정할 수 없고 동시에 확정·재생성하면 상태가 충돌할 수 있었다.
+     * 개선: 계약 행 잠금으로 상태 전이를 직렬화하고 회차를 먼저 확정한 뒤 헤더를 확정하여 DB 불변성 규칙을 활성화한다.
+     */
+    @Transactional(noRollbackFor = ScheduleConfirmationRejectedException.class)
+    public ScheduleDetailResponse confirmSchedule(Long scheduleId) {
+        ScheduleHeaderInsertDTO header = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        if (header == null) {
+            throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
+        }
+
+        scheduleMapper.lockContractForScheduleGeneration(header.getContractId());
+        header = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        if (header == null) {
+            throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
+        }
+        if (header.getStatus() == ScheduleHeaderStatus.CONFIRMED) {
+            return selectScheduleDetailById(scheduleId);
+        }
+        if (!Boolean.TRUE.equals(header.getActiveYn())
+                || header.getStatus() != ScheduleHeaderStatus.PLANNED) {
+            throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+        }
+
+        InsuranceContract contract = contractMapper.selectContractById(header.getContractId());
+        if (contract == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+        BigDecimal evidenceAmount = header.getPaymentStage() == PaymentStage.INSURER_TO_GA
+                ? capCheckMapper.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
+                : null;
+        CapCheckSaveResult capCheck;
+        try {
+            capCheck = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
+                    header.getContractId(), header.getPaymentStage(), LocalDate.now(DateUtil.SEOUL_ZONE), evidenceAmount));
+        } catch (FgcBusinessException exception) {
+            if (exception.getErrorCode() != FgcErrorCode.CAP_004) {
+                throw exception;
+            }
+            scheduleReviewService.registerCapReviewBeforeCommit(
+                    header.getContractId(),
+                    header.getPaymentStage(),
+                    "POLICY_MISSING",
+                    "1,200% 룰셋 검토 필요 - " + header.getPaymentStage().name(),
+                    exception.getDetail() == null
+                            ? "적용 가능한 1,200% 룰셋이 없습니다."
+                            : exception.getDetail()
+            );
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_004);
+        }
+        if (capCheck.result().resultStatus() == CapResultStatus.VIOLATION) {
+            scheduleReviewService.registerCapReviewBeforeCommit(
+                    header.getContractId(),
+                    header.getPaymentStage(),
+                    "CAP_VIOLATION",
+                    "1,200% 한도 초과 - " + header.getPaymentStage().name(),
+                    "1,200% 한도 초과로 스케줄 확정을 차단했습니다."
+            );
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_003);
+        }
+        if (capCheck.result().resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
+            Map<String, Object> calculationSnapshot = capCheck.result().calculationSnapshot();
+            boolean refundTableMissing = calculationSnapshot != null
+                    && Boolean.TRUE.equals(calculationSnapshot.get("refundTableMissing"));
+            scheduleReviewService.registerCapReviewBeforeCommit(
+                    header.getContractId(),
+                    header.getPaymentStage(),
+                    refundTableMissing ? ExceptionType.REFUND_TABLE_MISSING.name() : "CAP_REVIEW_REQUIRED",
+                    refundTableMissing
+                            ? "예상 해약환급률표 누락 - " + header.getPaymentStage().name()
+                            : "1,200% 한도 검토 필요 - " + header.getPaymentStage().name(),
+                    refundTableMissing
+                            ? "계약 조건에 적용할 12차월 예상 해약환급률표가 없어 스케줄 확정을 차단했습니다."
+                            : "한도 판정에 추가 검토가 필요해 스케줄 확정을 차단했습니다."
+            );
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_004);
+        }
+
+        List<ScheduleLineInsertDTO> lines = scheduleMapper.selectScheduleLinesByScheduleId(scheduleId);
+        if (lines.isEmpty()) {
+            throw validationException("scheduleId", "확정할 예정 회차가 없습니다.");
+        }
+        boolean hasPlannedLine = lines.stream()
+                .anyMatch(line -> line.getLineStatus() == ScheduleLineStatus.PLANNED);
+        if (hasPlannedLine) {
+            scheduleMapper.confirmPlannedScheduleLines(scheduleId);
+        } else if (lines.stream().anyMatch(line -> !isLockedLineStatus(line.getLineStatus()))) {
+            throw validationException("scheduleId", "확정할 예정 회차가 없습니다.");
+        }
+        if (scheduleMapper.confirmScheduleHeader(scheduleId) != 1) {
+            throw new FgcBusinessException(FgcErrorCode.SCHE_001);
+        }
+        ScheduleDetailResponse confirmed = selectScheduleDetailById(scheduleId);
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode("SCHEDULE_CONFIRMED")
+                .entityType("SCHEDULE")
+                .entityId(String.valueOf(scheduleId))
+                .before(header)
+                .after(confirmed)
+                .policyVersionId(header.getPolicyVersionId())
+                .build());
+        return confirmed;
     }
 
 }

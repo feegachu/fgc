@@ -15,6 +15,7 @@ import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -394,5 +395,21 @@ class CapCalculatorImplTest {
         assertThatThrownBy(() -> capCalculator.calculate(
                 CapCalculationCommand.realtime(CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.now())))
                 .isInstanceOf(FgcBusinessException.class);
+    }
+
+    @Test
+    void throwsCapRuleMissingWhenApplicableRuleSetDoesNotExist() {
+        when(capContractMapper.findById(CONTRACT_ID)).thenReturn(
+                contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
+        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(null);
+
+        assertThatThrownBy(() -> capCalculator.calculate(
+                CapCalculationCommand.realtime(
+                        CONTRACT_ID,
+                        PaymentStage.GA_TO_FC,
+                        LocalDate.of(2026, 7, 10))))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_004));
     }
 }
