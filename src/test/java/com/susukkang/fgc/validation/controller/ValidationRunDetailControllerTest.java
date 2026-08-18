@@ -126,7 +126,13 @@ class ValidationRunDetailControllerTest {
                 .andExpect(jsonPath("$.data.targets").isArray())
                 .andExpect(jsonPath("$.data.capSummary.violationCount").value(1))
                 .andExpect(jsonPath("$.data.ledgerSummary.imbalanceCount").value(0))
-                .andExpect(jsonPath("$.data.reconciliationSummary.mismatchCount").value(2));
+                .andExpect(jsonPath("$.data.reconciliationSummary.mismatchCount").value(2))
+                // FGC-FUN-043 확대 — 대사 3분류(MATCHED/MISMATCHED/UNMATCHED)와 차액 합계도
+                // API 계약에 노출돼야 한다(코드리뷰 반영).
+                .andExpect(jsonPath("$.data.reconciliationSummary.matchedCount").value(6))
+                .andExpect(jsonPath("$.data.reconciliationSummary.mismatchedCount").value(2))
+                .andExpect(jsonPath("$.data.reconciliationSummary.unmatchedCount").value(0))
+                .andExpect(jsonPath("$.data.reconciliationSummary.differenceAmountTotal").value(15000));
     }
 
     @Test
