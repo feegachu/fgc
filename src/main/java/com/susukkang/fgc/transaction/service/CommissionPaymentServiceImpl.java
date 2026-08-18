@@ -645,12 +645,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             return requestedPolicyVersionId;
         }
         if (contractId == null) {
-            throw new FgcBusinessException(
-                    FgcErrorCode.COMMON_002,
-                    "allocationPolicyVersion",
-                    Map.of("field", "allocationPolicyVersion"),
-                    null
-            );
+            // 귀속 전 DRAFT에는 정책을 고를 계약이 없을 수 있다.
+            // 저장은 허용하고 확정 게이트(POLICY_VERSION_MISSING)에서 차단한다.
+            return null;
         }
 
         try {

@@ -322,6 +322,30 @@ class CommissionPaymentServiceImplTest {
         verify(mapper, never()).insertAttributions(anyList());
     }
 
+    @Test
+    void createsDraftWithoutContractOrAttributionsWhenPolicyVersionIsUnresolved() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        stubInsertAndResponse(List.of());
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                "GA_MANUAL_PAYMENT", "GA-2026-07-DRAFT-001", null, 7L, 11L,
+                new BigDecimal("100000"), LocalDate.of(2026, 7, 1), "PAYMENT",
+                LocalDate.of(2026, 7, 25), PaymentStage.GA_TO_FC, null,
+                List.of(), null, "귀속 전 임시저장"
+        );
+
+        CommissionPaymentResponse response = service.create(request);
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getSourceContractId()).isNull();
+        assertThat(paymentCaptor.getValue().getPolicyVersionId()).isNull();
+        verify(mapper, never()).insertAttributions(anyList());
+    }
+
     // 2026-08-11 yslee - 최신 FUN-065의 저장·확정 분리 계약 검증
     // 기존 코드: 등록 성공만 확인하여 REVIEW_REQUIRED 초안 저장이 FUN-033을 호출하지 않는지 증명하지 못함
     // 문제: 저장 시 사전검증이 재도입되면 입력 중인 초안이 한도 판정 때문에 보존되지 않을 수 있음
