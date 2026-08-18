@@ -273,7 +273,8 @@ class CapCalculatorIntegrationTest {
                 CapCalculationCommand.realtime(id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
 
         CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(
-                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, "FGC-FGL01-202607-0001");
+                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, null,
+                "FGC-FGL01-202607-0001");
         CapCheckSearchResult result = capCheckService.search(criteria, 1, 20);
 
         assertThat(result.page().content())

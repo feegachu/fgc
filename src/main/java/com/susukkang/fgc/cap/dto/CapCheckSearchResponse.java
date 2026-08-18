@@ -2,9 +2,11 @@ package com.susukkang.fgc.cap.dto;
 
 import java.util.List;
 
-/** IF-API-30 응답. summary(카드 4장)와 page 필드가 같은 레벨에 나란히 옴 */
+/** IF-API-30 응답. 카드·전체범위 집계와 페이징 목록을 같은 검색 응답으로 제공한다. */
 public record CapCheckSearchResponse(
         CapCheckSummaryResponse summary,
+        List<CapStageSummaryResponse> stageSummary,
+        List<CapAgentSummaryResponse> agentSummary,
         List<CapCheckItemResponse> content,
         int page,
         int size,
@@ -18,6 +20,8 @@ public record CapCheckSearchResponse(
                 .toList();
         return new CapCheckSearchResponse(
                 CapCheckSummaryResponse.from(result.summary()),
+                result.stageSummary().stream().map(CapStageSummaryResponse::from).toList(),
+                result.agentSummary().stream().map(CapAgentSummaryResponse::from).toList(),
                 content,
                 result.page().page(), result.page().size(), result.page().totalElements(),
                 result.page().totalPages(), result.page().sort());
