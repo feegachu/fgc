@@ -126,6 +126,28 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
+    void auditListUsesCommonComponentsWithoutInlinePresentation() throws IOException {
+        assertThat(resource("templates/audit/list.html"))
+                .contains("class=\"page-header\"")
+                .contains("class=\"filter-bar audit-filter-bar\"")
+                .contains("class=\"button button-primary\"")
+                .contains("class=\"surface audit-list-panel\"")
+                .contains("class=\"data-table-viewport\"")
+                .contains("class=\"data-table audit-log-table\"")
+                .contains("class=\"empty-state audit-empty-state\"")
+                .doesNotContain("style=")
+                .doesNotContain("<style>")
+                .doesNotContain("<script>");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/audit.css");
+
+        assertThat(resource("static/css/features/audit.css"))
+                .contains("@media (max-width: 56.25rem)")
+                .doesNotContain("@media (max-width: 71.875rem)");
+    }
+
+    @Test
     void contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior() throws IOException {
         assertThat(resource("templates/contract/form.html"))
                 .contains("name=\"premiumPerCycleAmount\"")
