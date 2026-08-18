@@ -285,6 +285,102 @@
   padding: var(--space-4);
 }
 
+.guidance {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-8);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.guidance-info {
+  border-color: var(--color-status-info-border);
+  color: var(--color-status-info-text);
+  background: var(--color-status-info-bg);
+}
+
+.guidance-warning {
+  border-color: var(--color-status-warning-border);
+  color: var(--color-status-warning-text);
+  background: var(--color-status-warning-bg);
+}
+
+.guidance-neutral {
+  border-color: var(--color-border-default);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+}
+
+.guidance-icon {
+  margin-top: 0.125rem;
+  font-size: 1.125rem;
+}
+
+.guidance-title {
+  color: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+
+.guidance-copy {
+  color: var(--color-text-secondary);
+  text-wrap: pretty;
+}
+
+.guidance-title + .guidance-copy {
+  margin-top: var(--space-1);
+}
+
+.tab-list {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border-default);
+  scrollbar-width: thin;
+}
+
+.tab-button {
+  min-height: 2.5rem;
+  flex: 0 0 auto;
+  padding: 0 var(--space-4);
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+  white-space: nowrap;
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.tab-button:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
+}
+
+.tab-button[aria-selected="true"] {
+  border-bottom-color: var(--color-action-primary);
+  color: var(--color-text-link);
+  background: var(--color-bg-surface);
+}
+
+.tab-panel {
+  min-width: 0;
+  overflow: hidden;
+  border-top: 0;
+  border-radius: 0 0 var(--radius-12) var(--radius-12);
+}
+
 .filter-bar {
   display: flex;
   align-items: flex-end;
