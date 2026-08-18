@@ -63,17 +63,24 @@ class PolicyMapperIntegrationTest {
                 new String[]{}, new String[]{});
     }
 
+    /** REG-19: 적용 시작일과 종료일은 모두 조회 기준일에 포함된다. */
     @Test
     void asOfFilterSelectsOnlyVersionsEffectiveOnThatDate() {
-        List<PolicyVersionRow> in2026 = policyMapper.selectPolicyVersions(
-                PolicyType.CAP_1200, LocalDate.of(2026, 8, 1), null);
-        assertThat(in2026).extracting(PolicyVersionRow::getPolicyCode)
+        List<PolicyVersionRow> onEffectiveFrom = policyMapper.selectPolicyVersions(
+                PolicyType.CAP_1200, LocalDate.of(2026, 1, 1), null);
+        assertThat(onEffectiveFrom).extracting(PolicyVersionRow::getPolicyCode)
                 .contains(cap2026Code)
                 .doesNotContain(cap2027Code);
 
-        List<PolicyVersionRow> in2027 = policyMapper.selectPolicyVersions(
-                PolicyType.CAP_1200, LocalDate.of(2027, 6, 1), null);
-        assertThat(in2027).extracting(PolicyVersionRow::getPolicyCode)
+        List<PolicyVersionRow> onEffectiveTo = policyMapper.selectPolicyVersions(
+                PolicyType.CAP_1200, LocalDate.of(2026, 12, 31), null);
+        assertThat(onEffectiveTo).extracting(PolicyVersionRow::getPolicyCode)
+                .contains(cap2026Code)
+                .doesNotContain(cap2027Code);
+
+        List<PolicyVersionRow> afterEffectiveTo = policyMapper.selectPolicyVersions(
+                PolicyType.CAP_1200, LocalDate.of(2027, 1, 1), null);
+        assertThat(afterEffectiveTo).extracting(PolicyVersionRow::getPolicyCode)
                 .contains(cap2027Code)
                 .doesNotContain(cap2026Code);
     }
