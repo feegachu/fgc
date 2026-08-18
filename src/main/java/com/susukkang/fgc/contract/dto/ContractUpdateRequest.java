@@ -2,9 +2,11 @@ package com.susukkang.fgc.contract.dto;
 
 import com.susukkang.fgc.contract.domain.ContractStatus;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,7 +29,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class ContractUpdateRequest implements ContractInput {
 
-    @NotNull
+    @NotBlank
+    @Size(max = 80)
     private String contractNo; // 계약 번호
     @NotNull
     private Long insurerId; // 보험회사
@@ -44,10 +47,13 @@ public class ContractUpdateRequest implements ContractInput {
     @NotNull
     private PaymentCycleCode paymentCycleCode; // 보험료 납입 주기
     @NotNull
-    @Positive
+    @PositiveOrZero
+    private BigDecimal premiumPerCycleAmount; // 주기 보험료
+    @NotNull
+    @PositiveOrZero
     private BigDecimal firstPremiumAmount; // 초회 보험료
     @NotNull
-    @Positive
+    @PositiveOrZero
     private BigDecimal monthlyEquivalentFirstPremium; //월납 환산 보험료
     @NotNull
     @Positive
