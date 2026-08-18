@@ -561,11 +561,18 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         boolean nonContractNewcomerPayment = !attributionRequests.isEmpty()
                 && attributionRequests.stream()
                 .allMatch(request -> request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT);
+        boolean approvedAllocationPayment = attributionRequests.stream()
+                .anyMatch(request -> request.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION);
         Long effectivePolicyVersionId = nonContractNewcomerPayment
                 && policyContractId == null
                 && policyVersionId == null
                 ? null
-                : resolvePolicyVersionId(policyVersionId, policyContractId, paymentStage);
+                : resolvePolicyVersionId(
+                        policyVersionId,
+                        policyContractId,
+                        paymentStage,
+                        approvedAllocationPayment
+                );
 
         List<CommissionPaymentAttributionCommand> attributions = new ArrayList<>(attributionRequests.size());
         for (int index = 0; index < attributionRequests.size(); index++) {
@@ -620,7 +627,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private Long resolvePolicyVersionId(
             Long requestedPolicyVersionId,
             Long contractId,
-            com.susukkang.fgc.common.code.PaymentStage paymentStage
+            com.susukkang.fgc.common.code.PaymentStage paymentStage,
+            boolean approvedAllocationPayment
     ) {
         if (requestedPolicyVersionId != null) {
             validatePolicyVersion(requestedPolicyVersionId);
@@ -635,9 +643,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             );
         }
 
-        Long resolvedPolicyVersionId = commissionPolicyService
-                .resolveCurrentCommission(contractId, paymentStage)
-                .getPolicyVersionId();
+        Long resolvedPolicyVersionId;
+        if (approvedAllocationPayment) {
+            ContractReference contract = requireContract(contractId, "attributedContractId");
+            resolvedPolicyVersionId = commissionPolicyService
+                    .resolveCurrentAllocationPolicyVersion(contract.contractDate());
+        } else {
+            resolvedPolicyVersionId = commissionPolicyService
+                    .resolveCurrentCommission(contractId, paymentStage)
+                    .getPolicyVersionId();
+        }
         validatePolicyVersion(resolvedPolicyVersionId);
         return resolvedPolicyVersionId;
     }

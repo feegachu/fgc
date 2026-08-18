@@ -18,7 +18,6 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
-import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
@@ -107,11 +106,17 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
-    void resolvesCurrentPolicyWhenRequestOmitsPolicyVersion() {
-        stubReferences(3L, 9L);
+    void resolvesAllocationPolicyWhenApprovedAllocationOmitsPolicyVersion() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
-        given(commissionPolicyService.resolveCurrentCommission(3L, PaymentStage.GA_TO_FC))
-                .willReturn(ResolvedCommissionPolicy.builder().policyVersionId(3L).build());
+        given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 3)))
+                .willReturn(4L);
+        given(mapper.existsPolicyVersion(4L)).willReturn(true);
+        given(mapper.findAllocationPolicyId(4L, "DIRECT")).willReturn(77L);
 
         CommissionPaymentCreateRequest source = createRequest(List.of(
                 attribution(3L, "500000", AttributionMethod.APPROVED_ALLOCATION)
@@ -138,7 +143,8 @@ class CommissionPaymentServiceImplTest {
         ArgumentCaptor<CommissionPaymentCommand> captor =
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
         verify(mapper).insertTransaction(captor.capture());
-        assertThat(captor.getValue().getPolicyVersionId()).isEqualTo(3L);
+        assertThat(captor.getValue().getPolicyVersionId()).isEqualTo(4L);
+        verify(commissionPolicyService, never()).resolveCurrentCommission(any(Long.class), any(PaymentStage.class));
     }
 
     @Test

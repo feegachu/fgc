@@ -244,7 +244,15 @@
 
   function renderError(message) {
     clear(lineBody);
-    appendMessage(message, true);
+    var content = appendMessage(message, true);
+    var retryButton = document.createElement("button");
+    retryButton.type = "button";
+    retryButton.className = "fgc-btn fgc-btn--ghost";
+    retryButton.style.marginTop = "12px";
+    retryButton.textContent = "다시 시도";
+    retryButton.addEventListener("click", load);
+    content.appendChild(document.createElement("br"));
+    content.appendChild(retryButton);
     updateTotals(0, 0, 0);
   }
 
@@ -259,6 +267,7 @@
     cell.appendChild(content);
     row.appendChild(cell);
     lineBody.appendChild(row);
+    return content;
   }
 
   function appendCell(row, content) {

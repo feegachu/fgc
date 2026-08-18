@@ -1102,7 +1102,7 @@ public class ScheduleService {
         int affectedRows = scheduleMapper.upsertPolicyReviewCase(
                 contractId,
                 paymentStage,
-                "CAP_RULE_MISSING",
+                "POLICY_MISSING",
                 "1,200% 룰셋 검토 필요 - " + paymentStage.name(),
                 description
         );
