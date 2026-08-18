@@ -7,14 +7,11 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
-import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunCommand;
-import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunRequest;
-import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunResponse;
-import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
-import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse;
-import com.susukkang.fgc.reconciliation.dto.ReconciliationResultSearchResponse;
+import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.reconciliation.dto.*;
 import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
+import com.susukkang.fgc.reconciliation.service.ReconciliationRunHistoryService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,6 +48,33 @@ public class ReconciliationRunController {
 
     private final ReconciliationRunService reconciliationRunService;
     private final ReconciliationResultQueryService reconciliationResultQueryService;
+    private final ReconciliationRunHistoryService reconciliationRunHistoryService;
+
+    @Operation(summary = "대사 실행 이력 조회 (IF-API-39)")
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ReconciliationRunSearchResponse> searchHistory(
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) String stage,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort
+    ) {
+        LocalDate settlementMonth = null;
+        if (month != null) {
+            settlementMonth = parseSettlementMonth(month);
+        }
+
+        String paymentStage = null;
+        if (stage != null) {
+            paymentStage = parsePaymentStage(stage).name();
+        }
+
+        ReconciliationRunSearchCriteria criteria = new ReconciliationRunSearchCriteria(settlementMonth, paymentStage);
+        PageResponse<ReconciliationRunHistoryResponse> result = reconciliationRunHistoryService.findHistory(criteria, page, size, sort);
+
+        return ApiResponse.success(ReconciliationRunSearchResponse.from(result));
+    }
 
     @Operation(summary = "대사 실행 생성 (IF-API-38)")
     @PostMapping

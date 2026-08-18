@@ -8,6 +8,17 @@
       안전하게 INNER JOIN한다. insurer/app_user는 insurer_id·created_by가 nullable이라
       LEFT JOIN한다.
     -->
+    <sql id="searchWhere">
+        <where>
+            <if test="settlementMonth != null">
+                AND rr.settlement_month = #{settlementMonth}
+            </if>
+            <if test="paymentStage != null">
+                AND rr.payment_stage = #{paymentStage}
+            </if>
+        </where>
+    </sql>
+
     <select id="search" resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow">
         SELECT rr.reconciliation_run_id, rr.validation_run_id, rr.settlement_month, rr.payment_stage,
                rr.insurer_id, ins.insurer_name AS insurerName,
@@ -24,14 +35,23 @@
         LEFT JOIN fgc.insurer ins ON ins.insurer_id = rr.insurer_id
         LEFT JOIN fgc.app_user creator ON creator.user_id = rr.created_by
         LEFT JOIN fgc.app_user finalizer ON finalizer.user_id = rr.finalized_by
-        <where>
-            <if test="settlementMonth != null">
-                AND rr.settlement_month = #{settlementMonth}
-            </if>
-            <if test="paymentStage != null">
-                AND rr.payment_stage = #{paymentStage}
-            </if>
-        </where>
-        ORDER BY rr.created_at DESC, rr.reconciliation_run_id DESC
+        <include refid="searchWhere"/>
+        ORDER BY rr.created_at
+        <choose>
+            <when test="sortDirection == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>,
+        rr.reconciliation_run_id
+        <choose>
+            <when test="sortDirection == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.reconciliation_run rr
+        <include refid="searchWhere"/>
     </select>
 </mapper>
