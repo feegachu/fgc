@@ -18,7 +18,8 @@
     page: 1,
     abortController: null,
     detailAbortController: null,
-    detailRequestId: 0
+    detailRequestId: 0,
+    initialReferenceValues: {}
   };
 
   var STATUS_CLASS = {
@@ -80,9 +81,12 @@
 
   function queryFromLocation() {
     var params = new URLSearchParams(window.location.search);
-    ["month", "stage", "status", "insurerId", "orgId", "contractNo"].forEach(function (key) {
+    ["month", "stage", "status", "contractNo"].forEach(function (key) {
       if (!params.has(key) || !controls[key]) return;
       controls[key].value = params.get(key);
+    });
+    ["insurerId", "orgId"].forEach(function (key) {
+      if (params.has(key)) state.initialReferenceValues[key] = params.get(key);
     });
     if (!controls.month.value) controls.month.value = root.dataset.initialMonth || "";
     if (params.has("page")) state.page = Math.max(1, Number(params.get("page")) || 1);
@@ -116,8 +120,8 @@
     return envelope && envelope.data && Array.isArray(envelope.data.content) ? envelope.data.content : [];
   }
 
-  function setOptions(select, rows, valueKey, label) {
-    var selectedValue = select.value;
+  function setOptions(select, rows, valueKey, label, selectedValue) {
+    selectedValue = selectedValue == null ? select.value : selectedValue;
     select.replaceChildren();
     var all = document.createElement("option");
     all.value = "";
@@ -152,7 +156,8 @@
       .then(function (envelope) {
         setOptions(controls.insurerId, content(envelope), "insurerId", function (row) {
           return row.insurerCode + " · " + row.insurerName;
-        });
+        }, state.initialReferenceValues.insurerId);
+        delete state.initialReferenceValues.insurerId;
       })
       .catch(function (error) { setReferenceLoadError(controls.insurerId, "보험회사", error); });
   }
@@ -163,7 +168,8 @@
       .then(function (envelope) {
         setOptions(controls.orgId, content(envelope), "organizationId", function (row) {
           return row.organizationCode + " · " + row.organizationName;
-        });
+        }, state.initialReferenceValues.orgId);
+        delete state.initialReferenceValues.orgId;
       })
       .catch(function (error) { setReferenceLoadError(controls.orgId, "조직", error); });
   }
@@ -293,13 +299,15 @@
 
   function agentRow(agent) {
     var organization = [agent.organizationCode, agent.organizationName].filter(Boolean).join(" · ") || "—";
+    var status = stageStatus(agent);
     return "<tr>" +
       '<td><strong>' + escapeHtml(agent.agentName || "—") + '</strong><br><small>' + escapeHtml(agent.agentCode || "") + '</small></td>' +
       '<td>' + escapeHtml(organization) + '</td>' +
       '<td class="text-right tabular-nums">' + number(agent.contractCount) + '건</td>' +
       '<td class="text-right tabular-nums">' + won(agent.limitAmountTotal) + '</td>' +
       '<td class="text-right tabular-nums">' + won(agent.includedAmountTotal) + '</td>' +
-      '<td><div class="cap-usage-cell"><span class="cap-usage-track"><span class="cap-usage-bar" style="--cap-progress:' + visualWidth(agent.usagePct) + '"></span></span><span class="cap-usage-value">' + escapeHtml(percent(agent.usagePct)) + '</span></div></td></tr>';
+      '<td><div class="cap-usage-cell"><span class="cap-usage-track"><span class="cap-usage-bar ' + status.progressClass + '" style="--cap-progress:' + visualWidth(agent.usagePct) + '"></span></span><span class="cap-usage-value">' + escapeHtml(percent(agent.usagePct)) + '</span></div></td>' +
+      '<td><span class="status-badge ' + status.className + '">' + status.label + '</span></td></tr>';
   }
 
   function renderAgentSummary(rows) {
