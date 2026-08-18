@@ -247,28 +247,30 @@ class CommissionPaymentIntegrationTest {
     // 문제: 정책 불일치 이력 INSERT가 DataIntegrityViolationException으로 실패
     // 개선: V13 적용 후 동일 유형을 정상 저장하고 조회할 수 있는지 PostgreSQL에서 검증
     @Test
-    void databaseAcceptsCapRuleMismatchExceptionType() {
+    void databaseStoresCapRuleMismatchAsReviewRequiredReason() {
         String exceptionKey = "IT-FUN065-CAP-RULE-MISMATCH-" + UUID.randomUUID();
 
         int inserted = jdbcTemplate.update("""
                 INSERT INTO fgc.exception_case (
                     exception_key,
                     exception_type,
+                    reason_code,
                     severity,
                     status,
                     source_entity_type,
                     source_entity_id,
                     title
-                ) VALUES (?, 'CAP_RULE_MISMATCH', 'HIGH', 'NEW',
+                ) VALUES (?, 'CAP_REVIEW_REQUIRED', 'CAP_RULE_MISMATCH', 'HIGH', 'NEW',
                           'COMMISSION_TRANSACTION', 'IT-FUN065', '한도 정책 불일치')
                 """, exceptionKey);
 
         assertThat(inserted).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("""
-                SELECT exception_type
+                SELECT exception_type || ':' || reason_code
                   FROM fgc.exception_case
                  WHERE exception_key = ?
-                """, String.class, exceptionKey)).isEqualTo("CAP_RULE_MISMATCH");
+                """, String.class, exceptionKey))
+                .isEqualTo("CAP_REVIEW_REQUIRED:CAP_RULE_MISMATCH");
     }
 
     // 2026-08-11 yslee - V14의 불필요한 지급 순번 구조 제거 통합 검증

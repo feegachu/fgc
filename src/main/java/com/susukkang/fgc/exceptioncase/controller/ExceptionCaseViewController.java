@@ -67,9 +67,11 @@ public class ExceptionCaseViewController {
 
         model.addAttribute("statusFilter", status);
         model.addAttribute("typeFilter", criteria.getType());
+        model.addAttribute("reasonCodeFilter", criteria.getReasonCode());
         model.addAttribute("severityFilter", criteria.getSeverity());
         model.addAttribute("contractNoFilter", criteria.getContractNo());
         model.addAttribute("exceptionTypes", ExceptionType.values());
+        model.addAttribute("exceptionReasonCodes", exceptionCaseService.reasonCodes());
         model.addAttribute("exceptionSeverities", ExceptionSeverity.values());
         model.addAttribute("actionTypes", ExceptionActionType.values());
         model.addAttribute("newStatus", ExceptionStatus.NEW);

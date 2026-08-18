@@ -63,11 +63,20 @@
                   th:selected="${typeFilter == type}">예외 유형</option>
         </select>
       </div>
+      <div class="fgc-field" style="min-width:190px">
+        <label class="fgc-label" for="f-reason">상세 원인</label>
+        <select class="fgc-select" id="f-reason" name="reasonCode">
+          <option value="">전체</option>
+          <option th:each="reasonCode : ${exceptionReasonCodes}" th:value="${reasonCode}"
+                  th:text="${reasonCode}"
+                  th:selected="${reasonCodeFilter == reasonCode}">상세 원인</option>
+        </select>
+      </div>
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-severity">심각도</label>
         <select class="fgc-select" id="f-severity" name="severity">
           <option value="">전체</option>
-          <option th:each="severity : ${exceptionSeverities}" th:value="${severity}" th:text="${severity}"
+          <option th:each="severity : ${exceptionSeverities}" th:value="${severity}" th:text="${severity.label()}"
                   th:selected="${severityFilter == severity}">심각도</option>
         </select>
       </div>
@@ -114,12 +123,14 @@
             <tr>
               <th style="width:56px">번호</th>
               <th style="width:150px">유형</th>
+              <th style="width:150px">상세 원인</th>
               <th style="width:74px">심각도</th>
               <th style="width:70px">계약</th>
               <th class="exception-title-cell">내용</th>
               <th style="width:86px">상태</th>
               <th style="width:84px">담당자</th>
-              <th style="width:106px">발생</th>
+              <th style="width:106px">최근 검출</th>
+              <th style="width:64px">검출</th>
               <th>참조</th>
             </tr>
           </thead>
@@ -129,12 +140,14 @@
                 th:attr="data-exception-id=${c.exceptionCaseId()},data-status=${c.status()}">
               <td class="fgc-mono" th:text="${c.exceptionCaseId()}">-</td>
               <td th:text="${c.type().label()}">-</td>
-              <td th:text="${c.severity()}">-</td>
+              <td th:text="${c.reasonLabel()}">-</td>
+              <td th:text="${c.severity().label()}">-</td>
               <td class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</td>
               <td class="exception-title-cell" th:text="${c.title()}">-</td>
               <td data-role="status" th:text="${c.status().label()}">-</td>
               <td data-role="assignee" th:text="${c.assigneeLoginId()} ?: '미배정'">-</td>
-              <td class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
+              <td class="fgc-mono" th:text="${#temporals.format(c.lastDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</td>
+              <td class="fgc-mono" th:text="|${c.detectionCount()}회|">1회</td>
               <!-- 참조 = 원천 화면 링크 (화면정의서 :1349 "만들 때 주의") — 라우트가 없는 원천 유형은 텍스트로만 -->
               <td class="fgc-mono">
                 <a th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}"
@@ -143,7 +156,7 @@
                       th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
               </td>
             </tr>
-            <tr th:if="${cases.isEmpty()}"><td colspan="9"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr th:if="${cases.isEmpty()}"><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -154,7 +167,7 @@
         </span>
         <div class="pagination-controls">
           <a class="pagination-button" th:if="${casePage.page() > 1}"
-             th:href="@{/exceptions(type=${typeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() - 1})}"
+             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() - 1})}"
              aria-label="이전 페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
           </a>
@@ -165,7 +178,7 @@
           <span class="pagination-button is-active" aria-current="page"
                 th:text="${casePage.page()}">1</span>
           <a class="pagination-button" th:if="${casePage.page() < casePage.totalPages()}"
-             th:href="@{/exceptions(type=${typeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() + 1})}"
+             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() + 1})}"
              aria-label="다음 페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
           </a>
@@ -179,6 +192,16 @@
 
     <!-- ④ 처리 패널 + ⑤ 이력 -->
     <div class="exception-side-panels">
+
+      <section class="fgc-card">
+        <div class="fgc-card__head">
+          <span class="fgc-card__title">검출 이력</span>
+          <span class="fgc-muted" style="font-size:11px">실행별 증거는 고치거나 지울 수 없습니다</span>
+        </div>
+        <div class="fgc-card__body" id="occurrence-body">
+          <p class="fgc-muted" style="font-size:13px;margin:0">—</p>
+        </div>
+      </section>
 
       <section class="fgc-card">
         <div class="fgc-card__head">
@@ -209,11 +232,18 @@
         <div><dt>예외 번호</dt><dd class="fgc-mono" th:text="${c.exceptionCaseId()}">-</dd></div>
         <div><dt>상태</dt><dd data-role="status" th:text="${c.status().label()}">-</dd></div>
         <div><dt>유형</dt><dd th:text="${c.type().label()}">-</dd></div>
-        <div><dt>심각도</dt><dd th:text="${c.severity()}">-</dd></div>
+        <div><dt>상세 원인</dt><dd th:text="${c.reasonLabel()}">-</dd></div>
+        <div><dt>심각도</dt><dd th:text="${c.severity().label()}">-</dd></div>
         <div><dt>계약번호</dt><dd class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</dd></div>
         <div><dt>담당자</dt><dd data-role="assignee" th:text="${c.assigneeLoginId()} ?: '미배정'">-</dd></div>
         <div><dt>설계사</dt><dd th:text="${c.agentName()} ?: '-'">-</dd></div>
-        <div><dt>발생</dt><dd class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</dd></div>
+        <div><dt>검증월</dt><dd class="fgc-mono"
+             th:text="${c.validationMonth() != null} ? ${#temporals.format(c.validationMonth(), 'yyyy-MM')} : '—'">-</dd></div>
+        <div><dt>최초 검출 실행</dt><dd class="fgc-mono" th:text="${c.firstDetectedRunId()} ?: '—'">-</dd></div>
+        <div><dt>최근 검출 실행</dt><dd class="fgc-mono" th:text="${c.lastDetectedRunId()} ?: '—'">-</dd></div>
+        <div><dt>검출 횟수</dt><dd class="fgc-mono" th:text="|${c.detectionCount()}회|">1회</dd></div>
+        <div><dt>최초 검출</dt><dd class="fgc-mono" th:text="${#temporals.format(c.firstDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</dd></div>
+        <div><dt>최근 검출</dt><dd class="fgc-mono" th:text="${#temporals.format(c.lastDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</dd></div>
         <div class="exception-detail-wide"><dt>제목</dt><dd th:text="${c.title()}">-</dd></div>
         <div class="exception-detail-wide"><dt>설명</dt><dd th:text="${c.description()}">-</dd></div>
         <div class="exception-detail-wide"><dt>참조</dt><dd class="fgc-mono">
@@ -261,6 +291,23 @@
          th:unless="${c.status() == newStatus or c.status() == inReviewStatus}">
         종결된 예외입니다.
       </p>
+    </template>
+    <template th:id="|exception-occurrence-${c.exceptionCaseId()}|">
+      <ol class="exception-history-list" th:if="${!c.occurrences().isEmpty()}">
+        <li class="exception-history-item" th:each="occurrence : ${c.occurrences()}">
+          <strong th:text="|${occurrence.validationMonth()} · ${occurrence.runNo()}회차 · ${occurrence.detectionLabel()}|">검출</strong>
+          <p class="fgc-muted" style="margin:4px 0 0">
+            실행 <span class="fgc-mono" th:text="${occurrence.validationRunId()}">-</span>
+            · <span class="fgc-mono" th:text="${occurrence.sourceEntityType()} + ':' + ${occurrence.sourceEntityId()}">-</span>
+          </p>
+          <details th:if="${occurrence.evidenceJson() != null and !occurrence.evidenceJson().isBlank()}" style="margin-top:4px">
+            <summary class="fgc-muted">검출 증거</summary>
+            <pre class="fgc-mono" style="white-space:pre-wrap;font-size:11px" th:text="${occurrence.evidenceJson()}">{}</pre>
+          </details>
+          <small class="fgc-muted" th:text="${#temporals.format(occurrence.detectedAt(), 'yyyy-MM-dd HH:mm')}">검출 시각</small>
+        </li>
+      </ol>
+      <p class="fgc-muted" style="font-size:13px;margin:0" th:if="${c.occurrences().isEmpty()}">실행별 검출 이력이 없습니다.</p>
     </template>
     <template th:id="|exception-history-${c.exceptionCaseId()}|">
       <ol class="exception-history-list" th:if="${!c.actions().isEmpty()}">

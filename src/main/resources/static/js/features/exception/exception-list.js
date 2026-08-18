@@ -3,6 +3,7 @@
 
   const rows = Array.from(document.querySelectorAll(".exception-row"));
   const detailBody = document.getElementById("detail-body");
+  const occurrenceBody = document.getElementById("occurrence-body");
   const historyBody = document.getElementById("history-body");
   const selectedBadge = document.getElementById("sel-badge");
   const apiClient = window.FgcUi && window.FgcUi.apiClient;
@@ -15,7 +16,7 @@
     REJECTED: "오탐·반려"
   };
 
-  if (!detailBody || !historyBody || !selectedBadge) return;
+  if (!detailBody || !occurrenceBody || !historyBody || !selectedBadge) return;
 
   function formatActionTime(value) {
     return value ? value.replace("T", " ").slice(0, 16) : "-";
@@ -26,7 +27,8 @@
     if (!list) {
       list = document.createElement("ol");
       list.className = "exception-history-list";
-      historyBody.replaceChildren(list);
+      // 캐시된 wrapper(#history-body 유일한 자식) 안을 교체해야 재선택 후에도 이력이 남는다
+      historyBody.firstElementChild.replaceChildren(list);
     }
 
     const item = document.createElement("li");
@@ -128,11 +130,32 @@
     });
   }
 
+  // template을 매번 새로 clone하면 조치 저장으로 바꾼 이력·폼 상태가 재선택 시 초기값으로
+  // 되돌아가므로, 행별로 한 번만 clone한 DOM을 캐시해 세션 중 변경을 유지한다.
+  const panelCache = new Map();
+
+  function clonePanel(template) {
+    const wrapper = document.createElement("div");
+    wrapper.append(template.content.cloneNode(true));
+    return wrapper;
+  }
+
   function selectRow(row) {
     const caseId = row.dataset.exceptionId;
-    const detailTemplate = document.getElementById(`exception-detail-${caseId}`);
-    const historyTemplate = document.getElementById(`exception-history-${caseId}`);
-    if (!detailTemplate || !historyTemplate) return;
+    let panels = panelCache.get(caseId);
+    if (!panels) {
+      const detailTemplate = document.getElementById(`exception-detail-${caseId}`);
+      const occurrenceTemplate = document.getElementById(`exception-occurrence-${caseId}`);
+      const historyTemplate = document.getElementById(`exception-history-${caseId}`);
+      if (!detailTemplate || !occurrenceTemplate || !historyTemplate) return;
+      panels = {
+        detail: clonePanel(detailTemplate),
+        occurrence: clonePanel(occurrenceTemplate),
+        history: clonePanel(historyTemplate)
+      };
+      panelCache.set(caseId, panels);
+      bindActionForm(panels.detail.querySelector("[data-exception-action-form]"), row);
+    }
 
     rows.forEach((candidate) => {
       const selected = candidate === row;
@@ -140,10 +163,10 @@
       candidate.setAttribute("aria-selected", String(selected));
     });
 
-    detailBody.replaceChildren(detailTemplate.content.cloneNode(true));
-    historyBody.replaceChildren(historyTemplate.content.cloneNode(true));
+    detailBody.replaceChildren(panels.detail);
+    occurrenceBody.replaceChildren(panels.occurrence);
+    historyBody.replaceChildren(panels.history);
     selectedBadge.textContent = `#${caseId}`;
-    bindActionForm(detailBody.querySelector("[data-exception-action-form]"), row);
   }
 
   rows.forEach((row) => {

@@ -6,6 +6,7 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -42,6 +43,13 @@ public interface ExceptionCaseQueryMapper {
     List<ExceptionActionRow> findActionsByCaseIds(
             @Param("exceptionCaseIds") List<Long> exceptionCaseIds);
 
+    /** 현재 페이지 예외들의 실행별 검출 이력을 한 번에 조회한다. */
+    List<ExceptionOccurrenceRow> findOccurrencesByCaseIds(
+            @Param("exceptionCaseIds") List<Long> exceptionCaseIds);
+
     /** 화면 상단 유형별 미처리(NEW+IN_REVIEW) 요약 카드 집계. */
     List<ExceptionTypeSummaryRow> countOpenByType();
+
+    /** 관리자 상세 원인 필터 선택지. */
+    List<String> findReasonCodes();
 }

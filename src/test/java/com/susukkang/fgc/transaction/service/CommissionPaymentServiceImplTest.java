@@ -773,7 +773,8 @@ class CommissionPaymentServiceImplTest {
         ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
                 ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
         verify(mapper).insertExceptionCase(captor.capture());
-        assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_RULE_MISMATCH");
+        assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_REVIEW_REQUIRED");
+        assertThat(captor.getValue().getReasonCode()).isEqualTo("CAP_RULE_MISMATCH");
         verify(mapper, never()).insertCapCheck(any());
         verify(mapper, never()).confirm(any(), any(), any());
     }

@@ -211,6 +211,23 @@
     </section>
   </div>
 
+  <!-- SRC-032: 실행별 검출과 관리자 업무건을 분리해 재실행이 업무량을 부풀리지 않게 한다. -->
+  <section class="fgc-card" style="margin-top:16px" id="exception-detection-summary">
+    <div class="fgc-card__head">
+      <span class="fgc-card__title">예외 생성 결과</span>
+      <a class="fgc-btn fgc-btn--ghost" th:href="@{/exceptions(status='OPEN',month=${month})}"
+         style="padding:4px 10px;font-size:12px">예외함 열기</a>
+    </div>
+    <div class="fgc-card__body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+      <div class="publishing-result-placeholder"><strong th:text="${detail.exceptionSummary().detectedCount()}">0</strong><span>이번 실행 검출</span></div>
+      <div class="publishing-result-placeholder"><strong th:text="${detail.exceptionSummary().newCount()}">0</strong><span>신규 업무건</span></div>
+      <div class="publishing-result-placeholder"><strong th:text="${detail.exceptionSummary().recurringCount()}">0</strong><span>기존 업무건 재검출</span></div>
+      <div class="publishing-result-placeholder"><strong th:text="${detail.exceptionSummary().reopenedCount()}">0</strong><span>해결 후 재발</span></div>
+      <div class="publishing-result-placeholder"><strong th:text="${detail.exceptionSummary().notDetectedCount()}">0</strong><span>이번 실행 미검출</span></div>
+      <div class="publishing-result-placeholder"><strong th:text="${detail.exceptionSummary().openWorkItemCount()}">0</strong><span>미처리 업무건</span></div>
+    </div>
+  </section>
+
   <!-- ⑤ 확정 조건 체크리스트 — finalize-checklist API(IF-API-50, #172~#175) 연동 시 채운다 -->
   <section class="fgc-card" style="margin-top:16px">
     <div class="fgc-card__head">

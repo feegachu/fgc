@@ -20,6 +20,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ExceptionCaseSearchDTO {
     private ExceptionType type;
+    private String reasonCode;
     private ExceptionSeverity severity;
     private String status;
     private Long assignee;

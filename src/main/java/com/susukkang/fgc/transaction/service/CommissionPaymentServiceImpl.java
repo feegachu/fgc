@@ -381,10 +381,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             String title,
             String description
     ) {
+        String reasonCode = exceptionReasonCode(exceptionType, title);
         return ExceptionCaseCommand.builder()
                 .exceptionKey("PRE_CONFIRM:" + data.paymentId() + ":"
-                        + data.transactionAttributionId() + ":" + exceptionType)
+                        + data.transactionAttributionId() + ":" + reasonCode)
                 .exceptionType(exceptionType)
+                .reasonCode(reasonCode)
                 .severity(severity)
                 .contractId(data.contractId())
                 .agentId(data.agentId())
@@ -393,6 +395,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .title(title)
                 .description(description)
                 .build();
+    }
+
+    /** SRC-032 D-05: 관리자 상위 유형과 구체 실패 원인을 분리한다. */
+    private String exceptionReasonCode(String exceptionType, String title) {
+        if (ExceptionType.CAP_REVIEW_REQUIRED.name().equals(exceptionType)
+                && "한도 정책 불일치".equals(title)) {
+            return "CAP_RULE_MISMATCH";
+        }
+        return exceptionType;
     }
 
     /**
@@ -1067,10 +1078,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (!rule.capRuleSetId().equals(calculation.capRuleSetId())) {
             return new GateFailure(
                     data,
-                    "CAP_RULE_MISMATCH",
+                    ExceptionType.CAP_REVIEW_REQUIRED.name(),
                     "HIGH",
                     "한도 정책 불일치",
-                    "지급 정책과 한도 계산 정책이 서로 다릅니다.",
+                    "지급 적용 한도정책 ID=" + rule.capRuleSetId()
+                            + ", 계산 적용 한도정책 ID=" + calculation.capRuleSetId()
+                            + "로 서로 다릅니다. 정책 버전과 적용 기준일을 정정한 뒤 재검증하세요.",
                     FgcErrorCode.CAP_002,
                     Map.of()
             );

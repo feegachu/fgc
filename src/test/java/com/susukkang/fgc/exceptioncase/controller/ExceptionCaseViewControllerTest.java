@@ -12,6 +12,7 @@ import com.susukkang.fgc.common.web.ShellAdvice;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseResponseDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -72,11 +74,15 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("data-exception-id=\"10\"")))
                 .andExpect(content().string(containsString("id=\"exception-detail-10\"")))
                 .andExpect(content().string(containsString("id=\"exception-history-10\"")))
+                .andExpect(content().string(containsString("id=\"exception-occurrence-10\"")))
+                .andExpect(content().string(containsString("최초 검출 실행")))
+                .andExpect(content().string(containsString("최근 검출 실행")))
                 .andExpect(content().string(containsString("data-exception-action-form")))
                 .andExpect(content().string(containsString("처리 저장")))
                 .andExpect(content().string(containsString("href=\"/transactions\"")))
                 .andExpect(content().string(containsString("page=2")))
                 .andExpect(content().string(containsString("데이터 품질")))
+                .andExpect(content().string(containsString("value=\"WARNING\">주의")))
                 .andExpect(content().string(containsString("1. 검토 시작")))
                 .andExpect(content().string(containsString("<span>신규</span> → <span>검토중</span>")))
                 .andExpect(content().string(containsString("/js/features/exception/exception-list.js")))
@@ -176,7 +182,7 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(model().attribute("severityFilter", ExceptionSeverity.HIGH))
                 .andExpect(model().attribute("contractNoFilter", "C004"))
                 .andExpect(content().string(containsString("type=DATA_QUALITY&amp;status=OPEN")))
-                .andExpect(content().string(containsString("type=CAP_WARNING&amp;severity=HIGH&amp;status=OPEN")))
+                .andExpect(content().string(containsString("type=CAP_WARNING&amp;reasonCode=&amp;severity=HIGH&amp;status=OPEN")))
                 .andExpect(content().string(containsString("contractNo=C004")));
     }
 
@@ -185,9 +191,17 @@ class ExceptionCaseViewControllerTest {
             List<ExceptionActionResponse> actions
     ) {
         return new ExceptionCaseResponseDTO(
-                id, "KEY-" + id, ExceptionType.DATA_QUALITY, ExceptionSeverity.WARNING,
-                status, title, "상세 설명", "C001", "김정산", null, null,
-                sourceType, sourceId, OffsetDateTime.parse("2026-07-10T09:00:00+09:00"), actions);
+                id, "KEY-" + id, ExceptionType.DATA_QUALITY, "FINANCIAL_SNAPSHOT_MISSING",
+                ExceptionSeverity.WARNING, status, title, "상세 설명", "C001", "김정산",
+                null, null, sourceType, sourceId, LocalDate.of(2026, 7, 1), 1505L, 1506L,
+                OffsetDateTime.parse("2026-07-10T09:00:00+09:00"),
+                OffsetDateTime.parse("2026-07-11T09:00:00+09:00"), 2,
+                OffsetDateTime.parse("2026-07-10T09:00:00+09:00"),
+                List.of(new ExceptionOccurrenceResponse(
+                        id, 1506L, 2, LocalDate.of(2026, 7, 1), "DATA_QUALITY",
+                        "FINANCIAL_SNAPSHOT_MISSING", sourceType, sourceId, "{}", false, false,
+                        OffsetDateTime.parse("2026-07-11T09:00:00+09:00"))),
+                actions);
     }
 
     private static FgcUserDetails principal(String loginId, String userName, String roleCode) {

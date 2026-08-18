@@ -4,17 +4,16 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
- * fgc.exception_case 쓰기 전용 매퍼
- * DailyChangedContractJob이 계약 단위 데이터 품질 오류를 만났을 때 DATA_QUALITY 예외를 여기로 남김
+ * SRC-032 예외 업무건과 실행별 검출 이력을 함께 기록하는 쓰기 매퍼.
+ * 실제 동시성·멱등성은 DB 공용 함수 record_exception_detection이 한 곳에서 보장한다.
  */
 @Mapper
 public interface ExceptionCaseMapper {
 
     /**
-     * exception_key = "DATA_QUALITY:{validationRunId}:INSURANCE_CONTRACT:{contractId}"
-     * 같은 실행 안에서 같은 계약이 또 실패해도 ON CONFLICT DO NOTHING으로 중복 행이 안 생김(재시작해도 exception_case는 1건).
+     * 같은 검증월·계약·원인의 업무건은 하나이며 실행별 occurrence만 추가된다.
      *
-     * @return 실제로 새로 INSERT됐으면 1, 이미 같은 key로 있었으면(ON CONFLICT) 0
+     * @return 이 실행의 occurrence가 새로 기록됐으면 1, 같은 실행 재시도면 0
      */
     int insertDataQualityCase(@Param("validationRunId") Long validationRunId,
                                @Param("contractId") Long contractId,
@@ -50,7 +49,7 @@ public interface ExceptionCaseMapper {
      * 설명 : 예외건 처리를 위해 만든 메서드들
      *
      * @param  validationRunId 배치 실행 ID
-     * @return 처리된 건수
+     * @return 이 실행에 새로 기록된 occurrence 건수
      * @author hjKang
      * @since 2026-08-15
      */

@@ -11,6 +11,7 @@
         (
             exception_key,
             exception_type,
+            reason_code,
             severity,
             status,
             validation_run_id,
@@ -25,6 +26,7 @@
         VALUES
             (
             #{exceptionKey},
+            #{exceptionType},
             #{exceptionType},
             #{severity},
             'NEW',
@@ -42,6 +44,7 @@
             DO UPDATE
         SET
             exception_type = EXCLUDED.exception_type,
+            reason_code = EXCLUDED.reason_code,
             severity = EXCLUDED.severity,
             validation_run_id = COALESCE(EXCLUDED.validation_run_id, existing.validation_run_id),
             contract_id = EXCLUDED.contract_id,

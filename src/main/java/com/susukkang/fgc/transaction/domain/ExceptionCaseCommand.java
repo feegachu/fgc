@@ -15,6 +15,7 @@ import lombok.Getter;
 public class ExceptionCaseCommand {
     private final String exceptionKey;
     private final String exceptionType;
+    private final String reasonCode;
     private final String severity;
     private final Long contractId;
     private final Long agentId;
