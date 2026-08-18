@@ -62,7 +62,11 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
                         summary.getJournalImbalanceCount()),
                 new ValidationRunDetailResponse.ReconciliationSummary(
                         summary.getReconciliationResultCount(),
-                        summary.getReconciliationMismatchCount()));
+                        summary.getReconciliationMismatchCount(),
+                        summary.getReconciliationMatchedCount(),
+                        summary.getReconciliationMismatchedCount(),
+                        summary.getReconciliationUnmatchedCount(),
+                        summary.getReconciliationDifferenceAmountTotal()));
     }
 
     @Override
