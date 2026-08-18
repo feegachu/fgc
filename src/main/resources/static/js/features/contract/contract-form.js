@@ -101,7 +101,10 @@
   }
 
   function showError(error, fallbackMessage) {
-    var message = error && error.message ? error.message : fallbackMessage;
+    // 개발/운영 API가 제공하는 업무 상세 사유가 있으면 공통 오류코드보다 우선한다.
+    // 예: 조직 계층에서 팀장 수령자를 찾지 못해 스케줄 생성이 막힌 경우
+    // "입력값을 확인하세요. ({field})"만으로는 사용자가 조치할 수 없다.
+    var message = error && error.detail ? error.detail : (error && error.message ? error.message : fallbackMessage);
     if (error && error.code === "FGC-CONT-001") message = "저장 불가 — 이미 등록된 계약번호입니다.";
     if (error && error.field && Object.prototype.hasOwnProperty.call(elements, error.field)) {
       setFieldError(error.field, message);

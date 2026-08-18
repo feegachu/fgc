@@ -920,14 +920,25 @@ public class ScheduleService {
                     FgcErrorCode.COMMON_002,
                     "beneficiaryAgentId",
                     Map.of(
+                            "field", "beneficiaryAgentId",
                             "contractDate", contractDate,
                             "organizationId", organizationId,
                             "agentRankCode", agentRankCode.name()
                     ),
-                    "조직과 직급에 해당하는 활성 설계사를 찾을 수 없습니다."
+                    "계약일 기준 소속 조직 및 상위 조직에서 " + agentRankLabel(agentRankCode)
+                            + " 수령자를 찾을 수 없습니다. 조직 계층과 설계사 배정을 확인하세요."
             );
         }
         return agentId;
+    }
+
+    private String agentRankLabel(AgentRankCode agentRankCode) {
+        return switch (agentRankCode) {
+            case FC -> "설계사";
+            case TEAM_LEADER -> "팀장";
+            case BRANCH_MANAGER -> "지사장";
+            case DIVISION_HEAD -> "본부장";
+        };
     }
     /**
      * 설명 : 계약 정보와 지급 회차를 통해서 계약차월을 계산한다.
