@@ -295,7 +295,7 @@
     <template th:id="|exception-occurrence-${c.exceptionCaseId()}|">
       <ol class="exception-history-list" th:if="${!c.occurrences().isEmpty()}">
         <li class="exception-history-item" th:each="occurrence : ${c.occurrences()}">
-          <strong th:text="|${occurrence.validationMonth()} · ${occurrence.runNo()}회차 · ${occurrence.detectionLabel()}|">검출</strong>
+          <strong th:text="${occurrence.validationMonth()} + ' · ' + ${occurrence.runNo()} + '회차 · ' + ${occurrence.detectionLabel()}">검출</strong>
           <p class="fgc-muted" style="margin:4px 0 0">
             실행 <span class="fgc-mono" th:text="${occurrence.validationRunId()}">-</span>
             · <span class="fgc-mono" th:text="${occurrence.sourceEntityType()} + ':' + ${occurrence.sourceEntityId()}">-</span>
