@@ -168,6 +168,44 @@ class PublishingTemplateStructureTest {
                 .doesNotContain("fetch(");
     }
 
+    @Test
+    void baseReferenceScreenUsesSeparatedApiAndPageScripts() throws IOException {
+        assertThat(resource("templates/base/index.html"))
+                .contains("class=\"page-header base-page-header\"")
+                .contains("class=\"guidance guidance-neutral base-information-banner\"")
+                .contains("class=\"tab-list\"")
+                .contains("class=\"surface tab-panel base-panel\"")
+                .contains("class=\"filter-bar base-filter-form\"")
+                .contains("class=\"data-table base-table")
+                .contains("data-base-tab=\"organization\"")
+                .contains("data-base-tab=\"product\"")
+                .contains("data-base-tab=\"agent\"")
+                .doesNotContain("<script>")
+                .doesNotContain("style=\"")
+                .doesNotContain("onclick=\"");
+
+        assertThat(resource("static/js/features/base/base-api.js"))
+                .contains("/api/v1/base/organizations")
+                .contains("/api/v1/base/insurers")
+                .contains("/api/v1/base/products")
+                .contains("/api/v1/base/agents");
+
+        assertThat(resource("static/js/features/base/base-list.js"))
+                .contains("window.FgcUi.baseApi")
+                .contains("new AbortController()")
+                .contains("aria-busy")
+                .doesNotContain("fetch(");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/base.css")
+                .contains("/js/features/base/base-api.js")
+                .contains("/js/features/base/base-list.js");
+
+        assertThat(resource("static/css/features/base.css"))
+                .contains(".base-page")
+                .contains("@media (max-width: 47.9375rem)");
+    }
+
     private static String resource(String path) throws IOException {
         try (var input = PublishingTemplateStructureTest.class.getClassLoader().getResourceAsStream(path)) {
             assertThat(input).as(path).isNotNull();

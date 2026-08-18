@@ -77,11 +77,13 @@ class BaseViewControllerTest {
                 .andExpect(content().string(containsString("2026-01-01")))
                 .andExpect(content().string(not(containsString("<th scope=\"col\">산입 여부</th>"))))
                 .andExpect(content().string(containsString("href=\"/base\" aria-current=\"page\"")))
-                .andExpect(content().string(containsString("id=\"b1\"")))
-                .andExpect(content().string(containsString("id=\"b2\"")))
-                .andExpect(content().string(containsString("id=\"b3\"")))
-                .andExpect(content().string(containsString("id=\"b4\"")))
-                .andExpect(content().string(containsString("id=\"b5\"")))
+                .andExpect(content().string(containsString("id=\"base-tab-organization\"")))
+                .andExpect(content().string(containsString("id=\"base-tab-insurer\"")))
+                .andExpect(content().string(containsString("id=\"base-tab-product\"")))
+                .andExpect(content().string(containsString("id=\"base-tab-agent\"")))
+                .andExpect(content().string(containsString("id=\"base-tab-commission-item\"")))
+                .andExpect(content().string(containsString("/js/features/base/base-api.js")))
+                .andExpect(content().string(containsString("/js/features/base/base-list.js")))
                 .andExpect(content().string(not(containsString(">등록</button>"))))
                 .andExpect(content().string(not(containsString(">수정</button>"))));
     }
