@@ -80,6 +80,17 @@ class MonthlyValidationJobIntegrationTest {
                          SELECT exception_case_id FROM fgc.exception_case WHERE validation_run_id = ?
                      )
                     """, id);
+            // exception_occurrence는 append-only(trg_exception_occurrence_append_only가
+            // UPDATE/DELETE를 항상 거절한다, V23_1) — 테스트 정리 목적으로만 트리거를
+            // 잠깐 끈다.
+            jdbcTemplate.execute("ALTER TABLE fgc.exception_occurrence DISABLE TRIGGER trg_exception_occurrence_append_only");
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.exception_occurrence
+                     WHERE exception_case_id IN (
+                         SELECT exception_case_id FROM fgc.exception_case WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.execute("ALTER TABLE fgc.exception_occurrence ENABLE TRIGGER trg_exception_occurrence_append_only");
             jdbcTemplate.update(
                     "DELETE FROM fgc.exception_case WHERE validation_run_id = ?", id);
             jdbcTemplate.update("""

@@ -37,7 +37,7 @@ class ReconciliationExceptionServiceTest {
 
     @Test
     void createdAndSkippedDuplicateAddUpToCandidateCount() {
-        given(reconciliationRunMapper.findById(41L)).willReturn(new ReconciliationRunRow());
+        given(reconciliationRunMapper.findById(41L)).willReturn(runLinkedToValidationRun(41L, 900L));
         ReconciliationExceptionBulkCreateRow row = new ReconciliationExceptionBulkCreateRow();
         row.setCandidateCount(5L);
         row.setCreatedCount(2L);
@@ -59,5 +59,30 @@ class ReconciliationExceptionServiceTest {
                         assertThat(((FgcBusinessException) exception).getErrorCode())
                                 .isEqualTo(FgcErrorCode.COMMON_004));
         verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(99L);
+    }
+
+    // fgc.record_exception_detection()이 validation_run_id를 필수로 요구해서(V23_1),
+    // 월 검증 실행과 연결되지 않은 단독 대사 실행은 Mapper까지 가지 않고 여기서 막아야 한다
+    // (안 막으면 Mapper의 INNER JOIN 때문에 "후보 0건"으로 조용히 넘어가 버린다).
+    @Test
+    void throwsReco003WhenReconciliationRunHasNoLinkedValidationRun() {
+        ReconciliationRunRow standaloneRun = new ReconciliationRunRow();
+        standaloneRun.setReconciliationRunId(41L);
+        standaloneRun.setValidationRunId(null);
+        given(reconciliationRunMapper.findById(41L)).willReturn(standaloneRun);
+
+        assertThatThrownBy(() -> service.bulkCreate(41L))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception ->
+                        assertThat(((FgcBusinessException) exception).getErrorCode())
+                                .isEqualTo(FgcErrorCode.RECO_003));
+        verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(41L);
+    }
+
+    private static ReconciliationRunRow runLinkedToValidationRun(Long reconciliationRunId, Long validationRunId) {
+        ReconciliationRunRow row = new ReconciliationRunRow();
+        row.setReconciliationRunId(reconciliationRunId);
+        row.setValidationRunId(validationRunId);
+        return row;
     }
 }

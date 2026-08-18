@@ -132,6 +132,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.reconciliation.duplicateRun"
     ),
+    RECO_003(
+            "FGC-RECO-003",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.reconciliation.noValidationRun"
+    ),
 
     EXCP_001(
             "FGC-EXCP-001",
