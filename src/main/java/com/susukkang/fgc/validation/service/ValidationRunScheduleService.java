@@ -83,7 +83,12 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
 
 
             try {
-                itemService.process(contractId);
+                // FGC-FUN-043 결과 집계 — validation_run_id 연결은 itemService.process()
+                // 안에서 생성과 같은 REQUIRES_NEW 트랜잭션으로 함께 처리된다(코드리뷰 반영).
+                // 여기서 별도로 UPDATE를 걸면 이 바깥 트랜잭션이 나중에(다른 계약 처리 중)
+                // 롤백될 때 헤더는 이미 커밋된 채 연결만 풀려 validation_run_id=NULL로
+                // 남는 문제가 있었다.
+                itemService.process(contractId, validationRunId);
                 processedCount++;
             } catch (FgcBusinessException exception) {
                 skips.add(new ContractSkip(

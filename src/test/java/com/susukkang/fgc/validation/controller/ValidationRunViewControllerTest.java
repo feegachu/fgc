@@ -107,7 +107,7 @@ class ValidationRunViewControllerTest {
                 new ValidationRunDetailResponse.CapSummary(0, 0, 0, 0),
                 new ValidationRunDetailResponse.ArbitrageSummary(0, 0, 0),
                 new ValidationRunDetailResponse.LedgerSummary(0, 0),
-                new ValidationRunDetailResponse.ReconciliationSummary(0, 0));
+                new ValidationRunDetailResponse.ReconciliationSummary(0, 0, 0, 0, 0, java.math.BigDecimal.ZERO));
     }
 
     // ── W01 목록 ────────────────────────────────────────────────────
