@@ -211,6 +211,40 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void savesDraftWhenAutomaticCommissionPolicyResolutionFails() {
+        given(mapper.existsAgent(7L)).willReturn(true);
+        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
+        given(mapper.findContract(3L))
+                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+        given(commissionPolicyService.resolveCurrentCommission(3L, PaymentStage.GA_TO_FC))
+                .willThrow(new FgcBusinessException(
+                        FgcErrorCode.COMMON_002,
+                        "commissionPolicy",
+                        Map.of("reason", "POLICY_MISSING"),
+                        "계약에 적용할 현행 수수료 정책이 없습니다."
+                ));
+        CommissionPaymentCreateRequest source = createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        ));
+        CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), source.agentId(),
+                source.commissionItemId(), source.amount(), source.settlementMonth(), source.cashflowType(),
+                source.scheduledPaymentDate(), source.paymentStage(), null, source.attributions(),
+                source.evidenceRef(), source.note()
+        );
+
+        CommissionPaymentResponse response = service.create(request);
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        ArgumentCaptor<CommissionPaymentCommand> captor =
+                ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(captor.capture());
+        assertThat(captor.getValue().getPolicyVersionId()).isNull();
+    }
+
+    @Test
     void createsInsurerToGaDraftWithoutRecipientAgent() {
         given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));

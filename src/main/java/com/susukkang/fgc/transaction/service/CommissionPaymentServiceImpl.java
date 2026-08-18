@@ -623,6 +623,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      * 기존 코드: 화면에서 전달받은 allocationPolicyVersion 값만 검증하고 그대로 저장했다.
      * 문제: 지급 등록 화면이 정책 버전을 전달하지 않으면 지급 건과 귀속행의 정책 버전이 null로 저장되어 사전검증이 증빙 누락으로 잘못 차단되었다.
      * 개선: 요청 정책 버전이 없으면 지급 건 또는 귀속행의 계약과 지급단계를 기준으로 현행 수수료 정책 버전을 조회하여 저장한다.
+     *       다만 정책을 찾지 못한 것은 DRAFT 저장을 막을 사유가 아니다. 정책 버전 없이 초안을
+     *       보존하고, 확정 게이트가 POLICY_VERSION_MISSING으로 확정을 차단한다.
      */
     private Long resolvePolicyVersionId(
             Long requestedPolicyVersionId,
@@ -643,18 +645,31 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             );
         }
 
-        Long resolvedPolicyVersionId;
-        if (approvedAllocationPayment) {
-            ContractReference contract = requireContract(contractId, "attributedContractId");
-            resolvedPolicyVersionId = commissionPolicyService
-                    .resolveCurrentAllocationPolicyVersion(contract.contractDate());
-        } else {
-            resolvedPolicyVersionId = commissionPolicyService
-                    .resolveCurrentCommission(contractId, paymentStage)
-                    .getPolicyVersionId();
+        try {
+            Long resolvedPolicyVersionId;
+            if (approvedAllocationPayment) {
+                ContractReference contract = requireContract(contractId, "attributedContractId");
+                resolvedPolicyVersionId = commissionPolicyService
+                        .resolveCurrentAllocationPolicyVersion(contract.contractDate());
+            } else {
+                resolvedPolicyVersionId = commissionPolicyService
+                        .resolveCurrentCommission(contractId, paymentStage)
+                        .getPolicyVersionId();
+            }
+            validatePolicyVersion(resolvedPolicyVersionId);
+            return resolvedPolicyVersionId;
+        } catch (FgcBusinessException exception) {
+            if (isAutomaticPolicyResolutionFailure(exception)) {
+                return null;
+            }
+            throw exception;
         }
-        validatePolicyVersion(resolvedPolicyVersionId);
-        return resolvedPolicyVersionId;
+    }
+
+    private boolean isAutomaticPolicyResolutionFailure(FgcBusinessException exception) {
+        return "commissionPolicy".equals(exception.getField())
+                || "commissionRules".equals(exception.getField())
+                || "allocationPolicyVersion".equals(exception.getField());
     }
 
     // 2026-08-11 yslee - 지급 건 본문의 제외 증빙 참조를 화면·DB 계약에 맞게 검증
@@ -790,8 +805,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (attributionMethod != AttributionMethod.APPROVED_ALLOCATION) {
             return null;
         }
-        if (policyVersionId == null || !StringUtils.hasText(allocationBasis)) {
-            invalid("allocationPolicyVersion", "승인 배부에는 정책 버전과 배부기준이 필요합니다.");
+        if (!StringUtils.hasText(allocationBasis)) {
+            invalid("allocationBasis", "승인 배부에는 배부기준이 필요합니다.");
+        }
+        if (policyVersionId == null) {
+            // 정책 미비 초안은 보존하고, confirm()의 정책 버전 게이트에서 확정을 막는다.
+            return null;
         }
         Long allocationPolicyId = mapper.findAllocationPolicyId(
                 policyVersionId,
