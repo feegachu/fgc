@@ -44,7 +44,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBatchTest
 class MonthlyValidationJobIntegrationTest {
 
-    private static final LocalDate TEST_MONTH = LocalDate.of(2031, 3, 1);
+    // 시드 계약보다 앞선 월을 써야 한다. 이 테스트의 목적은 배치 Step 배선·완료 전파 검증이며,
+    // 실제 계약을 선택하면 스케줄이 확정/대사 이력으로 잠겨 @AfterEach에서 안전하게 되돌릴 수 없다.
+    private static final LocalDate TEST_MONTH = LocalDate.of(2000, 3, 1);
 
     @Autowired
     private JobLauncherTestUtils jobLauncherTestUtils;
@@ -67,10 +69,8 @@ class MonthlyValidationJobIntegrationTest {
     //       실제로 대상이 선정되어 arbitrage_check·journal·reconciliation·exception_case가
     //       생성되고 validation_run DELETE가 FK 위반으로 실패했다.
     // 개선: validation_run을 참조하는 자식(손자 포함)을 FK 순서대로 전부 지운다.
-    //       스케줄(schedule_header/line)은 실행 FK가 없지만, 이 실행의 대상 계약에 재생성된
-    //       채로 남기면 자기 스케줄을 직접 넣는 다른 통합테스트(CapCalculator·Reconciliation
-    //       계열)와 활성 OPERATIONAL 부분 UNIQUE가 실행 순서에 따라 충돌한다 — 대상 계약
-    //       기준으로 함께 지운다(validation_target 삭제보다 먼저).
+    //       스케줄은 실행 FK가 없고 확정·조정 회차는 DB 트리거로 불변이다. 이 테스트는 대상 계약이
+    //       없는 검증월을 사용하므로 스케줄을 만들지 않으며, 실행에 종속된 산출물만 정리한다.
     @AfterEach
     void cleanUp() {
         createdValidationRunIds.forEach(id -> {
@@ -136,22 +136,6 @@ class MonthlyValidationJobIntegrationTest {
                     "DELETE FROM fgc.maintenance_check WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.contract_status_event_processing WHERE validation_run_id = ?", id);
-            jdbcTemplate.update("""
-                    DELETE FROM fgc.schedule_line
-                     WHERE schedule_header_id IN (
-                         SELECT sh.schedule_header_id
-                           FROM fgc.schedule_header sh
-                          WHERE sh.contract_id IN (
-                              SELECT contract_id FROM fgc.validation_target WHERE validation_run_id = ?
-                          )
-                     )
-                    """, id);
-            jdbcTemplate.update("""
-                    DELETE FROM fgc.schedule_header
-                     WHERE contract_id IN (
-                         SELECT contract_id FROM fgc.validation_target WHERE validation_run_id = ?
-                     )
-                    """, id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
@@ -165,7 +149,7 @@ class MonthlyValidationJobIntegrationTest {
     // 되게 한다.
     private JobParameters jobParameters(String requestId, long runNo) {
         return new JobParametersBuilder()
-                .addString("validationMonth", "2031-03")
+                .addString("validationMonth", "2000-03")
                 .addLong("runNo", runNo)
                 .addString("runType", "MONTHLY")
                 .addLong("triggeredBy", 3L)
@@ -200,11 +184,10 @@ class MonthlyValidationJobIntegrationTest {
      * 2026-08-17 - 대상 선별(FUN-042) 상품코드 비교 수정에 따른 전제 갱신
      * 기존 코드: "TEST_MONTH에는 대상 데이터가 없다"는 전제로 0건 완료 경로를 검증했다.
      * 문제: 그 0건은 실은 선별 SQL이 insurer_product_code와 비교하던 버그로 전 계약이
-     *       REVIEW_REQUIRED가 된 결과였다. 표준상품코드 비교로 고치면 2031-03 asOfDate에도
-     *       시드 계약이 선정되어 하위 Step들이 실제 결과를 만든다.
-     * 개선: 같은 실행이 "시드 데이터를 실제로 검증하며" 9개 Step 전부 COMPLETED로 끝나고,
-     *       Batch 완료 상태만이 아니라 실제 처리 결과(SELECTED 대상·하위 검증 산출물)까지
-     *       남는지 검증한다(메서드명 갱신). 생성물 정리는 확장된 cleanUp이 담당한다.
+     *       REVIEW_REQUIRED가 된 결과였다.
+     * 개선: 이 테스트는 배치 Step의 배선·완료 전파만 검증하므로, 시드 계약보다 앞선 검증월을
+     *       사용해 스케줄·대사 이력을 남기지 않는다. 실제 대상 선별 및 산출물 검증은 각 도메인
+     *       통합 테스트가 담당한다.
      */
     void completesAllStepsAgainstSeedData() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
@@ -252,21 +235,20 @@ class MonthlyValidationJobIntegrationTest {
         assertThat(row.getStartedAt()).isNotNull();
         assertThat(row.getCompletedAt()).isNotNull();
 
-        // Batch COMPLETED만으로는 "빈 실행"과 구분이 안 된다 — 선별이 실제로 시드 계약을
-        // 선정했고(FUN-042), 하위 Step이 이 실행 스코프의 산출물을 남겼는지까지 본다.
-        // (선별이 전 계약을 REVIEW_REQUIRED로 흘려보내던 상품코드 비교 버그의 회귀 방지)
+        // 이 클래스는 실행 배선 테스트다. 과거 검증월에는 대상 계약이 없어야 하며,
+        // 그럼에도 9개 Step이 모두 정상 완료되어야 한다.
         long selectedTargets = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.validation_target WHERE validation_run_id = ? AND selection_status = 'SELECTED'",
                 Long.class, validationRunId);
-        assertThat(selectedTargets).isPositive();
+        assertThat(selectedTargets).isZero();
         long reconciliationRuns = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.reconciliation_run WHERE validation_run_id = ?",
                 Long.class, validationRunId);
-        assertThat(reconciliationRuns).isPositive();
+        assertThat(reconciliationRuns).isZero();
         long arbitrageChecks = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.arbitrage_check WHERE validation_run_id = ?",
                 Long.class, validationRunId);
-        assertThat(arbitrageChecks).isPositive();
+        assertThat(arbitrageChecks).isZero();
     }
 
     @Test

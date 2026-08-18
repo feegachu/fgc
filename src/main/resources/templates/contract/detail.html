@@ -140,6 +140,18 @@
   <section id="contract-panel-payment" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
            aria-labelledby="contract-tab-payment" hidden><div class="empty-state">지급·대사 탭 API 연동 대기 중입니다.</div></section>
 
+  <div class="modal-backdrop" data-modal="cap-detail" data-close-on-backdrop="true" hidden aria-hidden="true">
+    <section class="modal modal-large cap-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cap-detail-title">
+      <header class="modal-header">
+        <div><h2 id="cap-detail-title" class="modal-title">1,200% 계산근거</h2><p class="cap-modal-subtitle">검증 당시 저장된 스냅샷</p></div>
+        <button class="icon-button" type="button" data-modal-close aria-label="팝업 닫기" data-modal-initial-focus><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+      </header>
+      <div id="cap-detail-state" class="modal-body cap-detail-state">계산근거를 불러오는 중입니다.</div>
+      <div id="cap-detail-content" class="modal-body" hidden th:insert="~{cap/detail-modal :: modal}"></div>
+      <footer class="modal-footer"><button class="button button-secondary" type="button" data-modal-close>닫기</button></footer>
+    </section>
+  </div>
+
   <script>
   (function () {
     "use strict";

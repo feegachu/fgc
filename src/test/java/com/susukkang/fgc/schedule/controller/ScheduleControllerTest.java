@@ -5,6 +5,9 @@ import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
+import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +22,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +35,64 @@ class ScheduleControllerTest {
 
     @MockitoBean
     private ScheduleService scheduleService;
+
+    @Test
+    void returnsScheduleVersionsForSameContractAndStage() throws Exception {
+        when(scheduleService.selectScheduleVersions(10L)).thenReturn(java.util.List.of(
+                ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(11L)
+                        .scheduleVersionNo(2)
+                        .activeYn(true)
+                        .build(),
+                ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(10L)
+                        .scheduleVersionNo(1)
+                        .activeYn(false)
+                        .build()
+        ));
+
+        mockMvc.perform(get("/api/v1/schedules/{id}/versions", 10L)
+                        .with(user("viewer").roles("COMPLIANCE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].scheduleHeaderId").value(11))
+                .andExpect(jsonPath("$.data[1].scheduleVersionNo").value(1));
+
+        verify(scheduleService).selectScheduleVersions(10L);
+    }
+
+    @Test
+    void confirmsPlannedSchedule() throws Exception {
+        when(scheduleService.confirmSchedule(10L)).thenReturn(
+                ScheduleDetailResponse.builder()
+                        .header(ScheduleHeaderResponse.builder()
+                                .scheduleHeaderId(10L)
+                                .status(com.susukkang.fgc.common.code.ScheduleHeaderStatus.CONFIRMED)
+                                .build())
+                        .lines(java.util.List.of(ScheduleLineResponse.builder()
+                                .lineNo(1)
+                                .lineStatus("CONFIRMED")
+                                .build()))
+                        .build()
+        );
+
+        mockMvc.perform(post("/api/v1/schedules/{id}/confirm", 10L)
+                        .with(user("settlement").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.header.scheduleHeaderId").value(10))
+                .andExpect(jsonPath("$.data.header.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.lines[0].lineNo").value(1))
+                .andExpect(jsonPath("$.data.lines[0].lineStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.schedules").doesNotExist());
+
+        verify(scheduleService).confirmSchedule(10L);
+    }
+
+    @Test
+    void rejectsConfirmationWithoutSettlementRole() throws Exception {
+        mockMvc.perform(post("/api/v1/schedules/{id}/confirm", 10L)
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void regeneratesScheduleWithReason() throws Exception {
