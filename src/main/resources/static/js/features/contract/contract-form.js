@@ -25,6 +25,9 @@
   };
   var saveButton = document.querySelector("#contract-save-button");
   var saveHint = document.querySelector("#contract-save-hint");
+  var premiumPerCycleHelp = document.querySelector("#premium-per-cycle-help");
+  var contractLimitPreview = document.querySelector("#contract-limit-preview");
+  var contractLimitFormula = document.querySelector("#contract-limit-formula");
   var errorSummary = document.querySelector("#contract-form-error-summary");
   var errorMessage = document.querySelector("#contract-form-error-message");
   var requestIdMessage = document.querySelector("#contract-form-request-id");
@@ -36,6 +39,12 @@
   var isSubmitting = false;
   var productRequestSequence = 0;
   var agentRequestSequence = 0;
+  var PAYMENT_CYCLE_MONTHS = {
+    MONTHLY: 1,
+    QUARTERLY: 3,
+    SEMI_ANNUAL: 6,
+    ANNUAL: 12
+  };
 
   function today() {
     var date = new Date();
@@ -114,6 +123,39 @@
     clearFieldError("agentId");
     clearFieldError("organizationId");
     updateSaveState();
+  }
+
+  function syncPremiumPerCycleAmount() {
+    var paymentCycle = elements.paymentCycleCode.value;
+    var isSinglePayment = paymentCycle === "SINGLE";
+    elements.premiumPerCycleAmount.readOnly = !isSinglePayment;
+    elements.premiumPerCycleAmount.setAttribute("aria-readonly", String(!isSinglePayment));
+
+    if (isSinglePayment) {
+      if (premiumPerCycleHelp) premiumPerCycleHelp.textContent = "일시납은 한 번 낼 실제 보험료를 직접 입력합니다.";
+      updateCapLimitPreview();
+      return;
+    }
+
+    if (premiumPerCycleHelp) premiumPerCycleHelp.textContent = "월납환산 초회보험료와 납입주기에 따라 자동 계산됩니다.";
+    var monthlyEquivalent = numberValue(elements.monthlyEquivalentFirstPremium);
+    var cycleMonths = PAYMENT_CYCLE_MONTHS[paymentCycle];
+    elements.premiumPerCycleAmount.value = monthlyEquivalent === null || !cycleMonths
+      ? ""
+      : String(monthlyEquivalent * cycleMonths);
+    updateCapLimitPreview();
+  }
+
+  function updateCapLimitPreview() {
+    if (!contractLimitPreview || !contractLimitFormula) return;
+    var monthlyEquivalent = numberValue(elements.monthlyEquivalentFirstPremium);
+    if (monthlyEquivalent === null) {
+      contractLimitFormula.textContent = "월납환산 초회보험료 × 12";
+      contractLimitPreview.textContent = "—";
+      return;
+    }
+    contractLimitFormula.textContent = monthlyEquivalent.toLocaleString("ko-KR") + " × 12";
+    contractLimitPreview.textContent = (monthlyEquivalent * 12).toLocaleString("ko-KR");
   }
 
   function updateSaveState() {
@@ -259,6 +301,7 @@
     elements.monthlyEquivalentFirstPremium.value = contract.monthlyEquivalentFirstPremium ?? "";
     elements.paymentTermMonths.value = contract.paymentTermMonths ?? "";
     elements.standardSurrenderDeductionAmount.value = contract.standardSurrenderDeductionAmount ?? "";
+    syncPremiumPerCycleAmount();
   }
 
   function initializeCreateForm() {
@@ -318,11 +361,13 @@
       loadAgents();
     }
     if (event.target === elements.agentId) setOrganizationFromAgent();
+    if (event.target === elements.paymentCycleCode) syncPremiumPerCycleAmount();
     updateSaveState();
   }
 
   function handleInput(event) {
     clearFieldError(event.target.name);
+    if (event.target === elements.monthlyEquivalentFirstPremium) syncPremiumPerCycleAmount();
     updateSaveState();
   }
 
@@ -364,6 +409,7 @@
     showError(error, "계약 입력 화면을 준비하지 못했습니다.");
   }).finally(function () {
     isInitializing = false;
+    syncPremiumPerCycleAmount();
     updateSaveState();
   });
 })();

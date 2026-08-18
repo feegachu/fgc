@@ -357,6 +357,10 @@
     cell.append(track, text);
     return cell;
   }
+  function number(input) {
+    var parsed = Number(input);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
   function value(input) { return input === null || input === undefined || input === "" ? "—" : String(input); }
   function money(input) { var number = Number(input); return Number.isFinite(number) ? number.toLocaleString("ko-KR") + "원" : "—"; }
   function percent(input) { var number = Number(input); return Number.isFinite(number) ? number.toLocaleString("ko-KR", { maximumFractionDigits: 6 }) + "%" : "—"; }
