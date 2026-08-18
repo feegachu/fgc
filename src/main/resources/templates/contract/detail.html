@@ -37,8 +37,8 @@
                 title="연동 대기" aria-label="스케줄 재생성, 연동 대기">
           <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>스케줄 재생성
         </button>
-        <button class="button button-primary" type="button" data-fgc-action="recheck" disabled
-                title="연동 대기" aria-label="한도 재검증, 연동 대기">
+        <button id="contract-cap-recheck-button" class="button button-primary" type="button" data-fgc-action="recheck" th:disabled="${!canProcess}"
+                aria-label="한도 재검증">
           <span class="material-symbols-rounded" aria-hidden="true">speed</span>한도 재검증
         </button>
       </div>
@@ -423,6 +423,25 @@
         text("contract-detail-load-state", "공통 API 클라이언트를 불러오지 못했습니다.");
         historyEmpty("상태이력 연동 대기", "공통 API 클라이언트 로드를 확인해 주세요.");
         return;
+      }
+
+      var capRecheckButton = document.getElementById("contract-cap-recheck-button");
+      if (capRecheckButton && !capRecheckButton.disabled) {
+        capRecheckButton.addEventListener("click", function () {
+          capRecheckButton.disabled = true;
+          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/cap-check", { method: "POST" })
+            .then(function () {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast("1,200% 한도 재검증을 완료했습니다.", "success");
+              var capTab = document.getElementById("contract-tab-cap");
+              var capPanel = document.getElementById("contract-panel-cap");
+              if (capPanel) capPanel.dataset.loaded = "false";
+              if (capTab) capTab.click();
+            })
+            .catch(function (error) {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(error && error.message ? error.message : "한도 재검증에 실패했습니다.", "error");
+            })
+            .finally(function () { capRecheckButton.disabled = false; });
+        });
       }
 
       apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId))
