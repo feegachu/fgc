@@ -9,6 +9,7 @@ import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
@@ -1146,7 +1147,7 @@ public class ScheduleService {
         CapCheckSaveResult capCheck;
         try {
             capCheck = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
-                    header.getContractId(), header.getPaymentStage(), contract.getContractDate(), evidenceAmount));
+                    header.getContractId(), header.getPaymentStage(), LocalDate.now(DateUtil.SEOUL_ZONE), evidenceAmount));
         } catch (FgcBusinessException exception) {
             if (exception.getErrorCode() != FgcErrorCode.CAP_004) {
                 throw exception;

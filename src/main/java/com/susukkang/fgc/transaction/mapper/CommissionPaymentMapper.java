@@ -39,6 +39,12 @@ public interface CommissionPaymentMapper {
 
     boolean existsAgent(@Param("agentId") Long agentId);
 
+    /** 계약 미귀속 신인활동지원비 확정 전 설계사 적격 여부를 확인한다. */
+    boolean existsEligibleNewcomerSupportAgent(
+            @Param("agentId") Long agentId,
+            @Param("asOfDate") LocalDate asOfDate
+    );
+
     LocalDate findAgentAppointmentDate(@Param("agentId") Long agentId);
 
     ContractReference findContract(@Param("contractId") Long contractId);

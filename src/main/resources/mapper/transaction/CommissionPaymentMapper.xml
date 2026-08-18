@@ -116,6 +116,18 @@
         )
     </select>
 
+    <select id="existsEligibleNewcomerSupportAgent" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.agent
+             WHERE agent_id = #{agentId}
+               AND active_yn = TRUE
+               AND newcomer_support_eligible_yn = TRUE
+               AND prior_three_year_experience_yn = FALSE
+               AND newcomer_support_end_date >= #{asOfDate}
+        )
+    </select>
+
     <select id="findAgentAppointmentDate" resultType="java.time.LocalDate">
         SELECT appointment_date
           FROM fgc.agent

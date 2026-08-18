@@ -191,6 +191,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         for (ConfirmationData data : attributions) {
             failFirst(attributionFailures(data));
             if (isNonContractNewcomerAttribution(data)) {
+                failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
             CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
@@ -294,6 +295,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ));
             for (ConfirmationData data : attributions) {
                 failures.addAll(attributionFailures(data));
+                if (isNonContractNewcomerAttribution(data)) {
+                    GateFailure newcomerFailure = newcomerSupportEligibilityFailure(data);
+                    if (newcomerFailure != null) {
+                        failures.add(newcomerFailure);
+                    }
+                    continue;
+                }
                 if (data.contractId() == null || data.attributedAmount() == null) {
                     continue;
                 }
@@ -961,7 +969,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 2026-08-16 - 정책 버전 누락과 증빙 누락 오류 구분
          * 기존 코드: 정책 버전 누락에도 증빙 필수 오류(TRAN_004)를 반환했다.
          * 문제: 산입 귀속행처럼 증빙이 필요 없는 건도 증빙 누락으로 안내되어 실제 차단 원인을 확인할 수 없었다.
-         * 개선: 정책 버전 누락을 별도의 데이터 품질 오류로 분류하고 입력값 오류(COMMON_002)로 안내한다.
+         * 개선: 정책 버전 누락을 지급 확정 전용 업무 오류(TRAN_007)로 안내한다.
          */
         if (first.policyVersionId() == null && !isNonContractNewcomerAttribution(first)) {
             failures.add(new GateFailure(
@@ -970,8 +978,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "HIGH",
                     "정책 버전 누락",
                     "확정하려면 적용 정책 버전이 필요합니다.",
-                    FgcErrorCode.COMMON_002,
-                    Map.of("field", "allocationPolicyVersion")
+                    FgcErrorCode.TRAN_007,
+                    Map.of()
             ));
         }
         return failures;
@@ -1042,6 +1050,25 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private boolean isNonContractNewcomerAttribution(ConfirmationData data) {
         return data.contractId() == null
                 && data.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT;
+    }
+
+    /**
+     * 계약 미귀속 신인활동지원비는 1,200% 금액 한도에는 산입하지 않는다. 다만 REG-21의
+     * 제외 적격성(직전 3년 무경력·지원 가능 기간)을 확정 시점에 확인해야 한다.
+     */
+    private GateFailure newcomerSupportEligibilityFailure(ConfirmationData data) {
+        if (mapper.existsEligibleNewcomerSupportAgent(data.agentId(), data.attributionDate())) {
+            return null;
+        }
+        return new GateFailure(
+                data,
+                "NEWCOMER_SUPPORT_REVIEW",
+                "HIGH",
+                "신인활동지원 적격성 확인 필요",
+                "신인 지원 대상 또는 지원 가능 기간을 확인할 수 없어 지급 확정을 차단했습니다.",
+                FgcErrorCode.CAP_002,
+                Map.of()
+        );
     }
 
     // 2026-08-12 hjKang - 예외 유형과 심각도 공통 enum 적용 (ExceptionType·ExceptionSeverity의 name() 사용)

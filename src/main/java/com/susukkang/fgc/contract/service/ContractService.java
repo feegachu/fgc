@@ -177,7 +177,7 @@ public class ContractService {
                     CapCalculationCommand.realtime(
                             contractId,
                             paymentStage,
-                            request.getContractDate(),
+                            LocalDate.now(DateUtil.SEOUL_ZONE),
                             complianceEvidenceAmount
                     );
 
@@ -466,7 +466,7 @@ public class ContractService {
                 CapCalculationCommand command = CapCalculationCommand.realtime(
                         id,
                         paymentStage,
-                        request.getContractDate(),
+                        LocalDate.now(DateUtil.SEOUL_ZONE),
                         complianceEvidenceAmount
                 );
                 calculateCapCheckOrRegisterReview(id, paymentStage, command);

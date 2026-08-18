@@ -691,6 +691,40 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void blocksNonContractNewcomerSupportWhenRecipientIsNotEligible() {
+        ConfirmationData newcomer = confirmation(
+                201L, null, "500000", "500000", InclusionDecisionStatus.EXCLUDED,
+                ExclusionType.NEW_AGENT_SUPPORT, AttributionMethod.NEWCOMER_NON_CONTRACT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
+        given(mapper.existsEligibleNewcomerSupportAgent(7L, LocalDate.of(2026, 7, 3))).willReturn(false);
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+
+        verify(mapper).insertExceptionCase(any());
+        verify(mapper, never()).findCapRuleSnapshot(any(), any());
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    @Test
+    void blocksConfirmationWithTransactionPolicyVersionErrorWhenPolicyIsMissing() {
+        ConfirmationData withoutPolicy = withPolicyVersion(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        ), null);
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(withoutPolicy));
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_007));
+
+        verify(mapper).insertExceptionCase(any());
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    @Test
     void confirmsEveryAttributionAfterFun033Validation() {
         List<ConfirmationData> data = List.of(
                 confirmation(201L, 3L, "300000", "500000", InclusionDecisionStatus.INCLUDED,
@@ -1748,6 +1782,17 @@ class CommissionPaymentServiceImplTest {
                 data.allocationBasis(),
                 data.evidenceRef(),
                 data.attributionMethod()
+        );
+    }
+
+    private ConfirmationData withPolicyVersion(ConfirmationData data, Long policyVersionId) {
+        return new ConfirmationData(
+                data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(),
+                data.attributionMonth(), data.transactionAttributionId(), data.contractId(), data.agentId(),
+                data.paymentStage(), data.commissionItemId(), data.itemCode(), data.itemName(), policyVersionId,
+                data.inclusionDecisionStatus(), data.exclusionType(), data.inclusionDecisionReason(),
+                data.allocationBasis(), data.evidenceRef(), data.attributionMethod()
         );
     }
 

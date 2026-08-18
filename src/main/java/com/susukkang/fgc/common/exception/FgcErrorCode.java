@@ -55,6 +55,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.transaction.cancelConfirmedOnly"
     ),
+    TRAN_007(
+            "FGC-TRAN-007",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.transaction.policyVersionMissing"
+    ),
 
     CONT_001(
             "FGC-CONT-001",
