@@ -29,6 +29,7 @@
   var recipientField = document.getElementById("recipient-field");
   var previousPaymentStage = stage.value;
 
+  initializeSettlementMonth();
   fillOptions(sourceType, SOURCE_TYPES, "원천유형을 선택하세요");
   fillOptions(recipient, [], "설계사를 불러오는 중입니다.");
   if (!paymentId && !bizKey.value) bizKey.value = generateBusinessKey();
@@ -209,6 +210,9 @@
     row.appendChild(removeCell);
 
     row.querySelector("[data-attr-amount]").addEventListener("input", updateAttributionSummary);
+    row.querySelector("[data-contract-id]").addEventListener("change", function () {
+      syncAttributionDateWithContract(row);
+    });
     row.querySelector("[data-attr-date]").addEventListener("change", function (event) {
       var monthInput = row.querySelector("[data-attr-month]");
       monthInput.value = event.target.value ? event.target.value.slice(0, 7) + "-01" : "";
@@ -243,15 +247,20 @@
   function inclusionControls() {
     var decision = document.createElement("select");
     decision.dataset.inclusion = "";
-    fillOptions(decision, [
+    fillOptions(decision, inclusionOptions());
+    return decision;
+  }
+
+  function inclusionOptions() {
+    var options = [
       ["INCLUDED", "산입"],
       ["REVIEW_REQUIRED", "검토필요"],
       ["EXCLUDED:VOICE_RECORDING", "제외 · 녹취"],
       ["EXCLUDED:BROADCAST", "제외 · 방송"],
-      ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"],
-      ["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]
-    ]);
-    return decision;
+      ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"]
+    ];
+    if (isInsurerToGa()) options.push(["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]);
+    return options;
   }
 
   function setInclusionDecision(select, inclusionStatus, exclusionType) {
@@ -368,14 +377,7 @@
 
     if (method.value === "NEWCOMER_NON_CONTRACT") method.value = "DIRECT";
     method.disabled = false;
-    fillOptions(decision, [
-      ["INCLUDED", "산입"],
-      ["REVIEW_REQUIRED", "검토필요"],
-      ["EXCLUDED:VOICE_RECORDING", "제외 · 녹취"],
-      ["EXCLUDED:BROADCAST", "제외 · 방송"],
-      ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"],
-      ["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]
-    ]);
+    fillOptions(decision, inclusionOptions());
     var newAgentExclusion = decision.querySelector('option[value="EXCLUDED:NEW_AGENT_SUPPORT"]');
     if (newAgentExclusion) newAgentExclusion.disabled = isInsurerToGa();
     decision.value = Array.from(decision.options).some(function (option) {
@@ -645,7 +647,41 @@
       cell.textContent = selectedAgentLabel();
     });
   }
+
+  // 계약일 이전 귀속은 1,200% 산입 기간에 포함되지 않으므로, 계약 선택 시에만
+  // 기본 귀속일을 계약일로 보정한다. 사용자가 이미 계약일 이후 날짜를 입력한 경우는 유지한다.
+  function syncAttributionDateWithContract(row) {
+    var contractSelect = row.querySelector("[data-contract-id]");
+    var dateInput = row.querySelector("[data-attr-date]");
+    var selectedId = contractSelect.value;
+    var selectedContract = contracts.find(function (contract) {
+      return String(contract.contractId) === selectedId;
+    });
+    if (!selectedContract || !selectedContract.contractDate) {
+      dateInput.removeAttribute("min");
+      return;
+    }
+
+    var contractDate = String(selectedContract.contractDate).slice(0, 10);
+    dateInput.min = contractDate;
+    if (!dateInput.value || dateInput.value < contractDate) {
+      dateInput.value = contractDate;
+      row.querySelector("[data-attr-month]").value = contractDate.slice(0, 7) + "-01";
+    }
+  }
   function monthFirstDay() { return settlementMonth.value ? settlementMonth.value + "-01" : ""; }
+
+  function initializeSettlementMonth() {
+    if (settlementMonth.value) return;
+    var globalMonthSelector = document.querySelector("[data-month-selector]");
+    var globalMonth = globalMonthSelector && globalMonthSelector.dataset.value;
+    if (/^\d{4}-(0[1-9]|1[0-2])$/.test(globalMonth || "")) {
+      settlementMonth.value = globalMonth;
+      return;
+    }
+    var today = new Date();
+    settlementMonth.value = String(today.getFullYear()) + "-" + String(today.getMonth() + 1).padStart(2, "0");
+  }
   function decisionReason(decision) {
     var labels = {
       VOICE_RECORDING: "녹취 관련 비용",

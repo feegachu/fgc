@@ -354,6 +354,36 @@ class ScheduleServiceTest {
     }
 
     @Test
+    void registersRefundTableMissingCaseAndBlocksConfirmationWhenRefundTableIsMissing() {
+        ScheduleHeaderInsertDTO plannedHeader = ScheduleHeaderInsertDTO.builder()
+                .scheduleHeaderId(10L)
+                .contractId(20L)
+                .paymentStage(PaymentStage.GA_TO_FC)
+                .status(ScheduleHeaderStatus.PLANNED)
+                .activeYn(true)
+                .build();
+        CapCalculationResult result = mock(CapCalculationResult.class);
+        given(result.resultStatus()).willReturn(CapResultStatus.REVIEW_REQUIRED);
+        given(result.calculationSnapshot()).willReturn(Map.of("refundTableMissing", true));
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
+                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(capCheckService.calculateAndSave(any())).willReturn(new CapCheckSaveResult(1L, result));
+
+        assertThatThrownBy(() -> scheduleService.confirmSchedule(10L))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.SCHE_004));
+
+        verify(scheduleReviewService).registerCapReviewAfterRollback(
+                20L,
+                PaymentStage.GA_TO_FC,
+                "REFUND_TABLE_MISSING",
+                "예상 해약환급률표 누락 - GA_TO_FC",
+                "계약 조건에 적용할 12차월 예상 해약환급률표가 없어 스케줄 확정을 차단했습니다."
+        );
+    }
+
+    @Test
     void registersReviewAndKeepsExistingHeaderWhenPolicyIsMissing() {
         assertRegenerationRegistersReview("POLICY_MISSING");
     }

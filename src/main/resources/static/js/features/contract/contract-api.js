@@ -59,6 +59,10 @@
     return apiClient().request("/api/v1/contracts/" + encodeURIComponent(contractId));
   }
 
+  function getCapChecks(contractId) {
+    return apiClient().request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/cap-checks");
+  }
+
   function createContract(contract) {
     return apiClient().request("/api/v1/contracts", { method: "POST", body: contract });
   }
@@ -76,6 +80,7 @@
     getProductOfferings: getProductOfferings,
     getAgents: getAgents,
     getContract: getContract,
+    getCapChecks: getCapChecks,
     createContract: createContract,
     updateContract: updateContract
   };

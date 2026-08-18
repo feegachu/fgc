@@ -897,6 +897,22 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void blocksConfirmationWhenAttributionDatePrecedesContractDate() {
+        ConfirmationData data = withContractDate(confirmation(
+                201L, 3L, "100000", "100000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        ), LocalDate.of(2026, 7, 4));
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+
+        assertThatThrownBy(() -> service.confirm(101L, "before-contract"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_008));
+
+        verify(mapper, never()).findCapRuleSnapshot(any(), any());
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    @Test
     void blocksOneWonOverTwelveHundredPercentBoundary() {
         ConfirmationData data = confirmation(
                 201L, 3L, "1200001", "1200001", InclusionDecisionStatus.INCLUDED,
@@ -1908,6 +1924,18 @@ class CommissionPaymentServiceImplTest {
 
     private ConfirmationData withStatus(ConfirmationData data, CommissionPaymentStatus status) {
         return withConfirmationState(data, status, data.confirmIdempotencyKey());
+    }
+
+    private ConfirmationData withContractDate(ConfirmationData data, LocalDate contractDate) {
+        return new ConfirmationData(
+                data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(),
+                data.attributionMonth(), data.transactionAttributionId(), data.contractId(), data.agentId(),
+                data.paymentStage(), data.commissionItemId(), data.itemCode(), data.itemName(),
+                data.policyVersionId(), data.inclusionDecisionStatus(), data.exclusionType(),
+                data.inclusionDecisionReason(), data.allocationBasis(), data.evidenceRef(),
+                data.attributionMethod(), contractDate
+        );
     }
 
     private ConfirmationData withAllocationBasis(ConfirmationData data, String allocationBasis) {

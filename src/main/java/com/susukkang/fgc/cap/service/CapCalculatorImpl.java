@@ -239,6 +239,7 @@ public class CapCalculatorImpl implements CapCalculator {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("premiumMultiplier", ruleSet.getPremiumMultiplier());
         snapshot.put("refundAdditionCondition", ruleSet.getRefundAdditionCondition());
+        snapshot.put("refundTableMissing", refundAddition.reviewRequired());
         snapshot.put("refundRateTablePolicyVersionId", refundAddition.policyVersionId());
         snapshot.put("refundRateTableVersionNo", refundAddition.versionNo());
         snapshot.put("complianceDeductionPct", ruleSet.getComplianceDeductionPct());

@@ -40,6 +40,7 @@ import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
 import com.susukkang.fgc.transaction.dto.*;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
 /**
  * 설명 : 수수료 지급 건 등록·수정·확정 서비스
  *
@@ -62,6 +64,7 @@ import java.util.stream.Collectors;
  * @version 1.2
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
@@ -219,6 +222,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     actualValidation,
                     rule.warningUsagePct()
             );
+
             CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
             mapper.insertCapCheck(check);
             mapper.insertCapCheckDetail(check);
@@ -1009,6 +1013,21 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "산입 판단 검토 필요",
                     "검토필요 또는 비계약 귀속행은 자동 확정할 수 없습니다.",
                     FgcErrorCode.CAP_002,
+                    Map.of()
+            ));
+        }
+        if (!nonContractNewcomer
+                && data.contractDate() != null
+                && data.attributionDate() != null
+                && data.attributionDate().isBefore(data.contractDate())) {
+            failures.add(new GateFailure(
+                    data,
+                    "DATA_QUALITY",
+                    "HIGH",
+                    "계약일 전 귀속",
+                    "귀속일은 계약일 이후여야 합니다. 계약일: " + data.contractDate()
+                            + ", 귀속일: " + data.attributionDate(),
+                    FgcErrorCode.TRAN_008,
                     Map.of()
             ));
         }

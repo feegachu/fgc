@@ -60,6 +60,11 @@ public enum FgcErrorCode {
             HttpStatus.UNPROCESSABLE_ENTITY,
             "error.transaction.policyVersionMissing"
     ),
+    TRAN_008(
+            "FGC-TRAN-008",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.transaction.attributionBeforeContract"
+    ),
 
     CONT_001(
             "FGC-CONT-001",

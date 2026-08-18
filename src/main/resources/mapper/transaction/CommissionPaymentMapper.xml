@@ -373,6 +373,7 @@
                ta.attribution_month,
                ta.transaction_attribution_id,
                ta.contract_id,
+               c.contract_date,
                ct.recipient_agent_id AS agent_id,
                ct.payment_stage,
                ct.commission_item_id,
@@ -394,6 +395,8 @@
           <!-- 개선: LEFT JOIN으로 본문을 유지하고 확정 서비스가 TRAN-002 귀속 누락을 판정 -->
           LEFT JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
+          LEFT JOIN fgc.insurance_contract c
+            ON c.contract_id = ta.contract_id
          WHERE ct.commission_transaction_id = #{paymentId}
          ORDER BY ta.attribution_seq
     </sql>
@@ -425,7 +428,7 @@
     <!-- 기존 코드: 각 지급 건 행만 잠가 서로 다른 DRAFT는 동시에 한도 잔액을 읽음 -->
     <!-- 문제: 두 요청이 같은 기존 산입액을 보고 모두 확정되어 합산 한도를 넘길 수 있음 -->
     <!-- 개선: 귀속 계약을 ID 순서로 잠가 같은 계약의 사전검증과 CONFIRMED 전환을 순차 처리 -->
-    <select id="lockAttributedContracts">
+    <select id="lockAttributedContracts" resultType="long">
         SELECT c.contract_id
           FROM fgc.insurance_contract c
          WHERE c.contract_id IN (

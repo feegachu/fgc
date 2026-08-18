@@ -102,7 +102,7 @@
 
           <div class="fgc-field">
             <label class="fgc-label fgc-label--required" for="settlementMonth">정산월</label>
-            <input class="fgc-input" id="settlementMonth" type="month" value="2026-07">
+            <input class="fgc-input" id="settlementMonth" type="month" th:value="${month}" value="">
             <span class="fgc-help">DB에는 항상 그 달 1일로 저장됩니다.</span>
           </div>
 
@@ -153,20 +153,20 @@
           </button>
         </div>
         <div style="overflow-x:auto">
-          <table class="fgc-table attr-table" style="min-width:1040px">
+          <table class="fgc-table attr-table" style="min-width:1360px">
             <thead>
               <tr>
                 <th style="width:36px">#</th>
                 <th style="width:96px">귀속 범위</th>
                 <th style="width:100px">계약번호</th>
-                <th style="width:100px">설계사</th>
+                <th style="width:150px">설계사</th>
                 <th style="width:120px">귀속일</th>
-                <th style="width:110px">귀속월</th>
+                <th style="width:132px">귀속월</th>
                 <th style="width:120px" class="fgc-th-num">귀속금액</th>
                 <th style="width:118px">산입 판정</th>
                 <th style="width:150px">귀속 방법</th>
                 <th style="width:110px">배부정책</th>
-                <th>증빙</th>
+                <th style="width:300px">증빙</th>
                 <th style="width:40px"></th>
               </tr>
             </thead>

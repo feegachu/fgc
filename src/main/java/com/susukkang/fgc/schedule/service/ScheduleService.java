@@ -1172,12 +1172,19 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.SCHE_003);
         }
         if (capCheck.result().resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
+            Map<String, Object> calculationSnapshot = capCheck.result().calculationSnapshot();
+            boolean refundTableMissing = calculationSnapshot != null
+                    && Boolean.TRUE.equals(calculationSnapshot.get("refundTableMissing"));
             scheduleReviewService.registerCapReviewAfterRollback(
                     header.getContractId(),
                     header.getPaymentStage(),
-                    "CAP_REVIEW_REQUIRED",
-                    "1,200% 한도 검토 필요 - " + header.getPaymentStage().name(),
-                    "한도 판정에 추가 검토가 필요해 스케줄 확정을 차단했습니다."
+                    refundTableMissing ? ExceptionType.REFUND_TABLE_MISSING.name() : "CAP_REVIEW_REQUIRED",
+                    refundTableMissing
+                            ? "예상 해약환급률표 누락 - " + header.getPaymentStage().name()
+                            : "1,200% 한도 검토 필요 - " + header.getPaymentStage().name(),
+                    refundTableMissing
+                            ? "계약 조건에 적용할 12차월 예상 해약환급률표가 없어 스케줄 확정을 차단했습니다."
+                            : "한도 판정에 추가 검토가 필요해 스케줄 확정을 차단했습니다."
             );
             throw new FgcBusinessException(FgcErrorCode.SCHE_004);
         }

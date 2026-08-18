@@ -37,6 +37,7 @@
   var isLoadingProducts = false;
   var isLoadingAgents = false;
   var isSubmitting = false;
+  var productOfferings = [];
   var productRequestSequence = 0;
   var agentRequestSequence = 0;
   var PAYMENT_CYCLE_MONTHS = {
@@ -218,6 +219,7 @@
     return contractApi.getProductOfferings(insurerId, contractDate).then(function (envelope) {
       if (requestSequence !== productRequestSequence) return;
       var products = pageContent(envelope.data);
+      productOfferings = products;
       replaceOptions(elements.productOfferingId,
         products.length ? "상품 판매버전을 선택하세요" : "판매 가능한 상품이 없습니다.",
         products,
@@ -365,6 +367,44 @@
     updateSaveState();
   }
 
+  function selectedProductOffering() {
+    var selectedId = String(elements.productOfferingId.value || "");
+    return productOfferings.find(function (product) {
+      return String(product.productOfferingId) === selectedId;
+    });
+  }
+
+  function warnIfRefundRateTableIsMissing(contractId) {
+    var product = selectedProductOffering();
+    if (!product || !product.standardDeduction80Yn) return Promise.resolve(false);
+
+    return contractApi.getCapChecks(contractId).then(function (envelope) {
+      var checks = Array.isArray(envelope.data) ? envelope.data : [];
+      var missingRefundRateTable = checks.some(function (check) {
+        var result = check && check.result;
+        return result
+          && result.resultStatus === "REVIEW_REQUIRED"
+          && !result.refundRateTableId
+          && result.calculationSnapshot
+          && result.calculationSnapshot.refundAdditionCondition === "STANDARD_DEDUCTION_80";
+      });
+      if (!missingRefundRateTable) return false;
+
+      var term = elements.paymentTermMonths.value || "입력한";
+      if (window.FgcUi && typeof window.FgcUi.toast === "function") {
+        window.FgcUi.toast(
+          term + "개월 납입기간에 적용할 12차월 환급률표가 없어 1,200% 한도 판정이 검토필요입니다. 기준정보를 확인하세요.",
+          "warning",
+          6000
+        );
+      }
+      return true;
+    }).catch(function () {
+      // 계약 저장은 성공했으므로 안내 조회 실패가 상세 이동을 막으면 안 된다.
+      return false;
+    });
+  }
+
   function handleInput(event) {
     clearFieldError(event.target.name);
     if (event.target === elements.monthlyEquivalentFirstPremium) syncPremiumPerCycleAmount();
@@ -389,7 +429,17 @@
       : contractApi.createContract(requestBody());
 
     operation.then(function (envelope) {
-      window.location.assign("/contracts/" + encodeURIComponent(envelope.data.contractId));
+      var savedContractId = envelope.data.contractId;
+      var redirect = function () {
+        window.location.assign("/contracts/" + encodeURIComponent(savedContractId));
+      };
+      if (isEditMode) {
+        redirect();
+        return;
+      }
+      warnIfRefundRateTableIsMissing(savedContractId).then(function (warned) {
+        window.setTimeout(redirect, warned ? 1800 : 0);
+      });
     }).catch(function (error) {
       showError(error, "보험계약을 저장하지 못했습니다.");
     }).finally(function () {
