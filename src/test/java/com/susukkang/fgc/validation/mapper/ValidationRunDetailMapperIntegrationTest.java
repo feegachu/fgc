@@ -320,6 +320,22 @@ class ValidationRunDetailMapperIntegrationTest {
         assertThat(summary.getReconciliationDifferenceAmountTotal()).isEqualByComparingTo("57000");
     }
 
+    @Test
+    void summarizeRoundsEachDifferenceAmountBeforeSummingNotAfter() {
+        // 운영정책서 제17조의2 — 상세행 단위로 먼저 원 단위 HALF_UP 반올림한 뒤 합산한다.
+        // 0.50원짜리 두 건을 합계부터 내면 1.00 → 반올림 1이지만, 행마다 먼저 반올림하면
+        // 0.50→1, 0.50→1이라 합계는 2가 나와야 한다(코드리뷰 반영).
+        Long runId = insertValidationRun(LocalDate.of(2031, 9, 1), 1, "RUNNING");
+        Long reconRunId = insertReconciliationRun(runId);
+
+        insertReconciliationResult(reconRunId, "FUN043-ROUND-1", "AMOUNT_DIFFERENCE", new BigDecimal("0.50"));
+        insertReconciliationResult(reconRunId, "FUN043-ROUND-2", "AMOUNT_DIFFERENCE", new BigDecimal("0.50"));
+
+        ValidationRunResultSummaryRow summary = mapper.summarize(runId);
+
+        assertThat(summary.getReconciliationDifferenceAmountTotal()).isEqualByComparingTo("2");
+    }
+
     // ── FGC-FUN-043 확대: 설계사 모니터링 지표가 계약별 판정을 바꾸지 않음 ──────────
 
     @Test
