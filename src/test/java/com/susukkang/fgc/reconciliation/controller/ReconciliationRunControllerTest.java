@@ -7,8 +7,11 @@ import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunRequest;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
+import com.susukkang.fgc.reconciliation.service.ReconciliationRunHistoryService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +24,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -55,6 +64,67 @@ class ReconciliationRunControllerTest {
 
     @MockitoBean
     private ReconciliationResultQueryService reconciliationResultQueryService;
+
+    @MockitoBean
+    private ReconciliationRunHistoryService reconciliationRunHistoryService;
+
+    @Test
+    void 대사_실행_이력을_조건_없이_조회한다() throws Exception {
+        given(reconciliationRunHistoryService.findHistory(any(), eq(1), eq(20), eq("createdAt,desc")))
+                .willReturn(PageResponse.of(List.of(), 1, 20, 0, "createdAt,desc"));
+
+        mockMvc.perform(get("/api/v1/reconciliations")
+                        .with(user(principal("COMPLIANCE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
+    @Test
+    void 정산월과_지급단계로_대사_실행_이력을_필터링한다() throws Exception {
+        given(reconciliationRunHistoryService.findHistory(any(), eq(2), eq(10), eq("createdAt,asc")))
+                .willReturn(PageResponse.of(List.of(historyRow()), 2, 10, 1, "createdAt,asc"));
+
+        mockMvc.perform(get("/api/v1/reconciliations")
+                        .with(user(principal("COMPLIANCE")))
+                        .queryParam("month", "2026-07")
+                        .queryParam("stage", "GA_TO_FC")
+                        .queryParam("page", "2")
+                        .queryParam("size", "10")
+                        .queryParam("sort", "createdAt,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].reconciliationRunId").value(41))
+                .andExpect(jsonPath("$.data.content[0].paymentStageLabel").value("GA→설계사"));
+
+        verify(reconciliationRunHistoryService).findHistory(
+                argThat(criteria -> criteria.paymentStage().equals("GA_TO_FC")), eq(2), eq(10), eq("createdAt,asc"));
+    }
+
+    @Test
+    void 잘못된_기준월로_이력을_조회하면_400으로_거절한다() throws Exception {
+        mockMvc.perform(get("/api/v1/reconciliations")
+                        .with(user(principal("COMPLIANCE")))
+                        .queryParam("month", "2026/07"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("settlementMonth"));
+
+        verify(reconciliationRunHistoryService, never()).findHistory(any(), anyInt(), anyInt(), anyString());
+    }
+
+    @Test
+    void 정의되지_않은_지급단계로_이력을_조회하면_400으로_거절한다() throws Exception {
+        mockMvc.perform(get("/api/v1/reconciliations")
+                        .with(user(principal("COMPLIANCE")))
+                        .queryParam("stage", "UNKNOWN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("paymentStage"));
+    }
+
+    @Test
+    void 로그인하지_않으면_대사_실행_이력을_조회할_수_없다() throws Exception {
+        mockMvc.perform(get("/api/v1/reconciliations"))
+                .andExpect(status().isUnauthorized());
+    }
 
     @Test
     void 유효한_요청은_RUNNING_대사실행을_생성한다() throws Exception {
@@ -162,6 +232,21 @@ class ReconciliationRunControllerTest {
         row.setReconciliationRunId(41L);
         row.setStatus("RUNNING");
         return row;
+    }
+
+    private static ReconciliationRunHistoryResponse historyRow() {
+        return new ReconciliationRunHistoryResponse(
+                41L, 7L,
+                java.time.LocalDate.of(2026, 7, 1), "GA_TO_FC", "GA→설계사",
+                1L, "테스트생명",
+                "COMPLETED", "계산완료",
+                null,
+                "settlement-user", null,
+                null, null,
+                null, null,
+                10L, 9L, 1L,
+                java.math.BigDecimal.valueOf(100000), java.math.BigDecimal.valueOf(90000), java.math.BigDecimal.valueOf(10000),
+                java.math.BigDecimal.valueOf(90.0));
     }
 
     private static FgcUserDetails principal(String roleCode) {
