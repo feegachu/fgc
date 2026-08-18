@@ -40,7 +40,8 @@ public record ExceptionOccurrenceResponse(
     private static Map<String, String> evidenceLabels() {
         Map<String, String> labels = new LinkedHashMap<>();
         labels.put("paymentStage", "지급단계");
-        labels.put("resultType", "결과유형");
+        labels.put("resultType", "결과유형");   // 대사(reconciliation_result.result_type)
+        labels.put("resultStatus", "결과상태"); // CAP·차익거래(cap_check/arbitrage_check.result_status)
         labels.put("primaryReasonCode", "주원인");
         labels.put("limitAmount", "한도액");
         labels.put("includedAmount", "산입액");

@@ -13,7 +13,7 @@ UPDATE fgc.exception_case ec
   FROM fgc.journal_header jh
  WHERE ec.exception_type = 'JOURNAL_IMBALANCE'
    AND ec.source_entity_type = 'JOURNAL_HEADER'
-   AND jh.journal_header_id = CAST(ec.source_entity_id AS bigint)
+   AND ec.source_entity_id = CAST(jh.journal_header_id AS varchar)
    AND ec.exception_key NOT LIKE CONCAT('%:', jh.source_entity_id)
    AND NOT EXISTS (
        SELECT 1

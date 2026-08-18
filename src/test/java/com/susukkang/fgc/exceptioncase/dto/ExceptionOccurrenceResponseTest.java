@@ -26,6 +26,17 @@ class ExceptionOccurrenceResponseTest {
                 .containsExactly("GA_TO_FC", "실제 지급 없음", "5,000원", "-5,000원");
     }
 
+    /** CAP·차익거래 증거는 resultType 이 아니라 resultStatus 키를 쓴다 — 둘 다 풀린다. */
+    @Test
+    void CAP_차익거래_증거의_resultStatus_키도_푼다() {
+        var items = withEvidence("{\"resultStatus\":\"VIOLATION\",\"limitAmount\":1000}").evidenceItems();
+
+        assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::label)
+                .containsExactly("결과상태", "한도액");
+        assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
+                .containsExactly("VIOLATION", "1,000원");
+    }
+
     @Test
     void 증거가_없거나_파싱이_안_되면_빈_목록이다() {
         assertThat(withEvidence(null).evidenceItems()).isEmpty();

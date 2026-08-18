@@ -52,7 +52,9 @@ public class ExceptionCaseService {
         // 정렬·조인을 헛도는 행 조회를 아예 만들지 않는다. 응답의 page 가 보정된 값이다.
         long total = exceptionCaseQueryMapper.count(criteria, statuses);
         long totalPages = (total + size - 1) / size;
-        if (totalPages > 0 && page > totalPages) {
+        if (totalPages == 0) {
+            page = MIN_PAGE; // 0건이면 화면이 "N / 1 페이지"로 어긋나지 않게 1로 되돌린다
+        } else if (page > totalPages) {
             page = (int) totalPages;
         }
 

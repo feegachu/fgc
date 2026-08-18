@@ -146,22 +146,34 @@ class ExceptionCaseQueryMapperIntegrationTest {
         assertThat(mapper.findAssignees()).anyMatch(a -> a.userId().equals(userId));
     }
 
-    /** VRUN-W02 '예외함 열기' 링크의 검증월 검색조건. */
+    /** FGC-FUN-052·VRUN-W02 '예외함 열기' 링크의 검증월 검색조건 — 연도 경계(12월↔1월)도 섞이지 않는다. */
     @Test
     void 검증월_필터는_해당_월_검출건만_조회한다() {
-        java.time.LocalDate month = java.time.LocalDate.of(2031, 1, 1);
+        java.time.LocalDate january = java.time.LocalDate.of(2031, 1, 1);
+        java.time.LocalDate december = java.time.LocalDate.of(2030, 12, 1);
         jdbcTemplate.update("""
                 UPDATE fgc.exception_case SET validation_month = ?
                  WHERE source_entity_type = 'IT' AND source_entity_id = ? AND status = 'NEW'
-                """, month, suffix);
+                """, january, suffix);
+        jdbcTemplate.update("""
+                UPDATE fgc.exception_case SET validation_month = ?
+                 WHERE source_entity_type = 'IT' AND source_entity_id = ? AND status = 'IN_REVIEW'
+                """, december, suffix);
 
         ExceptionCaseSearchDTO criteria = ExceptionCaseSearchDTO.builder()
-                .validationMonth(month).contractNo(contractNo).build();
+                .validationMonth(january).contractNo(contractNo).build();
         assertThat(mapper.search(criteria, ExceptionStatus.dbStatuses(""), 0, 100)
                 .stream().map(row -> row.title()))
                 .containsExactly("IT 신규-" + suffix);
         assertThat(mapper.count(criteria, ExceptionStatus.dbStatuses(""))).isEqualTo(1L);
-        assertThat(mapper.findValidationMonths()).contains(month);
+
+        ExceptionCaseSearchDTO decemberCriteria = ExceptionCaseSearchDTO.builder()
+                .validationMonth(december).contractNo(contractNo).build();
+        assertThat(mapper.search(decemberCriteria, ExceptionStatus.dbStatuses(""), 0, 100)
+                .stream().map(row -> row.title()))
+                .containsExactly("IT 검토중-" + suffix);
+
+        assertThat(mapper.findValidationMonths()).contains(january, december);
     }
 
     private Long anyUserId() {

@@ -118,7 +118,9 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("statusFilter", "RESOLVED"))
                 .andExpect(content().string(containsString("필수값 누락")))
-                .andExpect(content().string(containsString("href=\"/contracts/5\"")));
+                .andExpect(content().string(containsString("href=\"/contracts/5\"")))
+                // 서비스가 보정한 페이지(2)가 화면 페이지 표기에 그대로 반영된다
+                .andExpect(content().string(containsString("<span>2</span> /")));
 
         verify(service).search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(9), eq(20));
     }
