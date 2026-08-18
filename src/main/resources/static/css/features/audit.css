@@ -185,7 +185,7 @@
   background: var(--color-status-warning-bg);
 }
 
-@media (max-width: 71.875rem) {
+@media (max-width: 56.25rem) {
   .audit-layout {
     grid-template-columns: minmax(0, 1fr);
   }

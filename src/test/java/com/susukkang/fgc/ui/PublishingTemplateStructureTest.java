@@ -98,6 +98,10 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("templates/layout/default.html"))
                 .contains("/css/features/audit.css");
+
+        assertThat(resource("static/css/features/audit.css"))
+                .contains("@media (max-width: 56.25rem)")
+                .doesNotContain("@media (max-width: 71.875rem)");
     }
 
     private static String resource(String path) throws IOException {
