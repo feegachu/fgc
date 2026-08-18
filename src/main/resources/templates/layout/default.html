@@ -17,6 +17,7 @@
   <link rel="stylesheet" th:href="@{/css/common/components.css}">
   <link rel="stylesheet" th:href="@{/css/common/utilities.css}">
   <link rel="stylesheet" th:href="@{/css/features/publishing.css}">
+  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-AUDT-W01'}" th:href="@{/css/features/audit.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-DASH-W01'}" th:href="@{/css/features/dashboard.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CONT-')}" th:href="@{/css/features/contract.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-SCHE-')}" th:href="@{/css/features/schedule.css}">
