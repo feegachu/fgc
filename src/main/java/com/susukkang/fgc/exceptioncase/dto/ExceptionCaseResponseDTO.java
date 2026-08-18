@@ -81,6 +81,8 @@ public record ExceptionCaseResponseDTO(
             case "POLICY_DUPLICATE" -> "정책 중복";
             case "SCHEDULE_STRUCTURE_INVALID" -> "스케줄 구조 오류";
             case "SCHEDULE_POLICY_INVALID" -> "스케줄 정책 오류";
+            case "CONTRACT_REVALIDATION_FAILED" -> "일일 변경 계약 재검증 실패";
+            case "ARBITRAGE_DATA_REVIEW_REQUIRED" -> "차익거래 자료 확인 필요";
             case "CAP_CALCULATION_FAILED" -> "1,200% 계산 실패";
             case "ACTUAL_MISSING" -> "실제 지급 없음";
             case "EXPECTED_MISSING" -> "예상 지급 없음";

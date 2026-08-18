@@ -74,7 +74,9 @@ class CapExceptionServiceImplTest {
                 .contains("한도액 1,000원")
                 .contains("산입액 900원")
                 .contains("사용률 90%")
-                .doesNotContain("계산근거");
+                .doesNotContain("계산근거")
+                .doesNotContain("{\"source\":\"test\"}");
+        assertThat(inserted.getTitle()).doesNotContain("{\"source\":\"test\"}");
     }
 
     @Test

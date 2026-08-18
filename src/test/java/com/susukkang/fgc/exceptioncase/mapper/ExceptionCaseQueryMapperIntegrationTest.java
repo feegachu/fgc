@@ -134,10 +134,14 @@ class ExceptionCaseQueryMapperIntegrationTest {
                 .stream().map(row -> row.title()))
                 .containsExactlyInAnyOrder("IT 검토중-" + suffix, "IT 해결-" + suffix);
 
-        // 미배정 우선: 두 조건이 함께 오면 unassignedOnly 가 이긴다 (choose 구조)
+        // 미배정 우선: 두 조건이 함께 오면 unassignedOnly 가 이긴다 (choose 구조) —
+        // count 와 search 가 같은 조건을 타는지 둘 다 검증한다.
         ExceptionCaseSearchDTO both = ExceptionCaseSearchDTO.builder()
                 .assignee(userId).unassignedOnly(true).contractNo(contractNo).build();
         assertThat(mapper.count(both, ExceptionStatus.dbStatuses(""))).isEqualTo(2L);
+        assertThat(mapper.search(both, ExceptionStatus.dbStatuses(""), 0, 100)
+                .stream().map(row -> row.title()))
+                .containsExactlyInAnyOrder("IT 검토중-" + suffix, "IT 해결-" + suffix);
 
         assertThat(mapper.findAssignees()).anyMatch(a -> a.userId().equals(userId));
     }

@@ -48,15 +48,23 @@ public class ExceptionCaseService {
         validatePage(page, size);
         List<ExceptionStatus> statuses = parseStatuses(criteria.getStatus());
 
+        // 총 건수를 먼저 세어 범위 밖 page 를 마지막 페이지로 보정한다 — 큰 OFFSET 으로
+        // 정렬·조인을 헛도는 행 조회를 아예 만들지 않는다. 응답의 page 가 보정된 값이다.
+        long total = exceptionCaseQueryMapper.count(criteria, statuses);
+        long totalPages = (total + size - 1) / size;
+        if (totalPages > 0 && page > totalPages) {
+            page = (int) totalPages;
+        }
+
         long offsetLong = (long) (page - 1) * size;
         if (offsetLong > Integer.MAX_VALUE) {
             throw invalidField("page");
         }
         int offset = (int) offsetLong;
 
-        List<ExceptionCaseSearchRow> rows = exceptionCaseQueryMapper.search(
-                criteria, statuses, offset, size);
-        long total = exceptionCaseQueryMapper.count(criteria, statuses);
+        List<ExceptionCaseSearchRow> rows = total == 0
+                ? List.of()
+                : exceptionCaseQueryMapper.search(criteria, statuses, offset, size);
 
         Map<Long, List<ExceptionActionResponse>> actionsByCaseId = loadActions(rows);
         Map<Long, List<ExceptionOccurrenceResponse>> occurrencesByCaseId = loadOccurrences(rows);

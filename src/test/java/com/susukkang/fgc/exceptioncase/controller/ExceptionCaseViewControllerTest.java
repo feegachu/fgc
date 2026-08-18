@@ -106,9 +106,9 @@ class ExceptionCaseViewControllerTest {
 
     @Test
     void actualStatusAndRequestedPageAreForwarded() throws Exception {
+        // 범위 밖 page 보정은 서비스 책임(count 선행) — 컨트롤러는 요청 page 를 그대로
+        // 넘기고 서비스가 돌려준 보정 페이지(casePage.page())를 렌더링한다.
         given(service.search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(9), eq(20)))
-                .willReturn(response(List.of(), 9, 20, 21, 3));
-        given(service.search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(2), eq(20)))
                 .willReturn(response(List.of(row(11L, ExceptionStatus.RESOLVED,
                         "INSURANCE_CONTRACT", "5", "필수값 누락")), 2, 20, 21, 3));
 
@@ -121,7 +121,6 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("href=\"/contracts/5\"")));
 
         verify(service).search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(9), eq(20));
-        verify(service).search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(2), eq(20));
     }
 
     @Test

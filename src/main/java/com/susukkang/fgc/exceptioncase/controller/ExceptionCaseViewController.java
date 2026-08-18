@@ -85,12 +85,10 @@ public class ExceptionCaseViewController {
         }
         criteria.setStatus(status);
 
+        // 범위 밖 page 는 서비스가 총 건수를 먼저 세어 마지막 페이지로 보정한다 —
+        // 응답(casePage.page())이 보정된 페이지를 담는다.
         page = Math.max(1, Math.min(page, Integer.MAX_VALUE / PAGE_SIZE));
         ExceptionCaseSearchResponse cases = exceptionCaseService.search(criteria, page, PAGE_SIZE);
-        if (cases.totalPages() > 0 && page > cases.totalPages()) {
-            page = cases.totalPages();
-            cases = exceptionCaseService.search(criteria, page, PAGE_SIZE);
-        }
 
         model.addAttribute("statusFilter", status);
         model.addAttribute("typeFilter", criteria.getType());

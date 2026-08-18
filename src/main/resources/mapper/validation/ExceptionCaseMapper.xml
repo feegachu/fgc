@@ -302,9 +302,12 @@
             ON header.journal_header_id = imbalance.journal_header_id
           JOIN fgc.validation_run vr ON vr.validation_run_id = header.validation_run_id
           CROSS JOIN LATERAL fgc.record_exception_detection(
+              <!-- 분개 원천 식별자(source_entity_id)까지 넣어야 같은 실행의 서로 다른
+                   불균형 분개가 별도 업무건으로 남는다 — 원천은 실행이 바뀌어도 안정적이다. -->
               CONCAT('JOURNAL_IMBALANCE:', TO_CHAR(vr.validation_month, 'YYYY-MM'),
                      ':CONTRACT:', COALESCE(CAST(header.contract_id AS varchar), '-'), ':',
-                     header.journal_type, ':', header.source_entity_type),
+                     header.journal_type, ':', header.source_entity_type, ':',
+                     header.source_entity_id),
               'JOURNAL_IMBALANCE', 'JOURNAL_IMBALANCE', 'CRITICAL',
               header.validation_run_id, header.contract_id, NULL, NULL,
               'JOURNAL_HEADER', CAST(imbalance.journal_header_id AS varchar),
