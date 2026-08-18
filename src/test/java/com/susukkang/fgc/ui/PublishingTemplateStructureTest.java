@@ -56,10 +56,12 @@ class PublishingTemplateStructureTest {
         // 아직 미연동인 유형별 요약카드만 대기 상태를 명시한다.
         assertThat(resource("templates/exception/list.html"))
                 .contains("유형별 미처리 집계 API 연동 대기");
+        // VRUN-W02 는 #188 에서 헤더·스텝퍼·실행(IF-API-48·49)이 연동됐다 — 아직 미연동인
+        // 확정 체크리스트(IF-API-50/51, #172~#175)만 대기 상태를 유지하고, 확정 버튼은
+        // 체크리스트 게이트 연동 전까지 정적 disabled 다.
         assertThat(resource("templates/vrun/detail.html"))
-                .contains("진행률 API 연동 대기")
                 .contains("확정 조건 API 연동 대기")
-                .containsPattern("(?s)<button[^>]*id=\"btn-execute\"[^>]*\\bdisabled\\b[^>]*>");
+                .containsPattern("(?s)<button[^>]*id=\"btn-finalize\"[^>]*\\bdisabled\\b[^>]*>");
     }
 
     @Test
@@ -102,6 +104,27 @@ class PublishingTemplateStructureTest {
         assertThat(resource("static/css/features/audit.css"))
                 .contains("@media (max-width: 56.25rem)")
                 .doesNotContain("@media (max-width: 71.875rem)");
+    }
+
+    @Test
+    void contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior() throws IOException {
+        assertThat(resource("templates/contract/form.html"))
+                .contains("name=\"premiumPerCycleAmount\"")
+                .contains("value=\"SINGLE\"")
+                .contains("data-field-error=\"organizationId\"")
+                .doesNotContain("style=\"")
+                .doesNotContain("onclick=")
+                .doesNotContain("<script>");
+
+        assertThat(resource("static/js/features/contract/contract-api.js"))
+                .contains("getProductOfferings")
+                .contains("createContract")
+                .contains("updateContract")
+                .doesNotContain("fetch(");
+        assertThat(resource("static/js/features/contract/contract-form.js"))
+                .contains("window.FgcUi.contractApi")
+                .contains("error.field")
+                .doesNotContain("fetch(");
     }
 
     private static String resource(String path) throws IOException {

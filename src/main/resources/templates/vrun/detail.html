@@ -4,12 +4,12 @@
   요구사항 FUN-042(대상 선별) · FUN-043(결과 집계) · FUN-044(확정·잠금)
   데이터  읽기·쓰기 validation_run, validation_target
           연결 cap_check, arbitrage_check, journal_header, reconciliation_run, exception_case
-  API     POST /api/v1/validation-runs/{id}/execute            (202 즉시 반환 · 배치 비동기)
-          GET  /api/v1/validation-runs/{id}/progress           (2초 폴링)
-          GET  /api/v1/validation-runs/{id}/finalize-checklist
-          POST /api/v1/validation-runs/{id}/finalize           (GA_ADMIN · SYSTEM_ADMIN 만)
+  API     POST /api/v1/validation-runs/{id}/execute            (IF-API-48 · 202 즉시 반환 · 배치 비동기)
+          GET  /api/v1/validation-runs/{id}/progress           (IF-API-49 · 2초 폴링 — /js/features/vrun/vrun-detail.js)
+          GET  /api/v1/validation-runs/{id}/finalize-checklist (IF-API-50 · #172~#175 브랜치에서 연동)
+          POST /api/v1/validation-runs/{id}/finalize           (IF-API-51 · GA_ADMIN · SYSTEM_ADMIN 만)
   배치    IF-BAT-01 MonthlyValidationJob (Spring Batch · Step 1~8)
-  라우트  GET /validation-runs/{runId} → vrun/detail.html
+  라우트  GET /validation-runs/{id} → vrun/detail.html (ValidationRunViewController)
 
   [★ 10단계 중 ⑨담당자 검토와 ⑩확정은 배치가 하지 않습니다]
      사람이 검토하고 사람이 확정합니다.
@@ -21,13 +21,14 @@
    · 확정 취소·되돌리기 — 그런 기능을 만들지 않습니다. 새 실행을 만드세요
    · "확정 = 송금 마감"으로 읽히는 표현
 
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-VRUN-W02)의 정적 골격만 옮겼다.
-  데이터 영역(헤더·스텝퍼·대상 선별·결과 요약·확정 조건)은 IF-API 연동 시 서버 렌더링으로 채운다.
+  헤더·스텝퍼·③대상 선별·④결과 요약은 서버 렌더링(IF-API-47 과 같은 조회를 서비스 직주입으로).
+  ⑤확정 조건·⑥확정 버튼은 IF-API-50/51 연동(#172~#175) 전까지 placeholder 를 유지한다.
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-VRUN-W02', '월 통합검증 상세·확정', '월 통합검증 실행 목록', '/validation-runs')}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-detail publishing-page-validation-detail">
+<main id="main-content" class="fgc-main publishing-page publishing-page-detail publishing-page-validation-detail"
+      th:with="st=${detail.header().status().name()}, cs=${detail.header().currentStep()}">
 
   <style>
     .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 20px; }
@@ -45,9 +46,13 @@
     </div>
     <div class="publishing-inline-controls" style="display:flex;gap:8px;align-items:center">
       <label class="fgc-label" for="pick-run" style="margin:0">실행</label>
-      <!-- 실행 선택지는 validation_run 목록으로 서버 렌더링해 채운다 -->
+      <!-- 최근 실행 20건 — 선택하면 해당 상세로 이동(인라인 스크립트) -->
       <select class="fgc-select" id="pick-run">
-        <option value="">실행 목록 연동 대기</option>
+        <option th:each="opt : ${runOptions.content()}"
+                th:value="${opt.validationRunId()}"
+                th:selected="${opt.validationRunId() == detail.header().validationRunId()}"
+                th:text="${#temporals.format(opt.validationMonth(), 'yyyy-MM')} + ' · ' + ${opt.runNo()} + '회차 · ' + ${opt.statusLabel()}">
+          2026-07 · 1회차 · 생성됨</option>
       </select>
     </div>
   </div>
@@ -64,20 +69,34 @@
   <!-- ① 실행 헤더 -->
   <section class="fgc-card" style="margin-top:16px">
     <div class="fgc-card__head">
-      <span class="fgc-card__title">실행 <span class="fgc-mono" id="hdr-id">—</span></span>
-      <span id="hdr-status" class="fgc-badge fgc-badge--neutral">연동 대기</span>
+      <span class="fgc-card__title">실행 <span class="fgc-mono" id="hdr-id"
+            th:text="${detail.header().validationRunId()}">—</span></span>
+      <!-- 톤 매핑은 화면 MVP 와 동일: 실패=violation, 확정=review, 계산완료=normal, 그 외=warning -->
+      <span id="hdr-status" class="fgc-badge"
+            th:classappend="${st == 'FAILED'} ? 'fgc-badge--violation'
+                            : (${st == 'FINALIZED'} ? 'fgc-badge--review'
+                            : (${st == 'COMPLETED'} ? 'fgc-badge--normal' : 'fgc-badge--warning'))"
+            th:text="${detail.header().statusLabel()}">연동 대기</span>
     </div>
     <div class="fgc-card__body">
       <dl class="kv">
-        <div><dt>검증월</dt><dd class="fgc-mono" id="hdr-month">—</dd></div>
-        <div><dt>회차</dt><dd class="fgc-mono" id="hdr-runno">—</dd></div>
-        <div><dt>실행 유형</dt><dd id="hdr-type">—</dd></div>
-        <div><dt>실행자</dt><dd class="fgc-mono" id="hdr-by">—</dd></div>
-        <div><dt>시작</dt><dd class="fgc-mono" id="hdr-started">—</dd></div>
-        <div><dt>완료</dt><dd class="fgc-mono" id="hdr-completed">—</dd></div>
-        <div><dt>확정자 · 확정시각</dt><dd class="fgc-mono" id="hdr-finalized">—</dd></div>
+        <div><dt>검증월</dt><dd class="fgc-mono" id="hdr-month"
+             th:text="${#temporals.format(detail.header().validationMonth(), 'yyyy-MM')}">—</dd></div>
+        <div><dt>회차</dt><dd class="fgc-mono" id="hdr-runno" th:text="${detail.header().runNo()}">—</dd></div>
+        <div><dt>실행 유형</dt><dd id="hdr-type" th:text="${detail.header().runTypeLabel()}">—</dd></div>
+        <div><dt>실행자</dt><dd class="fgc-mono" id="hdr-by" th:text="${detail.header().triggeredBy()} ?: '—'">—</dd></div>
+        <div><dt>시작</dt><dd class="fgc-mono" id="hdr-started"
+             th:text="${detail.header().startedAt() != null}
+                      ? ${#temporals.format(detail.header().startedAt(), 'yyyy-MM-dd HH:mm')} : '—'">—</dd></div>
+        <div><dt>완료</dt><dd class="fgc-mono" id="hdr-completed"
+             th:text="${detail.header().completedAt() != null}
+                      ? ${#temporals.format(detail.header().completedAt(), 'yyyy-MM-dd HH:mm')} : '—'">—</dd></div>
+        <div><dt>확정자 · 확정시각</dt><dd class="fgc-mono" id="hdr-finalized"
+             th:text="${detail.header().finalizedAt() != null}
+                      ? ${detail.header().finalizedBy()} + ' · ' + ${#temporals.format(detail.header().finalizedAt(), 'yyyy-MM-dd HH:mm')} : '—'">—</dd></div>
       </dl>
-      <p class="fgc-error" id="hdr-failure" style="margin-top:10px" hidden></p>
+      <p class="fgc-error" id="hdr-failure" style="margin-top:10px"
+         th:hidden="${st != 'FAILED'}" th:text="${detail.header().failureMessage()}"></p>
     </div>
   </section>
 
@@ -86,25 +105,34 @@
     <div class="fgc-card__head">
       <span class="fgc-card__title">진행 단계 (운영정책서 제43조)</span>
       <div style="display:flex;gap:8px">
-        <button class="fgc-btn fgc-btn--ghost" id="btn-refresh" type="button" disabled
-                aria-describedby="validation-actions-pending" style="padding:4px 10px;font-size:12px">
+        <button class="fgc-btn fgc-btn--ghost" id="btn-refresh" type="button" style="padding:4px 10px;font-size:12px">
           <span class="material-symbols-outlined" style="font-size:16px">refresh</span> 새로고침
         </button>
-        <!-- 실행은 SETTLEMENT (화면정의서 :1485, IF-API-48) -->
-        <button class="fgc-btn fgc-btn--primary" id="btn-execute" type="button" data-fgc-action="execute" disabled
-                aria-describedby="validation-actions-pending" style="padding:4px 12px;font-size:12px">
+        <!-- 실행은 SETTLEMENT (화면정의서 :1485, IF-API-48). CREATED 에서만 기동할 수 있다 —
+             1차는 재기동이 없다(실패하면 새 실행). FINALIZED 는 title 로 이유를 알린다. -->
+        <button class="fgc-btn fgc-btn--primary" id="btn-execute" type="button" data-fgc-action="execute"
+                style="padding:4px 12px;font-size:12px"
+                th:attr="data-run-id=${detail.header().validationRunId()}, data-run-status=${st}"
+                th:disabled="${!canProcess or st != 'CREATED'}"
+                th:title="${st == 'FINALIZED'} ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.' : null">
           <span class="material-symbols-outlined" style="font-size:16px">play_arrow</span> 실행
         </button>
       </div>
     </div>
     <div class="fgc-card__body">
-      <p class="fgc-help" id="validation-actions-pending" style="margin:0 0 12px">
-        진행률 새로고침과 실행은 API 연동 대기입니다.
-      </p>
       <!-- 진행률은 운영정책서 제43조 모델(current_step, 9단계는 저장하지 않음)을 따른다. batch_step_execution 에서 역산하지 않는다. -->
-      <!-- 스텝 칸은 IF-API(진행률 폴링) 연동 시 서버 렌더링으로 채운다 -->
+      <!-- 칸 CSS 는 컨트롤러(stepClasses)가 계산한다 — "__"가 Thymeleaf 전처리 구분자라 식 안에 못 쓴다.
+           폴링(IF-API-49) 중에는 vrun-detail.js 가 같은 규칙으로 칸 클래스를 갱신한다 -->
       <div class="fgc-stepper" id="stepper">
-        <div class="fgc-empty publishing-empty-state">진행률 API 연동 대기</div>
+        <div class="fgc-stepper__step" th:each="stepName, iter : ${stepNames}"
+             th:attr="data-step=${iter.count}"
+             th:classappend="${stepClasses[iter.index]}">
+          <div class="fgc-stepper__dot" th:text="${iter.count}">1</div>
+          <div class="fgc-stepper__label">
+            <span th:text="${stepName}">실행 생성</span>
+            <th:block th:if="${iter.count >= 9}"><br><span style="font-size:10px;color:#B45309">사람이 수행</span></th:block>
+          </div>
+        </div>
       </div>
       <div class="fgc-banner fgc-banner--muted" style="margin-top:16px">
         <span class="material-symbols-outlined" style="font-size:18px">engineering</span>
@@ -112,7 +140,7 @@
           1~8단계는 <strong>Spring Batch</strong>(정해진 작업을 단계별로 나눠 돌리는 스프링 기능)의
           <span class="fgc-mono">MonthlyValidationJob</span>이 수행합니다.
           <strong>9단계 담당자 검토와 10단계 확정은 사람이 합니다.</strong>
-          중간에 실패하면 실패한 단계부터 다시 시작합니다.
+          실패하면 새 실행을 만들어 다시 돌립니다.
         </span>
       </div>
     </div>
@@ -124,7 +152,8 @@
     <section class="fgc-card">
       <div class="fgc-card__head">
         <span class="fgc-card__title">③ 대상 선별 결과</span>
-        <span class="fgc-muted" style="font-size:11px">validation_target</span>
+        <span class="fgc-muted" style="font-size:11px"
+              th:text="'선정 ' + ${detail.targetSummary().selectedCount()} + ' · 제외 ' + ${detail.targetSummary().excludedCount()} + ' · 검토필요 ' + ${detail.targetSummary().reviewRequiredCount()}">validation_target</span>
       </div>
       <div style="overflow-x:auto">
         <table class="fgc-table">
@@ -132,25 +161,57 @@
             <tr><th>계약</th><th>선별</th><th>상품 판매버전</th><th>환급률표</th><th>사유</th></tr>
           </thead>
           <tbody id="target-body">
-            <tr><td colspan="5"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr th:each="t : ${detail.targets()}">
+              <td class="fgc-mono" th:text="${t.contractNo()}">-</td>
+              <td><span class="fgc-badge"
+                        th:classappend="${t.selectionStatus() == 'REVIEW_REQUIRED'} ? 'fgc-badge--review'
+                                        : (${t.selectionStatus() == 'EXCLUDED'} ? 'fgc-badge--neutral' : 'fgc-badge--normal')"
+                        th:text="${t.selectionStatusLabel()}">선정</span></td>
+              <td th:text="|${t.productName()} ${t.offeringVersion()}|">-</td>
+              <td class="fgc-mono" th:text="${t.refundRateTableId()} ?: '—'">—</td>
+              <td th:text="${t.selectionReason()} ?: '—'">—</td>
+            </tr>
+            <tr th:if="${detail.targets().isEmpty()}">
+              <td colspan="5"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td>
+            </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- ④ 결과 요약 4블록 — 1,200%·차익거래·원장·대사 집계는 IF-API 연동 시 채운다 -->
+    <!-- ④ 결과 요약 4블록 — 결과 테이블을 실행 스코프로 매번 집계(FUN-043, 복제 저장 없음) -->
     <section class="fgc-card">
       <div class="fgc-card__head"><span class="fgc-card__title">④ 결과 요약</span></div>
       <div class="fgc-card__body" style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="result-blocks">
-        <div class="publishing-result-placeholder"><strong>1,200%</strong><span>집계 연동 대기</span></div>
-        <div class="publishing-result-placeholder"><strong>차익거래</strong><span>집계 연동 대기</span></div>
-        <div class="publishing-result-placeholder"><strong>원장</strong><span>집계 연동 대기</span></div>
-        <div class="publishing-result-placeholder"><strong>대사</strong><span>집계 연동 대기</span></div>
+        <th:block th:if="${st == 'CREATED'}">
+          <div class="publishing-result-placeholder"><strong>1,200%</strong><span>실행 전</span></div>
+          <div class="publishing-result-placeholder"><strong>차익거래</strong><span>실행 전</span></div>
+          <div class="publishing-result-placeholder"><strong>원장</strong><span>실행 전</span></div>
+          <div class="publishing-result-placeholder"><strong>대사</strong><span>실행 전</span></div>
+        </th:block>
+        <th:block th:unless="${st == 'CREATED'}">
+          <div class="publishing-result-placeholder">
+            <strong>1,200%</strong>
+            <span th:text="'검사 ' + ${detail.capSummary().checkedCount()} + '건 · 위반 ' + ${detail.capSummary().violationCount()} + ' · 주의 ' + ${detail.capSummary().warningCount()} + ' · 검토 ' + ${detail.capSummary().reviewRequiredCount()}">-</span>
+          </div>
+          <div class="publishing-result-placeholder">
+            <strong>차익거래</strong>
+            <span th:text="'검사 ' + ${detail.arbitrageSummary().checkedCount()} + '건 · 검토대상 ' + ${detail.arbitrageSummary().candidateCount()} + ' · 검토 ' + ${detail.arbitrageSummary().reviewRequiredCount()}">-</span>
+          </div>
+          <div class="publishing-result-placeholder">
+            <strong>원장</strong>
+            <span th:text="'분개 ' + ${detail.ledgerSummary().journalCount()} + '건 · 불균형 ' + ${detail.ledgerSummary().imbalanceCount()}">-</span>
+          </div>
+          <div class="publishing-result-placeholder">
+            <strong>대사</strong>
+            <span th:text="'결과 ' + ${detail.reconciliationSummary().resultCount()} + '건 · 불일치 ' + ${detail.reconciliationSummary().mismatchCount()}">-</span>
+          </div>
+        </th:block>
       </div>
     </section>
   </div>
 
-  <!-- ⑤ 확정 조건 체크리스트 — finalize-checklist API 연동 시 채운다 -->
+  <!-- ⑤ 확정 조건 체크리스트 — finalize-checklist API(IF-API-50, #172~#175) 연동 시 채운다 -->
   <section class="fgc-card" style="margin-top:16px">
     <div class="fgc-card__head">
       <span class="fgc-card__title">⑤ 확정 조건 (운영정책서 제44조 · 6개 전부 통과해야 함)</span>
@@ -188,37 +249,10 @@
     </div>
   </section>
 
-  <!-- 멱등성 확인 (발표 ⑩번 컷) -->
-  <section class="fgc-card" style="margin-top:16px" id="idem-card" hidden>
-    <div class="fgc-card__head">
-      <span class="fgc-card__title">재실행 결과 — 중복이 생기지 않는가</span>
-      <span class="fgc-badge fgc-badge--normal">멱등성 확인</span>
-    </div>
-    <div style="overflow-x:auto">
-      <table class="fgc-table">
-        <thead>
-          <tr><th>대상</th><th>멱등키 (중복을 막는 열쇠)</th><th class="fgc-th-num">1회 실행 후</th><th class="fgc-th-num">2회 실행 후</th><th class="fgc-th-num">새로 생긴 행</th></tr>
-        </thead>
-        <tbody id="idem-body">
-          <tr><td colspan="5"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="fgc-card__body">
-      <div class="fgc-banner fgc-banner--info">
-        <span class="material-symbols-outlined" style="font-size:18px">verified</span>
-        <span>
-          같은 조건으로 다시 돌려도 <strong>새로 생긴 행이 0건</strong>입니다.
-          모든 Writer가 UPSERT 또는 <span class="fgc-mono">ON CONFLICT DO NOTHING</span>으로 쓰고,
-          위 멱등키에 UNIQUE 제약이 걸려 있기 때문입니다. "지웠다 다시 넣기"를 하지 않습니다.
-        </span>
-      </div>
-    </div>
-  </section>
-
 <!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
 <script>
-/* 화면 폭이 좁으면 중간 2단 그리드를 세로로 — 데이터 렌더링은 IF-API 연동 시 추가 */
+/* 화면 폭이 좁으면 중간 2단 그리드를 세로로. 실행 선택은 해당 상세로 이동.
+   실행 버튼·진행률 폴링은 /js/features/vrun/vrun-detail.js (IF-API-48·49) */
 (function () {
   "use strict";
   function reflow() {
@@ -227,6 +261,12 @@
   }
   reflow();
   window.addEventListener("resize", reflow);
+
+  document.getElementById("pick-run").addEventListener("change", function () {
+    if (this.value) {
+      window.location.assign("/validation-runs/" + this.value);
+    }
+  });
 })();
 </script>
 </main>

@@ -206,6 +206,38 @@ public class ScheduleService {
     }
 
     /**
+     * 계약 수정 결과를 반영해 활성 운영 스케줄을 지급단계별 새 버전으로 만든다.
+     * 기존 버전과 확정된 회차는 {@link #regenerateSchedules(Long, String)}의 규칙대로 보존하며,
+     * 기존 스케줄이 없던 지급단계도 현재 정책을 기준으로 다시 생성 시도한다.
+     */
+    @Transactional
+    public List<Long> regenerateContractSchedules(Long contractId, String reason) {
+        if (contractId == null) {
+            throw validationException("contractId", "계약 ID가 존재하지 않습니다.");
+        }
+
+        List<Long> activeScheduleIds =
+                scheduleMapper.selectActiveOperationalScheduleIds(contractId);
+        List<Long> regeneratedScheduleIds = new ArrayList<>();
+
+        for (Long activeScheduleId : activeScheduleIds) {
+            ScheduleRegenResponse response = regenerateSchedules(activeScheduleId, reason);
+            if (!Objects.equals(activeScheduleId, response.getScheduleHeaderId())) {
+                regeneratedScheduleIds.add(response.getScheduleHeaderId());
+            }
+        }
+
+        InsuranceContract updatedContract = contractMapper.selectContractById(contractId);
+        if (updatedContract == null) {
+            throw validationException("contractId", "존재하지 않는 계약입니다.");
+        }
+
+        ScheduleGenerationResult missingStageResult = generateSchedules(updatedContract);
+        regeneratedScheduleIds.addAll(missingStageResult.scheduleHeaderIds());
+        return List.copyOf(regeneratedScheduleIds);
+    }
+
+    /**
      * 설명 : 지급단계에 적용할 정책을 조회한다. 정책이 없거나 복수로 선택된 경우에는
      * 해당 지급단계의 스케줄 생성을 건너뛰고 exception_case에 검토 건을 등록한다.
      * 그 외의 정책·시스템 오류는 정상 실패 처리를 위해 상위로 전달한다.

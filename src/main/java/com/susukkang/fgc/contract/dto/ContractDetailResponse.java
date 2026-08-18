@@ -26,10 +26,18 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class ContractDetailResponse {
     //기본 정보 탭
+    private Long contractId; //계약 ID
+    private Long insurerId; //보험회사 ID
+    private String insurerName; //보험회사명
+    private Long productOfferingId; //상품 판매버전 ID
     private String contractNo; //계약번호
     private String productName; //상품명
+    private String offeringVersion; //상품 판매버전
     private LocalDate contractDate; //계약일
-    private String consumerName; //계약자
+    private Long agentId; //모집 설계사 ID
+    private String agentName; //모집 설계사명
+    private Long organizationId; //소속 조직 ID
+    private String organizationName; //소속 조직명
     private BigDecimal premiumPerCycleAmount; //주기 보험료
     private PaymentCycleCode paymentCycleCode; //납입주기
     private BigDecimal firstPremiumAmount; //초회 보험료
