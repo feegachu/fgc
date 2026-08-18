@@ -74,6 +74,20 @@ class ReconciliationRunHistoryServiceImplTest {
     }
 
     @Test
+    void roundsOnceInsteadOfCompoundingIntermediateRounding() {
+        // 코드리뷰 반영 회귀 테스트 — matched=12449, target=100000의 정확한 비율은
+        // 12.449%다. 소수 넷째 자리에서 먼저 반올림한 뒤 다시 소수 첫째 자리로
+        // 반올림하면(두 번 반올림) 12.45 → 12.5로 틀어진다. 한 번에 반올림하면 12.4가
+        // 맞는 값이다.
+        given(reconciliationRunHistoryMapper.search(null, null)).willReturn(List.of(row(100000, 12449, 87551)));
+
+        List<ReconciliationRunHistoryResponse> result = service.findHistory(new ReconciliationRunSearchCriteria(null, null));
+
+        assertThat(result).singleElement().satisfies(response ->
+                assertThat(response.matchRatePct()).isEqualByComparingTo("12.4"));
+    }
+
+    @Test
     void calculatesFullMatchRateAsHundred() {
         given(reconciliationRunHistoryMapper.search(null, null)).willReturn(List.of(row(5, 5, 0)));
 

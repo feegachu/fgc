@@ -32,6 +32,6 @@
                 AND rr.payment_stage = #{paymentStage}
             </if>
         </where>
-        ORDER BY rr.created_at DESC
+        ORDER BY rr.created_at DESC, rr.reconciliation_run_id DESC
     </select>
 </mapper>
