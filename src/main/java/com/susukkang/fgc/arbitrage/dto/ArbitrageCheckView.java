@@ -36,6 +36,12 @@ public class ArbitrageCheckView {
 
     private Boolean refundAdditionAppliedYn; // 환급금 가산 여부
     private SurrenderValueSourceType surrenderValueSourceType; // 환급금 출처
+
+    /** 화면 표기용 한글 라벨. 원본 enum 코드는 감사·연계 식별값으로 함께 유지한다. */
+    public String getSurrenderValueSourceTypeLabel() {
+        return surrenderValueSourceType == null ? null : surrenderValueSourceType.getLabel();
+    }
+
     private ArbitrageCheckStatus resultStatus; // 판정 결과
     private String decisionReason; // 판정 근거
 }

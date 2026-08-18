@@ -116,7 +116,7 @@
         <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건</span>
       </div>
       <div style="overflow-x:auto">
-        <table class="fgc-table" style="min-width:900px">
+        <table class="fgc-table arb-list-table">
           <thead>
             <tr>
               <th style="width:64px">계약</th>
@@ -145,10 +145,13 @@
     <section class="fgc-card" style="align-self:start">
       <div class="fgc-card__head">
         <span class="fgc-card__title">④ 상세</span>
-        <span style="display:flex;gap:8px;align-items:center"><span id="detail-badge"></span><button id="arb-recheck-button" class="fgc-btn fgc-btn--ghost" type="button" th:if="${canProcess}" disabled>이 계약만 다시 검증</button></span>
+        <span id="detail-badge"></span>
       </div>
       <div class="fgc-card__body" id="detail-body">
         <p class="fgc-muted" style="font-size:13px;margin:0">왼쪽 목록에서 한 건을 고르세요.</p>
+      </div>
+      <div class="arb-detail-actions" th:if="${canProcess}">
+        <button id="arb-recheck-button" class="fgc-btn fgc-btn--ghost" type="button" disabled><span class="material-symbols-rounded arb-recheck-icon" aria-hidden="true">refresh</span>이 계약만 다시 검증</button>
       </div>
     </section>
   </div>
