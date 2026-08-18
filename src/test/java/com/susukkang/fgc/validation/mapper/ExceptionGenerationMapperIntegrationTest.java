@@ -88,6 +88,54 @@ class ExceptionGenerationMapperIntegrationTest {
         assertThat(count).isEqualTo(8);
     }
 
+    // IF-API-42 — RECO-W01 "불일치 예외 일괄 생성" 버튼(수동, reconciliationRunId 기준)이
+    // 월 검증 실행 단계의 자동 생성(insertFromReconciliationResults, validationRunId 기준)과
+    // 정확히 같은 exception_key를 만들어서, 어느 경로가 먼저 실행됐든 서로 중복 생성하지
+    // 않아야 한다(FUN-052).
+    @Test
+    void bulkCreateByReconciliationRunIsIdempotentAndCrossCompatibleWithValidationRunGeneration() {
+        List<Long> contractIds = jdbcTemplate.queryForList("""
+                SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
+                """, Long.class);
+        assertThat(contractIds).isNotEmpty();
+        Long contractId = contractIds.get(0);
+
+        Long validationRunId = insertValidationRun();
+        Long reconciliationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (
+                    validation_run_id, settlement_month, payment_stage, status
+                ) VALUES (?, ?, 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class, validationRunId, TEST_MONTH);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-amount", "AMOUNT_DIFFERENCE", 100000, 90000);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-review", "REVIEW_REQUIRED", 100000, 0);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-matched", "MATCHED", 100000, 100000);
+
+        assertThat(exceptionCaseMapper.countReconciliationMismatchCandidates(reconciliationRunId))
+                .isEqualTo(2L);
+
+        assertThat(exceptionCaseMapper.insertFromReconciliationResultsByRun(reconciliationRunId))
+                .isEqualTo(2L);
+        // 같은 실행에 다시 눌러도 새 예외가 생기지 않는다.
+        assertThat(exceptionCaseMapper.insertFromReconciliationResultsByRun(reconciliationRunId))
+                .isZero();
+        // 월 검증 실행 단계의 자동 생성 경로로도 다시 시도해보면(같은 대사 실행이 그
+        // validation_run_id에 연결돼 있으므로) 이미 수동으로 만든 예외와 키가 같아서
+        // 새로 생기지 않는다.
+        assertThat(exceptionCaseMapper.insertFromReconciliationResults(validationRunId))
+                .isZero();
+
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case
+                 WHERE source_entity_type = 'RECONCILIATION_RESULT'
+                   AND validation_run_id = ?
+                """, Integer.class, validationRunId);
+        assertThat(count).isEqualTo(2);
+    }
+
     private Long insertValidationRun() {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status)

@@ -60,6 +60,20 @@ public interface ExceptionCaseMapper {
     long insertFromArbitrageChecks(@Param("validationRunId") Long validationRunId);
     // 대사 일치 관련
     long insertFromReconciliationResults(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * IF-API-42 — RECO-W01 "불일치 예외 일괄 생성" 버튼(수동, reconciliationRunId 기준).
+     * insertFromReconciliationResults와 exception_key 형식이 완전히 같다(월 검증 실행
+     * 단계에서 자동 생성된 예외와 같은 키를 만들어 ON CONFLICT DO NOTHING으로 서로
+     * 중복되지 않게 한다) — 다만 필터를 validation_run_id가 아니라 reconciliation_run_id로
+     * 건다.
+     *
+     * @return 실제로 새로 INSERT된 건수(이미 있던 건은 ON CONFLICT로 세지 않는다)
+     */
+    long insertFromReconciliationResultsByRun(@Param("reconciliationRunId") Long reconciliationRunId);
+
+    /** insertFromReconciliationResultsByRun과 같은 조건(WHERE)의 대상 후보 전체 건수. */
+    long countReconciliationMismatchCandidates(@Param("reconciliationRunId") Long reconciliationRunId);
     // 검증원장 차변·대변 불균형 관련
     long insertFromJournalImbalances(@Param("validationRunId") Long validationRunId);
 }

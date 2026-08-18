@@ -227,6 +227,54 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
+    <!-- IF-API-42 — insertFromReconciliationResults와 SELECT 목록·exception_key 형식이
+         완전히 같다(교차 중복 방지가 핵심이라 문자 그대로 맞춰야 한다). WHERE만
+         reconciliation_run_id 기준으로 바꿨다. -->
+    <insert id="insertFromReconciliationResultsByRun">
+        INSERT INTO fgc.exception_case (
+            exception_key, exception_type, severity, status,
+            validation_run_id, contract_id, source_entity_type, source_entity_id,
+            title, description
+        )
+        SELECT
+            CONCAT(
+                'RECONCILIATION_MISMATCH:', rrn.validation_run_id,
+                ':RECONCILIATION_RESULT:', rr.reconciliation_result_id
+            ),
+            'RECONCILIATION_MISMATCH',
+            CASE rr.result_type
+                WHEN 'REVIEW_REQUIRED' THEN 'WARNING'
+                ELSE 'HIGH'
+            END,
+            'NEW',
+            rrn.validation_run_id,
+            rr.contract_id,
+            'RECONCILIATION_RESULT',
+            CAST(rr.reconciliation_result_id AS varchar),
+            '대사 불일치',
+            CONCAT(
+                '지급단계=', rrn.payment_stage,
+                ', 결과유형=', rr.result_type,
+                ', 예상금액=', rr.expected_total_amount,
+                ', 실제금액=', rr.actual_total_amount,
+                ', 차액=', rr.difference_amount,
+                ', 주원인=', COALESCE(rr.primary_reason_code, '-')
+            )
+        FROM fgc.reconciliation_result rr
+        INNER JOIN fgc.reconciliation_run rrn
+            ON rrn.reconciliation_run_id = rr.reconciliation_run_id
+        WHERE rr.reconciliation_run_id = #{reconciliationRunId}
+          AND rr.result_type &lt;&gt; 'MATCHED'
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
+    <select id="countReconciliationMismatchCandidates" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.reconciliation_result rr
+         WHERE rr.reconciliation_run_id = #{reconciliationRunId}
+           AND rr.result_type &lt;&gt; 'MATCHED'
+    </select>
+
     <insert id="insertFromJournalImbalances">
         INSERT INTO fgc.exception_case (
             exception_key, exception_type, severity, status,

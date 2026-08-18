@@ -9,8 +9,10 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunRequest;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
+import com.susukkang.fgc.reconciliation.service.ReconciliationExceptionService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunHistoryService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
@@ -64,6 +66,9 @@ class ReconciliationRunControllerTest {
 
     @MockitoBean
     private ReconciliationResultQueryService reconciliationResultQueryService;
+
+    @MockitoBean
+    private ReconciliationExceptionService reconciliationExceptionService;
 
     @MockitoBean
     private ReconciliationRunHistoryService reconciliationRunHistoryService;
@@ -221,6 +226,36 @@ class ReconciliationRunControllerTest {
     void unauthenticatedUserCannotReadResultDetail() throws Exception {
         mockMvc.perform(get("/api/v1/reconciliations/results/99"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 정산담당자가_불일치_예외를_일괄_생성한다() throws Exception {
+        given(reconciliationExceptionService.bulkCreate(41L))
+                .willReturn(new ReconciliationExceptionBulkCreateResponse(2L, 1L));
+
+        mockMvc.perform(post("/api/v1/reconciliations/41/exceptions")
+                        .with(user(principal("SETTLEMENT")))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.created").value(2))
+                .andExpect(jsonPath("$.data.skippedDuplicate").value(1));
+    }
+
+    @Test
+    void 정산담당자가_아니면_예외_일괄_생성을_403으로_차단한다() throws Exception {
+        mockMvc.perform(post("/api/v1/reconciliations/41/exceptions")
+                        .with(user(principal("GA_ADMIN")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(reconciliationExceptionService, never()).bulkCreate(41L);
+    }
+
+    @Test
+    void 예외_일괄_생성_요청에_CSRF_토큰이_없으면_403으로_차단한다() throws Exception {
+        mockMvc.perform(post("/api/v1/reconciliations/41/exceptions")
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isForbidden());
     }
 
     private static CreateReconciliationRunRequest validRequest() {
