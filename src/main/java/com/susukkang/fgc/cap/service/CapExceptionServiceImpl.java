@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 
 /**
  * 설명 : 한도 검증 결과가 주의 또는 위반인 경우 중복 없는 한도 예외 건을 생성하는 서비스 구현체
@@ -111,9 +112,11 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         ExceptionSeverity severity = exceptionType == ExceptionType.CAP_VIOLATION
                 ? ExceptionSeverity.CRITICAL
                 : ExceptionSeverity.WARNING;
+        // 목업 편집 관행(title = '판정 — 수치 근거')을 따라 건별 수치를 제목에 담는다.
+        DecimalFormat amountFormat = new DecimalFormat("#,##0.##");
         String title = exceptionType == ExceptionType.CAP_VIOLATION
-                ? "1,200% 한도 초과"
-                : "1,200% 한도 사용률 주의";
+                ? "1,200% 한도 초과 — 사용률 " + command.usagePct() + "%"
+                : "1,200% 주의 — 잔여 한도 " + amountFormat.format(command.remainingAmount()) + "원";
 
         return CapExceptionInsertDTO.builder()
                 .exceptionKey(createExceptionKey(
@@ -155,20 +158,16 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 .subtract(command.limitAmount())
                 .max(BigDecimal.ZERO);
 
-        return "한도검증ID=" + command.capCheckId()
-                + ", 지급단계=" + command.paymentStage()
-                + ", 기준일=" + command.asOfDate()
-                + ", 한도룰셋ID=" + command.capRuleSetId()
-                + ", 환급률표ID=" + command.refundRateTableId()
-                + ", 기준보험료=" + command.basePremiumAmount()
-                + ", 환급금가산액=" + command.refund12mAmount()
-                + ", 준법경영비차감액=" + command.complianceDeductionAmount()
-                + ", 한도액=" + command.limitAmount()
-                + ", 산입액=" + command.includedAmount()
-                + ", 잔여액=" + command.remainingAmount()
-                + ", 사용률=" + command.usagePct()
-                + "%, 초과액=" + exceededAmount
-                + ", 계산근거=" + command.calculationSnapshot();
+        // 계산 근거 전체(검증 ID·룰셋·스냅샷 JSON)는 cap_check 원천 행이 보존한다 —
+        // 예외 설명에는 관리자가 판단에 쓰는 수치만 사람이 읽는 문장으로 남긴다.
+        DecimalFormat amount = new DecimalFormat("#,##0.##");
+        return "지급단계 " + command.paymentStage()
+                + " · 기준일 " + command.asOfDate()
+                + " · 한도액 " + amount.format(command.limitAmount()) + "원"
+                + " · 산입액 " + amount.format(command.includedAmount()) + "원"
+                + " · 잔여 " + amount.format(command.remainingAmount()) + "원"
+                + " · 사용률 " + command.usagePct() + "%"
+                + " · 초과액 " + amount.format(exceededAmount) + "원";
     }
 
     private void validateCreateCommand(CapExceptionCreateCommand command) {

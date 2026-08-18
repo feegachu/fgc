@@ -1,6 +1,7 @@
 package com.susukkang.fgc.exceptioncase.mapper;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
@@ -10,6 +11,7 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -52,4 +54,10 @@ public interface ExceptionCaseQueryMapper {
 
     /** 관리자 상세 원인 필터 선택지. */
     List<String> findReasonCodes();
+
+    /** 담당자 필터 선택지 — 예외를 배정받은 적 있는 사용자만. */
+    List<ExceptionAssigneeRow> findAssignees();
+
+    /** 검증월 필터 선택지 — 예외가 검출된 검증월만, 최신순. */
+    List<LocalDate> findValidationMonths();
 }

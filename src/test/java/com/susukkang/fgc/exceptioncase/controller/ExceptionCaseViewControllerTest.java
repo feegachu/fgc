@@ -10,6 +10,7 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.ShellAdvice;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseResponseDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceResponse;
@@ -29,6 +30,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -120,6 +122,84 @@ class ExceptionCaseViewControllerTest {
 
         verify(service).search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(9), eq(20));
         verify(service).search(argThat(c -> c != null && "RESOLVED".equals(c.getStatus())), eq(2), eq(20));
+    }
+
+    @Test
+    void assigneeFilterUnassignedMapsToUnassignedOnly() throws Exception {
+        given(service.search(argThat(c -> c != null && c.isUnassignedOnly() && c.getAssignee() == null),
+                eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions").param("assigneeFilter", "unassigned").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("assigneeFilter", "unassigned"));
+
+        verify(service).search(argThat(c -> c.isUnassignedOnly()), eq(1), eq(20));
+    }
+
+    @Test
+    void assigneeFilterNumberMapsToAssigneeAndSurvivesPaging() throws Exception {
+        given(service.assignees()).willReturn(List.of(new ExceptionAssigneeRow(2L, "settle01")));
+        given(service.search(argThat(c -> c != null && Long.valueOf(2L).equals(c.getAssignee())),
+                eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 41, 0));
+
+        mockMvc.perform(get("/exceptions").param("assigneeFilter", "2").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("assigneeFilter=2")))
+                .andExpect(content().string(containsString(">settle01</option>")));
+    }
+
+    @Test
+    void invalidAssigneeFilterIsSilentlyIgnored() throws Exception {
+        given(service.search(argThat(c -> c != null && c.getAssignee() == null && !c.isUnassignedOnly()),
+                eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions").param("assigneeFilter", "abc").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("assigneeFilter", nullValue()));
+    }
+
+    /** VRUN-W02 '예외함 열기' 링크가 보내는 검증월 검색조건 — 셸 기준월 month 와 별개다. */
+    @Test
+    void validationMonthFilterIsAppliedAndKeptInPagingLinks() throws Exception {
+        given(service.validationMonths()).willReturn(List.of(LocalDate.of(2026, 7, 1)));
+        given(service.search(argThat(c -> c != null
+                        && LocalDate.of(2026, 7, 1).equals(c.getValidationMonth())),
+                eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 41, 0));
+
+        mockMvc.perform(get("/exceptions").param("validationMonth", "2026-07-01").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("validationMonth=2026-07-01")))
+                .andExpect(content().string(containsString(">2026-07</option>")));
+    }
+
+    /** 형식이 깨진 필터는 400 대신 그 조건만 빠진 채 기본 필터로 조회된다. */
+    @Test
+    void malformedFilterValuesFallBackSilently() throws Exception {
+        given(service.search(argThat(c -> c != null && c.getType() == null
+                        && c.getValidationMonth() == null),
+                eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions")
+                        .param("type", "NOT_A_TYPE").param("validationMonth", "not-a-date")
+                        .with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("statusFilter", "OPEN"));
+    }
+
+    @Test
+    void reasonCodeOptionsShowKoreanLabels() throws Exception {
+        given(service.reasonCodes()).willReturn(List.of("CAP_LIMIT_VIOLATION"));
+        given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(">1,200% 한도 초과</option>")));
     }
 
     @Test

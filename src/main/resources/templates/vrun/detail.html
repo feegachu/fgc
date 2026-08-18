@@ -215,7 +215,10 @@
   <section class="fgc-card" style="margin-top:16px" id="exception-detection-summary">
     <div class="fgc-card__head">
       <span class="fgc-card__title">예외 생성 결과</span>
-      <a class="fgc-btn fgc-btn--ghost" th:href="@{/exceptions(status='OPEN',month=${month})}"
+      <!-- validationMonth 는 예외함의 검증월 검색조건 — 아래 '미처리 업무건'(월 스코프)과
+           열린 목록 건수가 일치한다. 셸 기준월 month 와는 별개 파라미터다. -->
+      <a class="fgc-btn fgc-btn--ghost"
+         th:href="@{/exceptions(status='OPEN',validationMonth=${detail.header().validationMonth()})}"
          style="padding:4px 10px;font-size:12px">예외함 열기</a>
     </div>
     <div class="fgc-card__body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">

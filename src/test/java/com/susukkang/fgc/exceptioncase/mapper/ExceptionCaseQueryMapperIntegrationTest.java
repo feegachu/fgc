@@ -113,6 +113,58 @@ class ExceptionCaseQueryMapperIntegrationTest {
         assertThat(screen).isEqualTo(dashboardMapper.countOpenException());
     }
 
+    /** EXCP-W01 담당자 필터 — 배정 건만 / 미배정 건만, 그리고 선택지에는 배정 이력 사용자만. */
+    @Test
+    void 담당자_필터와_미배정_필터는_배정_기준으로_나뉜다() {
+        Long userId = anyUserId();
+        jdbcTemplate.update("""
+                UPDATE fgc.exception_case SET assigned_to = ?
+                 WHERE source_entity_type = 'IT' AND source_entity_id = ? AND status = 'NEW'
+                """, userId, suffix);
+
+        ExceptionCaseSearchDTO assigned = ExceptionCaseSearchDTO.builder()
+                .assignee(userId).contractNo(contractNo).build();
+        assertThat(mapper.search(assigned, ExceptionStatus.dbStatuses(""), 0, 100)
+                .stream().map(row -> row.title()))
+                .containsExactly("IT 신규-" + suffix);
+
+        ExceptionCaseSearchDTO unassigned = ExceptionCaseSearchDTO.builder()
+                .unassignedOnly(true).contractNo(contractNo).build();
+        assertThat(mapper.search(unassigned, ExceptionStatus.dbStatuses(""), 0, 100)
+                .stream().map(row -> row.title()))
+                .containsExactlyInAnyOrder("IT 검토중-" + suffix, "IT 해결-" + suffix);
+
+        // 미배정 우선: 두 조건이 함께 오면 unassignedOnly 가 이긴다 (choose 구조)
+        ExceptionCaseSearchDTO both = ExceptionCaseSearchDTO.builder()
+                .assignee(userId).unassignedOnly(true).contractNo(contractNo).build();
+        assertThat(mapper.count(both, ExceptionStatus.dbStatuses(""))).isEqualTo(2L);
+
+        assertThat(mapper.findAssignees()).anyMatch(a -> a.userId().equals(userId));
+    }
+
+    /** VRUN-W02 '예외함 열기' 링크의 검증월 검색조건. */
+    @Test
+    void 검증월_필터는_해당_월_검출건만_조회한다() {
+        java.time.LocalDate month = java.time.LocalDate.of(2031, 1, 1);
+        jdbcTemplate.update("""
+                UPDATE fgc.exception_case SET validation_month = ?
+                 WHERE source_entity_type = 'IT' AND source_entity_id = ? AND status = 'NEW'
+                """, month, suffix);
+
+        ExceptionCaseSearchDTO criteria = ExceptionCaseSearchDTO.builder()
+                .validationMonth(month).contractNo(contractNo).build();
+        assertThat(mapper.search(criteria, ExceptionStatus.dbStatuses(""), 0, 100)
+                .stream().map(row -> row.title()))
+                .containsExactly("IT 신규-" + suffix);
+        assertThat(mapper.count(criteria, ExceptionStatus.dbStatuses(""))).isEqualTo(1L);
+        assertThat(mapper.findValidationMonths()).contains(month);
+    }
+
+    private Long anyUserId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1", Long.class);
+    }
+
     /** IF-API-43: 새 검색 DTO와 페이징 SQL이 OPEN 묶음 및 유형 조건을 함께 적용한다. */
     @Test
     void API_검색은_조건과_페이징을_적용한다() {

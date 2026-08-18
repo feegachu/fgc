@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,18 @@ public class ExceptionCaseService {
     @Transactional(readOnly = true)
     public List<String> reasonCodes() {
         return exceptionCaseQueryMapper.findReasonCodes();
+    }
+
+    /** 담당자 필터 선택지 — 예외를 배정받은 적 있는 사용자만. */
+    @Transactional(readOnly = true)
+    public List<ExceptionAssigneeRow> assignees() {
+        return exceptionCaseQueryMapper.findAssignees();
+    }
+
+    /** 검증월 필터 선택지 — 예외가 검출된 검증월만, 최신순. */
+    @Transactional(readOnly = true)
+    public List<LocalDate> validationMonths() {
+        return exceptionCaseQueryMapper.findValidationMonths();
     }
 
     private Map<Long, List<ExceptionActionResponse>> loadActions(

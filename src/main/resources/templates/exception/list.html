@@ -67,9 +67,9 @@
         <label class="fgc-label" for="f-reason">상세 원인</label>
         <select class="fgc-select" id="f-reason" name="reasonCode">
           <option value="">전체</option>
-          <option th:each="reasonCode : ${exceptionReasonCodes}" th:value="${reasonCode}"
-                  th:text="${reasonCode}"
-                  th:selected="${reasonCodeFilter == reasonCode}">상세 원인</option>
+          <option th:each="reasonEntry : ${exceptionReasonLabels}" th:value="${reasonEntry.key}"
+                  th:text="${reasonEntry.value}"
+                  th:selected="${reasonCodeFilter == reasonEntry.key}">상세 원인</option>
         </select>
       </div>
       <div class="fgc-field" style="min-width:130px">
@@ -93,11 +93,30 @@
       </div>
       <div class="fgc-field" style="min-width:140px">
         <label class="fgc-label" for="f-assignee">담당자</label>
-        <select class="fgc-select" id="f-assignee" disabled aria-label="담당자, 연동 대기"><option value="">전체</option></select>
+        <!-- (미배정)까지 한 select 라 화면 전용 assigneeFilter 로 보내고 서버가
+             unassignedOnly/assignee 검색조건으로 푼다. 선택지는 배정 이력이 있는 사용자만. -->
+        <select class="fgc-select" id="f-assignee" name="assigneeFilter">
+          <option value="">전체</option>
+          <option value="unassigned" th:selected="${assigneeFilter == 'unassigned'}">(미배정)</option>
+          <option th:each="assigneeOption : ${exceptionAssignees}" th:value="${assigneeOption.userId()}"
+                  th:text="${assigneeOption.loginId()}"
+                  th:selected="${assigneeFilter == assigneeOption.userId() + ''}">담당자</option>
+        </select>
+      </div>
+      <div class="fgc-field" style="min-width:130px">
+        <label class="fgc-label" for="f-validation-month">검증월</label>
+        <!-- 화면정의서 ② 검색의 '기간' 구현체 — 예외가 검출된 검증월(validation_month) 단위.
+             VRUN-W02 '예외함 열기' 링크도 이 파라미터로 들어와 카드 건수와 목록이 일치한다. -->
+        <select class="fgc-select" id="f-validation-month" name="validationMonth">
+          <option value="">전체</option>
+          <option th:each="monthOption : ${exceptionValidationMonths}" th:value="${monthOption}"
+                  th:text="${#temporals.format(monthOption, 'yyyy-MM')}"
+                  th:selected="${validationMonthFilter == monthOption}">검증월</option>
+        </select>
       </div>
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="f-contract">계약번호</label>
-        <input class="fgc-input" id="f-contract" name="contractNo" type="text" placeholder="C004"
+        <input class="fgc-input" id="f-contract" name="contractNo" type="text" placeholder="계약번호 입력"
                th:value="${contractNoFilter}">
       </div>
       <button class="fgc-btn fgc-btn--primary" type="submit">조회</button>
@@ -125,7 +144,7 @@
               <th style="width:150px">유형</th>
               <th style="width:150px">상세 원인</th>
               <th style="width:74px">심각도</th>
-              <th style="width:70px">계약</th>
+              <th style="width:160px">계약</th>
               <th class="exception-title-cell">내용</th>
               <th style="width:86px">상태</th>
               <th style="width:84px">담당자</th>
@@ -167,7 +186,7 @@
         </span>
         <div class="pagination-controls">
           <a class="pagination-button" th:if="${casePage.page() > 1}"
-             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() - 1})}"
+             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},assigneeFilter=${assigneeFilter},validationMonth=${validationMonthFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() - 1})}"
              aria-label="이전 페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
           </a>
@@ -178,7 +197,7 @@
           <span class="pagination-button is-active" aria-current="page"
                 th:text="${casePage.page()}">1</span>
           <a class="pagination-button" th:if="${casePage.page() < casePage.totalPages()}"
-             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() + 1})}"
+             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},assigneeFilter=${assigneeFilter},validationMonth=${validationMonthFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() + 1})}"
              aria-label="다음 페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
           </a>
@@ -300,9 +319,16 @@
             실행 <span class="fgc-mono" th:text="${occurrence.validationRunId()}">-</span>
             · <span class="fgc-mono" th:text="${occurrence.sourceEntityType()} + ':' + ${occurrence.sourceEntityId()}">-</span>
           </p>
-          <details th:if="${occurrence.evidenceJson() != null and !occurrence.evidenceJson().isBlank()}" style="margin-top:4px">
+          <!-- 원시 JSON 대신 알려진 증거 필드만 한글 라벨·콤마 금액으로 푼다.
+               전체 스냅샷은 evidence_snapshot 컬럼과 원천 행이 보존한다. -->
+          <details th:if="${!occurrence.evidenceItems().isEmpty()}" style="margin-top:4px">
             <summary class="fgc-muted">검출 증거</summary>
-            <pre class="fgc-mono" style="white-space:pre-wrap;font-size:11px" th:text="${occurrence.evidenceJson()}">{}</pre>
+            <ul style="margin:4px 0 0;padding:0;list-style:none;font-size:12px">
+              <li th:each="item : ${occurrence.evidenceItems()}">
+                <span class="fgc-muted" th:text="${item.label()}">항목</span>
+                <span class="fgc-mono" th:text="${item.value()}">값</span>
+              </li>
+            </ul>
           </details>
           <small class="fgc-muted" th:text="${#temporals.format(occurrence.detectedAt(), 'yyyy-MM-dd HH:mm')}">검출 시각</small>
         </li>

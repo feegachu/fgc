@@ -66,6 +66,9 @@
         <if test="criteria.contractNo != null and !criteria.contractNo.isBlank()">
             AND ic.contract_no ILIKE CONCAT('%', #{criteria.contractNo}, '%')
         </if>
+        <if test="criteria.validationMonth != null">
+            AND ec.validation_month = #{criteria.validationMonth}
+        </if>
     </sql>
 
     <select id="search" resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow">
@@ -175,5 +178,21 @@
           FROM fgc.exception_case
          WHERE reason_code IS NOT NULL
          ORDER BY reason_code
+    </select>
+
+    <select id="findAssignees"
+            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow">
+        SELECT DISTINCT ec.assigned_to AS userId,
+               au.login_id             AS loginId
+          FROM fgc.exception_case ec
+          JOIN fgc.app_user au ON au.user_id = ec.assigned_to
+         ORDER BY au.login_id
+    </select>
+
+    <select id="findValidationMonths" resultType="java.time.LocalDate">
+        SELECT DISTINCT validation_month
+          FROM fgc.exception_case
+         WHERE validation_month IS NOT NULL
+         ORDER BY validation_month DESC
     </select>
 </mapper>

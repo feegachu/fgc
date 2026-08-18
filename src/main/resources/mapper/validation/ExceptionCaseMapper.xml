@@ -126,15 +126,24 @@
               END,
               cc.validation_run_id, cc.contract_id, NULL, NULL,
               'CAP_CHECK', CAST(cc.cap_check_id AS varchar),
-              CASE cc.result_status
-                  WHEN 'VIOLATION' THEN '1,200% 한도 초과'
-                  WHEN 'REVIEW_REQUIRED' THEN '1,200% 한도 검토 필요'
-              END,
+              <!-- 목업 편집 관행: title = '판정 — 수치 근거' (fgc-seed.js exceptions). 유형·상세원인
+                   컬럼과 같은 말을 반복하지 않도록 건별 수치를 담고, 금액은 천단위 구분한다. -->
               CONCAT(
-                  '지급단계=', cc.payment_stage,
-                  ', 한도액=', cc.limit_amount,
-                  ', 산입액=', cc.included_amount,
-                  ', 사용률=', COALESCE(CAST(cc.usage_pct AS varchar), '-')
+                  CASE cc.result_status
+                      WHEN 'VIOLATION' THEN '1,200% 한도 초과'
+                      WHEN 'REVIEW_REQUIRED' THEN '1,200% 한도 검토 필요'
+                  END,
+                  CASE WHEN cc.usage_pct IS NOT NULL
+                       THEN CONCAT(' — 사용률 ', cc.usage_pct, '%')
+                       ELSE CONCAT(' — 산입액 ', TO_CHAR(cc.included_amount, 'FM999,999,999,990'), '원')
+                  END
+              ),
+              CONCAT(
+                  '지급단계 ', cc.payment_stage,
+                  ' · 한도액 ', TO_CHAR(cc.limit_amount, 'FM999,999,999,990'), '원',
+                  ' · 산입액 ', TO_CHAR(cc.included_amount, 'FM999,999,999,990'), '원',
+                  CASE WHEN cc.usage_pct IS NOT NULL
+                       THEN CONCAT(' · 사용률 ', cc.usage_pct, '%') ELSE '' END
               ),
               jsonb_build_object(
                   'capCheckId', cc.cap_check_id,
@@ -204,14 +213,18 @@
               CASE detected.result_status WHEN 'CANDIDATE' THEN 'HIGH' ELSE 'WARNING' END,
               detected.validation_run_id, detected.contract_id, NULL, NULL,
               'ARBITRAGE_CHECK', CAST(detected.arbitrage_check_id AS varchar),
-              CASE detected.result_status
-                  WHEN 'CANDIDATE' THEN '차익거래 검토대상'
+              CASE
+                  WHEN detected.result_status = 'CANDIDATE'
+                       AND detected.net_difference_amount IS NOT NULL THEN CONCAT(
+                      '차익거래 검토대상 — 순차액 ',
+                      TO_CHAR(detected.net_difference_amount, 'FM999,999,999,990'), '원')
+                  WHEN detected.result_status = 'CANDIDATE' THEN '차익거래 검토대상'
                   ELSE '차익거래 검증 자료 확인 필요'
               END,
               COALESCE(
                   detected.calculation_snapshot ->> 'decisionReason',
-                  CONCAT('지급단계=', detected.payment_stage,
-                         ', 순차액=', detected.net_difference_amount)
+                  CONCAT('지급단계 ', detected.payment_stage, ' · 순차액 ',
+                         TO_CHAR(COALESCE(detected.net_difference_amount, 0), 'FM999,999,999,990'), '원')
               ),
               jsonb_build_object(
                   'arbitrageCheckId', detected.arbitrage_check_id,
@@ -240,14 +253,31 @@
               CASE rr.result_type WHEN 'REVIEW_REQUIRED' THEN 'WARNING' ELSE 'HIGH' END,
               rrn.validation_run_id, rr.contract_id, NULL, NULL,
               'RECONCILIATION_RESULT', CAST(rr.reconciliation_result_id AS varchar),
-              '대사 불일치',
+              CASE COALESCE(rr.primary_reason_code, rr.result_type)
+                  WHEN 'ACTUAL_MISSING' THEN CONCAT(
+                      '실제 지급 없음 — 예상 ',
+                      TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'),
+                      '원 지급 건 미발견')
+                  WHEN 'EXPECTED_MISSING' THEN CONCAT(
+                      '예상 지급 없음 — 실제 ',
+                      TO_CHAR(COALESCE(rr.actual_total_amount, 0), 'FM999,999,999,990'),
+                      '원 대응 예상 건 없음')
+                  WHEN 'AMOUNT_DIFFERENCE' THEN CONCAT(
+                      '금액 차이 ', TO_CHAR(ABS(COALESCE(rr.difference_amount, 0)), 'FM999,999,999,990'),
+                      '원 — 예상 ', TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'),
+                      ' / 실제 ', TO_CHAR(COALESCE(rr.actual_total_amount, 0), 'FM999,999,999,990'))
+                  WHEN 'DUPLICATE' THEN CONCAT(
+                      '대사 대상 중복 — 차액 ',
+                      TO_CHAR(COALESCE(rr.difference_amount, 0), 'FM999,999,999,990'), '원')
+                  ELSE CONCAT(
+                      '대사 불일치 — 차액 ',
+                      TO_CHAR(COALESCE(rr.difference_amount, 0), 'FM999,999,999,990'), '원')
+              END,
               CONCAT(
-                  '지급단계=', rrn.payment_stage,
-                  ', 결과유형=', rr.result_type,
-                  ', 예상금액=', rr.expected_total_amount,
-                  ', 실제금액=', rr.actual_total_amount,
-                  ', 차액=', rr.difference_amount,
-                  ', 주원인=', COALESCE(rr.primary_reason_code, '-')
+                  '지급단계 ', rrn.payment_stage,
+                  ' · 예상 ', TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'), '원',
+                  ' / 실제 ', TO_CHAR(COALESCE(rr.actual_total_amount, 0), 'FM999,999,999,990'), '원',
+                  ' · 차액 ', TO_CHAR(COALESCE(rr.difference_amount, 0), 'FM999,999,999,990'), '원'
               ),
               jsonb_build_object(
                   'reconciliationResultId', rr.reconciliation_result_id,
@@ -278,12 +308,13 @@
               'JOURNAL_IMBALANCE', 'JOURNAL_IMBALANCE', 'CRITICAL',
               header.validation_run_id, header.contract_id, NULL, NULL,
               'JOURNAL_HEADER', CAST(imbalance.journal_header_id AS varchar),
-              '검증원장 차변·대변 불균형',
+              CONCAT('검증원장 차변·대변 불균형 — 차액 ',
+                     TO_CHAR(COALESCE(imbalance.difference_amount, 0), 'FM999,999,999,990'), '원'),
               CONCAT(
-                  '분개번호=', imbalance.journal_no,
-                  ', 차변합계=', imbalance.debit_total,
-                  ', 대변합계=', imbalance.credit_total,
-                  ', 차액=', imbalance.difference_amount
+                  '분개번호 ', imbalance.journal_no,
+                  ' · 차변 ', TO_CHAR(COALESCE(imbalance.debit_total, 0), 'FM999,999,999,990'), '원',
+                  ' / 대변 ', TO_CHAR(COALESCE(imbalance.credit_total, 0), 'FM999,999,999,990'), '원',
+                  ' · 차액 ', TO_CHAR(COALESCE(imbalance.difference_amount, 0), 'FM999,999,999,990'), '원'
               ),
               jsonb_build_object(
                   'journalHeaderId', imbalance.journal_header_id,

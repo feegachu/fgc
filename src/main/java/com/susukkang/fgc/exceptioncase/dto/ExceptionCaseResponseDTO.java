@@ -62,6 +62,11 @@ public record ExceptionCaseResponseDTO(
     }
 
     public String reasonLabel() {
+        return labelOf(reasonCode);
+    }
+
+    /** 상세 원인 필터 select 등 행 밖에서도 같은 한글 라벨을 쓴다. */
+    public static String labelOf(String reasonCode) {
         if (reasonCode == null || reasonCode.isBlank()) return "-";
         return switch (reasonCode) {
             case "CAP_RULE_MISMATCH" -> "한도 정책 불일치";
