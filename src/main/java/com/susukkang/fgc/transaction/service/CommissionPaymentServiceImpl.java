@@ -18,11 +18,14 @@ import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.MoneyUtil;
+import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -34,13 +37,10 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
-import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
+import com.susukkang.fgc.transaction.dto.*;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
 /**
  * 설명 : 수수료 지급 건 등록·수정·확정 서비스
  *
@@ -63,8 +64,15 @@ import java.util.stream.Collectors;
  * @version 1.2
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class CommissionPaymentServiceImpl implements CommissionPaymentService {
+
+    @Override
+    @Transactional(readOnly = true)
+    public CommissionPaymentResponse get(Long paymentId) {
+        return requirePayment(paymentId, mapper.findCapCheckIds(paymentId));
+    }
 
     // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
     // after JSON 에 지급단계·포함/제외 판단·정착지원금 귀속·배부정책·증빙(REG-20·22)을 함께 담는다.
@@ -80,6 +88,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final CapExceptionService capExceptionService;
     private final FgcMessageResolver messageResolver;
     private final AuditLogService auditLogService;
+    private final CommissionPolicyService commissionPolicyService;
 
     @Override
     @Transactional
@@ -184,11 +193,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 개선: 귀속행별 정책·한도·증빙 공제를 계산하고 하나라도 실패하면 확정을 차단
         for (ConfirmationData data : attributions) {
             failFirst(attributionFailures(data));
+            if (isNonContractNewcomerAttribution(data)) {
+                failFirst(newcomerSupportEligibilityFailure(data));
+                continue;
+            }
             CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
                     paymentId,
                     data.transactionAttributionId()
             );
-            failFirst(capRuleFailure(rule, data));
+            boolean applicableCapRuleSetExists = mapper.existsApplicableCapRuleSet(
+                    paymentId,
+                    data.transactionAttributionId()
+            );
+            failFirst(capRuleFailure(rule, data, applicableCapRuleSetExists));
             CapCalculationResult calculation = calculateLimit(
                     data.contractId(),
                     data.paymentStage(),
@@ -209,6 +226,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     actualValidation,
                     rule.warningUsagePct()
             );
+
             CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
             mapper.insertCapCheck(check);
             mapper.insertCapCheckDetail(check);
@@ -285,6 +303,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ));
             for (ConfirmationData data : attributions) {
                 failures.addAll(attributionFailures(data));
+                if (isNonContractNewcomerAttribution(data)) {
+                    GateFailure newcomerFailure = newcomerSupportEligibilityFailure(data);
+                    if (newcomerFailure != null) {
+                        failures.add(newcomerFailure);
+                    }
+                    continue;
+                }
                 if (data.contractId() == null || data.attributedAmount() == null) {
                     continue;
                 }
@@ -292,7 +317,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         paymentId,
                         data.transactionAttributionId()
                 );
-                GateFailure ruleFailure = capRuleFailure(rule, data);
+                boolean applicableCapRuleSetExists = mapper.existsApplicableCapRuleSet(
+                        paymentId,
+                        data.transactionAttributionId()
+                );
+                GateFailure ruleFailure = capRuleFailure(rule, data, applicableCapRuleSetExists);
                 if (ruleFailure != null) {
                     failures.add(ruleFailure);
                 }
@@ -351,6 +380,41 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 previews,
                 toBlockers(failures),
                 failures.isEmpty()
+        );
+    }
+
+    @Override
+    public PageResponse<CommissionPaymentListResponse> search(CommissionPaymentSearchCondition condition, int page, int size) {
+        if (page < 1) {
+            throw validationException("page", "page는 1 이상이어야 합니다.");
+        }
+        if (size < 1 || size > 100) {
+            throw validationException("size", "size는 1 이상 100 이하여야 합니다.");
+        }
+        if (condition == null) {
+            condition = new CommissionPaymentSearchCondition();
+        }
+        if (StringUtils.hasText(condition.getSettlementMonth())) {
+            try {
+                YearMonth.parse(condition.getSettlementMonth());
+            } catch (RuntimeException exception) {
+                throw validationException("settlementMonth", "정산월은 yyyy-MM 형식이어야 합니다.");
+            }
+        }
+
+        long offset = (long) (page - 1) * size;
+        List<CommissionPaymentListResponse> content = mapper.selectByCondition(condition, size, offset);
+        long totalElements = mapper.countByCondition(condition);
+
+        return PageResponse.of(content, page, size, totalElements, "commissionTransactionId,desc");
+    }
+
+    private FgcBusinessException validationException(String field, String detail) {
+        return new FgcBusinessException(
+                FgcErrorCode.COMMON_002,
+                field,
+                Map.of("field", field),
+                detail
         );
     }
 
@@ -493,7 +557,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 개선: 요청 항목 ID·현금흐름을 교차 검증하고 지급액·귀속액은 HALF_UP 원 단위로 정규화
         validateSourceType(sourceType);
         validateMonthStart(settlementMonth);
-        requireAgent(agentId);
+        validateRecipientAgent(paymentStage, agentId);
         CommissionItemReference item = requireCommissionItem(
                 commissionItemId,
                 settlementMonth
@@ -501,10 +565,39 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         validateCashflowType(cashflowType, item);
         validatePaymentEvidence(evidenceRef, attributionRequests);
         validateAttributionMethodCompatibility(item.itemCode(), attributionRequests);
+        validateAttributionMethodsForPaymentStage(paymentStage, attributionRequests);
         validatePolicyVersion(policyVersionId);
         if (sourceContractId != null) {
             requireContract(sourceContractId, "contractId");
         }
+
+        boolean nonContractNewcomerPayment = !attributionRequests.isEmpty()
+                && attributionRequests.stream()
+                .allMatch(request -> request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT);
+        boolean approvedAllocationPayment = attributionRequests.stream()
+                .anyMatch(request -> request.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION);
+        // 승인배부는 여러 계약에 배부될 수 있다. 귀속행 첫 계약의 계약일을 정책 기준으로 쓰면
+        // 요청 배열 순서에 따라 정책 버전이 바뀌므로, 정산월을 기준으로 별도 해석한다.
+        Long policyContractId = approvedAllocationPayment
+                ? null
+                : sourceContractId != null
+                ? sourceContractId
+                : attributionRequests.stream()
+                .map(CommissionPaymentAttributionRequest::contractId)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        Long effectivePolicyVersionId = nonContractNewcomerPayment
+                && policyContractId == null
+                && policyVersionId == null
+                ? null
+                : resolvePolicyVersionId(
+                        policyVersionId,
+                        policyContractId,
+                        paymentStage,
+                        approvedAllocationPayment,
+                        settlementMonth
+                );
 
         List<CommissionPaymentAttributionCommand> attributions = new ArrayList<>(attributionRequests.size());
         for (int index = 0; index < attributionRequests.size(); index++) {
@@ -512,10 +605,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     paymentId,
                     index + 1,
                     sourceContractId,
-                    agentId,
-                    settlementMonth,
-                    paymentStage,
-                    policyVersionId,
+                agentId,
+                settlementMonth,
+                paymentStage,
+                    effectivePolicyVersionId,
                     attributionRequests.get(index)
             ));
         }
@@ -535,7 +628,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .agentId(agentId)
                 .commissionItemId(item.commissionItemId())
                 .paymentStage(paymentStage)
-                .policyVersionId(policyVersionId)
+                .policyVersionId(effectivePolicyVersionId)
                 .settlementMonth(settlementMonth)
                 .dueDate(dueDate)
                 .amount(MoneyUtil.roundWon(amount))
@@ -545,6 +638,59 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .naturalContractId(naturalContractId)
                 .build();
         return new PreparedPayment(payment, attributions);
+    }
+
+    /**
+     * @author hjKang
+     * @since 2026-08-16
+     *
+     * 2026-08-16 - 지급 건의 적용 정책 버전 자동 결정
+     * 기존 코드: 화면에서 전달받은 allocationPolicyVersion 값만 검증하고 그대로 저장했다.
+     * 문제: 지급 등록 화면이 정책 버전을 전달하지 않으면 지급 건과 귀속행의 정책 버전이 null로 저장되어 사전검증이 증빙 누락으로 잘못 차단되었다.
+     * 개선: 요청 정책 버전이 없으면 지급 건 또는 귀속행의 계약과 지급단계를 기준으로 현행 수수료 정책 버전을 조회하여 저장한다.
+     *       다만 정책을 찾지 못한 것은 DRAFT 저장을 막을 사유가 아니다. 정책 버전 없이 초안을
+     *       보존하고, 확정 게이트가 POLICY_VERSION_MISSING으로 확정을 차단한다.
+     */
+    private Long resolvePolicyVersionId(
+            Long requestedPolicyVersionId,
+            Long contractId,
+            com.susukkang.fgc.common.code.PaymentStage paymentStage,
+            boolean approvedAllocationPayment,
+            LocalDate settlementMonth
+    ) {
+        if (requestedPolicyVersionId != null) {
+            validatePolicyVersion(requestedPolicyVersionId);
+            return requestedPolicyVersionId;
+        }
+        try {
+            Long resolvedPolicyVersionId;
+            if (approvedAllocationPayment) {
+                resolvedPolicyVersionId = commissionPolicyService
+                        .resolveCurrentAllocationPolicyVersion(settlementMonth);
+            } else {
+                if (contractId == null) {
+                    // 귀속 전 DRAFT에는 정책을 고를 계약이 없을 수 있다.
+                    // 저장은 허용하고 확정 게이트(POLICY_VERSION_MISSING)에서 차단한다.
+                    return null;
+                }
+                resolvedPolicyVersionId = commissionPolicyService
+                        .resolveCurrentCommission(contractId, paymentStage)
+                        .getPolicyVersionId();
+            }
+            validatePolicyVersion(resolvedPolicyVersionId);
+            return resolvedPolicyVersionId;
+        } catch (FgcBusinessException exception) {
+            if (isAutomaticPolicyResolutionFailure(exception)) {
+                return null;
+            }
+            throw exception;
+        }
+    }
+
+    private boolean isAutomaticPolicyResolutionFailure(FgcBusinessException exception) {
+        return "commissionPolicy".equals(exception.getField())
+                || "commissionRules".equals(exception.getField())
+                || "allocationPolicyVersion".equals(exception.getField());
     }
 
     // 2026-08-11 yslee - 지급 건 본문의 제외 증빙 참조를 화면·DB 계약에 맞게 검증
@@ -579,6 +725,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 agentId,
                 settlementMonth,
                 request.attributionDate(),
+                paymentStage,
                 request.attributionMethod()
         );
         Long allocationPolicyId = resolveAllocationPolicy(
@@ -603,7 +750,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .allocationBasisJson(allocationSnapshot(
                         sourceContractId,
                         request.allocationBasis(),
-                        request.inclusionDecisionReason()
+                        request.inclusionDecisionReason(),
+                        request.attributionMethod() == AttributionMethod.APPROVED_ALLOCATION
+                                && policyVersionId == null
                 ))
                 .evidenceRef(request.evidenceRef())
                 .build();
@@ -615,6 +764,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long agentId,
             LocalDate settlementMonth,
             LocalDate attributionDate,
+            PaymentStage paymentStage,
             AttributionMethod attributionMethod
     ) {
         if (attributionMethod == AttributionMethod.NEWCOMER_NON_CONTRACT) {
@@ -632,7 +782,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
 
         ContractReference target = requireContract(targetId, "attributedContractId");
-        if (!target.agentId().equals(agentId)) {
+        if (paymentStage == PaymentStage.GA_TO_FC && !target.agentId().equals(agentId)) {
             invalid("attributedContractId", "귀속계약의 설계사가 지급 대상 설계사와 다릅니다.");
         }
 
@@ -678,8 +828,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (attributionMethod != AttributionMethod.APPROVED_ALLOCATION) {
             return null;
         }
-        if (policyVersionId == null || !StringUtils.hasText(allocationBasis)) {
-            invalid("allocationPolicyVersion", "승인 배부에는 정책 버전과 배부기준이 필요합니다.");
+        if (!StringUtils.hasText(allocationBasis)) {
+            invalid("allocationBasis", "승인 배부에는 배부기준이 필요합니다.");
+        }
+        if (policyVersionId == null) {
+            // 정책 미비 초안은 보존하고, confirm()의 정책 버전 게이트에서 확정을 막는다.
+            return null;
         }
         Long allocationPolicyId = mapper.findAllocationPolicyId(
                 policyVersionId,
@@ -697,6 +851,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     ) {
         ExclusionType exclusionType = normalizeExclusionType(request.exclusionType());
         if (request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
+            if (paymentStage == PaymentStage.INSURER_TO_GA) {
+                invalid("attributionMethod", "원수사→GA 지급 건에는 신인 비계약 귀속을 사용할 수 없습니다.");
+            }
             if (request.inclusionDecisionStatus() == InclusionDecisionStatus.INCLUDED) {
                 invalid("inclusionDecisionStatus", "비계약 선지급 건은 산입 확정 상태로 저장할 수 없습니다.");
             }
@@ -820,14 +977,23 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
 
-        if (first.policyVersionId() == null) {
+        /*
+         * @author hjKang
+         * @since 2026-08-16
+         *
+         * 2026-08-16 - 정책 버전 누락과 증빙 누락 오류 구분
+         * 기존 코드: 정책 버전 누락에도 증빙 필수 오류(TRAN_004)를 반환했다.
+         * 문제: 산입 귀속행처럼 증빙이 필요 없는 건도 증빙 누락으로 안내되어 실제 차단 원인을 확인할 수 없었다.
+         * 개선: 정책 버전 누락을 지급 확정 전용 업무 오류(TRAN_007)로 안내한다.
+         */
+        if (first.policyVersionId() == null && !isNonContractNewcomerAttribution(first)) {
             failures.add(new GateFailure(
                     first,
-                    "ALLOCATION_EVIDENCE_MISSING",
+                    "POLICY_VERSION_MISSING",
                     "HIGH",
                     "정책 버전 누락",
                     "확정하려면 적용 정책 버전이 필요합니다.",
-                    FgcErrorCode.TRAN_004,
+                    FgcErrorCode.TRAN_007,
                     Map.of()
             ));
         }
@@ -836,9 +1002,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private List<GateFailure> attributionFailures(ConfirmationData data) {
         List<GateFailure> failures = new ArrayList<>();
+        boolean nonContractNewcomer = isNonContractNewcomerAttribution(data);
         if (data.attributedAmount() == null
                 || (data.contractId() == null
-                && data.attributionMethod() != AttributionMethod.NEWCOMER_NON_CONTRACT)) {
+                && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
                     "DATA_QUALITY",
@@ -850,7 +1017,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
-                || data.contractId() == null) {
+                || (data.contractId() == null && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
                     "CAP_REVIEW_REQUIRED",
@@ -858,6 +1025,21 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "산입 판단 검토 필요",
                     "검토필요 또는 비계약 귀속행은 자동 확정할 수 없습니다.",
                     FgcErrorCode.CAP_002,
+                    Map.of()
+            ));
+        }
+        if (!nonContractNewcomer
+                && data.contractDate() != null
+                && data.attributionDate() != null
+                && data.attributionDate().isBefore(data.contractDate())) {
+            failures.add(new GateFailure(
+                    data,
+                    "DATA_QUALITY",
+                    "HIGH",
+                    "계약일 전 귀속",
+                    "귀속일은 계약일 이후여야 합니다. 계약일: " + data.contractDate()
+                            + ", 귀속일: " + data.attributionDate(),
+                    FgcErrorCode.TRAN_008,
                     Map.of()
             ));
         }
@@ -893,6 +1075,30 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         return failures;
+    }
+
+    private boolean isNonContractNewcomerAttribution(ConfirmationData data) {
+        return data.contractId() == null
+                && data.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT;
+    }
+
+    /**
+     * 계약 미귀속 신인활동지원비는 1,200% 금액 한도에는 산입하지 않는다. 다만 REG-21의
+     * 제외 적격성(직전 3년 무경력·지원 가능 기간)을 확정 시점에 확인해야 한다.
+     */
+    private GateFailure newcomerSupportEligibilityFailure(ConfirmationData data) {
+        if (mapper.existsEligibleNewcomerSupportAgent(data.agentId(), data.attributionDate())) {
+            return null;
+        }
+        return new GateFailure(
+                data,
+                "NEWCOMER_SUPPORT_REVIEW",
+                "HIGH",
+                "신인활동지원 적격성 확인 필요",
+                "신인 지원 대상 또는 지원 가능 기간을 확인할 수 없어 지급 확정을 차단했습니다.",
+                FgcErrorCode.CAP_002,
+                Map.of()
+        );
     }
 
     // 2026-08-12 hjKang - 예외 유형과 심각도 공통 enum 적용 (ExceptionType·ExceptionSeverity의 name() 사용)
@@ -1078,15 +1284,22 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return null;
     }
 
-    private GateFailure capRuleFailure(CapRuleSnapshot rule, ConfirmationData data) {
+    private GateFailure capRuleFailure(
+            CapRuleSnapshot rule,
+            ConfirmationData data,
+            boolean applicableCapRuleSetExists
+    ) {
         if (rule == null) {
+            boolean missingRuleSet = !applicableCapRuleSetExists;
             return new GateFailure(
                     data,
-                    "POLICY_MISSING",
+                    missingRuleSet ? "POLICY_MISSING" : "CAP_ITEM_UNCLASSIFIED",
                     "HIGH",
-                    "확정 검증 정책 누락",
-                    "귀속행에 적용할 1,200% 분류정책을 찾을 수 없습니다.",
-                    FgcErrorCode.CAP_002,
+                    missingRuleSet ? "1,200% 룰셋 누락" : "한도 산입 항목 미분류",
+                    missingRuleSet
+                            ? "적용 가능한 활성 1,200% 룰셋이 없습니다."
+                            : "적용 룰셋에 해당 수수료 항목의 산입 기준이 없습니다.",
+                    missingRuleSet ? FgcErrorCode.CAP_004 : FgcErrorCode.CAP_002,
                     Map.of()
             );
         }
@@ -1160,6 +1373,32 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private void requireAgent(Long agentId) {
         if (!mapper.existsAgent(agentId)) {
             invalid("agentId", "설계사를 찾을 수 없습니다.");
+        }
+    }
+
+    private void validateRecipientAgent(PaymentStage paymentStage, Long agentId) {
+        if (paymentStage == PaymentStage.GA_TO_FC) {
+            requireAgent(agentId);
+            return;
+        }
+        if (agentId != null) {
+            invalid("agentId", "원수사→GA 지급 건에는 수령 설계사를 지정할 수 없습니다.");
+        }
+    }
+
+    private void validateAttributionMethodsForPaymentStage(
+            PaymentStage paymentStage,
+            List<CommissionPaymentAttributionRequest> attributions
+    ) {
+        if (paymentStage != PaymentStage.INSURER_TO_GA) {
+            return;
+        }
+        for (CommissionPaymentAttributionRequest attribution : attributions) {
+            if (attribution.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                    || attribution.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD
+                    || attribution.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
+                invalid("attributionMethod", "원수사→GA 지급 건에는 설계사 지원 귀속방식을 사용할 수 없습니다.");
+            }
         }
     }
 
@@ -1249,12 +1488,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private String allocationSnapshot(
             Long sourceContractId,
             String allocationBasis,
-            String inclusionReason
+            String inclusionReason,
+            boolean policyVersionResolutionPending
     ) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("sourceContractId", sourceContractId);
         snapshot.put("allocationBasis", allocationBasis);
         snapshot.put("inclusionDecisionReason", inclusionReason);
+        if (policyVersionResolutionPending) {
+            snapshot.put("policyVersionResolutionPending", true);
+        }
         return json(snapshot);
     }
 

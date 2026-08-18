@@ -25,6 +25,9 @@
   };
   var saveButton = document.querySelector("#contract-save-button");
   var saveHint = document.querySelector("#contract-save-hint");
+  var premiumPerCycleHelp = document.querySelector("#premium-per-cycle-help");
+  var contractLimitPreview = document.querySelector("#contract-limit-preview");
+  var contractLimitFormula = document.querySelector("#contract-limit-formula");
   var errorSummary = document.querySelector("#contract-form-error-summary");
   var errorMessage = document.querySelector("#contract-form-error-message");
   var requestIdMessage = document.querySelector("#contract-form-request-id");
@@ -34,8 +37,15 @@
   var isLoadingProducts = false;
   var isLoadingAgents = false;
   var isSubmitting = false;
+  var productOfferings = [];
   var productRequestSequence = 0;
   var agentRequestSequence = 0;
+  var PAYMENT_CYCLE_MONTHS = {
+    MONTHLY: 1,
+    QUARTERLY: 3,
+    SEMI_ANNUAL: 6,
+    ANNUAL: 12
+  };
 
   function today() {
     var date = new Date();
@@ -91,7 +101,11 @@
   }
 
   function showError(error, fallbackMessage) {
-    var message = error && error.message ? error.message : fallbackMessage;
+    // 개발/운영 API가 제공하는 업무 상세 사유가 있으면 공통 오류코드보다 우선한다.
+    // 예: 조직 계층에서 팀장 수령자를 찾지 못해 스케줄 생성이 막힌 경우
+    // "입력값을 확인하세요. ({field})"만으로는 사용자가 조치할 수 없다.
+    var message = error && error.detail ? error.detail : (error && error.message ? error.message : fallbackMessage);
+    if (error && error.code === "FGC-CONT-001") message = "저장 불가 — 이미 등록된 계약번호입니다.";
     if (error && error.field && Object.prototype.hasOwnProperty.call(elements, error.field)) {
       setFieldError(error.field, message);
       var target = elements[error.field];
@@ -113,6 +127,39 @@
     clearFieldError("agentId");
     clearFieldError("organizationId");
     updateSaveState();
+  }
+
+  function syncPremiumPerCycleAmount() {
+    var paymentCycle = elements.paymentCycleCode.value;
+    var isSinglePayment = paymentCycle === "SINGLE";
+    elements.premiumPerCycleAmount.readOnly = !isSinglePayment;
+    elements.premiumPerCycleAmount.setAttribute("aria-readonly", String(!isSinglePayment));
+
+    if (isSinglePayment) {
+      if (premiumPerCycleHelp) premiumPerCycleHelp.textContent = "일시납은 한 번 낼 실제 보험료를 직접 입력합니다.";
+      updateCapLimitPreview();
+      return;
+    }
+
+    if (premiumPerCycleHelp) premiumPerCycleHelp.textContent = "월납환산 초회보험료와 납입주기에 따라 자동 계산됩니다.";
+    var monthlyEquivalent = numberValue(elements.monthlyEquivalentFirstPremium);
+    var cycleMonths = PAYMENT_CYCLE_MONTHS[paymentCycle];
+    elements.premiumPerCycleAmount.value = monthlyEquivalent === null || !cycleMonths
+      ? ""
+      : String(monthlyEquivalent * cycleMonths);
+    updateCapLimitPreview();
+  }
+
+  function updateCapLimitPreview() {
+    if (!contractLimitPreview || !contractLimitFormula) return;
+    var monthlyEquivalent = numberValue(elements.monthlyEquivalentFirstPremium);
+    if (monthlyEquivalent === null) {
+      contractLimitFormula.textContent = "월납환산 초회보험료 × 12";
+      contractLimitPreview.textContent = "—";
+      return;
+    }
+    contractLimitFormula.textContent = monthlyEquivalent.toLocaleString("ko-KR") + " × 12";
+    contractLimitPreview.textContent = (monthlyEquivalent * 12).toLocaleString("ko-KR");
   }
 
   function updateSaveState() {
@@ -175,6 +222,7 @@
     return contractApi.getProductOfferings(insurerId, contractDate).then(function (envelope) {
       if (requestSequence !== productRequestSequence) return;
       var products = pageContent(envelope.data);
+      productOfferings = products;
       replaceOptions(elements.productOfferingId,
         products.length ? "상품 판매버전을 선택하세요" : "판매 가능한 상품이 없습니다.",
         products,
@@ -258,6 +306,7 @@
     elements.monthlyEquivalentFirstPremium.value = contract.monthlyEquivalentFirstPremium ?? "";
     elements.paymentTermMonths.value = contract.paymentTermMonths ?? "";
     elements.standardSurrenderDeductionAmount.value = contract.standardSurrenderDeductionAmount ?? "";
+    syncPremiumPerCycleAmount();
   }
 
   function initializeCreateForm() {
@@ -317,11 +366,51 @@
       loadAgents();
     }
     if (event.target === elements.agentId) setOrganizationFromAgent();
+    if (event.target === elements.paymentCycleCode) syncPremiumPerCycleAmount();
     updateSaveState();
+  }
+
+  function selectedProductOffering() {
+    var selectedId = String(elements.productOfferingId.value || "");
+    return productOfferings.find(function (product) {
+      return String(product.productOfferingId) === selectedId;
+    });
+  }
+
+  function warnIfRefundRateTableIsMissing(contractId) {
+    var product = selectedProductOffering();
+    if (!product || !product.standardDeduction80Yn) return Promise.resolve(false);
+
+    return contractApi.getCapChecks(contractId).then(function (envelope) {
+      var checks = Array.isArray(envelope.data) ? envelope.data : [];
+      var missingRefundRateTable = checks.some(function (check) {
+        var result = check && check.result;
+        return result
+          && result.resultStatus === "REVIEW_REQUIRED"
+          && !result.refundRateTableId
+          && result.calculationSnapshot
+          && result.calculationSnapshot.refundAdditionCondition === "STANDARD_DEDUCTION_80";
+      });
+      if (!missingRefundRateTable) return false;
+
+      var term = elements.paymentTermMonths.value || "입력한";
+      if (window.FgcUi && typeof window.FgcUi.toast === "function") {
+        window.FgcUi.toast(
+          term + "개월 납입기간에 적용할 12차월 환급률표가 없어 1,200% 한도 판정이 검토필요입니다. 기준정보를 확인하세요.",
+          "warning",
+          6000
+        );
+      }
+      return true;
+    }).catch(function () {
+      // 계약 저장은 성공했으므로 안내 조회 실패가 상세 이동을 막으면 안 된다.
+      return false;
+    });
   }
 
   function handleInput(event) {
     clearFieldError(event.target.name);
+    if (event.target === elements.monthlyEquivalentFirstPremium) syncPremiumPerCycleAmount();
     updateSaveState();
   }
 
@@ -343,7 +432,17 @@
       : contractApi.createContract(requestBody());
 
     operation.then(function (envelope) {
-      window.location.assign("/contracts/" + encodeURIComponent(envelope.data.contractId));
+      var savedContractId = envelope.data.contractId;
+      var redirect = function () {
+        window.location.assign("/contracts/" + encodeURIComponent(savedContractId));
+      };
+      if (isEditMode) {
+        redirect();
+        return;
+      }
+      warnIfRefundRateTableIsMissing(savedContractId).then(function (warned) {
+        window.setTimeout(redirect, warned ? 1800 : 0);
+      });
     }).catch(function (error) {
       showError(error, "보험계약을 저장하지 못했습니다.");
     }).finally(function () {
@@ -363,6 +462,7 @@
     showError(error, "계약 입력 화면을 준비하지 못했습니다.");
   }).finally(function () {
     isInitializing = false;
+    syncPremiumPerCycleAmount();
     updateSaveState();
   });
 })();

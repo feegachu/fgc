@@ -38,8 +38,7 @@
                 LIKE CONCAT('%', #{condition.contractNo}, '%')
             </if>
 
-            <if test="condition.stage != null
-                      and condition.stage != ''">
+            <if test="condition.stage != null">
                 AND sh.payment_stage = #{condition.stage}
             </if>
 
@@ -47,13 +46,11 @@
                 AND sh.schedule_regime = #{condition.regime}
             </if>
 
-            <if test="condition.purpose != null
-                      and condition.purpose != ''">
+            <if test="condition.purpose != null">
                 AND sh.schedule_purpose = #{condition.purpose}
             </if>
 
-            <if test="condition.status != null
-                      and condition.status != ''">
+            <if test="condition.status != null">
                 AND sh.status = #{condition.status}
             </if>
         </where>
@@ -68,6 +65,40 @@
     </select>
 
     <!-- 검색 조건에 해당하는 스케줄 헤더의 전체 건수를 조회한다. -->
+    <select id="selectVersionsByScheduleHeaderId"
+            resultType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
+        WITH target AS (
+            SELECT contract_id, payment_stage
+              FROM schedule_header
+             WHERE schedule_header_id = #{scheduleHeaderId}
+        )
+        SELECT sh.schedule_header_id,
+               c.contract_no,
+               sh.payment_stage,
+               sh.schedule_regime,
+               sh.schedule_purpose,
+               sh.schedule_version_no,
+               sh.status,
+               sh.active_yn,
+               sh.generated_at,
+               sh.generation_reason,
+               COUNT(sl.schedule_line_id) AS line_count,
+               COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
+               CONCAT(pv.policy_code, ' v', pv.version_no) AS policy_version_label
+          FROM schedule_header sh
+          JOIN target t
+            ON t.contract_id = sh.contract_id
+           AND t.payment_stage = sh.payment_stage
+          JOIN insurance_contract c
+            ON c.contract_id = sh.contract_id
+          JOIN policy_version pv
+            ON pv.policy_version_id = sh.policy_version_id
+          LEFT JOIN schedule_line sl
+            ON sl.schedule_header_id = sh.schedule_header_id
+         GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_code, pv.version_no
+         ORDER BY sh.schedule_version_no DESC, sh.schedule_header_id DESC
+    </select>
+
     <select id="countByCondition"
             resultType="long">
         SELECT
@@ -84,8 +115,7 @@
                 LIKE CONCAT('%', #{condition.contractNo}, '%')
             </if>
 
-            <if test="condition.stage != null
-                      and condition.stage != ''">
+            <if test="condition.stage != null">
                 AND sh.payment_stage = #{condition.stage}
             </if>
 
@@ -93,13 +123,11 @@
                 AND sh.schedule_regime = #{condition.regime}
             </if>
 
-            <if test="condition.purpose != null
-                      and condition.purpose != ''">
+            <if test="condition.purpose != null">
                 AND sh.schedule_purpose = #{condition.purpose}
             </if>
 
-            <if test="condition.status != null
-                      and condition.status != ''">
+            <if test="condition.status != null">
                 AND sh.status = #{condition.status}
             </if>
         </where>
@@ -109,6 +137,9 @@
     <!-- 상세 응답: 헤더 한 건과 스케줄 라인 목록을 매핑한다. -->
     <resultMap id="scheduleDetailResultMap"
                type="com.susukkang.fgc.schedule.dto.ScheduleDetailResponse">
+
+        <!-- selectOne이 라인 수만큼 루트 객체를 만들지 않도록 상세 헤더를 루트 식별자로 묶는다. -->
+        <id property="scheduleHeaderId" column="schedule_header_id"/>
 
         <!-- 스케줄 헤더 한 건 -->
         <association property="header"
@@ -128,7 +159,7 @@
             <result property="generatedAt" column="generated_at"/>
         </association>
 
-        <collection property="schedules"
+        <collection property="lines"
                     ofType="com.susukkang.fgc.schedule.dto.ScheduleLineResponse">
             <id property="lineNo" column="line_no"/>
             <result property="installmentNo" column="installment_no"/>
@@ -141,7 +172,7 @@
             <result property="calculationType" column="calculation_type"/>
             <result property="ratePct" column="rate_pct"/>
             <result property="expectedAmount" column="expected_amount"/>
-            <result property="status" column="line_status"/>
+            <result property="lineStatus" column="line_status"/>
             <result property="ruleRef" column="source_commission_rule_id"/>
         </collection>
     </resultMap>
@@ -485,5 +516,29 @@
             schedule_header_id = #{scheduleHeaderId}
         AND
             active_yn = TRUE
+    </update>
+
+    <!--
+      @author hjKang
+      @since 2026-08-16
+
+      2026-08-16 - 스케줄 확정 상태 전이 추가
+      기존 코드: 스케줄 재생성을 위한 헤더 상태 변경만 존재했다.
+      문제: 상세 화면에서 확정해도 헤더와 회차가 PLANNED로 남아 확정 후 변경 방지 트리거가 적용되지 않았다.
+      개선: 헤더가 PLANNED인 동안 회차를 먼저 확정하고, 활성 헤더를 CONFIRMED로 전환한다.
+    -->
+    <update id="confirmPlannedScheduleLines">
+        UPDATE schedule_line
+           SET line_status = 'CONFIRMED'
+         WHERE schedule_header_id = #{scheduleHeaderId}
+           AND line_status = 'PLANNED'
+    </update>
+
+    <update id="confirmScheduleHeader">
+        UPDATE schedule_header
+           SET status = 'CONFIRMED'
+         WHERE schedule_header_id = #{scheduleHeaderId}
+           AND status = 'PLANNED'
+           AND active_yn = TRUE
     </update>
 </mapper>

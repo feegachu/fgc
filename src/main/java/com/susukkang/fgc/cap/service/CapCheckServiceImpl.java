@@ -49,7 +49,11 @@ public class CapCheckServiceImpl implements CapCheckService {
     private final ObjectMapper objectMapper;
 
     @Override
-    @Transactional
+    // 계약 생성·수정 흐름은 CAP_004를 잡아 계약은 보존하고 검토 케이스만 남긴다.
+    // REQUIRED 참여 트랜잭션에서 이 예외를 rollback-only로 표시하면, 호출부가 예외를
+    // 흡수해도 최종 커밋이 UnexpectedRollbackException으로 실패한다. 다른 업무 예외는
+    // 호출한 상위 서비스까지 전파되어 그 상위 트랜잭션의 기본 롤백 규칙을 그대로 따른다.
+    @Transactional(noRollbackFor = FgcBusinessException.class)
     public CapCheckSaveResult calculateAndSave(CapCalculationCommand command) {
         // 계산(CapCalculator)과 저장(capCheckMapper)을 하나의 트랜잭션으로 묶는다.
         // 계산 중 예외가 나면 당연히 저장도 안 되고, 저장이 실패해도 계산 결과가 반쪽만 남지 않는다.

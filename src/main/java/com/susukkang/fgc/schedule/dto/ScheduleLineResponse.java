@@ -31,6 +31,6 @@ public class ScheduleLineResponse {
     private String calculationType; // 계산 방식(RATE, FIXED)
     private BigDecimal ratePct; // 적용 요율
     private BigDecimal expectedAmount; // 예상 금액
-    private String status; // 스케줄 상태
+    private String lineStatus; // 스케줄 라인 상태
     private Long ruleRef; // 예상액 산출 근거 수수료 규칙 ID
 }

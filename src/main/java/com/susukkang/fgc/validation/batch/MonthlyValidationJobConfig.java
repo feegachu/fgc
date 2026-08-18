@@ -1,6 +1,5 @@
 package com.susukkang.fgc.validation.batch;
 
-import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.JournalPostingPort;

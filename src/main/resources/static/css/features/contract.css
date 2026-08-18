@@ -977,7 +977,7 @@
 }
 
 .contract-table {
-  width: 68rem;
+  width: 100%;
   min-width: 68rem;
   table-layout: fixed;
 }
@@ -1034,7 +1034,7 @@
 
 .contract-premium-help {
   display: grid;
-  width: 68rem;
+  width: 100%;
   min-width: 68rem;
   min-height: 2.75rem;
   grid-template-columns: 1.25rem minmax(0, 1fr);
@@ -1070,7 +1070,7 @@
   display: flex;
   min-height: 2.5rem;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   margin: 2.5rem 1rem 0;
   padding-inline: 0.75rem;
