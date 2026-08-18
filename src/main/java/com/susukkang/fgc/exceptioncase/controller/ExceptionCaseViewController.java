@@ -1,6 +1,9 @@
 package com.susukkang.fgc.exceptioncase.controller;
 
+import com.susukkang.fgc.common.code.ExceptionActionType;
+import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
@@ -8,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -34,12 +38,14 @@ public class ExceptionCaseViewController {
 
     @GetMapping("/exceptions")
     public String list(
-            @RequestParam(required = false) String status,
+            @ModelAttribute ExceptionCaseSearchDTO criteria,
             @RequestParam(defaultValue = "1") int page,
+            @RequestParam(required = false) Long selected,
             Model model
     ) {
         // defaultValue 는 빈 문자열(status= → "전체")까지 OPEN 으로 덮어쓰므로 쓰지 않는다 —
         // 파라미터가 아예 없을 때만 워크큐 기본값(미처리)으로 연다.
+        String status = criteria.getStatus();
         if (status == null) {
             status = ExceptionStatus.OPEN_FILTER;
         }
@@ -50,9 +56,9 @@ public class ExceptionCaseViewController {
             // 보내는 값이라 사용자가 직접 칠 일이 없고, 워크큐 기본값은 미처리다.
             status = ExceptionStatus.OPEN_FILTER;
         }
+        criteria.setStatus(status);
 
         page = Math.max(1, Math.min(page, Integer.MAX_VALUE / PAGE_SIZE));
-        ExceptionCaseSearchDTO criteria = ExceptionCaseSearchDTO.builder().status(status).build();
         ExceptionCaseSearchResponse cases = exceptionCaseService.search(criteria, page, PAGE_SIZE);
         if (cases.totalPages() > 0 && page > cases.totalPages()) {
             page = cases.totalPages();
@@ -60,6 +66,15 @@ public class ExceptionCaseViewController {
         }
 
         model.addAttribute("statusFilter", status);
+        model.addAttribute("typeFilter", criteria.getType());
+        model.addAttribute("severityFilter", criteria.getSeverity());
+        model.addAttribute("contractNoFilter", criteria.getContractNo());
+        model.addAttribute("exceptionTypes", ExceptionType.values());
+        model.addAttribute("exceptionSeverities", ExceptionSeverity.values());
+        model.addAttribute("actionTypes", ExceptionActionType.values());
+        model.addAttribute("newStatus", ExceptionStatus.NEW);
+        model.addAttribute("inReviewStatus", ExceptionStatus.IN_REVIEW);
+        model.addAttribute("selectedExceptionId", selected);
         model.addAttribute("cases", cases.content());
         model.addAttribute("casePage", cases);
         model.addAttribute("openCount", cases.summary().stream()

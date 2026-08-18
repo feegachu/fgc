@@ -18,9 +18,11 @@
   서버 페이징하고, 현재 페이지의 상세·처리 이력은 행 선택 시 즉시 표시한다.
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-EXCP-W01', '예외함', null, null)}"
-      xmlns:th="http://www.thymeleaf.org">
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-exception">
+<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-exception"
+      th:attr="data-selected-exception-id=${selectedExceptionId}">
 
   <h1 class="fgc-page-title">예외함</h1>
   <p class="fgc-page-desc">규제·대사·데이터 문제로 <strong>사람이 봐야 하는 건</strong>만 모입니다.</p>
@@ -37,26 +39,37 @@
 
   <!-- ① 유형별 미처리 요약 -->
   <section class="exception-summary-grid" id="summary-cards" aria-label="유형별 미처리 요약">
-    <article class="fgc-card" th:each="summary : ${casePage.summary()}">
+    <a class="fgc-card exception-summary-card" th:each="summary : ${casePage.summary()}"
+       th:classappend="${typeFilter == summary.type()} ? 'is-active'"
+       th:attr="aria-current=${typeFilter == summary.type()} ? 'true' : null"
+       th:href="@{/exceptions(type=${summary.type()},status='OPEN',month=${month})}">
       <div class="fgc-card__body">
         <span class="fgc-muted" style="font-size:12px" th:text="${summary.type().label()}">예외 유형</span>
         <strong style="display:block;margin-top:4px;font-size:20px" th:text="|${summary.count()}건|">0건</strong>
+        <span class="fgc-mono exception-summary-code" th:text="${summary.type()}">EXCEPTION_TYPE</span>
       </div>
-    </article>
+    </a>
     <div class="fgc-empty publishing-empty-state" th:if="${casePage.summary().isEmpty()}">미처리 예외가 없습니다.</div>
   </section>
 
-  <!-- ② 검색 — 상태 필터만 서버 연동(#83). OPEN 은 화면 묶음값이고 서버가
-       NEW+IN_REVIEW 로 푼다. 나머지 필터는 IF-API-43 전체 연동 시 활성화한다. -->
+  <!-- ② 검색 — IF-API-43 쿼리스트링을 그대로 사용해 뒤로가기와 공유가 가능하다. -->
   <section class="fgc-card" style="margin-top:16px">
     <form class="fgc-card__body fgc-toolbar" method="get" th:action="@{/exceptions}">
       <div class="fgc-field" style="min-width:190px">
         <label class="fgc-label" for="f-type">예외 유형</label>
-        <select class="fgc-select" id="f-type" disabled aria-label="예외 유형, 연동 대기"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-type" name="type">
+          <option value="">전체</option>
+          <option th:each="type : ${exceptionTypes}" th:value="${type}" th:text="${type.label()}"
+                  th:selected="${typeFilter == type}">예외 유형</option>
+        </select>
       </div>
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-severity">심각도</label>
-        <select class="fgc-select" id="f-severity" disabled aria-label="심각도, 연동 대기"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-severity" name="severity">
+          <option value="">전체</option>
+          <option th:each="severity : ${exceptionSeverities}" th:value="${severity}" th:text="${severity}"
+                  th:selected="${severityFilter == severity}">심각도</option>
+        </select>
       </div>
       <div class="fgc-field" style="min-width:140px">
         <label class="fgc-label" for="f-status">상태</label>
@@ -75,8 +88,10 @@
       </div>
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="f-contract">계약번호</label>
-        <input class="fgc-input" id="f-contract" type="text" placeholder="C004" disabled aria-label="계약번호, 연동 대기">
+        <input class="fgc-input" id="f-contract" name="contractNo" type="text" placeholder="C004"
+               th:value="${contractNoFilter}">
       </div>
+      <button class="fgc-btn fgc-btn--primary" type="submit">조회</button>
       <a class="fgc-btn fgc-btn--ghost" id="f-reset" th:href="@{/exceptions}">
         <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
       </a>
@@ -111,14 +126,14 @@
           <tbody id="list-body">
             <tr class="exception-row" th:each="c : ${cases}"
                 tabindex="0" aria-controls="detail-body history-body" aria-selected="false"
-                th:attr="data-exception-id=${c.exceptionCaseId()}">
+                th:attr="data-exception-id=${c.exceptionCaseId()},data-status=${c.status()}">
               <td class="fgc-mono" th:text="${c.exceptionCaseId()}">-</td>
               <td th:text="${c.type().label()}">-</td>
               <td th:text="${c.severity()}">-</td>
               <td class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</td>
               <td class="exception-title-cell" th:text="${c.title()}">-</td>
-              <td th:text="${c.status().label()}">-</td>
-              <td th:text="${c.assigneeLoginId()} ?: '미배정'">-</td>
+              <td data-role="status" th:text="${c.status().label()}">-</td>
+              <td data-role="assignee" th:text="${c.assigneeLoginId()} ?: '미배정'">-</td>
               <td class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
               <!-- 참조 = 원천 화면 링크 (화면정의서 :1349 "만들 때 주의") — 라우트가 없는 원천 유형은 텍스트로만 -->
               <td class="fgc-mono">
@@ -139,7 +154,7 @@
         </span>
         <div class="pagination-controls">
           <a class="pagination-button" th:if="${casePage.page() > 1}"
-             th:href="@{/exceptions(status=${statusFilter}, month=${month}, page=${casePage.page() - 1})}"
+             th:href="@{/exceptions(type=${typeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() - 1})}"
              aria-label="이전 페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
           </a>
@@ -150,7 +165,7 @@
           <span class="pagination-button is-active" aria-current="page"
                 th:text="${casePage.page()}">1</span>
           <a class="pagination-button" th:if="${casePage.page() < casePage.totalPages()}"
-             th:href="@{/exceptions(status=${statusFilter}, month=${month}, page=${casePage.page() + 1})}"
+             th:href="@{/exceptions(type=${typeFilter},severity=${severityFilter},status=${statusFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() + 1})}"
              aria-label="다음 페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
           </a>
@@ -192,11 +207,11 @@
     <template th:id="|exception-detail-${c.exceptionCaseId()}|">
       <dl class="exception-detail-grid">
         <div><dt>예외 번호</dt><dd class="fgc-mono" th:text="${c.exceptionCaseId()}">-</dd></div>
-        <div><dt>상태</dt><dd th:text="${c.status().label()}">-</dd></div>
+        <div><dt>상태</dt><dd data-role="status" th:text="${c.status().label()}">-</dd></div>
         <div><dt>유형</dt><dd th:text="${c.type().label()}">-</dd></div>
         <div><dt>심각도</dt><dd th:text="${c.severity()}">-</dd></div>
         <div><dt>계약번호</dt><dd class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</dd></div>
-        <div><dt>담당자</dt><dd th:text="${c.assigneeLoginId()} ?: '미배정'">-</dd></div>
+        <div><dt>담당자</dt><dd data-role="assignee" th:text="${c.assigneeLoginId()} ?: '미배정'">-</dd></div>
         <div><dt>설계사</dt><dd th:text="${c.agentName()} ?: '-'">-</dd></div>
         <div><dt>발생</dt><dd class="fgc-mono" th:text="${#temporals.format(c.createdAt(), 'yyyy-MM-dd HH:mm')}">-</dd></div>
         <div class="exception-detail-wide"><dt>제목</dt><dd th:text="${c.title()}">-</dd></div>
@@ -208,6 +223,44 @@
                 th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
         </dd></div>
       </dl>
+      <form class="exception-action-form" data-exception-action-form
+            th:if="${c.status() == newStatus or c.status() == inReviewStatus}"
+            th:attr="data-exception-id=${c.exceptionCaseId()},data-current-status=${c.status()}"
+            sec:authorize="hasAnyRole('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')">
+        <label class="fgc-field">
+          <span class="fgc-label">조치</span>
+          <select class="fgc-select" name="actionType" required>
+            <option value="">조치를 선택하세요</option>
+            <option th:each="actionType : ${actionTypes}"
+                    th:value="${actionType}" th:text="${actionType.label()}"
+                    th:disabled="${!actionType.supports(c.status())}"
+                    th:hidden="${!actionType.supports(c.status())}"
+                    th:attr="data-supports-new=${actionType.supports(newStatus)},data-supports-review=${actionType.supports(inReviewStatus)}">
+              조치
+            </option>
+          </select>
+        </label>
+        <label class="fgc-field">
+          <span class="fgc-label">처리 사유 <span class="field-required" aria-hidden="true">*</span></span>
+          <textarea class="fgc-textarea" name="reason" maxlength="1000" required
+                    placeholder="판단 근거와 처리 내용을 입력하세요."></textarea>
+        </label>
+        <label class="fgc-field">
+          <span class="fgc-label">증빙</span>
+          <input class="fgc-input" name="evidenceRef" type="text" placeholder="문서번호 또는 링크">
+        </label>
+        <p class="fgc-error exception-action-error" data-action-error role="alert"></p>
+        <button class="fgc-btn fgc-btn--primary exception-action-submit" type="submit" disabled>처리 저장</button>
+      </form>
+      <p class="fgc-muted exception-action-notice"
+         th:if="${c.status() == newStatus or c.status() == inReviewStatus}"
+         sec:authorize="!hasAnyRole('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')">
+        조회 전용 권한입니다.
+      </p>
+      <p class="fgc-muted exception-action-notice"
+         th:unless="${c.status() == newStatus or c.status() == inReviewStatus}">
+        종결된 예외입니다.
+      </p>
     </template>
     <template th:id="|exception-history-${c.exceptionCaseId()}|">
       <ol class="exception-history-list" th:if="${!c.actions().isEmpty()}">
@@ -215,6 +268,8 @@
           <strong th:text="|${action.actionSeq()}. ${action.actionTypeLabel()}|">1. 조치</strong>
           <span class="fgc-muted"> · <span th:text="${action.fromStatusLabel()}">이전 상태</span> → <span th:text="${action.toStatusLabel()}">현재 상태</span></span>
           <p style="margin:4px 0 0" th:text="${action.reason()}">사유</p>
+          <p class="fgc-muted" style="margin:4px 0 0" th:if="${action.evidenceRef() != null and !action.evidenceRef().isBlank()}"
+             th:text="|증빙: ${action.evidenceRef()}|">증빙</p>
           <small class="fgc-muted"><span th:text="${action.actionByLoginId()}">처리자</span> · <span th:text="${#temporals.format(action.actionAt(), 'yyyy-MM-dd HH:mm')}">처리 시각</span></small>
         </li>
       </ol>

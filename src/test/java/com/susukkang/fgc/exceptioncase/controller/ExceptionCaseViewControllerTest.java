@@ -72,6 +72,8 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("data-exception-id=\"10\"")))
                 .andExpect(content().string(containsString("id=\"exception-detail-10\"")))
                 .andExpect(content().string(containsString("id=\"exception-history-10\"")))
+                .andExpect(content().string(containsString("data-exception-action-form")))
+                .andExpect(content().string(containsString("처리 저장")))
                 .andExpect(content().string(containsString("href=\"/transactions\"")))
                 .andExpect(content().string(containsString("page=2")))
                 .andExpect(content().string(containsString("데이터 품질")))
@@ -152,6 +154,30 @@ class ExceptionCaseViewControllerTest {
             long id, ExceptionStatus status, String sourceType, String sourceId, String title
     ) {
         return row(id, status, sourceType, sourceId, title, List.of());
+    }
+
+    @Test
+    void searchFiltersAreForwardedAndRemainInSummaryAndPagingLinks() throws Exception {
+        given(service.search(argThat(c -> c.getType() == ExceptionType.CAP_WARNING
+                        && c.getSeverity() == ExceptionSeverity.HIGH
+                        && "OPEN".equals(c.getStatus())
+                        && "C004".equals(c.getContractNo())), eq(2), eq(20)))
+                .willReturn(response(List.of(), 2, 20, 21, 3));
+
+        mockMvc.perform(get("/exceptions")
+                        .param("type", "CAP_WARNING")
+                        .param("severity", "HIGH")
+                        .param("status", "OPEN")
+                        .param("contractNo", "C004")
+                        .param("page", "2")
+                        .with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("typeFilter", ExceptionType.CAP_WARNING))
+                .andExpect(model().attribute("severityFilter", ExceptionSeverity.HIGH))
+                .andExpect(model().attribute("contractNoFilter", "C004"))
+                .andExpect(content().string(containsString("type=DATA_QUALITY&amp;status=OPEN")))
+                .andExpect(content().string(containsString("type=CAP_WARNING&amp;severity=HIGH&amp;status=OPEN")))
+                .andExpect(content().string(containsString("contractNo=C004")));
     }
 
     private static ExceptionCaseResponseDTO row(
