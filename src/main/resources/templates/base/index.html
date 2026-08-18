@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   FGC-UI-BASE-W01 기준정보 조회
-  FUN-005·006·007·008은 조회 API를 사용하고, FUN-009 수수료 항목은 최초 화면에서 서버 렌더링한다.
+  FUN-005·006·007·008·009 조회 API를 사용하며, 수수료 항목은 JavaScript 비활성 환경을 위해 최초 화면에서도 서버 렌더링한다.
   1차 범위는 조회 전용이며 등록·수정·삭제 기능을 제공하지 않는다.
 -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
@@ -175,20 +175,43 @@
 
     <section class="surface tab-panel base-panel" id="base-panel-commission-item" role="tabpanel"
              aria-labelledby="base-tab-commission-item" data-base-panel="commission-item" hidden>
+      <form class="filter-bar base-filter-form" data-base-form="commission-item">
+        <label class="field">
+          <span class="field-label">기준일</span>
+          <input class="field-control" name="asOf" type="date" required>
+        </label>
+        <div class="filter-actions">
+          <button class="button button-secondary" type="button" data-base-reset="commission-item">초기화</button>
+          <button class="button button-primary" type="submit">조회</button>
+        </div>
+      </form>
       <header class="surface-header base-result-header">
-        <div><h2 class="surface-title">수수료 항목 목록</h2><p class="base-result-description">기본 조회 기준일에 유효한 항목입니다.</p></div>
-        <span class="base-result-count"><strong th:text="${#lists.size(commissionItems)}">0</strong>건</span>
+        <div><h2 class="surface-title">수수료 항목 목록</h2><p class="base-result-description">선택한 기준일에 유효한 항목입니다.</p></div>
+        <span class="base-result-count"><strong data-base-count="commission-item" th:text="${#lists.size(commissionItems)}">0</strong>건</span>
       </header>
-      <div class="data-table-viewport base-table-viewport">
+      <div class="base-result-message" data-base-message="commission-item" role="status" aria-live="polite" hidden></div>
+      <div class="data-table-viewport base-table-viewport" data-base-table="commission-item">
         <table class="data-table base-table">
           <caption class="visually-hidden">수수료 항목 기준정보 목록</caption>
-          <thead><tr><th scope="col">항목코드</th><th scope="col">항목명</th><th scope="col">지급·차감 구분</th><th scope="col">분류</th><th scope="col">사용 시작일</th><th scope="col">사용 종료일</th></tr></thead>
-          <tbody>
+          <thead><tr><th scope="col">항목코드</th><th scope="col">항목명</th><th scope="col">지급/차감</th><th scope="col">분류</th><th scope="col">적용 시작일</th><th scope="col">적용 종료일</th></tr></thead>
+          <tbody data-base-body="commission-item">
           <tr th:each="item : ${commissionItems}">
             <td class="tabular-nums" th:text="${item.itemCode()}">BASE_COMMISSION</td>
             <td th:text="${item.itemName()}">FC 기본수수료</td>
-            <td th:text="${item.cashflowType()}">PAYMENT</td>
-            <td th:text="${item.itemCategory()}">SALES</td>
+            <td><span class="status-badge"
+                      th:classappend="${item.cashflowType() == 'PAYMENT' ? ' status-badge-success' : (item.cashflowType() == 'DEDUCTION' ? ' status-badge-warning' : ' status-badge-neutral')}"
+                      th:text="${item.cashflowType() == 'PAYMENT' ? '지급' : (item.cashflowType() == 'DEDUCTION' ? '차감' : item.cashflowType())}">지급</span></td>
+            <td th:text="${item.itemCode() == 'SETTLEMENT_SUPPORT' ? '정착지원' :
+                         (item.itemCode() == 'NEWCOMER_SUPPORT' ? '신인지원' :
+                         (item.itemCategory() == 'SALES' ? '모집수수료' :
+                         (item.itemCategory() == 'MAINTENANCE' ? '유지관리' :
+                         (item.itemCategory() == 'INCENTIVE' ? '판매촉진' :
+                         (item.itemCategory() == 'MANAGEMENT' ? '관리자수수료' :
+                         (item.itemCategory() == 'SUPPORT' ? '지원' :
+                         (item.itemCategory() == 'COST' ? '공통비' :
+                         (item.itemCategory() == 'ADJUSTMENT' ? '조정' :
+                         (item.itemCategory() == 'CLAWBACK' ? '환수' :
+                         (item.itemCategory() == 'RECOVERY' ? '회수' : item.itemCategory()))))))))))}">모집수수료</td>
             <td class="tabular-nums" th:text="${item.effectiveFrom()}">2026-01-01</td>
             <td class="tabular-nums" th:text="${item.effectiveTo() ?: '-'}">-</td>
           </tr>

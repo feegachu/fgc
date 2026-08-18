@@ -180,6 +180,12 @@ class PublishingTemplateStructureTest {
                 .contains("data-base-tab=\"organization\"")
                 .contains("data-base-tab=\"product\"")
                 .contains("data-base-tab=\"agent\"")
+                .contains("data-base-form=\"commission-item\"")
+                .contains("data-base-body=\"commission-item\"")
+                .contains("지급/차감")
+                .contains("적용 시작일")
+                .contains("적용 종료일")
+                .contains("status-badge-success")
                 .doesNotContain("<script>")
                 .doesNotContain("style=\"")
                 .doesNotContain("onclick=\"");
@@ -188,11 +194,19 @@ class PublishingTemplateStructureTest {
                 .contains("/api/v1/base/organizations")
                 .contains("/api/v1/base/insurers")
                 .contains("/api/v1/base/products")
-                .contains("/api/v1/base/agents");
+                .contains("/api/v1/base/agents")
+                .contains("/api/v1/base/commission-items");
 
         assertThat(resource("static/js/features/base/base-list.js"))
                 .contains("window.FgcUi.baseApi")
                 .contains("new AbortController()")
+                .contains("organizationOptionsRequestId")
+                .contains("organizationOptionsInitialized")
+                .contains("getCommissionItems")
+                .contains("PAYMENT: [\"지급\", \"status-badge-success\"]")
+                .contains("DEDUCTION: [\"차감\", \"status-badge-warning\"]")
+                .contains("SETTLEMENT_SUPPORT: \"정착지원\"")
+                .contains("NEWCOMER_SUPPORT: \"신인지원\"")
                 .contains("aria-busy")
                 .doesNotContain("fetch(");
 

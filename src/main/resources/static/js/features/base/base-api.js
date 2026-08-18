@@ -36,10 +36,15 @@
     return getReferenceList("/api/v1/base/agents", params, options);
   }
 
+  function getCommissionItems(params, options) {
+    return getReferenceList("/api/v1/base/commission-items", params, options);
+  }
+
   window.FgcUi.baseApi = {
     getOrganizations: getOrganizations,
     getInsurers: getInsurers,
     getProducts: getProducts,
-    getAgents: getAgents
+    getAgents: getAgents,
+    getCommissionItems: getCommissionItems
   };
 })();

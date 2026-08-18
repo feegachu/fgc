@@ -14,11 +14,32 @@
     requests: {},
     loaded: {},
     insurerOptionsLoaded: false,
-    organizationOptionsAsOf: null
+    organizationOptionsAsOf: null,
+    organizationOptionsInitialized: false,
+    organizationOptionsRequestId: 0
   };
   var tabs = Array.from(root.querySelectorAll("[data-base-tab]"));
   var panels = Array.from(root.querySelectorAll("[data-base-panel]"));
   var initialAsOf = root.dataset.initialAsOf || "";
+  var CASHFLOW_BADGES = {
+    PAYMENT: ["지급", "status-badge-success"],
+    DEDUCTION: ["차감", "status-badge-warning"]
+  };
+  var ITEM_CATEGORY_LABELS = {
+    SALES: "모집수수료",
+    MAINTENANCE: "유지관리",
+    INCENTIVE: "판매촉진",
+    MANAGEMENT: "관리자수수료",
+    SUPPORT: "지원",
+    COST: "공통비",
+    ADJUSTMENT: "조정",
+    CLAWBACK: "환수",
+    RECOVERY: "회수"
+  };
+  var ITEM_CODE_CATEGORY_LABELS = {
+    SETTLEMENT_SUPPORT: "정착지원",
+    NEWCOMER_SUPPORT: "신인지원"
+  };
 
   function escapeHtml(value) {
     return String(value == null ? "" : value)
@@ -42,6 +63,15 @@
       escapeHtml(isActive ? activeLabel : inactiveLabel) + "</span>";
   }
 
+  function cashflowBadge(value) {
+    var badge = CASHFLOW_BADGES[value] || [value || "—", "status-badge-neutral"];
+    return '<span class="status-badge ' + badge[1] + '">' + escapeHtml(badge[0]) + "</span>";
+  }
+
+  function commissionItemCategory(item) {
+    return ITEM_CODE_CATEGORY_LABELS[item.itemCode] || ITEM_CATEGORY_LABELS[item.itemCategory] || item.itemCategory;
+  }
+
   function panelElement(key, type) {
     return root.querySelector('[data-base-' + type + '="' + key + '"]');
   }
@@ -57,9 +87,16 @@
     new FormData(form).forEach(function (value, name) {
       if (String(value).trim()) params[name] = String(value).trim();
     });
-    params.page = state.pages[key] || 1;
-    params.size = DEFAULT_PAGE_SIZE;
+    if (key !== "commission-item") {
+      params.page = state.pages[key] || 1;
+      params.size = DEFAULT_PAGE_SIZE;
+    }
     return params;
+  }
+
+  function clearPagination(key) {
+    var pagination = panelElement(key, "pagination");
+    if (pagination) pagination.replaceChildren();
   }
 
   function setMessage(key, message, isError) {
@@ -75,7 +112,7 @@
     root.querySelector('[data-base-panel="' + key + '"]').setAttribute("aria-busy", "true");
     setMessage(key, "기준정보를 불러오는 중입니다.", false);
     panelElement(key, "table").hidden = true;
-    panelElement(key, "pagination").replaceChildren();
+    clearPagination(key);
   }
 
   function setError(key, error) {
@@ -84,7 +121,7 @@
     setMessage(key, message, true);
     panelElement(key, "table").hidden = true;
     panelElement(key, "count").textContent = "0";
-    panelElement(key, "pagination").replaceChildren();
+    clearPagination(key);
     root.querySelector('[data-base-panel="' + key + '"]').setAttribute("aria-busy", "false");
   }
 
@@ -146,11 +183,22 @@
       "<td>" + newcomer + "</td></tr>";
   }
 
+  function commissionItemRow(item) {
+    return "<tr>" +
+      '<td class="tabular-nums">' + display(item.itemCode) + "</td>" +
+      "<td>" + display(item.itemName) + "</td>" +
+      "<td>" + cashflowBadge(item.cashflowType) + "</td>" +
+      "<td>" + display(commissionItemCategory(item)) + "</td>" +
+      '<td class="tabular-nums">' + display(item.effectiveFrom) + "</td>" +
+      '<td class="tabular-nums">' + display(item.effectiveTo) + "</td></tr>";
+  }
+
   var rowRenderers = {
     organization: organizationRow,
     insurer: insurerRow,
     product: productRow,
-    agent: agentRow
+    agent: agentRow,
+    "commission-item": commissionItemRow
   };
 
   function pageButton(label, targetPage, options, key) {
@@ -184,10 +232,14 @@
   }
 
   function renderPage(key, data) {
-    var content = data && Array.isArray(data.content) ? data.content : [];
+    var isCommissionItem = key === "commission-item";
+    var content = isCommissionItem
+      ? (Array.isArray(data) ? data : [])
+      : (data && Array.isArray(data.content) ? data.content : []);
     var message = panelElement(key, "message");
     var table = panelElement(key, "table");
-    panelElement(key, "count").textContent = String(data && data.totalElements || 0);
+    var totalElements = isCommissionItem ? content.length : (data && data.totalElements || 0);
+    panelElement(key, "count").textContent = String(totalElements);
     if (!content.length) {
       setMessage(key, "조건에 맞는 기준정보가 없습니다.", false);
       table.hidden = true;
@@ -196,8 +248,10 @@
       message.hidden = true;
       table.hidden = false;
     }
-    state.pages[key] = data && data.page || state.pages[key];
-    renderPagination(key, state.pages[key], data && data.totalPages || 0);
+    if (!isCommissionItem) {
+      state.pages[key] = data && data.page || state.pages[key];
+      renderPagination(key, state.pages[key], data && data.totalPages || 0);
+    }
     root.querySelector('[data-base-panel="' + key + '"]').setAttribute("aria-busy", "false");
   }
 
@@ -206,25 +260,19 @@
     var current = new URLSearchParams(window.location.search);
     if (current.get("month")) query.set("month", current.get("month"));
     query.set("tab", key);
-    if (key !== "commission-item") {
-      var params = formParams(key);
-      Object.keys(params).forEach(function (name) {
-        if (name !== "size" && params[name] !== "") query.set(name, params[name]);
-      });
-    }
+    var params = formParams(key);
+    Object.keys(params).forEach(function (name) {
+      if (name !== "size" && params[name] !== "") query.set(name, params[name]);
+    });
     window.history.replaceState(null, "", window.location.pathname + "?" + query.toString());
   }
 
   function loadPanel(key) {
-    if (key === "commission-item") {
-      writeLocation(key);
-      return;
-    }
     var params = formParams(key);
     if (key === "product" && !params.insurerId) {
       panelElement(key, "count").textContent = "0";
       panelElement(key, "table").hidden = true;
-      panelElement(key, "pagination").replaceChildren();
+      clearPagination(key);
       setMessage(key, "보험회사를 선택하면 기준일에 판매 가능한 상품을 조회합니다.", false);
       writeLocation(key);
       return;
@@ -237,7 +285,8 @@
       organization: baseApi.getOrganizations,
       insurer: baseApi.getInsurers,
       product: baseApi.getProducts,
-      agent: baseApi.getAgents
+      agent: baseApi.getAgents,
+      "commission-item": baseApi.getCommissionItems
     }[key];
     method(params, { signal: state.requests[key].signal })
       .then(function (envelope) {
@@ -259,8 +308,7 @@
     });
   }
 
-  function replaceOptions(select, placeholder, items, valueKey, label) {
-    var selectedValue = select.value || new URLSearchParams(window.location.search).get(select.name);
+  function replaceOptions(select, placeholder, items, valueKey, label, selectedValue) {
     select.replaceChildren(new Option(placeholder, ""));
     items.forEach(function (item) {
       select.appendChild(new Option(label(item), item[valueKey]));
@@ -273,12 +321,13 @@
   function ensureInsurerOptions() {
     if (state.insurerOptionsLoaded) return Promise.resolve();
     var select = formFor("product").elements.insurerId;
+    var selectedValue = select.value || new URLSearchParams(window.location.search).get(select.name) || "";
     select.disabled = true;
     return collectOptions(baseApi.getInsurers, {}, 1, [])
       .then(function (items) {
         replaceOptions(select, "보험회사를 선택하세요", items, "insurerId", function (item) {
           return item.insurerName + " (" + item.insurerCode + ")" + (item.activeYn ? "" : " · 사용중지");
-        });
+        }, selectedValue);
         state.insurerOptionsLoaded = true;
       })
       .catch(function (error) {
@@ -292,17 +341,30 @@
     var form = formFor("agent");
     var select = form.elements.organizationId;
     var asOf = form.elements.asOf.value;
-    if (!force && state.organizationOptionsAsOf === asOf) return Promise.resolve();
+    if (!force && state.organizationOptionsAsOf === asOf) return Promise.resolve(true);
+    var requestId = ++state.organizationOptionsRequestId;
+    var selectedValue = state.organizationOptionsInitialized
+      ? select.value
+      : (select.value || new URLSearchParams(window.location.search).get(select.name) || "");
     select.disabled = true;
     return collectOptions(baseApi.getOrganizations, { asOf: asOf }, 1, [])
       .then(function (items) {
+        if (requestId !== state.organizationOptionsRequestId) return false;
         replaceOptions(select, "전체 조직", items, "organizationId", function (item) {
           return item.organizationName + " (" + item.organizationCode + ")" + (item.activeYn ? "" : " · 사용중지");
-        });
+        }, selectedValue);
         state.organizationOptionsAsOf = asOf;
+        state.organizationOptionsInitialized = true;
+        return true;
       })
-      .catch(function (error) { setError("agent", error); })
-      .finally(function () { select.disabled = false; });
+      .catch(function (error) {
+        if (requestId !== state.organizationOptionsRequestId) return false;
+        setError("agent", error);
+        return false;
+      })
+      .finally(function () {
+        if (requestId === state.organizationOptionsRequestId) select.disabled = false;
+      });
   }
 
   function prepareAndLoad(key) {
@@ -311,7 +373,9 @@
         .then(function () { loadPanel(key); })
         .catch(function () { /* 옵션 조회 오류는 ensureInsurerOptions에서 표시한다. */ });
     }
-    if (key === "agent") return ensureOrganizationOptions(false).then(function () { loadPanel(key); });
+    if (key === "agent") return ensureOrganizationOptions(false).then(function (ready) {
+      if (ready) loadPanel(key);
+    });
     loadPanel(key);
     return Promise.resolve();
   }
@@ -365,7 +429,9 @@
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       state.pages[key] = 1;
-      if (key === "agent") ensureOrganizationOptions(true).then(function () { loadPanel(key); });
+      if (key === "agent") ensureOrganizationOptions(true).then(function (ready) {
+        if (ready) loadPanel(key);
+      });
       else loadPanel(key);
     });
   });
@@ -378,7 +444,9 @@
       var asOf = form.elements.asOf;
       if (asOf) asOf.value = initialAsOf;
       state.pages[key] = 1;
-      if (key === "agent") ensureOrganizationOptions(true).then(function () { loadPanel(key); });
+      if (key === "agent") ensureOrganizationOptions(true).then(function (ready) {
+        if (ready) loadPanel(key);
+      });
       else loadPanel(key);
     });
   });
