@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.validation.dto.AgentCapMonitoringRow;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow;
 import com.susukkang.fgc.validation.dto.ValidationTargetListRow;
@@ -9,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -132,10 +134,47 @@ class ValidationRunDetailMapperIntegrationTest {
     }
 
     private void insertReconciliationResult(Long reconRunId, String matchGroupKey, String resultType) {
+        insertReconciliationResult(reconRunId, matchGroupKey, resultType, BigDecimal.ZERO);
+    }
+
+    private void insertReconciliationResult(Long reconRunId, String matchGroupKey, String resultType,
+                                             BigDecimal differenceAmount) {
         jdbcTemplate.update("""
-                INSERT INTO fgc.reconciliation_result (reconciliation_run_id, match_group_key, result_type)
-                VALUES (?, ?, ?)
-                """, reconRunId, matchGroupKey, resultType);
+                INSERT INTO fgc.reconciliation_result
+                    (reconciliation_run_id, match_group_key, result_type, difference_amount)
+                VALUES (?, ?, ?, ?)
+                """, reconRunId, matchGroupKey, resultType, differenceAmount);
+    }
+
+    private Long anyPolicyVersionId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT MIN(policy_version_id) FROM fgc.policy_version WHERE policy_type = 'CURRENT_COMMISSION'",
+                Long.class);
+    }
+
+    // uq_schedule_header_version이 (contract_id, payment_stage, schedule_purpose,
+    // scenario_code, schedule_version_no)로 유일하고 데모 시드가 이미 version_no=1을
+    // 쓰고 있을 수 있어, 매번 그 계약·지급단계의 다음 버전 번호를 조회해서 쓴다.
+    // uq_schedule_header_active_operational은 (contract_id, payment_stage)당 active_yn=true
+    // OPERATIONAL 헤더가 하나만 있어야 해서, 이 테스트는 건수만 필요하니 active_yn=false로
+    // 넣어 시드의 활성 헤더와 충돌하지 않게 한다.
+    private void insertScheduleHeader(Long runId, Long contractId, String paymentStage) {
+        Integer nextVersion = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(MAX(schedule_version_no), 0) + 1
+                  FROM fgc.schedule_header
+                 WHERE contract_id = ? AND payment_stage = ? AND schedule_purpose = 'OPERATIONAL'
+                """, Integer.class, contractId, paymentStage);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.schedule_header
+                    (contract_id, payment_stage, policy_version_id, schedule_version_no,
+                     schedule_regime, active_yn, validation_run_id)
+                VALUES (?, ?, ?, ?, 'CURRENT', false, ?)
+                """, contractId, paymentStage, anyPolicyVersionId(), nextVersion, runId);
+    }
+
+    private Long agentId(Long contractId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", Long.class, contractId);
     }
 
     @Test
@@ -233,5 +272,124 @@ class ValidationRunDetailMapperIntegrationTest {
         assertThat(summary.getArbitrageCheckedCount()).isZero();
         assertThat(summary.getJournalCount()).isZero();
         assertThat(summary.getReconciliationResultCount()).isZero();
+        assertThat(summary.getScheduleGeneratedCount()).isZero();
+    }
+
+    // ── FGC-FUN-043 확대: 스케줄 생성상태 집계 ──────────────────────────
+
+    @Test
+    void summarizeCountsScheduleHeadersLinkedToThisRunOnly() {
+        Long runId = insertValidationRun(LocalDate.of(2031, 6, 1), 1, "RUNNING");
+        Long otherRunId = insertValidationRun(LocalDate.of(2031, 7, 1), 1, "RUNNING");
+        Long c1 = contractId("FGC-FGL01-202607-0001");
+
+        insertScheduleHeader(runId, c1, "INSURER_TO_GA");
+        insertScheduleHeader(runId, c1, "GA_TO_FC");
+        // 검증 실행과 무관하게 만들어진 헤더(validation_run_id=NULL)와 다른 실행 헤더는
+        // 이 실행의 집계에 섞이면 안 된다.
+        insertScheduleHeader(null, c1, "INSURER_TO_GA");
+        insertScheduleHeader(otherRunId, c1, "INSURER_TO_GA");
+
+        ValidationRunResultSummaryRow summary = mapper.summarize(runId);
+
+        assertThat(summary.getScheduleGeneratedCount()).isEqualTo(2);
+    }
+
+    // ── FGC-FUN-043 확대: 대사 결과 3분류(MATCHED/MISMATCHED/UNMATCHED) + 금액 ──────
+
+    @Test
+    void summarizeClassifiesReconciliationResultsIntoThreeBucketsWithDifferenceAmount() {
+        Long runId = insertValidationRun(LocalDate.of(2031, 8, 1), 1, "RUNNING");
+        Long reconRunId = insertReconciliationRun(runId);
+
+        insertReconciliationResult(reconRunId, "FUN043-REC-1", "MATCHED");
+        insertReconciliationResult(reconRunId, "FUN043-REC-2", "AMOUNT_DIFFERENCE", new BigDecimal("15000"));
+        insertReconciliationResult(reconRunId, "FUN043-REC-3", "AGENT_MISMATCH", new BigDecimal("5000"));
+        insertReconciliationResult(reconRunId, "FUN043-REC-4", "EXPECTED_MISSING", new BigDecimal("30000"));
+        insertReconciliationResult(reconRunId, "FUN043-REC-5", "ACTUAL_MISSING", new BigDecimal("7000"));
+
+        ValidationRunResultSummaryRow summary = mapper.summarize(runId);
+
+        assertThat(summary.getReconciliationResultCount()).isEqualTo(5);
+        assertThat(summary.getReconciliationMatchedCount()).isEqualTo(1);
+        // AMOUNT_DIFFERENCE·AGENT_MISMATCH — 양쪽 다 있지만 값/상대방이 안 맞는 경우
+        assertThat(summary.getReconciliationMismatchedCount()).isEqualTo(2);
+        // EXPECTED_MISSING·ACTUAL_MISSING — 상대편 자체가 없는 경우
+        assertThat(summary.getReconciliationUnmatchedCount()).isEqualTo(2);
+        // 차액 합계는 MATCHED를 뺀 나머지(15000+5000+30000+7000)
+        assertThat(summary.getReconciliationDifferenceAmountTotal()).isEqualByComparingTo("57000");
+    }
+
+    @Test
+    void summarizeRoundsEachDifferenceAmountBeforeSummingNotAfter() {
+        // 운영정책서 제17조의2 — 상세행 단위로 먼저 원 단위 HALF_UP 반올림한 뒤 합산한다.
+        // 0.50원짜리 두 건을 합계부터 내면 1.00 → 반올림 1이지만, 행마다 먼저 반올림하면
+        // 0.50→1, 0.50→1이라 합계는 2가 나와야 한다(코드리뷰 반영).
+        Long runId = insertValidationRun(LocalDate.of(2031, 9, 1), 1, "RUNNING");
+        Long reconRunId = insertReconciliationRun(runId);
+
+        insertReconciliationResult(reconRunId, "FUN043-ROUND-1", "AMOUNT_DIFFERENCE", new BigDecimal("0.50"));
+        insertReconciliationResult(reconRunId, "FUN043-ROUND-2", "AMOUNT_DIFFERENCE", new BigDecimal("0.50"));
+
+        ValidationRunResultSummaryRow summary = mapper.summarize(runId);
+
+        assertThat(summary.getReconciliationDifferenceAmountTotal()).isEqualByComparingTo("2");
+    }
+
+    // ── FGC-FUN-043 확대: 설계사 모니터링 지표가 계약별 판정을 바꾸지 않음 ──────────
+
+    @Test
+    void summarizeCapByAgentAggregatesWithoutChangingContractLevelResultStatus() {
+        Long runId = insertValidationRun(LocalDate.of(2031, 9, 1), 1, "RUNNING");
+        Long c1 = contractId("FGC-FGL01-202607-0001");
+        Long c2 = contractId("FGC-FGL01-202607-0002");
+        Long sameAgentId = agentId(c1);
+
+        insertCapCheck(runId, c1, "INSURER_TO_GA", "VIOLATION");
+        insertCapCheck(runId, c2, "INSURER_TO_GA", "WARNING");
+
+        List<AgentCapMonitoringRow> byAgent = mapper.summarizeCapByAgent(runId);
+
+        // 두 계약이 같은 설계사 소속이면 모니터링 집계는 하나로 묶인다(참고용 합계일 뿐).
+        if (sameAgentId.equals(agentId(c2))) {
+            assertThat(byAgent).singleElement().satisfies(row -> {
+                assertThat(row.getAgentId()).isEqualTo(sameAgentId);
+                assertThat(row.getCheckedCount()).isEqualTo(2);
+                assertThat(row.getViolationCount()).isEqualTo(1);
+                assertThat(row.getWarningCount()).isEqualTo(1);
+            });
+        } else {
+            assertThat(byAgent).hasSize(2);
+        }
+        assertThat(byAgent.stream().mapToLong(AgentCapMonitoringRow::getCheckedCount).sum()).isEqualTo(2);
+
+        // 핵심 불변조건 — 모니터링 집계를 계산·조회했다고 해서 계약별 원본 판정이
+        // 바뀌지 않는다. 집계는 참고용 SELECT일 뿐 UPDATE를 하지 않기 때문이다.
+        String c1Status = jdbcTemplate.queryForObject(
+                "SELECT result_status FROM fgc.cap_check WHERE validation_run_id = ? AND contract_id = ?",
+                String.class, runId, c1);
+        String c2Status = jdbcTemplate.queryForObject(
+                "SELECT result_status FROM fgc.cap_check WHERE validation_run_id = ? AND contract_id = ?",
+                String.class, runId, c2);
+        assertThat(c1Status).isEqualTo("VIOLATION");
+        assertThat(c2Status).isEqualTo("WARNING");
+    }
+
+    @Test
+    void summarizeCapByAgentScopesToTheGivenRunOnly() {
+        Long runId = insertValidationRun(LocalDate.of(2031, 10, 1), 1, "RUNNING");
+        Long otherRunId = insertValidationRun(LocalDate.of(2031, 11, 1), 1, "RUNNING");
+        Long c1 = contractId("FGC-FGL01-202607-0001");
+
+        insertCapCheck(runId, c1, "INSURER_TO_GA", "VIOLATION");
+        insertCapCheck(otherRunId, c1, "INSURER_TO_GA", "WARNING");
+
+        List<AgentCapMonitoringRow> byAgent = mapper.summarizeCapByAgent(runId);
+
+        assertThat(byAgent).singleElement().satisfies(row -> {
+            assertThat(row.getCheckedCount()).isEqualTo(1);
+            assertThat(row.getViolationCount()).isEqualTo(1);
+            assertThat(row.getWarningCount()).isZero();
+        });
     }
 }

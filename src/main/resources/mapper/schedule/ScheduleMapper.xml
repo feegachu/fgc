@@ -281,6 +281,16 @@
         </foreach>
     </insert>
 
+    <!-- FGC-FUN-043 결과 집계 — 이번 실행이 만든 헤더만 validation_run_id로 표시한다. -->
+    <update id="linkHeadersToValidationRun">
+        UPDATE fgc.schedule_header
+        SET validation_run_id = #{validationRunId}
+        WHERE schedule_header_id IN
+        <foreach collection="scheduleHeaderIds" item="headerId" open="(" separator="," close=")">
+            #{headerId}
+        </foreach>
+    </update>
+
     <!-- 정책 없음·중복으로 생성하지 못한 지급단계를 공통 예외 큐에 검토 대상으로 등록한다. -->
     <insert id="upsertPolicyReviewCase">
         INSERT INTO fgc.exception_case
