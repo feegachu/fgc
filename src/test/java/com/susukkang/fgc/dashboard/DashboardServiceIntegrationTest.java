@@ -249,17 +249,24 @@ class DashboardServiceIntegrationTest {
         assertThat(result.kpis().openException()).isEqualTo(2);
     }
 
-    // 6. 빈 데이터는 0
+    // 6. 월 필터가 있는 KPI(1,200%·대사불일치·원장불균형)는 미래월(2099-01)에 0이어야
+    // 한다. arbitrageCandidate/openException/recentExceptions/recentValidationRuns는
+    // 설계상 월 필터가 없어(각 Mapper 주석 참고 — "월 필터: 없음") 로컬 dev DB에 이미
+    // 존재하는 시드 데이터(예: arbitrage_check의 CANDIDATE 5건)를 그대로 반영한다. 그래서
+    // 리스트가 "비어 있다"를 단언하는 대신 "널이 아닌 리스트를 돌려준다"(예외 없이 항상
+    // 채워진 배열 필드다)는 계약만 확인한다 — findRecentExceptions/findRecentValidationRuns가
+    // 실제로 빈 리스트를 돌려주는지는 DashboardServiceImplTest에서 Mapper를 빈 리스트로
+    // 스텁해 별도로 검증한다.
     @Test
-    void summarizeReturnsZeroCountsAndEmptyListsWhenNoDataExists() {
+    void summarizeReturnsZeroCountsForMonthFilteredKpisAndNeverReturnsNullLists() {
         DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2099, 1, 1));
 
         assertThat(result.kpis().capViolation()).isEqualTo(0);
         assertThat(result.kpis().capWarning()).isEqualTo(0);
-        assertThat(result.kpis().arbitrageCandidate()).isEqualTo(0);
         assertThat(result.kpis().reconciliationMismatch()).isEqualTo(0);
         assertThat(result.kpis().journalImbalance()).isEqualTo(0);
-        assertThat(result.kpis().openException()).isEqualTo(0);
+        assertThat(result.recentExceptions()).isNotNull();
+        assertThat(result.recentValidationRuns()).isNotNull();
     }
 
     // 7. 최근 예외 5건: 최신순, 5건 제한
