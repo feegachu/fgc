@@ -242,6 +242,19 @@ class ReconciliationRunControllerTest {
     }
 
     @Test
+    void 존재하지_않는_실행의_예외_일괄_생성은_404로_거절한다() throws Exception {
+        given(reconciliationExceptionService.bulkCreate(99L))
+                .willThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(
+                        com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_004,
+                        java.util.Map.of("id", 99L)));
+
+        mockMvc.perform(post("/api/v1/reconciliations/99/exceptions")
+                        .with(user(principal("SETTLEMENT")))
+                        .with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void 정산담당자가_아니면_예외_일괄_생성을_403으로_차단한다() throws Exception {
         mockMvc.perform(post("/api/v1/reconciliations/41/exceptions")
                         .with(user(principal("GA_ADMIN")))

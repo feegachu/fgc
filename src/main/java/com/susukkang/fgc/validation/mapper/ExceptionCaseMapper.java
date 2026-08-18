@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -68,12 +69,12 @@ public interface ExceptionCaseMapper {
      * 중복되지 않게 한다) — 다만 필터를 validation_run_id가 아니라 reconciliation_run_id로
      * 건다.
      *
-     * @return 실제로 새로 INSERT된 건수(이미 있던 건은 ON CONFLICT로 세지 않는다)
+     * 후보 건수 조회와 INSERT를 별도 왕복 두 번으로 나누면 그 사이에 결과가 더 들어올
+     * 때 skippedDuplicate가 음수가 될 수 있어(코드리뷰 지적), CTE로 한 SQL 스냅샷 안에서
+     * 후보 집합을 한 번만 읽어 candidateCount·createdCount를 함께 계산한다.
      */
-    long insertFromReconciliationResultsByRun(@Param("reconciliationRunId") Long reconciliationRunId);
-
-    /** insertFromReconciliationResultsByRun과 같은 조건(WHERE)의 대상 후보 전체 건수. */
-    long countReconciliationMismatchCandidates(@Param("reconciliationRunId") Long reconciliationRunId);
+    ReconciliationExceptionBulkCreateRow bulkCreateFromReconciliationResultsByRun(
+            @Param("reconciliationRunId") Long reconciliationRunId);
     // 검증원장 차변·대변 불균형 관련
     long insertFromJournalImbalances(@Param("validationRunId") Long validationRunId);
 }

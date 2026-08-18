@@ -3,6 +3,7 @@ package com.susukkang.fgc.reconciliation.service;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateResponse;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
 import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
@@ -37,8 +38,10 @@ class ReconciliationExceptionServiceTest {
     @Test
     void createdAndSkippedDuplicateAddUpToCandidateCount() {
         given(reconciliationRunMapper.findById(41L)).willReturn(new ReconciliationRunRow());
-        given(exceptionCaseMapper.countReconciliationMismatchCandidates(41L)).willReturn(5L);
-        given(exceptionCaseMapper.insertFromReconciliationResultsByRun(41L)).willReturn(2L);
+        ReconciliationExceptionBulkCreateRow row = new ReconciliationExceptionBulkCreateRow();
+        row.setCandidateCount(5L);
+        row.setCreatedCount(2L);
+        given(exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(41L)).willReturn(row);
 
         ReconciliationExceptionBulkCreateResponse response = service.bulkCreate(41L);
 
@@ -55,6 +58,6 @@ class ReconciliationExceptionServiceTest {
                 .satisfies(exception ->
                         assertThat(((FgcBusinessException) exception).getErrorCode())
                                 .isEqualTo(FgcErrorCode.COMMON_004));
-        verify(exceptionCaseMapper, never()).insertFromReconciliationResultsByRun(99L);
+        verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(99L);
     }
 }

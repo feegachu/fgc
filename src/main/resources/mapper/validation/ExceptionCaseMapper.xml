@@ -227,52 +227,65 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
-    <!-- IF-API-42 — insertFromReconciliationResults와 SELECT 목록·exception_key 형식이
-         완전히 같다(교차 중복 방지가 핵심이라 문자 그대로 맞춰야 한다). WHERE만
-         reconciliation_run_id 기준으로 바꿨다. -->
-    <insert id="insertFromReconciliationResultsByRun">
-        INSERT INTO fgc.exception_case (
-            exception_key, exception_type, severity, status,
-            validation_run_id, contract_id, source_entity_type, source_entity_id,
-            title, description
-        )
-        SELECT
-            CONCAT(
-                'RECONCILIATION_MISMATCH:', rrn.validation_run_id,
-                ':RECONCILIATION_RESULT:', rr.reconciliation_result_id
-            ),
-            'RECONCILIATION_MISMATCH',
-            CASE rr.result_type
-                WHEN 'REVIEW_REQUIRED' THEN 'WARNING'
-                ELSE 'HIGH'
-            END,
-            'NEW',
-            rrn.validation_run_id,
-            rr.contract_id,
-            'RECONCILIATION_RESULT',
-            CAST(rr.reconciliation_result_id AS varchar),
-            '대사 불일치',
-            CONCAT(
-                '지급단계=', rrn.payment_stage,
-                ', 결과유형=', rr.result_type,
-                ', 예상금액=', rr.expected_total_amount,
-                ', 실제금액=', rr.actual_total_amount,
-                ', 차액=', rr.difference_amount,
-                ', 주원인=', COALESCE(rr.primary_reason_code, '-')
-            )
-        FROM fgc.reconciliation_result rr
-        INNER JOIN fgc.reconciliation_run rrn
-            ON rrn.reconciliation_run_id = rr.reconciliation_run_id
-        WHERE rr.reconciliation_run_id = #{reconciliationRunId}
-          AND rr.result_type &lt;&gt; 'MATCHED'
-        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
-    </insert>
+    <!--
+      IF-API-42 — insertFromReconciliationResults와 exception_key 형식이 완전히 같다
+      (교차 중복 방지가 핵심이라 문자 그대로 맞춰야 한다). WHERE만 reconciliation_run_id
+      기준으로 바꿨다.
 
-    <select id="countReconciliationMismatchCandidates" resultType="long">
-        SELECT COUNT(*)
-          FROM fgc.reconciliation_result rr
-         WHERE rr.reconciliation_run_id = #{reconciliationRunId}
-           AND rr.result_type &lt;&gt; 'MATCHED'
+      후보 집합(candidates)을 한 번만 읽어서 그 스냅샷 그대로 INSERT하고, 후보 건수와
+      실제 INSERT된 건수(inserted)를 같은 문장에서 함께 센다 — countReconciliationMismatchCandidates
+      쿼리와 INSERT를 별도 왕복 두 번으로 나누면 그 사이에 결과가 더 들어올 때
+      createdCount > candidateCount가 될 수 있어(코드리뷰 지적) skippedDuplicate가
+      음수가 되는 문제가 있었다.
+    -->
+    <select id="bulkCreateFromReconciliationResultsByRun"
+            resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow">
+        WITH candidates AS (
+            SELECT rr.reconciliation_result_id, rr.contract_id, rr.result_type,
+                   rr.expected_total_amount, rr.actual_total_amount, rr.difference_amount,
+                   rr.primary_reason_code, rrn.validation_run_id, rrn.payment_stage
+              FROM fgc.reconciliation_result rr
+              INNER JOIN fgc.reconciliation_run rrn
+                  ON rrn.reconciliation_run_id = rr.reconciliation_run_id
+             WHERE rr.reconciliation_run_id = #{reconciliationRunId}
+               AND rr.result_type &lt;&gt; 'MATCHED'
+        ),
+        inserted AS (
+            INSERT INTO fgc.exception_case (
+                exception_key, exception_type, severity, status,
+                validation_run_id, contract_id, source_entity_type, source_entity_id,
+                title, description
+            )
+            SELECT
+                CONCAT(
+                    'RECONCILIATION_MISMATCH:', validation_run_id,
+                    ':RECONCILIATION_RESULT:', reconciliation_result_id
+                ),
+                'RECONCILIATION_MISMATCH',
+                CASE result_type
+                    WHEN 'REVIEW_REQUIRED' THEN 'WARNING'
+                    ELSE 'HIGH'
+                END,
+                'NEW',
+                validation_run_id,
+                contract_id,
+                'RECONCILIATION_RESULT',
+                CAST(reconciliation_result_id AS varchar),
+                '대사 불일치',
+                CONCAT(
+                    '지급단계=', payment_stage,
+                    ', 결과유형=', result_type,
+                    ', 예상금액=', expected_total_amount,
+                    ', 실제금액=', actual_total_amount,
+                    ', 차액=', difference_amount,
+                    ', 주원인=', COALESCE(primary_reason_code, '-')
+                )
+            FROM candidates
+            ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+            RETURNING exception_case_id
+        )
+        SELECT (SELECT COUNT(*) FROM candidates) AS candidateCount,
+               (SELECT COUNT(*) FROM inserted) AS createdCount
     </select>
 
     <insert id="insertFromJournalImbalances">
