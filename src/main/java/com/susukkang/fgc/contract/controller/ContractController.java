@@ -134,8 +134,11 @@ public class ContractController {
     /** 계약 상세에서 운영 중인 예상 스케줄을 지급단계별 새 버전으로 재생성한다. */
     @PostMapping("/{id}/schedules/regenerate")
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<List<Long>> regenerateSchedules(@PathVariable Long id) {
-        return ApiResponse.success(contractService.regenerateSchedules(id));
+    public ApiResponse<List<Long>> regenerateSchedules(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "CONTRACT_DETAIL_MANUAL") String reason
+    ) {
+        return ApiResponse.success(contractService.regenerateSchedules(id, reason));
     }
     /**
      * 설명 : 계약 ID를 기준으로 차익거래 수동 검증을 실행한다.

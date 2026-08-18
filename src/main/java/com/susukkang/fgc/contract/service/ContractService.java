@@ -406,7 +406,7 @@ public class ContractService {
                     ? capCheckMapper.selectComplianceEvidenceAmount(contractId, paymentStage)
                     : null;
             calculateCapCheckOrRegisterReview(contractId, paymentStage,
-                    CapCalculationCommand.realtime(contractId, paymentStage,
+                    CapCalculationCommand.manual(contractId, paymentStage,
                             LocalDate.now(DateUtil.SEOUL_ZONE), complianceEvidenceAmount));
         }
 
@@ -425,11 +425,11 @@ public class ContractService {
 
     /** 계약 상세에서 양 지급단계의 운영 스케줄을 새 버전으로 재생성한다. */
     @Transactional
-    public List<Long> regenerateSchedules(Long contractId) {
+    public List<Long> regenerateSchedules(Long contractId, String reason) {
         if (contractMapper.selectContractById(contractId) == null) {
             throw validationException("contractId", "존재하지 않는 보험계약입니다.");
         }
-        return scheduleService.regenerateContractSchedules(contractId, "CONTRACT_DETAIL_MANUAL");
+        return scheduleService.regenerateContractSchedules(contractId, reason);
     }
 
     /**

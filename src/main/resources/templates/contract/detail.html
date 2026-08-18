@@ -6,7 +6,7 @@
   - 상태이력은 GET /api/v1/contracts/{id}/status-events 응답을 수용한다.
     effectiveAt, receivedAt, processings[]를 사용하며 이벤트와 처리 작업을 분리해 표시한다.
   - 상태이력 기본 정렬은 효력일시 오름차순이며 도착일시 오름차순으로 전환할 수 있다.
-  - 나머지 탭은 해당 API 연동 시 lazy load한다.
+  - 예상 스케줄·1,200% 탭은 선택 시 각각 IF-API-13·14로 lazy load한다.
 -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W02', '보험계약 상세', '보험계약', '/contracts')}">
@@ -130,9 +130,17 @@
   </section>
 
   <section id="contract-panel-schedules" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-schedules" hidden><div class="empty-state">예상 스케줄 탭은 선택 시 조회하도록 연동합니다.</div></section>
+           aria-labelledby="contract-tab-schedules" hidden>
+    <header class="contract-lazy-panel-header"><div><h2 class="surface-title">예상 스케줄</h2><p>지급단계별 현재 운영 스케줄과 회차를 조회합니다.</p></div></header>
+    <p class="contract-lazy-note" data-schedule-load-state aria-live="polite">탭을 선택하면 스케줄을 불러옵니다.</p>
+    <div data-contract-schedules></div>
+  </section>
   <section id="contract-panel-cap" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-cap" hidden><div class="empty-state">1,200% 결과는 지급단계별 판정을 분리해 표시합니다.</div></section>
+           aria-labelledby="contract-tab-cap" hidden>
+    <header class="contract-lazy-panel-header"><div><h2 class="surface-title">1,200% 한도 검증</h2><p>지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.</p></div></header>
+    <p class="contract-lazy-note" data-cap-load-state aria-live="polite">탭을 선택하면 한도 판정을 불러옵니다.</p>
+    <div class="contract-cap-result-grid" data-contract-cap-results></div>
+  </section>
   <section id="contract-panel-arbitrage" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
            aria-labelledby="contract-tab-arbitrage" hidden><div class="empty-state">차익거래 검증 탭 API 연동 대기 중입니다.</div></section>
   <section id="contract-panel-ledger" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
@@ -157,6 +165,7 @@
     "use strict";
 
     var contractId = null;
+    var apiClient = null;
     var statusEvents = [];
     var currentStatusSort = "effectiveAt";
 
@@ -202,9 +211,9 @@
     }
 
     function statusBadgeClass(status) {
-      if (["ACTIVE", "COMPLETED", "SUCCESS", "SUCCEEDED"].indexOf(status) >= 0) return "status-badge-success";
-      if (["UNPAID", "LAPSED", "FAILED"].indexOf(status) >= 0) return "status-badge-error";
-      if (["APPLIED", "RUNNING", "PENDING"].indexOf(status) >= 0) return "status-badge-review";
+      if (["ACTIVE", "COMPLETED", "SUCCESS", "SUCCEEDED", "NORMAL"].indexOf(status) >= 0) return "status-badge-success";
+      if (["UNPAID", "LAPSED", "FAILED", "VIOLATION"].indexOf(status) >= 0) return "status-badge-error";
+      if (["APPLIED", "RUNNING", "PENDING", "WARNING", "REVIEW_REQUIRED"].indexOf(status) >= 0) return "status-badge-review";
       return "status-badge-neutral";
     }
 
@@ -355,6 +364,123 @@
         });
     }
 
+    function paymentStageLabel(stage) {
+      return stage === "INSURER_TO_GA" ? "원수사 → GA" : stage === "GA_TO_AGENT" ? "GA → 설계사" : (stage || "지급단계");
+    }
+
+    function clearElement(selector) {
+      var element = document.querySelector(selector);
+      if (element) element.replaceChildren();
+      return element;
+    }
+
+    function renderSchedulesByStage(stage, data, container) {
+      var section = document.createElement("section");
+      section.className = "contract-tab-result-section";
+      var header = document.createElement("header");
+      var title = document.createElement("h3");
+      title.textContent = paymentStageLabel(stage);
+      header.append(title);
+      var headers = Array.isArray(data.headers) ? data.headers : [];
+      var lines = Array.isArray(data.lines) ? data.lines : [];
+      if (!headers.length) {
+        var empty = document.createElement("p");
+        empty.className = "contract-tab-empty";
+        empty.textContent = "현재 운영 중인 예상 스케줄이 없습니다.";
+        section.append(header, empty);
+        container.append(section);
+        return;
+      }
+      var meta = document.createElement("p");
+      var activeHeader = headers[0];
+      meta.className = "contract-tab-meta";
+      meta.textContent = "버전 " + (activeHeader.scheduleVersionNo || "—") + " · " + money(activeHeader.expectedTotal) + " · " + (activeHeader.lineCount || lines.length) + "회차";
+      var table = document.createElement("table");
+      table.className = "data-table contract-tab-table";
+      var thead = document.createElement("thead");
+      thead.innerHTML = "<tr><th>회차</th><th>예정일</th><th>예정 지급액</th><th>상태</th></tr>";
+      var tbody = document.createElement("tbody");
+      lines.forEach(function (line) {
+        var row = document.createElement("tr");
+        [line.installmentNo, line.expectedPaymentDate || line.paymentDate, money(line.expectedAmount || line.amount), line.lineStatus || line.status || "—"]
+          .forEach(function (value) { var cell = document.createElement("td"); cell.textContent = value === undefined || value === null ? "—" : value; row.append(cell); });
+        tbody.append(row);
+      });
+      table.append(thead, tbody);
+      section.append(header, meta, table);
+      container.append(section);
+    }
+
+    function loadSchedules(force) {
+      var panel = document.getElementById("contract-panel-schedules");
+      if (!apiClient || !panel || (!force && panel.dataset.loaded === "true")) return Promise.resolve();
+      panel.dataset.loaded = "loading";
+      document.querySelector("[data-schedule-load-state]").textContent = "예상 스케줄을 불러오는 중입니다.";
+      var stages = ["INSURER_TO_GA", "GA_TO_AGENT"];
+      return Promise.all(stages.map(function (stage) {
+        return apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/schedules?paymentStage=" + stage)
+          .then(function (response) { return { stage: stage, data: response.data || {} }; });
+      })).then(function (results) {
+        var container = clearElement("[data-contract-schedules]");
+        results.forEach(function (result) { renderSchedulesByStage(result.stage, result.data, container); });
+        panel.dataset.loaded = "true";
+        document.querySelector("[data-schedule-load-state]").textContent = "현재 운영 스케줄을 불러왔습니다.";
+      }).catch(function (error) {
+        panel.dataset.loaded = "false";
+        document.querySelector("[data-schedule-load-state]").textContent = error && error.message ? error.message : "예상 스케줄을 불러오지 못했습니다.";
+      });
+    }
+
+    function renderCapChecks(items) {
+      var container = clearElement("[data-contract-cap-results]");
+      if (!items.length) {
+        var empty = document.createElement("p");
+        empty.className = "contract-tab-empty";
+        empty.textContent = "저장된 한도 검증 결과가 없습니다.";
+        container.append(empty);
+        return;
+      }
+      items.forEach(function (item) {
+        var result = item.result || item;
+        var card = document.createElement("article");
+        card.className = "contract-cap-result-card";
+        var title = document.createElement("h3");
+        title.textContent = paymentStageLabel(result.paymentStage);
+        var status = document.createElement("span");
+        status.className = "status-badge " + statusBadgeClass(result.resultStatus);
+        status.textContent = result.resultStatus || "—";
+        var header = document.createElement("header");
+        header.append(title, status);
+        var details = document.createElement("dl");
+        var capFields = [
+          { label: "검증유형", value: result.checkKind },
+          { label: "기준일", value: result.asOfDate },
+          { label: "한도금액", value: money(result.limitAmount) },
+          { label: "산입금액", value: money(result.includedAmount) },
+          { label: "사용률", value: result.usagePct === null || result.usagePct === undefined ? "—" : Number(result.usagePct).toLocaleString("ko-KR") + "%" }
+        ];
+        capFields.forEach(function (field) { var group = document.createElement("div"); var term = document.createElement("dt"); var description = document.createElement("dd"); term.textContent = field.label; description.textContent = field.value || "—"; group.append(term, description); details.append(group); });
+        card.append(header, details);
+        container.append(card);
+      });
+    }
+
+    function loadCapChecks(force) {
+      var panel = document.getElementById("contract-panel-cap");
+      if (!apiClient || !panel || (!force && panel.dataset.loaded === "true")) return Promise.resolve();
+      panel.dataset.loaded = "loading";
+      document.querySelector("[data-cap-load-state]").textContent = "한도 검증 결과를 불러오는 중입니다.";
+      return apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/cap-checks")
+        .then(function (response) {
+          renderCapChecks(Array.isArray(response.data) ? response.data : []);
+          panel.dataset.loaded = "true";
+          document.querySelector("[data-cap-load-state]").textContent = "지급단계별 최신 한도 판정을 불러왔습니다.";
+        }).catch(function (error) {
+          panel.dataset.loaded = "false";
+          document.querySelector("[data-cap-load-state]").textContent = error && error.message ? error.message : "한도 검증 결과를 불러오지 못했습니다.";
+        });
+    }
+
     function activateTab(tab) {
       document.querySelectorAll(".contract-detail-tab").forEach(function (candidate) {
         var active = candidate === tab;
@@ -363,6 +489,8 @@
         candidate.tabIndex = active ? 0 : -1;
         document.getElementById(candidate.getAttribute("aria-controls")).hidden = !active;
       });
+      if (tab.id === "contract-tab-schedules") loadSchedules(false);
+      if (tab.id === "contract-tab-cap") loadCapChecks(false);
     }
 
     function initializeTabs() {
@@ -418,7 +546,7 @@
         window.location.assign("/contracts/" + encodeURIComponent(contractId) + "/edit");
       });
 
-      var apiClient = window.FgcUi && window.FgcUi.apiClient;
+      apiClient = window.FgcUi && window.FgcUi.apiClient;
       if (!apiClient) {
         text("contract-detail-load-state", "공통 API 클라이언트를 불러오지 못했습니다.");
         historyEmpty("상태이력 연동 대기", "공통 API 클라이언트 로드를 확인해 주세요.");
@@ -448,7 +576,8 @@
       if (scheduleRegenerateButton && !scheduleRegenerateButton.disabled) {
         scheduleRegenerateButton.addEventListener("click", function () {
           scheduleRegenerateButton.disabled = true;
-          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/schedules/regenerate", { method: "POST" })
+          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId)
+            + "/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL", { method: "POST" })
             .then(function () {
               if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast("예상 스케줄을 새 버전으로 재생성했습니다.", "success");
               var schedulesPanel = document.getElementById("contract-panel-schedules");
