@@ -33,7 +33,10 @@ class ValidationRunItemResponseTest {
 
     @Test
     void fromMapsCodeAndLabelTogether() {
-        ValidationRunItemResponse response = ValidationRunItemResponse.from(sampleRow());
+        ValidationRunListRow row = sampleRow();
+        row.setStartedAt(OffsetDateTime.parse("2026-08-17T06:23:00Z"));
+
+        ValidationRunItemResponse response = ValidationRunItemResponse.from(row);
 
         assertThat(response.validationRunId()).isEqualTo(100L);
         assertThat(response.runType()).isEqualTo(ValidationRunType.MONTHLY);
@@ -42,6 +45,8 @@ class ValidationRunItemResponseTest {
         assertThat(response.statusLabel()).isEqualTo("실패");
         assertThat(response.currentStep()).isEqualTo(3);
         assertThat(response.triggeredBy()).isEqualTo("settle01");
+        assertThat(response.startedAt())
+                .isEqualTo(OffsetDateTime.parse("2026-08-17T15:23:00+09:00"));
         assertThat(response.finalizedBy()).isNull();
         assertThat(response.failureMessage()).isEqualTo("배치 3단계에서 예외 발생");
     }

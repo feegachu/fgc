@@ -107,7 +107,8 @@ class ValidationRunViewControllerTest {
                 new ValidationRunDetailResponse.CapSummary(0, 0, 0, 0),
                 new ValidationRunDetailResponse.ArbitrageSummary(0, 0, 0),
                 new ValidationRunDetailResponse.LedgerSummary(0, 0),
-                new ValidationRunDetailResponse.ReconciliationSummary(0, 0, 0, 0, 0, java.math.BigDecimal.ZERO));
+                new ValidationRunDetailResponse.ReconciliationSummary(0, 0, 0, 0, 0, java.math.BigDecimal.ZERO),
+                new ValidationRunDetailResponse.ExceptionSummary(49, 0, 49, 0, 0, 49));
     }
 
     // ── W01 목록 ────────────────────────────────────────────────────
@@ -221,7 +222,9 @@ class ValidationRunViewControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.matchesPattern(
                         "(?s).*<button[^>]*id=\"btn-execute\"[^>]*\\bdisabled\\b[^>]*>.*"))))
                 // 스텝 이름은 화면 상수 10개
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("담당자 검토")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("담당자 검토")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("기존 업무건 재검출")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("미처리 업무건")));
     }
 
     /** COMPLIANCE 는 조회만 — 실행 버튼은 비활성으로 렌더링된다(화면정의서 :229). */

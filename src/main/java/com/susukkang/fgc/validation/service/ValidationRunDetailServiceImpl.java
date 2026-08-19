@@ -66,7 +66,14 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
                         summary.getReconciliationMatchedCount(),
                         summary.getReconciliationMismatchedCount(),
                         summary.getReconciliationUnmatchedCount(),
-                        summary.getReconciliationDifferenceAmountTotal()));
+                        summary.getReconciliationDifferenceAmountTotal()),
+                new ValidationRunDetailResponse.ExceptionSummary(
+                        summary.getExceptionDetectedCount(),
+                        summary.getExceptionNewCount(),
+                        summary.getExceptionRecurringCount(),
+                        summary.getExceptionReopenedCount(),
+                        summary.getExceptionNotDetectedCount(),
+                        summary.getExceptionOpenWorkItemCount()));
     }
 
     @Override
