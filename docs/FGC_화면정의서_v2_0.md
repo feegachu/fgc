@@ -1064,7 +1064,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 지급예정액 | `planned_commission_amount` |
 | 합산 해약환급금 | `included_surrender_value_amount` |
 | 환급금 가산 여부 | `refund_addition_applied_yn` |
-| 환급금 출처 | 실제값 / 예상표 / 해당없음 |
+| 환급금 출처 | 실제 해약환급금 / 예상 환급률표 / 적용 대상 아님 |
 | 초과액 | `net_difference_amount` — 양수면 빨강 |
 | 판정 | 이상없음 / 검토대상 / 자료부족 |
 
