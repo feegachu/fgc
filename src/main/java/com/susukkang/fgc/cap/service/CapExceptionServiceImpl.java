@@ -177,7 +177,11 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         if (command == null) throw new IllegalArgumentException("한도 예외 생성 명령이 없습니다.");
         if (command.paymentId() == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
         if (command.contractId() == null) throw new IllegalArgumentException("계약 ID가 없습니다.");
-        if (command.agentId() == null) throw new IllegalArgumentException("설계사 ID가 없습니다.");
+        // 원수사→GA는 GA가 수령 주체라 설계사 ID가 없는 것이 정상이다. 반면
+        // GA→설계사 한도 예외는 어느 설계사 지급 건인지 반드시 식별할 수 있어야 한다.
+        if (command.paymentStage() == PaymentStage.GA_TO_FC && command.agentId() == null) {
+            throw new IllegalArgumentException("설계사 ID가 없습니다.");
+        }
         if (command.policyVersionId() == null) throw new IllegalArgumentException("정책 버전 ID가 없습니다.");
         if (command.paymentStage() == null) throw new IllegalArgumentException("지급 단계가 없습니다.");
         if (command.capRuleSetId() == null) throw new IllegalArgumentException("한도 룰셋 ID가 없습니다.");

@@ -22,12 +22,14 @@ public record ExceptionCaseResponseDTO(
         ExceptionStatus status,
         String title,
         String description,
+        Long contractId,
         String contractNo,
         String agentName,
         Long assignedTo,
         String assigneeLoginId,
         String sourceEntityType,
         String sourceEntityId,
+        String reconciliationResultType,
         LocalDate validationMonth,
         Long firstDetectedRunId,
         Long lastDetectedRunId,
@@ -52,9 +54,9 @@ public record ExceptionCaseResponseDTO(
                 row.reasonCode(),
                 ExceptionSeverity.valueOf(row.severity()),
                 ExceptionStatus.valueOf(row.status()),
-                row.title(), row.description(), row.contractNo(), row.agentName(),
+                row.title(), row.description(), row.contractId(), row.contractNo(), row.agentName(),
                 row.assignedTo(), row.assigneeLoginId(), row.sourceEntityType(),
-                row.sourceEntityId(), row.validationMonth(), row.firstDetectedRunId(),
+                row.sourceEntityId(), row.reconciliationResultType(), row.validationMonth(), row.firstDetectedRunId(),
                 row.lastDetectedRunId(), DateUtil.toSeoul(row.firstDetectedAt()),
                 DateUtil.toSeoul(row.lastDetectedAt()), row.detectionCount(),
                 DateUtil.toSeoul(row.createdAt()), occurrences, actions
@@ -102,11 +104,41 @@ public record ExceptionCaseResponseDTO(
 
     /** 예외의 원천 업무 화면이 제공되는 경우 바로 이동할 링크를 반환한다. */
     public String sourceLink() {
+        if (sourceEntityType == null || sourceEntityId == null || sourceEntityId.isBlank()) {
+            return null;
+        }
         return switch (sourceEntityType) {
             case "INSURANCE_CONTRACT" -> "/contracts/" + sourceEntityId;
             case "ARBITRAGE_CHECK" -> "/arbitrage-checks";
-            case "COMMISSION_TRANSACTION" -> "/transactions";
+            case "COMMISSION_TRANSACTION" -> "/transactions/new?id=" + sourceEntityId;
+            case "SCHEDULE_HEADER" -> "/schedules/" + sourceEntityId;
+            case "RECONCILIATION_RESULT" -> reconciliationSourceLink();
             default -> null;
         };
+    }
+
+    private String reconciliationSourceLink() {
+        String reason = reasonCode == null || reasonCode.isBlank()
+                ? reconciliationResultType
+                : reasonCode;
+        if ("EXPECTED_MISSING".equals(reason)) {
+            return contractNo == null || contractNo.isBlank()
+                    ? "/schedules"
+                    : "/schedules?contractNo=" + contractNo;
+        }
+        if ("ACTUAL_MISSING".equals(reason)) {
+            return "/transactions/new";
+        }
+        if ("INVALID_CONTRACT_PAYMENT".equals(reason)
+                || "POLICY_VERSION_ERROR".equals(reason)) {
+            return contractId == null
+                    ? null
+                    : "/contracts/" + contractId;
+        }
+        if ("JOURNAL_IMBALANCE".equals(reason)) {
+            return "/journals";
+        }
+        // 양쪽 금액·회차·조직·설계사를 함께 봐야 하는 유형은 대사 비교 팝업을 직접 연다.
+        return "/reconciliations?resultId=" + sourceEntityId;
     }
 }

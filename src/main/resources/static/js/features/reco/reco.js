@@ -437,4 +437,11 @@
       selectRun(autoSelectRunId);
     }
   }
+
+  // EXCP-W01의 대사 불일치 참조는 실행 이력을 먼저 선택할 필요 없이 결과 PK로
+  // 비교 상세를 직접 연다. 결과가 없어진 경우에는 기존 API 오류 안내를 그대로 쓴다.
+  var deepLinkedResultId = main.dataset.deepLinkedResultId;
+  if (deepLinkedResultId) {
+    openCompareModal(deepLinkedResultId);
+  }
 })();

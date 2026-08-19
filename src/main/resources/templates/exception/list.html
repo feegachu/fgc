@@ -167,10 +167,12 @@
               <td data-role="assignee" th:text="${c.assigneeLoginId()} ?: '미배정'">-</td>
               <td class="fgc-mono" th:text="${#temporals.format(c.lastDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</td>
               <td class="fgc-mono" th:text="|${c.detectionCount()}회|">1회</td>
-              <!-- 참조 = 원천 화면 링크 (화면정의서 :1349 "만들 때 주의") — 라우트가 없는 원천 유형은 텍스트로만 -->
+              <!-- 참조 = 원천 화면 링크. 라우트가 없는 원천 유형은 텍스트로만 표시한다. -->
               <td class="fgc-mono">
-                <a th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}"
-                   th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</a>
+                <a class="fgc-btn fgc-btn--ghost" th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}">
+                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">open_in_new</span>
+                  <span th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
+                </a>
                 <span th:if="${c.sourceLink() == null}"
                       th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
               </td>
@@ -270,8 +272,10 @@
         <div class="exception-detail-wide"><dt>제목</dt><dd th:text="${c.title()}">-</dd></div>
         <div class="exception-detail-wide"><dt>설명</dt><dd th:text="${c.description()}">-</dd></div>
         <div class="exception-detail-wide"><dt>참조</dt><dd class="fgc-mono">
-          <a th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}"
-             th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</a>
+          <a class="fgc-btn fgc-btn--ghost" th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}">
+            <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">open_in_new</span>
+            <span th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
+          </a>
           <span th:if="${c.sourceLink() == null}"
                 th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
         </dd></div>
