@@ -13,6 +13,7 @@ import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.CreateValidationRunResponse;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunDetailResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunExecuteResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
@@ -23,6 +24,7 @@ import com.susukkang.fgc.validation.dto.ValidationRunSearchResponse;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import com.susukkang.fgc.validation.service.ValidationRunDetailService;
 import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
+import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -60,6 +62,7 @@ public class ValidationRunController {
     private final ValidationRunSearchService validationRunSearchService;
     private final ValidationRunDetailService validationRunDetailService;
     private final ValidationRunExecuteService validationRunExecuteService;
+    private final ValidationRunFinalizationService validationRunFinalizationService;
 
     @Operation(
             summary = "검증 실행 생성 (IF-API-45)",
@@ -238,5 +241,26 @@ public class ValidationRunController {
             @Parameter(description = "validation_run_id") @PathVariable Long id
     ) {
         return ApiResponse.success(validationRunDetailService.progress(id));
+    }
+
+    @Operation(
+            summary = "검증 실행 확정 체크리스트 조회 (IF-API-50)",
+            description = "운영정책서 제44조의 확정 전 필수조건 6개를 문서 순서와 문구 그대로 반환한다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = FinalizeChecklistResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "검증 실행 없음 (FGC-COMMON-004)")
+    })
+    @GetMapping("/{id}/finalize-checklist")
+    @PreAuthorize(Roles.ANY_ROLE)
+    public ApiResponse<FinalizeChecklistResponse> getFinalizeChecklist(
+            @PathVariable("id") Long validationRunId
+    ) {
+        return ApiResponse.success(validationRunFinalizationService.getChecklist(validationRunId));
     }
 }
