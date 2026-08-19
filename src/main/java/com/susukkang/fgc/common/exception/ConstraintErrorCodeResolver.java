@@ -131,6 +131,30 @@ public class ConstraintErrorCodeResolver {
                 FgcErrorCode.VRUN_001
         );
         mappings.put(
+                "uq_journal_current_posted_source",
+                FgcErrorCode.LEDG_002
+        );
+        mappings.put(
+                "uq_journal_single_reversal",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_correction_original",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_correction_group_reversal",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_correction_group_repost",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_source_revision",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
                 "uq_validation_run_finalize_idempotency",
                 FgcErrorCode.VRUN_006
         );
