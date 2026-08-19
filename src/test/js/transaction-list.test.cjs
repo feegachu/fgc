@@ -19,7 +19,7 @@ function fields() {
   };
 }
 
-test("TRAN-W01 keeps the attribution imbalance filter when submitting a search", () => {
+test("FGC-FUN-044 TRAN-W01 keeps the attribution imbalance filter when submitting a search", () => {
   const state = buildTransactionFilterState(fields(), 1, true);
 
   assert.equal(state.attributionImbalanceOnly, true);
@@ -27,7 +27,7 @@ test("TRAN-W01 keeps the attribution imbalance filter when submitting a search",
   assert.equal(state.contractNo, "C004");
 });
 
-test("TRAN-W01 clears the hidden attribution imbalance filter on reset", () => {
+test("FGC-FUN-044 TRAN-W01 clears the hidden attribution imbalance filter on reset", () => {
   const state = buildTransactionFilterState(fields(), 1, false);
 
   assert.equal(state.attributionImbalanceOnly, false);
