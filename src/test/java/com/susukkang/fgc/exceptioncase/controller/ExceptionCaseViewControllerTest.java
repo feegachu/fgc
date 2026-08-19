@@ -30,6 +30,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -84,9 +85,14 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("href=\"/transactions/new?id=77\"")))
                 .andExpect(content().string(containsString("page=2")))
                 .andExpect(content().string(containsString("데이터 품질")))
+                .andExpect(content().string(containsString("status-badge-review")))
+                .andExpect(content().string(containsString("status-badge-warning")))
+                .andExpect(content().string(containsString("status-badge-info")))
                 .andExpect(content().string(containsString("value=\"WARNING\">주의")))
                 .andExpect(content().string(containsString("1. 검토 시작")))
                 .andExpect(content().string(containsString("<span>신규</span> → <span>검토중</span>")))
+                .andExpect(content().string(not(containsString("fgc-page-desc"))))
+                .andExpect(content().string(not(containsString("정상 건은 여기 오지 않습니다."))))
                 .andExpect(content().string(containsString("/js/features/exception/exception-list.js")))
                 .andExpect(content().string(containsString("/css/features/exception.css")));
     }

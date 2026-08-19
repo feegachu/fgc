@@ -60,7 +60,10 @@ class PublishingTemplateStructureTest {
                 .contains("exception-pagination")
                 .contains("pagination-controls")
                 .contains("pagination-button is-active")
-                .contains("exception-summary-card")
+                .contains("kpi-card exception-summary-card")
+                .contains("kpi-card-header")
+                .contains("kpi-value-row")
+                .contains("kpi-card-footer")
                 .contains("exception-detail-")
                 .contains("data-exception-action-form")
                 .contains("처리 저장")
@@ -69,7 +72,7 @@ class PublishingTemplateStructureTest {
                 .contains("/css/features/exception.css")
                 .containsPattern("(?s)<script[^>]*th:src=\"@\\{/js/features/exception/exception-list\\.js}\"[^>]*\\bdefer\\b[^>]*>");
         assertThat(resource("static/js/features/exception/exception-list.js"))
-                .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
+                .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a, button, details, input, select, textarea\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
                 .contains("apiClient.request")
                 .doesNotContain("fetch(");
         // 2026-08-19 yslee - #238 병합 후 VRUN-W02 템플릿·스크립트 검증 체인 정리
@@ -101,9 +104,11 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
-    void fixedBusinessNoticesStayAlignedWithScreenSpecification() throws IOException {
+    void screenGuidanceStaysAlignedWithCurrentUiDecisions() throws IOException {
         assertThat(resource("templates/exception/list.html"))
-                .contains("정상 건은 여기 오지 않습니다. 여기 있는 건 전부 사람이 봐야 합니다.");
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("fgc-banner")
+                .doesNotContain("정상 건은 여기 오지 않습니다.");
         assertThat(resource("templates/ledger/list.html"))
                 .contains("이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.")
                 .contains("data-modal=\"journal-reverse\"")
@@ -225,6 +230,61 @@ class PublishingTemplateStructureTest {
         assertThat(resource("static/css/features/audit.css"))
                 .contains("@media (max-width: 56.25rem)")
                 .doesNotContain("@media (max-width: 71.875rem)");
+    }
+
+    @Test
+    void exceptionListUsesFlexibleColumnsSharedBadgesAndProductionToast() throws IOException {
+        assertThat(resource("templates/exception/list.html"))
+                .contains("<colgroup>")
+                .contains("class=\"exception-col-title\"")
+                .contains("class=\"status-badge\"")
+                .contains("status-badge-warning")
+                .contains("status-badge-error")
+                .contains("status-badge-review")
+                .contains("status-badge-info")
+                .contains("status-badge-success")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"table-cell-details\" hidden")
+                .contains("class=\"table-cell-more\">전체 보기")
+                .contains("class=\"table-cell-less\">접기")
+                .contains("referenceValue=|${c.sourceEntityType()}:${c.sourceEntityId()}|")
+                .doesNotContain("class=\"fgc-page-desc\"")
+                .doesNotContain("class=\"fgc-banner")
+                .doesNotContain("<th style=\"width:");
+
+        assertThat(resource("static/css/features/exception.css"))
+                .contains(".exception-col-title")
+                .contains("width: auto")
+                .contains("table-layout: fixed")
+                .doesNotContain("width: 22rem")
+                .doesNotContain("min-width: 22rem")
+                .doesNotContain("max-width: 22rem");
+
+        assertThat(resource("static/js/features/exception/exception-list.js"))
+                .contains("STATUS_BADGE_CLASSES")
+                .contains("badge.classList.remove(...STATUS_BADGE_CLASS_NAMES)")
+                .contains("closest(\"a, button, details, input, select, textarea\")")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready")
+                .contains("toast(message, \"error\")");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains(".table-cell-disclosure")
+                .contains(".table-cell-details[open] .table-cell-less")
+                .contains(".table-cell-full");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains("top: calc(var(--layout-header-height) + var(--space-4))")
+                .contains("width: min(25rem, calc(100vw - 2rem))")
+                .contains("border-radius: var(--radius-12)")
+                .contains("box-shadow: var(--shadow-sm)")
+                .contains(".toast-icon");
+
+        assertThat(resource("static/js/common/toast.js"))
+                .contains("loading: \"progress_activity\"")
+                .contains("safeTone === \"error\" || safeTone === \"loading\" ? 0 : 5000")
+                .contains("toast.append(iconContainer, content, close)");
     }
 
     @Test
