@@ -21,6 +21,7 @@ public interface ContractMapper {
             @Param("size") int size,
             @Param("offset") int offset
     );
+    List<ContractView> selectAllByCondition(@Param("condition") ContractSearchCondition condition);
     // 계약Id에 따른 계약 조회
     InsuranceContract selectContractById(Long id);
     // 계약Id에 따른 계약 및 상품 정보 조회
