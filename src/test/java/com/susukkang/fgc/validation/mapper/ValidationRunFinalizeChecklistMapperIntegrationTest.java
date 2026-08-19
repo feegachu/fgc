@@ -14,7 +14,13 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** IF-API-50의 여섯 집계가 문서에 정의된 실행/월 범위를 지키는지 실제 PostgreSQL로 검증한다. */
+/**
+ * 설명 : IF-API-50 확정 체크리스트 PostgreSQL 통합 테스트
+ *
+ * @author yslee
+ * @since 2026-08-19
+ * @version 1.2
+ */
 @SpringBootTest
 @Transactional
 class ValidationRunFinalizeChecklistMapperIntegrationTest {
@@ -65,6 +71,26 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
         FinalizeChecklistCounts counts = validationRunMapper.findFinalizeChecklistCounts(runId);
 
         assertThat(counts.getIncompleteRunCount()).isEqualTo(1);
+    }
+
+    @Test
+    void roundsEachCapDetailHalfUpBeforeComparingItsSum() {
+        Long contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
+        Long mismatchRunId = createCompletedRun(TEST_MONTH.plusMonths(3));
+        Long matchedRunId = createCompletedRun(TEST_MONTH.plusMonths(4));
+
+        // 2026-08-19 yslee - 상세행별 원 단위 HALF_UP 후 합산하는 확정 조건 검증
+        // 기존 코드: 소수 상세금액을 먼저 합산해 0.5원 두 행을 1원으로 비교
+        // 문제: 문서 기준의 행별 반올림 합계 2원과 달라 불일치 판정이 뒤바뀔 수 있음
+        // 개선: 동일한 0.5원 두 행을 1원·2원 요약과 각각 비교해 경계값 판정 고정
+        insertCapDetails(insertCapCheck(mismatchRunId, contractId, "1.00"), "0.50", "0.50");
+        insertCapDetails(insertCapCheck(matchedRunId, contractId, "2.00"), "0.50", "0.50");
+
+        assertThat(validationRunMapper.findFinalizeChecklistCounts(mismatchRunId)
+                .getCapDetailMismatchCount()).isEqualTo(1);
+        assertThat(validationRunMapper.findFinalizeChecklistCounts(matchedRunId)
+                .getCapDetailMismatchCount()).isZero();
     }
 
     private Long createCompletedRun(LocalDate month) {
@@ -135,14 +161,35 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
     }
 
     private void insertCapMismatch(Long runId, Long contractId) {
+        insertCapCheck(runId, contractId, "100.00");
+    }
+
+    private Long insertCapCheck(Long runId, Long contractId, String includedAmount) {
         Long capRuleSetId = jdbcTemplate.queryForObject(
                 "SELECT cap_rule_set_id FROM fgc.cap_rule_set ORDER BY cap_rule_set_id LIMIT 1", Long.class);
-        jdbcTemplate.update("""
+        return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.cap_check (
                     validation_run_id, contract_id, payment_stage, cap_rule_set_id, check_kind,
                     as_of_date, base_premium_amount, limit_amount, included_amount,
                     remaining_amount, result_status
-                ) VALUES (?, ?, 'GA_TO_FC', ?, 'MONTHLY', ?, 100, 1200, 100, 1100, 'NORMAL')
-                """, runId, contractId, capRuleSetId, TEST_MONTH);
+                ) VALUES (?, ?, 'GA_TO_FC', ?, 'MONTHLY', ?, 100, 1200, ?::numeric, 1100, 'NORMAL')
+                RETURNING cap_check_id
+                """, Long.class, runId, contractId, capRuleSetId, TEST_MONTH, includedAmount);
+    }
+
+    private void insertCapDetails(Long capCheckId, String firstAmount, String secondAmount) {
+        Long commissionItemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1",
+                Long.class);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.cap_check_detail (
+                    cap_check_id, detail_seq, commission_item_id, classification_snapshot,
+                    amount, decision_reason, item_code, item_name
+                ) SELECT ?, detail_seq, commission_item_id, 'INCLUDED', amount::numeric,
+                         'FUN-044 rounding test', item_code, item_name
+                    FROM fgc.commission_item
+                    CROSS JOIN (VALUES (1, ?), (2, ?)) detail(detail_seq, amount)
+                   WHERE commission_item_id = ?
+                """, capCheckId, firstAmount, secondAmount, commissionItemId);
     }
 }

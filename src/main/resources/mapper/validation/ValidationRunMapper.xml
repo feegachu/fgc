@@ -65,7 +65,13 @@
                           AND detail.classification_snapshot = 'INCLUDED'
                         WHERE cc.validation_run_id = vr.validation_run_id
                         GROUP BY cc.cap_check_id, cc.included_amount
-                       HAVING cc.included_amount &lt;&gt; COALESCE(SUM(detail.amount), 0)
+                       <!--
+                         2026-08-19 yslee - 상세행별 원 단위 HALF_UP 반올림 후 합산
+                         기존 코드: 원 미만 상세금액을 그대로 합산한 값과 요약금액 비교
+                         문제: 행별 반올림 합계와 합계 후 반올림 결과가 달라 확정 조건이 오판될 수 있음
+                         개선: PostgreSQL ROUND(numeric, 0)를 각 상세행에 적용한 다음 합산
+                       -->
+                       HAVING cc.included_amount &lt;&gt; COALESCE(SUM(ROUND(detail.amount, 0)), 0)
                   ) mismatch)
                    AS capDetailMismatchCount
           FROM fgc.validation_run vr
