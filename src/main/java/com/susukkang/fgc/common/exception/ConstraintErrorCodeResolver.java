@@ -132,7 +132,7 @@ public class ConstraintErrorCodeResolver {
         );
         mappings.put(
                 "uq_validation_run_finalize_idempotency",
-                FgcErrorCode.VRUN_006
+                FgcErrorCode.VRUN_005
         );
 
         return Map.copyOf(mappings);

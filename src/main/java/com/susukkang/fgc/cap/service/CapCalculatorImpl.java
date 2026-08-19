@@ -40,6 +40,7 @@ public class CapCalculatorImpl implements CapCalculator {
 
     private static final String REFUND_ADDITION_STANDARD_DEDUCTION_80 = "STANDARD_DEDUCTION_80";
     private static final String INCLUDED = "INCLUDED";
+    private static final String EXCLUDED = "EXCLUDED";
     private static final String REVIEW_REQUIRED = "REVIEW_REQUIRED";
 
     private final CapContractMapper capContractMapper;
@@ -116,15 +117,19 @@ public class CapCalculatorImpl implements CapCalculator {
         int seq = 1;
         for (ScheduleAmountView line : scheduleAmounts) {
             CapRuleItemView ruleItem = ruleItemsByCommissionItem.get(line.getCommissionItemId());
-            // 룰셋에 아예 등록되지 않은 수수료 항목은 자동으로 산입/제외를 판단하지 않고 REVIEW_REQUIRED로 둠
-            //
-            // 보류(TODO): cap_rule_item.evidence_required_yn(EXCLUDED 항목이 증빙을 요구하는지)을
-            // 이 엔진이 읽지 않는다. 지금은 룰셋 템플릿의 정적 inclusion_status만으로 판정하고, 건별
-            // 실제 증빙 유무는 확인하지 않음
-            // 건별 증빙 연결은 transaction_attribution 경로가 아직 없어 미구현 상태
-            String classification = ruleItem != null ? ruleItem.getInclusionStatus() : REVIEW_REQUIRED;
+            // 룰셋에 없는 항목과 증빙 필수 제외항목의 미연결 건은 자동 제외하지 않는다.
+            // 후자는 transaction_attribution에 연결된 확정 증빙이 있을 때만 EXCLUDED를 유지한다.
+            boolean evidenceMissing = ruleItem != null
+                    && EXCLUDED.equals(ruleItem.getInclusionStatus())
+                    && ruleItem.isEvidenceRequiredYn()
+                    && (line.getEvidenceRef() == null || line.getEvidenceRef().isBlank());
+            String classification = ruleItem == null || evidenceMissing
+                    ? REVIEW_REQUIRED
+                    : ruleItem.getInclusionStatus();
             String reason = ruleItem != null
-                    ? ruleItem.getDecisionReason()
+                    ? evidenceMissing
+                        ? "제외 요건의 건별 증빙이 연결되지 않아 사람 판단이 필요하다"
+                        : ruleItem.getDecisionReason()
                     : "1,200% 룰셋에 분류되지 않은 수수료 항목이라 사람 판단이 필요하다";
             String itemCode = ruleItem != null ? ruleItem.getItemCode() : null;
             String itemName = ruleItem != null ? ruleItem.getItemName() : null;
@@ -134,9 +139,9 @@ public class CapCalculatorImpl implements CapCalculator {
             // MoneyUtil 규칙("각 지급행을 원 단위 HALF_UP으로 반올림한 뒤 합산")대로 여기서 먼저 반올림한다.
             BigDecimal amount = MoneyUtil.roundWon(line.getAmount());
 
-            // evidenceRef는 스케줄 기반 산입 후보 시점에는 아직 존재하지 않는다(증빙 연결은 저장 이후 별도 절차) — null로 둔다
             details.add(new CapCheckDetailLine(seq++, line.getCommissionItemId(), itemCode, itemName,
-                    line.getScheduleLineId(), line.getContractMonthNo(), classification, amount, reason, null));
+                    line.getScheduleLineId(), line.getContractMonthNo(), classification, amount, reason,
+                    line.getEvidenceRef()));
 
             if (INCLUDED.equals(classification)) {
                 includedAmount = includedAmount.add(amount);

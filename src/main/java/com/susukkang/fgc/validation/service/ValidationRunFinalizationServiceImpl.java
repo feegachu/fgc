@@ -23,13 +23,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 설명 : FGC-FUN-044 검증 실행 확정 체크리스트와 원자적 확정 처리
- *
- * @author yslee
- * @since 2026-08-16
- * @version 1.2
- */
+/** FGC-FUN-044 검증 실행 확정 체크리스트와 원자적 확정 처리. */
 @Service
 @RequiredArgsConstructor
 public class ValidationRunFinalizationServiceImpl implements ValidationRunFinalizationService {
@@ -60,14 +54,12 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         }
         String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
 
-        // 2026-08-19 yslee - 멱등키 영구 중복과 일시적 상태 경합 오류 분리
-        // 기존 코드: 다른 실행이 소유한 키와 조건부 UPDATE 경합을 모두 VRUN_005로 응답
-        // 문제: 영구 중복에 재조회·재시도를 안내해 같은 키 요청이 계속 실패함
-        // 개선: 다른 실행 소유 키는 새 키가 필요한 VRUN_006으로 명확히 응답
+        // 선택 멱등키는 실행 간 재사용을 금지한다. UNIQUE 인덱스가 최후 방어선이며,
+        // 이 사전 조회는 제약 위반보다 명확한 VRUN_005 응답을 주기 위한 것이다.
         if (normalizedKey != null) {
             Long keyOwner = validationRunMapper.findValidationRunIdByFinalizeIdempotencyKey(normalizedKey);
             if (keyOwner != null && !keyOwner.equals(validationRunId)) {
-                throw new FgcBusinessException(FgcErrorCode.VRUN_006,
+                throw new FgcBusinessException(FgcErrorCode.VRUN_005,
                         Map.of("id", validationRunId, "idempotencyKey", normalizedKey));
             }
         }
@@ -112,10 +104,10 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
 
         FinalizedValidationRunRow finalized = requireFinalization(validationRunId);
         recordFinalizationAudit(finalized, finalizedBy);
-        // 2026-08-19 yslee - 최초 확정 성공 시 IF-EVT-07 발행
-        // 기존 코드: 상태·감사로그만 저장하고 문서에 정의된 ValidationRunFinalized 이벤트 미발행
-        // 문제: AFTER_COMMIT 구독자가 확정된 실행을 인지할 공식 협업 계약이 없음
-        // 개선: 동일 트랜잭션에서 이벤트를 발행해 구독자가 AFTER_COMMIT으로 수신하도록 지원
+        // 2026-08-19 yslee - 검증 실행 확정 이벤트 발행 복원
+        // 기존 코드: 확정 상태와 감사로그만 저장하고 화면 잠금 연동 이벤트를 발행하지 않음
+        // 문제: IF-EVT-07 구독자가 확정 완료를 인지할 수 없음
+        // 개선: 최초 확정 성공 후에만 ValidationRunFinalized 이벤트를 한 번 발행
         eventPublisher.publishEvent(new ValidationRunFinalized(
                 validationRunId, lockedRun.getValidationMonth(), finalizedBy, finalized.getFinalizedAt()));
         return response(finalized);

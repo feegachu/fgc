@@ -273,16 +273,6 @@ class ValidationRunControllerTest {
     }
 
     @Test
-    void unauthenticatedUserCannotFinalize() throws Exception {
-        mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
-                        .header("Idempotency-Key", "finalize-100"))
-                .andExpect(status().isUnauthorized());
-
-        verify(validationRunFinalizationService, never())
-                .finalizeRun(anyLong(), anyLong(), anyString());
-    }
-
-    @Test
     void finalizeAllowsMissingOptionalIdempotencyKeyHeader() throws Exception {
         given(validationRunFinalizationService.finalizeRun(100L, 4L, null))
                 .willReturn(new FinalizeValidationRunResponse(

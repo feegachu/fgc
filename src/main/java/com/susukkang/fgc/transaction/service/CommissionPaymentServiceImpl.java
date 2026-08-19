@@ -607,9 +607,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     paymentId,
                     index + 1,
                     sourceContractId,
-                agentId,
-                settlementMonth,
-                paymentStage,
+                    agentId,
+                    settlementMonth,
+                    paymentStage,
+                    item.commissionItemId(),
                     effectivePolicyVersionId,
                     attributionRequests.get(index)
             ));
@@ -717,6 +718,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long agentId,
             LocalDate settlementMonth,
             com.susukkang.fgc.common.code.PaymentStage paymentStage,
+            Long commissionItemId,
             Long policyVersionId,
             CommissionPaymentAttributionRequest request
     ) {
@@ -735,12 +737,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 request.allocationBasis(),
                 request.attributionMethod()
         );
+        Long scheduleLineId = resolveOperationalScheduleLineId(
+                contractId,
+                paymentStage,
+                commissionItemId,
+                request.attributionDate()
+        );
 
         return CommissionPaymentAttributionCommand.builder()
                 .paymentId(paymentId)
                 .attributionSequence(sequence)
                 .agentId(agentId)
                 .contractId(contractId)
+                .scheduleLineId(scheduleLineId)
                 .attributionDate(request.attributionDate())
                 .attributionMonth(request.attributionDate().withDayOfMonth(1))
                 .amount(MoneyUtil.roundWon(request.amount()))
@@ -758,6 +767,22 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 ))
                 .evidenceRef(request.evidenceRef())
                 .build();
+    }
+
+    private Long resolveOperationalScheduleLineId(
+            Long contractId,
+            PaymentStage paymentStage,
+            Long commissionItemId,
+            LocalDate attributionDate
+    ) {
+        if (contractId == null || attributionDate == null) {
+            return null;
+        }
+        LocalDate attributionMonthStart = attributionDate.withDayOfMonth(1);
+        List<Long> ids = mapper.findOperationalScheduleLineIds(
+                contractId, paymentStage, commissionItemId,
+                attributionMonthStart, attributionMonthStart.plusMonths(1));
+        return ids != null && ids.size() == 1 ? ids.get(0) : null;
     }
 
     private Long resolveAttributedContract(

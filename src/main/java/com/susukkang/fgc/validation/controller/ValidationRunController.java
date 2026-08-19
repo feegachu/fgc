@@ -41,9 +41,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -282,10 +282,7 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404", description = "검증 실행 없음 (FGC-COMMON-004)"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "확정 결과 불변·상태 전이 오류·상태 경합 "
-                            + "또는 멱등키 충돌 (FGC-VRUN-003/004/005/006)"),
+                    responseCode = "409", description = "확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "422", description = "확정 조건 미충족 (FGC-VRUN-002)")
     })

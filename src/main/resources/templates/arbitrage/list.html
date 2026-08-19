@@ -90,21 +90,21 @@
   <!-- ② 요약 카드 3장 — 차익거래 조회 API 응답으로 Ajax 렌더링 -->
   <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px"
            id="summary-cards">
-    <div class="fgc-kpi fgc-kpi--success">
+    <button type="button" class="fgc-kpi fgc-kpi--success" data-arb-summary-status="CLEAR" aria-pressed="false" style="text-align:left;cursor:pointer">
       <div class="fgc-kpi__label">이상없음</div>
       <div class="fgc-kpi__value" id="summary-clear">—</div>
       <div class="fgc-kpi__sub">초과액이 없습니다</div>
-    </div>
-    <div class="fgc-kpi fgc-kpi--warning">
+    </button>
+    <button type="button" class="fgc-kpi fgc-kpi--warning" data-arb-summary-status="CANDIDATE" aria-pressed="false" style="text-align:left;cursor:pointer">
       <div class="fgc-kpi__label">검토대상</div>
       <div class="fgc-kpi__value" id="summary-candidate">—</div>
       <div class="fgc-kpi__sub">사람의 사유 확인이 필요합니다</div>
-    </div>
-    <div class="fgc-kpi fgc-kpi--closed">
+    </button>
+    <button type="button" class="fgc-kpi fgc-kpi--closed" data-arb-summary-status="REVIEW_REQUIRED" aria-pressed="false" style="text-align:left;cursor:pointer">
       <div class="fgc-kpi__label">자료부족</div>
       <div class="fgc-kpi__value" id="summary-review">—</div>
       <div class="fgc-kpi__sub">자료 보완 후 재확인합니다</div>
-    </div>
+    </button>
   </section>
 
   <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.25fr 1fr;gap:16px" id="arb-grid">
