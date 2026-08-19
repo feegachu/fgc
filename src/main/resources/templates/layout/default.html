@@ -27,14 +27,15 @@
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-EXCP-W01'}" th:href="@{/css/features/exception.css}">
 </head>
 <body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">
+  <script th:src="@{/js/common/sidebar-state-init.js}"></script>
   <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
-  <aside th:replace="~{layout/fragments/sidebar :: sidebar(${screenId})}"></aside>
-  <div class="app-sidebar-backdrop" data-action="close-app-sidebar" aria-hidden="true"></div>
-  <header th:replace="~{layout/fragments/header :: header(${title}, ${parentTitle}, ${parentHref})}"></header>
-  <nav th:replace="~{layout/fragments/workspace-tabs :: workspaceTabs(${screenId}, ${title})}"></nav>
-  <div class="app-main"><th:block th:replace="${content}"></th:block></div>
-  <!-- 교육용 면책 문구는 시연 사실감을 위해 화면에 표기하지 않는다 — 2026-08-12 팀 결정, 근거대장 COR-009 개정 기록 -->
-  <footer class="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
+  <div class="app-shell-layout" data-app-shell-layout>
+    <aside th:replace="~{layout/fragments/sidebar :: sidebar(${screenId})}"></aside>
+    <header th:replace="~{layout/fragments/header :: header(${screenId}, ${title})}"></header>
+    <div class="app-main"><th:block th:replace="${content}"></th:block></div>
+    <!-- 교육용 면책 문구는 시연 사실감을 위해 화면에 표기하지 않는다 — 2026-08-12 팀 결정, 근거대장 COR-009 개정 기록 -->
+    <footer class="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
+  </div>
   <div id="toast-region" class="toast-region" role="region" aria-label="알림" aria-live="polite"></div>
   <div id="modal-root"></div>
   <script th:src="@{/js/common/workspace-tabs.js}" defer></script>

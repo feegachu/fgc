@@ -1,12 +1,13 @@
 (function () {
   "use strict";
 
-  var MOBILE_SIDEBAR_QUERY = "(max-width: 47.9375rem)";
+  var NARROW_SIDEBAR_QUERY = "(max-width: 79.9375rem)";
   var SIDEBAR_OPEN_SECTIONS_KEY = "fgc.sidebar.open-sections.v1";
-  var mobileSidebarMedia = window.matchMedia(MOBILE_SIDEBAR_QUERY);
+  var SIDEBAR_COLLAPSED_KEY = "fgc.sidebar.collapsed.v1";
+  var narrowSidebarMedia = window.matchMedia(NARROW_SIDEBAR_QUERY);
   var sidebar = document.querySelector("[data-app-sidebar]");
-  var sidebarToggle = document.querySelector("[data-action='open-app-sidebar']");
-  var sidebarBackdrop = document.querySelector(".app-sidebar-backdrop");
+  var collapseButton = document.querySelector("[data-action='collapse-app-sidebar']");
+  var expandButton = document.querySelector("[data-action='expand-app-sidebar']");
 
   function getSidebarSections() {
     if (!sidebar) return [];
@@ -47,48 +48,49 @@
     persistOpenSidebarSections();
   }
 
-  function getSidebarFocusableElements() {
-    if (!sidebar) return [];
-    return Array.prototype.filter.call(
-      sidebar.querySelectorAll("a[href], button:not([disabled]), summary, select:not([disabled]), [tabindex]:not([tabindex='-1'])"),
-      function (element) { return element.getClientRects().length > 0; }
-    );
-  }
-
-  function setMobileSidebarOpen(open, restoreFocus) {
-    if (!sidebar || !sidebarToggle || !sidebarBackdrop || !mobileSidebarMedia.matches) return;
-
-    if (!open && restoreFocus) sidebarToggle.focus();
-
-    sidebar.classList.toggle("is-mobile-open", open);
-    sidebar.toggleAttribute("inert", !open);
-    sidebar.setAttribute("aria-hidden", String(!open));
-    sidebarToggle.setAttribute("aria-expanded", String(open));
-    sidebarToggle.setAttribute("aria-label", open ? "주요 업무 메뉴 닫기" : "주요 업무 메뉴 열기");
-    sidebarBackdrop.classList.toggle("is-visible", open);
-    document.body.classList.toggle("is-app-sidebar-open", open);
-
-    if (open) {
-      var closeButton = sidebar.querySelector("[data-action='close-app-sidebar']");
-      if (closeButton) closeButton.focus();
+  function readSidebarCollapsed() {
+    try {
+      var stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      if (stored === null) return narrowSidebarMedia.matches;
+      return stored === "true";
+    } catch (error) {
+      return narrowSidebarMedia.matches;
     }
   }
 
-  function syncSidebarMode() {
-    if (!sidebar || !sidebarToggle || !sidebarBackdrop) return;
-
-    if (mobileSidebarMedia.matches) {
-      setMobileSidebarOpen(false, false);
-      return;
+  function hasStoredSidebarPreference() {
+    try {
+      return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== null;
+    } catch (error) {
+      return false;
     }
+  }
 
-    sidebar.classList.remove("is-mobile-open");
-    sidebar.removeAttribute("inert");
-    sidebar.removeAttribute("aria-hidden");
-    sidebarToggle.setAttribute("aria-expanded", "false");
-    sidebarToggle.setAttribute("aria-label", "주요 업무 메뉴 열기");
-    sidebarBackdrop.classList.remove("is-visible");
-    document.body.classList.remove("is-app-sidebar-open");
+  function persistSidebarCollapsed(collapsed) {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+    } catch (error) {
+      // Storage may be unavailable in privacy-restricted browsing contexts.
+    }
+  }
+
+  function setSidebarCollapsed(collapsed, persist) {
+    if (!sidebar) return;
+
+    document.body.classList.toggle("is-sidebar-collapsed", collapsed);
+    document.body.classList.add("is-sidebar-ready");
+    sidebar.dataset.sidebarState = collapsed ? "collapsed" : "expanded";
+    if (collapseButton) collapseButton.setAttribute("aria-expanded", String(!collapsed));
+    if (expandButton) expandButton.setAttribute("aria-expanded", String(!collapsed));
+    if (persist) persistSidebarCollapsed(collapsed);
+  }
+
+  function initializeSidebarMode() {
+    setSidebarCollapsed(readSidebarCollapsed(), false);
+  }
+
+  function syncNarrowSidebarDefault() {
+    if (!hasStoredSidebarPreference()) setSidebarCollapsed(narrowSidebarMedia.matches, false);
   }
 
   function navigateToGlobalMonth(month) {
@@ -125,40 +127,30 @@
   }
 
   document.addEventListener("click", function (event) {
-    if (event.target.closest("[data-action='open-app-sidebar']")) {
-      setMobileSidebarOpen(true, false);
+    if (event.target.closest("[data-action='collapse-app-sidebar']")) {
+      setSidebarCollapsed(true, true);
       return;
     }
 
-    if (event.target.closest("[data-action='close-app-sidebar']")) {
-      setMobileSidebarOpen(false, true);
-    }
-  });
-
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && sidebar && sidebar.classList.contains("is-mobile-open")) {
-      setMobileSidebarOpen(false, true);
+    if (event.target.closest("[data-action='expand-app-sidebar']")) {
+      setSidebarCollapsed(false, true);
       return;
     }
 
-    if (event.key === "Tab" && sidebar && sidebar.classList.contains("is-mobile-open")) {
-      var focusableElements = getSidebarFocusableElements();
-      var firstElement = focusableElements[0];
-      var lastElement = focusableElements[focusableElements.length - 1];
-      if (!firstElement || !lastElement) return;
-
-      if (event.shiftKey && document.activeElement === firstElement) {
+    if (sidebar && document.body.classList.contains("is-sidebar-collapsed") && sidebar.contains(event.target)
+        && !event.target.closest("input, select, textarea, form")) {
+      var sectionSummary = event.target.closest("summary");
+      setSidebarCollapsed(false, true);
+      if (sectionSummary) {
         event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
+        var section = sectionSummary.closest("details");
+        if (section) section.open = true;
       }
     }
   });
 
-  mobileSidebarMedia.addEventListener("change", syncSidebarMode);
+  narrowSidebarMedia.addEventListener("change", syncNarrowSidebarDefault);
   initializeGlobalMonthSelector();
   initializeSidebarSectionState();
-  syncSidebarMode();
+  initializeSidebarMode();
 })();
