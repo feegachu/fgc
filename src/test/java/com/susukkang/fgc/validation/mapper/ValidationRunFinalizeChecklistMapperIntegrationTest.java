@@ -15,6 +15,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
+ * 요구사항 : FGC-FUN-044 검증 결과 확정·잠금
+ *
  * 설명 : IF-API-50 확정 체크리스트 PostgreSQL 통합 테스트
  *
  * @author yslee
@@ -74,7 +76,7 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
     }
 
     @Test
-    void roundsEachCapDetailHalfUpBeforeComparingItsSum() {
+    void fgcFun044_roundsEachCapDetailHalfUpBeforeComparingItsSum() {
         Long contractId = jdbcTemplate.queryForObject(
                 "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
         Long mismatchRunId = createCompletedRun(TEST_MONTH.plusMonths(3));
