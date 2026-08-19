@@ -97,6 +97,17 @@
           FROM fgc.cap_check cc
          WHERE cc.contract_id = #{contractId}
            AND cc.payment_stage = #{paymentStage}
+           <!-- 지급 확정이 거절된 DRAFT 후보의 계산근거는 예외함에서만 보존한다.
+                계약/한도 화면의 현재 산입액은 CONFIRMED 지급 건만 반영해야 한다. -->
+           AND (
+                cc.candidate_transaction_id IS NULL
+                OR EXISTS (
+                    SELECT 1
+                      FROM fgc.commission_transaction candidate_ct
+                     WHERE candidate_ct.commission_transaction_id = cc.candidate_transaction_id
+                       AND candidate_ct.status = 'CONFIRMED'
+                )
+           )
          ORDER BY cc.checked_at DESC, cc.cap_check_id DESC
          LIMIT 1
     </select>
@@ -127,75 +138,206 @@
          WHERE cc.cap_check_id = #{capCheckId}
     </select>
 
-    <!-- IF-API-30 목록·건수·요약이 공유하는 검색조건. month는 as_of_date가 속한 달(그 달 1일 기준)로 거른다. -->
-    <sql id="searchWhere">
+    <!--
+      CAP-W01은 계약 단위 판정 화면이므로 계약·지급단계·판정월별 최신 저장 결과만 사용한다.
+      month가 지정되면 해당 월의 최신 결과만, 생략되면 각 월의 최신 결과를 남겨 월별 이력을 보존한다.
+      status/stage는 latest 선정 뒤에 적용해야 과거 상태가 현재 결과인 것처럼 다시 노출되지 않는다.
+    -->
+    <sql id="latestScopedCapChecks">
+        WITH ranked_cap_check AS (
+            SELECT cc.cap_check_id,
+                   cc.contract_id,
+                   ic.contract_no,
+                   ic.agent_id,
+                   ic.organization_id,
+                   cc.payment_stage,
+                   cc.as_of_date,
+                   cc.base_premium_amount,
+                   cc.refund_12m_amount,
+                   cc.compliance_deduction_amount,
+                   cc.limit_amount,
+                   cc.included_amount,
+                   cc.remaining_amount,
+                   cc.usage_pct,
+                   cc.result_status,
+                   cc.cap_rule_set_id,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY cc.contract_id, cc.payment_stage,
+                                    date_trunc('month', cc.as_of_date)
+                       ORDER BY cc.checked_at DESC, cc.cap_check_id DESC
+                   ) AS latest_rank
+              FROM fgc.cap_check cc
+              JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+            <where>
+                <!-- 확정 거절된 DRAFT 후보의 cap_check가 최신 계약 판정을 덮어쓰지 않게 한다. -->
+                AND (
+                    cc.candidate_transaction_id IS NULL
+                    OR EXISTS (
+                        SELECT 1
+                          FROM fgc.commission_transaction candidate_ct
+                         WHERE candidate_ct.commission_transaction_id = cc.candidate_transaction_id
+                           AND candidate_ct.status = 'CONFIRMED'
+                    )
+                )
+                <if test="month != null">
+                    AND date_trunc('month', cc.as_of_date) = date_trunc('month', #{month}::date)
+                </if>
+                <if test="insurerId != null">
+                    AND ic.insurer_id = #{insurerId}
+                </if>
+                <if test="organizationId != null">
+                    AND ic.organization_id = #{organizationId}
+                </if>
+                <if test="contractNo != null">
+                    AND ic.contract_no = #{contractNo}
+                </if>
+            </where>
+        ), latest_cap_check AS (
+            SELECT *
+              FROM ranked_cap_check
+             WHERE latest_rank = 1
+        )
+    </sql>
+
+    <sql id="resultFilterWhere">
         <where>
-            <if test="month != null">
-                AND date_trunc('month', cc.as_of_date) = date_trunc('month', #{month}::date)
-            </if>
             <if test="paymentStage != null">
-                AND cc.payment_stage = #{paymentStage}
+                AND payment_stage = #{paymentStage}
             </if>
             <if test="resultStatus != null">
-                AND cc.result_status = #{resultStatus}
-            </if>
-            <if test="insurerId != null">
-                AND ic.insurer_id = #{insurerId}
-            </if>
-            <if test="contractNo != null">
-                AND ic.contract_no = #{contractNo}
+                AND result_status = #{resultStatus}
             </if>
         </where>
     </sql>
 
     <select id="search" resultType="com.susukkang.fgc.cap.dto.CapCheckListRow">
-        SELECT cc.cap_check_id                 AS capCheckId,
-               cc.contract_id                   AS contractId,
-               ic.contract_no                   AS contractNo,
-               cc.payment_stage                 AS paymentStage,
-               cc.as_of_date                    AS asOfDate,
-               cc.base_premium_amount           AS basePremiumAmount,
-               cc.refund_12m_amount             AS refund12mAmount,
-               cc.compliance_deduction_amount   AS complianceDeductionAmount,
-               cc.limit_amount                  AS limitAmount,
-               cc.included_amount               AS includedAmount,
-               cc.remaining_amount              AS remainingAmount,
-               cc.usage_pct                     AS usagePct,
-               cc.result_status                 AS resultStatus,
-               cc.cap_rule_set_id               AS capRuleSetId
-          FROM fgc.cap_check cc
-          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
-        <include refid="searchWhere"/>
-         ORDER BY cc.as_of_date DESC, cc.cap_check_id DESC
+        <include refid="latestScopedCapChecks"/>
+        SELECT cap_check_id                 AS capCheckId,
+               contract_id                  AS contractId,
+               contract_no                  AS contractNo,
+               payment_stage                AS paymentStage,
+               as_of_date                   AS asOfDate,
+               base_premium_amount          AS basePremiumAmount,
+               refund_12m_amount            AS refund12mAmount,
+               compliance_deduction_amount  AS complianceDeductionAmount,
+               limit_amount                 AS limitAmount,
+               included_amount              AS includedAmount,
+               remaining_amount             AS remainingAmount,
+               usage_pct                    AS usagePct,
+               result_status                AS resultStatus,
+               cap_rule_set_id              AS capRuleSetId
+          FROM latest_cap_check
+        <include refid="resultFilterWhere"/>
+         ORDER BY as_of_date DESC, cap_check_id DESC
          LIMIT #{limit} OFFSET #{offset}
     </select>
 
     <select id="count" resultType="long">
+        <include refid="latestScopedCapChecks"/>
         SELECT COUNT(*)
-          FROM fgc.cap_check cc
-          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
-        <include refid="searchWhere"/>
+          FROM latest_cap_check
+        <include refid="resultFilterWhere"/>
     </select>
 
     <select id="summarize" resultType="com.susukkang.fgc.cap.dto.CapCheckStatusCount">
-        SELECT cc.result_status AS resultStatus, COUNT(*) AS count
-          FROM fgc.cap_check cc
-          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+        <include refid="latestScopedCapChecks"/>
+        SELECT result_status AS resultStatus, COUNT(*) AS count
+          FROM latest_cap_check
         <where>
-            <if test="month != null">
-                AND date_trunc('month', cc.as_of_date) = date_trunc('month', #{month}::date)
-            </if>
             <if test="paymentStage != null">
-                AND cc.payment_stage = #{paymentStage}
-            </if>
-            <if test="insurerId != null">
-                AND ic.insurer_id = #{insurerId}
-            </if>
-            <if test="contractNo != null">
-                AND ic.contract_no = #{contractNo}
+                AND payment_stage = #{paymentStage}
             </if>
         </where>
-         GROUP BY cc.result_status
+         GROUP BY result_status
+    </select>
+
+    <select id="summarizeByStage" resultType="com.susukkang.fgc.cap.dto.CapStageSummaryRow">
+        <include refid="latestScopedCapChecks"/>
+        SELECT payment_stage AS paymentStage,
+               COUNT(*) AS contractCount,
+               COALESCE(SUM(ROUND(limit_amount, 0)), 0) AS limitAmountTotal,
+               COALESCE(SUM(ROUND(included_amount, 0)), 0) AS includedAmountTotal,
+               COALESCE(SUM(
+                   CASE WHEN payment_stage = 'INSURER_TO_GA'
+                        THEN ROUND(compliance_deduction_amount, 0)
+                        ELSE 0
+                   END
+               ), 0) AS complianceDeductionAmountTotal,
+               CASE WHEN COALESCE(SUM(ROUND(limit_amount, 0)), 0) = 0
+                    THEN 0.000000::numeric(12,6)
+                    ELSE ROUND(
+                        SUM(ROUND(included_amount, 0)) * 100 /
+                        SUM(ROUND(limit_amount, 0)), 6)
+               END AS usagePct,
+               COUNT(*) FILTER (WHERE result_status = 'VIOLATION') AS violationCount,
+               COUNT(*) FILTER (WHERE result_status = 'WARNING') AS warningCount,
+               (ARRAY_AGG(contract_no ORDER BY
+                    CASE result_status
+                        WHEN 'VIOLATION' THEN 4
+                        WHEN 'WARNING' THEN 3
+                        WHEN 'REVIEW_REQUIRED' THEN 2
+                        ELSE 1
+                    END DESC,
+                    usage_pct DESC NULLS LAST,
+                    cap_check_id DESC))[1] AS worstContractNo,
+               (ARRAY_AGG(usage_pct ORDER BY
+                    CASE result_status
+                        WHEN 'VIOLATION' THEN 4
+                        WHEN 'WARNING' THEN 3
+                        WHEN 'REVIEW_REQUIRED' THEN 2
+                        ELSE 1
+                    END DESC,
+                    usage_pct DESC NULLS LAST,
+                    cap_check_id DESC))[1] AS worstUsagePct
+          FROM latest_cap_check
+         GROUP BY payment_stage
+         ORDER BY CASE payment_stage WHEN 'INSURER_TO_GA' THEN 1 ELSE 2 END
+    </select>
+
+    <select id="summarizeByAgent" resultType="com.susukkang.fgc.cap.dto.CapAgentSummaryRow">
+        <include refid="latestScopedCapChecks"/>
+        SELECT a.agent_id AS agentId,
+               a.agent_code AS agentCode,
+               a.agent_name AS agentName,
+               o.organization_id AS organizationId,
+               o.organization_code AS organizationCode,
+               o.organization_name AS organizationName,
+               COUNT(*) AS contractCount,
+               COALESCE(SUM(ROUND(lcc.limit_amount, 0)), 0) AS limitAmountTotal,
+               COALESCE(SUM(ROUND(lcc.included_amount, 0)), 0) AS includedAmountTotal,
+               CASE WHEN COALESCE(SUM(ROUND(lcc.limit_amount, 0)), 0) = 0
+                    THEN 0.000000::numeric(12,6)
+                    ELSE ROUND(
+                        SUM(ROUND(lcc.included_amount, 0)) * 100 /
+                        SUM(ROUND(lcc.limit_amount, 0)), 6)
+               END AS usagePct,
+               COUNT(*) FILTER (WHERE lcc.result_status = 'VIOLATION') AS violationCount,
+               COUNT(*) FILTER (WHERE lcc.result_status = 'WARNING') AS warningCount,
+               (ARRAY_AGG(lcc.contract_no ORDER BY
+                    CASE lcc.result_status
+                        WHEN 'VIOLATION' THEN 4
+                        WHEN 'WARNING' THEN 3
+                        WHEN 'REVIEW_REQUIRED' THEN 2
+                        ELSE 1
+                    END DESC,
+                    lcc.usage_pct DESC NULLS LAST,
+                    lcc.cap_check_id DESC))[1] AS worstContractNo,
+               (ARRAY_AGG(lcc.usage_pct ORDER BY
+                    CASE lcc.result_status
+                        WHEN 'VIOLATION' THEN 4
+                        WHEN 'WARNING' THEN 3
+                        WHEN 'REVIEW_REQUIRED' THEN 2
+                        ELSE 1
+                    END DESC,
+                    lcc.usage_pct DESC NULLS LAST,
+                    lcc.cap_check_id DESC))[1] AS worstUsagePct
+          FROM latest_cap_check lcc
+          JOIN fgc.agent a ON a.agent_id = lcc.agent_id
+          JOIN fgc.organization o ON o.organization_id = lcc.organization_id
+         WHERE lcc.payment_stage = 'GA_TO_FC'
+         GROUP BY a.agent_id, a.agent_code, a.agent_name,
+                  o.organization_id, o.organization_code, o.organization_name
+         ORDER BY SUM(ROUND(lcc.included_amount, 0)) DESC, a.agent_code
     </select>
 
     <!--

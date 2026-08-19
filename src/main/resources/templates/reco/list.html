@@ -59,15 +59,18 @@
         <select class="fgc-select" id="r-insurer"><option value="">전체</option></select>
       </div>
       <!-- 실행(IF-API-38)·일괄 생성(IF-API-42)은 SETTLEMENT — GA_ADMIN 도 비활성이어야 한다 -->
-      <button class="fgc-btn fgc-btn--primary" id="btn-run" data-fgc-action="reconcile" th:disabled="${!canProcess}">
+      <button class="fgc-btn fgc-btn--primary" id="btn-run" type="button" data-fgc-action="reconcile" disabled
+              aria-describedby="reconciliation-actions-pending">
         <span class="material-symbols-outlined" style="font-size:18px">play_arrow</span> 대사 실행
       </button>
-      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" data-fgc-action="bulk" th:disabled="${!canProcess}">
+      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" type="button" data-fgc-action="bulk" disabled
+              aria-describedby="reconciliation-actions-pending">
         <span class="material-symbols-outlined" style="font-size:18px">playlist_add</span> 불일치 예외 일괄 생성
       </button>
     </div>
     <div class="fgc-card__body" style="padding-top:0">
-      <p class="fgc-help">
+      <p class="fgc-help" id="reconciliation-actions-pending">
+        대사 실행과 불일치 예외 일괄 생성은 API 연동 대기입니다.<br>
         같은 정산월 · 지급단계 · 보험회사 조합으로는 실행을 2건 만들 수 없습니다.
         다시 돌려도 결과가 중복으로 쌓이지 않습니다
         (<span class="fgc-mono">UNIQUE(reconciliation_run_id, match_group_key)</span>).

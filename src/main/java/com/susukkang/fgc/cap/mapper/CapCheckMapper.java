@@ -1,11 +1,13 @@
 package com.susukkang.fgc.cap.mapper;
 
+import com.susukkang.fgc.cap.dto.CapAgentSummaryRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapCheckInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
 import com.susukkang.fgc.cap.dto.CapCheckRow;
 import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
+import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -50,6 +52,7 @@ public interface CapCheckMapper {
                                   @Param("paymentStage") String paymentStage,
                                   @Param("resultStatus") String resultStatus,
                                   @Param("insurerId") Long insurerId,
+                                  @Param("organizationId") Long organizationId,
                                   @Param("contractNo") String contractNo,
                                   @Param("offset") int offset,
                                   @Param("limit") int limit);
@@ -59,6 +62,7 @@ public interface CapCheckMapper {
                @Param("paymentStage") String paymentStage,
                @Param("resultStatus") String resultStatus,
                @Param("insurerId") Long insurerId,
+               @Param("organizationId") Long organizationId,
                @Param("contractNo") String contractNo);
 
     /**
@@ -68,7 +72,22 @@ public interface CapCheckMapper {
     List<CapCheckStatusCount> summarize(@Param("month") LocalDate month,
                                          @Param("paymentStage") String paymentStage,
                                          @Param("insurerId") Long insurerId,
+                                         @Param("organizationId") Long organizationId,
                                          @Param("contractNo") String contractNo);
+
+    /** status와 stage를 제외한 전체 검색범위의 지급단계별 집계. */
+    List<CapStageSummaryRow> summarizeByStage(
+            @Param("month") LocalDate month,
+            @Param("insurerId") Long insurerId,
+            @Param("organizationId") Long organizationId,
+            @Param("contractNo") String contractNo);
+
+    /** status와 stage를 제외한 전체 검색범위의 GA_TO_FC 설계사별 모니터링 집계. */
+    List<CapAgentSummaryRow> summarizeByAgent(
+            @Param("month") LocalDate month,
+            @Param("insurerId") Long insurerId,
+            @Param("organizationId") Long organizationId,
+            @Param("contractNo") String contractNo);
 
     /**
      * IF-API-31(계산근거 팝업)용. cap_check_id로 cap_check 1건 + contractNo(insurance_contract join)를

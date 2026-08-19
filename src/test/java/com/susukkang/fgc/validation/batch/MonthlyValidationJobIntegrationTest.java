@@ -30,11 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * IF-BAT-01 MonthlyValidationJob(#57) 골격 통합테스트. 실제 JobRepository/DB로 Job 전체를
- * 한 번 돌려서 "①createRunStep은 정상 완료되고, 아직 실제 포트 구현이 없는 ②~⑧ 자리에서
- * Job이 FAILED로 멈추며 validation_run도 FAILED로 남는지"를 검증한다(#60에서 각 Step이
- * MonthlyValidationStepCoordinator의 포트를 실제 구현으로 갈아끼우면, 이 테스트도 정상 완료
- * 경로(COMPLETED)를 검증하도록 갱신해야 한다). 지금 이 테스트는 로직의 정확성이 아니라
- * 배선(순서·파티션·진행상황 기록·실패 전파)이 맞는지만 본다.
+ * 한 번 돌려서 "9개 Step이 순서대로·파티션까지 정상 배선돼 있고, 대상 데이터가 없는 달에는
+ * 전부 정상 완료되어 validation_run도 COMPLETED로 남는지"를 검증한다(#60에서 모든 Step의
+ * 포트가 실제 구현으로 교체되며 갱신됨 — 그 전에는 미구현 Placeholder Step에서 실패로
+ * 멈추는 경로를 검증했다). 지금 이 테스트는 로직의 정확성이 아니라 배선(순서·파티션·
+ * 진행상황 기록·완료 전파)이 맞는지만 본다.
  *
  * @Transactional을 안 쓴다: Spring Batch가 Step마다 자기 트랜잭션을 커밋해야 JobRepository가
  * 다음 Step에서 이전 상태를 볼 수 있다 — 테스트를 하나의 롤백 트랜잭션으로 감싸면 그 커밋이
@@ -44,7 +44,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBatchTest
 class MonthlyValidationJobIntegrationTest {
 
-    private static final LocalDate TEST_MONTH = LocalDate.of(2031, 3, 1);
+    // 시드 계약보다 앞선 월을 써야 한다. 이 테스트의 목적은 배치 Step 배선·완료 전파 검증이며,
+    // 실제 계약을 선택하면 스케줄이 확정/대사 이력으로 잠겨 @AfterEach에서 안전하게 되돌릴 수 없다.
+    private static final LocalDate TEST_MONTH = LocalDate.of(2000, 3, 1);
 
     @Autowired
     private JobLauncherTestUtils jobLauncherTestUtils;
@@ -60,9 +62,51 @@ class MonthlyValidationJobIntegrationTest {
 
     private final List<Long> createdValidationRunIds = new ArrayList<>();
 
+    // 2026-08-17 - 대상 선별 상품코드 비교 수정에 따른 정리 범위 확장
+    // 기존 코드: cap_check(_detail)·validation_target·validation_run만 지웠다.
+    // 문제: 선별 SQL이 insurer_product_code와 비교하던 버그로 전 계약이 REVIEW_REQUIRED가 되어
+    //       하위 Step이 결과를 만들지 않았기에 그 정리로 충분했지만, 표준상품코드 비교로 고치자
+    //       실제로 대상이 선정되어 arbitrage_check·journal·reconciliation·exception_case가
+    //       생성되고 validation_run DELETE가 FK 위반으로 실패했다.
+    // 개선: validation_run을 참조하는 자식(손자 포함)을 FK 순서대로 전부 지운다.
+    //       스케줄은 실행 FK가 없고 확정·조정 회차는 DB 트리거로 불변이다. 이 테스트는 대상 계약이
+    //       없는 검증월을 사용하므로 스케줄을 만들지 않으며, 실행에 종속된 산출물만 정리한다.
     @AfterEach
     void cleanUp() {
         createdValidationRunIds.forEach(id -> {
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.exception_action
+                     WHERE exception_case_id IN (
+                         SELECT exception_case_id FROM fgc.exception_case WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.exception_case WHERE validation_run_id = ?", id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.reconciliation_match
+                     WHERE reconciliation_result_id IN (
+                         SELECT rr.reconciliation_result_id
+                           FROM fgc.reconciliation_result rr
+                           JOIN fgc.reconciliation_run r ON r.reconciliation_run_id = rr.reconciliation_run_id
+                          WHERE r.validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.reconciliation_result
+                     WHERE reconciliation_run_id IN (
+                         SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.reconciliation_run WHERE validation_run_id = ?", id);
+            jdbcTemplate.update("""
+                    DELETE FROM fgc.journal_line
+                     WHERE journal_header_id IN (
+                         SELECT journal_header_id FROM fgc.journal_header WHERE validation_run_id = ?
+                     )
+                    """, id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.journal_header WHERE validation_run_id = ?", id);
             jdbcTemplate.update("""
                     DELETE FROM fgc.cap_check_detail
                      WHERE cap_check_id IN (
@@ -73,6 +117,14 @@ class MonthlyValidationJobIntegrationTest {
                     """, id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.cap_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.arbitrage_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.acquisition_cost_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.maintenance_check WHERE validation_run_id = ?", id);
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.contract_status_event_processing WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
                     "DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
             jdbcTemplate.update(
@@ -86,7 +138,7 @@ class MonthlyValidationJobIntegrationTest {
     // 되게 한다.
     private JobParameters jobParameters(String requestId, long runNo) {
         return new JobParametersBuilder()
-                .addString("validationMonth", "2031-03")
+                .addString("validationMonth", "2000-03")
                 .addLong("runNo", runNo)
                 .addString("runType", "MONTHLY")
                 .addLong("triggeredBy", 3L)
@@ -108,12 +160,25 @@ class MonthlyValidationJobIntegrationTest {
      * @author hjKang
      * @since 2026-08-13
      *
-     * 2026-08-13 - 대상 선별 Step 구현에 따른 월 통합검증 실행 흐름 검증 변경
-     * 기존 코드: createRunStep 완료 후 selectTargetStep의 Placeholder에서 실행이 실패했다.
-     * 문제: selectTargetStep이 실제 구현으로 교체되어 기존 완료 Step 기대값과 일치하지 않았다.
-     * 개선: 대상 선별 Step 완료 후 다음 미구현 Step에서 실행이 차단되는지 검증한다.
+     * 2026-08-16 - #142 reconciliationStep·exceptionGenerationStep 구현에 따른 완료 경로 변경
+     * 기존 코드: journalPostingStep·imbalanceCheckStep 완료 후 미구현 Placeholder였던
+     *       reconciliationStep에서 실행이 실패하는 것을 검증했다.
+     * 문제: develop 병합으로 reconciliationStep(ReconciliationTasklet)·exceptionGenerationStep
+     *       (ExceptionGenerationTasklet)이 모두 실제 구현으로 교체돼 더 이상 무조건 실패하지
+     *       않는다. TEST_MONTH(2031-03)에는 대상 데이터가 없어 두 Step 모두 0건 처리로 정상
+     *       완료되고, Job 전체가 COMPLETED로 끝난다.
+     * 개선: 9개 Step 전부가 COMPLETED로 끝나고 validation_run도 COMPLETED로 전이하는 정상
+     *       완료 경로를 검증하도록 갱신한다(클래스 Javadoc에서 예고한 #60 갱신 지점).
+     *
+     * 2026-08-17 - 대상 선별(FUN-042) 상품코드 비교 수정에 따른 전제 갱신
+     * 기존 코드: "TEST_MONTH에는 대상 데이터가 없다"는 전제로 0건 완료 경로를 검증했다.
+     * 문제: 그 0건은 실은 선별 SQL이 insurer_product_code와 비교하던 버그로 전 계약이
+     *       REVIEW_REQUIRED가 된 결과였다.
+     * 개선: 이 테스트는 배치 Step의 배선·완료 전파만 검증하므로, 시드 계약보다 앞선 검증월을
+     *       사용해 스케줄·대사 이력을 남기지 않는다. 실제 대상 선별 및 산출물 검증은 각 도메인
+     *       통합 테스트가 담당한다.
      */
-    void completesImplementedStepsAndBlocksAtJournalPlaceholder() throws Exception {
+    void completesAllStepsAgainstSeedData() throws Exception {
         jobLauncherTestUtils.setJob(monthlyValidationJob);
         long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
 
@@ -123,7 +188,7 @@ class MonthlyValidationJobIntegrationTest {
         assertThat(validationRunId).isNotNull();
         createdValidationRunIds.add(validationRunId);
 
-        assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
 
         Set<String> completedStepNames = jobExecution.getStepExecutions().stream()
                 .filter(se -> se.getStatus() == BatchStatus.COMPLETED)
@@ -135,7 +200,11 @@ class MonthlyValidationJobIntegrationTest {
                 "selectTargetStep",
                 "regenerateScheduleStep",
                 "capCheckStep",
-                "arbitrageCheckStep"
+                "arbitrageCheckStep",
+                "journalPostingStep",
+                "imbalanceCheckStep",
+                "reconciliationStep",
+                "exceptionGenerationStep"
         );
 
         // capCheckStep은 INSURER_TO_GA/GA_TO_FC 2개 파티션 워커로 나뉘어 실행돼야 한다.
@@ -146,15 +215,29 @@ class MonthlyValidationJobIntegrationTest {
 
         assertThat(jobExecution.getStepExecutions())
                 .filteredOn(step -> step.getStatus() == BatchStatus.FAILED)
-                .extracting(StepExecution::getStepName)
-                .containsExactly("journalPostingStep");
+                .isEmpty();
 
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
-        assertThat(row.getStatus()).isEqualTo("FAILED");
+        assertThat(row.getStatus()).isEqualTo("COMPLETED");
         assertThat(row.getValidationMonth()).isEqualTo(TEST_MONTH);
         assertThat(row.getRunNo()).isEqualTo(Math.toIntExact(runNo));
         assertThat(row.getStartedAt()).isNotNull();
-        assertThat(row.getCompletedAt()).isNull();
+        assertThat(row.getCompletedAt()).isNotNull();
+
+        // 이 클래스는 실행 배선 테스트다. 과거 검증월에는 대상 계약이 없어야 하며,
+        // 그럼에도 9개 Step이 모두 정상 완료되어야 한다.
+        long selectedTargets = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.validation_target WHERE validation_run_id = ? AND selection_status = 'SELECTED'",
+                Long.class, validationRunId);
+        assertThat(selectedTargets).isZero();
+        long reconciliationRuns = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.reconciliation_run WHERE validation_run_id = ?",
+                Long.class, validationRunId);
+        assertThat(reconciliationRuns).isZero();
+        long arbitrageChecks = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.arbitrage_check WHERE validation_run_id = ?",
+                Long.class, validationRunId);
+        assertThat(arbitrageChecks).isZero();
     }
 
     @Test

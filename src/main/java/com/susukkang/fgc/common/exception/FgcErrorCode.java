@@ -19,6 +19,11 @@ public enum FgcErrorCode {
             HttpStatus.UNPROCESSABLE_ENTITY,
             "error.cap.unresolvedViolation"
     ),
+    CAP_004(
+            "FGC-CAP-004",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.cap.ruleMissing"
+    ),
 
     TRAN_001(
             "FGC-TRAN-001",
@@ -50,6 +55,16 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.transaction.cancelConfirmedOnly"
     ),
+    TRAN_007(
+            "FGC-TRAN-007",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.transaction.policyVersionMissing"
+    ),
+    TRAN_008(
+            "FGC-TRAN-008",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.transaction.attributionBeforeContract"
+    ),
 
     CONT_001(
             "FGC-CONT-001",
@@ -71,6 +86,16 @@ public enum FgcErrorCode {
             "FGC-SCHE-002",
             HttpStatus.CONFLICT,
             "error.schedule.confirmedImmutable"
+    ),
+    SCHE_003(
+            "FGC-SCHE-003",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.schedule.capExceeded"
+    ),
+    SCHE_004(
+            "FGC-SCHE-004",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.schedule.capReviewRequired"
     ),
 
     VRUN_001(
@@ -126,6 +151,11 @@ public enum FgcErrorCode {
             "FGC-RECO-001",
             HttpStatus.CONFLICT,
             "error.reconciliation.duplicateGroup"
+    ),
+    RECO_002(
+            "FGC-RECO-002",
+            HttpStatus.CONFLICT,
+            "error.reconciliation.duplicateRun"
     ),
 
     EXCP_001(

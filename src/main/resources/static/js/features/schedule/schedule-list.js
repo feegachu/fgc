@@ -210,7 +210,9 @@
     retry.type = "button";
     retry.className = "button button-secondary";
     retry.textContent = "다시 시도";
-    retry.addEventListener("click", function () { load(currentState); });
+    retry.addEventListener("click", function () {
+      load(currentState);
+    });
     wrapper.append(title, message, retry);
     makeStateRow(wrapper, "schedule-error-state");
   }
@@ -389,7 +391,6 @@
       .then(function (envelope) {
         if (sequence !== requestSequence) return;
         if (!isPageResponse(envelope.data)) throw new apiClient.ApiError(null, envelope.requestId, 200);
-
         var pageData = envelope.data;
         var normalizedPage = normalizePage(pageData.page, pageData.totalPages);
         pageData.page = normalizedPage;

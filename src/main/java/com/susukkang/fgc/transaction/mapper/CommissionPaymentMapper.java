@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.mapper;
 
+import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
 import com.susukkang.fgc.transaction.domain.CommissionItemReference;
@@ -10,6 +11,8 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentListResponse;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentSearchCondition;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -26,7 +29,21 @@ import java.util.List;
 @Mapper
 public interface CommissionPaymentMapper {
 
+    List<CommissionPaymentListResponse> selectByCondition(
+            @Param("condition") CommissionPaymentSearchCondition condition,
+            @Param("size") int size,
+            @Param("offset") long offset
+    );
+
+    long countByCondition(@Param("condition") CommissionPaymentSearchCondition condition);
+
     boolean existsAgent(@Param("agentId") Long agentId);
+
+    /** 계약 미귀속 신인활동지원비 확정 전 설계사 적격 여부를 확인한다. */
+    boolean existsEligibleNewcomerSupportAgent(
+            @Param("agentId") Long agentId,
+            @Param("asOfDate") LocalDate asOfDate
+    );
 
     LocalDate findAgentAppointmentDate(@Param("agentId") Long agentId);
 
@@ -69,9 +86,23 @@ public interface CommissionPaymentMapper {
 
     List<ConfirmationData> findConfirmationDataForUpdate(@Param("paymentId") Long paymentId);
 
+    // IF-API-24 사전검증 전용 무잠금 조회 — 같은 SELECT의 FOR UPDATE 없는 버전
+    List<ConfirmationData> findConfirmationData(@Param("paymentId") Long paymentId);
+
+    List<AttributedContractNo> findAttributedContractNumbers(@Param("paymentId") Long paymentId);
+
     List<Long> lockAttributedContracts(@Param("paymentId") Long paymentId);
 
     CapRuleSnapshot findCapRuleSnapshot(
+            @Param("paymentId") Long paymentId,
+            @Param("transactionAttributionId") Long transactionAttributionId
+    );
+
+    /**
+     * 귀속 계약·지급단계에 적용 가능한 활성 1,200% 룰셋의 존재 여부를 확인한다.
+     * 수수료 항목(cap_rule_item) 미분류와 룰셋 자체 부재(CAP_004)를 구분하기 위한 조회다.
+     */
+    boolean existsApplicableCapRuleSet(
             @Param("paymentId") Long paymentId,
             @Param("transactionAttributionId") Long transactionAttributionId
     );

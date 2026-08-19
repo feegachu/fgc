@@ -13,5 +13,6 @@ public enum PremiumConversionRuleCode {
     MONTHLY_AS_IS,      //월 납입 x1
     MONTHLY_TO_QUARTERLY_X3, //분기별 납입 x3
     MONTHLY_TO_SEMI_ANNUAL_X6, //반년주기 납입 x6
-    MONTHLY_TO_ANNUAL_X12 //연간 납입 x12
+    MONTHLY_TO_ANNUAL_X12, //연간 납입 x12
+    DIRECT_INPUT //화면에서 원주기 보험료와 월납환산 보험료를 각각 직접 입력
 }

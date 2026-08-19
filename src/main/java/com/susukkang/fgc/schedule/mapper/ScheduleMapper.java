@@ -51,6 +51,10 @@ public interface ScheduleMapper {
             @Param("scheduleHeaderId") Long scheduleHeaderId
     );
 
+    List<ScheduleHeaderResponse> selectVersionsByScheduleHeaderId(
+            @Param("scheduleHeaderId") Long scheduleHeaderId
+    );
+
     /**
      * 설명 : 스케줄 라인 목록을 schedule_line에 일괄 저장한다.
      * @param scheduleLineList 스케줄 라인 목록
@@ -59,6 +63,16 @@ public interface ScheduleMapper {
      * @since 2026-08-09
      */
     int insertAllScheduleLines(@Param("lines") List<ScheduleLineInsertDTO> scheduleLineList);
+
+    /**
+     * FGC-FUN-043 결과 집계 — 월 검증 배치가 생성·재생성한 스케줄 헤더를 그 실행에
+     * 연결한다(schedule_header.validation_run_id, V21). 계약 생성·정책 변경 등 검증
+     * 실행과 무관한 경로로 만든 헤더는 이 메서드를 거치지 않아 NULL로 남는다.
+     *
+     * @return 갱신된 헤더 수
+     */
+    int linkHeadersToValidationRun(@Param("scheduleHeaderIds") List<Long> scheduleHeaderIds,
+                                    @Param("validationRunId") Long validationRunId);
 
     /**
      * 정책 미존재·중복으로 스케줄을 생성하지 못한 지급단계를 검토 예외 큐에 등록한다.
@@ -100,12 +114,21 @@ public interface ScheduleMapper {
             @Param("paymentStage") PaymentStage paymentStage
     );
 
+    /** 계약 수정 시 새 버전으로 교체할 활성 운영 스케줄 ID를 조회한다. */
+    List<Long> selectActiveOperationalScheduleIds(@Param("contractId") Long contractId);
+
     ScheduleDetailResponse selectByContractIdAndPaymentStage(
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage
     );
     // 스케줄 ID를 통해 헤더 조회
     ScheduleHeaderInsertDTO selectScheduleHeaderById(@Param("scheduleId") Long scheduleId);
+
+    /** 예정 상태인 회차를 확정 상태로 변경한다. */
+    int confirmPlannedScheduleLines(@Param("scheduleHeaderId") Long scheduleHeaderId);
+
+    /** 활성 예정 스케줄 헤더를 확정한다. */
+    int confirmScheduleHeader(@Param("scheduleHeaderId") Long scheduleHeaderId);
 
     // 스케줄 ID를 통해 기존 회차별 라인을 조회
     List<ScheduleLineInsertDTO> selectScheduleLinesByScheduleId(@Param("scheduleId") Long scheduleId);

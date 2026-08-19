@@ -31,7 +31,7 @@ class CommissionItemMapperIntegrationTest {
         String inactiveCode = "IT_INACTIVE_" + suffix;
         String expiredCode = "IT_EXPIRED_" + suffix;
 
-        insertItem(effectiveCode, "통합 테스트 유효 항목", true,
+        Long effectiveId = insertItem(effectiveCode, "통합 테스트 유효 항목", true,
                 LocalDate.of(2026, 1, 1), null);
         insertItem(inactiveCode, "통합 테스트 비활성 항목", false,
                 LocalDate.of(2026, 1, 1), null);
@@ -43,6 +43,7 @@ class CommissionItemMapperIntegrationTest {
         assertThat(result)
                 .filteredOn(item -> item.itemCode().equals(effectiveCode))
                 .containsExactly(new CommissionItemResponse(
+                        effectiveId,
                         effectiveCode,
                         "통합 테스트 유효 항목",
                         "PAYMENT",
@@ -55,14 +56,14 @@ class CommissionItemMapperIntegrationTest {
                 .doesNotContain(inactiveCode, expiredCode);
     }
 
-    private void insertItem(
+    private Long insertItem(
             String itemCode,
             String itemName,
             boolean active,
             LocalDate effectiveFrom,
             LocalDate effectiveTo
     ) {
-        jdbcTemplate.update("""
+        return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_item (
                     item_code,
                     item_name,
@@ -72,7 +73,9 @@ class CommissionItemMapperIntegrationTest {
                     effective_to,
                     active_yn
                 ) VALUES (?, ?, 'PAYMENT', 'SALES', ?, ?, ?)
+                RETURNING commission_item_id
                 """,
+                Long.class,
                 itemCode,
                 itemName,
                 effectiveFrom,
