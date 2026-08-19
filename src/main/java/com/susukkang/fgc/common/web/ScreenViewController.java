@@ -63,12 +63,8 @@ public class ScreenViewController {
         return "arbitrage/list";
     }
 
-    @GetMapping("/journals")
-    public String journalList() {
-        return "ledger/list";
-    }
-
     // AUDT-W01(/audit-logs)은 데이터 바인딩과 함께 audit.controller.AuditLogViewController 로,
     // VRUN-W01/W02(/validation-runs)는 validation.controller.ValidationRunViewController 로,
-    // RECO-W01(/reconciliations)은 reconciliation.controller.ReconciliationViewController 로 이관했다.
+    // RECO-W01(/reconciliations)은 reconciliation.controller.ReconciliationViewController 로,
+    // LEDG-W01(/journals)은 journal.controller.JournalViewController 로 이관했다.
 }

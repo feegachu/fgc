@@ -105,7 +105,34 @@ class PublishingTemplateStructureTest {
         assertThat(resource("templates/exception/list.html"))
                 .contains("정상 건은 여기 오지 않습니다. 여기 있는 건 전부 사람이 봐야 합니다.");
         assertThat(resource("templates/ledger/list.html"))
-                .contains("이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.");
+                .contains("이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.")
+                .contains("data-modal=\"journal-reverse\"")
+                .contains("id=\"journal-reverse-reason\"")
+                .contains("data-can-reverse=${roleCode == 'SETTLEMENT' or roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                .doesNotContain("데이터 렌더링은 IF-API 연동 시 추가");
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/js/features/ledger/ledger.js");
+        assertThat(resource("static/js/features/ledger/ledger.js"))
+                .contains("/api/v1/journals/imbalances?validationRunId=")
+                .contains("/reverse\"")
+                .contains("detail.status === \"POSTED\"")
+                .contains("evidenceRef: reverseEvidence.value.trim() || null")
+                .doesNotContain("apiClient.request(\"/api/v1/journals?\"")
+                .doesNotContain("fetch(");
+    }
+
+    @Test
+    void ledgerSearchRunsOnlyWhenFilterFormIsSubmitted() throws IOException {
+        assertThat(resource("templates/ledger/list.html"))
+                .contains("id=\"ledger-filter-form\"")
+                .contains("method=\"get\" th:action=\"@{/journals}\"")
+                .contains("id=\"f-search\" name=\"searched\" value=\"true\" type=\"submit\"")
+                .contains("th:each=\"journal : ${journals.content}\"")
+                .contains("조회 조건을 설정하고 조회 버튼을 눌러 주세요.");
+        assertThat(resource("static/js/features/ledger/ledger.js"))
+                .doesNotContain("form.addEventListener(\"submit\"")
+                .doesNotContain("function loadList(")
+                .doesNotContain("function query(");
     }
 
     @Test
