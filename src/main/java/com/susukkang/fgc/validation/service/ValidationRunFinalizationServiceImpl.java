@@ -104,6 +104,12 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
 
         FinalizedValidationRunRow finalized = requireFinalization(validationRunId);
         recordFinalizationAudit(finalized, finalizedBy);
+        // 2026-08-19 yslee - 검증 실행 확정 이벤트 발행 복원
+        // 기존 코드: 확정 상태와 감사로그만 저장하고 화면 잠금 연동 이벤트를 발행하지 않음
+        // 문제: IF-EVT-07 구독자가 확정 완료를 인지할 수 없음
+        // 개선: 최초 확정 성공 후에만 ValidationRunFinalized 이벤트를 한 번 발행
+        eventPublisher.publishEvent(new ValidationRunFinalized(
+                validationRunId, lockedRun.getValidationMonth(), finalizedBy, finalized.getFinalizedAt()));
         return response(finalized);
     }
 
