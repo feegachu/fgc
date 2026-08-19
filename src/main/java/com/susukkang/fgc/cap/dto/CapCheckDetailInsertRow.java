@@ -15,9 +15,7 @@ import java.math.BigDecimal;
  * 컬럼) — commission_item/schedule_line이 나중에 바뀌어도 과거 판정의 계산근거는 그때 값 그대로
  * 남아야 하기 때문이다(CAP-W02 요구사항, PR #2 코드리뷰 지적).
  *
- * evidenceRef가 없는 이유: 이 엔진(REALTIME/MONTHLY)이 만드는 detail 행은 schedule_line 기반
- * 산입 후보라 계산 시점엔 증빙이 존재하지 않는다(증빙은 실제 지급 건 확정 때 transaction_attribution
- * 경로로 붙는다 — 아직 미구현).
+ * evidenceRef는 증빙 필수 제외항목에 연결된 transaction_attribution의 증빙 참조를 스냅샷한다.
  */
 @Getter
 @Setter
@@ -35,4 +33,5 @@ public class CapCheckDetailInsertRow {
     private String classificationSnapshot;
     private BigDecimal amount;
     private String decisionReason;
+    private String evidenceRef;
 }
