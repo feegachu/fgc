@@ -72,18 +72,23 @@ class PublishingTemplateStructureTest {
                 .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
                 .contains("apiClient.request")
                 .doesNotContain("fetch(");
-        // VRUN-W02 는 IF-API-50 체크리스트를 연동하고, IF-API-51 연결 전까지 확정 버튼을
-        // 정적 disabled 로 유지한다.
+        // VRUN-W02 는 IF-API-50 체크리스트와 IF-API-51 확정을 연결한다. 버튼은 초기에는
+        // 정적 disabled 이고 권한·COMPLETED·6개 조건 통과를 확인한 뒤에만 스크립트가 푼다.
         assertThat(resource("templates/vrun/detail.html"))
                 .contains("id=\"cond-body\" aria-live=\"polite\"")
                 .contains("data-checklist-passed=\"false\"")
+                .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
                 .doesNotContain("확정 조건 API 연동 대기")
                 .containsPattern("(?s)<button[^>]*id=\"btn-finalize\"[^>]*\\bdisabled\\b[^>]*>");
         assertThat(resource("static/js/features/vrun/vrun-detail.js"))
                 .contains("/finalize-checklist")
+                .contains("/finalize\"")
                 .contains("safeInternalLink")
                 .contains("checklist.conditions.length !== 6")
                 .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
+                .contains("idempotencyKey: finalizeIdempotencyKey")
+                .contains("runStatus !== \"COMPLETED\"")
+                .contains("window.confirm")
                 .doesNotContain("fetch(");
     }
 

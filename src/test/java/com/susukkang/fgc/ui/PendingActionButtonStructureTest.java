@@ -23,17 +23,23 @@ class PendingActionButtonStructureTest {
      * 버튼의 활성/비활성 규칙(SETTLEMENT만 활성)은 ReconciliationViewControllerTest가 검증한다.
      */
 
-    /**
-     * FGC-FUN-044 — 확정(IF-API-51)만 아직 미연동이라 pending 을 유지한다.
-     * 생성·새로고침·실행(IF-API-45·48·49)은 #188 에서 연동돼 pending 단언에서 뺐다 —
-     * 해당 버튼들의 활성/비활성 규칙은 ValidationRunViewControllerTest 가 검증한다.
-     */
+    /** FGC-FUN-044 — IF-API-50/51 연결 후 초기 disabled를 권한·상태·체크리스트가 모두 통과할 때만 해제한다. */
     @Test
-    void validationRunFinalizeStaysDisabledUntilFrontendApiIntegration() throws IOException {
+    void validationRunFinalizeUsesFrontendChecklistAndRoleGate() throws IOException {
         String detailTemplate = resource("templates/vrun/detail.html");
+        String detailScript = resource("static/js/features/vrun/vrun-detail.js");
 
-        assertPendingButton(detailTemplate, "btn-finalize", "finalize-actions-pending");
-        assertThat(detailTemplate).contains("확정 조건 확인과 확정 작업은 API 연동 대기입니다.");
+        assertThat(detailTemplate)
+                .containsPattern("(?s)<button(?=[^>]*\\bid=\"btn-finalize\")"
+                        + "(?=[^>]*\\btype=\"button\")(?=[^>]*\\sdisabled\\b)"
+                        + "(?=[^>]*data-checklist-passed=\"false\")"
+                        + "(?=[^>]*data-can-finalize=)[^>]*>")
+                .contains("id=\"finalize-action-guide\"")
+                .doesNotContain("확정 조건 확인과 확정 작업은 API 연동 대기입니다.");
+        assertThat(detailScript)
+                .contains("/finalize-checklist")
+                .contains("/finalize\"")
+                .contains("idempotencyKey: finalizeIdempotencyKey");
     }
 
     private static void assertPendingButton(String template, String id, String descriptionId) {
