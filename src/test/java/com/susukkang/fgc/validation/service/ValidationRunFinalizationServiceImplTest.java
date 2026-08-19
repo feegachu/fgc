@@ -126,6 +126,7 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.finalizedAt()).isEqualTo(
                 OffsetDateTime.parse("2026-08-16T12:34:56+09:00"));
         verify(auditLogMapper, never()).insert(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
