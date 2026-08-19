@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +57,8 @@ class ExceptionCaseActionServiceIntegrationTest {
                 loginId);
 
         assertThat(started.actionSeq()).isEqualTo(1);
+        // SIR-008: 저장 직후 응답의 처리 시각도 GET 조회 경로와 같은 Asia/Seoul 오프셋이어야 한다
+        assertThat(started.actionAt().getOffset()).isEqualTo(ZoneOffset.ofHours(9));
         assertThat(started.fromStatus()).isEqualTo(ExceptionStatus.NEW);
         assertThat(started.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
         assertThat(resolved.actionSeq()).isEqualTo(2);
