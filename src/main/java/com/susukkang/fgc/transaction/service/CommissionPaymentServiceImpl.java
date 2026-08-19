@@ -441,6 +441,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private ExceptionCaseCommand exceptionCommand(
             ConfirmationData data,
             String exceptionType,
+            String reasonCode,
             String severity,
             String title,
             String description
@@ -449,6 +450,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .exceptionKey("PRE_CONFIRM:" + data.paymentId() + ":"
                         + data.transactionAttributionId() + ":" + exceptionType)
                 .exceptionType(exceptionType)
+                .reasonCode(reasonCode)
                 .severity(severity)
                 .contractId(data.contractId())
                 .agentId(data.agentId())
@@ -908,12 +910,28 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private record GateFailure(
             ConfirmationData data,
             String exceptionType,
+            String reasonCode,
             String severity,
             String title,
             String description,
             FgcErrorCode errorCode,
             Map<String, Object> params
-    ) {}
+    ) {
+        // reasonCode 없이 부르는 기존 호출부(대부분의 게이트)는 exceptionType이 곧 사유라
+        // reasonCode를 별도로 안 남긴다 — CAP_RULE_MISMATCH처럼 exceptionType 자체가
+        // 흡수·재분류된 경우에만 8-인자 정식 생성자로 reasonCode를 명시한다.
+        GateFailure(
+                ConfirmationData data,
+                String exceptionType,
+                String severity,
+                String title,
+                String description,
+                FgcErrorCode errorCode,
+                Map<String, Object> params
+        ) {
+            this(data, exceptionType, null, severity, title, description, errorCode, params);
+        }
+    }
 
     private void failFirst(GateFailure failure) {
         if (failure != null) {
@@ -930,6 +948,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             saveException(
                     failure.data(),
                     failure.exceptionType(),
+                    failure.reasonCode(),
                     failure.severity(),
                     failure.title(),
                     failure.description()
@@ -1271,8 +1290,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ConfirmationData data
     ) {
         if (!rule.capRuleSetId().equals(calculation.capRuleSetId())) {
+            // "CAP_RULE_MISMATCH"는 V23_1(exception_case_exception_type_check 재정의)에서
+            // exception_type 허용 목록에서 빠지고 CAP_REVIEW_REQUIRED로 흡수됐다 — 그 값을
+            // exceptionType으로 계속 쓰면 CHECK 제약 위반으로 저장 자체가 실패한다.
+            // 세부 사유는 reason_code로 남겨서 "정책 불일치"라는 원래 원인이 사라지지
+            // 않게 한다(코드리뷰 반영). exceptionKey가 exceptionType을 그대로 물고 있어
+            // (PRE_CONFIRM:{paymentId}:{attributionId}:{exceptionType}) 예전
+            // CAP_RULE_MISMATCH 키와는 여전히 다르다 — 이 지급 건이 과거에 이미
+            // CAP_RULE_MISMATCH로 기록된 적이 있어도 새 실행에서 재사용되지 않고 새
+            // 업무건이 생긴다는 뜻이다. exceptionKey를 exceptionType과 분리해 안정키로
+            // 바꾸는 건 이 세 게이트 실패 유형 전체(TRAN_002 등)에 걸친 별도 설계
+            // 결정이 필요해 이번 수정 범위에 넣지 않았다.
             return new GateFailure(
                     data,
+                    "CAP_REVIEW_REQUIRED",
                     "CAP_RULE_MISMATCH",
                     "HIGH",
                     "한도 정책 불일치",
@@ -1321,6 +1352,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private void saveException(
             ConfirmationData data,
             String exceptionType,
+            String reasonCode,
             String severity,
             String title,
             String description
@@ -1328,6 +1360,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         mapper.insertExceptionCase(exceptionCommand(
                 data,
                 exceptionType,
+                reasonCode,
                 severity,
                 title,
                 description
