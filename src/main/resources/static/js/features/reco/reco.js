@@ -25,6 +25,7 @@
     sumExpected: document.getElementById("sum-expected"),
     sumActual: document.getElementById("sum-actual"),
     sumDiff: document.getElementById("sum-diff"),
+    resultSumLabel: document.getElementById("result-sum-label"),
     resultPagination: document.getElementById("result-pagination"),
     resultPagePrev: document.getElementById("result-page-prev"),
     resultPageNext: document.getElementById("result-page-next"),
@@ -36,7 +37,8 @@
   var state = {
     reconciliationRunId: null,
     resultsAbortController: null,
-    resultsPage: 1
+    resultsPage: 1,
+    compareRequestId: 0
   };
 
   function number(value) {
@@ -111,8 +113,6 @@
   }
 
   function runErrorMessage(error) {
-    if (error && error.code === "FGC-RECO-002") return "실행 생성 불가 — 같은 정산월·지급단계·보험회사·검증실행 조합의 대사가 이미 존재합니다.";
-    if (error && error.code === "FGC-RECO-001") return "처리 불가 — 같은 대사 그룹이 중복 생성되었습니다. 다시 실행하세요.";
     return (error && error.message) || "대사 실행에 실패했습니다.";
   }
 
@@ -213,6 +213,7 @@
     // 필터가 걸리면 그 조건의 합계를 서버가 안 주므로 현재 페이지 안에서만 클라이언트가 더한다
     // (Number 합산이라 정밀도·페이지 범위 한계가 있음 — "불일치만" 옆 안내 문구 참고).
     var noFilter = !el.typeFilter.value && !el.mismatchOnly.checked;
+    el.resultSumLabel.textContent = noFilter ? "합계" : "이 페이지 합계";
     if (!rows.length) {
       el.resultBody.innerHTML = '<tr><td colspan="12"><div class="fgc-empty">조건에 맞는 자료가 없습니다.</div></td></tr>';
       el.sumExpected.textContent = "0";
@@ -362,14 +363,17 @@
   }
 
   function openCompareModal(reconciliationResultId) {
+    var requestId = ++state.compareRequestId;
     setCompareModalState("loading", "불러오는 중입니다.");
     window.FgcUi.modal.open("reco-compare");
     apiClient.request("/api/v1/reconciliations/results/" + encodeURIComponent(reconciliationResultId))
       .then(function (envelope) {
+        if (requestId !== state.compareRequestId) return;
         renderCompareModal(envelope.data);
         setCompareModalState("content");
       })
       .catch(function (error) {
+        if (requestId !== state.compareRequestId) return;
         setCompareModalState("error", (error && error.message) || "비교 상세를 불러오지 못했습니다.");
       });
   }
@@ -377,8 +381,6 @@
   // ---- [불일치 예외 일괄 생성] — IF-API-42 ----
 
   function bulkExceptionErrorMessage(error) {
-    if (error && error.code === "FGC-RECO-003") return "처리 불가 — 이 대사 실행은 월 검증 실행과 연결되어 있지 않아 예외를 생성할 수 없습니다.";
-    if (error && error.code === "FGC-RECO-004") return "처리 불가 — 대사 실행이 완료되지 않았습니다. 실행이 끝난 뒤 예외를 생성하세요.";
     return (error && error.message) || "예외 일괄 생성에 실패했습니다.";
   }
 

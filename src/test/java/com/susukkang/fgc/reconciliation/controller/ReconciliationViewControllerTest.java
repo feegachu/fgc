@@ -131,7 +131,9 @@ class ReconciliationViewControllerTest {
         mvc.perform(get("/reconciliations").with(user(settleUser())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(matchesPattern(
-                        "(?s).*<button[^>]*id=\"btn-run\"[^>]*\\bdisabled\\b[^>]*>.*"))));
+                        "(?s).*<button[^>]*id=\"btn-run\"[^>]*\\bdisabled\\b[^>]*>.*"))))
+                .andExpect(content().string(not(matchesPattern(
+                        "(?s).*<button[^>]*id=\"btn-bulk-exception\"[^>]*\\bdisabled\\b[^>]*>.*"))));
     }
 
     /** COMPLIANCE는 조회만 — 실행·예외생성 버튼이 비활성 렌더링된다(화면정의서 §4-1). */
