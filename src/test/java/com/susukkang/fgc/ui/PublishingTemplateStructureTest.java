@@ -207,10 +207,13 @@ class PublishingTemplateStructureTest {
     void baseReferenceScreenUsesSeparatedApiAndPageScripts() throws IOException {
         assertThat(resource("templates/base/index.html"))
                 .contains("class=\"page-header base-page-header\"")
-                .contains("class=\"guidance guidance-neutral base-information-banner\"")
+                .doesNotContain("class=\"guidance")
                 .contains("class=\"tab-list\"")
-                .contains("class=\"surface tab-panel base-panel\"")
+                .contains("class=\"tab-panel base-panel\"")
                 .contains("class=\"filter-bar base-filter-form\"")
+                .contains("class=\"filter-actions base-filter-actions\"")
+                .contains("class=\"surface base-result-surface\"")
+                .contains("class=\"empty-state base-result-message\"")
                 .contains("class=\"data-table base-table")
                 .contains("data-base-tab=\"organization\"")
                 .contains("data-base-tab=\"product\"")
@@ -221,6 +224,8 @@ class PublishingTemplateStructureTest {
                 .contains("적용 시작일")
                 .contains("적용 종료일")
                 .contains("status-badge-success")
+                .doesNotContain("class=\"surface tab-panel base-panel\"")
+                .doesNotContain("base-panel-note")
                 .doesNotContain("<script>")
                 .doesNotContain("style=\"")
                 .doesNotContain("onclick=\"");
@@ -252,7 +257,9 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("static/css/features/base.css"))
                 .contains(".base-page")
-                .contains("@media (max-width: 47.9375rem)");
+                .contains("@media (max-width: 47.9375rem)")
+                .doesNotContain(".base-information-banner")
+                .doesNotContain(".base-panel-note");
     }
 
     private static String resource(String path) throws IOException {
