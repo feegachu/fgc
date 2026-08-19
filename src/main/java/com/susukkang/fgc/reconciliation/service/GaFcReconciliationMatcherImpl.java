@@ -322,9 +322,19 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         Map<BaseMatchKey, List<BaseMatchKey>> candidatesByActualKey = new LinkedHashMap<>();
         Map<BaseMatchKey, Integer> uniqueTargetCounts = new LinkedHashMap<>();
         actualGroups.keySet().stream().sorted(BaseMatchKey.ORDER).forEach(actualKey -> {
+            // 2026-08-19 hjKang - 후보 선택에서 지급예정일 조건을 제거
+            // 기존 코드: 예상 sl.due_date 와 실제 ct.due_date 를 비교해 후보를 걸렀다
+            // 문제: 예상 예정일은 계약일 기준(계약일+회차-1개월)이고 실제 예정일은 정산 사이클
+            //       기준(정산월 마감 후)이라 월조차 다르다. 2026-07 정산분의 예상 예정일은
+            //       2026-07-10, 실제 예정일은 2026-08-25 다. 어떤 정밀도로 비교해도 후보가
+            //       0건이 되어 모든 그룹이 예상 전용·실제 전용으로 갈렸고, 회차·설계사·금액
+            //       비교는 실행조차 되지 않았다.
+            // 개선: 운영정책서 제36조 기본 매칭키(지급단계·보험회사·계약·수수료항목·
+            //       due_month = settlement_month)만으로 후보를 고른다. sameDimensions 가
+            //       바로 그 조건이다. 1:1 일 때만 붙이는 아래 안전장치는 그대로 두므로,
+            //       같은 계약·항목·월에 예상 행이 둘 이상이면 여전히 ambiguous 로 남는다.
             List<BaseMatchKey> candidates = orderedExpectedKeys.stream()
                     .filter(expectedKey -> expectedKey.sameDimensions(actualKey))
-                    .filter(expectedKey -> datesMatch(expectedKey.dueDate(), actualKey.dueDate()))
                     .toList();
             candidatesByActualKey.put(actualKey, candidates);
             if (candidates.size() == 1) {
@@ -342,12 +352,6 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
             aligned.computeIfAbsent(alignedKey, ignored -> new ArrayList<>()).addAll(entry.getValue());
         });
         return new ActualGroupAlignment(aligned, ambiguousKeys);
-    }
-
-    private boolean datesMatch(LocalDate expectedDate, LocalDate actualDate) {
-        return expectedDate != null
-                && actualDate != null
-                && tolerancePolicy.matchesDate(expectedDate, actualDate);
     }
 
     private static Map<BaseMatchKey, List<GaFcActualSourceRow>> groupActual(

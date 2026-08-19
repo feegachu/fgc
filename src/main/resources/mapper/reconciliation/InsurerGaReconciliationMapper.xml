@@ -93,7 +93,7 @@
            AND ct.insurer_id = #{insurerId}
            AND ct.settlement_month = #{settlementMonth}
            AND ct.payment_stage = 'INSURER_TO_GA'
-           AND ct.source_type = 'INSURER_STATEMENT'
+           AND ct.source_type = IN ( 'INSURER_STATEMENT','GA_MANUAL_PAYMENT')
            AND ct.cashflow_type = 'PAYMENT'
            AND ct.status = 'CONFIRMED'
            AND ta.attribution_scope = 'CONTRACT'

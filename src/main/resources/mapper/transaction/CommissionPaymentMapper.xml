@@ -181,8 +181,11 @@
     <!-- #39: 항목 전체가 아닌 실제 발생건에 증빙을 연결한다. 귀속일은 자유 입력값이므로 일자가 아닌
          귀속월로 후보를 찾는다. 0건·복수건은 서비스가 null로 보존해
          한도검증 시 자동 제외 대신 REVIEW_REQUIRED가 되도록 한다. -->
-    <select id="findOperationalScheduleLineIds" resultType="long">
-        SELECT sl.schedule_line_id
+    <!-- 2026-08-19 hjKang - 운영 스케줄 행 조회 조건을 회차 조회와 공유 -->
+    <!-- 기존 코드: findOperationalScheduleLineIds 안에 조건이 인라인으로 박혀 있음 -->
+    <!-- 문제: 회차 조회를 따로 만들면 두 쿼리의 조건이 갈라져 schedule_line_id는 연결됐는데 회차만 NULL인 불일치가 생길 수 있음 -->
+    <!-- 개선: WHERE 절을 sql 조각으로 공유해 한 곳만 고쳐도 둘 다 바뀌게 한다 -->
+    <sql id="operationalScheduleLineConditions">
           FROM fgc.schedule_line sl
           JOIN fgc.schedule_header sh
             ON sh.schedule_header_id = sl.schedule_header_id
@@ -195,6 +198,17 @@
            AND sl.due_date <![CDATA[ < ]]> #{nextAttributionMonthStart}
            AND sl.line_status &lt;&gt; 'CANCELLED'
          ORDER BY sl.schedule_line_id
+    </sql>
+
+    <select id="findOperationalScheduleLineIds" resultType="long">
+        SELECT sl.schedule_line_id
+        <include refid="operationalScheduleLineConditions"/>
+    </select>
+
+    <!-- 2026-08-19 hjKang - FUN-048 대사 회차 비교용 실제 회차 원천 조회 -->
+    <select id="findOperationalScheduleInstallmentNos" resultType="java.lang.Integer">
+        SELECT sl.installment_no
+        <include refid="operationalScheduleLineConditions"/>
     </select>
 
     <select id="existsPolicyVersion" resultType="boolean">
@@ -224,6 +238,7 @@
             policy_version_id,
             settlement_month,
             due_date,
+            installment_no,
             amount,
             cashflow_type,
             status,
@@ -239,6 +254,7 @@
             #{policyVersionId},
             #{settlementMonth},
             #{dueDate},
+            #{installmentNo},
             #{amount},
             #{cashflowType},
             'DRAFT',
@@ -258,6 +274,7 @@
                policy_version_id = #{policyVersionId},
                settlement_month = #{settlementMonth},
                due_date = #{dueDate},
+               installment_no = #{installmentNo},
                amount = #{amount},
                cashflow_type = #{cashflowType},
                evidence_ref = #{evidenceRef},

@@ -108,6 +108,15 @@ public interface CommissionPaymentMapper {
             @Param("nextAttributionMonthStart") LocalDate nextAttributionMonthStart
     );
 
+    /** 위와 같은 조건의 스케줄 행 회차. 실제 지급 건의 회차 자동 결정에 쓴다. */
+    List<Integer> findOperationalScheduleInstallmentNos(
+            @Param("contractId") Long contractId,
+            @Param("paymentStage") PaymentStage paymentStage,
+            @Param("commissionItemId") Long commissionItemId,
+            @Param("attributionMonthStart") LocalDate attributionMonthStart,
+            @Param("nextAttributionMonthStart") LocalDate nextAttributionMonthStart
+    );
+
     /**
      * 귀속 계약·지급단계에 적용 가능한 활성 1,200% 룰셋의 존재 여부를 확인한다.
      * 수수료 항목(cap_rule_item) 미분류와 룰셋 자체 부재(CAP_004)를 구분하기 위한 조회다.

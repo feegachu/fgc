@@ -634,6 +634,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .policyVersionId(effectivePolicyVersionId)
                 .settlementMonth(settlementMonth)
                 .dueDate(dueDate)
+                .installmentNo(resolvePaymentInstallmentNo(attributions))
                 .amount(MoneyUtil.roundWon(amount))
                 .cashflowType(cashflowType)
                 .evidenceRef(evidenceRef)
@@ -743,6 +744,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 commissionItemId,
                 request.attributionDate()
         );
+        Integer installmentNo = resolveOperationalScheduleInstallmentNo(
+                contractId,
+                paymentStage,
+                commissionItemId,
+                request.attributionDate()
+        );
 
         return CommissionPaymentAttributionCommand.builder()
                 .paymentId(paymentId)
@@ -750,6 +757,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .agentId(agentId)
                 .contractId(contractId)
                 .scheduleLineId(scheduleLineId)
+                .installmentNo(installmentNo)
                 .attributionDate(request.attributionDate())
                 .attributionMonth(request.attributionDate().withDayOfMonth(1))
                 .amount(MoneyUtil.roundWon(request.amount()))
@@ -783,6 +791,62 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 contractId, paymentStage, commissionItemId,
                 attributionMonthStart, attributionMonthStart.plusMonths(1));
         return ids != null && ids.size() == 1 ? ids.get(0) : null;
+    }
+
+    /**
+     * @author hjKang
+     * @since 2026-08-19
+     *
+     * 2026-08-19 - FUN-048 대사 회차 비교를 위한 실제 지급 건 회차 자동 결정
+     * 기존 코드: 귀속행에 schedule_line_id만 연결하고 commission_transaction.installment_no는 항상 null로 남았다.
+     * 문제: 대사 매처가 예상·실제가 모두 있는 그룹에서도 회차를 비교할 수 없어 REVIEW_REQUIRED로 떨어진다.
+     * 개선: schedule_line_id를 찾을 때와 같은 조건으로 회차를 읽어 지급 건에 스냅샷으로 보존한다.
+     *       관리자수수료처럼 같은 항목·같은 월에 수취인만 다른 행이 여럿이어도 회차가 하나면 확정한다.
+     */
+    private Integer resolveOperationalScheduleInstallmentNo(
+            Long contractId,
+            PaymentStage paymentStage,
+            Long commissionItemId,
+            LocalDate attributionDate
+    ) {
+        if (contractId == null || attributionDate == null) {
+            return null;
+        }
+        LocalDate attributionMonthStart = attributionDate.withDayOfMonth(1);
+        List<Integer> installmentNos = mapper.findOperationalScheduleInstallmentNos(
+                contractId, paymentStage, commissionItemId,
+                attributionMonthStart, attributionMonthStart.plusMonths(1));
+        if (installmentNos == null) {
+            return null;
+        }
+        List<Integer> distinct = installmentNos.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        return distinct.size() == 1 ? distinct.get(0) : null;
+    }
+
+    /**
+     * 지급 건 1건에 귀속행이 여럿이면(다중 계약 배부) 회차가 하나로 수렴할 때만 부모에 남긴다.
+     * 하나라도 결정하지 못했으면 null로 둔다 — 대사에서 REVIEW_REQUIRED 검토 대상이 된다
+     * (V18__commission_transaction_installment_no.sql 의 컬럼 주석과 같은 계약).
+     */
+    private static Integer resolvePaymentInstallmentNo(
+            List<CommissionPaymentAttributionCommand> attributions
+    ) {
+        if (attributions.isEmpty()) {
+            return null;
+        }
+        boolean allResolved = attributions.stream()
+                .allMatch(attribution -> attribution.getInstallmentNo() != null);
+        if (!allResolved) {
+            return null;
+        }
+        List<Integer> distinct = attributions.stream()
+                .map(CommissionPaymentAttributionCommand::getInstallmentNo)
+                .distinct()
+                .toList();
+        return distinct.size() == 1 ? distinct.get(0) : null;
     }
 
     private Long resolveAttributedContract(
