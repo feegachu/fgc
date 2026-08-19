@@ -95,6 +95,28 @@ class CapExceptionServiceImplTest {
     }
 
     @Test
+    void createsCapExceptionForInsurerToGaWithoutAgent() {
+        CapExceptionCreateCommand command = CapExceptionCreateCommand.builder()
+                .paymentId(10L)
+                .contractId(1L)
+                .agentId(null)
+                .policyVersionId(30L)
+                .paymentStage(PaymentStage.INSURER_TO_GA)
+                .asOfDate(LocalDate.of(2026, 8, 12))
+                .capRuleSetId(3L)
+                .limitAmount(new BigDecimal("1000"))
+                .includedAmount(new BigDecimal("1100"))
+                .remainingAmount(new BigDecimal("-100"))
+                .usagePct(new BigDecimal("110"))
+                .resultStatus(CapResultStatus.VIOLATION)
+                .build();
+
+        capExceptionService.createIfNecessary(command);
+
+        verify(capExceptionMapper).insertException(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void createsDifferentNaturalKeysForDifferentPaymentOrValidationRun() {
         ArgumentCaptor<CapExceptionInsertDTO> captor = ArgumentCaptor.forClass(CapExceptionInsertDTO.class);
 
