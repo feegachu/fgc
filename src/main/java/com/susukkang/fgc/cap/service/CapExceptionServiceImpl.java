@@ -41,7 +41,10 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Override
     @Transactional
     public void createIfNecessary(CapExceptionCreateCommand command) {
-        // TODO 1. 월 통합검증 8단계 예외 생성 구현 시 validationRunId를 포함하여 이 메서드를 호출한다.
+        // 이 메서드는 실시간 사전확정(FUN-034) 전용이다 — 월 통합검증 8단계의 CAP 예외는
+        // ExceptionCaseMapper.insertFromCapChecks(record_exception_detection 경유)가 만든다.
+        // validationRunId 를 여기로 넘기면 키에 실행 ID가 들어가 재실행마다 중복 예외가
+        // 생기므로(FGC-FUN-052 위반) 배치에서 이 메서드를 호출하지 않는다.
         // 연계 요구사항 : FGC-FUN-034, FGC-FUN-042, FGC-FUN-043
         validateCreateCommand(command);
         ExceptionType exceptionType = resolveExceptionType(command.resultStatus());

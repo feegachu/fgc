@@ -143,7 +143,8 @@ class ExceptionCaseQueryMapperIntegrationTest {
                 .stream().map(row -> row.title()))
                 .containsExactlyInAnyOrder("IT 검토중-" + suffix, "IT 해결-" + suffix);
 
-        // 선택지 = 배정 이력 있는 사용자 집합과 정확히 일치 — 배정 없는 사용자는 나오지 않는다
+        // FGC-FUN-053(담당자 기록)·IF-API-43: 선택지 = 배정 이력 있는 사용자 집합과
+        // 정확히 일치 — 배정 없는 사용자는 나오지 않는다
         List<Long> assignedUserIds = jdbcTemplate.queryForList("""
                 SELECT DISTINCT assigned_to
                   FROM fgc.exception_case
@@ -154,8 +155,11 @@ class ExceptionCaseQueryMapperIntegrationTest {
                 .containsExactlyInAnyOrderElementsOf(assignedUserIds)
                 .contains(userId);
         Long unassignedUserId = jdbcTemplate.queryForObject("""
-                SELECT user_id FROM fgc.app_user
-                 WHERE user_id <> ? ORDER BY user_id LIMIT 1
+                SELECT au.user_id FROM fgc.app_user au
+                 WHERE au.user_id <> ?
+                   AND NOT EXISTS (SELECT 1 FROM fgc.exception_case ec
+                                    WHERE ec.assigned_to = au.user_id)
+                 ORDER BY au.user_id LIMIT 1
                 """, Long.class, userId);
         assertThat(mapper.findAssignees())
                 .noneMatch(assigneeRow -> assigneeRow.userId().equals(unassignedUserId));
