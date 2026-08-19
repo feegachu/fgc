@@ -47,6 +47,13 @@
                      WHERE noattr_ta.commission_transaction_id = ct.commission_transaction_id
                 )
             </if>
+            <if test="condition.attributionImbalanceOnly != null and condition.attributionImbalanceOnly">
+                AND EXISTS (
+                    SELECT 1
+                      FROM fgc.vw_transaction_attribution_balance imbalance
+                     WHERE imbalance.commission_transaction_id = ct.commission_transaction_id
+                )
+            </if>
         </where>
     </sql>
 

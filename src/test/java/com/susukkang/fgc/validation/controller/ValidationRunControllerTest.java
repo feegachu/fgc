@@ -10,10 +10,13 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistConditionResponse;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import com.susukkang.fgc.validation.service.ValidationRunDetailService;
 import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
+import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +35,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,6 +67,9 @@ class ValidationRunControllerTest {
 
     @MockitoBean
     private ValidationRunExecuteService validationRunExecuteService;
+
+    @MockitoBean
+    private ValidationRunFinalizationService validationRunFinalizationService;
 
     private ValidationRunRow createdRow() {
         ValidationRunRow row = new ValidationRunRow();
@@ -195,5 +203,20 @@ class ValidationRunControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void checklistIsReadableBySettlementRole() throws Exception {
+        given(validationRunFinalizationService.getChecklist(100L)).willReturn(
+                new FinalizeChecklistResponse(100L, true, List.of(
+                        new FinalizeChecklistConditionResponse(
+                                1, "검증 실행 상태가 계산완료(COMPLETED)인가", true, 0, "/validation-runs/100"))));
+
+        mockMvc.perform(get("/api/v1/validation-runs/100/finalize-checklist")
+                        .with(user(settlementPrincipal())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.validationRunId").value(100))
+                .andExpect(jsonPath("$.data.passed").value(true))
+                .andExpect(jsonPath("$.data.conditions[0].no").value(1));
     }
 }
