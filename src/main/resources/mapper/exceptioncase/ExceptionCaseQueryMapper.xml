@@ -38,6 +38,33 @@
         <include refid="statusFilter"/>
     </select>
 
+    <!--
+      2026-08-19 yslee - 체크리스트 바로가기 선택조건을 예외함 화면 목록에 적용
+      기존 코드: REST 검색 API만 실행·유형·심각도 조건을 적용하고 MPA 화면은 상태만 적용
+      문제: 조건 3·4 바로가기에서 해당 실행의 대상 예외가 아닌 전체 워크큐가 표시됨
+      개선: 기존 searchFilters를 서버 렌더링 목록에도 재사용해 API와 화면 조회 기준 통일
+    -->
+    <select id="findCasesByCriteria"
+            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow">
+        SELECT ec.exception_case_id   AS exceptionCaseId,
+               ec.exception_type      AS exceptionType,
+               ec.severity,
+               ic.contract_no         AS contractNo,
+               ec.title,
+               ec.status,
+               au.login_id            AS assignedTo,
+               ec.created_at          AS createdAt,
+               ec.source_entity_type  AS sourceEntityType,
+               ec.source_entity_id    AS sourceEntityId
+          FROM fgc.exception_case ec
+          LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
+          LEFT JOIN fgc.app_user au ON au.user_id = ec.assigned_to
+         WHERE 1 = 1
+        <include refid="searchFilters"/>
+         ORDER BY CASE ec.severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'WARNING' THEN 2 ELSE 3 END,
+                  ec.created_at DESC, ec.exception_case_id DESC
+    </select>
+
     <!-- IF-API-43의 전체 검색조건. WHERE 1=1로 시작해 선택된 조건만 안전하게 덧붙인다. -->
     <sql id="searchFilters">
         <if test="criteria.type != null">
