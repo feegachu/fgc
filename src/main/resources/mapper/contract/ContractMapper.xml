@@ -78,6 +78,39 @@
         LIMIT #{size}
         OFFSET #{offset}
     </select>
+    <select id="selectAllByCondition"
+            resultType="com.susukkang.fgc.contract.dto.ContractView">
+        SELECT ic.contract_id AS contract_id,
+               ic.contract_no AS contract_no,
+               i.insurer_name AS insurer_name,
+               p.product_name AS product_name,
+               ic.contract_date AS contract_date,
+               ic.monthly_equivalent_first_premium AS monthly_equivalent_first_premium,
+               CONCAT('FC-', LPAD(a.agent_id::text, 4, '0'), ' ', a.agent_name) AS agent_id_name,
+               ic.current_status AS contract_status,
+               cc.result_status AS cap_result_status,
+               ic.data_origin AS data_origin
+          FROM insurance_contract ic
+          JOIN insurer i ON i.insurer_id = ic.insurer_id
+          JOIN product_offering po ON po.product_offering_id = ic.product_offering_id
+          JOIN product p ON p.product_id = po.product_id
+          JOIN agent a ON a.agent_id = ic.agent_id
+          LEFT JOIN fgc.vw_latest_cap_check cc
+            ON cc.contract_id = ic.contract_id
+           AND cc.payment_stage = 'GA_TO_FC'
+        <where>
+            <if test="condition.contractNo != null and condition.contractNo != ''">AND ic.contract_no LIKE CONCAT('%', #{condition.contractNo}, '%')</if>
+            <if test="condition.insurerId != null">AND ic.insurer_id = #{condition.insurerId}</if>
+            <if test="condition.productOfferingId != null">AND ic.product_offering_id = #{condition.productOfferingId}</if>
+            <if test="condition.agentId != null">AND ic.agent_id = #{condition.agentId}</if>
+            <if test="condition.orgId != null">AND ic.organization_id = #{condition.orgId}</if>
+            <if test="condition.capResultStatus != null">AND cc.result_status = #{condition.capResultStatus}</if>
+            <if test="condition.currentStatus != null">AND ic.current_status = #{condition.currentStatus}</if>
+            <if test="condition.contractDateFrom != null">AND ic.contract_date <![CDATA[ >= ]]> #{condition.contractDateFrom}</if>
+            <if test="condition.contractDateTo != null">AND ic.contract_date <![CDATA[ <= ]]> #{condition.contractDateTo}</if>
+        </where>
+        ORDER BY ic.contract_id DESC
+    </select>
     <!-- 검색 조건에 맞는 계약 건수 가져오기 -->
     <select id="countByCondition"
             parameterType="com.susukkang.fgc.contract.dto.ContractSearchCondition"
