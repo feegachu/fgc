@@ -27,6 +27,9 @@
       <span id="h-item">—</span> · <span id="h-inst">—</span>회차
     </span>
     <span id="h-type"></span>
+    <button class="icon-button" type="button" data-modal-close aria-label="팝업 닫기" data-modal-initial-focus>
+      <span class="material-symbols-outlined" aria-hidden="true">close</span>
+    </button>
   </div>
 
   <div class="fgc-modal__body">
@@ -51,16 +54,18 @@
       <section class="fgc-compare__side fgc-compare__side--expected">
         <div class="fgc-compare__head">예상 — 우리가 계산한 스케줄 (schedule_line)</div>
         <table class="fgc-table">
+          <thead><tr><th>지급예정일</th><th class="fgc-th-num">기준금액</th><th class="fgc-th-num">요율</th><th class="fgc-th-num">금액</th></tr></thead>
           <tbody id="expected-body">
-            <tr><td colspan="2"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr><td colspan="4"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
           </tbody>
         </table>
       </section>
       <section class="fgc-compare__side fgc-compare__side--actual">
         <div class="fgc-compare__head">실제 — 확정된 지급 건 (transaction_attribution)</div>
         <table class="fgc-table">
+          <thead><tr><th>귀속일</th><th>정산월</th><th class="fgc-th-num">금액</th></tr></thead>
           <tbody id="actual-body">
-            <tr><td colspan="2"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr><td colspan="3"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
           </tbody>
         </table>
       </section>
