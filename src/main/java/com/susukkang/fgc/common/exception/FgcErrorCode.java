@@ -137,7 +137,7 @@ public enum FgcErrorCode {
     //확인
     LEDG_003(
             "FGC-LEDG-003",
-            HttpStatus.CONFLICT,
+            HttpStatus.METHOD_NOT_ALLOWED,
             "error.ledger.reverseOnly"
     ),
 
