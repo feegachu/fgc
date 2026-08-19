@@ -11,8 +11,8 @@ package com.susukkang.fgc.common.security;
  *  애노테이션 값은 컴파일타임 상수여야 한다. static final String 리터럴끼리의 "+" 결합은
  *  자바 컴파일러가 컴파일타임에 접어(constant fold) 상수로 취급하므로 애노테이션에 쓸 수 있다.
  *
- * 지금 실제로 쓰이는 역할 조합만 정의한다. 새 조합(예: EXCP-W01의 SETTLEMENT·GA_ADMIN, 아직
- * 미구현인 역분개·검증실행확정)은 그 엔드포인트가 실제로 생길 때 추가한다.
+     * 지금 실제로 쓰이는 역할 조합만 정의한다. 새 조합은 해당 엔드포인트가 실제로 생길 때
+     * 문서의 역할 계약과 함께 추가한다.
  */
 public final class Roles {
 
@@ -28,6 +28,10 @@ public final class Roles {
     /** AUDT-W01 감사로그 조회. 화면정의서 v2.0 :1503,:1530. */
     public static final String CAN_VIEW_AUDIT_LOG =
             "hasAnyRole('" + COMPLIANCE + "','" + SYSTEM_ADMIN + "')";
+
+    /** IF-API-36 원장 역분개. SYSTEM_ADMIN의 전 기능 권한을 함께 반영한다. */
+    public static final String CAN_REVERSE_JOURNAL =
+            "hasAnyRole('" + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
     /** IF-API-51 검증 실행 확정. 정산 처리 권한과 다른 별도 관리자 조합이다. */
     public static final String CAN_FINALIZE_VALIDATION =
