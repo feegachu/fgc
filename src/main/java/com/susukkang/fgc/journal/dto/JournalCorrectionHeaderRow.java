@@ -1,34 +1,24 @@
 package com.susukkang.fgc.journal.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
 
-/**
- * journal_header 1행 INSERT 파라미터
- */
+/** 정정 대상 원분개 잠금 조회 결과. */
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class JournalHeaderInsertRow {
+public class JournalCorrectionHeaderRow {
     private Long journalHeaderId;
-    private String journalNo;
     private LocalDate journalDate;
     private String journalType;
     private String sourceEntityType;
     private String sourceEntityId;
     private Integer revisionNo;
     private Long validationRunId;
+    private String validationRunStatus;
     private Long contractId;
     private Long policyVersionId;
-    private Long reversalOfId;
-    private String correctionGroupKey;
+    private String status;
     private String description;
-    private Long createdBy;
 }
