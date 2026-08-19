@@ -51,4 +51,14 @@ public enum ExceptionStatus {
         }
         return List.of(valueOf(filter));
     }
+
+    /** 화면정의서 EXCP-W01의 상태 흐름 코드-표기 매핑과 일치시킨다. */
+    public String label() {
+        return switch (this) {
+            case NEW -> "신규";
+            case IN_REVIEW -> "검토중";
+            case RESOLVED -> "해결";
+            case REJECTED -> "오탐·반려";
+        };
+    }
 }

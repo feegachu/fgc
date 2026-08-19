@@ -67,10 +67,16 @@ class CapExceptionServiceImplTest {
         assertThat(inserted.getExceptionType()).isEqualTo(ExceptionType.CAP_WARNING);
         assertThat(inserted.getSeverity()).isEqualTo(ExceptionSeverity.WARNING);
         assertThat(inserted.getValidationRunId()).isEqualTo(77L);
+        // SRC-032 D-05 이후 설명은 관리자가 읽는 문장 — ID·스냅샷 JSON은 cap_check 원천이 보존
+        assertThat(inserted.getTitle()).isEqualTo("1,200% 주의 — 잔여 한도 100원");
         assertThat(inserted.getDescription())
-                .contains("한도검증ID=6")
-                .contains("한도룰셋ID=3")
-                .contains("계산근거={\"source\":\"test\"}");
+                .contains("지급단계 GA_TO_FC")
+                .contains("한도액 1,000원")
+                .contains("산입액 900원")
+                .contains("사용률 90%")
+                .doesNotContain("계산근거")
+                .doesNotContain("{\"source\":\"test\"}");
+        assertThat(inserted.getTitle()).doesNotContain("{\"source\":\"test\"}");
     }
 
     @Test
@@ -84,7 +90,8 @@ class CapExceptionServiceImplTest {
                 .isEqualTo("CAP_VIOLATION:null:COMMISSION_TRANSACTION:10:GA_TO_FC:3");
         assertThat(captor.getValue().getExceptionType()).isEqualTo(ExceptionType.CAP_VIOLATION);
         assertThat(captor.getValue().getSeverity()).isEqualTo(ExceptionSeverity.CRITICAL);
-        assertThat(captor.getValue().getDescription()).contains("초과액=100");
+        assertThat(captor.getValue().getTitle()).isEqualTo("1,200% 한도 초과 — 사용률 110%");
+        assertThat(captor.getValue().getDescription()).contains("초과액 100원");
     }
 
     @Test
