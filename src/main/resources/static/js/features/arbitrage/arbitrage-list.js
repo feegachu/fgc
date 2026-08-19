@@ -14,9 +14,9 @@
   };
   var state = { page: 1, abortController: null, selectedId: null, selectedRow: null, rows: [], timelineRequestId: 0 };
   var STATUS = {
-    CLEAR: { label: "이상없음", className: "fgc-badge fgc-badge--success" },
-    CANDIDATE: { label: "검토대상", className: "fgc-badge fgc-badge--warning" },
-    REVIEW_REQUIRED: { label: "자료부족", className: "fgc-badge fgc-badge--review" }
+    CLEAR: "fgc-badge fgc-badge--success",
+    CANDIDATE: "fgc-badge fgc-badge--warning",
+    REVIEW_REQUIRED: "fgc-badge fgc-badge--review"
   };
 
   function escapeHtml(value) {
@@ -26,14 +26,10 @@
   function number(value) { return new Intl.NumberFormat("ko-KR").format(Number(value || 0)); }
   function money(value) { return number(value) + "원"; }
   function value(value) { return value == null || value === "" ? "—" : String(value); }
-  function stageLabel(stage) { return stage === "INSURER_TO_GA" ? "원수사→GA" : stage === "GA_TO_FC" ? "GA→설계사" : value(stage); }
-  function surrenderValueSourceLabel(row) {
-    if (row.surrenderValueSourceTypeLabel) return row.surrenderValueSourceTypeLabel;
-    return { ACTUAL: "실제 해약환급금", EXPECTED_TABLE: "예상 환급률표", NOT_APPLICABLE: "적용 대상 아님" }[row.surrenderValueSourceType] || value(row.surrenderValueSourceType);
-  }
-  function statusInfo(status) { return STATUS[status] || { label: value(status), className: "fgc-badge" }; }
-  function badge(status) { var item = statusInfo(status); return '<span class="' + item.className + '">' + item.label + "</span>"; }
-  function refundBadge(row) { return '<span class="fgc-badge ' + (row.refundAdditionAppliedYn ? "fgc-badge--progress" : "fgc-badge--neutral") + '">' + (row.refundAdditionAppliedYn ? "가산 함" : "해당없음") + "</span>"; }
+  function stageLabel(row) { return value(row.paymentStageLabel); }
+  function surrenderValueSourceLabel(row) { return value(row.surrenderValueSourceTypeLabel); }
+  function badge(row) { return '<span class="' + (STATUS[row.resultStatus] || "fgc-badge") + '">' + escapeHtml(value(row.resultStatusLabel)) + "</span>"; }
+  function refundBadge(row) { return '<span class="fgc-badge ' + (row.refundAdditionAppliedYn ? "fgc-badge--progress" : "fgc-badge--neutral") + '">' + (row.refundAdditionAppliedYn ? "가산 함" : "가산 안 함") + "</span>"; }
 
   function initializeFromLocation() {
     var params = new URLSearchParams(window.location.search);
@@ -86,10 +82,10 @@
   function rowHtml(row) {
     return '<tr data-arbitrage-id="' + escapeHtml(row.arbitrageCheckId) + '">' +
       '<td><button class="fgc-btn fgc-btn--ghost arb-row-select" type="button">' + escapeHtml(row.contractNo) + '</button></td>' +
-      '<td class="arb-nowrap">' + escapeHtml(stageLabel(row.paymentStage)) + '</td><td class="arb-nowrap">' + escapeHtml(value(row.asOfDate)) + '</td><td class="fgc-td-num arb-nowrap">' + number(row.contractMonthNo) + '</td>' +
+      '<td class="arb-nowrap">' + escapeHtml(stageLabel(row)) + '</td><td class="arb-nowrap">' + escapeHtml(value(row.asOfDate)) + '</td><td class="fgc-td-num arb-nowrap">' + number(row.contractMonthNo) + '</td>' +
       '<td class="fgc-td-num arb-nowrap">' + money(row.cumulativePaidPremium) + '</td><td class="fgc-td-num arb-nowrap">' + money(row.paidCommissionAmount) + '</td><td class="fgc-td-num arb-nowrap">' + money(row.plannedCommissionAmount) + '</td>' +
       '<td class="fgc-td-num arb-nowrap">' + money(row.includedSurrenderValueAmount) + '</td><td class="arb-nowrap">' + escapeHtml(surrenderValueSourceLabel(row)) + '</td>' +
-      '<td class="fgc-td-num arb-nowrap" style="color:' + (Number(row.netDifferenceAmount) > 0 ? "var(--color-status-error-text)" : "inherit") + '">' + money(row.netDifferenceAmount) + '</td><td class="arb-nowrap">' + refundBadge(row) + '</td><td class="arb-nowrap">' + badge(row.resultStatus) + '</td></tr>';
+      '<td class="fgc-td-num arb-nowrap" style="color:' + (Number(row.netDifferenceAmount) > 0 ? "var(--color-status-error-text)" : "inherit") + '">' + money(row.netDifferenceAmount) + '</td><td class="arb-nowrap">' + refundBadge(row) + '</td><td class="arb-nowrap">' + badge(row) + '</td></tr>';
   }
 
   function renderDetail(row) {
@@ -97,9 +93,9 @@
     state.selectedRow = row;
     var recheckButton = document.getElementById("arb-recheck-button");
     if (recheckButton) recheckButton.disabled = false;
-    document.getElementById("detail-badge").innerHTML = badge(row.resultStatus);
+    document.getElementById("detail-badge").innerHTML = badge(row);
     document.getElementById("detail-body").innerHTML =
-      '<dl class="arb-detail-list"><div><dt>계약 · 지급단계</dt><dd>' + escapeHtml(row.contractNo) + " · " + escapeHtml(stageLabel(row.paymentStage)) + '</dd></div>' +
+      '<dl class="arb-detail-list"><div><dt>계약 · 지급단계</dt><dd>' + escapeHtml(row.contractNo) + " · " + escapeHtml(stageLabel(row)) + '</dd></div>' +
       '<div><dt>기준일 · 계약차월</dt><dd>' + escapeHtml(value(row.asOfDate)) + " · " + number(row.contractMonthNo) + '개월</dd></div>' +
       '<div><dt>환급금 가산 여부</dt><dd>' + (row.refundAdditionAppliedYn ? "가산 함" : "가산 안 함") + '</dd></div><div><dt>환급금 출처</dt><dd>' + escapeHtml(surrenderValueSourceLabel(row)) + '</dd></div>' +
       '<div><dt>판정 근거</dt><dd>' + escapeHtml(value(row.decisionReason)) + '</dd></div></dl>' +
@@ -184,12 +180,12 @@
 
   [controls.month, controls.status, controls.stage, controls.insurerId].forEach(function (control) { control.addEventListener("change", function () { state.page = 1; state.selectedId = null; load(); }); });
   controls.contractNo.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); state.page = 1; state.selectedId = null; load(); } });
-  document.getElementById("f-reset").addEventListener("click", function () { controls.month.value = root.dataset.initialMonth || ""; controls.status.value = ""; controls.stage.value = ""; controls.insurerId.value = ""; controls.contractNo.value = ""; state.page = 1; state.selectedId = null; load(); });
+  document.getElementById("f-reset").addEventListener("click", function () { controls.month.value = root.dataset.initialMonth || ""; controls.status.value = ""; controls.stage.value = "GA_TO_FC"; controls.insurerId.value = ""; controls.contractNo.value = ""; state.page = 1; state.selectedId = null; load(); });
   document.getElementById("list-body").addEventListener("click", function (event) { var row = event.target.closest("tr[data-arbitrage-id]"); if (!row) return; var id = row.dataset.arbitrageId; var current = state.rows.find(function (item) { return String(item.arbitrageCheckId) === id; }); if (current) renderDetail(current); });
   var recheckButton = document.getElementById("arb-recheck-button");
   if (recheckButton) recheckButton.addEventListener("click", function () {
     if (!state.selectedRow || !window.FgcUi.modal) return;
-    document.getElementById("arb-recheck-contract").textContent = state.selectedRow.contractNo + " · " + stageLabel(state.selectedRow.paymentStage);
+    document.getElementById("arb-recheck-contract").textContent = state.selectedRow.contractNo + " · " + stageLabel(state.selectedRow);
     document.getElementById("arb-recheck-date").value = state.selectedRow.asOfDate || "";
     document.getElementById("arb-recheck-reason").value = "";
     window.FgcUi.modal.open("arb-recheck");

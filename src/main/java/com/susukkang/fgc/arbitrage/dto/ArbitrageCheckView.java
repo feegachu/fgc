@@ -25,6 +25,12 @@ public class ArbitrageCheckView {
     private Long contractId; // 계약 ID
     private String contractNo; // 화면 표시용 계약번호
     private PaymentStage paymentStage; // 지급 단계
+
+    /** SIR-008 화면 표기용 한글 라벨. 원본 enum 코드는 감사·연계 식별값으로 함께 유지한다. */
+    public String getPaymentStageLabel() {
+        return paymentStage == null ? null : paymentStage.label();
+    }
+
     private LocalDate asOfDate; // 검증 기준일
     private Integer contractMonthNo; // 계약 차월
 
@@ -43,5 +49,11 @@ public class ArbitrageCheckView {
     }
 
     private ArbitrageCheckStatus resultStatus; // 판정 결과
+
+    /** SIR-008 화면 표기용 한글 라벨. 원본 enum 코드는 감사·연계 식별값으로 함께 유지한다. */
+    public String getResultStatusLabel() {
+        return resultStatus == null ? null : resultStatus.label();
+    }
+
     private String decisionReason; // 판정 근거
 }
