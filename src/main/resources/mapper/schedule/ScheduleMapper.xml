@@ -328,6 +328,7 @@
         (
             exception_key,
             exception_type,
+            reason_code,
             severity,
             status,
             contract_id,
@@ -347,6 +348,7 @@
                 #{exceptionType}
             ),
             #{exceptionType},
+            #{exceptionType},
             'HIGH',
             'NEW',
             #{contractId},
@@ -358,6 +360,7 @@
         ON CONFLICT (exception_key)
         DO UPDATE SET
             status = 'NEW',
+            reason_code = EXCLUDED.reason_code,
             title = EXCLUDED.title,
             description = EXCLUDED.description,
             resolved_at = NULL,

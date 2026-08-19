@@ -35,4 +35,9 @@ public final class DateUtil {
     public static OffsetDateTime nowSeoul() {
         return OffsetDateTime.now(SEOUL_ZONE);
     }
+
+    /** PostgreSQL JDBC가 timestamptz를 UTC OffsetDateTime으로 반환해도 업무 화면은 서울 시각으로 표시한다. */
+    public static OffsetDateTime toSeoul(OffsetDateTime value) {
+        return value == null ? null : value.atZoneSameInstant(SEOUL_ZONE).toOffsetDateTime();
+    }
 }

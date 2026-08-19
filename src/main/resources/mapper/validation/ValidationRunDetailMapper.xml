@@ -56,7 +56,10 @@
                rr.reconciliationResultCount, rr.reconciliationMismatchCount,
                sh.scheduleGeneratedCount,
                rr.reconciliationMatchedCount, rr.reconciliationMismatchedCount,
-               rr.reconciliationUnmatchedCount, rr.reconciliationDifferenceAmountTotal
+               rr.reconciliationUnmatchedCount, rr.reconciliationDifferenceAmountTotal,
+               ex.exceptionDetectedCount, ex.exceptionNewCount, ex.exceptionRecurringCount,
+               ex.exceptionReopenedCount, ex.exceptionNotDetectedCount,
+               ex.exceptionOpenWorkItemCount
           FROM (SELECT COUNT(*) FILTER (WHERE selection_status = 'SELECTED')        AS targetSelectedCount,
                        COUNT(*) FILTER (WHERE selection_status = 'EXCLUDED')        AS targetExcludedCount,
                        COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
@@ -103,6 +106,32 @@
          CROSS JOIN (SELECT COUNT(*) AS scheduleGeneratedCount
                        FROM fgc.schedule_header
                       WHERE validation_run_id = #{validationRunId}) sh
+         CROSS JOIN (
+             SELECT COUNT(occurrence.exception_occurrence_id) AS exceptionDetectedCount,
+                    COUNT(*) FILTER (WHERE occurrence.is_new_case) AS exceptionNewCount,
+                    COUNT(*) FILTER (WHERE NOT occurrence.is_new_case) AS exceptionRecurringCount,
+                    COUNT(*) FILTER (WHERE occurrence.was_reopened) AS exceptionReopenedCount,
+                    (SELECT COUNT(*)
+                       FROM fgc.exception_case ec
+                       JOIN fgc.validation_run target_run
+                         ON target_run.validation_run_id = #{validationRunId}
+                      WHERE ec.validation_month = target_run.validation_month
+                        AND ec.status IN ('NEW', 'IN_REVIEW')
+                        AND NOT EXISTS (
+                            SELECT 1
+                              FROM fgc.exception_occurrence current_occurrence
+                             WHERE current_occurrence.exception_case_id = ec.exception_case_id
+                               AND current_occurrence.validation_run_id = #{validationRunId}
+                        )) AS exceptionNotDetectedCount,
+                    (SELECT COUNT(*)
+                       FROM fgc.exception_case ec
+                       JOIN fgc.validation_run target_run
+                         ON target_run.validation_run_id = #{validationRunId}
+                      WHERE ec.validation_month = target_run.validation_month
+                        AND ec.status IN ('NEW', 'IN_REVIEW')) AS exceptionOpenWorkItemCount
+               FROM fgc.exception_occurrence occurrence
+              WHERE occurrence.validation_run_id = #{validationRunId}
+         ) ex
     </select>
 
     <!-- 설계사 단위 모니터링 참고용 집계 — 계약별 cap_check.result_status는 건드리지 않는다.
