@@ -57,6 +57,7 @@
       <div class="fgc-field" style="min-width:170px">
         <label class="fgc-label fgc-label--required" for="r-stage">지급단계</label>
         <select class="fgc-select" id="r-stage" name="stage">
+          <option value="" th:selected="${stageFilter == null}">전체</option>
           <option th:each="stage : ${stageOptions}"
                   th:value="${stage.name()}" th:text="${stage.label()}"
                   th:selected="${stage.name() == stageFilter}">GA→설계사</option>
@@ -123,7 +124,7 @@
             <option value="JOURNAL_IMBALANCE">분개 불균형</option>
             <option value="REVIEW_REQUIRED">검토 필요</option>
           </select>
-          <label style="display:flex;gap:4px;align-items:center;font-size:12px">
+          <label style="display:flex;gap:4px;align-items:center;font-size:12px" title="현재 페이지 안에서만 걸러집니다.">
             <input type="checkbox" id="f-mismatch"> 불일치만
           </label>
         </div>
@@ -141,12 +142,13 @@
               <th class="fgc-th-num" style="width:100px">실제 금액</th>
               <th class="fgc-th-num" style="width:100px">차액</th>
               <th style="width:130px">결과 유형</th>
-              <th style="width:180px">주 원인</th>
+              <th style="width:150px">주 원인</th>
+              <th style="width:150px">보조 원인</th>
               <th style="width:80px"></th>
             </tr>
           </thead>
           <tbody id="result-body">
-            <tr><td colspan="11"><div class="fgc-empty" id="result-empty" th:text="#{info.common.empty}">대사를 실행하면 결과가 여기 표시됩니다.</div></td></tr>
+            <tr><td colspan="12"><div class="fgc-empty" id="result-empty" th:text="#{info.common.empty}">대사를 실행하면 결과가 여기 표시됩니다.</div></td></tr>
           </tbody>
           <tfoot>
             <tr>
@@ -154,11 +156,18 @@
               <td class="fgc-td-num"><span class="fgc-amount" id="sum-expected">0</span></td>
               <td class="fgc-td-num"><span class="fgc-amount" id="sum-actual">0</span></td>
               <td class="fgc-td-num"><span class="fgc-amount" id="sum-diff">0</span></td>
-              <td colspan="3"></td>
+              <td colspan="4"></td>
             </tr>
           </tfoot>
         </table>
       </div>
+      <footer class="fgc-pagination" id="result-pagination" hidden>
+        <nav aria-label="대사 결과 페이지 이동" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px">
+          <button class="fgc-btn fgc-btn--ghost" id="result-page-prev" type="button">이전</button>
+          <span class="tabular-nums" id="result-page-indicator">1 / 1</span>
+          <button class="fgc-btn fgc-btn--ghost" id="result-page-next" type="button">다음</button>
+        </nav>
+      </footer>
     </section>
 
     <!-- ④ 실행 이력 — IF-API-39, 서버 렌더링(MPA) -->

@@ -24,14 +24,19 @@
     sumDiffTotal: document.getElementById("sum-diff-total"),
     sumExpected: document.getElementById("sum-expected"),
     sumActual: document.getElementById("sum-actual"),
-    sumDiff: document.getElementById("sum-diff")
+    sumDiff: document.getElementById("sum-diff"),
+    resultPagination: document.getElementById("result-pagination"),
+    resultPagePrev: document.getElementById("result-page-prev"),
+    resultPageNext: document.getElementById("result-page-next"),
+    resultPageIndicator: document.getElementById("result-page-indicator")
   };
 
   // ③ 결과 목록이 지금 보여주고 있는 실행 — 불일치 예외 일괄 생성 대상이자
   // 결과 필터가 다시 조회할 대상이다. 페이지 로드 시점엔 아무 실행도 안 골랐다.
   var state = {
     reconciliationRunId: null,
-    resultsAbortController: null
+    resultsAbortController: null,
+    resultsPage: 1
   };
 
   function number(value) {
@@ -61,7 +66,7 @@
   // ---- ① 실행 영역 상태 ----
 
   function updateRunButtonState() {
-    el.btnRun.disabled = !canProcess || !el.insurer.value;
+    el.btnRun.disabled = !canProcess || !el.insurer.value || !el.stage.value;
   }
 
   function updateBulkButtonState() {
@@ -155,17 +160,26 @@
   }
 
   function resultRow(item) {
+    var expectedAgentName = (item.expectedAgent && item.expectedAgent.agentName) || "실제 없음";
+    var actualAgentName = (item.actualAgent && item.actualAgent.agentName) || "실제 없음";
+    var agentMismatch = expectedAgentName !== actualAgentName;
+    var agentClass = agentMismatch ? ' class="fgc-error"' : "";
+    var diffClass = Number(item.differenceAmount || 0) !== 0 ? ' class="fgc-th-num fgc-error"' : ' class="fgc-th-num"';
+    var secondaryReasons = (item.secondaryReasons || [])
+      .map(function (reason) { return reason.label; })
+      .join(", ") || "—";
     return "<tr>" +
       "<td>" + escapeHtml(item.contractNo) + "</td>" +
       "<td>" + escapeHtml(item.commissionItemName) + "</td>" +
       "<td>" + escapeHtml(item.installmentNo) + "</td>" +
-      "<td>" + escapeHtml((item.expectedAgent && item.expectedAgent.agentName) || "실제 없음") + "</td>" +
-      "<td>" + escapeHtml((item.actualAgent && item.actualAgent.agentName) || "실제 없음") + "</td>" +
+      "<td" + agentClass + ">" + escapeHtml(expectedAgentName) + "</td>" +
+      "<td" + agentClass + ">" + escapeHtml(actualAgentName) + "</td>" +
       '<td class="fgc-th-num">' + won(item.expectedTotalAmount) + "</td>" +
       '<td class="fgc-th-num">' + won(item.actualTotalAmount) + "</td>" +
-      '<td class="fgc-th-num">' + won(item.differenceAmount) + "</td>" +
+      "<td" + diffClass + ">" + won(item.differenceAmount) + "</td>" +
       "<td>" + resultTypeBadge(item) + "</td>" +
       "<td>" + escapeHtml((item.primaryReason && item.primaryReason.label) || "—") + "</td>" +
+      "<td>" + escapeHtml(secondaryReasons) + "</td>" +
       '<td><button class="fgc-btn fgc-btn--ghost" type="button" data-reco-compare-id="' +
         escapeHtml(item.reconciliationResultId) + '">비교 상세</button></td>' +
       "</tr>";
@@ -181,35 +195,60 @@
     el.sumDiffTotal.textContent = won(summary.differenceTotal);
   }
 
+  function renderResultPagination(items) {
+    if (!items || items.totalPages <= 1) {
+      el.resultPagination.hidden = true;
+      return;
+    }
+    el.resultPagination.hidden = false;
+    el.resultPageIndicator.textContent = items.page + " / " + items.totalPages;
+    el.resultPagePrev.disabled = items.page <= 1;
+    el.resultPageNext.disabled = items.page >= items.totalPages;
+  }
+
   function renderResults(data) {
     renderSummary(data.summary);
     var rows = (data.items && data.items.content) || [];
+    // 필터(결과 유형·불일치만)가 없을 때만 서버가 준 BigDecimal 합계(summary)를 쓴다.
+    // 필터가 걸리면 그 조건의 합계를 서버가 안 주므로 현재 페이지 안에서만 클라이언트가 더한다
+    // (Number 합산이라 정밀도·페이지 범위 한계가 있음 — "불일치만" 옆 안내 문구 참고).
+    var noFilter = !el.typeFilter.value && !el.mismatchOnly.checked;
     if (!rows.length) {
-      el.resultBody.innerHTML = '<tr><td colspan="11"><div class="fgc-empty">조건에 맞는 자료가 없습니다.</div></td></tr>';
+      el.resultBody.innerHTML = '<tr><td colspan="12"><div class="fgc-empty">조건에 맞는 자료가 없습니다.</div></td></tr>';
       el.sumExpected.textContent = "0";
       el.sumActual.textContent = "0";
       el.sumDiff.textContent = "0";
+      renderResultPagination(noFilter ? data.items : null);
       return;
     }
     el.resultBody.innerHTML = rows.map(resultRow).join("");
-    var totals = rows.reduce(function (acc, row) {
-      acc.expected += Number(row.expectedTotalAmount || 0);
-      acc.actual += Number(row.actualTotalAmount || 0);
-      acc.diff += Number(row.differenceAmount || 0);
-      return acc;
-    }, { expected: 0, actual: 0, diff: 0 });
-    el.sumExpected.textContent = number(totals.expected);
-    el.sumActual.textContent = number(totals.actual);
-    el.sumDiff.textContent = number(totals.diff);
+    if (noFilter) {
+      var summary = data.summary || {};
+      el.sumExpected.textContent = number(summary.expectedTotal);
+      el.sumActual.textContent = number(summary.actualTotal);
+      el.sumDiff.textContent = number(summary.differenceTotal);
+    } else {
+      var totals = rows.reduce(function (acc, row) {
+        acc.expected += Number(row.expectedTotalAmount || 0);
+        acc.actual += Number(row.actualTotalAmount || 0);
+        acc.diff += Number(row.differenceAmount || 0);
+        return acc;
+      }, { expected: 0, actual: 0, diff: 0 });
+      el.sumExpected.textContent = number(totals.expected);
+      el.sumActual.textContent = number(totals.actual);
+      el.sumDiff.textContent = number(totals.diff);
+    }
+    renderResultPagination(data.items);
   }
 
   function loadResults(page) {
     if (!state.reconciliationRunId) return;
     if (state.resultsAbortController) state.resultsAbortController.abort();
     state.resultsAbortController = new AbortController();
+    state.resultsPage = page || 1;
 
     var params = new URLSearchParams();
-    params.set("page", String(page || 1));
+    params.set("page", String(state.resultsPage));
     if (el.typeFilter.value) params.set("resultType", el.typeFilter.value);
 
     var url = "/api/v1/reconciliations/" + encodeURIComponent(state.reconciliationRunId) + "/results?" + params.toString();
@@ -298,13 +337,30 @@
     }
   }
 
+  function setCompareModalState(mode, message) {
+    var stateBox = document.getElementById("reco-compare-state");
+    var content = document.getElementById("reco-compare-content");
+    if (mode === "content") {
+      stateBox.hidden = true;
+      content.hidden = false;
+      return;
+    }
+    stateBox.className = "fgc-modal__body fgc-empty" + (mode === "error" ? " is-error" : "");
+    stateBox.textContent = message;
+    stateBox.hidden = false;
+    content.hidden = true;
+  }
+
   function openCompareModal(reconciliationResultId) {
+    setCompareModalState("loading", "불러오는 중입니다.");
     window.FgcUi.modal.open("reco-compare");
     apiClient.request("/api/v1/reconciliations/results/" + encodeURIComponent(reconciliationResultId))
-      .then(function (envelope) { renderCompareModal(envelope.data); })
+      .then(function (envelope) {
+        renderCompareModal(envelope.data);
+        setCompareModalState("content");
+      })
       .catch(function (error) {
-        window.FgcUi.toast((error && error.message) || "비교 상세를 불러오지 못했습니다.", "error");
-        window.FgcUi.modal.close("reco-compare");
+        setCompareModalState("error", (error && error.message) || "비교 상세를 불러오지 못했습니다.");
       });
   }
 
@@ -342,10 +398,13 @@
   // ---- 이벤트 바인딩 ----
 
   el.insurer.addEventListener("change", updateRunButtonState);
+  el.stage.addEventListener("change", updateRunButtonState);
   el.btnRun.addEventListener("click", runReconciliation);
   el.btnBulk.addEventListener("click", bulkCreateExceptions);
   el.typeFilter.addEventListener("change", function () { loadResults(1); });
   el.mismatchOnly.addEventListener("change", function () { loadResults(1); });
+  el.resultPagePrev.addEventListener("click", function () { loadResults(state.resultsPage - 1); });
+  el.resultPageNext.addEventListener("click", function () { loadResults(state.resultsPage + 1); });
   el.resultBody.addEventListener("click", function (event) {
     var button = event.target.closest("[data-reco-compare-id]");
     if (button) openCompareModal(button.dataset.recoCompareId);
