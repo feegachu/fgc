@@ -136,7 +136,7 @@ public class ContractController {
     @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<List<Long>> regenerateSchedules(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "CONTRACT_DETAIL_MANUAL") String reason
+            @RequestParam(name = "reason") String reason
     ) {
         return ApiResponse.success(contractService.regenerateSchedules(id, reason));
     }

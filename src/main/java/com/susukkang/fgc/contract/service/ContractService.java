@@ -48,6 +48,7 @@ public class ContractService {
     private static final String AUDIT_CONTRACT_CREATED = "CONTRACT_CREATED";
     private static final String AUDIT_CONTRACT_UPDATED = "CONTRACT_UPDATED";
     private static final String AUDIT_CAP_RECHECKED = "CONTRACT_CAP_RECHECKED";
+    private static final String AUDIT_SCHEDULES_REGENERATED = "CONTRACT_SCHEDULES_REGENERATED";
 
     private final ContractMapper contractMapper;
     private final CapCheckMapper capCheckMapper;
@@ -429,7 +430,15 @@ public class ContractService {
         if (contractMapper.selectContractById(contractId) == null) {
             throw validationException("contractId", "존재하지 않는 보험계약입니다.");
         }
-        return scheduleService.regenerateContractSchedules(contractId, reason);
+        List<Long> scheduleIds = scheduleService.regenerateContractSchedules(contractId, reason);
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_SCHEDULES_REGENERATED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(contractId))
+                .after(scheduleIds)
+                .reason(reason)
+                .build());
+        return scheduleIds;
     }
 
     /**

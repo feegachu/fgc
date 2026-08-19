@@ -402,7 +402,7 @@
       var tbody = document.createElement("tbody");
       lines.forEach(function (line) {
         var row = document.createElement("tr");
-        [line.installmentNo, line.expectedPaymentDate || line.paymentDate, money(line.expectedAmount || line.amount), line.lineStatus || line.status || "—"]
+        [line.installmentNo, line.dueDate, money(line.expectedAmount || line.amount), line.lineStatus || line.status || "—"]
           .forEach(function (value) { var cell = document.createElement("td"); cell.textContent = value === undefined || value === null ? "—" : value; row.append(cell); });
         tbody.append(row);
       });
