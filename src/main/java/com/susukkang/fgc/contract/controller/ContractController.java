@@ -3,6 +3,8 @@ package com.susukkang.fgc.contract.controller;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.arbitrage.service.ArbitrageService;
+import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
@@ -33,6 +35,7 @@ public class ContractController {
     private final ContractService contractService;
     private final ScheduleService scheduleService;
     private final ArbitrageService arbitrageService;
+    private final CapCheckService capCheckService;
 
     /**
      * 설명 : 검색 조건에 따라 보험계약 목록을 조회한다.
@@ -60,7 +63,7 @@ public class ContractController {
      */
     @PostMapping
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<ContractResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
+    public ApiResponse<ContractCreateResponse> createContract(@Valid @RequestBody ContractCreateRequest request ) {
         return ApiResponse.success(contractService.createContract(request));
     }
     /**
@@ -73,7 +76,7 @@ public class ContractController {
      */
     @PutMapping("/{id}")
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<ContractResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
+    public ApiResponse<ContractUpdateResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
         return ApiResponse.success(contractService.updateContract(id, request));
     }
     /**
@@ -108,6 +111,34 @@ public class ContractController {
         return ApiResponse.success(
                 scheduleService.selectByContractId(contractId, paymentStage)
         );
+    }
+
+    /** IF-API-14 계약 상세 탭용 지급단계별 최신 1,200% 판정 조회. */
+    @GetMapping("/{id}/cap-checks")
+    public ApiResponse<List<CapCheckSaveResult>> getContractCapChecks(@PathVariable Long id) {
+        return ApiResponse.success(
+                java.util.Arrays.stream(PaymentStage.values())
+                        .map(stage -> capCheckService.findLatest(id, stage))
+                        .flatMap(java.util.Optional::stream)
+                        .toList()
+        );
+    }
+
+    /** 계약 생성·수정 후 사용하는 동일한 실시간 한도 계산을 수동으로 다시 실행한다. */
+    @PostMapping("/{id}/cap-check")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<List<CapCheckSaveResult>> recheckCap(@PathVariable Long id) {
+        return ApiResponse.success(contractService.recheckCap(id));
+    }
+
+    /** 계약 상세에서 운영 중인 예상 스케줄을 지급단계별 새 버전으로 재생성한다. */
+    @PostMapping("/{id}/schedules/regenerate")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<List<Long>> regenerateSchedules(
+            @PathVariable Long id,
+            @RequestParam(name = "reason") String reason
+    ) {
+        return ApiResponse.success(contractService.regenerateSchedules(id, reason));
     }
     /**
      * 설명 : 계약 ID를 기준으로 차익거래 수동 검증을 실행한다.

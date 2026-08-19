@@ -3,7 +3,7 @@
   FGC-UI-TRAN-W01 수수료 지급 건 목록
   요구사항 FUN-065 · FUN-031
   데이터  읽기 commission_transaction, transaction_attribution, vw_transaction_attribution_balance
-  API     GET /api/v1/transactions?settlementMonth=&paymentStage=&status=&sourceType=
+  API     GET /api/v1/transactions?settlementMonth=&paymentStage=&insurerId=&contractNo=&agentId=&commissionItemId=&status=&sourceType=&noAttributionOnly=
   라우트  GET /transactions → transaction/list.html
 
   [막을 것]
@@ -36,7 +36,7 @@
 
   <!-- ① 검색 -->
   <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__body fgc-toolbar">
+    <form class="fgc-card__body fgc-toolbar" data-transaction-filter-form>
       <div class="fgc-field" style="min-width:140px">
         <label class="fgc-label" for="f-month">정산월</label>
         <input class="fgc-input" id="f-month" type="month" th:value="${month}" value="2026-07">
@@ -47,6 +47,14 @@
           <option value="GA_TO_FC">GA→설계사</option>
           <option value="INSURER_TO_GA">원수사→GA</option>
         </select>
+      </div>
+      <div class="fgc-field" style="min-width:170px">
+        <label class="fgc-label" for="f-insurer">보험회사</label>
+        <select class="fgc-select" id="f-insurer"><option value="">전체</option></select>
+      </div>
+      <div class="fgc-field" style="min-width:160px">
+        <label class="fgc-label" for="f-contract-no">계약번호</label>
+        <input class="fgc-input" id="f-contract-no" type="search" placeholder="계약번호 입력" autocomplete="off">
       </div>
       <div class="fgc-field" style="min-width:170px">
         <label class="fgc-label" for="f-source">원천유형</label>
@@ -71,10 +79,13 @@
       <label style="display:flex;gap:5px;align-items:center;font-size:12px;padding-bottom:6px">
         <input type="checkbox" id="f-noattr"> 귀속 0건만
       </label>
-      <button class="fgc-btn fgc-btn--ghost" id="f-reset">
+      <button type="button" class="fgc-btn fgc-btn--ghost" id="f-reset">
         <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
       </button>
-    </div>
+      <button class="fgc-btn fgc-btn--primary" type="submit">
+        <span class="material-symbols-outlined" style="font-size:18px">search</span> 조회
+      </button>
+    </form>
   </section>
 
   <!-- ② 목록 -->
@@ -119,6 +130,18 @@
         0이면 빨간색으로 나오고, 그 상태로는 확정할 수 없습니다.
       </p>
     </div>
+    <nav class="schedule-pagination" aria-label="수수료 지급 건 목록 페이지" data-transaction-pagination hidden>
+      <span><span data-transaction-current-page>1</span> / <span data-transaction-total-pages>1</span> 페이지</span>
+      <div class="pagination-controls">
+        <button class="pagination-button" type="button" aria-label="이전 페이지" data-transaction-page-prev>
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+        </button>
+        <span data-transaction-page-numbers></span>
+        <button class="pagination-button" type="button" aria-label="다음 페이지" data-transaction-page-next>
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+        </button>
+      </div>
+    </nav>
   </section>
 
 </main>

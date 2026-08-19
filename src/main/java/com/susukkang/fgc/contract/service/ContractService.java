@@ -1,11 +1,14 @@
 package com.susukkang.fgc.contract.service;
 
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.MoneyUtil;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
@@ -43,8 +47,11 @@ public class ContractService {
     private static final String AUDIT_ENTITY_TYPE = "CONTRACT";
     private static final String AUDIT_CONTRACT_CREATED = "CONTRACT_CREATED";
     private static final String AUDIT_CONTRACT_UPDATED = "CONTRACT_UPDATED";
+    private static final String AUDIT_CAP_RECHECKED = "CONTRACT_CAP_RECHECKED";
+    private static final String AUDIT_SCHEDULES_REGENERATED = "CONTRACT_SCHEDULES_REGENERATED";
 
     private final ContractMapper contractMapper;
+    private final CapCheckMapper capCheckMapper;
     private final ContractStatusEventMapper contractStatusEventMapper;
     private final CapCheckService capCheckService;
     private final ScheduleService scheduleService;
@@ -110,7 +117,7 @@ public class ContractService {
      * @since 2026-08-05
      */
     @Transactional
-    public ContractResponse createContract(ContractCreateRequest request) {
+    public ContractCreateResponse createContract(ContractCreateRequest request) {
         validateInput(request); //검증
 
         // 납입 주기 -> 환산 코드 결정
@@ -150,8 +157,34 @@ public class ContractService {
         ScheduleGenerationResult scheduleResult =
                 scheduleService.generateSchedules(insuranceContract);
 
-        // FUN-030: 새 스케줄을 기준으로 두 지급단계의 1,200% 한도를 각각 계산한다.
-        calculateCapChecks(insuranceContract.getContractId());
+        // FUN-030: 계약 저장 및 예상 스케줄 생성 후 양방향 1,200% 한도 검증
+        Long contractId = insuranceContract.getContractId();
+
+        for (PaymentStage paymentStage : PaymentStage.values()) {
+            if (!scheduleService.hasActiveOperationalSchedule(contractId, paymentStage)) {
+                continue;
+            }
+            BigDecimal complianceEvidenceAmount = null;
+
+            // 준법경영비 공제는 보험회사 → GA 단계에만 적용
+            if (paymentStage == PaymentStage.INSURER_TO_GA) {
+                complianceEvidenceAmount =
+                        capCheckMapper.selectComplianceEvidenceAmount(
+                                contractId,
+                                paymentStage
+                        );
+            }
+
+            CapCalculationCommand command =
+                    CapCalculationCommand.realtime(
+                            contractId,
+                            paymentStage,
+                            LocalDate.now(DateUtil.SEOUL_ZONE),
+                            complianceEvidenceAmount
+                    );
+
+            calculateCapCheckOrRegisterReview(contractId, paymentStage, command);
+        }
 
         // TODO(FUN-026, 2차): 계약 생성 상태 사건 이력을 등록한다.
 
@@ -162,10 +195,9 @@ public class ContractService {
                 .after(insuranceContract)
                 .build());
 
-        return ContractResponse.builder()
+        return ContractCreateResponse.builder()
                 .contractId(insuranceContract.getContractId())
                 .scheduleHeaderIds(scheduleResult.scheduleHeaderIds())
-                .regeneratedScheduleIds(List.of())
                 .build();
     }
 
@@ -191,7 +223,7 @@ public class ContractService {
     }
 
     private void validateContractDate(ContractInput request) {
-        if (request.getContractDate().isAfter(LocalDate.now())) {
+        if (request.getContractDate().isAfter(LocalDate.now(DateUtil.SEOUL_ZONE))) {
             throw new FgcBusinessException(
                     FgcErrorCode.CONT_002,
                     "contractDate",
@@ -259,7 +291,7 @@ public class ContractService {
                             "contractNo",
                             request.getContractNo()
                     ),
-                    "이미 등록된 계약번호입니다."
+                    "저장 불가 — 이미 등록된 계약번호입니다."
             );
         }
     }
@@ -360,6 +392,55 @@ public class ContractService {
                 .toList();
     }
 
+    /** 계약 상세에서 현재 계약·운영 스케줄을 기준으로 양 지급단계 한도를 다시 계산한다. */
+    @Transactional
+    public List<com.susukkang.fgc.cap.dto.CapCheckSaveResult> recheckCap(Long contractId) {
+        if (contractMapper.selectContractById(contractId) == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+
+        for (PaymentStage paymentStage : PaymentStage.values()) {
+            if (!scheduleService.hasActiveOperationalSchedule(contractId, paymentStage)) {
+                continue;
+            }
+            BigDecimal complianceEvidenceAmount = paymentStage == PaymentStage.INSURER_TO_GA
+                    ? capCheckMapper.selectComplianceEvidenceAmount(contractId, paymentStage)
+                    : null;
+            calculateCapCheckOrRegisterReview(contractId, paymentStage,
+                    CapCalculationCommand.manual(contractId, paymentStage,
+                            LocalDate.now(DateUtil.SEOUL_ZONE), complianceEvidenceAmount));
+        }
+
+        List<com.susukkang.fgc.cap.dto.CapCheckSaveResult> results = java.util.Arrays.stream(PaymentStage.values())
+                .map(stage -> capCheckService.findLatest(contractId, stage))
+                .flatMap(java.util.Optional::stream)
+                .toList();
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_CAP_RECHECKED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(contractId))
+                .after(results)
+                .build());
+        return results;
+    }
+
+    /** 계약 상세에서 양 지급단계의 운영 스케줄을 새 버전으로 재생성한다. */
+    @Transactional
+    public List<Long> regenerateSchedules(Long contractId, String reason) {
+        if (contractMapper.selectContractById(contractId) == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+        List<Long> scheduleIds = scheduleService.regenerateContractSchedules(contractId, reason);
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_SCHEDULES_REGENERATED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(contractId))
+                .after(scheduleIds)
+                .reason(reason)
+                .build());
+        return scheduleIds;
+    }
+
     /**
      * 설명 : 계약 수정
      * 요청한 Request 검증 및 해당 계약 ID를 수정한다.
@@ -372,7 +453,7 @@ public class ContractService {
      * @since 2026-08-05
      */
     @Transactional
-    public ContractResponse updateContract(Long id, ContractUpdateRequest request) {
+    public ContractUpdateResponse updateContract(Long id, ContractUpdateRequest request) {
         // 계약 Id 검증 및 계약 및 스케줄 정보 가져오기
         InsuranceContract currentContract = contractMapper.selectContractById(id); //기존 계약 정보
 
@@ -416,12 +497,32 @@ public class ContractService {
                     FgcErrorCode.COMMON_500
             );
         }
-        // FUN-036: 기존 버전은 보존하고 현재 계약값을 반영한 새 스케줄 버전을 만든다.
-        List<Long> regeneratedScheduleIds =
-                scheduleService.regenerateContractSchedules(id, "CONTRACT_UPDATED");
+        List<Long> scheduleHeaderIds = List.of();
+        if (hasScheduleImpactingChanges(currentContract, updatedContract)) {
+            scheduleHeaderIds = scheduleService.regenerateContractSchedules(
+                    id,
+                    "CONTRACT_UPDATED"
+            );
 
-        // FUN-030: 새 스케줄을 기준으로 두 지급단계의 한도를 다시 계산한다.
-        calculateCapChecks(id);
+            for (PaymentStage paymentStage : PaymentStage.values()) {
+                if (!scheduleService.hasActiveOperationalSchedule(id, paymentStage)) {
+                    continue;
+                }
+                BigDecimal complianceEvidenceAmount = null;
+                if (paymentStage == PaymentStage.INSURER_TO_GA) {
+                    complianceEvidenceAmount =
+                            capCheckMapper.selectComplianceEvidenceAmount(id, paymentStage);
+                }
+
+                CapCalculationCommand command = CapCalculationCommand.realtime(
+                        id,
+                        paymentStage,
+                        LocalDate.now(DateUtil.SEOUL_ZONE),
+                        complianceEvidenceAmount
+                );
+                calculateCapCheckOrRegisterReview(id, paymentStage, command);
+            }
+        }
 
         /*
          * TODO(FUN-026, 2차)
@@ -438,23 +539,61 @@ public class ContractService {
                 .after(updatedContract)
                 .build());
 
-        return ContractResponse.builder()
+        return ContractUpdateResponse.builder()
                 .contractId(id)
-                .scheduleHeaderIds(regeneratedScheduleIds)
-                .regeneratedScheduleIds(regeneratedScheduleIds)
+                .scheduleHeaderIds(scheduleHeaderIds)
+                .regeneratedScheduleIds(scheduleHeaderIds)
                 .build();
     }
 
-    private void calculateCapChecks(Long contractId) {
-        LocalDate asOfDate = LocalDate.now();
-        for (PaymentStage paymentStage : List.of(
-                PaymentStage.INSURER_TO_GA,
-                PaymentStage.GA_TO_FC
-        )) {
-            capCheckService.calculateAndSave(
-                    CapCalculationCommand.realtime(contractId, paymentStage, asOfDate)
+    private boolean hasScheduleImpactingChanges(
+            InsuranceContract current,
+            InsuranceContract updated
+    ) {
+        return !Objects.equals(current.getInsurerId(), updated.getInsurerId())
+                || !Objects.equals(current.getProductOfferingId(), updated.getProductOfferingId())
+                || !Objects.equals(current.getContractDate(), updated.getContractDate())
+                || !Objects.equals(current.getAgentId(), updated.getAgentId())
+                || !Objects.equals(current.getOrganizationId(), updated.getOrganizationId())
+                || !Objects.equals(current.getPaymentCycleCode(), updated.getPaymentCycleCode())
+                || moneyChanged(current.getFirstPremiumAmount(), updated.getFirstPremiumAmount())
+                || moneyChanged(
+                        current.getMonthlyEquivalentFirstPremium(),
+                        updated.getMonthlyEquivalentFirstPremium()
+                )
+                || !Objects.equals(current.getPaymentTermMonths(), updated.getPaymentTermMonths())
+                || moneyChanged(
+                        current.getStandardSurrenderDeductionAmount(),
+                        updated.getStandardSurrenderDeductionAmount()
+                );
+    }
+
+    private void calculateCapCheckOrRegisterReview(
+            Long contractId,
+            PaymentStage paymentStage,
+            CapCalculationCommand command
+    ) {
+        try {
+            capCheckService.calculateAndSave(command);
+        } catch (FgcBusinessException exception) {
+            if (exception.getErrorCode() != FgcErrorCode.CAP_004) {
+                throw exception;
+            }
+            scheduleService.registerCapRuleReview(
+                    contractId,
+                    paymentStage,
+                    exception.getDetail() == null
+                            ? "적용 가능한 1,200% 룰셋이 없습니다."
+                            : exception.getDetail()
             );
         }
+    }
+
+    private boolean moneyChanged(BigDecimal current, BigDecimal updated) {
+        if (current == null || updated == null) {
+            return current != updated;
+        }
+        return current.compareTo(updated) != 0;
     }
     /**
      * 설명 : 수정 요청 값을 검증하는 함수
@@ -503,7 +642,7 @@ public class ContractService {
         )) {
             throw validationException(
                     "contractNo",
-                    "해당 보험사에 이미 등록된 계약번호입니다."
+                    "저장 불가 — 이미 등록된 계약번호입니다."
             );
         }
     }

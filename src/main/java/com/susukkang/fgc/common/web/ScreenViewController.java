@@ -3,7 +3,9 @@ package com.susukkang.fgc.common.web;
 import com.susukkang.fgc.common.security.Roles;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * 1차 21면 중 아직 실데이터 바인딩 전인 화면들의 정적 라우팅.
@@ -19,6 +21,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class ScreenViewController {
 
+    /**
+     * CONT-W03 — 인터페이스정의서 IF-API-18/19 역할 SETTLEMENT (+SYSTEM_ADMIN 은 전부, §4-1).
+     * FGC-FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
+     */
     @GetMapping("/contracts/{id}")
     public String contractDetail() {
         return "contract/detail";
@@ -42,7 +48,8 @@ public class ScreenViewController {
     }
 
     @GetMapping("/schedules/{id}")
-    public String scheduleDetail() {
+    public String scheduleDetail(@PathVariable Long id, Model model) {
+        model.addAttribute("id", id);
         return "schedule/detail";
     }
 

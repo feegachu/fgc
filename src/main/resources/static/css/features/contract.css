@@ -800,6 +800,68 @@
   padding: 2rem;
 }
 
+.contract-lazy-panel-header,
+.contract-tab-result-section > header,
+.contract-cap-result-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.contract-lazy-panel-header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.contract-lazy-panel-header p,
+.contract-tab-meta,
+.contract-tab-empty {
+  margin-top: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.contract-tab-result-section + .contract-tab-result-section {
+  margin-top: 1rem;
+}
+
+.contract-tab-table {
+  width: 100%;
+  margin-top: 0.625rem;
+}
+
+.contract-cap-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.contract-cap-result-card {
+  padding: 1rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-8);
+}
+
+.contract-cap-result-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.contract-cap-result-card dt {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+}
+
+.contract-cap-result-card dd {
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .contract-data-panel dl {
   display: grid;
   padding: 0.5rem 1rem 0.75rem;
@@ -977,7 +1039,7 @@
 }
 
 .contract-table {
-  width: 68rem;
+  width: 100%;
   min-width: 68rem;
   table-layout: fixed;
 }
@@ -1034,7 +1096,7 @@
 
 .contract-premium-help {
   display: grid;
-  width: 68rem;
+  width: 100%;
   min-width: 68rem;
   min-height: 2.75rem;
   grid-template-columns: 1.25rem minmax(0, 1fr);
@@ -1070,7 +1132,7 @@
   display: flex;
   min-height: 2.5rem;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   margin: 2.5rem 1rem 0;
   padding-inline: 0.75rem;

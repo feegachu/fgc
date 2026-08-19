@@ -3,15 +3,19 @@ package com.susukkang.fgc.policy.service;
 import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.PolicyStatus;
+import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
+import com.susukkang.fgc.policy.dto.PolicyVersionRow;
 import com.susukkang.fgc.policy.mapper.PolicyMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -128,6 +132,32 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                 .scheduleRegime(policy.getScheduleRegime())
                 .rules(resolvedRules)
                 .build();
+    }
+
+    @Override
+    public Long resolveCurrentAllocationPolicyVersion(LocalDate asOf) {
+        List<PolicyVersionRow> policies = policyMapper.selectPolicyVersions(
+                PolicyType.ALLOCATION,
+                asOf,
+                PolicyStatus.ACTIVE
+        );
+        if (policies == null || policies.isEmpty()) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "allocationPolicyVersion",
+                    Map.of("asOf", String.valueOf(asOf), "reason", "POLICY_MISSING"),
+                    "적용 가능한 승인 배부정책이 없습니다."
+            );
+        }
+        if (policies.size() > 1) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "allocationPolicyVersion",
+                    Map.of("asOf", String.valueOf(asOf), "reason", "POLICY_DUPLICATE", "policyCount", policies.size()),
+                    "적용 가능한 승인 배부정책이 여러 건 존재합니다."
+            );
+        }
+        return policies.getFirst().getPolicyVersionId();
     }
     /**
      * 후보 규칙을 수수료 항목, 지급 대상 직급 및 회차별로 그룹화하고

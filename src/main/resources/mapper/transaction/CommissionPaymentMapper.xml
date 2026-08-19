@@ -4,11 +4,127 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper">
 
+    <sql id="transactionSearchWhere">
+        <where>
+            <if test="condition.settlementMonth != null and condition.settlementMonth != ''">
+                AND ct.settlement_month = CAST(CONCAT(#{condition.settlementMonth}, '-01') AS date)
+            </if>
+            <if test="condition.paymentStage != null">
+                AND ct.payment_stage = #{condition.paymentStage}
+            </if>
+            <if test="condition.status != null">
+                AND ct.status = #{condition.status}
+            </if>
+            <if test="condition.sourceType != null and condition.sourceType != ''">
+                AND ct.source_type = #{condition.sourceType}
+            </if>
+            <if test="condition.insurerId != null">
+                AND COALESCE(ct.insurer_id, source_contract.insurer_id) = #{condition.insurerId}
+            </if>
+            <if test="condition.contractNo != null and condition.contractNo != ''">
+                AND (
+                    source_contract.contract_no ILIKE CONCAT('%', #{condition.contractNo}, '%')
+                    OR EXISTS (
+                        SELECT 1
+                          FROM fgc.transaction_attribution filter_ta
+                          JOIN fgc.insurance_contract filter_contract
+                            ON filter_contract.contract_id = filter_ta.contract_id
+                         WHERE filter_ta.commission_transaction_id = ct.commission_transaction_id
+                           AND filter_contract.contract_no ILIKE CONCAT('%', #{condition.contractNo}, '%')
+                    )
+                )
+            </if>
+            <if test="condition.agentId != null">
+                AND ct.recipient_agent_id = #{condition.agentId}
+            </if>
+            <if test="condition.commissionItemId != null">
+                AND ct.commission_item_id = #{condition.commissionItemId}
+            </if>
+            <if test="condition.noAttributionOnly != null and condition.noAttributionOnly">
+                AND NOT EXISTS (
+                    SELECT 1
+                      FROM fgc.transaction_attribution noattr_ta
+                     WHERE noattr_ta.commission_transaction_id = ct.commission_transaction_id
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectByCondition"
+            resultType="com.susukkang.fgc.transaction.dto.CommissionPaymentListResponse">
+        SELECT ct.commission_transaction_id,
+               ct.payment_stage,
+               CASE ct.payment_stage
+                   WHEN 'INSURER_TO_GA' THEN '원수사→GA'
+                   WHEN 'GA_TO_FC' THEN 'GA→설계사'
+               END AS payment_stage_label,
+               ct.source_type,
+               CASE ct.source_type
+                   WHEN 'INSURER_STATEMENT' THEN '원수사 명세'
+                   WHEN 'GA_MANUAL_PAYMENT' THEN 'GA 수기지급'
+                   WHEN 'GA_CONFIRMED_PAYMENT' THEN 'GA 확정지급'
+                   WHEN 'ADJUSTMENT' THEN '조정'
+                   WHEN 'ALLOCATION_POOL' THEN '공통비 풀'
+                   WHEN 'CLAWBACK' THEN '환수'
+                   WHEN 'RECOVERY' THEN '회수'
+               END AS source_type_label,
+               ct.source_business_key,
+               ct.settlement_month,
+               ct.recipient_agent_id,
+               agent.agent_name AS recipient_agent_name,
+               ct.commission_item_id,
+               item.item_code AS commission_item_code,
+               item.item_name AS commission_item_name,
+               ct.amount,
+               ct.cashflow_type,
+               CASE ct.cashflow_type WHEN 'PAYMENT' THEN '지급' WHEN 'DEDUCTION' THEN '차감' END
+                   AS cashflow_type_label,
+               ct.status,
+               CASE ct.status WHEN 'DRAFT' THEN '작성중' WHEN 'CONFIRMED' THEN '확정' WHEN 'CANCELLED' THEN '취소' END
+                   AS status_label,
+               COUNT(attribution.transaction_attribution_id)::integer AS attribution_count,
+               ct.amount - COALESCE(SUM(attribution.attributed_amount), 0) AS difference_amount
+          FROM fgc.commission_transaction ct
+          JOIN fgc.commission_item item
+            ON item.commission_item_id = ct.commission_item_id
+          LEFT JOIN fgc.agent agent
+            ON agent.agent_id = ct.recipient_agent_id
+          LEFT JOIN fgc.insurance_contract source_contract
+            ON source_contract.contract_id = ct.source_contract_id
+          LEFT JOIN fgc.transaction_attribution attribution
+            ON attribution.commission_transaction_id = ct.commission_transaction_id
+        <include refid="transactionSearchWhere"/>
+         GROUP BY ct.commission_transaction_id, agent.agent_name, item.item_code, item.item_name
+         ORDER BY ct.commission_transaction_id DESC
+         LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.commission_transaction ct
+          LEFT JOIN fgc.insurance_contract source_contract
+            ON source_contract.contract_id = ct.source_contract_id
+        <include refid="transactionSearchWhere"/>
+    </select>
+
     <select id="existsAgent" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
               FROM fgc.agent
              WHERE agent_id = #{agentId}
+        )
+    </select>
+
+    <select id="existsEligibleNewcomerSupportAgent" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.agent
+             WHERE agent_id = #{agentId}
+               AND active_yn = TRUE
+               AND newcomer_support_eligible_yn = TRUE
+               AND prior_three_year_experience_yn = FALSE
+               AND newcomer_support_end_date >= #{asOfDate}
         )
     </select>
 
@@ -268,7 +384,8 @@
                ta.allocation_basis_snapshot ->> 'inclusionDecisionReason' AS inclusion_decision_reason,
                ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
                COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
-               ta.attribution_method
+               ta.attribution_method,
+               c.contract_date
           FROM fgc.commission_transaction ct
           JOIN fgc.commission_item ci
             ON ci.commission_item_id = ct.commission_item_id
@@ -278,6 +395,8 @@
           <!-- 개선: LEFT JOIN으로 본문을 유지하고 확정 서비스가 TRAN-002 귀속 누락을 판정 -->
           LEFT JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
+          LEFT JOIN fgc.insurance_contract c
+            ON c.contract_id = ta.contract_id
          WHERE ct.commission_transaction_id = #{paymentId}
          ORDER BY ta.attribution_seq
     </sql>
@@ -309,7 +428,7 @@
     <!-- 기존 코드: 각 지급 건 행만 잠가 서로 다른 DRAFT는 동시에 한도 잔액을 읽음 -->
     <!-- 문제: 두 요청이 같은 기존 산입액을 보고 모두 확정되어 합산 한도를 넘길 수 있음 -->
     <!-- 개선: 귀속 계약을 ID 순서로 잠가 같은 계약의 사전검증과 CONFIRMED 전환을 순차 처리 -->
-    <select id="lockAttributedContracts">
+    <select id="lockAttributedContracts" resultType="long">
         SELECT c.contract_id
           FROM fgc.insurance_contract c
          WHERE c.contract_id IN (
@@ -382,23 +501,64 @@
             ON po.product_offering_id = c.product_offering_id
           JOIN fgc.product p
             ON p.product_id = po.product_id
+          <!--
+            @author hjKang
+            @since 2026-08-16
+
+            2026-08-16 - 지급 정책과 1,200% 한도 정책의 조회 기준 분리
+            기존 코드: commission_transaction.policy_version_id와 cap_rule_set.policy_version_id가 같은 룰셋만 조회했다.
+            문제: 지급 건에는 현행 수수료 정책(GA-CUR)이 저장되지만 한도 룰셋은 별도 규제 정책(REG-CAP)에 속하므로 정상 수수료 항목도 룰셋을 찾지 못해 검토필요로 차단되었다.
+            개선: CapCalculator와 동일하게 활성 상태의 한도 룰셋 중 지급단계·계약일·보험사·상품군·채널 조건이 맞는 룰셋을 조회한다.
+          -->
           JOIN fgc.cap_rule_set crs
-            ON crs.policy_version_id = ct.policy_version_id
-           AND crs.payment_stage = ct.payment_stage
+            ON crs.payment_stage = ct.payment_stage
            AND c.contract_date &gt;= crs.contract_date_from
            AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
            AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
            AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
            AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+          JOIN fgc.policy_version cap_pv
+            ON cap_pv.policy_version_id = crs.policy_version_id
+           AND cap_pv.status = 'ACTIVE'
           JOIN fgc.cap_rule_item cri
             ON cri.cap_rule_set_id = crs.cap_rule_set_id
            AND cri.commission_item_id = ct.commission_item_id
          WHERE ct.commission_transaction_id = #{paymentId}
-         ORDER BY (crs.insurer_id IS NOT NULL) DESC,
-                  (crs.product_group_code IS NOT NULL) DESC,
-                  (crs.channel_code IS NOT NULL) DESC,
+         ORDER BY
+               (CASE WHEN crs.insurer_id IS NOT NULL THEN 1 ELSE 0 END
+              + CASE WHEN crs.product_group_code IS NOT NULL THEN 1 ELSE 0 END
+              + CASE WHEN crs.channel_code IS NOT NULL THEN 1 ELSE 0 END) DESC,
+                  crs.contract_date_from DESC,
                   crs.cap_rule_set_id DESC
          LIMIT 1
+    </select>
+
+    <!-- 룰셋 부재(CAP_004)와 수수료 항목 미분류(CAP_002)를 구분한다. -->
+    <select id="existsApplicableCapRuleSet" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM fgc.commission_transaction ct
+              JOIN fgc.transaction_attribution ta
+                ON ta.commission_transaction_id = ct.commission_transaction_id
+               AND ta.transaction_attribution_id = #{transactionAttributionId}
+              JOIN fgc.insurance_contract c
+                ON c.contract_id = ta.contract_id
+              JOIN fgc.product_offering po
+                ON po.product_offering_id = c.product_offering_id
+              JOIN fgc.product p
+                ON p.product_id = po.product_id
+              JOIN fgc.cap_rule_set crs
+                ON crs.payment_stage = ct.payment_stage
+               AND c.contract_date &gt;= crs.contract_date_from
+               AND (crs.contract_date_to IS NULL OR c.contract_date &lt;= crs.contract_date_to)
+               AND (crs.insurer_id IS NULL OR crs.insurer_id = c.insurer_id)
+               AND (crs.product_group_code IS NULL OR crs.product_group_code = p.product_group_code)
+               AND (crs.channel_code IS NULL OR crs.channel_code = po.channel_code)
+              JOIN fgc.policy_version cap_pv
+                ON cap_pv.policy_version_id = crs.policy_version_id
+               AND cap_pv.status = 'ACTIVE'
+             WHERE ct.commission_transaction_id = #{paymentId}
+        )
     </select>
 
     <insert id="insertCapCheck"
@@ -476,6 +636,7 @@
         INSERT INTO fgc.exception_case AS existing (
             exception_key,
             exception_type,
+            reason_code,
             severity,
             status,
             contract_id,
@@ -488,6 +649,7 @@
         ) VALUES (
             #{exceptionKey},
             #{exceptionType},
+            #{reasonCode},
             #{severity},
             'NEW',
             #{contractId},
@@ -500,6 +662,7 @@
         )
         ON CONFLICT (exception_key) DO UPDATE
            SET status = 'NEW',
+               reason_code = EXCLUDED.reason_code,
                title = EXCLUDED.title,
                description = EXCLUDED.description,
                updated_at = clock_timestamp()
