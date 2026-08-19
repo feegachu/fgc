@@ -38,6 +38,7 @@ public class ReconciliationViewController {
     public String list(
             @ModelAttribute("month") String month,
             @RequestParam(required = false) String stage,
+            @RequestParam(required = false) Long resultId,
             @RequestParam(defaultValue = "1") int page,
             Model model
     ) {
@@ -60,6 +61,7 @@ public class ReconciliationViewController {
         model.addAttribute("history", ReconciliationRunSearchResponse.from(history));
         model.addAttribute("stageFilter", safeStage);
         model.addAttribute("stageOptions", PaymentStage.values());
+        model.addAttribute("deepLinkedResultId", resultId);
         return "reco/list";
     }
 }

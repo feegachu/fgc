@@ -81,7 +81,7 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("최근 검출 실행")))
                 .andExpect(content().string(containsString("data-exception-action-form")))
                 .andExpect(content().string(containsString("처리 저장")))
-                .andExpect(content().string(containsString("href=\"/transactions\"")))
+                .andExpect(content().string(containsString("href=\"/transactions/new?id=77\"")))
                 .andExpect(content().string(containsString("page=2")))
                 .andExpect(content().string(containsString("데이터 품질")))
                 .andExpect(content().string(containsString("value=\"WARNING\">주의")))
@@ -297,8 +297,8 @@ class ExceptionCaseViewControllerTest {
     ) {
         return new ExceptionCaseResponseDTO(
                 id, "KEY-" + id, ExceptionType.DATA_QUALITY, "FINANCIAL_SNAPSHOT_MISSING",
-                ExceptionSeverity.WARNING, status, title, "상세 설명", "C001", "김정산",
-                null, null, sourceType, sourceId, LocalDate.of(2026, 7, 1), 1505L, 1506L,
+                ExceptionSeverity.WARNING, status, title, "상세 설명", 5L, "C001", "김정산",
+                null, null, sourceType, sourceId, null, LocalDate.of(2026, 7, 1), 1505L, 1506L,
                 OffsetDateTime.parse("2026-07-10T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-07-11T09:00:00+09:00"), 2,
                 OffsetDateTime.parse("2026-07-10T09:00:00+09:00"),

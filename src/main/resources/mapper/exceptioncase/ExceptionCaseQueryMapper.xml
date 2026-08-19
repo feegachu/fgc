@@ -89,12 +89,14 @@
                ec.status,
                ec.title,
                ec.description,
+               ec.contract_id         AS contractId,
                ic.contract_no        AS contractNo,
                ag.agent_name         AS agentName,
                ec.assigned_to        AS assignedTo,
                assignee.login_id     AS assigneeLoginId,
                ec.source_entity_type AS sourceEntityType,
                ec.source_entity_id   AS sourceEntityId,
+               reconciliation.result_type AS reconciliationResultType,
                ec.validation_month   AS validationMonth,
                ec.first_detected_run_id AS firstDetectedRunId,
                ec.last_detected_run_id  AS lastDetectedRunId,
@@ -106,6 +108,9 @@
           LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
           LEFT JOIN fgc.agent ag ON ag.agent_id = ec.agent_id
           LEFT JOIN fgc.app_user assignee ON assignee.user_id = ec.assigned_to
+          LEFT JOIN fgc.reconciliation_result reconciliation
+                 ON ec.source_entity_type = 'RECONCILIATION_RESULT'
+                AND ec.source_entity_id = CAST(reconciliation.reconciliation_result_id AS varchar)
          WHERE 1 = 1
         <include refid="searchFilters"/>
          ORDER BY CASE ec.severity
