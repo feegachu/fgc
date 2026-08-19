@@ -568,7 +568,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 | 버튼 | 하는 일 |
 |---|---|
-| 스케줄 재생성 | 새 버전을 만듭니다. **기존 버전은 지우지 않습니다.** |
+| 스케줄 재생성 | 양 지급단계의 현재 운영 스케줄을 새 버전으로 만듭니다. **기존 버전은 지우지 않습니다.** 생성 사유는 `CONTRACT_DETAIL_MANUAL`로 남깁니다. |
 | 한도 재검증 | 이 계약만 `check_kind='MANUAL'`로 다시 계산 |
 | 수정 | CONT-W03으로 이동 |
 
@@ -578,7 +578,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회 / 처리 버튼은 `SETTLEMENT` (2026-08-12 교정 — IF-API-19/29/33·§4-1과 일치화)
 
-**데이터** API: `GET /api/v1/contracts/{id}`, `GET /api/v1/contracts/{id}/schedules` 등 탭별 분리
+**데이터** 탭은 선택 시 Ajax로 조회합니다. 예상 스케줄은 IF-API-13, 1,200%는 IF-API-14를 사용하며, 처리 성공 후 해당 탭을 즉시 재조회합니다. 처리 API는 IF-API-19A(스케줄 재생성)·IF-API-19B(한도 재검증)입니다.
 
 **관련 요구사항** FUN-018, FUN-032, FUN-035, FUN-036, FUN-063
 
@@ -1064,7 +1064,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 지급예정액 | `planned_commission_amount` |
 | 합산 해약환급금 | `included_surrender_value_amount` |
 | 환급금 가산 여부 | `refund_addition_applied_yn` |
-| 환급금 출처 | 실제값 / 예상표 / 해당없음 |
+| 환급금 출처 | 실제 해약환급금 / 예상 환급률표 / 적용 대상 아님 |
 | 초과액 | `net_difference_amount` — 양수면 빨강 |
 | 판정 | 이상없음 / 검토대상 / 자료부족 |
 

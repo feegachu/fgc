@@ -16,6 +16,7 @@ public record CapAgentSummaryResponse(
         String usagePct,
         long violationCount,
         long warningCount,
+        long reviewRequiredCount,
         String worstContractNo,
         String worstUsagePct
 ) {
@@ -33,6 +34,7 @@ public record CapAgentSummaryResponse(
                 DisplayFormat.rate(row.getUsagePct()),
                 row.getViolationCount(),
                 row.getWarningCount(),
+                row.getReviewRequiredCount(),
                 row.getWorstContractNo(),
                 DisplayFormat.rate(row.getWorstUsagePct()));
     }
