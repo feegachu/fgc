@@ -72,12 +72,32 @@ class PublishingTemplateStructureTest {
                 .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
                 .contains("apiClient.request")
                 .doesNotContain("fetch(");
-        // VRUN-W02 는 #188 에서 헤더·스텝퍼·실행(IF-API-48·49)이 연동됐다 — 아직 미연동인
-        // 확정 체크리스트(IF-API-50/51, #172~#175)만 대기 상태를 유지하고, 확정 버튼은
-        // 체크리스트 게이트 연동 전까지 정적 disabled 다.
+        // 2026-08-19 yslee - #238 병합 후 VRUN-W02 템플릿·스크립트 검증 체인 정리
+        // 기존 코드: IF-API-50 전용 검증과 IF-API-50·51 통합 검증이 병합 과정에서 중복됨
+        // 문제: 첫 번째 AssertJ 체인의 종결 문자가 유실되어 테스트 소스 컴파일이 실패함
+        // 개선: IF-API-50·51 연동 완료 상태를 중복 없는 하나의 템플릿·스크립트 체인으로 검증
         assertThat(resource("templates/vrun/detail.html"))
-                .contains("확정 조건 API 연동 대기")
+                .contains("id=\"cond-body\" aria-live=\"polite\"")
+                .contains("data-checklist-passed=\"false\"")
+                .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                .contains("검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.")
+                .containsOnlyOnce("id=\"finalize-action-guide\"")
+                .containsOnlyOnce("id=\"btn-finalize\"")
+                .doesNotContain("id=\"finalize-actions-pending\"")
+                .doesNotContain("확정 조건 API 연동 대기")
                 .containsPattern("(?s)<button[^>]*id=\"btn-finalize\"[^>]*\\bdisabled\\b[^>]*>");
+        assertThat(resource("static/js/features/vrun/vrun-detail.js"))
+                .contains("/finalize-checklist")
+                .contains("/finalize\"")
+                .contains("safeInternalLink")
+                .contains("checklist.conditions.length !== 6")
+                .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
+                .contains("idempotencyKey: finalizeIdempotencyKey")
+                .contains("error.code === \"FGC-VRUN-006\"")
+                .contains("finalizeIdempotencyKey = null")
+                .contains("runStatus !== \"COMPLETED\"")
+                .contains("window.confirm")
+                .doesNotContain("fetch(");
     }
 
     @Test

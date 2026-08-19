@@ -19,6 +19,8 @@ import java.time.YearMonth;
  *
  * 기준월은 {@link com.susukkang.fgc.common.web.ShellAdvice} 가 세션에 넣어 둔 값을 받는다 —
  * 헤더 select 를 바꾸면 ?month= 로 돌아와 이 화면이 다시 집계된다(SIR-006: 1차는 MPA 전체 갱신).
+ * DASH-W01 을 Ajax 가 아니라 MPA 로 둔다는 결정은 인터페이스정의서 5-1·5-2 에 적혀 있다
+ * (근거대장 "DASH-W01 MPA/Ajax 판정", SRC-028 · 2026-08-19).
  */
 @Controller
 @RequiredArgsConstructor
