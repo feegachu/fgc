@@ -36,32 +36,6 @@
     </div>
   </header>
 
-  <aside class="guidance guidance-warning" aria-labelledby="policy-date-guidance-title">
-    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">event</span>
-    <div>
-      <h2 id="policy-date-guidance-title" class="guidance-title">기준일을 “오늘”로 잡으면 안 되는 경우가 많습니다</h2>
-      <p class="guidance-copy">
-        1,200%룰과 차익거래는 <strong>계약 체결일</strong> 기준으로 정책을 고르고,
-        분급 체계는 <strong>상품 판매개시일·기초서류 버전</strong> 기준으로 고릅니다(REG-19).
-        두 기준을 섞으면 전혀 다른 요율이 적용됩니다.
-      </p>
-    </div>
-  </aside>
-
-  <aside class="guidance guidance-neutral policy-source-guidance" aria-labelledby="policy-source-guidance-title">
-    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">palette</span>
-    <div>
-      <h2 id="policy-source-guidance-title" class="guidance-title">정책 출처 구분</h2>
-      <p class="guidance-copy policy-source-copy">
-        <span class="fgc-badge fgc-badge--src-regulatory">규제</span>
-        <span class="fgc-badge fgc-badge--src-insurer">보험사 규칙</span>
-        <span class="fgc-badge fgc-badge--src-ga">회사 정책</span>
-        <span class="fgc-badge fgc-badge--src-assumption">프로젝트 가정</span>
-        <span><strong>프로젝트 가정은 실제 규정이 아니라 임시로 정한 값</strong>이며 법정 기준으로 사용하지 않습니다.</span>
-      </p>
-    </div>
-  </aside>
-
   <div class="policy-tabs">
     <div class="tab-list" role="tablist" aria-label="정책 상세 구분">
       <button class="tab-button" type="button" role="tab" aria-selected="true"  aria-controls="tab-version" id="p1" data-policy-tab>정책 버전</button>
@@ -110,15 +84,15 @@
             <td class="tabular-nums" th:text="${v.policyCode()}">REG-CAP-GA-2026-V1</td>
             <td th:text="${v.policyName()}">정책 이름</td>
             <td th:text="${v.policyTypeLabel()}">1,200% 한도</td>
-            <td><span class="fgc-badge" th:classappend="${v.sourceClass().badgeClass()}"
+            <td><span class="status-badge" th:classappend="${v.sourceClass().badgeClass()}"
                       th:text="${v.sourceClassLabel()}">규제</span></td>
             <td class="is-number tabular-nums" th:text="|v${v.versionNo()}|">v1</td>
             <td class="tabular-nums" th:text="${v.effectiveFrom()}">2026-07-01</td>
             <td class="tabular-nums" th:text="${v.effectiveTo()} ?: '계속'">계속</td>
-            <td><span class="fgc-badge" th:classappend="${v.status().badgeClass()}"
+            <td><span class="status-badge" th:classappend="${v.status().badgeClass()}"
                       th:text="${v.statusLabel()}">적용중</span></td>
             <td>
-              <span th:if="${#lists.isEmpty(v.regulationRefs())}" class="fgc-badge fgc-badge--review">근거 미기재</span>
+              <span th:if="${#lists.isEmpty(v.regulationRefs())}" class="status-badge status-badge-neutral">근거 미기재</span>
               <span th:unless="${#lists.isEmpty(v.regulationRefs())}" class="tabular-nums"
                     th:text="${#strings.listJoin(v.regulationRefs(), ' · ')}">REG-08 · REG-09</span>
             </td>
