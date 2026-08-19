@@ -11,11 +11,16 @@ class PendingActionButtonStructureTest {
 
     /** FGC-FUN-036, FGC-FUN-039, FGC-FUN-040 / REG-01, REG-19 */
     @Test
-    void scheduleExportStaysDisabledUntilApiIntegration() throws IOException {
+    void scheduleExportUsesCsvDownloadApi() throws IOException {
         String template = resource("templates/schedule/detail.html");
+        String script = resource("static/js/features/schedule/schedule-detail.js");
 
-        assertPendingButton(template, "btn-export", "schedule-export-pending");
-        assertThat(template).contains("엑셀 다운로드는 API 화면 연동 대기입니다.");
+        assertThat(template)
+                .contains("id=\"btn-export\"")
+                .contains("CSV 내보내기")
+                .doesNotContain("schedule-export-pending")
+                .doesNotContain("API 화면 연동 대기");
+        assertThat(script).contains("/export.csv");
     }
 
     /**
