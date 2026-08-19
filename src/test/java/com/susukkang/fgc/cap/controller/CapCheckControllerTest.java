@@ -88,6 +88,7 @@ class CapCheckControllerTest {
         insurerStage.setUsagePct(new BigDecimal("75.000000"));
         insurerStage.setViolationCount(1);
         insurerStage.setWarningCount(0);
+        insurerStage.setReviewRequiredCount(1);
         insurerStage.setWorstContractNo("C004");
         insurerStage.setWorstUsagePct(new BigDecimal("104.166667"));
 
@@ -111,6 +112,7 @@ class CapCheckControllerTest {
         agent.setUsagePct(new BigDecimal("54.166667"));
         agent.setViolationCount(1);
         agent.setWarningCount(0);
+        agent.setReviewRequiredCount(0);
         agent.setWorstContractNo("C004");
         agent.setWorstUsagePct(new BigDecimal("104.166667"));
 
@@ -129,6 +131,7 @@ class CapCheckControllerTest {
                 .andExpect(jsonPath("$.data.stageSummary[0].paymentStage").value("INSURER_TO_GA"))
                 .andExpect(jsonPath("$.data.stageSummary[0].complianceDeductionAmountTotal").value(30000))
                 .andExpect(jsonPath("$.data.stageSummary[0].usagePct").value("75.000000"))
+                .andExpect(jsonPath("$.data.stageSummary[0].reviewRequiredCount").value(1))
                 .andExpect(jsonPath("$.data.stageSummary[1].paymentStage").value("GA_TO_FC"))
                 .andExpect(jsonPath("$.data.stageSummary[1].complianceDeductionAmountTotal").value(0))
                 .andExpect(jsonPath("$.data.agentSummary[0].agentName").value("김설계"))
@@ -136,6 +139,7 @@ class CapCheckControllerTest {
                 .andExpect(jsonPath("$.data.agentSummary[0].usagePct").value("54.166667"))
                 .andExpect(jsonPath("$.data.agentSummary[0].violationCount").value(1))
                 .andExpect(jsonPath("$.data.agentSummary[0].warningCount").value(0))
+                .andExpect(jsonPath("$.data.agentSummary[0].reviewRequiredCount").value(0))
                 .andExpect(jsonPath("$.data.agentSummary[0].worstContractNo").value("C004"))
                 .andExpect(jsonPath("$.data.agentSummary[0].worstUsagePct").value("104.166667"))
                 .andExpect(jsonPath("$.data.content[0].capCheckId").value(999))

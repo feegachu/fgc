@@ -47,6 +47,8 @@ public class ContractService {
     private static final String AUDIT_ENTITY_TYPE = "CONTRACT";
     private static final String AUDIT_CONTRACT_CREATED = "CONTRACT_CREATED";
     private static final String AUDIT_CONTRACT_UPDATED = "CONTRACT_UPDATED";
+    private static final String AUDIT_CAP_RECHECKED = "CONTRACT_CAP_RECHECKED";
+    private static final String AUDIT_SCHEDULES_REGENERATED = "CONTRACT_SCHEDULES_REGENERATED";
 
     private final ContractMapper contractMapper;
     private final CapCheckMapper capCheckMapper;
@@ -388,6 +390,55 @@ public class ContractService {
                         event.sourceEventKey()
                 ))
                 .toList();
+    }
+
+    /** 계약 상세에서 현재 계약·운영 스케줄을 기준으로 양 지급단계 한도를 다시 계산한다. */
+    @Transactional
+    public List<com.susukkang.fgc.cap.dto.CapCheckSaveResult> recheckCap(Long contractId) {
+        if (contractMapper.selectContractById(contractId) == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+
+        for (PaymentStage paymentStage : PaymentStage.values()) {
+            if (!scheduleService.hasActiveOperationalSchedule(contractId, paymentStage)) {
+                continue;
+            }
+            BigDecimal complianceEvidenceAmount = paymentStage == PaymentStage.INSURER_TO_GA
+                    ? capCheckMapper.selectComplianceEvidenceAmount(contractId, paymentStage)
+                    : null;
+            calculateCapCheckOrRegisterReview(contractId, paymentStage,
+                    CapCalculationCommand.manual(contractId, paymentStage,
+                            LocalDate.now(DateUtil.SEOUL_ZONE), complianceEvidenceAmount));
+        }
+
+        List<com.susukkang.fgc.cap.dto.CapCheckSaveResult> results = java.util.Arrays.stream(PaymentStage.values())
+                .map(stage -> capCheckService.findLatest(contractId, stage))
+                .flatMap(java.util.Optional::stream)
+                .toList();
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_CAP_RECHECKED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(contractId))
+                .after(results)
+                .build());
+        return results;
+    }
+
+    /** 계약 상세에서 양 지급단계의 운영 스케줄을 새 버전으로 재생성한다. */
+    @Transactional
+    public List<Long> regenerateSchedules(Long contractId, String reason) {
+        if (contractMapper.selectContractById(contractId) == null) {
+            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+        List<Long> scheduleIds = scheduleService.regenerateContractSchedules(contractId, reason);
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_SCHEDULES_REGENERATED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(contractId))
+                .after(scheduleIds)
+                .reason(reason)
+                .build());
+        return scheduleIds;
     }
 
     /**

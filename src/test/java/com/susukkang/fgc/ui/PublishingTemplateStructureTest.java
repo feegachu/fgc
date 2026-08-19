@@ -50,9 +50,11 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
-    void apiDeferredScreensExposeExplicitPendingStatesWithoutSeedData() throws IOException {
+    void connectedArbitrageScreenDoesNotExposeStalePendingState() throws IOException {
         assertThat(resource("templates/arbitrage/list.html"))
-                .contains("조회 API 연동 대기");
+                .contains("id=\"arb-pagination\"")
+                .contains("data-modal=\"arb-recheck\"")
+                .doesNotContain("조회 API 연동 대기");
         // EXCP-W01 은 #83 에서 안내 배너·상태 필터·목록이 서버 렌더링으로 바인딩됐다 —
         // 아직 미연동인 유형별 요약카드만 대기 상태를 명시한다.
         assertThat(resource("templates/exception/list.html"))
