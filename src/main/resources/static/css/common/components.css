@@ -573,6 +573,85 @@ a.kpi-card:active {
   background: var(--color-action-subtle);
 }
 
+.table-cell-disclosure {
+  min-width: 0;
+  white-space: normal;
+}
+
+.table-cell-preview,
+.table-cell-full {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.table-cell-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.table-cell-preview.is-single-line {
+  -webkit-line-clamp: 1;
+}
+
+.table-cell-details {
+  margin-top: var(--space-1);
+}
+
+.table-cell-details summary {
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-link);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  list-style: none;
+}
+
+.table-cell-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.table-cell-details summary:focus-visible {
+  border-radius: var(--radius-4);
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.table-cell-less {
+  display: none;
+}
+
+.table-cell-chevron {
+  font-size: 1rem;
+  transition: transform var(--transition-fast);
+}
+
+.table-cell-details[open] .table-cell-more {
+  display: none;
+}
+
+.table-cell-details[open] .table-cell-less {
+  display: inline;
+}
+
+.table-cell-details[open] .table-cell-chevron {
+  transform: rotate(180deg);
+}
+
+.table-cell-full {
+  margin-top: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-4);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  line-height: 1.25rem;
+  white-space: pre-wrap;
+}
+
 .pagination-controls {
   display: flex;
   align-items: center;
