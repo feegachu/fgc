@@ -27,6 +27,10 @@ public interface ArbitrageMapper {
     ArbitrageCheckSummary arbitrageCheckSummary(
             @Param("condition") ArbitrageCheckSearchCondition condition);
 
+    // 검색 조건에 해당하는 차익거래 검증 결과의 전체 건수를 조회한다.
+    long countByCondition(
+            @Param("condition") ArbitrageCheckSearchCondition condition);
+
     // 계약과 기준일에 해당하는 계약 정보 및 최신 금융 스냅샷을 조회한다
     ArbitrageCalculationSource selectCalculationSource(
             @Param("contractId") Long contractId,

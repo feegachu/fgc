@@ -9,6 +9,8 @@ import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
+import com.susukkang.fgc.cap.dto.ScheduleAmountView;
+import com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.cap.service.ProductRefundRateResolver;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,6 +53,8 @@ class CapCalculatorIntegrationTest {
     private ProductRefundRateResolver refundRateResolver;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private CapScheduleAmountMapper capScheduleAmountMapper;
 
     private Long contractId(String contractNo) {
         return jdbcTemplate.queryForObject(
@@ -179,6 +184,49 @@ class CapCalculatorIntegrationTest {
         assertThat(result.details())
                 .extracting(detail -> detail.contractMonthNo())
                 .containsExactly(12);
+    }
+
+    // #39: 동일 수수료 항목의 다른 회차에 연결된 증빙을 공유하면 안 된다.
+    @Test
+    void evidenceIsResolvedOnlyForTheLinkedScheduleLineOccurrence() {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("100"), new BigDecimal("100"));
+        List<Long> lineIds = jdbcTemplate.queryForList("""
+                SELECT schedule_line_id
+                  FROM fgc.schedule_line
+                 WHERE schedule_header_id = ?
+                 ORDER BY line_no
+                """, Long.class, headerId);
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code = 'BASE_COMMISSION'",
+                Long.class);
+        Long agentId = jdbcTemplate.queryForObject(
+                "SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", Long.class, contractId);
+        Long paymentId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction (
+                    payment_stage, source_type, source_business_key, recipient_agent_id, commission_item_id,
+                    settlement_month, due_date, amount, cashflow_type, status
+                ) VALUES ('GA_TO_FC', 'GA_MANUAL_PAYMENT', 'IT-CAP-39-' || txid_current(), ?, ?,
+                          DATE '2026-07-01', DATE '2026-07-10', 100, 'PAYMENT', 'DRAFT')
+                RETURNING commission_transaction_id
+                """, Long.class, agentId, itemId);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.transaction_attribution (
+                    commission_transaction_id, attribution_seq, attribution_scope, contract_id, agent_id,
+                    schedule_line_id, attribution_date, attribution_month, attributed_amount,
+                    inclusion_status_snapshot, exclusion_type_snapshot, attribution_method,
+                    allocation_basis_snapshot, evidence_ref
+                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, DATE '2026-07-10', DATE '2026-07-01', 100,
+                          'EXCLUDED', 'VOICE_RECORDING', 'DIRECT', '{}'::jsonb, 'EVD-LINE-1')
+                """, paymentId, contractId, agentId, lineIds.get(0));
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", paymentId);
+
+        List<ScheduleAmountView> lines = capScheduleAmountMapper.findFirstYearScheduleAmounts(
+                contractId, PaymentStage.GA_TO_FC.name(), 12);
+
+        assertThat(lines).extracting(ScheduleAmountView::getEvidenceRef)
+                .containsExactly("EVD-LINE-1", null);
     }
 
     private String savedResultStatus(Long capCheckId) {

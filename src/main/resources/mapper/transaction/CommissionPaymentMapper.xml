@@ -47,6 +47,13 @@
                      WHERE noattr_ta.commission_transaction_id = ct.commission_transaction_id
                 )
             </if>
+            <if test="condition.attributionImbalanceOnly != null and condition.attributionImbalanceOnly">
+                AND EXISTS (
+                    SELECT 1
+                      FROM fgc.vw_transaction_attribution_balance imbalance
+                     WHERE imbalance.commission_transaction_id = ct.commission_transaction_id
+                )
+            </if>
         </where>
     </sql>
 
@@ -171,6 +178,25 @@
          LIMIT 1
     </select>
 
+    <!-- #39: 항목 전체가 아닌 실제 발생건에 증빙을 연결한다. 귀속일은 자유 입력값이므로 일자가 아닌
+         귀속월로 후보를 찾는다. 0건·복수건은 서비스가 null로 보존해
+         한도검증 시 자동 제외 대신 REVIEW_REQUIRED가 되도록 한다. -->
+    <select id="findOperationalScheduleLineIds" resultType="long">
+        SELECT sl.schedule_line_id
+          FROM fgc.schedule_line sl
+          JOIN fgc.schedule_header sh
+            ON sh.schedule_header_id = sl.schedule_header_id
+         WHERE sh.contract_id = #{contractId}
+           AND sh.payment_stage = #{paymentStage}
+           AND sh.schedule_purpose = 'OPERATIONAL'
+           AND sh.active_yn = true
+           AND sl.commission_item_id = #{commissionItemId}
+           AND sl.due_date <![CDATA[ >= ]]> #{attributionMonthStart}
+           AND sl.due_date <![CDATA[ < ]]> #{nextAttributionMonthStart}
+           AND sl.line_status &lt;&gt; 'CANCELLED'
+         ORDER BY sl.schedule_line_id
+    </select>
+
     <select id="existsPolicyVersion" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
@@ -269,6 +295,7 @@
             attribution_seq,
             attribution_scope,
             contract_id,
+            schedule_line_id,
             agent_id,
             attribution_date,
             attribution_month,
@@ -286,6 +313,7 @@
                 #{attribution.attributionSequence},
                 #{attribution.attributionScope},
                 #{attribution.contractId},
+                #{attribution.scheduleLineId},
                 #{attribution.agentId},
                 #{attribution.attributionDate},
                 #{attribution.attributionMonth},

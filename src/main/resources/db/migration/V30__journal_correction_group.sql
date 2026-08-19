@@ -1,4 +1,4 @@
--- FUN-047 원장 정정그룹 및 역분개/재기표 무결성(V29)
+-- FUN-047 원장 정정그룹 및 역분개/재기표 무결성(V30)
 -- 기존 V1 journal_header 스키마는 수정하지 않고 정정 메타데이터와 관계 제약만 확장한다.
 
 SET search_path TO fgc, public;
@@ -7,7 +7,7 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM fgc.journal_header WHERE correction_group_key IS NOT NULL) THEN
     RAISE EXCEPTION
-      'V28 cannot infer correction metadata for pre-existing correction_group_key values';
+      'V30 cannot infer correction metadata for pre-existing correction_group_key values';
   END IF;
 END;
 $$;
