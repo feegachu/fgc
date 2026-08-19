@@ -153,14 +153,26 @@
           </tbody>
         </table>
       </div>
-      <footer class="audit-pagination" th:if="${logs.totalPages > 1}">
+      <footer class="audit-pagination" th:if="${logs.totalPages > 1}"
+              th:with="groupStart=${(logs.page - 1) - ((logs.page - 1) % 5) + 1}, groupEnd=${T(java.lang.Math).min(groupStart + 4, logs.totalPages)}">
+        <span class="audit-pagination-status tabular-nums" aria-live="polite"
+              th:text="${logs.page} + ' / ' + ${logs.totalPages} + ' 페이지'">1 / 1 페이지</span>
         <nav class="audit-pagination-nav" aria-label="감사 기록 페이지 이동">
-          <a class="button button-secondary" th:if="${logs.page > 1}"
-             th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${logs.page - 1})}">이전</a>
-          <span class="audit-pagination-status tabular-nums" aria-live="polite"
-                th:text="${logs.page} + ' / ' + ${logs.totalPages}">1 / 1</span>
-          <a class="button button-secondary" th:if="${logs.page < logs.totalPages}"
-             th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${logs.page + 1})}">다음</a>
+          <a class="pagination-button" th:if="${groupStart > 1}"
+             th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${groupStart - 1})}"
+             aria-label="이전 5페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></a>
+          <span class="pagination-button is-disabled" th:unless="${groupStart > 1}"
+                aria-label="이전 5페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></span>
+          <th:block th:each="pageNumber : ${#numbers.sequence(groupStart, groupEnd)}">
+            <span class="pagination-button is-active" th:if="${pageNumber == logs.page}" aria-current="page" th:text="${pageNumber}">1</span>
+            <a class="pagination-button" th:unless="${pageNumber == logs.page}" th:text="${pageNumber}"
+               th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${pageNumber})}">1</a>
+          </th:block>
+          <a class="pagination-button" th:if="${groupEnd < logs.totalPages}"
+             th:href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${groupEnd + 1})}"
+             aria-label="다음 5페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></a>
+          <span class="pagination-button is-disabled" th:unless="${groupEnd < logs.totalPages}"
+                aria-label="다음 5페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></span>
         </nav>
       </footer>
     </section>

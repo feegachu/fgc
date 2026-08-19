@@ -49,14 +49,19 @@
       </table>
       <aside class="contract-premium-help"><span class="material-symbols-rounded" aria-hidden="true">info</span><div><h3>월납환산 초회보험료</h3><p>주기 보험료를 월 기준으로 환산한 값이며 1,200% 한도 계산 기준으로 사용합니다.</p></div></aside>
     </div>
-    <nav class="contract-pagination" aria-label="계약 목록 페이지">
-      <span><span th:text="${contracts.page()}">1</span> / <span th:text="${contracts.totalPages() == 0 ? 1 : contracts.totalPages()}">1</span> 페이지</span>
+    <nav class="contract-pagination" aria-label="계약 목록 페이지"
+         th:with="totalPageCount=${contracts.totalPages() == 0 ? 1 : contracts.totalPages()}, groupStart=${(contracts.page() - 1) - ((contracts.page() - 1) % 5) + 1}, groupEnd=${T(java.lang.Math).min(groupStart + 4, totalPageCount)}">
+      <span><span th:text="${contracts.page()}">1</span> / <span th:text="${totalPageCount}">1</span> 페이지</span>
       <div class="pagination-controls">
-        <a class="pagination-button" th:if="${contracts.page() > 1}" th:href="@{/contracts(page=${contracts.page() - 1},size=${contracts.size()},contractNo=${condition.contractNo},insurerId=${condition.insurerId},productOfferingId=${condition.productOfferingId},agentId=${condition.agentId},orgId=${condition.orgId},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="이전 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></a>
-        <span class="pagination-button is-disabled" th:unless="${contracts.page() > 1}" aria-label="이전 페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></span>
-        <span class="pagination-button is-active" aria-current="page" th:text="${contracts.page()}">1</span>
-        <a class="pagination-button" th:if="${contracts.page() < contracts.totalPages()}" th:href="@{/contracts(page=${contracts.page() + 1},size=${contracts.size()},contractNo=${condition.contractNo},insurerId=${condition.insurerId},productOfferingId=${condition.productOfferingId},agentId=${condition.agentId},orgId=${condition.orgId},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="다음 페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></a>
-        <span class="pagination-button is-disabled" th:unless="${contracts.page() < contracts.totalPages()}" aria-label="다음 페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></span>
+        <a class="pagination-button" th:if="${groupStart > 1}" th:href="@{/contracts(page=${groupStart - 1},size=${contracts.size()},contractNo=${condition.contractNo},insurerId=${condition.insurerId},productOfferingId=${condition.productOfferingId},agentId=${condition.agentId},orgId=${condition.orgId},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="이전 5페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></a>
+        <span class="pagination-button is-disabled" th:unless="${groupStart > 1}" aria-label="이전 5페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_left</span></span>
+        <th:block th:each="pageNumber : ${#numbers.sequence(groupStart, groupEnd)}">
+          <span class="pagination-button is-active" th:if="${pageNumber == contracts.page()}" aria-current="page" th:text="${pageNumber}">1</span>
+          <a class="pagination-button" th:unless="${pageNumber == contracts.page()}" th:text="${pageNumber}"
+             th:href="@{/contracts(page=${pageNumber},size=${contracts.size()},contractNo=${condition.contractNo},insurerId=${condition.insurerId},productOfferingId=${condition.productOfferingId},agentId=${condition.agentId},orgId=${condition.orgId},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}">1</a>
+        </th:block>
+        <a class="pagination-button" th:if="${groupEnd < totalPageCount}" th:href="@{/contracts(page=${groupEnd + 1},size=${contracts.size()},contractNo=${condition.contractNo},insurerId=${condition.insurerId},productOfferingId=${condition.productOfferingId},agentId=${condition.agentId},orgId=${condition.orgId},contractDateFrom=${condition.contractDateFrom},contractDateTo=${condition.contractDateTo},currentStatus=${condition.currentStatus},capResultStatus=${condition.capResultStatus})}" aria-label="다음 5페이지"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></a>
+        <span class="pagination-button is-disabled" th:unless="${groupEnd < totalPageCount}" aria-label="다음 5페이지" aria-disabled="true" tabindex="-1"><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></span>
       </div>
     </nav>
   </section>
