@@ -997,6 +997,10 @@ class CommissionPaymentServiceImplTest {
     // 기존 코드: CAP_RULE_MISMATCH 저장 시 DB CHECK 위반으로 500 오류 발생
     // 문제: 의도한 FGC-CAP-002 확정 차단과 예외 이력이 보존되지 않음
     // 개선: 불일치 유형을 저장하고 검토필요 업무 오류로 확정을 차단
+    //
+    // 2026-08-18 갱신 - V23_1이 exception_type 허용 목록에서 CAP_RULE_MISMATCH를 다시
+    // 빼고 CAP_REVIEW_REQUIRED로 흡수했다(CommissionPaymentServiceImpl.ruleConsistencyFailure
+    // 갱신). 그래서 저장되는 exception_type도 CAP_REVIEW_REQUIRED로 바뀐다.
     @Test
     void blocksConfirmationWithCapRuleMismatch() {
         ConfirmationData data = confirmation(
@@ -1026,7 +1030,7 @@ class CommissionPaymentServiceImplTest {
         ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
                 ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
         verify(mapper).insertExceptionCase(captor.capture());
-        assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_RULE_MISMATCH");
+        assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_REVIEW_REQUIRED");
         verify(mapper, never()).insertCapCheck(any());
         verify(mapper, never()).confirm(any(), any(), any());
     }
