@@ -140,6 +140,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.ledger.reverseOnly"
     ),
+    LEDG_004(
+            "FGC-LEDG-004",
+            HttpStatus.CONFLICT,
+            "error.ledger.correctionConflict"
+    ),
 
     JOURNAL_001(
             "FGC-JOURNAL-001",

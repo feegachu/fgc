@@ -2,6 +2,8 @@ package com.susukkang.fgc.common.exception;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -74,5 +76,35 @@ class ConstraintErrorCodeResolverTest {
 
         assertThat(resolver.resolve(exception))
                 .contains(FgcErrorCode.RECO_001);
+    }
+
+    @Test
+    void resolvesCurrentPostedJournalSourceConstraintAsAlreadyPosted() {
+        RuntimeException exception = new RuntimeException(
+                "duplicate key violates constraint uq_journal_current_posted_source"
+        );
+
+        assertThat(resolver.resolve(exception))
+                .contains(FgcErrorCode.LEDG_002);
+    }
+
+    @Test
+    void resolvesJournalCorrectionConstraintsSeparatelyFromAlreadyPosted() {
+        List<String> correctionConstraints = List.of(
+                "uq_journal_single_reversal",
+                "uq_journal_correction_original",
+                "uq_journal_correction_group_reversal",
+                "uq_journal_correction_group_repost",
+                "uq_journal_source_revision"
+        );
+
+        assertThat(correctionConstraints).allSatisfy(constraint -> {
+            RuntimeException exception = new RuntimeException(
+                    "duplicate key violates constraint " + constraint
+            );
+
+            assertThat(resolver.resolve(exception))
+                    .contains(FgcErrorCode.LEDG_004);
+        });
     }
 }

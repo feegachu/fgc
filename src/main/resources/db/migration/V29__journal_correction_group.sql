@@ -7,7 +7,7 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM fgc.journal_header WHERE correction_group_key IS NOT NULL) THEN
     RAISE EXCEPTION
-      'V28 cannot infer correction metadata for pre-existing correction_group_key values';
+      'V29 cannot infer correction metadata for pre-existing correction_group_key values';
   END IF;
 END;
 $$;
