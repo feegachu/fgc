@@ -70,7 +70,7 @@
       PLANNED: "예정",
       CONFIRMED: "확정",
       MATCHED: "대사일치",
-      ADJUSTED: "조정완료",
+      ADJUSTED: "조정",
       HOLD: "보류",
       CANCELLED: "취소",
       RESTARTED: "재개"
