@@ -9,30 +9,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PendingActionButtonStructureTest {
 
-    /**
-     * FGC-FUN-065, FGC-FUN-031, FGC-FUN-033, FGC-FUN-034 /
-     * REG-08, REG-09, REG-11, REG-20, REG-21
-     */
-    @Test
-    void transactionActionsStayDisabledUntilFrontendApiIntegration() throws IOException {
-        String template = resource("templates/transaction/form.html");
-
-        assertPendingButton(template, "btn-add-attr", "transaction-actions-pending");
-        assertPendingButton(template, "btn-save", "transaction-actions-pending");
-        assertPendingButton(template, "btn-precheck", "transaction-actions-pending");
-        assertPendingButton(template, "btn-confirm", "transaction-actions-pending");
-        assertThat(template).contains("지급 등록 작업은 API 화면 연동 대기입니다.");
-    }
-
     /** FGC-FUN-036, FGC-FUN-039, FGC-FUN-040 / REG-01, REG-19 */
     @Test
-    void scheduleActionsStayDisabledUntilFrontendApiIntegration() throws IOException {
+    void scheduleExportStaysDisabledUntilApiIntegration() throws IOException {
         String template = resource("templates/schedule/detail.html");
 
-        assertPendingButton(template, "btn-export", "schedule-actions-pending");
-        assertPendingButton(template, "btn-regenerate", "schedule-actions-pending");
-        assertPendingButton(template, "btn-confirm", "schedule-actions-pending");
-        assertThat(template).contains("다운로드·새 버전 생성·확정 작업은 API 화면 연동 대기입니다.");
+        assertPendingButton(template, "btn-export", "schedule-export-pending");
+        assertThat(template).contains("엑셀 다운로드는 API 화면 연동 대기입니다.");
     }
 
     /** FGC-FUN-048, FGC-FUN-049, FGC-FUN-050, FGC-FUN-051, FGC-FUN-052 */

@@ -9,10 +9,21 @@ package com.susukkang.fgc.contract.domain;
  * @since 2026-08-05
  */
 public enum PaymentCycleCode {
-    MONTHLY,  //매월
-    QUARTERLY, //3개월마다
-    SEMI_ANNUAL, //6개월마다
-    ANNUAL, //12개월마다
-    SINGLE, //일회납
-    OTHER //기타
+    MONTHLY,
+    QUARTERLY,
+    SEMI_ANNUAL,
+    ANNUAL,
+    SINGLE,
+    OTHER;
+
+    public String label() {
+        return switch (this) {
+            case MONTHLY -> "월납";
+            case QUARTERLY -> "3개월납";
+            case SEMI_ANNUAL -> "6개월납";
+            case ANNUAL -> "연납";
+            case SINGLE -> "일시납";
+            case OTHER -> "기타";
+        };
+    }
 }

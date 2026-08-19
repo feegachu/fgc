@@ -9,12 +9,26 @@ package com.susukkang.fgc.contract.domain;
  * @since 2026-08-05
  */
 public enum ContractStatus {
-    APPLIED, //청약
-    ACTIVE, //유지
-    UNPAID, //미납
-    LAPSED, //실효
-    REVIVED, //부활
-    CANCELLED, //청약 철회
-    TERMINATED, //해지
-    MATURED //만기
+    APPLIED,
+    ACTIVE,
+    UNPAID,
+    LAPSED,
+    REVIVED,
+    CANCELLED,
+    TERMINATED,
+    MATURED;
+
+    /** 화면과 API가 동일한 계약 상태 한글 라벨을 사용하도록 enum에서 관리한다. */
+    public String label() {
+        return switch (this) {
+            case APPLIED -> "청약";
+            case ACTIVE -> "정상";
+            case UNPAID -> "미납";
+            case LAPSED -> "실효";
+            case REVIVED -> "부활";
+            case CANCELLED -> "청약철회";
+            case TERMINATED -> "해지";
+            case MATURED -> "만기";
+        };
+    }
 }
