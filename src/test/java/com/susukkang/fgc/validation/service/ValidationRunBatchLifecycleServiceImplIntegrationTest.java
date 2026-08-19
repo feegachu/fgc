@@ -43,7 +43,10 @@ class ValidationRunBatchLifecycleServiceImplIntegrationTest {
     // demo 시드가 만드는 user_id는 한 자릿수라 이 값과 절대 겹치지 않는다.
     private static final long NON_EXISTENT_USER_ID = 999_999_999L;
 
-    private static final LocalDate TEST_MONTH = LocalDate.of(2026, 9, 1);
+    // cleanUp()이 이 월을 통째로 지우므로(@Transactional 없이 실제 커밋한다) 이 클래스 전용 월이어야
+    // 한다 — 다른 테스트와 공유하는 월을 쓰면 남의 행까지 지우려다 FK 위반으로 DELETE가 통째로
+    // 실패하고, 그 뒤로 남은 행이 다른 테스트를 무너뜨린다(2099-01에서 실제로 발생, bee042b4).
+    private static final LocalDate TEST_MONTH = LocalDate.of(2093, 1, 1);
 
     @Autowired
     private ValidationRunBatchLifecycleService lifecycleService;
