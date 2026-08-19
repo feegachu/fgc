@@ -40,6 +40,25 @@ class PendingActionButtonStructureTest {
                 .contains("/finalize-checklist")
                 .contains("/finalize\"")
                 .contains("idempotencyKey: finalizeIdempotencyKey");
+    /**
+     * FGC-FUN-044 — IF-API-50은 연동되었고 확정(IF-API-51)만 아직 미연동이다.
+     * 생성·새로고침·실행(IF-API-45·48·49)은 #188 에서 연동돼 pending 단언에서 뺐다 —
+     * 해당 버튼들의 활성/비활성 규칙은 ValidationRunViewControllerTest 가 검증한다.
+     */
+    // 2026-08-19 yslee - IF-API-50 체크리스트 연동 후 남은 IF-API-51 대기 상태 검증 적용
+    // 기존 코드: IF-API-50·51이 모두 미연동인 예전 안내 문구를 검사
+    // 문제: IF-API-50 연결로 문구가 제거되어 정상 기능이 CI 실패로 판정됨
+    // 개선: 체크리스트 API 호출과 확정 버튼의 초기 비활성 상태를 독립적으로 검증
+    @Test
+    void validationRunChecklistLoadsWhileFinalizeStaysDisabled() throws IOException {
+        String detailTemplate = resource("templates/vrun/detail.html");
+        String detailScript = resource("static/js/features/vrun/vrun-detail.js");
+
+        assertPendingButton(detailTemplate, "btn-finalize", "finalize-actions-pending");
+        assertThat(detailTemplate)
+                .contains("data-checklist-passed=\"false\"")
+                .doesNotContain("확정 조건 확인과 확정 작업은 API 연동 대기입니다.");
+        assertThat(detailScript).contains("/finalize-checklist");
     }
 
     private static void assertPendingButton(String template, String id, String descriptionId) {

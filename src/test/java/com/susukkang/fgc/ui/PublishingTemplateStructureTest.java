@@ -78,6 +78,11 @@ class PublishingTemplateStructureTest {
                 .contains("id=\"cond-body\" aria-live=\"polite\"")
                 .contains("data-checklist-passed=\"false\"")
                 .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+        // VRUN-W02 는 IF-API-50 체크리스트를 연동하고, IF-API-51 연결 전까지 확정 버튼을
+        // 정적 disabled 로 유지한다.
+        assertThat(resource("templates/vrun/detail.html"))
+                .contains("id=\"cond-body\" aria-live=\"polite\"")
+                .contains("data-checklist-passed=\"false\"")
                 .doesNotContain("확정 조건 API 연동 대기")
                 .containsPattern("(?s)<button[^>]*id=\"btn-finalize\"[^>]*\\bdisabled\\b[^>]*>");
         assertThat(resource("static/js/features/vrun/vrun-detail.js"))
@@ -89,6 +94,9 @@ class PublishingTemplateStructureTest {
                 .contains("idempotencyKey: finalizeIdempotencyKey")
                 .contains("runStatus !== \"COMPLETED\"")
                 .contains("window.confirm")
+                .contains("safeInternalLink")
+                .contains("checklist.conditions.length !== 6")
+                .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
                 .doesNotContain("fetch(");
     }
 
