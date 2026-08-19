@@ -324,24 +324,68 @@
 
   // ---- RECO-W02 비교 상세 모달 — IF-API-41 ----
 
-  function matchExpectedRow(match) {
-    return "<tr>" +
-      "<td>" + escapeHtml(match.dueDate || "—") + "</td>" +
-      '<td class="fgc-th-num">' + won(match.basisAmount) + "</td>" +
-      '<td class="fgc-th-num">' + (match.ratePct == null ? "—" : match.ratePct + "%") + "</td>" +
-      '<td class="fgc-th-num">' + won(match.matchedAmount) + "</td>" +
-      "</tr>";
+  function paymentStageLabel(value) {
+    if (value === "INSURER_TO_GA") return "원수사→GA";
+    if (value === "GA_TO_FC") return "GA→설계사";
+    return value || "지급단계 미확인";
   }
 
-  function matchActualRow(match) {
-    return "<tr>" +
-      "<td>" + escapeHtml(match.attributionDate || "—") + "</td>" +
-      "<td>" + escapeHtml(match.settlementMonth || "—") + "</td>" +
-      '<td class="fgc-th-num">' + won(match.matchedAmount) + "</td>" +
-      "</tr>";
+  function settlementMonth(value) {
+    return value ? String(value).slice(0, 7) : "—";
+  }
+
+  function agentLabel(agent) {
+    if (!agent) return "없음";
+    var name = agent.agentName || "이름 미확인";
+    return agent.agentCode ? name + " · " + agent.agentCode : name;
+  }
+
+  function sourceRow(label, value, tone) {
+    var valueClass = "tabular-nums" + (tone ? " " + tone : "");
+    return "<div class=\"reco-compare-source-row\"><dt>" + escapeHtml(label) +
+      '</dt><dd class="' + valueClass + '">' + escapeHtml(value) + "</dd></div>";
+  }
+
+  function expectedSource(match, data, index) {
+    var sourceLabel = match.scheduleLineId == null ? "schedule_line —" : "schedule_line #" + match.scheduleLineId;
+    return '<section class="reco-compare-source-entry">' +
+      (index > 0 ? '<h4 class="reco-compare-source-entry-title">예상 원천 ' + (index + 1) + " · " + escapeHtml(sourceLabel) + "</h4>" : "") +
+      '<dl class="reco-compare-source-fields">' +
+      sourceRow("회차", match.installmentNo == null ? "—" : match.installmentNo + "회차") +
+      sourceRow("지급예정일", match.dueDate || "—") +
+      sourceRow("수령자", agentLabel(data.expectedAgent)) +
+      sourceRow("기준금액", won(match.basisAmount)) +
+      sourceRow("적용 요율", match.ratePct == null ? "—" : match.ratePct + "%") +
+      sourceRow("예상 금액", won(match.matchedAmount)) +
+      "</dl>" +
+      '<p class="reco-compare-source-note">' + escapeHtml(sourceLabel) + " · 저장된 대사 원천</p></section>";
+  }
+
+  function actualSource(match, data, index) {
+    var sourceLabel = match.commissionTransactionId == null
+      ? "commission_transaction —"
+      : "commission_transaction #" + match.commissionTransactionId;
+    var attributionLabel = match.transactionAttributionId == null
+      ? "—"
+      : "attribution #" + match.transactionAttributionId;
+    return '<section class="reco-compare-source-entry">' +
+      (index > 0 ? '<h4 class="reco-compare-source-entry-title">실제 원천 ' + (index + 1) + " · " + escapeHtml(sourceLabel) + "</h4>" : "") +
+      '<dl class="reco-compare-source-fields">' +
+      sourceRow("회차", match.installmentNo == null ? "—" : match.installmentNo + "회차") +
+      sourceRow("정산월", settlementMonth(match.settlementMonth)) +
+      sourceRow("수령자", agentLabel(data.actualAgent)) +
+      sourceRow("귀속 ID", attributionLabel) +
+      sourceRow("실제 금액", won(match.matchedAmount), Number(data.differenceAmount || 0) !== 0 ? "reco-amount-error" : "") +
+      sourceRow("지급일", match.referenceDate || match.attributionDate || "—") +
+      "</dl>" +
+      '<p class="reco-compare-source-note">' + escapeHtml(sourceLabel) + " · 저장된 대사 원천</p></section>";
   }
 
   function renderCompareModal(data) {
+    var snapshot = data.detailSnapshot || {};
+    var stage = paymentStageLabel(snapshot.paymentStage);
+    document.getElementById("h-eyebrow").textContent =
+      "대사 결과 #" + data.reconciliationResultId + " · " + stage;
     document.getElementById("h-contract").textContent = data.contractNo || "—";
     document.getElementById("h-item").textContent = data.commissionItemName || "—";
     document.getElementById("h-inst").textContent = data.installmentNo == null ? "—" : data.installmentNo;
@@ -350,42 +394,50 @@
     document.getElementById("h-key").textContent = data.matchGroupKey || "—";
     document.getElementById("h-reason").textContent = (data.primaryReason && data.primaryReason.label) || "—";
     document.getElementById("h-diff").textContent = won(data.differenceAmount);
+    document.getElementById("h-summary-diff").textContent = won(data.differenceAmount);
 
     var matches = data.matches || [];
     var expected = matches.filter(function (m) { return m.matchRole === "EXPECTED" || m.matchRole === "BOTH"; });
     var actual = matches.filter(function (m) { return m.matchRole === "ACTUAL" || m.matchRole === "BOTH"; });
+    document.getElementById("expected-source-id").textContent = expected.length === 1 && expected[0].scheduleLineId != null
+      ? "schedule_line #" + expected[0].scheduleLineId
+      : expected.length + "개 원천";
+    document.getElementById("actual-source-id").textContent = actual.length === 1 && actual[0].commissionTransactionId != null
+      ? "commission_transaction #" + actual[0].commissionTransactionId
+      : actual.length + "개 원천";
     document.getElementById("expected-body").innerHTML = expected.length
-      ? expected.map(matchExpectedRow).join("")
-      : '<tr><td colspan="4"><div class="fgc-empty">실제 없음</div></td></tr>';
+      ? expected.map(function (match, index) { return expectedSource(match, data, index); }).join("")
+      : '<div class="empty-state reco-compare-empty">예상 없음</div>';
     document.getElementById("actual-body").innerHTML = actual.length
-      ? actual.map(matchActualRow).join("")
-      : '<tr><td colspan="3"><div class="fgc-empty">실제 없음</div></td></tr>';
+      ? actual.map(function (match, index) { return actualSource(match, data, index); }).join("")
+      : '<div class="empty-state reco-compare-empty">실제 없음</div>';
 
-    document.getElementById("diff-body").innerHTML =
-      "<tr><th>예상 금액</th><td>" + won(data.expectedTotalAmount) + "</td></tr>" +
-      "<tr><th>실제 금액</th><td>" + won(data.actualTotalAmount) + "</td></tr>" +
-      "<tr><th>차액</th><td>" + won(data.differenceAmount) + "</td></tr>" +
-      "<tr><th>결과 유형</th><td>" + resultTypeBadge(data) + "</td></tr>";
-
-    document.getElementById("tolerance-note").textContent =
-      "1차 허용오차 0원 — 1원만 달라도 " + (data.resultTypeLabel || "불일치") + "로 판정됩니다.";
+    var secondaryReasons = (data.secondaryReasons || [])
+      .map(function (reason) { return reason.label; })
+      .join(", ") || "—";
+    document.getElementById("diff-expected").textContent = won(data.expectedTotalAmount);
+    document.getElementById("diff-actual").textContent = won(data.actualTotalAmount);
+    document.getElementById("diff-result-type").innerHTML = resultTypeBadge(data);
+    document.getElementById("diff-primary-reason").textContent =
+      (data.primaryReason && data.primaryReason.label) || "—";
+    document.getElementById("diff-secondary-reason").textContent = secondaryReasons;
+    document.getElementById("difference-formula").textContent =
+      "차액 = 실제 " + won(data.actualTotalAmount) + " − 예상 " + won(data.expectedTotalAmount) +
+      " = " + won(data.differenceAmount);
+    document.getElementById("tolerance-note").textContent = "허용오차 0원 · 시스템 계산 결과";
 
     var links = document.getElementById("links");
     links.innerHTML = "";
-    if (data.contractId) {
-      links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/contracts/' +
-        encodeURIComponent(data.contractId) + '">계약 상세</a>';
-    }
     var scheduleHeaderId = matches
       .map(function (m) { return m.scheduleHeaderId; })
       .filter(function (id) { return id != null; })[0];
     if (scheduleHeaderId != null) {
-      links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/schedules/' +
-        encodeURIComponent(scheduleHeaderId) + '">예상 스케줄 상세</a>';
+      links.innerHTML += '<a class="button button-secondary" href="/schedules/' +
+        encodeURIComponent(scheduleHeaderId) + '">스케줄 상세</a>';
     }
-    links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/transactions">지급 건 목록</a>';
-    links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/journals">관련 분개(검증원장)</a>';
-    links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/exceptions">예외함</a>';
+    links.innerHTML += '<a class="button button-secondary" href="/transactions">지급 건 목록</a>';
+    links.innerHTML += '<a class="button button-secondary" href="/journals">관련 분개</a>';
+    links.innerHTML += '<a class="button button-secondary" href="/exceptions">예외 건</a>';
   }
 
   function setCompareModalState(mode, message) {
@@ -396,7 +448,7 @@
       content.hidden = false;
       return;
     }
-    stateBox.className = "fgc-modal__body fgc-empty" + (mode === "error" ? " is-error" : "");
+    stateBox.className = "modal-body empty-state reco-compare-state" + (mode === "error" ? " is-error" : "");
     stateBox.textContent = message;
     stateBox.hidden = false;
     content.hidden = true;

@@ -237,7 +237,7 @@
 
   <!-- RECO-W02 비교 상세 팝업 — 페이지 로드 시 숨겨서 넣어두고 JS가 JSON으로 값만 채운다
        (cap-detail 모달과 같은 관례, contract/detail.html에서도 재사용) -->
-  <div class="modal-backdrop" data-modal="reco-compare" data-close-on-backdrop="true" hidden aria-hidden="true">
+  <div class="modal-backdrop reco-compare-backdrop" data-modal="reco-compare" data-close-on-backdrop="true" hidden aria-hidden="true">
     <div th:insert="~{reco/compare-modal :: modal}"></div>
   </div>
 
