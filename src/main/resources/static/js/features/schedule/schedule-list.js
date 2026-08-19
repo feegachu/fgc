@@ -29,7 +29,7 @@
   var nextButton = document.querySelector("[data-schedule-page-next]");
   var currentPageText = document.querySelector("[data-schedule-current-page]");
   var totalPagesText = document.querySelector("[data-schedule-total-pages]");
-  var pageNumberText = document.querySelector("[data-schedule-page-number]");
+  var pageNumbers = document.querySelector("[data-schedule-page-numbers]");
   var resultCount = document.querySelector("[data-schedule-result-count]");
   var pageSizeText = document.querySelector("[data-schedule-page-size]");
   var dataWarning = document.querySelector("[data-schedule-data-warning]");
@@ -349,10 +349,32 @@
 
     currentPageText.textContent = String(page);
     totalPagesText.textContent = String(displayedTotalPages);
-    pageNumberText.textContent = String(page);
+    renderPageNumbers(page, displayedTotalPages);
     setPageButton(previousButton, page <= 1);
     setPageButton(nextButton, totalPages === 0 || page >= totalPages);
     pagination.hidden = false;
+  }
+
+  function renderPageNumbers(page, totalPages) {
+    pageNumbers.replaceChildren();
+    var start = Math.max(1, page - 2);
+    var end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    for (var current = start; current <= end; current += 1) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "pagination-button" + (current === page ? " is-active" : "");
+      button.textContent = String(current);
+      if (current === page) button.setAttribute("aria-current", "page");
+      else (function (target) {
+        button.addEventListener("click", function () {
+          currentState.page = target;
+          updateBrowserUrl(currentState, false);
+          load(currentState);
+        });
+      })(current);
+      pageNumbers.appendChild(button);
+    }
   }
 
   function renderPage(pageData) {

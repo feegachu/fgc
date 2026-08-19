@@ -6,7 +6,7 @@
   - 상태이력은 GET /api/v1/contracts/{id}/status-events 응답을 수용한다.
     effectiveAt, receivedAt, processings[]를 사용하며 이벤트와 처리 작업을 분리해 표시한다.
   - 상태이력 기본 정렬은 효력일시 오름차순이며 도착일시 오름차순으로 전환할 수 있다.
-  - 나머지 탭은 해당 API 연동 시 lazy load한다.
+  - 예상 스케줄·1,200% 탭은 선택 시 각각 IF-API-13·14로 lazy load한다.
 -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W02', '보험계약 상세', '보험계약', '/contracts')}">
@@ -33,12 +33,12 @@
         <button id="contract-edit-button" class="button button-secondary" type="button" data-fgc-action="edit" th:disabled="${!canProcess}">
           <span class="material-symbols-rounded" aria-hidden="true">edit</span>수정
         </button>
-        <button class="button button-secondary" type="button" data-fgc-action="regenerate" disabled
-                title="연동 대기" aria-label="스케줄 재생성, 연동 대기">
+        <button id="contract-schedule-regenerate-button" class="button button-secondary" type="button" data-fgc-action="regenerate" th:disabled="${!canProcess}"
+                aria-label="스케줄 재생성">
           <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>스케줄 재생성
         </button>
-        <button class="button button-primary" type="button" data-fgc-action="recheck" disabled
-                title="연동 대기" aria-label="한도 재검증, 연동 대기">
+        <button id="contract-cap-recheck-button" class="button button-primary" type="button" data-fgc-action="recheck" th:disabled="${!canProcess}"
+                aria-label="한도 재검증">
           <span class="material-symbols-rounded" aria-hidden="true">speed</span>한도 재검증
         </button>
       </div>
@@ -130,9 +130,17 @@
   </section>
 
   <section id="contract-panel-schedules" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-schedules" hidden><div class="empty-state">예상 스케줄 탭은 선택 시 조회하도록 연동합니다.</div></section>
+           aria-labelledby="contract-tab-schedules" hidden>
+    <header class="contract-lazy-panel-header"><div><h2 class="surface-title">예상 스케줄</h2><p>지급단계별 현재 운영 스케줄과 회차를 조회합니다.</p></div></header>
+    <p class="contract-lazy-note" data-schedule-load-state aria-live="polite">탭을 선택하면 스케줄을 불러옵니다.</p>
+    <div data-contract-schedules></div>
+  </section>
   <section id="contract-panel-cap" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-cap" hidden><div class="empty-state">1,200% 결과는 지급단계별 판정을 분리해 표시합니다.</div></section>
+           aria-labelledby="contract-tab-cap" hidden>
+    <header class="contract-lazy-panel-header"><div><h2 class="surface-title">1,200% 한도 검증</h2><p>지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.</p></div></header>
+    <p class="contract-lazy-note" data-cap-load-state aria-live="polite">탭을 선택하면 한도 판정을 불러옵니다.</p>
+    <div class="contract-cap-result-grid" data-contract-cap-results></div>
+  </section>
   <section id="contract-panel-arbitrage" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
            aria-labelledby="contract-tab-arbitrage" hidden><div class="empty-state">차익거래 검증 탭 API 연동 대기 중입니다.</div></section>
   <section id="contract-panel-ledger" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
@@ -157,6 +165,7 @@
     "use strict";
 
     var contractId = null;
+    var apiClient = null;
     var statusEvents = [];
     var currentStatusSort = "effectiveAt";
 
@@ -202,9 +211,9 @@
     }
 
     function statusBadgeClass(status) {
-      if (["ACTIVE", "COMPLETED", "SUCCESS", "SUCCEEDED"].indexOf(status) >= 0) return "status-badge-success";
-      if (["UNPAID", "LAPSED", "FAILED"].indexOf(status) >= 0) return "status-badge-error";
-      if (["APPLIED", "RUNNING", "PENDING"].indexOf(status) >= 0) return "status-badge-review";
+      if (["ACTIVE", "COMPLETED", "SUCCESS", "SUCCEEDED", "NORMAL"].indexOf(status) >= 0) return "status-badge-success";
+      if (["UNPAID", "LAPSED", "FAILED", "VIOLATION"].indexOf(status) >= 0) return "status-badge-error";
+      if (["APPLIED", "RUNNING", "PENDING", "WARNING", "REVIEW_REQUIRED"].indexOf(status) >= 0) return "status-badge-review";
       return "status-badge-neutral";
     }
 
@@ -418,11 +427,50 @@
         window.location.assign("/contracts/" + encodeURIComponent(contractId) + "/edit");
       });
 
-      var apiClient = window.FgcUi && window.FgcUi.apiClient;
+      apiClient = window.FgcUi && window.FgcUi.apiClient;
       if (!apiClient) {
         text("contract-detail-load-state", "공통 API 클라이언트를 불러오지 못했습니다.");
         historyEmpty("상태이력 연동 대기", "공통 API 클라이언트 로드를 확인해 주세요.");
         return;
+      }
+
+      var capRecheckButton = document.getElementById("contract-cap-recheck-button");
+      if (capRecheckButton && !capRecheckButton.disabled) {
+        capRecheckButton.addEventListener("click", function () {
+          capRecheckButton.disabled = true;
+          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/cap-check", { method: "POST" })
+            .then(function () {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast("1,200% 한도 재검증을 완료했습니다.", "success");
+              var capTab = document.getElementById("contract-tab-cap");
+              var capPanel = document.getElementById("contract-panel-cap");
+              if (capPanel) capPanel.dataset.loaded = "false";
+              if (capTab) capTab.click();
+            })
+            .catch(function (error) {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(error && error.message ? error.message : "한도 재검증에 실패했습니다.", "error");
+            })
+            .finally(function () { capRecheckButton.disabled = false; });
+        });
+      }
+
+      var scheduleRegenerateButton = document.getElementById("contract-schedule-regenerate-button");
+      if (scheduleRegenerateButton && !scheduleRegenerateButton.disabled) {
+        scheduleRegenerateButton.addEventListener("click", function () {
+          scheduleRegenerateButton.disabled = true;
+          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId)
+            + "/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL", { method: "POST" })
+            .then(function () {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast("예상 스케줄을 새 버전으로 재생성했습니다.", "success");
+              var schedulesPanel = document.getElementById("contract-panel-schedules");
+              var schedulesTab = document.getElementById("contract-tab-schedules");
+              if (schedulesPanel) schedulesPanel.dataset.loaded = "false";
+              if (schedulesTab) schedulesTab.click();
+            })
+            .catch(function (error) {
+              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(error && error.message ? error.message : "스케줄 재생성에 실패했습니다.", "error");
+            })
+            .finally(function () { scheduleRegenerateButton.disabled = false; });
+        });
       }
 
       apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId))

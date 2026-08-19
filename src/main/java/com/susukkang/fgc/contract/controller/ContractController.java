@@ -123,6 +123,23 @@ public class ContractController {
                         .toList()
         );
     }
+
+    /** 계약 생성·수정 후 사용하는 동일한 실시간 한도 계산을 수동으로 다시 실행한다. */
+    @PostMapping("/{id}/cap-check")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<List<CapCheckSaveResult>> recheckCap(@PathVariable Long id) {
+        return ApiResponse.success(contractService.recheckCap(id));
+    }
+
+    /** 계약 상세에서 운영 중인 예상 스케줄을 지급단계별 새 버전으로 재생성한다. */
+    @PostMapping("/{id}/schedules/regenerate")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<List<Long>> regenerateSchedules(
+            @PathVariable Long id,
+            @RequestParam(name = "reason") String reason
+    ) {
+        return ApiResponse.success(contractService.regenerateSchedules(id, reason));
+    }
     /**
      * 설명 : 계약 ID를 기준으로 차익거래 수동 검증을 실행한다.
      * @param id 계약 ID
