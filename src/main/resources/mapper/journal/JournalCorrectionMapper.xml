@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalCorrectionMapper">
+    <select id="findHeaderForUpdate"
+            resultType="com.susukkang.fgc.journal.dto.JournalCorrectionHeaderRow">
+        SELECT h.journal_header_id, h.journal_date, h.journal_type,
+               h.source_entity_type, h.source_entity_id, h.revision_no,
+               h.validation_run_id, vr.status AS validationRunStatus,
+               h.contract_id, h.policy_version_id, h.status, h.description
+        FROM fgc.journal_header h
+        LEFT JOIN fgc.validation_run vr ON vr.validation_run_id = h.validation_run_id
+        WHERE h.journal_header_id = #{journalHeaderId}
+        FOR UPDATE OF h
+    </select>
+
+    <select id="findLines"
+            resultType="com.susukkang.fgc.journal.dto.JournalCorrectionLineRow">
+        SELECT line_no, journal_account_id, debit_amount, credit_amount,
+               contract_id, agent_id, payment_stage, commission_item_id, memo
+        FROM fgc.journal_line
+        WHERE journal_header_id = #{journalHeaderId}
+        ORDER BY line_no
+    </select>
+
+    <insert id="insertGroup"
+            parameterType="com.susukkang.fgc.journal.dto.JournalCorrectionGroupInsertRow">
+        INSERT INTO fgc.journal_correction_group
+            (correction_group_key, original_journal_header_id, reason,
+             evidence_ref, created_by)
+        VALUES
+            (#{correctionGroupKey}, #{originalJournalHeaderId}, #{reason},
+             #{evidenceRef}, #{createdBy})
+    </insert>
+
+    <select id="lockJournalNumbering" resultType="int">
+        SELECT 1
+        FROM pg_advisory_xact_lock(hashtextextended(#{lockKey}, 0))
+    </select>
+
+    <update id="markPosted">
+        UPDATE fgc.journal_header
+        SET status = 'POSTED', posted_by = #{postedBy}
+        WHERE journal_header_id = #{journalHeaderId} AND status = 'DRAFT'
+    </update>
+
+    <update id="markReversed">
+        UPDATE fgc.journal_header
+        SET status = 'REVERSED'
+        WHERE journal_header_id = #{journalHeaderId} AND status = 'POSTED'
+    </update>
+</mapper>
