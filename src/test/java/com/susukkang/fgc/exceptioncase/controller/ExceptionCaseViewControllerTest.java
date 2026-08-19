@@ -2,12 +2,15 @@ package com.susukkang.fgc.exceptioncase.controller;
 
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.ShellAdvice;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +28,9 @@ import static com.susukkang.fgc.common.code.ExceptionStatus.IN_REVIEW;
 import static com.susukkang.fgc.common.code.ExceptionStatus.NEW;
 import static com.susukkang.fgc.common.code.ExceptionStatus.RESOLVED;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -35,9 +41,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 /**
- * EXCP-W01 예외함 — 화면 필터 status=OPEN(묶음값)을 서버가 NEW+IN_REVIEW 로
- * 풀어서 조회하는지(#83) 를 OPEN / 개별 상태값 / 필터 없음 3가지 경로로 지킨다.
- * FUN-057 인수조건 "카드 클릭 → 목록 이동 + 검색조건 자동 적용"(화면정의서 :405)의 수신부.
+ * 설명 : EXCP-W01 예외함 화면 검색조건 웹 슬라이스 테스트
+ *
+ * @author yslee
+ * @since 2026-08-19
+ * @version 1.2
  */
 @WebMvcTest(ExceptionCaseViewController.class)
 @Import({ExceptionCaseViewController.class, ShellAdvice.class, GlobalExceptionHandler.class,
@@ -128,6 +136,30 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(model().attribute("month", "2026-05"));
 
         verify(mapper).findCases(List.of(NEW, IN_REVIEW));
+    }
+
+    @Test
+    void 확정_체크리스트가_보낸_실행_유형_심각도_조건을_화면_목록에_적용한다() throws Exception {
+        given(mapper.findCasesByCriteria(any(ExceptionCaseSearchDTO.class),
+                eq(List.of(NEW, IN_REVIEW)))).willReturn(List.of(OPEN_ROW));
+        given(mapper.countByStatuses(List.of(NEW, IN_REVIEW))).willReturn(1L);
+
+        mockMvc.perform(get("/exceptions")
+                        .param("validationRunId", "44")
+                        .param("severity", "CRITICAL")
+                        .param("types", "POLICY_MISSING", "POLICY_DUPLICATE")
+                        .param("status", "OPEN")
+                        .with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("exception/list"))
+                .andExpect(content().string(containsString("1200% 한도 초과")));
+
+        verify(mapper).findCasesByCriteria(argThat(criteria ->
+                        Long.valueOf(44L).equals(criteria.getValidationRunId())
+                                && criteria.getSeverity() == ExceptionSeverity.CRITICAL
+                                && criteria.getTypes().equals(List.of(
+                                ExceptionType.POLICY_MISSING, ExceptionType.POLICY_DUPLICATE))),
+                eq(List.of(NEW, IN_REVIEW)));
     }
 
     /** FGC-FUN-053 상태값(RESOLVED 등 실제 코드) 필터 — 묶음 해석 없이 그 값 하나로만 조회한다. */
