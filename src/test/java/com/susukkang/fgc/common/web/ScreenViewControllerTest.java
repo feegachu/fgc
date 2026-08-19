@@ -138,21 +138,21 @@ class ScreenViewControllerTest {
                         org.hamcrest.Matchers.containsString("교육용 프로토타입입니다"))));
     }
 
-    /** FGC-FUN-030 / REG-08 — 현재 제공 API만 연결하고 미제공 전체범위 집계를 만들지 않는다. */
+    /** FGC-FUN-030 / REG-08 — 서버가 제공하는 전체 검색범위 집계를 화면에 연결한다. */
     @Test
-    void cap_screen_uses_only_available_api_data_and_marks_pending_aggregates() throws Exception {
+    void cap_screen_uses_server_provided_stage_and_agent_aggregates() throws Exception {
         mvc.perform(get("/cap-checks").with(user(settleUser())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "/js/features/cap/cap-list.js")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id=\"cap-insurer\" name=\"insurerId\" disabled")))
+                        "id=\"cap-insurer\" name=\"insurerId\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id=\"cap-organization\" name=\"organizationId\" disabled")))
+                        "id=\"cap-organization\" name=\"orgId\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "전체 검색범위 Stage 집계 API가 아직 제공되지 않습니다.")))
+                        "전체 검색범위 지급단계 집계를 불러오는 중입니다.")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "현재 페이지 목록으로 합산하지 않습니다.")));
+                        "전체 검색범위 설계사 집계를 불러오는 중입니다.")));
     }
 
     private static com.susukkang.fgc.auth.dto.FgcUserDetails gaAdminUser() {
