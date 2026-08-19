@@ -25,6 +25,7 @@ import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -220,6 +221,19 @@ public class ScheduleService {
         }
 
         return new ScheduleGenerationResult(createdHeaderIds, createdLineCount);
+    }
+
+    /**
+     * DailyChangedContractJob의 changedContractStep 전용 진입점.
+     * generateSchedules()를 그대로 호출하지만 REQUIRES_NEW로 별도 트랜잭션에 담는다 — 이 메서드가
+     * (noRollbackFor 없이) FgcBusinessException을 던지면 그 트랜잭션만 원자적으로 롤백되고,
+     * 청크를 감싸는 바깥 트랜잭션(TaskletStep)은 rollback-only로 오염되지 않는다. 이게 없으면
+     * ChangedContractItemProcessor의 catch-and-skip이 예외를 잡아도 커밋 시점에
+     * UnexpectedRollbackException으로 스텝 전체가 실패한다(2026-08-19 QA 중 재현·확인).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ScheduleGenerationResult generateSchedulesInNewTransaction(InsuranceContract contract) {
+        return generateSchedules(contract);
     }
 
     /**

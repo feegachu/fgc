@@ -62,7 +62,9 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
                     && lastProcessedAt != null
                     && contract.getUpdatedAt().isAfter(lastProcessedAt);
             if (!pendingEventIds.isEmpty() || contractItselfChanged) {
-                scheduleService.generateSchedules(contract);
+                // REQUIRES_NEW — 이 계약만 실패해도 청크(다른 계약들)의 트랜잭션을
+                // rollback-only로 오염시키지 않는다(아래 catch의 skip이 실제로 동작하려면 필수).
+                scheduleService.generateSchedulesInNewTransaction(contract);
             }
 
             LocalDate asOfDate = LocalDate.now(DateUtil.SEOUL_ZONE);

@@ -33,12 +33,12 @@ class ArbitrageCheckBatchAdapterTest {
     @Mock
     private ArbitrageMapper arbitrageMapper;
     @Mock
-    private ArbitrageService arbitrageService;
+    private ArbitrageCheckBatchItemService arbitrageCheckBatchItemService;
 
     @Test
     void checksSelectedContractsAndReturnsRecoverableFailureAsSkip() {
         ArbitrageCheckBatchAdapter adapter =
-                new ArbitrageCheckBatchAdapter(arbitrageMapper, arbitrageService);
+                new ArbitrageCheckBatchAdapter(arbitrageMapper, arbitrageCheckBatchItemService);
         ValidationStepContext context = new ValidationStepContext(
                 100L,
                 new ValidationJobContext(
@@ -49,12 +49,12 @@ class ArbitrageCheckBatchAdapterTest {
                         "request-1")
         );
         given(arbitrageMapper.selectSelectedContractIds(100L)).willReturn(List.of(10L, 20L));
-        given(arbitrageService.checkInExistingRun(
+        given(arbitrageCheckBatchItemService.process(
                 100L, 10L, LocalDate.of(2026, 7, 31)))
                 .willReturn(new ArbitrageCheckInsertDTO());
         doThrow(new FgcBusinessException(FgcErrorCode.COMMON_004, java.util.Map.of()))
-                .when(arbitrageService)
-                .checkInExistingRun(100L, 20L, LocalDate.of(2026, 7, 31));
+                .when(arbitrageCheckBatchItemService)
+                .process(100L, 20L, LocalDate.of(2026, 7, 31));
 
         StepProcessingResult result = adapter.check(context);
 
@@ -64,6 +64,6 @@ class ArbitrageCheckBatchAdapterTest {
             assertThat(skip.contractId()).isEqualTo(20L);
             assertThat(skip.reasonCode()).isEqualTo("ARBITRAGE_CHECK_FAILED");
         });
-        verify(arbitrageService).checkInExistingRun(100L, 10L, LocalDate.of(2026, 7, 31));
+        verify(arbitrageCheckBatchItemService).process(100L, 10L, LocalDate.of(2026, 7, 31));
     }
 }
