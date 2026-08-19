@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.base.mapper.ProductMapper">
+
+    <sql id="productSearchConditions">
+        p.insurer_id = #{criteria.insurerId}
+        AND p.active_yn = true
+        AND po.active_yn = true
+        AND po.sales_start_date &lt;= #{criteria.asOf}
+        AND (po.sales_end_date IS NULL OR po.sales_end_date &gt;= #{criteria.asOf})
+    </sql>
+
+    <select id="selectProducts" resultType="com.susukkang.fgc.base.dto.ProductRow">
+        SELECT po.product_offering_id AS productOfferingId,
+               p.insurer_product_code AS insurerProductCode,
+               p.standard_product_code AS standardProductCode,
+               p.product_name AS productName,
+               p.product_group_code AS productGroupCode,
+               po.offering_version AS offeringVersion,
+               po.sales_start_date AS salesStartDate,
+               po.sales_end_date AS salesEndDate,
+               po.basic_document_version AS basicDocumentVersion,
+               po.basic_document_date AS basicDocumentDate,
+               po.channel_code AS channelCode,
+               po.channel_special_rule_yn AS channelSpecialRuleYn,
+               po.fee_regime_code AS feeRegimeCode,
+               po.standard_deduction_80_yn AS standardDeduction80Yn
+          FROM fgc.product p
+          JOIN fgc.product_offering po
+            ON po.product_id = p.product_id
+         WHERE <include refid="productSearchConditions"/>
+         ORDER BY p.insurer_product_code ASC,
+                  po.offering_version ASC,
+                  po.channel_code ASC,
+                  po.product_offering_id ASC
+         LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countProducts" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.product p
+          JOIN fgc.product_offering po
+            ON po.product_id = p.product_id
+         WHERE <include refid="productSearchConditions"/>
+    </select>
+
+</mapper>

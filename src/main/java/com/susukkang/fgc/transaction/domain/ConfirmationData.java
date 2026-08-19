@@ -38,6 +38,26 @@ public record ConfirmationData(
         String inclusionDecisionReason,
         String allocationBasis,
         String evidenceRef,
-        AttributionMethod attributionMethod
+        AttributionMethod attributionMethod,
+        LocalDate contractDate
 ) {
+
+    /**
+     * 기존 단위 테스트와 호출부 호환용 생성자입니다. DB 조회에서는 canonical 생성자에
+     * contract_date가 매핑되고, 직접 만든 테스트 데이터는 계약일 미확인 상태로 둡니다.
+     */
+    public ConfirmationData(
+            Long paymentId, CommissionPaymentStatus status, BigDecimal amount, BigDecimal attributedAmount,
+            BigDecimal totalAttributedAmount, String confirmIdempotencyKey, LocalDate attributionDate,
+            LocalDate attributionMonth, Long transactionAttributionId, Long contractId, Long agentId,
+            PaymentStage paymentStage, Long commissionItemId, String itemCode, String itemName,
+            Long policyVersionId, InclusionDecisionStatus inclusionDecisionStatus, ExclusionType exclusionType,
+            String inclusionDecisionReason, String allocationBasis, String evidenceRef,
+            AttributionMethod attributionMethod
+    ) {
+        this(paymentId, status, amount, attributedAmount, totalAttributedAmount, confirmIdempotencyKey,
+                attributionDate, attributionMonth, transactionAttributionId, contractId, agentId, paymentStage,
+                commissionItemId, itemCode, itemName, policyVersionId, inclusionDecisionStatus, exclusionType,
+                inclusionDecisionReason, allocationBasis, evidenceRef, attributionMethod, null);
+    }
 }

@@ -11,6 +11,7 @@ public record CapCheckSearchCriteria(
         String paymentStage,
         String resultStatus,
         Long insurerId,
+        Long organizationId,
         String contractNo
 ) {
 }

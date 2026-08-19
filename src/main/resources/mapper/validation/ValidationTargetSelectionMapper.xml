@@ -15,7 +15,7 @@
                    ic.payment_term_months,
                    po.product_id,
                    po.channel_code,
-                   p.insurer_product_code
+                   p.standard_product_code
               FROM insurance_contract ic
               JOIN product_offering po
                 ON po.product_offering_id = ic.product_offering_id
@@ -31,7 +31,11 @@
         candidate AS (
             SELECT ec.*,
                    rrt.refund_rate_table_id,
-                   (rrt.source_product_code = ec.insurer_product_code) AS product_code_matches
+                   <!-- 환급률표 정본은 표준상품코드 기준이다(시드데이터 명세서 §환급률표 필수 조합:
+                        상품 식별을 STD-* 로 하고, V3 시드도 source_product_code 에 표준코드를 적재).
+                        보험사 상품코드(insurer_product_code)와 비교하면 전 계약이 "상품코드 불일치"로
+                        REVIEW_REQUIRED 처리되어 하위 검증(1,200%·차익거래·원장·대사·예외)이 전부 빈다. -->
+                   (rrt.source_product_code = ec.standard_product_code) AS product_code_matches
               FROM eligible_contract ec
               LEFT JOIN refund_rate_table rrt
                 ON rrt.insurer_id = ec.insurer_id
@@ -63,13 +67,13 @@
                    insurer_id,
                    payment_term_months,
                    channel_code,
-                   insurer_product_code,
+                   standard_product_code,
                    COUNT(refund_rate_table_id) AS candidate_count,
                    COUNT(refund_rate_table_id) FILTER (WHERE product_code_matches) AS matching_count,
                    MIN(refund_rate_table_id) FILTER (WHERE product_code_matches) AS refund_rate_table_id
               FROM candidate
              GROUP BY contract_id, product_offering_id, contract_date, current_status,
-                      insurer_id, payment_term_months, channel_code, insurer_product_code
+                      insurer_id, payment_term_months, channel_code, standard_product_code
         )
         INSERT INTO validation_target (
             validation_run_id,
@@ -99,7 +103,7 @@
                    'insurerId', insurer_id,
                    'paymentTermMonths', payment_term_months,
                    'channelCode', channel_code,
-                   'insurerProductCode', insurer_product_code,
+                   'standardProductCode', standard_product_code,
                    'refundRateCandidateCount', candidate_count,
                    'refundRateMatchingCount', matching_count
                )

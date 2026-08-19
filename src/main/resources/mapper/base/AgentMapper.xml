@@ -4,6 +4,53 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.susukkang.fgc.base.mapper.AgentMapper">
+    <sql id="agentSearchConditions">
+        a.appointment_date &lt;= #{criteria.asOf}
+        AND (a.termination_date IS NULL OR a.termination_date &gt;= #{criteria.asOf})
+        <if test="criteria.organizationId != null">
+            AND a.organization_id = #{criteria.organizationId}
+        </if>
+        <if test="criteria.keyword != null">
+            AND (
+                LOWER(a.agent_code) LIKE CONCAT('%', LOWER(#{criteria.keyword}), '%')
+                OR LOWER(a.agent_name) LIKE CONCAT('%', LOWER(#{criteria.keyword}), '%')
+            )
+        </if>
+    </sql>
+
+    <select id="selectAgents"
+            resultType="com.susukkang.fgc.base.dto.AgentRow">
+        SELECT a.agent_id AS agentId,
+               a.agent_code AS agentCode,
+               a.agent_name AS agentName,
+               a.rank_code AS rankCode,
+               a.organization_id AS organizationId,
+               o.organization_code AS organizationCode,
+               o.organization_name AS organizationName,
+               a.appointment_date AS appointmentDate,
+               a.termination_date AS terminationDate,
+               a.agent_status AS agentStatus,
+               a.latest_registration_date AS latestRegistrationDate,
+               a.prior_three_year_experience_yn AS priorThreeYearExperienceYn,
+               a.experience_checked_on AS experienceCheckedOn,
+               a.newcomer_support_eligible_yn AS newcomerSupportEligibleYn,
+               a.newcomer_support_end_date AS newcomerSupportEndDate,
+               a.active_yn AS activeYn
+          FROM fgc.agent a
+          JOIN fgc.organization o
+            ON o.organization_id = a.organization_id
+         WHERE <include refid="agentSearchConditions"/>
+         ORDER BY a.agent_code ASC
+         LIMIT #{limit}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countAgents" resultType="long">
+        SELECT COUNT(*)
+          FROM fgc.agent a
+         WHERE <include refid="agentSearchConditions"/>
+    </select>
+
     <!-- 조직 계층 및 직급별 설계사 조회 SQL -->
     <select id="findActiveAgentIdFromOrganizationHierarchy"
             resultType="long">

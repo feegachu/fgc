@@ -3,7 +3,9 @@ package com.susukkang.fgc.common.web;
 import com.susukkang.fgc.common.security.Roles;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * 1차 21면 중 아직 실데이터 바인딩 전인 화면들의 정적 라우팅.
@@ -23,18 +25,6 @@ public class ScreenViewController {
      * CONT-W03 — 인터페이스정의서 IF-API-18/19 역할 SETTLEMENT (+SYSTEM_ADMIN 은 전부, §4-1).
      * FGC-FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
      */
-    @PreAuthorize(Roles.CAN_PROCESS)
-    @GetMapping("/contracts/new")
-    public String contractNew() {
-        return "contract/form";
-    }
-
-    @PreAuthorize(Roles.CAN_PROCESS)
-    @GetMapping("/contracts/{id}/edit")
-    public String contractEdit() {
-        return "contract/form";
-    }
-
     @GetMapping("/contracts/{id}")
     public String contractDetail() {
         return "contract/detail";
@@ -58,7 +48,8 @@ public class ScreenViewController {
     }
 
     @GetMapping("/schedules/{id}")
-    public String scheduleDetail() {
+    public String scheduleDetail(@PathVariable Long id, Model model) {
+        model.addAttribute("id", id);
         return "schedule/detail";
     }
 
@@ -82,23 +73,6 @@ public class ScreenViewController {
         return "reco/list";
     }
 
-    @GetMapping("/validation-runs")
-    public String validationRunList() {
-        return "vrun/list";
-    }
-
-    @GetMapping("/validation-runs/{id}")
-    public String validationRunDetail() {
-        return "vrun/detail";
-    }
-
-    /**
-     * AUDT-W01 은 다른 1차 화면과 달리 "전체 조회"가 아니다 — 화면정의서 :1530 권한
-     * COMPLIANCE·SYSTEM_ADMIN. FUN-002 인수조건: 직접 URL 호출도 403 으로 차단된다.
-     */
-    @PreAuthorize(Roles.CAN_VIEW_AUDIT_LOG)
-    @GetMapping("/audit-logs")
-    public String auditLogList() {
-        return "audit/list";
-    }
+    // AUDT-W01(/audit-logs)은 데이터 바인딩과 함께 audit.controller.AuditLogViewController 로,
+    // VRUN-W01/W02(/validation-runs)는 validation.controller.ValidationRunViewController 로 이관했다.
 }

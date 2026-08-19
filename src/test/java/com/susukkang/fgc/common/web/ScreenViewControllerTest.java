@@ -1,6 +1,8 @@
 package com.susukkang.fgc.common.web;
 
 import com.susukkang.fgc.common.config.SecurityConfig;
+import com.susukkang.fgc.contract.controller.ContractViewController;
+import com.susukkang.fgc.contract.service.ContractService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -9,6 +11,7 @@ import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfigura
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -22,14 +25,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 실데이터 바인딩 검증은 화면별 기능 브랜치의 몫이다.
  * (실데이터 바인딩된 화면은 도메인 뷰 컨트롤러 테스트로 이관:
  *  DASH → DashboardViewControllerTest, BASE → BaseViewControllerTest,
- *  POL → PolicyViewControllerTest, EXCP → ExceptionCaseViewControllerTest)
+ *  POL → PolicyViewControllerTest, EXCP → ExceptionCaseViewControllerTest,
+ *  VRUN → ValidationRunViewControllerTest)
  *
  * 요구사항 추적(FGC-FUN-xxx): CONT 018 ·
  * TRAN 065/031/033/034 · SCHE 036/039 · CAP 030/032/035 · ARB 063 ·
  * LEDG 046/047 · RECO 048~051 · VRUN 041~044 · AUDT 061.
  * /audit-logs 만 역할 제한(FUN-002·화면정의서 :1530)이라 별도 테스트로 뺐다.
  */
-@WebMvcTest(ScreenViewController.class)
+@WebMvcTest({ScreenViewController.class, ContractViewController.class})
 @Import({ShellAdvice.class, SecurityConfig.class, MessageSourceAutoConfiguration.class,
         com.susukkang.fgc.common.exception.FgcMessageResolver.class,
         com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver.class})
@@ -38,6 +42,9 @@ class ScreenViewControllerTest {
 
     @Autowired
     MockMvc mvc;
+
+    @MockitoBean
+    ContractService contractService;
 
     private static com.susukkang.fgc.auth.dto.FgcUserDetails settleUser() {
         var view = new com.susukkang.fgc.auth.dto.AppUserView();
@@ -52,8 +59,6 @@ class ScreenViewControllerTest {
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
             "/contracts/1,         FGC-UI-CONT-W02",
-            "/contracts/new,       FGC-UI-CONT-W03",
-            "/contracts/1/edit,    FGC-UI-CONT-W03",
             "/transactions,        FGC-UI-TRAN-W01",
             "/transactions/new,    FGC-UI-TRAN-W02",
             "/schedules,           FGC-UI-SCHE-W01",
@@ -62,8 +67,6 @@ class ScreenViewControllerTest {
             "/arbitrage-checks,    FGC-UI-ARB-W01",
             "/journals,            FGC-UI-LEDG-W01",
             "/reconciliations,     FGC-UI-RECO-W01",
-            "/validation-runs,     FGC-UI-VRUN-W01",
-            "/validation-runs/1,   FGC-UI-VRUN-W02",
     })
     void screen_renders_with_its_id(String route, String screenId) throws Exception {
         mvc.perform(get(route).with(user(settleUser())))
@@ -81,32 +84,21 @@ class ScreenViewControllerTest {
         return new com.susukkang.fgc.auth.dto.FgcUserDetails(view, true, true);
     }
 
-    /** AUDT-W01(FUN-061)은 COMPLIANCE·SYSTEM_ADMIN 전용 — 화면정의서 :1530. */
-    @Test
-    void audit_log_screen_renders_for_compliance() throws Exception {
-        mvc.perform(get("/audit-logs").with(user(complianceUser())))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("FGC-UI-AUDT-W01")));
-    }
-
-    /** FUN-002 인수조건: 권한 없는 역할의 직접 URL 호출은 403 으로 차단된다. */
-    @Test
-    void audit_log_screen_forbidden_for_settlement() throws Exception {
-        mvc.perform(get("/audit-logs").with(user(settleUser())))
-                .andExpect(status().isForbidden());
-    }
+    // AUDT-W01(/audit-logs) 스모크·역할 테스트는 데이터 바인딩 이관과 함께
+    // audit.controller.AuditLogViewControllerTest 로 옮겼다 (FUN-061).
 
     /**
-     * COMPLIANCE "모든 처리 버튼 회색"(화면정의서 :229) — readOnly 모델값이 아니라
-     * 실제 렌더링(th:disabled)을 본다. 대표로 RECO-W01 의 처리 버튼 2개.
+     * FGC-FUN-048, FGC-FUN-052 — RECO-W01 처리 버튼은 API 연동 전까지
+     * 권한과 관계없이 활성화하지 않는다.
      */
     @Test
-    void process_buttons_disabled_for_compliance_but_not_settlement() throws Exception {
+    void reconciliation_actions_disabled_for_all_roles_while_api_pending() throws Exception {
+        var disabledRunButton = org.hamcrest.Matchers.matchesPattern(
+                "(?s).*<button[^>]*id=\"btn-run\"[^>]*\\bdisabled\\b[^>]*>.*");
         mvc.perform(get("/reconciliations").with(user(complianceUser())))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("disabled=\"disabled\"")));
+                .andExpect(content().string(disabledRunButton));
         mvc.perform(get("/reconciliations").with(user(settleUser())))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
+                .andExpect(content().string(disabledRunButton));
     }
 
     @Test
@@ -200,14 +192,6 @@ class ScreenViewControllerTest {
      */
     @ParameterizedTest(name = "{0} {1} → {2}")
     @CsvSource({
-            "SETTLEMENT,   /contracts/new,    200",
-            "SYSTEM_ADMIN, /contracts/new,    200",
-            "GA_ADMIN,     /contracts/new,    403",
-            "COMPLIANCE,   /contracts/new,    403",
-            "SETTLEMENT,   /contracts/1/edit, 200",
-            "SYSTEM_ADMIN, /contracts/1/edit, 200",
-            "GA_ADMIN,     /contracts/1/edit, 403",
-            "COMPLIANCE,   /contracts/1/edit, 403",
             "SETTLEMENT,   /transactions/new, 200",
             "SYSTEM_ADMIN, /transactions/new, 200",
             "GA_ADMIN,     /transactions/new, 403",
@@ -237,15 +221,30 @@ class ScreenViewControllerTest {
     /**
      * FGC-FUN-002 — GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다(§4-1 "정책·조직 조회, 검증 실행 확정").
      * readOnly 만 보던 시절 GA_ADMIN 에게 처리 버튼이 활성이던 회귀를 막는다 — 대표로
-     * SCHE-W02(재생성·확정, :873)와 CONT-W02(처리 버튼, IF-API-19/29/33).
+     * CONT-W02 처리 버튼(IF-API-19/29/33).
      */
-    @ParameterizedTest(name = "{0} 처리버튼 비활성")
-    @CsvSource({"/schedules/1", "/contracts/1"})
-    void process_buttons_disabled_for_ga_admin(String route) throws Exception {
-        mvc.perform(get(route).with(user(gaAdminUser())))
+    @Test
+    void contract_process_buttons_disabled_for_ga_admin() throws Exception {
+        mvc.perform(get("/contracts/1").with(user(gaAdminUser())))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("disabled=\"disabled\"")));
-        mvc.perform(get(route).with(user(adminUser())))
+        mvc.perform(get("/contracts/1").with(user(adminUser())))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
+    }
+
+    /**
+     * FGC-FUN-036, FGC-FUN-039, FGC-FUN-040 / REG-01, REG-19 —
+     * SCHE-W02 작업 버튼은 API와 같은 CAN_PROCESS 권한에서만 활성화한다.
+     */
+    @Test
+    void schedule_actions_enabled_only_for_processing_roles() throws Exception {
+        var disabledRegenerateButton = org.hamcrest.Matchers.matchesPattern(
+                "(?s).*<button(?=[^>]*id=\"btn-regenerate\")(?=[^>]*\\bdisabled\\b)[^>]*>.*");
+        mvc.perform(get("/schedules/1").with(user(gaAdminUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"btn-regenerate\"")))
+                .andExpect(content().string(disabledRegenerateButton));
+        mvc.perform(get("/schedules/1").with(user(adminUser())))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"btn-regenerate\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(disabledRegenerateButton)));
     }
 }

@@ -270,9 +270,18 @@
     <select id="selectContractDetailById"
             resultType="com.susukkang.fgc.contract.dto.ContractDetailResponse">
         SELECT
+            ic.contract_id,
+            ic.insurer_id,
+            i.insurer_name,
+            ic.product_offering_id,
             ic.contract_no,
             p.product_name,
+            po.offering_version,
             ic.contract_date,
+            ic.agent_id,
+            a.agent_name,
+            ic.organization_id,
+            o.organization_name,
             ic.premium_per_cycle_amount,
             ic.payment_cycle_code,
             ic.first_premium_amount,
@@ -282,10 +291,16 @@
             ic.current_status AS contract_status,
             ic.data_origin
         FROM insurance_contract ic
+                 JOIN insurer i
+                      ON i.insurer_id = ic.insurer_id
                  JOIN product_offering po
                       ON ic.product_offering_id = po.product_offering_id
                  JOIN product p
                       ON p.product_id = po.product_id
+                 JOIN agent a
+                      ON a.agent_id = ic.agent_id
+                 JOIN organization o
+                      ON o.organization_id = ic.organization_id
         WHERE ic.contract_id = #{contractId}
     </select>
     <!-- 계약 수정 -->

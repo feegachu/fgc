@@ -61,9 +61,15 @@ public class CapCalculatorImpl implements CapCalculator {
                 command.paymentStage().name(), contract.getContractDate(),
                 contract.getInsurerId(), contract.getProductGroupCode(), contract.getChannelCode());
         if (ruleSet == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_500,
-                    Map.of("requestId", "contractId=" + command.contractId()
-                            + ", paymentStage=" + command.paymentStage() + " no applicable cap_rule_set"));
+            throw new FgcBusinessException(
+                    FgcErrorCode.CAP_004,
+                    "paymentStage",
+                    Map.of(
+                            "contractId", command.contractId(),
+                            "paymentStage", command.paymentStage().name()
+                    ),
+                    "적용 가능한 1,200% 룰셋이 없습니다."
+            );
         }
 
         // 1) 기준 보험료 = 월납환산 초회보험료 원액(화면정의서 CAP-W01 "기준 보험료"/CAP-W02
@@ -233,6 +239,7 @@ public class CapCalculatorImpl implements CapCalculator {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("premiumMultiplier", ruleSet.getPremiumMultiplier());
         snapshot.put("refundAdditionCondition", ruleSet.getRefundAdditionCondition());
+        snapshot.put("refundTableMissing", refundAddition.reviewRequired());
         snapshot.put("refundRateTablePolicyVersionId", refundAddition.policyVersionId());
         snapshot.put("refundRateTableVersionNo", refundAddition.versionNo());
         snapshot.put("complianceDeductionPct", ruleSet.getComplianceDeductionPct());
