@@ -4,6 +4,7 @@
   var STORAGE_KEY = "fgc.workspace-tabs.v1";
   var MAX_TABS = 10;
   var DASHBOARD_TAB_ID = "FGC-UI-DASH-W01";
+  var MODAL_SCREEN_IDS = ["FGC-UI-CAP-W02", "FGC-UI-RECO-W02"];
 
   function readTabs() {
     try {
@@ -11,9 +12,11 @@
       var parsed = value ? JSON.parse(value) : [];
       if (!Array.isArray(parsed)) return [];
       return parsed.filter(isValidTab).map(function (tab) {
-        return tab.href === "/dashboard"
+        var normalized = tab.href === "/dashboard"
           ? { id: DASHBOARD_TAB_ID, title: "업무 대시보드", href: "/", icon: "dashboard" }
-          : tab;
+          : Object.assign({}, tab);
+        normalized.modified = tab.modified === true;
+        return normalized;
       });
     } catch (error) {
       return [];
@@ -73,20 +76,21 @@
     var body = document.body;
     var id = body.dataset.workspaceTabId;
     var title = body.dataset.workspaceTabTitle || document.title.replace(/\s*\|\s*FGC\s*$/, "");
-    if (!id || !title) return null;
+    if (!id || !title || MODAL_SCREEN_IDS.indexOf(id) !== -1) return null;
 
     return {
       id: id,
       title: title,
       href: window.location.pathname + window.location.search,
-      icon: body.dataset.workspaceTabIcon || "description"
+      icon: body.dataset.workspaceTabIcon || "description",
+      modified: body.dataset.workspaceTabModified === "true"
     };
   }
 
   function upsertCurrentTab(tabs, tab) {
     var index = tabs.findIndex(function (item) { return item.id === tab.id; });
     if (index >= 0) {
-      tabs[index] = tab;
+      tabs[index] = Object.assign({}, tab, { modified: tabs[index].modified || tab.modified });
       return tabs;
     }
 
@@ -109,7 +113,7 @@
   function createTabElement(tab, activeId) {
     var tabElement = document.createElement("div");
     var isActive = tab.id === activeId;
-    tabElement.className = "workspace-tab" + (isActive ? " is-active" : "");
+    tabElement.className = "workspace-tab" + (isActive ? " is-active" : "") + (tab.modified ? " is-modified" : "");
     tabElement.dataset.tabId = tab.id;
 
     var link = document.createElement("a");
@@ -123,6 +127,13 @@
     label.textContent = tab.title;
     link.appendChild(label);
     tabElement.appendChild(link);
+
+    var modified = document.createElement("span");
+    modified.className = "workspace-tab-modified";
+    modified.setAttribute("role", "img");
+    modified.setAttribute("aria-label", "수정됨");
+    modified.title = "수정됨";
+    tabElement.appendChild(modified);
 
     var close = document.createElement("button");
     close.className = "workspace-tab-close";
@@ -172,6 +183,22 @@
     overflowButton.hidden = container.scrollWidth <= container.clientWidth + 1;
   }
 
+  function markModified(tabId, modified) {
+    var tabs = readTabs();
+    var tab = tabs.find(function (item) { return item.id === tabId; });
+    if (!tab) return false;
+
+    tab.modified = modified !== false;
+    writeTabs(tabs);
+
+    var tabElement = Array.prototype.find.call(
+      document.querySelectorAll("[data-workspace-tabs] [data-tab-id]"),
+      function (element) { return element.dataset.tabId === tabId; }
+    );
+    if (tabElement) tabElement.classList.toggle("is-modified", tab.modified);
+    return true;
+  }
+
   function initWorkspaceTabs() {
     var container = document.querySelector("[data-workspace-tabs]");
     if (!container) return;
@@ -205,6 +232,13 @@
     window.addEventListener("resize", function () {
       updateOverflowState(container, overflowButton);
     });
+
+    if (window.ResizeObserver) {
+      var resizeObserver = new ResizeObserver(function () {
+        updateOverflowState(container, overflowButton);
+      });
+      resizeObserver.observe(container);
+    }
   }
 
   if (document.readyState === "loading") {
@@ -217,6 +251,7 @@
   window.FgcUi.workspaceTabs = {
     applyGlobalMonth: applyGlobalMonth,
     getOpenTabCount: getOpenTabCount,
+    markModified: markModified,
     restoreTabs: restoreTabs
   };
 })();
