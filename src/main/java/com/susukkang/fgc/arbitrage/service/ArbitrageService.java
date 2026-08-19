@@ -86,16 +86,20 @@ public class ArbitrageService {
         // 검색 조건에 해당하는 차익거래 검증 결과 목록 조회
         List<ArbitrageCheckView> arbitrageCheckList =
                 arbitrageMapper.selectByCondition(condition, offset, size);
-        // 검색 조건에 해당하는 판정별 요약 건수 조회
-        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
+        // 상태 필터와 무관하게 현재 조회 범위의 판정 분포를 카드에 유지한다.
+        ArbitrageCheckSearchCondition summaryCondition = new ArbitrageCheckSearchCondition(
+                condition.getMonth(), null, condition.getStage(),
+                condition.getInsurerId(), condition.getContractNo());
+        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(summaryCondition);
         if (summary == null) summary = new ArbitrageCheckSummary();
+        long totalElements = arbitrageMapper.countByCondition(condition);
 
         // 조회 목록을 페이지 응답으로 변환
         PageResponse<ArbitrageCheckView> items = PageResponse.of(
                 arbitrageCheckList,
                 page,
                 size,
-                summary.getTotalArbitrageChecks(),
+                totalElements,
                 "arbitrageCheckId,desc"
         );
 
