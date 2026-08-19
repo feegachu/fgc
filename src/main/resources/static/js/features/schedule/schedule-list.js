@@ -15,8 +15,13 @@
     return Math.min(positivePage(requestedPage), lastPage);
   }
 
+  function responseLabel(serverLabel, labels, code) {
+    if (typeof serverLabel === "string" && serverLabel.trim()) return serverLabel;
+    return labels[code] || code || "-";
+  }
+
   if (typeof module === "object" && module.exports) {
-    module.exports = { normalizePage: normalizePage };
+    module.exports = { normalizePage: normalizePage, responseLabel: responseLabel };
     return;
   }
 
@@ -217,10 +222,6 @@
     makeStateRow(wrapper, "schedule-error-state");
   }
 
-  function label(group, value) {
-    return LABELS[group][value] || value || "-";
-  }
-
   function isTrue(value) {
     return value === true || value === "true";
   }
@@ -288,11 +289,11 @@
       }
 
       row.appendChild(contractCell);
-      row.appendChild(textCell(label("paymentStage", schedule.paymentStage)));
-      row.appendChild(badgeCell(label("scheduleRegime", schedule.scheduleRegime), "status-badge-neutral"));
-      row.appendChild(badgeCell(label("schedulePurpose", schedule.schedulePurpose), schedule.schedulePurpose === "OPERATIONAL" ? "status-badge-info" : "status-badge-neutral"));
+      row.appendChild(textCell(responseLabel(schedule.paymentStageLabel, LABELS.paymentStage, schedule.paymentStage)));
+      row.appendChild(badgeCell(responseLabel(schedule.scheduleRegimeLabel, LABELS.scheduleRegime, schedule.scheduleRegime), "status-badge-neutral"));
+      row.appendChild(badgeCell(responseLabel(schedule.schedulePurposeLabel, LABELS.schedulePurpose, schedule.schedulePurpose), schedule.schedulePurpose === "OPERATIONAL" ? "status-badge-info" : "status-badge-neutral"));
       row.appendChild(textCell(schedule.scheduleVersionNo === null || schedule.scheduleVersionNo === undefined ? "-" : "v" + schedule.scheduleVersionNo, "is-center tabular-nums"));
-      row.appendChild(badgeCell(label("scheduleStatus", schedule.status), STATUS_TONES[schedule.status] || "status-badge-neutral"));
+      row.appendChild(badgeCell(responseLabel(schedule.statusLabel, LABELS.scheduleStatus, schedule.status), STATUS_TONES[schedule.status] || "status-badge-neutral"));
       row.appendChild(badgeCell(isTrue(schedule.activeYn) ? "사용중" : "미사용", isTrue(schedule.activeYn) ? "status-badge-success" : "status-badge-neutral"));
       row.appendChild(textCell(formatInteger(schedule.lineCount), "is-number tabular-nums"));
       row.appendChild(textCell(formatWon(schedule.expectedTotal), "is-number tabular-nums"));

@@ -2,6 +2,8 @@ package com.susukkang.fgc.schedule.dto;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
+import com.susukkang.fgc.schedule.code.SchedulePurpose;
+import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,10 +27,30 @@ public class ScheduleHeaderResponse {
     private Long scheduleHeaderId; // 스케줄 헤더 ID
     private String contractNo; // 화면에 표시할 계약 번호
     private PaymentStage paymentStage; // 지급 단계
+
+    public String getPaymentStageLabel() {
+        return paymentStage == null ? null : paymentStage.label();
+    }
+
     private String scheduleRegime; // 적용 체계
+
+    public String getScheduleRegimeLabel() {
+        return ScheduleRegime.labelOf(scheduleRegime);
+    }
+
     private String schedulePurpose; // 스케줄 용도
+
+    public String getSchedulePurposeLabel() {
+        return SchedulePurpose.labelOf(schedulePurpose);
+    }
+
     private Integer scheduleVersionNo; // 스케줄 버전
     private ScheduleHeaderStatus status; // 스케줄 상태
+
+    public String getStatusLabel() {
+        return status == null ? null : status.label();
+    }
+
     private Boolean activeYn; // 현재 사용 여부
     private Integer lineCount; // 전체 회차 수
     private BigDecimal expectedTotal; // 예상 총액
