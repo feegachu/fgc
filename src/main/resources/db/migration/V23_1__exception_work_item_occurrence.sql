@@ -168,6 +168,16 @@ WITH keyed AS (
                    CONCAT(ec.exception_type, ':', TO_CHAR(vr.validation_month, 'YYYY-MM'),
                           ':CONTRACT:', COALESCE(CAST(ec.contract_id AS varchar), '-'), ':',
                           jh.journal_type, ':', jh.source_entity_type)
+               -- insertCapCheckFailure가 만든 행은 title이 "1,200% 한도 검증 실패 - {지급단계}"
+               -- 형식이다(reason_code는 DATA_QUALITY로만 백필돼 지급단계를 못 담는다) —
+               -- title에서 지급단계를 복원하지 않으면 계약당 GA_TO_FC·INSURER_TO_GA 두
+               -- 실패가 ELSE 분기의 동일 키로 합쳐진다(REG-08 "두 지급단계 게이지를
+               -- 합치지 않는다" 위반, 코드리뷰 지적).
+               WHEN ec.source_entity_type = 'INSURANCE_CONTRACT'
+                    AND ec.title LIKE '1,200% 한도 검증 실패 - %' THEN
+                   CONCAT(ec.exception_type, ':', TO_CHAR(vr.validation_month, 'YYYY-MM'),
+                          ':CONTRACT:', ec.contract_id, ':',
+                          TRIM(SUBSTRING(ec.title FROM '1,200% 한도 검증 실패 - (.*)$')))
                ELSE
                    CONCAT(ec.exception_type, ':', TO_CHAR(vr.validation_month, 'YYYY-MM'),
                           ':', ec.source_entity_type, ':',

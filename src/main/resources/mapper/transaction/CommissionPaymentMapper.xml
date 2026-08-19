@@ -662,6 +662,7 @@
         )
         ON CONFLICT (exception_key) DO UPDATE
            SET status = 'NEW',
+               reason_code = EXCLUDED.reason_code,
                title = EXCLUDED.title,
                description = EXCLUDED.description,
                updated_at = clock_timestamp()

@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -115,10 +116,12 @@ class ExceptionGenerationMapperIntegrationTest {
                    AND result_status = 'REVIEW_REQUIRED'
                 """, rerunId);
 
-        assertThat(exceptionCaseMapper.insertFromCapChecks(rerunId)).isEqualTo(2L);
-        assertThat(exceptionCaseMapper.insertFromArbitrageChecks(rerunId)).isEqualTo(3L);
-        assertThat(exceptionCaseMapper.insertFromReconciliationResults(rerunId)).isEqualTo(2L);
-        assertThat(exceptionCaseMapper.insertFromJournalImbalances(rerunId)).isEqualTo(1L);
+        // 반환값은 "새 업무건" 수 — 같은 월 재실행은 전부 기존 업무건 재검출이라 0이다.
+        // 실행별 검출(occurrence)이 쌓였는지는 아래 rerunSummary SQL이 검증한다.
+        assertThat(exceptionCaseMapper.insertFromCapChecks(rerunId)).isZero();
+        assertThat(exceptionCaseMapper.insertFromArbitrageChecks(rerunId)).isZero();
+        assertThat(exceptionCaseMapper.insertFromReconciliationResults(rerunId)).isZero();
+        assertThat(exceptionCaseMapper.insertFromJournalImbalances(rerunId)).isZero();
 
         Map<String, Object> rerunSummary = jdbcTemplate.queryForMap("""
                 SELECT COUNT(DISTINCT ec.exception_case_id) AS work_items,
@@ -161,6 +164,98 @@ class ExceptionGenerationMapperIntegrationTest {
                 "SELECT status FROM fgc.exception_case WHERE exception_case_id = ?",
                 String.class,
                 exceptionCaseId);
+    }
+
+    // IF-API-42 — RECO-W01 "불일치 예외 일괄 생성" 버튼(수동, reconciliationRunId 기준)이
+    // 월 검증 실행 단계의 자동 생성(insertFromReconciliationResults, validationRunId 기준)과
+    // 정확히 같은 exception_key를 만들어서, 어느 경로가 먼저 실행됐든 서로 중복 생성하지
+    // 않아야 한다(FUN-052). 수동 → 자동 순서.
+    @Test
+    void bulkCreateByReconciliationRunIsIdempotentAndCrossCompatibleWithValidationRunGeneration() {
+        List<Long> contractIds = jdbcTemplate.queryForList("""
+                SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
+                """, Long.class);
+        assertThat(contractIds).isNotEmpty();
+        Long contractId = contractIds.get(0);
+
+        Long validationRunId = insertValidationRun();
+        Long reconciliationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (
+                    validation_run_id, settlement_month, payment_stage, status
+                ) VALUES (?, ?, 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class, validationRunId, TEST_MONTH);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-amount", "AMOUNT_DIFFERENCE", 100000, 90000);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-review", "REVIEW_REQUIRED", 100000, 0);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-matched", "MATCHED", 100000, 100000);
+
+        ReconciliationExceptionBulkCreateRow first =
+                exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
+        assertThat(first.getCandidateCount()).isEqualTo(2L);
+        assertThat(first.getCreatedCount()).isEqualTo(2L);
+
+        // 같은 실행에 다시 눌러도 새 예외가 생기지 않는다.
+        ReconciliationExceptionBulkCreateRow second =
+                exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
+        assertThat(second.getCandidateCount()).isEqualTo(2L);
+        assertThat(second.getCreatedCount()).isZero();
+
+        // 월 검증 실행 단계의 자동 생성 경로로도 다시 시도해보면(같은 대사 실행이 그
+        // validation_run_id에 연결돼 있으므로) 이미 수동으로 만든 예외와 키가 같아서
+        // 새로 생기지 않는다.
+        assertThat(exceptionCaseMapper.insertFromReconciliationResults(validationRunId))
+                .isZero();
+
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case
+                 WHERE source_entity_type = 'RECONCILIATION_RESULT'
+                   AND validation_run_id = ?
+                """, Integer.class, validationRunId);
+        assertThat(count).isEqualTo(2);
+    }
+
+    // 위 테스트의 역순 — 자동 생성이 먼저 실행된 뒤 수동 버튼을 눌러도 중복이 생기면
+    // 안 된다(코드리뷰 지적: 한쪽 순서만 검증하면 두 경로의 exception_key 형식이 나중에
+    // 어긋나는 회귀를 놓칠 수 있다).
+    @Test
+    void bulkCreateByReconciliationRunSkipsExceptionsAlreadyCreatedByValidationRunGeneration() {
+        List<Long> contractIds = jdbcTemplate.queryForList("""
+                SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
+                """, Long.class);
+        assertThat(contractIds).isNotEmpty();
+        Long contractId = contractIds.get(0);
+
+        Long validationRunId = insertValidationRun();
+        Long reconciliationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (
+                    validation_run_id, settlement_month, payment_stage, status
+                ) VALUES (?, ?, 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class, validationRunId, TEST_MONTH);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "auto-first-amount", "AMOUNT_DIFFERENCE", 100000, 90000);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "auto-first-review", "REVIEW_REQUIRED", 100000, 0);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "auto-first-matched", "MATCHED", 100000, 100000);
+
+        assertThat(exceptionCaseMapper.insertFromReconciliationResults(validationRunId))
+                .isEqualTo(2L);
+
+        ReconciliationExceptionBulkCreateRow manual =
+                exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
+        assertThat(manual.getCandidateCount()).isEqualTo(2L);
+        assertThat(manual.getCreatedCount()).isZero();
+
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case
+                 WHERE source_entity_type = 'RECONCILIATION_RESULT'
+                   AND validation_run_id = ?
+                """, Integer.class, validationRunId);
+        assertThat(count).isEqualTo(2);
     }
 
     private Long insertValidationRun() {

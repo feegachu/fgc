@@ -10,6 +10,7 @@ import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.*;
 import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
+import com.susukkang.fgc.reconciliation.service.ReconciliationExceptionService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunHistoryService;
 import com.susukkang.fgc.reconciliation.service.ReconciliationRunService;
@@ -49,6 +50,7 @@ public class ReconciliationRunController {
     private final ReconciliationRunService reconciliationRunService;
     private final ReconciliationResultQueryService reconciliationResultQueryService;
     private final ReconciliationRunHistoryService reconciliationRunHistoryService;
+    private final ReconciliationExceptionService reconciliationExceptionService;
 
     @Operation(summary = "대사 실행 이력 조회 (IF-API-39)")
     @GetMapping
@@ -117,6 +119,15 @@ public class ReconciliationRunController {
         }
         return ApiResponse.success(reconciliationResultQueryService.search(
                 reconciliationRunId, resultType, page, size, sort));
+    }
+
+    @Operation(summary = "불일치 예외 일괄 생성 (IF-API-42)")
+    @PostMapping("/{reconciliationRunId}/exceptions")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<ReconciliationExceptionBulkCreateResponse> bulkCreateExceptions(
+            @PathVariable Long reconciliationRunId
+    ) {
+        return ApiResponse.success(reconciliationExceptionService.bulkCreate(reconciliationRunId));
     }
 
     @Operation(summary = "대사 결과 상세 조회 (IF-API-41)")

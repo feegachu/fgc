@@ -7,7 +7,7 @@ UPDATE fgc.exception_case ec
        )
   FROM fgc.cap_check cc
  WHERE ec.source_entity_type = 'CAP_CHECK'
-   AND cc.cap_check_id = ec.source_entity_id::bigint;
+   AND ec.source_entity_id = CAST(cc.cap_check_id AS varchar);
 
 UPDATE fgc.exception_case ec
    SET exception_key = CONCAT(
@@ -20,4 +20,4 @@ UPDATE fgc.exception_case ec
   JOIN fgc.reconciliation_run reconciliation
     ON reconciliation.reconciliation_run_id = rr.reconciliation_run_id
  WHERE ec.source_entity_type = 'RECONCILIATION_RESULT'
-   AND rr.reconciliation_result_id = ec.source_entity_id::bigint;
+   AND ec.source_entity_id = CAST(rr.reconciliation_result_id AS varchar);

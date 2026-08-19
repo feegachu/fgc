@@ -8,7 +8,7 @@ UPDATE fgc.exception_case ec
   FROM fgc.arbitrage_check ac
  WHERE ec.exception_type = 'ARBITRAGE_CANDIDATE'
    AND ec.source_entity_type = 'ARBITRAGE_CHECK'
-   AND ac.arbitrage_check_id = ec.source_entity_id::bigint;
+   AND ec.source_entity_id = CAST(ac.arbitrage_check_id AS varchar);
 
 CREATE OR REPLACE FUNCTION fgc.record_exception_detection(
     p_exception_key varchar,
@@ -94,6 +94,13 @@ BEGIN
          WHERE occurrence.exception_case_id = v_case_id
          ORDER BY occurrence.detected_at DESC, occurrence.exception_occurrence_id DESC
          LIMIT 1;
+
+        -- exception_occurrence 행이 하나도 없으면(V23_1이 validation_run_id IS NULL인
+        -- 업무건은 occurrence를 안 만들었다) SELECT INTO가 v_evidence_changed를 NULL로
+        -- 만든다 — 초기값 false는 이 시점에 이미 덮어써진다. COALESCE 없이 그대로 쓰면
+        -- 아래 v_reopened가 NULL이 되고, exception_occurrence.was_reopened(NOT NULL)에
+        -- 그대로 들어가 저장 자체가 실패한다.
+        v_evidence_changed := COALESCE(v_evidence_changed, true);
     END IF;
 
     v_reopened := v_previous_status = 'RESOLVED'
