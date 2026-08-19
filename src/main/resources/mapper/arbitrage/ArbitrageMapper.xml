@@ -28,6 +28,24 @@
         <result property="decisionReason" column="decision_reason"/>
     </resultMap>
 
+    <!--
+      uq_arbitrage_check가 (validation_run_id, contract_id, payment_stage, as_of_date)라
+      같은 계약·지급단계·기준일이라도 검증을 다시 돌리면 행이 새로 쌓인다(인터페이스정의서
+      7-5 단계표. 게다가 IF-API-33 수동 재검증은 MANUAL_CONTRACT run을 새로 만들어 붙이므로
+      [이 계약만 다시 검증]을 누를 때마다 한 줄씩 늘어난다). 이력은 감사용으로 그대로 두되,
+      ARB-W01은 화면정의서상 계약번호·지급단계·기준일이 한 줄이고 회차 컬럼이 없으므로
+      읽을 때 그 단위의 최신 1건으로 접는다(#257 — 검토대상 10건인데 예외함은 5건이었다).
+      as_of_date가 접기 키에 들어 있어 월 필터를 나중에 걸어도 다른 달 판정에 가려지지
+      않는다 — vw_latest_cap_check가 전체 기간 최신을 먼저 골라 겪던 문제를 피한다.
+      as_of_date·contract_id 조건은 접기 키라 서브쿼리 안으로 밀려 들어가고,
+      result_status·보험사 조건은 (당연히) 접은 뒤에 걸린다.
+    -->
+    <sql id="latestArbitrageCheck">
+        (SELECT DISTINCT ON (contract_id, payment_stage, as_of_date) *
+           FROM arbitrage_check
+          ORDER BY contract_id, payment_stage, as_of_date, arbitrage_check_id DESC)
+    </sql>
+
     <!-- 목록과 요약 조회에 동일한 검색 조건을 적용한다. -->
     <sql id="arbitrageSearchCondition">
         <where>
@@ -70,7 +88,7 @@
             ac.result_status,
             ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
         FROM
-            arbitrage_check ac
+            <include refid="latestArbitrageCheck"/> ac
         JOIN
             insurance_contract c
         ON
@@ -90,7 +108,7 @@
             COUNT(*) FILTER (WHERE ac.result_status = 'CANDIDATE') AS candidate_count,
             COUNT(*) FILTER (WHERE ac.result_status = 'REVIEW_REQUIRED') AS review_required_count
         FROM
-            arbitrage_check ac
+            <include refid="latestArbitrageCheck"/> ac
         JOIN
             insurance_contract c
         ON
@@ -101,7 +119,7 @@
     <!-- 검색 조건에 해당하는 목록 페이징용 전체 건수를 조회한다. -->
     <select id="countByCondition" resultType="long">
         SELECT COUNT(*)
-        FROM arbitrage_check ac
+        FROM <include refid="latestArbitrageCheck"/> ac
         JOIN insurance_contract c
           ON c.contract_id = ac.contract_id
         <include refid="arbitrageSearchCondition"/>
@@ -326,7 +344,7 @@
             ac.result_status,
             ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
         FROM
-            arbitrage_check ac
+            <include refid="latestArbitrageCheck"/> ac
         JOIN
             insurance_contract c
         ON

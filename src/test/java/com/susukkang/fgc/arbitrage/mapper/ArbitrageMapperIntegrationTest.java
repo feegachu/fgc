@@ -108,6 +108,62 @@ class ArbitrageMapperIntegrationTest {
         assertThat(summary.getReviewRequiredCount()).isZero();
     }
 
+    /**
+     * 설명 : 같은 달을 다시 검증해도 계약·지급단계·기준일당 한 줄만 보이고,
+     *        요약 건수도 늘지 않는지 검증한다(#257 — ARB-W01 검토대상과 예외함 카드의 불일치).
+     *        uq_arbitrage_check에 validation_run_id가 들어 있어 재실행마다 행은 새로 쌓이지만,
+     *        화면정의서 ARB-W01 목록에는 회차 컬럼이 없다.
+     *
+     * @since 2026-08-19
+     */
+    @Test
+    void collapsesRerunsToLatestCheckPerContractStageAndAsOfDate() {
+        TestReference reference = testReference();
+        LocalDate asOfDate = LocalDate.of(2098, 11, 20);
+        insertArbitrageCheck(insertValidationRun(), reference.contractId(), asOfDate,
+                PaymentStage.GA_TO_FC, ArbitrageCheckStatus.CANDIDATE, "1회차 판정");
+        insertArbitrageCheck(insertValidationRun(), reference.contractId(), asOfDate,
+                PaymentStage.GA_TO_FC, ArbitrageCheckStatus.CANDIDATE, "2회차 판정");
+
+        ArbitrageCheckSearchCondition condition = condition(
+                TEST_MONTH, null, PaymentStage.GA_TO_FC, reference.insurerId());
+        condition.setContractNo(reference.contractNo());
+
+        List<ArbitrageCheckView> items = arbitrageMapper.selectByCondition(condition, 0, 20);
+        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
+
+        assertThat(items).singleElement()
+                .extracting(ArbitrageCheckView::getDecisionReason)
+                .isEqualTo("2회차 판정");
+        assertThat(arbitrageMapper.countByCondition(condition)).isEqualTo(1);
+        assertThat(summary.getCandidateCount()).isEqualTo(1);
+    }
+
+    /**
+     * 설명 : 재실행에서 판정이 뒤집히면 최신 판정만 남는지 검증한다 —
+     *        옛 행을 고르면 이미 해소된 검토대상이 목록에 남는다.
+     *
+     * @since 2026-08-19
+     */
+    @Test
+    void keepsLatestResultWhenRerunChangesJudgement() {
+        TestReference reference = testReference();
+        LocalDate asOfDate = LocalDate.of(2098, 11, 21);
+        insertArbitrageCheck(insertValidationRun(), reference.contractId(), asOfDate,
+                PaymentStage.GA_TO_FC, ArbitrageCheckStatus.CANDIDATE, "1회차 검토대상");
+        insertArbitrageCheck(insertValidationRun(), reference.contractId(), asOfDate,
+                PaymentStage.GA_TO_FC, ArbitrageCheckStatus.CLEAR, "2회차 이상없음");
+
+        ArbitrageCheckSearchCondition condition = condition(
+                TEST_MONTH, null, PaymentStage.GA_TO_FC, reference.insurerId());
+        condition.setContractNo(reference.contractNo());
+
+        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
+
+        assertThat(summary.getCandidateCount()).isZero();
+        assertThat(summary.getClearCount()).isEqualTo(1);
+    }
+
     private ArbitrageCheckSearchCondition condition(
             YearMonth month,
             ArbitrageCheckStatus status,
