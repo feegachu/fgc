@@ -250,6 +250,10 @@
     });
   }
 
+  // 2026-08-19 yslee - 검증원장 조건 조회를 명시적 조회 버튼 방식으로 변경
+  // 기존 코드: 페이지 진입 즉시 전체 원장을 조회하고 폼 제출 시 조건 조회를 실행
+  // 문제: 사용자가 조회 조건을 확정하기 전에 전체 원장 조회 요청이 발생함
+  // 개선: 초기 자동 조회를 제거하고 조회 버튼으로 제출한 조건만 1페이지부터 조회
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     state.selectedId = null;
@@ -279,5 +283,5 @@
   reverseReason.addEventListener("input", function () { reverseReasonError.hidden = Boolean(reverseReason.value.trim()); });
   reverseSubmit.addEventListener("click", submitReverse);
 
-  loadList(1);
+  renderEmpty("조회 조건을 설정하고 조회 버튼을 눌러 주세요.");
 })();

@@ -121,6 +121,18 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
+    void ledgerSearchRunsOnlyWhenFilterFormIsSubmitted() throws IOException {
+        assertThat(resource("templates/ledger/list.html"))
+                .contains("id=\"ledger-filter-form\"")
+                .contains("id=\"f-search\" type=\"submit\"");
+        assertThat(resource("static/js/features/ledger/ledger.js"))
+                .contains("form.addEventListener(\"submit\"")
+                .contains("apiClient.request(\"/api/v1/journals?\" + query(page))")
+                .contains("renderEmpty(\"조회 조건을 설정하고 조회 버튼을 눌러 주세요.\");")
+                .doesNotContain("\n  loadList(1);\n})();");
+    }
+
+    @Test
     void productionLayoutLoadsScopedResponsivePublishingStyles() throws IOException {
         assertThat(resource("templates/layout/default.html"))
                 .contains("/css/features/publishing.css");
