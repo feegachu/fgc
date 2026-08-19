@@ -106,7 +106,7 @@ class ValidationRunExecuteServiceImplTest {
         assertThat(result).isSameAs(created);
         // JobParameters는 트리거가 행 값으로 만든다 — 실행자(9L)가 아닌 행이 그대로 전달되는지
         verify(monthlyValidationJobTrigger).launch(created, "req-1");
-        verify(dailyChangedContractJobTrigger, never()).runManual(anyLong(), anyString());
+        verify(dailyChangedContractJobTrigger, never()).runManual(any(), anyLong(), anyString());
     }
 
     /** MANUAL_CONTRACT는 MonthlyValidationJob이 아니라 DailyChangedContractJob으로 가야 한다(코드리뷰 반영). */
@@ -118,9 +118,9 @@ class ValidationRunExecuteServiceImplTest {
         ValidationRunRow result = service.execute(100L, 9L, "req-1");
 
         assertThat(result).isSameAs(created);
-        // 행의 원래 생성자(triggeredBy=1L)를 그대로 넘겨야 오늘의 같은 행을 재사용한다 —
-        // 실행 버튼을 누른 사용자(9L)가 아니다.
-        verify(dailyChangedContractJobTrigger).runManual(1L, "req-1");
+        // validationRunId(100L)를 그대로 넘겨야 그 행을 정확히 이어받는다. triggeredBy도
+        // 행의 원래 생성자(1L)를 넘겨야 한다 — 실행 버튼을 누른 사용자(9L)가 아니다.
+        verify(dailyChangedContractJobTrigger).runManual(100L, 1L, "req-1");
         verify(monthlyValidationJobTrigger, never()).launch(any(), anyString());
     }
 

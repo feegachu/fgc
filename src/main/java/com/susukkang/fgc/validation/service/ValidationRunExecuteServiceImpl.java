@@ -46,12 +46,13 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
 
         // join하지 않는다 — IF-API-48은 202 즉시 반환, 진행은 IF-API-49 폴링이 본다.
         // runType별로 서로 다른 배치를 기동한다 — MANUAL_CONTRACT를 MonthlyValidationJob에
-        // 잘못 태우면 안 된다(#XXX 코드리뷰 반영). DailyChangedContractJobTrigger는 행을 직접
-        // 받지 않고 "오늘의 MANUAL_CONTRACT 실행"을 스스로 조회/재사용하므로(CreateDailyRunTasklet
-        // 이 created_at 기준으로 판정) row.getTriggeredBy()만 넘기면 이 행을 그대로 이어 탄다.
+        // 잘못 태우면 안 된다. validationRunId를 반드시 함께 넘겨야 CreateDailyRunTasklet이
+        // "오늘 생성된 아무 MANUAL_CONTRACT 행"이 아니라 지금 요청받은 이 행을 정확히 이어받는다
+        // (코드리뷰 반영 — 빠뜨리면 이 행이 오늘 생성분이 아닐 때 조용히 실패하거나, 오늘 다른
+        // MANUAL_CONTRACT 행이 있으면 그 행이 대신 진행될 수 있었다).
         try {
             if (ValidationRunType.MANUAL_CONTRACT.name().equals(row.getRunType())) {
-                dailyChangedContractJobTrigger.runManual(row.getTriggeredBy(), requestId);
+                dailyChangedContractJobTrigger.runManual(row.getValidationRunId(), row.getTriggeredBy(), requestId);
             } else {
                 monthlyValidationJobTrigger.launch(row, requestId);
             }
