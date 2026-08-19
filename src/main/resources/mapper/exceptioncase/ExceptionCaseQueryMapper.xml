@@ -49,6 +49,15 @@
         <if test="criteria.severity != null">
             AND ec.severity = #{criteria.severity}
         </if>
+        <if test="criteria.validationRunId != null">
+            AND ec.validation_run_id = #{criteria.validationRunId}
+        </if>
+        <if test="criteria.types != null and !criteria.types.isEmpty()">
+            AND ec.exception_type IN
+            <foreach item="type" collection="criteria.types" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
         <if test="statuses != null and !statuses.isEmpty()">
             AND ec.status IN
             <foreach item="status" collection="statuses" open="(" separator="," close=")">

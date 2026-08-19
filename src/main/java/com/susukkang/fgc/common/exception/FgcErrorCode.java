@@ -123,6 +123,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.validationRun.stateConflict"
     ),
+    VRUN_006(
+            "FGC-VRUN-006",
+            HttpStatus.CONFLICT,
+            "error.validationRun.idempotencyKeyConflict"
+    ),
 
     LEDG_001(
             "FGC-LEDG-001",
