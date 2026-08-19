@@ -29,9 +29,15 @@ import java.util.Map;
  * @version 1.0
  * @since 2026-08-10
  */
+// readOnly=true라 원래 롤백할 쓰기 자체가 없다. noRollbackFor가 없으면 이 서비스가 던지는
+// FgcBusinessException(POLICY_MISSING 등)이 호출자의 try/catch로 잡혀도 그 트랜잭션은 이미
+// rollback-only로 표시돼, 나중에 그 트랜잭션을 커밋하려는 다른 코드가 UnexpectedRollbackException으로
+// 죽는다 — ScheduleService.resolvePolicyOrRegisterReview()가 정확히 이 패턴으로 예외를 삼키다가
+// DailyChangedContractJob의 changedContractStep을 조용히 실패시켰다(2026-08-19 QA 중 재현).
+// CapCheckServiceImpl.calculateAndSave()가 같은 이유로 이미 noRollbackFor를 쓰고 있다.
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, noRollbackFor = FgcBusinessException.class)
 public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
     // 현재 시스템이 지원하는 7년 체계의 최대 회차이며 비정상 범위 확장을 방지한다.

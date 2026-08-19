@@ -80,7 +80,7 @@ class ChangedContractItemProcessorTest {
         assertThat(result.success()).isTrue();
         assertThat(result.contractId()).isEqualTo(1L);
         assertThat(result.pendingEventIds()).containsExactly(100L);
-        verify(scheduleService).generateSchedules(any());
+        verify(scheduleService).generateSchedulesInNewTransaction(any());
 
         // cap_check가 이 배치의 validation_run에 실제로 연결되는지 확인한다(코드리뷰 지적,
         // 2026-08-11) — CapCalculationCommand.realtime()을 그대로 썼다면 validationRunId가
@@ -102,7 +102,7 @@ class ChangedContractItemProcessorTest {
         ChangedContractResult result = processor.process(1L);
 
         assertThat(result.success()).isTrue();
-        verify(scheduleService, never()).generateSchedules(any());
+        verify(scheduleService, never()).generateSchedulesInNewTransaction(any());
         verify(capCheckService, times(2)).calculateAndSave(any(CapCalculationCommand.class));
     }
 
@@ -123,7 +123,7 @@ class ChangedContractItemProcessorTest {
         ChangedContractResult result = processor.process(1L);
 
         assertThat(result.success()).isTrue();
-        verify(scheduleService).generateSchedules(any());
+        verify(scheduleService).generateSchedulesInNewTransaction(any());
     }
 
     @Test
@@ -142,7 +142,7 @@ class ChangedContractItemProcessorTest {
         given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of(100L));
         willThrow(new FgcBusinessException(FgcErrorCode.CONT_001, Map.of()))
-                .given(scheduleService).generateSchedules(any());
+                .given(scheduleService).generateSchedulesInNewTransaction(any());
 
         ChangedContractResult result = processor.process(3L);
 
