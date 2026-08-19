@@ -46,17 +46,17 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                         "/api/v1/journals/imbalances?validationRunId=" + id),
                 condition(3, "심각도 긴급(CRITICAL) 미처리 예외가 0건인가",
                         counts.getUnresolvedCriticalExceptionCount(),
-                        "/api/v1/exceptions?validationRunId=" + id + "&severity=CRITICAL&status=OPEN"),
+                        "/exceptions?validationRunId=" + id + "&severity=CRITICAL&status=OPEN"),
                 condition(4, "정책 없음 · 정책 중복이 0건인가",
                         counts.getUnresolvedPolicyExceptionCount(),
-                        "/api/v1/exceptions?validationRunId=" + id
+                        "/exceptions?validationRunId=" + id
                                 + "&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN"),
                 condition(5, "귀속합계 오류가 0건인가",
                         counts.getAttributionImbalanceCount(),
                         "/transactions?settlementMonth=" + month + "&attributionImbalanceOnly=true"),
                 condition(6, "계약별 상세 합계 = 실행 요약 합계인가",
                         counts.getCapDetailMismatchCount(),
-                        "/validation-runs/" + id + "?section=cap-details")
+                        "/validation-runs/" + id)
         );
         return new FinalizeChecklistResponse(id,
                 conditions.stream().allMatch(FinalizeChecklistConditionResponse::passed), conditions);

@@ -50,10 +50,10 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.conditions()).extracting("linkUrl").containsExactly(
                 "/validation-runs/44",
                 "/api/v1/journals/imbalances?validationRunId=44",
-                "/api/v1/exceptions?validationRunId=44&severity=CRITICAL&status=OPEN",
-                "/api/v1/exceptions?validationRunId=44&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN",
+                "/exceptions?validationRunId=44&severity=CRITICAL&status=OPEN",
+                "/exceptions?validationRunId=44&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN",
                 "/transactions?settlementMonth=2026-08&attributionImbalanceOnly=true",
-                "/validation-runs/44?section=cap-details");
+                "/validation-runs/44");
     }
 
     private FinalizeChecklistCounts passingCounts() {
