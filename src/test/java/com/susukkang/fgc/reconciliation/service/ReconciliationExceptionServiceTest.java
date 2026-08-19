@@ -79,10 +79,27 @@ class ReconciliationExceptionServiceTest {
         verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(41L);
     }
 
+    // 실행이 아직 COMPLETED/FINALIZED가 아니면(CREATED·RUNNING·FAILED) 결과가 안정적이지
+    // 않으니 예외를 만들면 안 된다(코드리뷰 지적 — 예전엔 실행 존재 여부만 확인했다).
+    @Test
+    void throwsReco004WhenReconciliationRunIsNotCompleted() {
+        ReconciliationRunRow runningRun = runLinkedToValidationRun(41L, 900L);
+        runningRun.setStatus("RUNNING");
+        given(reconciliationRunMapper.findById(41L)).willReturn(runningRun);
+
+        assertThatThrownBy(() -> service.bulkCreate(41L))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception ->
+                        assertThat(((FgcBusinessException) exception).getErrorCode())
+                                .isEqualTo(FgcErrorCode.RECO_004));
+        verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(41L);
+    }
+
     private static ReconciliationRunRow runLinkedToValidationRun(Long reconciliationRunId, Long validationRunId) {
         ReconciliationRunRow row = new ReconciliationRunRow();
         row.setReconciliationRunId(reconciliationRunId);
         row.setValidationRunId(validationRunId);
+        row.setStatus("COMPLETED");
         return row;
     }
 }
