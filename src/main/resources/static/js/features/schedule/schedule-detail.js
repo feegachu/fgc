@@ -9,6 +9,27 @@
   var regenerateButton = document.getElementById("btn-regenerate");
   var regenerateReason = document.getElementById("regenerate-reason");
   var regenerateSubmit = document.getElementById("btn-regenerate-submit");
+  var PAYMENT_STAGE_LABELS = { INSURER_TO_GA: "원수사→GA", GA_TO_FC: "GA→설계사" };
+  var SCHEDULE_REGIME_LABELS = {
+    CURRENT: "현행",
+    FOUR_YEAR_2027: "4년 분급(2027)",
+    SEVEN_YEAR_2029: "7년 분급(2029)",
+    TM_SPECIAL: "TM 특례"
+  };
+  var SCHEDULE_PURPOSE_LABELS = {
+    OPERATIONAL: "운영",
+    COMPARISON: "비교",
+    SIMULATION: "시뮬레이션"
+  };
+  var SCHEDULE_STATUS_LABELS = {
+    PLANNED: "예정",
+    CONFIRMED: "확정",
+    MATCHED: "대사일치",
+    ADJUSTED: "조정완료",
+    HOLD: "보류",
+    CANCELLED: "취소",
+    RESTARTED: "재개"
+  };
 
   if (!main || !lineBody || !apiClient) return;
 
@@ -54,11 +75,11 @@
     setText("hdr-id", "schedule_header #" + value(header.scheduleHeaderId));
     setText("hdr-contract", header.contractNo);
     setText("hdr-product", "—");
-    setText("hdr-stage", label({ INSURER_TO_GA: "원수사→GA", GA_TO_FC: "GA→설계사" }, header.paymentStage));
-    setText("hdr-regime", label({ CURRENT: "현행", FOUR_YEAR: "4년 분급", SEVEN_YEAR: "7년 분급" }, header.scheduleRegime));
-    setText("hdr-purpose", label({ OPERATIONAL: "운영", SIMULATION: "비교·시뮬레이션" }, header.schedulePurpose));
+    setText("hdr-stage", responseLabel(header.paymentStageLabel, PAYMENT_STAGE_LABELS, header.paymentStage));
+    setText("hdr-regime", responseLabel(header.scheduleRegimeLabel, SCHEDULE_REGIME_LABELS, header.scheduleRegime));
+    setText("hdr-purpose", responseLabel(header.schedulePurposeLabel, SCHEDULE_PURPOSE_LABELS, header.schedulePurpose));
     setText("hdr-version", header.scheduleVersionNo == null ? "—" : "v" + header.scheduleVersionNo);
-    setText("hdr-status", label({ PLANNED: "예정", CONFIRMED: "확정", MATCHED: "대사일치", ADJUSTED: "조정" }, header.status));
+    setText("hdr-status", responseLabel(header.statusLabel, SCHEDULE_STATUS_LABELS, header.status));
     setText("hdr-active", header.activeYn === true ? "사용중" : "미사용");
     setText("hdr-policy", header.policyVersionLabel);
     setText("hdr-reason", join(header.generationReason, formatDateTime(header.generatedAt)));
@@ -208,10 +229,7 @@
       versionCell.appendChild(link);
       row.appendChild(versionCell);
 
-      appendCell(row, label({
-        PLANNED: "예정", CONFIRMED: "확정", MATCHED: "매칭", ADJUSTED: "조정",
-        HOLD: "보류", CANCELLED: "취소", RESTARTED: "재개"
-      }, version.status));
+      appendCell(row, responseLabel(version.statusLabel, SCHEDULE_STATUS_LABELS, version.status));
       appendCell(row, version.activeYn === true ? "사용중" : "미사용");
       appendCell(row, version.policyVersionLabel);
       appendCell(row, version.generationReason);
@@ -300,6 +318,12 @@
 
   function label(labels, code) {
     return labels[code] || value(code);
+  }
+
+  function responseLabel(serverLabel, labels, code) {
+    return typeof serverLabel === "string" && serverLabel.trim()
+      ? serverLabel
+      : label(labels, code);
   }
 
   function join(first, second) {
