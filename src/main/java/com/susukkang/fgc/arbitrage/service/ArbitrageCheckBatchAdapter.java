@@ -24,7 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ArbitrageCheckBatchAdapter implements ArbitrageCheckBatchPort {
     private final ArbitrageMapper arbitrageMapper;
-    private final ArbitrageService arbitrageService;
+    private final ArbitrageCheckBatchItemService arbitrageCheckBatchItemService;
 
     @Override
     public StepProcessingResult check(ValidationStepContext context) {
@@ -36,7 +36,10 @@ public class ArbitrageCheckBatchAdapter implements ArbitrageCheckBatchPort {
 
         for (Long contractId : contractIds) {
             try {
-                arbitrageService.checkInExistingRun(
+                // REQUIRES_NEW — 이 계약만 실패해도 청크(다른 계약들)의 트랜잭션을
+                // rollback-only로 오염시키지 않는다(아래 catch의 skip이 실제로 동작하려면 필수,
+                // #266 changedContractStep과 동일한 근본 원인).
+                arbitrageCheckBatchItemService.process(
                         context.validationRunId(), contractId, asOfDate);
                 processedCount++;
             } catch (FgcBusinessException exception) {

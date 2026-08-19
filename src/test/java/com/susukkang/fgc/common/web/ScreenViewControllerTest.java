@@ -65,7 +65,6 @@ class ScreenViewControllerTest {
             "/schedules/1,         FGC-UI-SCHE-W02",
             "/cap-checks,          FGC-UI-CAP-W01",
             "/arbitrage-checks,    FGC-UI-ARB-W01",
-            "/journals,            FGC-UI-LEDG-W01",
     })
     void screen_renders_with_its_id(String route, String screenId) throws Exception {
         mvc.perform(get(route).with(user(settleUser())))

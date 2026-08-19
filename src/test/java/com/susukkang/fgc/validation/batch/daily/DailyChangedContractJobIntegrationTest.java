@@ -59,16 +59,52 @@ class DailyChangedContractJobIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        createdValidationRunIds.forEach(id -> jdbcTemplate.update(
-                "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", id));
+        // changedContractStep이 실제로 계약을 처리하면(스케줄 재생성 → 1,200% 검사 → 위반 시
+        // 예외 생성까지) 이 validation_run을 참조하는 자식 행이 여러 테이블에 걸쳐 생긴다
+        // (2026-08-19 트랜잭션 격리 수정 이후 changedContractStep이 실제로 성공하면서 드러남).
+        // exception_occurrence·exception_action·contract_status_event_processing은 append-only라
+        // DB 트리거가 DELETE 자체를 거부한다 — 그런 자식이 남아 있으면 이 validation_run은
+        // 못 지우고 테스트 DB에 남는다(append-only 설계상 의도된 트레이드오프). 정리 실패가
+        // 테스트 자체를 실패시키지 않도록 최선을 다해 지우고 나머지는 조용히 넘어간다.
+        createdValidationRunIds.forEach(id -> {
+            try {
+                jdbcTemplate.update(
+                        "DELETE FROM fgc.cap_check_detail WHERE cap_check_id IN "
+                                + "(SELECT cap_check_id FROM fgc.cap_check WHERE validation_run_id = ?)", id);
+                jdbcTemplate.update("DELETE FROM fgc.cap_check WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("DELETE FROM fgc.arbitrage_check WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("DELETE FROM fgc.journal_header WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("DELETE FROM fgc.reconciliation_run WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("DELETE FROM fgc.acquisition_cost_check WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("DELETE FROM fgc.maintenance_check WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("UPDATE fgc.schedule_header SET validation_run_id = NULL WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("DELETE FROM fgc.validation_target WHERE validation_run_id = ?", id);
+                jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE validation_run_id = ?"
+                        + " OR first_detected_run_id = ? OR last_detected_run_id = ?", id, id, id);
+                jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", id);
+            } catch (org.springframework.dao.DataAccessException ignored) {
+                // append-only 자식(위 주석 참고) 때문에 끝까지 못 지우면 이 실행은 테스트 DB에
+                // 남는다 — 정리 실패를 테스트 실패로 번지게 하지 않는다.
+            }
+        });
     }
 
     // MonthlyValidationJobIntegrationTest와 같은 이유로 매번 새 JobInstance가 되도록 requestId를
     // 무작위로 바꾼다. validationMonth는 CreateDailyRunTasklet이 실제로 쓰지 않는 필드지만
     // MonthlyValidationJobParameters 파싱 규칙(yyyy-MM, STRICT)은 통과해야 한다.
+    //
+    // 이 값은 고정 문자열("2031-03")이었다가 매번 무작위로 바꾸도록 고쳤다 — changedContractStep이
+    // 실제로 성공하면(2026-08-19 트랜잭션 격리 수정 이후) 그 validation_run에 append-only 자식
+    // 행(exception_occurrence 등)이 남을 수 있어 cleanUp()이 그 행을 못 지우고 남겨 두는데,
+    // 고정 월을 계속 재사용하면 다음 실행이 uq_validation_run(validation_month, run_no)에 걸리고
+    // (해당 실행뿐 아니라 같은 월·회차를 쓰는 다른 통합테스트와도 충돌할 수 있다 — CI에서
+    // ValidationRunDetailMapperIntegrationTest와 실제로 충돌 재현됨) 무작위 월을 쓰면 이 문제를
+    // 피한다.
     private JobParameters jobParameters(String requestId) {
+        int year = 2040 + ThreadLocalRandom.current().nextInt(60);
+        int month = 1 + ThreadLocalRandom.current().nextInt(12);
         return new JobParametersBuilder()
-                .addString("validationMonth", "2031-03")
+                .addString("validationMonth", String.format("%04d-%02d", year, month))
                 .addLong("runNo", 1L)
                 .addString("runType", "MANUAL_CONTRACT")
                 .addLong("triggeredBy", 3L)
