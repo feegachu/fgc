@@ -24,10 +24,6 @@
   <header class="page-header policy-page-header">
     <div class="page-header-copy">
       <h1 class="page-title">정책 · 룰셋 조회</h1>
-      <p class="page-description">
-        수수료를 얼마나 줄지, 무엇을 1,200% 한도에 넣을지를 정해 둔 <strong>규칙표</strong>입니다.
-        계산에 쓰이는 모든 숫자는 코드가 아니라 여기서 읽습니다(COR-004).
-      </p>
     </div>
     <div class="field policy-date-field">
       <label class="field-label" for="as-of">적용 기준일</label>
@@ -81,8 +77,30 @@
                      th:aria-label="|${v.policyName()} v${v.versionNo()} 선택|"
                      data-policy-select>
             </td>
-            <td class="tabular-nums" th:text="${v.policyCode()}">REG-CAP-GA-2026-V1</td>
-            <td th:text="${v.policyName()}">정책 이름</td>
+            <td class="tabular-nums policy-disclosure-cell">
+              <span th:if="${#strings.isEmpty(v.policyCode()) or #strings.length(v.policyCode()) <= 22}"
+                    th:text="${v.policyCode()} ?: '-'">REG-CAP-GA-2026-V1</span>
+              <div class="table-cell-disclosure"
+                   th:if="${!#strings.isEmpty(v.policyCode()) and #strings.length(v.policyCode()) > 22}">
+                <span class="table-cell-preview is-single-line" th:text="${v.policyCode()}">정책코드</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${v.policyCode()}">정책코드</p>
+                </details>
+              </div>
+            </td>
+            <td class="policy-disclosure-cell">
+              <span th:if="${#strings.isEmpty(v.policyName()) or #strings.length(v.policyName()) <= 28}"
+                    th:text="${v.policyName()} ?: '-'">정책 이름</span>
+              <div class="table-cell-disclosure"
+                   th:if="${!#strings.isEmpty(v.policyName()) and #strings.length(v.policyName()) > 28}">
+                <span class="table-cell-preview" th:text="${v.policyName()}">정책 이름</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${v.policyName()}">정책 이름</p>
+                </details>
+              </div>
+            </td>
             <td th:text="${v.policyTypeLabel()}">1,200% 한도</td>
             <td><span class="status-badge" th:classappend="${v.sourceClass().badgeClass()}"
                       th:text="${v.sourceClassLabel()}">규제</span></td>
@@ -91,10 +109,18 @@
             <td class="tabular-nums" th:text="${v.effectiveTo()} ?: '계속'">계속</td>
             <td><span class="status-badge" th:classappend="${v.status().badgeClass()}"
                       th:text="${v.statusLabel()}">적용중</span></td>
-            <td>
+            <td class="policy-disclosure-cell" th:with="referenceText=${#strings.listJoin(v.regulationRefs(), ' · ')}">
               <span th:if="${#lists.isEmpty(v.regulationRefs())}" class="status-badge status-badge-neutral">근거 미기재</span>
-              <span th:unless="${#lists.isEmpty(v.regulationRefs())}" class="tabular-nums"
-                    th:text="${#strings.listJoin(v.regulationRefs(), ' · ')}">REG-08 · REG-09</span>
+              <span th:if="${!#lists.isEmpty(v.regulationRefs()) and #strings.length(referenceText) <= 28}"
+                    class="tabular-nums" th:text="${referenceText}">REG-08 · REG-09</span>
+              <div class="table-cell-disclosure"
+                   th:if="${!#lists.isEmpty(v.regulationRefs()) and #strings.length(referenceText) > 28}">
+                <span class="table-cell-preview" th:text="${referenceText}">REG-08 · REG-09</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full tabular-nums" th:text="${referenceText}">REG-08 · REG-09</p>
+                </details>
+              </div>
             </td>
           </tr>
           <tr class="policy-state-row" th:if="${#lists.isEmpty(policyVersions)}">
