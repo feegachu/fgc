@@ -2,6 +2,7 @@ package com.susukkang.fgc.schedule.controller;
 
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
+import com.susukkang.fgc.common.web.CsvExportWriter;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.schedule.dto.*;
 import com.susukkang.fgc.schedule.service.ScheduleService;
@@ -9,6 +10,16 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -30,6 +41,51 @@ public class ScheduleController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.success(scheduleService.selectByCondition(condition,page,size));
+    }
+
+    /** SCHE-W01 검색 결과 전체를 CSV로 내려받는다. */
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> exportSchedules(@ModelAttribute @Valid ScheduleSearchCondition condition) {
+        List<List<?>> rows = new ArrayList<>();
+        for (ScheduleHeaderResponse schedule : scheduleService.selectAllByCondition(condition)) {
+            rows.add(CsvExportWriter.row(
+                    schedule.getContractNo(), schedule.getPaymentStageLabel(), schedule.getScheduleRegimeLabel(),
+                    schedule.getSchedulePurposeLabel(), schedule.getStatusLabel(), schedule.getPolicyVersionLabel(),
+                    schedule.getScheduleVersionNo(), schedule.getLineCount(), schedule.getExpectedTotal(),
+                    Boolean.TRUE.equals(schedule.getActiveYn()) ? "사용중" : "미사용",
+                    schedule.getGenerationReason(), schedule.getGeneratedAt()
+            ));
+        }
+        String filename = "예상스케줄목록_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(CsvExportWriter.write(List.of(
+                        "계약번호", "지급단계", "적용 체계", "용도", "상태", "정책 버전", "버전", "회차 수", "예상 총액", "사용 여부", "생성 사유", "생성 일시"
+                ), rows));
+    }
+
+    /** SCHE-W02의 회차 표 전체를 CSV로 내려받는다. */
+    @GetMapping(value = "/{scheduleHeaderId}/export.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> exportScheduleLines(@PathVariable Long scheduleHeaderId) {
+        ScheduleDetailResponse detail = scheduleService.selectScheduleDetailById(scheduleHeaderId);
+        List<List<?>> rows = new ArrayList<>();
+        List<ScheduleLineResponse> lines = detail.getLines() == null ? List.of() : detail.getLines();
+        for (ScheduleLineResponse line : lines) {
+            rows.add(CsvExportWriter.row(
+                    line.getLineNo(), line.getInstallmentNo(), line.getContractMonthNo(), line.getDueDate(),
+                    line.getCommissionItemName(), line.getRecipientName(), line.getBasisCode(), line.getBasisAmount(),
+                    line.getCalculationType(), line.getRatePct(), line.getExpectedAmount(), line.getLineStatus(), line.getRuleRef()
+            ));
+        }
+        String filename = "예상스케줄_" + detail.getHeader().getContractNo() + "_v"
+                + detail.getHeader().getScheduleVersionNo() + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(CsvExportWriter.write(List.of(
+                        "줄번호", "회차", "계약차월", "지급예정일", "수수료 항목", "수령자", "기준코드", "기준금액", "계산방식", "요율", "예상금액", "상태", "수수료 규칙 ID"
+                ), rows));
     }
 
     /**

@@ -38,9 +38,19 @@
   var resultCount = document.querySelector("[data-schedule-result-count]");
   var pageSizeText = document.querySelector("[data-schedule-page-size]");
   var dataWarning = document.querySelector("[data-schedule-data-warning]");
+  var exportButton = document.getElementById("btn-schedule-export");
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
 
   if (!form || !table || !tableBody || !pagination || !previousButton || !nextButton) return;
+
+  if (exportButton) {
+    exportButton.addEventListener("click", function () {
+      var parameters = new URLSearchParams(window.location.search);
+      parameters.delete("page");
+      parameters.delete("size");
+      window.location.assign("/api/v1/schedules/export.csv" + (parameters.size ? "?" + parameters.toString() : ""));
+    });
+  }
 
   var PAGE_SIZE = 20;
   var FILTER_NAMES = ["contractNo", "stage", "regime", "purpose", "status"];
@@ -351,16 +361,15 @@
     currentPageText.textContent = String(page);
     totalPagesText.textContent = String(displayedTotalPages);
     renderPageNumbers(page, displayedTotalPages);
-    setPageButton(previousButton, page <= 1);
-    setPageButton(nextButton, totalPages === 0 || page >= totalPages);
+    setPageButton(previousButton, pageGroupStart(page) === 1);
+    setPageButton(nextButton, totalPages === 0 || pageGroupStart(page) + 5 > totalPages);
     pagination.hidden = false;
   }
 
   function renderPageNumbers(page, totalPages) {
     pageNumbers.replaceChildren();
-    var start = Math.max(1, page - 2);
+    var start = pageGroupStart(page);
     var end = Math.min(totalPages, start + 4);
-    start = Math.max(1, end - 4);
     for (var current = start; current <= end; current += 1) {
       var button = document.createElement("button");
       button.type = "button";
@@ -376,6 +385,10 @@
       })(current);
       pageNumbers.appendChild(button);
     }
+  }
+
+  function pageGroupStart(page) {
+    return Math.floor((page - 1) / 5) * 5 + 1;
   }
 
   function renderPage(pageData) {
@@ -448,15 +461,17 @@
   });
 
   previousButton.addEventListener("click", function () {
-    if (!currentState || currentState.page <= 1) return;
-    currentState.page -= 1;
+    if (!currentState) return;
+    var previousGroupLastPage = pageGroupStart(currentState.page) - 1;
+    if (previousGroupLastPage < 1) return;
+    currentState.page = previousGroupLastPage;
     updateBrowserUrl(currentState, false);
     load(currentState);
   });
 
   nextButton.addEventListener("click", function () {
     if (!currentState || nextButton.disabled) return;
-    currentState.page += 1;
+    currentState.page = pageGroupStart(currentState.page) + 5;
     updateBrowserUrl(currentState, false);
     load(currentState);
   });

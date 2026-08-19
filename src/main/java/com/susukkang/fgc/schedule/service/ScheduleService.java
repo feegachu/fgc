@@ -932,6 +932,17 @@ public class ScheduleService {
         return agentId;
     }
 
+    @Transactional(readOnly = true)
+    public List<ScheduleHeaderResponse> selectAllByCondition(ScheduleSearchCondition condition) {
+        if (condition == null) {
+            condition = new ScheduleSearchCondition();
+        }
+        if (condition.getPurpose() == null) {
+            condition.setPurpose(SchedulePurpose.OPERATIONAL);
+        }
+        return scheduleMapper.selectAllByCondition(condition);
+    }
+
     private String agentRankLabel(AgentRankCode agentRankCode) {
         return switch (agentRankCode) {
             case FC -> "설계사";

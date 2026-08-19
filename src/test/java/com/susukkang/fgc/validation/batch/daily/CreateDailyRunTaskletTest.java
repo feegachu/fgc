@@ -66,27 +66,41 @@ class CreateDailyRunTaskletTest {
         BatchWatermarkRow watermark = new BatchWatermarkRow();
         watermark.setJobName(DailyChangedContractJobNames.JOB_NAME);
         watermark.setLastProcessedAt(seededWatermark);
-        given(batchWatermarkMapper.findByJobNameAndStepName(
-                DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME))
-                .willReturn(watermark);
+        // lenient — 요청된 validationRunId가 재실행 대상이 아니어서 조기 실패하는 테스트들은
+        // 이 지점까지 도달하지 않아 스텁이 안 쓰인다.
+        org.mockito.Mockito.lenient().when(batchWatermarkMapper.findByJobNameAndStepName(
+                        DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME))
+                .thenReturn(watermark);
     }
 
     private ChunkContext newChunkContext() {
-        JobParameters parameters = new JobParametersBuilder()
+        return newChunkContext(null);
+    }
+
+    private ChunkContext newChunkContext(Long requestedValidationRunId) {
+        JobParametersBuilder builder = new JobParametersBuilder()
                 .addString("validationMonth", "2026-08")
                 .addLong("runNo", 1L)
                 .addString("runType", "MANUAL_CONTRACT")
                 .addLong("triggeredBy", 1L)
-                .addString("requestId", "req-1")
-                .toJobParameters();
-        JobExecution jobExecution = new JobExecution(new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), parameters);
+                .addString("requestId", "req-1");
+        if (requestedValidationRunId != null) {
+            builder.addLong("validationRunId", requestedValidationRunId);
+        }
+        JobExecution jobExecution = new JobExecution(
+                new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), builder.toJobParameters());
         StepExecution stepExecution = new StepExecution("createDailyRunStep", jobExecution);
         return new ChunkContext(new StepContext(stepExecution));
     }
 
     private ValidationRunRow runWithStatus(ValidationRunStatus status) {
+        return runWithStatus(status, "MANUAL_CONTRACT");
+    }
+
+    private ValidationRunRow runWithStatus(ValidationRunStatus status, String runType) {
         ValidationRunRow row = new ValidationRunRow();
         row.setValidationRunId(42L);
+        row.setRunType(runType);
         row.setStatus(status.name());
         return row;
     }
@@ -178,6 +192,56 @@ class CreateDailyRunTaskletTest {
         verify(lifecycleService, never()).start(eq(42L), any());
         verify(validationRunTransitionService, never()).transition(anyLong(), any());
         assertThat(ValidationRunBatchContext.getValidationRunId(chunkContext)).isEqualTo(77L);
+    }
+
+    /** validationRunId가 지정되면 날짜창 조회 없이 그 행을 바로 이어받는다(코드리뷰 반영). */
+    @Test
+    void requestedValidationRunIdResumesThatRowDirectly() {
+        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.CREATED));
+
+        ChunkContext chunkContext = newChunkContext(42L);
+        RepeatStatus result = tasklet.execute(null, chunkContext);
+
+        assertThat(result).isEqualTo(RepeatStatus.FINISHED);
+        verify(lifecycleService).start(eq(42L), any());
+        verify(validationRunMapper, never()).findManualContractRunCreatedBetween(any(), any());
+        assertThat(ValidationRunBatchContext.getValidationRunId(chunkContext)).isEqualTo(42L);
+    }
+
+    /** 지정된 행이 오늘 생성분이 아니어도(=날짜창 조회로는 못 찾는 행이어도) 그대로 이어받는다. */
+    @Test
+    void requestedValidationRunIdResumesRowNotCreatedToday() {
+        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.CREATED));
+        // 날짜창 조회는 아예 스텁하지 않는다 — 호출되면 Mockito가 null을 돌려주므로
+        // resolveOrCreateTodaysRun 경로로 잘못 빠지면 이 테스트가 실패한다(create 미스텁이라 NPE).
+
+        tasklet.execute(null, newChunkContext(42L));
+
+        verify(lifecycleService).start(eq(42L), any());
+        verify(validationRunCreateService, never()).create(any());
+    }
+
+    /** 지정된 행이 이미 다른 상태로 넘어갔으면(경쟁 등) 조용히 다른 행을 만들지 않고 명확히 실패한다. */
+    @Test
+    void requestedValidationRunIdThatIsNoLongerCreatedFailsLoudly() {
+        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.RUNNING));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> tasklet.execute(null, newChunkContext(42L)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(lifecycleService, never()).start(anyLong(), any());
+        verify(validationRunCreateService, never()).create(any());
+    }
+
+    /** 지정된 행이 MANUAL_CONTRACT가 아니면(운영 실수로 잘못된 id가 넘어온 경우) 명확히 실패한다. */
+    @Test
+    void requestedValidationRunIdWithWrongRunTypeFailsLoudly() {
+        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.CREATED, "MONTHLY"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> tasklet.execute(null, newChunkContext(42L)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(lifecycleService, never()).start(anyLong(), any());
     }
 
     @Test

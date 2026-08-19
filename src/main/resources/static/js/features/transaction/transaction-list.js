@@ -81,8 +81,8 @@ if (typeof module !== "undefined" && module.exports) {
     updateUrl();
     load();
   });
-  previousButton.addEventListener("click", function () { changePage(state.page - 1); });
-  nextButton.addEventListener("click", function () { changePage(state.page + 1); });
+  previousButton.addEventListener("click", function () { changePage(pageGroupStart(state.page) - 1); });
+  nextButton.addEventListener("click", function () { changePage(pageGroupStart(state.page) + 5); });
 
   load();
 
@@ -212,16 +212,15 @@ if (typeof module !== "undefined" && module.exports) {
     currentPageText.textContent = page;
     totalPagesText.textContent = totalPages;
     renderPageNumbers(page, totalPages);
-    previousButton.disabled = page <= 1;
-    nextButton.disabled = page >= totalPages;
+    previousButton.disabled = pageGroupStart(page) === 1;
+    nextButton.disabled = pageGroupStart(page) + 5 > totalPages;
     pagination.hidden = number(pageData.totalElements) === 0;
   }
 
   function renderPageNumbers(page, totalPages) {
     pageNumbers.replaceChildren();
-    var start = Math.max(1, page - 2);
+    var start = pageGroupStart(page);
     var end = Math.min(totalPages, start + 4);
-    start = Math.max(1, end - 4);
     for (var current = start; current <= end; current += 1) {
       var button = document.createElement("button");
       button.type = "button";
@@ -231,6 +230,10 @@ if (typeof module !== "undefined" && module.exports) {
       else (function (target) { button.addEventListener("click", function () { changePage(target); }); })(current);
       pageNumbers.appendChild(button);
     }
+  }
+
+  function pageGroupStart(page) {
+    return Math.floor((page - 1) / 5) * 5 + 1;
   }
 
   function changePage(page) {
