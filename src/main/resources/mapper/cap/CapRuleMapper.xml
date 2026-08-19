@@ -50,6 +50,7 @@
                ci.item_name               AS itemName,
                cri.inclusion_status       AS inclusionStatus,
                cri.exclusion_type         AS exclusionType,
+               cri.evidence_required_yn   AS evidenceRequiredYn,
                cri.attribution_method     AS attributionMethod,
                cri.decision_reason        AS decisionReason
           FROM fgc.cap_rule_item cri

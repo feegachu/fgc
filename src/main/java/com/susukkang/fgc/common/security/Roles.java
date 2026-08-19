@@ -33,6 +33,10 @@ public final class Roles {
     public static final String CAN_REVERSE_JOURNAL =
             "hasAnyRole('" + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
+    /** IF-API-51 검증 실행 확정. 정산 처리 권한과 다른 별도 관리자 조합이다. */
+    public static final String CAN_FINALIZE_VALIDATION =
+            "hasAnyRole('" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+
     /**
      * "전체 조회" API용(기준정보 등). 사실상 authenticated()와 같지만, 역할 4종을 명시해
      * 새 역할이 추가될 때 조회 범위를 다시 판단하도록 강제한다.

@@ -18,15 +18,10 @@ class PendingActionButtonStructureTest {
         assertThat(template).contains("엑셀 다운로드는 API 화면 연동 대기입니다.");
     }
 
-    /** FGC-FUN-048, FGC-FUN-049, FGC-FUN-050, FGC-FUN-051, FGC-FUN-052 */
-    @Test
-    void reconciliationActionsStayDisabledUntilApiIntegration() throws IOException {
-        String template = resource("templates/reco/list.html");
-
-        assertPendingButton(template, "btn-run", "reconciliation-actions-pending");
-        assertPendingButton(template, "btn-bulk-exception", "reconciliation-actions-pending");
-        assertThat(template).contains("대사 실행과 불일치 예외 일괄 생성은 API 연동 대기입니다.");
-    }
+    /**
+     * FGC-FUN-048~052 — RECO-W01 실행·예외생성 버튼은 #205에서 IF-API-38·42로 연동됐다.
+     * 버튼의 활성/비활성 규칙(SETTLEMENT만 활성)은 ReconciliationViewControllerTest가 검증한다.
+     */
 
     /**
      * FGC-FUN-044 — 확정(IF-API-51)만 아직 미연동이라 pending 을 유지한다.

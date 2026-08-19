@@ -17,6 +17,7 @@ import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import com.susukkang.fgc.validation.service.ValidationRunDetailService;
 import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
+import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,8 +45,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * FGC-FUN-042·043 — IF-API-47(상세)·48(실행)·49(진행률) 웹 슬라이스.
- * 인증/인가, 상태코드, envelope 매핑만 검증. 서비스는 mock (ValidationRunControllerTest와 같은 패턴).
+ * 설명 : FGC-FUN-042·043 IF-API-47·48·49 웹 슬라이스 테스트
+ *
+ * @author yslee
+ * @since 2026-08-19
+ * @version 1.2
  */
 @WebMvcTest(ValidationRunController.class)
 @Import({ValidationRunController.class, GlobalExceptionHandler.class, FgcMessageResolver.class,
@@ -66,6 +70,13 @@ class ValidationRunDetailControllerTest {
 
     @MockitoBean
     private ValidationRunExecuteService validationRunExecuteService;
+
+    // 2026-08-19 yslee - 확정 API 추가 후 기존 컨트롤러 슬라이스 의존성 보완
+    // 기존 코드: 상세·실행·진행률 서비스만 mock으로 등록
+    // 문제: 동일 컨트롤러 생성자에 확정 서비스가 추가되어 웹 슬라이스 컨텍스트 생성 실패
+    // 개선: 이 테스트에서 직접 사용하지 않아도 생성자 의존성을 충족하도록 mock 등록
+    @MockitoBean
+    private ValidationRunFinalizationService validationRunFinalizationService;
 
     private FgcUserDetails settlementPrincipal() {
         AppUserView appUserView = new AppUserView();
@@ -97,7 +108,8 @@ class ValidationRunDetailControllerTest {
                 new ValidationRunDetailResponse.CapSummary(6, 1, 2, 0),
                 new ValidationRunDetailResponse.ArbitrageSummary(3, 1, 0),
                 new ValidationRunDetailResponse.LedgerSummary(4, 0),
-                new ValidationRunDetailResponse.ReconciliationSummary(8, 2, 6, 2, 0, java.math.BigDecimal.valueOf(15000)));
+                new ValidationRunDetailResponse.ReconciliationSummary(8, 2, 6, 2, 0, java.math.BigDecimal.valueOf(15000)),
+                new ValidationRunDetailResponse.ExceptionSummary(49, 0, 49, 0, 0, 49));
     }
 
     private ValidationRunRow createdRow() {
@@ -132,7 +144,11 @@ class ValidationRunDetailControllerTest {
                 .andExpect(jsonPath("$.data.reconciliationSummary.matchedCount").value(6))
                 .andExpect(jsonPath("$.data.reconciliationSummary.mismatchedCount").value(2))
                 .andExpect(jsonPath("$.data.reconciliationSummary.unmatchedCount").value(0))
-                .andExpect(jsonPath("$.data.reconciliationSummary.differenceAmountTotal").value(15000));
+                .andExpect(jsonPath("$.data.reconciliationSummary.differenceAmountTotal").value(15000))
+                .andExpect(jsonPath("$.data.exceptionSummary.detectedCount").value(49))
+                .andExpect(jsonPath("$.data.exceptionSummary.newCount").value(0))
+                .andExpect(jsonPath("$.data.exceptionSummary.recurringCount").value(49))
+                .andExpect(jsonPath("$.data.exceptionSummary.openWorkItemCount").value(49));
     }
 
     @Test

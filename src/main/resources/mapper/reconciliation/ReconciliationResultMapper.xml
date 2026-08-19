@@ -238,6 +238,7 @@
         SELECT match.match_seq AS matchSeq,
                match.match_role AS matchRole,
                match.schedule_line_id AS scheduleLineId,
+               line.schedule_header_id AS scheduleHeaderId,
                match.transaction_attribution_id AS transactionAttributionId,
                transaction.commission_transaction_id AS commissionTransactionId,
                COALESCE(expected_journal.journal_header_id, actual_journal.journal_header_id) AS journalHeaderId,

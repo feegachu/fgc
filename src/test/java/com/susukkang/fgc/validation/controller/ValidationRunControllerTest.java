@@ -10,10 +10,14 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistConditionResponse;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
+import com.susukkang.fgc.validation.dto.FinalizeValidationRunResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import com.susukkang.fgc.validation.service.ValidationRunDetailService;
 import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
+import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,13 +28,18 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -63,6 +72,9 @@ class ValidationRunControllerTest {
     @MockitoBean
     private ValidationRunExecuteService validationRunExecuteService;
 
+    @MockitoBean
+    private ValidationRunFinalizationService validationRunFinalizationService;
+
     private ValidationRunRow createdRow() {
         ValidationRunRow row = new ValidationRunRow();
         row.setValidationRunId(100L);
@@ -79,6 +91,16 @@ class ValidationRunControllerTest {
         appUserView.setPasswordHash("{bcrypt}dummy");
         appUserView.setUserName("정산담당자");
         appUserView.setRoleCode("SETTLEMENT");
+        return new FgcUserDetails(appUserView, true, true);
+    }
+
+    private FgcUserDetails principal(long userId, String loginId, String roleCode) {
+        AppUserView appUserView = new AppUserView();
+        appUserView.setUserId(userId);
+        appUserView.setLoginId(loginId);
+        appUserView.setPasswordHash("{bcrypt}dummy");
+        appUserView.setUserName(loginId);
+        appUserView.setRoleCode(roleCode);
         return new FgcUserDetails(appUserView, true, true);
     }
 
@@ -195,5 +217,71 @@ class ValidationRunControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void checklistIsReadableBySettlementRole() throws Exception {
+        given(validationRunFinalizationService.getChecklist(100L)).willReturn(
+                new FinalizeChecklistResponse(100L, true, List.of(
+                        new FinalizeChecklistConditionResponse(
+                                1, "검증 실행 상태가 계산완료(COMPLETED)인가", true, 0, "/validation-runs/100"))));
+
+        mockMvc.perform(get("/api/v1/validation-runs/100/finalize-checklist")
+                        .with(user(settlementPrincipal())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.validationRunId").value(100))
+                .andExpect(jsonPath("$.data.passed").value(true))
+                .andExpect(jsonPath("$.data.conditions[0].no").value(1));
+    }
+
+    @Test
+    void systemAdminCanFinalizeWithIdempotencyKey() throws Exception {
+        OffsetDateTime finalizedAt = OffsetDateTime.parse("2026-08-16T12:34:56+09:00");
+        given(validationRunFinalizationService.finalizeRun(100L, 4L, "finalize-100"))
+                .willReturn(new FinalizeValidationRunResponse("FINALIZED", finalizedAt, "admin"));
+
+        mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
+                        .header("Idempotency-Key", "finalize-100")
+                        .with(user(principal(4L, "admin", "SYSTEM_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("FINALIZED"))
+                .andExpect(jsonPath("$.data.finalizedBy").value("admin"))
+                .andExpect(jsonPath("$.data.finalizedAt").value("2026-08-16T12:34:56+09:00"));
+    }
+
+    @Test
+    void gaAdminCanFinalize() throws Exception {
+        given(validationRunFinalizationService.finalizeRun(100L, 2L, "ga-finalize-100"))
+                .willReturn(new FinalizeValidationRunResponse(
+                        "FINALIZED", OffsetDateTime.parse("2026-08-16T12:34:56+09:00"), "gaadmin"));
+
+        mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
+                        .header("Idempotency-Key", "ga-finalize-100")
+                        .with(user(principal(2L, "gaadmin", "GA_ADMIN"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void settlementCannotFinalize() throws Exception {
+        mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
+                        .header("Idempotency-Key", "finalize-100")
+                        .with(user(settlementPrincipal())))
+                .andExpect(status().isForbidden());
+
+        verify(validationRunFinalizationService, never())
+                .finalizeRun(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void finalizeAllowsMissingOptionalIdempotencyKeyHeader() throws Exception {
+        given(validationRunFinalizationService.finalizeRun(100L, 4L, null))
+                .willReturn(new FinalizeValidationRunResponse(
+                        "FINALIZED", OffsetDateTime.parse("2026-08-16T12:34:56+09:00"), "admin"));
+
+        mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
+                        .with(user(principal(4L, "admin", "SYSTEM_ADMIN"))))
+                .andExpect(status().isOk());
+
+        verify(validationRunFinalizationService).finalizeRun(100L, 4L, null);
     }
 }

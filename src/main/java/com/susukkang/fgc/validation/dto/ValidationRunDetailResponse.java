@@ -14,7 +14,8 @@ public record ValidationRunDetailResponse(
         CapSummary capSummary,
         ArbitrageSummary arbitrageSummary,
         LedgerSummary ledgerSummary,
-        ReconciliationSummary reconciliationSummary
+        ReconciliationSummary reconciliationSummary,
+        ExceptionSummary exceptionSummary
 ) {
     /** ③ 대상 선별 건수 (선정·제외·검토필요) */
     public record TargetSummary(long selectedCount, long excludedCount, long reviewRequiredCount) {
@@ -45,5 +46,15 @@ public record ValidationRunDetailResponse(
             long mismatchedCount,
             long unmatchedCount,
             BigDecimal differenceAmountTotal) {
+    }
+
+    /** SRC-032 실행별 검출과 중복 없는 관리자 업무건 집계. */
+    public record ExceptionSummary(
+            long detectedCount,
+            long newCount,
+            long recurringCount,
+            long reopenedCount,
+            long notDetectedCount,
+            long openWorkItemCount) {
     }
 }

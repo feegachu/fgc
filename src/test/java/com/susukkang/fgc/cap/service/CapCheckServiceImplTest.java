@@ -143,13 +143,13 @@ class CapCheckServiceImplTest {
         verify(capCheckMapper, org.mockito.Mockito.never()).insertCapCheckDetails(any());
     }
 
-    // item_code/item_name/contract_month_no는 계산 당시 값을 cap_check_detail에 그대로 스냅샷해야
+    // item_code/item_name/contract_month_no/evidence_ref는 계산 당시 값을 cap_check_detail에 그대로 스냅샷해야
     // 한다 — commission_item/schedule_line이 나중에 바뀌어도 과거 판정 근거가 그때 값으로 남게 하려면
     // INSERT 시점에 빠짐없이 넘어가야 한다 (PR #2 코드리뷰 지적)
     @Test
-    void calculateAndSaveSnapshotsItemCodeNameAndContractMonthNoOnDetailRows() {
+    void calculateAndSaveSnapshotsItemCodeNameMonthAndEvidenceOnDetailRows() {
         CapCheckDetailLine detail = new CapCheckDetailLine(
-                1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 3, "INCLUDED", new BigDecimal("650000"), "산입", null);
+                1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 3, "EXCLUDED", new BigDecimal("650000"), "제외", "EVD-001");
         CapCalculationResult result = sampleResult(List.of(detail));
 
         CapCalculationCommand command = CapCalculationCommand.realtime(1L, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10));
@@ -171,6 +171,7 @@ class CapCheckServiceImplTest {
         assertThat(insertedDetail.getItemCode()).isEqualTo("BASE_COMMISSION");
         assertThat(insertedDetail.getItemName()).isEqualTo("FC 기본수수료");
         assertThat(insertedDetail.getContractMonthNo()).isEqualTo(3);
+        assertThat(insertedDetail.getEvidenceRef()).isEqualTo("EVD-001");
     }
 
     @Test

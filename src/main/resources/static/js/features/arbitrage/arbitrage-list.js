@@ -77,6 +77,12 @@
     document.getElementById("summary-clear").textContent = number(summary.clearCount) + "건";
     document.getElementById("summary-candidate").textContent = number(summary.candidateCount) + "건";
     document.getElementById("summary-review").textContent = number(summary.reviewRequiredCount) + "건";
+    document.querySelectorAll("[data-arb-summary-status]").forEach(function (card) {
+      var selected = card.dataset.arbSummaryStatus === controls.status.value;
+      card.setAttribute("aria-pressed", String(selected));
+      card.style.outline = selected ? "2px solid var(--color-primary, #2563eb)" : "";
+      card.style.outlineOffset = selected ? "2px" : "";
+    });
   }
 
   function rowHtml(row) {
@@ -181,6 +187,14 @@
   [controls.month, controls.status, controls.stage, controls.insurerId].forEach(function (control) { control.addEventListener("change", function () { state.page = 1; state.selectedId = null; load(); }); });
   controls.contractNo.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); state.page = 1; state.selectedId = null; load(); } });
   document.getElementById("f-reset").addEventListener("click", function () { controls.month.value = root.dataset.initialMonth || ""; controls.status.value = ""; controls.stage.value = "GA_TO_FC"; controls.insurerId.value = ""; controls.contractNo.value = ""; state.page = 1; state.selectedId = null; load(); });
+  document.getElementById("summary-cards").addEventListener("click", function (event) {
+    var card = event.target.closest("[data-arb-summary-status]");
+    if (!card) return;
+    controls.status.value = card.dataset.arbSummaryStatus;
+    state.page = 1;
+    state.selectedId = null;
+    load();
+  });
   document.getElementById("list-body").addEventListener("click", function (event) { var row = event.target.closest("tr[data-arbitrage-id]"); if (!row) return; var id = row.dataset.arbitrageId; var current = state.rows.find(function (item) { return String(item.arbitrageCheckId) === id; }); if (current) renderDetail(current); });
   var recheckButton = document.getElementById("arb-recheck-button");
   if (recheckButton) recheckButton.addEventListener("click", function () {

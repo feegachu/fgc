@@ -422,7 +422,7 @@
       var badgeClass = detail.classificationSnapshot === "INCLUDED" ? "status-badge-info" : detail.classificationSnapshot === "REVIEW_REQUIRED" ? "status-badge-review" : "status-badge-neutral";
       return "<tr><td>" + number(detail.detailSeq) + "</td><td>" + escapeHtml(detail.commissionItemName || "—") +
         '</td><td class="text-right tabular-nums">' + won(detail.amount) + '</td><td><span class="status-badge ' + badgeClass + '">' + escapeHtml(label) +
-        "</span></td><td>" + escapeHtml(detail.decisionReason || "—") + "</td><td>" + escapeHtml(detail.evidenceRef || "—") + "</td><td>저장 스냅샷</td></tr>";
+        "</span></td><td>" + escapeHtml(detail.decisionReason || "—") + "</td><td>" + escapeHtml(detail.evidenceRef || "증빙 미연결 / 후속 연결 대기") + "</td><td>저장 스냅샷</td></tr>";
     }).join("") : '<tr><td colspan="7"><div class="cap-inline-message">저장된 항목별 산입 내역이 없습니다.</div></td></tr>';
     var includedDetailTotal = details.reduce(function (total, detail) {
       return detail.classificationSnapshot === "INCLUDED" ? total + Number(detail.amount || 0) : total;
