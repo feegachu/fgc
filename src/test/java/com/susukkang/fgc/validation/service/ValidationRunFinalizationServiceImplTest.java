@@ -8,12 +8,14 @@ import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.FinalizeValidationRunResponse;
 import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import com.susukkang.fgc.validation.event.ValidationRunFinalized;
 import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -34,12 +36,15 @@ class ValidationRunFinalizationServiceImplTest {
     private ValidationRunMapper validationRunMapper;
     @Mock
     private AuditLogMapper auditLogMapper;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private ValidationRunFinalizationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new ValidationRunFinalizationServiceImpl(validationRunMapper, auditLogMapper);
+        service = new ValidationRunFinalizationServiceImpl(
+                validationRunMapper, auditLogMapper, eventPublisher);
         // Mockito의 Long 기본값 0L과 MyBatis 단건 SELECT 무결과 null의 차이를 제거한다.
         lenient().when(validationRunMapper.findValidationRunIdByFinalizeIdempotencyKey(any()))
                 .thenReturn(null);
@@ -87,6 +92,9 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.finalizedBy()).isEqualTo("gaadmin");
         verify(validationRunMapper).finalizeIfCompleted(44L, 7L, "finalize-44");
         verify(auditLogMapper).insert(any());
+        verify(eventPublisher).publishEvent(new ValidationRunFinalized(
+                44L, LocalDate.of(2026, 8, 1), 7L,
+                OffsetDateTime.parse("2026-08-16T12:34:56+09:00")));
     }
 
     @Test
@@ -101,6 +109,7 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.status()).isEqualTo("FINALIZED");
         verify(validationRunMapper, never()).finalizeIfCompleted(any(), any(), any());
         verify(auditLogMapper, never()).insert(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -148,7 +157,7 @@ class ValidationRunFinalizationServiceImplTest {
 
         assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "shared-key"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_005));
+                        assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_006));
 
         verify(validationRunMapper, never()).findByIdForUpdate(44L);
     }
@@ -190,6 +199,7 @@ class ValidationRunFinalizationServiceImplTest {
     private ValidationRunRow run(String status, int currentStep) {
         ValidationRunRow row = new ValidationRunRow();
         row.setValidationRunId(44L);
+        row.setValidationMonth(LocalDate.of(2026, 8, 1));
         row.setStatus(status);
         row.setCurrentStep(currentStep);
         return row;

@@ -285,7 +285,7 @@ public class ValidationRunController {
                     responseCode = "404", description = "검증 실행 없음 (FGC-COMMON-004)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "확정 결과 불변·상태 전이 오류·상태 경합 "
-                            + "(FGC-VRUN-003/004/005)"),
+                            + "또는 멱등키 충돌 (FGC-VRUN-003/004/005/006)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "422", description = "확정 조건 미충족 (FGC-VRUN-002)")
     })
