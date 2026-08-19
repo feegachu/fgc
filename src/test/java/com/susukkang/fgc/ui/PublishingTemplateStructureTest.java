@@ -288,6 +288,41 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
+    void reconciliationListUsesCommonComponentsAndProductionToast() throws IOException {
+        assertThat(resource("templates/reco/list.html"))
+                .contains("class=\"page-header\"")
+                .contains("class=\"filter-bar reco-filter-bar\"")
+                .contains("class=\"kpi-grid reco-summary-grid\"")
+                .contains("class=\"kpi-card kpi-card-success\"")
+                .contains("class=\"surface reco-panel reco-result-panel\"")
+                .contains("class=\"data-table reco-result-table\"")
+                .contains("class=\"data-table reco-history-table\"")
+                .contains("class=\"status-badge\"")
+                .contains("class=\"reco-history-row\" tabindex=\"0\"")
+                .doesNotContain("class=\"fgc-page-desc\"")
+                .doesNotContain("class=\"fgc-banner")
+                .doesNotContain("class=\"fgc-kpi")
+                .doesNotContain("style=");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/reco.css");
+
+        assertThat(resource("static/css/features/reco.css"))
+                .contains(".reco-summary-grid")
+                .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
+                .contains(".reco-result-table")
+                .contains("@media (max-width: 47.9375rem)");
+
+        assertThat(resource("static/js/features/reco/reco.js"))
+                .contains("tableCellDisclosure")
+                .contains("table-cell-more\">전체 보기")
+                .contains("window.FgcUi.toast(")
+                .contains("\"success\"")
+                .contains("event.key !== \"Enter\" && event.key !== \" \"")
+                .doesNotContain("fetch(");
+    }
+
+    @Test
     void contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior() throws IOException {
         assertThat(resource("templates/contract/form.html"))
                 .contains("name=\"premiumPerCycleAmount\"")
