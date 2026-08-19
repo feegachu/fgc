@@ -38,9 +38,19 @@
   var resultCount = document.querySelector("[data-schedule-result-count]");
   var pageSizeText = document.querySelector("[data-schedule-page-size]");
   var dataWarning = document.querySelector("[data-schedule-data-warning]");
+  var exportButton = document.getElementById("btn-schedule-export");
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
 
   if (!form || !table || !tableBody || !pagination || !previousButton || !nextButton) return;
+
+  if (exportButton) {
+    exportButton.addEventListener("click", function () {
+      var parameters = new URLSearchParams(window.location.search);
+      parameters.delete("page");
+      parameters.delete("size");
+      window.location.assign("/api/v1/schedules/export.csv" + (parameters.size ? "?" + parameters.toString() : ""));
+    });
+  }
 
   var PAGE_SIZE = 20;
   var FILTER_NAMES = ["contractNo", "stage", "regime", "purpose", "status"];

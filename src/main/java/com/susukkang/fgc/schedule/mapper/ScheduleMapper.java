@@ -27,6 +27,9 @@ public interface ScheduleMapper {
             @Param("size") int size,
             @Param("offset") long offset
     );
+    List<ScheduleHeaderResponse> selectAllByCondition(
+            @Param("condition") ScheduleSearchCondition condition
+    );
     /**
      * 현재 검색조건에 맞는 스케줄의 수를 구한다 -> 최대 페이지 수 계산
      * @param condition 스케줄 검색 조건

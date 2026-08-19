@@ -4,6 +4,7 @@
   요구사항 FUN-036(스케줄 생성) · FUN-039(상태·버전) · FUN-040(멱등성) / REG-01 · REG-19
   데이터  읽기 schedule_header, schedule_line, commission_rule
   API     GET  /api/v1/schedules/{id}
+          GET  /api/v1/schedules/{id}/export.csv
           POST /api/v1/schedules/{id}/regenerate   (사유 필수 · 새 버전 생성)
           POST /api/v1/schedules/{id}/confirm      (예정 스케줄 확정·잠금)
   라우트  GET /schedules/{id} → schedule/detail.html
@@ -43,11 +44,10 @@
         나중에 실제로 준 돈과 이 표를 맞춰 보는 것이 <strong>대사</strong>입니다.
       </p>
     </div>
-    <!-- 버튼 동작은 IF-API-28(엑셀)·IF-API-29(새 버전)·확정 API 연동 시 붙인다 -->
+    <!-- 버튼 동작은 IF-API-28(상세)·IF-API-28B(CSV)·IF-API-29(새 버전)·확정 API 연동 시 붙인다 -->
     <div class="publishing-inline-controls" style="display:flex;gap:8px">
-      <button class="fgc-btn fgc-btn--ghost" id="btn-export" type="button" disabled
-              aria-describedby="schedule-export-pending">
-        <span class="material-symbols-outlined" style="font-size:18px">download</span> 엑셀 다운로드
+      <button class="fgc-btn fgc-btn--ghost" id="btn-export" type="button">
+        <span class="material-symbols-outlined" style="font-size:18px">download</span> CSV 다운로드
       </button>
       <!-- 재생성·확정은 SETTLEMENT (화면정의서 :873, IF-API-29) — GA_ADMIN 도 비활성이어야 한다 -->
       <button class="fgc-btn fgc-btn--ghost" id="btn-regenerate" type="button"
@@ -87,10 +87,6 @@
       </footer>
     </section>
   </div>
-
-  <p class="fgc-help" id="schedule-export-pending" style="margin:8px 0 0;text-align:right">
-    엑셀 다운로드는 API 화면 연동 대기입니다.
-  </p>
 
   <!-- ① 헤더 — 값은 IF-API-28 연동 시 서버 렌더링으로 채운다 -->
   <section class="fgc-card" style="margin-top:16px">
