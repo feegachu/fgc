@@ -125,6 +125,26 @@ public class ConstraintErrorCodeResolver {
                 "uq_validation_run",
                 FgcErrorCode.VRUN_001
         );
+        mappings.put(
+                "uq_journal_single_reversal",
+                FgcErrorCode.LEDG_002
+        );
+        mappings.put(
+                "uq_journal_correction_original",
+                FgcErrorCode.LEDG_002
+        );
+        mappings.put(
+                "uq_journal_correction_group_reversal",
+                FgcErrorCode.LEDG_002
+        );
+        mappings.put(
+                "uq_journal_correction_group_repost",
+                FgcErrorCode.LEDG_002
+        );
+        mappings.put(
+                "uq_journal_source_revision",
+                FgcErrorCode.LEDG_002
+        );
 
         return Map.copyOf(mappings);
     }
