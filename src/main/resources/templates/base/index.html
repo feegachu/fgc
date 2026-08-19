@@ -23,13 +23,6 @@
     </p>
   </header>
 
-  <aside class="guidance guidance-neutral base-information-banner" aria-label="기준정보 조회 안내">
-    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">database</span>
-    <p class="guidance-copy">
-      원수사 자료는 표준 형식으로 정리되어 DB에 적재되어 있습니다. 이 화면에서는 파일 업로드나 기준정보 변경을 제공하지 않습니다.
-    </p>
-  </aside>
-
   <div class="base-workspace">
     <div class="tab-list" role="tablist" aria-label="기준정보 유형">
       <button class="tab-button" id="base-tab-organization" type="button" role="tab" aria-selected="true"
@@ -44,7 +37,7 @@
               aria-controls="base-panel-commission-item" data-base-tab="commission-item" tabindex="-1">수수료 항목</button>
     </div>
 
-    <section class="surface tab-panel base-panel" id="base-panel-organization" role="tabpanel"
+    <section class="tab-panel base-panel" id="base-panel-organization" role="tabpanel"
              aria-labelledby="base-tab-organization" data-base-panel="organization">
       <form class="filter-bar base-filter-form" data-base-form="organization">
         <label class="field base-filter-keyword">
@@ -55,57 +48,61 @@
           <span class="field-label">기준일</span>
           <input class="field-control" name="asOf" type="date" required>
         </label>
-        <div class="base-filter-actions">
+        <div class="filter-actions base-filter-actions">
           <button class="button button-secondary" type="button" data-base-reset="organization">초기화</button>
           <button class="button button-primary" type="submit">조회</button>
         </div>
       </form>
-      <header class="surface-header base-result-header">
-        <div>
-          <h2 class="surface-title">조직 목록</h2>
-          <p class="base-result-description">적용기간 안의 조직을 표시하며 사용중지 조직도 조회됩니다.</p>
+      <div class="surface base-result-surface">
+        <header class="surface-header base-result-header">
+          <div>
+            <h2 class="surface-title">조직 목록</h2>
+            <p class="base-result-description">적용기간 안의 조직을 표시하며 사용중지 조직도 조회됩니다.</p>
+          </div>
+          <span class="base-result-count"><strong class="tabular-nums" data-base-count="organization">0</strong>건</span>
+        </header>
+        <div class="empty-state base-result-message" data-base-message="organization" role="status" aria-live="polite">조직을 불러오는 중입니다.</div>
+        <div class="data-table-viewport base-table-viewport" data-base-table="organization" hidden>
+          <table class="data-table base-table base-organization-table">
+            <caption class="visually-hidden">조직 기준정보 목록</caption>
+            <thead><tr><th scope="col">조직코드</th><th scope="col">조직명</th><th scope="col">유형</th><th scope="col">상위 조직</th><th scope="col">적용 시작일</th><th scope="col">적용 종료일</th><th scope="col">상태</th></tr></thead>
+            <tbody data-base-body="organization"></tbody>
+          </table>
         </div>
-        <span class="base-result-count"><strong data-base-count="organization">0</strong>건</span>
-      </header>
-      <div class="base-result-message" data-base-message="organization" role="status" aria-live="polite">조직을 불러오는 중입니다.</div>
-      <div class="data-table-viewport base-table-viewport" data-base-table="organization" hidden>
-        <table class="data-table base-table base-organization-table">
-          <caption class="visually-hidden">조직 기준정보 목록</caption>
-          <thead><tr><th scope="col">조직코드</th><th scope="col">조직명</th><th scope="col">유형</th><th scope="col">상위 조직</th><th scope="col">적용 시작일</th><th scope="col">적용 종료일</th><th scope="col">상태</th></tr></thead>
-          <tbody data-base-body="organization"></tbody>
-        </table>
+        <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="organization" aria-label="조직 목록 페이지"></nav></footer>
       </div>
-      <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="organization" aria-label="조직 목록 페이지"></nav></footer>
     </section>
 
-    <section class="surface tab-panel base-panel" id="base-panel-insurer" role="tabpanel"
+    <section class="tab-panel base-panel" id="base-panel-insurer" role="tabpanel"
              aria-labelledby="base-tab-insurer" data-base-panel="insurer" hidden>
       <form class="filter-bar base-filter-form" data-base-form="insurer">
         <label class="field base-filter-keyword">
           <span class="field-label">보험회사 검색</span>
           <input class="field-control" name="keyword" type="search" placeholder="보험회사 코드 또는 이름" autocomplete="off">
         </label>
-        <div class="base-filter-actions">
+        <div class="filter-actions base-filter-actions">
           <button class="button button-secondary" type="button" data-base-reset="insurer">초기화</button>
           <button class="button button-primary" type="submit">조회</button>
         </div>
       </form>
-      <header class="surface-header base-result-header">
-        <div><h2 class="surface-title">보험회사 목록</h2><p class="base-result-description">상품 판매버전 조회의 선행 기준정보입니다.</p></div>
-        <span class="base-result-count"><strong data-base-count="insurer">0</strong>건</span>
-      </header>
-      <div class="base-result-message" data-base-message="insurer" role="status" aria-live="polite">보험회사를 불러오는 중입니다.</div>
-      <div class="data-table-viewport base-table-viewport" data-base-table="insurer" hidden>
-        <table class="data-table base-table">
-          <caption class="visually-hidden">보험회사 기준정보 목록</caption>
-          <thead><tr><th scope="col">보험회사 코드</th><th scope="col">보험회사명</th><th scope="col">구분</th><th scope="col">상태</th></tr></thead>
-          <tbody data-base-body="insurer"></tbody>
-        </table>
+      <div class="surface base-result-surface">
+        <header class="surface-header base-result-header">
+          <div><h2 class="surface-title">보험회사 목록</h2><p class="base-result-description">상품 판매버전 조회의 선행 기준정보입니다.</p></div>
+          <span class="base-result-count"><strong class="tabular-nums" data-base-count="insurer">0</strong>건</span>
+        </header>
+        <div class="empty-state base-result-message" data-base-message="insurer" role="status" aria-live="polite">보험회사를 불러오는 중입니다.</div>
+        <div class="data-table-viewport base-table-viewport" data-base-table="insurer" hidden>
+          <table class="data-table base-table">
+            <caption class="visually-hidden">보험회사 기준정보 목록</caption>
+            <thead><tr><th scope="col">보험회사 코드</th><th scope="col">보험회사명</th><th scope="col">구분</th><th scope="col">상태</th></tr></thead>
+            <tbody data-base-body="insurer"></tbody>
+          </table>
+        </div>
+        <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="insurer" aria-label="보험회사 목록 페이지"></nav></footer>
       </div>
-      <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="insurer" aria-label="보험회사 목록 페이지"></nav></footer>
     </section>
 
-    <section class="surface tab-panel base-panel" id="base-panel-product" role="tabpanel"
+    <section class="tab-panel base-panel" id="base-panel-product" role="tabpanel"
              aria-labelledby="base-tab-product" data-base-panel="product" hidden>
       <form class="filter-bar base-filter-form" data-base-form="product">
         <label class="field base-filter-select">
@@ -118,27 +115,29 @@
           <span class="field-label">계약 기준일</span>
           <input class="field-control" name="asOf" type="date" required>
         </label>
-        <div class="base-filter-actions">
+        <div class="filter-actions base-filter-actions">
           <button class="button button-secondary" type="button" data-base-reset="product">초기화</button>
           <button class="button button-primary" type="submit">조회</button>
         </div>
       </form>
-      <header class="surface-header base-result-header">
-        <div><h2 class="surface-title">상품 판매버전 목록</h2><p class="base-result-description">같은 상품이라도 판매버전과 채널이 다르면 별도로 표시합니다.</p></div>
-        <span class="base-result-count"><strong data-base-count="product">0</strong>건</span>
-      </header>
-      <div class="base-result-message" data-base-message="product" role="status" aria-live="polite">보험회사를 선택하면 상품을 조회합니다.</div>
-      <div class="data-table-viewport base-table-viewport" data-base-table="product" hidden>
-        <table class="data-table base-table base-product-table">
-          <caption class="visually-hidden">보험상품 판매버전 기준정보 목록</caption>
-          <thead><tr><th scope="col">상품코드</th><th scope="col">상품명</th><th scope="col">표준상품코드</th><th scope="col">상품군</th><th scope="col">판매버전</th><th scope="col">판매기간</th><th scope="col">기초서류</th><th scope="col">채널</th><th scope="col">수수료체계</th><th scope="col">80% 공제</th></tr></thead>
-          <tbody data-base-body="product"></tbody>
-        </table>
+      <div class="surface base-result-surface">
+        <header class="surface-header base-result-header">
+          <div><h2 class="surface-title">상품 판매버전 목록</h2><p class="base-result-description">같은 상품이라도 판매버전과 채널이 다르면 별도로 표시합니다.</p></div>
+          <span class="base-result-count"><strong class="tabular-nums" data-base-count="product">0</strong>건</span>
+        </header>
+        <div class="empty-state base-result-message" data-base-message="product" role="status" aria-live="polite">보험회사를 선택하면 상품을 조회합니다.</div>
+        <div class="data-table-viewport base-table-viewport" data-base-table="product" hidden>
+          <table class="data-table base-table base-product-table">
+            <caption class="visually-hidden">보험상품 판매버전 기준정보 목록</caption>
+            <thead><tr><th scope="col">상품코드</th><th scope="col">상품명</th><th scope="col">표준상품코드</th><th scope="col">상품군</th><th scope="col">판매버전</th><th scope="col">판매기간</th><th scope="col">기초서류</th><th scope="col">채널</th><th scope="col">수수료체계</th><th scope="col">80% 공제</th></tr></thead>
+            <tbody data-base-body="product"></tbody>
+          </table>
+        </div>
+        <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="product" aria-label="상품 목록 페이지"></nav></footer>
       </div>
-      <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="product" aria-label="상품 목록 페이지"></nav></footer>
     </section>
 
-    <section class="surface tab-panel base-panel" id="base-panel-agent" role="tabpanel"
+    <section class="tab-panel base-panel" id="base-panel-agent" role="tabpanel"
              aria-labelledby="base-tab-agent" data-base-panel="agent" hidden>
       <form class="filter-bar base-filter-form" data-base-form="agent">
         <label class="field base-filter-select">
@@ -153,73 +152,76 @@
           <span class="field-label">기준일</span>
           <input class="field-control" name="asOf" type="date" required>
         </label>
-        <div class="base-filter-actions">
+        <div class="filter-actions base-filter-actions">
           <button class="button button-secondary" type="button" data-base-reset="agent">초기화</button>
           <button class="button button-primary" type="submit">조회</button>
         </div>
       </form>
-      <header class="surface-header base-result-header">
-        <div><h2 class="surface-title">설계사 목록</h2><p class="base-result-description">위촉 유효기간과 상태, 소속 조직 및 신인활동지원 정보를 확인합니다.</p></div>
-        <span class="base-result-count"><strong data-base-count="agent">0</strong>건</span>
-      </header>
-      <div class="base-result-message" data-base-message="agent" role="status" aria-live="polite">설계사를 불러오는 중입니다.</div>
-      <div class="data-table-viewport base-table-viewport" data-base-table="agent" hidden>
-        <table class="data-table base-table base-agent-table">
-          <caption class="visually-hidden">보험설계사 기준정보 목록</caption>
-          <thead><tr><th scope="col">설계사 코드</th><th scope="col">설계사명</th><th scope="col">직급</th><th scope="col">소속 조직</th><th scope="col">위촉일</th><th scope="col">해촉일</th><th scope="col">상태</th><th scope="col">최근 등록일</th><th scope="col">직전 3년 경력</th><th scope="col">신인지원</th></tr></thead>
-          <tbody data-base-body="agent"></tbody>
-        </table>
+      <div class="surface base-result-surface">
+        <header class="surface-header base-result-header">
+          <div><h2 class="surface-title">설계사 목록</h2><p class="base-result-description">위촉 유효기간과 상태, 소속 조직 및 신인활동지원 정보를 확인합니다.</p></div>
+          <span class="base-result-count"><strong class="tabular-nums" data-base-count="agent">0</strong>건</span>
+        </header>
+        <div class="empty-state base-result-message" data-base-message="agent" role="status" aria-live="polite">설계사를 불러오는 중입니다.</div>
+        <div class="data-table-viewport base-table-viewport" data-base-table="agent" hidden>
+          <table class="data-table base-table base-agent-table">
+            <caption class="visually-hidden">보험설계사 기준정보 목록</caption>
+            <thead><tr><th scope="col">설계사 코드</th><th scope="col">설계사명</th><th scope="col">직급</th><th scope="col">소속 조직</th><th scope="col">위촉일</th><th scope="col">해촉일</th><th scope="col">상태</th><th scope="col">최근 등록일</th><th scope="col">직전 3년 경력</th><th scope="col">신인지원</th></tr></thead>
+            <tbody data-base-body="agent"></tbody>
+          </table>
+        </div>
+        <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="agent" aria-label="설계사 목록 페이지"></nav></footer>
       </div>
-      <footer class="base-pagination-footer"><nav class="pagination-controls" data-base-pagination="agent" aria-label="설계사 목록 페이지"></nav></footer>
     </section>
 
-    <section class="surface tab-panel base-panel" id="base-panel-commission-item" role="tabpanel"
+    <section class="tab-panel base-panel" id="base-panel-commission-item" role="tabpanel"
              aria-labelledby="base-tab-commission-item" data-base-panel="commission-item" hidden>
       <form class="filter-bar base-filter-form" data-base-form="commission-item">
         <label class="field">
           <span class="field-label">기준일</span>
           <input class="field-control" name="asOf" type="date" required>
         </label>
-        <div class="filter-actions">
+        <div class="filter-actions base-filter-actions">
           <button class="button button-secondary" type="button" data-base-reset="commission-item">초기화</button>
           <button class="button button-primary" type="submit">조회</button>
         </div>
       </form>
-      <header class="surface-header base-result-header">
-        <div><h2 class="surface-title">수수료 항목 목록</h2><p class="base-result-description">선택한 기준일에 유효한 항목입니다.</p></div>
-        <span class="base-result-count"><strong data-base-count="commission-item" th:text="${#lists.size(commissionItems)}">0</strong>건</span>
-      </header>
-      <div class="base-result-message" data-base-message="commission-item" role="status" aria-live="polite" hidden></div>
-      <div class="data-table-viewport base-table-viewport" data-base-table="commission-item">
-        <table class="data-table base-table">
-          <caption class="visually-hidden">수수료 항목 기준정보 목록</caption>
-          <thead><tr><th scope="col">항목코드</th><th scope="col">항목명</th><th scope="col">지급/차감</th><th scope="col">분류</th><th scope="col">적용 시작일</th><th scope="col">적용 종료일</th></tr></thead>
-          <tbody data-base-body="commission-item">
-          <tr th:each="item : ${commissionItems}">
-            <td class="tabular-nums" th:text="${item.itemCode()}">BASE_COMMISSION</td>
-            <td th:text="${item.itemName()}">FC 기본수수료</td>
-            <td><span class="status-badge"
-                      th:classappend="${item.cashflowType() == 'PAYMENT' ? ' status-badge-success' : (item.cashflowType() == 'DEDUCTION' ? ' status-badge-warning' : ' status-badge-neutral')}"
-                      th:text="${item.cashflowType() == 'PAYMENT' ? '지급' : (item.cashflowType() == 'DEDUCTION' ? '차감' : item.cashflowType())}">지급</span></td>
-            <td th:text="${item.itemCode() == 'SETTLEMENT_SUPPORT' ? '정착지원' :
-                         (item.itemCode() == 'NEWCOMER_SUPPORT' ? '신인지원' :
-                         (item.itemCategory() == 'SALES' ? '모집수수료' :
-                         (item.itemCategory() == 'MAINTENANCE' ? '유지관리' :
-                         (item.itemCategory() == 'INCENTIVE' ? '판매촉진' :
-                         (item.itemCategory() == 'MANAGEMENT' ? '관리자수수료' :
-                         (item.itemCategory() == 'SUPPORT' ? '지원' :
-                         (item.itemCategory() == 'COST' ? '공통비' :
-                         (item.itemCategory() == 'ADJUSTMENT' ? '조정' :
-                         (item.itemCategory() == 'CLAWBACK' ? '환수' :
-                         (item.itemCategory() == 'RECOVERY' ? '회수' : item.itemCategory()))))))))))}">모집수수료</td>
-            <td class="tabular-nums" th:text="${item.effectiveFrom()}">2026-01-01</td>
-            <td class="tabular-nums" th:text="${item.effectiveTo() ?: '-'}">-</td>
-          </tr>
-          <tr class="base-state-row" th:if="${#lists.isEmpty(commissionItems)}"><td colspan="6"><div class="empty-state">조건에 맞는 수수료 항목이 없습니다.</div></td></tr>
-          </tbody>
-        </table>
+      <div class="surface base-result-surface">
+        <header class="surface-header base-result-header">
+          <div><h2 class="surface-title">수수료 항목 목록</h2><p class="base-result-description">선택한 기준일에 유효한 항목입니다.</p></div>
+          <span class="base-result-count"><strong class="tabular-nums" data-base-count="commission-item" th:text="${#lists.size(commissionItems)}">0</strong>건</span>
+        </header>
+        <div class="empty-state base-result-message" data-base-message="commission-item" role="status" aria-live="polite" hidden></div>
+        <div class="data-table-viewport base-table-viewport" data-base-table="commission-item">
+          <table class="data-table base-table">
+            <caption class="visually-hidden">수수료 항목 기준정보 목록</caption>
+            <thead><tr><th scope="col">항목코드</th><th scope="col">항목명</th><th scope="col">지급/차감</th><th scope="col">분류</th><th scope="col">적용 시작일</th><th scope="col">적용 종료일</th></tr></thead>
+            <tbody data-base-body="commission-item">
+            <tr th:each="item : ${commissionItems}">
+              <td class="tabular-nums" th:text="${item.itemCode()}">BASE_COMMISSION</td>
+              <td th:text="${item.itemName()}">FC 기본수수료</td>
+              <td><span class="status-badge"
+                        th:classappend="${item.cashflowType() == 'PAYMENT' ? ' status-badge-success' : (item.cashflowType() == 'DEDUCTION' ? ' status-badge-warning' : ' status-badge-neutral')}"
+                        th:text="${item.cashflowType() == 'PAYMENT' ? '지급' : (item.cashflowType() == 'DEDUCTION' ? '차감' : item.cashflowType())}">지급</span></td>
+              <td th:text="${item.itemCode() == 'SETTLEMENT_SUPPORT' ? '정착지원' :
+                           (item.itemCode() == 'NEWCOMER_SUPPORT' ? '신인지원' :
+                           (item.itemCategory() == 'SALES' ? '모집수수료' :
+                           (item.itemCategory() == 'MAINTENANCE' ? '유지관리' :
+                           (item.itemCategory() == 'INCENTIVE' ? '판매촉진' :
+                           (item.itemCategory() == 'MANAGEMENT' ? '관리자수수료' :
+                           (item.itemCategory() == 'SUPPORT' ? '지원' :
+                           (item.itemCategory() == 'COST' ? '공통비' :
+                           (item.itemCategory() == 'ADJUSTMENT' ? '조정' :
+                           (item.itemCategory() == 'CLAWBACK' ? '환수' :
+                           (item.itemCategory() == 'RECOVERY' ? '회수' : item.itemCategory()))))))))))}">모집수수료</td>
+              <td class="tabular-nums" th:text="${item.effectiveFrom()}">2026-01-01</td>
+              <td class="tabular-nums" th:text="${item.effectiveTo() ?: '-'}">-</td>
+            </tr>
+            <tr class="base-state-row" th:if="${#lists.isEmpty(commissionItems)}"><td colspan="6"><div class="empty-state">조건에 맞는 수수료 항목이 없습니다.</div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div class="base-panel-note">1,200% 산입 여부는 항목 자체가 아니라 적용 룰셋에서 결정하므로 이 화면에 표시하지 않습니다.</div>
     </section>
   </div>
 </main>
