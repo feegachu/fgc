@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
 # ---------------------------------------------------------------- #
 # AI 기본 설정 (언어 및 페르소나)
 # ---------------------------------------------------------------- #
@@ -98,9 +100,14 @@ reviews:
   # 자동 리뷰 트리거 설정
   # ---------------------------------------------------------------- #
   auto_review:
-    # PR이 생성됐을 때
-    # `@coderabbitai review`를 코멘트에 입력하면 리뷰를 시작합니다.
-    # enabled: false
+    # 2026-08-13 yslee - Draft 및 스택형 PR도 자동 리뷰 대상에 포함
+    # 기존 코드: enabled가 주석 처리되고 drafts/base_branches가 없어 CodeRabbit 기본값에 의존
+    # 문제: Draft PR은 기본적으로 제외되고 기본 브랜치가 아닌 feature 브랜치 대상 PR도 자동 리뷰에서 빠질 수 있음
+    # 개선: 자동 리뷰를 명시적으로 활성화하고 Draft와 모든 base 브랜치를 허용
+    enabled: true
+    drafts: true
+    base_branches:
+      - ".*"
     # 이미 리뷰가 진행된 PR에 새로운 커밋이 추가될 때, 변경된 부분에 대해서만 자동으로 리뷰를 진행할지 여부입니다.
     # false로 두면 "Review skipped: incremental reviews are disabled"가 뜨면서
     # 첫 리뷰 이후에 밀어넣은 커밋은 아무도 검토하지 않은 채 머지됩니다.

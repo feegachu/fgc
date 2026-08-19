@@ -2,6 +2,7 @@ package com.susukkang.fgc.arbitrage.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCalculationSource;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.arbitrage.dto.ConfirmedCommissionSummary;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
@@ -43,6 +44,8 @@ class ArbitrageServiceTest {
     private ValidationRunMapper validationRunMapper;
     @Mock
     private ExceptionCaseMapper exceptionCaseMapper;
+    @Mock
+    private AuditLogService auditLogService;
 
     private ArbitrageService arbitrageService;
 
@@ -53,7 +56,8 @@ class ArbitrageServiceTest {
                 validationRunCreateService,
                 validationRunMapper,
                 exceptionCaseMapper,
-                new ObjectMapper().findAndRegisterModules()
+                new ObjectMapper().findAndRegisterModules(),
+                auditLogService
         );
     }
 
@@ -96,6 +100,52 @@ class ArbitrageServiceTest {
         verify(exceptionCaseMapper).insertArbitrageCandidate(
                 100L, 10L, 200L, "GA_TO_FC",
                 "지급예정 수수료를 포함하면 누적 납입보험료를 초과합니다.");
+    }
+
+    /**
+     * FUN-061·운영정책서 제51조 — 수동 재검증은 실행 사용자·사유와 함께 감사행을 남긴다.
+     * 실DB 통합 검증은 두지 않는다: 실행 생성이 REQUIRES_NEW 로 별도 커밋되어(ValidationRunCreateServiceImpl)
+     * 테스트 롤백으로 정리되지 않고 uq_validation_run_active_manual_contract 잔존 충돌을 일으킨다.
+     * 감사행의 DB 왕복은 AuditLogQueryMapperIntegrationTest 가 검증한다.
+     */
+    @Test
+    void recordsArbitrageRecheckedAudit() {
+        LocalDate asOfDate = LocalDate.of(2026, 7, 31);
+        ArbitrageCalculationSource source = calculationSource(
+                new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
+        given(arbitrageMapper.selectCalculationSource(10L, asOfDate)).willReturn(source);
+        given(arbitrageMapper.sumConfirmedCommissionAmount(
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
+        given(arbitrageMapper.sumPlannedCommissionAmount(
+                10L, PaymentStage.GA_TO_FC)).willReturn(new BigDecimal("400000"));
+        given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
+        given(validationRunMapper.transitionToRunning(100L)).willReturn(1);
+        given(validationRunMapper.updateCurrentStep(100L, 5)).willReturn(1);
+        given(arbitrageMapper.insertArbitrageCheck(any())).willAnswer(invocation -> {
+            invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0)
+                    .setArbitrageCheckId(200L);
+            return 1;
+        });
+        given(validationRunMapper.transitionToCompleted(100L)).willReturn(1);
+
+        arbitrageService.reArbitrageCheck(
+                10L,
+                new ReArbitrageCheckRequest(asOfDate, "지급예정액 포함 재검증"),
+                1L
+        );
+
+        org.mockito.ArgumentCaptor<AuditLogService.AuditEvent> captor =
+                org.mockito.ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(captor.capture());
+        AuditLogService.AuditEvent event = captor.getValue();
+        assertThat(event.actionCode()).isEqualTo("ARBITRAGE_RECHECKED");
+        assertThat(event.entityType()).isEqualTo("ARBITRAGE_CHECK");
+        assertThat(event.entityId()).isEqualTo("200");
+        assertThat(event.userId()).isEqualTo(1L);
+        assertThat(event.reason()).isEqualTo("지급예정액 포함 재검증");
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> after = (java.util.Map<String, Object>) event.after();
+        assertThat(after).containsKeys("validationRunId", "contractId", "resultStatus");
     }
 
     /**

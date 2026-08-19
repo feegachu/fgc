@@ -50,4 +50,10 @@
             AND source_entity_id = #{sourceEntityId} AND status = 'POSTED'
         )
     </select>
+
+    <update id="markPosted">
+        UPDATE fgc.journal_header
+        SET status = 'POSTED', posted_by = #{postedBy}
+        WHERE journal_header_id = #{journalHeaderId} AND status = 'DRAFT'
+    </update>
 </mapper>

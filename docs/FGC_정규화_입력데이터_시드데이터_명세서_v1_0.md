@@ -1284,7 +1284,7 @@ random_seed = 20260803
 | 담당자·환수 | agent_history, contract_manager_assignment, policy_approval_action, clawback_rule, clawback_case, clawback_line, recovery_transaction |
 | 원장 | journal_account, journal_header, journal_line |
 | 대사 | reconciliation_run, reconciliation_result, reconciliation_match |
-| 예외 | exception_case, exception_action |
+| 예외 | exception_case, exception_action, exception_occurrence |
 | 감사 | audit_log |
 
 `cap_check_detail`은 계산 당시 `item_code`, `item_name`을 반드시 스냅샷으로 저장한다. `schedule_line_id`가 있는 상세행은 `contract_month_no`도 필수이고, 실제 귀속행에서 온 상세는 회차가 없으므로 `NULL`이 허용된다. `acquisition_cost_check_detail`은 초년도 1,200%가 아니라 REG-02·03·05의 계약체결비용 한도 상세만 저장한다.

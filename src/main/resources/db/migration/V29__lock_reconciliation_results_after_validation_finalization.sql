@@ -10,9 +10,13 @@ AS $$
 DECLARE
   v_old_run_id bigint;
   v_new_run_id bigint;
+  v_old_result_id bigint;
+  v_new_result_id bigint;
+  v_result_id bigint;
   v_run_id bigint;
   v_status varchar(20);
   v_validation_run_id bigint;
+  v_validation_run_ids bigint[] := ARRAY[]::bigint[];
   v_validation_status varchar(20);
 BEGIN
   -- UPDATE가 부모를 바꾸는 경우 OLD/NEW 양쪽 실행을 모두 검사해야 우회 이동을 막을 수 있다.
@@ -20,18 +24,25 @@ BEGIN
     IF TG_OP <> 'INSERT' THEN v_old_run_id := OLD.reconciliation_run_id; END IF;
     IF TG_OP <> 'DELETE' THEN v_new_run_id := NEW.reconciliation_run_id; END IF;
   ELSIF TG_TABLE_NAME = 'reconciliation_match' THEN
-    IF TG_OP <> 'INSERT' THEN
-      SELECT reconciliation_run_id INTO v_old_run_id
+    IF TG_OP <> 'INSERT' THEN v_old_result_id := OLD.reconciliation_result_id; END IF;
+    IF TG_OP <> 'DELETE' THEN v_new_result_id := NEW.reconciliation_result_id; END IF;
+
+    -- 2026-08-19 yslee - 매칭행 부모 결과를 ID 오름차순으로 잠금
+    -- 기존 코드: OLD 결과를 잠근 뒤 NEW 결과를 잠가 반대 방향 재배치가 서로 교착할 수 있음
+    -- 문제: 두 트랜잭션이 A→B, B→A로 동시에 이동하면 부모 잠금 순서가 반대가 됨
+    -- 개선: OLD/NEW 결과 ID를 한 번에 조회하고 오름차순 FOR SHARE 잠금 후 실행 ID를 배정
+    FOR v_result_id, v_run_id IN
+      SELECT reconciliation_result_id, reconciliation_run_id
         FROM fgc.reconciliation_result
-       WHERE reconciliation_result_id = OLD.reconciliation_result_id
-       FOR SHARE;
-    END IF;
-    IF TG_OP <> 'DELETE' THEN
-      SELECT reconciliation_run_id INTO v_new_run_id
-        FROM fgc.reconciliation_result
-       WHERE reconciliation_result_id = NEW.reconciliation_result_id
-       FOR SHARE;
-    END IF;
+       WHERE reconciliation_result_id = ANY (
+         array_remove(ARRAY[v_old_result_id, v_new_result_id]::bigint[], NULL)
+       )
+       ORDER BY reconciliation_result_id
+       FOR SHARE
+    LOOP
+      IF v_result_id = v_old_result_id THEN v_old_run_id := v_run_id; END IF;
+      IF v_result_id = v_new_result_id THEN v_new_run_id := v_run_id; END IF;
+    END LOOP;
   ELSE
     RAISE EXCEPTION 'Unsupported reconciliation result table: %', TG_TABLE_NAME;
   END IF;
@@ -50,14 +61,21 @@ BEGIN
       RAISE EXCEPTION 'Results of finalized reconciliation run % are immutable', v_run_id;
     END IF;
     IF v_validation_run_id IS NOT NULL THEN
-      SELECT status INTO v_validation_status
-        FROM fgc.validation_run
-       WHERE validation_run_id = v_validation_run_id
-       FOR SHARE;
-      IF v_validation_status = 'FINALIZED' THEN
-        RAISE EXCEPTION 'Reconciliation results of finalized validation run % are immutable',
-          v_validation_run_id;
-      END IF;
+      v_validation_run_ids := array_append(v_validation_run_ids, v_validation_run_id);
+    END IF;
+  END LOOP;
+
+  -- reconciliation_run과 별도로 validation_run도 ID 오름차순으로 잠가 전체 부모 잠금 순서를 고정한다.
+  FOR v_validation_run_id, v_validation_status IN
+    SELECT validation_run_id, status
+      FROM fgc.validation_run
+     WHERE validation_run_id = ANY (v_validation_run_ids)
+     ORDER BY validation_run_id
+     FOR SHARE
+  LOOP
+    IF v_validation_status = 'FINALIZED' THEN
+      RAISE EXCEPTION 'Reconciliation results of finalized validation run % are immutable',
+        v_validation_run_id;
     END IF;
   END LOOP;
 

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.validation.mapper.ValidationRunDetailMapper">
+
+    <select id="findHeaderById" resultType="com.susukkang.fgc.validation.dto.ValidationRunListRow">
+        SELECT vr.validation_run_id AS validationRunId,
+               vr.validation_month AS validationMonth,
+               vr.run_no AS runNo,
+               vr.run_type AS runType,
+               vr.status,
+               vr.current_step AS currentStep,
+               triggered.login_id AS triggeredBy,
+               vr.started_at AS startedAt,
+               vr.completed_at AS completedAt,
+               finalized.login_id AS finalizedBy,
+               vr.finalized_at AS finalizedAt,
+               vr.failure_message AS failureMessage
+        FROM fgc.validation_run vr
+        LEFT JOIN fgc.app_user triggered ON triggered.user_id = vr.triggered_by
+        LEFT JOIN fgc.app_user finalized ON finalized.user_id = vr.finalized_by
+        WHERE vr.validation_run_id = #{validationRunId}
+    </select>
+
+    <select id="findTargets" resultType="com.susukkang.fgc.validation.dto.ValidationTargetListRow">
+        SELECT vt.validation_target_id AS validationTargetId,
+               ic.contract_no          AS contractNo,
+               vt.selection_status     AS selectionStatus,
+               p.product_name          AS productName,
+               po.offering_version     AS offeringVersion,
+               vt.refund_rate_table_id AS refundRateTableId,
+               vt.selection_reason     AS selectionReason
+          FROM fgc.validation_target vt
+          JOIN fgc.insurance_contract ic ON ic.contract_id = vt.contract_id
+          JOIN fgc.product_offering po   ON po.product_offering_id = vt.product_offering_id
+          JOIN fgc.product p             ON p.product_id = po.product_id
+         WHERE vt.validation_run_id = #{validationRunId}
+         ORDER BY CASE vt.selection_status
+                      WHEN 'REVIEW_REQUIRED' THEN 0
+                      WHEN 'EXCLUDED' THEN 1
+                      ELSE 2
+                  END,
+                  vt.validation_target_id
+         LIMIT #{limit}
+    </select>
+
+    <!-- 원장은 vw_journal_imbalance에 실행 컬럼이 없어 journal_header로 스코프한다.
+         대사는 commission_transaction과 달리 reconciliation_run에 validation_run_id가 있어
+         그 경유로 좁힌다 — 뷰·결과를 그냥 세면 다른 실행 것까지 섞인다(화면정의서 :1462).
+         테이블당 파생 서브쿼리 1개(COUNT FILTER)로 각 테이블을 한 번만 스캔한다 —
+         GROUP BY 없는 집계라 결과가 없는 실행도 0이 채워진 1행이 나온다. -->
+    <select id="summarize" resultType="com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow">
+        SELECT vt.targetSelectedCount, vt.targetExcludedCount, vt.targetReviewRequiredCount,
+               cc.capCheckedCount, cc.capViolationCount, cc.capWarningCount, cc.capReviewRequiredCount,
+               ac.arbitrageCheckedCount, ac.arbitrageCandidateCount, ac.arbitrageReviewRequiredCount,
+               jh.journalCount, jh.journalImbalanceCount,
+               rr.reconciliationResultCount, rr.reconciliationMismatchCount,
+               sh.scheduleGeneratedCount,
+               rr.reconciliationMatchedCount, rr.reconciliationMismatchedCount,
+               rr.reconciliationUnmatchedCount, rr.reconciliationDifferenceAmountTotal
+          FROM (SELECT COUNT(*) FILTER (WHERE selection_status = 'SELECTED')        AS targetSelectedCount,
+                       COUNT(*) FILTER (WHERE selection_status = 'EXCLUDED')        AS targetExcludedCount,
+                       COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
+                  FROM fgc.validation_target
+                 WHERE validation_run_id = #{validationRunId}) vt
+         CROSS JOIN (SELECT COUNT(*)                                                  AS capCheckedCount,
+                            COUNT(*) FILTER (WHERE result_status = 'VIOLATION')       AS capViolationCount,
+                            COUNT(*) FILTER (WHERE result_status = 'WARNING')         AS capWarningCount,
+                            COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS capReviewRequiredCount
+                       FROM fgc.cap_check
+                      WHERE validation_run_id = #{validationRunId}) cc
+         CROSS JOIN (SELECT COUNT(*)                                                  AS arbitrageCheckedCount,
+                            COUNT(*) FILTER (WHERE result_status = 'CANDIDATE')       AS arbitrageCandidateCount,
+                            COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS arbitrageReviewRequiredCount
+                       FROM fgc.arbitrage_check
+                      WHERE validation_run_id = #{validationRunId}) ac
+         CROSS JOIN (SELECT COUNT(*)                     AS journalCount,
+                            COUNT(vji.journal_header_id) AS journalImbalanceCount
+                       FROM fgc.journal_header j
+                       LEFT JOIN fgc.vw_journal_imbalance vji ON vji.journal_header_id = j.journal_header_id
+                      WHERE j.validation_run_id = #{validationRunId}) jh
+         <!-- 대사 3분류(FUN-043) — 누락(EXPECTED_MISSING/ACTUAL_MISSING)만 UNMATCHED,
+              그 외 MATCHED가 아닌 나머지 전부(AMOUNT_DIFFERENCE·DUPLICATE·AGENT_MISMATCH·
+              INSTALLMENT_MISMATCH·INVALID_CONTRACT_PAYMENT·POLICY_VERSION_ERROR·
+              JOURNAL_IMBALANCE·REVIEW_REQUIRED)는 MISMATCHED로 묶는다 — 양쪽 다 있지만
+              값/상태가 안 맞는 것과 아예 상대편이 없는 것을 구분하려는 목적이다. 차액
+              합계는 MATCHED가 아닌 모든 행(대사가 안 맞아 영향이 있는 행)만 더하되,
+              운영정책서 제17조의2(상세행 단위로 먼저 원 단위 HALF_UP 반올림한 뒤 합산)에
+              맞춰 행마다 ROUND(..., 0)을 먼저 적용한다(코드리뷰 반영) — difference_amount가
+              numeric(15,2)라 이론상 소수 원이 저장될 수 있는데, 합산부터 하고 나중에
+              반올림하면 상세행 기준 반올림 규칙과 어긋날 수 있다. -->
+         CROSS JOIN (SELECT COUNT(r.reconciliation_result_id)                                    AS reconciliationResultCount,
+                            COUNT(*) FILTER (WHERE r.result_type &lt;&gt; 'MATCHED')              AS reconciliationMismatchCount,
+                            COUNT(*) FILTER (WHERE r.result_type = 'MATCHED')                     AS reconciliationMatchedCount,
+                            COUNT(*) FILTER (WHERE r.result_type NOT IN
+                                ('MATCHED', 'EXPECTED_MISSING', 'ACTUAL_MISSING'))                AS reconciliationMismatchedCount,
+                            COUNT(*) FILTER (WHERE r.result_type IN
+                                ('EXPECTED_MISSING', 'ACTUAL_MISSING'))                            AS reconciliationUnmatchedCount,
+                            COALESCE(SUM(ROUND(r.difference_amount, 0)) FILTER (WHERE r.result_type &lt;&gt; 'MATCHED'), 0)
+                                                                                                    AS reconciliationDifferenceAmountTotal
+                       FROM fgc.reconciliation_run recon
+                       LEFT JOIN fgc.reconciliation_result r ON r.reconciliation_run_id = recon.reconciliation_run_id
+                      WHERE recon.validation_run_id = #{validationRunId}) rr
+         CROSS JOIN (SELECT COUNT(*) AS scheduleGeneratedCount
+                       FROM fgc.schedule_header
+                      WHERE validation_run_id = #{validationRunId}) sh
+    </select>
+
+    <!-- 설계사 단위 모니터링 참고용 집계 — 계약별 cap_check.result_status는 건드리지 않는다.
+         payment_stage로 반드시 나눈다(코드리뷰 반영) — 원수사→GA와 GA→설계사 1,200%는
+         계산 규칙이 다른 별도 게이지라 합치면 안 된다(docs/07_규제조문표_v0.2.1.md
+         절대 금지사항). cap_check가 (validation_run_id, contract_id, payment_stage)로
+         유일해서(uq_cap_check_monthly) 같은 계약이 두 지급단계 행을 동시에 가질 수
+         있다 — GROUP BY에서 빠지면 그 두 행이 하나로 합산된다. -->
+    <select id="summarizeCapByAgent" resultType="com.susukkang.fgc.validation.dto.AgentCapMonitoringRow">
+        SELECT ag.agent_id                                                    AS agentId,
+               ag.agent_name                                                  AS agentName,
+               cc.payment_stage                                               AS paymentStage,
+               COUNT(*)                                                       AS checkedCount,
+               COUNT(*) FILTER (WHERE cc.result_status = 'VIOLATION')         AS violationCount,
+               COUNT(*) FILTER (WHERE cc.result_status = 'WARNING')           AS warningCount,
+               COUNT(*) FILTER (WHERE cc.result_status = 'REVIEW_REQUIRED')   AS reviewRequiredCount
+          FROM fgc.cap_check cc
+          JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+          JOIN fgc.agent ag ON ag.agent_id = ic.agent_id
+         WHERE cc.validation_run_id = #{validationRunId}
+         GROUP BY ag.agent_id, ag.agent_name, cc.payment_stage
+         ORDER BY ag.agent_id, cc.payment_stage
+    </select>
+
+</mapper>

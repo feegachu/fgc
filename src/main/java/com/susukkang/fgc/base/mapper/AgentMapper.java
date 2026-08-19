@@ -1,10 +1,13 @@
 package com.susukkang.fgc.base.mapper;
 
+import com.susukkang.fgc.base.dto.AgentRow;
+import com.susukkang.fgc.base.dto.AgentSearchCriteria;
 import com.susukkang.fgc.common.code.AgentRankCode;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 설명 : 설계사 기준정보 조회 Mapper
@@ -15,6 +18,14 @@ import java.time.LocalDate;
  */
 @Mapper
 public interface AgentMapper {
+
+    List<AgentRow> selectAgents(
+            @Param("criteria") AgentSearchCriteria criteria,
+            @Param("offset") int offset,
+            @Param("limit") int limit
+    );
+
+    long countAgents(@Param("criteria") AgentSearchCriteria criteria);
 
     /**
      * 설명 : 계약 소속 조직과 상위 조직에서 직급에 해당하는 활성 설계사 ID를 조회한다.

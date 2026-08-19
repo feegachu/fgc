@@ -1,14 +1,17 @@
 package com.susukkang.fgc.contract.controller;
 
 import com.susukkang.fgc.common.code.CapResultStatus;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.contract.domain.ContractStatus;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.service.ContractService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.Map;
@@ -19,6 +22,24 @@ import java.util.Map;
 public class ContractViewController {
 
     private final ContractService contractService;
+
+    /** CONT-W03 신규 등록 폼. 기준정보와 저장은 화면 전용 JavaScript가 API로 연결한다. */
+    @PreAuthorize(Roles.CAN_PROCESS)
+    @GetMapping("/contracts/new")
+    public String createForm(Model model) {
+        model.addAttribute("isEditMode", false);
+        model.addAttribute("contractId", null);
+        return "contract/form";
+    }
+
+    /** CONT-W03 수정 폼. 기존 계약값은 GET /api/v1/contracts/{id}로 복원한다. */
+    @PreAuthorize(Roles.CAN_PROCESS)
+    @GetMapping("/contracts/{id}/edit")
+    public String editForm(@PathVariable Long id, Model model) {
+        model.addAttribute("isEditMode", true);
+        model.addAttribute("contractId", id);
+        return "contract/form";
+    }
 
     @GetMapping("/contracts")
     public String list(

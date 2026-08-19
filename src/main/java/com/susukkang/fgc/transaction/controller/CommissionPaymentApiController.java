@@ -2,12 +2,13 @@ package com.susukkang.fgc.transaction.controller;
 
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
-import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
+import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.transaction.dto.*;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -15,13 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 설명 : 수수료 지급 건 등록·수정·확정 REST API
@@ -42,10 +37,34 @@ import org.springframework.web.bind.annotation.RestController;
 // 기존 코드: SETTLEMENT만 허용하여 모든 기능 권한을 가진 SYSTEM_ADMIN도 접근 차단
 // 문제: 인터페이스 정의서의 SYSTEM_ADMIN 전부 권한과 FUN-065 API 인가가 불일치
 // 개선: SETTLEMENT 업무권한을 유지하면서 SYSTEM_ADMIN의 전체관리 권한도 허용
-@PreAuthorize(Roles.CAN_PROCESS)
 public class CommissionPaymentApiController {
 
     private final CommissionPaymentService commissionPaymentService;
+
+    
+    /**
+     * 설명 : 수수료 계약건 조회
+     *
+     * @param  condition
+     * @return 수수료 계약건 LIST
+     * @author hjKang
+     * @since 2026-08-16
+     */
+    @GetMapping
+    public ApiResponse<PageResponse<CommissionPaymentListResponse>> search(
+            @ModelAttribute CommissionPaymentSearchCondition condition,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(
+                commissionPaymentService.search(condition, page, size)
+        );
+    }
+
+    @GetMapping("/{paymentId}")
+    public ApiResponse<CommissionPaymentResponse> get(@PathVariable Long paymentId) {
+        return ApiResponse.success(commissionPaymentService.get(paymentId));
+    }
 
     // 2026-08-07 yslee - 지급 건 API의 성공·실패 계약을 Swagger 응답 명세로 보강
     // 기존 코드: 작업 요약만 표시되어 자연키 중복·증빙 누락·한도 초과 응답을 구분하기 어려움
@@ -66,6 +85,7 @@ public class CommissionPaymentApiController {
                     responseCode = "403", description = "정산담당자 권한 없음")
     })
     @PostMapping
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ResponseEntity<ApiResponse<CommissionPaymentResponse>> create(
             @Valid @RequestBody CommissionPaymentCreateRequest request
     ) {
@@ -90,6 +110,7 @@ public class CommissionPaymentApiController {
                     responseCode = "403", description = "정산담당자 권한 없음")
     })
     @PutMapping("/{paymentId}")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<CommissionPaymentResponse> update(
             @Parameter(description = "지급 건 ID", required = true)
             @PathVariable Long paymentId,
@@ -117,6 +138,7 @@ public class CommissionPaymentApiController {
                     responseCode = "403", description = "정산담당자 권한 없음")
     })
     @PostMapping("/{paymentId}/confirm")
+    @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<CommissionPaymentResponse> confirm(
             @Parameter(description = "지급 건 ID", required = true)
             @PathVariable Long paymentId,
@@ -124,5 +146,31 @@ public class CommissionPaymentApiController {
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
         return ApiResponse.success(commissionPaymentService.confirm(paymentId, idempotencyKey));
+    }
+
+    @Operation(
+            summary = "지급 전 한도 사전검증 미리보기 (IF-API-24)",
+            description = "저장·상태 변경 없이 DRAFT 지급 건을 제31조 확정 게이트로 검사해 "
+                    + "계약·지급단계별 1,200% 게이지(capPreview)와 확정 차단 사유(blockers)를 반환합니다. "
+                    + "차단 사유가 있어도 200으로 응답합니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "사전검증 결과 (차단 사유가 있어도 200 + blockers[])",
+                    content = @Content(schema = @Schema(implementation = TransactionPrecheckResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "지급 건 없음 (FGC-COMMON-002)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "DRAFT 상태가 아님 (FGC-TRAN-005)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "정산담당자 권한 없음")
+    })
+    @PostMapping("/{paymentId}/precheck")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<TransactionPrecheckResponse> precheck(
+            @Parameter(description = "지급 건 ID", required = true)
+            @PathVariable Long paymentId
+    ) {
+        return ApiResponse.success(commissionPaymentService.precheck(paymentId));
     }
 }

@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 public class LedgerImbalanceRow {
     private Long journalHeaderId;
     private String journalNo;
+    private String journalType;
     private String status;
     private BigDecimal debitTotal;
     private BigDecimal creditTotal;

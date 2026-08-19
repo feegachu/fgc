@@ -130,14 +130,14 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                         counts.getIncompleteRunCount(), "/validation-runs/" + id),
                 condition(2, "원장 불균형(차변≠대변)이 0건인가",
                         counts.getJournalImbalanceCount(),
-                        "/journals?validationRunId=" + id + "&imbalanceOnly=true"),
+                        "/api/v1/journals/imbalances?validationRunId=" + id),
                 condition(3, "심각도 긴급(CRITICAL) 미처리 예외가 0건인가",
                         counts.getUnresolvedCriticalExceptionCount(),
-                        "/exceptions?validationRunId=" + id + "&severity=CRITICAL&status=OPEN"),
+                        "/api/v1/exceptions?validationRunId=" + id + "&severity=CRITICAL&status=OPEN"),
                 condition(4, "정책 없음 · 정책 중복이 0건인가",
                         counts.getUnresolvedPolicyExceptionCount(),
-                        "/exceptions?validationRunId=" + id
-                                + "&type=POLICY_MISSING%2CPOLICY_DUPLICATE&status=OPEN"),
+                        "/api/v1/exceptions?validationRunId=" + id
+                                + "&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN"),
                 condition(5, "귀속합계 오류가 0건인가",
                         counts.getAttributionImbalanceCount(),
                         "/transactions?settlementMonth=" + month + "&attributionImbalanceOnly=true"),

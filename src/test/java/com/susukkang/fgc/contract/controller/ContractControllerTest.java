@@ -12,7 +12,8 @@ import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
-import com.susukkang.fgc.contract.dto.ContractResponse;
+import com.susukkang.fgc.contract.dto.ContractCreateResponse;
+import com.susukkang.fgc.contract.dto.ContractUpdateResponse;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.service.ContractService;
@@ -21,6 +22,7 @@ import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.arbitrage.service.ArbitrageService;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView;
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +88,22 @@ class ContractControllerTest {
 
     @MockitoBean
     private ArbitrageService arbitrageService;
+
+    @MockitoBean
+    private CapCheckService capCheckService;
+
+    @Test
+    @DisplayName("계약별 지급단계 최신 1,200% 판정을 조회한다")
+    void getContractCapChecksReturnsSuccess() throws Exception {
+        when(capCheckService.findLatest(eq(21L), any(PaymentStage.class)))
+                .thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/v1/contracts/{id}/cap-checks", 21L)
+                        .with(user("admin").roles("GA_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
 
     @Test
     @DisplayName("계약별 차익거래 검증 시계열을 조회한다")
@@ -198,8 +216,17 @@ class ContractControllerTest {
         ContractDetailResponse detail =
                 ContractDetailResponse.builder()
                         .contractNo("TEST-20260806-001")
+                        .contractId(21L)
+                        .insurerId(1L)
+                        .insurerName("미래가상생명")
+                        .productOfferingId(3L)
                         .productName("가상 건강보장보험 A")
+                        .offeringVersion("2026-A")
                         .contractDate(LocalDate.of(2026, 8, 6))
+                        .agentId(4L)
+                        .agentName("김설계")
+                        .organizationId(5L)
+                        .organizationName("서울지사")
                         .premiumPerCycleAmount(
                                 new BigDecimal("100000")
                         )
@@ -236,7 +263,11 @@ class ContractControllerTest {
                 .andExpect(
                         jsonPath("$.data.productName")
                                 .value("가상 건강보장보험 A")
-                );
+                )
+                .andExpect(jsonPath("$.data.insurerId").value(1))
+                .andExpect(jsonPath("$.data.productOfferingId").value(3))
+                .andExpect(jsonPath("$.data.agentId").value(4))
+                .andExpect(jsonPath("$.data.organizationId").value(5));
     }
 
     @Test
@@ -276,14 +307,52 @@ class ContractControllerTest {
     @DisplayName("보험계약을 생성한다")
     void createContractReturnsSuccess() throws Exception {
         when(contractService.createContract(any(ContractCreateRequest.class)))
-                .thenReturn(ContractResponse.builder().contractId(21L).build());
+                .thenReturn(ContractCreateResponse.builder()
+                        .contractId(21L)
+                        .scheduleHeaderIds(java.util.List.of(101L, 102L))
+                        .build());
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("settlement").roles("SETTLEMENT"))
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contractId").value(21))
+                .andExpect(jsonPath("$.data.scheduleHeaderIds[0]").value(101))
+                .andExpect(jsonPath("$.data.regeneratedScheduleIds").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("일시납과 0원 경계값으로 보험계약을 생성할 수 있다")
+    void createContractAcceptsSinglePaymentAndZeroPremiums() throws Exception {
+        ContractCreateRequest request = createRequest();
+        request.setPaymentCycleCode(com.susukkang.fgc.contract.domain.PaymentCycleCode.SINGLE);
+        request.setPremiumPerCycleAmount(BigDecimal.ZERO);
+        request.setFirstPremiumAmount(BigDecimal.ZERO);
+        request.setMonthlyEquivalentFirstPremium(BigDecimal.ZERO);
+        when(contractService.createContract(any(ContractCreateRequest.class)))
+                .thenReturn(ContractCreateResponse.builder().contractId(21L).build());
+
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("settlement").roles("SETTLEMENT"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.contractId").value(21));
+    }
+
+    @Test
+    @DisplayName("주기 보험료가 없으면 계약 생성을 거절한다")
+    void createContractRejectsMissingPremiumPerCycle() throws Exception {
+        ContractCreateRequest request = createRequest();
+        request.setPremiumPerCycleAmount(null);
+
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("settlement").roles("SETTLEMENT"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("premiumPerCycleAmount"));
     }
 
     /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 계약 등록·수정도 허용된다. */
@@ -291,7 +360,7 @@ class ContractControllerTest {
     @DisplayName("SYSTEM_ADMIN 도 보험계약을 생성할 수 있다")
     void createContractAllowsSystemAdmin() throws Exception {
         when(contractService.createContract(any(ContractCreateRequest.class)))
-                .thenReturn(ContractResponse.builder().contractId(21L).build());
+                .thenReturn(ContractCreateResponse.builder().contractId(21L).build());
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("admin").roles("SYSTEM_ADMIN"))
@@ -308,14 +377,21 @@ class ContractControllerTest {
         when(contractService.updateContract(
                 eq(21L),
                 any(ContractUpdateRequest.class)
-        )).thenReturn(ContractResponse.builder().contractId(21L).build());
+        )).thenReturn(ContractUpdateResponse.builder()
+                .contractId(21L)
+                .scheduleHeaderIds(java.util.List.of(201L, 202L))
+                .regeneratedScheduleIds(java.util.List.of(201L, 202L))
+                .build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("admin").roles("SYSTEM_ADMIN"))
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.contractId").value(21));
+                .andExpect(jsonPath("$.data.contractId").value(21))
+                .andExpect(jsonPath("$.data.scheduleHeaderIds[0]").value(201))
+                .andExpect(jsonPath("$.data.regeneratedScheduleIds[0]").value(201))
+                .andExpect(jsonPath("$.data.scheduleHeaderIds[1]").value(202));
     }
 
     @Test
@@ -324,7 +400,7 @@ class ContractControllerTest {
         when(contractService.updateContract(
                 eq(21L),
                 any(ContractUpdateRequest.class)
-        )).thenReturn(ContractResponse.builder().contractId(21L).build());
+        )).thenReturn(ContractUpdateResponse.builder().contractId(21L).build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("settlement").roles("SETTLEMENT"))
@@ -346,6 +422,7 @@ class ContractControllerTest {
                 MONTHLY,
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
+                new BigDecimal("100000"),
                 120,
                 new BigDecimal("50000")
         );
@@ -361,6 +438,7 @@ class ContractControllerTest {
                 1L,
                 4L,
                 MONTHLY,
+                new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 120,

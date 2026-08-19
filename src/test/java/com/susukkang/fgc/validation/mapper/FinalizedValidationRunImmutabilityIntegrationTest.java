@@ -1,10 +1,15 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
+import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -13,7 +18,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * "FINALIZED 상태의 검증 실행과 그 하위 결과가 재실행으로 변경되지 않는지 검증"
+ * 설명 : FINALIZED 검증 실행과 하위 결과의 불변성 통합 테스트
+ *
+ * @author yslee
+ * @since 2026-08-19
+ * @version 1.2
  */
 @SpringBootTest
 @Transactional
@@ -21,9 +30,13 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private ValidationRunCreateService validationRunCreateService;
 
     private Long validationRunId;
     private Long capCheckId;
+    private Long committedOriginalRunId;
+    private Long committedCorrectionRunId;
 
     private Long contractId() {
         return jdbcTemplate.queryForObject(
@@ -162,6 +175,49 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
     }
 
     @Test
+    void updatingReconciliationMatchUnderFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        Long reconciliationResultId = createMatchedReconciliationResult(reconciliationRunId, "MATCH");
+        Long scheduleLineId = createScheduleLine();
+        Long reconciliationMatchId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_match (
+                    reconciliation_result_id, match_seq, schedule_line_id,
+                    matched_amount, match_role
+                ) VALUES (?, 1, ?, 100, 'EXPECTED')
+                RETURNING reconciliation_match_id
+                """, Long.class, reconciliationResultId, scheduleLineId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_match
+                   SET matched_amount = 90
+                 WHERE reconciliation_match_id = ?
+                """, reconciliationMatchId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
+    void movingReconciliationResultAwayFromFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long finalizedReconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        Long reconciliationResultId = createMatchedReconciliationResult(
+                finalizedReconciliationRunId, "REPARENT");
+        Long openValidationRunId = createRunningValidationRun();
+        Long openReconciliationRunId = createCompletedReconciliationRun(openValidationRunId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_result
+                   SET reconciliation_run_id = ?
+                 WHERE reconciliation_result_id = ?
+                """, openReconciliationRunId, reconciliationResultId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
     void updatingReconciliationRunUnderFinalizedValidationRunIsRejected() {
         validationRunId = createRunningValidationRun();
         Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
@@ -208,30 +264,45 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
 
     @Test
     void correctionForSameMonthCreatesNextRunNumberWithoutChangingFinalizedRun() {
-        validationRunId = createFinalizedValidationRun();
-        Integer previousRunNo = jdbcTemplate.queryForObject(
-                "SELECT run_no FROM fgc.validation_run WHERE validation_run_id = ?",
-                Integer.class, validationRunId);
-        Integer nextRunNo = jdbcTemplate.queryForObject("""
-                SELECT COALESCE(MAX(run_no), 0) + 1
-                  FROM fgc.validation_run
-                 WHERE validation_month = DATE '2031-05-01'
-                """, Integer.class);
+        LocalDate validationMonth = LocalDate.of(2031, 5, 1);
+        Long userId = jdbcTemplate.queryForObject(
+                "SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1", Long.class);
+        ValidationRunRow original = validationRunCreateService.create(
+                new CreateValidationRunCommand(validationMonth, ValidationRunType.PRE_CONFIRM, userId));
+        committedOriginalRunId = original.getValidationRunId();
+        validationRunId = committedOriginalRunId;
+        jdbcTemplate.update(
+                "UPDATE fgc.validation_run SET status='RUNNING', current_step=1, started_at=now() WHERE validation_run_id=?",
+                validationRunId);
+        finalizeValidationRun(validationRunId);
 
-        // 정정은 확정본을 되돌리는 UPDATE가 아니라 같은 월의 새 실행으로 남겨 이력 재현성을 보장한다.
-        Long newRunId = jdbcTemplate.queryForObject("""
-                INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
-                VALUES (DATE '2031-05-01', ?, 'PRE_CONFIRM')
-                RETURNING validation_run_id
-                """, Long.class, nextRunNo);
+        // 2026-08-19 yslee - 같은 월 보정 실행을 운영 생성 서비스 경로로 검증
+        // 기존 코드: 테스트가 MAX(run_no)+1을 직접 계산하고 validation_run을 raw SQL로 삽입
+        // 문제: 실제 서비스의 회차 채번과 정책 스냅샷 저장 경로가 깨져도 테스트가 통과할 수 있음
+        // 개선: ValidationRunCreateService를 호출해 실제 운영 경로가 다음 회차를 생성하는지 확인
+        ValidationRunRow correction = validationRunCreateService.create(
+                new CreateValidationRunCommand(validationMonth, ValidationRunType.PRE_CONFIRM, userId));
+        committedCorrectionRunId = correction.getValidationRunId();
 
-        assertThat(nextRunNo).isGreaterThan(previousRunNo);
+        assertThat(correction.getRunNo()).isGreaterThan(original.getRunNo());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM fgc.validation_run WHERE validation_run_id = ?",
                 String.class, validationRunId)).isEqualTo("FINALIZED");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM fgc.validation_run WHERE validation_run_id = ?",
-                String.class, newRunId)).isEqualTo("CREATED");
+                String.class, committedCorrectionRunId)).isEqualTo("CREATED");
+    }
+
+    @AfterTransaction
+    void removeRunsCommittedByCreateServiceTest() {
+        if (committedCorrectionRunId != null) {
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", committedCorrectionRunId);
+        }
+        if (committedOriginalRunId != null) {
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", committedOriginalRunId);
+        }
     }
 
     private Long createCompletedReconciliationRun(Long runId) {
@@ -252,5 +323,48 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
                  WHERE reconciliation_run_id = ?
                 """, reconciliationRunId);
         return reconciliationRunId;
+    }
+
+    private Long createMatchedReconciliationResult(Long reconciliationRunId, String suffix) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_result (
+                    reconciliation_run_id, match_group_key, result_type,
+                    expected_total_amount, actual_total_amount, difference_amount
+                ) VALUES (?, ?, 'MATCHED', 100, 100, 0)
+                RETURNING reconciliation_result_id
+                """, Long.class, reconciliationRunId,
+                "FUN044-RECO-" + suffix + "-" + reconciliationRunId);
+    }
+
+    private Long createScheduleLine() {
+        Long policyVersionId = jdbcTemplate.queryForObject(
+                "SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1",
+                Long.class);
+        Long commissionItemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1",
+                Long.class);
+        Integer scheduleVersionNo = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(MAX(schedule_version_no), 0) + 1
+                  FROM fgc.schedule_header
+                 WHERE contract_id = ?
+                   AND payment_stage = 'GA_TO_FC'
+                   AND schedule_purpose = 'OPERATIONAL'
+                """, Integer.class, contractId());
+        Long scheduleHeaderId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_header (
+                    contract_id, payment_stage, policy_version_id, schedule_version_no,
+                    schedule_regime, schedule_purpose, active_yn
+                ) VALUES (?, 'GA_TO_FC', ?, ?, 'CURRENT', 'OPERATIONAL', false)
+                RETURNING schedule_header_id
+                """, Long.class, contractId(), policyVersionId, scheduleVersionNo);
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_line (
+                    schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                    commission_item_id, basis_code, basis_amount, calculation_type,
+                    rate_pct, expected_amount
+                ) VALUES (?, 1, 1, 1, DATE '2031-05-01', ?, 'TEST_AMOUNT', 100,
+                          'RATE', 100.000000, 100)
+                RETURNING schedule_line_id
+                """, Long.class, scheduleHeaderId, commissionItemId);
     }
 }

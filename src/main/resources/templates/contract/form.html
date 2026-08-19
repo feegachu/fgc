@@ -1,231 +1,201 @@
-<!DOCTYPE html>
-<!--
-  FGC-UI-CONT-W03 보험계약 등록·수정
-  요구사항 FUN-018(수기 등록) · FUN-036(스케줄 생성) · FUN-040(멱등성)
-  데이터  쓰기 insurance_contract (data_origin='MANUAL')
-          같은 트랜잭션 안에서 schedule_header + schedule_line 생성
-  API     POST /api/v1/contracts        PUT /api/v1/contracts/{id}
-  라우트  GET /contracts/new → contract/form.html
-
-  [막을 것]
-   · 계약번호 중복 저장 — DB UNIQUE(insurer_id, contract_no) 가 물리적으로 막습니다
-   · 필수값이 비어 있으면 저장 버튼을 활성화하지 않습니다
-   · 계약일에 미래 날짜를 넣을 수 없습니다
-
-  [만들 때 주의]
-   저장과 스케줄 생성은 반드시 같은 트랜잭션입니다.
-   계약만 저장되고 스케줄이 없는 상태가 생기면 대사가 전부 틀립니다.
-
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-CONT-W03)의 정적 골격만 옮겼다.
-  드롭다운 선택지(보험회사·판매버전·설계사·계약상태·납입주기)는 기준정보 조회(IF-API-04~08)
-  연동 시 서버 렌더링으로, 폼 전송은 IF-API-18/19 연동 시 th:action 으로 연결한다.
-  가운뎃점 문자를 th:* 표현식에 쓰지 않기 위해 화면 제목은 '보험계약 등록' 으로 줄였다(1차는 등록만).
--->
-<!-- 가운뎃점(·)은 작은따옴표 문자열 안이라 안전하다 — layout/default.html 주석 참고 -->
-<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W03', '보험계약 등록·수정', '보험계약', '/contracts')}"
-      xmlns:th="http://www.thymeleaf.org">
+<!doctype html>
+<!-- FGC-UI-CONT-W03 · 최신 docs/FGC_화면정의서_v2_0.md 기준 보험계약 등록·수정 -->
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W03', '보험계약 등록·수정', '보험계약', '/contracts')}">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-form publishing-page-contract-form">
-
-  <!-- 목업 head 의 .form-grid 스타일 — ~{::main} 으로 main 만 옮겨지므로 여기 둔다 -->
-  <style>
-    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
-    @media (max-width: 820px) { .form-grid { grid-template-columns: 1fr; } }
-  </style>
-
-  <div class="publishing-page-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div>
-      <h1 class="fgc-page-title">보험계약 등록</h1>
-      <p class="fgc-page-desc">
-        계약을 저장하면 <strong>같은 순간에 예상 스케줄(회차별로 언제 얼마를 줄 예정인지)이 자동으로 만들어집니다.</strong>
-        계약만 저장되고 스케줄이 없는 상태는 생기지 않습니다.
-      </p>
+<main id="main-content" class="page-content publishing-page contract-form-page">
+  <header class="page-header contract-form-page-header">
+    <div class="page-header-copy">
+      <h1 class="page-title" th:text="${isEditMode ? '보험계약 수정' : '보험계약 등록'}">보험계약 등록</h1>
+      <p class="page-description">계약을 저장하면 같은 트랜잭션에서 예상 스케줄을 생성하고 1,200% 한도를 계산합니다.</p>
     </div>
-    <a class="fgc-btn fgc-btn--ghost" th:href="@{/contracts}" style="text-decoration:none">
-      <span class="material-symbols-outlined" style="font-size:18px">arrow_back</span> 목록으로
-    </a>
+    <div class="page-header-actions">
+      <a class="button button-secondary" th:href="@{/contracts}">
+        <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>목록으로
+      </a>
+    </div>
+  </header>
+
+  <div id="contract-form-error-summary" class="form-error-summary" role="alert" hidden>
+    <strong>입력 내용을 확인해 주세요.</strong>
+    <p id="contract-form-error-message"></p>
+    <p id="contract-form-request-id" class="contract-request-id" hidden></p>
   </div>
 
-  <!-- 폼 전송(POST · IF-API-18)은 다음 단계에서 th:action/th:object 로 연결한다. 지금은 정적 골격만. -->
-  <form id="contract-form" style="margin-top:20px;display:flex;flex-direction:column;gap:16px" novalidate>
+  <form id="contract-form" class="contract-form-layout" novalidate
+        th:attr="data-mode=${isEditMode ? 'edit' : 'create'},data-contract-id=${contractId}">
+    <div class="contract-form-left-column">
+      <section class="surface contract-form-card contract-basic-form-card" aria-labelledby="contract-basic-title">
+        <header class="contract-form-card-header">
+          <h2 id="contract-basic-title">계약 기본</h2>
+          <p>보험회사와 계약일을 먼저 선택하면 판매 가능한 상품 버전을 조회합니다.</p>
+        </header>
+        <div class="contract-form-fields">
+          <label class="field" data-field="insurerId">
+            <span class="field-label">보험회사 <span class="field-required" aria-hidden="true">*</span></span>
+            <select id="insurer-id" name="insurerId" class="select-control" required>
+              <option value="">불러오는 중...</option>
+            </select>
+            <span class="field-error" data-field-error="insurerId"></span>
+          </label>
 
-    <!-- ── 계약 기본 ─────────────────────────────────────── -->
-    <section class="fgc-card">
-      <div class="fgc-card__head"><span class="fgc-card__title">계약 기본</span></div>
-      <div class="fgc-card__body form-grid">
+          <label class="field" data-field="productOfferingId">
+            <span class="field-label">상품 판매버전 <span class="field-required" aria-hidden="true">*</span></span>
+            <select id="product-offering-id" name="productOfferingId" class="select-control" required disabled>
+              <option value="">보험회사와 계약일을 먼저 선택하세요</option>
+            </select>
+            <span class="field-error" data-field-error="productOfferingId"></span>
+          </label>
 
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="insurer">보험회사</label>
-          <select class="fgc-select" id="insurer" required>
-            <option value="">선택하세요</option>
-          </select>
-          <span class="fgc-help">insurer 테이블. 선택하면 아래 상품 목록이 걸러집니다.</span>
+          <label class="field" data-field="contractNo">
+            <span class="field-label">계약번호 <span class="field-required" aria-hidden="true">*</span></span>
+            <input id="contract-no" name="contractNo" class="field-control" type="text" maxlength="80"
+                   autocomplete="off" placeholder="계약번호 입력" required>
+            <span class="field-helper">같은 보험회사 안에서는 중복될 수 없습니다.</span>
+            <span class="field-error" data-field-error="contractNo"></span>
+          </label>
+
+          <label class="field" data-field="contractDate">
+            <span class="field-label">계약일 <span class="field-required" aria-hidden="true">*</span></span>
+            <input id="contract-date" name="contractDate" class="field-control tabular-nums" type="date" required>
+            <span class="field-helper">미래 날짜는 선택할 수 없습니다.</span>
+            <span class="field-error" data-field-error="contractDate"></span>
+          </label>
+
+          <label class="field" data-field="contractStatus">
+            <span class="field-label">계약상태 <span class="field-required" aria-hidden="true">*</span></span>
+            <select id="contract-status" name="contractStatus" class="select-control" required>
+              <option value="APPLIED">청약</option>
+              <option value="ACTIVE" selected>유지</option>
+              <option value="UNPAID">미납</option>
+              <option value="LAPSED">실효</option>
+              <option value="REVIVED">부활</option>
+              <option value="CANCELLED">청약철회</option>
+              <option value="TERMINATED">해지</option>
+              <option value="MATURED">만기</option>
+            </select>
+            <span class="field-error" data-field-error="contractStatus"></span>
+          </label>
         </div>
+      </section>
 
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="offering">상품 판매버전</label>
-          <select class="fgc-select" id="offering" required disabled>
-            <option value="">보험회사를 먼저 선택하세요</option>
-          </select>
-          <span class="fgc-help">
-            product_offering. <span class="fgc-evidence">판매버전<span class="fgc-evidence__tip">
-            같은 상품이라도 판매개시일·기초서류 버전이 다르면 적용되는 수수료 체계가 달라집니다(REG-19).
-            그래서 상품이 아니라 "판매버전"을 고릅니다.</span></span>을 고르는 이유가 있습니다.
-          </span>
+      <section class="surface contract-form-card contract-agent-card" aria-labelledby="contract-agent-title">
+        <header class="contract-form-card-header">
+          <h2 id="contract-agent-title">모집 설계사 · 소속</h2>
+          <p>설계사를 선택하면 계약일 기준 소속 조직을 자동으로 채웁니다.</p>
+        </header>
+        <div class="contract-form-fields contract-agent-fields">
+          <label class="field" data-field="agentId">
+            <span class="field-label">모집 설계사 <span class="field-required" aria-hidden="true">*</span></span>
+            <select id="agent-id" name="agentId" class="select-control" required disabled>
+              <option value="">계약일을 먼저 선택하세요</option>
+            </select>
+            <span class="field-error" data-field-error="agentId"></span>
+          </label>
+
+          <label class="field" data-field="organizationId">
+            <span class="field-label">소속 조직 <span class="field-required" aria-hidden="true">*</span></span>
+            <input id="organization-name" class="field-control contract-filled-control" type="text"
+                   readonly placeholder="설계사를 선택하면 자동으로 채워집니다">
+            <input id="organization-id" name="organizationId" type="hidden">
+            <span class="field-error" data-field-error="organizationId"></span>
+          </label>
         </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="contractNo">계약번호</label>
-          <input class="fgc-input" id="contractNo" type="text" maxlength="80" placeholder="C007" required>
-          <span class="fgc-help">같은 보험회사 안에서 중복될 수 없습니다.</span>
-          <span class="fgc-error" id="err-contractNo" hidden></span>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="contractDate">계약일 (계약 체결일)</label>
-          <input class="fgc-input" id="contractDate" type="date" required>
-          <span class="fgc-help">
-            미래 날짜는 넣을 수 없습니다. 1,200%룰과 차익거래는 <strong>이 날짜</strong>를 기준으로 판단합니다(REG-19). 분급 체계·수수료율은 상품 판매개시일·기초서류 버전 기준으로 별도로 정해집니다(REG-19).
-          </span>
-          <span class="fgc-error" id="err-contractDate" hidden></span>
-        </div>
-
-        <!-- 계약자 이름 입력칸은 제거했습니다 (SRC-027 D-05).
-             계약 식별은 계약번호(contract_no)로 합니다. 계약자 이름은 1,200%룰·차익거래·대사
-             어느 계산에도 쓰이지 않고, insurance_contract 에 저장할 컬럼도 없습니다.
-             운영 화면에서도 불필요한 개인정보를 만들거나 노출하지 않습니다(COR-009). -->
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="status">계약상태</label>
-          <!-- 계약상태 선택지는 서버 렌더링으로 채운다 (contract_status 코드) -->
-          <select class="fgc-select" id="status" required></select>
-          <span class="fgc-help">새 계약은 보통 정상(ACTIVE)입니다.</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── 모집 · 조직 ─────────────────────────────────────── -->
-    <section class="fgc-card">
-      <div class="fgc-card__head"><span class="fgc-card__title">모집 설계사 · 소속</span></div>
-      <div class="fgc-card__body form-grid">
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="agent">모집 설계사</label>
-          <select class="fgc-select" id="agent" required>
-            <option value="">선택하세요</option>
-          </select>
-          <span class="fgc-help">agent 테이블. 이 계약을 처음 체결한 설계사입니다.</span>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label" for="org">소속 조직</label>
-          <input class="fgc-input" id="org" type="text" readonly placeholder="설계사를 선택하면 자동으로 채워집니다">
-          <span class="fgc-help">설계사의 현재 소속을 따라갑니다. 직접 고치지 않습니다.</span>
-        </div>
-      </div>
-
-      <div class="fgc-card__body" style="padding-top:0">
-        <div class="fgc-banner fgc-banner--muted">
-          <span class="material-symbols-outlined" style="font-size:18px">groups</span>
-          <span>
-            <strong>모집설계사</strong>와 <strong>유지관리 담당설계사</strong>는 다른 사람일 수 있습니다.
-            처음 계약을 체결한 사람이 모집설계사, 지금 계약을 관리하는 사람이 유지관리 담당자입니다(REG-07).
-            담당자 변경 이력 관리는 2차(FGC-UI-ORG-W01)에서 만듭니다.
-          </span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── 보험료 · 납입 ─────────────────────────────────────── -->
-    <section class="fgc-card">
-      <div class="fgc-card__head">
-        <span class="fgc-card__title">보험료 · 납입 조건</span>
-        <span class="fgc-muted" style="font-size:12px">1,200% 한도의 기준이 되는 값입니다</span>
-      </div>
-      <div class="fgc-card__body form-grid">
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="cycle">납입주기</label>
-          <!-- 납입주기 선택지는 서버 렌더링으로 채운다 (payment_cycle 코드) -->
-          <select class="fgc-select" id="cycle" required></select>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="premiumPerCycle">주기 보험료 (원)</label>
-          <input class="fgc-input fgc-num" id="premiumPerCycle" type="number" min="0" step="1" value="100000" required>
-          <span class="fgc-help">한 번 낼 때마다 내는 금액. 3개월납이면 3개월치입니다.</span>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="firstPremium">초회 보험료 (원)</label>
-          <input class="fgc-input fgc-num" id="firstPremium" type="number" min="0" step="1" value="100000" required>
-          <span class="fgc-help">계약하고 처음 낸 보험료.</span>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="monthlyEquiv">월납환산 초회보험료 (원)</label>
-          <input class="fgc-input fgc-num" id="monthlyEquiv" type="number" min="0" step="1" value="100000" required>
-          <span class="fgc-help" style="color:#B45309;font-weight:600">
-            ★ 1,200% 한도는 이 값 × 12로 계산됩니다. 주기 보험료가 아니라 <strong>월로 환산한 값</strong>입니다.
-          </span>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label fgc-label--required" for="termMonths">납입기간 (개월)</label>
-          <input class="fgc-input fgc-num" id="termMonths" type="number" min="1" step="1" value="240" required>
-        </div>
-
-        <div class="fgc-field">
-          <label class="fgc-label" for="stdDeduction">표준해약공제액 (원)</label>
-          <input class="fgc-input fgc-num" id="stdDeduction" type="number" min="0" step="1" placeholder="해당 상품만 입력">
-          <span class="fgc-help">
-            <span class="fgc-evidence">표준해약공제액의 80% 이상<span class="fgc-evidence__tip">
-            표준해약공제액을 80% 이상 공제하는 상품은 1,200% 한도에 12차월 예상 해약환급금을 더해서 봅니다(REG-08).
-            차익거래 판정에서도 해약환급금을 합산합니다(REG-12).</span></span>을 공제하는 상품만 씁니다.
-          </span>
-        </div>
-      </div>
-
-      <!-- 한도 미리보기 — 값 갱신은 IF-API-18 연동 단계의 스크립트에서 처리한다 -->
-      <div class="fgc-card__body" style="padding-top:0">
-        <div class="fgc-stage-card fgc-stage-card--fc">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div>
-              <div style="font-size:12px;font-weight:700;color:#43474d">GA→설계사 초년도 1,200% 한도 (미리보기)</div>
-              <div class="fgc-help">
-                실제 한도는 저장 후 서버가 적용 룰셋(cap_rule_set)을 찾아 다시 계산합니다.
-                여기 값은 기본 계산식만 보여주는 참고값입니다.
-              </div>
-            </div>
-            <div style="text-align:right">
-              <div class="fgc-mono" style="font-size:12px;color:#43474d" id="limit-formula">100,000 × 12</div>
-              <div class="fgc-amount" style="font-size:22px;font-weight:800" id="limit-preview">1,200,000</div>
-            </div>
+        <aside class="contract-form-guidance">
+          <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+          <div>
+            <h3>소속 조직은 직접 수정하지 않습니다.</h3>
+            <p>계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다.</p>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── 버튼 ─────────────────────────────────────── -->
-    <div style="display:flex;justify-content:flex-end;gap:8px">
-      <a class="fgc-btn fgc-btn--ghost" th:href="@{/contracts}" style="text-decoration:none">취소</a>
-      <!-- 정적 disabled 로 시작한다 — 필수값을 다 채워야 활성화(화면정의서 :622).
-           th:disabled 를 걸면 정적 disabled 를 덮어써 readOnly=false 에서 즉시 활성화돼 버린다
-           (vrun/detail.html 확정 버튼과 같은 함정). IF-API-18 연동 시
-           th:disabled="${readOnly or !formValid}" 로 두 조건을 합친다. -->
-      <button class="fgc-btn fgc-btn--primary" id="save-btn" type="submit" data-fgc-action="save" disabled>
-        <span class="material-symbols-outlined" style="font-size:18px">save</span>
-        저장하고 예상 스케줄 만들기
-      </button>
+        </aside>
+      </section>
     </div>
 
-    <p class="fgc-help" id="save-hint" style="text-align:right">
-      필수 항목(*)을 모두 채우면 저장 버튼이 켜집니다.
-    </p>
+    <section class="surface contract-form-card contract-premium-card" aria-labelledby="contract-premium-title">
+      <header class="contract-form-card-header">
+        <h2 id="contract-premium-title">보험료 · 납입 조건</h2>
+        <p>원주기 보험료와 월납환산 초회보험료를 구분해 입력합니다.</p>
+      </header>
+      <div class="contract-form-fields contract-premium-fields">
+        <label class="field" data-field="paymentCycleCode">
+          <span class="field-label">납입주기 <span class="field-required" aria-hidden="true">*</span></span>
+          <select id="payment-cycle-code" name="paymentCycleCode" class="select-control" required>
+            <option value="MONTHLY">월납</option>
+            <option value="QUARTERLY">3개월납</option>
+            <option value="SEMI_ANNUAL">6개월납</option>
+            <option value="ANNUAL">연납</option>
+            <option value="SINGLE">일시납</option>
+          </select>
+          <span class="field-error" data-field-error="paymentCycleCode"></span>
+        </label>
+
+        <label class="field" data-field="premiumPerCycleAmount">
+          <span class="field-label">주기 보험료(원) <span class="field-required" aria-hidden="true">*</span></span>
+          <input id="premium-per-cycle-amount" name="premiumPerCycleAmount"
+                 class="field-control tabular-nums" type="number" min="0" step="1" inputmode="numeric" required>
+          <span id="premium-per-cycle-help" class="field-helper">월납환산 초회보험료와 납입주기에 따라 자동 계산됩니다.</span>
+          <span class="field-error" data-field-error="premiumPerCycleAmount"></span>
+        </label>
+
+        <label class="field" data-field="firstPremiumAmount">
+          <span class="field-label">초회 보험료(원) <span class="field-required" aria-hidden="true">*</span></span>
+          <input id="first-premium-amount" name="firstPremiumAmount"
+                 class="field-control tabular-nums" type="number" min="0" step="1" inputmode="numeric" required>
+          <span class="field-error" data-field-error="firstPremiumAmount"></span>
+        </label>
+
+        <label class="field" data-field="monthlyEquivalentFirstPremium">
+          <span class="field-label">월납환산 초회보험료(원) <span class="field-required" aria-hidden="true">*</span></span>
+          <input id="monthly-equivalent-first-premium" name="monthlyEquivalentFirstPremium"
+                 class="field-control tabular-nums" type="number" min="0" step="1" inputmode="numeric" required>
+          <span class="field-helper">서버의 1,200% 한도 계산 기준값입니다.</span>
+          <span class="field-error" data-field-error="monthlyEquivalentFirstPremium"></span>
+        </label>
+
+        <label class="field" data-field="paymentTermMonths">
+          <span class="field-label">납입기간(개월) <span class="field-required" aria-hidden="true">*</span></span>
+          <input id="payment-term-months" name="paymentTermMonths"
+                 class="field-control tabular-nums" type="number" min="1" step="1" inputmode="numeric" required>
+          <span class="field-error" data-field-error="paymentTermMonths"></span>
+        </label>
+
+        <label class="field" data-field="standardSurrenderDeductionAmount">
+          <span class="field-label">표준해약공제액(원)</span>
+          <input id="standard-surrender-deduction-amount" name="standardSurrenderDeductionAmount"
+                 class="field-control tabular-nums" type="number" min="0" step="1" inputmode="numeric"
+                 placeholder="해당 상품만 입력">
+          <span class="field-helper">비워 두면 한도 가산에 사용하지 않습니다.</span>
+          <span class="field-error" data-field-error="standardSurrenderDeductionAmount"></span>
+        </label>
+      </div>
+
+      <aside class="contract-limit-preview" aria-label="1,200% 한도 참고 미리보기">
+        <p>GA→설계사 초년도 1,200% 한도 참고값</p>
+        <div class="contract-limit-value-row">
+          <strong id="contract-limit-preview">—</strong><span>원</span>
+        </div>
+        <p id="contract-limit-formula">월납환산 초회보험료 × 12</p>
+        <p>참고용 기본 계산식입니다. 실제 한도는 저장 후 적용 룰셋·환급금 가산 등을 반영해 서버가 다시 계산합니다.</p>
+      </aside>
+    </section>
+
+    <section class="surface contract-form-actions" aria-label="계약 저장 작업">
+      <div class="contract-action-guidance">
+        <span class="material-symbols-rounded" aria-hidden="true">info</span>
+        <div>
+          <strong>필수 항목을 모두 입력하면 저장할 수 있습니다.</strong>
+          <p id="contract-save-hint">기준정보를 불러오는 중입니다.</p>
+        </div>
+      </div>
+      <div class="contract-action-buttons">
+        <a class="button button-secondary" th:href="@{/contracts}">취소</a>
+        <button id="contract-save-button" class="button button-primary contract-save-button" type="submit" disabled>
+          <span class="material-symbols-rounded" aria-hidden="true">save</span>
+          <span th:text="${isEditMode ? '수정하고 스케줄 재생성' : '저장하고 예상 스케줄 만들기'}">저장하고 예상 스케줄 만들기</span>
+        </button>
+      </div>
+    </section>
   </form>
-
-  <!-- 목업의 저장 완료 모달(saved-modal)은 옮기지 않았다 —
-       IF-API-18/19 연동 시 MPA 리다이렉트(저장 후 상세/스케줄 이동)로 대체 예정. -->
-
 </main>
 </body>
 </html>
