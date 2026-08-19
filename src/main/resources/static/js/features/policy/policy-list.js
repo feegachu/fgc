@@ -14,6 +14,37 @@
     return value == null || value === "" ? "-" : escapeHtml(value);
   }
 
+  function tableCellDisclosure(value, limit, singleLine) {
+    var text = value == null || value === "" ? "-" : String(value);
+    var safeText = escapeHtml(text);
+    if (text.length <= limit) return safeText;
+    return "<div class='table-cell-disclosure'>"
+        + "<span class='table-cell-preview" + (singleLine ? " is-single-line" : "") + "'>" + safeText + "</span>"
+        + "<details class='table-cell-details' hidden><summary>"
+        + "<span class='table-cell-more'>전체 보기</span><span class='table-cell-less'>접기</span>"
+        + "<span class='material-symbols-rounded table-cell-chevron' aria-hidden='true'>expand_more</span>"
+        + "</summary><p class='table-cell-full'>" + safeText + "</p></details></div>";
+  }
+
+  function syncTableCellDisclosures(scope) {
+    (scope || document).querySelectorAll(".table-cell-disclosure").forEach(function (disclosure) {
+      var preview = disclosure.querySelector(".table-cell-preview");
+      var details = disclosure.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+
+      var isTruncated = preview.scrollWidth > preview.clientWidth + 1
+          || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !isTruncated;
+      if (!isTruncated) details.open = false;
+    });
+  }
+
+  function scheduleDisclosureSync(scope) {
+    window.requestAnimationFrame(function () {
+      syncTableCellDisclosures(scope);
+    });
+  }
+
   function formatNumber(value, options) {
     if (value == null || value === "" || (typeof value === "string" && value.trim() === "")) return "-";
     var parsed = Number(value);
@@ -47,7 +78,12 @@
   }
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { formatNumber: formatNumber, formatRate: formatRate, formatRange: formatRange };
+    module.exports = {
+      formatNumber: formatNumber,
+      formatRate: formatRate,
+      formatRange: formatRange,
+      tableCellDisclosure: tableCellDisclosure
+    };
     return;
   }
 
@@ -104,13 +140,13 @@
     var rows = rules.map(function (rule) {
       return "<tr>"
           + "<td>" + escapeHtml(rule.paymentStageLabel) + "</td>"
-          + "<td>" + (rule.insurerName == null ? "전체" : escapeHtml(rule.insurerName)) + "</td>"
-          + "<td>" + (rule.productName == null ? "전체" : escapeHtml(rule.productName)) + "</td>"
+          + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(rule.insurerName == null ? "전체" : rule.insurerName, 24, true) + "</td>"
+          + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(rule.productName == null ? "전체" : rule.productName, 28, false) + "</td>"
           + "<td class='tabular-nums'>" + dash(rule.agentRankCode) + "</td>"
-          + "<td>" + escapeHtml(rule.itemName) + "</td>"
+          + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(rule.itemName, 28, false) + "</td>"
           + "<td class='tabular-nums'>" + formatRange(rule.installmentFrom, rule.installmentTo) + "</td>"
           + "<td>" + escapeHtml(calculationType[rule.calculationType] || rule.calculationType) + "</td>"
-          + "<td class='tabular-nums'>" + escapeHtml(rule.basisCode) + "</td>"
+          + "<td class='tabular-nums policy-disclosure-cell'>" + tableCellDisclosure(rule.basisCode, 20, true) + "</td>"
           + "<td class='is-number tabular-nums'>" + formatRate(rule.ratePct) + "</td>"
           + "<td class='is-number tabular-nums'>" + formatNumber(rule.fixedAmount, { maximumFractionDigits: 0 }) + "</td>"
           + "</tr>";
@@ -137,7 +173,7 @@
           + "<td class='is-number tabular-nums'>" + escapeHtml(set.premiumMultiplier) + "</td>"
           + "<td class='is-number tabular-nums'>" + escapeHtml(set.complianceDeductionPct) + "</td>"
           + "<td class='is-number tabular-nums'>" + escapeHtml(set.warningUsagePct) + "</td>"
-          + "<td class='tabular-nums'>" + escapeHtml(set.refundAdditionCondition) + "</td>"
+          + "<td class='tabular-nums policy-disclosure-cell'>" + tableCellDisclosure(set.refundAdditionCondition, 28, false) + "</td>"
           + "</tr>";
     }).join("");
     var setHeader = "<thead><tr>"
@@ -150,11 +186,11 @@
     result += sets.map(function (set) {
       var itemRows = (set.items || []).map(function (item) {
         return "<tr>"
-            + "<td>" + escapeHtml(item.itemName) + "</td>"
+            + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(item.itemName, 28, false) + "</td>"
             + "<td>" + inclusionBadge(item.inclusionStatus) + "</td>"
-            + "<td class='tabular-nums'>" + dash(item.exclusionType) + "</td>"
-            + "<td class='tabular-nums'>" + escapeHtml(item.attributionMethod) + "</td>"
-            + "<td>" + escapeHtml(item.decisionReason) + "</td>"
+            + "<td class='tabular-nums policy-disclosure-cell'>" + tableCellDisclosure(item.exclusionType, 24, true) + "</td>"
+            + "<td class='tabular-nums policy-disclosure-cell'>" + tableCellDisclosure(item.attributionMethod, 24, true) + "</td>"
+            + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(item.decisionReason, 36, false) + "</td>"
             + "</tr>";
       }).join("");
       if (!itemRows) return "";
@@ -209,6 +245,7 @@
       var body = document.querySelector(target[0]);
       if (body) body.innerHTML = target[1];
     });
+    scheduleDisclosureSync(document.querySelector('[data-policy-panel]:not([hidden])'));
   }
 
   function ensureDetail() {
@@ -294,6 +331,7 @@
     document.querySelectorAll("[data-policy-panel]").forEach(function (panel) {
       panel.hidden = panel.id !== tab.getAttribute("aria-controls");
     });
+    scheduleDisclosureSync(document.getElementById(tab.getAttribute("aria-controls")));
     if (detailTabs.indexOf(tab.getAttribute("aria-controls")) >= 0) ensureDetail();
   }
 
@@ -321,4 +359,24 @@
 
   var firstRow = document.querySelector("[data-policy-row]");
   if (firstRow) selectRow(firstRow);
+  scheduleDisclosureSync(document);
+
+  window.addEventListener("load", function () {
+    syncTableCellDisclosures(document.querySelector('[data-policy-panel]:not([hidden])'));
+  }, { once: true });
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      syncTableCellDisclosures(document.querySelector('[data-policy-panel]:not([hidden])'));
+    });
+  }
+
+  var disclosureResizeFrame = null;
+  window.addEventListener("resize", function () {
+    if (disclosureResizeFrame != null) window.cancelAnimationFrame(disclosureResizeFrame);
+    disclosureResizeFrame = window.requestAnimationFrame(function () {
+      disclosureResizeFrame = null;
+      syncTableCellDisclosures(document.querySelector('[data-policy-panel]:not([hidden])'));
+    });
+  });
 })();

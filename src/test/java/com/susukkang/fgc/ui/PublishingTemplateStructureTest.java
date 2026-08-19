@@ -152,6 +152,8 @@ class PublishingTemplateStructureTest {
     void policyListUsesCommonComponentsWithoutInlinePresentation() throws IOException {
         assertThat(resource("templates/policy/list.html"))
                 .contains("class=\"page-header policy-page-header\"")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
                 .contains("class=\"field policy-date-field\"")
                 .doesNotContain("class=\"guidance")
                 .contains("class=\"tab-list\"")
@@ -162,6 +164,10 @@ class PublishingTemplateStructureTest {
                 .contains("data-policy-select")
                 .contains("colspan=\"10\"")
                 .contains("class=\"empty-state policy-empty-state\"")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"table-cell-details\" hidden")
+                .contains("class=\"table-cell-more\">전체 보기")
+                .contains("class=\"table-cell-less\">접기")
                 .doesNotContain("data-policy-row tabindex=")
                 .doesNotContain("data-policy-row aria-selected=")
                 .doesNotContain("style=")
@@ -173,7 +179,18 @@ class PublishingTemplateStructureTest {
                 .contains("signal: requestController.signal")
                 .contains("detailAbortController.abort()")
                 .contains("selector.addEventListener(\"change\"")
+                .contains("function tableCellDisclosure(")
+                .contains("function syncTableCellDisclosures(")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready.then")
+                .contains("policy-disclosure-cell")
                 .doesNotContain("candidate.setAttribute(\"aria-selected\", isSelected");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains(".table-cell-disclosure")
+                .contains(".table-cell-details[open] .table-cell-less")
+                .contains(".table-cell-full");
 
         assertThat(resource("templates/layout/default.html"))
                 .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-POL-W01'\\}\"[^>]*th:href=\"@\\{/css/features/policy\\.css\\}\"[^>]*>")
@@ -181,7 +198,8 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("static/css/features/policy.css"))
                 .contains(".policy-page")
-                .contains(".policy-version-table");
+                .contains(".policy-version-table")
+                .contains(".data-table td.policy-disclosure-cell");
         assertThat(resource("static/js/features/policy/policy-list.js"))
                 .contains("[data-policy-tab]")
                 .contains("[data-detail-body]");
