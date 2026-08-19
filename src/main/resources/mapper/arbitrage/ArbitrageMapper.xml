@@ -98,6 +98,15 @@
         <include refid="arbitrageSearchCondition"/>
     </select>
 
+    <!-- 검색 조건에 해당하는 목록 페이징용 전체 건수를 조회한다. -->
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM arbitrage_check ac
+        JOIN insurance_contract c
+          ON c.contract_id = ac.contract_id
+        <include refid="arbitrageSearchCondition"/>
+    </select>
+
     <!-- 계약과 기준일에 해당하는 계약 정보 및 최신 금융 스냅샷을 조회한다. -->
     <select id="selectCalculationSource"
             resultType="com.susukkang.fgc.arbitrage.dto.ArbitrageCalculationSource">
