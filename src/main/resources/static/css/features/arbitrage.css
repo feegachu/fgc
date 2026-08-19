@@ -1,0 +1,15 @@
+/*
+ * ARB-W01 화면 전용 스타일 (#138).
+ *
+ * 지금은 루트 레이아웃만 둔다. 목록·상세 2단 Grid, 컬럼 폭, 정렬 헤더는 ARB 담당 이슈에서 채운다.
+ * 공통 컴포넌트(components.css)의 디자인을 여기에 다시 복사하지 않는다.
+ *
+ * 이관 예정: templates/arbitrage/list.html 의 <script> 블록(2단 Grid → CSS 미디어쿼리)과
+ *           인라인 style 34줄.
+ */
+
+.arbitrage-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}

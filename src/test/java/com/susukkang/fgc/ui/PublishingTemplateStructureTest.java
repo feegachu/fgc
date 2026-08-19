@@ -27,6 +27,38 @@ class PublishingTemplateStructureTest {
             "templates/audit/list.html"
     );
 
+    /*
+     * publishing.css 브리지 스코프에 아직 의존하는 화면.
+     *
+     * .publishing-page 안에서만 fgc-* 변수가 새 디자인 토큰으로 재매핑되므로(publishing.css:19-29),
+     * 레거시 클래스가 남아 있는 동안은 이 클래스가 반드시 있어야 목업 원본 팔레트로 떨어지지 않는다.
+     * 공통 컴포넌트 전환이 끝난 화면은 이 목록에서 빼고 아래 FULLY_MIGRATED_TEMPLATES 로 옮긴다
+     * — 그래야 화면 하나를 전환할 때 다른 화면 담당자의 테스트가 함께 깨지지 않는다 (#138).
+     */
+    private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of(
+            "templates/contract/form.html",
+            "templates/transaction/list.html",
+            "templates/transaction/form.html",
+            "templates/schedule/list.html",
+            "templates/schedule/detail.html",
+            "templates/arbitrage/list.html",
+            "templates/ledger/list.html",
+            "templates/exception/list.html",
+            "templates/vrun/list.html",
+            "templates/vrun/detail.html"
+    );
+
+    /*
+     * 공통 컴포넌트 전환이 끝나 브리지가 필요 없는 화면.
+     * 레거시 fgc-* 와 인라인 style 이 남아 있으면 안 된다.
+     */
+    private static final List<String> FULLY_MIGRATED_TEMPLATES = List.of(
+            "templates/base/index.html",
+            "templates/policy/list.html",
+            "templates/reco/list.html",
+            "templates/audit/list.html"
+    );
+
     @Test
     void publishedScreensUseProductionShellScopeWithoutPrototypeDependencies() throws IOException {
         for (String resource : PUBLISHED_TEMPLATES) {
@@ -35,9 +67,27 @@ class PublishingTemplateStructureTest {
             assertThat(template)
                     .as(resource)
                     .contains("id=\"main-content\"")
-                    .contains("publishing-page")
                     .doesNotContain("cdn.tailwindcss.com")
                     .doesNotContain("FGC.SEED");
+        }
+    }
+
+    @Test
+    void screensStillUsingLegacyClassesKeepTheBridgeScope() throws IOException {
+        for (String resource : BRIDGE_SCOPED_TEMPLATES) {
+            assertThat(resource(resource))
+                    .as(resource)
+                    .contains("publishing-page");
+        }
+    }
+
+    @Test
+    void migratedScreensDropLegacyClassesAndInlineStyles() throws IOException {
+        for (String resource : FULLY_MIGRATED_TEMPLATES) {
+            assertThat(resource(resource))
+                    .as(resource)
+                    .doesNotContain("class=\"fgc-")
+                    .doesNotContain("style=\"");
         }
     }
 
@@ -150,6 +200,73 @@ class PublishingTemplateStructureTest {
                 .contains("@media (max-width: 63.9375rem)")
                 .contains("@media (max-width: 47.9375rem)")
                 .contains("@media (prefers-reduced-motion: reduce)");
+    }
+
+    /*
+     * #138 선행 정비 — 화면별 이슈가 함께 쓰는 공통 자산이 자리를 잡았는지 확인한다.
+     * 이게 없으면 각 화면 담당자가 조건부 링크를 제각각 추가하거나 포맷 유틸을 또 만든다.
+     */
+    @Test
+    void productionLayoutLoadsSharedFormatUtilityAndPendingFeatureStyles() throws IOException {
+        String layout = resource("templates/layout/default.html");
+
+        assertThat(layout)
+                .containsPattern("(?s)<script[^>]*th:src=\"@\\{/js/common/format\\.js\\}\"[^>]*\\bdefer\\b[^>]*>");
+
+        assertThat(layout)
+                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{#strings\\.startsWith\\(screenId, 'FGC-UI-TRAN-'\\)\\}\"[^>]*th:href=\"@\\{/css/features/transaction\\.css\\}\"[^>]*>")
+                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{#strings\\.startsWith\\(screenId, 'FGC-UI-VRUN-'\\)\\}\"[^>]*th:href=\"@\\{/css/features/vrun\\.css\\}\"[^>]*>")
+                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-LEDG-W01'\\}\"[^>]*th:href=\"@\\{/css/features/ledger\\.css\\}\"[^>]*>")
+                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-ARB-W01'\\}\"[^>]*th:href=\"@\\{/css/features/arbitrage\\.css\\}\"[^>]*>");
+    }
+
+    /*
+     * FGC-SIR-008 — 표시 형식을 화면마다 다시 구현하지 않도록 공통 유틸에 계약을 고정한다.
+     * 특히 Asia/Seoul 고정과 "화면에서 반올림하지 않는다"(화면정의서 4장 규칙 2)가 지켜져야 한다.
+     */
+    @Test
+    void sharedFormatUtilityFixesDisplayStandardContracts() throws IOException {
+        assertThat(resource("static/js/common/format.js"))
+                .contains("Asia/Seoul")
+                .contains("window.FgcUi.format = format")
+                .contains("function errorText(")
+                .contains("요청 ID: ")
+                .doesNotContain("toFixed(")
+                .doesNotContain("Math.round(");
+    }
+
+    /*
+     * FGC-SIR-005 / 화면정의서 4장 규칙 5 — 규제 근거는 상단 배너가 아니라 값 옆에서 연다.
+     * data-table 이 overflow: hidden 이라 popover(top layer)로 두어야 셀 안에서 잘리지 않는다.
+     */
+    @Test
+    void evidencePopoverComponentEscapesTableClipping() throws IOException {
+        assertThat(resource("static/css/common/components.css"))
+                .contains(".evidence-trigger")
+                .contains(".evidence-popover")
+                .contains(":popover-open")
+                .contains(".data-table td.has-evidence")
+                // popover 를 못 쓰는 브라우저에서는 근거가 펼쳐진 채로 남아야 한다.
+                .contains(".evidence-popover:not([popover])");
+    }
+
+    /*
+     * 화면정의서 4장 규칙 5 는 "마우스를 올리면" 이지만, 호버만 지원하면
+     * 터치와 키보드에서 근거에 닿을 수 없다. 세 경로가 모두 살아 있어야 한다.
+     */
+    @Test
+    void evidenceOpensOnHoverFocusAndClick() throws IOException {
+        assertThat(resource("templates/layout/default.html"))
+                .containsPattern("(?s)<script[^>]*th:src=\"@\\{/js/common/evidence\\.js\\}\"[^>]*\\bdefer\\b[^>]*>");
+
+        assertThat(resource("static/js/common/evidence.js"))
+                .contains("\"mouseenter\"")
+                .contains("\"focusin\"")
+                .contains("trigger.addEventListener(\"click\"")
+                .contains("showPopover()")
+                .contains("--evidence-x")
+                .contains("removeAttribute(\"popover\")")
+                .doesNotContain("fetch(");
     }
 
     // FGC-UI-POL-W01: 정책 목록은 공통 컴포넌트와 화면 전용 정적 리소스만 사용한다.

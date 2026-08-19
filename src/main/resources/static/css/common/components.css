@@ -658,7 +658,16 @@ a.kpi-card:active {
   gap: var(--space-1);
 }
 
-/* 목록형 Ajax 페이지네이션: 페이지 번호 버튼이 세로로 쌓이지 않도록 한 줄로 유지한다. */
+/*
+ * 목록형 Ajax 페이지네이션: 페이지 번호 버튼이 세로로 쌓이지 않도록 한 줄로 유지한다.
+ *
+ * TODO(#138): 아래 세 선택자는 TRAN·SCHE 화면 전용이라 공통 파일에 있을 자리가 아니다.
+ *   [data-transaction-page-numbers] → features/transaction.css 의 .transaction-page-numbers
+ *   [data-transaction-pagination]   → features/transaction.css 의 .transaction-pagination
+ *   [data-schedule-page-numbers]    → features/schedule.css 의 .schedule-page-numbers
+ * data-* 훅은 JS 가 참조하므로 그대로 두고 스타일만 옮긴다.
+ * 두 도메인이 같은 블록을 동시에 건드리지 않도록 TRAN 이슈가 먼저 옮기고 SCHE 가 뒤따른다.
+ */
 [data-transaction-page-numbers],
 [data-schedule-page-numbers] {
   display: flex;
@@ -928,4 +937,107 @@ body.is-modal-open {
     max-height: calc(100dvh - 2rem);
     border-radius: var(--radius-16) var(--radius-16) 0 0;
   }
+}
+
+/*
+ * Evidence Popover — 규제 근거·계산식 표시 (화면정의서 4장 규칙 5)
+ *
+ * "근거 없는 숫자는 화면에 띄우지 않는다" 를 지키되 화면 상단 배너를 쓰지 않기 위한 컴포넌트다.
+ * 값 옆의 작은 트리거를 누르면 근거 ID 와 계산식이 뜬다.
+ *
+ * 네이티브 popover 를 쓰는 이유: 근거는 data-table 셀 안에 놓이는데 .data-table 은
+ * table-layout: fixed + overflow: hidden 이고 .data-table-viewport 는 overflow-x: auto 라
+ * 일반적인 absolute 툴팁은 두 겹으로 잘린다. popover 는 top layer 에 그려져 조상의
+ * overflow 와 z-index 에 영향받지 않으며, Esc 닫기와 바깥 클릭 닫기를 브라우저가 처리한다.
+ *
+ * 위치는 js/common/evidence.js 가 트리거 기준으로 잡는다. popover 기본값이 화면 중앙이라
+ * 호버로 열면 시선이 튀기 때문이다. 여는 방법은 호버·포커스·클릭 세 가지다 —
+ * 규칙 5 는 "마우스를 올리면" 이지만 호버 전용이면 터치와 키보드에서 근거에 닿을 수 없다.
+ */
+.evidence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.evidence-trigger {
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-tertiary);
+  background: none;
+  cursor: pointer;
+}
+
+.evidence-trigger:hover {
+  color: var(--color-text-link);
+  background: var(--color-bg-subtle);
+}
+
+.evidence-trigger .material-symbols-rounded {
+  font-size: 1rem;
+}
+
+/*
+ * position/inset/margin 은 UA 기본값(중앙 정렬)을 덮기 위한 것이다.
+ * 실제 좌표는 evidence.js 가 --evidence-x / --evidence-y 로 넣는다.
+ */
+.evidence-popover {
+  position: fixed;
+  inset: auto;
+  left: var(--evidence-x, 50%);
+  top: var(--evidence-y, 50%);
+  width: min(24rem, calc(100vw - 2rem));
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-12);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.evidence-popover[popover]:not(:popover-open) {
+  display: none;
+}
+
+/*
+ * popover 를 지원하지 않는 브라우저에서는 evidence.js 가 popover 속성을 떼어 낸다.
+ * 그러면 근거가 값 아래에 그냥 펼쳐진 채로 남는다 — 규칙 5 가 요구하는 것은
+ * "근거가 보이는 것" 이므로, 숨겨서 못 읽게 되는 쪽보다 낫다.
+ */
+.evidence-popover:not([popover]) {
+  position: static;
+  width: auto;
+  margin-top: var(--space-2);
+  box-shadow: none;
+}
+
+.evidence-code {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.evidence-body {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.evidence-body + .evidence-body {
+  margin-top: var(--space-2);
+}
+
+/* 근거 트리거가 들어간 셀은 말줄임 대신 내용을 그대로 보여준다. */
+.data-table td.has-evidence {
+  overflow: visible;
+  text-overflow: clip;
 }
