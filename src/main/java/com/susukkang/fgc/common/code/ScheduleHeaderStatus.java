@@ -9,11 +9,21 @@ package com.susukkang.fgc.common.code;
  * @since 2026-08-10
  */
 public enum ScheduleHeaderStatus {
-    PLANNED,  //예정 계약이 생성되고 막 생성 된 상태
-    CONFIRMED,//확정 정산 담당자가 확정을 누를 경우
-    MATCHED,  //대사일치 실제 수수료 지급과 명세가 같은 경우
-    ADJUSTED, //조정완료 실제 수수료 지급과 명세가 다른 경우
-    HOLD,     //보류 계약이 미납된 경우
-    CANCELLED,//취소 계약이 해지된 경우
-    RESTARTED //재개 계약이 부활한 경우
+    PLANNED("예정"),
+    CONFIRMED("확정"),
+    MATCHED("대사일치"),
+    ADJUSTED("조정완료"),
+    HOLD("보류"),
+    CANCELLED("취소"),
+    RESTARTED("재개");
+
+    private final String label;
+
+    ScheduleHeaderStatus(String label) {
+        this.label = label;
+    }
+
+    public String label() {
+        return label;
+    }
 }
