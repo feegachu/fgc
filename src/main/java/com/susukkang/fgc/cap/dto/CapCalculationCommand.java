@@ -52,6 +52,23 @@ public record CapCalculationCommand(
         );
     }
 
+    /** 계약 상세의 수동 한도 재검증용. 자동 REALTIME 이력과 구분해 저장한다. */
+    public static CapCalculationCommand manual(
+            Long contractId,
+            PaymentStage paymentStage,
+            LocalDate asOfDate,
+            BigDecimal complianceEvidenceAmount
+    ) {
+        return new CapCalculationCommand(
+                contractId,
+                paymentStage,
+                asOfDate,
+                CapCheckKind.MANUAL,
+                null,
+                complianceEvidenceAmount
+        );
+    }
+
     /**
      * #76 DailyChangedContractJob 전용. cap_check.check_kind CHECK 제약에는 DAILY 값이 없어
      * checkKind는 REALTIME을 그대로 재사용하지만(스키마 변경 없이 안전 — uq_cap_check_monthly는
