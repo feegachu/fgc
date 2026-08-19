@@ -270,6 +270,7 @@
     if (!stage.contractCount) return { label: "대상 없음", className: "status-badge-neutral", progressClass: "" };
     if (stage.violationCount > 0) return { label: "위반 " + number(stage.violationCount) + "건", className: "status-badge-error", progressClass: "is-violation" };
     if (stage.warningCount > 0) return { label: "주의 " + number(stage.warningCount) + "건", className: "status-badge-warning", progressClass: "is-warning" };
+    if (stage.reviewRequiredCount > 0) return { label: "검토필요 " + number(stage.reviewRequiredCount) + "건", className: "status-badge-review", progressClass: "is-review" };
     return { label: "정상", className: "status-badge-success", progressClass: "" };
   }
 

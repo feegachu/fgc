@@ -271,6 +271,7 @@
                END AS usagePct,
                COUNT(*) FILTER (WHERE result_status = 'VIOLATION') AS violationCount,
                COUNT(*) FILTER (WHERE result_status = 'WARNING') AS warningCount,
+               COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS reviewRequiredCount,
                (ARRAY_AGG(contract_no ORDER BY
                     CASE result_status
                         WHEN 'VIOLATION' THEN 4
@@ -313,6 +314,7 @@
                END AS usagePct,
                COUNT(*) FILTER (WHERE lcc.result_status = 'VIOLATION') AS violationCount,
                COUNT(*) FILTER (WHERE lcc.result_status = 'WARNING') AS warningCount,
+               COUNT(*) FILTER (WHERE lcc.result_status = 'REVIEW_REQUIRED') AS reviewRequiredCount,
                (ARRAY_AGG(lcc.contract_no ORDER BY
                     CASE lcc.result_status
                         WHEN 'VIOLATION' THEN 4
