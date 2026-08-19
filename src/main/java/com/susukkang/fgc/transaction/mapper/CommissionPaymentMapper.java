@@ -99,12 +99,13 @@ public interface CommissionPaymentMapper {
             @Param("transactionAttributionId") Long transactionAttributionId
     );
 
-    /** 계약·단계·항목·귀속일이 정확히 일치하는 활성 운영 스케줄 행만 돌려준다. */
+    /** 계약·단계·항목·귀속월이 일치하는 활성 운영 스케줄 행을 돌려준다. */
     List<Long> findOperationalScheduleLineIds(
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage,
             @Param("commissionItemId") Long commissionItemId,
-            @Param("dueDate") LocalDate dueDate
+            @Param("attributionMonthStart") LocalDate attributionMonthStart,
+            @Param("nextAttributionMonthStart") LocalDate nextAttributionMonthStart
     );
 
     /**

@@ -775,11 +775,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long commissionItemId,
             LocalDate attributionDate
     ) {
-        if (contractId == null) {
+        if (contractId == null || attributionDate == null) {
             return null;
         }
+        LocalDate attributionMonthStart = attributionDate.withDayOfMonth(1);
         List<Long> ids = mapper.findOperationalScheduleLineIds(
-                contractId, paymentStage, commissionItemId, attributionDate);
+                contractId, paymentStage, commissionItemId,
+                attributionMonthStart, attributionMonthStart.plusMonths(1));
         return ids != null && ids.size() == 1 ? ids.get(0) : null;
     }
 
