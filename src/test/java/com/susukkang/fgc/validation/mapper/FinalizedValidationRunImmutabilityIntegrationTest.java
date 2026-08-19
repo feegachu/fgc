@@ -1,10 +1,15 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
+import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -13,7 +18,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * "FINALIZED 상태의 검증 실행과 그 하위 결과가 재실행으로 변경되지 않는지 검증"
+ * 설명 : FINALIZED 검증 실행과 하위 결과의 불변성 통합 테스트
+ *
+ * @author yslee
+ * @since 2026-08-19
+ * @version 1.2
  */
 @SpringBootTest
 @Transactional
@@ -21,9 +30,13 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private ValidationRunCreateService validationRunCreateService;
 
     private Long validationRunId;
     private Long capCheckId;
+    private Long committedOriginalRunId;
+    private Long committedCorrectionRunId;
 
     private Long contractId() {
         return jdbcTemplate.queryForObject(
@@ -295,6 +308,49 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
                 "UPDATE fgc.cap_check_detail SET amount = 200 WHERE cap_check_detail_id = ?", detailId))
                 .isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("immutable");
+    }
+
+    @Test
+    void correctionForSameMonthCreatesNextRunNumberWithoutChangingFinalizedRun() {
+        LocalDate validationMonth = LocalDate.of(2031, 5, 1);
+        Long userId = jdbcTemplate.queryForObject(
+                "SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1", Long.class);
+        ValidationRunRow original = validationRunCreateService.create(
+                new CreateValidationRunCommand(validationMonth, ValidationRunType.PRE_CONFIRM, userId));
+        committedOriginalRunId = original.getValidationRunId();
+        validationRunId = committedOriginalRunId;
+        jdbcTemplate.update(
+                "UPDATE fgc.validation_run SET status='RUNNING', current_step=1, started_at=now() WHERE validation_run_id=?",
+                validationRunId);
+        finalizeValidationRun(validationRunId);
+
+        // 2026-08-19 yslee - 같은 월 보정 실행을 운영 생성 서비스 경로로 검증
+        // 기존 코드: 테스트가 MAX(run_no)+1을 직접 계산하고 validation_run을 raw SQL로 삽입
+        // 문제: 실제 서비스의 회차 채번과 정책 스냅샷 저장 경로가 깨져도 테스트가 통과할 수 있음
+        // 개선: ValidationRunCreateService를 호출해 실제 운영 경로가 다음 회차를 생성하는지 확인
+        ValidationRunRow correction = validationRunCreateService.create(
+                new CreateValidationRunCommand(validationMonth, ValidationRunType.PRE_CONFIRM, userId));
+        committedCorrectionRunId = correction.getValidationRunId();
+
+        assertThat(correction.getRunNo()).isGreaterThan(original.getRunNo());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.validation_run WHERE validation_run_id = ?",
+                String.class, validationRunId)).isEqualTo("FINALIZED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.validation_run WHERE validation_run_id = ?",
+                String.class, committedCorrectionRunId)).isEqualTo("CREATED");
+    }
+
+    @AfterTransaction
+    void removeRunsCommittedByCreateServiceTest() {
+        if (committedCorrectionRunId != null) {
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", committedCorrectionRunId);
+        }
+        if (committedOriginalRunId != null) {
+            jdbcTemplate.update(
+                    "DELETE FROM fgc.validation_run WHERE validation_run_id = ?", committedOriginalRunId);
+        }
     }
 
     private Long createCompletedReconciliationRun(Long runId) {
