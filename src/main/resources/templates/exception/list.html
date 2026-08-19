@@ -28,14 +28,31 @@
 
   <!-- ① 유형별 미처리 요약 -->
   <section class="exception-summary-grid" id="summary-cards" aria-label="유형별 미처리 요약">
-    <a class="fgc-card exception-summary-card" th:each="summary : ${casePage.summary()}"
-       th:classappend="${typeFilter == summary.type()} ? 'is-active'"
+    <a class="kpi-card exception-summary-card" th:each="summary : ${casePage.summary()}"
+       th:classappend="${summary.type().name() == 'CAP_VIOLATION'
+                         or summary.type().name() == 'RECONCILIATION_MISMATCH'
+                         or summary.type().name() == 'JOURNAL_IMBALANCE'
+                         or summary.type().name() == 'POLICY_MISSING'
+                         or summary.type().name() == 'POLICY_DUPLICATE'} ? ' kpi-card-error'
+                       : (${summary.type().name() == 'CAP_WARNING'
+                           or summary.type().name() == 'ARBITRAGE_CANDIDATE'
+                           or summary.type().name() == 'ALLOCATION_EVIDENCE_MISSING'} ? ' kpi-card-warning'
+                       : (${summary.type().name() == 'CAP_REVIEW_REQUIRED'
+                           or summary.type().name() == 'REFUND_TABLE_MISSING'
+                           or summary.type().name() == 'PRODUCT_CODE_MISMATCH'
+                           or summary.type().name() == 'DATA_QUALITY'} ? ' kpi-card-risk' : ''))
+                       + (${typeFilter == summary.type()} ? ' is-active' : '')"
        th:attr="aria-current=${typeFilter == summary.type()} ? 'true' : null"
        th:href="@{/exceptions(type=${summary.type()},status='OPEN',month=${month})}">
-      <div class="fgc-card__body">
-        <span class="fgc-muted" style="font-size:12px" th:text="${summary.type().label()}">예외 유형</span>
-        <strong style="display:block;margin-top:4px;font-size:20px" th:text="|${summary.count()}건|">0건</strong>
-        <span class="fgc-mono exception-summary-code" th:text="${summary.type()}">EXCEPTION_TYPE</span>
+      <div class="kpi-card-header">
+        <span class="kpi-label" th:text="${summary.type().label()}">예외 유형</span>
+      </div>
+      <div class="kpi-value-row">
+        <strong class="kpi-value" th:text="${summary.count()}">0</strong>
+        <span class="kpi-unit">건</span>
+      </div>
+      <div class="kpi-card-footer">
+        <span class="kpi-comparison fgc-mono" th:text="${summary.type()}">EXCEPTION_TYPE</span>
       </div>
     </a>
     <div class="fgc-empty publishing-empty-state" th:if="${casePage.summary().isEmpty()}">미처리 예외가 없습니다.</div>
