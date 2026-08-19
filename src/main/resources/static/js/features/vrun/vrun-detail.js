@@ -3,6 +3,7 @@
  * POST /api/v1/validation-runs/{id}/execute  (IF-API-48, 202 · 배치 비동기)
  * GET  /api/v1/validation-runs/{id}/progress (IF-API-49, 2초 폴링)
  * GET  /api/v1/validation-runs/{id}/finalize-checklist (IF-API-50)
+ * POST /api/v1/validation-runs/{id}/finalize (IF-API-51)
  *
  * 헤더·스텝퍼·대상 선별·결과 요약은 서버 렌더링이다 — 이 스크립트는 실행 버튼과
  * 폴링 중 스텝퍼/상태 배지 갱신만 맡고, 종료 상태(COMPLETED/FAILED)는 전체
@@ -27,6 +28,8 @@
   var runId = executeButton.dataset.runId;
   var runStatus = executeButton.dataset.runStatus;
   var pollTimer = null;
+  var finalizeRequestPending = false;
+  var finalizeIdempotencyKey = null;
 
   var STATUS_TONES = {
     FAILED: "fgc-badge--violation",
@@ -117,6 +120,21 @@
     empty.textContent = message;
     checklistBody.appendChild(empty);
     finalizeButton.dataset.checklistPassed = "false";
+    updateFinalizeButtonState();
+  }
+
+  function updateFinalizeButtonState() {
+    if (!finalizeButton) return;
+    var canFinalize = finalizeButton.dataset.canFinalize === "true";
+    var checklistPassed = finalizeButton.dataset.checklistPassed === "true";
+    finalizeButton.disabled = finalizeRequestPending || runStatus !== "COMPLETED" || !canFinalize || !checklistPassed;
+    if (!canFinalize) {
+      finalizeButton.title = "확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN에게만 있습니다.";
+    } else if (!checklistPassed) {
+      finalizeButton.title = "확정 조건 6개를 모두 통과해야 합니다.";
+    } else {
+      finalizeButton.removeAttribute("title");
+    }
   }
 
   function renderChecklist(checklist) {
@@ -144,6 +162,7 @@
     checklistSummary.className = "fgc-badge "
       + (checklist.passed ? "fgc-badge--normal" : "fgc-badge--violation");
     finalizeButton.dataset.checklistPassed = String(checklist.passed);
+    updateFinalizeButtonState();
   }
 
   function loadFinalizeChecklist() {
@@ -172,6 +191,50 @@
       });
   }
 
+  // 2026-08-19 yslee - FUN-044 검증 실행 확정 API를 화면 버튼에 연결
+  // 기존 코드: 확정 버튼이 항상 비활성이고 IF-API-51을 호출하는 사용자 동작이 없음
+  // 문제: 서버 확정 기능이 구현돼도 VRUN-W02에서 사람이 검토 후 확정할 수 없음
+  // 개선: 권한·완료 상태·체크리스트를 모두 확인하고 멱등키로 한 번만 확정 요청
+  function createFinalizeIdempotencyKey() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return "vrun-finalize-" + runId + "-" + window.crypto.randomUUID();
+    }
+    return "vrun-finalize-" + runId + "-" + Date.now();
+  }
+
+  function finalizeRun() {
+    updateFinalizeButtonState();
+    if (finalizeButton.disabled || finalizeRequestPending) return;
+    if (!window.confirm("이 검증 실행을 확정하면 결과와 계산 근거를 고칠 수 없습니다. 확정하시겠습니까?")) {
+      return;
+    }
+
+    finalizeRequestPending = true;
+    finalizeIdempotencyKey = finalizeIdempotencyKey || createFinalizeIdempotencyKey();
+    updateFinalizeButtonState();
+    finalizeButton.setAttribute("aria-busy", "true");
+
+    apiClient.request("/api/v1/validation-runs/" + runId + "/finalize", {
+      method: "POST",
+      idempotencyKey: finalizeIdempotencyKey
+    }).then(function () {
+      if (toast) toast("검증 실행을 확정했습니다.", "success");
+      window.location.reload();
+    }).catch(function (error) {
+      finalizeRequestPending = false;
+      finalizeButton.removeAttribute("aria-busy");
+      // 2026-08-19 yslee - FGC-VRUN-006 멱등키 충돌 시 다음 재시도에서 새 키를 발급하도록 수정
+      // 기존 코드: 모든 실패 후 최초 멱등키를 계속 재사용
+      // 문제: 다른 검증 실행에 귀속된 키 충돌 시 새로고침 전까지 같은 409 오류가 반복됨
+      // 개선: 문서에서 새 키 재시도를 요구하는 FGC-VRUN-006에서만 저장된 키를 초기화
+      if (error && error.code === "FGC-VRUN-006") {
+        finalizeIdempotencyKey = null;
+      }
+      if (toast) toast(error && error.message ? error.message : "검증 실행 확정에 실패했습니다.", "error");
+      loadFinalizeChecklist();
+    });
+  }
+
   executeButton.addEventListener("click", function () {
     executeButton.disabled = true;
     apiClient.request("/api/v1/validation-runs/" + runId + "/execute", { method: "POST" })
@@ -198,6 +261,10 @@
   // 새로고침으로 진입했는데 이미 실행 중이면 폴링을 이어 붙인다
   if (executeButton.dataset.runStatus === "RUNNING") {
     startPolling();
+  }
+  if (finalizeButton) {
+    finalizeButton.addEventListener("click", finalizeRun);
+    updateFinalizeButtonState();
   }
   loadFinalizeChecklist();
 })();
