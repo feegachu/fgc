@@ -97,15 +97,15 @@ public class ReconciliationRunServiceImpl implements ReconciliationRunService {
             notFound("insurerId", command.insurerId());
         }
 
-        ValidationRunRow validationRun = validationRunMapper.findById(command.validationRunId());
+        ValidationRunRow validationRun = validationRunMapper.findByIdForUpdate(command.validationRunId());
         if (validationRun == null) {
             notFound("validationRunId", command.validationRunId());
         }
 
         // 2026-08-19 yslee - FGC-FUN-044 확정 실행의 하위 대사 실행 생성 사전 차단
-        // 기존 코드: FINALIZED 여부를 확인하지 않고 INSERT하여 DB 불변 트리거에 처리를 위임
-        // 문제: 트리거의 P0001 예외가 공통 500으로 변환되어 호출자가 원인을 알 수 없음
-        // 개선: 서비스에서 확정 상태를 먼저 검증하고 기존 FGC-VRUN-003·409로 일관되게 응답
+        // 기존 코드: 락 없는 상태 조회 후 FINALIZED 여부만 검사하고 DB 불변 트리거에 경합 처리를 위임
+        // 문제: 조회 직후 다른 요청이 확정하면 트리거의 P0001 예외가 공통 500으로 변환됨
+        // 개선: 검증 실행을 FOR UPDATE로 잠근 뒤 상태를 검사해 FGC-VRUN-003·409로 일관되게 응답
         if (ValidationRunStatus.FINALIZED.name().equals(validationRun.getStatus())) {
             throw new FgcBusinessException(
                     FgcErrorCode.VRUN_003,
