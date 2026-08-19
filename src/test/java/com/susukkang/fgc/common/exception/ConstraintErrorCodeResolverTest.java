@@ -52,6 +52,16 @@ class ConstraintErrorCodeResolverTest {
                 .contains(FgcErrorCode.TRAN_001);
     }
 
+    @Test
+    void resolvesValidationFinalizationIdempotencyKeyConstraintBeforeRunNaturalKey() {
+        RuntimeException exception = new RuntimeException(
+                "duplicate key violates constraint uq_validation_run_finalize_idempotency"
+        );
+
+        assertThat(resolver.resolve(exception))
+                .contains(FgcErrorCode.VRUN_006);
+    }
+
     // 2026-08-12 yslee - 대사 실행 중복과 결과 그룹 중복 오류 분리 회귀 테스트
     // 기존 코드: 대사 결과 그룹 중복 제약만 테스트
     // 문제: uq_reconciliation_run을 결과 그룹 중복과 같은 코드로 처리하면 장애 원인을 구분하지 못함
@@ -76,13 +86,4 @@ class ConstraintErrorCodeResolverTest {
                 .contains(FgcErrorCode.RECO_001);
     }
 
-    @Test
-    void resolvesValidationFinalizationIdempotencyKeyConstraintBeforeRunNaturalKey() {
-        RuntimeException exception = new RuntimeException(
-                "duplicate key violates constraint uq_validation_run_finalize_idempotency"
-        );
-
-        assertThat(resolver.resolve(exception))
-                .contains(FgcErrorCode.VRUN_005);
-    }
 }
