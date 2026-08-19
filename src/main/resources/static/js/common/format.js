@@ -1,10 +1,12 @@
 /*
  * 공통 표시 형식 유틸 — FGC-SIR-008 (인터페이스정의서 2-4절, 화면정의서 4장 규칙 1~3)
  *
- * 규칙 2 가 "화면에서 반올림하지 않는다" 이므로 여기서는 자리수를 늘리거나 줄이지 않는다.
- * 서버가 금액은 원 단위 정수로, 요율은 문자열로 이미 확정해서 보낸다. 화면은 끊어 읽기 좋게
- * 묶고 잘라 보여줄 뿐이다. 특히 요율은 Number 로 바꾸는 순간 1,200% 판정에 쓰는 소수 6자리가
- * 흔들리므로 문자열 그대로 자른다.
+ * 규칙 2 가 "화면에서 반올림하지 않는다" 이므로 여기서는 값을 반올림하지 않는다.
+ * 서버가 금액은 원 단위 정수로, 요율·사용률은 문자열로 이미 확정해서 보낸다. 화면은 끊어 읽기
+ * 좋게 묶고 정해진 자리에서 자를 뿐이다. Number 로 바꾸면 1,200% 판정에 쓰는 소수 6자리가
+ * 흔들리므로 문자열 그대로 다룬다.
+ *
+ * 요율과 사용률은 자리수가 다르다 — rate() 4자리, usageRate() 6자리. 섞어 쓰면 안 된다.
  *
  * 시각은 Asia/Seoul 로 고정한다. new Date().getMonth() 처럼 브라우저 로컬 시각을 쓰면
  * 월말·월초에 정산월이 한 달 어긋난다.
@@ -31,6 +33,14 @@
    * 금액. 음수는 괄호로 감싼다 (화면정의서 4장 규칙 1).
    * 빨강은 색만으로 뜻을 전달하지 않도록 괄호와 함께 쓰는 보조 수단이므로,
    * 호출부가 isNegative() 로 판별해 .is-negative-amount 클래스를 붙인다.
+   *
+   * 괄호 위치 주의 — 여기서는 "원" 을 괄호 안에 넣어 (1,517,944원) 으로 낸다.
+   * 산출물의 리터럴 예시는 괄호 밖이다.
+   *   화면정의서 4장 규칙 1 (:209) — "음수는 빨강 + 괄호. 예: (1,517,944)"
+   *   인터페이스정의서 2-4 (:176) — "1,517,944 / 음수 (1,517,944) 빨강"
+   * 기존 유일한 구현인 features/cap/cap-list.js:67 이 (1,200,000원) 으로 내고 있고
+   * CAP-W01 은 이미 QA 를 거쳤기 때문에 그쪽에 맞췄다. 전환 시 시각 변화를 만들지 않기 위해서다.
+   * 문서-구현 불일치이므로 팀 확정 후 한쪽으로 통일해야 한다 — 임의로 바꾸지 말 것.
    */
   function won(value) {
     if (isBlank(value)) return EMPTY;
@@ -47,11 +57,11 @@
   }
 
   /*
-   * 요율·사용률. 소수 넷째 자리까지 "자르기만" 한다 — 반올림하지 않는다.
+   * 소수 자리를 "자르기만" 한다 — 반올림하지 않는다 (화면정의서 4장 규칙 2·3).
    * 서버가 문자열("104.166667")로 주는 이유가 부동소수점 오차를 없애기 위해서이므로
    * Number 로 바꾸지 않고 문자열을 다룬다.
    */
-  function rate(value) {
+  function truncateDecimal(value, digits) {
     if (isBlank(value)) return EMPTY;
 
     var normalized = String(value).trim();
@@ -65,8 +75,29 @@
 
     var parts = normalized.split(".");
     var integerPart = parts[0].replace(/^0+(?=\d)/, "");
-    var fractionPart = ((parts[1] || "") + "0000").slice(0, 4);
+    var fractionPart = ((parts[1] || "") + new Array(digits + 1).join("0")).slice(0, digits);
     return sign + integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + fractionPart;
+  }
+
+  /*
+   * 요율 — 소수 넷째 자리. 예: 650.0000%
+   * 인터페이스정의서 2-4 "요율 소수점 4자리".
+   */
+  function rate(value) {
+    return truncateDecimal(value, 4);
+  }
+
+  /*
+   * 사용률 — 소수 여섯째 자리. 예: 104.166667%
+   *
+   * 요율과 자리수가 다르다. 1,200% 한도 판정이 소수 6자리까지 쓰기 때문에 4자리로 자르면
+   * 화면 숫자와 판정 근거가 어긋난다.
+   *   인터페이스정의서 2-4 (:177) — "요율 소수점 4자리, 사용률 6자리"
+   *   화면정의서 CAP-W01 (:934) — "사용률 | 게이지 막대 + 숫자 (소수점 6자리)"
+   *   화면정의서 CAP-W02 (:1005) — "사용률 74.166667%"
+   */
+  function usageRate(value) {
+    return truncateDecimal(value, 6);
   }
 
   function seoulParts(value) {
@@ -145,6 +176,7 @@
     won: won,
     isNegative: isNegative,
     rate: rate,
+    usageRate: usageRate,
     date: date,
     dateTime: dateTime,
     month: month,

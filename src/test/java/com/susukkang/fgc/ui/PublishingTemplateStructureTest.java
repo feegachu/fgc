@@ -232,11 +232,18 @@ class PublishingTemplateStructureTest {
                 .contains("function errorText(")
                 .contains("요청 ID: ")
                 .doesNotContain("toFixed(")
-                .doesNotContain("Math.round(");
+                .doesNotContain("Math.round(")
+                // 요율 4자리 · 사용률 6자리 (인터페이스정의서 2-4:177). 한 함수로 합치면 CAP 화면이 어긋난다.
+                .contains("function rate(")
+                .contains("function usageRate(")
+                .contains("truncateDecimal(value, 4)")
+                .contains("truncateDecimal(value, 6)");
     }
 
     /*
-     * FGC-SIR-005 / 화면정의서 4장 규칙 5 — 규제 근거는 상단 배너가 아니라 값 옆에서 연다.
+     * 화면정의서 4장 규칙 5 (docs/FGC_화면정의서_v2_0.md:213) — 요율·한도·판정이 나오는 곳에는
+     * 마우스를 올리면 근거가 뜨고, 근거 없는 숫자는 화면에 띄우지 않는다.
+     * 즉 근거는 상단 배너가 아니라 값 옆에서 연다.
      * data-table 이 overflow: hidden 이라 popover(top layer)로 두어야 셀 안에서 잘리지 않는다.
      */
     @Test

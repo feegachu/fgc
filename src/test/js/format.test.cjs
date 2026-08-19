@@ -19,6 +19,18 @@ test("요율은 소수 넷째 자리까지 자르기만 하고 반올림하지 �
   assert.equal(format.rate("1200"), "1,200.0000");
 });
 
+test("사용률은 소수 여섯째 자리다 — 요율과 자리수가 다르다 (인터페이스정의서 2-4)", () => {
+  // 화면정의서 CAP-W02(:1005) 예시 그대로.
+  assert.equal(format.usageRate("74.166667"), "74.166667");
+  assert.equal(format.usageRate("104.166667"), "104.166667");
+  // 4자리로 자르면 판정 근거와 어긋난다 — 두 함수가 실제로 달라야 한다.
+  assert.notEqual(format.usageRate("104.166667"), format.rate("104.166667"));
+  // 모자란 자리는 0으로 채우고, 넘치는 자리는 반올림 없이 버린다.
+  assert.equal(format.usageRate("1200"), "1,200.000000");
+  assert.equal(format.usageRate("1.23456789"), "1.234567");
+  assert.equal(format.usageRate("not-a-rate"), "-");
+});
+
 test("서버가 이미 YYYY-MM-DD 로 준 날짜는 그대로 통과시킨다", () => {
   assert.equal(format.date("2026-07-01"), "2026-07-01");
   assert.equal(format.month("2026-07-01"), "2026-07");
