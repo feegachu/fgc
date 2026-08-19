@@ -109,6 +109,14 @@
   margin-inline: var(--space-6);
 }
 
+.data-table td.base-disclosure-cell {
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: middle;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .base-code-label,
 .base-secondary-line {
   display: block;
@@ -142,6 +150,18 @@
   white-space: normal;
 }
 
+@media (max-width: 63.9375rem) {
+  .base-filter-form .field {
+    width: 100%;
+    flex: none;
+  }
+
+  .base-filter-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 @media (max-width: 47.9375rem) {
   .base-page-header {
     align-items: flex-start;
@@ -168,7 +188,6 @@
   }
 
   .base-filter-form .field,
-  .base-filter-actions,
   .base-filter-actions .button {
     width: 100%;
   }

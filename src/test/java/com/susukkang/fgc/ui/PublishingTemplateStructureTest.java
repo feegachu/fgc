@@ -234,6 +234,8 @@ class PublishingTemplateStructureTest {
     void baseReferenceScreenUsesSeparatedApiAndPageScripts() throws IOException {
         assertThat(resource("templates/base/index.html"))
                 .contains("class=\"page-header base-page-header\"")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
                 .doesNotContain("class=\"guidance")
                 .contains("class=\"tab-list\"")
                 .contains("class=\"tab-panel base-panel\"")
@@ -251,6 +253,9 @@ class PublishingTemplateStructureTest {
                 .contains("적용 시작일")
                 .contains("적용 종료일")
                 .contains("status-badge-success")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"table-cell-more\">전체 보기")
+                .contains("class=\"table-cell-less\">접기")
                 .doesNotContain("class=\"surface tab-panel base-panel\"")
                 .doesNotContain("base-panel-note")
                 .doesNotContain("<script>")
@@ -274,8 +279,17 @@ class PublishingTemplateStructureTest {
                 .contains("DEDUCTION: [\"차감\", \"status-badge-warning\"]")
                 .contains("SETTLEMENT_SUPPORT: \"정착지원\"")
                 .contains("NEWCOMER_SUPPORT: \"신인지원\"")
+                .contains("function tableCellDisclosure(")
+                .contains("tableCellDisclosure(item.itemCode, 18, true)")
+                .contains("table-cell-preview")
+                .contains("base-disclosure-cell")
                 .contains("aria-busy")
                 .doesNotContain("fetch(");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains(".table-cell-disclosure")
+                .contains(".table-cell-details[open] .table-cell-less")
+                .contains(".table-cell-full");
 
         assertThat(resource("templates/layout/default.html"))
                 .contains("/css/features/base.css")
@@ -284,6 +298,7 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("static/css/features/base.css"))
                 .contains(".base-page")
+                .contains(".data-table td.base-disclosure-cell")
                 .contains("@media (max-width: 47.9375rem)")
                 .doesNotContain(".base-information-banner")
                 .doesNotContain(".base-panel-note");
