@@ -18,17 +18,6 @@
   color: var(--color-text-secondary);
 }
 
-.policy-source-copy {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
-}
-
-.policy-source-copy > :last-child {
-  flex: 1 1 24rem;
-}
-
 .policy-tabs,
 .policy-tab-panel,
 .policy-detail-body {

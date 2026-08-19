@@ -72,7 +72,11 @@ class PolicyViewControllerTest {
                 .andExpect(content().string(containsString("1,200% 룰셋")))
                 .andExpect(content().string(containsString("예상 해약환급률표")))
                 .andExpect(content().string(containsString("REG-CAP-GA-2026-V1")))
-                .andExpect(content().string(containsString("fgc-badge--src-regulatory")))
+                .andExpect(content().string(containsString("status-badge-info")))
+                .andExpect(content().string(containsString("status-badge-success")))
+                .andExpect(content().string(not(containsString("fgc-badge"))))
+                .andExpect(content().string(not(containsString("policy-date-guidance-title"))))
+                .andExpect(content().string(not(containsString("policy-source-guidance-title"))))
                 .andExpect(content().string(containsString("REG-08 · REG-09")))
                 .andExpect(content().string(containsString("data-policy-version-id=\"1\"")))
                 .andExpect(content().string(containsString("data-policy-code=\"REG-CAP-GA-2026-V1\"")))
@@ -92,7 +96,8 @@ class PolicyViewControllerTest {
         mockMvc.perform(get("/policies").with(user(principal("SETTLEMENT"))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("근거 미기재")))
-                .andExpect(content().string(containsString("fgc-badge--src-assumption")))
+                .andExpect(content().string(containsString("status-badge-warning")))
+                .andExpect(content().string(containsString("status-badge-neutral")))
                 .andExpect(content().string(containsString("policy-row-missing-reference")));
     }
 
