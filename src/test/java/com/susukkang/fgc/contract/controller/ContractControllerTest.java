@@ -120,7 +120,9 @@ class ContractControllerTest {
                         .with(user("admin").roles("GA_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].arbitrageCheckId").value(100))
-                .andExpect(jsonPath("$.data[0].resultStatus").value("CLEAR"));
+                .andExpect(jsonPath("$.data[0].resultStatus").value("CLEAR"))
+                .andExpect(jsonPath("$.data[0].resultStatusLabel").value("이상없음"))
+                .andExpect(jsonPath("$.data[0].paymentStageLabel").value("GA→설계사"));
     }
 
     @Test

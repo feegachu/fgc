@@ -97,7 +97,8 @@ class ValidationRunDetailControllerTest {
                 new ValidationRunDetailResponse.CapSummary(6, 1, 2, 0),
                 new ValidationRunDetailResponse.ArbitrageSummary(3, 1, 0),
                 new ValidationRunDetailResponse.LedgerSummary(4, 0),
-                new ValidationRunDetailResponse.ReconciliationSummary(8, 2, 6, 2, 0, java.math.BigDecimal.valueOf(15000)));
+                new ValidationRunDetailResponse.ReconciliationSummary(8, 2, 6, 2, 0, java.math.BigDecimal.valueOf(15000)),
+                new ValidationRunDetailResponse.ExceptionSummary(49, 0, 49, 0, 0, 49));
     }
 
     private ValidationRunRow createdRow() {
@@ -132,7 +133,11 @@ class ValidationRunDetailControllerTest {
                 .andExpect(jsonPath("$.data.reconciliationSummary.matchedCount").value(6))
                 .andExpect(jsonPath("$.data.reconciliationSummary.mismatchedCount").value(2))
                 .andExpect(jsonPath("$.data.reconciliationSummary.unmatchedCount").value(0))
-                .andExpect(jsonPath("$.data.reconciliationSummary.differenceAmountTotal").value(15000));
+                .andExpect(jsonPath("$.data.reconciliationSummary.differenceAmountTotal").value(15000))
+                .andExpect(jsonPath("$.data.exceptionSummary.detectedCount").value(49))
+                .andExpect(jsonPath("$.data.exceptionSummary.newCount").value(0))
+                .andExpect(jsonPath("$.data.exceptionSummary.recurringCount").value(49))
+                .andExpect(jsonPath("$.data.exceptionSummary.openWorkItemCount").value(49));
     }
 
     @Test

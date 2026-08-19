@@ -636,6 +636,7 @@
         INSERT INTO fgc.exception_case AS existing (
             exception_key,
             exception_type,
+            reason_code,
             severity,
             status,
             contract_id,
@@ -648,6 +649,7 @@
         ) VALUES (
             #{exceptionKey},
             #{exceptionType},
+            #{reasonCode},
             #{severity},
             'NEW',
             #{contractId},
@@ -660,6 +662,7 @@
         )
         ON CONFLICT (exception_key) DO UPDATE
            SET status = 'NEW',
+               reason_code = EXCLUDED.reason_code,
                title = EXCLUDED.title,
                description = EXCLUDED.description,
                updated_at = clock_timestamp()

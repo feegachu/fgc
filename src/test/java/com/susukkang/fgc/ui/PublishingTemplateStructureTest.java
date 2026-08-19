@@ -50,13 +50,28 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
-    void apiDeferredScreensExposeExplicitPendingStatesWithoutSeedData() throws IOException {
+    void connectedArbitrageScreenDoesNotExposeStalePendingState() throws IOException {
         assertThat(resource("templates/arbitrage/list.html"))
-                .contains("조회 API 연동 대기");
-        // EXCP-W01 은 #83 에서 안내 배너·상태 필터·목록이 서버 렌더링으로 바인딩됐다 —
-        // 아직 미연동인 유형별 요약카드만 대기 상태를 명시한다.
+                .contains("id=\"arb-pagination\"")
+                .contains("data-modal=\"arb-recheck\"")
+                .doesNotContain("조회 API 연동 대기");
+        // EXCP-W01 은 유형별 요약·페이지 목록·행 선택 상세까지 서버 데이터로 연동됐다.
         assertThat(resource("templates/exception/list.html"))
-                .contains("유형별 미처리 집계 API 연동 대기");
+                .contains("exception-pagination")
+                .contains("pagination-controls")
+                .contains("pagination-button is-active")
+                .contains("exception-summary-card")
+                .contains("exception-detail-")
+                .contains("data-exception-action-form")
+                .contains("처리 저장")
+                .doesNotContain("유형별 미처리 집계 API 연동 대기");
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/exception.css")
+                .containsPattern("(?s)<script[^>]*th:src=\"@\\{/js/features/exception/exception-list\\.js}\"[^>]*\\bdefer\\b[^>]*>");
+        assertThat(resource("static/js/features/exception/exception-list.js"))
+                .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
+                .contains("apiClient.request")
+                .doesNotContain("fetch(");
         // VRUN-W02 는 #188 에서 헤더·스텝퍼·실행(IF-API-48·49)이 연동됐다 — 아직 미연동인
         // 확정 체크리스트(IF-API-50/51, #172~#175)만 대기 상태를 유지하고, 확정 버튼은
         // 체크리스트 게이트 연동 전까지 정적 disabled 다.
@@ -166,6 +181,58 @@ class PublishingTemplateStructureTest {
                 .contains("window.FgcUi.contractApi")
                 .contains("error.field")
                 .doesNotContain("fetch(");
+    }
+
+    @Test
+    void baseReferenceScreenUsesSeparatedApiAndPageScripts() throws IOException {
+        assertThat(resource("templates/base/index.html"))
+                .contains("class=\"page-header base-page-header\"")
+                .contains("class=\"guidance guidance-neutral base-information-banner\"")
+                .contains("class=\"tab-list\"")
+                .contains("class=\"surface tab-panel base-panel\"")
+                .contains("class=\"filter-bar base-filter-form\"")
+                .contains("class=\"data-table base-table")
+                .contains("data-base-tab=\"organization\"")
+                .contains("data-base-tab=\"product\"")
+                .contains("data-base-tab=\"agent\"")
+                .contains("data-base-form=\"commission-item\"")
+                .contains("data-base-body=\"commission-item\"")
+                .contains("지급/차감")
+                .contains("적용 시작일")
+                .contains("적용 종료일")
+                .contains("status-badge-success")
+                .doesNotContain("<script>")
+                .doesNotContain("style=\"")
+                .doesNotContain("onclick=\"");
+
+        assertThat(resource("static/js/features/base/base-api.js"))
+                .contains("/api/v1/base/organizations")
+                .contains("/api/v1/base/insurers")
+                .contains("/api/v1/base/products")
+                .contains("/api/v1/base/agents")
+                .contains("/api/v1/base/commission-items");
+
+        assertThat(resource("static/js/features/base/base-list.js"))
+                .contains("window.FgcUi.baseApi")
+                .contains("new AbortController()")
+                .contains("organizationOptionsRequestId")
+                .contains("organizationOptionsInitialized")
+                .contains("getCommissionItems")
+                .contains("PAYMENT: [\"지급\", \"status-badge-success\"]")
+                .contains("DEDUCTION: [\"차감\", \"status-badge-warning\"]")
+                .contains("SETTLEMENT_SUPPORT: \"정착지원\"")
+                .contains("NEWCOMER_SUPPORT: \"신인지원\"")
+                .contains("aria-busy")
+                .doesNotContain("fetch(");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/base.css")
+                .contains("/js/features/base/base-api.js")
+                .contains("/js/features/base/base-list.js");
+
+        assertThat(resource("static/css/features/base.css"))
+                .contains(".base-page")
+                .contains("@media (max-width: 47.9375rem)");
     }
 
     private static String resource(String path) throws IOException {

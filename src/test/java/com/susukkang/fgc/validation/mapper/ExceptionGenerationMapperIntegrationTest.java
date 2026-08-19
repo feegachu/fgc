@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.mapper;
 
+import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -86,6 +87,175 @@ class ExceptionGenerationMapperIntegrationTest {
                 Integer.class,
                 validationRunId);
         assertThat(count).isEqualTo(8);
+
+        Long resolvedCaseId = exceptionCaseId(validationRunId, "CAP_VIOLATION");
+        Long changedRejectedCaseId = exceptionCaseId(validationRunId, "CAP_REVIEW_REQUIRED");
+        Long unchangedRejectedCaseId = exceptionCaseId(validationRunId, "ARBITRAGE_CANDIDATE");
+        jdbcTemplate.update("""
+                UPDATE fgc.exception_case
+                   SET status = CASE WHEN exception_case_id = ? THEN 'RESOLVED' ELSE 'REJECTED' END,
+                       resolved_at = clock_timestamp()
+                 WHERE exception_case_id IN (?, ?, ?)
+                """, resolvedCaseId, resolvedCaseId, changedRejectedCaseId, unchangedRejectedCaseId);
+
+        jdbcTemplate.update(
+                "UPDATE fgc.validation_run SET status = 'RUNNING' WHERE validation_run_id = ?",
+                validationRunId);
+        jdbcTemplate.update(
+                "UPDATE fgc.validation_run SET status = 'COMPLETED', current_step = 8 WHERE validation_run_id = ?",
+                validationRunId);
+        Long rerunId = insertValidationRun();
+        insertCapChecks(rerunId, contractIds);
+        insertArbitrageChecks(rerunId, contractIds.get(0));
+        insertReconciliationResults(rerunId, contractIds.get(0));
+        insertJournalImbalance(rerunId, contractIds.get(0));
+        jdbcTemplate.update("""
+                UPDATE fgc.cap_check
+                   SET included_amount = included_amount + 100000
+                 WHERE validation_run_id = ?
+                   AND result_status = 'REVIEW_REQUIRED'
+                """, rerunId);
+
+        // 반환값은 "새 업무건" 수 — 같은 월 재실행은 전부 기존 업무건 재검출이라 0이다.
+        // 실행별 검출(occurrence)이 쌓였는지는 아래 rerunSummary SQL이 검증한다.
+        assertThat(exceptionCaseMapper.insertFromCapChecks(rerunId)).isZero();
+        assertThat(exceptionCaseMapper.insertFromArbitrageChecks(rerunId)).isZero();
+        assertThat(exceptionCaseMapper.insertFromReconciliationResults(rerunId)).isZero();
+        assertThat(exceptionCaseMapper.insertFromJournalImbalances(rerunId)).isZero();
+
+        Map<String, Object> rerunSummary = jdbcTemplate.queryForMap("""
+                SELECT COUNT(DISTINCT ec.exception_case_id) AS work_items,
+                       COUNT(eo.exception_occurrence_id) AS occurrences,
+                       COUNT(*) FILTER (WHERE eo.is_new_case) AS new_occurrences,
+                       COUNT(*) FILTER (WHERE NOT eo.is_new_case) AS recurring_occurrences,
+                       COUNT(*) FILTER (WHERE eo.was_reopened) AS reopened_occurrences,
+                       MIN(ec.detection_count) AS min_detection_count,
+                       MAX(ec.detection_count) AS max_detection_count
+                  FROM fgc.exception_case ec
+                  JOIN fgc.exception_occurrence eo
+                    ON eo.exception_case_id = ec.exception_case_id
+                 WHERE ec.validation_month = ?
+                """, TEST_MONTH);
+        assertThat(rerunSummary.get("work_items")).isEqualTo(8L);
+        assertThat(rerunSummary.get("occurrences")).isEqualTo(16L);
+        assertThat(rerunSummary.get("new_occurrences")).isEqualTo(8L);
+        assertThat(rerunSummary.get("recurring_occurrences")).isEqualTo(8L);
+        assertThat(rerunSummary.get("reopened_occurrences")).isEqualTo(2L);
+        assertThat(rerunSummary.get("min_detection_count")).isEqualTo(2);
+        assertThat(rerunSummary.get("max_detection_count")).isEqualTo(2);
+        assertThat(status(resolvedCaseId)).isEqualTo("NEW");
+        assertThat(status(changedRejectedCaseId)).isEqualTo("NEW");
+        assertThat(status(unchangedRejectedCaseId)).isEqualTo("REJECTED");
+    }
+
+    private Long exceptionCaseId(Long validationRunId, String exceptionType) {
+        return jdbcTemplate.queryForObject("""
+                SELECT exception_case_id
+                  FROM fgc.exception_case
+                 WHERE validation_run_id = ?
+                   AND exception_type = ?
+                 ORDER BY exception_case_id
+                 LIMIT 1
+                """, Long.class, validationRunId, exceptionType);
+    }
+
+    private String status(Long exceptionCaseId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.exception_case WHERE exception_case_id = ?",
+                String.class,
+                exceptionCaseId);
+    }
+
+    // IF-API-42 — RECO-W01 "불일치 예외 일괄 생성" 버튼(수동, reconciliationRunId 기준)이
+    // 월 검증 실행 단계의 자동 생성(insertFromReconciliationResults, validationRunId 기준)과
+    // 정확히 같은 exception_key를 만들어서, 어느 경로가 먼저 실행됐든 서로 중복 생성하지
+    // 않아야 한다(FUN-052). 수동 → 자동 순서.
+    @Test
+    void bulkCreateByReconciliationRunIsIdempotentAndCrossCompatibleWithValidationRunGeneration() {
+        List<Long> contractIds = jdbcTemplate.queryForList("""
+                SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
+                """, Long.class);
+        assertThat(contractIds).isNotEmpty();
+        Long contractId = contractIds.get(0);
+
+        Long validationRunId = insertValidationRun();
+        Long reconciliationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (
+                    validation_run_id, settlement_month, payment_stage, status
+                ) VALUES (?, ?, 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class, validationRunId, TEST_MONTH);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-amount", "AMOUNT_DIFFERENCE", 100000, 90000);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-review", "REVIEW_REQUIRED", 100000, 0);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "bulk-matched", "MATCHED", 100000, 100000);
+
+        ReconciliationExceptionBulkCreateRow first =
+                exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
+        assertThat(first.getCandidateCount()).isEqualTo(2L);
+        assertThat(first.getCreatedCount()).isEqualTo(2L);
+
+        // 같은 실행에 다시 눌러도 새 예외가 생기지 않는다.
+        ReconciliationExceptionBulkCreateRow second =
+                exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
+        assertThat(second.getCandidateCount()).isEqualTo(2L);
+        assertThat(second.getCreatedCount()).isZero();
+
+        // 월 검증 실행 단계의 자동 생성 경로로도 다시 시도해보면(같은 대사 실행이 그
+        // validation_run_id에 연결돼 있으므로) 이미 수동으로 만든 예외와 키가 같아서
+        // 새로 생기지 않는다.
+        assertThat(exceptionCaseMapper.insertFromReconciliationResults(validationRunId))
+                .isZero();
+
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case
+                 WHERE source_entity_type = 'RECONCILIATION_RESULT'
+                   AND validation_run_id = ?
+                """, Integer.class, validationRunId);
+        assertThat(count).isEqualTo(2);
+    }
+
+    // 위 테스트의 역순 — 자동 생성이 먼저 실행된 뒤 수동 버튼을 눌러도 중복이 생기면
+    // 안 된다(코드리뷰 지적: 한쪽 순서만 검증하면 두 경로의 exception_key 형식이 나중에
+    // 어긋나는 회귀를 놓칠 수 있다).
+    @Test
+    void bulkCreateByReconciliationRunSkipsExceptionsAlreadyCreatedByValidationRunGeneration() {
+        List<Long> contractIds = jdbcTemplate.queryForList("""
+                SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
+                """, Long.class);
+        assertThat(contractIds).isNotEmpty();
+        Long contractId = contractIds.get(0);
+
+        Long validationRunId = insertValidationRun();
+        Long reconciliationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (
+                    validation_run_id, settlement_month, payment_stage, status
+                ) VALUES (?, ?, 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class, validationRunId, TEST_MONTH);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "auto-first-amount", "AMOUNT_DIFFERENCE", 100000, 90000);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "auto-first-review", "REVIEW_REQUIRED", 100000, 0);
+        insertReconciliationResult(reconciliationRunId, contractId,
+                "auto-first-matched", "MATCHED", 100000, 100000);
+
+        assertThat(exceptionCaseMapper.insertFromReconciliationResults(validationRunId))
+                .isEqualTo(2L);
+
+        ReconciliationExceptionBulkCreateRow manual =
+                exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
+        assertThat(manual.getCandidateCount()).isEqualTo(2L);
+        assertThat(manual.getCreatedCount()).isZero();
+
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case
+                 WHERE source_entity_type = 'RECONCILIATION_RESULT'
+                   AND validation_run_id = ?
+                """, Integer.class, validationRunId);
+        assertThat(count).isEqualTo(2);
     }
 
     private Long insertValidationRun() {
@@ -211,18 +381,28 @@ class ExceptionGenerationMapperIntegrationTest {
     }
 
     private void insertJournalImbalance(Long validationRunId, Long contractId) {
+        // 실제 기표처럼 원천(source_entity_id)은 실행이 바뀌어도 같고 revision_no 만
+        // 올라간다 (JournalMapper.existsPostedForSource / uq_journal_source_revision) —
+        // 안정 업무키가 재실행에서 같은 업무건으로 수렴하는 전제다.
         Long journalHeaderId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.journal_header (
                     journal_no, journal_date, journal_type,
-                    source_entity_type, source_entity_id,
+                    source_entity_type, source_entity_id, revision_no,
                     validation_run_id, contract_id, status
                 ) VALUES (?, ?, 'EXPECTED_FC_PAYOUT',
-                          'VALIDATION_RUN', ?, ?, ?, 'DRAFT')
+                          'SCHEDULE_LINE', ?,
+                          COALESCE((SELECT MAX(revision_no) + 1
+                                      FROM fgc.journal_header
+                                     WHERE journal_type = 'EXPECTED_FC_PAYOUT'
+                                       AND source_entity_type = 'SCHEDULE_LINE'
+                                       AND source_entity_id = ?), 1),
+                          ?, ?, 'DRAFT')
                 RETURNING journal_header_id
                 """, Long.class,
                 "TEST-IMBALANCE-" + validationRunId,
                 TEST_MONTH,
-                String.valueOf(validationRunId),
+                "TEST-SRC-" + contractId,
+                "TEST-SRC-" + contractId,
                 validationRunId,
                 contractId);
 
