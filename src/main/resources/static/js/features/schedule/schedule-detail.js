@@ -9,6 +9,7 @@
   var regenerateButton = document.getElementById("btn-regenerate");
   var regenerateReason = document.getElementById("regenerate-reason");
   var regenerateSubmit = document.getElementById("btn-regenerate-submit");
+  var exportButton = document.getElementById("btn-export");
   var PAYMENT_STAGE_LABELS = { INSURER_TO_GA: "원수사→GA", GA_TO_FC: "GA→설계사" };
   var SCHEDULE_REGIME_LABELS = {
     CURRENT: "현행",
@@ -42,6 +43,9 @@
 
   load();
   if (confirmButton) confirmButton.addEventListener("click", confirmSchedule);
+  if (exportButton) exportButton.addEventListener("click", function () {
+    window.location.assign("/api/v1/schedules/" + encodeURIComponent(scheduleHeaderId) + "/export.csv");
+  });
   if (regenerateButton) regenerateButton.addEventListener("click", regenerateSchedule);
   if (regenerateReason) regenerateReason.addEventListener("input", updateRegenerateSubmit);
   if (regenerateSubmit) regenerateSubmit.addEventListener("click", submitRegeneration);

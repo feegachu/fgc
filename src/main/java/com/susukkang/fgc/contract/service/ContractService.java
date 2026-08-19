@@ -108,6 +108,11 @@ public class ContractService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<ContractView> selectAllByCondition(ContractSearchCondition condition) {
+        return contractMapper.selectAllByCondition(condition);
+    }
+
     /**
      * 설명 : 보험계약 등록 요청을 검증하고 계약을 저장한다.
      *
