@@ -26,6 +26,7 @@ public class CommissionPaymentAttributionCommand {
     private final Integer attributionSequence;
     private final Long agentId;
     private final Long contractId;
+    private final Long scheduleLineId;
     private final LocalDate attributionDate;
     private final LocalDate attributionMonth;
     private final BigDecimal amount;

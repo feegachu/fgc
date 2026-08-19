@@ -12,20 +12,19 @@
                sl.contract_month_no      AS contractMonthNo,
                sl.expected_amount        AS amount,
                (
-                   SELECT MIN(NULLIF(BTRIM(ta.evidence_ref), ''))
+                   SELECT CASE
+                              WHEN COUNT(ta.transaction_attribution_id) > 0
+                               AND BOOL_AND(NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL)
+                                  THEN MIN(NULLIF(BTRIM(ta.evidence_ref), ''))
+                          END
                      FROM fgc.transaction_attribution ta
                      JOIN fgc.commission_transaction ct
                        ON ct.commission_transaction_id = ta.commission_transaction_id
-                     JOIN fgc.insurance_contract c
-                       ON c.contract_id = ta.contract_id
-                    WHERE ta.contract_id = sh.contract_id
+                    WHERE ta.schedule_line_id = sl.schedule_line_id
+                      AND ct.status = 'CONFIRMED'
                       AND ct.payment_stage = sh.payment_stage
                       AND ct.commission_item_id = sl.commission_item_id
-                      AND ct.status = 'CONFIRMED'
                       AND ta.inclusion_status_snapshot = 'EXCLUDED'
-                      AND ta.attribution_date >= c.contract_date
-                      AND ta.attribution_date <![CDATA[ < ]]> c.contract_date + INTERVAL '12 months'
-                      AND NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL
                ) AS evidenceRef
           FROM fgc.schedule_line sl
           JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
