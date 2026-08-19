@@ -4,38 +4,6 @@
   gap: var(--space-4);
 }
 
-.audit-notice {
-  display: grid;
-  grid-template-columns: 1.25rem minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-8);
-  color: var(--color-text-secondary);
-  background: var(--color-bg-subtle);
-}
-
-.audit-notice-icon {
-  margin-top: 0.125rem;
-  color: var(--color-icon-secondary);
-  font-size: 1.125rem;
-}
-
-.audit-notice-title {
-  color: var(--color-text-primary);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  line-height: 1.25rem;
-}
-
-.audit-notice-copy {
-  margin-top: var(--space-1);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  text-wrap: pretty;
-}
-
 .audit-filter-bar {
   align-items: flex-end;
 }
@@ -115,6 +83,15 @@
   text-decoration-color: currentcolor;
 }
 
+.audit-log-row {
+  cursor: pointer;
+}
+
+.audit-log-row:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
 .audit-state-row:hover {
   background: var(--color-bg-surface);
 }
@@ -122,6 +99,15 @@
 .audit-state-row td {
   height: auto;
   padding: 0;
+  white-space: normal;
+}
+
+.data-table td.audit-disclosure-cell {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: top;
+  text-overflow: clip;
   white-space: normal;
 }
 
