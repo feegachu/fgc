@@ -95,7 +95,7 @@
 .reco-col-amount { width: 7rem; }
 .reco-col-result { width: 8.5rem; }
 .reco-col-reason { width: 10rem; }
-.reco-col-action { width: 6rem; }
+.reco-col-action { width: 7rem; }
 
 .data-table td.reco-disclosure-cell {
   padding-block: var(--space-2);

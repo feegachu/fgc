@@ -311,14 +311,20 @@ class PublishingTemplateStructureTest {
                 .contains(".reco-summary-grid")
                 .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
                 .contains(".reco-result-table")
+                .contains(".reco-col-action { width: 7rem; }")
                 .contains("@media (max-width: 47.9375rem)");
 
         assertThat(resource("static/js/features/reco/reco.js"))
                 .contains("tableCellDisclosure")
+                .contains("class=\"table-cell-details\" hidden")
                 .contains("table-cell-more\">전체 보기")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready")
                 .contains("window.FgcUi.toast(")
                 .contains("\"success\"")
                 .contains("event.key !== \"Enter\" && event.key !== \" \"")
+                .doesNotContain("text.length <= limit")
                 .doesNotContain("fetch(");
     }
 

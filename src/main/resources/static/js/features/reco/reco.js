@@ -60,6 +60,23 @@
       .replace(/'/g, "&#039;");
   }
 
+  function syncTableCellDisclosures() {
+    el.resultBody.querySelectorAll(".table-cell-disclosure").forEach(function (disclosure) {
+      var preview = disclosure.querySelector(".table-cell-preview");
+      var details = disclosure.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+
+      var isTruncated = preview.scrollWidth > preview.clientWidth + 1
+        || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !isTruncated;
+      if (!isTruncated) details.open = false;
+    });
+  }
+
+  function scheduleDisclosureSync() {
+    window.requestAnimationFrame(syncTableCellDisclosures);
+  }
+
   function addOption(select, value, label) {
     var option = document.createElement("option");
     option.value = value == null ? "" : String(value);
@@ -161,13 +178,12 @@
     return '<span class="status-badge ' + tone + '">' + escapeHtml(item.resultTypeLabel) + "</span>";
   }
 
-  function tableCellDisclosure(value, limit, singleLine) {
+  function tableCellDisclosure(value, singleLine) {
     var text = String(value == null || value === "" ? "—" : value);
     var safeText = escapeHtml(text);
-    if (text.length <= limit) return safeText;
     return '<div class="table-cell-disclosure">' +
       '<span class="table-cell-preview' + (singleLine ? " is-single-line" : "") + '">' + safeText + "</span>" +
-      '<details class="table-cell-details"><summary>' +
+      '<details class="table-cell-details" hidden><summary>' +
       '<span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>' +
       '<span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>' +
       '</summary><p class="table-cell-full">' + safeText + "</p></details></div>";
@@ -185,8 +201,8 @@
       .map(function (reason) { return reason.label; })
       .join(", ") || "—";
     return "<tr>" +
-      '<td class="reco-disclosure-cell tabular-nums">' + tableCellDisclosure(item.contractNo, 18, true) + "</td>" +
-      '<td class="reco-disclosure-cell">' + tableCellDisclosure(item.commissionItemName, 22, false) + "</td>" +
+      '<td class="reco-disclosure-cell tabular-nums">' + tableCellDisclosure(item.contractNo, true) + "</td>" +
+      '<td class="reco-disclosure-cell">' + tableCellDisclosure(item.commissionItemName, false) + "</td>" +
       '<td class="is-center tabular-nums">' + escapeHtml(item.installmentNo) + "</td>" +
       "<td" + agentClass + ">" + escapeHtml(expectedAgentName) + "</td>" +
       "<td" + agentClass + ">" + escapeHtml(actualAgentName) + "</td>" +
@@ -194,8 +210,8 @@
       '<td class="is-number tabular-nums">' + won(item.actualTotalAmount) + "</td>" +
       "<td" + diffClass + ">" + won(item.differenceAmount) + "</td>" +
       "<td>" + resultTypeBadge(item) + "</td>" +
-      '<td class="reco-disclosure-cell">' + tableCellDisclosure((item.primaryReason && item.primaryReason.label) || "—", 24, false) + "</td>" +
-      '<td class="reco-disclosure-cell">' + tableCellDisclosure(secondaryReasons, 24, false) + "</td>" +
+      '<td class="reco-disclosure-cell">' + tableCellDisclosure((item.primaryReason && item.primaryReason.label) || "—", false) + "</td>" +
+      '<td class="reco-disclosure-cell">' + tableCellDisclosure(secondaryReasons, false) + "</td>" +
       '<td><button class="button button-ghost" type="button" data-reco-compare-id="' +
         escapeHtml(item.reconciliationResultId) + '">비교 상세</button></td>' +
       "</tr>";
@@ -244,6 +260,7 @@
       return;
     }
     el.resultBody.innerHTML = rows.map(resultRow).join("");
+    scheduleDisclosureSync();
     if (noFilter) {
       var summary = data.summary || {};
       el.sumExpected.textContent = number(summary.expectedTotal);
@@ -460,6 +477,11 @@
   updateRunButtonState();
   updateBulkButtonState();
   loadInsurers();
+  window.addEventListener("load", scheduleDisclosureSync, { once: true });
+  window.addEventListener("resize", scheduleDisclosureSync);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(scheduleDisclosureSync);
+  }
 
   var autoSelectRunId = window.sessionStorage.getItem("reco.autoSelectRunId");
   if (autoSelectRunId) {
