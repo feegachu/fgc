@@ -80,6 +80,10 @@ class PublishingTemplateStructureTest {
                 .contains("id=\"cond-body\" aria-live=\"polite\"")
                 .contains("data-checklist-passed=\"false\"")
                 .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                .contains("검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.")
+                .containsOnlyOnce("id=\"finalize-action-guide\"")
+                .containsOnlyOnce("id=\"btn-finalize\"")
+                .doesNotContain("id=\"finalize-actions-pending\"")
                 .doesNotContain("확정 조건 API 연동 대기")
                 .containsPattern("(?s)<button[^>]*id=\"btn-finalize\"[^>]*\\bdisabled\\b[^>]*>");
         assertThat(resource("static/js/features/vrun/vrun-detail.js"))
@@ -89,6 +93,8 @@ class PublishingTemplateStructureTest {
                 .contains("checklist.conditions.length !== 6")
                 .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
                 .contains("idempotencyKey: finalizeIdempotencyKey")
+                .contains("error.code === \"FGC-VRUN-006\"")
+                .contains("finalizeIdempotencyKey = null")
                 .contains("runStatus !== \"COMPLETED\"")
                 .contains("window.confirm")
                 .doesNotContain("fetch(");

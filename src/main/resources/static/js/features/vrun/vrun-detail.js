@@ -223,6 +223,13 @@
     }).catch(function (error) {
       finalizeRequestPending = false;
       finalizeButton.removeAttribute("aria-busy");
+      // 2026-08-19 yslee - FGC-VRUN-006 멱등키 충돌 시 다음 재시도에서 새 키를 발급하도록 수정
+      // 기존 코드: 모든 실패 후 최초 멱등키를 계속 재사용
+      // 문제: 다른 검증 실행에 귀속된 키 충돌 시 새로고침 전까지 같은 409 오류가 반복됨
+      // 개선: 문서에서 새 키 재시도를 요구하는 FGC-VRUN-006에서만 저장된 키를 초기화
+      if (error && error.code === "FGC-VRUN-006") {
+        finalizeIdempotencyKey = null;
+      }
       if (toast) toast(error && error.message ? error.message : "검증 실행 확정에 실패했습니다.", "error");
       loadFinalizeChecklist();
     });

@@ -248,10 +248,14 @@
     <div class="fgc-card__body" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
       <div style="max-width:640px">
         <div style="font-weight:700;font-size:14px">⑥ 확정 (FINALIZED)</div>
+        <!-- 2026-08-19 yslee - #238 병합 잔재를 제거하고 VRUN-W02 확정 안내 고정 문구 적용 -->
+        <!-- 기존 코드: 신·구 안내 p 요소가 중첩되고 송금·회계 마감 아님 안내가 누락됨 -->
+        <!-- 문제: aria-describedby가 빈 p를 가리켜 접근성 안내가 제공되지 않고 확정을 송금 마감으로 오인할 수 있음 -->
+        <!-- 개선: 단일 안내 요소에 검증 결과 잠금이며 실제 송금·회계 마감이 아니라는 고정 문구를 표시 -->
         <p class="fgc-help" id="finalize-action-guide" style="margin-top:4px">
-        <p class="fgc-help" id="finalize-actions-pending" style="margin-top:4px">
           위 6개 조건이 모두 통과한 실행만 확정할 수 있습니다.<br>
           확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 <strong>잠깁니다</strong>.
+          <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong><br>
           <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요.
           확정 권한은 <span class="fgc-mono">GA_ADMIN</span> · <span class="fgc-mono">SYSTEM_ADMIN</span> 에게만 있습니다.
         </p>
@@ -265,10 +269,6 @@
               data-checklist-passed="false"
               th:attr="data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}"
               aria-describedby="finalize-action-guide" style="padding:10px 20px">
-      <!-- IF-API-51 연결 전까지 비활성. IF-API-50 결과는 data-checklist-passed에만 보존한다. -->
-      <button class="fgc-btn fgc-btn--primary" id="btn-finalize" type="button" data-fgc-action="finalize" disabled
-              data-checklist-passed="false"
-              aria-describedby="finalize-actions-pending" style="padding:10px 20px">
         <span class="material-symbols-outlined" style="font-size:18px">lock</span> 확정
       </button>
     </div>

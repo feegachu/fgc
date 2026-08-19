@@ -38,10 +38,16 @@ class PendingActionButtonStructureTest {
                         + "(?=[^>]*data-checklist-passed=\"false\")"
                         + "(?=[^>]*data-can-finalize=)[^>]*>")
                 .contains("id=\"finalize-action-guide\"")
+                .contains("검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.")
+                .containsOnlyOnce("id=\"finalize-action-guide\"")
+                .containsOnlyOnce("id=\"btn-finalize\"")
+                .doesNotContain("id=\"finalize-actions-pending\"")
                 .doesNotContain("확정 조건 확인과 확정 작업은 API 연동 대기입니다.");
         assertThat(detailScript)
                 .contains("/finalize-checklist")
                 .contains("/finalize\"")
+                .contains("error.code === \"FGC-VRUN-006\"")
+                .contains("finalizeIdempotencyKey = null")
                 .contains("idempotencyKey: finalizeIdempotencyKey");
     }
 
