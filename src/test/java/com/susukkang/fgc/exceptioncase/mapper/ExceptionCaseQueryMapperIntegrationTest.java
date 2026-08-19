@@ -143,7 +143,22 @@ class ExceptionCaseQueryMapperIntegrationTest {
                 .stream().map(row -> row.title()))
                 .containsExactlyInAnyOrder("IT 검토중-" + suffix, "IT 해결-" + suffix);
 
-        assertThat(mapper.findAssignees()).anyMatch(a -> a.userId().equals(userId));
+        // 선택지 = 배정 이력 있는 사용자 집합과 정확히 일치 — 배정 없는 사용자는 나오지 않는다
+        List<Long> assignedUserIds = jdbcTemplate.queryForList("""
+                SELECT DISTINCT assigned_to
+                  FROM fgc.exception_case
+                 WHERE assigned_to IS NOT NULL
+                """, Long.class);
+        assertThat(mapper.findAssignees())
+                .extracting(assigneeRow -> assigneeRow.userId())
+                .containsExactlyInAnyOrderElementsOf(assignedUserIds)
+                .contains(userId);
+        Long unassignedUserId = jdbcTemplate.queryForObject("""
+                SELECT user_id FROM fgc.app_user
+                 WHERE user_id <> ? ORDER BY user_id LIMIT 1
+                """, Long.class, userId);
+        assertThat(mapper.findAssignees())
+                .noneMatch(assigneeRow -> assigneeRow.userId().equals(unassignedUserId));
     }
 
     /** FGC-FUN-052·VRUN-W02 '예외함 열기' 링크의 검증월 검색조건 — 연도 경계(12월↔1월)도 섞이지 않는다. */

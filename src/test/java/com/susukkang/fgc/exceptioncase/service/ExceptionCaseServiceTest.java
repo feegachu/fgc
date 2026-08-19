@@ -80,6 +80,7 @@ class ExceptionCaseServiceTest {
         verify(queryMapper).search(any(), anyList(), eq(40), eq(20));
     }
 
+    /** IF-API-43·FGC-FUN-052: 0건이면 행 조회를 생략하고 page 는 1로 되돌린다. */
     @Test
     void skipsRowQueryWhenTotalIsZero() {
         given(queryMapper.count(any(), anyList())).willReturn(0L);
