@@ -1,6 +1,6 @@
 package com.susukkang.fgc.validation.service;
 
-import com.susukkang.fgc.audit.mapper.AuditLogMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
@@ -8,12 +8,14 @@ import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.FinalizeValidationRunResponse;
 import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import com.susukkang.fgc.validation.event.ValidationRunFinalized;
 import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -33,13 +35,16 @@ class ValidationRunFinalizationServiceImplTest {
     @Mock
     private ValidationRunMapper validationRunMapper;
     @Mock
-    private AuditLogMapper auditLogMapper;
+    private AuditLogService auditLogService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private ValidationRunFinalizationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new ValidationRunFinalizationServiceImpl(validationRunMapper, auditLogMapper);
+        service = new ValidationRunFinalizationServiceImpl(
+                validationRunMapper, auditLogService, eventPublisher);
         // Mockito의 Long 기본값 0L과 MyBatis 단건 SELECT 무결과 null의 차이를 제거한다.
         lenient().when(validationRunMapper.findValidationRunIdByFinalizeIdempotencyKey(any()))
                 .thenReturn(null);
@@ -79,14 +84,15 @@ class ValidationRunFinalizationServiceImplTest {
         when(validationRunMapper.findFinalizeChecklistCounts(44L)).thenReturn(passingCounts());
         when(validationRunMapper.finalizeIfCompleted(44L, 7L, "finalize-44")).thenReturn(1);
         when(validationRunMapper.findFinalizationById(44L)).thenReturn(finalized("finalize-44"));
-        when(auditLogMapper.insert(any())).thenReturn(1);
-
         FinalizeValidationRunResponse response = service.finalizeRun(44L, 7L, " finalize-44 ");
 
         assertThat(response.status()).isEqualTo("FINALIZED");
         assertThat(response.finalizedBy()).isEqualTo("gaadmin");
         verify(validationRunMapper).finalizeIfCompleted(44L, 7L, "finalize-44");
-        verify(auditLogMapper).insert(any());
+        verify(auditLogService).record(any());
+        verify(eventPublisher).publishEvent(new ValidationRunFinalized(
+                44L, LocalDate.of(2026, 8, 1), 7L,
+                OffsetDateTime.parse("2026-08-16T12:34:56+09:00")));
     }
 
     @Test
@@ -100,7 +106,8 @@ class ValidationRunFinalizationServiceImplTest {
 
         assertThat(response.status()).isEqualTo("FINALIZED");
         verify(validationRunMapper, never()).finalizeIfCompleted(any(), any(), any());
-        verify(auditLogMapper, never()).insert(any());
+        verify(auditLogService, never()).record(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -166,8 +173,6 @@ class ValidationRunFinalizationServiceImplTest {
         when(validationRunMapper.findFinalizeChecklistCounts(44L)).thenReturn(passingCounts());
         when(validationRunMapper.finalizeIfCompleted(44L, 7L, null)).thenReturn(1);
         when(validationRunMapper.findFinalizationById(44L)).thenReturn(finalized(null));
-        when(auditLogMapper.insert(any())).thenReturn(1);
-
         assertThat(service.finalizeRun(44L, 7L, null).status()).isEqualTo("FINALIZED");
         verify(validationRunMapper, never()).findValidationRunIdByFinalizeIdempotencyKey(any());
     }

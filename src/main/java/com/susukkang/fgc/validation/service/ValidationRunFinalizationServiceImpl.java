@@ -1,19 +1,19 @@
 package com.susukkang.fgc.validation.service;
 
-import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
-import com.susukkang.fgc.audit.mapper.AuditLogMapper;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
-import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistConditionResponse;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.FinalizeValidationRunResponse;
 import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import com.susukkang.fgc.validation.event.ValidationRunFinalized;
 import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +31,8 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 160;
 
     private final ValidationRunMapper validationRunMapper;
-    private final AuditLogMapper auditLogMapper;
+    private final AuditLogService auditLogService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -166,23 +167,24 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
     }
 
     private void recordFinalizationAudit(FinalizedValidationRunRow finalized, Long finalizedBy) {
-        String afterValue = "{\"status\":\"FINALIZED\",\"currentStep\":10,"
-                + "\"finalizedBy\":" + finalizedBy + ",\"finalizedAt\":\""
-                + finalized.getFinalizedAt() + "\"}";
-        int affected = auditLogMapper.insert(AuditLogInsertRow.builder()
+        // 2026-08-19 yslee - FGC-FUN-044 확정 감사로그를 FUN-061 공통 기록 경로로 통합
+        // 기존 코드: AuditLogMapper를 직접 호출하며 clientIp를 항상 null로 저장
+        // 문제: HTTP 확정 요청의 접속 IP가 누락되어 동일한 핵심 업무 감사로그와 형식이 달라짐
+        // 개선: AuditLogService가 요청 ID·클라이언트 IP·JSON 직렬화를 공통 규칙으로 처리
+        auditLogService.record(AuditLogService.AuditEvent.builder()
                 .userId(finalizedBy)
                 .actionCode("VALIDATION_RUN_FINALIZED")
                 .entityType("VALIDATION_RUN")
                 .entityId(String.valueOf(finalized.getValidationRunId()))
-                .beforeValue("{\"status\":\"COMPLETED\",\"currentStep\":8}")
-                .afterValue(afterValue)
+                .before(Map.of("status", "COMPLETED", "currentStep", 8))
+                .after(Map.of(
+                        "status", "FINALIZED",
+                        "currentStep", 10,
+                        "finalizedBy", finalizedBy,
+                        "finalizedAt", finalized.getFinalizedAt()
+                ))
                 .reason("월 통합검증 결과 확정(검증 결과 잠금; 실제 송금·법정 회계마감 아님)")
-                .requestId(limit(RequestIdContext.current(), 80))
-                .clientIp(null)
                 .build());
-        if (affected != 1) {
-            throw new IllegalStateException("Validation run finalization audit insert failed");
-        }
     }
 
     private FinalizeValidationRunResponse response(FinalizedValidationRunRow row) {
@@ -193,7 +195,4 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         return new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
     }
 
-    private String limit(String value, int maxLength) {
-        return value == null || value.length() <= maxLength ? value : value.substring(0, maxLength);
-    }
 }
