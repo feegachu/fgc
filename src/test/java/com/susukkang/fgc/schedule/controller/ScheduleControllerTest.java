@@ -57,7 +57,7 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.data.content[0].schedulePurpose").value("COMPARISON"))
                 .andExpect(jsonPath("$.data.content[0].schedulePurposeLabel").value("비교"))
                 .andExpect(jsonPath("$.data.content[0].status").value("ADJUSTED"))
-                .andExpect(jsonPath("$.data.content[0].statusLabel").value("조정완료"));
+                .andExpect(jsonPath("$.data.content[0].statusLabel").value("조정"));
     }
 
     @Test
@@ -74,7 +74,7 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.data.header.paymentStageLabel").value("GA→설계사"))
                 .andExpect(jsonPath("$.data.header.scheduleRegimeLabel").value("4년 분급(2027)"))
                 .andExpect(jsonPath("$.data.header.schedulePurposeLabel").value("비교"))
-                .andExpect(jsonPath("$.data.header.statusLabel").value("조정완료"));
+                .andExpect(jsonPath("$.data.header.statusLabel").value("조정"));
     }
 
     @Test

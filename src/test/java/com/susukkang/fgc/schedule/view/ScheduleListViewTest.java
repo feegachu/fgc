@@ -50,6 +50,8 @@ class ScheduleListViewTest {
                 .andExpect(content().string(containsString("name=\"regime\"")))
                 .andExpect(content().string(containsString("name=\"purpose\"")))
                 .andExpect(content().string(containsString("name=\"status\"")))
+                .andExpect(content().string(containsString("value=\"ADJUSTED\">조정</option>")))
+                .andExpect(content().string(not(containsString("조정완료"))))
                 .andExpect(content().string(containsString("value=\"OPERATIONAL\" selected")))
                 .andExpect(content().string(containsString("data-table-viewport schedule-table-viewport")))
                 .andExpect(content().string(containsString("/css/features/schedule.css")))
