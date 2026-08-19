@@ -292,7 +292,7 @@ class PublishingTemplateStructureTest {
     private static String resource(String path) throws IOException {
         try (var input = PublishingTemplateStructureTest.class.getClassLoader().getResourceAsStream(path)) {
             assertThat(input).as(path).isNotNull();
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
         }
     }
 }
