@@ -60,6 +60,7 @@ public record ReconciliationResultDetailResponse(
             int matchSeq,
             String matchRole,
             Long scheduleLineId,
+            Long scheduleHeaderId,
             Long transactionAttributionId,
             Long commissionTransactionId,
             Long journalHeaderId,
@@ -77,7 +78,7 @@ public record ReconciliationResultDetailResponse(
     ) {
         static Match from(ReconciliationMatchDetailRow row) {
             return new Match(row.getMatchSeq(), row.getMatchRole(), row.getScheduleLineId(),
-                    row.getTransactionAttributionId(), row.getCommissionTransactionId(),
+                    row.getScheduleHeaderId(), row.getTransactionAttributionId(), row.getCommissionTransactionId(),
                     row.getJournalHeaderId(), row.getContractId(), row.getAgentId(),
                     row.getCommissionItemId(), row.getInstallmentNo(), row.getDueDate(),
                     row.getBasisAmount(), row.getRatePct(), row.getAttributionDate(), row.getSettlementMonth(),

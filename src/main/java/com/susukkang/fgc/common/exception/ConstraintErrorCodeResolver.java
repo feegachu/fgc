@@ -4,6 +4,7 @@ import org.postgresql.util.PSQLException;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +48,10 @@ public class ConstraintErrorCodeResolver {
         return CONSTRAINT_MAPPING.entrySet()
                 .stream()
                 .filter(entry -> message.contains(entry.getKey()))
+                // uq_validation_run이 더 구체적인 uq_validation_run_finalize_idempotency를
+                // 먼저 가로채지 않도록 가장 긴 제약 이름부터 판정한다.
+                .sorted(Comparator.comparingInt((Map.Entry<String, FgcErrorCode> entry) ->
+                        entry.getKey().length()).reversed())
                 .map(Map.Entry::getValue)
                 .findFirst();
     }
@@ -124,6 +129,34 @@ public class ConstraintErrorCodeResolver {
         mappings.put(
                 "uq_validation_run",
                 FgcErrorCode.VRUN_001
+        );
+        mappings.put(
+                "uq_journal_current_posted_source",
+                FgcErrorCode.LEDG_002
+        );
+        mappings.put(
+                "uq_journal_single_reversal",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_correction_original",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_correction_group_reversal",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_correction_group_repost",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_journal_source_revision",
+                FgcErrorCode.LEDG_004
+        );
+        mappings.put(
+                "uq_validation_run_finalize_idempotency",
+                FgcErrorCode.VRUN_006
         );
 
         return Map.copyOf(mappings);

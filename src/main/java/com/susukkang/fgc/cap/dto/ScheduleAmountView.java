@@ -15,4 +15,5 @@ public class ScheduleAmountView {
     private Long commissionItemId;
     private Integer contractMonthNo;
     private BigDecimal amount;
+    private String evidenceRef;
 }

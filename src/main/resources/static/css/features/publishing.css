@@ -464,6 +464,11 @@
   text-align: center;
 }
 
+.publishing-page .fgc-empty.is-error {
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
 .publishing-page .publishing-empty-state {
   grid-column: 1 / -1;
   min-height: 5rem;

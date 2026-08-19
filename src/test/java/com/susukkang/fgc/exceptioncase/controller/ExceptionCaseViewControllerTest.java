@@ -177,6 +177,30 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString(">2026-07</option>")));
     }
 
+    @Test
+    void fgcFun044_finalizationChecklistFiltersAreForwardedToTheSearchService() throws Exception {
+        given(service.search(argThat(c -> Long.valueOf(44L).equals(c.getValidationRunId())
+                        && c.getSeverity() == ExceptionSeverity.CRITICAL
+                        && c.getTypes().equals(List.of(
+                        ExceptionType.POLICY_MISSING, ExceptionType.POLICY_DUPLICATE))
+                        && "OPEN".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(), 1, 20, 0, 0));
+
+        mockMvc.perform(get("/exceptions")
+                        .param("validationRunId", "44")
+                        .param("severity", "CRITICAL")
+                        .param("types", "POLICY_MISSING", "POLICY_DUPLICATE")
+                        .param("status", "OPEN")
+                        .with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("exception/list"));
+
+        verify(service).search(argThat(c -> Long.valueOf(44L).equals(c.getValidationRunId())
+                        && c.getTypes().equals(List.of(
+                        ExceptionType.POLICY_MISSING, ExceptionType.POLICY_DUPLICATE))),
+                eq(1), eq(20));
+    }
+
     /** 형식이 깨진 필터는 400 대신 그 조건만 빠진 채 기본 필터로 조회된다. */
     @Test
     void malformedFilterValuesFallBackSilently() throws Exception {

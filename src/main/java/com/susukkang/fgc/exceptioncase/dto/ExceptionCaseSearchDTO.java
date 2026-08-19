@@ -10,6 +10,7 @@ import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * IF-API-43 예외함 검색조건.
@@ -32,6 +33,12 @@ public class ExceptionCaseSearchDTO {
     private Long assignee;
     private boolean unassignedOnly;
     private String contractNo;
+    // 2026-08-19 yslee - FUN-044 확정 체크리스트의 실행·복수유형 검색조건 유지
+    // 기존 코드: develop 예외함 개편에서 검증월·상세원인은 지원하지만 실행 ID·복수유형은 제외
+    // 문제: 확정 실패 바로가기에서 다른 실행의 예외가 섞이고 정책 누락·중복을 한 번에 조회할 수 없음
+    // 개선: 공통 서비스 검색 DTO에 선택 실행 ID와 복수 예외유형 조건을 함께 제공
+    private Long validationRunId;
+    private List<ExceptionType> types;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate validationMonth;
 }
