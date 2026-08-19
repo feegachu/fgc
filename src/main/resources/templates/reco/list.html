@@ -3,26 +3,34 @@
   FGC-UI-RECO-W01 대사 실행·결과
   요구사항 FUN-048~051 / 운영정책서 제36조
   데이터  reconciliation_run, reconciliation_result, reconciliation_match, vw_reconciliation_summary
-  API     POST /api/v1/reconciliations                    (실행)
-          GET  /api/v1/reconciliations/{id}/results       (Ajax)
-  라우트  GET /reconciliations → reco/list.html
+  API     POST /api/v1/reconciliations                      (실행, Ajax)
+          GET  /api/v1/reconciliations/{id}/results         (결과 목록, Ajax)
+          GET  /api/v1/reconciliations/results/{resultId}   (비교 상세, Ajax·팝업)
+          POST /api/v1/reconciliations/{id}/exceptions      (예외 일괄 생성, Ajax)
+  라우트  GET /reconciliations → reco/list.html (ReconciliationViewController, #205)
+          ④ 실행 이력만 MPA(IF-API-39·서버 렌더링) — 나머지는 SIR-006에 따라 Ajax.
 
   [대사 방향 2개]
    · 원수사→GA : 우리가 계산한 예상 수입 스케줄  vs  원수사가 보낸 실제 명세
    · GA→설계사 : 우리가 계산한 예상 지급 스케줄  vs  GA가 확정한 실제 지급 건
   [매칭키] 계약번호 + 지급단계 + 설계사 + 수수료 항목 + 회차
 
-  [막을 것]
-   · 같은 정산월·지급단계·보험회사로 실행 2건 만들기 — DB UNIQUE 가 막습니다
-   · 화면에서 결과 유형(일치/불일치)을 사람이 바꾸기 — 계산 결과이지 의견이 아닙니다
+  [validationRunId] IF-API-38은 validationRunId가 필수라, 화면엔 안 보이지만 reco.js가
+  [대사 실행]을 누르는 시점에 GET /api/v1/validation-runs?month=&status=COMPLETED로
+  그 정산월의 완료된 검증 실행 중 최신(회차 최대, 서버가 이미 run_no DESC로 정렬)을
+  자동으로 찾아 씁니다. 0건이면 "그 달 월 검증이 아직 완료되지 않았습니다"로 막습니다.
 
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-RECO-W01)의 정적 골격만 옮겼다.
-  데이터 영역(요약 카드·결과 목록·실행 이력·필터 선택지)은 IF-API 연동 시 서버 렌더링으로 채운다.
+  [막을 것]
+   · 같은 정산월·지급단계·보험회사·검증실행 조합으로 실행 2건 만들기 — DB UNIQUE가 막습니다
+     (검증을 다시 돌려 새 검증실행이 생기면 대사도 새로 도는 게 정상 동작입니다)
+   · 화면에서 결과 유형(일치/불일치)을 사람이 바꾸기 — 계산 결과이지 의견이 아닙니다
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-RECO-W01', '대사 실행·결과', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-reconciliation">
+<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-reconciliation"
+      data-reco-run-url="/api/v1/reconciliations"
+      th:data-can-process="${canProcess}">
 
   <h1 class="fgc-page-title">대사 실행 · 결과</h1>
   <p class="fgc-page-desc">
@@ -33,59 +41,65 @@
   <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
     <span class="material-symbols-outlined" style="font-size:18px">straighten</span>
     <span>
-      <!-- 허용오차 안내 문구(FGC.NOTICE.TOLERANCE)는 메시지 프로퍼티로 채운다 -->
       <strong id="notice-tolerance">1차 허용오차 0원 — 1원만 달라도 불일치입니다.</strong>
       회차와 지급예정일도 정확히 맞아야 일치로 봅니다. (2차에서 허용오차 정책을 도입합니다)
     </span>
   </div>
 
-  <!-- ① 실행 영역 -->
+  <!-- ① 실행 영역 — 정산월·지급단계는 ④ 실행 이력 조회 조건도 겸한다(조회 버튼 = GET 재조회) -->
   <section class="fgc-card" style="margin-top:16px">
     <div class="fgc-card__head"><span class="fgc-card__title">① 대사 실행</span></div>
-    <div class="fgc-card__body fgc-toolbar">
+    <form class="fgc-card__body fgc-toolbar" id="reco-filter-form" method="get" th:action="@{/reconciliations}">
       <div class="fgc-field" style="min-width:140px">
         <label class="fgc-label fgc-label--required" for="r-month">정산월</label>
-        <input class="fgc-input" id="r-month" type="month" th:value="${month}" value="2026-07">
+        <input class="fgc-input" id="r-month" name="month" type="month" th:value="${month}" required>
       </div>
       <div class="fgc-field" style="min-width:170px">
         <label class="fgc-label fgc-label--required" for="r-stage">지급단계</label>
-        <select class="fgc-select" id="r-stage">
-          <option value="GA_TO_FC">GA→설계사</option>
-          <option value="INSURER_TO_GA">원수사→GA</option>
+        <select class="fgc-select" id="r-stage" name="stage">
+          <option value="" th:selected="${stageFilter == null}">전체</option>
+          <option th:each="stage : ${stageOptions}"
+                  th:value="${stage.name()}" th:text="${stage.label()}"
+                  th:selected="${stage.name() == stageFilter}">GA→설계사</option>
         </select>
       </div>
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="r-insurer">보험회사</label>
-        <select class="fgc-select" id="r-insurer"><option value="">전체</option></select>
+        <select class="fgc-select" id="r-insurer" disabled><option value="">전체</option></select>
       </div>
+      <button class="fgc-btn fgc-btn--ghost" type="submit">
+        <span class="material-symbols-outlined" style="font-size:18px">search</span> 조회
+      </button>
       <!-- 실행(IF-API-38)·일괄 생성(IF-API-42)은 SETTLEMENT — GA_ADMIN 도 비활성이어야 한다 -->
-      <button class="fgc-btn fgc-btn--primary" id="btn-run" type="button" data-fgc-action="reconcile" disabled
-              aria-describedby="reconciliation-actions-pending">
+      <button class="fgc-btn fgc-btn--primary" id="btn-run" type="button" data-fgc-action="reconcile"
+              th:disabled="${!canProcess}"
+              th:attr="aria-describedby=${canProcess} ? null : 'reconciliation-actions-pending'">
         <span class="material-symbols-outlined" style="font-size:18px">play_arrow</span> 대사 실행
       </button>
-      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" type="button" data-fgc-action="bulk" disabled
-              aria-describedby="reconciliation-actions-pending">
+      <button class="fgc-btn fgc-btn--ghost" id="btn-bulk-exception" type="button" data-fgc-action="bulk"
+              th:disabled="${!canProcess}"
+              th:attr="aria-describedby=${canProcess} ? null : 'reconciliation-actions-pending'">
         <span class="material-symbols-outlined" style="font-size:18px">playlist_add</span> 불일치 예외 일괄 생성
       </button>
-    </div>
-    <div class="fgc-card__body" style="padding-top:0">
+    </form>
+    <div class="fgc-card__body" style="padding-top:0" th:if="${!canProcess}">
       <p class="fgc-help" id="reconciliation-actions-pending">
-        대사 실행과 불일치 예외 일괄 생성은 API 연동 대기입니다.<br>
-        같은 정산월 · 지급단계 · 보험회사 조합으로는 실행을 2건 만들 수 없습니다.
+        대사 실행과 불일치 예외 일괄 생성은 SETTLEMENT 권한이 필요합니다.<br>
+        같은 정산월 · 지급단계 · 보험회사 · 검증실행 조합으로는 실행을 2건 만들 수 없습니다.
         다시 돌려도 결과가 중복으로 쌓이지 않습니다
         (<span class="fgc-mono">UNIQUE(reconciliation_run_id, match_group_key)</span>).
       </p>
     </div>
   </section>
 
-  <!-- ② 실행 요약 — 대상·일치·불일치·일치율·차액 카드는 IF-API 연동 시 채운다 -->
+  <!-- ② 실행 요약 — [대사 실행] Ajax 응답으로 채운다 -->
   <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px"
            id="summary-cards">
-    <div class="fgc-kpi"><div class="fgc-kpi__label">대상</div><div class="fgc-kpi__value">—</div></div>
-    <div class="fgc-kpi fgc-kpi--success"><div class="fgc-kpi__label">일치</div><div class="fgc-kpi__value">—</div></div>
-    <div class="fgc-kpi fgc-kpi--danger"><div class="fgc-kpi__label">불일치</div><div class="fgc-kpi__value">—</div></div>
-    <div class="fgc-kpi fgc-kpi--warning"><div class="fgc-kpi__label">일치율</div><div class="fgc-kpi__value">—</div></div>
-    <div class="fgc-kpi"><div class="fgc-kpi__label">차액 합계</div><div class="fgc-kpi__value">—</div></div>
+    <div class="fgc-kpi"><div class="fgc-kpi__label">대상</div><div class="fgc-kpi__value" id="sum-target">—</div></div>
+    <div class="fgc-kpi fgc-kpi--success"><div class="fgc-kpi__label">일치</div><div class="fgc-kpi__value" id="sum-matched">—</div></div>
+    <div class="fgc-kpi fgc-kpi--danger"><div class="fgc-kpi__label">불일치</div><div class="fgc-kpi__value" id="sum-exception">—</div></div>
+    <div class="fgc-kpi fgc-kpi--warning"><div class="fgc-kpi__label">일치율</div><div class="fgc-kpi__value" id="sum-rate">—</div></div>
+    <div class="fgc-kpi"><div class="fgc-kpi__label">차액 합계</div><div class="fgc-kpi__value" id="sum-diff-total">—</div></div>
   </section>
 
   <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1fr;gap:16px">
@@ -96,8 +110,21 @@
         <span class="fgc-card__title">③ 대사 결과</span>
         <div class="publishing-inline-controls" style="display:flex;gap:8px;align-items:center">
           <label class="fgc-label" for="f-type" style="margin:0">결과 유형</label>
-          <select class="fgc-select" id="f-type" style="padding:4px 8px"><option value="">전체 (11종)</option></select>
-          <label style="display:flex;gap:4px;align-items:center;font-size:12px">
+          <select class="fgc-select" id="f-type" style="padding:4px 8px">
+            <option value="">전체 (11종)</option>
+            <option value="MATCHED">일치</option>
+            <option value="AMOUNT_DIFFERENCE">금액 차이</option>
+            <option value="EXPECTED_MISSING">예상 내역 없음</option>
+            <option value="ACTUAL_MISSING">실제 지급 없음</option>
+            <option value="DUPLICATE">중복 지급</option>
+            <option value="AGENT_MISMATCH">설계사 불일치</option>
+            <option value="INSTALLMENT_MISMATCH">회차 불일치</option>
+            <option value="INVALID_CONTRACT_PAYMENT">무효·취소 계약 지급</option>
+            <option value="POLICY_VERSION_ERROR">정책 버전 오류</option>
+            <option value="JOURNAL_IMBALANCE">분개 불균형</option>
+            <option value="REVIEW_REQUIRED">검토 필요</option>
+          </select>
+          <label style="display:flex;gap:4px;align-items:center;font-size:12px" title="현재 페이지 안에서만 걸러집니다.">
             <input type="checkbox" id="f-mismatch"> 불일치만
           </label>
         </div>
@@ -115,27 +142,35 @@
               <th class="fgc-th-num" style="width:100px">실제 금액</th>
               <th class="fgc-th-num" style="width:100px">차액</th>
               <th style="width:130px">결과 유형</th>
-              <th style="width:180px">주 원인</th>
+              <th style="width:150px">주 원인</th>
+              <th style="width:150px">보조 원인</th>
               <th style="width:80px"></th>
             </tr>
           </thead>
           <tbody id="result-body">
-            <tr><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr><td colspan="12"><div class="fgc-empty" id="result-empty" th:text="#{info.common.empty}">대사를 실행하면 결과가 여기 표시됩니다.</div></td></tr>
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="5">합계</td>
+              <td colspan="5" id="result-sum-label">합계</td>
               <td class="fgc-td-num"><span class="fgc-amount" id="sum-expected">0</span></td>
               <td class="fgc-td-num"><span class="fgc-amount" id="sum-actual">0</span></td>
               <td class="fgc-td-num"><span class="fgc-amount" id="sum-diff">0</span></td>
-              <td colspan="3"></td>
+              <td colspan="4"></td>
             </tr>
           </tfoot>
         </table>
       </div>
+      <footer class="fgc-pagination" id="result-pagination" hidden>
+        <nav aria-label="대사 결과 페이지 이동" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px">
+          <button class="fgc-btn fgc-btn--ghost" id="result-page-prev" type="button">이전</button>
+          <span class="tabular-nums" id="result-page-indicator">1 / 1</span>
+          <button class="fgc-btn fgc-btn--ghost" id="result-page-next" type="button">다음</button>
+        </nav>
+      </footer>
     </section>
 
-    <!-- ④ 실행 이력 -->
+    <!-- ④ 실행 이력 — IF-API-39, 서버 렌더링(MPA) -->
     <section class="fgc-card">
       <div class="fgc-card__head"><span class="fgc-card__title">④ 실행 이력</span></div>
       <div style="overflow-x:auto">
@@ -149,11 +184,43 @@
             </tr>
           </thead>
           <tbody id="run-body">
-            <tr><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+            <tr th:if="${history.content.empty}">
+              <td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td>
+            </tr>
+            <tr th:each="run : ${history.content}" th:data-reconciliation-run-id="${run.reconciliationRunId}"
+                style="cursor:pointer" class="reco-history-row">
+              <td class="fgc-mono" th:text="${run.reconciliationRunId}">41</td>
+              <td th:text="${#temporals.format(run.settlementMonth, 'yyyy-MM')}">2026-07</td>
+              <td th:text="${run.paymentStageLabel}">GA→설계사</td>
+              <td th:text="${run.insurerName ?: '—'}">—</td>
+              <td><span class="fgc-badge" th:text="${run.statusLabel}">계산완료</span></td>
+              <td class="fgc-th-num" th:text="${run.targetCount}">0</td>
+              <td class="fgc-th-num" th:text="${run.matchedCount}">0</td>
+              <td class="fgc-th-num" th:text="${run.exceptionCount}">0</td>
+              <td class="fgc-th-num" th:text="${run.matchRatePct != null ? run.matchRatePct + '%' : '—'}">—</td>
+              <td class="fgc-th-num" th:text="${run.differenceTotal}">0</td>
+              <td th:text="${(run.startedAt != null ? #temporals.format(run.startedAt, 'MM-dd HH:mm') : '—')
+                             + ' · ' + (run.completedAt != null ? #temporals.format(run.completedAt, 'MM-dd HH:mm') : '—')}">— · —</td>
+            </tr>
           </tbody>
         </table>
       </div>
+      <footer class="fgc-pagination" th:if="${history.totalPages > 1}">
+        <nav aria-label="실행 이력 페이지 이동" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px">
+          <a class="fgc-btn fgc-btn--ghost" th:if="${history.page > 1}"
+             th:href="@{/reconciliations(month=${month},stage=${stageFilter},page=${history.page - 1})}">이전</a>
+          <span class="tabular-nums" th:text="${history.page} + ' / ' + ${history.totalPages}">1 / 1</span>
+          <a class="fgc-btn fgc-btn--ghost" th:if="${history.page < history.totalPages}"
+             th:href="@{/reconciliations(month=${month},stage=${stageFilter},page=${history.page + 1})}">다음</a>
+        </nav>
+      </footer>
     </section>
+  </div>
+
+  <!-- RECO-W02 비교 상세 팝업 — 페이지 로드 시 숨겨서 넣어두고 JS가 JSON으로 값만 채운다
+       (cap-detail 모달과 같은 관례, contract/detail.html에서도 재사용) -->
+  <div class="modal-backdrop" data-modal="reco-compare" data-close-on-backdrop="true" hidden aria-hidden="true">
+    <div th:insert="~{reco/compare-modal :: modal}"></div>
   </div>
 
 </main>

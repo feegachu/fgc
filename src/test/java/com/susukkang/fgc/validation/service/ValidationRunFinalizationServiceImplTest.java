@@ -155,7 +155,7 @@ class ValidationRunFinalizationServiceImplTest {
 
         assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "shared-key"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_006));
+                        assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_005));
 
         verify(validationRunMapper, never()).findByIdForUpdate(44L);
     }
@@ -195,7 +195,6 @@ class ValidationRunFinalizationServiceImplTest {
     private ValidationRunRow run(String status, int currentStep) {
         ValidationRunRow row = new ValidationRunRow();
         row.setValidationRunId(44L);
-        row.setValidationMonth(LocalDate.of(2026, 8, 1));
         row.setStatus(status);
         row.setCurrentStep(currentStep);
         return row;
