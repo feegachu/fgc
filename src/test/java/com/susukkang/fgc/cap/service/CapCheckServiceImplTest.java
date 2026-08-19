@@ -336,6 +336,7 @@ class CapCheckServiceImplTest {
         agent.setUsagePct(new BigDecimal("54.166667"));
         agent.setViolationCount(1);
         agent.setWarningCount(0);
+        agent.setReviewRequiredCount(1);
         agent.setWorstContractNo("C004");
         agent.setWorstUsagePct(new BigDecimal("104.166667"));
         when(capCheckMapper.summarizeByAgent(criteria.month(), criteria.insurerId(),
@@ -353,6 +354,7 @@ class CapCheckServiceImplTest {
                 .satisfies(summary -> {
                     assertThat(summary.getAgentCode()).isEqualTo("FC-001");
                     assertThat(summary.getViolationCount()).isEqualTo(1);
+                    assertThat(summary.getReviewRequiredCount()).isEqualTo(1);
                     assertThat(summary.getWorstContractNo()).isEqualTo("C004");
                 });
         assertThat(result.page().content()).hasSize(1);

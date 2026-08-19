@@ -18,13 +18,13 @@
 
   [실행 시점] 실효·해지·금액 변경이 생긴 즉시 + 일일 변경분 배치 + 월 전체 배치
 
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-ARB-W01)의 정적 골격만 옮겼다.
-  데이터 영역(요약카드·목록·상세 패널)은 차익거래 조회 API 연동 시 서버 렌더링으로 채운다.
+  [연동 범위] 차익거래 조회 API로 요약카드·목록·상세 패널을 Ajax로 채우고,
+  수동 재검증 실행 후 목록을 다시 조회한다.
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ARB-W01', '차익거래 검증', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-arbitrage">
+<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-arbitrage" th:attr="data-initial-month=${month}">
 
   <h1 class="fgc-page-title">차익거래 검증</h1>
   <p class="fgc-page-desc">
@@ -63,12 +63,13 @@
       </div>
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="f-status">판정</label>
-        <select class="fgc-select" id="f-status"><option value="">전체</option></select>
+        <select class="fgc-select" id="f-status"><option value="">전체</option><option value="CLEAR">이상없음</option><option value="CANDIDATE">검토대상</option><option value="REVIEW_REQUIRED">자료부족</option></select>
       </div>
       <div class="fgc-field" style="min-width:170px">
         <label class="fgc-label" for="f-stage">지급단계</label>
         <select class="fgc-select" id="f-stage">
-          <option value="GA_TO_FC">GA→설계사</option>
+          <option value="GA_TO_FC" selected>GA→설계사</option>
+          <option value="">전체</option>
           <option value="INSURER_TO_GA">원수사→GA</option>
         </select>
       </div>
@@ -86,23 +87,23 @@
     </div>
   </section>
 
-  <!-- ② 요약 카드 3장 — 차익거래 조회 API 연동 시 서버 렌더링으로 채운다 -->
+  <!-- ② 요약 카드 3장 — 차익거래 조회 API 응답으로 Ajax 렌더링 -->
   <section style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px"
            id="summary-cards">
     <div class="fgc-kpi fgc-kpi--success">
       <div class="fgc-kpi__label">이상없음</div>
-      <div class="fgc-kpi__value">—</div>
-      <div class="fgc-kpi__sub">조회 API 연동 대기</div>
+      <div class="fgc-kpi__value" id="summary-clear">—</div>
+      <div class="fgc-kpi__sub">초과액이 없습니다</div>
     </div>
     <div class="fgc-kpi fgc-kpi--warning">
       <div class="fgc-kpi__label">검토대상</div>
-      <div class="fgc-kpi__value">—</div>
-      <div class="fgc-kpi__sub">조회 API 연동 대기</div>
+      <div class="fgc-kpi__value" id="summary-candidate">—</div>
+      <div class="fgc-kpi__sub">사람의 사유 확인이 필요합니다</div>
     </div>
     <div class="fgc-kpi fgc-kpi--closed">
       <div class="fgc-kpi__label">자료부족</div>
-      <div class="fgc-kpi__value">—</div>
-      <div class="fgc-kpi__sub">조회 API 연동 대기</div>
+      <div class="fgc-kpi__value" id="summary-review">—</div>
+      <div class="fgc-kpi__sub">자료 보완 후 재확인합니다</div>
     </div>
   </section>
 
@@ -115,7 +116,7 @@
         <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건</span>
       </div>
       <div style="overflow-x:auto">
-        <table class="fgc-table" style="min-width:900px">
+        <table class="fgc-table arb-list-table">
           <thead>
             <tr>
               <th style="width:64px">계약</th>
@@ -137,6 +138,7 @@
           </tbody>
         </table>
       </div>
+      <nav id="arb-pagination" class="pagination" aria-label="차익거래 검증 목록 페이지" style="padding:12px 16px;justify-content:flex-end"></nav>
     </section>
 
     <!-- ④ 상세 패널 -->
@@ -148,6 +150,20 @@
       <div class="fgc-card__body" id="detail-body">
         <p class="fgc-muted" style="font-size:13px;margin:0">왼쪽 목록에서 한 건을 고르세요.</p>
       </div>
+      <div class="arb-detail-actions" th:if="${canProcess}">
+        <button id="arb-recheck-button" class="fgc-btn fgc-btn--ghost" type="button" disabled><span class="material-symbols-rounded arb-recheck-icon" aria-hidden="true">refresh</span>이 계약만 다시 검증</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" data-modal="arb-recheck" data-close-on-backdrop="true" hidden aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="arb-recheck-title" style="width:min(480px,100%)">
+      <header class="modal-header"><h2 id="arb-recheck-title" class="modal-title">차익거래 수동 재검증</h2></header>
+      <div class="modal-body"><p id="arb-recheck-contract" class="fgc-muted" style="margin-top:0"></p>
+        <label class="fgc-label" for="arb-recheck-date">검증 기준일</label><input id="arb-recheck-date" class="fgc-input" type="date" data-modal-initial-focus>
+        <label class="fgc-label" for="arb-recheck-reason" style="display:block;margin-top:16px">재검증 사유</label><textarea id="arb-recheck-reason" class="textarea-control" maxlength="200" rows="4" placeholder="예) 지급·환수 자료 변경 확인"></textarea>
+      </div>
+      <footer class="modal-footer"><button class="fgc-btn fgc-btn--ghost" type="button" data-modal-close>취소</button><button id="arb-recheck-submit" class="fgc-btn fgc-btn--primary" type="button">재검증 실행</button></footer>
     </section>
   </div>
 

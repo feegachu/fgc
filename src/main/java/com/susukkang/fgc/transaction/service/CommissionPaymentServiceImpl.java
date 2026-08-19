@@ -1307,7 +1307,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "CAP_RULE_MISMATCH",
                     "HIGH",
                     "한도 정책 불일치",
-                    "지급 정책과 한도 계산 정책이 서로 다릅니다.",
+                    "지급 적용 한도정책 ID=" + rule.capRuleSetId()
+                            + ", 계산 적용 한도정책 ID=" + calculation.capRuleSetId()
+                            + "로 서로 다릅니다. 정책 버전과 적용 기준일을 정정한 뒤 재검증하세요.",
                     FgcErrorCode.CAP_002,
                     Map.of()
             );

@@ -8,7 +8,17 @@ package com.susukkang.fgc.common.code;
  * @since 2026-08-12
  */
 public enum SurrenderValueSourceType {
-    ACTUAL,
-    EXPECTED_TABLE,
-    NOT_APPLICABLE
+    ACTUAL("실제 해약환급금"),
+    EXPECTED_TABLE("예상 환급률표"),
+    NOT_APPLICABLE("적용 대상 아님");
+
+    private final String label;
+
+    SurrenderValueSourceType(String label) {
+        this.label = label;
+    }
+
+    public String getLabel() {
+        return label;
+    }
 }
