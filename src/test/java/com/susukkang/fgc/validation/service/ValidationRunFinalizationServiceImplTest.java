@@ -123,7 +123,7 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.status()).isEqualTo("FINALIZED");
         assertThat(response.finalizedAt()).isEqualTo(
                 OffsetDateTime.parse("2026-08-16T12:34:56+09:00"));
-        verify(auditLogMapper, never()).insert(any());
+        verify(auditLogService, never()).record(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
 
