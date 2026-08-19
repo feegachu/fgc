@@ -284,7 +284,7 @@
     fillOptions(select, [
       ["DIRECT", "직접 귀속"], ["SETTLEMENT_SUPPORT_MONTHLY", "정착지원금 월배부"],
       ["FIRST_CONTRACT_CARRY_FORWARD", "최초계약 이월"], ["APPROVED_ALLOCATION", "승인 배부"],
-      ["MANUAL_REVIEW", "수기 검토"], ["NEWCOMER_NON_CONTRACT", "신인 비계약"]
+      ["MANUAL_REVIEW", "수기 검토"]
     ]);
     return select;
   }
@@ -338,24 +338,32 @@
     var decision = row.querySelector("[data-inclusion]");
     var evidence = row.querySelector("[data-attr-evidence]");
     var contractCell = contract.parentElement;
+    var methodCell = method.parentElement;
     var noContract = contractCell.querySelector("[data-no-contract]");
+    var automaticMethod = methodCell.querySelector("[data-automatic-method]");
     var previousDecision = decision.value;
 
     if (!noContract) {
       noContract = document.createElement("span");
       noContract.dataset.noContract = "";
       noContract.className = "fgc-muted";
-      noContract.textContent = "계약 없음";
+      noContract.textContent = "-";
       noContract.hidden = true;
       contractCell.appendChild(noContract);
+    }
+    if (!automaticMethod) {
+      automaticMethod = document.createElement("span");
+      automaticMethod.dataset.automaticMethod = "";
+      automaticMethod.className = "fgc-muted";
+      automaticMethod.textContent = "-";
+      automaticMethod.hidden = true;
+      methodCell.appendChild(automaticMethod);
     }
 
     scope.textContent = newcomerSupport ? "설계사" : "계약";
     contract.hidden = newcomerSupport;
     contract.disabled = newcomerSupport;
     noContract.hidden = !newcomerSupport;
-    var newcomerOption = method.querySelector('option[value="NEWCOMER_NON_CONTRACT"]');
-    if (newcomerOption) newcomerOption.disabled = !newcomerSupport;
     ["SETTLEMENT_SUPPORT_MONTHLY", "FIRST_CONTRACT_CARRY_FORWARD"].forEach(function (value) {
       var option = method.querySelector('option[value="' + value + '"]');
       if (option) option.disabled = isInsurerToGa();
@@ -363,8 +371,16 @@
     });
     if (newcomerSupport) {
       contract.value = "";
+      if (!method.querySelector('option[value="NEWCOMER_NON_CONTRACT"]')) {
+        var newcomerOption = document.createElement("option");
+        newcomerOption.value = "NEWCOMER_NON_CONTRACT";
+        newcomerOption.textContent = "신인 비계약";
+        method.appendChild(newcomerOption);
+      }
       method.value = "NEWCOMER_NON_CONTRACT";
       method.disabled = true;
+      method.hidden = true;
+      automaticMethod.hidden = false;
       fillOptions(decision, [
         ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"],
         ["REVIEW_REQUIRED", "검토필요"]
@@ -375,6 +391,10 @@
       return;
     }
 
+    var newcomerOption = method.querySelector('option[value="NEWCOMER_NON_CONTRACT"]');
+    if (newcomerOption) newcomerOption.remove();
+    method.hidden = false;
+    automaticMethod.hidden = true;
     if (method.value === "NEWCOMER_NON_CONTRACT") method.value = "DIRECT";
     method.disabled = false;
     fillOptions(decision, inclusionOptions());

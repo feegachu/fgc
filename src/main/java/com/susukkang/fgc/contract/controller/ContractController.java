@@ -8,6 +8,7 @@ import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
+import com.susukkang.fgc.common.web.CsvExportWriter;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.service.ContractService;
@@ -18,7 +19,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -51,6 +60,32 @@ public class ContractController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.success(contractService.selectByCondition(condition, page, size));
+    }
+
+    /** CONT-W01 검색 결과 전체를 CSV로 내려받는다. */
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> exportContracts(@ModelAttribute @Valid ContractSearchCondition condition) {
+        List<List<?>> rows = new ArrayList<>();
+        for (ContractView contract : contractService.selectAllByCondition(condition)) {
+            rows.add(CsvExportWriter.row(
+                    contract.getContractNo(), contract.getInsurerName(), contract.getProductName(),
+                    contract.getContractDate(), contract.getMonthlyEquivalentFirstPremium(), contract.getAgentIdName(),
+                    contract.getContractStatus() == null ? null : contract.getContractStatus().label(),
+                    contract.getCapResultStatus() == null ? null : contract.getCapResultStatus().label(),
+                    contract.getDataOrigin()
+            ));
+        }
+        return csvAttachment("보험계약목록", List.of(
+                "계약번호", "보험회사", "상품명", "계약일", "월납환산 초회보험료", "모집 설계사", "계약상태", "1,200% 판정", "데이터 출처"
+        ), rows);
+    }
+
+    private static ResponseEntity<byte[]> csvAttachment(String prefix, List<String> headers, List<List<?>> rows) {
+        String filename = prefix + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(CsvExportWriter.write(headers, rows));
     }
 
     /**

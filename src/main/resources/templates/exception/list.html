@@ -179,30 +179,34 @@
           </tbody>
         </table>
       </div>
-      <nav class="exception-pagination" aria-label="예외 목록 페이지">
+      <nav class="exception-pagination" aria-label="예외 목록 페이지"
+           th:with="totalPageCount=${casePage.totalPages() == 0 ? 1 : casePage.totalPages()}, groupStart=${(casePage.page() - 1) - ((casePage.page() - 1) % 5) + 1}, groupEnd=${T(java.lang.Math).min(groupStart + 4, totalPageCount)}">
         <span>
           <span th:text="${casePage.page()}">1</span> /
-          <span th:text="${casePage.totalPages() == 0 ? 1 : casePage.totalPages()}">1</span> 페이지
+          <span th:text="${totalPageCount}">1</span> 페이지
         </span>
         <div class="pagination-controls">
-          <a class="pagination-button" th:if="${casePage.page() > 1}"
-             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},assigneeFilter=${assigneeFilter},validationMonth=${validationMonthFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() - 1})}"
-             aria-label="이전 페이지">
+          <a class="pagination-button" th:if="${groupStart > 1}"
+             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},assigneeFilter=${assigneeFilter},validationMonth=${validationMonthFilter},contractNo=${contractNoFilter},month=${month},page=${groupStart - 1})}"
+             aria-label="이전 5페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
           </a>
-          <span class="pagination-button is-disabled" th:unless="${casePage.page() > 1}"
-                aria-label="이전 페이지" aria-disabled="true" tabindex="-1">
+          <span class="pagination-button is-disabled" th:unless="${groupStart > 1}"
+                aria-label="이전 5페이지" aria-disabled="true" tabindex="-1">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
           </span>
-          <span class="pagination-button is-active" aria-current="page"
-                th:text="${casePage.page()}">1</span>
-          <a class="pagination-button" th:if="${casePage.page() < casePage.totalPages()}"
-             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},assigneeFilter=${assigneeFilter},validationMonth=${validationMonthFilter},contractNo=${contractNoFilter},month=${month},page=${casePage.page() + 1})}"
-             aria-label="다음 페이지">
+          <th:block th:each="pageNumber : ${#numbers.sequence(groupStart, groupEnd)}">
+            <span class="pagination-button is-active" th:if="${pageNumber == casePage.page()}" aria-current="page" th:text="${pageNumber}">1</span>
+            <a class="pagination-button" th:unless="${pageNumber == casePage.page()}" th:text="${pageNumber}"
+               th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},assigneeFilter=${assigneeFilter},validationMonth=${validationMonthFilter},contractNo=${contractNoFilter},month=${month},page=${pageNumber})}">1</a>
+          </th:block>
+          <a class="pagination-button" th:if="${groupEnd < totalPageCount}"
+             th:href="@{/exceptions(type=${typeFilter},reasonCode=${reasonCodeFilter},severity=${severityFilter},status=${statusFilter},assigneeFilter=${assigneeFilter},validationMonth=${validationMonthFilter},contractNo=${contractNoFilter},month=${month},page=${groupEnd + 1})}"
+             aria-label="다음 5페이지">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
           </a>
-          <span class="pagination-button is-disabled" th:unless="${casePage.page() < casePage.totalPages()}"
-                aria-label="다음 페이지" aria-disabled="true" tabindex="-1">
+          <span class="pagination-button is-disabled" th:unless="${groupEnd < totalPageCount}"
+                aria-label="다음 5페이지" aria-disabled="true" tabindex="-1">
             <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
           </span>
         </div>

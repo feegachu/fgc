@@ -83,6 +83,10 @@ class ValidationRunViewControllerTest {
         return userWithRole(1L, "settle01", "SETTLEMENT");
     }
 
+    private static FgcUserDetails gaAdminUser() {
+        return userWithRole(3L, "gaadmin01", "GA_ADMIN");
+    }
+
     private ValidationRunListRow listRow(String status, int currentStep) {
         ValidationRunListRow row = new ValidationRunListRow();
         row.setValidationRunId(100L);
@@ -238,6 +242,21 @@ class ValidationRunViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
                         "(?s).*<button[^>]*id=\"btn-execute\"[^>]*\\bdisabled\\b[^>]*>.*")));
+    }
+
+    @Test
+    void detailExposesFinalizeCapabilityOnlyToFinalizeRoles() throws Exception {
+        given(validationRunDetailService.detail(100L)).willReturn(detailResponse("COMPLETED", 8));
+        given(validationRunSearchService.search(any(), anyInt(), anyInt()))
+                .willReturn(pageOf(listRow("COMPLETED", 8)));
+
+        mvc.perform(get("/validation-runs/100").with(user(settleUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("data-can-finalize=\"false\"")));
+
+        mvc.perform(get("/validation-runs/100").with(user(gaAdminUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("data-can-finalize=\"true\"")));
     }
 
     /**

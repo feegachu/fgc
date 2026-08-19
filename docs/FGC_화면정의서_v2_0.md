@@ -512,6 +512,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 ① 검색 조건 — 계약번호, 보험회사, 상품, 설계사, 조직, 계약일 기간, 계약상태, 1,200% 판정
 ② 결과 목록 (20행)
 ③ 신규 등록 버튼 → CONT-W03
+④ CSV 내보내기 — 현재 검색 조건의 전체 결과를 UTF-8 BOM CSV로 다운로드
 
 **항목 정의 — 목록 컬럼**
 
@@ -534,7 +535,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `insurance_contract`, `insurer`, `product`, `product_offering`, `agent`, `cap_check`
-- API: `GET /api/v1/contracts?page=1&size=20&...`
+- API: `GET /api/v1/contracts?page=1&size=20&...`, `GET /api/v1/contracts/export.csv?...` (검색 조건은 목록과 동일, 전건 다운로드)
 
 **관련 요구사항** FUN-018, FUN-058(2차 확장)
 
@@ -795,6 +796,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 **화면 구성**
 ① 검색 — 계약번호, 지급단계, 정책버전, 상태, 체계
 ② 목록 (20행)
+③ CSV 내보내기 — 현재 검색 조건의 전체 결과를 UTF-8 BOM CSV로 다운로드
 
 **항목 정의 — 목록 컬럼**
 
@@ -816,7 +818,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **권한** 전체 조회
 
-**데이터** API: `GET /api/v1/schedules?...`
+**데이터** API: `GET /api/v1/schedules?...`, `GET /api/v1/schedules/export.csv?...` (검색 조건은 목록과 동일, 전건 다운로드)
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 
@@ -862,7 +864,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 |---|---|
 | 재생성 | **새 버전**을 만듭니다. 기존 버전은 남습니다 |
 | 확정 | 헤더 상태를 확정으로 |
-| 엑셀 다운로드 | 회차 표 내려받기 |
+| CSV 내보내기 | 회차 표 전체를 UTF-8 BOM CSV로 내려받기 |
 
 **막아야 할 것**
 
@@ -876,7 +878,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `schedule_header`, `schedule_line`, `commission_rule`
-- API: `GET /api/v1/schedules/{id}`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
+- API: `GET /api/v1/schedules/{id}`, `GET /api/v1/schedules/{id}/export.csv`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 
