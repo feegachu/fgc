@@ -172,6 +172,7 @@ class ExceptionCaseQueryMapperIntegrationTest {
         assertThat(mapper.search(decemberCriteria, ExceptionStatus.dbStatuses(""), 0, 100)
                 .stream().map(row -> row.title()))
                 .containsExactly("IT 검토중-" + suffix);
+        assertThat(mapper.count(decemberCriteria, ExceptionStatus.dbStatuses(""))).isEqualTo(1L);
 
         assertThat(mapper.findValidationMonths()).contains(january, december);
     }
