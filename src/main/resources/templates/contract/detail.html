@@ -364,123 +364,6 @@
         });
     }
 
-    function paymentStageLabel(stage) {
-      return stage === "INSURER_TO_GA" ? "원수사 → GA" : stage === "GA_TO_AGENT" ? "GA → 설계사" : (stage || "지급단계");
-    }
-
-    function clearElement(selector) {
-      var element = document.querySelector(selector);
-      if (element) element.replaceChildren();
-      return element;
-    }
-
-    function renderSchedulesByStage(stage, data, container) {
-      var section = document.createElement("section");
-      section.className = "contract-tab-result-section";
-      var header = document.createElement("header");
-      var title = document.createElement("h3");
-      title.textContent = paymentStageLabel(stage);
-      header.append(title);
-      var headers = Array.isArray(data.headers) ? data.headers : [];
-      var lines = Array.isArray(data.lines) ? data.lines : [];
-      if (!headers.length) {
-        var empty = document.createElement("p");
-        empty.className = "contract-tab-empty";
-        empty.textContent = "현재 운영 중인 예상 스케줄이 없습니다.";
-        section.append(header, empty);
-        container.append(section);
-        return;
-      }
-      var meta = document.createElement("p");
-      var activeHeader = headers[0];
-      meta.className = "contract-tab-meta";
-      meta.textContent = "버전 " + (activeHeader.scheduleVersionNo || "—") + " · " + money(activeHeader.expectedTotal) + " · " + (activeHeader.lineCount || lines.length) + "회차";
-      var table = document.createElement("table");
-      table.className = "data-table contract-tab-table";
-      var thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>회차</th><th>예정일</th><th>예정 지급액</th><th>상태</th></tr>";
-      var tbody = document.createElement("tbody");
-      lines.forEach(function (line) {
-        var row = document.createElement("tr");
-        [line.installmentNo, line.dueDate, money(line.expectedAmount || line.amount), line.lineStatus || line.status || "—"]
-          .forEach(function (value) { var cell = document.createElement("td"); cell.textContent = value === undefined || value === null ? "—" : value; row.append(cell); });
-        tbody.append(row);
-      });
-      table.append(thead, tbody);
-      section.append(header, meta, table);
-      container.append(section);
-    }
-
-    function loadSchedules(force) {
-      var panel = document.getElementById("contract-panel-schedules");
-      if (!apiClient || !panel || (!force && panel.dataset.loaded === "true")) return Promise.resolve();
-      panel.dataset.loaded = "loading";
-      document.querySelector("[data-schedule-load-state]").textContent = "예상 스케줄을 불러오는 중입니다.";
-      var stages = ["INSURER_TO_GA", "GA_TO_AGENT"];
-      return Promise.all(stages.map(function (stage) {
-        return apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/schedules?paymentStage=" + stage)
-          .then(function (response) { return { stage: stage, data: response.data || {} }; });
-      })).then(function (results) {
-        var container = clearElement("[data-contract-schedules]");
-        results.forEach(function (result) { renderSchedulesByStage(result.stage, result.data, container); });
-        panel.dataset.loaded = "true";
-        document.querySelector("[data-schedule-load-state]").textContent = "현재 운영 스케줄을 불러왔습니다.";
-      }).catch(function (error) {
-        panel.dataset.loaded = "false";
-        document.querySelector("[data-schedule-load-state]").textContent = error && error.message ? error.message : "예상 스케줄을 불러오지 못했습니다.";
-      });
-    }
-
-    function renderCapChecks(items) {
-      var container = clearElement("[data-contract-cap-results]");
-      if (!items.length) {
-        var empty = document.createElement("p");
-        empty.className = "contract-tab-empty";
-        empty.textContent = "저장된 한도 검증 결과가 없습니다.";
-        container.append(empty);
-        return;
-      }
-      items.forEach(function (item) {
-        var result = item.result || item;
-        var card = document.createElement("article");
-        card.className = "contract-cap-result-card";
-        var title = document.createElement("h3");
-        title.textContent = paymentStageLabel(result.paymentStage);
-        var status = document.createElement("span");
-        status.className = "status-badge " + statusBadgeClass(result.resultStatus);
-        status.textContent = result.resultStatus || "—";
-        var header = document.createElement("header");
-        header.append(title, status);
-        var details = document.createElement("dl");
-        var capFields = [
-          { label: "검증유형", value: result.checkKind },
-          { label: "기준일", value: result.asOfDate },
-          { label: "한도금액", value: money(result.limitAmount) },
-          { label: "산입금액", value: money(result.includedAmount) },
-          { label: "사용률", value: result.usagePct === null || result.usagePct === undefined ? "—" : Number(result.usagePct).toLocaleString("ko-KR") + "%" }
-        ];
-        capFields.forEach(function (field) { var group = document.createElement("div"); var term = document.createElement("dt"); var description = document.createElement("dd"); term.textContent = field.label; description.textContent = field.value || "—"; group.append(term, description); details.append(group); });
-        card.append(header, details);
-        container.append(card);
-      });
-    }
-
-    function loadCapChecks(force) {
-      var panel = document.getElementById("contract-panel-cap");
-      if (!apiClient || !panel || (!force && panel.dataset.loaded === "true")) return Promise.resolve();
-      panel.dataset.loaded = "loading";
-      document.querySelector("[data-cap-load-state]").textContent = "한도 검증 결과를 불러오는 중입니다.";
-      return apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/cap-checks")
-        .then(function (response) {
-          renderCapChecks(Array.isArray(response.data) ? response.data : []);
-          panel.dataset.loaded = "true";
-          document.querySelector("[data-cap-load-state]").textContent = "지급단계별 최신 한도 판정을 불러왔습니다.";
-        }).catch(function (error) {
-          panel.dataset.loaded = "false";
-          document.querySelector("[data-cap-load-state]").textContent = error && error.message ? error.message : "한도 검증 결과를 불러오지 못했습니다.";
-        });
-    }
-
     function activateTab(tab) {
       document.querySelectorAll(".contract-detail-tab").forEach(function (candidate) {
         var active = candidate === tab;
@@ -489,8 +372,6 @@
         candidate.tabIndex = active ? 0 : -1;
         document.getElementById(candidate.getAttribute("aria-controls")).hidden = !active;
       });
-      if (tab.id === "contract-tab-schedules") loadSchedules(false);
-      if (tab.id === "contract-tab-cap") loadCapChecks(false);
     }
 
     function initializeTabs() {
