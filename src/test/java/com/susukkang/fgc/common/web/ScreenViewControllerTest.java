@@ -66,7 +66,6 @@ class ScreenViewControllerTest {
             "/cap-checks,          FGC-UI-CAP-W01",
             "/arbitrage-checks,    FGC-UI-ARB-W01",
             "/journals,            FGC-UI-LEDG-W01",
-            "/reconciliations,     FGC-UI-RECO-W01",
     })
     void screen_renders_with_its_id(String route, String screenId) throws Exception {
         mvc.perform(get(route).with(user(settleUser())))
@@ -85,21 +84,8 @@ class ScreenViewControllerTest {
     }
 
     // AUDT-W01(/audit-logs) 스모크·역할 테스트는 데이터 바인딩 이관과 함께
-    // audit.controller.AuditLogViewControllerTest 로 옮겼다 (FUN-061).
-
-    /**
-     * FGC-FUN-048, FGC-FUN-052 — RECO-W01 처리 버튼은 API 연동 전까지
-     * 권한과 관계없이 활성화하지 않는다.
-     */
-    @Test
-    void reconciliation_actions_disabled_for_all_roles_while_api_pending() throws Exception {
-        var disabledRunButton = org.hamcrest.Matchers.matchesPattern(
-                "(?s).*<button[^>]*id=\"btn-run\"[^>]*\\bdisabled\\b[^>]*>.*");
-        mvc.perform(get("/reconciliations").with(user(complianceUser())))
-                .andExpect(content().string(disabledRunButton));
-        mvc.perform(get("/reconciliations").with(user(settleUser())))
-                .andExpect(content().string(disabledRunButton));
-    }
+    // audit.controller.AuditLogViewControllerTest 로, RECO-W01(/reconciliations)은
+    // reconciliation.controller.ReconciliationViewControllerTest 로 옮겼다 (FUN-061, #205).
 
     @Test
     void contract_detail_uses_status_event_contract_without_consumer_name() throws Exception {
