@@ -44,21 +44,70 @@
 
 .publishing-page .exception-table {
   width: 100%;
-  min-width: 72rem;
-  table-layout: auto;
+  min-width: 75rem;
+  table-layout: fixed;
 }
 
 .publishing-page .exception-table th,
 .publishing-page .exception-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .publishing-page .exception-table .exception-title-cell {
-  width: 22rem;
-  min-width: 22rem;
-  max-width: 22rem;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.publishing-page .exception-table td.exception-disclosure-cell {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: top;
+  text-overflow: clip;
   white-space: normal;
+}
+
+.exception-col-number {
+  width: 4rem;
+}
+
+.exception-col-type,
+.exception-col-reason {
+  width: 8.5rem;
+}
+
+.exception-col-severity {
+  width: 5rem;
+}
+
+.exception-col-contract {
+  width: 7.5rem;
+}
+
+.exception-col-title {
+  width: auto;
+}
+
+.exception-col-status {
+  width: 5.75rem;
+}
+
+.exception-col-assignee {
+  width: 6rem;
+}
+
+.exception-col-detected-at {
+  width: 8.5rem;
+}
+
+.exception-col-detection-count {
+  width: 4rem;
+}
+
+.exception-col-reference {
+  width: 8rem;
 }
 
 .exception-row {
