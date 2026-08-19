@@ -36,7 +36,7 @@ if (typeof module !== "undefined" && module.exports) {
   var nextButton = document.querySelector("[data-transaction-page-next]");
   var currentPageText = document.querySelector("[data-transaction-current-page]");
   var totalPagesText = document.querySelector("[data-transaction-total-pages]");
-  var pageNumberText = document.querySelector("[data-transaction-page-number]");
+  var pageNumbers = document.querySelector("[data-transaction-page-numbers]");
 
   if (!apiClient || !form || !body || !pagination || !previousButton || !nextButton) return;
 
@@ -211,10 +211,26 @@ if (typeof module !== "undefined" && module.exports) {
     setText("row-count", pageData.totalElements);
     currentPageText.textContent = page;
     totalPagesText.textContent = totalPages;
-    pageNumberText.textContent = page;
+    renderPageNumbers(page, totalPages);
     previousButton.disabled = page <= 1;
     nextButton.disabled = page >= totalPages;
     pagination.hidden = number(pageData.totalElements) === 0;
+  }
+
+  function renderPageNumbers(page, totalPages) {
+    pageNumbers.replaceChildren();
+    var start = Math.max(1, page - 2);
+    var end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    for (var current = start; current <= end; current += 1) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "pagination-button" + (current === page ? " is-active" : "");
+      button.textContent = current;
+      if (current === page) button.setAttribute("aria-current", "page");
+      else (function (target) { button.addEventListener("click", function () { changePage(target); }); })(current);
+      pageNumbers.appendChild(button);
+    }
   }
 
   function changePage(page) {

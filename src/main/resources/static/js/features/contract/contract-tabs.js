@@ -70,22 +70,23 @@
 
   function loadSchedules() {
     return Promise.all(["INSURER_TO_GA", "GA_TO_FC"].map(function (stage) {
-      return request("/api/v1/contracts/" + contractId + "/schedules?paymentStage=" + stage);
+      return request("/api/v1/contracts/" + contractId + "/schedules?paymentStage=" + stage)
+        .then(function (response) { return { stage: stage, data: response || {} }; });
     })).then(function (responses) {
-      var headers = [];
-      var lines = [];
+      var root = document.createDocumentFragment();
       responses.forEach(function (response) {
-        headers = headers.concat(response && Array.isArray(response.headers) ? response.headers : []);
-        lines = lines.concat(response && Array.isArray(response.lines) ? response.lines : []);
+        var headers = Array.isArray(response.data.headers) ? response.data.headers : [];
+        var lines = Array.isArray(response.data.lines) ? response.data.lines : [];
+        var activeHeader = headers[0];
+        var summary = activeHeader
+          ? "버전 " + value(activeHeader.scheduleVersionNo) + " · " + value(activeHeader.lineCount || lines.length) + "회차"
+          : "현재 운영 스케줄이 없습니다.";
+        var schedule = section(stageLabel(response.stage), summary);
+        schedule.appendChild(table(["회차", "예정일", "예정 지급액", "상태"], lines.map(function (line) {
+          return [value(line.installmentNo), value(line.dueDate), money(line.expectedAmount), value(line.lineStatus)];
+        })));
+        root.appendChild(schedule);
       });
-      var root = section("예상 스케줄", headers.length + "개 지급단계 · " + lines.length + "개 회차");
-      root.appendChild(table([
-        "지급단계", "버전", "상태", "회차 수", "예상 총액", "정책버전", "상세"
-      ], headers.map(function (row) {
-        return [stageLabel(row.paymentStage), "v" + value(row.scheduleVersionNo), value(row.status),
-          value(row.lineCount), money(row.expectedTotal), value(row.policyVersionLabel),
-          link("회차 보기", "/schedules/" + row.scheduleHeaderId)];
-      })));
       return root;
     });
   }

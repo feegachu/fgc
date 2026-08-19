@@ -1,11 +1,11 @@
 <!doctype html>
 <!--
   FGC-UI-CAP-W01 1,200% 한도 검증 현황
-  현재 연결 API: GET /api/v1/cap-checks?month=&stage=&status=&insurerId=&contractNo=&page=&size=
+  현재 연결 API: GET /api/v1/cap-checks?month=&stage=&status=&insurerId=&orgId=&contractNo=&page=&size=
 
-  현재 응답의 summary와 content만 연결한다. 아직 응답에 없는 지급단계별·설계사별 집계는
-  페이징된 content로 다시 계산하지 않고 연동 대기로 표시한다. 저장된 resultStatus를 그대로
-  표시하며 CAP-W02는 현재 상세 API를 사용하는 팝업으로 유지한다.
+  응답의 summary, stageSummary, agentSummary, content를 각각 표시한다. 지급단계별·설계사별
+  집계는 전체 검색범위 서버 집계를 그대로 사용하며, 페이징된 content를 다시 합산하지 않는다.
+  저장된 resultStatus를 그대로 표시하며 CAP-W02는 현재 상세 API를 사용하는 팝업으로 유지한다.
 -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CAP-W01', '1,200% 한도 검증 현황', null, null)}">
@@ -50,17 +50,15 @@
       </div>
       <div class="field">
         <label class="field-label" for="cap-insurer">보험회사</label>
-        <select class="select-control" id="cap-insurer" name="insurerId" disabled aria-describedby="cap-insurer-help">
-          <option value="">기준정보 연동 대기</option>
+        <select class="select-control" id="cap-insurer" name="insurerId" disabled>
+          <option value="">불러오는 중</option>
         </select>
-        <span id="cap-insurer-help" class="field-helper">보험회사 조회 API 연결 후 사용할 수 있습니다.</span>
       </div>
       <div class="field">
         <label class="field-label" for="cap-organization">조직</label>
-        <select class="select-control" id="cap-organization" name="organizationId" disabled aria-describedby="cap-organization-help">
-          <option value="">기준정보 연동 대기</option>
+        <select class="select-control" id="cap-organization" name="orgId" disabled>
+          <option value="">불러오는 중</option>
         </select>
-        <span id="cap-organization-help" class="field-helper">조직 조회 API 연결 후 사용할 수 있습니다.</span>
       </div>
       <div class="field cap-filter-contract">
         <label class="field-label" for="cap-contract-no">계약번호</label>
@@ -104,13 +102,13 @@
     </header>
     <div id="cap-stage-grid" class="cap-stage-grid" aria-live="polite">
       <article class="cap-stage-card cap-stage-card-pending">
-        <header class="cap-stage-card-header"><div><h3 class="cap-stage-title">원수사→GA</h3><p class="cap-stage-code">INSURER_TO_GA</p></div><span class="status-badge status-badge-neutral">연동 대기</span></header>
-        <div class="cap-stage-pending-copy"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span><p>전체 검색범위 Stage 집계 API가 아직 제공되지 않습니다.</p></div>
+        <header class="cap-stage-card-header"><div><h3 class="cap-stage-title">원수사→GA</h3><p class="cap-stage-code">INSURER_TO_GA</p></div><span class="status-badge status-badge-neutral">조회 중</span></header>
+        <div class="cap-stage-pending-copy"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span><p>전체 검색범위 지급단계 집계를 불러오는 중입니다.</p></div>
         <p class="cap-stage-note">준법경영비 공제는 이 단계에만 적용됩니다.</p>
       </article>
       <article class="cap-stage-card cap-stage-card-pending">
-        <header class="cap-stage-card-header"><div><h3 class="cap-stage-title">GA→설계사</h3><p class="cap-stage-code">GA_TO_FC</p></div><span class="status-badge status-badge-neutral">연동 대기</span></header>
-        <div class="cap-stage-pending-copy"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span><p>전체 검색범위 Stage 집계 API가 아직 제공되지 않습니다.</p></div>
+        <header class="cap-stage-card-header"><div><h3 class="cap-stage-title">GA→설계사</h3><p class="cap-stage-code">GA_TO_FC</p></div><span class="status-badge status-badge-neutral">조회 중</span></header>
+        <div class="cap-stage-pending-copy"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span><p>전체 검색범위 지급단계 집계를 불러오는 중입니다.</p></div>
         <p class="cap-stage-note">준법경영비 공제를 적용하지 않습니다.</p>
       </article>
     </div>
@@ -170,12 +168,12 @@
       </div>
       <span class="status-badge status-badge-neutral">모니터링 지표 · 규제 판정 아님</span>
     </header>
-    <div id="cap-agent-message" class="cap-inline-message">전체 검색범위 설계사 집계 API 연동 대기 · 현재 페이지 목록으로 합산하지 않습니다.</div>
+    <div id="cap-agent-message" class="cap-inline-message">전체 검색범위 설계사 집계를 불러오는 중입니다.</div>
     <div id="cap-agent-table-wrap" class="data-table-viewport cap-agent-table-wrap" hidden>
       <table class="data-table cap-agent-table">
         <caption class="visually-hidden">설계사별 GA에서 설계사 단계 모니터링 지표</caption>
-        <colgroup><col><col><col><col><col><col></colgroup>
-        <thead><tr><th scope="col">설계사</th><th scope="col">소속</th><th scope="col" class="text-right">계약 수</th><th scope="col" class="text-right">한도 합계</th><th scope="col" class="text-right">산입 합계</th><th scope="col">사용률</th></tr></thead>
+        <colgroup><col><col><col><col><col><col><col></colgroup>
+        <thead><tr><th scope="col">설계사</th><th scope="col">소속</th><th scope="col" class="text-right">계약 수</th><th scope="col" class="text-right">한도 합계</th><th scope="col" class="text-right">산입 합계</th><th scope="col">사용률</th><th scope="col">모니터링</th></tr></thead>
         <tbody id="cap-agent-body"></tbody>
       </table>
     </div>

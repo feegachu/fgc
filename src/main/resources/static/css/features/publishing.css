@@ -316,6 +316,108 @@
   line-height: 1.25rem;
 }
 
+.publishing-page-arbitrage .arb-list-table {
+  width: max-content;
+  min-width: 72rem;
+}
+
+.publishing-page-arbitrage .arb-nowrap {
+  white-space: nowrap;
+}
+
+.publishing-page-arbitrage .arb-detail-list {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.publishing-page-arbitrage .arb-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr);
+  min-height: 2.25rem;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.publishing-page-arbitrage .arb-detail-list dt,
+.publishing-page-arbitrage .arb-detail-list dd {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.publishing-page-arbitrage .arb-detail-list dt {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.publishing-page-arbitrage .arb-detail-list dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.publishing-page-arbitrage .arb-calculation {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+  background: var(--color-bg-subtle);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  white-space: pre-wrap;
+}
+
+.publishing-page-arbitrage .arb-timeline-panel {
+  margin-top: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+}
+
+.publishing-page-arbitrage .arb-timeline-panel > .fgc-muted {
+  padding: 1rem;
+}
+
+.publishing-page-arbitrage .arb-timeline-title {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-default);
+  font-size: 0.75rem;
+}
+
+.publishing-page-arbitrage .arb-timeline-panel svg {
+  display: block;
+  padding: 0.75rem 0.75rem 0;
+}
+
+.publishing-page-arbitrage .arb-timeline-table {
+  overflow-x: auto;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.publishing-page-arbitrage .arb-detail-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.publishing-page-arbitrage .arb-recheck-icon {
+  margin-right: 0.25rem;
+  font-size: 1rem;
+  line-height: 1;
+  vertical-align: -0.15em;
+}
+
+.publishing-page-arbitrage #arb-recheck-button.is-loading .arb-recheck-icon {
+  animation: arb-recheck-spin 0.8s linear infinite;
+}
+
+@keyframes arb-recheck-spin {
+  to { transform: rotate(360deg); }
+}
+
 .publishing-page .fgc-table thead th,
 .publishing-modal .fgc-table thead th {
   height: 2.5rem;
