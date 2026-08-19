@@ -11,11 +11,12 @@
     </select>
 
     <select id="findImbalances" resultType="com.susukkang.fgc.journal.dto.LedgerImbalanceRow">
-        SELECT vw.journal_header_id, vw.journal_no, vw.status,
+        SELECT vw.journal_header_id, vw.journal_no, h.journal_type, vw.status,
                vw.debit_total, vw.credit_total, vw.difference_amount
         FROM fgc.vw_journal_imbalance vw
         JOIN fgc.journal_header h ON h.journal_header_id = vw.journal_header_id
         WHERE h.validation_run_id = #{validationRunId}
+        ORDER BY vw.journal_header_id
     </select>
     
     <!--

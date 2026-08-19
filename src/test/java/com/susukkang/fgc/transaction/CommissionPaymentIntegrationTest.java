@@ -14,6 +14,7 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
+import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -118,6 +120,75 @@ class CommissionPaymentIntegrationTest {
                 .isEqualTo(LocalDate.of(2026, 7, 31));
     }
 
+    // IF-API-24 (FGC-FUN-033) — 사전검증 미리보기는 호출 전후 DB 상태가 동일해야 한다
+    // (지급 건 상태·updated_at·cap_check·exception_case 무변화, 기록 생성은 확정 경로 전용)
+    @Test
+    void precheckLeavesDatabaseUntouched() {
+        CommissionPaymentResponse created = commissionPaymentService.create(request(
+                "IT-FUN033-" + UUID.randomUUID()
+        ));
+        OffsetDateTime updatedAtBefore = jdbcTemplate.queryForObject("""
+                SELECT updated_at
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, OffsetDateTime.class, created.paymentId());
+
+        TransactionPrecheckResponse response = commissionPaymentService.precheck(created.paymentId());
+
+        assertThat(response.confirmable()).isTrue();
+        assertThat(response.blockers()).isEmpty();
+        assertThat(response.capPreview()).isNotEmpty();
+        assertThat(response.capPreview().get(0).capCheckId()).isNull();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT status
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, String.class, created.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT updated_at
+                  FROM fgc.commission_transaction
+                 WHERE commission_transaction_id = ?
+                """, OffsetDateTime.class, created.paymentId())).isEqualTo(updatedAtBefore);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                """, Integer.class, created.paymentId())).isZero();
+        // source_entity 기준 집계 — saveException·CapExceptionService 두 저장 경로를 모두 잡는다
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.exception_case
+                 WHERE source_entity_type = 'COMMISSION_TRANSACTION'
+                   AND source_entity_id = CAST(? AS varchar)
+                """, Integer.class, created.paymentId())).isZero();
+    }
+
+    // IF-API-24 완료 조건 — precheck의 판정과 같은 지급 건 confirm 판정이 일치한다
+    @Test
+    void precheckVerdictMatchesConfirmOnRealData() {
+        CommissionPaymentResponse created = commissionPaymentService.create(request(
+                "IT-FUN033-MATCH-" + UUID.randomUUID()
+        ));
+
+        TransactionPrecheckResponse preview = commissionPaymentService.precheck(created.paymentId());
+        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(
+                created.paymentId(),
+                "IT-FUN033-CONFIRM-" + created.paymentId()
+        );
+
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        BigDecimal confirmedUsagePct = jdbcTemplate.queryForObject("""
+                SELECT usage_pct
+                  FROM fgc.cap_check
+                 WHERE candidate_transaction_id = ?
+                 ORDER BY cap_check_id DESC
+                 LIMIT 1
+                """, BigDecimal.class, created.paymentId());
+        assertThat(preview.capPreview().get(0).usagePct())
+                .isEqualTo(confirmedUsagePct.toPlainString());
+    }
+
     // 2026-08-11 yslee - 귀속행 입력 전 DRAFT의 PostgreSQL 저장·확정 경계 검증
     // 기존 코드: 빈 귀속 목록은 DTO와 일괄 INSERT 및 INNER JOIN 조회에서 차단
     // 문제: 화면의 지급 본문 선저장 흐름을 재현할 수 없고 누락 확정이 잘못된 오류로 응답
@@ -174,12 +245,22 @@ class CommissionPaymentIntegrationTest {
     // 2026-08-11 yslee - CAP_RULE_MISMATCH 예외 유형의 실제 DB CHECK 통합 검증
     // 기존 코드: 서비스가 사용하는 유형이 baseline CHECK 허용 목록에서 누락
     // 문제: 정책 불일치 이력 INSERT가 DataIntegrityViolationException으로 실패
-    // 개선: V13 적용 후 동일 유형을 정상 저장하고 조회할 수 있는지 PostgreSQL에서 검증
+    // 개선: V15 적용 후 동일 유형을 정상 저장하고 조회할 수 있는지 PostgreSQL에서 검증
+    //
+    // 2026-08-18 갱신 - V23_1(exception_case_exception_type_check 재정의)이
+    // CAP_RULE_MISMATCH를 exception_type 허용 목록에서 다시 빼고 CAP_REVIEW_REQUIRED +
+    // reason_code='CAP_RULE_MISMATCH'로 흡수했다(CommissionPaymentServiceImpl도 함께
+    // 전환). 그래서 이 테스트는 이제 "CAP_RULE_MISMATCH가 exception_type으로는 거절되고,
+    // CAP_REVIEW_REQUIRED + reason_code로는 저장된다"를 검증한다.
+    // 두 INSERT를 한 테스트 메서드에 같이 두면 첫 INSERT의 CHECK 위반이 테스트
+    // 트랜잭션을 abort 상태로 만들어(Postgres는 오류 이후 ROLLBACK 전까지 같은
+    // 트랜잭션의 어떤 문장도 거절한다) 두 번째 INSERT까지 실패한다 — 그래서
+    // 트랜잭션(=테스트 메서드)을 분리한다.
     @Test
-    void databaseAcceptsCapRuleMismatchExceptionType() {
-        String exceptionKey = "IT-FUN065-CAP-RULE-MISMATCH-" + UUID.randomUUID();
+    void databaseRejectsCapRuleMismatchAsExceptionType() {
+        String rejectedKey = "IT-FUN065-CAP-RULE-MISMATCH-REJECTED-" + UUID.randomUUID();
 
-        int inserted = jdbcTemplate.update("""
+        assertThatThrownBy(() -> jdbcTemplate.update("""
                 INSERT INTO fgc.exception_case (
                     exception_key,
                     exception_type,
@@ -190,14 +271,34 @@ class CommissionPaymentIntegrationTest {
                     title
                 ) VALUES (?, 'CAP_RULE_MISMATCH', 'HIGH', 'NEW',
                           'COMMISSION_TRANSACTION', 'IT-FUN065', '한도 정책 불일치')
-                """, exceptionKey);
+                """, rejectedKey))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void databaseAcceptsCapRuleMismatchAsReasonCodeUnderCapReviewRequired() {
+        String acceptedKey = "IT-FUN065-CAP-RULE-MISMATCH-REASON-" + UUID.randomUUID();
+
+        int inserted = jdbcTemplate.update("""
+                INSERT INTO fgc.exception_case (
+                    exception_key,
+                    exception_type,
+                    reason_code,
+                    severity,
+                    status,
+                    source_entity_type,
+                    source_entity_id,
+                    title
+                ) VALUES (?, 'CAP_REVIEW_REQUIRED', 'CAP_RULE_MISMATCH', 'HIGH', 'NEW',
+                          'COMMISSION_TRANSACTION', 'IT-FUN065', '한도 정책 불일치')
+                """, acceptedKey);
 
         assertThat(inserted).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT exception_type
                   FROM fgc.exception_case
                  WHERE exception_key = ?
-                """, String.class, exceptionKey)).isEqualTo("CAP_RULE_MISMATCH");
+                """, String.class, acceptedKey)).isEqualTo("CAP_REVIEW_REQUIRED");
     }
 
     // 2026-08-11 yslee - V14의 불필요한 지급 순번 구조 제거 통합 검증

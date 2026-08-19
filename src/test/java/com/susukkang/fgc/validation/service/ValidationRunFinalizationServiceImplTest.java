@@ -64,8 +64,13 @@ class ValidationRunFinalizationServiceImplTest {
                 "계약별 상세 합계 = 실행 요약 합계인가");
         assertThat(response.conditions().get(1).passed()).isFalse();
         assertThat(response.conditions().get(1).count()).isEqualTo(2);
-        assertThat(response.conditions()).allSatisfy(condition ->
-                assertThat(condition.linkUrl()).startsWith("/"));
+        assertThat(response.conditions()).extracting("linkUrl").containsExactly(
+                "/validation-runs/44",
+                "/api/v1/journals/imbalances?validationRunId=44",
+                "/api/v1/exceptions?validationRunId=44&severity=CRITICAL&status=OPEN",
+                "/api/v1/exceptions?validationRunId=44&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN",
+                "/transactions?settlementMonth=2026-08&attributionImbalanceOnly=true",
+                "/validation-runs/44?section=cap-details");
     }
 
     @Test

@@ -32,6 +32,11 @@
   margin-top: 0.25rem;
 }
 
+.contract-request-id {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
 .contract-form-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.03fr);
@@ -197,6 +202,17 @@
   color: var(--color-text-tertiary);
   font-size: 0.75rem;
   line-height: 1.125rem;
+}
+
+.contract-save-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-link);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
 }
 
 .contract-atomic-guidance {
@@ -961,7 +977,7 @@
 }
 
 .contract-table {
-  width: 68rem;
+  width: 100%;
   min-width: 68rem;
   table-layout: fixed;
 }
@@ -1018,7 +1034,7 @@
 
 .contract-premium-help {
   display: grid;
-  width: 68rem;
+  width: 100%;
   min-width: 68rem;
   min-height: 2.75rem;
   grid-template-columns: 1.25rem minmax(0, 1fr);
@@ -1054,7 +1070,7 @@
   display: flex;
   min-height: 2.5rem;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   margin: 2.5rem 1rem 0;
   padding-inline: 0.75rem;

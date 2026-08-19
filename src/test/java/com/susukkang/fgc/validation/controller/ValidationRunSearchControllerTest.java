@@ -8,6 +8,8 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationRunDetailService;
+import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
 import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import org.junit.jupiter.api.Test;
@@ -45,12 +47,18 @@ class ValidationRunSearchControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    // 컨트롤러 생성자가 두 서비스를 다 필요로 하므로 이 테스트에서 안 쓰더라도 빈으로 있어야 한다
+    // 컨트롤러 생성자가 서비스 4개를 다 필요로 하므로 이 테스트에서 안 쓰더라도 빈으로 있어야 한다
     @MockitoBean
     private ValidationRunCreateService validationRunCreateService;
 
     @MockitoBean
     private ValidationRunSearchService validationRunSearchService;
+
+    @MockitoBean
+    private ValidationRunDetailService validationRunDetailService;
+
+    @MockitoBean
+    private ValidationRunExecuteService validationRunExecuteService;
 
     @MockitoBean
     private ValidationRunFinalizationService validationRunFinalizationService;

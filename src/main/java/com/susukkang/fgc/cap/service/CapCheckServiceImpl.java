@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapAgentSummaryRow;
 import com.susukkang.fgc.cap.dto.CapCheckBasisResponse;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
@@ -14,6 +15,7 @@ import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.CapCheckSummary;
+import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
@@ -25,7 +27,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,7 +49,11 @@ public class CapCheckServiceImpl implements CapCheckService {
     private final ObjectMapper objectMapper;
 
     @Override
-    @Transactional
+    // 계약 생성·수정 흐름은 CAP_004를 잡아 계약은 보존하고 검토 케이스만 남긴다.
+    // REQUIRED 참여 트랜잭션에서 이 예외를 rollback-only로 표시하면, 호출부가 예외를
+    // 흡수해도 최종 커밋이 UnexpectedRollbackException으로 실패한다. 다른 업무 예외는
+    // 호출한 상위 서비스까지 전파되어 그 상위 트랜잭션의 기본 롤백 규칙을 그대로 따른다.
+    @Transactional(noRollbackFor = FgcBusinessException.class)
     public CapCheckSaveResult calculateAndSave(CapCalculationCommand command) {
         // 계산(CapCalculator)과 저장(capCheckMapper)을 하나의 트랜잭션으로 묶는다.
         // 계산 중 예외가 나면 당연히 저장도 안 되고, 저장이 실패해도 계산 결과가 반쪽만 남지 않는다.
@@ -128,16 +136,41 @@ public class CapCheckServiceImpl implements CapCheckService {
 
         List<CapCheckListRow> rows = capCheckMapper.search(
                 criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
-                criteria.insurerId(), criteria.contractNo(), offset, size);
+                criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), offset, size);
         long total = capCheckMapper.count(
                 criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
-                criteria.insurerId(), criteria.contractNo());
+                criteria.insurerId(), criteria.organizationId(), criteria.contractNo());
         CapCheckSummary summary = CapCheckSummary.from(capCheckMapper.summarize(
-                criteria.month(), criteria.paymentStage(), criteria.insurerId(), criteria.contractNo()));
+                criteria.month(), criteria.paymentStage(), criteria.insurerId(),
+                criteria.organizationId(), criteria.contractNo()));
+        List<CapStageSummaryRow> stageSummary = completeStageSummary(capCheckMapper.summarizeByStage(
+                criteria.month(), criteria.insurerId(), criteria.organizationId(), criteria.contractNo()));
+        List<CapAgentSummaryRow> agentSummary = capCheckMapper.summarizeByAgent(
+                criteria.month(), criteria.insurerId(), criteria.organizationId(), criteria.contractNo());
 
         PageResponse<CapCheckListRow> pageResponse =
                 PageResponse.of(rows, page, size, total, "asOfDate,desc");
-        return new CapCheckSearchResult(summary, pageResponse);
+        return new CapCheckSearchResult(summary, stageSummary, agentSummary, pageResponse);
+    }
+
+    private List<CapStageSummaryRow> completeStageSummary(List<CapStageSummaryRow> rows) {
+        Map<PaymentStage, CapStageSummaryRow> byStage = new EnumMap<>(PaymentStage.class);
+        for (CapStageSummaryRow row : rows) {
+            byStage.put(PaymentStage.valueOf(row.getPaymentStage()), row);
+        }
+        return List.of(
+                byStage.getOrDefault(PaymentStage.INSURER_TO_GA, emptyStage(PaymentStage.INSURER_TO_GA)),
+                byStage.getOrDefault(PaymentStage.GA_TO_FC, emptyStage(PaymentStage.GA_TO_FC)));
+    }
+
+    private CapStageSummaryRow emptyStage(PaymentStage paymentStage) {
+        CapStageSummaryRow row = new CapStageSummaryRow();
+        row.setPaymentStage(paymentStage.name());
+        row.setLimitAmountTotal(BigDecimal.ZERO);
+        row.setIncludedAmountTotal(BigDecimal.ZERO);
+        row.setComplianceDeductionAmountTotal(BigDecimal.ZERO);
+        row.setUsagePct(BigDecimal.ZERO.setScale(6));
+        return row;
     }
 
     @Override

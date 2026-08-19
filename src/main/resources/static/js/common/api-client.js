@@ -7,6 +7,7 @@
     this.message = error && error.message ? error.message : "요청을 처리하지 못했습니다.";
     this.field = error && error.field ? error.field : null;
     this.params = error && error.params ? error.params : {};
+    this.detail = error && error.detail ? error.detail : null;
     this.requestId = requestId || null;
     this.status = status;
   }

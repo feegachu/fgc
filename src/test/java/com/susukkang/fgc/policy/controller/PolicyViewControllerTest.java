@@ -74,6 +74,9 @@ class PolicyViewControllerTest {
                 .andExpect(content().string(containsString("REG-CAP-GA-2026-V1")))
                 .andExpect(content().string(containsString("fgc-badge--src-regulatory")))
                 .andExpect(content().string(containsString("REG-08 · REG-09")))
+                .andExpect(content().string(containsString("data-policy-version-id=\"1\"")))
+                .andExpect(content().string(containsString("data-policy-code=\"REG-CAP-GA-2026-V1\"")))
+                .andExpect(content().string(containsString("data-version-no=\"1\"")))
                 // 요율 수정 UI 금지 — 화면정의서 POL-W01 "막아야 할 것" (1차 조회 전용)
                 .andExpect(content().string(not(containsString(">수정</button>"))))
                 .andExpect(content().string(not(containsString(">등록</button>"))))
@@ -90,7 +93,7 @@ class PolicyViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("근거 미기재")))
                 .andExpect(content().string(containsString("fgc-badge--src-assumption")))
-                .andExpect(content().string(containsString("color:#74777e")));
+                .andExpect(content().string(containsString("policy-row-missing-reference")));
     }
 
     /** 화면정의서 :499 — 기준일을 조회 조건에 꼭 넣는다. ?asOf= 가 정산월 기본값을 덮어쓴다. */
@@ -106,6 +109,48 @@ class PolicyViewControllerTest {
                 .andExpect(model().attribute("asOf", LocalDate.of(2027, 6, 1)));
 
         verify(policyQueryService).findPolicyVersions(null, LocalDate.of(2027, 6, 1), null);
+    }
+
+    /** REG-19: 적용 시작일 당일은 포함하고 전날은 제외해 표시한다. */
+    @Test
+    void 적용_시작일_경계에서_정책_표시가_갈린다() throws Exception {
+        LocalDate effectiveFrom = LocalDate.of(2026, 7, 1);
+        given(policyQueryService.findPolicyVersions(null, effectiveFrom, null))
+                .willReturn(samplePolicyVersions());
+        given(policyQueryService.findPolicyVersions(null, effectiveFrom.minusDays(1), null))
+                .willReturn(List.of());
+
+        mockMvc.perform(get("/policies").param("asOf", effectiveFrom.toString())
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("REG-CAP-GA-2026-V1")))
+                .andExpect(content().string(containsString(">계속</td>")));
+
+        mockMvc.perform(get("/policies").param("asOf", effectiveFrom.minusDays(1).toString())
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("기준일에 적용되는 정책 버전이 없습니다")));
+    }
+
+    /** REG-19: 적용 종료일 당일은 포함하고 다음 날은 제외해 표시한다. */
+    @Test
+    void 적용_종료일_경계에서_정책_표시가_갈린다() throws Exception {
+        LocalDate effectiveTo = LocalDate.of(2026, 12, 31);
+        given(policyQueryService.findPolicyVersions(null, effectiveTo, null))
+                .willReturn(closedPolicyVersions(effectiveTo));
+        given(policyQueryService.findPolicyVersions(null, effectiveTo.plusDays(1), null))
+                .willReturn(List.of());
+
+        mockMvc.perform(get("/policies").param("asOf", effectiveTo.toString())
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("REG-CAP-GA-2026-V1")))
+                .andExpect(content().string(containsString(">2026-12-31</td>")));
+
+        mockMvc.perform(get("/policies").param("asOf", effectiveTo.plusDays(1).toString())
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("기준일에 적용되는 정책 버전이 없습니다")));
     }
 
     @Test
@@ -142,6 +187,15 @@ class PolicyViewControllerTest {
                         1, PolicyStatus.ACTIVE, PolicyStatus.ACTIVE.label(),
                         LocalDate.of(2026, 1, 1), null,
                         List.of(), "admin01", "gaadmin", null));
+    }
+
+    private static List<PolicyVersionResponse> closedPolicyVersions(LocalDate effectiveTo) {
+        PolicyVersionResponse sample = samplePolicyVersions().getFirst();
+        return List.of(new PolicyVersionResponse(
+                sample.policyVersionId(), sample.policyCode(), sample.policyName(),
+                sample.policyType(), sample.policyTypeLabel(), sample.sourceClass(), sample.sourceClassLabel(),
+                sample.versionNo(), sample.status(), sample.statusLabel(), sample.effectiveFrom(), effectiveTo,
+                sample.regulationRefs(), sample.createdBy(), sample.approvedBy(), sample.approvedAt()));
     }
 
     private static FgcUserDetails principal(String roleCode) {

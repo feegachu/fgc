@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -48,5 +49,11 @@ public class ValidationRunSearchServiceImpl implements ValidationRunSearchServic
 
         // 4) PageResponse로 조립
          return PageResponse.of(rows, page, size, total, "validationMonth,desc");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsActiveMonthlyRun(LocalDate validationMonth) {
+        return validationRunMapper.existsActiveMonthlyRun(validationMonth);
     }
 }

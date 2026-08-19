@@ -56,6 +56,8 @@ class DashboardServiceImplTest {
         assertThat(result.kpis().reconciliationMismatch()).isEqualTo(4L);
         assertThat(result.kpis().journalImbalance()).isEqualTo(5L);
         assertThat(result.kpis().openException()).isEqualTo(6L);
+        assertThat(result.recentExceptions()).isEmpty();
+        assertThat(result.recentValidationRuns()).isEmpty();
     }
 
     // arbitrageCandidate/journalImbalance/openException은 월과 무관해야함

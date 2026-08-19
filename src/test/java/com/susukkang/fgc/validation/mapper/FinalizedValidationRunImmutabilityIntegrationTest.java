@@ -162,6 +162,49 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
     }
 
     @Test
+    void updatingReconciliationMatchUnderFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        Long reconciliationResultId = createMatchedReconciliationResult(reconciliationRunId, "MATCH");
+        Long scheduleLineId = createScheduleLine();
+        Long reconciliationMatchId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_match (
+                    reconciliation_result_id, match_seq, schedule_line_id,
+                    matched_amount, match_role
+                ) VALUES (?, 1, ?, 100, 'EXPECTED')
+                RETURNING reconciliation_match_id
+                """, Long.class, reconciliationResultId, scheduleLineId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_match
+                   SET matched_amount = 90
+                 WHERE reconciliation_match_id = ?
+                """, reconciliationMatchId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
+    void movingReconciliationResultAwayFromFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long finalizedReconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        Long reconciliationResultId = createMatchedReconciliationResult(
+                finalizedReconciliationRunId, "REPARENT");
+        Long openValidationRunId = createRunningValidationRun();
+        Long openReconciliationRunId = createCompletedReconciliationRun(openValidationRunId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE fgc.reconciliation_result
+                   SET reconciliation_run_id = ?
+                 WHERE reconciliation_result_id = ?
+                """, openReconciliationRunId, reconciliationResultId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
     void updatingReconciliationRunUnderFinalizedValidationRunIsRejected() {
         validationRunId = createRunningValidationRun();
         Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
@@ -224,5 +267,48 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
                  WHERE reconciliation_run_id = ?
                 """, reconciliationRunId);
         return reconciliationRunId;
+    }
+
+    private Long createMatchedReconciliationResult(Long reconciliationRunId, String suffix) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_result (
+                    reconciliation_run_id, match_group_key, result_type,
+                    expected_total_amount, actual_total_amount, difference_amount
+                ) VALUES (?, ?, 'MATCHED', 100, 100, 0)
+                RETURNING reconciliation_result_id
+                """, Long.class, reconciliationRunId,
+                "FUN044-RECO-" + suffix + "-" + reconciliationRunId);
+    }
+
+    private Long createScheduleLine() {
+        Long policyVersionId = jdbcTemplate.queryForObject(
+                "SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1",
+                Long.class);
+        Long commissionItemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1",
+                Long.class);
+        Integer scheduleVersionNo = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(MAX(schedule_version_no), 0) + 1
+                  FROM fgc.schedule_header
+                 WHERE contract_id = ?
+                   AND payment_stage = 'GA_TO_FC'
+                   AND schedule_purpose = 'OPERATIONAL'
+                """, Integer.class, contractId());
+        Long scheduleHeaderId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_header (
+                    contract_id, payment_stage, policy_version_id, schedule_version_no,
+                    schedule_regime, schedule_purpose, active_yn
+                ) VALUES (?, 'GA_TO_FC', ?, ?, 'CURRENT', 'OPERATIONAL', false)
+                RETURNING schedule_header_id
+                """, Long.class, contractId(), policyVersionId, scheduleVersionNo);
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_line (
+                    schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                    commission_item_id, basis_code, basis_amount, calculation_type,
+                    rate_pct, expected_amount
+                ) VALUES (?, 1, 1, 1, DATE '2031-05-01', ?, 'TEST_AMOUNT', 100,
+                          'RATE', 100.000000, 100)
+                RETURNING schedule_line_id
+                """, Long.class, scheduleHeaderId, commissionItemId);
     }
 }

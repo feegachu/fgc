@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
+import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.dto.ValidationScheduleState;
@@ -49,16 +50,22 @@ class ValidationRunScheduleServiceTest {
     }
 
     @Test
-    void delegatesValidContractToExistingScheduleService() {
+    void delegatesValidContractToExistingScheduleServiceWithValidationRunId() {
         given(validationScheduleMapper.selectScheduleStates(118L))
                 .willReturn(List.of(validState(10L, PaymentStage.INSURER_TO_GA),
                         validState(10L, PaymentStage.GA_TO_FC)));
+        given(itemService.process(10L, 118L))
+                .willReturn(new ScheduleGenerationResult(List.of(200L, 201L), 24));
 
         StepProcessingResult result = service.validateContractSchedules(118L);
 
         assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.skippedCount()).isZero();
-        verify(itemService).process(10L);
+        // FGC-FUN-043 결과 집계 — validationRunId를 itemService에 넘겨야 생성·연결이
+        // 같은 REQUIRES_NEW 트랜잭션 안에서 처리된다(코드리뷰 반영). 이 Service 자신은
+        // 더 이상 scheduleMapper.linkHeadersToValidationRun을 직접 호출하지 않는다 —
+        // 그 책임은 ScheduleRegenerationBatchItemServiceTest가 검증한다.
+        verify(itemService).process(10L, 118L);
     }
 
     @Test
@@ -75,7 +82,7 @@ class ValidationRunScheduleServiceTest {
         verify(exceptionCaseMapper).insertDataQualityCase(
                 118L, 10L, "예상 스케줄 정합성 오류",
                 "GA_TO_FC 활성 OPERATIONAL 스케줄 헤더가 중복되었습니다.");
-        verify(itemService, never()).process(any());
+        verify(itemService, never()).process(any(), any());
     }
 
     @Test
@@ -95,7 +102,7 @@ class ValidationRunScheduleServiceTest {
         verify(scheduleMapper).upsertPolicyReviewCase(
                 10L, PaymentStage.INSURER_TO_GA, "POLICY_MISSING",
                 "예상 스케줄 생성 검토 필요", "적용 가능한 현행 수수료 정책이 없습니다.");
-        verify(itemService, never()).process(any());
+        verify(itemService, never()).process(any(), any());
     }
 
     @Test
@@ -107,7 +114,9 @@ class ValidationRunScheduleServiceTest {
                         validState(20L, PaymentStage.INSURER_TO_GA),
                         validState(20L, PaymentStage.GA_TO_FC)));
         doThrow(new FgcBusinessException(FgcErrorCode.COMMON_002))
-                .when(itemService).process(10L);
+                .when(itemService).process(10L, 118L);
+        given(itemService.process(20L, 118L))
+                .willReturn(new ScheduleGenerationResult(List.of(202L), 12));
 
         StepProcessingResult result = service.validateContractSchedules(118L);
 
@@ -117,8 +126,8 @@ class ValidationRunScheduleServiceTest {
             assertThat(skip.contractId()).isEqualTo(10L);
             assertThat(skip.reasonCode()).isEqualTo("SCHEDULE_REGENERATION_FAILED");
         });
-        verify(itemService).process(10L);
-        verify(itemService).process(20L);
+        verify(itemService).process(10L, 118L);
+        verify(itemService).process(20L, 118L);
     }
 
     private ValidationScheduleState validState(Long contractId, PaymentStage paymentStage) {

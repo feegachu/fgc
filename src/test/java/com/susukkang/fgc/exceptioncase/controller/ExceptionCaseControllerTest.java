@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -71,6 +72,29 @@ class ExceptionCaseControllerTest {
                 .andExpect(jsonPath("$.data.page").value(2))
                 .andExpect(jsonPath("$.data.size").value(10))
                 .andExpect(jsonPath("$.data.content").isArray());
+    }
+
+    @Test
+    void bindsValidationRunAndMultiplePolicyTypesForFinalizeChecklistLink() throws Exception {
+        ExceptionCaseSearchResponse response = new ExceptionCaseSearchResponse(
+                List.of(), List.of(), 1, 20, 0, 0,
+                "severity,asc,createdAt,desc");
+        given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(1), eq(20)))
+                .willReturn(response);
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("validationRunId", "44")
+                        .param("types", "POLICY_MISSING", "POLICY_DUPLICATE")
+                        .param("status", "OPEN"))
+                .andExpect(status().isOk());
+
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        Long.valueOf(44L).equals(criteria.getValidationRunId())
+                                && criteria.getTypes().equals(List.of(
+                                ExceptionType.POLICY_MISSING, ExceptionType.POLICY_DUPLICATE))),
+                eq(1), eq(20));
     }
 
     @Test

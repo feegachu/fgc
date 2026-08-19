@@ -9,16 +9,22 @@ import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.CreateValidationRunResponse;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.FinalizeValidationRunResponse;
+import com.susukkang.fgc.validation.dto.ValidationRunDetailResponse;
+import com.susukkang.fgc.validation.dto.ValidationRunExecuteResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
+import com.susukkang.fgc.validation.dto.ValidationRunProgressResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchResponse;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
+import com.susukkang.fgc.validation.service.ValidationRunDetailService;
+import com.susukkang.fgc.validation.service.ValidationRunExecuteService;
 import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,9 +41,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -56,6 +62,8 @@ public class ValidationRunController {
 
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunSearchService validationRunSearchService;
+    private final ValidationRunDetailService validationRunDetailService;
+    private final ValidationRunExecuteService validationRunExecuteService;
     private final ValidationRunFinalizationService validationRunFinalizationService;
 
     @Operation(
@@ -163,6 +171,81 @@ public class ValidationRunController {
     }
 
     @Operation(
+            summary = "검증 실행 상세 조회 (IF-API-47)",
+            description = "실행 헤더 + 대상 선별 결과(validation_target) + 결과 요약 4블록(1,200%·차익거래·원장·대사). "
+                    + "요약은 결과 테이블을 매번 집계한다 — 화면용 복제 저장 없음(FUN-043)."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = ValidationRunDetailResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "실행 미존재 (FGC-COMMON-004)")
+    })
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ValidationRunDetailResponse> detail(
+            @Parameter(description = "validation_run_id") @PathVariable Long id
+    ) {
+        return ApiResponse.success(validationRunDetailService.detail(id));
+    }
+
+    @Operation(
+            summary = "검증 실행 기동 (IF-API-48)",
+            description = "CREATED 상태의 실행을 MonthlyValidationJob(IF-BAT-01)으로 비동기 기동한다. "
+                    + "202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. "
+                    + "1차는 재기동을 지원하지 않는다 — FAILED면 새 실행을 만든다(FUN-045는 2차)."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "202", description = "기동 수락",
+                    content = @Content(schema = @Schema(implementation = ValidationRunExecuteResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "실행 미존재 (FGC-COMMON-004)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "FINALIZED (FGC-VRUN-003) 또는 CREATED가 아닌 상태 (FGC-VRUN-004)")
+    })
+    @PostMapping("/{id}/execute")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<ValidationRunExecuteResponse> execute(
+            @Parameter(description = "validation_run_id") @PathVariable Long id,
+            @AuthenticationPrincipal FgcUserDetails principal
+    ) {
+        ValidationRunRow row = validationRunExecuteService.execute(
+                id, principal.getUserId(), RequestIdContext.current());
+        return ApiResponse.success(ValidationRunExecuteResponse.from(row));
+    }
+
+    @Operation(
+            summary = "검증 실행 진행률 조회 (IF-API-49)",
+            description = "validation_run.current_step 기반 진행률 — 화면이 2초 간격으로 폴링한다. "
+                    + "progressPct = current_step / 10 × 100 (운영정책서 제43조)."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = ValidationRunProgressResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "실행 미존재 (FGC-COMMON-004)")
+    })
+    @GetMapping("/{id}/progress")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ValidationRunProgressResponse> progress(
+            @Parameter(description = "validation_run_id") @PathVariable Long id
+    ) {
+        return ApiResponse.success(validationRunDetailService.progress(id));
+    }
+
+    @Operation(
             summary = "검증 실행 확정 체크리스트 조회 (IF-API-50)",
             description = "운영정책서 제44조의 확정 전 필수조건 6개를 문서 순서와 문구 그대로 반환한다."
     )
@@ -199,7 +282,10 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005)"),
+                    responseCode = "404", description = "검증 실행 없음 (FGC-COMMON-004)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "확정 결과 불변·상태 전이 오류·상태 경합 "
+                            + "(FGC-VRUN-003/004/005)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "422", description = "확정 조건 미충족 (FGC-VRUN-002)")
     })
@@ -213,5 +299,4 @@ public class ValidationRunController {
         return ApiResponse.success(validationRunFinalizationService.finalizeRun(
                 validationRunId, principal.getUserId(), idempotencyKey));
     }
-
 }

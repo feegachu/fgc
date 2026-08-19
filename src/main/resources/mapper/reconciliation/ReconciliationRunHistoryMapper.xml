@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.reconciliation.mapper.ReconciliationRunHistoryMapper">
+    <!--
+      vw_reconciliation_summary는 reconciliation_run을 LEFT JOIN reconciliation_result로
+      만든 뷰라(V1__baseline_v2_1_2.sql:1489-1494) reconciliation_run 1건당 항상 1행이
+      나온다(결과가 0건이어도 COUNT/SUM이 0으로 채워진 행이 존재) — 그래서 여기서는
+      안전하게 INNER JOIN한다. insurer/app_user는 insurer_id·created_by가 nullable이라
+      LEFT JOIN한다.
+    -->
+    <sql id="searchWhere">
+        <where>
+            <if test="settlementMonth != null">
+                AND rr.settlement_month = #{settlementMonth}
+            </if>
+            <if test="paymentStage != null">
+                AND rr.payment_stage = #{paymentStage}
+            </if>
+        </where>
+    </sql>
+
+    <select id="search" resultType="com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow">
+        SELECT rr.reconciliation_run_id, rr.validation_run_id, rr.settlement_month, rr.payment_stage,
+               rr.insurer_id, ins.insurer_name AS insurerName,
+               rr.status, rr.tolerance_policy_version_id,
+               creator.login_id AS createdBy, rr.created_at AS createdAt,
+               rr.started_at AS startedAt, rr.completed_at AS completedAt,
+               rr.finalized_at AS finalizedAt, finalizer.login_id AS finalizedBy,
+               vw.result_count AS targetCount, vw.matched_count AS matchedCount,
+               vw.exception_count AS exceptionCount,
+               vw.expected_total AS expectedTotal, vw.actual_total AS actualTotal,
+               vw.difference_total AS differenceTotal
+        FROM fgc.reconciliation_run rr
+        JOIN fgc.vw_reconciliation_summary vw ON vw.reconciliation_run_id = rr.reconciliation_run_id
+        LEFT JOIN fgc.insurer ins ON ins.insurer_id = rr.insurer_id
+        LEFT JOIN fgc.app_user creator ON creator.user_id = rr.created_by
+        LEFT JOIN fgc.app_user finalizer ON finalizer.user_id = rr.finalized_by
+        <include refid="searchWhere"/>
+        ORDER BY rr.created_at
+        <choose>
+            <when test="sortDirection == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>,
+        rr.reconciliation_run_id
+        <choose>
+            <when test="sortDirection == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.reconciliation_run rr
+        <include refid="searchWhere"/>
+    </select>
+</mapper>
