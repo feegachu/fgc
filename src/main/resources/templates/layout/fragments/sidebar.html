@@ -2,12 +2,16 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"><body>
 <aside id="app-sidebar" class="app-sidebar" th:fragment="sidebar(screenId)" data-app-sidebar>
   <div class="sidebar-brand">
-    <a class="sidebar-brand-link" th:href="@{/}" aria-label="FGC 업무 대시보드">
+    <a class="sidebar-brand-link sidebar-brand-home" th:href="@{/}" aria-label="FGC 업무 대시보드">
       <img th:src="@{/images/brand/logo-horizontal-white.png}" class="sidebar-brand-horizontal" width="114" height="31" alt="FGC">
-      <img th:src="@{/images/brand/logo-symbol-white.png}" class="sidebar-brand-symbol" width="36" height="36" alt="">
     </a>
-    <button class="icon-button sidebar-mobile-close" type="button" data-action="close-app-sidebar" aria-label="주요 업무 메뉴 닫기">
-      <span class="material-symbols-rounded" aria-hidden="true">close</span>
+    <button class="sidebar-expand-button" type="button" data-action="expand-app-sidebar"
+            aria-controls="app-sidebar" aria-expanded="false" aria-label="사이드바 펼치기">
+      <img th:src="@{/images/brand/logo-symbol-white.png}" class="sidebar-brand-symbol" width="48" height="48" alt="">
+    </button>
+    <button class="icon-button sidebar-collapse-button" type="button" data-action="collapse-app-sidebar"
+            aria-controls="app-sidebar" aria-expanded="true" aria-label="사이드바 접기" title="사이드바 접기">
+      <span class="material-symbols-rounded" aria-hidden="true">keyboard_double_arrow_left</span>
     </button>
   </div>
   <nav class="sidebar-nav" aria-label="주요 업무 메뉴">
