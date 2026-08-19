@@ -24,6 +24,7 @@
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-SCHE-')}" th:href="@{/css/features/schedule.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CAP-') or screenId == 'FGC-UI-CONT-W02'}" th:href="@{/css/features/cap.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-POL-W01'}" th:href="@{/css/features/policy.css}">
+  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-RECO-W01'}" th:href="@{/css/features/reco.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-EXCP-W01'}" th:href="@{/css/features/exception.css}">
 </head>
 <body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">

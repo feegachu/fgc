@@ -2,7 +2,7 @@
   "use strict";
 
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
-  var main = document.querySelector(".publishing-page-reconciliation");
+  var main = document.querySelector(".reco-page");
   if (!apiClient || !main) return;
 
   var canProcess = main.dataset.canProcess === "true";
@@ -22,6 +22,8 @@
     sumException: document.getElementById("sum-exception"),
     sumRate: document.getElementById("sum-rate"),
     sumDiffTotal: document.getElementById("sum-diff-total"),
+    sumRateCard: document.getElementById("sum-rate-card"),
+    sumDiffCard: document.getElementById("sum-diff-card"),
     sumExpected: document.getElementById("sum-expected"),
     sumActual: document.getElementById("sum-actual"),
     sumDiff: document.getElementById("sum-diff"),
@@ -56,6 +58,23 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function syncTableCellDisclosures() {
+    el.resultBody.querySelectorAll(".table-cell-disclosure").forEach(function (disclosure) {
+      var preview = disclosure.querySelector(".table-cell-preview");
+      var details = disclosure.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+
+      var isTruncated = preview.scrollWidth > preview.clientWidth + 1
+        || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !isTruncated;
+      if (!isTruncated) details.open = false;
+    });
+  }
+
+  function scheduleDisclosureSync() {
+    window.requestAnimationFrame(syncTableCellDisclosures);
   }
 
   function addOption(select, value, label) {
@@ -159,28 +178,41 @@
     return '<span class="status-badge ' + tone + '">' + escapeHtml(item.resultTypeLabel) + "</span>";
   }
 
+  function tableCellDisclosure(value, singleLine) {
+    var text = String(value == null || value === "" ? "—" : value);
+    var safeText = escapeHtml(text);
+    return '<div class="table-cell-disclosure">' +
+      '<span class="table-cell-preview' + (singleLine ? " is-single-line" : "") + '">' + safeText + "</span>" +
+      '<details class="table-cell-details" hidden><summary>' +
+      '<span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>' +
+      '<span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>' +
+      '</summary><p class="table-cell-full">' + safeText + "</p></details></div>";
+  }
+
   function resultRow(item) {
     var expectedAgentName = (item.expectedAgent && item.expectedAgent.agentName) || "실제 없음";
     var actualAgentName = (item.actualAgent && item.actualAgent.agentName) || "실제 없음";
     var agentMismatch = expectedAgentName !== actualAgentName;
-    var agentClass = agentMismatch ? ' class="fgc-error"' : "";
-    var diffClass = Number(item.differenceAmount || 0) !== 0 ? ' class="fgc-th-num fgc-error"' : ' class="fgc-th-num"';
+    var agentClass = agentMismatch ? ' class="reco-agent-mismatch"' : "";
+    var diffClass = Number(item.differenceAmount || 0) !== 0
+      ? ' class="is-number tabular-nums reco-amount-error"'
+      : ' class="is-number tabular-nums"';
     var secondaryReasons = (item.secondaryReasons || [])
       .map(function (reason) { return reason.label; })
       .join(", ") || "—";
     return "<tr>" +
-      "<td>" + escapeHtml(item.contractNo) + "</td>" +
-      "<td>" + escapeHtml(item.commissionItemName) + "</td>" +
-      "<td>" + escapeHtml(item.installmentNo) + "</td>" +
+      '<td class="reco-disclosure-cell tabular-nums">' + tableCellDisclosure(item.contractNo, true) + "</td>" +
+      '<td class="reco-disclosure-cell">' + tableCellDisclosure(item.commissionItemName, false) + "</td>" +
+      '<td class="is-center tabular-nums">' + escapeHtml(item.installmentNo) + "</td>" +
       "<td" + agentClass + ">" + escapeHtml(expectedAgentName) + "</td>" +
       "<td" + agentClass + ">" + escapeHtml(actualAgentName) + "</td>" +
-      '<td class="fgc-th-num">' + won(item.expectedTotalAmount) + "</td>" +
-      '<td class="fgc-th-num">' + won(item.actualTotalAmount) + "</td>" +
+      '<td class="is-number tabular-nums">' + won(item.expectedTotalAmount) + "</td>" +
+      '<td class="is-number tabular-nums">' + won(item.actualTotalAmount) + "</td>" +
       "<td" + diffClass + ">" + won(item.differenceAmount) + "</td>" +
       "<td>" + resultTypeBadge(item) + "</td>" +
-      "<td>" + escapeHtml((item.primaryReason && item.primaryReason.label) || "—") + "</td>" +
-      "<td>" + escapeHtml(secondaryReasons) + "</td>" +
-      '<td><button class="fgc-btn fgc-btn--ghost" type="button" data-reco-compare-id="' +
+      '<td class="reco-disclosure-cell">' + tableCellDisclosure((item.primaryReason && item.primaryReason.label) || "—", false) + "</td>" +
+      '<td class="reco-disclosure-cell">' + tableCellDisclosure(secondaryReasons, false) + "</td>" +
+      '<td><button class="button button-ghost" type="button" data-reco-compare-id="' +
         escapeHtml(item.reconciliationResultId) + '">비교 상세</button></td>' +
       "</tr>";
   }
@@ -191,8 +223,13 @@
     el.sumMatched.textContent = number(summary.matchedCount);
     el.sumException.textContent = number(summary.exceptionCount);
     var rate = summary.resultCount ? (summary.matchedCount / summary.resultCount * 100).toFixed(1) : null;
-    el.sumRate.textContent = rate == null ? "—" : rate + "%";
-    el.sumDiffTotal.textContent = won(summary.differenceTotal);
+    var differenceTotal = Number(summary.differenceTotal || 0);
+    el.sumRate.textContent = rate == null ? "—" : rate;
+    el.sumDiffTotal.textContent = number(differenceTotal);
+    el.sumRateCard.classList.toggle("kpi-card-success", rate === "100.0");
+    el.sumRateCard.classList.toggle("kpi-card-warning", rate !== "100.0");
+    el.sumDiffCard.classList.toggle("kpi-card-success", differenceTotal === 0);
+    el.sumDiffCard.classList.toggle("kpi-card-error", differenceTotal !== 0);
   }
 
   function renderResultPagination(items) {
@@ -215,7 +252,7 @@
     var noFilter = !el.typeFilter.value && !el.mismatchOnly.checked;
     el.resultSumLabel.textContent = noFilter ? "합계" : "이 페이지 합계";
     if (!rows.length) {
-      el.resultBody.innerHTML = '<tr><td colspan="12"><div class="fgc-empty">조건에 맞는 자료가 없습니다.</div></td></tr>';
+      el.resultBody.innerHTML = '<tr class="reco-state-row"><td colspan="12"><div class="empty-state">조건에 맞는 자료가 없습니다.</div></td></tr>';
       el.sumExpected.textContent = "0";
       el.sumActual.textContent = "0";
       el.sumDiff.textContent = "0";
@@ -223,6 +260,7 @@
       return;
     }
     el.resultBody.innerHTML = rows.map(resultRow).join("");
+    scheduleDisclosureSync();
     if (noFilter) {
       var summary = data.summary || {};
       el.sumExpected.textContent = number(summary.expectedTotal);
@@ -278,7 +316,9 @@
     updateBulkButtonState();
     loadResults(1);
     document.querySelectorAll(".reco-history-row").forEach(function (row) {
-      row.classList.toggle("is-selected", row.dataset.reconciliationRunId === String(reconciliationRunId));
+      var isSelected = row.dataset.reconciliationRunId === String(reconciliationRunId);
+      row.classList.toggle("is-selected", isSelected);
+      row.setAttribute("aria-selected", String(isSelected));
     });
   }
 
@@ -425,10 +465,23 @@
     var row = event.target.closest(".reco-history-row");
     if (row) selectRun(row.dataset.reconciliationRunId);
   });
+  el.runBody.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.target.closest("a, button, details, input, select, textarea")) return;
+    var row = event.target.closest(".reco-history-row");
+    if (!row) return;
+    event.preventDefault();
+    selectRun(row.dataset.reconciliationRunId);
+  });
 
   updateRunButtonState();
   updateBulkButtonState();
   loadInsurers();
+  window.addEventListener("load", scheduleDisclosureSync, { once: true });
+  window.addEventListener("resize", scheduleDisclosureSync);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(scheduleDisclosureSync);
+  }
 
   var autoSelectRunId = window.sessionStorage.getItem("reco.autoSelectRunId");
   if (autoSelectRunId) {
