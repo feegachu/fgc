@@ -1,6 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
 import com.susukkang.fgc.validation.dto.BatchWatermarkRow;
@@ -44,13 +45,15 @@ public class CreateDailyRunTasklet implements Tasklet {
         // "오늘"을 Asia/Seoul 자정 기준으로 구한다 — 서버 타임존이 달라도 배치 기준시는
         // 항상 서울 자정이어야 "매일 02:00 KST"라는 운영 가정과 어긋나지 않는다.
         OffsetDateTime now = OffsetDateTime.now(DateUtil.SEOUL_ZONE);
-        OffsetDateTime dayStart = now.toLocalDate().atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime();
-        OffsetDateTime dayEnd = dayStart.plusDays(1);
 
-        ValidationRunRow existing = validationRunMapper.findManualContractRunCreatedBetween(dayStart, dayEnd);
-        Long validationRunId = (existing == null)
-                ? createAndStart(params)
-                : reuseOrRecreate(existing, params);
+        // validationRunId가 지정돼 있으면(VRUN-W02의 [실행] 버튼 등 특정 행을 겨냥한 수동 재실행)
+        // "오늘 생성된 아무 MANUAL_CONTRACT 행"을 날짜창으로 다시 찾지 않고 그 행을 그대로 쓴다.
+        // 안 그러면 그 행이 오늘 생성분이 아닐 때 엉뚱한 새 행을 만들려다 전역 UNIQUE 제약에
+        // 걸려 조용히 실패하거나, 오늘 다른 MANUAL_CONTRACT 행이 있으면 그 행이 대신 진행된다.
+        Long requestedValidationRunId = jobParameters.getLong("validationRunId");
+        Long validationRunId = requestedValidationRunId != null
+                ? resumeRequestedRun(requestedValidationRunId, params)
+                : resolveOrCreateTodaysRun(params, now);
 
         // 이 Step 이후로는 changedContractStep을 포함한 모든 뒤 Step이 이 값을 읽는다.
         ValidationRunBatchContext.putValidationRunId(chunkContext, validationRunId);
@@ -70,6 +73,32 @@ public class CreateDailyRunTasklet implements Tasklet {
         DailyBatchContext.putRunStartedAt(chunkContext, now);
 
         return RepeatStatus.FINISHED;
+    }
+
+    private Long resolveOrCreateTodaysRun(MonthlyValidationJobParameters params, OffsetDateTime now) {
+        OffsetDateTime dayStart = now.toLocalDate().atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime();
+        OffsetDateTime dayEnd = dayStart.plusDays(1);
+        ValidationRunRow existing = validationRunMapper.findManualContractRunCreatedBetween(dayStart, dayEnd);
+        return existing == null ? createAndStart(params) : reuseOrRecreate(existing, params);
+    }
+
+    /**
+     * VRUN-W02의 [실행] 버튼처럼 특정 행을 지정해 호출됐을 때, 그 행이 지금도 수동 재실행
+     * 대상(MANUAL_CONTRACT · CREATED)인지 다시 확인하고 그 행을 그대로 이어받는다. 호출부
+     * (ValidationRunExecuteServiceImpl)가 이미 CREATED를 확인했지만, 비동기 기동 사이의
+     * 경쟁을 여기서 한 번 더 막는다(MonthlyValidationJobTrigger.runOrWrap()과 같은 패턴).
+     */
+    private Long resumeRequestedRun(Long validationRunId, MonthlyValidationJobParameters params) {
+        ValidationRunRow requested = validationRunMapper.findById(validationRunId);
+        if (requested == null
+                || !ValidationRunType.MANUAL_CONTRACT.name().equals(requested.getRunType())
+                || !ValidationRunStatus.CREATED.name().equals(requested.getStatus())) {
+            throw new IllegalStateException("validation_run " + validationRunId
+                    + " 은 수동 재실행 대상이 아닙니다(runType=계약수동·status=CREATED 이어야 함, 실제 status="
+                    + (requested == null ? "삭제됨" : requested.getStatus()) + ")");
+        }
+        lifecycleService.start(requested.getValidationRunId(), params);
+        return requested.getValidationRunId();
     }
 
     private Long createAndStart(MonthlyValidationJobParameters params) {
