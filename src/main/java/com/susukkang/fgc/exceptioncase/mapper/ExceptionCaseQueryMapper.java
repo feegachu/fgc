@@ -24,6 +24,11 @@ public interface ExceptionCaseQueryMapper {
 
     List<ExceptionCaseListRow> findCases(@Param("statuses") List<ExceptionStatus> statuses);
 
+    /** 체크리스트 등 화면 바로가기의 선택 검색조건을 적용한 서버 렌더링 목록 조회. */
+    List<ExceptionCaseListRow> findCasesByCriteria(
+            @Param("criteria") ExceptionCaseSearchDTO criteria,
+            @Param("statuses") List<ExceptionStatus> statuses);
+
     long countByStatuses(@Param("statuses") List<ExceptionStatus> statuses);
 
     /** IF-API-43 검색조건에 맞는 현재 페이지의 예외를 조회한다. */

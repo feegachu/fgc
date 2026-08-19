@@ -1,17 +1,24 @@
 package com.susukkang.fgc.exceptioncase.controller;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.util.List;
 
 /**
- * FGC-UI-EXCP-W01 예외함 화면 (FUN-052·053).
+ * 설명 : FGC-UI-EXCP-W01 예외함 화면(FUN-052·053)
+ *
+ * @author yslee
+ * @since 2026-08-19
+ * @version 1.2
+ *
  * 인터페이스정의서 5-2 라우팅표: GET /exceptions → exception/list.html.
  * 조회는 전체 역할(인터페이스정의서 IF-API-43), 처리 API(IF-API-44)만 SETTLEMENT·GA_ADMIN.
  *
@@ -31,7 +38,8 @@ public class ExceptionCaseViewController {
     private final ExceptionCaseQueryMapper exceptionCaseQueryMapper;
 
     @GetMapping("/exceptions")
-    public String list(@RequestParam(required = false) String status, Model model) {
+    public String list(@ModelAttribute ExceptionCaseSearchDTO criteria, Model model) {
+        String status = criteria.getStatus();
         // defaultValue 는 빈 문자열(status= → "전체")까지 OPEN 으로 덮어쓰므로 쓰지 않는다 —
         // 파라미터가 아예 없을 때만 워크큐 기본값(미처리)으로 연다.
         if (status == null) {
@@ -46,10 +54,29 @@ public class ExceptionCaseViewController {
             status = ExceptionStatus.OPEN_FILTER;
             statuses = ExceptionStatus.dbStatuses(status);
         }
+        criteria.setStatus(status);
+        // 2026-08-19 yslee - 예외함 화면에 체크리스트 바로가기 검색조건 적용
+        // 기존 코드: 화면 컨트롤러가 status만 받고 validationRunId·severity·types를 무시
+        // 문제: 확정 실패 조건을 눌러도 해당 검증 실행과 예외 사유로 범위가 좁혀지지 않음
+        // 개선: 추가 조건이 있을 때 기존 검색 SQL의 동일 필터를 서버 렌더링 목록에 적용
+        List<ExceptionCaseListRow> cases = hasAdditionalCriteria(criteria)
+                ? exceptionCaseQueryMapper.findCasesByCriteria(criteria, statuses)
+                : exceptionCaseQueryMapper.findCases(statuses);
         model.addAttribute("statusFilter", status);
-        model.addAttribute("cases", exceptionCaseQueryMapper.findCases(statuses));
+        model.addAttribute("cases", cases);
+        model.addAttribute("searchCriteria", criteria);
         model.addAttribute("openCount", exceptionCaseQueryMapper.countByStatuses(
                 ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER)));
         return "exception/list";
+    }
+
+    private boolean hasAdditionalCriteria(ExceptionCaseSearchDTO criteria) {
+        return criteria.getType() != null
+                || criteria.getSeverity() != null
+                || criteria.getValidationRunId() != null
+                || criteria.getTypes() != null && !criteria.getTypes().isEmpty()
+                || criteria.getAssignee() != null
+                || criteria.isUnassignedOnly()
+                || criteria.getContractNo() != null && !criteria.getContractNo().isBlank();
     }
 }
