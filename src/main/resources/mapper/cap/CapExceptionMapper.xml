@@ -11,6 +11,7 @@
         (
             exception_key,
             exception_type,
+            reason_code,
             severity,
             status,
             validation_run_id,
@@ -26,6 +27,12 @@
             (
             #{exceptionKey},
             #{exceptionType},
+            <!-- SRC-032 D-05: 상세 원인은 배치 경로(ExceptionCaseMapper)와 같은 코드 체계를 쓴다 -->
+            CASE
+                WHEN #{exceptionType} = 'CAP_VIOLATION' THEN 'CAP_LIMIT_VIOLATION'
+                WHEN #{exceptionType} = 'CAP_WARNING' THEN 'CAP_LIMIT_WARNING'
+                ELSE #{exceptionType}
+            END,
             #{severity},
             'NEW',
             #{validationRunId},
@@ -42,6 +49,7 @@
             DO UPDATE
         SET
             exception_type = EXCLUDED.exception_type,
+            reason_code = EXCLUDED.reason_code,
             severity = EXCLUDED.severity,
             validation_run_id = COALESCE(EXCLUDED.validation_run_id, existing.validation_run_id),
             contract_id = EXCLUDED.contract_id,

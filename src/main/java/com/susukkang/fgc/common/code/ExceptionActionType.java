@@ -46,4 +46,21 @@ public enum ExceptionActionType {
             case FALSE_POSITIVE, REJECT -> ExceptionStatus.REJECTED;
         };
     }
+
+    /** 화면정의서 EXCP-W01의 "조치 유형" 코드-표기 매핑과 일치시킨다. */
+    public String label() {
+        return switch (this) {
+            case ASSIGN -> "담당 배정";
+            case START_REVIEW -> "검토 시작";
+            case CORRECT -> "정정";
+            case REDUCE -> "감액";
+            case CANCEL -> "취소";
+            case DEFER -> "이연";
+            case RECONCILE_AGAIN -> "재대사";
+            case FALSE_POSITIVE -> "오탐";
+            case RESOLVE -> "해결";
+            case REJECT -> "반려";
+            case COMMENT -> "의견";
+        };
+    }
 }
