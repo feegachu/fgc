@@ -1,6 +1,7 @@
 package com.susukkang.fgc.reconciliation.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunCommand;
@@ -164,6 +165,22 @@ class ReconciliationRunServiceImplTest {
                 });
 
         verify(reconciliationRunMapper, never()).insert(any());
+    }
+
+    @Test
+    void fgcFun044_rejectsFinalizedValidationRunBeforeInsert() {
+        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(true);
+        ValidationRunRow finalizedRun = validationRun(LocalDate.of(2026, 8, 1));
+        finalizedRun.setStatus(ValidationRunStatus.FINALIZED.name());
+        given(validationRunMapper.findById(17L)).willReturn(finalizedRun);
+
+        assertThatThrownBy(() -> service.create(command()))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_003));
+
+        verify(reconciliationRunMapper, never()).findByNaturalKey(any(), any(), any(), any());
+        verify(reconciliationRunMapper, never()).insert(any());
+        verify(executionRequestPort, never()).requestExecution(any());
     }
 
     private static CreateReconciliationRunCommand command() {
