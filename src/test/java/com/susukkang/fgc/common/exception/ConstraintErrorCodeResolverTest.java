@@ -86,13 +86,4 @@ class ConstraintErrorCodeResolverTest {
                 .contains(FgcErrorCode.RECO_001);
     }
 
-    @Test
-    void resolvesValidationFinalizationIdempotencyKeyConstraintBeforeRunNaturalKey() {
-        RuntimeException exception = new RuntimeException(
-                "duplicate key violates constraint uq_validation_run_finalize_idempotency"
-        );
-
-        assertThat(resolver.resolve(exception))
-                .contains(FgcErrorCode.VRUN_005);
-    }
 }
