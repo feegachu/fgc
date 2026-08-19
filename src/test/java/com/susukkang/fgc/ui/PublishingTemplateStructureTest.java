@@ -106,7 +106,7 @@ class PublishingTemplateStructureTest {
         assertThat(resource("templates/policy/list.html"))
                 .contains("class=\"page-header policy-page-header\"")
                 .contains("class=\"field policy-date-field\"")
-                .contains("class=\"guidance guidance-warning\"")
+                .doesNotContain("class=\"guidance")
                 .contains("class=\"tab-list\"")
                 .contains("class=\"surface tab-panel policy-tab-panel\"")
                 .contains("class=\"data-table-viewport policy-version-table-viewport\"")

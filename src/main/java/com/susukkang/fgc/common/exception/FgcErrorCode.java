@@ -123,6 +123,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.validationRun.stateConflict"
     ),
+    VRUN_006(
+            "FGC-VRUN-006",
+            HttpStatus.CONFLICT,
+            "error.validationRun.idempotencyKeyConflict"
+    ),
 
     LEDG_001(
             "FGC-LEDG-001",
@@ -137,8 +142,13 @@ public enum FgcErrorCode {
     //확인
     LEDG_003(
             "FGC-LEDG-003",
-            HttpStatus.CONFLICT,
+            HttpStatus.METHOD_NOT_ALLOWED,
             "error.ledger.reverseOnly"
+    ),
+    LEDG_004(
+            "FGC-LEDG-004",
+            HttpStatus.CONFLICT,
+            "error.ledger.correctionConflict"
     ),
 
     JOURNAL_001(

@@ -22,13 +22,13 @@ public enum PolicySourceClass {
         };
     }
 
-    /** POL-W01 출처분류 배지 — 화면정의서 색 기준: 규제 파랑·보험사 초록·회사 회색·가정 주황. */
+    /** POL-W01 출처분류 배지 — 공통 Status Badge 색 기준: 규제 파랑·보험사 초록·회사 회색·가정 주황. */
     public String badgeClass() {
         return switch (this) {
-            case REGULATORY -> "fgc-badge--src-regulatory";
-            case INSURER_RULE -> "fgc-badge--src-insurer";
-            case GA_POLICY -> "fgc-badge--src-ga";
-            case PROJECT_ASSUMPTION -> "fgc-badge--src-assumption";
+            case REGULATORY -> "status-badge-info";
+            case INSURER_RULE -> "status-badge-success";
+            case GA_POLICY -> "status-badge-neutral";
+            case PROJECT_ASSUMPTION -> "status-badge-warning";
         };
     }
 }

@@ -1,5 +1,6 @@
 package com.susukkang.fgc.reconciliation.service;
 
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
@@ -96,9 +97,20 @@ public class ReconciliationRunServiceImpl implements ReconciliationRunService {
             notFound("insurerId", command.insurerId());
         }
 
-        ValidationRunRow validationRun = validationRunMapper.findById(command.validationRunId());
+        ValidationRunRow validationRun = validationRunMapper.findByIdForUpdate(command.validationRunId());
         if (validationRun == null) {
             notFound("validationRunId", command.validationRunId());
+        }
+
+        // 2026-08-19 yslee - FGC-FUN-044 확정 실행의 하위 대사 실행 생성 사전 차단
+        // 기존 코드: 락 없는 상태 조회 후 FINALIZED 여부만 검사하고 DB 불변 트리거에 경합 처리를 위임
+        // 문제: 조회 직후 다른 요청이 확정하면 트리거의 P0001 예외가 공통 500으로 변환됨
+        // 개선: 검증 실행을 FOR UPDATE로 잠근 뒤 상태를 검사해 FGC-VRUN-003·409로 일관되게 응답
+        if (ValidationRunStatus.FINALIZED.name().equals(validationRun.getStatus())) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.VRUN_003,
+                    Map.of("id", command.validationRunId())
+            );
         }
 
         if (!command.settlementMonth().equals(validationRun.getValidationMonth())) {

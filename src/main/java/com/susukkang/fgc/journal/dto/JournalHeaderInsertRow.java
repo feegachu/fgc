@@ -27,6 +27,7 @@ public class JournalHeaderInsertRow {
     private Long validationRunId;
     private Long contractId;
     private Long policyVersionId;
+    private Long reversalOfId;
     private String correctionGroupKey;
     private String description;
     private Long createdBy;

@@ -23,14 +23,14 @@ public enum PolicyStatus {
         };
     }
 
-    /** POL-W01 상태 배지 (목업 fgc-seed 매핑 그대로). */
+    /** POL-W01 상태 배지 — 공통 Status Badge 의미 체계에 맞춘다. */
     public String badgeClass() {
         return switch (this) {
-            case DRAFT -> "fgc-badge--neutral";
-            case REVIEW -> "fgc-badge--progress";
-            case APPROVED -> "fgc-badge--warning";
-            case ACTIVE -> "fgc-badge--normal";
-            case RETIRED -> "fgc-badge--review";
+            case DRAFT -> "status-badge-neutral";
+            case REVIEW -> "status-badge-info";
+            case APPROVED -> "status-badge-warning";
+            case ACTIVE -> "status-badge-success";
+            case RETIRED -> "status-badge-neutral";
         };
     }
 }

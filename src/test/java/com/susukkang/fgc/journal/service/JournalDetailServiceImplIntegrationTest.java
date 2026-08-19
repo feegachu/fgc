@@ -50,6 +50,23 @@ class JournalDetailServiceImplIntegrationTest {
                 contractId, reversalOfId);
     }
 
+    private Long insertReversalHeader(String journalNo, Long contractId, Long originalId) {
+        String correctionGroupKey = "TEST-CORRECTION-" + originalId;
+        jdbcTemplate.update("""
+                INSERT INTO fgc.journal_correction_group
+                    (correction_group_key, original_journal_header_id, reason)
+                VALUES (?, ?, 'detail service integration test')
+                """, correctionGroupKey, originalId);
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.journal_header
+                    (journal_no, journal_date, journal_type, source_entity_type, source_entity_id,
+                     contract_id, reversal_of_id, correction_group_key, description)
+                VALUES (?, ?, 'REVERSAL', 'JOURNAL_HEADER', ?, ?, ?, ?, '역분개 조회 테스트')
+                RETURNING journal_header_id
+                """, Long.class, journalNo, LocalDate.of(2026, 8, 1), originalId.toString(),
+                contractId, originalId, correctionGroupKey);
+    }
+
     private void insertLine(Long headerId, int lineNo, String accountCode,
                              BigDecimal debit, BigDecimal credit) {
         jdbcTemplate.update("""
@@ -118,7 +135,10 @@ class JournalDetailServiceImplIntegrationTest {
     void reversalLinkIsExposedBidirectionally() {
         Long contractId = anyContractId();
         Long originalId = insertHeader("TEST-DETAIL-0003", "ADJUSTMENT", contractId, null);
-        Long reversalId = insertHeader("TEST-DETAIL-0004", "REVERSAL", contractId, originalId);
+        insertLine(originalId, 1, "EXPECTED_RECEIVABLE", new BigDecimal("10000.00"), BigDecimal.ZERO);
+        insertLine(originalId, 2, "EXPECTED_INCOME", BigDecimal.ZERO, new BigDecimal("10000.00"));
+        postJournal(originalId);
+        Long reversalId = insertReversalHeader("TEST-DETAIL-0004", contractId, originalId);
 
         JournalDetailResponse original = journalDetailService.findByJournalHeaderId(originalId);
         JournalDetailResponse reversal = journalDetailService.findByJournalHeaderId(reversalId);
@@ -154,7 +174,7 @@ class JournalDetailServiceImplIntegrationTest {
         insertLine(originalId, 2, "EXPECTED_INCOME", BigDecimal.ZERO, new BigDecimal("10000.00"));
         postJournal(originalId);
 
-        Long reversalId = insertHeader("TEST-DETAIL-0007", "REVERSAL", contractId, originalId);
+        Long reversalId = insertReversalHeader("TEST-DETAIL-0007", contractId, originalId);
         insertLine(reversalId, 1, "EXPECTED_RECEIVABLE", BigDecimal.ZERO, new BigDecimal("10000.00"));
         insertLine(reversalId, 2, "EXPECTED_INCOME", new BigDecimal("10000.00"), BigDecimal.ZERO);
         postJournal(reversalId);
