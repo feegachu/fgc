@@ -12,5 +12,15 @@ public enum ExceptionSeverity {
     INFO,       // 참고
     WARNING,    // 주의
     HIGH,       // 높음
-    CRITICAL    // 긴급
+    CRITICAL;   // 긴급
+
+    /** 인터페이스정의서 v2.0 부록(누락 정리 G)에서 화면 v2.0 신규 정의로 확정한 한글 라벨. */
+    public String label() {
+        return switch (this) {
+            case INFO -> "참고";
+            case WARNING -> "주의";
+            case HIGH -> "높음";
+            case CRITICAL -> "긴급";
+        };
+    }
 }
