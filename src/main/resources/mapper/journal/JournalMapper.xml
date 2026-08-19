@@ -11,11 +11,11 @@
         INSERT INTO fgc.journal_header
             (journal_no, journal_date, journal_type, source_entity_type, source_entity_id,
              revision_no, validation_run_id, contract_id, policy_version_id,
-             correction_group_key, description, created_by)
+             reversal_of_id, correction_group_key, description, created_by)
         VALUES
             (#{journalNo}, #{journalDate}, #{journalType}, #{sourceEntityType}, #{sourceEntityId},
              #{revisionNo}, #{validationRunId}, #{contractId}, #{policyVersionId},
-             #{correctionGroupKey}, #{description}, #{createdBy})
+             #{reversalOfId}, #{correctionGroupKey}, #{description}, #{createdBy})
     </insert>
 
     <insert id="insertLine" parameterType="com.susukkang.fgc.journal.dto.JournalLineInsertRow"
