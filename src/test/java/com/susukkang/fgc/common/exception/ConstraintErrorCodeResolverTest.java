@@ -59,7 +59,7 @@ class ConstraintErrorCodeResolverTest {
         );
 
         assertThat(resolver.resolve(exception))
-                .contains(FgcErrorCode.VRUN_005);
+                .contains(FgcErrorCode.VRUN_006);
     }
 
     // 2026-08-12 yslee - 대사 실행 중복과 결과 그룹 중복 오류 분리 회귀 테스트

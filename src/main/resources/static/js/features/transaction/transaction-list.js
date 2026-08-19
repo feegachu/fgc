@@ -1,5 +1,32 @@
+// 2026-08-19 yslee - 체크리스트에서 진입한 귀속 불균형 필터 상태 유지
+// 기존 코드: URL에서 읽은 attributionImbalanceOnly를 검색 폼 상태 재생성 시 누락
+// 문제: 사용자가 검색 조건을 제출하면 불균형 전용 필터가 해제되어 전체 지급 건이 표시됨
+// 개선: 검색 제출은 숨은 필터를 보존하고 명시적인 초기화에서만 해제하도록 상태 생성 분리
+function buildTransactionFilterState(fields, page, attributionImbalanceOnly) {
+  return {
+    settlementMonth: fields.month.value,
+    paymentStage: fields.stage.value,
+    insurerId: fields.insurer.value,
+    contractNo: fields.contractNo.value.trim(),
+    sourceType: fields.source.value,
+    agentId: fields.agent.value,
+    commissionItemId: fields.item.value,
+    status: fields.status.value,
+    noAttributionOnly: fields.noAttribution.checked,
+    attributionImbalanceOnly: attributionImbalanceOnly === true,
+    page: page,
+    size: 20
+  };
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { buildTransactionFilterState: buildTransactionFilterState };
+}
+
 (function () {
   "use strict";
+
+  if (typeof window === "undefined" || typeof document === "undefined") return;
 
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
   var form = document.querySelector("[data-transaction-filter-form]");
@@ -42,7 +69,7 @@
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
-    state = stateFromFields(1);
+    state = stateFromFields(1, state.attributionImbalanceOnly);
     updateUrl();
     load();
   });
@@ -50,7 +77,7 @@
     event.preventDefault();
     form.reset();
     fields.month.value = initialMonth;
-    state = stateFromFields(1);
+    state = stateFromFields(1, false);
     updateUrl();
     load();
   });
@@ -86,20 +113,8 @@
     fields.noAttribution.checked = state.noAttributionOnly;
   }
 
-  function stateFromFields(page) {
-    return {
-      settlementMonth: fields.month.value,
-      paymentStage: fields.stage.value,
-      insurerId: fields.insurer.value,
-      contractNo: fields.contractNo.value.trim(),
-      sourceType: fields.source.value,
-      agentId: fields.agent.value,
-      commissionItemId: fields.item.value,
-      status: fields.status.value,
-      noAttributionOnly: fields.noAttribution.checked,
-      page: page,
-      size: 20
-    };
+  function stateFromFields(page, attributionImbalanceOnly) {
+    return buildTransactionFilterState(fields, page, attributionImbalanceOnly);
   }
 
   function load() {
