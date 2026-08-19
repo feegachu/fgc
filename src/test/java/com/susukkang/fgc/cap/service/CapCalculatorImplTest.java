@@ -123,6 +123,17 @@ class CapCalculatorImplTest {
         return s;
     }
 
+    private CapRuleItemView excludedEvidenceRequiredItem(Long commissionItemId, String code) {
+        CapRuleItemView item = new CapRuleItemView();
+        item.setCommissionItemId(commissionItemId);
+        item.setItemCode(code);
+        item.setInclusionStatus("EXCLUDED");
+        item.setExclusionType("NEWCOMER_SUPPORT");
+        item.setEvidenceRequiredYn(true);
+        item.setDecisionReason("증빙된 신인활동지원비 제외");
+        return item;
+    }
+
     // 월납 100,000원 일반 샘플의 기본 한도는 1,200,000원이다
     @Test
     void basicLimitIsMonthlyPremiumTimesTwelveForGeneralSample() {
@@ -299,6 +310,47 @@ class CapCalculatorImplTest {
         assertThat(result.remainingAmount()).isEqualByComparingTo("-50000");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
         assertThat(result.details()).hasSize(2);
+    }
+
+    @Test
+    void requiresReviewInsteadOfExcludingWhenEvidenceRequiredItemHasNoEvidence() {
+        when(capContractMapper.findById(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
+        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "NONE"));
+        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID))
+                .thenReturn(List.of(excludedEvidenceRequiredItem(2L, "NEWCOMER_SUPPORT")));
+        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+                .thenReturn(List.of(scheduleLine(12L, 2L, 1, "500000")));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
+        assertThat(result.includedAmount()).isEqualByComparingTo("0");
+        assertThat(result.details().get(0).classification()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(result.details().get(0).evidenceRef()).isNull();
+    }
+
+    @Test
+    void keepsExcludedStatusAndSnapshotsEvidenceWhenEvidenceRequiredItemIsLinked() {
+        when(capContractMapper.findById(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
+        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "NONE"));
+        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID))
+                .thenReturn(List.of(excludedEvidenceRequiredItem(2L, "NEWCOMER_SUPPORT")));
+        ScheduleAmountView line = scheduleLine(12L, 2L, 1, "500000");
+        line.setEvidenceRef("EVD-2026-001");
+        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+                .thenReturn(List.of(line));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
+        assertThat(result.details().get(0).classification()).isEqualTo("EXCLUDED");
+        assertThat(result.details().get(0).evidenceRef()).isEqualTo("EVD-2026-001");
     }
 
     // 룰셋에 없는 항목이나 환급률표 미존재는 REVIEW_REQUIRED다
