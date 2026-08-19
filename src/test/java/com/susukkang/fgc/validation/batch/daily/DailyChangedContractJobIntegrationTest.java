@@ -92,9 +92,19 @@ class DailyChangedContractJobIntegrationTest {
     // MonthlyValidationJobIntegrationTest와 같은 이유로 매번 새 JobInstance가 되도록 requestId를
     // 무작위로 바꾼다. validationMonth는 CreateDailyRunTasklet이 실제로 쓰지 않는 필드지만
     // MonthlyValidationJobParameters 파싱 규칙(yyyy-MM, STRICT)은 통과해야 한다.
+    //
+    // 이 값은 고정 문자열("2031-03")이었다가 매번 무작위로 바꾸도록 고쳤다 — changedContractStep이
+    // 실제로 성공하면(2026-08-19 트랜잭션 격리 수정 이후) 그 validation_run에 append-only 자식
+    // 행(exception_occurrence 등)이 남을 수 있어 cleanUp()이 그 행을 못 지우고 남겨 두는데,
+    // 고정 월을 계속 재사용하면 다음 실행이 uq_validation_run(validation_month, run_no)에 걸리고
+    // (해당 실행뿐 아니라 같은 월·회차를 쓰는 다른 통합테스트와도 충돌할 수 있다 — CI에서
+    // ValidationRunDetailMapperIntegrationTest와 실제로 충돌 재현됨) 무작위 월을 쓰면 이 문제를
+    // 피한다.
     private JobParameters jobParameters(String requestId) {
+        int year = 2040 + ThreadLocalRandom.current().nextInt(60);
+        int month = 1 + ThreadLocalRandom.current().nextInt(12);
         return new JobParametersBuilder()
-                .addString("validationMonth", "2031-03")
+                .addString("validationMonth", String.format("%04d-%02d", year, month))
                 .addLong("runNo", 1L)
                 .addString("runType", "MANUAL_CONTRACT")
                 .addLong("triggeredBy", 3L)
