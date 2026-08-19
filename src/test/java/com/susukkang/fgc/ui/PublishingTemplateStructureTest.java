@@ -85,7 +85,19 @@ class PublishingTemplateStructureTest {
         assertThat(resource("templates/exception/list.html"))
                 .contains("정상 건은 여기 오지 않습니다. 여기 있는 건 전부 사람이 봐야 합니다.");
         assertThat(resource("templates/ledger/list.html"))
-                .contains("이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.");
+                .contains("이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.")
+                .contains("data-modal=\"journal-reverse\"")
+                .contains("id=\"journal-reverse-reason\"")
+                .contains("data-can-reverse=${roleCode == 'SETTLEMENT' or roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                .doesNotContain("데이터 렌더링은 IF-API 연동 시 추가");
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/js/features/ledger/ledger.js");
+        assertThat(resource("static/js/features/ledger/ledger.js"))
+                .contains("/api/v1/journals?")
+                .contains("/reverse\"")
+                .contains("detail.status === \"POSTED\"")
+                .contains("evidenceRef: reverseEvidence.value.trim() || null")
+                .doesNotContain("fetch(");
     }
 
     @Test

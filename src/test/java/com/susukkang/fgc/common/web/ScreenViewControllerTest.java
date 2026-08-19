@@ -204,6 +204,20 @@ class ScreenViewControllerTest {
                 .andExpect(content().string(visible ? marker : org.hamcrest.Matchers.not(marker)));
     }
 
+    @ParameterizedTest(name = "{0} LEDG-W01 역분개 가능={1}")
+    @CsvSource({
+            "SETTLEMENT,   true",
+            "GA_ADMIN,     true",
+            "SYSTEM_ADMIN, true",
+            "COMPLIANCE,   false",
+    })
+    void journal_reverse_capability_matches_api_roles(String role, boolean allowed) throws Exception {
+        mvc.perform(get("/journals").with(user(userFor(role))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-can-reverse=\"" + allowed + "\"")));
+    }
+
     /**
      * FGC-FUN-002 — GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다(§4-1 "정책·조직 조회, 검증 실행 확정").
      * readOnly 만 보던 시절 GA_ADMIN 에게 처리 버튼이 활성이던 회귀를 막는다 — 대표로
