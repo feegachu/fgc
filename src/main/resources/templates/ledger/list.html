@@ -14,7 +14,7 @@
    · 차변≠대변인 상태로 기표(POSTED) 전환
    · 한 줄에 차변·대변을 동시에 적기 — DB CHECK 가 막습니다
 
-  목록·상세는 IF-API-34/35, 역분개는 IF-API-36을 Ajax로 연결한다.
+  목록은 IF-API-34 MPA, 상세·역분개·불균형 확인은 IF-API-35/36/37 Ajax로 연결한다.
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-LEDG-W01', '검증원장 조회', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
@@ -58,43 +58,49 @@
 
   <!-- ① 검색 -->
   <section class="fgc-card" style="margin-top:16px">
-    <form class="fgc-card__body fgc-toolbar" id="ledger-filter-form">
+    <form class="fgc-card__body fgc-toolbar" id="ledger-filter-form" method="get" th:action="@{/journals}">
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-from">분개일 (시작)</label>
-        <input class="fgc-input" id="f-from" type="date" th:value="${month} + '-01'" value="2026-07-01">
+        <input class="fgc-input" id="f-from" name="from" type="date"
+               th:value="${fromFilter ?: month + '-01'}" value="2026-07-01">
       </div>
       <div class="fgc-field" style="min-width:130px">
         <label class="fgc-label" for="f-to">분개일 (끝)</label>
-        <input class="fgc-input" id="f-to" type="date" th:value="${T(java.time.YearMonth).parse(month).atEndOfMonth()}" value="2026-07-31">
+        <input class="fgc-input" id="f-to" name="to" type="date"
+               th:value="${toFilter ?: T(java.time.YearMonth).parse(month).atEndOfMonth()}" value="2026-07-31">
       </div>
       <div class="fgc-field" style="min-width:220px">
         <label class="fgc-label" for="f-type">분개 유형</label>
         <select class="fgc-select" id="f-type" name="type">
-          <option value="">전체</option>
-          <option th:each="type : ${journalTypes}" th:value="${type.name()}" th:text="${type.label()}"></option>
+          <option value="" th:selected="${typeFilter == null}">전체</option>
+          <option th:each="type : ${journalTypes}" th:value="${type.name()}" th:text="${type.label()}"
+                  th:selected="${type.name() == typeFilter}"></option>
         </select>
       </div>
       <div class="fgc-field" style="min-width:150px">
         <label class="fgc-label" for="f-account">계정과목</label>
-        <input class="fgc-input" id="f-account" name="account" type="text" placeholder="계정코드">
+        <input class="fgc-input" id="f-account" name="account" type="text" placeholder="계정코드"
+               th:value="${accountFilter}">
       </div>
       <div class="fgc-field" style="min-width:120px">
         <label class="fgc-label" for="f-contract">계약 ID</label>
-        <input class="fgc-input" id="f-contract" name="contract" type="number" min="1" inputmode="numeric">
+        <input class="fgc-input" id="f-contract" name="contract" type="number" min="1" inputmode="numeric"
+               th:value="${contractFilter}">
       </div>
       <div class="fgc-field" style="min-width:120px">
         <label class="fgc-label" for="f-status">상태</label>
         <select class="fgc-select" id="f-status" name="status">
-          <option value="">전체</option>
-          <option th:each="status : ${journalStatuses}" th:value="${status.name()}" th:text="${status.label()}"></option>
+          <option value="" th:selected="${statusFilter == null}">전체</option>
+          <option th:each="status : ${journalStatuses}" th:value="${status.name()}" th:text="${status.label()}"
+                  th:selected="${status.name() == statusFilter}"></option>
         </select>
       </div>
-      <button class="fgc-btn fgc-btn--primary" id="f-search" type="submit">
+      <button class="fgc-btn fgc-btn--primary" id="f-search" name="searched" value="true" type="submit">
         <span class="material-symbols-outlined" style="font-size:18px">search</span> 조회
       </button>
-      <button class="fgc-btn fgc-btn--ghost" id="f-reset" type="button">
+      <a class="fgc-btn fgc-btn--ghost" id="f-reset" th:href="@{/journals}">
         <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
-      </button>
+      </a>
     </form>
   </section>
 
@@ -104,7 +110,7 @@
     <section class="fgc-card">
       <div class="fgc-card__head">
         <span class="fgc-card__title">분개 목록</span>
-        <span class="fgc-muted" style="font-size:12px"><span id="row-count">0</span>건 · 한 화면 20행</span>
+        <span class="fgc-muted" style="font-size:12px"><span id="row-count" th:text="${journals.totalElements}">0</span>건 · 한 화면 20행</span>
       </div>
       <div style="overflow-x:auto">
         <table class="fgc-table">
@@ -113,21 +119,52 @@
               <th style="width:126px">분개번호</th>
               <th style="width:92px">분개일</th>
               <th style="width:170px">유형</th>
+              <th style="width:170px">원천</th>
               <th style="width:66px">계약</th>
               <th class="fgc-th-num" style="width:104px">차변 합계</th>
               <th class="fgc-th-num" style="width:104px">대변 합계</th>
               <th style="width:88px">상태</th>
+              <th style="width:126px">역분개 표시</th>
             </tr>
           </thead>
           <tbody id="list-body">
-            <tr><td colspan="7"><div class="fgc-empty">분개 목록을 불러오는 중입니다.</div></td></tr>
+            <tr th:if="${!searched}">
+              <td colspan="9"><div class="fgc-empty">조회 조건을 설정하고 조회 버튼을 눌러 주세요.</div></td>
+            </tr>
+            <tr th:if="${searched and journals.content.empty}">
+              <td colspan="9"><div class="fgc-empty">조건에 맞는 자료가 없습니다.</div></td>
+            </tr>
+            <tr th:each="journal : ${journals.content}" tabindex="0"
+                th:data-journal-id="${journal.journalHeaderId}">
+              <td class="fgc-mono" th:text="${journal.journalNo}">JRN-001</td>
+              <td th:text="${journal.journalDate}">2026-07-31</td>
+              <td th:text="${journal.journalTypeLabel}">실제 지급</td>
+              <td class="fgc-mono"
+                  th:text="${journal.sourceEntityType + ' #' + journal.sourceEntityId}">COMMISSION_TRANSACTION #1</td>
+              <td class="fgc-mono" th:text="${journal.contractNo ?: journal.contractId}">C-001</td>
+              <td class="fgc-td-num"
+                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-error'"
+                  th:text="${#numbers.formatDecimal(journal.debitTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
+              <td class="fgc-td-num"
+                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-error'"
+                  th:text="${#numbers.formatDecimal(journal.creditTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
+              <td><span class="fgc-badge" th:text="${journal.statusLabel}">기표</span></td>
+              <td>
+                <span class="fgc-badge fgc-badge--review" th:if="${journal.reversalOfJournalNo != null}"
+                      th:text="${'원분개 ' + journal.reversalOfJournalNo}">원분개 JRN-001</span>
+                <span th:unless="${journal.reversalOfJournalNo != null}">—</span>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
       <footer class="fgc-pagination" id="ledger-pagination" style="padding:10px 16px;display:flex;justify-content:flex-end;gap:8px">
-        <button class="fgc-btn fgc-btn--ghost" id="ledger-prev" type="button">이전</button>
-        <span id="ledger-page-info" class="fgc-muted" style="align-self:center">1 / 1</span>
-        <button class="fgc-btn fgc-btn--ghost" id="ledger-next" type="button">다음</button>
+        <a class="fgc-btn fgc-btn--ghost" id="ledger-prev" th:if="${journals.page > 1}"
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page - 1})}">이전</a>
+        <span id="ledger-page-info" class="fgc-muted" style="align-self:center"
+              th:text="${journals.page + ' / ' + (journals.totalPages > 0 ? journals.totalPages : 1)}">1 / 1</span>
+        <a class="fgc-btn fgc-btn--ghost" id="ledger-next" th:if="${journals.page < journals.totalPages}"
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page + 1})}">다음</a>
       </footer>
     </section>
 

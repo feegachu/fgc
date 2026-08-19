@@ -113,10 +113,11 @@ class PublishingTemplateStructureTest {
         assertThat(resource("templates/layout/default.html"))
                 .contains("/js/features/ledger/ledger.js");
         assertThat(resource("static/js/features/ledger/ledger.js"))
-                .contains("/api/v1/journals?")
+                .contains("/api/v1/journals/imbalances?validationRunId=")
                 .contains("/reverse\"")
                 .contains("detail.status === \"POSTED\"")
                 .contains("evidenceRef: reverseEvidence.value.trim() || null")
+                .doesNotContain("apiClient.request(\"/api/v1/journals?\"")
                 .doesNotContain("fetch(");
     }
 
@@ -124,12 +125,14 @@ class PublishingTemplateStructureTest {
     void ledgerSearchRunsOnlyWhenFilterFormIsSubmitted() throws IOException {
         assertThat(resource("templates/ledger/list.html"))
                 .contains("id=\"ledger-filter-form\"")
-                .contains("id=\"f-search\" type=\"submit\"");
+                .contains("method=\"get\" th:action=\"@{/journals}\"")
+                .contains("id=\"f-search\" name=\"searched\" value=\"true\" type=\"submit\"")
+                .contains("th:each=\"journal : ${journals.content}\"")
+                .contains("조회 조건을 설정하고 조회 버튼을 눌러 주세요.");
         assertThat(resource("static/js/features/ledger/ledger.js"))
-                .contains("form.addEventListener(\"submit\"")
-                .contains("apiClient.request(\"/api/v1/journals?\" + query(page))")
-                .contains("renderEmpty(\"조회 조건을 설정하고 조회 버튼을 눌러 주세요.\");")
-                .doesNotContain("\n  loadList(1);\n})();");
+                .doesNotContain("form.addEventListener(\"submit\"")
+                .doesNotContain("function loadList(")
+                .doesNotContain("function query(");
     }
 
     @Test

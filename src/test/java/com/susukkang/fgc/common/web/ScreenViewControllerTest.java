@@ -65,7 +65,6 @@ class ScreenViewControllerTest {
             "/schedules/1,         FGC-UI-SCHE-W02",
             "/cap-checks,          FGC-UI-CAP-W01",
             "/arbitrage-checks,    FGC-UI-ARB-W01",
-            "/journals,            FGC-UI-LEDG-W01",
     })
     void screen_renders_with_its_id(String route, String screenId) throws Exception {
         mvc.perform(get(route).with(user(settleUser())))
@@ -202,20 +201,6 @@ class ScreenViewControllerTest {
         var marker = org.hamcrest.Matchers.containsString("data-fgc-action=\"create\"");
         mvc.perform(get(route).with(user(userFor(role))))
                 .andExpect(content().string(visible ? marker : org.hamcrest.Matchers.not(marker)));
-    }
-
-    @ParameterizedTest(name = "{0} LEDG-W01 역분개 가능={1}")
-    @CsvSource({
-            "SETTLEMENT,   true",
-            "GA_ADMIN,     true",
-            "SYSTEM_ADMIN, true",
-            "COMPLIANCE,   false",
-    })
-    void journal_reverse_capability_matches_api_roles(String role, boolean allowed) throws Exception {
-        mvc.perform(get("/journals").with(user(userFor(role))))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "data-can-reverse=\"" + allowed + "\"")));
     }
 
     /**

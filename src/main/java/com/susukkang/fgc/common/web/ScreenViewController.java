@@ -1,8 +1,6 @@
 package com.susukkang.fgc.common.web;
 
-import com.susukkang.fgc.common.code.JournalHeaderStatus;
 import com.susukkang.fgc.common.security.Roles;
-import com.susukkang.fgc.journal.domain.JournalType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -65,18 +63,8 @@ public class ScreenViewController {
         return "arbitrage/list";
     }
 
-    @GetMapping("/journals")
-    public String journalList(Model model) {
-        // 2026-08-19 yslee - LEDG-W01 검색 선택지를 도메인 enum에서 제공
-        // 기존 코드: 화면에 비어 있는 select만 있어 분개유형·상태 검색을 사용할 수 없음
-        // 문제: 프론트에 enum 값을 하드코딩하면 서버 도메인과 변경 시점이 어긋남
-        // 개선: 서버 도메인 값을 모델로 전달해 IF-API-34 검색조건과 같은 값을 사용
-        model.addAttribute("journalTypes", JournalType.values());
-        model.addAttribute("journalStatuses", JournalHeaderStatus.values());
-        return "ledger/list";
-    }
-
     // AUDT-W01(/audit-logs)은 데이터 바인딩과 함께 audit.controller.AuditLogViewController 로,
     // VRUN-W01/W02(/validation-runs)는 validation.controller.ValidationRunViewController 로,
-    // RECO-W01(/reconciliations)은 reconciliation.controller.ReconciliationViewController 로 이관했다.
+    // RECO-W01(/reconciliations)은 reconciliation.controller.ReconciliationViewController 로,
+    // LEDG-W01(/journals)은 journal.controller.JournalViewController 로 이관했다.
 }

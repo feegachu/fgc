@@ -1,8 +1,9 @@
 /**
  * FGC-UI-LEDG-W01 검증원장 목록·상세·역분개 (FUN-046·047)
- * GET  /api/v1/journals                         (IF-API-34)
+ * GET  /journals                                (IF-API-34 · MPA)
  * GET  /api/v1/journals/{id}                    (IF-API-35)
  * POST /api/v1/journals/{id}/reverse            (IF-API-36)
+ * GET  /api/v1/journals/imbalances              (IF-API-37)
  */
 (function () {
   "use strict";
@@ -11,22 +12,19 @@
   var root = document.querySelector(".publishing-page-ledger");
   if (!apiClient || !root) return;
 
-  var form = document.getElementById("ledger-filter-form");
   var listBody = document.getElementById("list-body");
   var detailBody = document.getElementById("detail-body");
   var detailBadge = document.getElementById("detail-badge");
-  var rowCount = document.getElementById("row-count");
-  var previousButton = document.getElementById("ledger-prev");
-  var nextButton = document.getElementById("ledger-next");
-  var pageInfo = document.getElementById("ledger-page-info");
-  var resetButton = document.getElementById("f-reset");
+  var imbalanceBanner = document.getElementById("imbalance-banner");
+  var imbalanceText = document.getElementById("imbalance-text");
+  var balanceBanner = document.getElementById("balance-banner");
   var reverseTarget = document.getElementById("journal-reverse-target");
   var reverseReason = document.getElementById("journal-reverse-reason");
   var reverseEvidence = document.getElementById("journal-reverse-evidence");
   var reverseReasonError = document.getElementById("journal-reverse-reason-error");
   var reverseSubmit = document.getElementById("journal-reverse-submit");
   var canReverse = root.dataset.canReverse === "true";
-  var state = { page: 1, totalPages: 1, selectedId: null, selected: null, pending: false };
+  var state = { selectedId: null, selected: null, pending: false };
 
   function text(value) {
     return value === null || value === undefined || value === "" ? "—" : String(value);
@@ -52,73 +50,6 @@
     if (status === "POSTED") return "fgc-badge--normal";
     if (status === "REVERSED") return "fgc-badge--review";
     return "fgc-badge--neutral";
-  }
-
-  function query(page) {
-    var params = new URLSearchParams();
-    ["from", "to"].forEach(function (name) {
-      var value = document.getElementById("f-" + name).value;
-      if (value) params.set(name, value);
-    });
-    [["type", "f-type"], ["account", "f-account"], ["contract", "f-contract"], ["status", "f-status"]]
-      .forEach(function (entry) {
-        var value = document.getElementById(entry[1]).value.trim();
-        if (value) params.set(entry[0], value);
-      });
-    params.set("page", String(page));
-    params.set("size", "20");
-    return params.toString();
-  }
-
-  function renderEmpty(message) {
-    listBody.replaceChildren();
-    var row = document.createElement("tr");
-    var td = document.createElement("td");
-    td.colSpan = 7;
-    td.appendChild(element("div", "fgc-empty", message));
-    row.appendChild(td);
-    listBody.appendChild(row);
-  }
-
-  function renderRows(content) {
-    listBody.replaceChildren();
-    if (!content.length) {
-      renderEmpty("조건에 맞는 자료가 없습니다.");
-      return;
-    }
-    content.forEach(function (journal) {
-      var row = document.createElement("tr");
-      row.tabIndex = 0;
-      row.dataset.journalId = journal.journalHeaderId;
-      row.classList.toggle("is-selected", String(journal.journalHeaderId) === String(state.selectedId));
-      row.appendChild(cell(text(journal.journalNo), "fgc-mono"));
-      row.appendChild(cell(text(journal.journalDate)));
-      row.appendChild(cell(text(journal.journalTypeLabel)));
-      row.appendChild(cell(text(journal.contractNo || journal.contractId), "fgc-mono"));
-      row.appendChild(cell(won(journal.debitTotal), "fgc-td-num"));
-      row.appendChild(cell(won(journal.creditTotal), "fgc-td-num"));
-      var statusCell = document.createElement("td");
-      statusCell.appendChild(element("span", "fgc-badge " + statusTone(journal.status), journal.statusLabel));
-      row.appendChild(statusCell);
-      listBody.appendChild(row);
-    });
-  }
-
-  function loadList(page) {
-    renderEmpty("분개 목록을 불러오는 중입니다.");
-    return apiClient.request("/api/v1/journals?" + query(page))
-      .then(function (envelope) {
-        var data = envelope.data;
-        state.page = data.page;
-        state.totalPages = Math.max(data.totalPages, 1);
-        rowCount.textContent = data.totalElements;
-        pageInfo.textContent = state.page + " / " + state.totalPages;
-        previousButton.disabled = state.page <= 1;
-        nextButton.disabled = state.page >= state.totalPages;
-        renderRows(data.content || []);
-      }).catch(function (error) {
-        renderEmpty(error && error.message ? error.message : "분개 목록을 불러오지 못했습니다.");
-      });
   }
 
   function appendKeyValue(container, label, value) {
@@ -160,6 +91,46 @@
       && !detail.reversedByJournalHeaderId;
   }
 
+  function showBalanceResult(totalCount) {
+    var hasImbalance = Number(totalCount) > 0;
+    imbalanceBanner.hidden = !hasImbalance;
+    imbalanceText.textContent = hasImbalance
+      ? "이 검증 실행에 차변·대변이 맞지 않는 분개가 " + totalCount + "건 있습니다."
+      : "";
+    balanceBanner.hidden = hasImbalance;
+    if (!hasImbalance) {
+      balanceBanner.className = "fgc-banner fgc-banner--success";
+      balanceBanner.querySelector("span:last-child").textContent =
+        "선택한 분개의 검증 실행은 원장 불균형이 0건입니다.";
+    }
+  }
+
+  // 2026-08-19 yslee - 상세 분개의 검증실행 기준 불균형 배너를 IF-API-37과 연동
+  // 기존 코드: 배너 요소와 연동 주석만 있고 항상 hidden 상태로 남아 있었음
+  // 문제: 사용자가 POSTED 전 필수 조건인 원장 불균형 0건 여부를 화면에서 확인할 수 없음
+  // 개선: 상세의 validationRunId로 불균형 뷰를 조회해 오류 건수와 0건 결과를 구분 표시
+  function loadImbalance(validationRunId) {
+    imbalanceBanner.hidden = true;
+    balanceBanner.hidden = false;
+    balanceBanner.className = "fgc-banner fgc-banner--muted";
+    balanceBanner.querySelector("span:last-child").textContent = validationRunId
+      ? "원장 불균형 여부를 확인하는 중입니다."
+      : "이 분개에는 연결된 검증 실행이 없어 실행 단위 불균형을 조회할 수 없습니다.";
+    if (!validationRunId) return Promise.resolve();
+
+    return apiClient.request("/api/v1/journals/imbalances?validationRunId="
+      + encodeURIComponent(validationRunId))
+      .then(function (envelope) {
+        showBalanceResult(envelope.data.totalCount);
+      }).catch(function () {
+        imbalanceBanner.hidden = true;
+        balanceBanner.hidden = false;
+        balanceBanner.className = "fgc-banner fgc-banner--muted";
+        balanceBanner.querySelector("span:last-child").textContent =
+          "원장 불균형 결과를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.";
+      });
+  }
+
   function renderDetail(detail) {
     state.selected = detail;
     detailBody.replaceChildren();
@@ -190,6 +161,7 @@
       actions.appendChild(element("p", "fgc-muted", "POSTED 원분개만 역분개할 수 있습니다."));
     }
     detailBody.appendChild(actions);
+    loadImbalance(detail.validationRunId);
   }
 
   function loadDetail(journalId) {
@@ -239,7 +211,8 @@
       var result = envelope.data;
       window.FgcUi.modal.close("journal-reverse");
       if (window.FgcUi.toast) window.FgcUi.toast("역분개 " + result.journalHeaderId + "을 생성했습니다.", "success");
-      return loadList(state.page).then(function () { return loadDetail(result.journalHeaderId); });
+      window.location.reload();
+      return result;
     }).catch(function (error) {
       if (window.FgcUi.toast) window.FgcUi.toast(error && error.message
         ? error.message : "역분개 생성에 실패했습니다.", "error");
@@ -250,22 +223,6 @@
     });
   }
 
-  // 2026-08-19 yslee - 검증원장 조건 조회를 명시적 조회 버튼 방식으로 변경
-  // 기존 코드: 페이지 진입 즉시 전체 원장을 조회하고 폼 제출 시 조건 조회를 실행
-  // 문제: 사용자가 조회 조건을 확정하기 전에 전체 원장 조회 요청이 발생함
-  // 개선: 초기 자동 조회를 제거하고 조회 버튼으로 제출한 조건만 1페이지부터 조회
-  form.addEventListener("submit", function (event) {
-    event.preventDefault();
-    state.selectedId = null;
-    loadList(1);
-  });
-  resetButton.addEventListener("click", function () {
-    form.reset();
-    state.selectedId = null;
-    loadList(1);
-  });
-  previousButton.addEventListener("click", function () { if (state.page > 1) loadList(state.page - 1); });
-  nextButton.addEventListener("click", function () { if (state.page < state.totalPages) loadList(state.page + 1); });
   listBody.addEventListener("click", function (event) {
     var row = event.target.closest("tr[data-journal-id]");
     if (row) loadDetail(row.dataset.journalId);
@@ -283,5 +240,4 @@
   reverseReason.addEventListener("input", function () { reverseReasonError.hidden = Boolean(reverseReason.value.trim()); });
   reverseSubmit.addEventListener("click", submitReverse);
 
-  renderEmpty("조회 조건을 설정하고 조회 버튼을 눌러 주세요.");
 })();
