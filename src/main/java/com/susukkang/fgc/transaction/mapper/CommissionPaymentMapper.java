@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.mapper;
 
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
 import com.susukkang.fgc.transaction.domain.CapRuleSnapshot;
@@ -96,6 +97,15 @@ public interface CommissionPaymentMapper {
     CapRuleSnapshot findCapRuleSnapshot(
             @Param("paymentId") Long paymentId,
             @Param("transactionAttributionId") Long transactionAttributionId
+    );
+
+    /** 계약·단계·항목·귀속월이 일치하는 활성 운영 스케줄 행을 돌려준다. */
+    List<Long> findOperationalScheduleLineIds(
+            @Param("contractId") Long contractId,
+            @Param("paymentStage") PaymentStage paymentStage,
+            @Param("commissionItemId") Long commissionItemId,
+            @Param("attributionMonthStart") LocalDate attributionMonthStart,
+            @Param("nextAttributionMonthStart") LocalDate nextAttributionMonthStart
     );
 
     /**

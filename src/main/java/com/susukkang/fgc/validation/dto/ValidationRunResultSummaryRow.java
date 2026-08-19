@@ -38,4 +38,10 @@ public class ValidationRunResultSummaryRow {
     private long reconciliationMismatchedCount;
     private long reconciliationUnmatchedCount;
     private BigDecimal reconciliationDifferenceAmountTotal;
+    private long exceptionDetectedCount;
+    private long exceptionNewCount;
+    private long exceptionRecurringCount;
+    private long exceptionReopenedCount;
+    private long exceptionNotDetectedCount;
+    private long exceptionOpenWorkItemCount;
 }

@@ -74,6 +74,15 @@ class MonthlyValidationJobIntegrationTest {
     @AfterEach
     void cleanUp() {
         createdValidationRunIds.forEach(id -> {
+            jdbcTemplate.execute(
+                    "ALTER TABLE fgc.exception_occurrence DISABLE TRIGGER trg_exception_occurrence_append_only");
+            try {
+                jdbcTemplate.update(
+                        "DELETE FROM fgc.exception_occurrence WHERE validation_run_id = ?", id);
+            } finally {
+                jdbcTemplate.execute(
+                        "ALTER TABLE fgc.exception_occurrence ENABLE TRIGGER trg_exception_occurrence_append_only");
+            }
             jdbcTemplate.update("""
                     DELETE FROM fgc.exception_action
                      WHERE exception_case_id IN (

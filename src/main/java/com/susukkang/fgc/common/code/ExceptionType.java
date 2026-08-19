@@ -20,5 +20,24 @@ public enum ExceptionType {
     POLICY_DUPLICATE,            // 적용 가능한 정책 중복
     ALLOCATION_EVIDENCE_MISSING, // 배부 근거 누락
     DATA_QUALITY,                // 데이터 품질 오류
-    OTHER                        // 기타 예외
+    OTHER;                       // 기타 예외
+
+    /** 화면정의서 EXCP-W01의 "예외 유형 13종" 코드-표기 매핑과 일치시킨다. */
+    public String label() {
+        return switch (this) {
+            case CAP_WARNING -> "1,200% 주의";
+            case CAP_VIOLATION -> "1,200% 위반";
+            case CAP_REVIEW_REQUIRED -> "1,200% 검토필요";
+            case RECONCILIATION_MISMATCH -> "대사 불일치";
+            case JOURNAL_IMBALANCE -> "원장 불균형";
+            case ARBITRAGE_CANDIDATE -> "차익거래 검토대상";
+            case REFUND_TABLE_MISSING -> "환급률표 없음";
+            case PRODUCT_CODE_MISMATCH -> "상품코드 불일치";
+            case POLICY_MISSING -> "정책 없음";
+            case POLICY_DUPLICATE -> "정책 중복";
+            case ALLOCATION_EVIDENCE_MISSING -> "배부 근거 없음";
+            case DATA_QUALITY -> "데이터 품질";
+            case OTHER -> "기타";
+        };
+    }
 }

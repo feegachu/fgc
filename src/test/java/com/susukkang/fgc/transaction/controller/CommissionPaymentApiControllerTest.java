@@ -13,8 +13,10 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionResponse;
+import com.susukkang.fgc.transaction.dto.CommissionPaymentSearchCondition;
 import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -71,6 +74,24 @@ class CommissionPaymentApiControllerTest {
 
     @MockitoBean
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
+
+    @Test
+    void bindsAttributionImbalanceFilterFromFinalizeChecklistLink() throws Exception {
+        given(commissionPaymentService.search(any(CommissionPaymentSearchCondition.class), eq(1), eq(20)))
+                .willReturn(PageResponse.of(List.of(), 1, 20, 0, "settlementMonth,desc"));
+
+        mockMvc.perform(get("/api/v1/transactions")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .param("settlementMonth", "2026-08")
+                        .param("attributionImbalanceOnly", "true"))
+                .andExpect(status().isOk());
+
+        verify(commissionPaymentService).search(
+                org.mockito.ArgumentMatchers.argThat(condition ->
+                        "2026-08".equals(condition.getSettlementMonth())
+                                && Boolean.TRUE.equals(condition.getAttributionImbalanceOnly())),
+                eq(1), eq(20));
+    }
 
     @Test
     void settlementRoleCreatesDraftPayment() throws Exception {
