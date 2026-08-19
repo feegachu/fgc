@@ -233,6 +233,54 @@ class FinalizedValidationRunImmutabilityIntegrationTest {
     }
 
     @Test
+    void insertingReconciliationRunUnderFinalizedValidationRunIsRejected() {
+        validationRunId = createFinalizedValidationRun();
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO fgc.reconciliation_run (
+                    validation_run_id, settlement_month, payment_stage, status
+                ) VALUES (?, DATE '2031-05-01', 'GA_TO_FC', 'CREATED')
+                """, validationRunId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
+    void insertingReconciliationResultUnderFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO fgc.reconciliation_result (
+                    reconciliation_run_id, match_group_key, result_type,
+                    expected_total_amount, actual_total_amount, difference_amount
+                ) VALUES (?, ?, 'MATCHED', 100, 100, 0)
+                """, reconciliationRunId, "FUN044-AFTER-FINALIZE-" + validationRunId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
+    void insertingReconciliationMatchUnderFinalizedValidationRunIsRejected() {
+        validationRunId = createRunningValidationRun();
+        Long reconciliationRunId = createCompletedReconciliationRun(validationRunId);
+        Long reconciliationResultId = createMatchedReconciliationResult(
+                reconciliationRunId, "INSERT-MATCH");
+        Long scheduleLineId = createScheduleLine();
+        finalizeValidationRun(validationRunId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO fgc.reconciliation_match (
+                    reconciliation_result_id, match_seq, schedule_line_id,
+                    matched_amount, match_role
+                ) VALUES (?, 1, ?, 100, 'EXPECTED')
+                """, reconciliationResultId, scheduleLineId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("finalized validation run");
+    }
+
+    @Test
     void updatingCapDetailUnderFinalizedRunIsRejectedByDbTrigger() {
         validationRunId = createRunningValidationRun();
         capCheckId = jdbcTemplate.queryForObject("""
