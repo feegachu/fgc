@@ -1,9 +1,11 @@
 package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.validation.batch.MonthlyValidationJobTrigger;
+import com.susukkang.fgc.validation.batch.daily.DailyChangedContractJobTrigger;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
 
     private final ValidationRunMapper validationRunMapper;
     private final MonthlyValidationJobTrigger monthlyValidationJobTrigger;
+    private final DailyChangedContractJobTrigger dailyChangedContractJobTrigger;
 
     @Override
     public ValidationRunRow execute(Long validationRunId, Long executedBy, String requestId) {
@@ -42,8 +45,17 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
                 validationRunId, executedBy, requestId);
 
         // join하지 않는다 — IF-API-48은 202 즉시 반환, 진행은 IF-API-49 폴링이 본다.
+        // runType별로 서로 다른 배치를 기동한다 — MANUAL_CONTRACT를 MonthlyValidationJob에
+        // 잘못 태우면 안 된다. validationRunId를 반드시 함께 넘겨야 CreateDailyRunTasklet이
+        // "오늘 생성된 아무 MANUAL_CONTRACT 행"이 아니라 지금 요청받은 이 행을 정확히 이어받는다
+        // (코드리뷰 반영 — 빠뜨리면 이 행이 오늘 생성분이 아닐 때 조용히 실패하거나, 오늘 다른
+        // MANUAL_CONTRACT 행이 있으면 그 행이 대신 진행될 수 있었다).
         try {
-            monthlyValidationJobTrigger.launch(row, requestId);
+            if (ValidationRunType.MANUAL_CONTRACT.name().equals(row.getRunType())) {
+                dailyChangedContractJobTrigger.runManual(row.getValidationRunId(), row.getTriggeredBy(), requestId);
+            } else {
+                monthlyValidationJobTrigger.launch(row, requestId);
+            }
         } catch (java.util.concurrent.RejectedExecutionException e) {
             // 트리거 대기열 포화(AbortPolicy) — 500 대신 재시도 안내가 있는 409 로 돌려준다.
             // VRUN_005("다시 조회 후 시도하세요")가 기존 코드 중 재시도 의미에 가장 가깝다.
