@@ -1,6 +1,8 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
+import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.util.DateUtil;
 
 import java.time.OffsetDateTime;
 
@@ -22,7 +24,20 @@ public record ExceptionActionResponse(
                 row.exceptionActionId(), row.actionSeq(),
                 row.fromStatus() == null ? null : ExceptionStatus.valueOf(row.fromStatus()),
                 ExceptionStatus.valueOf(row.toStatus()), row.actionType(), row.reason(),
-                row.evidenceRef(), row.actionBy(), row.actionByLoginId(), row.actionAt()
+                row.evidenceRef(), row.actionBy(), row.actionByLoginId(),
+                DateUtil.toSeoul(row.actionAt())
         );
+    }
+
+    public String actionTypeLabel() {
+        return ExceptionActionType.valueOf(actionType).label();
+    }
+
+    public String fromStatusLabel() {
+        return fromStatus == null ? "-" : fromStatus.label();
+    }
+
+    public String toStatusLabel() {
+        return toStatus.label();
     }
 }

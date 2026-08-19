@@ -8,6 +8,7 @@ import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
 import com.susukkang.fgc.audit.mapper.AuditLogMapper;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.exceptioncase.dto.*;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -46,20 +48,33 @@ public class ExceptionCaseService {
         validatePage(page, size);
         List<ExceptionStatus> statuses = parseStatuses(criteria.getStatus());
 
+        // 총 건수를 먼저 세어 범위 밖 page 를 마지막 페이지로 보정한다 — 큰 OFFSET 으로
+        // 정렬·조인을 헛도는 행 조회를 아예 만들지 않는다. 응답의 page 가 보정된 값이다.
+        long total = exceptionCaseQueryMapper.count(criteria, statuses);
+        long totalPages = (total + size - 1) / size;
+        if (totalPages == 0) {
+            page = MIN_PAGE; // 0건이면 화면이 "N / 1 페이지"로 어긋나지 않게 1로 되돌린다
+        } else if (page > totalPages) {
+            page = (int) totalPages;
+        }
+
         long offsetLong = (long) (page - 1) * size;
         if (offsetLong > Integer.MAX_VALUE) {
             throw invalidField("page");
         }
         int offset = (int) offsetLong;
 
-        List<ExceptionCaseSearchRow> rows = exceptionCaseQueryMapper.search(
-                criteria, statuses, offset, size);
-        long total = exceptionCaseQueryMapper.count(criteria, statuses);
+        List<ExceptionCaseSearchRow> rows = total == 0
+                ? List.of()
+                : exceptionCaseQueryMapper.search(criteria, statuses, offset, size);
 
         Map<Long, List<ExceptionActionResponse>> actionsByCaseId = loadActions(rows);
+        Map<Long, List<ExceptionOccurrenceResponse>> occurrencesByCaseId = loadOccurrences(rows);
         List<ExceptionCaseResponseDTO> content = rows.stream()
                 .map(row -> ExceptionCaseResponseDTO.from(
-                        row, actionsByCaseId.getOrDefault(row.exceptionCaseId(), List.of())))
+                        row,
+                        occurrencesByCaseId.getOrDefault(row.exceptionCaseId(), List.of()),
+                        actionsByCaseId.getOrDefault(row.exceptionCaseId(), List.of())))
                 .toList();
 
         List<ExceptionTypeSummaryResponse> summary = exceptionCaseQueryMapper.countOpenByType()
@@ -72,6 +87,40 @@ public class ExceptionCaseService {
         return new ExceptionCaseSearchResponse(
                 summary, result.content(), result.page(), result.size(), result.totalElements(),
                 result.totalPages(), result.sort());
+    }
+
+    private Map<Long, List<ExceptionOccurrenceResponse>> loadOccurrences(
+            List<ExceptionCaseSearchRow> rows
+    ) {
+        if (rows.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> exceptionCaseIds = rows.stream()
+                .map(ExceptionCaseSearchRow::exceptionCaseId)
+                .toList();
+        return exceptionCaseQueryMapper.findOccurrencesByCaseIds(exceptionCaseIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ExceptionOccurrenceRow::exceptionCaseId,
+                        Collectors.mapping(ExceptionOccurrenceResponse::from, Collectors.toList())
+                ));
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> reasonCodes() {
+        return exceptionCaseQueryMapper.findReasonCodes();
+    }
+
+    /** 담당자 필터 선택지 — 예외를 배정받은 적 있는 사용자만. */
+    @Transactional(readOnly = true)
+    public List<ExceptionAssigneeRow> assignees() {
+        return exceptionCaseQueryMapper.findAssignees();
+    }
+
+    /** 검증월 필터 선택지 — 예외가 검출된 검증월만, 최신순. */
+    @Transactional(readOnly = true)
+    public List<LocalDate> validationMonths() {
+        return exceptionCaseQueryMapper.findValidationMonths();
     }
 
     private Map<Long, List<ExceptionActionResponse>> loadActions(
@@ -159,7 +208,8 @@ public class ExceptionCaseService {
         int nextActionSeq =
                 exceptionCaseActionMapper.findNextActionSeq(exceptionCaseId);
 
-        OffsetDateTime actionAt = OffsetDateTime.now();
+        // 응답이 즉시 화면에 표시되므로 GET 조회 경로(DateUtil.toSeoul)와 같은 기준으로 맞춘다 — SIR-008
+        OffsetDateTime actionAt = DateUtil.nowSeoul();
 
         // 4. 처리 이력 INSERT
         int inserted = exceptionCaseActionMapper.insertAction(

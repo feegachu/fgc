@@ -43,6 +43,9 @@
         <if test="criteria.type != null">
             AND ec.exception_type = #{criteria.type}
         </if>
+        <if test="criteria.reasonCode != null and !criteria.reasonCode.isBlank()">
+            AND ec.reason_code = #{criteria.reasonCode}
+        </if>
         <if test="criteria.severity != null">
             AND ec.severity = #{criteria.severity}
         </if>
@@ -63,12 +66,16 @@
         <if test="criteria.contractNo != null and !criteria.contractNo.isBlank()">
             AND ic.contract_no ILIKE CONCAT('%', #{criteria.contractNo}, '%')
         </if>
+        <if test="criteria.validationMonth != null">
+            AND ec.validation_month = #{criteria.validationMonth}
+        </if>
     </sql>
 
     <select id="search" resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow">
         SELECT ec.exception_case_id  AS exceptionCaseId,
                ec.exception_key      AS exceptionKey,
                ec.exception_type     AS exceptionType,
+               ec.reason_code        AS reasonCode,
                ec.severity,
                ec.status,
                ec.title,
@@ -79,6 +86,12 @@
                assignee.login_id     AS assigneeLoginId,
                ec.source_entity_type AS sourceEntityType,
                ec.source_entity_id   AS sourceEntityId,
+               ec.validation_month   AS validationMonth,
+               ec.first_detected_run_id AS firstDetectedRunId,
+               ec.last_detected_run_id  AS lastDetectedRunId,
+               ec.first_detected_at  AS firstDetectedAt,
+               ec.last_detected_at   AS lastDetectedAt,
+               ec.detection_count    AS detectionCount,
                ec.created_at         AS createdAt
           FROM fgc.exception_case ec
           LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
@@ -93,6 +106,31 @@
                   ec.created_at DESC,
                   ec.exception_case_id DESC
          LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findOccurrencesByCaseIds"
+            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceRow">
+        SELECT occurrence.exception_occurrence_id AS exceptionOccurrenceId,
+               occurrence.exception_case_id       AS exceptionCaseId,
+               occurrence.validation_run_id       AS validationRunId,
+               vr.run_no                          AS runNo,
+               vr.validation_month                AS validationMonth,
+               occurrence.exception_type          AS exceptionType,
+               occurrence.reason_code             AS reasonCode,
+               occurrence.source_entity_type      AS sourceEntityType,
+               occurrence.source_entity_id        AS sourceEntityId,
+               occurrence.evidence_snapshot::text AS evidenceJson,
+               occurrence.is_new_case             AS newCase,
+               occurrence.was_reopened            AS reopened,
+               occurrence.detected_at             AS detectedAt
+          FROM fgc.exception_occurrence occurrence
+          JOIN fgc.validation_run vr ON vr.validation_run_id = occurrence.validation_run_id
+         WHERE occurrence.exception_case_id IN
+        <foreach item="id" collection="exceptionCaseIds" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+         ORDER BY occurrence.exception_case_id, occurrence.detected_at DESC,
+                  occurrence.exception_occurrence_id DESC
     </select>
 
     <select id="count" resultType="long">
@@ -133,5 +171,28 @@
          WHERE status IN ('NEW', 'IN_REVIEW')
          GROUP BY exception_type
          ORDER BY exception_type
+    </select>
+
+    <select id="findReasonCodes" resultType="string">
+        SELECT DISTINCT reason_code
+          FROM fgc.exception_case
+         WHERE reason_code IS NOT NULL
+         ORDER BY reason_code
+    </select>
+
+    <select id="findAssignees"
+            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow">
+        SELECT DISTINCT ec.assigned_to AS userId,
+               au.login_id             AS loginId
+          FROM fgc.exception_case ec
+          JOIN fgc.app_user au ON au.user_id = ec.assigned_to
+         ORDER BY au.login_id
+    </select>
+
+    <select id="findValidationMonths" resultType="java.time.LocalDate">
+        SELECT DISTINCT validation_month
+          FROM fgc.exception_case
+         WHERE validation_month IS NOT NULL
+         ORDER BY validation_month DESC
     </select>
 </mapper>
