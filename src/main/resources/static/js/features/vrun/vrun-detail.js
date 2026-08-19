@@ -1,7 +1,8 @@
 /**
- * FGC-UI-VRUN-W02 실행·진행률 (FUN-042·043)
+ * FGC-UI-VRUN-W02 실행·진행률·확정 체크리스트 (FUN-042·043·044)
  * POST /api/v1/validation-runs/{id}/execute  (IF-API-48, 202 · 배치 비동기)
  * GET  /api/v1/validation-runs/{id}/progress (IF-API-49, 2초 폴링)
+ * GET  /api/v1/validation-runs/{id}/finalize-checklist (IF-API-50)
  *
  * 헤더·스텝퍼·대상 선별·결과 요약은 서버 렌더링이다 — 이 스크립트는 실행 버튼과
  * 폴링 중 스텝퍼/상태 배지 갱신만 맡고, 종료 상태(COMPLETED/FAILED)는 전체
@@ -16,11 +17,15 @@
   var refreshButton = document.getElementById("btn-refresh");
   var stepper = document.getElementById("stepper");
   var statusBadge = document.getElementById("hdr-status");
+  var checklistSummary = document.getElementById("cond-summary");
+  var checklistBody = document.getElementById("cond-body");
+  var finalizeButton = document.getElementById("btn-finalize");
   if (!apiClient || !executeButton || !stepper) {
     return;
   }
 
   var runId = executeButton.dataset.runId;
+  var runStatus = executeButton.dataset.runStatus;
   var pollTimer = null;
 
   var STATUS_TONES = {
@@ -87,6 +92,86 @@
     pollTimer = window.setInterval(poll, 2000); // IF-API-49: 2초 폴링
   }
 
+  // 2026-08-19 yslee - FUN-044 확정 조건을 IF-API-50 응답으로 표시
+  // 기존 코드: 체크리스트 영역이 정적 "연동 대기" 문구와 비활성 버튼만 표시
+  // 문제: 사용자가 어떤 조건 때문에 확정할 수 없는지 화면에서 확인할 수 없음
+  // 개선: 서버가 판정한 6개 조건을 그대로 표시하고 통과 여부를 후속 확정 게이트에 전달
+  function safeInternalLink(linkUrl) {
+    if (!linkUrl || typeof linkUrl !== "string" || !linkUrl.startsWith("/") || linkUrl.startsWith("//")) {
+      return null;
+    }
+    try {
+      var url = new URL(linkUrl, window.location.origin);
+      return url.origin === window.location.origin ? url.pathname + url.search + url.hash : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function setChecklistState(summary, message, tone) {
+    checklistSummary.textContent = summary;
+    checklistSummary.className = tone ? "fgc-badge " + tone : "fgc-muted";
+    checklistBody.replaceChildren();
+    var empty = document.createElement("div");
+    empty.className = "fgc-empty publishing-empty-state";
+    empty.textContent = message;
+    checklistBody.appendChild(empty);
+    finalizeButton.dataset.checklistPassed = "false";
+  }
+
+  function renderChecklist(checklist) {
+    checklistBody.replaceChildren();
+    checklist.conditions.forEach(function (condition) {
+      var row = document.createElement("div");
+      row.className = "publishing-result-placeholder";
+
+      var title = document.createElement("strong");
+      title.textContent = condition.no + ". " + condition.label;
+      row.appendChild(title);
+
+      var result = document.createElement(condition.passed ? "span" : "a");
+      result.className = "fgc-badge " + (condition.passed ? "fgc-badge--normal" : "fgc-badge--violation");
+      result.textContent = condition.passed ? "통과" : "미충족 " + condition.count + "건";
+      if (!condition.passed) {
+        var link = safeInternalLink(condition.linkUrl);
+        if (link) result.href = link;
+      }
+      row.appendChild(result);
+      checklistBody.appendChild(row);
+    });
+
+    checklistSummary.textContent = checklist.passed ? "6개 조건 모두 통과" : "미충족 조건 있음";
+    checklistSummary.className = "fgc-badge "
+      + (checklist.passed ? "fgc-badge--normal" : "fgc-badge--violation");
+    finalizeButton.dataset.checklistPassed = String(checklist.passed);
+  }
+
+  function loadFinalizeChecklist() {
+    if (!checklistSummary || !checklistBody || !finalizeButton) return;
+    if (runStatus === "FINALIZED") {
+      setChecklistState("확정 완료", "확정된 실행의 결과와 계산 근거가 잠겼습니다.", "fgc-badge--review");
+      return;
+    }
+    if (runStatus !== "COMPLETED") {
+      setChecklistState("확인 대기", "검증 실행이 완료되면 확정 조건을 확인할 수 있습니다.");
+      return;
+    }
+
+    checklistSummary.textContent = "확인 중";
+    apiClient.request("/api/v1/validation-runs/" + runId + "/finalize-checklist")
+      .then(function (envelope) {
+        var checklist = envelope.data;
+        if (!checklist || !Array.isArray(checklist.conditions) || checklist.conditions.length !== 6) {
+          throw new apiClient.ApiError({ message: "확정 조건 응답 형식이 올바르지 않습니다." }, envelope.requestId, 200);
+        }
+        renderChecklist(checklist);
+      })
+      .catch(function (error) {
+        setChecklistState("조회 실패", error && error.message
+          ? error.message : "확정 조건을 불러오지 못했습니다.", "fgc-badge--violation");
+      });
+  }
+
   executeButton.addEventListener("click", function () {
     executeButton.disabled = true;
     apiClient.request("/api/v1/validation-runs/" + runId + "/execute", { method: "POST" })
@@ -114,4 +199,5 @@
   if (executeButton.dataset.runStatus === "RUNNING") {
     startPolling();
   }
+  loadFinalizeChecklist();
 })();

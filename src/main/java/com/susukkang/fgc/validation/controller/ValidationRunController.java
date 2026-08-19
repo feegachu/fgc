@@ -194,7 +194,8 @@ public class ValidationRunController {
 
     @Operation(
             summary = "검증 실행 기동 (IF-API-48)",
-            description = "CREATED 상태의 실행을 MonthlyValidationJob(IF-BAT-01)으로 비동기 기동한다. "
+            description = "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 "
+                    + "MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. "
                     + "202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. "
                     + "1차는 재기동을 지원하지 않는다 — FAILED면 새 실행을 만든다(FUN-045는 2차)."
     )

@@ -68,31 +68,38 @@ public class DailyChangedContractJobTrigger {
             return;
         }
         // 스케줄러 스레드는 결과를 기다리는 호출자가 없다 — launch() 안의 로깅으로 충분하다.
-        launch(scheduledTriggeredByUserId, RequestIdContext.generate());
+        // 특정 행을 지정하지 않는다 — CreateDailyRunTasklet이 "오늘" 기준으로 알아서 찾는다.
+        launch(null, scheduledTriggeredByUserId, RequestIdContext.generate());
     }
 
     /**
-     * 운영자가 화면/API에서 재실행을 요청했을 때 호출하는 진입점
+     * 운영자가 화면/API에서 특정 실행(validationRunId)의 재실행을 요청했을 때 호출하는 진입점.
+     * validationRunId를 넘겨야 CreateDailyRunTasklet이 "오늘 생성된 아무 행"이 아니라 요청받은
+     * 그 행을 정확히 이어받는다(코드리뷰 반영 — 이 값 없이 호출하면 오늘 생성분이 아닌 행이거나
+     * 오늘 다른 MANUAL_CONTRACT 행이 이미 있을 때 엉뚱한 행이 진행되거나 조용히 실패할 수 있다).
      */
-    public CompletableFuture<JobExecution> runManual(long triggeredBy, String requestId) {
-        return launch(triggeredBy, requestId);
+    public CompletableFuture<JobExecution> runManual(Long validationRunId, long triggeredBy, String requestId) {
+        return launch(validationRunId, triggeredBy, requestId);
     }
 
-    private CompletableFuture<JobExecution> launch(long triggeredBy, String requestId) {
+    private CompletableFuture<JobExecution> launch(Long validationRunId, long triggeredBy, String requestId) {
         String validationMonth = DateUtil.formatSettlementMonth(
                 DateUtil.nowSeoul().toLocalDate().withDayOfMonth(1));
 
         // runNo: MonthlyValidationJobParameters가 두 Job의 공통 계약이라 형식상 필요하지만,
-        // CreateDailyRunTasklet은 이 값을 쓰지 않는다(하루 1건 판정은 created_at 기준).
-        // 그래서 항상 고정값 1을 채운다 — 실제로 채번되는 run_no는 ValidationRunCreateService가
-        // (validationMonth, runType) 조합으로 별도로 매긴다.
-        JobParameters jobParameters = new JobParametersBuilder()
+        // CreateDailyRunTasklet은 이 값을 쓰지 않는다(하루 1건 판정은 created_at 기준 또는
+        // validationRunId 직접 지정). 그래서 항상 고정값 1을 채운다 — 실제로 채번되는 run_no는
+        // ValidationRunCreateService가 (validationMonth, runType) 조합으로 별도로 매긴다.
+        JobParametersBuilder jobParametersBuilder = new JobParametersBuilder()
                 .addString("validationMonth", validationMonth)
                 .addLong("runNo", 1L)
                 .addString("runType", ValidationRunType.MANUAL_CONTRACT.name())
                 .addLong("triggeredBy", triggeredBy)
-                .addString("requestId", requestId)
-                .toJobParameters();
+                .addString("requestId", requestId);
+        if (validationRunId != null) {
+            jobParametersBuilder.addLong("validationRunId", validationRunId);
+        }
+        JobParameters jobParameters = jobParametersBuilder.toJobParameters();
 
         // whenComplete는 exceptionally와 달리 예외를 다른 값으로 바꿔치기하지 않는다 — 로그만
         // 남기고, 반환된 CompletableFuture는 실패 상태를 그대로 유지해 호출자가 원하면 알 수 있다.
