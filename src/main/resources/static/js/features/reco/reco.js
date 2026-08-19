@@ -335,6 +335,16 @@
       links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/contracts/' +
         encodeURIComponent(data.contractId) + '">계약 상세</a>';
     }
+    var scheduleHeaderId = matches
+      .map(function (m) { return m.scheduleHeaderId; })
+      .filter(function (id) { return id != null; })[0];
+    if (scheduleHeaderId != null) {
+      links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/schedules/' +
+        encodeURIComponent(scheduleHeaderId) + '">예상 스케줄 상세</a>';
+    }
+    links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/transactions">지급 건 목록</a>';
+    links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/journals">관련 분개(검증원장)</a>';
+    links.innerHTML += '<a class="fgc-btn fgc-btn--ghost" href="/exceptions">예외함</a>';
   }
 
   function setCompareModalState(mode, message) {

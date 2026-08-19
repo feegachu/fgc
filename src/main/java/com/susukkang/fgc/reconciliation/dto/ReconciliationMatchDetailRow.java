@@ -13,6 +13,7 @@ public class ReconciliationMatchDetailRow {
     private int matchSeq;
     private String matchRole;
     private Long scheduleLineId;
+    private Long scheduleHeaderId;
     private Long transactionAttributionId;
     private Long commissionTransactionId;
     private Long journalHeaderId;
