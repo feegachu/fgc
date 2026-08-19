@@ -72,12 +72,19 @@ class PublishingTemplateStructureTest {
                 .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
                 .contains("apiClient.request")
                 .doesNotContain("fetch(");
-        // VRUN-W02 는 #188 에서 헤더·스텝퍼·실행(IF-API-48·49)이 연동됐다 — 아직 미연동인
-        // 확정 체크리스트(IF-API-50/51, #172~#175)만 대기 상태를 유지하고, 확정 버튼은
-        // 체크리스트 게이트 연동 전까지 정적 disabled 다.
+        // VRUN-W02 는 IF-API-50 체크리스트를 연동하고, IF-API-51 연결 전까지 확정 버튼을
+        // 정적 disabled 로 유지한다.
         assertThat(resource("templates/vrun/detail.html"))
-                .contains("확정 조건 API 연동 대기")
+                .contains("id=\"cond-body\" aria-live=\"polite\"")
+                .contains("data-checklist-passed=\"false\"")
+                .doesNotContain("확정 조건 API 연동 대기")
                 .containsPattern("(?s)<button[^>]*id=\"btn-finalize\"[^>]*\\bdisabled\\b[^>]*>");
+        assertThat(resource("static/js/features/vrun/vrun-detail.js"))
+                .contains("/finalize-checklist")
+                .contains("safeInternalLink")
+                .contains("checklist.conditions.length !== 6")
+                .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
+                .doesNotContain("fetch(");
     }
 
     @Test
