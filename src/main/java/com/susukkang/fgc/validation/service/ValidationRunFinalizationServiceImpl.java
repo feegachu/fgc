@@ -54,12 +54,14 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         }
         String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
 
-        // 선택 멱등키는 실행 간 재사용을 금지한다. UNIQUE 인덱스가 최후 방어선이며,
-        // 이 사전 조회는 제약 위반보다 명확한 VRUN_005 응답을 주기 위한 것이다.
+        // 2026-08-19 yslee - 다른 검증 실행에 귀속된 확정 멱등키 사전 검사 오류코드 정합성 수정
+        // 기존 코드: 멱등키 소유자가 다른 실행이면 상태 경합 코드 FGC-VRUN-005를 반환
+        // 문제: IF-API-51 명세는 앱 사전검사와 DB UNIQUE 제약 모두 FGC-VRUN-006을 반환하도록 규정함
+        // 개선: 사전 조회 충돌도 FGC-VRUN-006으로 통일해 클라이언트가 새 키로 재시도하게 함
         if (normalizedKey != null) {
             Long keyOwner = validationRunMapper.findValidationRunIdByFinalizeIdempotencyKey(normalizedKey);
             if (keyOwner != null && !keyOwner.equals(validationRunId)) {
-                throw new FgcBusinessException(FgcErrorCode.VRUN_005,
+                throw new FgcBusinessException(FgcErrorCode.VRUN_006,
                         Map.of("id", validationRunId, "idempotencyKey", normalizedKey));
             }
         }
