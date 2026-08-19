@@ -15,6 +15,7 @@ public class CapRuleItemView {
     private String itemName;
     private String inclusionStatus;
     private String exclusionType;
+    private boolean evidenceRequiredYn;
     private String attributionMethod;
     private String decisionReason;
 }

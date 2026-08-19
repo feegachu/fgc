@@ -2,6 +2,8 @@ package com.susukkang.fgc.arbitrage.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCalculationSource;
+import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSearchCondition;
+import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSummary;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.arbitrage.dto.ConfirmedCommissionSummary;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
@@ -21,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -146,6 +150,30 @@ class ArbitrageServiceTest {
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> after = (java.util.Map<String, Object>) event.after();
         assertThat(after).containsKeys("validationRunId", "contractId", "resultStatus");
+    }
+
+    @Test
+    void keepsSummaryCountsAcrossStatusCardFiltering() {
+        ArbitrageCheckSearchCondition condition = new ArbitrageCheckSearchCondition(
+                YearMonth.of(2026, 8), ArbitrageCheckStatus.CANDIDATE,
+                PaymentStage.GA_TO_FC, 10L, "C001");
+        ArbitrageCheckSummary summary = new ArbitrageCheckSummary();
+        summary.setClearCount(3);
+        summary.setCandidateCount(2);
+        summary.setReviewRequiredCount(1);
+        given(arbitrageMapper.selectByCondition(condition, 0, 20)).willReturn(List.of());
+        given(arbitrageMapper.arbitrageCheckSummary(any())).willReturn(summary);
+        given(arbitrageMapper.countByCondition(condition)).willReturn(2L);
+
+        var response = arbitrageService.selectByCondition(condition, 1, 20);
+
+        assertThat(response.getSummary().getTotalArbitrageChecks()).isEqualTo(6);
+        assertThat(response.getItems().totalElements()).isEqualTo(2);
+        org.mockito.ArgumentCaptor<ArbitrageCheckSearchCondition> summaryCondition =
+                org.mockito.ArgumentCaptor.forClass(ArbitrageCheckSearchCondition.class);
+        verify(arbitrageMapper).arbitrageCheckSummary(summaryCondition.capture());
+        assertThat(summaryCondition.getValue().getStatus()).isNull();
+        assertThat(summaryCondition.getValue().getMonth()).isEqualTo(condition.getMonth());
     }
 
     /**

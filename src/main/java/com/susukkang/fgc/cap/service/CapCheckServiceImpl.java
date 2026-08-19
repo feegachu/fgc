@@ -101,6 +101,7 @@ public class CapCheckServiceImpl implements CapCheckService {
                         .classificationSnapshot(d.classification())
                         .amount(d.amount())
                         .decisionReason(d.decisionReason())
+                        .evidenceRef(d.evidenceRef())
                         .build());
             }
             capCheckMapper.insertCapCheckDetails(detailRows);
