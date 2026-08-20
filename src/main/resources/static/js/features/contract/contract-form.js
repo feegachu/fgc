@@ -46,6 +46,8 @@
   var isLoadingAgents = false;
   var isSubmitting = false;
   var productOfferings = [];
+  /* 주기 보험료에 사용자 입력 또는 서버 저장값이 들어와 있으면 파생값으로 덮어쓰지 않는다. */
+  var isPremiumPerCycleUserValue = false;
   var productRequestSequence = 0;
   var agentRequestSequence = 0;
   var PAYMENT_CYCLE_MONTHS = {
@@ -151,31 +153,34 @@
   }
 
   /*
-   * 주기 보험료는 일시납이 아니면 읽기전용이고 월납환산 × 주기개월로 자동 계산한다.
+   * 주기 보험료는 사용자가 입력하는 값이다 — 자동 계산은 "비어 있을 때 채워 주는" 것까지만 한다.
    *
-   * 화면정의서 CONT-W03 항목표는 "주기 보험료 | 입력 | 금액 | O | 0 이상" 이므로 문서와 다르다.
-   * 두 값을 따로 받으면 monthlyEquivalentFirstPremium 과 어긋난 계약이 저장되고
-   * 그 값이 그대로 1,200% 한도 계산 기준이 되기 때문에 화면에서 파생시킨다 (#283).
-   * 문서 갱신은 별도 이슈로 올린다 — 여기서 docs/ 를 고치지 않는다.
+   * 화면정의서 :550 이 못박고 있다 —
+   *   "premium_per_cycle_amount(원래 주기 보험료)와 monthly_equivalent_first_premium
+   *    (월납으로 환산한 값)은 다른 값입니다. ... 한도 계산에 쓰이는 게 이 값입니다"(월납환산).
+   * 항목표(:619)도 "주기 보험료 | 입력 | 금액 | O | 0 이상" 으로 입력 필드다.
+   * 할인·부가보험료 때문에 실제 청구액은 월납환산 × 개월과 다를 수 있고,
+   * 1,200% 한도 기준은 주기 보험료가 아니라 월납환산이므로 파생시킬 이유도 없다.
+   *
+   * 예전 구현은 일시납 외에는 readOnly + 강제 덮어쓰기였는데, 그 탓에 수정 화면에서
+   * fillContract() 가 불러온 저장값을 곧바로 파생값으로 지워 버리고 있었다 (#283 리뷰).
+   * 그래서 사용자가 손댔거나 서버 값이 들어온 필드는 다시 계산하지 않는다.
    */
   function syncPremiumPerCycleAmount() {
     var paymentCycle = elements.paymentCycleCode.value;
     var isSinglePayment = paymentCycle === "SINGLE";
-    elements.premiumPerCycleAmount.readOnly = !isSinglePayment;
-    elements.premiumPerCycleAmount.setAttribute("aria-readonly", String(!isSinglePayment));
 
-    if (isSinglePayment) {
-      if (premiumPerCycleHelp) premiumPerCycleHelp.textContent = "일시납은 한 번 낼 실제 보험료를 직접 입력합니다.";
-      updateCapLimitPreview();
-      return;
+    if (premiumPerCycleHelp) {
+      premiumPerCycleHelp.textContent = isSinglePayment
+        ? "일시납은 한 번 낼 실제 보험료를 입력합니다."
+        : "비워 두면 월납환산 초회보험료 × 납입주기로 채웁니다. 실제 청구액이 다르면 직접 고치세요.";
     }
 
-    if (premiumPerCycleHelp) premiumPerCycleHelp.textContent = "월납환산 초회보험료와 납입주기에 따라 자동 계산됩니다.";
-    var monthlyEquivalent = numberValue(elements.monthlyEquivalentFirstPremium);
     var cycleMonths = PAYMENT_CYCLE_MONTHS[paymentCycle];
-    elements.premiumPerCycleAmount.value = monthlyEquivalent === null || !cycleMonths
-      ? ""
-      : String(monthlyEquivalent * cycleMonths);
+    var monthlyEquivalent = numberValue(elements.monthlyEquivalentFirstPremium);
+    if (!isPremiumPerCycleUserValue && cycleMonths && monthlyEquivalent !== null) {
+      elements.premiumPerCycleAmount.value = String(monthlyEquivalent * cycleMonths);
+    }
     updateCapLimitPreview();
   }
 
@@ -331,6 +336,7 @@
     elements.contractStatus.value = contract.contractStatus || "ACTIVE";
     elements.paymentCycleCode.value = contract.paymentCycleCode || "MONTHLY";
     elements.premiumPerCycleAmount.value = contract.premiumPerCycleAmount ?? "";
+    isPremiumPerCycleUserValue = contract.premiumPerCycleAmount != null;
     elements.firstPremiumAmount.value = contract.firstPremiumAmount ?? "";
     elements.monthlyEquivalentFirstPremium.value = contract.monthlyEquivalentFirstPremium ?? "";
     elements.paymentTermMonths.value = contract.paymentTermMonths ?? "";
@@ -443,6 +449,10 @@
 
   function handleInput(event) {
     clearFieldError(event.target.name);
+    if (event.target === elements.premiumPerCycleAmount) {
+      /* 비우면 다시 자동 채움 대상으로 돌아간다. */
+      isPremiumPerCycleUserValue = event.target.value !== "";
+    }
     if (event.target === elements.monthlyEquivalentFirstPremium) syncPremiumPerCycleAmount();
     updateSaveState();
   }

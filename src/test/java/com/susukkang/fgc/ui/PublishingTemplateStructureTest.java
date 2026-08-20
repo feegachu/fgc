@@ -659,6 +659,14 @@ class PublishingTemplateStructureTest {
         assertThat(resource("static/js/features/contract/contract-form.js"))
                 .contains("window.FgcUi.contractApi")
                 .contains("error.field")
+                /*
+                 * 주기 보험료는 입력 필드다 — 화면정의서 CONT-W03 항목표(:619)
+                 * "주기 보험료 | 입력 | 금액 | O | 0 이상", 그리고 :550 "premium_per_cycle_amount 와
+                 * monthly_equivalent_first_premium 은 다른 값입니다".
+                 * 자동 계산은 비어 있을 때 채우는 데까지만 하고 저장값·사용자 입력을 덮어쓰지 않는다.
+                 */
+                .doesNotContain("premiumPerCycleAmount.readOnly")
+                .contains("isPremiumPerCycleUserValue")
                 // 기준정보 로드 실패는 Toast, 필드 오류는 필드 옆 (가이드 §11).
                 .contains("function showLoadFailure(")
                 .contains("format.errorText")
