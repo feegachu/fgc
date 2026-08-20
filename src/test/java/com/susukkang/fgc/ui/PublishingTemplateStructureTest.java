@@ -682,13 +682,6 @@ class PublishingTemplateStructureTest {
                 // 납입주기·계약상태 라벨은 서버 enum 하나만 쓴다.
                 .contains("T(com.susukkang.fgc.contract.domain.PaymentCycleCode).values()")
                 .contains("T(com.susukkang.fgc.contract.domain.ContractStatus).values()")
-                /*
-                 * 등록 모드는 청약·정상만 고를 수 있다. 저장이 같은 트랜잭션에서 예상 스케줄과
-                 * 1,200% 한도 검증을 연쇄 실행하므로 이미 끝난 계약을 새로 등록하면 안 된다.
-                 * 수정 모드는 전 상태를 남긴다 — 상태 사건 이력(CONT-W04·FUN-026)이 2차라
-                 * 1차에서는 계약 수정이 상태를 바꾸는 유일한 경로다.
-                 */
-                .contains("th:if=\"${isEditMode or status.name() == 'APPLIED' or status.name() == 'ACTIVE'}\"")
                 .doesNotContain("3개월납")
                 .doesNotContain("style=\"")
                 .doesNotContain("onclick=")

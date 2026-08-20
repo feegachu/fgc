@@ -10,7 +10,6 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
-import com.susukkang.fgc.contract.domain.ContractStatus;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
@@ -28,11 +27,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * 설명 : 보험계약 등록·조회·수정 업무를 처리한다.
@@ -52,25 +49,6 @@ public class ContractService {
     private static final String AUDIT_CONTRACT_UPDATED = "CONTRACT_UPDATED";
     private static final String AUDIT_CAP_RECHECKED = "CONTRACT_CAP_RECHECKED";
     private static final String AUDIT_SCHEDULES_REGENERATED = "CONTRACT_SCHEDULES_REGENERATED";
-
-    /*
-     * 신규 등록으로 받을 수 있는 계약상태.
-     *
-     * createContract() 는 저장 직후 같은 트랜잭션에서 초회 재무 스냅샷·예상 스케줄(FUN-036)·
-     * 1,200% 한도 검증(FUN-030)을 연쇄 실행한다. 실효·해지·만기 계약을 그대로 받아 주면
-     * 이미 끝난 계약에 대해 앞으로 받을 수수료 스케줄을 새로 만들고 한도까지 재는 셈이 된다.
-     * 계약이 처음 들어오는 시점의 상태는 청약 아니면 정상이므로 그 둘만 받는다.
-     *
-     * 등록 이후의 상태 변화는 계약 수정에서 처리한다. 상태 사건 이력(contract_status_event)으로
-     * 남기는 것은 CONT-W04 · FUN-026 으로 2차다 (인터페이스정의서 :905 결정 C,
-     * updateContract() 의 TODO(FUN-026, 2차) 참조) — 그래서 수정 쪽은 제한하지 않는다.
-     *
-     * 화면정의서 :622 는 이 항목의 검증 규칙을 "기본 ACTIVE(정상)" 으로만 적어 두어
-     * 허용 범위를 규정하지 않는다. 이 제한은 PR #315 리뷰 지적을 받아들인 것이며
-     * 산출물에 근거가 없다 — 화면정의서 항목표 갱신이 별도로 필요하다.
-     */
-    private static final Set<ContractStatus> CREATABLE_STATUSES =
-            EnumSet.of(ContractStatus.APPLIED, ContractStatus.ACTIVE);
 
     private final ContractMapper contractMapper;
     private final CapCheckMapper capCheckMapper;
@@ -254,28 +232,9 @@ public class ContractService {
         }
 
         validateContractDate(request); //계약 일자 적합한지 확인
-        validateCreatableStatus(request); //신규 등록 가능한 계약상태인지 확인
         validateInsurerAndProduct(request); //보험사 , 보험상품 유무 확인
         validateAgentAndOrganization(request); // 직원 , 조직 유무 확인
         validateDuplicateContract(request); // 계약번호 중복 확인
-    }
-
-    /**
-     * 설명 : 신규 등록 계약상태를 청약·정상으로 제한한다.
-     *
-     * 화면에서 선택지를 줄이는 것만으로는 API 직접 호출을 막지 못하므로 서버에서 같이 막는다.
-     * 제한 근거는 {@link #CREATABLE_STATUSES} 주석 참고.
-     *
-     * @param request 보험계약 등록 요청
-     */
-    private void validateCreatableStatus(ContractCreateRequest request) {
-        if (!CREATABLE_STATUSES.contains(request.getContractStatus())) {
-            throw validationException(
-                    "contractStatus",
-                    "저장 불가 — 신규 계약은 청약·정상 상태로만 등록할 수 있습니다. "
-                            + "이후 상태 변경은 계약 수정에서 처리하세요."
-            );
-        }
     }
 
     private void validateContractDate(ContractInput request) {
