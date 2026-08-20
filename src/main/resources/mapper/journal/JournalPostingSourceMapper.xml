@@ -66,7 +66,11 @@
         WHERE vt.validation_run_id = #{validationRunId}
           AND vt.selection_status = 'SELECTED'
           AND ct.payment_stage = 'INSURER_TO_GA'
-          AND ct.source_type = 'INSURER_STATEMENT'
+          -- 2026-08-19 hjKang - 수기 등록 원수사 수입 건도 실제 분개 대상에 포함한다.
+          -- 대사(InsurerGaReconciliationMapper)가 예상·실제 양쪽의 POSTED 분개를 필수로 요구하므로,
+          -- 여기서 기표하지 않으면 수기 건은 대사 조건을 완화해도 여전히 0건이 된다.
+          -- payment_stage 로 이미 좁혀져 있어 GA_TO_FC 의 CONFIRMED_FC_PAYOUT 과 겹치지 않는다.
+          AND ct.source_type IN ('INSURER_STATEMENT', 'GA_MANUAL_PAYMENT')
           AND ct.cashflow_type = 'PAYMENT'
           AND ct.status = 'CONFIRMED'
           AND ct.settlement_month = #{validationMonth}

@@ -34,6 +34,7 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
 import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
+import com.susukkang.fgc.base.mapper.AgentMapper;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,8 @@ class CommissionPaymentServiceImplTest {
     @Mock
     private CommissionPaymentMapper mapper;
     @Mock
+    private AgentMapper agentMapper;
+    @Mock
     private CapCalculator capCalculator;
     @Mock
     private CapExceptionService capExceptionService;
@@ -95,6 +98,7 @@ class CommissionPaymentServiceImplTest {
         messageResolver = new FgcMessageResolver(messageSource);
         service = new CommissionPaymentServiceImpl(
                 mapper,
+                agentMapper,
                 new ObjectMapper(),
                 capValidator,
                 capCalculator,
@@ -111,7 +115,7 @@ class CommissionPaymentServiceImplTest {
         given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
         given(mapper.findContract(3L))
-                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+                .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
                 .willReturn(4L);
@@ -216,7 +220,7 @@ class CommissionPaymentServiceImplTest {
         given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
         given(mapper.findContract(3L))
-                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+                .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         given(commissionPolicyService.resolveCurrentCommission(3L, PaymentStage.GA_TO_FC))
                 .willThrow(new FgcBusinessException(
@@ -250,7 +254,7 @@ class CommissionPaymentServiceImplTest {
         given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
         given(mapper.findContract(3L))
-                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+                .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
                 .willThrow(new FgcBusinessException(
@@ -286,7 +290,7 @@ class CommissionPaymentServiceImplTest {
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
         given(mapper.existsPolicyVersion(3L)).willReturn(true);
         given(mapper.findContract(3L))
-                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 7, 3)));
+                .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         CommissionPaymentCreateRequest source = createRequest(List.of(
                 attribution(3L, "500000", AttributionMethod.DIRECT)
@@ -571,7 +575,7 @@ class CommissionPaymentServiceImplTest {
                 ));
         given(mapper.existsPolicyVersion(3L)).willReturn(true);
         given(mapper.findContract(3L))
-                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 8, 5)));
+                .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 8, 5)));
         given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 8, 1)))
                 .willReturn(0);
         given(mapper.findAgentAppointmentDate(7L))
@@ -643,7 +647,7 @@ class CommissionPaymentServiceImplTest {
                 ));
         given(mapper.existsPolicyVersion(3L)).willReturn(true);
         given(mapper.findContract(3L))
-                .willReturn(new ContractReference(3L, 7L, LocalDate.of(2026, 8, 5)));
+                .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 8, 5)));
         given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 8, 1)))
                 .willReturn(0);
         given(mapper.findAgentAppointmentDate(7L))
@@ -1475,7 +1479,7 @@ class CommissionPaymentServiceImplTest {
         lenient().when(mapper.findAllocationPolicyId(3L, "DIRECT")).thenReturn(77L);
         for (Long contractId : contractIds) {
             lenient().when(mapper.findContract(contractId))
-                    .thenReturn(new ContractReference(contractId, 7L, LocalDate.of(2026, 7, 3)));
+                    .thenReturn(new ContractReference(contractId, 7L, 11L, LocalDate.of(2026, 7, 3)));
         }
     }
 

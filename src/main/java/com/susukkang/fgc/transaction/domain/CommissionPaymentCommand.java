@@ -34,6 +34,8 @@ public class CommissionPaymentCommand {
     private final Long policyVersionId;
     private final LocalDate settlementMonth;
     private final LocalDate dueDate;
+    /** 실제 지급 회차. 대응 운영 스케줄에서 유도하며 단일 값으로 수렴하지 않으면 null이다. */
+    private final Integer installmentNo;
     private final BigDecimal amount;
     private final String cashflowType;
     private final String evidenceRef;

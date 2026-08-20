@@ -53,6 +53,12 @@ public interface ContractMapper {
 
     int insertContract(InsuranceContract insuranceContract);
 
+    /**
+     * FGC-FUN-018 수기 등록 계약의 계약일 기준 초회 재무 스냅샷을 만든다.
+     * 업무 UNIQUE 로 멱등하므로 이미 있으면 0을 돌려준다.
+     */
+    int insertInitialFinancialSnapshot(@Param("contractId") Long contractId);
+
     int updateContract(InsuranceContract updatedContract);
     // 현재 검색조건에 맞는 계약의 수를 구한다 -> 최대 페이지 수 계산
     long countByCondition(ContractSearchCondition condition);
