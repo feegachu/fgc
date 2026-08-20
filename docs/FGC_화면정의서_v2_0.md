@@ -290,7 +290,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 |---|---|
 | MATCHED | 일치 |
 | AMOUNT_DIFFERENCE | 금액 차이 |
-| EXPECTED_MISSING | 예상 없음(실제만 있음) |
+| EXPECTED_MISSING | 예상 금액 없음 |
 | ACTUAL_MISSING | 실제 없음(누락) |
 | DUPLICATE | 중복 지급 |
 | AGENT_MISMATCH | 설계사 불일치 |
@@ -299,6 +299,8 @@ FGC — GA 수수료 정산·검증 플랫폼
 | POLICY_VERSION_ERROR | 정책버전 오류 |
 | JOURNAL_IMBALANCE | 원장 불균형 |
 | REVIEW_REQUIRED | 검토필요 |
+
+> #312 개정: `EXPECTED_MISSING` 화면 표기를 "예상 없음(실제만 있음)" → "예상 금액 없음"으로 변경. RECO-W01 대사 결과 표의 결과 유형 뱃지 폭에서 원래 표기가 잘려 보이는 문제가 있어 더 짧은 표기로 정리함.
 
 **예외 상태** `exception_case.status`
 
@@ -1235,7 +1237,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 대사 실행 | 실행 생성 → 계산 → 결과 목록 표시 |
 | 재실행 | 같은 조건으로 다시. **중복 결과가 생기면 안 됩니다** |
 | 예외 일괄 생성 | 불일치 건을 예외함으로 |
-| 비교 상세 | RECO-W02 팝업 |
+| 보기 | RECO-W02 비교 상세 팝업(#312 개정: 버튼 문구를 "비교 상세" → "보기"로 단순화) |
 
 **막아야 할 것**
 - 같은 정산월·지급단계·보험회사로 실행이 두 번 만들어지지 않게 합니다(DB UNIQUE).

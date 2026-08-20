@@ -38,6 +38,7 @@ public class ReconciliationViewController {
     public String list(
             @ModelAttribute("month") String month,
             @RequestParam(required = false) String stage,
+            @RequestParam(required = false) Long insurer,
             @RequestParam(required = false) Long resultId,
             @RequestParam(defaultValue = "1") int page,
             Model model
@@ -54,13 +55,14 @@ public class ReconciliationViewController {
         page = Math.max(1, Math.min(page, Integer.MAX_VALUE / PAGE_SIZE));
 
         var settlementMonth = YearMonth.parse(month).atDay(1);
-        var criteria = new ReconciliationRunSearchCriteria(settlementMonth, safeStage);
+        var criteria = new ReconciliationRunSearchCriteria(settlementMonth, safeStage, insurer);
         PageResponse<ReconciliationRunHistoryResponse> history =
                 reconciliationRunHistoryService.findHistory(criteria, page, PAGE_SIZE, "createdAt,desc");
 
         model.addAttribute("history", ReconciliationRunSearchResponse.from(history));
         model.addAttribute("stageFilter", safeStage);
         model.addAttribute("stageOptions", PaymentStage.values());
+        model.addAttribute("insurerFilter", insurer);
         model.addAttribute("deepLinkedResultId", resultId);
         return "reco/list";
     }

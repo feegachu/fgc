@@ -58,7 +58,7 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         Long insurerId = insertInsurer("FUN051-1");
         Long runId = insertReconciliationRun("GA_TO_FC", insurerId, null);
 
-        List<ReconciliationRunHistoryRow> rows = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> rows = mapper.search(TEST_MONTH, "GA_TO_FC", null, "desc", 0, 100);
 
         assertThat(rows).filteredOn(row -> row.getReconciliationRunId().equals(runId))
                 .singleElement()
@@ -78,7 +78,7 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         insertReconciliationResult(runId, "FUN051-B", "MATCHED");
         insertReconciliationResult(runId, "FUN051-C", "AMOUNT_DIFFERENCE");
 
-        List<ReconciliationRunHistoryRow> rows = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> rows = mapper.search(TEST_MONTH, "GA_TO_FC", null, "desc", 0, 100);
 
         assertThat(rows).filteredOn(row -> row.getReconciliationRunId().equals(runId))
                 .singleElement()
@@ -95,13 +95,33 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         Long gaToFcId = insertReconciliationRun("GA_TO_FC", insurerId, null);
         Long insurerToGaId = insertReconciliationRun("INSURER_TO_GA", insurerId, null);
 
-        List<ReconciliationRunHistoryRow> gaToFcRows = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 0, 100);
-        List<ReconciliationRunHistoryRow> insurerToGaRows = mapper.search(TEST_MONTH, "INSURER_TO_GA", "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> gaToFcRows = mapper.search(TEST_MONTH, "GA_TO_FC", null, "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> insurerToGaRows = mapper.search(TEST_MONTH, "INSURER_TO_GA", null, "desc", 0, 100);
 
         assertThat(gaToFcRows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
                 .contains(gaToFcId).doesNotContain(insurerToGaId);
         assertThat(insurerToGaRows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
                 .contains(insurerToGaId).doesNotContain(gaToFcId);
+    }
+
+    // #312 — RECO-W01 "실행 이력" 보험회사 조회 조건이 화면 select에 name이 없어 서버까지
+    // 전달되지 않던 문제(criteria/mapper 배선 누락) 회귀 테스트.
+    @Test
+    void searchFiltersByInsurer() {
+        Long insurerA = insertInsurer("FUN312-A");
+        Long insurerB = insertInsurer("FUN312-B");
+        Long runA = insertReconciliationRun("GA_TO_FC", insurerA, null);
+        Long runB = insertReconciliationRun("GA_TO_FC", insurerB, null);
+
+        List<ReconciliationRunHistoryRow> insurerARows = mapper.search(TEST_MONTH, "GA_TO_FC", insurerA, "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> insurerBRows = mapper.search(TEST_MONTH, "GA_TO_FC", insurerB, "desc", 0, 100);
+        long insurerACount = mapper.count(TEST_MONTH, "GA_TO_FC", insurerA);
+
+        assertThat(insurerARows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
+                .contains(runA).doesNotContain(runB);
+        assertThat(insurerBRows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
+                .contains(runB).doesNotContain(runA);
+        assertThat(insurerACount).isEqualTo(1);
     }
 
     @Test
@@ -114,7 +134,7 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         Long runA = insertReconciliationRun("GA_TO_FC", insurerA, null);
         Long runB = insertReconciliationRun("GA_TO_FC", insurerB, null);
 
-        List<ReconciliationRunHistoryRow> rows = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> rows = mapper.search(TEST_MONTH, "GA_TO_FC", null, "desc", 0, 100);
 
         assertThat(rows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
                 .contains(runA, runB);
@@ -125,7 +145,7 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         Long insurerId = insertInsurer("FUN051-5");
         Long runId = insertReconciliationRun("GA_TO_FC", insurerId, null);
 
-        List<ReconciliationRunHistoryRow> rows = mapper.search(null, null, "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> rows = mapper.search(null, null, null, "desc", 0, 100);
 
         assertThat(rows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId).contains(runId);
     }
@@ -142,8 +162,8 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         Long runOlder = insertReconciliationRun("GA_TO_FC", insurerA, null);
         Long runNewer = insertReconciliationRun("GA_TO_FC", insurerB, null);
 
-        List<ReconciliationRunHistoryRow> descRows = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 0, 100);
-        List<ReconciliationRunHistoryRow> ascRows = mapper.search(TEST_MONTH, "GA_TO_FC", "asc", 0, 100);
+        List<ReconciliationRunHistoryRow> descRows = mapper.search(TEST_MONTH, "GA_TO_FC", null, "desc", 0, 100);
+        List<ReconciliationRunHistoryRow> ascRows = mapper.search(TEST_MONTH, "GA_TO_FC", null, "asc", 0, 100);
 
         assertThat(descRows).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
                 .containsExactly(runNewer, runOlder);
@@ -153,8 +173,8 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         // offset=0,limit=1은 desc 정렬의 첫 번째 행(runNewer)만, offset=1,limit=1은
         // 두 번째 행(runOlder)만 돌려줘야 한다 — 둘 다 확인해야 LIMIT/OFFSET이 실제로
         // 적용되는지 검증된다.
-        List<ReconciliationRunHistoryRow> firstPage = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 0, 1);
-        List<ReconciliationRunHistoryRow> secondPage = mapper.search(TEST_MONTH, "GA_TO_FC", "desc", 1, 1);
+        List<ReconciliationRunHistoryRow> firstPage = mapper.search(TEST_MONTH, "GA_TO_FC", null, "desc", 0, 1);
+        List<ReconciliationRunHistoryRow> secondPage = mapper.search(TEST_MONTH, "GA_TO_FC", null, "desc", 1, 1);
         assertThat(firstPage).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
                 .containsExactly(runNewer);
         assertThat(secondPage).extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
@@ -171,8 +191,8 @@ class ReconciliationRunHistoryMapperIntegrationTest {
         insertReconciliationRun("GA_TO_FC", insurerId, null);
         insertReconciliationRun("INSURER_TO_GA", insurerId, null);
 
-        long gaToFcCount = mapper.count(TEST_MONTH, "GA_TO_FC");
-        long allCount = mapper.count(TEST_MONTH, null);
+        long gaToFcCount = mapper.count(TEST_MONTH, "GA_TO_FC", null);
+        long allCount = mapper.count(TEST_MONTH, null, null);
 
         assertThat(gaToFcCount).isEqualTo(1);
         assertThat(allCount).isEqualTo(2);

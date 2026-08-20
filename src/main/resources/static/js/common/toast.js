@@ -34,10 +34,21 @@
 
     var content = document.createElement("div");
     content.className = "toast-content";
+    // 서버 오류 메시지는 "제목 — 상세" 형식을 많이 쓴다(FgcErrorCode 메시지 다수 해당) —
+    // 있으면 제목만 본문 크기로, 상세는 그 아래 작은 글씨로 줄바꿔서 보여준다.
+    var separatorIndex = message.indexOf(" — ");
+    var title = separatorIndex === -1 ? message : message.slice(0, separatorIndex);
+    var detail = separatorIndex === -1 ? null : message.slice(separatorIndex + 3);
     var text = document.createElement("p");
     text.className = "toast-message";
-    text.textContent = message;
+    text.textContent = title;
     content.appendChild(text);
+    if (detail) {
+      var detailText = document.createElement("p");
+      detailText.className = "toast-message-detail";
+      detailText.textContent = detail;
+      content.appendChild(detailText);
+    }
 
     var close = document.createElement("button");
     close.className = "icon-button toast-close";
