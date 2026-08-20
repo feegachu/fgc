@@ -4,7 +4,7 @@
 <body>
 <main id="main-content" class="page-content dashboard-page">
   <header class="page-header">
-    <div class="page-header-copy"><h1 class="page-title">업무 대시보드</h1><p class="page-description">이번 달 정산 병목과 우선 처리 업무를 한눈에 확인합니다.</p></div>
+    <div class="page-header-copy"><h1 class="page-title">업무 대시보드</h1></div>
   </header>
 
   <section class="kpi-grid" aria-label="주요 검증 지표">
@@ -16,25 +16,37 @@
     <!-- OPEN 은 exception_case.status 값이 아니라 EXCP-W01 과 공유하는 화면 묶음 필터다(= NEW + IN_REVIEW).
          ExceptionCaseViewController 가 ExceptionStatus.dbStatuses() 로 풀어서 조회하므로(#83)
          이 링크는 그대로 둔다 — NEW/IN_REVIEW 로 바꾸면 예외함 상태 select 어휘와 어긋난다. -->
-    <a class="kpi-card" th:href="@{/exceptions(status='OPEN',month=${month})}"><div class="kpi-card-header"><span class="kpi-label">미처리 예외</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.openException()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">신규 + 검토중</span></div></a>
+    <a class="kpi-card kpi-card-warning" th:href="@{/exceptions(status='OPEN',month=${month})}"><div class="kpi-card-header"><span class="kpi-label">미처리 예외</span></div><div class="kpi-value-row"><strong class="kpi-value" th:text="${summary.openException()}">0</strong><span class="kpi-unit">건</span></div><div class="kpi-card-footer"><span class="kpi-comparison">신규 + 검토중</span></div></a>
   </section>
 
   <div class="dashboard-main-grid">
     <div class="dashboard-primary-column">
-      <section class="surface trend-card" aria-labelledby="trend-title"><div class="trend-card-header"><div><h2 id="trend-title" class="trend-card-title">최근 6개월 예상액 ↔ 실제액</h2><p class="trend-card-meta">월별 추세 집계 API 연동 대기</p></div><span class="status-badge status-badge-neutral">데이터 준비 중</span></div><div class="empty-state">표시할 추세 데이터가 아직 제공되지 않습니다.</div></section>
       <section class="surface" aria-labelledby="priority-title">
         <header class="surface-header"><div><h2 id="priority-title" class="surface-title">최근 예외</h2></div><a class="run-list-link" th:href="@{/exceptions}">예외함 전체 보기 →</a></header>
-        <div class="data-table-viewport"><table class="data-table priority-table"><caption class="visually-hidden">최근 예외 목록</caption><thead><tr><th scope="col">심각도</th><th scope="col">계약번호</th><th scope="col">예외 내용</th><th scope="col">상태</th><th scope="col">발생</th></tr></thead><tbody>
-          <tr th:each="e : ${summary.recentExceptions()}"><td><span class="status-badge" th:classappend="${e.severity() == 'CRITICAL' or e.severity() == 'BLOCK'} ? ' status-badge-error' : ' status-badge-warning'" th:text="${e.severity()}">-</span></td><td class="tabular-nums" th:text="${e.contractNo()}">-</td><td><a th:href="@{/exceptions(contractNo=${e.contractNo()})}" th:text="${e.title()}">-</a></td><td th:text="${e.status()}">-</td><td class="tabular-nums" th:text="${#temporals.format(e.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td></tr>
-          <tr th:if="${summary.recentExceptions().isEmpty()}"><td colspan="5"><div class="empty-state" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
+        <div class="data-table-viewport"><table class="data-table priority-table"><caption class="visually-hidden">최근 예외 목록</caption><thead><tr><th scope="col">심각도</th><th scope="col">유형</th><th scope="col">계약번호</th><th scope="col">예외 내용</th><th scope="col">상태</th><th scope="col">발생</th></tr></thead><tbody>
+          <tr th:each="e : ${summary.recentExceptions()}"
+              th:with="severityLabel=${T(com.susukkang.fgc.common.code.ExceptionSeverity).valueOf(e.severity()).label()},typeCode=${e.exceptionType()},typeLabel=${T(com.susukkang.fgc.common.code.ExceptionType).valueOf(e.exceptionType()).label()},statusLabel=${T(com.susukkang.fgc.common.code.ExceptionStatus).valueOf(e.status()).label()}">
+            <td><span class="status-badge" th:classappend="${e.severity() == 'WARNING'} ? ' status-badge-warning' : (${e.severity() == 'HIGH' or e.severity() == 'CRITICAL'} ? ' status-badge-error' : ' status-badge-neutral')" th:title="${e.severity()}" th:text="${severityLabel}">-</span></td>
+            <td><span class="status-badge" th:classappend="${typeCode == 'CAP_WARNING' or typeCode == 'ARBITRAGE_CANDIDATE' or typeCode == 'ALLOCATION_EVIDENCE_MISSING'} ? ' status-badge-warning' : (${typeCode == 'CAP_VIOLATION' or typeCode == 'RECONCILIATION_MISMATCH' or typeCode == 'JOURNAL_IMBALANCE' or typeCode == 'POLICY_MISSING' or typeCode == 'POLICY_DUPLICATE'} ? ' status-badge-error' : (${typeCode == 'CAP_REVIEW_REQUIRED' or typeCode == 'REFUND_TABLE_MISSING' or typeCode == 'PRODUCT_CODE_MISMATCH' or typeCode == 'DATA_QUALITY'} ? ' status-badge-review' : ' status-badge-neutral'))" th:title="${typeCode}" th:text="${typeLabel}">-</span></td>
+            <td class="tabular-nums dashboard-disclosure-cell"><div class="table-cell-disclosure"><span class="table-cell-preview is-single-line" th:text="${e.contractNo()}">-</span><details class="table-cell-details" hidden><summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary><p class="table-cell-full" th:text="${e.contractNo()}">-</p></details></div></td>
+            <td class="dashboard-disclosure-cell"><div class="table-cell-disclosure"><a class="table-cell-preview is-single-line" th:href="@{/exceptions(contractNo=${e.contractNo()})}" th:text="${e.title()}">-</a><details class="table-cell-details" hidden><summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary><p class="table-cell-full" th:text="${e.title()}">-</p></details></div></td>
+            <td><span class="status-badge" th:classappend="${e.status() == 'NEW'} ? ' status-badge-error' : (${e.status() == 'IN_REVIEW'} ? ' status-badge-info' : (${e.status() == 'RESOLVED'} ? ' status-badge-success' : ' status-badge-review'))" th:title="${e.status()}" th:text="${statusLabel}">-</span></td>
+            <td class="tabular-nums" th:text="${#temporals.format(e.createdAt(), 'yyyy-MM-dd HH:mm')}">-</td>
+          </tr>
+          <tr th:if="${summary.recentExceptions().isEmpty()}"><td colspan="6"><div class="empty-state" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
         </tbody></table></div>
       </section>
     </div>
 
     <aside class="dashboard-secondary-column" aria-label="마감 및 실행 현황">
-      <section class="surface readiness-card" aria-labelledby="readiness-title"><div class="readiness-header"><h2 id="readiness-title" class="readiness-title">마감 준비도</h2><a class="readiness-link" th:href="@{/validation-runs}">마감 조건 보기 →</a></div><div class="readiness-value-row"><strong class="readiness-value">—</strong><span class="status-badge status-badge-neutral">집계 대기</span></div><div class="progress" role="progressbar" aria-label="마감 준비도"><span class="progress-bar" data-progress="0"></span></div><p class="readiness-meta"><span>준비도 집계 API가 아직 제공되지 않습니다.</span></p></section>
       <section class="surface run-list-card" aria-labelledby="run-list-title"><div class="run-list-header"><h2 id="run-list-title" class="run-list-title">최근 통합검증 실행</h2><a class="run-list-link" th:href="@{/validation-runs}">실행 목록 →</a></div>
-        <a class="run-row" th:each="r : ${summary.recentRuns()}" th:href="@{/validation-runs/{id}(id=${r.validationRunId()})}"><strong class="run-title" th:text="${r.validationMonth()} + ' · ' + ${r.runNo()} + '회차'">-</strong><span class="run-meta" th:text="${r.currentStep() == null ? 0 : r.currentStep()} + '/10 단계 · 실행 ' + ${r.triggeredBy()}">-</span><span class="status-badge" th:classappend="${r.status() == 'FAILED'} ? ' status-badge-error' : (${r.status() == 'FINALIZED' or r.status() == 'COMPLETED'} ? ' status-badge-success' : ' status-badge-info')" th:text="${r.status()}">-</span><span class="progress" role="progressbar" aria-label="검증 진행률" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${r.currentStep() == null ? 0 : r.currentStep() * 10}"><span class="progress-bar" th:attr="data-progress=${r.currentStep() == null ? 0 : r.currentStep() * 10}"></span></span></a>
+        <a class="run-row" th:each="r : ${summary.recentRuns()}" th:href="@{/validation-runs/{id}(id=${r.validationRunId()})}"
+           th:with="statusLabel=${T(com.susukkang.fgc.common.code.ValidationRunStatus).valueOf(r.status()).label()}">
+          <strong class="run-title" th:text="${r.validationMonth()} + ' · ' + ${r.runNo()} + '회차'">-</strong>
+          <span class="run-meta" th:text="${r.currentStep() == null ? 0 : r.currentStep()} + '/10 단계 · 실행 ' + ${r.triggeredBy()}">-</span>
+          <span class="status-badge" th:classappend="${r.status() == 'FAILED'} ? ' status-badge-error' : (${r.status() == 'FINALIZED' or r.status() == 'COMPLETED'} ? ' status-badge-success' : (${r.status() == 'RUNNING'} ? ' status-badge-info' : ' status-badge-neutral'))" th:title="${r.status()}" th:text="${statusLabel}">-</span>
+          <span class="progress" role="progressbar" aria-label="검증 진행률" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${r.currentStep() == null ? 0 : r.currentStep() * 10}"><span class="progress-bar" th:attr="data-progress=${r.currentStep() == null ? 0 : r.currentStep() * 10}"></span></span>
+        </a>
         <div class="empty-state" th:if="${summary.recentRuns().isEmpty()}" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div>
       </section>
     </aside>

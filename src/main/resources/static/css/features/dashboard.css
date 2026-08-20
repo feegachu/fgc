@@ -27,60 +27,6 @@
   max-width: 100%;
 }
 
-.trend-card {
-  min-height: 10.75rem;
-}
-
-.trend-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4) 0;
-}
-
-.trend-card-title {
-  font-size: 0.875rem;
-  font-weight: 700;
-  line-height: 1.375rem;
-}
-
-.trend-card-meta,
-.trend-card-legend {
-  color: var(--color-text-tertiary);
-  font-size: 0.625rem;
-  line-height: 1rem;
-}
-
-.trend-card-legend {
-  display: flex;
-  gap: var(--space-3);
-}
-
-.trend-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.trend-legend-swatch {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: var(--radius-full);
-  background: var(--color-action-primary);
-}
-
-.trend-legend-swatch-secondary {
-  background: var(--color-steel-500);
-}
-
-.trend-plot {
-  width: 100%;
-  height: 7.75rem;
-  padding: var(--space-1) var(--space-4) var(--space-3);
-  object-fit: fill;
-}
-
 .priority-table th:nth-child(1),
 .priority-table td:nth-child(1) {
   width: 5.75rem;
@@ -89,57 +35,52 @@
 
 .priority-table th:nth-child(2),
 .priority-table td:nth-child(2) {
-  width: 8.125rem;
+  width: 7rem;
 }
 
 .priority-table th:nth-child(3),
 .priority-table td:nth-child(3) {
-  width: auto;
+  width: 7.5rem;
 }
 
 .priority-table th:nth-child(4),
 .priority-table td:nth-child(4) {
-  width: 4.375rem;
-  text-align: center;
+  width: auto;
 }
 
 .priority-table th:nth-child(5),
 .priority-table td:nth-child(5) {
+  width: 4.75rem;
+  text-align: center;
+}
+
+.priority-table th:nth-child(6),
+.priority-table td:nth-child(6) {
   width: 5.625rem;
 }
 
-.readiness-card {
-  padding: var(--space-3) var(--space-4);
+/* 계약번호·예외 내용은 자유 텍스트라 잘리면 볼 방법이 없다 — table-cell-disclosure가
+   실제로 넘칠 때만 "전체 보기"를 드러내려면 이 셀은 nowrap 잘라내기 규칙에서 빠져야 한다
+   (exception.css의 .exception-disclosure-cell과 같은 패턴). */
+.priority-table td.dashboard-disclosure-cell {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: top;
+  text-overflow: clip;
+  white-space: normal;
 }
 
-.readiness-header,
-.readiness-value-row,
-.readiness-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.readiness-title,
 .run-list-title {
   font-size: 0.875rem;
   font-weight: 700;
   line-height: 1.375rem;
 }
 
-.readiness-link,
 .run-list-link {
   font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1.125rem;
-}
-
-.readiness-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 2rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .progress {
@@ -156,17 +97,6 @@
   height: 100%;
   border-radius: inherit;
   background: var(--color-action-primary);
-}
-
-.progress-bar-error {
-  background: var(--color-status-error-solid);
-}
-
-.readiness-meta {
-  margin-top: var(--space-2);
-  color: var(--color-text-tertiary);
-  font-size: 0.625rem;
-  line-height: 1rem;
 }
 
 .run-list-card {
@@ -198,6 +128,11 @@
   text-decoration: none;
 }
 
+.run-row:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: -2px;
+}
+
 .run-row:last-child {
   border-bottom: 0;
 }
@@ -226,18 +161,13 @@
   margin-top: var(--space-1);
 }
 
-@media (max-width: 74.9375rem) {
-  .dashboard-main-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard-secondary-column {
-    grid-template-columns: minmax(0, 0.7fr) minmax(20rem, 1.3fr);
-  }
+.dashboard-page .kpi-card:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: 2px;
 }
 
-@media (max-width: 47.9375rem) {
-  .dashboard-secondary-column {
+@media (max-width: 74.9375rem) {
+  .dashboard-main-grid {
     grid-template-columns: 1fr;
   }
 }
