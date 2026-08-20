@@ -33,6 +33,18 @@ public enum ExceptionActionType {
         };
     }
 
+    // 2026-08-20 yslee - 원장 정정 일반 조치 허용 기준을 서비스와 화면이 함께 사용하도록 중앙화
+    // 기존 코드: ExceptionCaseService의 private 메서드에만 허용 조치 목록이 정의됨
+    // 문제: 화면은 같은 기준을 재사용할 수 없어 검토중 오탐·반려 폼이 숨겨짐
+    // 개선: enum이 허용 기준을 제공해 서버 검증과 화면 노출 조건을 일치시킴
+    /** 원장 정정 전용 처리 전에도 일반 예외 조치 API에서 수행할 수 있는 조치인지 반환한다. */
+    public boolean isJournalCorrectionGeneralAction() {
+        return switch (this) {
+            case ASSIGN, START_REVIEW, COMMENT, FALSE_POSITIVE, REJECT -> true;
+            default -> false;
+        };
+    }
+
     /** 조치 완료 후 exception_case에 저장할 현재 상태를 반환한다. */
     public ExceptionStatus nextStatus(ExceptionStatus currentStatus) {
         if (!supports(currentStatus)) {

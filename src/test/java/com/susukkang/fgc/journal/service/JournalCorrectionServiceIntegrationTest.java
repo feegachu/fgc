@@ -37,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** FUN-047 차대 역전, 원본 불변, 정정그룹, 중복 방지와 실패 롤백 통합 검증. */
+/** FGC-FUN-047 차대 역전, 원본 불변, 정정그룹, 중복 방지와 실패 롤백 통합 검증. */
 @SpringBootTest
 class JournalCorrectionServiceIntegrationTest {
 
@@ -325,6 +325,7 @@ class JournalCorrectionServiceIntegrationTest {
     @Test
     @Transactional
     void activeCorrectionCaseIsUniqueAtDatabaseBoundary() {
+        // FGC-FUN-052: 정책 버전이 없는 활성 정정 예외도 DB 경계에서 하나만 허용한다.
         Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(650_000));
         journalCorrectionExceptionService.createOrGet(
                 originalId,
@@ -346,7 +347,35 @@ class JournalCorrectionServiceIntegrationTest {
 
     @Test
     @Transactional
+    void activeCorrectionCaseWithPolicyVersionIsUniqueAtDatabaseBoundary() {
+        // FGC-FUN-052: 정책 버전이 있는 업무키 차원도 V38 부분 UNIQUE 제약으로 보호한다.
+        Long policyVersionId = jdbcTemplate.queryForObject(
+                "SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1",
+                Long.class);
+        Long originalId = insertPostedOriginal(
+                newSourceId(), BigDecimal.valueOf(650_000), policyVersionId);
+        journalCorrectionExceptionService.createOrGet(
+                originalId,
+                new JournalCorrectionExceptionRequest("정책 버전 정정 요청", null),
+                ACTOR_ID);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO fgc.exception_case (
+                    exception_key, exception_type, reason_code, severity, status,
+                    policy_version_id, validation_month, source_entity_type, source_entity_id, title
+                ) VALUES (
+                    ?, 'JOURNAL_CORRECTION_REQUIRED', 'JOURNAL_CORRECTION_REQUIRED',
+                    'HIGH', 'NEW', ?, ?, 'JOURNAL_HEADER', ?, '정책 버전 중복 활성 정정 예외'
+                )
+                """, "FGC-FUN-052-DUPLICATE-" + UUID.randomUUID(), policyVersionId,
+                JOURNAL_DATE, String.valueOf(originalId)))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    @Transactional
     void repostRoundsEachLineHalfUpAndAllowsChangedLineComposition() {
+        // FGC-FUN-047 / 운영정책서 제17조의2: 상세행별 HALF_UP 후 라인 재구성을 허용한다.
         Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(650_000));
         String loginId = jdbcTemplate.queryForObject(
                 "SELECT login_id FROM fgc.app_user WHERE user_id = ?", String.class, ACTOR_ID);
@@ -437,15 +466,20 @@ class JournalCorrectionServiceIntegrationTest {
     }
 
     private Long insertPostedOriginal(String sourceId, BigDecimal amount) {
+        return insertPostedOriginal(sourceId, amount, null);
+    }
+
+    private Long insertPostedOriginal(String sourceId, BigDecimal amount, Long policyVersionId) {
         Long contractId = contractId();
         String journalNo = "TEST-CORR-" + UUID.randomUUID();
         Long headerId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.journal_header
                     (journal_no, journal_date, journal_type, source_entity_type,
-                     source_entity_id, revision_no, contract_id, description, created_by)
-                VALUES (?, ?, 'EXPECTED_INSURER_INCOME', 'SCHEDULE_LINE', ?, 1, ?, ?, ?)
+                     source_entity_id, revision_no, contract_id, policy_version_id,
+                     description, created_by)
+                VALUES (?, ?, 'EXPECTED_INSURER_INCOME', 'SCHEDULE_LINE', ?, 1, ?, ?, ?, ?)
                 RETURNING journal_header_id
-                """, Long.class, journalNo, JOURNAL_DATE, sourceId, contractId,
+                """, Long.class, journalNo, JOURNAL_DATE, sourceId, contractId, policyVersionId,
                 "FUN-047 통합테스트", ACTOR_ID);
 
         Long debitAccountId = accountId(JournalAccountCode.EXPECTED_RECEIVABLE);

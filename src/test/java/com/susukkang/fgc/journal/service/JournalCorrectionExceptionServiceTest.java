@@ -72,6 +72,7 @@ class JournalCorrectionExceptionServiceTest {
 
     @Test
     void repeatedRequestReturnsExistingCaseWithoutDuplicateHistory() {
+        // FGC-FUN-052: 같은 원분개의 미종결 정정 예외를 재사용한다.
         given(journalCorrectionMapper.findHeaderForUpdate(10L)).willReturn(postedHeader());
         given(exceptionMapper.findActiveBySource(10L, 9L))
                 .willReturn(new JournalCorrectionExceptionRow(30L, ExceptionStatus.IN_REVIEW));

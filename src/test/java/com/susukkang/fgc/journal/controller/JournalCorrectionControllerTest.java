@@ -77,6 +77,7 @@ class JournalCorrectionControllerTest {
 
     @Test
     void createsOrReusesCorrectionExceptionAndReturnsRedirect() throws Exception {
+        // FGC-FUN-052 / IF-API-36A: 활성 정정 예외의 멱등 생성과 이동 응답을 검증한다.
         given(journalCorrectionExceptionService.createOrGet(
                 eq(10L), any(JournalCorrectionExceptionRequest.class), eq(1L)))
                 .willReturn(new JournalCorrectionExceptionResponse(

@@ -227,7 +227,7 @@ public class ExceptionCaseService {
         // 개선: 검토 준비·오탐 조치만 일반 API로 허용하고 실제 정정은 IF-API-44A만 사용
         if (ExceptionType.JOURNAL_CORRECTION_REQUIRED.name().equals(target.exceptionType())
                 && !journalCorrectionExecuted
-                && !isJournalCorrectionGeneralAction(actionType)) {
+                && !actionType.isJournalCorrectionGeneralAction()) {
             throw new FgcBusinessException(FgcErrorCode.EXCP_003,
                     Map.of("status", fromStatus.name(), "actionType", actionType.name()));
         }
@@ -322,14 +322,6 @@ public class ExceptionCaseService {
 
     private boolean isClosed(ExceptionStatus status) {
         return status == ExceptionStatus.RESOLVED || status == ExceptionStatus.REJECTED;
-    }
-
-    private boolean isJournalCorrectionGeneralAction(ExceptionActionType actionType) {
-        return actionType == ExceptionActionType.ASSIGN
-                || actionType == ExceptionActionType.START_REVIEW
-                || actionType == ExceptionActionType.COMMENT
-                || actionType == ExceptionActionType.FALSE_POSITIVE
-                || actionType == ExceptionActionType.REJECT;
     }
 
     private String toJson(ExceptionAuditValue value) {

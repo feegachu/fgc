@@ -353,8 +353,9 @@
                 th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
         </dd></div>
       </dl>
+      <!-- 2026-08-20 yslee - FGC-FUN-053 원장 정정 예외도 검토중 오탐·반려 조치를 유지 -->
       <form class="exception-action-form" data-exception-action-form
-            th:if="${(c.status() == newStatus or c.status() == inReviewStatus) and (c.type().name() != 'JOURNAL_CORRECTION_REQUIRED' or c.status() == newStatus)}"
+            th:if="${c.status() == newStatus or c.status() == inReviewStatus}"
             th:attr="data-exception-id=${c.exceptionCaseId()},data-current-status=${c.status()}"
             sec:authorize="hasAnyRole('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')">
         <label class="fgc-field">
@@ -363,8 +364,8 @@
             <option value="">조치를 선택하세요</option>
             <option th:each="actionType : ${actionTypes}"
                     th:value="${actionType}" th:text="${actionType.label()}"
-                    th:disabled="${!actionType.supports(c.status())}"
-                    th:hidden="${!actionType.supports(c.status())}"
+                    th:disabled="${!actionType.supports(c.status()) or (c.type().name() == 'JOURNAL_CORRECTION_REQUIRED' and !actionType.isJournalCorrectionGeneralAction())}"
+                    th:hidden="${!actionType.supports(c.status()) or (c.type().name() == 'JOURNAL_CORRECTION_REQUIRED' and !actionType.isJournalCorrectionGeneralAction())}"
                     th:attr="data-supports-new=${actionType.supports(newStatus)},data-supports-review=${actionType.supports(inReviewStatus)}">
               조치
             </option>

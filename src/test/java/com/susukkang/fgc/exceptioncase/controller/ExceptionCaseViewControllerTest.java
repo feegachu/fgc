@@ -124,6 +124,10 @@ class ExceptionCaseViewControllerTest {
 
         mockMvc.perform(get("/exceptions").param("selected", "30").with(user(SETTLE)))
                 .andExpect(status().isOk())
+                // FGC-FUN-053: 검토중 정정 예외에서도 오탐·반려 일반 조치를 선택할 수 있어야 한다.
+                .andExpect(content().string(containsString("data-exception-action-form")))
+                .andExpect(content().string(containsString("value=\"FALSE_POSITIVE\"")))
+                .andExpect(content().string(containsString("value=\"REJECT\"")))
                 .andExpect(content().string(containsString("data-journal-correction-form")))
                 .andExpect(content().string(containsString("data-journal-id=\"10\"")))
                 .andExpect(content().string(containsString("data-add-correction-line")))
