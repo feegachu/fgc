@@ -16,13 +16,28 @@
   var initializationError = false;
   var paymentId = new URLSearchParams(window.location.search).get("id");
   var lastPrecheckResult = null;
+  /*
+   * 확정 게이트 6단계 — 화면정의서 :710-718 · 운영정책서 제31조의 순서를 그대로 옮긴다.
+   * 게이트를 임의로 늘리거나 줄이지 않는다. 이전 구현은 차익거래·업무키 게이트를 만들어 넣었는데
+   * 두 문서 어디에도 없고(화면정의서 :795 "검증 시 생성: cap_check, exception_case",
+   * 제31조 게이트 목록) precheck 가 해당 코드를 발행하지도 않아 영구히 판정되지 않는 칸이었다.
+   *
+   * codes 는 IF-API-24 blockers[] 의 오류 카탈로그 코드다. Blocker.code 는 FgcErrorCode.getCode()
+   * ("FGC-TRAN-002" 형태), message 는 부록 A 한글 표준 문구이므로
+   * (TransactionPrecheckResponse.Blocker) 영문 키워드 부분일치로는 분류할 수 없다 —
+   * 이전 구현에서 "FGC-CAP-*" 가 전부 "CAP" 키에 걸려 한도 게이트로 몰리고
+   * 나머지는 마지막 게이트로 떨어지던 원인이다.
+   *
+   * 6단계는 검사가 아니라 "앞 단계를 전부 통과하면 확정" 이라는 결과다 —
+   * 앞의 어느 게이트에도 속하지 않는 차단 사유(증빙 누락·정책버전 없음 등)를 여기서 받는다.
+   */
   var GATES = [
-    { label: "귀속행 존재", keys: ["ATTRIBUTION_REQUIRED", "NO_ATTRIBUTION", "ATTRIBUTION_EMPTY"] },
-    { label: "귀속금액 합계 일치", keys: ["ATTRIBUTION_AMOUNT", "ATTRIBUTION_BALANCE", "MISMATCH"] },
-    { label: "검토필요 귀속 해소", keys: ["REVIEW_REQUIRED"] },
-    { label: "1,200% 한도", keys: ["CAP", "1200", "VIOLATION"] },
-    { label: "차익거래 검증", keys: ["ARBITRAGE"] },
-    { label: "증빙·업무키 검증", keys: ["EVIDENCE", "DUPLICATE", "BUSINESS_KEY"] }
+    { label: "작성중(DRAFT) 저장", codes: ["FGC-TRAN-005"] },
+    { label: "귀속행 입력", codes: ["FGC-TRAN-002"] },
+    { label: "귀속합계 = 지급액", codes: ["FGC-TRAN-003"] },
+    { label: "검토필요 귀속 해소", codes: ["FGC-CAP-002"] },
+    { label: "1,200% 사전검증", codes: ["FGC-CAP-001", "FGC-CAP-003", "FGC-CAP-004"] },
+    { label: "전부 통과 → 확정", codes: [] }
   ];
 
   var stage = document.getElementById("stage");
@@ -45,9 +60,6 @@
   var confirmSubmitButton = document.getElementById("btn-confirm-submit");
   var confirmSummary = document.getElementById("transaction-confirm-summary");
   var confirmBlockers = document.getElementById("transaction-confirm-blockers");
-  var confirmLinks = document.getElementById("transaction-confirm-links");
-  var capLink = document.getElementById("transaction-cap-link");
-  var exceptionLink = document.getElementById("transaction-exception-link");
   var canProcess = !saveButton.disabled;
   var previousPaymentStage = stage.value;
 
@@ -602,17 +614,32 @@
     clear(gateList);
     var matched = GATES.map(function () { return []; });
     (blockers || []).forEach(function (blocker) {
-      var haystack = String((blocker && blocker.code) || "") + " " + String((blocker && blocker.message) || "");
-      haystack = haystack.toUpperCase();
+      var code = String((blocker && blocker.code) || "");
       var index = GATES.findIndex(function (gate) {
-        return gate.keys.some(function (key) { return haystack.indexOf(key) !== -1; });
+        return gate.codes.indexOf(code) !== -1;
       });
+      /* 어느 게이트에도 없는 코드는 마지막 "전부 통과 → 확정" 이 받는다. */
       matched[index < 0 ? GATES.length - 1 : index].push(blocker);
     });
 
+    /*
+     * 제31조는 "반드시 다음 순서로 처리한다" 이고 precheck 도 앞 단계가 막히면 뒤 단계 계산에
+     * 도달하지 못한다(예: 귀속행이 없으면 한도 계산 루프 자체를 돌지 않는다).
+     * 그래서 앞 게이트가 차단이면 뒤 게이트는 "통과" 가 아니라 "미확인" 으로 둔다 —
+     * 판정되지 않은 것을 통과로 보이게 하지 않는다.
+     */
+    var blockedBefore = false;
+    /* 사전검증 전에는 confirmable 이 null 이다 — 아직 아무것도 판정되지 않았다. */
+    var evaluated = confirmable != null;
+
     GATES.forEach(function (gate, index) {
       var failures = matched[index];
-      var state = confirmable === true ? "pass" : failures.length ? "fail" : "todo";
+      var state;
+      if (!evaluated) state = "todo";
+      else if (confirmable === true) state = "pass";
+      else if (failures.length) state = "fail";
+      else state = blockedBefore ? "todo" : "pass";
+      if (failures.length) blockedBefore = true;
       var row = document.createElement("div");
       row.className = "transaction-gate-step transaction-gate-" + state;
       var icon = textElement("span", state === "pass" ? "check" : state === "fail" ? "close" : "more_horiz");
@@ -625,7 +652,9 @@
       copy.appendChild(label);
       var detail = textElement("div", failures.length
         ? failures.map(function (blocker) { return blocker.message || blocker.code; }).join(" / ")
-        : state === "pass" ? "서버 사전검증 결과 통과했습니다." : "사전검증 후 서버 판정이 표시됩니다.");
+        : state === "pass" ? "서버 사전검증 결과 통과했습니다."
+          : evaluated ? "앞 단계가 막혀 아직 판정하지 않았습니다."
+            : "사전검증 후 서버 판정이 표시됩니다.");
       detail.className = "transaction-gate-detail";
       copy.appendChild(detail);
       row.appendChild(copy);
@@ -654,19 +683,17 @@
     confirmBlockers.hidden = blockers.length === 0;
     confirmSubmitButton.hidden = result.confirmable !== true;
     confirmSubmitButton.disabled = result.confirmable !== true;
-    configureResultLinks(result);
   }
 
-  function configureResultLinks(result) {
-    var preview = (result.capPreview || []).find(function (entry) { return entry.capCheckId != null; });
-    var capCheckId = result.capCheckId || (preview && preview.capCheckId);
-    var exceptionCaseId = result.exceptionCaseId || result.exceptionId;
-    capLink.hidden = capCheckId == null;
-    exceptionLink.hidden = exceptionCaseId == null;
-    if (capCheckId != null) capLink.href = "/cap-checks?capCheckId=" + encodeURIComponent(capCheckId);
-    if (exceptionCaseId != null) exceptionLink.href = "/exceptions?exceptionCaseId=" + encodeURIComponent(exceptionCaseId);
-    confirmLinks.hidden = capLink.hidden && exceptionLink.hidden;
-  }
+  /*
+   * 계산근거·예외함 링크는 두지 않는다 — 내려줄 ID 가 없다.
+   * IF-API-24 는 아무것도 저장하지 않는 미리보기라 CapPreviewItem.capCheckId 는 항상 null 이고
+   * (TransactionPrecheckResponse 주석), 응답에 exceptionCaseId 자체가 없다.
+   * 확정 실패 응답의 params 도 문구 치환값(a·b·c)만 담아 링크용 ID 가 오지 않는다.
+   * 세 경로 모두 막혀 있어 버튼은 영구히 hidden 이었다 —
+   * "API 없는 기능을 동작하는 것처럼 만들지 않는다"(이슈 #283).
+   * 확정 경로에서 cap_check·exception_case ID 를 내려주게 되면 그때 별도 이슈로 되살린다.
+   */
 
   function confirmPayment() {
     if (!paymentId || !lastPrecheckResult || lastPrecheckResult.confirmable !== true) return;

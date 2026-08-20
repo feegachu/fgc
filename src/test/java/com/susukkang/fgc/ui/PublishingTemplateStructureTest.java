@@ -322,6 +322,12 @@ class PublishingTemplateStructureTest {
                 .contains("id=\"transaction-permission-help\"")
                 .contains("id=\"err-bizKey\"")
                 .contains("id=\"err-attributions\"")
+                // 게이트 패널 제목은 화면정의서 :718 "위 6단계" 와 제31조를 그대로 인용한다.
+                .contains("확정 게이트 6단계")
+                // 내려줄 ID 가 없어 영구히 hidden 이던 링크는 두지 않는다.
+                .doesNotContain("transaction-confirm-links")
+                .doesNotContain("계산근거 보기")
+                .doesNotContain("예외함으로 이동")
                 .doesNotContain("page-description")
                 .doesNotContain("fgc-page-desc")
                 .doesNotContain("style=")
@@ -358,6 +364,31 @@ class PublishingTemplateStructureTest {
                 .contains("idempotencyKey: \"TRAN-CONFIRM-\" + paymentId")
                 .contains("var GATES = [")
                 .contains("renderGates([], null)")
+                /*
+                 * 확정 게이트는 화면정의서 :710-718 · 운영정책서 제31조의 6단계 그대로다.
+                 * 문서에 없는 게이트(차익거래·업무키)를 만들어 넣지 않는다 —
+                 * precheck 가 그런 코드를 발행하지 않아 영구히 판정되지 않는 칸이 된다.
+                 */
+                .contains("{ label: \"작성중(DRAFT) 저장\", codes: [\"FGC-TRAN-005\"] }")
+                .contains("{ label: \"귀속행 입력\", codes: [\"FGC-TRAN-002\"] }")
+                .contains("{ label: \"귀속합계 = 지급액\", codes: [\"FGC-TRAN-003\"] }")
+                .contains("{ label: \"검토필요 귀속 해소\", codes: [\"FGC-CAP-002\"] }")
+                .contains("{ label: \"1,200% 사전검증\", codes: [\"FGC-CAP-001\", \"FGC-CAP-003\", \"FGC-CAP-004\"] }")
+                .doesNotContain("차익거래 검증")
+                .doesNotContain("증빙·업무키 검증")
+                /*
+                 * blocker 분류는 오류 카탈로그 코드로 한다. Blocker.message 는 부록 A 한글 문구라
+                 * 영문 키워드 부분일치는 "FGC-CAP-*" 가 전부 "CAP" 에 걸리는 오분류를 낳았다.
+                 */
+                .doesNotContain("ATTRIBUTION_REQUIRED")
+                .doesNotContain("haystack")
+                /*
+                 * 계산근거·예외함 링크는 내려줄 ID 가 없어 제거했다 (capCheckId 는 IF-API-24 에서 항상 null).
+                 * 동작하지 않는 버튼을 되살리지 않는다.
+                 */
+                .doesNotContain("configureResultLinks")
+                .doesNotContain("transaction-cap-link")
+                .doesNotContain("transaction-exception-link")
                 .contains("format.today().slice(0, 7)")
                 .contains("format.won(")
                 .contains("showValidationError")

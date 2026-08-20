@@ -247,7 +247,6 @@
 .transaction-confirm-blockers { display: grid; gap: var(--space-3); }
 .transaction-confirm-summary { padding: var(--space-3); border-radius: var(--radius-8); background: var(--color-bg-subtle); }
 .transaction-confirm-blockers { padding: var(--space-3); border: 1px solid var(--color-status-error-border); border-radius: var(--radius-8); color: var(--color-status-error-text); background: var(--color-status-error-bg); }
-.transaction-confirm-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .transaction-page :is(a, button, input, select, textarea, summary):focus-visible {
   outline: 2px solid var(--color-border-focus);
@@ -276,6 +275,5 @@
   .transaction-form-grid { width: 100%; }
   .transaction-form-grid { grid-template-columns: 1fr; }
   .transaction-filter-checkbox { padding-block: var(--space-2); }
-  .transaction-add-attribution,
-  .transaction-confirm-links .button { width: 100%; }
+  .transaction-add-attribution { width: 100%; }
 }
