@@ -34,20 +34,20 @@
    * 빨강은 색만으로 뜻을 전달하지 않도록 괄호와 함께 쓰는 보조 수단이므로,
    * 호출부가 isNegative() 로 판별해 .is-negative-amount 클래스를 붙인다.
    *
-   * 괄호 위치 주의 — 여기서는 "원" 을 괄호 안에 넣어 (1,517,944원) 으로 낸다.
-   * 산출물의 리터럴 예시는 괄호 밖이다.
+   * 괄호는 숫자만 감싸고 "원" 은 밖에 둔다 — (1,517,944)원.
+   * 산출물의 리터럴 예시를 그대로 따른 것이다.
    *   화면정의서 4장 규칙 1 (:209) — "음수는 빨강 + 괄호. 예: (1,517,944)"
    *   인터페이스정의서 2-4 (:176) — "1,517,944 / 음수 (1,517,944) 빨강"
-   * 기존 유일한 구현인 features/cap/cap-list.js:67 이 (1,200,000원) 으로 내고 있고
-   * CAP-W01 은 이미 QA 를 거쳤기 때문에 그쪽에 맞췄다. 전환 시 시각 변화를 만들지 않기 위해서다.
-   * 문서-구현 불일치이므로 팀 확정 후 한쪽으로 통일해야 한다 — 임의로 바꾸지 말 것.
+   *
+   * features/cap/cap-list.js:67 은 (1,200,000원) 으로 괄호 안에 원을 넣고 있다.
+   * CAP-W01 전환(#289) 때 이 함수로 옮기면서 함께 맞춰야 한다 — 그 화면만 표기가 달라진다.
    */
   function won(value) {
     if (isBlank(value)) return EMPTY;
     var parsed = Number(value);
     if (!isFinite(parsed)) return EMPTY;
-    var text = Math.abs(parsed).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "원";
-    return parsed < 0 ? "(" + text + ")" : text;
+    var digits = Math.abs(parsed).toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+    return parsed < 0 ? "(" + digits + ")원" : digits + "원";
   }
 
   function isNegative(value) {

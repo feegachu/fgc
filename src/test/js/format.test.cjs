@@ -3,9 +3,10 @@ const assert = require("node:assert/strict");
 
 const format = require("../../main/resources/static/js/common/format.js");
 
-test("금액은 천 단위로 묶고 음수는 괄호로 감싼다 (화면정의서 4장 규칙 1)", () => {
+test("금액은 천 단위로 묶고 음수는 숫자만 괄호로 감싼다 (화면정의서 4장 규칙 1)", () => {
   assert.equal(format.won(1517944), "1,517,944원");
-  assert.equal(format.won(-1517944), "(1,517,944원)");
+  // 산출물 리터럴 예시가 (1,517,944) 이므로 "원" 은 괄호 밖이다.
+  assert.equal(format.won(-1517944), "(1,517,944)원");
   assert.equal(format.won(0), "0원");
   assert.equal(format.isNegative(-1), true);
   assert.equal(format.isNegative(0), false);
