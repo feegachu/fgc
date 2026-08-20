@@ -43,9 +43,7 @@ class PublishingTemplateStructureTest {
             "templates/transaction/form.html",
             "templates/schedule/detail.html",
             "templates/ledger/list.html",
-            "templates/exception/list.html",
-            "templates/vrun/list.html",
-            "templates/vrun/detail.html"
+            "templates/exception/list.html"
     );
 
     /*
@@ -61,6 +59,8 @@ class PublishingTemplateStructureTest {
             "templates/audit/list.html",
             "templates/contract/form.html",
             "templates/schedule/list.html",
+            "templates/vrun/list.html",
+            "templates/vrun/detail.html",
             "templates/arbitrage/list.html",
             "templates/error/403.html",
             "templates/error/404.html",
@@ -184,7 +184,10 @@ class PublishingTemplateStructureTest {
                 .contains("error.code === \"FGC-VRUN-006\"")
                 .contains("finalizeIdempotencyKey = null")
                 .contains("runStatus !== \"COMPLETED\"")
-                .contains("window.confirm")
+                // 확정 확인이 브라우저 기본 대화상자에서 공통 Modal 로 바뀌었다 (#286).
+                // 기본 대화상자는 화면정의서 :1487 의 송금·회계 마감 아님 문구를 담을 수 없다.
+                .contains("modal.open(\"vrun-finalize\")")
+                .doesNotContain("window.confirm")
                 .doesNotContain("fetch(");
     }
 
@@ -789,6 +792,122 @@ class PublishingTemplateStructureTest {
                 .contains("passwordToggle.setAttribute(\"aria-label\", willShow ? \"비밀번호 숨기기\" : \"비밀번호 표시\")")
                 .doesNotContain("FGC-AUTH-")
                 .doesNotContain("fetch(");
+    }
+
+    /*
+     * VRUN-W01·W02 월 통합검증 화면 (#286).
+     *
+     * 두 화면 모두 레거시 골격 그대로였다. 회귀 방지가 특히 중요한 두 가지를 인수조건으로 고정한다.
+     *   · 비가역인 확정을 브라우저 기본 대화상자로 확인했다 — 규제 고정 문구를 담을 수 없다
+     *   · 확정 성공 Toast 를 띄우자마자 reload() 해서 사용자에게 보이지 않았다
+     */
+    @Test
+    void validationRunScreensUseCommonComponentsWithoutInlinePresentation() throws IOException {
+        assertThat(resource("templates/vrun/list.html"))
+                .contains("class=\"page-content vrun-page vrun-list-page\"")
+                .contains("class=\"filter-bar vrun-filter-bar\"")
+                .contains("class=\"data-table-viewport vrun-table-viewport\" tabindex=\"0\" role=\"region\"")
+                .contains("<colgroup>")
+                .contains("scope=\"col\"")
+                .contains("class=\"visually-hidden\">월 통합검증 실행 목록")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"pagination-controls\"")
+                .contains("aria-label=\"월 통합검증 실행 목록 페이지\"")
+                // PRG 결과는 배너가 아니라 Toast 로 — 문구를 data-* 로 넘긴다
+                .contains("data-success-message=${successMessage}")
+                .contains("data-error-message=${errorMessage}")
+                // 폼 계약은 골격이 바뀌어도 그대로여야 한다
+                .contains("id=\"btn-create\"")
+                .contains("data-fgc-action=\"create\"")
+                .contains("name=\"month\"")
+                .contains("name=\"runType\"")
+                .contains("name=\"status\"")
+                // select 변경만으로 제출되던 동작을 명시적 조회 버튼으로 바꿨다 (LEDG-W01 선례)
+                .doesNotContain("onchange=")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("fgc-banner")
+                .doesNotContain("publishing-page")
+                .doesNotContain("<th style=\"width:")
+                .doesNotContain("style=\"");
+
+        assertThat(resource("templates/vrun/detail.html"))
+                .contains("class=\"page-content vrun-page vrun-detail-page\"")
+                // 확정 확인 모달 — 규제 고정 문구를 담는다
+                .contains("data-modal=\"vrun-finalize\"")
+                .contains("id=\"btn-finalize-submit\"")
+                .contains("data-modal-initial-focus")
+                // 확정 완료 모달 — reload 로 사라지던 성공 피드백을 대신한다 (목업 :195-210)
+                .contains("data-modal=\"vrun-finalized\"")
+                .contains("id=\"btn-finalized-close\"")
+                // 결과 요약이 "플레이스홀더" 클래스가 아니라 공통 KPI 카드다
+                .contains("class=\"kpi-grid vrun-summary-grid\"")
+                .contains("class=\"kpi-card\"")
+                // 스텝퍼는 색만으로 상태를 전달하지 않는다 (규칙 4)
+                .contains("class=\"vrun-stepper\"")
+                .contains("data-step-state")
+                // 진행률 % 를 상세에도 표시한다 (화면정의서 :1442)
+                .contains("id=\"progress-text\"")
+                // 비활성 사유는 title 이 아니라 가시 텍스트 + aria-describedby
+                .contains("id=\"finalize-action-note\"")
+                .contains("id=\"execute-action-note\"")
+                .contains("aria-describedby=\"finalize-action-guide finalize-action-note\"")
+                // 기존 구조 테스트가 고정하던 계약은 그대로 유지한다
+                .contains("id=\"cond-body\" aria-live=\"polite\"")
+                .contains("data-checklist-passed=\"false\"")
+                .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                .contains("검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.")
+                .containsOnlyOnce("id=\"finalize-action-guide\"")
+                .containsOnlyOnce("id=\"btn-finalize\"")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("publishing-result-placeholder")
+                .doesNotContain("publishing-page")
+                .doesNotContain("style=\"")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContain("<script>");
+
+        // 서버 렌더링 배지 매핑을 한 곳으로 모았다 — 전에는 두 템플릿과 JS 에 4벌이 흩어져 있었다
+        assertThat(resource("templates/vrun/status-badge.html"))
+                .contains("th:fragment=\"runStatusBadge(status, label)\"")
+                .contains("status-badge-error")
+                .contains("status-badge-review")
+                .contains("status-badge-success")
+                .contains("status-badge-info")
+                .contains("status-badge-neutral")
+                .contains("vrun-badge-lock");
+
+        assertThat(resource("static/js/features/vrun/vrun-detail.js"))
+                // JS 배지가 서버 렌더링과 같은 클래스를 쓴다. CREATED 와 RUNNING 을 구분한다
+                .contains("STATUS_BADGE_CLASSES")
+                .contains("CREATED: \"status-badge-neutral\"")
+                .contains("RUNNING: \"status-badge-info\"")
+                .contains("statusBadge.classList.remove.apply(statusBadge.classList, STATUS_BADGE_CLASS_NAMES)")
+                .doesNotContain("statusBadge.className =")
+                // 폴링 오류가 더는 무음이 아니다
+                .contains("pollFailures >= 3")
+                // 확정 성공은 완료 모달로 알린다 — Toast 직후 reload 하지 않는다
+                .contains("modal.open(\"vrun-finalized\")")
+                // 비활성 사유는 title 이 아니다
+                .doesNotContain("finalizeButton.title =")
+                .contains("finalizeNote.textContent = reason");
+
+        assertThat(resource("static/js/features/vrun/vrun-list.js"))
+                .contains("main.dataset[attribute]")
+                .contains("delete main.dataset[attribute]")
+                .contains("flash(\"successMessage\", \"success\", 5000)")
+                .contains("flash(\"errorMessage\", \"error\", 0)")
+                .doesNotContain("fetch(");
+
+        assertThat(resource("static/css/features/vrun.css"))
+                .contains(".vrun-stepper")
+                .contains(".vrun-inline-state")
+                .contains(".vrun-kv")
+                .contains(".vrun-mid-grid")
+                // 인라인 <script> 의 resize 리스너를 CSS 미디어쿼리로 대체했다
+                .contains("@media (max-width: 63.9375rem)")
+                .contains(":focus-visible");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("th:src=\"@{/js/features/vrun/vrun-list.js}\" defer");
     }
 
     private static String resource(String path) throws IOException {

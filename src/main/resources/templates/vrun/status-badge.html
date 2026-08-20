@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!--
+  VRUN 실행 상태 배지 — 서버 렌더링 쪽 단일 매핑 (#286)
+
+  전에는 같은 매핑이 4벌 있었다.
+    vrun/list.html:112-118 · vrun/detail.html:75-79 · vrun/detail.html:166-169 · vrun-detail.js:34-38
+  그중 CREATED 와 RUNNING 이 같은 톤(warning)이라 "아직 시작 안 함"과 "돌고 있음"을 구분할 수 없었다.
+
+  톤은 화면정의서 4장 규칙 4(:212 "정상=초록, 주의=주황, 위반·차단=빨강, 검토필요=회색, 진행중=파랑")와
+  common/code/ValidationRunStatus.java 의 label()·canTransitionTo() 가 정의한 상태 흐름을 따른다.
+    CREATED   생성됨      → neutral  (아직 실행 전)
+    RUNNING   실행중      → info     (진행중)
+    COMPLETED 계산완료    → success  (정상 종료)
+    FINALIZED 확정(잠김)  → review + 자물쇠  (규칙 8 확정 후 잠금)
+    FAILED    실패        → error    (차단)
+
+  FINALIZED 만 라벨을 "확정" 으로 줄인다 — "(잠김)" 은 자물쇠 아이콘이 대신하므로 배지가 짧아진다.
+  이 처리는 PR #316 이 목록에서 먼저 넣은 것을 그대로 이어받았다.
+
+  JS 쪽(vrun-detail.js 의 STATUS_BADGE_CLASSES)이 같은 클래스명을 쓴다. 한쪽만 고치면 폴링 도중
+  배지 색이 서버 렌더링과 어긋나므로 두 곳을 함께 고쳐야 한다.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<span th:fragment="runStatusBadge(status, label)"
+      class="status-badge"
+      th:classappend="${status == 'FAILED'} ? 'status-badge-error'
+                      : (${status == 'FINALIZED'} ? 'status-badge-review'
+                      : (${status == 'COMPLETED'} ? 'status-badge-success'
+                      : (${status == 'RUNNING'} ? 'status-badge-info' : 'status-badge-neutral')))"
+      ><span th:text="${status == 'FINALIZED'} ? '확정' : ${label}">생성됨</span><span
+        class="material-symbols-rounded vrun-badge-lock" aria-hidden="true"
+        th:if="${status == 'FINALIZED'}">lock</span></span>
+
+</body>
+</html>
