@@ -9,7 +9,322 @@
  */
 
 .arbitrage-page {
+.arb-page {
   display: grid;
   min-width: 0;
   gap: var(--space-4);
+}
+
+.arb-filter-fields {
+  flex: 1 1 auto;
+}
+
+.arb-filter-month { width: 9rem; }
+.arb-filter-status { width: 9rem; }
+.arb-filter-stage { width: 10rem; }
+.arb-filter-insurer { width: 13rem; }
+.arb-filter-contract { width: 13rem; }
+
+.arb-filter-actions {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.arb-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.arb-summary-card {
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.arb-summary-card:hover {
+  background: var(--color-neutral-50);
+  box-shadow: var(--shadow-xs);
+}
+
+.arb-summary-card:active {
+  transform: translateY(1px);
+}
+
+.arb-summary-card:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.arb-summary-card[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
+.arb-summary-review {
+  border-color: var(--color-status-review-border);
+}
+
+.arb-summary-review .kpi-value {
+  color: var(--color-status-review-text);
+}
+
+.arb-content-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.25fr) minmax(22rem, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.arb-list-panel,
+.arb-detail-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.arb-panel-header {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.arb-result-count {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.arb-list-table {
+  min-width: 79rem;
+}
+
+.arb-col-contract { width: 12rem; }
+.arb-col-stage { width: 7rem; }
+.arb-col-date { width: 6.5rem; }
+.arb-col-month { width: 5.5rem; }
+.arb-col-amount { width: 8rem; }
+.arb-col-source { width: 7.5rem; }
+.arb-col-refund { width: 7.5rem; }
+.arb-col-status { width: 7rem; }
+
+.arb-result-row {
+  cursor: pointer;
+}
+
+.arb-result-row:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.arb-result-row.is-selected {
+  background: var(--color-action-subtle);
+}
+
+.arb-amount-error {
+  color: var(--color-status-error-text);
+  font-weight: 600;
+}
+
+.arb-state-row:hover {
+  background: var(--color-bg-surface);
+}
+
+.arb-state-row td {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+}
+
+.arb-pagination-footer {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.arb-detail-panel {
+  align-self: start;
+}
+
+.arb-detail-placeholder,
+.arb-recheck-contract {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.arb-detail-list {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.arb-detail-list > div {
+  display: grid;
+  min-height: 2.5rem;
+  grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr);
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.arb-detail-list dt,
+.arb-detail-list dd {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.arb-detail-list dt {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.arb-detail-list dd {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.arb-calculation {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  white-space: pre-wrap;
+}
+
+.arb-timeline-panel {
+  margin-top: var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+}
+
+.arb-timeline-state {
+  min-height: 7rem;
+  padding: var(--space-4);
+}
+
+.arb-timeline-title {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.arb-timeline-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: var(--space-3) var(--space-3) 0;
+  color: var(--color-text-secondary);
+}
+
+.arb-timeline-axis {
+  stroke: currentColor;
+  opacity: 0.25;
+}
+
+.arb-timeline-line {
+  fill: none;
+  stroke: var(--color-status-error-solid);
+  stroke-width: 3;
+}
+
+.arb-timeline-point {
+  fill: var(--color-status-error-solid);
+}
+
+.arb-timeline-table {
+  overflow-x: auto;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.arb-timeline-data-table {
+  min-width: 34rem;
+}
+
+.arb-detail-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.arb-recheck-icon {
+  font-size: 1rem;
+}
+
+#arb-recheck-button.is-loading .arb-recheck-icon {
+  animation: arb-recheck-spin 0.8s linear infinite;
+}
+
+.arb-recheck-modal {
+  width: min(30rem, 100%);
+}
+
+.arb-recheck-body {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@keyframes arb-recheck-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 71.875rem) {
+  .arb-content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 63.9375rem) {
+  .arb-filter-bar {
+    align-items: stretch;
+  }
+
+  .arb-filter-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .arb-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .arb-filter-month,
+  .arb-filter-status,
+  .arb-filter-stage,
+  .arb-filter-insurer,
+  .arb-filter-contract,
+  .arb-filter-actions,
+  .arb-filter-actions .button {
+    width: 100%;
+  }
+
+  .arb-detail-list > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .arb-detail-list dd {
+    padding-top: 0;
+  }
+
+  .arb-pagination-footer {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #arb-recheck-button.is-loading .arb-recheck-icon {
+    animation: none;
+  }
 }

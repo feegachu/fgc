@@ -235,6 +235,7 @@
         renderCapDetail(data || {});
         state.hidden = true;
         content.hidden = false;
+        window.requestAnimationFrame(function () { syncCapDisclosures(content); });
       })
       .catch(function (error) {
         if (requestId !== capDetailRequestId || (error && error.name === "AbortError")) return;
@@ -249,9 +250,8 @@
     capText("sum-contract", item.contractNo);
     capText("sum-stage", item.paymentStageLabel || stageLabel(item.paymentStage));
     capText("sum-asof", item.asOfDate);
-    capText("sum-kind", item.checkKind || "저장 판정");
-    capText("sum-ruleset", item.capRuleSetId == null ? "—" : "ID " + item.capRuleSetId);
-    capText("sum-id", item.capCheckId);
+    capText("sum-ruleset", item.capRuleSetId == null ? "—" : "룰셋 ID " + item.capRuleSetId);
+    capText("sum-id", item.capCheckId == null ? "—" : "cap_check #" + item.capCheckId);
     var badge = document.getElementById("sum-badge");
     badge.replaceChildren();
     var badgeValue = document.createElement("span");
@@ -260,46 +260,76 @@
     badge.appendChild(badgeValue);
 
     var insurerStage = item.paymentStage === "INSURER_TO_GA";
+    var multiplier = snapshot.premiumMultiplier == null ? null : String(snapshot.premiumMultiplier);
+    var ruleSetLabel = item.capRuleSetId == null ? "—" : "룰셋 ID " + item.capRuleSetId;
     capTableRows("input-body", [
       ["월납환산 초회보험료", money(item.basePremiumAmount)],
-      ["12차월 환급금 가산", number(item.refund12mAmount) === 0 ? "해당없음" : money(item.refund12mAmount)],
+      ["한도 배수", multiplier == null ? "—" : multiplier + "배"],
+      ["환급금 가산", money(item.refund12mAmount)],
       ["준법경영비 공제", insurerStage ? money(item.complianceDeductionAmount) : "적용하지 않음"],
-      ["보험료 배수", snapshot.premiumMultiplier == null ? "—" : snapshot.premiumMultiplier]
+      ["적용 룰셋", ruleSetLabel]
     ]);
-    capText("formula", insurerStage
-      ? "기준 보험료 × 배수 + 환급금 가산 − 준법경영비 공제"
-      : "기준 보험료 × 배수 + 환급금 가산");
-    capText("formula-note", insurerStage
-      ? "원수사 → GA 단계의 저장된 공제 금액을 표시합니다."
-      : "GA → 설계사 단계에는 준법경영비 공제를 적용하지 않습니다.");
+    var limitParts = [number(item.basePremiumAmount).toLocaleString("ko-KR"), "×", multiplier == null ? "—" : multiplier];
+    if (number(item.refund12mAmount) !== 0) {
+      limitParts.push("+", number(item.refund12mAmount).toLocaleString("ko-KR"));
+    }
+    if (insurerStage && number(item.complianceDeductionAmount) !== 0) {
+      limitParts.push("−", number(item.complianceDeductionAmount).toLocaleString("ko-KR"));
+    }
+    capText("formula-limit", "한도 = " + limitParts.join(" ") + " = " + money(item.limitAmount));
+    capText("formula-usage", "사용률 = " + number(item.includedAmount).toLocaleString("ko-KR") + " ÷ "
+      + number(item.limitAmount).toLocaleString("ko-KR") + " × 100");
+    capText("formula-result", "= " + percent(item.usagePct));
     var finalBar = document.getElementById("final-bar");
+    finalBar.className = "cap-detail-gauge-bar " + capProgressClass(item.resultStatus);
     finalBar.style.width = capProgressWidth(item.usagePct);
-    capText("final-limit-label", "한도 " + money(item.limitAmount));
-    capTableRows("final-body", [
-      ["한도", money(item.limitAmount)], ["산입금액", money(item.includedAmount)],
-      ["잔여", money(item.remainingAmount)], ["사용률", percent(item.usagePct)],
-      ["저장 판정", value(item.resultStatusLabel || item.resultStatus)]
-    ]);
+    finalBar.setAttribute("aria-valuenow", String(Math.max(0, Math.min(100, number(item.usagePct)))));
+    finalBar.setAttribute("aria-valuetext", "사용률 " + percent(item.usagePct));
+    capText("final-usage", "사용률 " + percent(item.usagePct));
+    var warningMark = document.getElementById("final-warning-mark");
+    var warningUsagePct = Number(snapshot.warningUsagePct);
+    warningMark.hidden = !Number.isFinite(warningUsagePct);
+    if (!warningMark.hidden) warningMark.style.left = capProgressWidth(warningUsagePct);
+    var finalBody = document.getElementById("final-body");
+    finalBody.replaceChildren(
+      capResultRow("산입 합계", money(item.includedAmount)),
+      capResultRow("한도", money(item.limitAmount)),
+      capResultRow("잔여", money(item.remainingAmount))
+    );
+    var finalStatus = document.getElementById("final-status");
+    finalStatus.replaceChildren();
+    var finalBadge = document.createElement("span");
+    finalBadge.className = "status-badge " + capStatusClass(item.resultStatus);
+    finalBadge.textContent = value(item.resultStatusLabel || item.resultStatus);
+    finalStatus.appendChild(finalBadge);
 
     var details = Array.isArray(data.details) ? data.details : [];
+    capText("detail-count", details.length.toLocaleString("ko-KR") + "개 항목");
     var detailBody = document.getElementById("detail-body");
     detailBody.replaceChildren();
     if (!details.length) {
       var emptyRow = document.createElement("tr");
       var emptyCell = document.createElement("td");
-      emptyCell.colSpan = 7;
+      emptyCell.colSpan = 6;
       emptyCell.textContent = "저장된 항목별 산입 내역이 없습니다.";
       emptyRow.appendChild(emptyCell);
       detailBody.appendChild(emptyRow);
     } else {
       details.forEach(function (detail) {
         var row = document.createElement("tr");
-        [detail.detailSeq, detail.commissionItemName, money(detail.amount), capClassificationLabel(detail.classificationSnapshot),
-          detail.decisionReason, detail.evidenceRef, "저장 스냅샷"].forEach(function (entry) {
-          var cell = document.createElement("td");
-          cell.textContent = value(entry);
-          row.appendChild(cell);
-        });
+        var sequenceCell = document.createElement("td");
+        sequenceCell.textContent = value(detail.detailSeq);
+        var amountCell = document.createElement("td");
+        amountCell.className = "text-right tabular-nums";
+        amountCell.textContent = money(detail.amount);
+        var statusCell = document.createElement("td");
+        statusCell.className = "text-center";
+        var statusBadge = document.createElement("span");
+        statusBadge.className = "status-badge " + capClassificationClass(detail.classificationSnapshot);
+        statusBadge.textContent = capClassificationLabel(detail.classificationSnapshot);
+        statusCell.appendChild(statusBadge);
+        row.append(sequenceCell, capDisclosureCell(detail.commissionItemName, false), amountCell, statusCell,
+          capDisclosureCell(detail.decisionReason, false), capDisclosureCell(detail.evidenceRef || "증빙 미연결 / 후속 연결 대기", false));
         detailBody.appendChild(row);
       });
     }
@@ -307,9 +337,57 @@
       return detail.classificationSnapshot === "INCLUDED" ? total + number(detail.amount) : total;
     }, 0);
     capText("detail-included", includedTotal.toLocaleString("ko-KR"));
-    capText("detail-included-note", includedTotal === number(item.includedAmount)
-      ? "제외·검토필요 금액은 합계에 넣지 않습니다 · 저장 산입금액과 일치"
+    var includedMatches = includedTotal === number(item.includedAmount);
+    var includedNote = document.getElementById("detail-included-note");
+    includedNote.classList.toggle("cap-detail-mismatch", !includedMatches);
+    capText("detail-included-note", includedMatches
+      ? "제외 항목 미포함"
       : "저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.");
+  }
+
+  function capResultRow(label, displayValue) {
+    var row = document.createElement("div");
+    var term = document.createElement("dt");
+    var description = document.createElement("dd");
+    description.className = "tabular-nums";
+    term.textContent = label;
+    description.textContent = displayValue;
+    row.append(term, description);
+    return row;
+  }
+
+  function capDisclosureCell(input, singleLine) {
+    var cell = document.createElement("td");
+    cell.className = "cap-disclosure-cell";
+    var disclosure = document.createElement("div");
+    disclosure.className = "table-cell-disclosure";
+    var preview = document.createElement("span");
+    preview.className = "table-cell-preview" + (singleLine ? " is-single-line" : "");
+    preview.textContent = value(input);
+    var details = document.createElement("details");
+    details.className = "table-cell-details";
+    details.hidden = true;
+    var summary = document.createElement("summary");
+    summary.innerHTML = '<span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>' +
+      '<span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>';
+    var full = document.createElement("p");
+    full.className = "table-cell-full";
+    full.textContent = value(input);
+    details.append(summary, full);
+    disclosure.append(preview, details);
+    cell.appendChild(disclosure);
+    return cell;
+  }
+
+  function syncCapDisclosures(scope) {
+    scope.querySelectorAll(".table-cell-disclosure").forEach(function (disclosure) {
+      var preview = disclosure.querySelector(".table-cell-preview");
+      var details = disclosure.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+      var isTruncated = preview.scrollWidth > preview.clientWidth + 1 || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !isTruncated;
+      if (!isTruncated) details.open = false;
+    });
   }
 
   function capText(id, input) { document.getElementById(id).textContent = value(input); }
@@ -334,6 +412,12 @@
   }
   function capClassificationLabel(status) {
     return status === "INCLUDED" ? "산입" : status === "EXCLUDED" ? "제외" : status === "REVIEW_REQUIRED" ? "검토필요" : value(status);
+  }
+  function capClassificationClass(status) {
+    return status === "INCLUDED" ? "status-badge-info" : status === "REVIEW_REQUIRED" ? "status-badge-review" : "status-badge-neutral";
+  }
+  function capProgressClass(status) {
+    return status === "WARNING" ? "is-warning" : status === "VIOLATION" ? "is-violation" : status === "REVIEW_REQUIRED" ? "is-review" : "";
   }
   function capProgressWidth(input) { return Math.max(0, Math.min(100, number(input))) + "%"; }
   function usageGauge(input, status) {
@@ -364,6 +448,6 @@
   }
   function value(input) { return input === null || input === undefined || input === "" ? "—" : String(input); }
   function money(input) { var number = Number(input); return Number.isFinite(number) ? number.toLocaleString("ko-KR") + "원" : "—"; }
-  function percent(input) { var number = Number(input); return Number.isFinite(number) ? number.toLocaleString("ko-KR", { maximumFractionDigits: 6 }) + "%" : "—"; }
+  function percent(input) { return input === null || input === undefined || input === "" ? "—" : String(input) + "%"; }
   function stageLabel(stage) { return stage === "INSURER_TO_GA" ? "원수사→GA" : stage === "GA_TO_FC" ? "GA→설계사" : value(stage); }
 })();

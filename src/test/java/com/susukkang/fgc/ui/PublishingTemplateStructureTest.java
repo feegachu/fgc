@@ -93,10 +93,37 @@ class PublishingTemplateStructureTest {
 
     @Test
     void reconciliationComparisonKeepsPopupPublishingScope() throws IOException {
+        assertThat(resource("templates/reco/list.html"))
+                .contains("class=\"modal-backdrop reco-compare-backdrop\"");
+
         assertThat(resource("templates/reco/compare-modal.html"))
                 .contains("th:fragment=\"modal\"")
-                .contains("publishing-modal")
+                .contains("class=\"modal modal-large publishing-modal reco-compare-modal\"")
+                .contains("role=\"dialog\" aria-modal=\"true\"")
+                .contains("class=\"reco-compare-grid\"")
+                .contains("class=\"reco-compare-source-list\" id=\"expected-body\"")
+                .contains("class=\"reco-compare-source-list\" id=\"actual-body\"")
+                .contains("class=\"reco-compare-diff-grid\"")
+                .contains("class=\"modal-footer reco-compare-footer\"")
+                .contains("class=\"surface reco-compare-panel\"")
+                .doesNotContain("class=\"fgc-modal")
+                .doesNotContain("class=\"fgc-card")
+                .doesNotContain("class=\"fgc-table")
+                .doesNotContain("class=\"fgc-banner")
+                .doesNotContain("class=\"guidance")
+                .doesNotContain("style=")
                 .doesNotContain("<main");
+
+        assertThat(resource("static/js/features/reco/reco.js"))
+                .contains("class=\"status-badge ")
+                .contains("empty-state reco-compare-empty\">예상 없음</div>")
+                .contains("empty-state reco-compare-empty\">실제 없음</div>")
+                .contains("sourceRow(\"적용 요율\"")
+                .contains("sourceRow(\"귀속 ID\"")
+                .contains("difference-formula")
+                .contains("class=\"button button-secondary\"")
+                .doesNotContain("class=\"fgc-btn fgc-btn--ghost\"")
+                .doesNotContain("class=\"fgc-th-num\"");
     }
 
     @Test
