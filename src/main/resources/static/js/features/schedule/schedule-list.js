@@ -15,15 +15,25 @@
     return Math.min(positivePage(requestedPage), lastPage);
   }
 
-  function responseLabel(serverLabel, labels, code) {
-    if (typeof serverLabel === "string" && serverLabel.trim()) return serverLabel;
-    return labels[code] || code || "-";
-  }
-
+  /*
+   * responseLabel 구현은 schedule-labels.js 한 곳에만 둔다 (#285).
+   * 다만 src/test/js/schedule-list.test.cjs 가 이 파일에서 responseLabel 을 require 하므로
+   * export 계약은 그대로 유지한다 — Node 에서는 형제 모듈을 직접 읽고, 브라우저에서는
+   * 아래 window.FgcUi.scheduleLabels 를 쓴다. require 는 이 분기 안에서만 실행되므로
+   * 브라우저에 require 가 없어도 안전하다.
+   */
   if (typeof module === "object" && module.exports) {
-    module.exports = { normalizePage: normalizePage, responseLabel: responseLabel };
+    module.exports = {
+      normalizePage: normalizePage,
+      responseLabel: require("./schedule-labels.js").responseLabel
+    };
     return;
   }
+
+  var scheduleLabels = window.FgcUi && window.FgcUi.scheduleLabels;
+  var format = window.FgcUi && window.FgcUi.format;
+  if (!scheduleLabels || !format) return;
+  var responseLabel = scheduleLabels.responseLabel;
 
   var form = document.querySelector("[data-schedule-filter-form]");
   var resetButton = document.querySelector("[data-schedule-filter-reset]");
@@ -43,13 +53,52 @@
 
   if (!form || !table || !tableBody || !pagination || !previousButton || !nextButton) return;
 
+  /*
+   * CSV 내보내기 — 전에는 window.location.assign 만 호출해서 성공·실패 어느 쪽도 알리지 않았다.
+   * fetch + Blob 으로 바꿔 두 경우 모두 Toast 를 띄운다. JS 가 죽어 있으면 아무 일도 없던
+   * 예전과 같아지므로 회귀는 없다. 진행 중에는 aria-busy 로 스크린리더에도 알린다.
+   */
   if (exportButton) {
     exportButton.addEventListener("click", function () {
       var parameters = new URLSearchParams(window.location.search);
       parameters.delete("page");
       parameters.delete("size");
-      window.location.assign("/api/v1/schedules/export.csv" + (parameters.size ? "?" + parameters.toString() : ""));
+      exportCsv("/api/v1/schedules/export.csv" + (parameters.size ? "?" + parameters.toString() : ""));
     });
+  }
+
+  function exportCsv(url) {
+    exportButton.disabled = true;
+    exportButton.setAttribute("aria-busy", "true");
+    window.fetch(url, { credentials: "same-origin" })
+      .then(function (response) {
+        if (!response.ok) throw new Error("CSV 내보내기에 실패했습니다. (HTTP " + response.status + ")");
+        return response.blob();
+      })
+      .then(function (blob) {
+        var objectUrl = window.URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = "schedules.csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(objectUrl);
+        toast("예상 스케줄 CSV를 내려받았습니다.", "success", 3500);
+      })
+      .catch(function (error) {
+        toast(format.errorText(error, "CSV 내보내기에 실패했습니다."), "error", 5000);
+      })
+      .finally(function () {
+        exportButton.disabled = false;
+        exportButton.removeAttribute("aria-busy");
+      });
+  }
+
+  function toast(message, tone, duration) {
+    if (window.FgcUi && typeof window.FgcUi.toast === "function") {
+      window.FgcUi.toast(message, tone, duration);
+    }
   }
 
   var PAGE_SIZE = 20;
@@ -60,41 +109,14 @@
     purpose: ["OPERATIONAL", "COMPARISON", "SIMULATION"],
     status: ["", "PLANNED", "CONFIRMED", "MATCHED", "ADJUSTED", "HOLD", "CANCELLED", "RESTARTED"]
   };
+  /* 라벨·톤은 schedule-labels.js 한 벌만 쓴다 — SCHE-W02 와 같은 값을 보장한다. */
   var LABELS = {
-    paymentStage: {
-      INSURER_TO_GA: "원수사→GA",
-      GA_TO_FC: "GA→설계사"
-    },
-    scheduleRegime: {
-      CURRENT: "현행",
-      FOUR_YEAR_2027: "4년 분급(2027)",
-      SEVEN_YEAR_2029: "7년 분급(2029)",
-      TM_SPECIAL: "TM 특례"
-    },
-    schedulePurpose: {
-      OPERATIONAL: "운영",
-      COMPARISON: "비교",
-      SIMULATION: "시뮬레이션"
-    },
-    scheduleStatus: {
-      PLANNED: "예정",
-      CONFIRMED: "확정",
-      MATCHED: "대사일치",
-      ADJUSTED: "조정",
-      HOLD: "보류",
-      CANCELLED: "취소",
-      RESTARTED: "재개"
-    }
+    paymentStage: scheduleLabels.PAYMENT_STAGE,
+    scheduleRegime: scheduleLabels.SCHEDULE_REGIME,
+    schedulePurpose: scheduleLabels.SCHEDULE_PURPOSE,
+    scheduleStatus: scheduleLabels.SCHEDULE_STATUS
   };
-  var STATUS_TONES = {
-    PLANNED: "status-badge-info",
-    CONFIRMED: "status-badge-review",
-    MATCHED: "status-badge-success",
-    ADJUSTED: "status-badge-warning",
-    HOLD: "status-badge-risk",
-    CANCELLED: "status-badge-error",
-    RESTARTED: "status-badge-info"
-  };
+  var EMPTY = scheduleLabels.EMPTY;
 
   var activeRequest = null;
   var requestSequence = 0;
@@ -183,7 +205,7 @@
     table.setAttribute("aria-busy", "true");
     pagination.hidden = true;
     dataWarning.hidden = true;
-    resultCount.textContent = "—";
+    resultCount.textContent = EMPTY;
 
     for (var rowIndex = 0; rowIndex < 5; rowIndex += 1) {
       var row = document.createElement("tr");
@@ -236,44 +258,98 @@
     return value === true || value === "true";
   }
 
-  function formatInteger(value) {
-    if (value === null || value === undefined || value === "") return "-";
-    var raw = String(value).trim();
-    if (!/^-?\d+$/.test(raw)) return raw;
-    var sign = raw.charAt(0) === "-" ? "-" : "";
-    var digits = sign ? raw.slice(1) : raw;
-    return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  }
-
-  function formatWon(value) {
-    if (value === null || value === undefined || value === "") return "-";
-    var raw = String(value).trim();
-    var match = raw.match(/^(-?)(\d+)(?:\.(\d+))?$/);
-    if (!match) return raw;
-    var integer = match[2].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    var fraction = match[3] && /[1-9]/.test(match[3]) ? "." + match[3] : "";
-    return match[1] + integer + fraction + "원";
-  }
-
+  /*
+   * 금액·건수는 공통 유틸만 쓴다 (FGC-SIR-008).
+   * 전에는 이 파일이 직접 짠 정규식으로 콤마를 찍어서, 같은 도메인인 SCHE-W02 의
+   * Intl 기반 포맷과 결과가 갈렸다. 음수 괄호 표기(화면정의서 4장 규칙 1)도 여기서만 빠져 있었다.
+   */
   function textCell(value, className) {
     var cell = document.createElement("td");
     if (className) cell.className = className;
-    cell.textContent = value === null || value === undefined || value === "" ? "-" : String(value);
+    cell.textContent = value === null || value === undefined || value === "" ? EMPTY : String(value);
     return cell;
   }
 
-  function badge(value, tone) {
+  function moneyCell(value) {
+    var cell = textCell(format.won(value), "is-number tabular-nums");
+    if (format.isNegative(value)) cell.classList.add("is-negative-amount");
+    return cell;
+  }
+
+  function badge(value, tone, locked) {
     var element = document.createElement("span");
     element.className = "status-badge " + tone;
-    element.textContent = value;
+    element.appendChild(document.createTextNode(value));
+    /* 규칙 8 확정 후 잠금 — 색이 아니라 아이콘으로도 확정을 알린다 (VRUN-W01 과 같은 표현). */
+    if (locked) {
+      var lock = document.createElement("span");
+      lock.className = "material-symbols-rounded schedule-badge-lock";
+      lock.setAttribute("aria-hidden", "true");
+      lock.textContent = "lock";
+      element.appendChild(lock);
+    }
     return element;
   }
 
-  function badgeCell(value, tone) {
+  function badgeCell(value, tone, locked) {
     var cell = document.createElement("td");
     cell.className = "is-center";
-    cell.appendChild(badge(value, tone));
+    cell.appendChild(badge(value, tone, locked));
     return cell;
+  }
+
+  /*
+   * 긴 값 접기·펴기 — components.css:576-653 공통 구조.
+   * 미리보기 자리에 노드를 그대로 넣을 수 있게 DOM 으로 만든다 (계약번호는 링크라서 필요하다).
+   * 문자열을 조립하지 않으므로 escape 가 따로 필요 없다.
+   */
+  function disclosure(text, previewNode) {
+    var value = text === null || text === undefined || text === "" ? EMPTY : String(text);
+    var root = document.createElement("div");
+    root.className = "table-cell-disclosure";
+
+    var preview = document.createElement("span");
+    preview.className = "table-cell-preview is-single-line";
+    preview.appendChild(previewNode || document.createTextNode(value));
+    root.appendChild(preview);
+
+    var details = document.createElement("details");
+    details.className = "table-cell-details";
+    details.hidden = true;
+
+    var summary = document.createElement("summary");
+    var more = document.createElement("span");
+    more.className = "table-cell-more";
+    more.textContent = "전체 보기";
+    var less = document.createElement("span");
+    less.className = "table-cell-less";
+    less.textContent = "접기";
+    var chevron = document.createElement("span");
+    chevron.className = "material-symbols-rounded table-cell-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "expand_more";
+    summary.append(more, less, chevron);
+
+    var full = document.createElement("p");
+    full.className = "table-cell-full";
+    full.textContent = value;
+
+    details.append(summary, full);
+    root.appendChild(details);
+    return root;
+  }
+
+  /* 실제 렌더링 폭을 재서 잘린 셀에만 "전체 보기" 를 남긴다. */
+  function syncDisclosures() {
+    tableBody.querySelectorAll(".table-cell-disclosure").forEach(function (root) {
+      var preview = root.querySelector(".table-cell-preview");
+      var details = root.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+      var truncated = preview.scrollWidth > preview.clientWidth + 1
+        || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !truncated;
+      if (!truncated) details.open = false;
+    });
   }
 
   function detailHref(scheduleHeaderId) {
@@ -287,33 +363,37 @@
       var row = document.createElement("tr");
       var contractCell = document.createElement("td");
       var hasId = schedule.scheduleHeaderId !== null && schedule.scheduleHeaderId !== undefined;
+      var contractNo = schedule.contractNo || EMPTY;
 
       if (hasId) {
         var contractLink = document.createElement("a");
         contractLink.href = detailHref(schedule.scheduleHeaderId);
         contractLink.className = "tabular-nums";
-        contractLink.textContent = schedule.contractNo || "-";
-        contractCell.appendChild(contractLink);
+        contractLink.textContent = contractNo;
+        contractCell.appendChild(disclosure(contractNo, contractLink));
       } else {
-        contractCell.textContent = schedule.contractNo || "-";
+        contractCell.appendChild(disclosure(contractNo));
       }
 
       row.appendChild(contractCell);
       row.appendChild(textCell(responseLabel(schedule.paymentStageLabel, LABELS.paymentStage, schedule.paymentStage)));
-      row.appendChild(badgeCell(responseLabel(schedule.scheduleRegimeLabel, LABELS.scheduleRegime, schedule.scheduleRegime), "status-badge-neutral"));
-      row.appendChild(badgeCell(responseLabel(schedule.schedulePurposeLabel, LABELS.schedulePurpose, schedule.schedulePurpose), schedule.schedulePurpose === "OPERATIONAL" ? "status-badge-info" : "status-badge-neutral"));
-      row.appendChild(textCell(schedule.scheduleVersionNo === null || schedule.scheduleVersionNo === undefined ? "-" : "v" + schedule.scheduleVersionNo, "is-center tabular-nums"));
-      row.appendChild(badgeCell(responseLabel(schedule.statusLabel, LABELS.scheduleStatus, schedule.status), STATUS_TONES[schedule.status] || "status-badge-neutral"));
+      /* 적용 체계·용도는 상태가 아니라 분류값이다 — 규칙 4 의 상태 5색을 쓰지 않고 neutral 로 통일한다. */
+      row.appendChild(badgeCell(responseLabel(schedule.scheduleRegimeLabel, LABELS.scheduleRegime, schedule.scheduleRegime), scheduleLabels.CLASSIFICATION_TONE));
+      row.appendChild(badgeCell(responseLabel(schedule.schedulePurposeLabel, LABELS.schedulePurpose, schedule.schedulePurpose), scheduleLabels.CLASSIFICATION_TONE));
+      row.appendChild(textCell(schedule.scheduleVersionNo === null || schedule.scheduleVersionNo === undefined ? EMPTY : "v" + schedule.scheduleVersionNo, "is-center tabular-nums"));
+      row.appendChild(badgeCell(
+        responseLabel(schedule.statusLabel, LABELS.scheduleStatus, schedule.status),
+        scheduleLabels.statusTone(schedule.status),
+        scheduleLabels.isLocked(schedule.status)));
       row.appendChild(badgeCell(isTrue(schedule.activeYn) ? "사용중" : "미사용", isTrue(schedule.activeYn) ? "status-badge-success" : "status-badge-neutral"));
-      row.appendChild(textCell(formatInteger(schedule.lineCount), "is-number tabular-nums"));
-      row.appendChild(textCell(formatWon(schedule.expectedTotal), "is-number tabular-nums"));
+      row.appendChild(textCell(format.int(schedule.lineCount), "is-number tabular-nums"));
+      row.appendChild(moneyCell(schedule.expectedTotal));
 
       var policyCell = document.createElement("td");
       var policyValue = document.createElement("span");
-      policyValue.className = "schedule-policy-value tabular-nums";
-      policyValue.textContent = schedule.policyVersionLabel || "-";
-      if (schedule.policyVersionLabel) policyValue.title = schedule.policyVersionLabel;
-      policyCell.appendChild(policyValue);
+      policyValue.className = "tabular-nums";
+      policyValue.textContent = schedule.policyVersionLabel || EMPTY;
+      policyCell.appendChild(disclosure(schedule.policyVersionLabel, policyValue));
       row.appendChild(policyCell);
 
       var actionCell = document.createElement("td");
@@ -393,7 +473,7 @@
 
   function renderPage(pageData) {
     var rows = Array.isArray(pageData.content) ? pageData.content : [];
-    resultCount.textContent = formatInteger(pageData.totalElements || 0);
+    resultCount.textContent = format.int(pageData.totalElements || 0);
     pageSizeText.textContent = String(pageData.size || PAGE_SIZE);
     dataWarning.hidden = !hasDuplicateActiveOperational(rows);
 
@@ -402,6 +482,7 @@
 
     renderPagination(pageData);
     table.setAttribute("aria-busy", "false");
+    window.requestAnimationFrame(syncDisclosures);
   }
 
   function isPageResponse(value) {
