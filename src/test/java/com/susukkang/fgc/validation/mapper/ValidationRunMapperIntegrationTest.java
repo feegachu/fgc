@@ -228,9 +228,12 @@ class ValidationRunMapperIntegrationTest {
     }
 
     @Test
-    // 조건에 맞는 실행이 없으면 빈 리스트(에러 아님)
+    // 조건에 맞는 실행이 없으면 빈 리스트(에러 아님).
+    // "아무 실행도 없는 월"이어야 하므로 다른 테스트가 커밋해 두는 월을 쓰면 안 된다 —
+    // 2099-01은 ReconciliationRunIntegrationTest가 실제로 커밋하는 월이라 실행 순서에 따라
+    // 비어 있지 않을 수 있었다(CI 2026-08-19 bee042b4). 아무도 안 쓰는 월로 옮긴다.
     void searchReturnsEmptyListWhenNoMatch() {
-        List<ValidationRunListRow> rows = validationRunMapper.search(LocalDate.of(2099, 1, 1), null, 0, 20);
+        List<ValidationRunListRow> rows = validationRunMapper.search(LocalDate.of(2094, 1, 1), null, 0, 20);
 
         assertThat(rows).isEmpty();
     }

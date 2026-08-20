@@ -25,28 +25,34 @@
       th:attr="data-selected-exception-id=${selectedExceptionId}">
 
   <h1 class="fgc-page-title">예외함</h1>
-  <p class="fgc-page-desc">규제·대사·데이터 문제로 <strong>사람이 봐야 하는 건</strong>만 모입니다.</p>
-
-  <div class="fgc-banner fgc-banner--warn" style="margin-top:12px">
-    <span class="material-symbols-outlined" style="font-size:18px">inbox</span>
-    <span>
-      <strong>정상 건은 여기 오지 않습니다. 여기 있는 건 전부 사람이 봐야 합니다.</strong>
-      <!-- 대시보드 '미처리 예외' KPI 카드(DashboardMapper.countOpenException)와 같은
-           기준(NEW+IN_REVIEW, 월 필터 없음)이라 카드 건수와 항상 일치한다 -->
-      <span id="notice-exception">미처리(신규 + 검토중) <strong th:text="${openCount}">0</strong>건이 처리를 기다립니다.</span>
-    </span>
-  </div>
 
   <!-- ① 유형별 미처리 요약 -->
   <section class="exception-summary-grid" id="summary-cards" aria-label="유형별 미처리 요약">
-    <a class="fgc-card exception-summary-card" th:each="summary : ${casePage.summary()}"
-       th:classappend="${typeFilter == summary.type()} ? 'is-active'"
+    <a class="kpi-card exception-summary-card" th:each="summary : ${casePage.summary()}"
+       th:classappend="${summary.type().name() == 'CAP_VIOLATION'
+                         or summary.type().name() == 'RECONCILIATION_MISMATCH'
+                         or summary.type().name() == 'JOURNAL_IMBALANCE'
+                         or summary.type().name() == 'POLICY_MISSING'
+                         or summary.type().name() == 'POLICY_DUPLICATE'} ? ' kpi-card-error'
+                       : (${summary.type().name() == 'CAP_WARNING'
+                           or summary.type().name() == 'ARBITRAGE_CANDIDATE'
+                           or summary.type().name() == 'ALLOCATION_EVIDENCE_MISSING'} ? ' kpi-card-warning'
+                       : (${summary.type().name() == 'CAP_REVIEW_REQUIRED'
+                           or summary.type().name() == 'REFUND_TABLE_MISSING'
+                           or summary.type().name() == 'PRODUCT_CODE_MISMATCH'
+                           or summary.type().name() == 'DATA_QUALITY'} ? ' kpi-card-risk' : ''))
+                       + (${typeFilter == summary.type()} ? ' is-active' : '')"
        th:attr="aria-current=${typeFilter == summary.type()} ? 'true' : null"
        th:href="@{/exceptions(type=${summary.type()},status='OPEN',month=${month})}">
-      <div class="fgc-card__body">
-        <span class="fgc-muted" style="font-size:12px" th:text="${summary.type().label()}">예외 유형</span>
-        <strong style="display:block;margin-top:4px;font-size:20px" th:text="|${summary.count()}건|">0건</strong>
-        <span class="fgc-mono exception-summary-code" th:text="${summary.type()}">EXCEPTION_TYPE</span>
+      <div class="kpi-card-header">
+        <span class="kpi-label" th:text="${summary.type().label()}">예외 유형</span>
+      </div>
+      <div class="kpi-value-row">
+        <strong class="kpi-value" th:text="${summary.count()}">0</strong>
+        <span class="kpi-unit">건</span>
+      </div>
+      <div class="kpi-card-footer">
+        <span class="kpi-comparison fgc-mono" th:text="${summary.type()}">EXCEPTION_TYPE</span>
       </div>
     </a>
     <div class="fgc-empty publishing-empty-state" th:if="${casePage.summary().isEmpty()}">미처리 예외가 없습니다.</div>
@@ -138,43 +144,103 @@
       </div>
       <div class="exception-table-viewport">
         <table class="fgc-table exception-table">
+          <colgroup>
+            <col class="exception-col-number">
+            <col class="exception-col-type">
+            <col class="exception-col-reason">
+            <col class="exception-col-severity">
+            <col class="exception-col-contract">
+            <col class="exception-col-title">
+            <col class="exception-col-status">
+            <col class="exception-col-assignee">
+            <col class="exception-col-detected-at">
+            <col class="exception-col-detection-count">
+            <col class="exception-col-reference">
+          </colgroup>
           <thead>
             <tr>
-              <th style="width:56px">번호</th>
-              <th style="width:150px">유형</th>
-              <th style="width:150px">상세 원인</th>
-              <th style="width:74px">심각도</th>
-              <th style="width:160px">계약</th>
-              <th class="exception-title-cell">내용</th>
-              <th style="width:86px">상태</th>
-              <th style="width:84px">담당자</th>
-              <th style="width:106px">최근 검출</th>
-              <th style="width:64px">검출</th>
-              <th>참조</th>
+              <th scope="col">번호</th>
+              <th scope="col">유형</th>
+              <th scope="col">상세 원인</th>
+              <th scope="col">심각도</th>
+              <th scope="col">계약</th>
+              <th scope="col">내용</th>
+              <th scope="col">상태</th>
+              <th scope="col">담당자</th>
+              <th scope="col">최근 검출</th>
+              <th scope="col">검출</th>
+              <th scope="col">참조</th>
             </tr>
           </thead>
           <tbody id="list-body">
             <tr class="exception-row" th:each="c : ${cases}"
+                th:with="typeCode=${c.type().name()},severityCode=${c.severity().name()},statusCode=${c.status().name()}"
                 tabindex="0" aria-controls="detail-body history-body" aria-selected="false"
                 th:attr="data-exception-id=${c.exceptionCaseId()},data-status=${c.status()},data-exception-type=${c.type()}">
               <td class="fgc-mono" th:text="${c.exceptionCaseId()}">-</td>
-              <td th:text="${c.type().label()}">-</td>
+              <td><span class="status-badge"
+                        th:classappend="${typeCode == 'CAP_WARNING' or typeCode == 'ARBITRAGE_CANDIDATE' or typeCode == 'ALLOCATION_EVIDENCE_MISSING'} ? ' status-badge-warning' : (${typeCode == 'CAP_VIOLATION' or typeCode == 'RECONCILIATION_MISMATCH' or typeCode == 'JOURNAL_IMBALANCE' or typeCode == 'POLICY_MISSING' or typeCode == 'POLICY_DUPLICATE'} ? ' status-badge-error' : (${typeCode == 'CAP_REVIEW_REQUIRED' or typeCode == 'REFUND_TABLE_MISSING' or typeCode == 'PRODUCT_CODE_MISMATCH' or typeCode == 'DATA_QUALITY'} ? ' status-badge-review' : ' status-badge-neutral'))"
+                        th:title="${typeCode}" th:text="${c.type().label()}">-</span></td>
               <td th:text="${c.reasonLabel()}">-</td>
-              <td th:text="${c.severity().label()}">-</td>
-              <td class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</td>
-              <td class="exception-title-cell" th:text="${c.title()}">-</td>
-              <td data-role="status" th:text="${c.status().label()}">-</td>
+              <td><span class="status-badge"
+                        th:classappend="${severityCode == 'WARNING'} ? ' status-badge-warning' : (${severityCode == 'HIGH' or severityCode == 'CRITICAL'} ? ' status-badge-error' : ' status-badge-neutral')"
+                        th:title="${severityCode}" th:text="${c.severity().label()}">-</span></td>
+              <td class="fgc-mono exception-disclosure-cell">
+                <div class="table-cell-disclosure">
+                  <span class="table-cell-preview is-single-line" th:text="${c.contractNo()} ?: '-'">계약번호</span>
+                  <details class="table-cell-details" hidden>
+                    <summary>
+                      <span class="table-cell-more">전체 보기</span>
+                      <span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
+                    </summary>
+                    <p class="table-cell-full" th:text="${c.contractNo()}">계약번호</p>
+                  </details>
+                </div>
+              </td>
+              <td class="exception-title-cell exception-disclosure-cell">
+                <div class="table-cell-disclosure">
+                  <span class="table-cell-preview" th:text="${c.title()} ?: '-'">예외 내용</span>
+                  <details class="table-cell-details" hidden>
+                    <summary>
+                      <span class="table-cell-more">전체 보기</span>
+                      <span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
+                    </summary>
+                    <p class="table-cell-full" th:text="${c.title()}">예외 내용</p>
+                  </details>
+                </div>
+              </td>
+              <td><span class="status-badge" data-role="status"
+                        th:classappend="${statusCode == 'NEW'} ? ' status-badge-error' : (${statusCode == 'IN_REVIEW'} ? ' status-badge-info' : (${statusCode == 'RESOLVED'} ? ' status-badge-success' : ' status-badge-review'))"
+                        th:title="${statusCode}" th:text="${c.status().label()}">-</span></td>
               <td data-role="assignee" th:text="${c.assigneeLoginId()} ?: '미배정'">-</td>
               <td class="fgc-mono" th:text="${#temporals.format(c.lastDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</td>
               <td class="fgc-mono" th:text="|${c.detectionCount()}회|">1회</td>
               <!-- 참조 = 원천 화면 링크. 라우트가 없는 원천 유형은 텍스트로만 표시한다. -->
-              <td class="fgc-mono">
-                <a class="fgc-btn fgc-btn--ghost" th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}">
-                  <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">open_in_new</span>
-                  <span th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
-                </a>
-                <span th:if="${c.sourceLink() == null}"
-                      th:text="${c.sourceEntityType()} + ':' + ${c.sourceEntityId()}">-</span>
+              <td class="fgc-mono exception-disclosure-cell"
+                  th:with="referenceValue=|${c.sourceEntityType()}:${c.sourceEntityId()}|">
+                <div class="table-cell-disclosure">
+                  <a class="table-cell-preview is-single-line"
+                     th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}"
+                     th:text="${referenceValue}">참조</a>
+                  <span class="table-cell-preview is-single-line"
+                        th:if="${c.sourceLink() == null}" th:text="${referenceValue}">참조</span>
+                  <details class="table-cell-details" hidden>
+                    <summary>
+                      <span class="table-cell-more">전체 보기</span>
+                      <span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
+                    </summary>
+                    <p class="table-cell-full">
+                      <a class="fgc-btn fgc-btn--ghost" th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}">
+                        <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+                        <span th:text="${referenceValue}">참조</span>
+                      </a>
+                      <span th:if="${c.sourceLink() == null}" th:text="${referenceValue}">참조</span>
+                    </p>
+                  </details>
+                </div>
               </td>
             </tr>
             <tr th:if="${cases.isEmpty()}"><td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
@@ -253,12 +319,19 @@
   <!-- 현재 페이지 데이터만 template으로 보관해 행 선택 시 추가 요청 없이 상세·이력을 표시한다. -->
   <th:block th:each="c : ${cases}">
     <template th:id="|exception-detail-${c.exceptionCaseId()}|">
-      <dl class="exception-detail-grid">
+      <dl class="exception-detail-grid"
+          th:with="typeCode=${c.type().name()},severityCode=${c.severity().name()},statusCode=${c.status().name()}">
         <div><dt>예외 번호</dt><dd class="fgc-mono" th:text="${c.exceptionCaseId()}">-</dd></div>
-        <div><dt>상태</dt><dd data-role="status" th:text="${c.status().label()}">-</dd></div>
-        <div><dt>유형</dt><dd th:text="${c.type().label()}">-</dd></div>
+        <div><dt>상태</dt><dd><span class="status-badge" data-role="status"
+             th:classappend="${statusCode == 'NEW'} ? ' status-badge-error' : (${statusCode == 'IN_REVIEW'} ? ' status-badge-info' : (${statusCode == 'RESOLVED'} ? ' status-badge-success' : ' status-badge-review'))"
+             th:title="${statusCode}" th:text="${c.status().label()}">-</span></dd></div>
+        <div><dt>유형</dt><dd><span class="status-badge"
+             th:classappend="${typeCode == 'CAP_WARNING' or typeCode == 'ARBITRAGE_CANDIDATE' or typeCode == 'ALLOCATION_EVIDENCE_MISSING'} ? ' status-badge-warning' : (${typeCode == 'CAP_VIOLATION' or typeCode == 'RECONCILIATION_MISMATCH' or typeCode == 'JOURNAL_IMBALANCE' or typeCode == 'POLICY_MISSING' or typeCode == 'POLICY_DUPLICATE'} ? ' status-badge-error' : (${typeCode == 'CAP_REVIEW_REQUIRED' or typeCode == 'REFUND_TABLE_MISSING' or typeCode == 'PRODUCT_CODE_MISMATCH' or typeCode == 'DATA_QUALITY'} ? ' status-badge-review' : ' status-badge-neutral'))"
+             th:title="${typeCode}" th:text="${c.type().label()}">-</span></dd></div>
         <div><dt>상세 원인</dt><dd th:text="${c.reasonLabel()}">-</dd></div>
-        <div><dt>심각도</dt><dd th:text="${c.severity().label()}">-</dd></div>
+        <div><dt>심각도</dt><dd><span class="status-badge"
+             th:classappend="${severityCode == 'WARNING'} ? ' status-badge-warning' : (${severityCode == 'HIGH' or severityCode == 'CRITICAL'} ? ' status-badge-error' : ' status-badge-neutral')"
+             th:title="${severityCode}" th:text="${c.severity().label()}">-</span></dd></div>
         <div><dt>계약번호</dt><dd class="fgc-mono" th:text="${c.contractNo()} ?: '-'">-</dd></div>
         <div><dt>담당자</dt><dd data-role="assignee" th:text="${c.assigneeLoginId()} ?: '미배정'">-</dd></div>
         <div><dt>설계사</dt><dd th:text="${c.agentName()} ?: '-'">-</dd></div>

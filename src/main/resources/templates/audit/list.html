@@ -10,7 +10,7 @@
   [막을 것] 수정 · 삭제 버튼 자체를 만들지 않습니다.
             감사로그를 고칠 수 있으면 감사로그가 아닙니다.
   [주의] before_value / after_value 는 JSON 입니다.
-         전부 늘어놓지 말고 바뀐 칸만 노랗게 강조합니다 (DiffEntry.changed).
+         서버가 계산한 DiffEntry를 변경 전·후 표로 표시합니다.
   행 선택은 selected 파라미터로 같은 검색조건을 유지한 채 재요청합니다 (§4-1 공통 규칙 7).
 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-AUDT-W01', '감사로그 조회', null, null)}"
@@ -20,24 +20,8 @@
   <header class="page-header">
     <div class="page-header-copy">
       <h1 class="page-title">감사로그 조회</h1>
-      <p class="page-description">
-        누가 · 언제 · 무엇을 · 왜 바꿨는지 기록입니다.
-        <strong>기록만 쌓이고 고치거나 지울 수 없습니다.</strong>
-      </p>
     </div>
   </header>
-
-  <aside class="audit-notice" aria-labelledby="audit-notice-title">
-    <span class="material-symbols-rounded audit-notice-icon" aria-hidden="true">lock</span>
-    <div>
-      <h2 id="audit-notice-title" class="audit-notice-title">수정하거나 삭제할 수 없는 기록입니다</h2>
-      <p class="audit-notice-copy">
-        이 화면에는 <strong>수정·삭제 버튼이 없습니다.</strong> DB에서도
-        <span class="tabular-nums">audit_log</span> 테이블의 UPDATE·DELETE를 트리거가 거부합니다.
-        지급기준을 몰래 바꾸거나 소급 적용하는 것을 막기 위한 장치입니다(REG-22).
-      </p>
-    </div>
-  </aside>
 
   <!-- 검색조건은 GET 파라미터로 유지한다 (§4-1 공통 규칙 7). -->
   <form class="filter-bar audit-filter-bar" method="get" th:action="@{/audit-logs}">
@@ -135,6 +119,10 @@
           </tr>
           <tr class="audit-log-row"
               th:each="row : ${logs.content}"
+              tabindex="0"
+              aria-controls="diff-body"
+              th:attr="aria-selected=${selectedLog != null and row.auditLogId == selectedLog.auditLogId} ? 'true' : 'false'"
+              th:data-audit-detail-href="@{/audit-logs(entityType=${form.entityType},entityId=${form.entityId},userId=${form.userId},action=${form.action},from=${form.from},to=${form.to},page=${logs.page},selected=${row.auditLogId})}"
               th:classappend="${selectedLog != null and row.auditLogId == selectedLog.auditLogId} ? 'is-selected'">
             <td>
               <a class="audit-log-link tabular-nums"
@@ -143,12 +131,60 @@
                  th:text="${#temporals.format(row.occurredAt, 'yyyy-MM-dd HH:mm:ss')}">2026-08-16 10:00:00</a>
             </td>
             <td th:text="${row.userLoginId} ?: 'BATCH'">settle01</td>
-            <td class="tabular-nums" th:text="${row.actionCode}">PAYMENT_CONFIRMED</td>
-            <td class="tabular-nums" th:text="${row.entityType}">COMMISSION_PAYMENT</td>
-            <td class="tabular-nums" th:text="${row.entityId}">42</td>
-            <td th:text="${row.reason}"></td>
-            <td class="tabular-nums" th:text="${row.policyVersionId}"></td>
-            <td class="tabular-nums" th:text="${row.requestId}">20260816-1a2b3c</td>
+            <td class="tabular-nums audit-disclosure-cell">
+              <div class="table-cell-disclosure">
+                <span class="table-cell-preview is-single-line" th:text="${row.actionCode} ?: '-'">PAYMENT_CONFIRMED</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${row.actionCode} ?: '-'">PAYMENT_CONFIRMED</p>
+                </details>
+              </div>
+            </td>
+            <td class="tabular-nums audit-disclosure-cell">
+              <div class="table-cell-disclosure">
+                <span class="table-cell-preview is-single-line" th:text="${row.entityType} ?: '-'">COMMISSION_PAYMENT</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${row.entityType} ?: '-'">COMMISSION_PAYMENT</p>
+                </details>
+              </div>
+            </td>
+            <td class="tabular-nums audit-disclosure-cell">
+              <div class="table-cell-disclosure">
+                <span class="table-cell-preview is-single-line" th:text="${row.entityId} ?: '-'">42</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${row.entityId} ?: '-'">42</p>
+                </details>
+              </div>
+            </td>
+            <td class="audit-disclosure-cell">
+              <div class="table-cell-disclosure">
+                <span class="table-cell-preview" th:text="${row.reason} ?: '-'">-</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${row.reason} ?: '-'">-</p>
+                </details>
+              </div>
+            </td>
+            <td class="tabular-nums audit-disclosure-cell">
+              <div class="table-cell-disclosure">
+                <span class="table-cell-preview is-single-line" th:text="${row.policyVersionId} ?: '-'">-</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${row.policyVersionId} ?: '-'">-</p>
+                </details>
+              </div>
+            </td>
+            <td class="tabular-nums audit-disclosure-cell">
+              <div class="table-cell-disclosure">
+                <span class="table-cell-preview is-single-line" th:text="${row.requestId} ?: '-'">20260816-1a2b3c</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${row.requestId} ?: '-'">20260816-1a2b3c</p>
+                </details>
+              </div>
+            </td>
           </tr>
           </tbody>
         </table>
@@ -181,7 +217,6 @@
     <section class="surface audit-diff-panel" aria-labelledby="audit-diff-title">
       <header class="surface-header audit-panel-header">
         <h2 id="audit-diff-title" class="surface-title">변경 내용 비교</h2>
-        <p class="audit-panel-caption">바뀐 칸만 노랗게 표시</p>
       </header>
       <div class="surface-body audit-diff-body" id="diff-body">
         <p class="audit-diff-prompt" th:if="${selectedLog == null}">왼쪽 목록에서 한 건을 고르세요.</p>

@@ -172,10 +172,40 @@ class AuditLogViewControllerTest {
         stubSearch(List.of(log(1L, "settle01", null, null)));
         mvc.perform(get("/audit-logs").with(user(complianceUser())))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-audit-detail-href")))
+                .andExpect(content().string(containsString("aria-controls=\"diff-body\"")))
                 .andExpect(content().string(containsString("PAYMENT_CONFIRMED")))
                 .andExpect(content().string(containsString("settle01")))
                 .andExpect(content().string(containsString("20260816-1a2b3c")))
                 .andExpect(content().string(containsString("확정 처리")));
+    }
+
+    @Test
+    void renders_long_values_with_disclosure_markup() throws Exception {
+        String reason = "Transaction rolled back because the validation run failed while persisting the final result.";
+        AuditLogResponse longValueLog = new AuditLogResponse(
+                2L,
+                OffsetDateTime.parse("2026-08-16T10:00:00+09:00"),
+                null,
+                null,
+                "VALIDATION_RUN_FAILED",
+                "VALIDATION_RUN",
+                "202607-VALIDATION-0001",
+                null,
+                null,
+                reason,
+                "20260816-validation-run-failure-request",
+                null
+        );
+        stubSearch(List.of(longValueLog));
+
+        mvc.perform(get("/audit-logs").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("VALIDATION_RUN_FAILED")))
+                .andExpect(content().string(containsString("table-cell-disclosure")))
+                .andExpect(content().string(containsString("table-cell-details")))
+                .andExpect(content().string(containsString("전체 보기")))
+                .andExpect(content().string(containsString(reason)));
     }
 
     /** 배치 발 감사행(user_id NULL)은 행위자를 "BATCH" 로 표기한다 — 화면정의서 :1517. */
@@ -245,13 +275,12 @@ class AuditLogViewControllerTest {
                 .andExpect(content().string(containsString("[1,2,3]")));
     }
 
-    /** 화면정의서 "막아야 할 것": 수정·삭제 버튼 자체를 만들지 않는다 — 안내 배너만 있고 버튼은 없다. */
+    /** 화면정의서 "막아야 할 것": 별도 안내 문구와 무관하게 수정·삭제 버튼 자체를 만들지 않는다. */
     @Test
     void never_renders_mutation_buttons() throws Exception {
         stubSearch(List.of(log(1L, "settle01", null, null)));
         mvc.perform(get("/audit-logs").with(user(complianceUser())))
                 .andExpect(content().string(not(containsString("삭제</button>"))))
-                .andExpect(content().string(not(containsString("수정</button>"))))
-                .andExpect(content().string(containsString("수정·삭제 버튼이 없습니다")));
+                .andExpect(content().string(not(containsString("수정</button>"))));
     }
 }

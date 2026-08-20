@@ -183,21 +183,43 @@ class DashboardServiceIntegrationTest {
         assertThat(augustResult.kpis().capViolation()).isEqualTo(0);
     }
 
-    // 2. 차익거래 검토대상: 월 필터 없음, dedup 없음(전부 카운트)
+    // 2. 차익거래 검토대상: 이번 달만, 계약·지급단계별 최신 1건만(#257)
     @Test
-    void summarizeCountsAllArbitrageCandidatesAcrossMonthsWithoutDedup() {
+    void summarizeCountsArbitrageCandidatesInMonthAndCollapsesReruns() {
         Long id = contractId("FGC-FGL01-202607-0003");
-        Long run1 = insertValidationRun(LocalDate.of(2026, 6, 1), 1, "COMPLETED",
+        Long juneRun = insertValidationRun(LocalDate.of(2026, 6, 1), 1, "COMPLETED",
                 OffsetDateTime.parse("2026-06-30T09:00:00+09:00"));
-        Long run2 = insertValidationRun(LocalDate.of(2026, 7, 1), 1, "COMPLETED",
+        Long julyRun1 = insertValidationRun(LocalDate.of(2026, 7, 1), 1, "COMPLETED",
                 OffsetDateTime.parse("2026-07-31T09:00:00+09:00"));
-        // 같은 계약이라도 dedup 없이 둘 다, 월도 다르지만 둘 다 잡혀야 한다(월 필터 없음).
-        insertArbitrageCheck(run1, id, LocalDate.of(2026, 6, 30), "CANDIDATE");
-        insertArbitrageCheck(run2, id, LocalDate.of(2026, 7, 31), "CANDIDATE");
+        Long julyRun2 = insertValidationRun(LocalDate.of(2026, 7, 1), 2, "COMPLETED",
+                OffsetDateTime.parse("2026-08-01T09:00:00+09:00"));
+        // 6월 판정은 7월 카드에 들어오면 안 된다(기준월 변경 시 카드를 다시 계산한다).
+        insertArbitrageCheck(juneRun, id, LocalDate.of(2026, 6, 30), "CANDIDATE");
+        // 7월을 두 번 돌렸다 — uq_arbitrage_check에 validation_run_id가 있어 행은 둘이지만
+        // 같은 계약·지급단계라 카드에는 1건으로 보여야 한다(예외함 카드와 같은 단위).
+        insertArbitrageCheck(julyRun1, id, LocalDate.of(2026, 7, 31), "CANDIDATE");
+        insertArbitrageCheck(julyRun2, id, LocalDate.of(2026, 7, 31), "CANDIDATE");
 
         DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
 
-        assertThat(result.kpis().arbitrageCandidate()).isEqualTo(2);
+        assertThat(result.kpis().arbitrageCandidate()).isEqualTo(1);
+    }
+
+    // 재실행에서 판정이 뒤집히면 카드는 최신 판정을 따라야 한다 — 접을 때 옛 행을
+    // 고르면 이미 해소된 검토대상이 카드에 남는다.
+    @Test
+    void summarizeUsesLatestRunResultWhenRerunClearsCandidate() {
+        Long id = contractId("FGC-FGL01-202607-0004");
+        Long julyRun1 = insertValidationRun(LocalDate.of(2026, 7, 1), 3, "COMPLETED",
+                OffsetDateTime.parse("2026-07-31T09:00:00+09:00"));
+        Long julyRun2 = insertValidationRun(LocalDate.of(2026, 7, 1), 4, "COMPLETED",
+                OffsetDateTime.parse("2026-08-01T09:00:00+09:00"));
+        insertArbitrageCheck(julyRun1, id, LocalDate.of(2026, 7, 31), "CANDIDATE");
+        insertArbitrageCheck(julyRun2, id, LocalDate.of(2026, 7, 31), "CLEAR");
+
+        DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
+
+        assertThat(result.kpis().arbitrageCandidate()).isEqualTo(0);
     }
 
     // 3. 대사 불일치: 정산월·지급단계·보험사별 최신 run만, MATCHED 제외
@@ -249,10 +271,10 @@ class DashboardServiceIntegrationTest {
         assertThat(result.kpis().openException()).isEqualTo(2);
     }
 
-    // 6. 월 필터가 있는 KPI(1,200%·대사불일치)는 미래월(2099-01)에 0이어야 한다.
-    // journalImbalance/arbitrageCandidate/openException/recentExceptions/recentValidationRuns는
+    // 6. 월 필터가 있는 KPI(1,200%·차익거래·대사불일치)는 미래월(2099-01)에 0이어야 한다.
+    // journalImbalance/openException/recentExceptions/recentValidationRuns는
     // 설계상 월 필터가 없어(각 Mapper 주석 참고 — "월 필터: 없음") 로컬 dev DB에 이미
-    // 존재하는 시드 데이터(예: arbitrage_check의 CANDIDATE 5건)를 그대로 반영한다 — 그래서
+    // 존재하는 시드 데이터를 그대로 반영한다 — 그래서
     // journalImbalance는 이 테스트에서 단언하지 않는다(월과 무관하게 vw_journal_imbalance
     // 전체를 세므로, "미래월이라 0"이라는 근거가 없다. 실제로 0건인지는 4번
     // summarizeCountsJournalImbalance()가 별도로 검증한다). 리스트도 "비어 있다"를
@@ -266,6 +288,7 @@ class DashboardServiceIntegrationTest {
 
         assertThat(result.kpis().capViolation()).isEqualTo(0);
         assertThat(result.kpis().capWarning()).isEqualTo(0);
+        assertThat(result.kpis().arbitrageCandidate()).isEqualTo(0);
         assertThat(result.kpis().reconciliationMismatch()).isEqualTo(0);
         assertThat(result.recentExceptions()).isNotNull();
         assertThat(result.recentValidationRuns()).isNotNull();

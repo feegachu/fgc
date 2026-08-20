@@ -146,6 +146,15 @@ class ValidationRunDetailMapperIntegrationTest {
                 """, reconRunId, matchGroupKey, resultType, differenceAmount);
     }
 
+    private void insertReconciliationResult(Long reconRunId, String matchGroupKey, String resultType,
+                                             Long contractId, BigDecimal differenceAmount) {
+        jdbcTemplate.update("""
+                INSERT INTO fgc.reconciliation_result
+                    (reconciliation_run_id, match_group_key, result_type, contract_id, difference_amount)
+                VALUES (?, ?, ?, ?, ?)
+                """, reconRunId, matchGroupKey, resultType, contractId, differenceAmount);
+    }
+
     private Long anyPolicyVersionId() {
         return jdbcTemplate.queryForObject(
                 "SELECT MIN(policy_version_id) FROM fgc.policy_version WHERE policy_type = 'CURRENT_COMMISSION'",
@@ -422,5 +431,43 @@ class ValidationRunDetailMapperIntegrationTest {
             assertThat(row.getViolationCount()).isEqualTo(1);
             assertThat(row.getWarningCount()).isZero();
         });
+    }
+
+    // ── FGC-FUN-043: 규제(한도)·차익거래·대사 판정은 계약 하나에 동시에 존재해도
+    //    서로 다른 테이블·컬럼에 남아 하나의 종합 상태로 합쳐지거나 덮어써지지 않는다 ──
+
+    @Test
+    void capArbitrageAndReconciliationStatusesForSameContractRemainIndependent() {
+        Long runId = insertValidationRun(LocalDate.of(2031, 12, 1), 1, "RUNNING");
+        Long c1 = contractId("FGC-FGL01-202607-0001");
+
+        insertCapCheck(runId, c1, "INSURER_TO_GA", "VIOLATION");
+        insertArbitrageCheck(runId, c1, "CANDIDATE");
+        Long reconRunId = insertReconciliationRun(runId);
+        insertReconciliationResult(reconRunId, "FUN043-TAX-1", "AMOUNT_DIFFERENCE", c1, new BigDecimal("1000"));
+
+        String capStatus = jdbcTemplate.queryForObject("""
+                SELECT result_status FROM fgc.cap_check
+                 WHERE validation_run_id = ? AND contract_id = ?
+                """, String.class, runId, c1);
+        String arbitrageStatus = jdbcTemplate.queryForObject("""
+                SELECT result_status FROM fgc.arbitrage_check
+                 WHERE validation_run_id = ? AND contract_id = ?
+                """, String.class, runId, c1);
+        String reconciliationType = jdbcTemplate.queryForObject("""
+                SELECT result_type FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id = ? AND contract_id = ?
+                """, String.class, reconRunId, c1);
+
+        // 세 판정이 서로 다른 테이블/컬럼에 각자의 값으로 남아 하나를 덮어쓰지 않는다.
+        assertThat(capStatus).isEqualTo("VIOLATION");
+        assertThat(arbitrageStatus).isEqualTo("CANDIDATE");
+        assertThat(reconciliationType).isEqualTo("AMOUNT_DIFFERENCE");
+
+        // 집계 레이어(요약)에서도 세 판정이 각자의 카운트로 분리 유지된다.
+        ValidationRunResultSummaryRow summary = mapper.summarize(runId);
+        assertThat(summary.getCapViolationCount()).isEqualTo(1);
+        assertThat(summary.getArbitrageCandidateCount()).isEqualTo(1);
+        assertThat(summary.getReconciliationMismatchCount()).isEqualTo(1);
     }
 }

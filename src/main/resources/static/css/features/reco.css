@@ -1,0 +1,643 @@
+.reco-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.reco-run-panel,
+.reco-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reco-panel-header {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.reco-filter-bar {
+  border: 0;
+  border-radius: 0;
+}
+
+.reco-filter-fields {
+  flex: 1 1 auto;
+}
+
+.reco-filter-month {
+  width: 9rem;
+}
+
+.reco-filter-stage {
+  width: 10.5rem;
+}
+
+.reco-filter-insurer {
+  width: 13rem;
+}
+
+.reco-filter-actions {
+  flex: 0 0 auto;
+}
+
+.reco-permission-note {
+  margin: 0 var(--space-3) var(--space-3);
+  color: var(--color-status-warning-text);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.reco-summary-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.reco-content-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.reco-result-controls {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.reco-result-type {
+  width: 11rem;
+}
+
+.reco-checkbox {
+  display: inline-flex;
+  min-height: var(--control-height-sm);
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.reco-checkbox input {
+  accent-color: var(--color-action-primary);
+}
+
+.reco-result-table {
+  min-width: 82rem;
+}
+
+.reco-col-contract { width: 7rem; }
+.reco-col-item { width: 9rem; }
+.reco-col-installment { width: 4rem; }
+.reco-col-agent { width: 8.5rem; }
+.reco-col-amount { width: 7rem; }
+.reco-col-result { width: 8.5rem; }
+.reco-col-reason { width: 10rem; }
+.reco-col-action { width: 7rem; }
+
+.data-table td.reco-disclosure-cell {
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: middle;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.reco-agent-mismatch,
+.reco-amount-error {
+  color: var(--color-status-error-text);
+  font-weight: 600;
+}
+
+.reco-result-table tfoot td {
+  border-top: 1px solid var(--color-border-strong);
+  border-bottom: 0;
+  background: var(--color-bg-subtle);
+  font-weight: 600;
+}
+
+.reco-state-row:hover {
+  background: var(--color-bg-surface);
+}
+
+.reco-state-row td {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+}
+
+.reco-history-table {
+  min-width: 72rem;
+}
+
+.reco-history-col-id { width: 5rem; }
+.reco-history-col-month { width: 6rem; }
+.reco-history-col-stage { width: 7rem; }
+.reco-history-col-insurer { width: 8rem; }
+.reco-history-col-status { width: 6rem; }
+.reco-history-col-count { width: 4.5rem; }
+.reco-history-col-rate { width: 5.5rem; }
+.reco-history-col-diff { width: 7rem; }
+.reco-history-col-period { width: 11rem; }
+
+.reco-history-row {
+  cursor: pointer;
+}
+
+.reco-history-row:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: -2px;
+}
+
+.reco-history-row.is-selected {
+  background: var(--color-action-subtle);
+}
+
+.reco-pagination {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.reco-pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.reco-pagination-status {
+  min-width: 4.5rem;
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.reco-compare-modal {
+  width: min(65rem, calc(100vw - var(--layout-sidebar-current-width) - 3rem));
+  height: min(53.75rem, calc(100dvh - 3rem));
+  border-radius: var(--radius-16);
+  transform: translateX(calc(var(--layout-sidebar-current-width) / 2));
+}
+
+.reco-compare-modal-header,
+.reco-compare-header-actions,
+.reco-compare-links,
+.reco-compare-related-row,
+.reco-compare-formula-row,
+.reco-compare-footer {
+  display: flex;
+  align-items: center;
+}
+
+.reco-compare-modal-header {
+  min-height: 4.75rem;
+  min-width: 0;
+  padding-block: var(--space-3);
+}
+
+.reco-compare-heading {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  column-gap: var(--space-6);
+}
+
+.reco-compare-eyebrow {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-link);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+}
+
+.reco-compare-modal .modal-title {
+  font-size: 1.3125rem;
+  line-height: 1.6875rem;
+}
+
+.reco-compare-description {
+  min-width: 0;
+  margin: 0 0 0.125rem;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reco-compare-header-actions {
+  flex: 0 0 auto;
+  gap: var(--space-2);
+}
+
+.reco-compare-content {
+  display: grid;
+  min-height: 0;
+  grid-auto-rows: max-content;
+  align-content: start;
+  padding: var(--space-3) var(--space-6);
+  gap: var(--space-4);
+}
+
+.reco-compare-state {
+  min-height: 16rem;
+}
+
+.reco-compare-state.is-error {
+  color: var(--color-status-error-text);
+}
+
+.reco-compare-summary {
+  display: grid;
+  min-height: 5rem;
+  grid-template-columns: minmax(15rem, 2fr) repeat(3, minmax(7rem, 1fr)) minmax(12rem, 1.45fr);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-12);
+  background: var(--color-bg-surface);
+}
+
+.reco-compare-summary-item {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  padding: var(--space-3) var(--space-4);
+}
+
+.reco-compare-summary-item dt {
+  margin-bottom: var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1rem;
+}
+
+.reco-compare-summary-item dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  overflow-wrap: anywhere;
+}
+
+.reco-compare-context-value {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.125rem var(--space-1);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+.reco-compare-context-segment {
+  display: inline-flex;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.reco-compare-match-key {
+  text-align: right;
+}
+
+.reco-compare-summary-item .reco-compare-summary-amount,
+.reco-compare-diff-grid .reco-amount-error,
+.reco-compare-diff-grid .reco-compare-reason {
+  color: var(--color-status-error-text);
+}
+
+.reco-compare-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.reco-compare-side,
+.reco-compare-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reco-compare-side {
+  min-height: 21.875rem;
+  border-color: var(--color-border-subtle);
+  border-radius: var(--radius-12);
+}
+
+.reco-compare-side-header {
+  min-height: 3.25rem;
+  padding-inline: var(--space-4);
+}
+
+.reco-compare-side-expected .reco-compare-side-header {
+  background: var(--color-status-info-bg);
+}
+
+.reco-compare-side-actual .reco-compare-side-header {
+  background: var(--color-bg-subtle);
+}
+
+.reco-compare-source-id,
+.reco-compare-source-note,
+.reco-compare-related-note,
+.reco-compare-footer p {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+}
+
+.reco-compare-source-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reco-compare-empty {
+  min-height: 18rem;
+  padding: var(--space-4);
+  white-space: normal;
+}
+
+.reco-compare-source-entry + .reco-compare-source-entry {
+  border-top: var(--space-2) solid var(--color-bg-subtle);
+}
+
+.reco-compare-source-entry-title {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.reco-compare-source-fields {
+  margin: 0;
+  padding-inline: var(--space-4);
+}
+
+.reco-compare-source-row {
+  display: grid;
+  min-height: 2.5rem;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 1.75fr);
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+}
+
+.reco-compare-source-row dt {
+  color: var(--color-text-secondary);
+}
+
+.reco-compare-source-row dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.reco-compare-source-note {
+  margin: 0;
+  padding: 0 var(--space-4);
+}
+
+.reco-compare-diff-body {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+}
+
+.reco-compare-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(7rem, 1fr)) minmax(6rem, 0.7fr) repeat(2, minmax(7rem, 1fr));
+  align-items: end;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.reco-compare-diff-grid dt {
+  margin-bottom: 0.125rem;
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+}
+
+.reco-compare-diff-grid dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reco-compare-diff-grid > div:nth-child(-n + 3) dd {
+  font-size: 0.875rem;
+}
+
+.reco-compare-result-badge {
+  align-self: center;
+}
+
+.reco-compare-formula-row {
+  min-width: 0;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.reco-compare-formula,
+.reco-tolerance-note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+}
+
+.reco-compare-formula {
+  padding-left: var(--space-2);
+  border-left: 3px solid var(--color-status-error-text);
+  font-weight: 500;
+}
+
+.reco-tolerance-note {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  text-align: right;
+}
+
+.reco-compare-related-row {
+  min-height: 3.5rem;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-bg-subtle);
+}
+
+.reco-compare-links {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reco-compare-related-note {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: right;
+}
+
+.reco-compare-footer {
+  min-height: 3.5rem;
+  justify-content: space-between;
+  padding-block: var(--space-2);
+}
+
+.reco-compare-footer p {
+  margin: 0;
+}
+
+@media (max-width: 63.9375rem) {
+  .reco-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reco-filter-bar {
+    align-items: stretch;
+  }
+
+  .reco-filter-actions {
+    justify-content: flex-end;
+  }
+
+  .reco-compare-modal {
+    width: min(65rem, calc(100vw - var(--layout-sidebar-current-width) - 3rem));
+  }
+
+  .reco-compare-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reco-compare-diff-grid {
+    grid-template-columns: repeat(3, minmax(7rem, 1fr));
+  }
+
+  .reco-compare-result-badge {
+    align-self: end;
+  }
+
+  .reco-compare-related-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reco-compare-related-note {
+    text-align: left;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .reco-compare-backdrop > div {
+    width: 100%;
+  }
+
+  .reco-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reco-filter-month,
+  .reco-filter-stage,
+  .reco-filter-insurer {
+    width: 100%;
+  }
+
+  .reco-filter-actions .button {
+    flex: 1 1 0;
+  }
+
+  .reco-panel-header {
+    align-items: stretch;
+    flex-direction: column;
+    padding-block: var(--space-2);
+  }
+
+  .reco-result-controls {
+    justify-content: flex-start;
+  }
+
+  .reco-result-type {
+    width: min(100%, 14rem);
+  }
+
+  .reco-pagination {
+    justify-content: center;
+  }
+
+  .reco-compare-modal-header {
+    align-items: flex-start;
+  }
+
+  .reco-compare-heading {
+    display: block;
+  }
+
+  .reco-compare-description {
+    margin-top: var(--space-1);
+    white-space: normal;
+  }
+
+  .reco-compare-summary {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reco-compare-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reco-compare-diff-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reco-compare-formula-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reco-tolerance-note {
+    text-align: left;
+  }
+
+  .reco-compare-links .button {
+    width: 100%;
+  }
+
+  .reco-compare-footer {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .reco-compare-modal {
+    width: 100%;
+    transform: none;
+  }
+
+  .reco-compare-footer .button {
+    width: 100%;
+  }
+}

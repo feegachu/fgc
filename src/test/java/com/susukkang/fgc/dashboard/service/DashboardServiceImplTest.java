@@ -40,7 +40,7 @@ class DashboardServiceImplTest {
         // 6개 값을 서로 다르게 줘서, 조립 순서가 하나라도 틀리면 바로 드러나게 함
         when(dashboardMapper.countCapViolation(month)).thenReturn(1L);
         when(dashboardMapper.countCapWarning(month)).thenReturn(2L);
-        when(dashboardMapper.countArbitrageCandidate()).thenReturn(3L);
+        when(dashboardMapper.countArbitrageCandidate(month)).thenReturn(3L);
         when(dashboardMapper.countReconciliationMismatch(month)).thenReturn(4L);
         when(dashboardMapper.countJournalImbalance()).thenReturn(5L);
         when(dashboardMapper.countOpenException()).thenReturn(6L);
@@ -60,7 +60,9 @@ class DashboardServiceImplTest {
         assertThat(result.recentValidationRuns()).isEmpty();
     }
 
-    // arbitrageCandidate/journalImbalance/openException은 월과 무관해야함
+    // journalImbalance/openException은 월과 무관해야함.
+    // arbitrageCandidate는 화면정의서 DASH-W01 KPI 표가 "기준월 변경 → 6장 카드를 다시 계산"
+    // 이라고 못박으므로 1,200%·대사불일치와 같이 기준월을 받아야 한다(#257).
     @Test
     void summarizeCallsMonthIndependentCountsWithoutMonthParameter() {
         LocalDate month = LocalDate.of(2026, 7, 1);
@@ -69,11 +71,11 @@ class DashboardServiceImplTest {
 
         dashboardService.summarize(month);
 
-        org.mockito.Mockito.verify(dashboardMapper).countArbitrageCandidate();
         org.mockito.Mockito.verify(dashboardMapper).countJournalImbalance();
         org.mockito.Mockito.verify(dashboardMapper).countOpenException();
         org.mockito.Mockito.verify(dashboardMapper).countCapViolation(month);
         org.mockito.Mockito.verify(dashboardMapper).countCapWarning(month);
+        org.mockito.Mockito.verify(dashboardMapper).countArbitrageCandidate(month);
         org.mockito.Mockito.verify(dashboardMapper).countReconciliationMismatch(month);
     }
 
