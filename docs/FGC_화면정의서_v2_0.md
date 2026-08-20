@@ -850,7 +850,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 회차별로 언제 얼마를 주고받을 예정인지 한 줄씩 보여줍니다. **대사의 기준값이 여기서 나옵니다.**
 
 **화면 구성**
-① 헤더 정보 — 계약, 방향, 체계, 버전, 상태, 정책버전, 생성 사유·일시
+① 헤더 정보 — 계약, 방향, 체계, 버전, 상태, 정책버전, 생성 사유·일시. 지급단계를 선택하면 같은 계약·선택 단계의 사용 중인 최신 운영 스케줄로 이동
 ② 회차 표 (아래)
 ③ 합계 줄
 ④ 버전 비교 영역 — 이전 버전과 나란히
@@ -876,6 +876,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 | 버튼 | 하는 일 |
 |---|---|
+| 지급단계 선택 | 같은 계약에서 선택한 지급단계의 사용 중인 최신 운영 스케줄 상세로 이동합니다 |
 | 재생성 | **새 버전**을 만듭니다. 기존 버전은 남습니다 |
 | 확정 | 헤더 상태를 확정으로 |
 | CSV 내보내기 | 회차 표 전체를 UTF-8 BOM CSV로 내려받기 |
@@ -892,7 +893,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `schedule_header`, `schedule_line`, `commission_rule`
-- API: `GET /api/v1/schedules/{id}`, `GET /api/v1/schedules/{id}/export.csv`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
+- API: `GET /api/v1/schedules/{id}`, `GET /api/v1/schedules/{id}/active?paymentStage={paymentStage}`, `GET /api/v1/schedules/{id}/export.csv`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 
@@ -1340,7 +1341,12 @@ FGC — GA 수수료 정산·검증 플랫폼
 ```
 신규(NEW) → 검토중(IN_REVIEW) → 해결(RESOLVED)
                               → 오탐·반려(REJECTED)
+오탐·반려(REJECTED) → 재검토(REOPEN) → 검토중(IN_REVIEW)
 ```
+
+`REOPEN`은 오탐·반려 오조작 또는 추가 증빙이 확인된 경우에만 사유를 필수로 입력해 수행한다.
+원장 정정이 끝난 `RESOLVED`는 기존 원분개에 대한 중복 역분개를 막기 위해 직접 재오픈하지 않고,
+추가 정정이 필요하면 직전 재기표 분개를 대상으로 새 정정 예외를 생성한다.
 
 **조치 유형** (`exception_action.action_type`)
 
@@ -1356,6 +1362,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | FALSE_POSITIVE | 오탐 |
 | RESOLVE | 해결 |
 | REJECT | 반려 |
+| REOPEN | 재검토 시작 |
 | COMMENT | 의견 |
 
 **원장 정정 예외 처리 패널**
@@ -1366,6 +1373,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 |---|---|
 | 원분개 | 분개번호·분개일·차변/대변 줄을 읽기 전용으로 표시하고 [원장 상세] 링크 제공 |
 | 정정사유 | 필수. 예외 처리이력과 정정그룹에 함께 저장 |
+| 재검토 | 오탐·반려 상태에서 [재검토 시작]과 사유를 저장하면 검토중으로 돌아가 정정 입력을 계속한다 |
 | 증빙 참조 | 선택. 실제 파일 업로드가 아니라 저장된 증빙 식별자·링크 |
 | 새 분개일 | 필수 |
 | 새 분개 설명 | 필수 |

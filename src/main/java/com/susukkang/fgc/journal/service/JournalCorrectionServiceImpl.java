@@ -4,7 +4,9 @@ import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.journal.domain.JournalType;
+import com.susukkang.fgc.journal.domain.JournalAccountCode;
 import com.susukkang.fgc.journal.dto.JournalAccountRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionGroupInsertRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionHeaderRow;
@@ -14,6 +16,8 @@ import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
 import com.susukkang.fgc.journal.dto.JournalHeaderInsertRow;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
 import com.susukkang.fgc.journal.dto.JournalLineInsertRow;
+import com.susukkang.fgc.journal.dto.JournalRepostCommand;
+import com.susukkang.fgc.journal.dto.JournalRepostLineCommand;
 import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.mapper.JournalAccountMapper;
@@ -28,6 +32,8 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +41,13 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+/**
+ * 설명 : FUN-047 원장 역분개·재기표와 정정그룹 저장 구현
+ *
+ * @author yslee
+ * @since 2026-08-20
+ * @version 1.2
+ */
 @Service
 @RequiredArgsConstructor
 public class JournalCorrectionServiceImpl implements JournalCorrectionService {
@@ -42,7 +55,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     private static final int REASON_MAX_LENGTH = 1000;
     private static final int EVIDENCE_MAX_LENGTH = 500;
     private static final int DESCRIPTION_MAX_LENGTH = 1000;
+    private static final int LINE_DESCRIPTION_MAX_LENGTH = 500;
     private static final int MAX_MONTHLY_SEQ = 9999;
+    private static final BigDecimal MAX_JOURNAL_AMOUNT =
+            new BigDecimal("9999999999999");
 
     private final JournalCorrectionMapper correctionMapper;
     private final JournalMapper journalMapper;
@@ -64,15 +80,128 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
         return correct(command.reversal(), command.correctedDraft());
     }
 
-    private JournalCorrectionResult correct(ReverseJournalCommand command,
-                                              JournalHeaderDraft correctedDraft) {
-        ValidatedRequest request = validateRequest(command);
+    @Override
+    @Transactional
+    public JournalCorrectionResult reverseAndRepost(JournalRepostCommand command) {
+        validateRepostCommand(command);
         JournalCorrectionHeaderRow original = correctionMapper.findHeaderForUpdate(
                 command.journalHeaderId());
         validateOriginal(original, command.journalHeaderId());
-
         List<JournalCorrectionLineRow> originalLines = correctionMapper.findLines(
-                original.getJournalHeaderId());
+                command.journalHeaderId());
+        JournalHeaderDraft correctedDraft = buildCorrectedDraft(
+                original, originalLines, command);
+        return correct(new ReverseJournalCommand(
+                        command.journalHeaderId(), command.reason(), command.evidenceRef(),
+                        command.requestedBy()),
+                correctedDraft, original, originalLines);
+    }
+
+    private void validateRepostCommand(JournalRepostCommand command) {
+        if (command == null || command.journalHeaderId() == null
+                || command.requestedBy() == null || command.journalDate() == null
+                || command.description() == null || command.description().isBlank()
+                || command.description().length() > DESCRIPTION_MAX_LENGTH
+                || command.lines() == null || command.lines().isEmpty()) {
+            throw validationFailure("correctedDraft");
+        }
+    }
+
+    private JournalHeaderDraft buildCorrectedDraft(
+            JournalCorrectionHeaderRow original,
+            List<JournalCorrectionLineRow> originalLines,
+            JournalRepostCommand command
+    ) {
+        Map<Integer, JournalCorrectionLineRow> originalByLineNo = new HashMap<>();
+        originalLines.forEach(line -> originalByLineNo.put(line.getLineNo(), line));
+        HashSet<Integer> usedLineNumbers = new HashSet<>();
+        List<JournalLineDraft> correctedLines = new ArrayList<>();
+
+        // 2026-08-20 yslee - 재기표 라인을 원분개 라인 수에 종속하지 않고 상세행별 원 단위로 정규화
+        // 기존 코드: 원분개와 같은 라인 수·라인 번호만 허용하고 입력 소수 금액을 그대로 저장
+        // 문제: 올바른 신규 분개가 라인을 추가·삭제할 수 없고 원 단위 HALF_UP 정책도 재현되지 않음
+        // 개선: 제출 순서로 신규 라인 번호를 부여하고 선택적 원본 참조의 추적값만 승계하며 금액을 먼저 반올림
+        for (int index = 0; index < command.lines().size(); index++) {
+            JournalRepostLineCommand input = command.lines().get(index);
+            if (input == null) {
+                throw validationFailure("lines");
+            }
+            JournalCorrectionLineRow source = null;
+            if (input.originalLineNo() != null) {
+                if (!usedLineNumbers.add(input.originalLineNo())) {
+                    throw validationFailure("lines.originalLineNo");
+                }
+                source = originalByLineNo.get(input.originalLineNo());
+            }
+            if (input.originalLineNo() != null && source == null) {
+                throw validationFailure("lines.originalLineNo");
+            }
+            JournalAccountCode accountCode;
+            try {
+                accountCode = JournalAccountCode.valueOf(input.accountCode());
+            } catch (IllegalArgumentException | NullPointerException exception) {
+                throw validationFailure("lines.accountCode");
+            }
+            BigDecimal debitAmount = normalizeWonAmount(
+                    input.debitAmount(), "lines.debitAmount");
+            BigDecimal creditAmount = normalizeWonAmount(
+                    input.creditAmount(), "lines.creditAmount");
+            if (input.lineDescription() != null
+                    && input.lineDescription().length() > LINE_DESCRIPTION_MAX_LENGTH) {
+                throw validationFailure("lines.lineDescription");
+            }
+            PaymentStage paymentStage = source == null || source.getPaymentStage() == null
+                    ? null
+                    : PaymentStage.valueOf(source.getPaymentStage());
+            correctedLines.add(JournalLineDraft.builder()
+                    .lineNo(index + 1)
+                    .accountCode(accountCode)
+                    .debitAmount(debitAmount)
+                    .creditAmount(creditAmount)
+                    .contractId(source == null
+                            ? original.getContractId() : source.getContractId())
+                    .agentId(source == null ? null : source.getAgentId())
+                    .paymentStage(paymentStage)
+                    .commissionItemId(source == null ? null : source.getCommissionItemId())
+                    .memo(input.lineDescription() == null
+                            ? source == null ? null : source.getMemo()
+                            : input.lineDescription().trim())
+                    .build());
+        }
+        return JournalHeaderDraft.builder()
+                .journalType(JournalType.valueOf(original.getJournalType()))
+                .journalDate(command.journalDate())
+                .sourceEntityType(original.getSourceEntityType())
+                .sourceEntityId(original.getSourceEntityId())
+                .revisionNo(original.getRevisionNo() + 1)
+                .validationRunId(original.getValidationRunId())
+                .contractId(original.getContractId())
+                .policyVersionId(original.getPolicyVersionId())
+                .description(command.description().trim())
+                .lines(correctedLines)
+                .build();
+    }
+
+    private JournalCorrectionResult correct(ReverseJournalCommand command,
+                                              JournalHeaderDraft correctedDraft) {
+        return correct(command, correctedDraft, null, null);
+    }
+
+    private JournalCorrectionResult correct(
+            ReverseJournalCommand command,
+            JournalHeaderDraft correctedDraft,
+            JournalCorrectionHeaderRow lockedOriginal,
+            List<JournalCorrectionLineRow> lockedOriginalLines
+    ) {
+        ValidatedRequest request = validateRequest(command);
+        JournalCorrectionHeaderRow original = lockedOriginal == null
+                ? correctionMapper.findHeaderForUpdate(command.journalHeaderId())
+                : lockedOriginal;
+        validateOriginal(original, command.journalHeaderId());
+
+        List<JournalCorrectionLineRow> originalLines = lockedOriginalLines == null
+                ? correctionMapper.findLines(original.getJournalHeaderId())
+                : lockedOriginalLines;
         assertBalanced(originalLines);
 
         List<Long> correctedAccountIds = correctedDraft == null
@@ -192,6 +321,19 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 || (line.getDebitAmount().signum() > 0) == (line.getCreditAmount().signum() > 0)) {
             throw validationFailure("correctedDraft.lines");
         }
+    }
+
+    private BigDecimal normalizeWonAmount(BigDecimal amount, String field) {
+        if (amount == null || amount.signum() < 0
+                || amount.stripTrailingZeros().scale() > 2
+                || amount.compareTo(MAX_JOURNAL_AMOUNT) > 0) {
+            throw validationFailure(field);
+        }
+        BigDecimal rounded = MoneyUtil.roundWon(amount);
+        if (rounded.compareTo(MAX_JOURNAL_AMOUNT) > 0) {
+            throw validationFailure(field);
+        }
+        return rounded;
     }
 
     private void assertBalanced(List<JournalCorrectionLineRow> lines) {

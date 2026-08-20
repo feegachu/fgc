@@ -33,6 +33,10 @@ public final class Roles {
     public static final String CAN_REVERSE_JOURNAL =
             "hasAnyRole('" + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
+    /** IF-API-44·44A 예외 처리와 원장 정정 실행. 화면정의서 EXCP-W01 권한 계약. */
+    public static final String CAN_HANDLE_EXCEPTION =
+            "hasAnyRole('" + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+
     /** IF-API-51 검증 실행 확정. 정산 처리 권한과 다른 별도 관리자 조합이다. */
     public static final String CAN_FINALIZE_VALIDATION =
             "hasAnyRole('" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";

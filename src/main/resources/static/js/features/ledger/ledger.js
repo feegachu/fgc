@@ -3,6 +3,7 @@
  * GET  /journals                                (IF-API-34 · MPA)
  * GET  /api/v1/journals/{id}                    (IF-API-35)
  * POST /api/v1/journals/{id}/reverse            (IF-API-36)
+ * POST /api/v1/journals/{id}/correction-exceptions (IF-API-36A)
  * GET  /api/v1/journals/imbalances              (IF-API-37)
  */
 (function () {
@@ -23,6 +24,11 @@
   var reverseEvidence = document.getElementById("journal-reverse-evidence");
   var reverseReasonError = document.getElementById("journal-reverse-reason-error");
   var reverseSubmit = document.getElementById("journal-reverse-submit");
+  var correctionTarget = document.getElementById("journal-correction-target");
+  var correctionReason = document.getElementById("journal-correction-reason");
+  var correctionEvidence = document.getElementById("journal-correction-evidence");
+  var correctionReasonError = document.getElementById("journal-correction-reason-error");
+  var correctionSubmit = document.getElementById("journal-correction-submit");
   var canReverse = root.dataset.canReverse === "true";
   var state = { selectedId: null, selected: null, pending: false };
 
@@ -155,6 +161,11 @@
       button.type = "button";
       button.dataset.reverseJournal = detail.journalHeaderId;
       actions.appendChild(button);
+      var correctionButton = element("button", "fgc-btn fgc-btn--ghost", "역분개 + 재기표");
+      correctionButton.type = "button";
+      correctionButton.dataset.correctionJournal = detail.journalHeaderId;
+      correctionButton.style.marginLeft = "8px";
+      actions.appendChild(correctionButton);
     } else if (detail.status === "POSTED" && !canReverse) {
       actions.appendChild(element("p", "fgc-muted", "역분개는 SETTLEMENT·GA_ADMIN·SYSTEM_ADMIN 권한이 필요합니다."));
     } else {
@@ -186,6 +197,15 @@
     reverseEvidence.value = "";
     reverseReasonError.hidden = true;
     window.FgcUi.modal.open("journal-reverse");
+  }
+
+  function openCorrectionModal() {
+    if (!state.selected || !reverseAllowed(state.selected) || !window.FgcUi.modal) return;
+    correctionTarget.textContent = state.selected.journalNo + " · " + state.selected.journalTypeLabel;
+    correctionReason.value = "";
+    correctionEvidence.value = "";
+    correctionReasonError.hidden = true;
+    window.FgcUi.modal.open("journal-correction-request");
   }
 
   // 2026-08-19 yslee - FUN-047 원분개 역분개 API를 LEDG-W01에 연결
@@ -223,6 +243,38 @@
     });
   }
 
+  // 2026-08-20 yslee - LEDG-W01 정정 요청을 원장 정정 예외와 연결
+  // 기존 코드: 단순 역분개 버튼만 있어 올바른 신규 분개를 입력할 업무 화면으로 이동할 수 없음
+  // 문제: 역분개+재기표 내부 서비스가 있어도 사용자는 예외 처리 흐름에서 실제 정정을 수행할 수 없음
+  // 개선: IF-API-36A로 예외를 멱등 생성한 뒤 서버가 반환한 EXCP-W01 선택 주소로 이동
+  function submitCorrectionRequest() {
+    var reason = correctionReason.value.trim();
+    if (!reason) {
+      correctionReasonError.hidden = false;
+      correctionReason.focus();
+      return;
+    }
+    if (state.pending || !state.selected || !reverseAllowed(state.selected)) return;
+
+    state.pending = true;
+    correctionSubmit.disabled = true;
+    correctionSubmit.setAttribute("aria-busy", "true");
+    apiClient.request("/api/v1/journals/"
+      + encodeURIComponent(state.selected.journalHeaderId) + "/correction-exceptions", {
+      method: "POST",
+      body: { reason: reason, evidenceRef: correctionEvidence.value.trim() || null }
+    }).then(function (envelope) {
+      window.location.assign(envelope.data.redirectUrl);
+    }).catch(function (error) {
+      if (window.FgcUi.toast) window.FgcUi.toast(error && error.message
+        ? error.message : "원장 정정 요청을 만들지 못했습니다.", "error");
+    }).finally(function () {
+      state.pending = false;
+      correctionSubmit.disabled = false;
+      correctionSubmit.removeAttribute("aria-busy");
+    });
+  }
+
   listBody.addEventListener("click", function (event) {
     var row = event.target.closest("tr[data-journal-id]");
     if (row) loadDetail(row.dataset.journalId);
@@ -236,8 +288,17 @@
   });
   detailBody.addEventListener("click", function (event) {
     if (event.target.closest("[data-reverse-journal]")) openReverseModal();
+    if (event.target.closest("[data-correction-journal]")) openCorrectionModal();
   });
   reverseReason.addEventListener("input", function () { reverseReasonError.hidden = Boolean(reverseReason.value.trim()); });
   reverseSubmit.addEventListener("click", submitReverse);
+  correctionReason.addEventListener("input", function () {
+    correctionReasonError.hidden = Boolean(correctionReason.value.trim());
+  });
+  correctionSubmit.addEventListener("click", submitCorrectionRequest);
+
+  if (root.dataset.selectedJournalId) {
+    loadDetail(root.dataset.selectedJournalId);
+  }
 
 })();

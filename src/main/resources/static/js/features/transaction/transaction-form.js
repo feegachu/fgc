@@ -6,7 +6,8 @@
   if (!apiClient || !main) return;
 
   var AGENTS = [];
-  var SOURCE_TYPES = [["GA_MANUAL_PAYMENT", "GA 수기지급"]];
+  var MANUAL_PAYMENT_SOURCE_TYPE = "GA_MANUAL_PAYMENT";
+  var SOURCE_TYPES = [[MANUAL_PAYMENT_SOURCE_TYPE, "GA 수기지급"]];
   var contracts = [];
   var attributionSequence = 0;
   var saving = false;
@@ -31,6 +32,7 @@
 
   initializeSettlementMonth();
   fillOptions(sourceType, SOURCE_TYPES, "원천유형을 선택하세요");
+  sourceType.value = MANUAL_PAYMENT_SOURCE_TYPE;
   fillOptions(recipient, [], "설계사를 불러오는 중입니다.");
   if (!paymentId && !bizKey.value) bizKey.value = generateBusinessKey();
 
@@ -124,7 +126,7 @@
         && (!isInsurerToGa() || entry.itemCode !== "NEWCOMER_SUPPORT");
     })
       .map(function (entry) {
-        return [String(entry.commissionItemId), entry.itemCode + " · " + entry.itemName];
+        return [String(entry.commissionItemId), entry.itemName];
       });
     fillOptions(item, options, "수수료 항목을 선택하세요");
     item.value = selected;
@@ -137,7 +139,7 @@
         var draft = envelope && envelope.data;
         if (!draft || draft.status !== "DRAFT") throw new Error("수정 가능한 지급 초안이 아닙니다.");
         stage.value = draft.paymentStage || "";
-        sourceType.value = draft.sourceType || "";
+        sourceType.value = MANUAL_PAYMENT_SOURCE_TYPE;
         bizKey.value = draft.sourceBusinessKey || "";
         settlementMonth.value = String(draft.settlementMonth || "").slice(0, 7);
         cashflow.value = draft.cashflowType || "PAYMENT";

@@ -8,6 +8,7 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseResponseDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
+import com.susukkang.fgc.journal.service.JournalAccountCatalogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -44,6 +45,7 @@ public class ExceptionCaseViewController {
     private static final int PAGE_SIZE = 20;
 
     private final ExceptionCaseService exceptionCaseService;
+    private final JournalAccountCatalogService journalAccountCatalogService;
 
     @GetMapping("/exceptions")
     public String list(
@@ -108,7 +110,9 @@ public class ExceptionCaseViewController {
         model.addAttribute("actionTypes", ExceptionActionType.values());
         model.addAttribute("newStatus", ExceptionStatus.NEW);
         model.addAttribute("inReviewStatus", ExceptionStatus.IN_REVIEW);
+        model.addAttribute("rejectedStatus", ExceptionStatus.REJECTED);
         model.addAttribute("selectedExceptionId", selected);
+        model.addAttribute("journalAccounts", journalAccountCatalogService.findAllActive());
         model.addAttribute("cases", cases.content());
         model.addAttribute("casePage", cases);
         model.addAttribute("openCount", cases.summary().stream()

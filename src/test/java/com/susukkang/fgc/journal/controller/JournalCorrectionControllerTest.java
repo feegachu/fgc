@@ -10,9 +10,13 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
+import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRequest;
+import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionResponse;
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalRequest;
 import com.susukkang.fgc.journal.service.JournalCorrectionService;
+import com.susukkang.fgc.journal.service.JournalCorrectionExceptionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -23,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -48,6 +53,9 @@ class JournalCorrectionControllerTest {
     @MockitoBean
     private JournalCorrectionService journalCorrectionService;
 
+    @MockitoBean
+    private JournalCorrectionExceptionService journalCorrectionExceptionService;
+
     @Test
     void reversesPostedJournalForSettlementRole() throws Exception {
         given(journalCorrectionService.reverse(any(ReverseJournalCommand.class)))
@@ -65,6 +73,26 @@ class JournalCorrectionControllerTest {
 
         verify(journalCorrectionService).reverse(new ReverseJournalCommand(
                 10L, "금액 정정", "DOC-10", 1L));
+    }
+
+    @Test
+    void createsOrReusesCorrectionExceptionAndReturnsRedirect() throws Exception {
+        // FGC-FUN-052 / IF-API-36A: 활성 정정 예외의 멱등 생성과 이동 응답을 검증한다.
+        given(journalCorrectionExceptionService.createOrGet(
+                eq(10L), any(JournalCorrectionExceptionRequest.class), eq(1L)))
+                .willReturn(new JournalCorrectionExceptionResponse(
+                        30L, true, ExceptionStatus.NEW, "/exceptions?selected=30"));
+
+        mockMvc.perform(post("/api/v1/journals/10/correction-exceptions")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"금액 오류\",\"evidenceRef\":\"DOC-10\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.exceptionCaseId").value(30L))
+                .andExpect(jsonPath("$.data.created").value(true))
+                .andExpect(jsonPath("$.data.status").value("NEW"))
+                .andExpect(jsonPath("$.data.redirectUrl").value("/exceptions?selected=30"));
     }
 
     @Test

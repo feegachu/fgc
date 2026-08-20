@@ -19,6 +19,7 @@ public record ProductRow(
         String channelCode,
         boolean channelSpecialRuleYn,
         String feeRegimeCode,
-        boolean standardDeduction80Yn
+        boolean standardDeduction80Yn,
+        Integer paymentTermMonths
 ) {
 }

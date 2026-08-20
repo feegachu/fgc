@@ -176,6 +176,8 @@
                      javaType="com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse">
             <id property="scheduleHeaderId" column="schedule_header_id"/>
             <result property="contractNo" column="contract_no"/>
+            <result property="insurerName" column="insurer_name"/>
+            <result property="productName" column="product_name"/>
             <result property="paymentStage" column="payment_stage"/>
             <result property="scheduleRegime" column="schedule_regime"/>
             <result property="schedulePurpose" column="schedule_purpose"/>
@@ -214,6 +216,8 @@
             -- 헤더 컬럼
             sh.schedule_header_id,
             c.contract_no,
+            i.insurer_name,
+            p.product_name,
             sh.payment_stage,
             sh.schedule_regime,
             sh.schedule_purpose,
@@ -243,6 +247,12 @@
         FROM schedule_header sh
              JOIN insurance_contract c
                   ON c.contract_id = sh.contract_id
+             JOIN insurer i
+                  ON i.insurer_id = c.insurer_id
+             JOIN product_offering po
+                  ON po.product_offering_id = c.product_offering_id
+             JOIN product p
+                  ON p.product_id = po.product_id
              JOIN policy_version pv
                   ON pv.policy_version_id = sh.policy_version_id
              LEFT JOIN schedule_line sl

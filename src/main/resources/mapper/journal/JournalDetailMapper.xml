@@ -17,19 +17,32 @@
         SELECT h.journal_header_id, h.journal_no, h.journal_date, h.journal_type,
                h.source_entity_type, h.source_entity_id, h.revision_no,
                h.contract_id, c.contract_no AS contractNo,
-               h.validation_run_id, h.policy_version_id, h.correction_group_key,
+               h.validation_run_id, h.policy_version_id,
+               COALESCE(h.correction_group_key, correction_group.correction_group_key) AS correctionGroupKey,
                h.status, h.description,
                creator.login_id AS createdBy, h.created_at AS createdAt,
                poster.login_id AS postedBy, h.posted_at AS postedAt,
                h.reversal_of_id AS reversalOfId, rev.journal_no AS reversalOfJournalNo,
                successor.journal_header_id AS reversedByJournalHeaderId,
-               successor.journal_no AS reversedByJournalNo
+               successor.journal_no AS reversedByJournalNo,
+               repost.journal_header_id AS repostedJournalHeaderId,
+               repost.journal_no AS repostedJournalNo
         FROM fgc.journal_header h
         LEFT JOIN fgc.insurance_contract c ON c.contract_id = h.contract_id
         LEFT JOIN fgc.app_user creator ON creator.user_id = h.created_by
         LEFT JOIN fgc.app_user poster ON poster.user_id = h.posted_by
         LEFT JOIN fgc.journal_header rev ON rev.journal_header_id = h.reversal_of_id
         LEFT JOIN fgc.journal_header successor ON successor.reversal_of_id = h.journal_header_id
+        <!-- 2026-08-20 yslee - 원분개·역분개 어느 쪽에서 조회해도 영구 정정그룹과 재기표를 추적 -->
+        <!-- 기존 코드: journal_header 자신의 correction_group_key만 읽어 원분개에서는 그룹키가 NULL -->
+        <!-- 문제: 즉시 처리 응답을 놓치면 재기표 ID와 실제 반영 결과를 화면에서 재구성할 수 없음 -->
+        <!-- 개선: 원분개 유일 정정그룹을 조인하고 같은 그룹의 REVERSAL 아닌 신규 분개를 함께 조회 -->
+        LEFT JOIN fgc.journal_correction_group correction_group
+               ON correction_group.original_journal_header_id = h.journal_header_id
+               OR correction_group.correction_group_key = h.correction_group_key
+        LEFT JOIN fgc.journal_header repost
+               ON repost.correction_group_key = correction_group.correction_group_key
+              AND repost.journal_type != 'REVERSAL'
         WHERE h.journal_header_id = #{journalHeaderId}
     </select>
 

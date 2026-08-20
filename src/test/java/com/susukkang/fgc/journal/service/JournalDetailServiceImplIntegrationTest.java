@@ -67,6 +67,25 @@ class JournalDetailServiceImplIntegrationTest {
                 contractId, originalId, correctionGroupKey);
     }
 
+    private Long insertRepostHeader(String journalNo, Long originalId) {
+        String correctionGroupKey = jdbcTemplate.queryForObject("""
+                SELECT correction_group_key
+                  FROM fgc.journal_correction_group
+                 WHERE original_journal_header_id = ?
+                """, String.class, originalId);
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.journal_header
+                    (journal_no, journal_date, journal_type, source_entity_type, source_entity_id,
+                     contract_id, revision_no, correction_group_key, description)
+                SELECT ?, ?, original.journal_type, original.source_entity_type, original.source_entity_id,
+                       original.contract_id, original.revision_no + 1, ?, '재기표 조회 테스트'
+                  FROM fgc.journal_header original
+                 WHERE original.journal_header_id = ?
+                RETURNING journal_header_id
+                """, Long.class, journalNo, LocalDate.of(2026, 8, 1),
+                correctionGroupKey, originalId);
+    }
+
     private void insertLine(Long headerId, int lineNo, String accountCode,
                              BigDecimal debit, BigDecimal credit) {
         jdbcTemplate.update("""
@@ -139,6 +158,10 @@ class JournalDetailServiceImplIntegrationTest {
         insertLine(originalId, 2, "EXPECTED_INCOME", BigDecimal.ZERO, new BigDecimal("10000.00"));
         postJournal(originalId);
         Long reversalId = insertReversalHeader("TEST-DETAIL-0004", contractId, originalId);
+        insertLine(reversalId, 1, "EXPECTED_RECEIVABLE", BigDecimal.ZERO, new BigDecimal("10000.00"));
+        insertLine(reversalId, 2, "EXPECTED_INCOME", new BigDecimal("10000.00"), BigDecimal.ZERO);
+        postJournal(reversalId);
+        Long repostedId = insertRepostHeader("TEST-DETAIL-REPOST-0004", originalId);
 
         JournalDetailResponse original = journalDetailService.findByJournalHeaderId(originalId);
         JournalDetailResponse reversal = journalDetailService.findByJournalHeaderId(reversalId);
@@ -146,6 +169,9 @@ class JournalDetailServiceImplIntegrationTest {
         assertThat(original.reversalOfId()).isNull();
         assertThat(original.reversedByJournalHeaderId()).isEqualTo(reversalId);
         assertThat(original.reversedByJournalNo()).isEqualTo("TEST-DETAIL-0004");
+        assertThat(original.correctionGroupKey()).isEqualTo("TEST-CORRECTION-" + originalId);
+        assertThat(original.repostedJournalHeaderId()).isEqualTo(repostedId);
+        assertThat(original.repostedJournalNo()).isEqualTo("TEST-DETAIL-REPOST-0004");
 
         assertThat(reversal.reversalOfId()).isEqualTo(originalId);
         assertThat(reversal.reversalOfJournalNo()).isEqualTo("TEST-DETAIL-0003");

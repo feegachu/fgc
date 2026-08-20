@@ -278,7 +278,7 @@ public class ContractService {
         )) {
             throw validationException(
                     "agentId",
-                    "존재하지 않는 설계사입니다."
+                    "계약일 기준 활동 중인 FC 직급의 모집설계사만 선택할 수 있습니다."
             );
         }
 
