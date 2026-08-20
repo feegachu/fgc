@@ -1,3 +1,10 @@
+/*
+ * FGC-UI-CONT-W03 보험계약 등록·수정 (IF-API-18·19).
+ *
+ * 오류 표시는 두 갈래로 나눈다 (마이그레이션 가이드 §11).
+ *   · 필드 유효성 오류 — 해당 필드 옆 .field-error
+ *   · 기준정보 로드 실패 — 우상단 Toast (필드와 무관한 화면 준비 실패다)
+ */
 (function () {
   "use strict";
 
@@ -7,6 +14,7 @@
   var contractApi = window.FgcUi && window.FgcUi.contractApi;
   if (!contractApi) return;
 
+  var format = (window.FgcUi && window.FgcUi.format) || null;
   var elements = {
     insurerId: document.querySelector("#insurer-id"),
     productOfferingId: document.querySelector("#product-offering-id"),
@@ -47,10 +55,19 @@
     ANNUAL: 12
   };
 
+  /* Asia/Seoul 고정. contract-list.js 와 바이트 단위로 같던 중복 구현을 공통 유틸로 합쳤다. */
   function today() {
-    var date = new Date();
-    var localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-    return localDate.toISOString().slice(0, 10);
+    return format ? format.today() : new Date().toISOString().slice(0, 10);
+  }
+
+  function toast(message, tone, duration) {
+    if (window.FgcUi && typeof window.FgcUi.toast === "function") window.FgcUi.toast(message, tone, duration);
+  }
+
+  /* 기준정보 로드 실패는 필드 오류가 아니다 — 오류코드·요청 ID 를 붙여 Toast 로만 알린다. */
+  function showLoadFailure(error, fallbackMessage) {
+    toast(format ? format.errorText(error, fallbackMessage)
+      : ((error && error.message) || fallbackMessage), "error");
   }
 
   function pageContent(pageResponse) {
@@ -112,10 +129,14 @@
       if (target && target.type !== "hidden") target.focus();
     }
     errorMessage.textContent = message;
-    if (error && error.requestId) {
-      requestIdMessage.textContent = "요청 ID: " + error.requestId;
-      requestIdMessage.hidden = false;
+    /* FGC-SIR-007 — 오류코드와 추적ID 를 함께 보여 준다. Toast 와 같은 순서·형식으로 적는다. */
+    var trace = [];
+    if (error && error.code) trace.push(error.code);
+    if (error && error.requestId && message.indexOf(error.requestId) === -1) {
+      trace.push("요청 ID: " + error.requestId);
     }
+    requestIdMessage.textContent = trace.join(" · ");
+    requestIdMessage.hidden = trace.length === 0;
     errorSummary.hidden = false;
     errorSummary.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -129,6 +150,14 @@
     updateSaveState();
   }
 
+  /*
+   * 주기 보험료는 일시납이 아니면 읽기전용이고 월납환산 × 주기개월로 자동 계산한다.
+   *
+   * 화면정의서 CONT-W03 항목표는 "주기 보험료 | 입력 | 금액 | O | 0 이상" 이므로 문서와 다르다.
+   * 두 값을 따로 받으면 monthlyEquivalentFirstPremium 과 어긋난 계약이 저장되고
+   * 그 값이 그대로 1,200% 한도 계산 기준이 되기 때문에 화면에서 파생시킨다 (#283).
+   * 문서 갱신은 별도 이슈로 올린다 — 여기서 docs/ 를 고치지 않는다.
+   */
   function syncPremiumPerCycleAmount() {
     var paymentCycle = elements.paymentCycleCode.value;
     var isSinglePayment = paymentCycle === "SINGLE";
@@ -158,8 +187,8 @@
       contractLimitPreview.textContent = "—";
       return;
     }
-    contractLimitFormula.textContent = monthlyEquivalent.toLocaleString("ko-KR") + " × 12";
-    contractLimitPreview.textContent = (monthlyEquivalent * 12).toLocaleString("ko-KR");
+    contractLimitFormula.textContent = int(monthlyEquivalent) + " × 12";
+    contractLimitPreview.textContent = int(monthlyEquivalent * 12);
   }
 
   function updateSaveState() {
@@ -234,7 +263,7 @@
     }).catch(function (error) {
       if (requestSequence !== productRequestSequence) return;
       replaceOptions(elements.productOfferingId, "상품을 불러오지 못했습니다.", [], option);
-      showError(error, "상품 판매버전을 불러오지 못했습니다.");
+      showLoadFailure(error, "상품 판매버전을 불러오지 못했습니다.");
     }).finally(function () {
       if (requestSequence === productRequestSequence) {
         isLoadingProducts = false;
@@ -287,7 +316,7 @@
     }).catch(function (error) {
       if (requestSequence !== agentRequestSequence) return;
       replaceOptions(elements.agentId, "설계사를 불러오지 못했습니다.", [], option);
-      showError(error, "모집 설계사를 불러오지 못했습니다.");
+      showLoadFailure(error, "모집 설계사를 불러오지 못했습니다.");
     }).finally(function () {
       if (requestSequence === agentRequestSequence) {
         isLoadingAgents = false;
@@ -331,6 +360,10 @@
         ]);
       });
     });
+  }
+
+  function int(value) {
+    return format ? format.int(value) : Number(value).toLocaleString("ko-KR");
   }
 
   function numberValue(element) {
@@ -426,16 +459,24 @@
 
     isSubmitting = true;
     saveButton.classList.add("is-loading");
+    saveButton.setAttribute("aria-busy", "true");
     updateSaveState();
     var operation = isEditMode
       ? contractApi.updateContract(contractId, requestBody())
       : contractApi.createContract(requestBody());
 
     operation.then(function (envelope) {
-      var savedContractId = envelope.data.contractId;
+      var saved = envelope.data || {};
+      var savedContractId = saved.contractId;
       var redirect = function () {
         window.location.assign("/contracts/" + encodeURIComponent(savedContractId));
       };
+      /*
+       * 저장 성공 Toast 는 여기서 띄우지 않는다 — 곧바로 상세로 이동하므로 화면 전환에 묻힌다.
+       * 문구만 남겨 두고 contract-detail.js 가 상세 진입 직후 한 번 꺼내 띄운다 (가이드 §11 마지막 절).
+       * IF-API-18·19 가 내려 주는 scheduleHeaderIds 로 "스케줄이 함께 만들어졌다"까지 알린다.
+       */
+      rememberSaveMessage(saveMessage(saved));
       if (isEditMode) {
         redirect();
         return;
@@ -448,8 +489,25 @@
     }).finally(function () {
       isSubmitting = false;
       saveButton.classList.remove("is-loading");
+      saveButton.setAttribute("aria-busy", "false");
       updateSaveState();
     });
+  }
+
+  function saveMessage(saved) {
+    var scheduleIds = Array.isArray(saved.scheduleHeaderIds) ? saved.scheduleHeaderIds : [];
+    var action = isEditMode ? "수정했습니다" : "저장했습니다";
+    if (!scheduleIds.length) return "보험계약을 " + action + ".";
+    return "보험계약을 " + action + ". 예상 스케줄 " + scheduleIds.length
+      + "건을 함께 " + (isEditMode ? "재생성" : "생성") + "했습니다 — [예상 스케줄] 탭에서 확인하세요.";
+  }
+
+  function rememberSaveMessage(message) {
+    try {
+      window.sessionStorage.setItem("fgc.contract.saveMessage", message);
+    } catch (error) {
+      /* 저장 자체는 성공했다. 안내를 남기지 못해도 이동을 막지 않는다. */
+    }
   }
 
   elements.contractDate.max = today();
@@ -459,7 +517,7 @@
 
   var initialization = isEditMode ? initializeEditForm() : initializeCreateForm();
   initialization.catch(function (error) {
-    showError(error, "계약 입력 화면을 준비하지 못했습니다.");
+    showLoadFailure(error, "계약 입력 화면을 준비하지 못했습니다.");
   }).finally(function () {
     isInitializing = false;
     syncPremiumPerCycleAmount();
