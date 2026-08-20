@@ -20,8 +20,8 @@ public record DashboardSummaryResponse(
         long reconMismatch,
         long journalImbalance,
         long openException,
-        List<RecentExceptionRow> recentExceptions,
-        List<RecentValidationRunRow> recentRuns
+        List<RecentExceptionResponse> recentExceptions,
+        List<RecentValidationRunResponse> recentRuns
 ) {
     public static DashboardSummaryResponse from(DashboardSummaryResult result) {
         DashboardKpiCounts kpis = result.kpis();
@@ -33,8 +33,8 @@ public record DashboardSummaryResponse(
                 kpis.reconciliationMismatch(),
                 kpis.journalImbalance(),
                 kpis.openException(),
-                result.recentExceptions(),
-                result.recentValidationRuns()
+                result.recentExceptions().stream().map(RecentExceptionResponse::from).toList(),
+                result.recentValidationRuns().stream().map(RecentValidationRunResponse::from).toList()
         );
     }
 }
