@@ -27,6 +27,8 @@ public class CommissionPaymentAttributionCommand {
     private final Long agentId;
     private final Long contractId;
     private final Long scheduleLineId;
+    /** 대응 운영 스케줄 행의 회차. 부모 지급 건 회차를 정하는 데만 쓰고 귀속행 테이블에는 저장하지 않는다. */
+    private final Integer installmentNo;
     private final LocalDate attributionDate;
     private final LocalDate attributionMonth;
     private final BigDecimal amount;

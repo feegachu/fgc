@@ -82,8 +82,11 @@
           ? "버전 " + value(activeHeader.scheduleVersionNo) + " · " + value(activeHeader.lineCount || lines.length) + "회차"
           : "현재 운영 스케줄이 없습니다.";
         var schedule = section(stageLabel(response.stage), summary);
-        schedule.appendChild(table(["회차", "예정일", "예정 지급액", "상태"], lines.map(function (line) {
-          return [value(line.installmentNo), value(line.dueDate), money(line.expectedAmount), value(line.lineStatus)];
+        // 관리자수수료는 같은 회차·항목에 팀장·지사장·본부장 3행이 정상적으로 존재한다(운영정책서 제20조).
+        // 수취인·항목을 빼면 FC 행과 구분되지 않아 스케줄이 잘못 만들어진 것처럼 보인다.
+        schedule.appendChild(table(["회차", "예정일", "수수료 항목", "수취인", "예정 지급액", "상태"], lines.map(function (line) {
+          return [value(line.installmentNo), value(line.dueDate), value(line.commissionItemName),
+            value(line.recipientName), money(line.expectedAmount), value(line.lineStatus)];
         })));
         root.appendChild(schedule);
       });

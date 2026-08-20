@@ -145,9 +145,22 @@
             resultType="com.susukkang.fgc.transaction.domain.ContractReference">
         SELECT contract_id,
                agent_id,
+               organization_id,
                contract_date
           FROM fgc.insurance_contract
          WHERE contract_id = #{contractId}
+    </select>
+
+    <!--
+      2026-08-19 hjKang - FGC-FUN-065 관리자수수료 수취인 검증용 직급 조회
+      관리자수수료는 계약 모집설계사가 아니라 조직 계층의 상위 관리자에게 지급된다
+      (운영정책서 제20조 패턴 GA-LIFE-A). 수취인이 그 계약 조직의 정당한 관리자인지
+      판정하려면 직급이 필요하다.
+    -->
+    <select id="findAgentRankCode" resultType="com.susukkang.fgc.common.code.AgentRankCode">
+        SELECT rank_code
+          FROM fgc.agent
+         WHERE agent_id = #{agentId}
     </select>
 
     <select id="countContractsBeforeMonth" resultType="int">
@@ -181,8 +194,11 @@
     <!-- #39: 항목 전체가 아닌 실제 발생건에 증빙을 연결한다. 귀속일은 자유 입력값이므로 일자가 아닌
          귀속월로 후보를 찾는다. 0건·복수건은 서비스가 null로 보존해
          한도검증 시 자동 제외 대신 REVIEW_REQUIRED가 되도록 한다. -->
-    <select id="findOperationalScheduleLineIds" resultType="long">
-        SELECT sl.schedule_line_id
+    <!-- 2026-08-19 hjKang - 운영 스케줄 행 조회 조건을 회차 조회와 공유 -->
+    <!-- 기존 코드: findOperationalScheduleLineIds 안에 조건이 인라인으로 박혀 있음 -->
+    <!-- 문제: 회차 조회를 따로 만들면 두 쿼리의 조건이 갈라져 schedule_line_id는 연결됐는데 회차만 NULL인 불일치가 생길 수 있음 -->
+    <!-- 개선: WHERE 절을 sql 조각으로 공유해 한 곳만 고쳐도 둘 다 바뀌게 한다 -->
+    <sql id="operationalScheduleLineConditions">
           FROM fgc.schedule_line sl
           JOIN fgc.schedule_header sh
             ON sh.schedule_header_id = sl.schedule_header_id
@@ -191,10 +207,31 @@
            AND sh.schedule_purpose = 'OPERATIONAL'
            AND sh.active_yn = true
            AND sl.commission_item_id = #{commissionItemId}
+           <!-- 2026-08-20 hjKang - 수취인까지 좁힌다.
+                기존 코드: 계약·단계·항목·귀속월만으로 조회했다.
+                문제: 관리자수수료는 같은 계약·항목·월에 팀장·지사장·본부장 3행이 정상적으로 있어
+                      후보가 항상 3건이 되고, 단건일 때만 연결하는 호출부 때문에
+                      transaction_attribution.schedule_line_id 가 구조적으로 NULL 이 됐다.
+                      회차 조회도 세 행의 회차가 우연히 같아서 동작했을 뿐이다.
+                개선: uq_schedule_line_business 가 COALESCE(beneficiary_agent_id,0) 을 포함하듯
+                      수취인을 술어에 넣는다. 원수사→GA 는 양쪽 모두 NULL 이라
+                      IS NOT DISTINCT FROM 으로 null-safe 비교한다. -->
+           AND sl.beneficiary_agent_id IS NOT DISTINCT FROM #{beneficiaryAgentId,jdbcType=BIGINT}
            AND sl.due_date <![CDATA[ >= ]]> #{attributionMonthStart}
            AND sl.due_date <![CDATA[ < ]]> #{nextAttributionMonthStart}
            AND sl.line_status &lt;&gt; 'CANCELLED'
          ORDER BY sl.schedule_line_id
+    </sql>
+
+    <select id="findOperationalScheduleLineIds" resultType="long">
+        SELECT sl.schedule_line_id
+        <include refid="operationalScheduleLineConditions"/>
+    </select>
+
+    <!-- 2026-08-19 hjKang - FUN-048 대사 회차 비교용 실제 회차 원천 조회 -->
+    <select id="findOperationalScheduleInstallmentNos" resultType="java.lang.Integer">
+        SELECT sl.installment_no
+        <include refid="operationalScheduleLineConditions"/>
     </select>
 
     <select id="existsPolicyVersion" resultType="boolean">
@@ -219,11 +256,13 @@
             source_type,
             source_business_key,
             source_contract_id,
+            insurer_id,
             recipient_agent_id,
             commission_item_id,
             policy_version_id,
             settlement_month,
             due_date,
+            installment_no,
             amount,
             cashflow_type,
             status,
@@ -234,11 +273,13 @@
             #{sourceType},
             #{sourceBusinessKey},
             #{naturalContractId},
+            (SELECT c.insurer_id FROM fgc.insurance_contract c WHERE c.contract_id = #{naturalContractId}),
             #{agentId},
             #{commissionItemId},
             #{policyVersionId},
             #{settlementMonth},
             #{dueDate},
+            #{installmentNo},
             #{amount},
             #{cashflowType},
             'DRAFT',
@@ -253,11 +294,16 @@
                source_type = #{sourceType},
                source_business_key = #{sourceBusinessKey},
                source_contract_id = #{naturalContractId},
+               -- 2026-08-19 hjKang - 수기 INSURER_TO_GA 지급 건도 원수사 대사 대상이 되도록 보험회사를 채운다.
+               -- InsurerGaReconciliationMapper.findActualSources 가 ct.insurer_id 로 대상을 좁히는데
+               -- 기존에는 이 컬럼이 항상 NULL 이라 수기 건이 전부 탈락했다.
+               insurer_id = (SELECT c.insurer_id FROM fgc.insurance_contract c WHERE c.contract_id = #{naturalContractId}),
                recipient_agent_id = #{agentId},
                commission_item_id = #{commissionItemId},
                policy_version_id = #{policyVersionId},
                settlement_month = #{settlementMonth},
                due_date = #{dueDate},
+               installment_no = #{installmentNo},
                amount = #{amount},
                cashflow_type = #{cashflowType},
                evidence_ref = #{evidenceRef},

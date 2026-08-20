@@ -276,6 +276,43 @@
                    #{dataOrigin}
                )
     </insert>
+
+    <!--
+      2026-08-19 hjKang - FGC-FUN-018 수기 등록 계약의 초회 재무 스냅샷 생성
+      기존 코드: contract_financial_snapshot 에 쓰는 경로가 db/demo 시드뿐이었다.
+      문제: CONT-W03 으로 등록한 계약은 스냅샷이 없어 FUN-063 차익거래가 항상
+            "기준일 이하 계약 금융 스냅샷이 없습니다"로 REVIEW_REQUIRED(자료부족)가 된다.
+      개선: 계약 저장 트랜잭션 안에서 계약일 기준 1차월 스냅샷 1행을 만든다.
+            누적 납입보험료는 계약 시점 정의상 초회보험료와 같으므로 그대로 쓰고,
+            해약환급금은 임의 산정이 금지되어 NULL 로 둔다(운영정책서 제33조·REG-23).
+            80% 공제 상품이면 환급률표가 없는 상태이므로 ArbitrageService 가
+            의도대로 REVIEW_REQUIRED 를 낸다 — 억지 계산을 하지 않는다.
+            IF-API-19(PUT) 재호출과 재시도를 위해 업무 UNIQUE 로 멱등을 보장한다.
+    -->
+    <insert id="insertInitialFinancialSnapshot">
+        INSERT INTO fgc.contract_financial_snapshot (
+            contract_id,
+            as_of_date,
+            contract_month_no,
+            cumulative_paid_premium,
+            surrender_value,
+            surrender_value_type,
+            refund_rate_table_id,
+            source_ref
+        )
+        SELECT c.contract_id,
+               c.contract_date,
+               1,
+               c.first_premium_amount,
+               NULL,
+               'EXPECTED_TABLE',
+               NULL,
+               'MANUAL_CONTRACT_INITIAL'
+          FROM fgc.insurance_contract c
+         WHERE c.contract_id = #{contractId}
+        ON CONFLICT ON CONSTRAINT uq_contract_financial_snapshot DO NOTHING
+    </insert>
+
     <!-- 계약 ID 조회 -->
     <select id="selectContractById" parameterType="long" resultType="com.susukkang.fgc.contract.dto.InsuranceContract">
             SELECT
