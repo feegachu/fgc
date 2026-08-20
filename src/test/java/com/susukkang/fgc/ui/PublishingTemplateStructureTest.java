@@ -591,8 +591,11 @@ class PublishingTemplateStructureTest {
                 .doesNotContain(".base-panel-note");
     }
 
-    // FGC-UI-DASH-W01: 업무 대시보드는 공통 컴포넌트만 쓰고, 서버 enum label을 그대로 노출하며,
-    // 화면정의서에 없는 "연동 대기" 카드가 남아있지 않아야 한다(#282).
+    // FGC-UI-DASH-W01: 업무 대시보드는 공통 컴포넌트만 쓰고, 화면정의서에 없는 "연동 대기" 카드가
+    // 남아있지 않아야 한다(#282). 라벨은 템플릿의 T(...).valueOf(...).label() SpEL 반사 호출이 아니라
+    // IF-API-03 응답(RecentExceptionResponse/RecentValidationRunResponse)이 서버에서 미리 만들어
+    // 내려주는 *Label 필드를 그대로 찍는다 — SIR-008(코드값은 영문 코드+한글 라벨 동봉)이 API 계약
+    // 레벨에서 지켜지도록, 화면과 JSON이 같은 라벨을 공유한다.
     @Test
     void dashboardUsesCommonComponentsWithoutStalePlaceholdersOrRawEnumCodes() throws IOException {
         assertThat(resource("templates/dashboard/index.html"))
@@ -603,10 +606,11 @@ class PublishingTemplateStructureTest {
                 .doesNotContain("trend-card")
                 .doesNotContain("readiness-card")
                 .contains("kpi-card kpi-card-warning")
-                .contains("T(com.susukkang.fgc.common.code.ExceptionSeverity).valueOf(e.severity()).label()")
-                .contains("T(com.susukkang.fgc.common.code.ExceptionType).valueOf(e.exceptionType()).label()")
-                .contains("T(com.susukkang.fgc.common.code.ExceptionStatus).valueOf(e.status()).label()")
-                .contains("T(com.susukkang.fgc.common.code.ValidationRunStatus).valueOf(r.status()).label()")
+                .contains("${e.severityLabel()}")
+                .contains("${e.exceptionTypeLabel()}")
+                .contains("${e.statusLabel()}")
+                .contains("${r.statusLabel()}")
+                .doesNotContain("T(com.susukkang.fgc.common.code")
                 .contains("<th scope=\"col\">유형</th>")
                 .contains("class=\"table-cell-disclosure\"")
                 .contains("class=\"table-cell-details\" hidden")

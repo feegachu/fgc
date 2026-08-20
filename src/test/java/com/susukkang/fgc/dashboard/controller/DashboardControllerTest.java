@@ -75,8 +75,18 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.data.openException").value(6))
                 .andExpect(jsonPath("$.data.recentExceptions[0].exceptionCaseId").value(10))
                 .andExpect(jsonPath("$.data.recentExceptions[0].contractNo").value("C001"))
+                // SIR-008 — 코드값은 영문 코드와 한글 라벨을 함께 내려준다. 화면(Thymeleaf)만이 아니라
+                // 이 JSON 계약 자체가 라벨을 갖고 있어야 2차 React가 그대로 재사용할 수 있다.
+                .andExpect(jsonPath("$.data.recentExceptions[0].exceptionType").value("CAP_VIOLATION"))
+                .andExpect(jsonPath("$.data.recentExceptions[0].exceptionTypeLabel").value("1,200% 위반"))
+                .andExpect(jsonPath("$.data.recentExceptions[0].severity").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.recentExceptions[0].severityLabel").value("긴급"))
+                .andExpect(jsonPath("$.data.recentExceptions[0].status").value("NEW"))
+                .andExpect(jsonPath("$.data.recentExceptions[0].statusLabel").value("신규"))
                 .andExpect(jsonPath("$.data.recentRuns[0].validationRunId").value(100))
-                .andExpect(jsonPath("$.data.recentRuns[0].currentStep").value(8));
+                .andExpect(jsonPath("$.data.recentRuns[0].currentStep").value(8))
+                .andExpect(jsonPath("$.data.recentRuns[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.recentRuns[0].statusLabel").value("계산완료"));
     }
 
     @Test
