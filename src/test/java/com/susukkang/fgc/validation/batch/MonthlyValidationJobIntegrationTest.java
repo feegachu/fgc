@@ -291,4 +291,60 @@ class MonthlyValidationJobIntegrationTest {
                 runNo);
         assertThat(rows).isEmpty();
     }
+
+    /**
+     * TER-006 안정화 DoD — 핵심 배치 실행이 연속 3회 모두 성공해야 한다.
+     * 실제 계약이 걸린 월을 쓰면 클래스 Javadoc에 적힌 이유(스케줄 확정·대사 이력으로 잠겨
+     * 롤백 불가)로 안전하게 반복할 수 없어, 이 테스트는 completesAllStepsAgainstSeedData와
+     * 같은 대상 없음(TEST_MONTH) 시나리오로 "매번 새 JobInstance로 9개 Step이 전부 COMPLETED,
+     * 실행끼리 산출물이 섞이지 않음, 잔여 데이터 없음"을 3회 연속 재확인한다.
+     *
+     * @author hjKang
+     * @since 2026-08-20
+     */
+    @Test
+    void repeatsTheFullJobThreeTimesConsecutivelyWithIdenticalOutcomesAndNoCrossRunLeakage() throws Exception {
+        jobLauncherTestUtils.setJob(monthlyValidationJob);
+
+        List<Long> runIds = new ArrayList<>();
+        for (int i = 1; i <= 3; i++) {
+            long runNo = ThreadLocalRandom.current().nextLong(1, Integer.MAX_VALUE);
+            JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters("req-repeat-" + i, runNo));
+
+            assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+            assertThat(jobExecution.getStepExecutions())
+                    .filteredOn(step -> step.getStatus() == BatchStatus.FAILED)
+                    .isEmpty();
+
+            Long validationRunId = ValidationRunBatchContext.getValidationRunId(jobExecution.getExecutionContext());
+            assertThat(validationRunId).isNotNull();
+            // 이전 회차와 같은 JobInstance로 잘못 이어붙지 않고 매번 새 실행이어야 한다.
+            assertThat(runIds).doesNotContain(validationRunId);
+            runIds.add(validationRunId);
+            createdValidationRunIds.add(validationRunId);
+
+            Set<String> completedStepNames = jobExecution.getStepExecutions().stream()
+                    .filter(se -> se.getStatus() == BatchStatus.COMPLETED)
+                    .map(StepExecution::getStepName)
+                    .collect(Collectors.toSet());
+            assertThat(completedStepNames).contains(
+                    "createRunStep", "selectTargetStep", "regenerateScheduleStep",
+                    "capCheckStep", "arbitrageCheckStep", "journalPostingStep",
+                    "imbalanceCheckStep", "reconciliationStep", "exceptionGenerationStep");
+
+            ValidationRunRow row = validationRunMapper.findById(validationRunId);
+            assertThat(row.getStatus()).isEqualTo("COMPLETED");
+            assertThat(row.getRunNo()).isEqualTo(Math.toIntExact(runNo));
+        }
+
+        assertThat(runIds).hasSize(3);
+        // 3회 각각 자신의 validation_run에만 결과가 귀속되고, 회차 간 산출물이 섞이거나
+        // 중복 행이 남지 않는다.
+        for (Long runId : runIds) {
+            long selectedTargets = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM fgc.validation_target WHERE validation_run_id = ?",
+                    Long.class, runId);
+            assertThat(selectedTargets).isZero();
+        }
+    }
 }
