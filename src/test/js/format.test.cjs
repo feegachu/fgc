@@ -64,3 +64,19 @@ test("오류 문구에 오류코드와 요청 ID 를 병기한다 (FGC-SIR-007)"
   assert.equal(format.errorText({ message: "저장 불가" }), "저장 불가");
   assert.equal(format.errorText(null, "요청을 처리하지 못했습니다."), "요청을 처리하지 못했습니다.");
 });
+
+test("본문에 이미 요청 ID 가 있으면 뒤에 다시 붙이지 않는다 (FGC-COMMON-500)", () => {
+  const requestId = "20260803-7f3a1c";
+  // messages_ko.properties:50 의 {requestId} 가 서버에서 치환되어 내려오는 형태.
+  const text = format.errorText({
+    code: "FGC-COMMON-500",
+    message: `처리 중 오류가 발생했습니다. 요청번호 ${requestId}를 담당자에게 알려주세요.`,
+    requestId
+  });
+
+  assert.equal(text.match(new RegExp(requestId, "g")).length, 1);
+  assert.equal(
+    text,
+    `처리 중 오류가 발생했습니다. 요청번호 ${requestId}를 담당자에게 알려주세요. (FGC-COMMON-500)`
+  );
+});

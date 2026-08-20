@@ -175,12 +175,26 @@
    *   features/contract/contract-form.js:114-118 은 요청 ID 를 별도 DOM 에 "요청 ID: xxx" 로만
    *   두고 오류코드는 노출하지 않는다. Toast 는 한 줄이라 별도 슬롯을 둘 수 없어 괄호로 묶었다.
    *   화면마다 형식이 갈리지 않도록 오류 표시는 이 함수 하나만 쓴다.
+   *
+   * 요청 ID 중복 방지
+   *   일부 문구는 서버가 이미 요청 ID 를 본문에 치환해 보낸다.
+   *     messages_ko.properties:50 error.common.internal
+   *       "처리 중 오류가 발생했습니다. 요청번호 {requestId}를 담당자에게 알려주세요."
+   *   GlobalExceptionHandler 가 COMMON_500 경로(:227-249, :167-173)에서 params 에 requestId 를
+   *   넣고 FgcMessageResolver 가 치환하는데, 그 값은 ApiResponse 봉투의 requestId 와 같은
+   *   RequestIdContext.current() 다. 그대로 덧붙이면 가장 흔한 500 토스트에서 같은 번호가 두 번 찍힌다.
+   *   그래서 본문에 이미 들어 있으면 뒤에 다시 적지 않는다.
    */
   function errorText(error, fallbackMessage) {
     var message = (error && error.message) || fallbackMessage || "요청을 처리하지 못했습니다.";
+    var requestId = error && error.requestId;
     var trace = [];
+
     if (error && error.code) trace.push(error.code);
-    if (error && error.requestId) trace.push("요청 ID: " + error.requestId);
+    if (requestId && message.indexOf(requestId) === -1) {
+      trace.push("요청 ID: " + requestId);
+    }
+
     return trace.length ? message + " (" + trace.join(" · ") + ")" : message;
   }
 
