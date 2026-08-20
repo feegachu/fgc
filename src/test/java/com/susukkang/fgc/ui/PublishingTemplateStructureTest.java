@@ -24,7 +24,10 @@ class PublishingTemplateStructureTest {
             "templates/exception/list.html",
             "templates/vrun/list.html",
             "templates/vrun/detail.html",
-            "templates/audit/list.html"
+            "templates/audit/list.html",
+            "templates/error/403.html",
+            "templates/error/404.html",
+            "templates/error/500.html"
     );
 
     /*
@@ -58,7 +61,10 @@ class PublishingTemplateStructureTest {
             "templates/audit/list.html",
             "templates/contract/form.html",
             "templates/schedule/list.html",
-            "templates/arbitrage/list.html"
+            "templates/arbitrage/list.html",
+            "templates/error/403.html",
+            "templates/error/404.html",
+            "templates/error/500.html"
     );
 
     @Test
@@ -637,6 +643,105 @@ class PublishingTemplateStructureTest {
                 .contains("preview.scrollWidth > preview.clientWidth")
                 .contains("preview.scrollHeight > preview.clientHeight")
                 .contains("document.fonts.ready")
+                .doesNotContain("fetch(");
+    }
+
+    /*
+     * 오류 화면 3종(#291).
+     *
+     * 전환 전에는 publishing-page 클래스가 없어 publishing.css 의 토큰 재매핑 스코프 밖이었다 —
+     * 그래서 fgc-* 레거시 클래스가 assets/fgc.css 의 원본 HEX 팔레트를 그대로 써서 업무 화면과 색이
+     * 어긋났다. 공통 컴포넌트로 옮기면 브리지 스코프 자체가 필요 없어지므로 여기서는
+     * publishing-page 를 요구하지 않고 레거시가 되돌아오지 않는 것만 막는다.
+     */
+    @Test
+    void errorScreensUseCommonComponentsAndShowCodeWithTraceId() throws IOException {
+        for (String resource : List.of(
+                "templates/error/403.html", "templates/error/404.html", "templates/error/500.html")) {
+            assertThat(resource(resource))
+                    .as(resource)
+                    .contains("class=\"page-content error-page\"")
+                    .contains("class=\"surface error-card\"")
+                    .contains("class=\"surface-header\"")
+                    .contains("class=\"surface-title\"")
+                    .contains("class=\"surface-body error-card-body\"")
+                    .contains("class=\"button button-secondary error-action\"")
+                    // SIR-007 규칙 3 — 코드와 요청 ID 는 세 화면 모두 서버 모델에서 온다.
+                    .contains("${errorCode}")
+                    .doesNotContain("fgc-main")
+                    .doesNotContain("fgc-card")
+                    .doesNotContain("fgc-btn")
+                    .doesNotContain("fgc-help")
+                    .doesNotContain("style=")
+                    .doesNotContainPattern("(?i)<style[\\s>]")
+                    .doesNotContainPattern("(?i)<script[\\s>]");
+        }
+
+        // 403·404 는 문구 안에 요청번호가 없으므로 추적 ID 를 코드 옆에 따로 붙인다.
+        // 500 은 error.common.internal 문구가 이미 {requestId} 를 품고 있어 코드만 덧붙인다
+        // (format.js:errorText() 의 중복 방지 규칙과 같은 처리).
+        assertThat(resource("templates/error/403.html")).contains("' · 요청 ID: ' + ${requestId}");
+        assertThat(resource("templates/error/404.html")).contains("' · 요청 ID: ' + ${requestId}");
+        assertThat(resource("templates/error/500.html")).contains("'{requestId}', requestId ?: '-'");
+
+        // SIR-007 규칙 4 — 화면 문구는 전부 메시지 키로. 하드코딩이 되돌아오면 여기서 걸린다.
+        assertThat(resource("templates/error/403.html"))
+                .contains("#{error.auth.forbidden}")
+                .contains("#{error.auth.forbiddenHelp}");
+        assertThat(resource("templates/error/404.html"))
+                .contains("#{error.common.pageNotFound}")
+                .contains("#{error.common.pageNotFoundHelp}");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("th:if=\"${#strings.startsWith(screenId, 'FGC-UI-ERR-')}\" th:href=\"@{/css/features/error.css}\"");
+
+        assertThat(resource("static/css/features/error.css"))
+                .contains(".error-page")
+                .contains(".error-card")
+                .contains(".error-trace")
+                .contains("var(--space-")
+                .contains("var(--color-text-tertiary)")
+                .doesNotContain("var(--fgc-");
+    }
+
+    /*
+     * AUTH-W01 회귀 방지(#291) — 이미 공통 컴포넌트로 전환이 끝난 화면이라 현재 상태를 고정만 한다.
+     *
+     * 로그인은 앱 셸(layout/default :: page) 밖이 의도된 설계다. 그래서 id="main-content" 도
+     * toast-region 도 없다 — 인라인 role="alert" 하나로 충분하고, 셸로 끌어들이면 미인증 화면이
+     * 사이드바·워크스페이스 탭 스크립트를 함께 로드하게 된다.
+     *
+     * 오류코드·추적 ID 를 찍지 않는 것도 의도다 — 부록 A FGC-AUTH-001 은 "아이디 또는 비밀번호가
+     * 맞지 않습니다." 한 줄만 규정하고, 실패 사유를 갈라 보여주면 계정 존재 여부가 새어 나간다.
+     */
+    @Test
+    void loginScreenKeepsCommonComponentsAndHidesAuthFailureDetail() throws IOException {
+        assertThat(resource("templates/auth/login.html"))
+                .contains("class=\"field auth-field\"")
+                .contains("class=\"field-label\"")
+                .contains("class=\"field-control auth-control\"")
+                .contains("class=\"button button-primary button-large auth-submit\"")
+                .contains("class=\"icon-button auth-password-toggle\"")
+                .contains("aria-pressed=\"false\"")
+                .contains("role=\"alert\" aria-live=\"polite\"")
+                // 부록 A FGC-AUTH-001 표준 문구를 메시지 키로 가져온다 (SIR-007 규칙 4).
+                .contains("#{error.auth.invalidCredentials}")
+                // 30분 세션(application.yml server.servlet.session.timeout) 안내와 보안 정책 고지.
+                .contains("30분간 사용하지 않으면 자동으로 로그아웃됩니다.")
+                .contains("인증 실패 사유는 보안을 위해 공통 문구로 안내합니다.")
+                .doesNotContain("fgc-")
+                .doesNotContain("toast-region")
+                .doesNotContain("FGC-AUTH-")
+                .doesNotContain("requestId")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContain("<script>");
+
+        assertThat(resource("static/js/features/auth/login.js"))
+                // 비밀번호 표시 토글은 aria-pressed·aria-label·아이콘을 함께 갱신한다.
+                .contains("passwordToggle.setAttribute(\"aria-pressed\", String(willShow))")
+                .contains("passwordToggle.setAttribute(\"aria-label\", willShow ? \"비밀번호 숨기기\" : \"비밀번호 표시\")")
+                .doesNotContain("FGC-AUTH-")
                 .doesNotContain("fetch(");
     }
 

@@ -38,7 +38,7 @@
       <div class="auth-heading-anchor" aria-hidden="true"></div>
       <header class="auth-login-header"><p class="auth-eyebrow">FGC WORKSPACE</p><h2 id="login-title">로그인</h2><p>업무 계정의 아이디와 비밀번호를 입력하세요.</p></header>
       <div class="auth-error" role="alert" aria-live="polite" th:classappend="${param.error != null} ? ' is-visible'">
-        <span class="material-symbols-rounded" aria-hidden="true">error</span><span data-login-error-message>아이디 또는 비밀번호를 확인해 주세요.</span>
+        <span class="material-symbols-rounded" aria-hidden="true">error</span><span data-login-error-message th:text="#{error.auth.invalidCredentials}">아이디 또는 비밀번호가 맞지 않습니다.</span>
       </div>
       <form class="auth-form" th:action="@{/login}" method="post" data-login-form novalidate>
         <label class="field auth-field"><span class="field-label">아이디</span><input class="field-control auth-control" type="text" name="username" autocomplete="username" placeholder="업무 계정 아이디" required autofocus></label>
