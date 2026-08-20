@@ -70,6 +70,7 @@ public class JournalDetailServiceImpl implements JournalDetailService {
                 row.getCreatedBy(), row.getCreatedAt(), row.getPostedBy(), row.getPostedAt(),
                 row.getReversalOfId(), row.getReversalOfJournalNo(),
                 row.getReversedByJournalHeaderId(), row.getReversedByJournalNo(),
+                row.getRepostedJournalHeaderId(), row.getRepostedJournalNo(),
                 debitTotal, creditTotal, differenceAmount, balanced, lines
         );
     }

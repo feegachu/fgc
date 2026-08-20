@@ -272,7 +272,13 @@
     const amount = document.createElement("span");
     amount.className = "fgc-muted";
     amount.textContent = `차변 ${Number(journal.debitTotal).toLocaleString("ko-KR")}원 · 대변 ${Number(journal.creditTotal).toLocaleString("ko-KR")}원`;
-    summary.append(title, date, amount);
+    const status = document.createElement("span");
+    status.className = "fgc-muted";
+    status.textContent = `원장상태 ${journal.statusLabel}`;
+    const validation = document.createElement("strong");
+    validation.className = journal.balanced ? "journal-correction-validation is-valid" : "journal-correction-validation is-invalid";
+    validation.textContent = journal.balanced ? "차변·대변 검증 통과" : "차변·대변 검증 필요";
+    summary.append(title, date, amount, status, validation);
     if (journal.correctionGroupKey) {
       const correctionGroup = document.createElement("span");
       correctionGroup.className = "fgc-muted";
@@ -285,6 +291,13 @@
       reversalLink.href = `/journals?selected=${journal.reversedByJournalHeaderId}`;
       reversalLink.textContent = `역분개 #${journal.reversedByJournalHeaderId}`;
       summary.append(reversalLink);
+    }
+    if (journal.repostedJournalHeaderId) {
+      const repostedLink = document.createElement("a");
+      repostedLink.className = "fgc-btn fgc-btn--ghost";
+      repostedLink.href = `/journals?selected=${journal.repostedJournalHeaderId}`;
+      repostedLink.textContent = `재기표 #${journal.repostedJournalHeaderId}`;
+      summary.append(repostedLink);
     }
 
     const lineGrid = document.createElement("div");

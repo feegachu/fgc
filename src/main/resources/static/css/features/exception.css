@@ -300,6 +300,22 @@
   gap: var(--space-2);
 }
 
+.journal-correction-validation {
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+}
+
+.journal-correction-validation.is-valid {
+  color: var(--color-status-success-text);
+  background: var(--color-status-success-bg);
+}
+
+.journal-correction-validation.is-invalid {
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
 .journal-correction-original-lines {
   display: grid;
   grid-template-columns: minmax(3rem, 0.4fr) minmax(12rem, 1.5fr) repeat(2, minmax(7rem, 0.7fr)) minmax(9rem, 1fr);
