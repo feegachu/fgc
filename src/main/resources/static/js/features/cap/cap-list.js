@@ -61,10 +61,15 @@
     return Number(value) === 0 ? "해당없음" : won(value);
   }
 
+  /*
+   * 음수 표기는 괄호가 숫자만 감싸고 "원" 은 밖이다 — (1,200,000)원.
+   * 공통 유틸 FgcUi.format.won() 과 같은 형태다 (PR #293 팀 결정).
+   * 화면마다 표기가 갈리지 않도록 여기서만 바꾸지 말 것.
+   */
   function remainingAmount(value) {
     var parsed = Number(value);
     if (parsed < 0) {
-      return '<span class="cap-negative-amount">(' + number(Math.abs(parsed)) + "원)</span>";
+      return '<span class="cap-negative-amount">(' + number(Math.abs(parsed)) + ")원</span>";
     }
     return won(value);
   }
