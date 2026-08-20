@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class ReconciliationRunHistoryServiceImplTest {
 
     private static final ReconciliationRunSearchCriteria NO_FILTER =
-            new ReconciliationRunSearchCriteria(null, null);
+            new ReconciliationRunSearchCriteria(null, null, null);
 
     @Mock
     private ReconciliationRunHistoryMapper reconciliationRunHistoryMapper;
@@ -64,7 +64,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void returnsNullMatchRateWhenTargetCountIsZero() {
-        given(reconciliationRunHistoryMapper.search(null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(0, 0, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -77,7 +77,7 @@ class ReconciliationRunHistoryServiceImplTest {
     @Test
     void calculatesMatchRatePctRoundedToOneDecimal() {
         // 3건 중 2건 일치 = 66.6666...% → 소수점 첫째 자리 반올림으로 66.7
-        given(reconciliationRunHistoryMapper.search(null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(3, 2, 1)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -93,7 +93,7 @@ class ReconciliationRunHistoryServiceImplTest {
         // 12.449%다. 소수 넷째 자리에서 먼저 반올림한 뒤 다시 소수 첫째 자리로
         // 반올림하면(두 번 반올림) 12.45 → 12.5로 틀어진다. 한 번에 반올림하면 12.4가
         // 맞는 값이다.
-        given(reconciliationRunHistoryMapper.search(null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(100000, 12449, 87551)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -105,7 +105,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void calculatesFullMatchRateAsHundred() {
-        given(reconciliationRunHistoryMapper.search(null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(5, 5, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -117,7 +117,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void mapsPaymentStageAndStatusLabels() {
-        given(reconciliationRunHistoryMapper.search(null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(1, 1, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -133,9 +133,9 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void returnsEmptyPageWhenMapperFindsNothing() {
-        given(reconciliationRunHistoryMapper.search(null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of());
-        given(reconciliationRunHistoryMapper.count(null, null)).willReturn(0L);
+        given(reconciliationRunHistoryMapper.count(null, null, null)).willReturn(0L);
 
         PageResponse<ReconciliationRunHistoryResponse> result =
                 service.findHistory(NO_FILTER, 1, 20, "createdAt,desc");
@@ -147,37 +147,37 @@ class ReconciliationRunHistoryServiceImplTest {
     @Test
     void passesSettlementMonthAndPaymentStageFiltersThrough() {
         ReconciliationRunSearchCriteria criteria =
-                new ReconciliationRunSearchCriteria(LocalDate.of(2026, 7, 1), "GA_TO_FC");
+                new ReconciliationRunSearchCriteria(LocalDate.of(2026, 7, 1), "GA_TO_FC", null);
         given(reconciliationRunHistoryMapper.search(
-                LocalDate.of(2026, 7, 1), "GA_TO_FC", "desc", 0, 20))
+                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, "desc", 0, 20))
                 .willReturn(List.of());
 
         service.findHistory(criteria, 1, 20, "createdAt,desc");
 
         verify(reconciliationRunHistoryMapper)
-                .search(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq("desc"), eq(0), eq(20));
+                .search(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq((Long) null), eq("desc"), eq(0), eq(20));
         verify(reconciliationRunHistoryMapper)
-                .count(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"));
+                .count(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq((Long) null));
     }
 
     @Test
     void ascendingSortIsPassedThroughAsDirection() {
-        given(reconciliationRunHistoryMapper.search(null, null, "asc", 0, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "asc", 0, 20))
                 .willReturn(List.of());
 
         service.findHistory(NO_FILTER, 1, 20, "createdAt,asc");
 
-        verify(reconciliationRunHistoryMapper).search(null, null, "asc", 0, 20);
+        verify(reconciliationRunHistoryMapper).search(null, null, null, "asc", 0, 20);
     }
 
     @Test
     void secondPageUsesOffsetOfSizeTimesPageMinusOne() {
-        given(reconciliationRunHistoryMapper.search(null, null, "desc", 40, 20))
+        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 40, 20))
                 .willReturn(List.of());
 
         service.findHistory(NO_FILTER, 3, 20, "createdAt,desc");
 
-        verify(reconciliationRunHistoryMapper).search(null, null, "desc", 40, 20);
+        verify(reconciliationRunHistoryMapper).search(null, null, null, "desc", 40, 20);
     }
 
     @Test

@@ -489,7 +489,7 @@ class PublishingTemplateStructureTest {
                 .contains(".reco-summary-grid")
                 .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
                 .contains(".reco-result-table")
-                .contains(".reco-col-action { width: 7rem; }")
+                .contains(".reco-col-action { width: 4rem; }")
                 .contains("@media (max-width: 47.9375rem)");
 
         assertThat(resource("static/js/features/reco/reco.js"))

@@ -810,6 +810,15 @@ a.kpi-card:active {
   overflow-wrap: anywhere;
 }
 
+.toast-message-detail {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  overflow-wrap: anywhere;
+}
+
 .toast-close {
   flex: 0 0 var(--control-height-sm);
 }

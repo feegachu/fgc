@@ -53,11 +53,12 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
         String direction = sort.endsWith(",asc") ? "asc" : "desc";
 
         List<ReconciliationRunHistoryResponse> content = reconciliationRunHistoryMapper
-                .search(criteria.settlementMonth(), criteria.paymentStage(), direction, offset, size)
+                .search(criteria.settlementMonth(), criteria.paymentStage(), criteria.insurerId(), direction, offset, size)
                 .stream()
                 .map(this::toResponse)
                 .toList();
-        long total = reconciliationRunHistoryMapper.count(criteria.settlementMonth(), criteria.paymentStage());
+        long total = reconciliationRunHistoryMapper.count(
+                criteria.settlementMonth(), criteria.paymentStage(), criteria.insurerId());
 
         return PageResponse.of(content, page, size, total, sort);
     }

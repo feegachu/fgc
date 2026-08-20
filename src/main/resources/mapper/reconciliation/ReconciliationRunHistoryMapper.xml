@@ -16,6 +16,9 @@
             <if test="paymentStage != null">
                 AND rr.payment_stage = #{paymentStage}
             </if>
+            <if test="insurerId != null">
+                AND rr.insurer_id = #{insurerId}
+            </if>
         </where>
     </sql>
 
