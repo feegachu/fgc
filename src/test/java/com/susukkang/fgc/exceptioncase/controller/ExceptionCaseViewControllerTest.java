@@ -16,6 +16,8 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
+import com.susukkang.fgc.journal.service.JournalAccountCatalogService;
+import com.susukkang.fgc.journal.dto.JournalAccountRow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -34,6 +36,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -56,6 +59,9 @@ class ExceptionCaseViewControllerTest {
 
     @MockitoBean
     private ExceptionCaseService service;
+
+    @MockitoBean
+    private JournalAccountCatalogService journalAccountCatalogService;
 
     private static final FgcUserDetails SETTLE = principal("settle01", "정산담당", "SETTLEMENT");
 
@@ -106,6 +112,55 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(not(containsString("정상 건은 여기 오지 않습니다."))))
                 .andExpect(content().string(containsString("/js/features/exception/exception-list.js")))
                 .andExpect(content().string(containsString("/css/features/exception.css")));
+    }
+
+    @Test
+    void journalCorrectionCaseRendersDedicatedFormWithDatabaseAccounts() throws Exception {
+        ExceptionCaseResponseDTO correction = journalCorrection(ExceptionStatus.IN_REVIEW);
+        given(service.search(any(), eq(1), eq(20)))
+                .willReturn(response(List.of(correction), 1, 20, 1, 1));
+        JournalAccountRow account = new JournalAccountRow();
+        account.setAccountCode("EXPECTED_RECEIVABLE");
+        account.setAccountName("예상 미수금");
+        given(journalAccountCatalogService.findAllActive()).willReturn(List.of(account));
+
+        mockMvc.perform(get("/exceptions").param("selected", "30").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                // FGC-FUN-053: 검토중 정정 예외에서도 오탐·반려 일반 조치를 선택할 수 있어야 한다.
+                .andExpect(content().string(containsString("data-exception-action-form")))
+                .andExpect(content().string(containsString("value=\"FALSE_POSITIVE\"")))
+                .andExpect(content().string(containsString("value=\"REJECT\"")))
+                .andExpect(content().string(containsString("class=\"modal-backdrop journal-correction-backdrop\"")))
+                .andExpect(content().string(containsString("data-modal=\"journal-correction-30\"")))
+                .andExpect(content().string(containsString("hidden aria-hidden=\"true\"")))
+                .andExpect(content().string(containsString("class=\"modal modal-large publishing-modal journal-correction-modal\"")))
+                .andExpect(content().string(containsString("data-correction-read-only=\"false\"")))
+                .andExpect(content().string(containsString("원장 정정 계속")))
+                .andExpect(content().string(containsString("data-journal-correction-form")))
+                .andExpect(content().string(containsString("data-journal-id=\"10\"")))
+                .andExpect(content().string(containsString("원분개 (읽기 전용)")))
+                .andExpect(content().string(containsString("신규 재기표 입력")))
+                .andExpect(content().string(containsString("data-add-correction-line")))
+                .andExpect(content().string(containsString("EXPECTED_RECEIVABLE · 예상 미수금")))
+                .andExpect(content().string(containsString("정정 실행")))
+                .andExpect(content().string(containsString("href=\"/journals?selected=10\"")));
+    }
+
+    @Test
+    void rejectedJournalCorrectionRemainsAvailableAsReadOnlyModal() throws Exception {
+        given(service.search(any(), eq(1), eq(20)))
+                .willReturn(response(List.of(journalCorrection(ExceptionStatus.REJECTED)), 1, 20, 1, 0));
+
+        mockMvc.perform(get("/exceptions").param("selected", "30").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-journal-correction-open")))
+                .andExpect(content().string(containsString("원장 정정 확인")))
+                .andExpect(content().string(containsString("data-exception-action-form")))
+                .andExpect(content().string(containsString("value=\"REOPEN\"")))
+                .andExpect(content().string(containsString("재검토 시작")))
+                .andExpect(content().string(containsString("data-correction-read-only=\"true\"")))
+                .andExpect(content().string(containsString(
+                        "오탐·반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.")));
     }
 
     @Test
@@ -276,6 +331,19 @@ class ExceptionCaseViewControllerTest {
         return new ExceptionCaseSearchResponse(
                 summary, content, page, size, total, totalPages,
                 "severity,asc,createdAt,desc");
+    }
+
+    private static ExceptionCaseResponseDTO journalCorrection(ExceptionStatus status) {
+        return new ExceptionCaseResponseDTO(
+                30L, "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:NONE:REQUEST:1",
+                ExceptionType.JOURNAL_CORRECTION_REQUIRED,
+                "JOURNAL_CORRECTION_REQUIRED", ExceptionSeverity.HIGH,
+                status, "원장 정정 필요", "금액 오류", 5L, "C001",
+                null, 1L, "settle01", "JOURNAL_HEADER", "10", null,
+                LocalDate.of(2026, 8, 1), null, null,
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"),
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), 1,
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), List.of(), List.of());
     }
 
     private static ExceptionCaseResponseDTO row(

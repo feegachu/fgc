@@ -13,6 +13,7 @@ public enum ExceptionType {
     CAP_REVIEW_REQUIRED,         // 한도 검토 필요
     RECONCILIATION_MISMATCH,     // 대사 결과 불일치
     JOURNAL_IMBALANCE,           // 회계 원장 차변·대변 불일치
+    JOURNAL_CORRECTION_REQUIRED, // 회계 원장 역분개·재기표 필요
     ARBITRAGE_CANDIDATE,         // 차익거래 의심 후보
     REFUND_TABLE_MISSING,        // 해약환급률표 누락
     PRODUCT_CODE_MISMATCH,       // 상품 코드 불일치
@@ -22,7 +23,7 @@ public enum ExceptionType {
     DATA_QUALITY,                // 데이터 품질 오류
     OTHER;                       // 기타 예외
 
-    /** 화면정의서 EXCP-W01의 "예외 유형 13종" 코드-표기 매핑과 일치시킨다. */
+    /** 화면정의서 EXCP-W01의 예외 유형 코드-표기 매핑과 일치시킨다. */
     public String label() {
         return switch (this) {
             case CAP_WARNING -> "1,200% 주의";
@@ -30,6 +31,7 @@ public enum ExceptionType {
             case CAP_REVIEW_REQUIRED -> "1,200% 검토필요";
             case RECONCILIATION_MISMATCH -> "대사 불일치";
             case JOURNAL_IMBALANCE -> "원장 불균형";
+            case JOURNAL_CORRECTION_REQUIRED -> "원장 정정 필요";
             case ARBITRAGE_CANDIDATE -> "차익거래 검토대상";
             case REFUND_TABLE_MISSING -> "환급률표 없음";
             case PRODUCT_CODE_MISMATCH -> "상품코드 불일치";

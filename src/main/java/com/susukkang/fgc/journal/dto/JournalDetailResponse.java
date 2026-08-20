@@ -41,6 +41,8 @@ public record JournalDetailResponse(
         String reversalOfJournalNo,
         Long reversedByJournalHeaderId,
         String reversedByJournalNo,
+        Long repostedJournalHeaderId,
+        String repostedJournalNo,
         BigDecimal debitTotal,
         BigDecimal creditTotal,
         BigDecimal differenceAmount,

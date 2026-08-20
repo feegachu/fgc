@@ -188,6 +188,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.exception.invalidTransition"
     ),
+    EXCP_004(
+            "FGC-EXCP-004",
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "error.exception.invalidJournalCorrectionSource"
+    ),
 
     AUDT_001(
             "FGC-AUDT-001",

@@ -7,8 +7,21 @@
     <select id="findByIdForUpdate"
             resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget">
         SELECT exception_case_id AS exceptionCaseId,
+               exception_type    AS exceptionType,
                status,
                assigned_to       AS assignedTo
+          FROM fgc.exception_case
+         WHERE exception_case_id = #{exceptionCaseId}
+           FOR UPDATE
+    </select>
+
+    <select id="findJournalCorrectionTargetForUpdate"
+            resultType="com.susukkang.fgc.exceptioncase.dto.JournalCorrectionExceptionTarget">
+        SELECT exception_case_id  AS exceptionCaseId,
+               exception_type     AS exceptionType,
+               status,
+               source_entity_type AS sourceEntityType,
+               source_entity_id   AS sourceEntityId
           FROM fgc.exception_case
          WHERE exception_case_id = #{exceptionCaseId}
            FOR UPDATE

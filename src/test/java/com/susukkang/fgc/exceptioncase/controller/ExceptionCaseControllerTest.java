@@ -15,7 +15,10 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
+import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
+import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
+import com.susukkang.fgc.exceptioncase.service.JournalCorrectionExceptionActionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -54,6 +57,9 @@ class ExceptionCaseControllerTest {
 
     @MockitoBean
     private ExceptionCaseService exceptionCaseService;
+
+    @MockitoBean
+    private JournalCorrectionExceptionActionService journalCorrectionExceptionActionService;
 
     @Test
     void searchesExceptionsForAuthenticatedUser() throws Exception {
@@ -120,6 +126,126 @@ class ExceptionCaseControllerTest {
 
         verify(exceptionCaseService).action(
                 eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
+    }
+
+    @Test
+    void fun047IfApi44aCorrectsJournalAndResolvesExceptionThroughDedicatedApi() throws Exception {
+        JournalCorrectionActionResponse response = new JournalCorrectionActionResponse(
+                2, ExceptionStatus.IN_REVIEW, ExceptionStatus.RESOLVED, "CORRECT",
+                "금액 정정", "DOC-10", 1L, "settle01", OffsetDateTime.now(),
+                10L, 21L, 22L, "JCG-10-test");
+        given(journalCorrectionExceptionActionService.correct(
+                eq(30L), any(JournalCorrectionActionRequest.class), eq(1L), eq("settle01")))
+                .willReturn(response);
+
+        String request = """
+                {
+                  "reason":"금액 정정",
+                  "evidenceRef":"DOC-10",
+                  "journalDate":"2026-08-20",
+                  "description":"재기표",
+                  "lines":[
+                    {"originalLineNo":1,"accountCode":"CONFIRMED_PAYOUT_EXPENSE","debitAmount":1000,"creditAmount":0},
+                    {"originalLineNo":2,"accountCode":"CONFIRMED_PAYOUT_PAYABLE","debitAmount":0,"creditAmount":1000}
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.toStatus").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.originalJournalHeaderId").value(10L))
+                .andExpect(jsonPath("$.data.reversalJournalHeaderId").value(21L))
+                .andExpect(jsonPath("$.data.repostedJournalHeaderId").value(22L))
+                .andExpect(jsonPath("$.data.correctionGroupKey").value("JCG-10-test"));
+    }
+
+    @Test
+    void fun047IfApi44aRejectsReadOnlyRole() throws Exception {
+        mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCorrectionRequest()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
+
+        verify(journalCorrectionExceptionActionService, never())
+                .correct(any(), any(), any(), any());
+    }
+
+    @Test
+    void fun047IfApi44aRejectsEmptyLinesWithCommonValidationError() throws Exception {
+        String request = """
+                {
+                  "reason":"금액 정정",
+                  "journalDate":"2026-08-20",
+                  "description":"재기표",
+                  "lines":[]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+
+        verify(journalCorrectionExceptionActionService, never())
+                .correct(any(), any(), any(), any());
+    }
+
+    @Test
+    void fun047IfApi44aRejectsBlankReasonWithCommonValidationError() throws Exception {
+        String request = validCorrectionRequest().replace(
+                "\"reason\":\"금액 정정\"", "\"reason\":\" \"");
+
+        mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+
+        verify(journalCorrectionExceptionActionService, never())
+                .correct(any(), any(), any(), any());
+    }
+
+    @Test
+    void fun047IfApi44aRejectsAmountOutsideJournalStorageRange() throws Exception {
+        String request = validCorrectionRequest().replace(
+                "\"debitAmount\":1000", "\"debitAmount\":10000000000000");
+
+        mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+
+        verify(journalCorrectionExceptionActionService, never())
+                .correct(any(), any(), any(), any());
+    }
+
+    @Test
+    void fun047IfApi44aReturnsConflictWhenExceptionStateChanged() throws Exception {
+        willThrow(new FgcBusinessException(
+                FgcErrorCode.EXCP_003,
+                java.util.Map.of("status", "RESOLVED", "actionType", "CORRECT")))
+                .given(journalCorrectionExceptionActionService)
+                .correct(eq(30L), any(JournalCorrectionActionRequest.class),
+                        eq(1L), eq("settle01"));
+
+        mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCorrectionRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("FGC-EXCP-003"));
     }
 
     @Test
@@ -236,5 +362,20 @@ class ExceptionCaseControllerTest {
         view.setUserName(loginId);
         view.setRoleCode(roleCode);
         return new FgcUserDetails(view, true, true);
+    }
+
+    private String validCorrectionRequest() {
+        return """
+                {
+                  "reason":"금액 정정",
+                  "evidenceRef":"DOC-10",
+                  "journalDate":"2026-08-20",
+                  "description":"재기표",
+                  "lines":[
+                    {"originalLineNo":1,"accountCode":"CONFIRMED_PAYOUT_EXPENSE","debitAmount":1000,"creditAmount":0},
+                    {"originalLineNo":2,"accountCode":"CONFIRMED_PAYOUT_PAYABLE","debitAmount":0,"creditAmount":1000}
+                  ]
+                }
+                """;
     }
 }

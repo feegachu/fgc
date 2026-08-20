@@ -6,4 +6,11 @@
         FROM fgc.journal_account
         WHERE account_code = #{accountCode} AND active_yn = true
     </select>
+
+    <select id="findAllActive" resultType="com.susukkang.fgc.journal.dto.JournalAccountRow">
+        SELECT journal_account_id, account_code, account_name, normal_balance, active_yn
+        FROM fgc.journal_account
+        WHERE active_yn = true
+        ORDER BY account_code
+    </select>
 </mapper>

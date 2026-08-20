@@ -6,6 +6,7 @@
   API     GET  /api/v1/journals?period=&type=&account=&contract=&status=
           GET  /api/v1/journals/imbalances?validationRunId=   (Ajax · 불균형 배너)
           POST /api/v1/journals/{id}/reverse                  (사유 필수)
+          POST /api/v1/journals/{id}/correction-exceptions    (정정 예외 생성·이동)
   라우트  GET /journals → ledger/list.html
 
   [막을 것]
@@ -20,7 +21,7 @@
       xmlns:th="http://www.thymeleaf.org">
 <body>
 <main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-ledger"
-      th:attr="data-can-reverse=${roleCode == 'SETTLEMENT' or roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}">
+      th:attr="data-can-reverse=${roleCode == 'SETTLEMENT' or roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'},data-selected-journal-id=${selectedJournalId}">
 
   <h1 class="fgc-page-title">검증원장 조회</h1>
   <p class="fgc-page-desc">
@@ -198,6 +199,28 @@
       <footer class="modal-footer">
         <button class="fgc-btn fgc-btn--ghost" type="button" data-modal-close>취소</button>
         <button class="fgc-btn fgc-btn--primary" id="journal-reverse-submit" type="button">역분개 생성</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" data-modal="journal-correction-request" data-close-on-backdrop="true" hidden aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="journal-correction-title" style="width:min(560px,100%)">
+      <header class="modal-header"><h2 class="modal-title" id="journal-correction-title">역분개 + 재기표 요청</h2></header>
+      <div class="modal-body">
+        <p class="fgc-muted" id="journal-correction-target" style="margin-top:0"></p>
+        <div class="fgc-banner fgc-banner--muted">
+          원분개를 바로 바꾸지 않고 원장 정정 예외를 만든 뒤 예외함에서 올바른 신규 분개를 입력합니다.
+        </div>
+        <label class="fgc-label fgc-label--required" for="journal-correction-reason" style="display:block;margin-top:16px">정정 요청 사유</label>
+        <textarea class="textarea-control" id="journal-correction-reason" maxlength="1000" rows="5" required
+                  data-modal-initial-focus placeholder="잘못된 내용과 필요한 정정을 입력하세요."></textarea>
+        <p class="fgc-error" id="journal-correction-reason-error" hidden>정정 요청 사유를 입력하세요.</p>
+        <label class="fgc-label" for="journal-correction-evidence" style="display:block;margin-top:16px">증빙 참조</label>
+        <input class="fgc-input" id="journal-correction-evidence" maxlength="500" type="text" placeholder="문서번호 또는 내부 증빙 경로">
+      </div>
+      <footer class="modal-footer">
+        <button class="fgc-btn fgc-btn--ghost" type="button" data-modal-close>취소</button>
+        <button class="fgc-btn fgc-btn--primary" id="journal-correction-submit" type="button">예외함에서 정정 계속</button>
       </footer>
     </section>
   </div>
