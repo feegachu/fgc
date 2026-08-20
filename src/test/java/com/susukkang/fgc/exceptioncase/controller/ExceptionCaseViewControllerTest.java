@@ -105,16 +105,7 @@ class ExceptionCaseViewControllerTest {
 
     @Test
     void journalCorrectionCaseRendersDedicatedFormWithDatabaseAccounts() throws Exception {
-        ExceptionCaseResponseDTO correction = new ExceptionCaseResponseDTO(
-                30L, "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:NONE:REQUEST:1",
-                ExceptionType.JOURNAL_CORRECTION_REQUIRED,
-                "JOURNAL_CORRECTION_REQUIRED", ExceptionSeverity.HIGH,
-                ExceptionStatus.IN_REVIEW, "원장 정정 필요", "금액 오류", 5L, "C001",
-                null, 1L, "settle01", "JOURNAL_HEADER", "10", null,
-                LocalDate.of(2026, 8, 1), null, null,
-                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"),
-                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), 1,
-                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), List.of(), List.of());
+        ExceptionCaseResponseDTO correction = journalCorrection(ExceptionStatus.IN_REVIEW);
         given(service.search(any(), eq(1), eq(20)))
                 .willReturn(response(List.of(correction), 1, 20, 1, 1));
         JournalAccountRow account = new JournalAccountRow();
@@ -128,6 +119,12 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("data-exception-action-form")))
                 .andExpect(content().string(containsString("value=\"FALSE_POSITIVE\"")))
                 .andExpect(content().string(containsString("value=\"REJECT\"")))
+                .andExpect(content().string(containsString("class=\"modal-backdrop journal-correction-backdrop\"")))
+                .andExpect(content().string(containsString("data-modal=\"journal-correction-30\"")))
+                .andExpect(content().string(containsString("hidden aria-hidden=\"true\"")))
+                .andExpect(content().string(containsString("class=\"modal modal-large publishing-modal journal-correction-modal\"")))
+                .andExpect(content().string(containsString("data-correction-read-only=\"false\"")))
+                .andExpect(content().string(containsString("원장 정정 계속")))
                 .andExpect(content().string(containsString("data-journal-correction-form")))
                 .andExpect(content().string(containsString("data-journal-id=\"10\"")))
                 .andExpect(content().string(containsString("원분개 (읽기 전용)")))
@@ -136,6 +133,23 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("EXPECTED_RECEIVABLE · 예상 미수금")))
                 .andExpect(content().string(containsString("정정 실행")))
                 .andExpect(content().string(containsString("href=\"/journals?selected=10\"")));
+    }
+
+    @Test
+    void rejectedJournalCorrectionRemainsAvailableAsReadOnlyModal() throws Exception {
+        given(service.search(any(), eq(1), eq(20)))
+                .willReturn(response(List.of(journalCorrection(ExceptionStatus.REJECTED)), 1, 20, 1, 0));
+
+        mockMvc.perform(get("/exceptions").param("selected", "30").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-journal-correction-open")))
+                .andExpect(content().string(containsString("원장 정정 확인")))
+                .andExpect(content().string(containsString("data-exception-action-form")))
+                .andExpect(content().string(containsString("value=\"REOPEN\"")))
+                .andExpect(content().string(containsString("재검토 시작")))
+                .andExpect(content().string(containsString("data-correction-read-only=\"true\"")))
+                .andExpect(content().string(containsString(
+                        "오탐·반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.")));
     }
 
     @Test
@@ -306,6 +320,19 @@ class ExceptionCaseViewControllerTest {
         return new ExceptionCaseSearchResponse(
                 summary, content, page, size, total, totalPages,
                 "severity,asc,createdAt,desc");
+    }
+
+    private static ExceptionCaseResponseDTO journalCorrection(ExceptionStatus status) {
+        return new ExceptionCaseResponseDTO(
+                30L, "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:NONE:REQUEST:1",
+                ExceptionType.JOURNAL_CORRECTION_REQUIRED,
+                "JOURNAL_CORRECTION_REQUIRED", ExceptionSeverity.HIGH,
+                status, "원장 정정 필요", "금액 오류", 5L, "C001",
+                null, 1L, "settle01", "JOURNAL_HEADER", "10", null,
+                LocalDate.of(2026, 8, 1), null, null,
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"),
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), 1,
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), List.of(), List.of());
     }
 
     private static ExceptionCaseResponseDTO row(

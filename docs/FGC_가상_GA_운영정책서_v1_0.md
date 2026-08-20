@@ -998,9 +998,15 @@ LEDG-W01에서 [역분개 + 재기표]
 ```text
 NEW → IN_REVIEW → RESOLVED
                  ↘ REJECTED
+REJECTED → REOPEN → IN_REVIEW
 ```
 
 상태변경에는 처리사유가 필수다.
+
+`REOPEN`은 오탐·반려 판단의 오조작 또는 추가 증빙이 확인된 경우에 한해 `REJECTED`를
+`IN_REVIEW`로 되돌리는 재검토 조치다. 최초 검토인 `START_REVIEW`와 감사이력에서 구분하며,
+`RESOLVED` 원장 정정 예외는 직접 재오픈하지 않는다. 이미 역분개·재기표가 끝난 원장을 다시
+고쳐야 하면 직전 재기표 분개를 원분개로 하는 새 정정 예외를 생성한다.
 
 ## 제42조 해결조치
 
@@ -1010,6 +1016,7 @@ NEW → IN_REVIEW → RESOLVED
 - `DEFER`: 실제 미지급 후 미래 회차로 이연
 - `RECONCILE_AGAIN`: 재대사
 - `FALSE_POSITIVE`: 오탐
+- `REOPEN`: 오탐·반려 재검토 시작
 - `RESOLVE`: 해결확정
 
 `DEFER`는 실제 지급을 미루는 경우에만 사용하며 날짜만 바꾸는 우회처리는 금지한다.

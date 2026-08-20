@@ -103,7 +103,9 @@
       if (!option.value) return;
       const supported = status === "NEW"
         ? option.dataset.supportsNew === "true"
-        : option.dataset.supportsReview === "true";
+        : status === "REJECTED"
+          ? option.dataset.supportsRejected === "true"
+          : option.dataset.supportsReview === "true";
       option.disabled = !supported;
       option.hidden = !supported;
     });
@@ -135,12 +137,14 @@
         }
       }).then((envelope) => {
         const action = envelope.data;
+        const shouldOpenJournalCorrection = row.dataset.exceptionType === "JOURNAL_CORRECTION_REQUIRED"
+            && (action.actionType === "START_REVIEW" || action.actionType === "REOPEN")
+            && action.toStatus === "IN_REVIEW";
         appendHistory(action, actionLabel);
         setStatus(row, action.toStatus);
-        if (row.dataset.exceptionType === "JOURNAL_CORRECTION_REQUIRED"
-            && action.actionType === "START_REVIEW") {
-          window.location.assign(`/exceptions?selected=${form.dataset.exceptionId}`);
-          return;
+        if (row.dataset.exceptionType === "JOURNAL_CORRECTION_REQUIRED") {
+          setJournalCorrectionMode(
+            form.parentElement.querySelector("[data-journal-correction-form]"), action.toStatus);
         }
         if (action.actionType === "ASSIGN") {
           const rowAssignee = row.querySelector('[data-role="assignee"]');
@@ -160,6 +164,13 @@
           form.replaceWith(notice);
         }
         if (toast) toast("처리 내용이 저장되었습니다.", "success");
+        // 2026-08-20 yslee - 검토 시작 처리 저장 성공 시에만 원장 정정 모달 표시
+        // 기존 코드: 예외 목록 페이지를 다시 조회해 상세 본문에 정정 폼을 노출
+        // 문제: 불필요한 페이지 이동이 발생하고 처리 결과 상태를 확인하지 않은 채 화면 전환
+        // 개선: JOURNAL_CORRECTION_REQUIRED가 IN_REVIEW로 전이된 경우에만 공통 모달 API 호출
+        if (shouldOpenJournalCorrection && window.FgcUi && window.FgcUi.modal) {
+          window.FgcUi.modal.open(`journal-correction-${form.dataset.exceptionId}`);
+        }
       }).catch((requestError) => {
         const message = requestError.message || "처리 내용을 저장하지 못했습니다.";
         error.textContent = message;
@@ -262,6 +273,19 @@
     amount.className = "fgc-muted";
     amount.textContent = `차변 ${Number(journal.debitTotal).toLocaleString("ko-KR")}원 · 대변 ${Number(journal.creditTotal).toLocaleString("ko-KR")}원`;
     summary.append(title, date, amount);
+    if (journal.correctionGroupKey) {
+      const correctionGroup = document.createElement("span");
+      correctionGroup.className = "fgc-muted";
+      correctionGroup.textContent = `정정그룹 ${journal.correctionGroupKey}`;
+      summary.append(correctionGroup);
+    }
+    if (journal.reversedByJournalHeaderId) {
+      const reversalLink = document.createElement("a");
+      reversalLink.className = "fgc-btn fgc-btn--ghost";
+      reversalLink.href = `/journals?selected=${journal.reversedByJournalHeaderId}`;
+      reversalLink.textContent = `역분개 #${journal.reversedByJournalHeaderId}`;
+      summary.append(reversalLink);
+    }
 
     const lineGrid = document.createElement("div");
     lineGrid.className = "journal-correction-original-lines";
@@ -289,6 +313,50 @@
     container.replaceChildren(summary, lineGrid);
   }
 
+  // 2026-08-20 yslee - 원장 정정 모달을 예외 상태에 따라 편집·조회 모드로 전환
+  // 기존 코드: 검토 시작 직후에만 모달을 열고 재선택·종결 상태에서 다시 확인할 진입점이 없음
+  // 문제: 검토중 작업을 이어갈 수 없고 오탐·반려 후 원분개와 미실행 결과를 확인할 수 없음
+  // 개선: 검토중은 편집 가능, 해결·오탐·반려는 조회 전용으로 고정하고 재진입 버튼 상태 동기화
+  function setJournalCorrectionMode(form, status) {
+    if (!form) return;
+    const readOnly = status !== "NEW" && status !== "IN_REVIEW";
+    form.dataset.correctionStatus = status;
+    form.dataset.correctionReadOnly = String(readOnly);
+    form.querySelectorAll("[data-correction-editor]").forEach((editor) => {
+      editor.hidden = readOnly;
+      editor.querySelectorAll("input, select, textarea, button").forEach((control) => {
+        control.disabled = readOnly;
+      });
+    });
+    const notice = form.querySelector("[data-correction-read-only-notice]");
+    if (notice) notice.hidden = !readOnly;
+    const rejectedNotice = form.querySelector("[data-correction-rejected-notice]");
+    if (rejectedNotice) rejectedNotice.hidden = status !== "REJECTED";
+    const resolvedNotice = form.querySelector("[data-correction-resolved-notice]");
+    if (resolvedNotice) resolvedNotice.hidden = status !== "RESOLVED";
+
+    const panel = form.closest("[data-modal]")?.parentElement;
+    const openButton = panel?.querySelector("[data-journal-correction-open]");
+    if (openButton) {
+      openButton.hidden = status === "NEW";
+      const label = openButton.querySelector("[data-journal-correction-open-label]");
+      if (label) label.textContent = status === "IN_REVIEW" ? "원장 정정 계속" : "원장 정정 확인";
+    }
+    if (!readOnly) {
+      const loaded = form.dataset.loaded === "true";
+      const submitButton = form.querySelector("button[type='submit']");
+      const addLineButton = form.querySelector("[data-add-correction-line]");
+      const linesContainer = form.querySelector("[data-correction-lines]");
+      if (loaded && form.journalSnapshot && linesContainer && !linesContainer.children.length) {
+        form.elements.journalDate.value = form.journalSnapshot.journalDate;
+        form.elements.description.value = form.journalSnapshot.description || "";
+        renderCorrectionLines(linesContainer, form.journalSnapshot.lines || []);
+      }
+      if (submitButton) submitButton.disabled = !loaded;
+      if (addLineButton) addLineButton.disabled = !loaded;
+    }
+  }
+
   function bindJournalCorrectionForm(form, row) {
     if (!form || !apiClient) return;
     const submitButton = form.querySelector("button[type='submit']");
@@ -296,6 +364,7 @@
     const originalContainer = form.querySelector("[data-original-journal]");
     const linesContainer = form.querySelector("[data-correction-lines]");
     const addLineButton = form.querySelector("[data-add-correction-line]");
+    setJournalCorrectionMode(form, form.dataset.correctionStatus);
 
     addLineButton?.addEventListener("click", () => {
       appendCorrectionLine(linesContainer);
@@ -304,13 +373,16 @@
     apiClient.request(`/api/v1/journals/${encodeURIComponent(form.dataset.journalId)}`)
       .then((envelope) => {
         const journal = envelope.data;
+        form.journalSnapshot = journal;
         renderOriginalJournal(originalContainer, journal);
-        form.elements.journalDate.value = journal.journalDate;
-        form.elements.description.value = journal.description || "";
-        renderCorrectionLines(linesContainer, journal.lines || []);
         form.dataset.loaded = "true";
-        submitButton.disabled = false;
-        if (addLineButton) addLineButton.disabled = false;
+        if (form.dataset.correctionReadOnly !== "true") {
+          form.elements.journalDate.value = journal.journalDate;
+          form.elements.description.value = journal.description || "";
+          renderCorrectionLines(linesContainer, journal.lines || []);
+          submitButton.disabled = false;
+          if (addLineButton) addLineButton.disabled = false;
+        }
       }).catch((requestError) => {
         originalContainer.replaceChildren();
         error.textContent = requestError.message || "원분개를 불러오지 못했습니다.";
@@ -318,7 +390,8 @@
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (form.dataset.loaded !== "true" || submitButton.disabled) return;
+      if (form.dataset.correctionReadOnly === "true"
+          || form.dataset.loaded !== "true" || submitButton.disabled) return;
       const lineRows = Array.from(linesContainer.querySelectorAll(".journal-correction-line"));
       const lines = lineRows.map((lineRow) => ({
         originalLineNo: lineRow.dataset.originalLineNo
@@ -366,6 +439,7 @@
         completed.append(
           message, correctionGroup, originalLink, reversalLink, repostedLink
         );
+        setJournalCorrectionMode(form, result.status);
         form.replaceWith(completed);
         if (toast) toast("원장 정정을 완료했습니다.", "success");
       }).catch((requestError) => {

@@ -110,6 +110,7 @@ public class ExceptionCaseViewController {
         model.addAttribute("actionTypes", ExceptionActionType.values());
         model.addAttribute("newStatus", ExceptionStatus.NEW);
         model.addAttribute("inReviewStatus", ExceptionStatus.IN_REVIEW);
+        model.addAttribute("rejectedStatus", ExceptionStatus.REJECTED);
         model.addAttribute("selectedExceptionId", selected);
         model.addAttribute("journalAccounts", journalAccountCatalogService.findAllActive());
         model.addAttribute("cases", cases.content());

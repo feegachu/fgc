@@ -195,6 +195,77 @@ class ExceptionCaseActionServiceIntegrationTest {
         assertThat(currentStatus(exceptionCaseId)).isEqualTo("REJECTED");
     }
 
+    /** FGC-FUN-053: 오탐·반려 종결 건은 사유를 남긴 REOPEN으로만 재검토한다. */
+    @Test
+    void 오탐반려는_REOPEN으로_검토중에_복귀하고_이력을_남긴다() {
+        Long userId = firstUserId();
+        String loginId = loginIdOf(userId);
+        Long exceptionCaseId = insertNewCase();
+
+        exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "최초 검토를 시작합니다.", "DOC-REOPEN-START"),
+                userId,
+                loginId);
+        exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.FALSE_POSITIVE, "오탐으로 판단했습니다.", "DOC-REOPEN-REJECT"),
+                userId,
+                loginId);
+
+        var reopened = exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.REOPEN, "추가 증빙으로 재검토합니다.", "DOC-REOPEN-001"),
+                userId,
+                loginId);
+
+        assertThat(reopened.fromStatus()).isEqualTo(ExceptionStatus.REJECTED);
+        assertThat(reopened.toStatus()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        assertThat(reopened.actionType()).isEqualTo("REOPEN");
+        assertThat(currentStatus(exceptionCaseId)).isEqualTo("IN_REVIEW");
+        assertThat(actionCount(exceptionCaseId)).isEqualTo(3);
+        assertThat(auditCount(exceptionCaseId)).isEqualTo(3);
+    }
+
+    /** FGC-FUN-047·053: 실제 조치가 끝난 RESOLVED 원장 건은 중복 정정을 막기 위해 직접 재오픈하지 않는다. */
+    @Test
+    void 해결상태는_REOPEN을_허용하지_않는다() {
+        Long userId = firstUserId();
+        String loginId = loginIdOf(userId);
+        Long exceptionCaseId = insertNewCase();
+
+        exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "해결 여부를 검토합니다.", "DOC-RESOLVE-START"),
+                userId,
+                loginId);
+        exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.RESOLVE, "검토 결과 해결했습니다.", "DOC-RESOLVE-001"),
+                userId,
+                loginId);
+
+        assertThatThrownBy(() -> exceptionCaseService.action(
+                exceptionCaseId,
+                new ExceptionActionRequest(
+                        ExceptionActionType.REOPEN, "해결 건을 직접 재검토합니다.", "DOC-INVALID-REOPEN"),
+                userId,
+                loginId))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception -> assertThat(
+                        ((FgcBusinessException) exception).getErrorCode())
+                        .isEqualTo(FgcErrorCode.EXCP_003));
+
+        assertThat(currentStatus(exceptionCaseId)).isEqualTo("RESOLVED");
+        assertThat(actionCount(exceptionCaseId)).isEqualTo(2);
+        assertThat(auditCount(exceptionCaseId)).isEqualTo(2);
+    }
+
     /** FGC-FUN-053·FGC-QUR-001: 허용되지 않은 전이는 어떤 이력도 남기지 않는다. */
     @Test
     void 신규상태에서_해결조치를_요청하면_이력과_감사로그를_남기지_않는다() {

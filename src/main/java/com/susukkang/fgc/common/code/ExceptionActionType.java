@@ -18,6 +18,11 @@ public enum ExceptionActionType {
     FALSE_POSITIVE,   // 오탐
     RESOLVE,          // 해결
     REJECT,           // 반려
+    // 2026-08-20 yslee - 오탐·반려 종결 건을 감사이력과 함께 재검토하는 조치 추가
+    // 기존 코드: REJECTED는 모든 조치를 거부해 담당자의 오탐·반려 오조작을 복구할 수 없음
+    // 문제: 직접 DB 상태 변경 외에는 IN_REVIEW로 돌아갈 경로가 없어 사유·처리자 이력이 유실됨
+    // 개선: REJECTED에서만 IN_REVIEW로 전이하는 REOPEN을 별도 코드로 제공
+    REOPEN,           // 재검토 시작
     COMMENT;          // 의견
 
     /** 현재 예외 상태에서 이 조치를 수행할 수 있는지 검사한다. 종결 상태는 재처리하지 않는다. */
@@ -27,6 +32,7 @@ public enum ExceptionActionType {
                     currentStatus == ExceptionStatus.NEW
                             || currentStatus == ExceptionStatus.IN_REVIEW;
             case START_REVIEW -> currentStatus == ExceptionStatus.NEW;
+            case REOPEN -> currentStatus == ExceptionStatus.REJECTED;
             case CORRECT, REDUCE, CANCEL, DEFER, RECONCILE_AGAIN,
                     FALSE_POSITIVE, RESOLVE, REJECT ->
                     currentStatus == ExceptionStatus.IN_REVIEW;
@@ -40,7 +46,7 @@ public enum ExceptionActionType {
     /** 원장 정정 전용 처리 전에도 일반 예외 조치 API에서 수행할 수 있는 조치인지 반환한다. */
     public boolean isJournalCorrectionGeneralAction() {
         return switch (this) {
-            case ASSIGN, START_REVIEW, COMMENT, FALSE_POSITIVE, REJECT -> true;
+            case ASSIGN, START_REVIEW, COMMENT, FALSE_POSITIVE, REJECT, REOPEN -> true;
             default -> false;
         };
     }
@@ -53,6 +59,7 @@ public enum ExceptionActionType {
         return switch (this) {
             case ASSIGN, COMMENT -> currentStatus;
             case START_REVIEW -> ExceptionStatus.IN_REVIEW;
+            case REOPEN -> ExceptionStatus.IN_REVIEW;
             case CORRECT, REDUCE, CANCEL, DEFER, RECONCILE_AGAIN, RESOLVE ->
                     ExceptionStatus.RESOLVED;
             case FALSE_POSITIVE, REJECT -> ExceptionStatus.REJECTED;
@@ -72,6 +79,7 @@ public enum ExceptionActionType {
             case FALSE_POSITIVE -> "오탐";
             case RESOLVE -> "해결";
             case REJECT -> "반려";
+            case REOPEN -> "재검토 시작";
             case COMMENT -> "의견";
         };
     }
