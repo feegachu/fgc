@@ -940,10 +940,16 @@ body.is-modal-open {
 }
 
 /*
- * Evidence Popover — 규제 근거·계산식 표시 (화면정의서 4장 규칙 5)
+ * Evidence Popover — 규제 근거 인용 (화면정의서 4장 규칙 5, :213)
  *
- * "근거 없는 숫자는 화면에 띄우지 않는다" 를 지키되 화면 상단 배너를 쓰지 않기 위한 컴포넌트다.
- * 값 옆의 작은 트리거를 누르면 근거 ID 와 계산식이 뜬다.
+ * 규칙 5 는 "요율·한도·판정이 나오는 곳에는 마우스를 올리면 근거가 뜬다. 예: REG-08 · 제4-32조제11항"
+ * 이다. 즉 이 컴포넌트가 담는 것은 **근거 코드와 조문 인용**이고, 화면 상단 배너를 쓰지 않고
+ * "근거 없는 숫자는 화면에 띄우지 않는다" 를 지키기 위한 것이다.
+ *
+ * ★ 규칙 6(계산근거 열기, :214)과 혼동하지 말 것.
+ *   규칙 6 은 **금액을 클릭**하면 calculation_snapshot 을 "입력값 → 계산식 → 항목별 금액 → 합계"
+ *   순서의 구조화된 표로 펼치는 별도 요구사항이고, CAP-W02 팝업이 그 구현이다.
+ *   트리거도 형식도 다르므로 이 컴포넌트를 그 용도로 재사용하면 요구 형식을 충족하지 못한다.
  *
  * 네이티브 popover 를 쓰는 이유: 근거는 data-table 셀 안에 놓이는데 .data-table 은
  * table-layout: fixed + overflow: hidden 이고 .data-table-viewport 는 overflow-x: auto 라
@@ -984,13 +990,19 @@ body.is-modal-open {
 
 /*
  * position/inset/margin 은 UA 기본값(중앙 정렬)을 덮기 위한 것이다.
- * 실제 좌표는 evidence.js 가 --evidence-x / --evidence-y 로 넣는다.
+ *
+ * --evidence-x / --evidence-y 는 열릴 때 evidence.js 가 트리거 좌표로 덮어쓴다
+ * (인라인 스타일이라 아래 선언보다 우선한다). 여기 초기값을 두는 이유는 두 가지다.
+ *   · JS 가 아직 위치를 잡기 전 한 프레임 동안 화면 밖으로 튀지 않게 한다
+ *   · 정적 분석이 출처를 찾을 수 있게 한다 — 값을 JS 에서만 넣으면 미해결 속성으로 잡힌다
  */
 .evidence-popover {
+  --evidence-x: 50%;
+  --evidence-y: 50%;
   position: fixed;
   inset: auto;
-  left: var(--evidence-x, 50%);
-  top: var(--evidence-y, 50%);
+  left: var(--evidence-x);
+  top: var(--evidence-y);
   width: min(24rem, calc(100vw - 2rem));
   margin: 0;
   padding: var(--space-4);

@@ -36,12 +36,9 @@ class PublishingTemplateStructureTest {
      * — 그래야 화면 하나를 전환할 때 다른 화면 담당자의 테스트가 함께 깨지지 않는다 (#138).
      */
     private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of(
-            "templates/contract/form.html",
             "templates/transaction/list.html",
             "templates/transaction/form.html",
-            "templates/schedule/list.html",
             "templates/schedule/detail.html",
-            "templates/arbitrage/list.html",
             "templates/ledger/list.html",
             "templates/exception/list.html",
             "templates/vrun/list.html",
@@ -49,14 +46,19 @@ class PublishingTemplateStructureTest {
     );
 
     /*
-     * 공통 컴포넌트 전환이 끝나 브리지가 필요 없는 화면.
-     * 레거시 fgc-* 와 인라인 style 이 남아 있으면 안 된다.
+     * 공통 컴포넌트 전환이 끝난 화면. 레거시 fgc-* 와 인라인 style 이 남아 있으면 안 된다.
+     *
+     * publishing-page 클래스는 아직 붙어 있다 — 브리지가 제거되기 전까지는 붙어 있어도 무해하고,
+     * 떼는 시점은 assets/fgc.css 정리와 함께 판단한다 (#138 완료 조건).
      */
     private static final List<String> FULLY_MIGRATED_TEMPLATES = List.of(
             "templates/base/index.html",
             "templates/policy/list.html",
             "templates/reco/list.html",
-            "templates/audit/list.html"
+            "templates/audit/list.html",
+            "templates/contract/form.html",
+            "templates/schedule/list.html",
+            "templates/arbitrage/list.html"
     );
 
     @Test
@@ -243,8 +245,23 @@ class PublishingTemplateStructureTest {
         assertThat(layout)
                 .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{#strings\\.startsWith\\(screenId, 'FGC-UI-TRAN-'\\)\\}\"[^>]*th:href=\"@\\{/css/features/transaction\\.css\\}\"[^>]*>")
                 .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{#strings\\.startsWith\\(screenId, 'FGC-UI-VRUN-'\\)\\}\"[^>]*th:href=\"@\\{/css/features/vrun\\.css\\}\"[^>]*>")
-                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-LEDG-W01'\\}\"[^>]*th:href=\"@\\{/css/features/ledger\\.css\\}\"[^>]*>")
-                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-ARB-W01'\\}\"[^>]*th:href=\"@\\{/css/features/arbitrage\\.css\\}\"[^>]*>");
+                .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-LEDG-W01'\\}\"[^>]*th:href=\"@\\{/css/features/ledger\\.css\\}\"[^>]*>");
+        // ARB-W01 의 조건부 링크와 arbitrage.css 는 #295 가 이미 develop 에 넣었다. 여기서 중복 추가하지 않는다.
+    }
+
+    /* 같은 도메인 CSS 를 두 번 링크하면 뒤엣것이 앞엣것을 덮어 디버깅이 어려워진다. */
+    @Test
+    void productionLayoutLinksEachFeatureStylesheetOnce() throws IOException {
+        String layout = resource("templates/layout/default.html");
+
+        for (String stylesheet : List.of(
+                "audit.css", "arbitrage.css", "base.css", "dashboard.css", "contract.css",
+                "schedule.css", "cap.css", "policy.css", "reco.css", "exception.css",
+                "transaction.css", "vrun.css", "ledger.css")) {
+            assertThat(layout.split("/css/features/" + stylesheet.replace(".", "\\."), -1).length - 1)
+                    .as(stylesheet)
+                    .isEqualTo(1);
+        }
     }
 
     /*

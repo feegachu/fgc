@@ -8,8 +8,7 @@
  *           components.css 의 [data-transaction-page-numbers]·[data-transaction-pagination].
  */
 
-.transaction-list-page,
-.transaction-form-page {
+.transaction-page {
   display: grid;
   min-width: 0;
   gap: var(--space-4);

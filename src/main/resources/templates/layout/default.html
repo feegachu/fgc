@@ -30,7 +30,6 @@
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-TRAN-')}" th:href="@{/css/features/transaction.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-VRUN-')}" th:href="@{/css/features/vrun.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-LEDG-W01'}" th:href="@{/css/features/ledger.css}">
-  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-ARB-W01'}" th:href="@{/css/features/arbitrage.css}">
 </head>
 <body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">
   <script th:src="@{/js/common/sidebar-state-init.js}"></script>

@@ -150,9 +150,15 @@
   background: var(--color-bg-subtle);
 }
 
+/*
+ * --progress 는 dashboard.js 가 data-progress 값을 읽어 인라인 스타일로 덮어쓴다.
+ * 여기 초기값을 두면 스크립트가 돌기 전 한 프레임 동안 막대가 튀지 않고,
+ * 정적 분석도 속성 출처를 찾을 수 있다.
+ */
 .progress-bar {
+  --progress: 0%;
   display: block;
-  width: var(--progress, 0%);
+  width: var(--progress);
   height: 100%;
   border-radius: inherit;
   background: var(--color-action-primary);

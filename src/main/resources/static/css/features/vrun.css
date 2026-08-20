@@ -9,8 +9,7 @@
  *           publishing.css 의 .publishing-result-placeholder 의존 → kpi-card 로 교체.
  */
 
-.vrun-list-page,
-.vrun-detail-page {
+.vrun-page {
   display: grid;
   min-width: 0;
   gap: var(--space-4);
