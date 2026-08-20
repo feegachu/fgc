@@ -591,6 +591,55 @@ class PublishingTemplateStructureTest {
                 .doesNotContain(".base-panel-note");
     }
 
+    // FGC-UI-DASH-W01: 업무 대시보드는 공통 컴포넌트만 쓰고, 화면정의서에 없는 "연동 대기" 카드가
+    // 남아있지 않아야 한다(#282). 라벨은 템플릿의 T(...).valueOf(...).label() SpEL 반사 호출이 아니라
+    // IF-API-03 응답(RecentExceptionResponse/RecentValidationRunResponse)이 서버에서 미리 만들어
+    // 내려주는 *Label 필드를 그대로 찍는다 — SIR-008(코드값은 영문 코드+한글 라벨 동봉)이 API 계약
+    // 레벨에서 지켜지도록, 화면과 JSON이 같은 라벨을 공유한다.
+    @Test
+    void dashboardUsesCommonComponentsWithoutStalePlaceholdersOrRawEnumCodes() throws IOException {
+        assertThat(resource("templates/dashboard/index.html"))
+                .contains("class=\"page-content dashboard-page\"")
+                .doesNotContain("page-description")
+                .doesNotContain("월별 추세 집계 API 연동 대기")
+                .doesNotContain("준비도 집계 API가 아직 제공되지 않습니다")
+                .doesNotContain("trend-card")
+                .doesNotContain("readiness-card")
+                .contains("kpi-card kpi-card-warning")
+                .contains("${e.severityLabel()}")
+                .contains("${e.exceptionTypeLabel()}")
+                .contains("${e.statusLabel()}")
+                .contains("${r.statusLabel()}")
+                .doesNotContain("T(com.susukkang.fgc.common.code")
+                .contains("<th scope=\"col\">유형</th>")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"table-cell-details\" hidden")
+                .contains("class=\"table-cell-more\">전체 보기")
+                .contains("class=\"table-cell-less\">접기")
+                .contains("dashboard-disclosure-cell")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("static/css/features/dashboard.css"))
+                .doesNotContain(".trend-plot")
+                .doesNotContain(".trend-card-legend")
+                .doesNotContain(".trend-legend-item")
+                .doesNotContain(".trend-legend-swatch")
+                .doesNotContain(".progress-bar-error")
+                .doesNotContain(".readiness-value")
+                .contains(".run-row:focus-visible")
+                .contains(".kpi-card:focus-visible")
+                .contains(".priority-table td.dashboard-disclosure-cell");
+
+        assertThat(resource("static/js/features/dashboard/dashboard.js"))
+                .contains("syncTableCellDisclosures")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready")
+                .doesNotContain("fetch(");
+    }
+
     private static String resource(String path) throws IOException {
         try (var input = PublishingTemplateStructureTest.class.getClassLoader().getResourceAsStream(path)) {
             assertThat(input).as(path).isNotNull();
