@@ -91,6 +91,19 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                 itemService.process(contractId, validationRunId);
                 processedCount++;
             } catch (FgcBusinessException exception) {
+                // 2026-08-20 hjKang - 스케줄 생성 실패를 예외함에 노출한다.
+                // 기존 코드: ContractSkip 만 남기고 exception_case 를 만들지 않아 무음 스킵이었다.
+                // 문제: 조직 계층에 해당 직급 관리자가 없으면(예: 팀장 공석) 관리자수수료 수취인을
+                //       찾지 못해 계약 전체의 스케줄 생성이 롤백되는데, 예외함에 아무것도 뜨지 않아
+                //       담당자는 그 계약이 예상 스케줄 0행이라는 사실을 알 수 없었다.
+                //       그 상태로 대사가 돌면 실제 지급만 남아 엉뚱한 판정이 나온다.
+                // 개선: 구조 오류·정책 오류 분기와 동일하게 DATA_QUALITY 케이스를 남긴다.
+                exceptionCaseMapper.insertDataQualityCase(
+                        validationRunId,
+                        contractId,
+                        "예상 스케줄 생성 실패",
+                        exception.getMessage()
+                );
                 skips.add(new ContractSkip(
                         contractId,
                         "SCHEDULE_REGENERATION_FAILED",

@@ -247,8 +247,17 @@ class InsurerGaReconciliationMatcherImplTest {
         assertThat(result.actualAgentId()).isEqualTo(501L);
     }
 
+    // 2026-08-20 hjKang - FGC-FUN-048 대사 매칭키를 운영정책서 제36조에 맞춘다
+    // 기존 테스트: 같은 월이어도 지급예정일이 하루 다르면 별개 그룹으로 분리된다고 단언했다.
+    // 문제: 예상 지급예정일은 계약일 기준(계약일+회차-1개월), 실제 지급예정일은 정산 사이클
+    //       기준(정산월 마감 후)이라 실데이터에서는 월조차 다르다(예상 07-10 / 실제 08-25).
+    //       이 규칙이 있는 한 MATCHED 는 영구히 0건이 된다.
+    // 근거: 제36조 기본 매칭키는 due_month = settlement_month 이며 due_date 는 매칭키가 아니다.
+    //       시드명세 §30 도 "매칭 월은 due_month = settlement_month 로 비교한다"로 못 박고 있다.
+    // 개선: 같은 월이면 같은 그룹으로 붙는지 검증한다. 1:1 일 때만 붙이는 안전장치는 유지되므로
+    //       같은 계약·항목·월에 예상 행이 둘 이상이면 여전히 ambiguous 로 남는다.
     @Test
-    void 같은_월이어도_지급예정일이_다르면_정확일치로_합치지_않는다() {
+    void 같은_월이면_지급예정일이_달라도_같은_그룹으로_대사한다() {
         InsurerGaActualSourceRow actual = actual(21L, "650000", null);
         actual.setDueDate(MONTH.plusDays(15));
         given(reconciliationMapper.findExpectedSources(MONTH, 3L))
@@ -258,7 +267,7 @@ class InsurerGaReconciliationMatcherImplTest {
         List<InsurerGaMatchCandidate> results = matcher.match(request());
 
         assertThat(results).extracting(InsurerGaMatchCandidate::resultType)
-                .containsExactly(ReconciliationResultType.ACTUAL_MISSING, ReconciliationResultType.EXPECTED_MISSING);
+                .containsExactly(ReconciliationResultType.MATCHED);
     }
 
     @Test
@@ -294,10 +303,10 @@ class InsurerGaReconciliationMatcherImplTest {
 
         assertThat(reviewRequired.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
         assertThat(reviewRequired.secondaryReasonCodes()).isEmpty();
+        // 예상·실제가 같은 월이라 한 그룹으로 붙는다. 그 그룹의 예상 지급예정일이 없어
+        // 비교 기준이 없으므로 REVIEW_REQUIRED 하나로 수렴한다 — 누락으로 단정하지 않는다.
         assertThat(results).extracting(InsurerGaMatchCandidate::resultType)
-                .containsExactlyInAnyOrder(
-                        ReconciliationResultType.REVIEW_REQUIRED,
-                        ReconciliationResultType.EXPECTED_MISSING);
+                .containsExactly(ReconciliationResultType.REVIEW_REQUIRED);
     }
 
     // 2026-08-14 yslee - FGC-FUN-050 비영 날짜 정책의 복수 후보 안전성 검증

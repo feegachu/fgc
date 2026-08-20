@@ -60,15 +60,27 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         keys.addAll(expectedByKey.keySet());
         keys.addAll(actualByKey.keySet());
 
+        // 2026-08-19 hjKang - 그룹 안에서 수취인 단위로 짝을 지어 판정한다(운영정책서 제36조).
+        // 기존 코드: 그룹 하나를 통째로 합산해 후보 1건을 만들었다.
+        // 문제: 관리자수수료처럼 수취인이 여럿인 정상 지급에서 수취인을 하나로 좁히지 못해
+        //       REVIEW_REQUIRED 로 빠지고, 팀장 몫이 다른 사람에게 가도 합계가 같으면 통과했다.
+        // 개선: RecipientPairing 이 수취인별 짝을 만들고 짝마다 후보를 만든다.
+        //       createCandidate 내부 판정은 그대로 두어도 각 짝의 수취인이 단일해 정상 동작한다.
         return keys.stream()
                 .sorted(BaseMatchKey.ORDER)
-                .map(key -> createCandidate(
-                        request,
-                        key,
-                        expectedByKey.getOrDefault(key, List.of()),
-                        actualByKey.getOrDefault(key, List.of()),
-                        actualAlignment.ambiguousKeys().contains(key)
-                ))
+                .flatMap(key -> RecipientPairing.byRecipient(
+                                expectedByKey.getOrDefault(key, List.of()),
+                                GaFcExpectedSourceRow::getExpectedAgentId,
+                                actualByKey.getOrDefault(key, List.of()),
+                                GaFcActualSourceRow::getActualAgentId)
+                        .stream()
+                        .map(pair -> createCandidate(
+                                request,
+                                key,
+                                pair.expected(),
+                                pair.actual(),
+                                actualAlignment.ambiguousKeys().contains(key)
+                        )))
                 .toList();
     }
 
@@ -237,6 +249,12 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         if (installmentResolutionIssue || agentResolutionIssue) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
+        // 2026-08-20 hjKang - 중복 판정을 원래 순서대로 유지한다.
+        // 수취인 짝짓기(RecipientPairing) 도입 전에는 관리자수수료 예상 3행(팀장·지사장·본부장)이
+        // 한 그룹에 뭉쳐 들어와, 실제가 0건인 미지급 상태가 "중복 지급"으로 보고됐다.
+        // 짝짓기 후에는 서로 다른 수취인이 각각 단독 짝으로 분리되므로(제36조 3·4번)
+        // 이 지점에 복수 행이 도달하는 경우는 "같은 수취인에게 같은 항목·회차가 두 번 잡힌"
+        // 진짜 중복뿐이다. 따라서 DUPLICATE 를 먼저 판정하는 것이 정확하다.
         if (expectedSources.size() > 1 || actualSources.size() > 1) {
             return ReconciliationResultType.DUPLICATE;
         }
@@ -273,7 +291,19 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         if (installmentResolutionIssue || installmentMismatch) {
             reasons.add(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
         }
-        if (expectedSources.size() > 1 || actualSources.size() > 1) {
+        // 2026-08-20 hjKang - 보조 사유 DUPLICATE 를 "같은 수취인 안의 복수"로 한정
+        // 기존 코드: 양쪽이 존재하고 행이 2개 이상이면 무조건 DUPLICATE 를 보조 사유로 붙였다.
+        // 문제: 최종 result_type 은 matcher 반환값이 아니라 ReconciliationReasonClassifier 가
+        //       주·보조 사유를 우선순위(DUPLICATE=40 · ACTUAL_MISSING=60 · REVIEW_REQUIRED=110)로
+        //       재정렬해 가장 낮은 번호를 고른 결과다. 따라서 보조 사유에 DUPLICATE 가 남아 있으면
+        //       classify() 가 REVIEW_REQUIRED 를 돌려줘도 저장은 DUPLICATE·HIGH 로 뒤집힌다.
+        //       수취인 짝짓기에서 양쪽에 2명 이상이 남아 대응을 단정할 수 없는 묶음(제36조 5번)이
+        //       정확히 이 경우이며, "중복 지급"은 사실과 다르다.
+        // 개선: 수취인이 양쪽 모두 하나로 좁혀졌을 때(!agentResolutionIssue)만 복수 행을 중복으로 본다.
+        //       그때의 복수는 같은 수취인에게 같은 항목·회차가 두 번 잡힌 진짜 중복이다.
+        if (!expectedSources.isEmpty() && !actualSources.isEmpty()
+                && !agentResolutionIssue
+                && (expectedSources.size() > 1 || actualSources.size() > 1)) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
         }
         // 2026-08-13 yslee - FGC-FUN-048-03 설계사 식별 불가 보조 사유 보존
@@ -322,9 +352,19 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         Map<BaseMatchKey, List<BaseMatchKey>> candidatesByActualKey = new LinkedHashMap<>();
         Map<BaseMatchKey, Integer> uniqueTargetCounts = new LinkedHashMap<>();
         actualGroups.keySet().stream().sorted(BaseMatchKey.ORDER).forEach(actualKey -> {
+            // 2026-08-19 hjKang - 후보 선택에서 지급예정일 조건을 제거
+            // 기존 코드: 예상 sl.due_date 와 실제 ct.due_date 를 비교해 후보를 걸렀다
+            // 문제: 예상 예정일은 계약일 기준(계약일+회차-1개월)이고 실제 예정일은 정산 사이클
+            //       기준(정산월 마감 후)이라 월조차 다르다. 2026-07 정산분의 예상 예정일은
+            //       2026-07-10, 실제 예정일은 2026-08-25 다. 어떤 정밀도로 비교해도 후보가
+            //       0건이 되어 모든 그룹이 예상 전용·실제 전용으로 갈렸고, 회차·설계사·금액
+            //       비교는 실행조차 되지 않았다.
+            // 개선: 운영정책서 제36조 기본 매칭키(지급단계·보험회사·계약·수수료항목·
+            //       due_month = settlement_month)만으로 후보를 고른다. sameDimensions 가
+            //       바로 그 조건이다. 1:1 일 때만 붙이는 아래 안전장치는 그대로 두므로,
+            //       같은 계약·항목·월에 예상 행이 둘 이상이면 여전히 ambiguous 로 남는다.
             List<BaseMatchKey> candidates = orderedExpectedKeys.stream()
                     .filter(expectedKey -> expectedKey.sameDimensions(actualKey))
-                    .filter(expectedKey -> datesMatch(expectedKey.dueDate(), actualKey.dueDate()))
                     .toList();
             candidatesByActualKey.put(actualKey, candidates);
             if (candidates.size() == 1) {
@@ -342,12 +382,6 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
             aligned.computeIfAbsent(alignedKey, ignored -> new ArrayList<>()).addAll(entry.getValue());
         });
         return new ActualGroupAlignment(aligned, ambiguousKeys);
-    }
-
-    private boolean datesMatch(LocalDate expectedDate, LocalDate actualDate) {
-        return expectedDate != null
-                && actualDate != null
-                && tolerancePolicy.matchesDate(expectedDate, actualDate);
     }
 
     private static Map<BaseMatchKey, List<GaFcActualSourceRow>> groupActual(

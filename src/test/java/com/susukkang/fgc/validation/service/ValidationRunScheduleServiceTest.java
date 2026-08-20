@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -126,6 +127,11 @@ class ValidationRunScheduleServiceTest {
             assertThat(skip.contractId()).isEqualTo(10L);
             assertThat(skip.reasonCode()).isEqualTo("SCHEDULE_REGENERATION_FAILED");
         });
+        // 스케줄 생성 실패는 무음 스킵이 아니라 예외함에 떠야 한다.
+        // 직급 공석 등으로 수취인을 찾지 못하면 계약 전체의 예상 스케줄이 0행이 되는데,
+        // 케이스를 남기지 않으면 담당자가 그 사실을 알 수 없고 대사가 엉뚱한 판정을 낸다.
+        verify(exceptionCaseMapper).insertDataQualityCase(
+                eq(118L), eq(10L), eq("예상 스케줄 생성 실패"), any());
         verify(itemService).process(10L, 118L);
         verify(itemService).process(20L, 118L);
     }

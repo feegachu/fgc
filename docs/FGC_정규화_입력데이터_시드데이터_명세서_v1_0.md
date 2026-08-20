@@ -665,6 +665,22 @@ failure_reason     = FAILED일 때 필수
 
 GOLDEN 차익거래 계약은 1~36차월을 월별로 넣는다. 37차월 이후 사례는 실제 누적값만 넣고 1~36차월 예상 환급률표를 연장하지 않는다.
 
+### 시드분과 수기 등록분의 구분
+
+위 월별 행은 시드가 넣는다. 화면(FGC-UI-CONT-W03)에서 수기로 등록한 계약은 시드 대상이 아니므로 계약 저장 트랜잭션이 **초회 1행만** 생성한다.
+
+```text
+as_of_date              = 계약일
+contract_month_no       = 1
+cumulative_paid_premium = 계약의 초회보험료
+surrender_value         = NULL            # 임의 산정 금지
+surrender_value_type    = EXPECTED_TABLE
+refund_rate_table_id    = NULL
+source_ref              = MANUAL_CONTRACT_INITIAL
+```
+
+`source_ref`로 시드 합성분과 수기 등록분을 구분한다. 업무키 `(contract_id, as_of_date, surrender_value_type)`가 UNIQUE라 재저장·재시도해도 중복 행이 생기지 않는다. 근거분류는 운영정책서 제7조 예외조항의 `PROJECT_ASSUMPTION`이다.
+
 ---
 
 # 제7장 실제 지급명세·지급 건 시드
@@ -951,6 +967,19 @@ FC 기본수수료      650,000
 | REC-10 | 원장 불균형 | 금액 같음 | JOURNAL_IMBALANCE |
 
 매칭 월은 `schedule_line.due_month = commission_transaction.settlement_month`로 비교한다.
+
+### 수취인 짝짓기 시나리오
+
+관리자수수료는 같은 계약·항목·회차에 수취인이 셋이다(팀장 40% · 지사장 30% · 본부장 20%). 짝짓기 규칙(운영정책서 제36조)을 검증하는 시나리오를 둔다.
+
+| ID | 예상 | 실제 | 기대결과 |
+|---|---|---|---|
+| REC-11 | 팀장 40,000 · 지사장 30,000 · 본부장 20,000 | 동일 수취인 3건, 동일 금액 | 결과 3행 모두 `MATCHED` |
+| REC-12 | 위와 같음 | 팀장 건만 없음 | 팀장 `ACTUAL_MISSING`, 나머지 2행 `MATCHED` |
+| REC-13 | 위와 같음 | 팀장 몫 40,000이 지사장에게 지급 | 지사장 `AMOUNT_DIFFERENCE`(30,000↔70,000)가 아니라 **수취인 기준 짝짓기 후** 팀장 `ACTUAL_MISSING` + 지사장 금액차이로 분리 |
+| REC-14 | 위와 같음 | 팀장 40,000이 미등록 설계사에게 지급 | 남은 예상 1명·실제 1명 → `AGENT_MISMATCH` |
+
+합계만 비교하면 REC-13·REC-14가 전부 `MATCHED`로 통과해버린다. 결과 건수가 아니라 **수취인별 행이 맞는지**를 인수조건으로 삼는다.
 
 ## 31. 차익거래 시나리오
 

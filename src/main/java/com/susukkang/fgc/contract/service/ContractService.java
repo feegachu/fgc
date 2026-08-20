@@ -157,6 +157,16 @@ public class ContractService {
             );
         }
 
+        // 2026-08-19 hjKang - FGC-FUN-018·063 수기 등록 계약의 초회 재무 스냅샷 생성
+        // 기존 코드: 계약만 저장하고 contract_financial_snapshot 은 db/demo 시드로만 존재했다.
+        // 문제: CONT-W03 으로 등록한 계약은 스냅샷이 없어 차익거래 검증이 항상
+        //       "기준일 이하 계약 금융 스냅샷이 없습니다"로 자료부족 처리됐다(FUN-063 인수조건 위반).
+        // 개선: 계약일 기준 1차월 스냅샷 1행을 같은 트랜잭션에서 만든다. 누적 납입보험료는
+        //       계약 시점 정의상 초회보험료와 같다. 해약환급금은 임의 산정이 금지되므로
+        //       NULL 로 두고, 80% 공제 상품이면 환급률표 부재로 REVIEW_REQUIRED 가 나는 것이
+        //       의도된 동작이다(운영정책서 제33조·REG-23).
+        contractMapper.insertInitialFinancialSnapshot(insuranceContract.getContractId());
+
         // FUN-036: 계약 저장과 같은 트랜잭션에서 양방향 예상 스케줄을 생성한다.
         // 정책 없음·중복 지급단계는 exception_case 검토 큐에 등록되고 생성에서 제외된다.
         ScheduleGenerationResult scheduleResult =
@@ -502,6 +512,12 @@ public class ContractService {
                     FgcErrorCode.COMMON_500
             );
         }
+
+        // 초회 스냅샷은 업무 UNIQUE(contract_id, as_of_date, surrender_value_type)로 멱등하다.
+        // 이 기능 도입 전에 등록된 계약도 재저장 한 번으로 보정된다.
+        // 계약일을 바꾸면 새 계약일 기준 행이 추가되고 기존 행은 이력으로 남는다 —
+        // 차익거래 조회는 as_of_date <= 기준일 중 최신을 쓰므로 판정에 쓰이는 값은 하나다.
+        contractMapper.insertInitialFinancialSnapshot(id);
         List<Long> scheduleHeaderIds = List.of();
         if (hasScheduleImpactingChanges(currentContract, updatedContract)) {
             scheduleHeaderIds = scheduleService.regenerateContractSchedules(
