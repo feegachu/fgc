@@ -206,6 +206,7 @@
             SELECT 1
             FROM fgc.agent
             WHERE agent_id = #{agentId}
+              AND rank_code = 'FC'
               AND active_yn = TRUE
               AND agent_status = 'ACTIVE'
               AND appointment_date <![CDATA[ <= ]]> #{contractDate}

@@ -1,6 +1,7 @@
 package com.susukkang.fgc.schedule.controller;
 
 import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.CsvExportWriter;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -99,6 +100,14 @@ public class ScheduleController {
     @GetMapping("/{scheduleHeaderId}")
     public ApiResponse<ScheduleDetailResponse> getScheduleLineById(@PathVariable Long scheduleHeaderId) {
         return ApiResponse.success(scheduleService.selectScheduleDetailById(scheduleHeaderId));
+    }
+
+    /** 같은 계약의 선택한 지급단계에서 사용 중인 운영 스케줄 헤더 ID를 반환한다. */
+    @GetMapping("/{scheduleHeaderId}/active")
+    public ApiResponse<Long> getActiveScheduleByPaymentStage(
+            @PathVariable Long scheduleHeaderId,
+            @RequestParam PaymentStage paymentStage) {
+        return ApiResponse.success(scheduleService.findActiveOperationalScheduleId(scheduleHeaderId, paymentStage));
     }
 
     @GetMapping("/{scheduleHeaderId}/versions")

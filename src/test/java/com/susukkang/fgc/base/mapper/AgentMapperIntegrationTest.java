@@ -2,6 +2,7 @@ package com.susukkang.fgc.base.mapper;
 
 import com.susukkang.fgc.base.dto.AgentRow;
 import com.susukkang.fgc.base.dto.AgentSearchCriteria;
+import com.susukkang.fgc.common.code.AgentRankCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -108,6 +109,42 @@ class AgentMapperIntegrationTest {
         });
     }
 
+    @Test
+    void everyActiveSeedFcHasTeamBranchAndDivisionManagers() {
+        LocalDate asOf = LocalDate.of(2026, 8, 20);
+        List<SeedFc> activeFcs = jdbcTemplate.query("""
+                SELECT agent_code, organization_id
+                  FROM fgc.agent
+                 WHERE rank_code = 'FC'
+                   AND agent_status = 'ACTIVE'
+                   AND active_yn = TRUE
+                   AND appointment_date <= ?
+                   AND (termination_date IS NULL OR termination_date >= ?)
+                 ORDER BY agent_code
+                """, (rs, rowNum) -> new SeedFc(
+                        rs.getString("agent_code"),
+                        rs.getLong("organization_id")
+                ), asOf, asOf);
+
+        assertThat(activeFcs).extracting(SeedFc::agentCode)
+                .containsExactly("A-FC-001", "A-FC-002", "A-FC-003");
+
+        activeFcs.forEach(fc -> {
+            assertThat(agentMapper.findActiveAgentIdFromOrganizationHierarchy(
+                    fc.organizationId(), AgentRankCode.TEAM_LEADER, asOf))
+                    .as("%s의 팀장", fc.agentCode())
+                    .isNotNull();
+            assertThat(agentMapper.findActiveAgentIdFromOrganizationHierarchy(
+                    fc.organizationId(), AgentRankCode.BRANCH_MANAGER, asOf))
+                    .as("%s의 지사장", fc.agentCode())
+                    .isNotNull();
+            assertThat(agentMapper.findActiveAgentIdFromOrganizationHierarchy(
+                    fc.organizationId(), AgentRankCode.DIVISION_HEAD, asOf))
+                    .as("%s의 본부장", fc.agentCode())
+                    .isNotNull();
+        });
+    }
+
     private long insertOrganization(String code, String name) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.organization (
@@ -156,5 +193,8 @@ class AgentMapperIntegrationTest {
                 status,
                 activeYn
         );
+    }
+
+    private record SeedFc(String agentCode, long organizationId) {
     }
 }

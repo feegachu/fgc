@@ -10,6 +10,8 @@
   var regenerateReason = document.getElementById("regenerate-reason");
   var regenerateSubmit = document.getElementById("btn-regenerate-submit");
   var exportButton = document.getElementById("btn-export");
+  var stageSelect = document.getElementById("stage");
+  var currentPaymentStage = null;
   var PAYMENT_STAGE_LABELS = { INSURER_TO_GA: "원수사→GA", GA_TO_FC: "GA→설계사" };
   var SCHEDULE_REGIME_LABELS = {
     CURRENT: "현행",
@@ -46,6 +48,7 @@
   if (exportButton) exportButton.addEventListener("click", function () {
     window.location.assign("/api/v1/schedules/" + encodeURIComponent(scheduleHeaderId) + "/export.csv");
   });
+  if (stageSelect) stageSelect.addEventListener("change", moveToPaymentStage);
   if (regenerateButton) regenerateButton.addEventListener("click", regenerateSchedule);
   if (regenerateReason) regenerateReason.addEventListener("input", updateRegenerateSubmit);
   if (regenerateSubmit) regenerateSubmit.addEventListener("click", submitRegeneration);
@@ -78,7 +81,7 @@
   function renderHeader(header) {
     setText("hdr-id", "schedule_header #" + value(header.scheduleHeaderId));
     setText("hdr-contract", header.contractNo);
-    setText("hdr-product", "—");
+    setText("hdr-product", join(header.insurerName, header.productName));
     setText("hdr-stage", responseLabel(header.paymentStageLabel, PAYMENT_STAGE_LABELS, header.paymentStage));
     setText("hdr-regime", responseLabel(header.scheduleRegimeLabel, SCHEDULE_REGIME_LABELS, header.scheduleRegime));
     setText("hdr-purpose", responseLabel(header.schedulePurposeLabel, SCHEDULE_PURPOSE_LABELS, header.schedulePurpose));
@@ -88,10 +91,10 @@
     setText("hdr-policy", header.policyVersionLabel);
     setText("hdr-reason", join(header.generationReason, formatDateTime(header.generatedAt)));
 
-    var stage = document.getElementById("stage");
-    if (stage && header.paymentStage) {
-      stage.value = header.paymentStage;
-      stage.disabled = true;
+    if (stageSelect && header.paymentStage) {
+      currentPaymentStage = header.paymentStage;
+      stageSelect.value = header.paymentStage;
+      stageSelect.disabled = false;
     }
     if (confirmButton) {
       confirmButton.disabled = !canProcess || header.status !== "PLANNED" || header.activeYn !== true;
@@ -100,6 +103,25 @@
     if (regenerateButton) {
       regenerateButton.disabled = !canProcess || header.activeYn !== true || header.status === "CANCELLED";
     }
+  }
+
+  function moveToPaymentStage() {
+    var targetStage = stageSelect.value;
+    if (!targetStage || targetStage === currentPaymentStage) return;
+
+    stageSelect.disabled = true;
+    apiClient.request("/api/v1/schedules/" + encodeURIComponent(scheduleHeaderId)
+      + "/active?paymentStage=" + encodeURIComponent(targetStage))
+      .then(function (envelope) {
+        var targetScheduleHeaderId = envelope && envelope.data;
+        if (targetScheduleHeaderId == null) throw new Error("이동할 스케줄을 찾을 수 없습니다.");
+        window.location.assign("/schedules/" + encodeURIComponent(String(targetScheduleHeaderId)));
+      })
+      .catch(function (error) {
+        stageSelect.value = currentPaymentStage || "";
+        stageSelect.disabled = false;
+        toast(error && error.message ? error.message : "선택한 지급단계의 스케줄을 찾을 수 없습니다.", "warning", 4500);
+      });
   }
 
   function confirmSchedule() {

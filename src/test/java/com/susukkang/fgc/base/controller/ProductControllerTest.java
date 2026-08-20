@@ -69,7 +69,8 @@ class ProductControllerTest {
                 "FACE_TO_FACE",
                 false,
                 "CURRENT",
-                true
+                true,
+                240
         );
         given(productService.search(criteria, 1, 20)).willReturn(
                 PageResponse.of(List.of(product), 1, 20, 1, SORT)

@@ -263,7 +263,11 @@
     updateSaveState();
     return contractApi.getAgents(contractDate).then(function (envelope) {
       if (requestSequence !== agentRequestSequence) return;
-      var agents = pageContent(envelope.data);
+      var agents = pageContent(envelope.data).filter(function (agent) {
+        return agent.rankCode === "FC"
+          && agent.agentStatus === "ACTIVE"
+          && agent.activeYn === true;
+      });
       replaceOptions(elements.agentId,
         agents.length ? "모집 설계사를 선택하세요" : "선택 가능한 설계사가 없습니다.",
         agents,
@@ -366,6 +370,7 @@
       loadAgents();
     }
     if (event.target === elements.agentId) setOrganizationFromAgent();
+    if (event.target === elements.productOfferingId) syncProductDependentFields();
     if (event.target === elements.paymentCycleCode) syncPremiumPerCycleAmount();
     updateSaveState();
   }
@@ -377,35 +382,34 @@
     });
   }
 
-  function warnIfRefundRateTableIsMissing(contractId) {
+  function syncProductDependentFields() {
     var product = selectedProductOffering();
-    if (!product || !product.standardDeduction80Yn) return Promise.resolve(false);
+    var standardDeductionAllowed = Boolean(product && product.standardDeduction80Yn);
+    elements.standardSurrenderDeductionAmount.disabled = !standardDeductionAllowed;
+    elements.standardSurrenderDeductionAmount.setAttribute("aria-disabled", String(!standardDeductionAllowed));
+    if (!standardDeductionAllowed) elements.standardSurrenderDeductionAmount.value = "";
 
-    return contractApi.getCapChecks(contractId).then(function (envelope) {
-      var checks = Array.isArray(envelope.data) ? envelope.data : [];
-      var missingRefundRateTable = checks.some(function (check) {
-        var result = check && check.result;
-        return result
-          && result.resultStatus === "REVIEW_REQUIRED"
-          && !result.refundRateTableId
-          && result.calculationSnapshot
-          && result.calculationSnapshot.refundAdditionCondition === "STANDARD_DEDUCTION_80";
-      });
-      if (!missingRefundRateTable) return false;
+    var paymentTermMonths = product && product.paymentTermMonths;
+    var hasRefundRateTable = Number.isInteger(Number(paymentTermMonths)) && Number(paymentTermMonths) > 0;
+    elements.paymentTermMonths.readOnly = hasRefundRateTable;
+    elements.paymentTermMonths.setAttribute("aria-readonly", String(hasRefundRateTable));
+    if (hasRefundRateTable) elements.paymentTermMonths.value = String(paymentTermMonths);
+  }
 
-      var term = elements.paymentTermMonths.value || "입력한";
-      if (window.FgcUi && typeof window.FgcUi.toast === "function") {
-        window.FgcUi.toast(
-          term + "개월 납입기간에 적용할 12차월 환급률표가 없어 1,200% 한도 판정이 검토필요입니다. 기준정보를 확인하세요.",
-          "warning",
-          6000
-        );
-      }
-      return true;
-    }).catch(function () {
-      // 계약 저장은 성공했으므로 안내 조회 실패가 상세 이동을 막으면 안 된다.
-      return false;
-    });
+  function warnIfRefundRateTableIsMissing() {
+    var product = selectedProductOffering();
+    if (!product || !product.standardDeduction80Yn || product.paymentTermMonths != null) {
+      return Promise.resolve(false);
+    }
+
+    if (window.FgcUi && typeof window.FgcUi.toast === "function") {
+      window.FgcUi.toast(
+        "선택한 상품버전에 적용할 해약환급률표가 없습니다. 계약은 저장되며, 월 통합검증에서 검토필요로 처리됩니다.",
+        "warning",
+        6000
+      );
+    }
+    return Promise.resolve(true);
   }
 
   function handleInput(event) {
@@ -436,11 +440,7 @@
       var redirect = function () {
         window.location.assign("/contracts/" + encodeURIComponent(savedContractId));
       };
-      if (isEditMode) {
-        redirect();
-        return;
-      }
-      warnIfRefundRateTableIsMissing(savedContractId).then(function (warned) {
+      warnIfRefundRateTableIsMissing().then(function (warned) {
         window.setTimeout(redirect, warned ? 1800 : 0);
       });
     }).catch(function (error) {
@@ -462,6 +462,7 @@
     showError(error, "계약 입력 화면을 준비하지 못했습니다.");
   }).finally(function () {
     isInitializing = false;
+    syncProductDependentFields();
     syncPremiumPerCycleAmount();
     updateSaveState();
   });
