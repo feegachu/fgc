@@ -3,18 +3,22 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ERR-403', '권한 없음', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
-  <div class="fgc-card" style="max-width:560px;margin-top:40px">
-    <div class="fgc-card__head"><span class="fgc-card__title">403 · 권한 없음</span></div>
-    <div class="fgc-card__body">
-      <p th:text="#{error.auth.forbidden}">이 작업을 할 권한이 없습니다.</p>
-      <p class="fgc-help">
-        역할에 따라 볼 수 있는 화면과 누를 수 있는 버튼이 다릅니다.
-        필요한 권한은 GA관리자에게 요청하세요.
-      </p>
-      <a class="fgc-btn fgc-btn--ghost" th:href="@{/}" style="margin-top:16px;text-decoration:none">대시보드로</a>
+<main id="main-content" class="page-content error-page">
+  <section class="surface error-card" aria-labelledby="error-title">
+    <header class="surface-header"><h1 id="error-title" class="surface-title">403 · 권한 없음</h1></header>
+    <div class="surface-body error-card-body">
+      <p class="error-message" th:text="#{error.auth.forbidden}">이 작업을 할 권한이 없습니다.</p>
+      <!-- SIR-007 규칙 3 — 같은 상황이면 화면과 Ajax 가 같은 코드·문구를 보여야 한다.
+           format.js:errorText() 가 토스트에 찍는 "코드 · 요청 ID: 값" 과 형식까지 맞춘다.
+           코드 문자열은 FgcErrorAttributes 가 FgcErrorCode 에서 꺼내 모델에 담는다 —
+           여기에 'FGC-AUTH-003' 을 적으면 enum 이 바뀔 때 화면만 옛 코드로 남는다. -->
+      <p class="error-trace tabular-nums" th:if="${errorCode != null}"><span
+        th:text="${errorCode}">FGC-AUTH-003</span><span
+        th:if="${requestId != null}" th:text="' · 요청 ID: ' + ${requestId}"></span></p>
+      <p class="error-help" th:text="#{error.auth.forbiddenHelp}">역할에 따라 볼 수 있는 화면과 누를 수 있는 버튼이 다릅니다. 필요한 권한은 GA관리자에게 요청하세요.</p>
+      <a class="button button-secondary error-action" th:href="@{/}">대시보드로</a>
     </div>
-  </div>
+  </section>
 </main>
 </body>
 </html>
