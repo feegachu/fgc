@@ -370,7 +370,7 @@
       loadAgents();
     }
     if (event.target === elements.agentId) setOrganizationFromAgent();
-    if (event.target === elements.productOfferingId) syncProductDependentFields();
+    if (event.target === elements.productOfferingId) syncProductDependentFields(true);
     if (event.target === elements.paymentCycleCode) syncPremiumPerCycleAmount();
     updateSaveState();
   }
@@ -382,18 +382,22 @@
     });
   }
 
-  function syncProductDependentFields() {
+  function syncProductDependentFields(overwriteValues) {
     var product = selectedProductOffering();
     var standardDeductionAllowed = Boolean(product && product.standardDeduction80Yn);
     elements.standardSurrenderDeductionAmount.disabled = !standardDeductionAllowed;
     elements.standardSurrenderDeductionAmount.setAttribute("aria-disabled", String(!standardDeductionAllowed));
-    if (!standardDeductionAllowed) elements.standardSurrenderDeductionAmount.value = "";
+    if (overwriteValues && !standardDeductionAllowed) {
+      elements.standardSurrenderDeductionAmount.value = "";
+    }
 
     var paymentTermMonths = product && product.paymentTermMonths;
     var hasRefundRateTable = Number.isInteger(Number(paymentTermMonths)) && Number(paymentTermMonths) > 0;
     elements.paymentTermMonths.readOnly = hasRefundRateTable;
     elements.paymentTermMonths.setAttribute("aria-readonly", String(hasRefundRateTable));
-    if (hasRefundRateTable) elements.paymentTermMonths.value = String(paymentTermMonths);
+    if (overwriteValues && hasRefundRateTable) {
+      elements.paymentTermMonths.value = String(paymentTermMonths);
+    }
   }
 
   function warnIfRefundRateTableIsMissing() {
@@ -462,7 +466,9 @@
     showError(error, "계약 입력 화면을 준비하지 못했습니다.");
   }).finally(function () {
     isInitializing = false;
-    syncProductDependentFields();
+    // 수정 화면 최초 진입에서는 계약에 저장된 값을 보존하고 입력 가능 상태만 갱신한다.
+    // 상품버전을 사용자가 직접 변경했을 때만 새 상품 기준값으로 덮어쓴다.
+    syncProductDependentFields(!isEditMode);
     syncPremiumPerCycleAmount();
     updateSaveState();
   });

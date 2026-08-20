@@ -115,6 +115,29 @@ class ProductMapperIntegrationTest {
         assertThat(productMapper.countProducts(criteria)).isZero();
     }
 
+    @Test
+    void findsRefundRatePaymentTermByProductAndChannelAcrossOfferingVersions() {
+        Long insurerId = jdbcTemplate.queryForObject("""
+                SELECT insurer_id
+                  FROM fgc.insurer
+                 WHERE insurer_code = 'FGL02'
+                """, Long.class);
+
+        List<ProductRow> rows = productMapper.selectProducts(
+                new ProductSearchCriteria(insurerId, LocalDate.of(2026, 5, 10)),
+                0,
+                20
+        );
+
+        assertThat(rows)
+                .filteredOn(row -> "STD-LIFE-B".equals(row.standardProductCode()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.offeringVersion()).isEqualTo("2026-H1-B");
+                    assertThat(row.paymentTermMonths()).isEqualTo(240);
+                });
+    }
+
     private long insertInsurer(String code) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.insurer (insurer_code, insurer_name, insurer_type)

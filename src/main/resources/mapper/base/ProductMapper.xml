@@ -31,9 +31,12 @@
                    SELECT rrt.payment_term_months
                      FROM fgc.refund_rate_table rrt
                      JOIN fgc.policy_version pv ON pv.policy_version_id = rrt.policy_version_id
-                    WHERE rrt.product_offering_id = po.product_offering_id
+                    WHERE rrt.insurer_id = p.insurer_id
+                      AND rrt.product_id = p.product_id
+                      AND rrt.channel_code = po.channel_code
                       AND pv.status = 'ACTIVE'
                       AND rrt.effective_from &lt;= #{criteria.asOf}
+                      AND (rrt.effective_to IS NULL OR rrt.effective_to &gt;= #{criteria.asOf})
                     ORDER BY rrt.effective_from DESC, rrt.refund_rate_table_id DESC
                     LIMIT 1
                ) AS paymentTermMonths
