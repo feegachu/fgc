@@ -146,9 +146,16 @@
   background: var(--color-bg-subtle);
 }
 
+/*
+ * --cap-progress 는 사용률 값에 따라 인라인 스타일로 덮어쓴다
+ * (cap-list.js 는 style 속성 문자열로, contract-tabs.js 는 setProperty 로).
+ * 여기 초기값을 두면 값이 오기 전 한 프레임 동안 막대가 튀지 않고,
+ * 정적 분석도 속성 출처를 찾을 수 있다.
+ */
 .cap-usage-bar {
+  --cap-progress: 0%;
   display: block;
-  width: var(--cap-progress, 0%);
+  width: var(--cap-progress);
   height: 100%;
   border-radius: inherit;
   background: var(--color-status-success-solid);
