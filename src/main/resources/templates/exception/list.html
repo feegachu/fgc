@@ -386,7 +386,7 @@
             th:if="${c.type().name() == 'JOURNAL_CORRECTION_REQUIRED' and c.status() == inReviewStatus}"
             th:attr="data-exception-id=${c.exceptionCaseId()},data-journal-id=${c.sourceEntityId()}"
             sec:authorize="hasAnyRole('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')">
-        <div class="fgc-banner fgc-banner--muted">
+        <div class="journal-correction-guidance">
           원분개는 직접 수정하지 않습니다. 아래 신규 분개가 검증을 통과하면 역분개와 재기표를 한 번에 처리합니다.
         </div>
         <div data-original-journal>
