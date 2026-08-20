@@ -850,7 +850,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 회차별로 언제 얼마를 주고받을 예정인지 한 줄씩 보여줍니다. **대사의 기준값이 여기서 나옵니다.**
 
 **화면 구성**
-① 헤더 정보 — 계약, 방향, 체계, 버전, 상태, 정책버전, 생성 사유·일시
+① 헤더 정보 — 계약, 방향, 체계, 버전, 상태, 정책버전, 생성 사유·일시. 지급단계를 선택하면 같은 계약·선택 단계의 사용 중인 최신 운영 스케줄로 이동
 ② 회차 표 (아래)
 ③ 합계 줄
 ④ 버전 비교 영역 — 이전 버전과 나란히
@@ -876,6 +876,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 | 버튼 | 하는 일 |
 |---|---|
+| 지급단계 선택 | 같은 계약에서 선택한 지급단계의 사용 중인 최신 운영 스케줄 상세로 이동합니다 |
 | 재생성 | **새 버전**을 만듭니다. 기존 버전은 남습니다 |
 | 확정 | 헤더 상태를 확정으로 |
 | CSV 내보내기 | 회차 표 전체를 UTF-8 BOM CSV로 내려받기 |
@@ -892,7 +893,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `schedule_header`, `schedule_line`, `commission_rule`
-- API: `GET /api/v1/schedules/{id}`, `GET /api/v1/schedules/{id}/export.csv`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
+- API: `GET /api/v1/schedules/{id}`, `GET /api/v1/schedules/{id}/active?paymentStage={paymentStage}`, `GET /api/v1/schedules/{id}/export.csv`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 

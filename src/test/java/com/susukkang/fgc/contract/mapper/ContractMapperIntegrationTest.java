@@ -60,6 +60,17 @@ class ContractMapperIntegrationTest {
                 refs.insurerId(), refs.productOfferingId(), LocalDate.of(1900, 1, 1))).isFalse();
         assertThat(contractMapper.existsAgent(
                 refs.agentId(), LocalDate.of(1900, 1, 1))).isFalse();
+
+        Long managerId = jdbcTemplate.queryForObject("""
+                SELECT agent_id
+                  FROM fgc.agent
+                 WHERE rank_code <> 'FC'
+                   AND active_yn = TRUE
+                   AND agent_status = 'ACTIVE'
+                 ORDER BY agent_id
+                 LIMIT 1
+                """, Long.class);
+        assertThat(contractMapper.existsAgent(managerId, contractDate)).isFalse();
     }
 
     @Test
@@ -197,6 +208,9 @@ class ContractMapperIntegrationTest {
                 CROSS JOIN LATERAL (
                     SELECT agent_id, organization_id
                     FROM fgc.agent
+                    WHERE rank_code = 'FC'
+                      AND active_yn = TRUE
+                      AND agent_status = 'ACTIVE'
                     ORDER BY agent_id
                     LIMIT 1
                 ) a

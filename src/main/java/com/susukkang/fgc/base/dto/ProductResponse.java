@@ -33,7 +33,9 @@ public record ProductResponse(
         @Schema(description = "수수료 체계 코드", example = "CURRENT")
         String feeRegimeCode,
         @Schema(description = "표준해약공제액 80% 이상 공제 상품 여부", example = "true")
-        boolean standardDeduction80Yn
+        boolean standardDeduction80Yn,
+        @Schema(description = "활성 해약환급률표의 납입기간(개월). 표가 없으면 null", example = "240", nullable = true)
+        Integer paymentTermMonths
 ) {
     public static ProductResponse from(ProductRow row) {
         return new ProductResponse(
@@ -50,7 +52,8 @@ public record ProductResponse(
                 row.channelCode(),
                 row.channelSpecialRuleYn(),
                 row.feeRegimeCode(),
-                row.standardDeduction80Yn()
+                row.standardDeduction80Yn(),
+                row.paymentTermMonths()
         );
     }
 }

@@ -26,6 +26,8 @@ import java.time.OffsetDateTime;
 public class ScheduleHeaderResponse {
     private Long scheduleHeaderId; // 스케줄 헤더 ID
     private String contractNo; // 화면에 표시할 계약 번호
+    private String insurerName; // 보험회사명
+    private String productName; // 상품명
     private PaymentStage paymentStage; // 지급 단계
 
     public String getPaymentStageLabel() {
