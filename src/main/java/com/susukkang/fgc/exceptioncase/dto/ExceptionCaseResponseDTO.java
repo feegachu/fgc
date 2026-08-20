@@ -90,6 +90,9 @@ public record ExceptionCaseResponseDTO(
             case "EXPECTED_MISSING" -> "예상 지급 없음";
             case "DUPLICATE" -> "대사 대상 중복";
             case "AMOUNT_DIFFERENCE" -> "금액 불일치";
+            case "ORGANIZATION_MISMATCH" -> "소속 조직 불일치";
+            case "INSTALLMENT_MISMATCH" -> "회차 불일치";
+            case "REVIEW_REQUIRED" -> "검토 필요";
             // PRE_CONFIRM 실시간 경로는 상위 유형명을 그대로 상세 원인으로 저장한다
             // (CommissionPaymentServiceImpl.exceptionReasonCode) — 유형 한글 라벨로 보여 준다.
             default -> {

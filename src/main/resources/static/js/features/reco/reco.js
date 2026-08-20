@@ -106,6 +106,10 @@
         rows.forEach(function (row) {
           addOption(el.insurer, row.insurerId, row.insurerCode + " · " + row.insurerName);
         });
+        // 서버가 이미 조회한 조건(insurer 쿼리 파라미터)을 다시 선택 상태로 복원한다 —
+        // 옵션은 여기서 비동기로 채워지므로 페이지 로드 시점의 select에는 반영할 수 없다.
+        var selectedInsurer = main.dataset.insurerFilter;
+        if (selectedInsurer) el.insurer.value = selectedInsurer;
         el.insurer.disabled = false;
         updateRunButtonState();
       })
@@ -159,8 +163,13 @@
       .then(function (envelope) {
         // ④ 실행 이력은 서버 렌더링(MPA)이라 새 실행을 보려면 새로고침해야 한다 —
         // 새로고침 뒤 이 실행을 자동으로 골라 ③에 결과를 띄우도록 ID만 넘겨 둔다.
+        window.FgcUi.toast("대사 실행이 생성됐습니다. 이력에서 결과를 불러옵니다.", "success");
         window.sessionStorage.setItem("reco.autoSelectRunId", String(envelope.data.reconciliationRunId));
-        window.location.reload();
+        // 새 실행은 항상 이력 1페이지 맨 위에 나온다(created_at desc) — 사용자가 이전에
+        // 다른 페이지를 보고 있었다면 그 page 파라미터를 지워야 자동 선택이 성공한다.
+        var reloadUrl = new URL(window.location.href);
+        reloadUrl.searchParams.delete("page");
+        window.location.href = reloadUrl.toString();
       })
       .catch(function (error) {
         window.FgcUi.toast(runErrorMessage(error), "error");
@@ -173,8 +182,13 @@
 
   // ---- ③ 결과 목록 — IF-API-40 ----
 
+  // REVIEW_REQUIRED는 "확정된 오류"가 아니라 "비교 자체를 못 해 사람이 봐야 하는" 상태라
+  // 다른 불일치(DUPLICATE·AMOUNT_DIFFERENCE 등)와 같은 error 톤으로 묶지 않는다
+  // (exception-list.js의 유형별 톤 분리 관례를 따름).
   function resultTypeBadge(item) {
-    var tone = item.resultType === "MATCHED" ? "status-badge-success" : "status-badge-error";
+    var tone = "status-badge-error";
+    if (item.resultType === "MATCHED") tone = "status-badge-success";
+    else if (item.resultType === "REVIEW_REQUIRED") tone = "status-badge-review";
     return '<span class="status-badge ' + tone + '">' + escapeHtml(item.resultTypeLabel) + "</span>";
   }
 
@@ -201,19 +215,19 @@
       .map(function (reason) { return reason.label; })
       .join(", ") || "—";
     return "<tr>" +
-      '<td class="reco-disclosure-cell tabular-nums">' + tableCellDisclosure(item.contractNo, true) + "</td>" +
+      '<td class="tabular-nums">' + escapeHtml(item.contractNo == null || item.contractNo === "" ? "—" : item.contractNo) + "</td>" +
       '<td class="reco-disclosure-cell">' + tableCellDisclosure(item.commissionItemName, false) + "</td>" +
-      '<td class="is-center tabular-nums">' + escapeHtml(item.installmentNo) + "</td>" +
+      '<td class="tabular-nums">' + escapeHtml(item.installmentNo) + "</td>" +
       "<td" + agentClass + ">" + escapeHtml(expectedAgentName) + "</td>" +
       "<td" + agentClass + ">" + escapeHtml(actualAgentName) + "</td>" +
       '<td class="is-number tabular-nums">' + won(item.expectedTotalAmount) + "</td>" +
       '<td class="is-number tabular-nums">' + won(item.actualTotalAmount) + "</td>" +
       "<td" + diffClass + ">" + won(item.differenceAmount) + "</td>" +
-      "<td>" + resultTypeBadge(item) + "</td>" +
+      '<td class="is-center">' + resultTypeBadge(item) + "</td>" +
       '<td class="reco-disclosure-cell">' + tableCellDisclosure((item.primaryReason && item.primaryReason.label) || "—", false) + "</td>" +
       '<td class="reco-disclosure-cell">' + tableCellDisclosure(secondaryReasons, false) + "</td>" +
-      '<td><button class="button button-ghost" type="button" data-reco-compare-id="' +
-        escapeHtml(item.reconciliationResultId) + '">비교 상세</button></td>' +
+      '<td class="is-center"><button class="button button-ghost" type="button" data-reco-compare-id="' +
+        escapeHtml(item.reconciliationResultId) + '">보기</button></td>' +
       "</tr>";
   }
 

@@ -58,6 +58,7 @@ public class ReconciliationRunController {
     public ApiResponse<ReconciliationRunSearchResponse> searchHistory(
             @RequestParam(required = false) String month,
             @RequestParam(required = false) String stage,
+            @RequestParam(required = false) Long insurerId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort
@@ -72,7 +73,8 @@ public class ReconciliationRunController {
             paymentStage = parsePaymentStage(stage).name();
         }
 
-        ReconciliationRunSearchCriteria criteria = new ReconciliationRunSearchCriteria(settlementMonth, paymentStage);
+        ReconciliationRunSearchCriteria criteria =
+                new ReconciliationRunSearchCriteria(settlementMonth, paymentStage, insurerId);
         PageResponse<ReconciliationRunHistoryResponse> result = reconciliationRunHistoryService.findHistory(criteria, page, size, sort);
 
         return ApiResponse.success(ReconciliationRunSearchResponse.from(result));

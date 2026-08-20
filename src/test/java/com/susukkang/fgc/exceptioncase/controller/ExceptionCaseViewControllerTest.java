@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -63,6 +64,16 @@ class ExceptionCaseViewControllerTest {
     private JournalAccountCatalogService journalAccountCatalogService;
 
     private static final FgcUserDetails SETTLE = principal("settle01", "정산담당", "SETTLEMENT");
+
+    @Test
+    void mapsExceptionDetailReasonCodesToKoreanLabels() {
+        assertThat(ExceptionCaseResponseDTO.labelOf("ORGANIZATION_MISMATCH"))
+                .isEqualTo("소속 조직 불일치");
+        assertThat(ExceptionCaseResponseDTO.labelOf("INSTALLMENT_MISMATCH"))
+                .isEqualTo("회차 불일치");
+        assertThat(ExceptionCaseResponseDTO.labelOf("REVIEW_REQUIRED"))
+                .isEqualTo("검토 필요");
+    }
 
     @Test
     void defaultsToOpenAndRendersPagedRowsWithSelectableDetails() throws Exception {

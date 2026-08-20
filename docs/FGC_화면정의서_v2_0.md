@@ -290,7 +290,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 |---|---|
 | MATCHED | 일치 |
 | AMOUNT_DIFFERENCE | 금액 차이 |
-| EXPECTED_MISSING | 예상 없음(실제만 있음) |
+| EXPECTED_MISSING | 예상 금액 없음 |
 | ACTUAL_MISSING | 실제 없음(누락) |
 | DUPLICATE | 중복 지급 |
 | AGENT_MISMATCH | 설계사 불일치 |
@@ -299,6 +299,8 @@ FGC — GA 수수료 정산·검증 플랫폼
 | POLICY_VERSION_ERROR | 정책버전 오류 |
 | JOURNAL_IMBALANCE | 원장 불균형 |
 | REVIEW_REQUIRED | 검토필요 |
+
+> #312 개정: `EXPECTED_MISSING` 화면 표기를 "예상 없음(실제만 있음)" → "예상 금액 없음"으로 변경. RECO-W01 대사 결과 표의 결과 유형 뱃지 폭에서 원래 표기가 잘려 보이는 문제가 있어 더 짧은 표기로 정리함.
 
 **예외 상태** `exception_case.status`
 
@@ -338,6 +340,11 @@ FGC — GA 수수료 정산·검증 플랫폼
 ② 로그인 폼 — 아이디 / 비밀번호 / 로그인 버튼
 ③ 실패 안내 영역 — 빨간 글씨 한 줄
 ④ 푸터 — 버전, 기준일 (교육용 표시는 화면 미표기 — §4-12 공통 규칙 12, 근거대장 "COR-009 화면 표기 개정")
+
+> 이 넷 외에는 두지 않는다 — 기능 소개 카드·접속 보안 안내 패널은 문서 근거 없이 구현에 들어가 있다가
+> 2026-08-20 팀 결정으로 걷어냈다 (근거대장 "AUTH-W01 로그인 화면 정리", 이슈 #291 / PR #313).
+> 세션 30분은 서버 설정이며(인터페이스정의서 §2-1-1) 만료 안내는 `FGC-AUTH-002` 문구가 담당한다 —
+> 로그인 화면에 사전 고지하지 않는다.
 
 **항목 정의**
 
@@ -843,7 +850,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 회차별로 언제 얼마를 주고받을 예정인지 한 줄씩 보여줍니다. **대사의 기준값이 여기서 나옵니다.**
 
 **화면 구성**
-① 헤더 정보 — 계약, 방향, 체계, 버전, 상태, 정책버전, 생성 사유·일시
+① 헤더 정보 — 계약, 방향, 체계, 버전, 상태, 정책버전, 생성 사유·일시. 지급단계를 선택하면 같은 계약·선택 단계의 사용 중인 최신 운영 스케줄로 이동
 ② 회차 표 (아래)
 ③ 합계 줄
 ④ 버전 비교 영역 — 이전 버전과 나란히
@@ -869,6 +876,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 | 버튼 | 하는 일 |
 |---|---|
+| 지급단계 선택 | 같은 계약에서 선택한 지급단계의 사용 중인 최신 운영 스케줄 상세로 이동합니다 |
 | 재생성 | **새 버전**을 만듭니다. 기존 버전은 남습니다 |
 | 확정 | 헤더 상태를 확정으로 |
 | CSV 내보내기 | 회차 표 전체를 UTF-8 BOM CSV로 내려받기 |
@@ -885,7 +893,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 **데이터**
 - 읽기: `schedule_header`, `schedule_line`, `commission_rule`
-- API: `GET /api/v1/schedules/{id}`, `GET /api/v1/schedules/{id}/export.csv`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
+- API: `GET /api/v1/schedules/{id}`, `GET /api/v1/schedules/{id}/active?paymentStage={paymentStage}`, `GET /api/v1/schedules/{id}/export.csv`, `POST /api/v1/schedules/{id}/regenerate`, `POST /api/v1/schedules/{id}/confirm`
 
 **관련 요구사항** FUN-036, FUN-039, FUN-040
 
@@ -1230,7 +1238,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 대사 실행 | 실행 생성 → 계산 → 결과 목록 표시 |
 | 재실행 | 같은 조건으로 다시. **중복 결과가 생기면 안 됩니다** |
 | 예외 일괄 생성 | 불일치 건을 예외함으로 |
-| 비교 상세 | RECO-W02 팝업 |
+| 보기 | RECO-W02 비교 상세 팝업(#312 개정: 버튼 문구를 "비교 상세" → "보기"로 단순화) |
 
 **막아야 할 것**
 - 같은 정산월·지급단계·보험회사로 실행이 두 번 만들어지지 않게 합니다(DB UNIQUE).

@@ -151,6 +151,28 @@ public class ScheduleService {
         }
         return scheduleMapper.selectVersionsByScheduleHeaderId(scheduleHeaderId);
     }
+
+    /** 같은 계약에서 선택한 지급단계의 사용 중인 운영 스케줄 헤더를 찾는다. */
+    @Transactional(readOnly = true)
+    public Long findActiveOperationalScheduleId(Long scheduleHeaderId, PaymentStage paymentStage) {
+        if (scheduleHeaderId == null) {
+            throw validationException("scheduleHeaderId", "스케줄 헤더 ID는 필수입니다.");
+        }
+        if (paymentStage == null) {
+            throw validationException("paymentStage", "지급단계는 필수입니다.");
+        }
+
+        ScheduleHeaderInsertDTO current = scheduleMapper.selectScheduleHeaderById(scheduleHeaderId);
+        if (current == null) {
+            throw validationException("scheduleHeaderId", "존재하지 않는 스케줄입니다.");
+        }
+        ScheduleDetailResponse target = scheduleMapper.selectByContractIdAndPaymentStage(
+                current.getContractId(), paymentStage);
+        if (target == null || target.getScheduleHeaderId() == null) {
+            throw validationException("paymentStage", "선택한 지급단계의 사용 중인 운영 스케줄이 없습니다.");
+        }
+        return target.getScheduleHeaderId();
+    }
     /**
      * 설명 : 계약 ID에 따라 회차별 스케줄을 자동 생성한다
      * @param contract 계약 class

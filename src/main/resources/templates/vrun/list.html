@@ -113,9 +113,9 @@
                     th:classappend="${run.status().name() == 'FAILED'} ? 'fgc-badge--violation'
                                     : (${run.status().name() == 'FINALIZED'} ? 'fgc-badge--review'
                                     : (${run.status().name() == 'COMPLETED'} ? 'fgc-badge--normal' : 'fgc-badge--warning'))"
-                    th:text="${run.statusLabel()}">생성됨</span>
-              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle"
-                    th:if="${run.status().name() == 'FINALIZED'}">lock</span>
+                    ><span th:text="${run.status().name() == 'FINALIZED' ? '확정' : run.statusLabel()}">생성됨</span><span class="material-symbols-outlined"
+                    style="font-size:14px;vertical-align:-2px;margin-left:2px"
+                    th:if="${run.status().name() == 'FINALIZED'}">lock</span></span>
             </td>
             <td class="fgc-mono"
                 th:text="|${run.currentStep()}/10 단계 (${run.currentStep() * 10}%)|">0/10 단계 (0%)</td>
