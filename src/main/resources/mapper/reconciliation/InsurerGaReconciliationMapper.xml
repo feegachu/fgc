@@ -64,9 +64,11 @@
                ta.attributed_amount AS actualAmount,
                ct.source_business_key AS sourceBusinessKey,
                ta.source_agent_code AS sourceAgentCode
-          FROM fgc.statement_batch sb
-          JOIN fgc.commission_transaction ct
-            ON ct.statement_batch_id = sb.statement_batch_id
+          FROM fgc.commission_transaction ct
+          LEFT JOIN fgc.statement_batch sb
+            ON sb.statement_batch_id = ct.statement_batch_id
+           AND sb.insurer_id = #{insurerId}
+           AND sb.settlement_month = #{settlementMonth}
           JOIN fgc.transaction_attribution ta
             ON ta.commission_transaction_id = ct.commission_transaction_id
           JOIN fgc.journal_header jh
@@ -86,14 +88,25 @@
                  AND code.effective_from &lt;= ta.attribution_date
                  AND (code.effective_to IS NULL OR code.effective_to &gt;= ta.attribution_date)
           ) aic ON TRUE
-         WHERE sb.insurer_id = #{insurerId}
-           AND sb.settlement_month = #{settlementMonth}
-           AND sb.statement_type = 'INSURER_COMMISSION'
-           AND sb.status IN ('AVAILABLE', 'VALIDATED', 'RECONCILED')
-           AND ct.insurer_id = #{insurerId}
+         WHERE ct.insurer_id = #{insurerId}
+           -- 2026-08-19 hjKang - 수기 등록 원수사 수입 건을 대사 대상에 포함
+           -- 기존 코드: statement_batch 를 INNER JOIN 해 명세 묶음이 있는 건만 조회했다.
+           -- 문제: TRAN-W02 로 등록한 INSURER_TO_GA 지급 건은 statement_batch_id 가 NULL 이라
+           --       source_type 조건을 풀어도 조인에서 전부 탈락했다.
+           -- 개선: 묶음을 LEFT JOIN 으로 바꾸고 원천유형별로 요구조건을 나눈다.
+           --       정규화 적재분(INSURER_STATEMENT)은 유효한 명세 묶음을 여전히 필수로 요구하고,
+           --       수기 등록분(GA_MANUAL_PAYMENT)은 묶음 없이 허용한다.
+           AND (
+                 (ct.source_type = 'INSURER_STATEMENT'
+                  AND sb.statement_batch_id IS NOT NULL
+                  AND sb.statement_type = 'INSURER_COMMISSION'
+                  AND sb.status IN ('AVAILABLE', 'VALIDATED', 'RECONCILED'))
+              OR (ct.source_type = 'GA_MANUAL_PAYMENT'
+                  AND ct.statement_batch_id IS NULL)
+               )
            AND ct.settlement_month = #{settlementMonth}
            AND ct.payment_stage = 'INSURER_TO_GA'
-           AND ct.source_type = 'INSURER_STATEMENT'
+           AND ct.source_type IN ( 'INSURER_STATEMENT','GA_MANUAL_PAYMENT')
            AND ct.cashflow_type = 'PAYMENT'
            AND ct.status = 'CONFIRMED'
            AND ta.attribution_scope = 'CONTRACT'

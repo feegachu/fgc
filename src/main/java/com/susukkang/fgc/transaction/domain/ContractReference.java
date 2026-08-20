@@ -12,6 +12,7 @@ import java.time.LocalDate;
 public record ContractReference(
         Long contractId,
         Long agentId,
+        Long organizationId,
         LocalDate contractDate
 ) {
 }

@@ -75,6 +75,7 @@
             id: agent.agentId,
             code: agent.agentCode,
             name: agent.agentName,
+            rank: agent.rankCode,
             organizationId: agent.organizationId,
             organizationName: agent.organizationName
           };
@@ -408,7 +409,19 @@
 
   function handleRecipientChange() {
     clearAttributionsForRecipientChange();
-    loadContracts(recipient.value);
+    loadContracts(contractFilterAgentId());
+  }
+
+  // 2026-08-19 hjKang - 관리자수수료 수취인은 계약 목록을 좁히지 않는다.
+  // 팀장·지사장·본부장은 그 계약을 모집한 사람이 아니라(운영정책서 제20조 패턴 GA-LIFE-A)
+  // 모집설계사 기준으로 계약을 필터링하면 목록이 비어버려 관리자수수료를 등록할 수 없다.
+  // 서버는 계약 조직 계층의 해당 직급 관리자인지 다시 검증하므로 여기서 넓혀도 안전하다.
+  function contractFilterAgentId() {
+    var selected = AGENTS.filter(function (agent) {
+      return String(agent.id) === String(recipient.value);
+    })[0];
+    var isManager = selected && selected.rank && selected.rank !== "FC";
+    return isManager ? "" : recipient.value;
   }
 
   function clearAttributionsForRecipientChange() {
