@@ -1,15 +1,281 @@
-/*
- * TRAN-W01·W02 화면 전용 스타일 (#138).
- *
- * 지금은 루트 레이아웃만 둔다. 컬럼 폭·화면 전용 Grid·반응형은 TRAN 담당 이슈에서 채운다.
- * 공통 컴포넌트(components.css)의 디자인을 여기에 다시 복사하지 않는다.
- *
- * 이관 예정: templates/transaction/form.html 의 <style> 블록, 두 템플릿의 인라인 style,
- *           components.css 의 [data-transaction-page-numbers]·[data-transaction-pagination].
- */
-
+/* TRAN-W01·W02 화면 전용 레이아웃과 상태 표현. */
 .transaction-page {
   display: grid;
   min-width: 0;
   gap: var(--space-4);
+}
+
+.transaction-page-header,
+.transaction-surface-header { min-width: 0; }
+
+.transaction-filter-bar { align-items: flex-end; }
+.transaction-filter-fields { flex: 1 1 auto; }
+.transaction-filter-month,
+.transaction-filter-stage,
+.transaction-filter-status-field { width: 8.5rem; }
+.transaction-filter-insurer,
+.transaction-filter-source,
+.transaction-filter-agent,
+.transaction-filter-item { width: 10rem; }
+.transaction-filter-contract { width: 9.5rem; }
+
+.transaction-filter-checkbox {
+  display: inline-flex;
+  min-height: var(--control-height-sm);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.transaction-filter-checkbox input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-action-primary);
+}
+
+.transaction-filter-status { margin: calc(-1 * var(--space-2)) var(--space-3) 0; }
+
+.transaction-result-count,
+.transaction-panel-meta,
+.transaction-panel-placeholder {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.transaction-list-panel,
+.transaction-form-panel,
+.transaction-attribution-panel,
+.transaction-gate-panel,
+.transaction-cap-panel,
+.transaction-action-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.transaction-list-table { min-width: 71.25rem; }
+.transaction-col-stage { width: 6.5rem; }
+.transaction-col-source { width: 7rem; }
+.transaction-col-business-key { width: 10.5rem; }
+.transaction-col-month { width: 5.5rem; }
+.transaction-col-agent { width: 9rem; }
+.transaction-col-item { width: 8.5rem; }
+.transaction-col-amount { width: 7rem; }
+.transaction-col-cashflow { width: 5rem; }
+.transaction-col-status { width: 5.5rem; }
+.transaction-col-attribution { width: 6.5rem; }
+.transaction-col-action { width: 5rem; }
+
+.transaction-state-row td {
+  height: 8rem;
+  white-space: normal;
+}
+
+.transaction-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  text-align: center;
+}
+
+.transaction-state-title { color: var(--color-text-primary); font-weight: 700; }
+.transaction-state-copy { max-width: 36rem; color: var(--color-text-secondary); }
+.transaction-state-error .transaction-state-title,
+.transaction-state-error .transaction-state-icon { color: var(--color-status-error-text); }
+.transaction-state-icon { color: var(--color-icon-secondary); font-size: 1.5rem; }
+
+.transaction-pagination {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.transaction-page-numbers { display: flex; align-items: center; gap: var(--space-1); }
+
+.transaction-form-layout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 1fr);
+  gap: var(--space-4);
+}
+
+.transaction-form-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.transaction-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.transaction-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.transaction-number,
+.transaction-attribution-table input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
+
+.transaction-screen-state {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-status-info-border);
+  border-radius: var(--radius-8);
+  color: var(--color-status-info-text);
+  background: var(--color-status-info-bg);
+  font-size: 0.8125rem;
+}
+
+.transaction-screen-state.is-error {
+  border-color: var(--color-status-error-border);
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
+.transaction-attribution-table { min-width: 85rem; }
+
+.transaction-attribution-table input,
+.transaction-attribution-table select {
+  width: 100%;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  font-size: 0.75rem;
+}
+
+.transaction-attribution-table input:focus,
+.transaction-attribution-table select:focus {
+  border-color: var(--color-border-focus);
+  outline: 0;
+  box-shadow: var(--shadow-focus);
+}
+
+.transaction-attr-col-index { width: 2.5rem; }
+.transaction-attr-col-scope { width: 6rem; }
+.transaction-attr-col-contract { width: 11rem; }
+.transaction-attr-col-agent { width: 9rem; }
+.transaction-attr-col-date { width: 8rem; }
+.transaction-attr-col-month { width: 8rem; }
+.transaction-attr-col-amount { width: 8rem; }
+.transaction-attr-col-decision { width: 9rem; }
+.transaction-attr-col-method { width: 10rem; }
+.transaction-attr-col-policy { width: 9rem; }
+.transaction-attr-col-evidence { width: 13rem; }
+.transaction-attr-col-action { width: 3.5rem; }
+.transaction-add-attribution { min-width: auto; }
+.transaction-attribution-error { margin: var(--space-3) var(--space-4); }
+
+.transaction-gate-list { padding-block: var(--space-2); }
+
+.transaction-gate-step {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.transaction-gate-step:last-child { border-bottom: 0; }
+
+.transaction-gate-icon {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  font-size: 0.875rem;
+}
+
+.transaction-gate-label { color: var(--color-text-primary); font-size: 0.8125rem; font-weight: 600; }
+.transaction-gate-detail { margin-top: var(--space-1); color: var(--color-text-tertiary); font-size: 0.75rem; line-height: 1.125rem; overflow-wrap: anywhere; }
+.transaction-gate-pass .transaction-gate-icon { color: var(--color-text-inverse); background: var(--color-status-success-solid); }
+.transaction-gate-fail .transaction-gate-icon { color: var(--color-text-inverse); background: var(--color-status-error-solid); }
+
+.transaction-cap-body { display: grid; gap: var(--space-3); }
+.transaction-cap-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-top: 3px solid var(--color-action-primary);
+  border-radius: var(--radius-8);
+}
+
+.transaction-cap-heading,
+.transaction-cap-usage,
+.transaction-cap-amount-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.transaction-cap-heading,
+.transaction-cap-amount-line.is-emphasized { font-weight: 700; }
+.transaction-cap-progress {
+  width: 100%;
+  height: 0.625rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-status-review-solid);
+  background: var(--color-bg-subtle);
+}
+.transaction-cap-progress::-webkit-progress-bar { background: var(--color-bg-subtle); }
+.transaction-cap-progress::-webkit-progress-value { background: currentColor; }
+.transaction-cap-progress::-moz-progress-bar { background: currentColor; }
+.transaction-cap-progress.is-normal { color: var(--color-status-success-solid); }
+.transaction-cap-progress.is-warning { color: var(--color-status-warning-solid); }
+.transaction-cap-progress.is-violation { color: var(--color-status-error-solid); }
+.transaction-cap-usage,
+.transaction-cap-amount-line { font-size: 0.75rem; }
+.transaction-cap-amount-line { padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border-default); }
+.is-negative-amount { color: var(--color-status-error-text); }
+
+.transaction-action-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.transaction-confirm-body,
+.transaction-confirm-summary,
+.transaction-confirm-blockers { display: grid; gap: var(--space-3); }
+.transaction-confirm-summary { padding: var(--space-3); border-radius: var(--radius-8); background: var(--color-bg-subtle); }
+.transaction-confirm-blockers { padding: var(--space-3); border: 1px solid var(--color-status-error-border); border-radius: var(--radius-8); color: var(--color-status-error-text); background: var(--color-status-error-bg); }
+.transaction-confirm-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.transaction-page :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 63.9375rem) {
+  .transaction-form-layout { grid-template-columns: 1fr; }
+  .transaction-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 47.9375rem) {
+  .transaction-page-header,
+  .transaction-surface-header,
+  .transaction-pagination { align-items: stretch; flex-direction: column; }
+  .transaction-filter-month,
+  .transaction-filter-stage,
+  .transaction-filter-status-field,
+  .transaction-filter-insurer,
+  .transaction-filter-source,
+  .transaction-filter-agent,
+  .transaction-filter-item,
+  .transaction-filter-contract,
+  .transaction-filter-checkbox,
+  .transaction-filter-actions,
+  .transaction-form-grid { width: 100%; }
+  .transaction-form-grid { grid-template-columns: 1fr; }
+  .transaction-filter-checkbox { padding-block: var(--space-2); }
+  .transaction-add-attribution,
+  .transaction-confirm-links .button { width: 100%; }
 }

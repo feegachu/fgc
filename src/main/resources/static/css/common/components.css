@@ -658,34 +658,11 @@ a.kpi-card:active {
   gap: var(--space-1);
 }
 
-/*
- * 목록형 Ajax 페이지네이션: 페이지 번호 버튼이 세로로 쌓이지 않도록 한 줄로 유지한다.
- *
- * TODO(#138): 아래 세 선택자는 TRAN·SCHE 화면 전용이라 공통 파일에 있을 자리가 아니다.
- *   [data-transaction-page-numbers] → features/transaction.css 의 .transaction-page-numbers
- *   [data-transaction-pagination]   → features/transaction.css 의 .transaction-pagination
- *   [data-schedule-page-numbers]    → features/schedule.css 의 .schedule-page-numbers
- * data-* 훅은 JS 가 참조하므로 그대로 두고 스타일만 옮긴다.
- * 두 도메인이 같은 블록을 동시에 건드리지 않도록 TRAN 이슈가 먼저 옮기고 SCHE 가 뒤따른다.
- */
-[data-transaction-page-numbers],
+/* SCHE 목록형 Ajax 페이지네이션. SCHE 전용 CSS 이관 전까지 훅을 유지한다. */
 [data-schedule-page-numbers] {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-}
-
-[data-transaction-pagination] {
-  display: flex;
-  min-height: 2.5rem;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid var(--color-border-subtle);
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.125rem;
 }
 
 .pagination-button {

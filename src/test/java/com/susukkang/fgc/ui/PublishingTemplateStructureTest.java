@@ -39,8 +39,6 @@ class PublishingTemplateStructureTest {
      * — 그래야 화면 하나를 전환할 때 다른 화면 담당자의 테스트가 함께 깨지지 않는다 (#138).
      */
     private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of(
-            "templates/transaction/list.html",
-            "templates/transaction/form.html",
             "templates/schedule/detail.html",
             "templates/ledger/list.html",
             "templates/exception/list.html",
@@ -60,6 +58,8 @@ class PublishingTemplateStructureTest {
             "templates/reco/list.html",
             "templates/audit/list.html",
             "templates/contract/form.html",
+            "templates/transaction/list.html",
+            "templates/transaction/form.html",
             "templates/schedule/list.html",
             "templates/arbitrage/list.html",
             "templates/error/403.html",
@@ -288,6 +288,84 @@ class PublishingTemplateStructureTest {
                 .contains("function usageRate(")
                 .contains("truncateDecimal(value, 4)")
                 .contains("truncateDecimal(value, 6)");
+    }
+
+    // FGC-UI-TRAN-W01·W02: 지급 목록·등록 화면은 공통 컴포넌트와 TRAN 전용 자산만 사용한다.
+    @Test
+    void transactionScreensUseCommonComponentsAndPreserveCriticalContracts() throws IOException {
+        assertThat(resource("templates/transaction/list.html"))
+                .contains("class=\"page-content publishing-page transaction-page transaction-list-page\"")
+                .contains("class=\"page-header transaction-page-header\"")
+                .contains("class=\"filter-bar transaction-filter-bar\"")
+                .contains("class=\"surface transaction-list-panel\"")
+                .contains("class=\"data-table transaction-list-table\"")
+                .contains("class=\"transaction-pagination\"")
+                .contains("data-transaction-filter-form")
+                .contains("data-transaction-page-numbers")
+                .contains("<caption class=\"visually-hidden\"")
+                .contains("scope=\"col\"")
+                .doesNotContain("schedule-")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("templates/transaction/form.html"))
+                .contains("class=\"page-content publishing-page transaction-page transaction-form-page\"")
+                .contains("data-transaction-form aria-busy=\"true\"")
+                .contains("class=\"surface transaction-form-panel\"")
+                .contains("class=\"data-table transaction-attribution-table\"")
+                .contains("data-modal=\"transaction-confirm\"")
+                .contains("확정 후에는 이 화면에서 되돌릴 수 없습니다")
+                .contains("초년도 구간은 [계약일, 1주년일)입니다")
+                .contains("id=\"transaction-permission-help\"")
+                .contains("id=\"err-bizKey\"")
+                .contains("id=\"err-attributions\"")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("static/css/features/transaction.css"))
+                .contains(".transaction-form-layout")
+                .contains(".transaction-pagination")
+                .contains(".transaction-gate-step")
+                .contains("@media (max-width: 63.9375rem)")
+                .contains("@media (max-width: 47.9375rem)")
+                .contains("var(--color-status-error-solid)")
+                .doesNotContainPattern("#[0-9a-fA-F]{3,8}\\b");
+
+        assertThat(resource("static/css/common/components.css"))
+                .doesNotContain("[data-transaction-page-numbers]")
+                .doesNotContain("[data-transaction-pagination]");
+
+        assertThat(resource("static/js/features/transaction/transaction-list.js"))
+                .contains("buildTransactionFilterState(fields, page, attributionImbalanceOnly)")
+                .contains("attributionImbalanceOnly: attributionImbalanceOnly === true")
+                .contains("format.won(")
+                .contains("status-badge ")
+                .contains("aria-disabled")
+                .contains("다시 시도")
+                .doesNotContain("new Intl.NumberFormat")
+                .doesNotContain("style.")
+                .doesNotContain("fetch(");
+
+        assertThat(resource("static/js/features/transaction/transaction-form.js"))
+                .contains("modal.open(\"transaction-confirm\")")
+                .contains("modal.close(\"transaction-confirm\")")
+                .contains("idempotencyKey: \"TRAN-CONFIRM-\" + paymentId")
+                .contains("var GATES = [")
+                .contains("renderGates([], null)")
+                .contains("format.today().slice(0, 7)")
+                .contains("format.won(")
+                .contains("showValidationError")
+                .doesNotContain("new Intl.NumberFormat")
+                .doesNotContain("statusStyle(")
+                .doesNotContain("statusColor(")
+                .doesNotContain("style.")
+                .doesNotContain("fetch(");
     }
 
     /*
