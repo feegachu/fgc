@@ -1,15 +1,242 @@
 /*
- * LEDG-W01 화면 전용 스타일 (#138).
+ * LEDG-W01 화면 전용 스타일.
  *
- * 지금은 루트 레이아웃만 둔다. 목록·상세 2단 Grid 와 컬럼 폭은 LEDG 담당 이슈에서 채운다.
- * 공통 컴포넌트(components.css)의 디자인을 여기에 다시 복사하지 않는다.
- *
- * 이관 예정: templates/ledger/list.html 의 <script> 블록(2단 Grid → CSS 미디어쿼리)과
- *           인라인 style 37줄.
+ * 공통 컴포넌트의 디자인은 다시 정의하지 않고, 원장 화면의 폭·배치·상태만 ledger- 스코프로
+ * 제한한다. 템플릿에 있던 인라인 스타일과 resize 스크립트는 이 파일의 미디어쿼리로 옮겼다.
  */
 
 .ledger-page {
   display: grid;
   min-width: 0;
   gap: var(--space-4);
+}
+
+.ledger-filter-fields {
+  flex: 1 1 auto;
+}
+
+.ledger-filter-actions {
+  flex: 0 0 auto;
+}
+
+.ledger-filter-date {
+  width: 8.125rem;
+}
+
+.ledger-filter-type {
+  width: 13.75rem;
+}
+
+.ledger-filter-account {
+  width: 9.375rem;
+}
+
+.ledger-filter-contract,
+.ledger-filter-status {
+  width: 7.5rem;
+}
+
+.ledger-work-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.ledger-count-note {
+  font-size: 0.75rem;
+}
+
+.ledger-table {
+  min-width: 76.25rem;
+}
+
+.ledger-col-number { width: 7.875rem; }
+.ledger-col-date { width: 5.75rem; }
+.ledger-col-type { width: 10.625rem; }
+.ledger-col-source { width: 10.625rem; }
+.ledger-col-contract { width: 5rem; }
+.ledger-col-amount { width: 6.5rem; }
+.ledger-col-status { width: 5.5rem; }
+.ledger-col-reversal { width: 7.875rem; }
+
+.ledger-table td.ledger-disclosure-cell,
+.ledger-detail-table td.ledger-disclosure-cell {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow: visible;
+  white-space: normal;
+}
+
+.ledger-row {
+  cursor: pointer;
+}
+
+.ledger-row:focus-visible,
+.ledger-table-viewport:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.ledger-imbalanced-amount {
+  color: var(--color-status-error-text);
+  font-weight: 700;
+  text-decoration: underline wavy;
+  text-decoration-thickness: 0.0625rem;
+}
+
+.ledger-pagination {
+  min-height: 2.75rem;
+  justify-content: flex-end;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.ledger-pagination-text {
+  width: auto;
+  min-width: var(--control-height-sm);
+  padding-inline: var(--space-2);
+}
+
+.ledger-detail-panel {
+  min-width: 0;
+}
+
+.ledger-detail-body {
+  min-height: 12rem;
+}
+
+.ledger-placeholder {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.ledger-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.ledger-detail-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.ledger-detail-summary dt {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+}
+
+.ledger-detail-summary dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.ledger-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.ledger-detail-table {
+  min-width: 53rem;
+}
+
+.ledger-detail-col-line { width: 4rem; }
+.ledger-detail-col-account { width: 11rem; }
+.ledger-detail-col-amount { width: 7rem; }
+.ledger-detail-col-agent { width: 8rem; }
+.ledger-detail-col-item { width: 9rem; }
+.ledger-detail-col-memo { width: 10rem; }
+
+.ledger-detail-empty {
+  min-height: 7rem;
+}
+
+.ledger-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.ledger-action-guide {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.ledger-modal-target {
+  margin-top: 0;
+}
+
+.ledger-reverse-modal {
+  width: min(32.5rem, 100%);
+}
+
+.ledger-correction-modal {
+  width: min(35rem, 100%);
+}
+
+.ledger-modal-field {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+}
+
+.ledger-page :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 63.9375rem) {
+  .ledger-work-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .ledger-filter-bar,
+  .ledger-filter-fields,
+  .ledger-filter-actions {
+    width: 100%;
+  }
+
+  .ledger-filter-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledger-filter-date,
+  .ledger-filter-type,
+  .ledger-filter-account,
+  .ledger-filter-contract,
+  .ledger-filter-status {
+    width: 100%;
+  }
+
+  .ledger-filter-actions {
+    justify-content: flex-end;
+  }
+
+  .ledger-detail-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledger-detail-wide {
+    grid-column: auto;
+  }
+
+  .ledger-reverse-modal,
+  .ledger-correction-modal {
+    width: 100%;
+  }
 }

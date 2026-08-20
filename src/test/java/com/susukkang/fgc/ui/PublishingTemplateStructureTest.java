@@ -42,7 +42,6 @@ class PublishingTemplateStructureTest {
             "templates/transaction/list.html",
             "templates/transaction/form.html",
             "templates/schedule/detail.html",
-            "templates/ledger/list.html",
             "templates/exception/list.html",
             "templates/vrun/list.html",
             "templates/vrun/detail.html"
@@ -61,6 +60,7 @@ class PublishingTemplateStructureTest {
             "templates/audit/list.html",
             "templates/contract/form.html",
             "templates/schedule/list.html",
+            "templates/ledger/list.html",
             "templates/arbitrage/list.html",
             "templates/error/403.html",
             "templates/error/404.html",
@@ -223,6 +223,70 @@ class PublishingTemplateStructureTest {
                 .doesNotContain("form.addEventListener(\"submit\"")
                 .doesNotContain("function loadList(")
                 .doesNotContain("function query(");
+    }
+
+    @Test
+    void ledgerUsesCommonPageShellFormattingAndAccessibleAjaxStates() throws IOException {
+        String template = resource("templates/ledger/list.html");
+
+        // 페이지 셸 전환 (#287) — 기능 훅은 유지하고 레거시 클래스·인라인 표현은 다시 들어오지 못하게 한다.
+        assertThat(template)
+                .contains("class=\"page-content ledger-page\"")
+                .contains("class=\"page-header\"")
+                .contains("class=\"page-title\"")
+                .contains("class=\"guidance guidance-neutral\" aria-labelledby=\"notice-ledger\"")
+                .contains("id=\"imbalance-banner\" role=\"alert\"")
+                .contains("id=\"balance-banner\" role=\"status\" aria-live=\"polite\"")
+                .contains("class=\"filter-bar ledger-filter-bar\"")
+                .contains("class=\"filter-fields ledger-filter-fields\"")
+                .contains("class=\"surface\"")
+                .contains("class=\"data-table-viewport ledger-table-viewport\"")
+                .contains("class=\"data-table ledger-table\"")
+                .contains("<caption class=\"visually-hidden\">")
+                .contains("<th scope=\"col\">")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"pagination-controls ledger-pagination\"")
+                .contains("aria-label=\"검증원장 페이지 이동\"")
+                .contains("aria-selected=\"false\"")
+                // Modal 은 이미 공통 구조를 쓰고 있으므로 data-* 계약까지 함께 고정한다.
+                .contains("data-modal=\"journal-reverse\" data-close-on-backdrop=\"true\"")
+                .contains("data-modal-initial-focus")
+                .contains("data-modal-close")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("publishing-page")
+                .doesNotContain("style=\"")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("static/css/features/ledger.css"))
+                .contains(".ledger-work-grid")
+                .contains("grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 1fr)")
+                .contains("@media (max-width: 63.9375rem)")
+                .contains("@media (max-width: 47.9375rem)")
+                .contains(".ledger-page :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible")
+                .contains("var(--space-")
+                .contains("var(--color-")
+                .doesNotContainPattern("#[0-9a-fA-F]{3,8}\\b")
+                // 공통 컴포넌트의 구현을 화면 CSS 에 복제하지 않는다.
+                .doesNotContain("overscroll-behavior-inline");
+
+        assertThat(resource("static/js/features/ledger/ledger.js"))
+                .contains("document.querySelector(\".ledger-page\")")
+                .contains("format.won(value)")
+                .contains("format.isNegative(value)")
+                .contains("format.errorText(error, fallback)")
+                .contains("function syncTableCellDisclosures()")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready")
+                .contains("row.setAttribute(\"aria-selected\", String(selected))")
+                .contains("event.target.closest(\"a, button, details, input, select, textarea\")")
+                .contains("detailBody.setAttribute(\"aria-busy\", \"true\")")
+                .contains("window.FgcUi.toast(message, \"error\")")
+                .contains("sessionStorage.setItem(SUCCESS_TOAST_KEY")
+                .contains("window.FgcUi.toast(successMessage, \"success\")")
+                .doesNotContain("toLocaleString")
+                .doesNotContain("wrapper.style")
+                .doesNotContain("className = \"fgc-");
     }
 
     @Test
