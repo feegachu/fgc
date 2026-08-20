@@ -390,9 +390,12 @@
         <div class="journal-correction-guidance">
           원분개는 직접 수정하지 않습니다. 아래 신규 분개가 검증을 통과하면 역분개와 재기표를 한 번에 처리합니다.
         </div>
+        <!-- 2026-08-20 yslee - FGC-UI-EXCP-W01 원분개 조회와 신규 재기표 입력을 시각적으로 분리 -->
+        <h3 class="journal-correction-section-title">원분개 (읽기 전용)</h3>
         <div data-original-journal>
           <p class="fgc-muted">원분개를 불러오는 중입니다.</p>
         </div>
+        <h3 class="journal-correction-section-title">신규 재기표 입력</h3>
         <label class="fgc-field">
           <span class="fgc-label">새 분개일 <span class="field-required" aria-hidden="true">*</span></span>
           <input class="fgc-input" name="journalDate" type="date" required>

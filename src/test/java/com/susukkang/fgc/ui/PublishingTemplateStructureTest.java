@@ -422,6 +422,8 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("static/css/features/exception.css"))
                 .contains(".exception-col-title")
+                .contains(".journal-correction-original-lines")
+                .contains(".journal-correction-original-line.is-heading")
                 .contains("width: auto")
                 .contains("table-layout: fixed")
                 .doesNotContain("width: 22rem")
@@ -431,6 +433,9 @@ class PublishingTemplateStructureTest {
         assertThat(resource("static/js/features/exception/exception-list.js"))
                 .contains("STATUS_BADGE_CLASSES")
                 .contains("badge.classList.remove(...STATUS_BADGE_CLASS_NAMES)")
+                .contains("renderOriginalJournal(originalContainer, journal)")
+                .contains("date.textContent = `분개일 ${journal.journalDate}`")
+                .contains("(journal.lines || []).forEach((line) =>")
                 .contains("closest(\"a, button, details, input, select, textarea\")")
                 .contains("preview.scrollWidth > preview.clientWidth")
                 .contains("preview.scrollHeight > preview.clientHeight")

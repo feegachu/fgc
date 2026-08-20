@@ -180,12 +180,38 @@
   justify-self: start;
 }
 
+.journal-correction-section-title {
+  margin: var(--space-2) 0 0;
+  font-size: 0.95rem;
+}
+
 .journal-correction-original,
 .journal-correction-result {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.journal-correction-original-lines {
+  display: grid;
+  grid-template-columns: minmax(3rem, 0.4fr) minmax(12rem, 1.5fr) repeat(2, minmax(7rem, 0.7fr)) minmax(9rem, 1fr);
+  margin-top: var(--space-3);
+  overflow-x: auto;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.journal-correction-original-line {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.journal-correction-original-line.is-heading {
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
 }
 
 .exception-action-error,

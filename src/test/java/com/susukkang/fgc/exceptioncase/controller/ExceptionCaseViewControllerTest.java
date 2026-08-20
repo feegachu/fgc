@@ -130,6 +130,8 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("value=\"REJECT\"")))
                 .andExpect(content().string(containsString("data-journal-correction-form")))
                 .andExpect(content().string(containsString("data-journal-id=\"10\"")))
+                .andExpect(content().string(containsString("원분개 (읽기 전용)")))
+                .andExpect(content().string(containsString("신규 재기표 입력")))
                 .andExpect(content().string(containsString("data-add-correction-line")))
                 .andExpect(content().string(containsString("EXPECTED_RECEIVABLE · 예상 미수금")))
                 .andExpect(content().string(containsString("정정 실행")))

@@ -246,6 +246,49 @@
     lines.forEach((line) => appendCorrectionLine(container, line));
   }
 
+  // 2026-08-20 yslee - FGC-UI-EXCP-W01 원분개 일자와 상세행을 읽기 전용으로 표시
+  // 기존 코드: 분개번호·유형·합계만 표시하고 원본 상세행은 편집 입력에만 복사함
+  // 문제: 사용자가 원분개 일자와 계정별 차·대변 원본을 신규 입력과 구분해 확인할 수 없음
+  // 개선: 원본 헤더와 모든 상세행을 별도 읽기 전용 그리드로 렌더링한 뒤 신규 입력을 프리필함
+  function renderOriginalJournal(container, journal) {
+    const summary = document.createElement("div");
+    summary.className = "journal-correction-original";
+    const title = document.createElement("strong");
+    title.textContent = `${journal.journalNo} · ${journal.journalTypeLabel}`;
+    const date = document.createElement("span");
+    date.className = "fgc-muted";
+    date.textContent = `분개일 ${journal.journalDate}`;
+    const amount = document.createElement("span");
+    amount.className = "fgc-muted";
+    amount.textContent = `차변 ${Number(journal.debitTotal).toLocaleString("ko-KR")}원 · 대변 ${Number(journal.creditTotal).toLocaleString("ko-KR")}원`;
+    summary.append(title, date, amount);
+
+    const lineGrid = document.createElement("div");
+    lineGrid.className = "journal-correction-original-lines";
+    ["라인", "계정과목", "차변", "대변", "설명"].forEach((heading) => {
+      const cell = document.createElement("strong");
+      cell.className = "journal-correction-original-line is-heading";
+      cell.textContent = heading;
+      lineGrid.append(cell);
+    });
+    (journal.lines || []).forEach((line) => {
+      const values = [
+        line.lineNo,
+        `${line.accountCode} · ${line.accountName || "-"}`,
+        `${Number(line.debitAmount).toLocaleString("ko-KR")}원`,
+        `${Number(line.creditAmount).toLocaleString("ko-KR")}원`,
+        line.memo || "-"
+      ];
+      values.forEach((value) => {
+        const cell = document.createElement("span");
+        cell.className = "journal-correction-original-line";
+        cell.textContent = value;
+        lineGrid.append(cell);
+      });
+    });
+    container.replaceChildren(summary, lineGrid);
+  }
+
   function bindJournalCorrectionForm(form, row) {
     if (!form || !apiClient) return;
     const submitButton = form.querySelector("button[type='submit']");
@@ -261,15 +304,7 @@
     apiClient.request(`/api/v1/journals/${encodeURIComponent(form.dataset.journalId)}`)
       .then((envelope) => {
         const journal = envelope.data;
-        const summary = document.createElement("div");
-        summary.className = "journal-correction-original";
-        const title = document.createElement("strong");
-        title.textContent = `${journal.journalNo} · ${journal.journalTypeLabel}`;
-        const amount = document.createElement("span");
-        amount.className = "fgc-muted";
-        amount.textContent = `차변 ${Number(journal.debitTotal).toLocaleString("ko-KR")}원 · 대변 ${Number(journal.creditTotal).toLocaleString("ko-KR")}원`;
-        summary.append(title, amount);
-        originalContainer.replaceChildren(summary);
+        renderOriginalJournal(originalContainer, journal);
         form.elements.journalDate.value = journal.journalDate;
         form.elements.description.value = journal.description || "";
         renderCorrectionLines(linesContainer, journal.lines || []);
