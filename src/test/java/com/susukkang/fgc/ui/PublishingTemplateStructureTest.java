@@ -43,10 +43,37 @@ class PublishingTemplateStructureTest {
 
     @Test
     void reconciliationComparisonKeepsPopupPublishingScope() throws IOException {
+        assertThat(resource("templates/reco/list.html"))
+                .contains("class=\"modal-backdrop reco-compare-backdrop\"");
+
         assertThat(resource("templates/reco/compare-modal.html"))
                 .contains("th:fragment=\"modal\"")
-                .contains("publishing-modal")
+                .contains("class=\"modal modal-large publishing-modal reco-compare-modal\"")
+                .contains("role=\"dialog\" aria-modal=\"true\"")
+                .contains("class=\"reco-compare-grid\"")
+                .contains("class=\"reco-compare-source-list\" id=\"expected-body\"")
+                .contains("class=\"reco-compare-source-list\" id=\"actual-body\"")
+                .contains("class=\"reco-compare-diff-grid\"")
+                .contains("class=\"modal-footer reco-compare-footer\"")
+                .contains("class=\"surface reco-compare-panel\"")
+                .doesNotContain("class=\"fgc-modal")
+                .doesNotContain("class=\"fgc-card")
+                .doesNotContain("class=\"fgc-table")
+                .doesNotContain("class=\"fgc-banner")
+                .doesNotContain("class=\"guidance")
+                .doesNotContain("style=")
                 .doesNotContain("<main");
+
+        assertThat(resource("static/js/features/reco/reco.js"))
+                .contains("class=\"status-badge ")
+                .contains("empty-state reco-compare-empty\">예상 없음</div>")
+                .contains("empty-state reco-compare-empty\">실제 없음</div>")
+                .contains("sourceRow(\"적용 요율\"")
+                .contains("sourceRow(\"귀속 ID\"")
+                .contains("difference-formula")
+                .contains("class=\"button button-secondary\"")
+                .doesNotContain("class=\"fgc-btn fgc-btn--ghost\"")
+                .doesNotContain("class=\"fgc-th-num\"");
     }
 
     @Test
@@ -60,7 +87,10 @@ class PublishingTemplateStructureTest {
                 .contains("exception-pagination")
                 .contains("pagination-controls")
                 .contains("pagination-button is-active")
-                .contains("exception-summary-card")
+                .contains("kpi-card exception-summary-card")
+                .contains("kpi-card-header")
+                .contains("kpi-value-row")
+                .contains("kpi-card-footer")
                 .contains("exception-detail-")
                 .contains("data-exception-action-form")
                 .contains("처리 저장")
@@ -69,7 +99,7 @@ class PublishingTemplateStructureTest {
                 .contains("/css/features/exception.css")
                 .containsPattern("(?s)<script[^>]*th:src=\"@\\{/js/features/exception/exception-list\\.js}\"[^>]*\\bdefer\\b[^>]*>");
         assertThat(resource("static/js/features/exception/exception-list.js"))
-                .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
+                .containsPattern("(?s)row\\.addEventListener\\(\"keydown\".*?if \\(event\\.target\\.closest\\(\"a, button, details, input, select, textarea\"\\)\\) return;.*?event\\.preventDefault\\(\\)")
                 .contains("apiClient.request")
                 .doesNotContain("fetch(");
         // 2026-08-19 yslee - #238 병합 후 VRUN-W02 템플릿·스크립트 검증 체인 정리
@@ -101,9 +131,11 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
-    void fixedBusinessNoticesStayAlignedWithScreenSpecification() throws IOException {
+    void screenGuidanceStaysAlignedWithCurrentUiDecisions() throws IOException {
         assertThat(resource("templates/exception/list.html"))
-                .contains("정상 건은 여기 오지 않습니다. 여기 있는 건 전부 사람이 봐야 합니다.");
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("fgc-banner")
+                .doesNotContain("정상 건은 여기 오지 않습니다.");
         assertThat(resource("templates/ledger/list.html"))
                 .contains("이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.")
                 .contains("data-modal=\"journal-reverse\"")
@@ -152,6 +184,8 @@ class PublishingTemplateStructureTest {
     void policyListUsesCommonComponentsWithoutInlinePresentation() throws IOException {
         assertThat(resource("templates/policy/list.html"))
                 .contains("class=\"page-header policy-page-header\"")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
                 .contains("class=\"field policy-date-field\"")
                 .doesNotContain("class=\"guidance")
                 .contains("class=\"tab-list\"")
@@ -162,6 +196,10 @@ class PublishingTemplateStructureTest {
                 .contains("data-policy-select")
                 .contains("colspan=\"10\"")
                 .contains("class=\"empty-state policy-empty-state\"")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"table-cell-details\" hidden")
+                .contains("class=\"table-cell-more\">전체 보기")
+                .contains("class=\"table-cell-less\">접기")
                 .doesNotContain("data-policy-row tabindex=")
                 .doesNotContain("data-policy-row aria-selected=")
                 .doesNotContain("style=")
@@ -173,7 +211,18 @@ class PublishingTemplateStructureTest {
                 .contains("signal: requestController.signal")
                 .contains("detailAbortController.abort()")
                 .contains("selector.addEventListener(\"change\"")
+                .contains("function tableCellDisclosure(")
+                .contains("function syncTableCellDisclosures(")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready.then")
+                .contains("policy-disclosure-cell")
                 .doesNotContain("candidate.setAttribute(\"aria-selected\", isSelected");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains(".table-cell-disclosure")
+                .contains(".table-cell-details[open] .table-cell-less")
+                .contains(".table-cell-full");
 
         assertThat(resource("templates/layout/default.html"))
                 .containsPattern("(?s)<link[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-POL-W01'\\}\"[^>]*th:href=\"@\\{/css/features/policy\\.css\\}\"[^>]*>")
@@ -181,7 +230,8 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("static/css/features/policy.css"))
                 .contains(".policy-page")
-                .contains(".policy-version-table");
+                .contains(".policy-version-table")
+                .contains(".data-table td.policy-disclosure-cell");
         assertThat(resource("static/js/features/policy/policy-list.js"))
                 .contains("[data-policy-tab]")
                 .contains("[data-detail-body]");
@@ -210,6 +260,102 @@ class PublishingTemplateStructureTest {
     }
 
     @Test
+    void exceptionListUsesFlexibleColumnsSharedBadgesAndProductionToast() throws IOException {
+        assertThat(resource("templates/exception/list.html"))
+                .contains("<colgroup>")
+                .contains("class=\"exception-col-title\"")
+                .contains("class=\"status-badge\"")
+                .contains("status-badge-warning")
+                .contains("status-badge-error")
+                .contains("status-badge-review")
+                .contains("status-badge-info")
+                .contains("status-badge-success")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"table-cell-details\" hidden")
+                .contains("class=\"table-cell-more\">전체 보기")
+                .contains("class=\"table-cell-less\">접기")
+                .contains("referenceValue=|${c.sourceEntityType()}:${c.sourceEntityId()}|")
+                .doesNotContain("class=\"fgc-page-desc\"")
+                .doesNotContain("class=\"fgc-banner")
+                .doesNotContain("<th style=\"width:");
+
+        assertThat(resource("static/css/features/exception.css"))
+                .contains(".exception-col-title")
+                .contains("width: auto")
+                .contains("table-layout: fixed")
+                .doesNotContain("width: 22rem")
+                .doesNotContain("min-width: 22rem")
+                .doesNotContain("max-width: 22rem");
+
+        assertThat(resource("static/js/features/exception/exception-list.js"))
+                .contains("STATUS_BADGE_CLASSES")
+                .contains("badge.classList.remove(...STATUS_BADGE_CLASS_NAMES)")
+                .contains("closest(\"a, button, details, input, select, textarea\")")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready")
+                .contains("toast(message, \"error\")");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains(".table-cell-disclosure")
+                .contains(".table-cell-details[open] .table-cell-less")
+                .contains(".table-cell-full");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains("top: calc(var(--layout-header-height) + var(--space-4))")
+                .contains("width: min(25rem, calc(100vw - 2rem))")
+                .contains("border-radius: var(--radius-12)")
+                .contains("box-shadow: var(--shadow-sm)")
+                .contains(".toast-icon");
+
+        assertThat(resource("static/js/common/toast.js"))
+                .contains("loading: \"progress_activity\"")
+                .contains("safeTone === \"error\" || safeTone === \"loading\" ? 0 : 5000")
+                .contains("toast.append(iconContainer, content, close)");
+    }
+
+    @Test
+    void reconciliationListUsesCommonComponentsAndProductionToast() throws IOException {
+        assertThat(resource("templates/reco/list.html"))
+                .contains("class=\"page-header\"")
+                .contains("class=\"filter-bar reco-filter-bar\"")
+                .contains("class=\"kpi-grid reco-summary-grid\"")
+                .contains("class=\"kpi-card kpi-card-success\"")
+                .contains("class=\"surface reco-panel reco-result-panel\"")
+                .contains("class=\"data-table reco-result-table\"")
+                .contains("class=\"data-table reco-history-table\"")
+                .contains("class=\"status-badge\"")
+                .contains("class=\"reco-history-row\" tabindex=\"0\"")
+                .doesNotContain("class=\"fgc-page-desc\"")
+                .doesNotContain("class=\"fgc-banner")
+                .doesNotContain("class=\"fgc-kpi")
+                .doesNotContain("style=");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("/css/features/reco.css");
+
+        assertThat(resource("static/css/features/reco.css"))
+                .contains(".reco-summary-grid")
+                .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
+                .contains(".reco-result-table")
+                .contains(".reco-col-action { width: 7rem; }")
+                .contains("@media (max-width: 47.9375rem)");
+
+        assertThat(resource("static/js/features/reco/reco.js"))
+                .contains("tableCellDisclosure")
+                .contains("class=\"table-cell-details\" hidden")
+                .contains("table-cell-more\">전체 보기")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("preview.scrollHeight > preview.clientHeight")
+                .contains("document.fonts.ready")
+                .contains("window.FgcUi.toast(")
+                .contains("\"success\"")
+                .contains("event.key !== \"Enter\" && event.key !== \" \"")
+                .doesNotContain("text.length <= limit")
+                .doesNotContain("fetch(");
+    }
+
+    @Test
     void contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior() throws IOException {
         assertThat(resource("templates/contract/form.html"))
                 .contains("name=\"premiumPerCycleAmount\"")
@@ -234,6 +380,8 @@ class PublishingTemplateStructureTest {
     void baseReferenceScreenUsesSeparatedApiAndPageScripts() throws IOException {
         assertThat(resource("templates/base/index.html"))
                 .contains("class=\"page-header base-page-header\"")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
                 .doesNotContain("class=\"guidance")
                 .contains("class=\"tab-list\"")
                 .contains("class=\"tab-panel base-panel\"")
@@ -251,6 +399,9 @@ class PublishingTemplateStructureTest {
                 .contains("적용 시작일")
                 .contains("적용 종료일")
                 .contains("status-badge-success")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"table-cell-more\">전체 보기")
+                .contains("class=\"table-cell-less\">접기")
                 .doesNotContain("class=\"surface tab-panel base-panel\"")
                 .doesNotContain("base-panel-note")
                 .doesNotContain("<script>")
@@ -274,8 +425,17 @@ class PublishingTemplateStructureTest {
                 .contains("DEDUCTION: [\"차감\", \"status-badge-warning\"]")
                 .contains("SETTLEMENT_SUPPORT: \"정착지원\"")
                 .contains("NEWCOMER_SUPPORT: \"신인지원\"")
+                .contains("function tableCellDisclosure(")
+                .contains("tableCellDisclosure(item.itemCode, 18, true)")
+                .contains("table-cell-preview")
+                .contains("base-disclosure-cell")
                 .contains("aria-busy")
                 .doesNotContain("fetch(");
+
+        assertThat(resource("static/css/common/components.css"))
+                .contains(".table-cell-disclosure")
+                .contains(".table-cell-details[open] .table-cell-less")
+                .contains(".table-cell-full");
 
         assertThat(resource("templates/layout/default.html"))
                 .contains("/css/features/base.css")
@@ -284,6 +444,7 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("static/css/features/base.css"))
                 .contains(".base-page")
+                .contains(".data-table td.base-disclosure-cell")
                 .contains("@media (max-width: 47.9375rem)")
                 .doesNotContain(".base-information-banner")
                 .doesNotContain(".base-panel-note");
@@ -292,7 +453,7 @@ class PublishingTemplateStructureTest {
     private static String resource(String path) throws IOException {
         try (var input = PublishingTemplateStructureTest.class.getClassLoader().getResourceAsStream(path)) {
             assertThat(input).as(path).isNotNull();
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
         }
     }
 }

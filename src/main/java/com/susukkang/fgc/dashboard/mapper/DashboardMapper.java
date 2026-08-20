@@ -33,10 +33,14 @@ public interface DashboardMapper {
     /**
      * 차익거래 검토대상 건수
      * 원본: arbitrage_check WHERE result_status = 'CANDIDATE'
-     * 월 필터: 없음 — 존재하는 행 전부
-     * 중복 처리: 없음 — 계약당 여러 번 재검증됐어도 dedup하지 않고 행 개수 그대로 카운트
+     * 월 필터: 있음 — as_of_date가 month가 속한 달에 포함되는 행만
+     * 중복 처리: 계약·지급단계별 "이번 달 안에서" 최신 판정만. uq_arbitrage_check에
+     *   validation_run_id가 들어 있어 같은 달을 재실행하면 같은 계약의 행이 새로 쌓인다
+     *   (수동 재검증 IF-API-33도 MANUAL_CONTRACT run을 새로 만든다). 접지 않으면 재실행
+     *   횟수만큼 부풀어, 예외 키가 월·계약·지급단계 UNIQUE인 예외함 카드와 어긋난다.
+     *   countCapViolation과 같은 이유로 월 필터를 먼저 적용한 뒤 그 안에서 dedup한다.
      */
-    long countArbitrageCandidate();
+    long countArbitrageCandidate(@Param("month") LocalDate month);
 
     /**
      * 대사 불일치 건수

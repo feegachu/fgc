@@ -73,10 +73,42 @@
     return value == null || value === "" ? "—" : String(value) + "%";
   }
 
+  function tableCellDisclosure(value, singleLine, previewHtml) {
+    var text = value == null || value === "" ? "—" : String(value);
+    var safeText = escapeHtml(text);
+    return '<div class="table-cell-disclosure">' +
+      '<span class="table-cell-preview' + (singleLine ? " is-single-line" : "") + '">' + (previewHtml || safeText) + '</span>' +
+      '<details class="table-cell-details" hidden><summary>' +
+      '<span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>' +
+      '<span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>' +
+      '</summary><p class="table-cell-full">' + safeText + '</p></details></div>';
+  }
+
+  function syncTableCellDisclosures(scope) {
+    (scope || document).querySelectorAll(".table-cell-disclosure").forEach(function (disclosure) {
+      var preview = disclosure.querySelector(".table-cell-preview");
+      var details = disclosure.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+      var isTruncated = preview.scrollWidth > preview.clientWidth + 1 || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !isTruncated;
+      if (!isTruncated) details.open = false;
+    });
+  }
+
+  function scheduleDisclosureSync(scope) {
+    window.requestAnimationFrame(function () { syncTableCellDisclosures(scope); });
+  }
+
   function visualWidth(value) {
     var parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed <= 0) return "0%";
     return Math.min(parsed, 100) + "%";
+  }
+
+  function accessibleProgress(value) {
+    var parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.min(parsed, 100));
   }
 
   function queryFromLocation() {
@@ -179,8 +211,12 @@
   }
 
   function setLoading() {
-    document.getElementById("cap-kpi-grid").setAttribute("aria-busy", "true");
-    document.getElementById("cap-stage-grid").setAttribute("aria-busy", "true");
+    var kpiGrid = document.getElementById("cap-kpi-grid");
+    var stageGrid = document.getElementById("cap-stage-grid");
+    kpiGrid.setAttribute("aria-busy", "true");
+    stageGrid.setAttribute("aria-busy", "true");
+    kpiGrid.classList.add("is-loading");
+    stageGrid.classList.add("is-loading");
     document.getElementById("cap-agent-message").textContent = "설계사별 모니터링 지표를 불러오는 중입니다.";
     document.getElementById("cap-agent-message").hidden = false;
     document.getElementById("cap-agent-table-wrap").hidden = true;
@@ -203,7 +239,11 @@
       value.textContent = "—";
     });
     document.getElementById("cap-kpi-grid").setAttribute("aria-busy", "false");
-    document.getElementById("cap-stage-grid").setAttribute("aria-busy", "false");
+    var stageGrid = document.getElementById("cap-stage-grid");
+    stageGrid.setAttribute("aria-busy", "false");
+    document.getElementById("cap-kpi-grid").classList.remove("is-loading");
+    stageGrid.classList.remove("is-loading");
+    stageGrid.innerHTML = '<div class="cap-inline-message is-error">지급단계별 집계를 불러오지 못했습니다.</div>';
     document.getElementById("cap-agent-message").textContent = "설계사별 모니터링 지표를 불러오지 못했습니다.";
     document.getElementById("cap-agent-message").hidden = false;
     document.getElementById("cap-agent-table-wrap").hidden = true;
@@ -225,17 +265,20 @@
       button.setAttribute("aria-pressed", String(button.dataset.capStatus === controls.status.value));
     });
     document.getElementById("cap-kpi-grid").setAttribute("aria-busy", "false");
+    document.getElementById("cap-kpi-grid").classList.remove("is-loading");
   }
 
   function statusBadge(item) {
-    return '<span class="status-badge ' + (STATUS_CLASS[item.resultStatus] || "status-badge-neutral") + '">' + escapeHtml(item.resultStatusLabel) + '</span>';
+    return '<span class="status-badge ' + (STATUS_CLASS[item.resultStatus] || "status-badge-neutral") + '">' + escapeHtml(item.resultStatusLabel || item.resultStatus || "—") + '</span>';
   }
 
   function contractRow(item) {
     var isAgent = item.paymentStage === "GA_TO_FC";
     var deduction = isAgent ? '<span class="cap-not-applicable">적용하지 않음</span>' : won(item.complianceDeductionAmount);
+    var contractHref = "/contracts/" + encodeURIComponent(item.contractId) + "?tab=cap";
+    var contractLink = '<a class="cap-contract-link" href="' + contractHref + '">' + escapeHtml(item.contractNo) + '</a>';
     return "<tr>" +
-      '<td><a class="cap-contract-link" href="/contracts/' + encodeURIComponent(item.contractId) + '?tab=cap">' + escapeHtml(item.contractNo) + '</a></td>' +
+      '<td class="cap-disclosure-cell">' + tableCellDisclosure(item.contractNo, true, contractLink) + '</td>' +
       '<td><span class="cap-stage-label"><span class="cap-stage-dot' + (isAgent ? " is-agent" : "") + '"></span>' + escapeHtml(item.paymentStageLabel) + '</span></td>' +
       '<td class="tabular-nums">' + escapeHtml(item.asOfDate) + '</td>' +
       '<td class="text-right tabular-nums">' + won(item.basePremiumAmount) + '</td>' +
@@ -262,6 +305,7 @@
       document.getElementById("cap-contract-body").innerHTML = data.content.map(contractRow).join("");
       message.hidden = true;
       tableWrap.hidden = false;
+      scheduleDisclosureSync(tableWrap);
     }
     renderPagination(data.page, data.totalPages);
   }
@@ -291,6 +335,7 @@
   function renderStageSummary(rows) {
     var grid = document.getElementById("cap-stage-grid");
     grid.setAttribute("aria-busy", "false");
+    grid.classList.remove("is-loading");
     if (!rows || !rows.length) {
       grid.innerHTML = '<div class="cap-inline-message">조건에 맞는 지급단계별 집계가 없습니다.</div>';
       return;
@@ -301,9 +346,10 @@
   function agentRow(agent) {
     var organization = [agent.organizationCode, agent.organizationName].filter(Boolean).join(" · ") || "—";
     var status = stageStatus(agent);
+    var agentLabel = [agent.agentName || "—", agent.agentCode].filter(Boolean).join(" · ");
     return "<tr>" +
-      '<td><strong>' + escapeHtml(agent.agentName || "—") + '</strong><br><small>' + escapeHtml(agent.agentCode || "") + '</small></td>' +
-      '<td>' + escapeHtml(organization) + '</td>' +
+      '<td class="cap-disclosure-cell">' + tableCellDisclosure(agentLabel, false) + '</td>' +
+      '<td class="cap-disclosure-cell">' + tableCellDisclosure(organization, false) + '</td>' +
       '<td class="text-right tabular-nums">' + number(agent.contractCount) + '건</td>' +
       '<td class="text-right tabular-nums">' + won(agent.limitAmountTotal) + '</td>' +
       '<td class="text-right tabular-nums">' + won(agent.includedAmountTotal) + '</td>' +
@@ -323,6 +369,7 @@
     document.getElementById("cap-agent-body").innerHTML = rows.map(agentRow).join("");
     message.hidden = true;
     tableWrap.hidden = false;
+    scheduleDisclosureSync(tableWrap);
   }
 
   function pageButton(label, page, options) {
@@ -380,50 +427,63 @@
     return "<tr><th scope=\"row\">" + escapeHtml(label) + "</th><td class=\"text-right tabular-nums\">" + escapeHtml(value) + "</td></tr>";
   }
 
-  function detailPairHtml(label, valueHtml) {
-    return "<tr><th scope=\"row\">" + escapeHtml(label) + "</th><td class=\"text-right tabular-nums\">" + valueHtml + "</td></tr>";
-  }
-
   function renderDetail(data) {
     var item = data.capCheck;
     var snapshot = data.calculationSnapshot || {};
     document.getElementById("sum-contract").textContent = item.contractNo || "—";
     document.getElementById("sum-stage").textContent = item.paymentStageLabel || "—";
     document.getElementById("sum-asof").textContent = item.asOfDate || "—";
-    document.getElementById("sum-kind").textContent = item.checkKind || "저장 판정";
-    document.getElementById("sum-ruleset").textContent = "ID " + item.capRuleSetId;
-    document.getElementById("sum-id").textContent = item.capCheckId;
+    document.getElementById("sum-ruleset").textContent = item.capRuleSetId == null ? "—" : "룰셋 ID " + item.capRuleSetId;
+    document.getElementById("sum-id").textContent = item.capCheckId == null ? "—" : "cap_check #" + item.capCheckId;
     document.getElementById("sum-badge").innerHTML = statusBadge(item);
 
     var insurerStage = item.paymentStage === "INSURER_TO_GA";
+    var multiplier = snapshot.premiumMultiplier == null ? null : String(snapshot.premiumMultiplier);
+    var ruleSetLabel = item.capRuleSetId == null ? "—" : "룰셋 ID " + item.capRuleSetId;
     document.getElementById("input-body").innerHTML =
       detailPair("월납환산 초회보험료", won(item.basePremiumAmount)) +
-      detailPair("12차월 환급금 가산", refundAddition(item.refund12mAmount)) +
+      detailPair("한도 배수", multiplier == null ? "—" : multiplier + "배") +
+      detailPair("환급금 가산", won(item.refund12mAmount)) +
       detailPair("준법경영비 공제", insurerStage ? won(item.complianceDeductionAmount) : "적용하지 않음") +
-      detailPair("보험료 배수", snapshot.premiumMultiplier == null ? "—" : snapshot.premiumMultiplier);
+      detailPair("적용 룰셋", ruleSetLabel);
 
-    document.getElementById("formula").textContent = insurerStage
-      ? "기준 보험료 × 배수 + 환급금 가산 − 준법경영비 공제"
-      : "기준 보험료 × 배수 + 환급금 가산";
-    document.getElementById("formula-note").textContent = insurerStage
-      ? "원수사 → GA 단계의 저장된 공제 금액을 표시합니다."
-      : "GA → 설계사 단계에는 준법경영비 공제를 적용하지 않습니다.";
+    var limitParts = [number(item.basePremiumAmount), "×", multiplier == null ? "—" : multiplier];
+    if (Number(item.refund12mAmount) !== 0) limitParts.push("+", number(item.refund12mAmount));
+    if (insurerStage && Number(item.complianceDeductionAmount) !== 0) {
+      limitParts.push("−", number(item.complianceDeductionAmount));
+    }
+    document.getElementById("formula-limit").textContent =
+      "한도 = " + limitParts.join(" ") + " = " + won(item.limitAmount);
+    document.getElementById("formula-usage").textContent =
+      "사용률 = " + number(item.includedAmount) + " ÷ " + number(item.limitAmount) + " × 100";
+    document.getElementById("formula-result").textContent = "= " + percent(item.usagePct);
 
-    document.getElementById("final-bar").style.width = visualWidth(item.usagePct);
-    document.getElementById("final-limit-label").textContent = "한도 " + won(item.limitAmount);
+    var finalBar = document.getElementById("final-bar");
+    finalBar.className = "cap-detail-gauge-bar " + (STATUS_PROGRESS_CLASS[item.resultStatus] || "");
+    finalBar.style.width = visualWidth(item.usagePct);
+    finalBar.setAttribute("aria-valuenow", String(accessibleProgress(item.usagePct)));
+    finalBar.setAttribute("aria-valuetext", "사용률 " + percent(item.usagePct));
+    document.getElementById("final-usage").textContent = "사용률 " + percent(item.usagePct);
+    var warningMark = document.getElementById("final-warning-mark");
+    var warningUsagePct = Number(snapshot.warningUsagePct);
+    warningMark.hidden = !Number.isFinite(warningUsagePct);
+    if (!warningMark.hidden) warningMark.style.left = visualWidth(warningUsagePct);
     document.getElementById("final-body").innerHTML =
-      detailPair("한도", won(item.limitAmount)) + detailPair("산입금액", won(item.includedAmount)) +
-      detailPairHtml("잔여", remainingAmount(item.remainingAmount)) + detailPair("사용률", percent(item.usagePct)) +
-      detailPair("저장 판정", item.resultStatusLabel);
+      '<div><dt>산입 합계</dt><dd class="tabular-nums">' + won(item.includedAmount) + "</dd></div>" +
+      '<div><dt>한도</dt><dd class="tabular-nums">' + won(item.limitAmount) + "</dd></div>" +
+      '<div><dt>잔여</dt><dd class="tabular-nums">' + remainingAmount(item.remainingAmount) + "</dd></div>";
+    document.getElementById("final-status").innerHTML = statusBadge(item);
 
     var details = data.details || [];
+    document.getElementById("detail-count").textContent = number(details.length) + "개 항목";
     document.getElementById("detail-body").innerHTML = details.length ? details.map(function (detail) {
       var label = CLASSIFICATION_LABEL[detail.classificationSnapshot] || detail.classificationSnapshot;
       var badgeClass = detail.classificationSnapshot === "INCLUDED" ? "status-badge-info" : detail.classificationSnapshot === "REVIEW_REQUIRED" ? "status-badge-review" : "status-badge-neutral";
-      return "<tr><td>" + number(detail.detailSeq) + "</td><td>" + escapeHtml(detail.commissionItemName || "—") +
-        '</td><td class="text-right tabular-nums">' + won(detail.amount) + '</td><td><span class="status-badge ' + badgeClass + '">' + escapeHtml(label) +
-        "</span></td><td>" + escapeHtml(detail.decisionReason || "—") + "</td><td>" + escapeHtml(detail.evidenceRef || "증빙 미연결 / 후속 연결 대기") + "</td><td>저장 스냅샷</td></tr>";
-    }).join("") : '<tr><td colspan="7"><div class="cap-inline-message">저장된 항목별 산입 내역이 없습니다.</div></td></tr>';
+      return "<tr><td>" + number(detail.detailSeq) + '</td><td class="cap-disclosure-cell">' + tableCellDisclosure(detail.commissionItemName, false) +
+        '</td><td class="text-right tabular-nums">' + won(detail.amount) + '</td><td class="text-center"><span class="status-badge ' + badgeClass + '">' + escapeHtml(label) +
+        '</span></td><td class="cap-disclosure-cell">' + tableCellDisclosure(detail.decisionReason, false) +
+        '</td><td class="cap-disclosure-cell">' + tableCellDisclosure(detail.evidenceRef || "증빙 미연결 / 후속 연결 대기", false) + "</td></tr>";
+    }).join("") : '<tr><td colspan="6"><div class="cap-inline-message">저장된 항목별 산입 내역이 없습니다.</div></td></tr>';
     var includedDetailTotal = details.reduce(function (total, detail) {
       return detail.classificationSnapshot === "INCLUDED" ? total + Number(detail.amount || 0) : total;
     }, 0);
@@ -432,8 +492,9 @@
     var includedMatches = includedDetailTotal === Number(item.includedAmount);
     includedNote.classList.toggle("cap-detail-mismatch", !includedMatches);
     includedNote.textContent = includedMatches
-      ? "제외·검토필요 금액은 합계에 넣지 않습니다 · 저장 산입금액과 일치"
+      ? "제외 항목 미포함"
       : "저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.";
+    scheduleDisclosureSync(document.getElementById("cap-detail-content"));
   }
 
   function openDetail(capCheckId) {
@@ -498,4 +559,8 @@
 
   queryFromLocation();
   loadReferenceData().then(load);
+  window.addEventListener("resize", function () { scheduleDisclosureSync(root); });
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { scheduleDisclosureSync(root); });
+  }
 })();

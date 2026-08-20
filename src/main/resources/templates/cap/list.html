@@ -14,16 +14,12 @@
   <header class="page-header">
     <div class="page-header-copy">
       <h1 class="page-title">1,200% 한도 검증 현황</h1>
-      <p class="page-description">계약 단위 한도 판정과 지급단계별 사용 현황을 확인합니다.</p>
     </div>
   </header>
 
   <section class="surface cap-filter-panel" aria-labelledby="cap-filter-title">
     <header class="surface-header cap-section-header">
-      <div>
-        <h2 id="cap-filter-title" class="surface-title">검색 조건</h2>
-        <p class="cap-section-description">기준월과 계약 조건으로 저장된 판정 결과를 조회합니다.</p>
-      </div>
+      <h2 id="cap-filter-title" class="surface-title">검색 조건</h2>
     </header>
     <form id="cap-search-form" class="cap-filter-form">
       <div class="field cap-filter-month">
@@ -94,10 +90,7 @@
 
   <section class="surface cap-stage-panel" aria-labelledby="cap-stage-title">
     <header class="surface-header cap-section-header cap-stage-header">
-      <div>
-        <h2 id="cap-stage-title" class="surface-title">지급단계별 Stage Gauges</h2>
-        <p class="cap-section-description">서로 다른 규제이므로 두 단계를 합산하지 않습니다.</p>
-      </div>
+      <h2 id="cap-stage-title" class="surface-title">지급단계별 한도 게이지</h2>
       <span class="status-badge status-badge-neutral">전체 검색범위 집계</span>
     </header>
     <div id="cap-stage-grid" class="cap-stage-grid" aria-live="polite">
@@ -114,21 +107,9 @@
     </div>
   </section>
 
-  <section class="cap-guidance" aria-labelledby="cap-guidance-title">
-    <span class="material-symbols-outlined" aria-hidden="true">verified_user</span>
-    <div>
-      <h2 id="cap-guidance-title">계산 기준</h2>
-      <p><strong>한도 = 월납환산 초회보험료 × 12 + 12차월 예상 해약환급금 − 준법경영비 공제</strong></p>
-      <p>준법경영비 공제는 원수사 → GA에만 적용합니다. GA → 설계사에는 적용하지 않습니다. 판정 색상은 저장된 <code>resultStatus</code>를 사용합니다.</p>
-    </div>
-  </section>
-
   <section class="surface cap-table-panel" aria-labelledby="cap-contract-list-title">
     <header class="surface-header cap-section-header">
-      <div>
-        <h2 id="cap-contract-list-title" class="surface-title">계약별 판정 목록</h2>
-        <p class="cap-section-description">규제 판정 단위는 계약 1건입니다.</p>
-      </div>
+      <h2 id="cap-contract-list-title" class="surface-title">계약별 판정 목록</h2>
       <span class="cap-list-count"><strong id="cap-total-count">0</strong>건</span>
     </header>
     <div id="cap-list-message" class="cap-inline-message" role="status" aria-live="polite">판정 목록을 불러오는 중입니다.</div>
@@ -162,10 +143,7 @@
 
   <section class="surface cap-table-panel" aria-labelledby="cap-agent-title">
     <header class="surface-header cap-section-header cap-agent-header">
-      <div>
-        <h2 id="cap-agent-title" class="surface-title">설계사별 모니터링 지표</h2>
-        <p class="cap-section-description">GA → 설계사 지급단계만 집계합니다.</p>
-      </div>
+      <h2 id="cap-agent-title" class="surface-title">설계사별 합계</h2>
       <span class="status-badge status-badge-neutral">모니터링 지표 · 규제 판정 아님</span>
     </header>
     <div id="cap-agent-message" class="cap-inline-message">전체 검색범위 설계사 집계를 불러오는 중입니다.</div>
@@ -181,13 +159,21 @@
 
   <div class="modal-backdrop" data-modal="cap-detail" data-close-on-backdrop="true" hidden aria-hidden="true">
     <section class="modal modal-large cap-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cap-detail-title">
-      <header class="modal-header">
-        <div><h2 id="cap-detail-title" class="modal-title">1,200% 계산근거</h2><p class="cap-modal-subtitle">검증 당시 저장된 스냅샷</p></div>
+      <header class="modal-header cap-detail-modal-header">
+        <div class="cap-detail-modal-heading">
+          <p class="cap-detail-eyebrow">1,200% 한도 · 계산 스냅샷</p>
+          <h2 id="cap-detail-title" class="modal-title">계산근거</h2>
+        </div>
         <button class="icon-button" type="button" data-modal-close aria-label="팝업 닫기" data-modal-initial-focus><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
       </header>
       <div id="cap-detail-state" class="modal-body cap-detail-state">계산근거를 불러오는 중입니다.</div>
       <div id="cap-detail-content" class="modal-body" hidden th:insert="~{cap/detail-modal :: modal}"></div>
-      <footer class="modal-footer"><button class="button button-secondary" type="button" data-modal-close>닫기</button></footer>
+      <footer class="modal-footer cap-detail-modal-footer">
+        <div class="cap-detail-footer-actions">
+          <button class="button button-secondary" type="button" data-modal-close>닫기</button>
+          <a class="button button-primary" id="go-exception" th:href="@{/exceptions}">예외 목록 보기</a>
+        </div>
+      </footer>
     </section>
   </div>
 </main>

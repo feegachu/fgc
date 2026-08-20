@@ -16,6 +16,32 @@
     REJECTED: "오탐·반려"
   };
 
+  const STATUS_BADGE_CLASSES = {
+    NEW: "status-badge-error",
+    IN_REVIEW: "status-badge-info",
+    RESOLVED: "status-badge-success",
+    REJECTED: "status-badge-review"
+  };
+
+  const STATUS_BADGE_CLASS_NAMES = Object.values(STATUS_BADGE_CLASSES);
+
+  function syncTableCellDisclosures() {
+    document.querySelectorAll(".table-cell-disclosure").forEach((disclosure) => {
+      const preview = disclosure.querySelector(".table-cell-preview");
+      const details = disclosure.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+
+      const isTruncated = preview.scrollWidth > preview.clientWidth + 1
+        || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !isTruncated;
+      if (!isTruncated) details.open = false;
+    });
+  }
+
+  function scheduleDisclosureSync() {
+    window.requestAnimationFrame(syncTableCellDisclosures);
+  }
+
   if (!detailBody || !occurrenceBody || !historyBody || !selectedBadge) return;
 
   function formatActionTime(value) {
@@ -61,8 +87,13 @@
     const label = STATUS_LABELS[status] || status;
     const rowStatus = row.querySelector('[data-role="status"]');
     const detailStatus = detailBody.querySelector('[data-role="status"]');
-    if (rowStatus) rowStatus.textContent = label;
-    if (detailStatus) detailStatus.textContent = label;
+    [rowStatus, detailStatus].forEach((badge) => {
+      if (!badge) return;
+      badge.textContent = label;
+      badge.title = status;
+      badge.classList.remove(...STATUS_BADGE_CLASS_NAMES);
+      badge.classList.add(STATUS_BADGE_CLASSES[status] || "status-badge-neutral");
+    });
   }
 
   function updateActionOptions(form, status) {
@@ -124,7 +155,9 @@
         }
         if (toast) toast("처리 내용이 저장되었습니다.", "success");
       }).catch((requestError) => {
-        error.textContent = requestError.message || "처리 내용을 저장하지 못했습니다.";
+        const message = requestError.message || "처리 내용을 저장하지 못했습니다.";
+        error.textContent = message;
+        if (toast) toast(message, "error");
         updateSubmit();
       });
     });
@@ -171,12 +204,12 @@
 
   rows.forEach((row) => {
     row.addEventListener("click", (event) => {
-      if (event.target.closest("a")) return;
+      if (event.target.closest("a, button, details, input, select, textarea")) return;
       selectRow(row);
     });
     row.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
-      if (event.target.closest("a")) return;
+      if (event.target.closest("a, button, details, input, select, textarea")) return;
       event.preventDefault();
       selectRow(row);
     });
@@ -185,4 +218,11 @@
   const selectedId = document.getElementById("main-content").dataset.selectedExceptionId;
   const initialRow = rows.find((row) => row.dataset.exceptionId === selectedId);
   if (initialRow) selectRow(initialRow);
+
+  scheduleDisclosureSync();
+  window.addEventListener("load", scheduleDisclosureSync, { once: true });
+  window.addEventListener("resize", scheduleDisclosureSync);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(scheduleDisclosureSync);
+  }
 })();

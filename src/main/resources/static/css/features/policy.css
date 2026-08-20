@@ -49,6 +49,15 @@
 .policy-col-status { width: 6rem; }
 .policy-col-reference { width: 11.5rem; }
 
+.data-table td.policy-disclosure-cell {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: middle;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .policy-row {
   cursor: pointer;
 }
@@ -169,6 +178,11 @@
 }
 
 @media (max-width: 47.9375rem) {
+  .policy-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .policy-date-field {
     width: 100%;
   }
