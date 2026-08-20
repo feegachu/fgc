@@ -741,16 +741,21 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 request.allocationBasis(),
                 request.attributionMethod()
         );
+        // 수취인까지 좁혀야 관리자수수료(팀장·지사장·본부장 3행)에서 올바른 스케줄 행이 잡힌다.
+        // 귀속행 설계사(resolveAttributionAgentId)가 아니라 지급 건의 수취인을 넘긴다 —
+        // 원수사→GA 는 수취인이 없어 null 이고, 스케줄의 beneficiary_agent_id 도 null 이라 짝이 맞는다.
         Long scheduleLineId = resolveOperationalScheduleLineId(
                 contractId,
                 paymentStage,
                 commissionItemId,
+                agentId,
                 request.attributionDate()
         );
         Integer installmentNo = resolveOperationalScheduleInstallmentNo(
                 contractId,
                 paymentStage,
                 commissionItemId,
+                agentId,
                 request.attributionDate()
         );
 
@@ -784,6 +789,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long contractId,
             PaymentStage paymentStage,
             Long commissionItemId,
+            Long recipientAgentId,
             LocalDate attributionDate
     ) {
         if (contractId == null || attributionDate == null) {
@@ -791,7 +797,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
         LocalDate attributionMonthStart = attributionDate.withDayOfMonth(1);
         List<Long> ids = mapper.findOperationalScheduleLineIds(
-                contractId, paymentStage, commissionItemId,
+                contractId, paymentStage, commissionItemId, recipientAgentId,
                 attributionMonthStart, attributionMonthStart.plusMonths(1));
         return ids != null && ids.size() == 1 ? ids.get(0) : null;
     }
@@ -810,6 +816,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long contractId,
             PaymentStage paymentStage,
             Long commissionItemId,
+            Long recipientAgentId,
             LocalDate attributionDate
     ) {
         if (contractId == null || attributionDate == null) {
@@ -817,7 +824,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
         LocalDate attributionMonthStart = attributionDate.withDayOfMonth(1);
         List<Integer> installmentNos = mapper.findOperationalScheduleInstallmentNos(
-                contractId, paymentStage, commissionItemId,
+                contractId, paymentStage, commissionItemId, recipientAgentId,
                 attributionMonthStart, attributionMonthStart.plusMonths(1));
         if (installmentNos == null) {
             return null;

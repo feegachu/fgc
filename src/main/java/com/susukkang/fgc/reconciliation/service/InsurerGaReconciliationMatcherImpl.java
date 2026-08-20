@@ -318,8 +318,18 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
         if (installmentResolutionIssue || installmentMismatch) {
             reasons.add(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
         }
-        // 한쪽이 비어 있으면 중복이 아니다 — 주 사유와 모순되는 보조 사유를 만들지 않는다.
+        // 2026-08-20 hjKang - 보조 사유 DUPLICATE 를 "같은 수취인 안의 복수"로 한정
+        // 기존 코드: 양쪽이 존재하고 행이 2개 이상이면 무조건 DUPLICATE 를 보조 사유로 붙였다.
+        // 문제: 최종 result_type 은 matcher 반환값이 아니라 ReconciliationReasonClassifier 가
+        //       주·보조 사유를 우선순위(DUPLICATE=40 · ACTUAL_MISSING=60 · REVIEW_REQUIRED=110)로
+        //       재정렬해 가장 낮은 번호를 고른 결과다. 따라서 보조 사유에 DUPLICATE 가 남아 있으면
+        //       classify() 가 REVIEW_REQUIRED 를 돌려줘도 저장은 DUPLICATE·HIGH 로 뒤집힌다.
+        //       수취인 짝짓기에서 양쪽에 2명 이상이 남아 대응을 단정할 수 없는 묶음(제36조 5번)이
+        //       정확히 이 경우이며, "중복 지급"은 사실과 다르다.
+        // 개선: 수취인이 양쪽 모두 하나로 좁혀졌을 때(!agentResolutionIssue)만 복수 행을 중복으로 본다.
+        //       그때의 복수는 같은 수취인에게 같은 항목·회차가 두 번 잡힌 진짜 중복이다.
         if (!expectedSources.isEmpty() && !actualSources.isEmpty()
+                && !agentResolutionIssue
                 && (expectedSources.size() > 1 || actualSources.size() > 1)) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
         }

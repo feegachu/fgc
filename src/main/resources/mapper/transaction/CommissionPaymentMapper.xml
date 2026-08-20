@@ -207,6 +207,16 @@
            AND sh.schedule_purpose = 'OPERATIONAL'
            AND sh.active_yn = true
            AND sl.commission_item_id = #{commissionItemId}
+           <!-- 2026-08-20 hjKang - 수취인까지 좁힌다.
+                기존 코드: 계약·단계·항목·귀속월만으로 조회했다.
+                문제: 관리자수수료는 같은 계약·항목·월에 팀장·지사장·본부장 3행이 정상적으로 있어
+                      후보가 항상 3건이 되고, 단건일 때만 연결하는 호출부 때문에
+                      transaction_attribution.schedule_line_id 가 구조적으로 NULL 이 됐다.
+                      회차 조회도 세 행의 회차가 우연히 같아서 동작했을 뿐이다.
+                개선: uq_schedule_line_business 가 COALESCE(beneficiary_agent_id,0) 을 포함하듯
+                      수취인을 술어에 넣는다. 원수사→GA 는 양쪽 모두 NULL 이라
+                      IS NOT DISTINCT FROM 으로 null-safe 비교한다. -->
+           AND sl.beneficiary_agent_id IS NOT DISTINCT FROM #{beneficiaryAgentId,jdbcType=BIGINT}
            AND sl.due_date <![CDATA[ >= ]]> #{attributionMonthStart}
            AND sl.due_date <![CDATA[ < ]]> #{nextAttributionMonthStart}
            AND sl.line_status &lt;&gt; 'CANCELLED'

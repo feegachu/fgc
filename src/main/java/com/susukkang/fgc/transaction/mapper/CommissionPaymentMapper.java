@@ -108,6 +108,7 @@ public interface CommissionPaymentMapper {
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage,
             @Param("commissionItemId") Long commissionItemId,
+            @Param("beneficiaryAgentId") Long beneficiaryAgentId,
             @Param("attributionMonthStart") LocalDate attributionMonthStart,
             @Param("nextAttributionMonthStart") LocalDate nextAttributionMonthStart
     );
@@ -117,6 +118,7 @@ public interface CommissionPaymentMapper {
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage,
             @Param("commissionItemId") Long commissionItemId,
+            @Param("beneficiaryAgentId") Long beneficiaryAgentId,
             @Param("attributionMonthStart") LocalDate attributionMonthStart,
             @Param("nextAttributionMonthStart") LocalDate nextAttributionMonthStart
     );
