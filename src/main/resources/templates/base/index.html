@@ -12,10 +12,6 @@
   <header class="page-header base-page-header">
     <div class="page-header-copy">
       <h1 class="page-title">기준정보 조회</h1>
-      <p class="page-description">
-        계약·지급을 등록할 때 사용하는 조직, 보험회사, 상품 판매버전, 설계사 정보를 조회합니다.
-        1차에서는 조회만 제공하며 등록·수정 기능은 제공하지 않습니다.
-      </p>
     </div>
     <p class="base-as-of-summary">
       기본 조회 기준일
@@ -198,8 +194,38 @@
             <thead><tr><th scope="col">항목코드</th><th scope="col">항목명</th><th scope="col">지급/차감</th><th scope="col">분류</th><th scope="col">적용 시작일</th><th scope="col">적용 종료일</th></tr></thead>
             <tbody data-base-body="commission-item">
             <tr th:each="item : ${commissionItems}">
-              <td class="tabular-nums" th:text="${item.itemCode()}">BASE_COMMISSION</td>
-              <td th:text="${item.itemName()}">FC 기본수수료</td>
+              <td class="tabular-nums base-disclosure-cell">
+                <span th:if="${#strings.isEmpty(item.itemCode()) or #strings.length(item.itemCode()) <= 18}"
+                      th:text="${item.itemCode()} ?: '-'">BASE_COMMISSION</span>
+                <div class="table-cell-disclosure"
+                     th:if="${!#strings.isEmpty(item.itemCode()) and #strings.length(item.itemCode()) > 18}">
+                  <span class="table-cell-preview is-single-line" th:text="${item.itemCode()}">COMMISSION_ITEM_CODE</span>
+                  <details class="table-cell-details">
+                    <summary>
+                      <span class="table-cell-more">전체 보기</span>
+                      <span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
+                    </summary>
+                    <p class="table-cell-full" th:text="${item.itemCode()}">COMMISSION_ITEM_CODE</p>
+                  </details>
+                </div>
+              </td>
+              <td class="base-disclosure-cell">
+                <span th:if="${#strings.isEmpty(item.itemName()) or #strings.length(item.itemName()) <= 28}"
+                      th:text="${item.itemName()} ?: '-'">FC 기본수수료</span>
+                <div class="table-cell-disclosure"
+                     th:if="${!#strings.isEmpty(item.itemName()) and #strings.length(item.itemName()) > 28}">
+                  <span class="table-cell-preview" th:text="${item.itemName()}">수수료 항목명</span>
+                  <details class="table-cell-details">
+                    <summary>
+                      <span class="table-cell-more">전체 보기</span>
+                      <span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
+                    </summary>
+                    <p class="table-cell-full" th:text="${item.itemName()}">수수료 항목명</p>
+                  </details>
+                </div>
+              </td>
               <td><span class="status-badge"
                         th:classappend="${item.cashflowType() == 'PAYMENT' ? ' status-badge-success' : (item.cashflowType() == 'DEDUCTION' ? ' status-badge-warning' : ' status-badge-neutral')}"
                         th:text="${item.cashflowType() == 'PAYMENT' ? '지급' : (item.cashflowType() == 'DEDUCTION' ? '차감' : item.cashflowType())}">지급</span></td>

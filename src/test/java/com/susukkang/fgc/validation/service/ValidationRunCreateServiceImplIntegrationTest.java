@@ -43,6 +43,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 class ValidationRunCreateServiceImplIntegrationTest {
 
+    // 이 클래스는 @Transactional 없이 실제 커밋하고, 아래 cleanUp()이 "월 통째로" 지운다.
+    // 그래서 센티넬 월은 이 클래스 전용이어야 한다 — 2099-01은 ReconciliationRunIntegrationTest도
+    // 쓰는 월이라, 남이 만든 실행(자식 exception_case가 달린)까지 지우려다 FK 위반으로 DELETE가
+    // 통째로 실패했다. 그러면 이 클래스가 만든 활성 MANUAL_CONTRACT 행이 남고,
+    // uq_validation_run_active_manual_contract는 월과 무관한 전역 1건 제약이라 뒤따르는 테스트가
+    // 줄줄이 무너진다(CI 2026-08-19 bee042b4에서 5건 실패). 아무도 안 쓰는 월로 옮긴다.
+    private static final LocalDate MONTHLY_MONTH = LocalDate.of(2095, 1, 1);
+    private static final LocalDate NON_MONTHLY_MONTH = LocalDate.of(2095, 2, 1);
+
     @Autowired
     private ValidationRunCreateService validationRunCreateService;
     @Autowired
@@ -51,7 +60,7 @@ class ValidationRunCreateServiceImplIntegrationTest {
     @AfterEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_month IN (?, ?)",
-                LocalDate.of(2099, 1, 1), LocalDate.of(2099, 2, 1));
+                MONTHLY_MONTH, NON_MONTHLY_MONTH);
     }
 
     private Callable<ValidationRunRow> createTask(LocalDate month, ValidationRunType runType) {
@@ -61,7 +70,7 @@ class ValidationRunCreateServiceImplIntegrationTest {
 
     @Test
     void concurrentMonthlyRunsResultInExactlyOneSuccessAndOneAlreadyRunningConflict() throws InterruptedException {
-        LocalDate month = LocalDate.of(2099, 1, 1);
+        LocalDate month = MONTHLY_MONTH;
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             List<Future<ValidationRunRow>> futures = executor.invokeAll(List.of(
@@ -98,7 +107,7 @@ class ValidationRunCreateServiceImplIntegrationTest {
         // 풀리면 둘 다 성공해야 한다. MANUAL_CONTRACT는 V9부터 이 시나리오가 성립하지 않으므로
         // (아래 concurrentManualContractRunsResultInExactlyOneSuccessAndOneActiveConflict 참고)
         // PRE_CONFIRM으로 이 케이스를 대신 검증한다.
-        LocalDate month = LocalDate.of(2099, 2, 1);
+        LocalDate month = NON_MONTHLY_MONTH;
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             List<Future<ValidationRunRow>> futures = executor.invokeAll(List.of(
@@ -130,7 +139,7 @@ class ValidationRunCreateServiceImplIntegrationTest {
     // 사전 확인이 MONTHLY와 같은 패턴으로 이를 FgcBusinessException(VRUN_001)으로 앞서 걸러낸다.
     @Test
     void concurrentManualContractRunsResultInExactlyOneSuccessAndOneActiveConflict() throws InterruptedException {
-        LocalDate month = LocalDate.of(2099, 2, 1);
+        LocalDate month = NON_MONTHLY_MONTH;
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             List<Future<ValidationRunRow>> futures = executor.invokeAll(List.of(

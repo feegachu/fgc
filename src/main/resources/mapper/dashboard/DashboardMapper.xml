@@ -37,9 +37,28 @@
          WHERE result_status = 'WARNING'
     </select>
 
+    <!--
+      차익거래 KPI도 1,200%와 같은 규칙을 따른다 — 화면정의서 DASH-W01 KPI 표가
+      "`CANDIDATE` 계약 수"라고 못박고, 같은 절의 버튼 표가 "기준월 변경 → 6장 카드를
+      다시 계산"이라고 쓴다. 예전 구현은 월 필터도 dedup도 없어 arbitrage_check 전체
+      행 수를 셌고, 한 달을 두 번 검증하면(run_no 1·2) 같은 계약이 두 번 세어져
+      예외함의 ARBITRAGE_CANDIDATE 카드와 숫자가 어긋났다(#257, 10건 vs 5건).
+      uq_arbitrage_check가 (validation_run_id, contract_id, payment_stage, as_of_date)라
+      재실행마다 행이 새로 쌓이는 것 자체는 설계대로다(인터페이스정의서 7-5 단계표,
+      IF-API-33 수동 재검증도 MANUAL_CONTRACT run을 새로 만들어 붙인다). 이력은 그대로
+      쌓아 두고 읽을 때 계약·지급단계별 최신 1건으로 접는다 — 예외 키
+      (ARBITRAGE_CANDIDATE:월:CONTRACT:계약:지급단계)와 같은 단위라 예외함과 항상 맞는다.
+      as_of_date::timestamp 캐스팅과 ORDER BY 컬럼 순서는 ix_arbitrage_check_month_latest
+      (V33) 정의와 문자 그대로 일치해야 플래너가 그 인덱스를 쓴다 — cap 쪽과 같은 이유다.
+    -->
     <select id="countArbitrageCandidate" resultType="long">
         SELECT COUNT(*)
-          FROM fgc.arbitrage_check
+          FROM (
+              SELECT DISTINCT ON (contract_id, payment_stage) result_status
+                FROM fgc.arbitrage_check
+               WHERE date_trunc('month', as_of_date::timestamp) = date_trunc('month', #{month}::date::timestamp)
+               ORDER BY contract_id, payment_stage, as_of_date DESC, arbitrage_check_id DESC
+          ) AS latest_in_month
          WHERE result_status = 'CANDIDATE'
     </select>
 

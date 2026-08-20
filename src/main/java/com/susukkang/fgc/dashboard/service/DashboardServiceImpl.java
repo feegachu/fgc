@@ -33,7 +33,7 @@ public class DashboardServiceImpl implements DashboardService {
         // 카드 6장 + 최근 목록 2개를 하나의 읽기 전용 트랜잭션에서 조회
         long capVilation = dashboardMapper.countCapViolation(month);
         long capWarning = dashboardMapper.countCapWarning(month);
-        long arbitrageCandidate = dashboardMapper.countArbitrageCandidate();
+        long arbitrageCandidate = dashboardMapper.countArbitrageCandidate(month);
         long reconciliationMismatch = dashboardMapper.countReconciliationMismatch(month);
         long journalImbalance = dashboardMapper.countJournalImbalance();
         long openException = dashboardMapper.countOpenException();

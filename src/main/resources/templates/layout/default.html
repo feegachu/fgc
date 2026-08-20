@@ -18,13 +18,18 @@
   <link rel="stylesheet" th:href="@{/css/common/utilities.css}">
   <link rel="stylesheet" th:href="@{/css/features/publishing.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-AUDT-W01'}" th:href="@{/css/features/audit.css}">
+  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-ARB-W01'}" th:href="@{/css/features/arbitrage.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-BASE-W01'}" th:href="@{/css/features/base.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-DASH-W01'}" th:href="@{/css/features/dashboard.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CONT-')}" th:href="@{/css/features/contract.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-SCHE-')}" th:href="@{/css/features/schedule.css}">
   <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-CAP-') or screenId == 'FGC-UI-CONT-W02'}" th:href="@{/css/features/cap.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-POL-W01'}" th:href="@{/css/features/policy.css}">
+  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-RECO-W01'}" th:href="@{/css/features/reco.css}">
   <link rel="stylesheet" th:if="${screenId == 'FGC-UI-EXCP-W01'}" th:href="@{/css/features/exception.css}">
+  <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-TRAN-')}" th:href="@{/css/features/transaction.css}">
+  <link rel="stylesheet" th:if="${#strings.startsWith(screenId, 'FGC-UI-VRUN-')}" th:href="@{/css/features/vrun.css}">
+  <link rel="stylesheet" th:if="${screenId == 'FGC-UI-LEDG-W01'}" th:href="@{/css/features/ledger.css}">
 </head>
 <body class="app-shell" th:attr="data-workspace-tab-id=${screenId},data-workspace-tab-title=${title},data-workspace-tab-icon=${screenId == 'FGC-UI-DASH-W01' ? 'dashboard' : 'description'}">
   <script th:src="@{/js/common/sidebar-state-init.js}"></script>
@@ -44,6 +49,9 @@
   <script th:src="@{/js/common/modal.js}" defer></script>
   <script th:src="@{/js/common/toast.js}" defer></script>
   <script th:src="@{/js/common/api-client.js}" defer></script>
+  <script th:src="@{/js/common/format.js}" defer></script>
+  <script th:src="@{/js/common/evidence.js}" defer></script>
+  <script th:if="${screenId == 'FGC-UI-AUDT-W01'}" th:src="@{/js/features/audit/audit-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-BASE-W01'}" th:src="@{/js/features/base/base-api.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-BASE-W01'}" th:src="@{/js/features/base/base-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-DASH-W01'}" th:src="@{/js/features/dashboard/dashboard.js}" defer></script>

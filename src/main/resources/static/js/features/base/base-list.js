@@ -54,6 +54,18 @@
     return value === null || value === undefined || value === "" ? (fallback || "—") : escapeHtml(value);
   }
 
+  function tableCellDisclosure(value, limit, singleLine) {
+    var text = value === null || value === undefined || value === "" ? "—" : String(value);
+    var safeText = escapeHtml(text);
+    if (text.length <= limit) return safeText;
+    return '<div class="table-cell-disclosure">' +
+      '<span class="table-cell-preview' + (singleLine ? " is-single-line" : "") + '">' + safeText + "</span>" +
+      '<details class="table-cell-details"><summary>' +
+      '<span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>' +
+      '<span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>' +
+      '</summary><p class="table-cell-full">' + safeText + "</p></details></div>";
+  }
+
   function booleanLabel(value) {
     return value === true ? "예" : value === false ? "아니오" : "—";
   }
@@ -127,10 +139,10 @@
 
   function organizationRow(item) {
     return "<tr>" +
-      '<td class="tabular-nums">' + display(item.organizationCode) + "</td>" +
-      "<td>" + display(item.organizationName) + "</td>" +
+      '<td class="tabular-nums base-disclosure-cell">' + tableCellDisclosure(item.organizationCode, 20, true) + "</td>" +
+      '<td class="base-disclosure-cell">' + tableCellDisclosure(item.organizationName, 24, true) + "</td>" +
       "<td>" + display(item.organizationTypeLabel) + ' <span class="base-code-label">' + display(item.organizationType) + "</span></td>" +
-      "<td>" + display(item.parentName) + "</td>" +
+      '<td class="base-disclosure-cell">' + tableCellDisclosure(item.parentName, 24, true) + "</td>" +
       '<td class="tabular-nums">' + display(item.effectiveFrom) + "</td>" +
       '<td class="tabular-nums">' + display(item.effectiveTo) + "</td>" +
       "<td>" + statusBadge(item.activeYn, "사용", "사용중지") + "</td></tr>";
@@ -138,8 +150,8 @@
 
   function insurerRow(item) {
     return "<tr>" +
-      '<td class="tabular-nums">' + display(item.insurerCode) + "</td>" +
-      "<td>" + display(item.insurerName) + "</td>" +
+      '<td class="tabular-nums base-disclosure-cell">' + tableCellDisclosure(item.insurerCode, 20, true) + "</td>" +
+      '<td class="base-disclosure-cell">' + tableCellDisclosure(item.insurerName, 24, true) + "</td>" +
       "<td>" + display(item.insurerTypeLabel) + ' <span class="base-code-label">' + display(item.insurerType) + "</span></td>" +
       "<td>" + statusBadge(item.activeYn, "사용", "사용중지") + "</td></tr>";
   }
@@ -148,9 +160,9 @@
     var salesPeriod = display(item.salesStartDate) + " ~ " + display(item.salesEndDate, "현재");
     var documentVersion = display(item.basicDocumentVersion) + '<span class="base-secondary-line">' + display(item.basicDocumentDate) + "</span>";
     return "<tr>" +
-      '<td class="tabular-nums">' + display(item.insurerProductCode) + "</td>" +
-      "<td>" + display(item.productName) + "</td>" +
-      '<td class="tabular-nums">' + display(item.standardProductCode) + "</td>" +
+      '<td class="tabular-nums base-disclosure-cell">' + tableCellDisclosure(item.insurerProductCode, 20, true) + "</td>" +
+      '<td class="base-disclosure-cell">' + tableCellDisclosure(item.productName, 28, false) + "</td>" +
+      '<td class="tabular-nums base-disclosure-cell">' + tableCellDisclosure(item.standardProductCode, 20, true) + "</td>" +
       "<td>" + display(item.productGroupCode) + "</td>" +
       '<td class="tabular-nums">' + display(item.offeringVersion) + "</td>" +
       '<td class="tabular-nums">' + salesPeriod + "</td>" +
@@ -170,10 +182,10 @@
       ? '<span class="status-badge status-badge-warning">대상</span><span class="base-secondary-line">' + display(item.newcomerSupportEndDate) + "까지</span>"
       : '<span class="status-badge status-badge-neutral">비대상</span>';
     return "<tr>" +
-      '<td class="tabular-nums">' + display(item.agentCode) + "</td>" +
+      '<td class="tabular-nums base-disclosure-cell">' + tableCellDisclosure(item.agentCode, 20, true) + "</td>" +
       "<td>" + display(item.agentName) + "</td>" +
       "<td>" + display(item.rankLabel) + ' <span class="base-code-label">' + display(item.rankCode) + "</span></td>" +
-      "<td>" + display(item.organizationName) + '<span class="base-secondary-line tabular-nums">' + display(item.organizationCode) + "</span></td>" +
+      '<td class="base-disclosure-cell">' + tableCellDisclosure(item.organizationName, 24, true) + '<span class="base-secondary-line tabular-nums">' + display(item.organizationCode) + "</span></td>" +
       '<td class="tabular-nums">' + display(item.appointmentDate) + "</td>" +
       '<td class="tabular-nums">' + display(item.terminationDate) + "</td>" +
       "<td>" + statusBadge(isActiveStatus, item.agentStatusLabel || "활동", item.agentStatusLabel || "비활동") +
@@ -185,8 +197,8 @@
 
   function commissionItemRow(item) {
     return "<tr>" +
-      '<td class="tabular-nums">' + display(item.itemCode) + "</td>" +
-      "<td>" + display(item.itemName) + "</td>" +
+      '<td class="tabular-nums base-disclosure-cell">' + tableCellDisclosure(item.itemCode, 18, true) + "</td>" +
+      '<td class="base-disclosure-cell">' + tableCellDisclosure(item.itemName, 28, false) + "</td>" +
       "<td>" + cashflowBadge(item.cashflowType) + "</td>" +
       "<td>" + display(commissionItemCategory(item)) + "</td>" +
       '<td class="tabular-nums">' + display(item.effectiveFrom) + "</td>" +

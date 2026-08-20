@@ -5,15 +5,7 @@
 }
 
 .cap-section-header {
-  align-items: flex-start;
-}
-
-.cap-section-description,
-.cap-modal-subtitle {
-  margin-top: var(--space-1);
-  color: var(--color-text-tertiary);
-  font-size: 0.75rem;
-  line-height: 1.125rem;
+  padding: var(--space-4) var(--space-6);
 }
 
 .cap-filter-panel,
@@ -29,6 +21,11 @@
   padding: var(--space-4) var(--space-6) var(--space-6);
 }
 
+.cap-filter-panel > .cap-section-header,
+.cap-stage-panel > .cap-section-header {
+  padding-bottom: 0;
+}
+
 .cap-filter-actions {
   display: flex;
   gap: var(--space-2);
@@ -41,10 +38,20 @@
   background: var(--color-bg-subtle);
 }
 
+.cap-filter-form .select-control {
+  min-width: 0;
+}
+
 .cap-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.cap-kpi-grid.is-loading,
+.cap-stage-grid.is-loading {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 .cap-kpi-card {
@@ -96,15 +103,12 @@
   font-size: 0.75rem;
 }
 
-.cap-stage-panel > .cap-section-header {
-  padding-bottom: 0;
-}
-
 .cap-stage-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6) var(--space-6);
+  transition: opacity var(--transition-fast);
 }
 
 .cap-stage-card {
@@ -142,9 +146,16 @@
   background: var(--color-bg-subtle);
 }
 
+/*
+ * --cap-progress 는 사용률 값에 따라 인라인 스타일로 덮어쓴다
+ * (cap-list.js 는 style 속성 문자열로, contract-tabs.js 는 setProperty 로).
+ * 여기 초기값을 두면 값이 오기 전 한 프레임 동안 막대가 튀지 않고,
+ * 정적 분석도 속성 출처를 찾을 수 있다.
+ */
 .cap-usage-bar {
+  --cap-progress: 0%;
   display: block;
-  width: var(--cap-progress, 0%);
+  width: var(--cap-progress);
   height: 100%;
   border-radius: inherit;
   background: var(--color-status-success-solid);
@@ -227,33 +238,6 @@
   line-height: 1.125rem;
 }
 
-.cap-guidance {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
-  border: 1px solid var(--color-status-info-border);
-  border-radius: var(--radius-12);
-  color: var(--color-status-info-text);
-  background: var(--color-status-info-bg);
-}
-
-.cap-guidance h2 {
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
-}
-
-.cap-guidance p {
-  margin-top: var(--space-1);
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-}
-
-.cap-guidance code {
-  font-size: 0.6875rem;
-}
-
 .cap-table-panel {
   min-width: 0;
 }
@@ -316,6 +300,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cap-contract-table td.cap-disclosure-cell,
+.cap-agent-table td.cap-disclosure-cell,
+.cap-detail-table td.cap-disclosure-cell {
+  overflow: visible;
+  white-space: normal;
+}
+
+.cap-disclosure-cell .table-cell-details {
+  white-space: normal;
 }
 
 .cap-contract-link,
@@ -412,15 +407,335 @@
 }
 
 .cap-detail-modal {
-  width: min(76rem, 100%);
+  width: min(67.5rem, 100%);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-16);
 }
 
 .cap-detail-modal .modal-body + .modal-body {
-  padding-top: 0;
+  padding-top: var(--space-3);
+}
+
+.cap-detail-modal-header {
+  min-height: 4.625rem;
+}
+
+.cap-detail-modal-heading {
+  min-width: 0;
+}
+
+.cap-detail-eyebrow {
+  color: var(--color-text-link);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+}
+
+.cap-detail-modal-heading .modal-title {
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+}
+
+.cap-detail-footer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-2);
 }
 
 .cap-detail-state {
   min-height: 15rem;
+}
+
+.cap-detail {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.cap-detail-summary,
+.cap-detail-section {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-12);
+}
+
+.cap-detail-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(22rem, 1.9fr) repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+
+.cap-detail-summary-grid div {
+  min-width: 0;
+}
+
+.cap-detail-summary-grid dt,
+.cap-detail-count {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+.cap-detail-summary-grid dd {
+  min-width: 0;
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+.cap-detail-summary-contract dd {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cap-detail-contract-context {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.cap-detail-contract-context #sum-contract {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cap-detail-contract-context #sum-stage,
+.cap-detail-contract-context > [aria-hidden="true"] {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.cap-detail-summary-contract #sum-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.cap-detail-layout {
+  display: grid;
+  grid-template-columns: 22rem minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.cap-detail-primary {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.cap-detail-section > .surface-header {
+  min-height: 2.625rem;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.cap-detail-step-header {
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+
+.cap-detail-step-header .surface-title {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.cap-detail-count {
+  text-align: right;
+}
+
+.cap-detail-pair-table {
+  min-width: 0;
+}
+
+.cap-detail-pair-table th {
+  width: 58%;
+  padding: 0.1875rem var(--space-4);
+  border-bottom-color: var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+}
+
+.cap-detail-pair-table td {
+  padding: 0.1875rem var(--space-4);
+  border-bottom-color: var(--color-border-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  text-align: right;
+}
+
+.cap-detail-formula-body {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.cap-detail-formula {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-8);
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.cap-detail-formula strong {
+  font-size: 0.8125rem;
+}
+
+.cap-detail-formula span {
+  color: var(--color-text-secondary);
+}
+
+.cap-detail-formula em {
+  color: var(--color-status-success-text);
+  font-style: normal;
+  font-weight: 700;
+  text-align: right;
+}
+
+.cap-detail-result-gauge {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.cap-detail-gauge-heading,
+.cap-detail-final-status,
+.cap-detail-result-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.cap-detail-gauge-heading {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+.cap-detail-gauge-heading strong {
+  color: var(--color-status-success-text);
+  font-size: 0.75rem;
+}
+
+.cap-detail-gauge-track {
+  position: relative;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+}
+
+.cap-detail-gauge-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--color-status-success-solid);
+  transition: width var(--transition-standard);
+}
+
+.cap-detail-gauge-bar.is-warning {
+  background: var(--color-status-warning-solid);
+}
+
+.cap-detail-gauge-bar.is-violation {
+  background: var(--color-status-error-solid);
+}
+
+.cap-detail-gauge-bar.is-review {
+  background: var(--color-status-review-solid);
+}
+
+.cap-detail-gauge-mark {
+  position: absolute;
+  top: -0.25rem;
+  width: 0.125rem;
+  height: 1.125rem;
+  background: var(--color-status-warning-solid);
+  transform: translateX(-50%);
+}
+
+.cap-detail-result-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.cap-detail-result-list dt {
+  color: var(--color-text-secondary);
+}
+
+.cap-detail-result-list dd {
+  font-weight: 600;
+}
+
+.cap-detail-final-status {
+  margin-top: var(--space-1);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.cap-detail-table {
+  min-width: 39.5rem;
+}
+
+.cap-detail-lines > .data-table-viewport {
+  margin: 0 var(--space-4);
+}
+
+.cap-detail-col-seq { width: 2rem; }
+.cap-detail-col-item { width: 7rem; }
+.cap-detail-col-amount { width: 5.5rem; }
+.cap-detail-col-status { width: 5rem; }
+.cap-detail-col-reason { width: 12.5rem; }
+.cap-detail-col-evidence { width: 7.5rem; }
+
+.cap-detail-table tbody td:first-child {
+  text-align: right;
+}
+
+.cap-detail-table tfoot th,
+.cap-detail-table tfoot td {
+  min-height: 3rem;
+  padding: var(--space-3) var(--data-table-cell-padding-x);
+  border-bottom: 0;
+  background: var(--color-bg-subtle);
+  white-space: normal;
+}
+
+.cap-detail-table tfoot strong {
+  color: var(--color-action-primary);
+}
+
+@media (max-width: 63.9375rem) {
+  .cap-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cap-detail-primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cap-detail-primary > :last-child {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 79.9375rem) {
@@ -474,7 +789,8 @@
   }
 
   .cap-stage-grid,
-  .cap-filter-form {
+  .cap-filter-form,
+  .cap-section-header {
     padding-right: var(--space-4);
     padding-left: var(--space-4);
   }
@@ -483,11 +799,43 @@
     padding: var(--space-4);
   }
 
-  .cap-guidance {
-    padding: var(--space-4);
-  }
-
   .pagination {
     justify-content: center;
   }
+
+  .cap-detail-lines-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+
+  .cap-detail-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cap-detail-summary-contract {
+    grid-column: 1 / -1;
+  }
+
+  .cap-detail-primary {
+    grid-template-columns: 1fr;
+  }
+
+  .cap-detail-primary > :last-child {
+    grid-column: auto;
+  }
+
+  .cap-detail-footer-actions,
+  .cap-detail-footer-actions .button {
+    width: 100%;
+  }
+
+}
+
+@media (max-width: 31.25rem) {
+  .cap-detail-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
 }
