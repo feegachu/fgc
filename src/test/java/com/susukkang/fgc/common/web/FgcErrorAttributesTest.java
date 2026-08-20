@@ -35,15 +35,21 @@ class FgcErrorAttributesTest {
     @Test
     void maps_http_status_to_the_error_code_shown_on_the_error_page() {
         assertThat(attributesOf(errorRequest(403))).containsEntry("errorCode", "FGC-AUTH-003");
-        assertThat(attributesOf(errorRequest(404))).containsEntry("errorCode", "FGC-COMMON-004");
         assertThat(attributesOf(errorRequest(500))).containsEntry("errorCode", "FGC-COMMON-500");
-        // 3-2 매핑표에 없는 상태(예: 502)는 전부 공통 500 코드로 떨어진다.
-        assertThat(attributesOf(errorRequest(502))).containsEntry("errorCode", "FGC-COMMON-500");
     }
 
-    /** 오류가 아닌 요청까지 오류코드로 물들이지 않는다. */
+    /*
+     * 3-2 오류코드 표준 매핑표(05_인터페이스정의서 :242~261)에 없는 상태에는 코드를 붙이지 않는다.
+     *
+     * 404 가 특히 중요하다 — FgcErrorCode.COMMON_004 는 enum 에만 있고 3-1 절(:205)의 404 는
+     * "그 ID 의 자료가 없음" 이다. 경로 자체가 없는 MPA 404 에 그 코드를 재사용하면 한 코드가
+     * 문구 둘을 갖게 되어 SIR-007 규칙 3 을 오히려 어긴다 (2026-08-20 PR #313 리뷰 판정).
+     * 아무 코드나 붙이지 않고 비워 두어야 화면이 요청 ID 만 보여준다.
+     */
     @Test
-    void omits_error_code_when_status_is_not_an_error() {
+    void omits_error_code_for_statuses_absent_from_the_standard_mapping_table() {
+        assertThat(attributesOf(errorRequest(404))).doesNotContainKey("errorCode");
+        assertThat(attributesOf(errorRequest(502))).doesNotContainKey("errorCode");
         assertThat(attributesOf(errorRequest(200))).doesNotContainKey("errorCode");
     }
 

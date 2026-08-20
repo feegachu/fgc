@@ -666,8 +666,9 @@ class PublishingTemplateStructureTest {
                     .contains("class=\"surface-title\"")
                     .contains("class=\"surface-body error-card-body\"")
                     .contains("class=\"button button-secondary error-action\"")
-                    // SIR-007 규칙 3 — 코드와 요청 ID 는 세 화면 모두 서버 모델에서 온다.
-                    .contains("${errorCode}")
+                    // 추적 ID 는 세 화면 모두 서버 모델(FgcErrorAttributes)에서 온다.
+                    // 표현식 모양은 화면마다 다르므로(500 은 문구 안 치환) 정확한 형태는 아래에서 따로 본다.
+                    .contains("requestId")
                     .doesNotContain("fgc-main")
                     .doesNotContain("fgc-card")
                     .doesNotContain("fgc-btn")
@@ -677,12 +678,27 @@ class PublishingTemplateStructureTest {
                     .doesNotContainPattern("(?i)<script[\\s>]");
         }
 
-        // 403·404 는 문구 안에 요청번호가 없으므로 추적 ID 를 코드 옆에 따로 붙인다.
+        /*
+         * 오류코드는 3-2 오류코드 표준 매핑표(05_인터페이스정의서 :242~261)에 등재된 것만 화면에 띄운다.
+         *
+         * 403(FGC-AUTH-003)·500(FGC-COMMON-500)은 표에 있다. 404 는 표에 **없다** —
+         * FgcErrorCode.COMMON_004 는 enum 에만 있고 3-1 절(:205)의 404 는 "그 ID 의 자료가 없음"
+         * 이라, 경로 자체가 없는 이 화면에 재사용하면 한 코드가 문구 둘을 갖게 되어 SIR-007
+         * 규칙 3 을 오히려 어긴다. 그래서 404 는 코드 없이 요청 ID 만 보여준다
+         * (2026-08-20 PR #313 리뷰 판정). 표에 "경로 없음" 코드가 등재되면 그때 되살린다.
+         */
+        assertThat(resource("templates/error/403.html"))
+                .contains("${errorCode}")
+                .contains("' · 요청 ID: ' + ${requestId}");
+        assertThat(resource("templates/error/404.html"))
+                .contains("'요청 ID: ' + ${requestId}")
+                .doesNotContain("${errorCode}")
+                .doesNotContain("FGC-COMMON-004");
         // 500 은 error.common.internal 문구가 이미 {requestId} 를 품고 있어 코드만 덧붙인다
         // (format.js:errorText() 의 중복 방지 규칙과 같은 처리).
-        assertThat(resource("templates/error/403.html")).contains("' · 요청 ID: ' + ${requestId}");
-        assertThat(resource("templates/error/404.html")).contains("' · 요청 ID: ' + ${requestId}");
-        assertThat(resource("templates/error/500.html")).contains("'{requestId}', requestId ?: '-'");
+        assertThat(resource("templates/error/500.html"))
+                .contains("${errorCode}")
+                .contains("'{requestId}', requestId ?: '-'");
 
         // SIR-007 규칙 4 — 화면 문구는 전부 메시지 키로. 하드코딩이 되돌아오면 여기서 걸린다.
         assertThat(resource("templates/error/403.html"))
@@ -726,9 +742,13 @@ class PublishingTemplateStructureTest {
                 .contains("role=\"alert\" aria-live=\"polite\"")
                 // 부록 A FGC-AUTH-001 표준 문구를 메시지 키로 가져온다 (SIR-007 규칙 4).
                 .contains("#{error.auth.invalidCredentials}")
-                // 30분 세션(application.yml server.servlet.session.timeout) 안내와 보안 정책 고지.
-                .contains("30분간 사용하지 않으면 자동으로 로그아웃됩니다.")
-                .contains("인증 실패 사유는 보안을 위해 공통 문구로 안내합니다.")
+                // 2026-08-20 팀 결정 — 브랜드 패널의 기능 소개 리스트와 접속 보안 안내 패널을 걷어냈다.
+                // 화면정의서 AUTH-W01 "화면 구성" 은 ①시스템명 ②폼 ③실패 안내 ④푸터 넷만 규정하고
+                // 이 둘은 규정에 없던 장식이었다. 30분 세션은 만료 시 FGC-AUTH-002 문구로 안내하는 것이
+                // 규정된 경로이고(인터페이스정의서 2-1-1·3-2), 로그인 화면 사전 고지는 요구되지 않는다.
+                .doesNotContain("auth-capability")
+                .doesNotContain("auth-security-notice")
+                .doesNotContain("30분간 사용하지 않으면 자동으로 로그아웃됩니다.")
                 .doesNotContain("fgc-")
                 .doesNotContain("toast-region")
                 .doesNotContain("FGC-AUTH-")

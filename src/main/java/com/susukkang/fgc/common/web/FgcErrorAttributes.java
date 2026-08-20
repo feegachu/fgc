@@ -24,14 +24,22 @@ import java.util.Map;
  * Ajax JSON 봉투가 "코드와 문구" 를 똑같이 보여야 한다. Ajax 쪽은 GlobalExceptionHandler 가
  * FgcErrorCode 를 그대로 내보내므로, 화면도 같은 enum 에서 코드를 가져와야 둘이 갈라지지 않는다.
  * 템플릿에 'FGC-AUTH-003' 문자열을 직접 적으면 enum 이 바뀌는 순간 화면만 옛 코드를 보여준다.
+ *
+ * 404 를 매핑하지 않는 이유 (2026-08-20, PR #313 리뷰 판정)
+ *  3-2 오류코드 표준 매핑표(05_인터페이스정의서 :242~261)에 404 계열 공통 코드가 **없다**.
+ *  FgcErrorCode.COMMON_004 는 enum 에만 있고, 3-1 절(:205)이 규정한 404 는 "그 ID 의 자료가 없음"
+ *  이며 실제 호출부 30여 곳도 전부 Map.of("id", ...) 로 던진다. 경로(화면) 자체가 없는 MPA 404 에
+ *  같은 코드를 붙이면 한 코드가 "요청한 데이터를 찾을 수 없습니다.({id})" 와 "요청한 화면이 없습니다."
+ *  두 문구를 갖게 되어 규칙 3 을 오히려 어긴다. 그래서 404 화면은 코드 없이 요청 ID 만 보여준다.
+ *  "경로 없음" 전용 코드가 필요하면 3-2 표 등재부터다 — 여기서 임의로 만들지 않는다.
  */
 @Component
 public class FgcErrorAttributes extends DefaultErrorAttributes {
 
-    /** HTTP 상태 → 3-2 매핑표의 오류코드. 표에 없는 상태는 전부 FGC-COMMON-500 이다. */
+    /** HTTP 상태 → 3-2 매핑표에 **등재된** 오류코드만. 표에 없는 상태는 코드를 붙이지 않는다. */
     private static final Map<Integer, FgcErrorCode> ERROR_CODE_BY_STATUS = Map.of(
             403, FgcErrorCode.AUTH_003,
-            404, FgcErrorCode.COMMON_004
+            500, FgcErrorCode.COMMON_500
     );
 
     @Override
@@ -41,11 +49,9 @@ public class FgcErrorAttributes extends DefaultErrorAttributes {
         if (requestId != null) {
             attributes.put("requestId", requestId);
         }
-        if (attributes.get("status") instanceof Integer status && status >= 400) {
-            attributes.put(
-                    "errorCode",
-                    ERROR_CODE_BY_STATUS.getOrDefault(status, FgcErrorCode.COMMON_500).getCode()
-            );
+        FgcErrorCode errorCode = ERROR_CODE_BY_STATUS.get(attributes.get("status"));
+        if (errorCode != null) {
+            attributes.put("errorCode", errorCode.getCode());
         }
         return attributes;
     }
