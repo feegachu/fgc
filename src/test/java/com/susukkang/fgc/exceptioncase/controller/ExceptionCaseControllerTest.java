@@ -15,7 +15,10 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
+import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
+import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
+import com.susukkang.fgc.exceptioncase.service.JournalCorrectionExceptionActionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -54,6 +57,9 @@ class ExceptionCaseControllerTest {
 
     @MockitoBean
     private ExceptionCaseService exceptionCaseService;
+
+    @MockitoBean
+    private JournalCorrectionExceptionActionService journalCorrectionExceptionActionService;
 
     @Test
     void searchesExceptionsForAuthenticatedUser() throws Exception {
@@ -120,6 +126,40 @@ class ExceptionCaseControllerTest {
 
         verify(exceptionCaseService).action(
                 eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
+    }
+
+    @Test
+    void correctsJournalAndResolvesExceptionThroughDedicatedApi() throws Exception {
+        JournalCorrectionActionResponse response = new JournalCorrectionActionResponse(
+                2, ExceptionStatus.IN_REVIEW, ExceptionStatus.RESOLVED, "CORRECT",
+                "금액 정정", "DOC-10", 1L, "settle01", OffsetDateTime.now(),
+                10L, 21L, 22L, "JCG-10-test");
+        given(journalCorrectionExceptionActionService.correct(
+                eq(30L), any(JournalCorrectionActionRequest.class), eq(1L), eq("settle01")))
+                .willReturn(response);
+
+        String request = """
+                {
+                  "reason":"금액 정정",
+                  "evidenceRef":"DOC-10",
+                  "journalDate":"2026-08-20",
+                  "description":"재기표",
+                  "lines":[
+                    {"originalLineNo":1,"accountCode":"CONFIRMED_PAYOUT_EXPENSE","debitAmount":1000,"creditAmount":0},
+                    {"originalLineNo":2,"accountCode":"CONFIRMED_PAYOUT_PAYABLE","debitAmount":0,"creditAmount":1000}
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
+                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.toStatus").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.originalJournalHeaderId").value(10L))
+                .andExpect(jsonPath("$.data.reversalJournalHeaderId").value(21L))
+                .andExpect(jsonPath("$.data.repostedJournalHeaderId").value(22L));
     }
 
     @Test

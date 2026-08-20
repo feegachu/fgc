@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.journal.domain.JournalType;
+import com.susukkang.fgc.journal.domain.JournalAccountCode;
 import com.susukkang.fgc.journal.dto.JournalAccountRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionGroupInsertRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionHeaderRow;
@@ -14,6 +15,8 @@ import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
 import com.susukkang.fgc.journal.dto.JournalHeaderInsertRow;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
 import com.susukkang.fgc.journal.dto.JournalLineInsertRow;
+import com.susukkang.fgc.journal.dto.JournalRepostCommand;
+import com.susukkang.fgc.journal.dto.JournalRepostLineCommand;
 import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.mapper.JournalAccountMapper;
@@ -28,6 +31,8 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +40,13 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+/**
+ * 설명 : FUN-047 원장 역분개·재기표와 정정그룹 저장 구현
+ *
+ * @author yslee
+ * @since 2026-08-20
+ * @version 1.2
+ */
 @Service
 @RequiredArgsConstructor
 public class JournalCorrectionServiceImpl implements JournalCorrectionService {
@@ -62,6 +74,93 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
             throw validationFailure("correctedDraft");
         }
         return correct(command.reversal(), command.correctedDraft());
+    }
+
+    @Override
+    @Transactional
+    public JournalCorrectionResult reverseAndRepost(JournalRepostCommand command) {
+        validateRepostCommand(command);
+        JournalCorrectionHeaderRow original = correctionMapper.findHeaderForUpdate(
+                command.journalHeaderId());
+        validateOriginal(original, command.journalHeaderId());
+        List<JournalCorrectionLineRow> originalLines = correctionMapper.findLines(
+                command.journalHeaderId());
+        JournalHeaderDraft correctedDraft = buildCorrectedDraft(
+                original, originalLines, command);
+        return correct(new ReverseJournalCommand(
+                        command.journalHeaderId(), command.reason(), command.evidenceRef(),
+                        command.requestedBy()),
+                correctedDraft);
+    }
+
+    private void validateRepostCommand(JournalRepostCommand command) {
+        if (command == null || command.journalHeaderId() == null
+                || command.requestedBy() == null || command.journalDate() == null
+                || command.description() == null || command.description().isBlank()
+                || command.description().length() > DESCRIPTION_MAX_LENGTH
+                || command.lines() == null || command.lines().isEmpty()) {
+            throw validationFailure("correctedDraft");
+        }
+    }
+
+    private JournalHeaderDraft buildCorrectedDraft(
+            JournalCorrectionHeaderRow original,
+            List<JournalCorrectionLineRow> originalLines,
+            JournalRepostCommand command
+    ) {
+        if (originalLines.size() != command.lines().size()) {
+            throw validationFailure("lines");
+        }
+        Map<Integer, JournalCorrectionLineRow> originalByLineNo = new HashMap<>();
+        originalLines.forEach(line -> originalByLineNo.put(line.getLineNo(), line));
+        HashSet<Integer> usedLineNumbers = new HashSet<>();
+        List<JournalLineDraft> correctedLines = new ArrayList<>();
+
+        for (JournalRepostLineCommand input : command.lines()) {
+            if (input == null || input.originalLineNo() == null
+                    || !usedLineNumbers.add(input.originalLineNo())) {
+                throw validationFailure("lines.originalLineNo");
+            }
+            JournalCorrectionLineRow source = originalByLineNo.get(input.originalLineNo());
+            if (source == null) {
+                throw validationFailure("lines.originalLineNo");
+            }
+            JournalAccountCode accountCode;
+            try {
+                accountCode = JournalAccountCode.valueOf(input.accountCode());
+            } catch (IllegalArgumentException | NullPointerException exception) {
+                throw validationFailure("lines.accountCode");
+            }
+            PaymentStage paymentStage = source.getPaymentStage() == null
+                    ? null
+                    : PaymentStage.valueOf(source.getPaymentStage());
+            correctedLines.add(JournalLineDraft.builder()
+                    .lineNo(source.getLineNo())
+                    .accountCode(accountCode)
+                    .debitAmount(input.debitAmount())
+                    .creditAmount(input.creditAmount())
+                    .contractId(source.getContractId())
+                    .agentId(source.getAgentId())
+                    .paymentStage(paymentStage)
+                    .commissionItemId(source.getCommissionItemId())
+                    .memo(input.lineDescription() == null
+                            ? source.getMemo()
+                            : input.lineDescription().trim())
+                    .build());
+        }
+        correctedLines.sort(Comparator.comparingInt(JournalLineDraft::getLineNo));
+        return JournalHeaderDraft.builder()
+                .journalType(JournalType.valueOf(original.getJournalType()))
+                .journalDate(command.journalDate())
+                .sourceEntityType(original.getSourceEntityType())
+                .sourceEntityId(original.getSourceEntityId())
+                .revisionNo(original.getRevisionNo() + 1)
+                .validationRunId(original.getValidationRunId())
+                .contractId(original.getContractId())
+                .policyVersionId(original.getPolicyVersionId())
+                .description(command.description().trim())
+                .lines(correctedLines)
+                .build();
     }
 
     private JournalCorrectionResult correct(ReverseJournalCommand command,

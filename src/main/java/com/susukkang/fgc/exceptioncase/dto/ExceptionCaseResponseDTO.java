@@ -112,6 +112,7 @@ public record ExceptionCaseResponseDTO(
             case "ARBITRAGE_CHECK" -> "/arbitrage-checks";
             case "COMMISSION_TRANSACTION" -> "/transactions/new?id=" + sourceEntityId;
             case "SCHEDULE_HEADER" -> "/schedules/" + sourceEntityId;
+            case "JOURNAL_HEADER" -> "/journals?selected=" + sourceEntityId;
             case "RECONCILIATION_RESULT" -> reconciliationSourceLink();
             default -> null;
         };

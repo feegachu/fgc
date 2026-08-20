@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
 import com.susukkang.fgc.audit.mapper.AuditLogMapper;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -24,7 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** IF-API-43 예외함 검색 및 처리 패널 조회 서비스. */
+/**
+ * 설명 : IF-API-43·44 예외함 검색과 처리 서비스
+ *
+ * @author yslee
+ * @since 2026-08-20
+ * @version 1.2
+ */
 @Service
 @RequiredArgsConstructor
 public class ExceptionCaseService {
@@ -169,6 +176,30 @@ public class ExceptionCaseService {
             ExceptionActionRequest request,
             Long actionUserId,
             String actionUserLoginId) {
+        return actionInternal(
+                exceptionCaseId, request, actionUserId, actionUserLoginId, false);
+    }
+
+    /** 실제 원장 reverseAndRepost 성공 뒤 같은 트랜잭션에서만 호출하는 전용 종결 경로. */
+    @Transactional
+    public ExceptionActionResponse actionAfterJournalCorrection(
+            Long exceptionCaseId,
+            ExceptionActionRequest request,
+            Long actionUserId,
+            String actionUserLoginId) {
+        if (request.actionType() != ExceptionActionType.CORRECT) {
+            throw new IllegalArgumentException("원장 정정 후속 조치는 CORRECT만 허용합니다.");
+        }
+        return actionInternal(
+                exceptionCaseId, request, actionUserId, actionUserLoginId, true);
+    }
+
+    private ExceptionActionResponse actionInternal(
+            Long exceptionCaseId,
+            ExceptionActionRequest request,
+            Long actionUserId,
+            String actionUserLoginId,
+            boolean journalCorrectionExecuted) {
 
         if (request.reason() == null || request.reason().isBlank()) {
             throw new FgcBusinessException(FgcErrorCode.EXCP_001);
@@ -189,6 +220,17 @@ public class ExceptionCaseService {
 
         ExceptionStatus fromStatus = target.status();
         ExceptionActionType actionType = request.actionType();
+
+        // 2026-08-20 yslee - 원장 정정 예외의 형식적 종결을 일반 조치 API에서 차단
+        // 기존 코드: CORRECT·RESOLVE 이력만 저장해도 JOURNAL_CORRECTION_REQUIRED가 종결됨
+        // 문제: 실제 역분개·재기표 없이 화면 상태만 해결로 바뀌어 원장과 예외가 불일치함
+        // 개선: 검토 준비·오탐 조치만 일반 API로 허용하고 실제 정정은 IF-API-44A만 사용
+        if (ExceptionType.JOURNAL_CORRECTION_REQUIRED.name().equals(target.exceptionType())
+                && !journalCorrectionExecuted
+                && !isJournalCorrectionGeneralAction(actionType)) {
+            throw new FgcBusinessException(FgcErrorCode.EXCP_003,
+                    Map.of("status", fromStatus.name(), "actionType", actionType.name()));
+        }
 
         // 2. 현재 상태에서 가능한 조치인지 검증
         if (!actionType.supports(fromStatus)) {
@@ -280,6 +322,14 @@ public class ExceptionCaseService {
 
     private boolean isClosed(ExceptionStatus status) {
         return status == ExceptionStatus.RESOLVED || status == ExceptionStatus.REJECTED;
+    }
+
+    private boolean isJournalCorrectionGeneralAction(ExceptionActionType actionType) {
+        return actionType == ExceptionActionType.ASSIGN
+                || actionType == ExceptionActionType.START_REVIEW
+                || actionType == ExceptionActionType.COMMENT
+                || actionType == ExceptionActionType.FALSE_POSITIVE
+                || actionType == ExceptionActionType.REJECT;
     }
 
     private String toJson(ExceptionAuditValue value) {

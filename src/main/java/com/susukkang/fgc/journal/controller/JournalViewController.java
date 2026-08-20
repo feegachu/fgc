@@ -40,6 +40,7 @@ public class JournalViewController {
             @RequestParam(name = "account", required = false) String accountCode,
             @RequestParam(name = "contract", required = false) Long contractId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long selected,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "false") boolean searched,
             Model model
@@ -72,6 +73,7 @@ public class JournalViewController {
         model.addAttribute("statusFilter", safeStatus);
         model.addAttribute("journalTypes", JournalType.values());
         model.addAttribute("journalStatuses", JournalHeaderStatus.values());
+        model.addAttribute("selectedJournalId", selected);
         return "ledger/list";
     }
 

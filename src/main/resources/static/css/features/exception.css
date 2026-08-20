@@ -92,6 +92,33 @@
   justify-self: end;
 }
 
+.journal-correction-lines {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.journal-correction-line {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1.5fr) repeat(2, minmax(7rem, 0.75fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.journal-correction-line__title,
+.journal-correction-line .fgc-field:last-child {
+  grid-column: 1 / -1;
+}
+
+.journal-correction-original,
+.journal-correction-result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .exception-action-error,
 .exception-action-notice {
   min-height: 1.125rem;
@@ -158,6 +185,15 @@
   }
 
   .exception-detail-wide {
+    grid-column: auto;
+  }
+
+  .journal-correction-line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .journal-correction-line__title,
+  .journal-correction-line .fgc-field:last-child {
     grid-column: auto;
   }
 

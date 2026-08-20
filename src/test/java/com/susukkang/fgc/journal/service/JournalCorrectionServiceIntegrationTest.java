@@ -1,6 +1,7 @@
 package com.susukkang.fgc.journal.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
@@ -11,6 +12,12 @@ import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
 import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
+import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRequest;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
+import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionLineRequest;
+import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
+import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
+import com.susukkang.fgc.exceptioncase.service.JournalCorrectionExceptionActionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +45,15 @@ class JournalCorrectionServiceIntegrationTest {
 
     @Autowired
     private JournalCorrectionService journalCorrectionService;
+
+    @Autowired
+    private JournalCorrectionExceptionService journalCorrectionExceptionService;
+
+    @Autowired
+    private JournalCorrectionExceptionActionService correctionExceptionActionService;
+
+    @Autowired
+    private ExceptionCaseService exceptionCaseService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -187,6 +203,85 @@ class JournalCorrectionServiceIntegrationTest {
 
     @Test
     @Transactional
+    void exceptionWorkflowReversesRepostsAndResolvesInOneTransaction() {
+        Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(650_000));
+        String loginId = jdbcTemplate.queryForObject(
+                "SELECT login_id FROM fgc.app_user WHERE user_id = ?", String.class, ACTOR_ID);
+        RequestIdContext.set("req-fun047-exception-flow");
+
+        var created = journalCorrectionExceptionService.createOrGet(
+                originalId,
+                new JournalCorrectionExceptionRequest("금액 오류 정정", "DOC-047"),
+                ACTOR_ID);
+        exceptionCaseService.action(
+                created.exceptionCaseId(),
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "원분개 검토 시작", "DOC-047"),
+                ACTOR_ID,
+                loginId);
+
+        var corrected = correctionExceptionActionService.correct(
+                created.exceptionCaseId(),
+                correctionRequest(BigDecimal.valueOf(620_000), BigDecimal.valueOf(620_000)),
+                ACTOR_ID,
+                loginId);
+
+        assertThat(corrected.originalJournalHeaderId()).isEqualTo(originalId);
+        assertThat(corrected.reversalJournalHeaderId()).isNotNull();
+        assertThat(corrected.repostedJournalHeaderId()).isNotNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.journal_header WHERE journal_header_id = ?",
+                String.class, originalId)).isEqualTo("REVERSED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.exception_case WHERE exception_case_id = ?",
+                String.class, created.exceptionCaseId())).isEqualTo("RESOLVED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.journal_header
+                WHERE correction_group_key = ?
+                """, Integer.class, corrected.correctionGroupKey())).isEqualTo(2);
+    }
+
+    @Test
+    @Transactional
+    void failedRepostKeepsOriginalPostedAndExceptionInReview() {
+        Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(650_000));
+        String loginId = jdbcTemplate.queryForObject(
+                "SELECT login_id FROM fgc.app_user WHERE user_id = ?", String.class, ACTOR_ID);
+        RequestIdContext.set("req-fun047-exception-rollback");
+        var created = journalCorrectionExceptionService.createOrGet(
+                originalId,
+                new JournalCorrectionExceptionRequest("불균형 정정 시도", null),
+                ACTOR_ID);
+        exceptionCaseService.action(
+                created.exceptionCaseId(),
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "검토 시작", null),
+                ACTOR_ID,
+                loginId);
+
+        assertThatThrownBy(() -> correctionExceptionActionService.correct(
+                created.exceptionCaseId(),
+                correctionRequest(BigDecimal.valueOf(620_000), BigDecimal.valueOf(610_000)),
+                ACTOR_ID,
+                loginId))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(error -> assertThat(((FgcBusinessException) error).getErrorCode())
+                        .isEqualTo(FgcErrorCode.LEDG_001));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.journal_header WHERE journal_header_id = ?",
+                String.class, originalId)).isEqualTo("POSTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.exception_case WHERE exception_case_id = ?",
+                String.class, created.exceptionCaseId())).isEqualTo("IN_REVIEW");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.journal_correction_group
+                WHERE original_journal_header_id = ?
+                """, Integer.class, originalId)).isZero();
+    }
+
+    @Test
+    @Transactional
     void duplicateRequestDoesNotCreateAnotherReversal() {
         Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(100_000));
         ReverseJournalCommand command = new ReverseJournalCommand(
@@ -288,6 +383,22 @@ class JournalCorrectionServiceIntegrationTest {
                                 .paymentStage(PaymentStage.INSURER_TO_GA)
                                 .build()))
                 .build();
+    }
+
+    private JournalCorrectionActionRequest correctionRequest(
+            BigDecimal debitAmount,
+            BigDecimal creditAmount
+    ) {
+        return new JournalCorrectionActionRequest(
+                "원장 금액 정정", "DOC-047", JOURNAL_DATE, "FUN-047 정정 분개",
+                List.of(
+                        new JournalCorrectionActionLineRequest(
+                                1, JournalAccountCode.EXPECTED_RECEIVABLE.name(),
+                                debitAmount, BigDecimal.ZERO, "정정 차변"),
+                        new JournalCorrectionActionLineRequest(
+                                2, JournalAccountCode.EXPECTED_INCOME.name(),
+                                BigDecimal.ZERO, creditAmount, "정정 대변")
+                ));
     }
 
     private Long contractId() {

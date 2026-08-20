@@ -156,7 +156,7 @@
           <tbody id="list-body">
             <tr class="exception-row" th:each="c : ${cases}"
                 tabindex="0" aria-controls="detail-body history-body" aria-selected="false"
-                th:attr="data-exception-id=${c.exceptionCaseId()},data-status=${c.status()}">
+                th:attr="data-exception-id=${c.exceptionCaseId()},data-status=${c.status()},data-exception-type=${c.type()}">
               <td class="fgc-mono" th:text="${c.exceptionCaseId()}">-</td>
               <td th:text="${c.type().label()}">-</td>
               <td th:text="${c.reasonLabel()}">-</td>
@@ -281,7 +281,7 @@
         </dd></div>
       </dl>
       <form class="exception-action-form" data-exception-action-form
-            th:if="${c.status() == newStatus or c.status() == inReviewStatus}"
+            th:if="${(c.status() == newStatus or c.status() == inReviewStatus) and (c.type().name() != 'JOURNAL_CORRECTION_REQUIRED' or c.status() == newStatus)}"
             th:attr="data-exception-id=${c.exceptionCaseId()},data-current-status=${c.status()}"
             sec:authorize="hasAnyRole('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')">
         <label class="fgc-field">
@@ -308,6 +308,37 @@
         </label>
         <p class="fgc-error exception-action-error" data-action-error role="alert"></p>
         <button class="fgc-btn fgc-btn--primary exception-action-submit" type="submit" disabled>처리 저장</button>
+      </form>
+      <form class="exception-action-form journal-correction-form" data-journal-correction-form
+            th:if="${c.type().name() == 'JOURNAL_CORRECTION_REQUIRED' and c.status() == inReviewStatus}"
+            th:attr="data-exception-id=${c.exceptionCaseId()},data-journal-id=${c.sourceEntityId()}"
+            sec:authorize="hasAnyRole('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')">
+        <div class="fgc-banner fgc-banner--muted">
+          원분개는 직접 수정하지 않습니다. 아래 신규 분개가 검증을 통과하면 역분개와 재기표를 한 번에 처리합니다.
+        </div>
+        <div data-original-journal>
+          <p class="fgc-muted">원분개를 불러오는 중입니다.</p>
+        </div>
+        <label class="fgc-field">
+          <span class="fgc-label">새 분개일 <span class="field-required" aria-hidden="true">*</span></span>
+          <input class="fgc-input" name="journalDate" type="date" required>
+        </label>
+        <label class="fgc-field">
+          <span class="fgc-label">새 분개 설명 <span class="field-required" aria-hidden="true">*</span></span>
+          <input class="fgc-input" name="description" maxlength="1000" required placeholder="올바른 분개 내용을 입력하세요.">
+        </label>
+        <div class="journal-correction-lines" data-correction-lines></div>
+        <label class="fgc-field">
+          <span class="fgc-label">정정 사유 <span class="field-required" aria-hidden="true">*</span></span>
+          <textarea class="fgc-textarea" name="reason" maxlength="1000" required
+                    placeholder="판단 근거와 실제 정정 내용을 입력하세요."></textarea>
+        </label>
+        <label class="fgc-field">
+          <span class="fgc-label">증빙</span>
+          <input class="fgc-input" name="evidenceRef" maxlength="500" type="text" placeholder="문서번호 또는 링크">
+        </label>
+        <p class="fgc-error exception-action-error" data-correction-error role="alert"></p>
+        <button class="fgc-btn fgc-btn--primary exception-action-submit" type="submit" disabled>정정 실행</button>
       </form>
       <p class="fgc-muted exception-action-notice"
          th:if="${c.status() == newStatus or c.status() == inReviewStatus}"
@@ -357,6 +388,11 @@
       <p class="fgc-muted" style="font-size:13px;margin:0" th:if="${c.actions().isEmpty()}">처리 이력이 없습니다.</p>
     </template>
   </th:block>
+
+  <template id="journal-account-options">
+    <option th:each="account : ${journalAccounts}" th:value="${account.accountCode}"
+            th:text="${account.accountCode + ' · ' + account.accountName}">계정과목</option>
+  </template>
 
 </main>
 </body>

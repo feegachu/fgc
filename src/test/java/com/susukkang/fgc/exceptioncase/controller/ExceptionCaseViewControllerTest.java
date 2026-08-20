@@ -16,6 +16,8 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
+import com.susukkang.fgc.journal.service.JournalAccountCatalogService;
+import com.susukkang.fgc.journal.dto.JournalAccountRow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration;
@@ -32,6 +34,7 @@ import java.util.List;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -54,6 +57,9 @@ class ExceptionCaseViewControllerTest {
 
     @MockitoBean
     private ExceptionCaseService service;
+
+    @MockitoBean
+    private JournalAccountCatalogService journalAccountCatalogService;
 
     private static final FgcUserDetails SETTLE = principal("settle01", "정산담당", "SETTLEMENT");
 
@@ -89,6 +95,34 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("<span>신규</span> → <span>검토중</span>")))
                 .andExpect(content().string(containsString("/js/features/exception/exception-list.js")))
                 .andExpect(content().string(containsString("/css/features/exception.css")));
+    }
+
+    @Test
+    void journalCorrectionCaseRendersDedicatedFormWithDatabaseAccounts() throws Exception {
+        ExceptionCaseResponseDTO correction = new ExceptionCaseResponseDTO(
+                30L, "JOURNAL_CORRECTION_REQUIRED:JOURNAL_HEADER:10",
+                ExceptionType.JOURNAL_CORRECTION_REQUIRED,
+                "JOURNAL_CORRECTION_REQUIRED", ExceptionSeverity.HIGH,
+                ExceptionStatus.IN_REVIEW, "원장 정정 필요", "금액 오류", 5L, "C001",
+                null, 1L, "settle01", "JOURNAL_HEADER", "10", null,
+                LocalDate.of(2026, 8, 1), null, null,
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"),
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), 1,
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), List.of(), List.of());
+        given(service.search(any(), eq(1), eq(20)))
+                .willReturn(response(List.of(correction), 1, 20, 1, 1));
+        JournalAccountRow account = new JournalAccountRow();
+        account.setAccountCode("EXPECTED_RECEIVABLE");
+        account.setAccountName("예상 미수금");
+        given(journalAccountCatalogService.findAllActive()).willReturn(List.of(account));
+
+        mockMvc.perform(get("/exceptions").param("selected", "30").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-journal-correction-form")))
+                .andExpect(content().string(containsString("data-journal-id=\"10\"")))
+                .andExpect(content().string(containsString("EXPECTED_RECEIVABLE · 예상 미수금")))
+                .andExpect(content().string(containsString("정정 실행")))
+                .andExpect(content().string(containsString("href=\"/journals?selected=10\"")));
     }
 
     @Test

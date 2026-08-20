@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susukkang.fgc.journal.mapper.JournalCorrectionExceptionMapper">
+
+    <insert id="insertCase">
+        INSERT INTO fgc.exception_case (
+            exception_key, exception_type, reason_code, severity, status,
+            validation_run_id, validation_month, contract_id, policy_version_id,
+            source_entity_type, source_entity_id, title, description
+        ) VALUES (
+            #{exceptionKey}, 'JOURNAL_CORRECTION_REQUIRED', 'JOURNAL_CORRECTION_REQUIRED',
+            'HIGH', 'NEW', #{validationRunId}, #{validationMonth}, #{contractId},
+            #{policyVersionId}, 'JOURNAL_HEADER', CAST(#{journalHeaderId} AS varchar),
+            #{title}, #{description}
+        )
+        ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
+    </insert>
+
+    <select id="findByExceptionKey"
+            resultType="com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow">
+        SELECT exception_case_id AS exceptionCaseId,
+               status
+          FROM fgc.exception_case
+         WHERE exception_key = #{exceptionKey}
+    </select>
+
+    <insert id="insertInitialAction">
+        INSERT INTO fgc.exception_action (
+            exception_case_id, action_seq, from_status, to_status,
+            action_type, reason, evidence_ref, action_by
+        )
+        SELECT exception_case_id, 1, 'NEW', 'NEW',
+               'COMMENT', #{reason}, #{evidenceRef}, #{requestedBy}
+          FROM fgc.exception_case
+         WHERE exception_key = #{exceptionKey}
+    </insert>
+</mapper>
