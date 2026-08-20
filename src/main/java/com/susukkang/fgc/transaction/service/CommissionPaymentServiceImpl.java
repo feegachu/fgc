@@ -11,6 +11,8 @@ import com.susukkang.fgc.cap.dto.CapValidationResult;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
+import com.susukkang.fgc.base.mapper.AgentMapper;
+import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
@@ -82,6 +84,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private static final String AUDIT_PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
 
     private final CommissionPaymentMapper mapper;
+    private final AgentMapper agentMapper;
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
     private final CapCalculator capCalculator;
@@ -753,8 +756,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         return CommissionPaymentAttributionCommand.builder()
                 .paymentId(paymentId)
+                .agentId(resolveAttributionAgentId(agentId, contractId))
                 .attributionSequence(sequence)
-                .agentId(agentId)
                 .contractId(contractId)
                 .scheduleLineId(scheduleLineId)
                 .installmentNo(installmentNo)
@@ -874,7 +877,17 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         ContractReference target = requireContract(targetId, "attributedContractId");
         if (paymentStage == PaymentStage.GA_TO_FC && !target.agentId().equals(agentId)) {
-            invalid("attributedContractId", "귀속계약의 설계사가 지급 대상 설계사와 다릅니다.");
+            // 2026-08-19 hjKang - FGC-FUN-065 관리자수수료 수취인 허용
+            // 기존 코드: GA→FC 지급 건의 수취인이 귀속계약의 모집설계사와 다르면 무조건 거부했다.
+            // 문제: 관리자수수료는 팀장·지사장·본부장이 받는 돈이고(운영정책서 제20조 패턴 GA-LIFE-A),
+            //       이들은 그 계약을 모집한 적이 없어 등록 자체가 불가능했다.
+            //       V3 시드는 SQL로 직접 넣어 이 검증을 우회하므로, API가 자기 시드 데이터를
+            //       재현하지 못하는 상태였다.
+            // 개선: 모집설계사가 아니면 곧바로 거부하지 않고, 계약일 기준 그 계약 조직 계층에서
+            //       수취인 직급의 활성 관리자를 찾아 일치할 때만 통과시킨다. 아무 팀장이나 되는 게
+            //       아니라 그 계약 조직의 팀장만 통과한다 —
+            //       ScheduleService.resolveBeneficiaryAgentId 와 같은 판정을 재사용한다.
+            requireManagerOfContractOrganization(target, agentId);
         }
 
         if (sourceContractId != null) {
@@ -909,6 +922,33 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             }
         }
         return targetId;
+    }
+
+    /**
+     * @author hjKang
+     * @since 2026-08-19
+     *
+     * 2026-08-19 - 원수사→GA 귀속행의 설계사 자동 결정
+     * 기존 코드: 귀속행 agent_id 에 지급 건의 수령 설계사를 그대로 넣었다.
+     * 문제: 원수사→GA 지급 건은 받는 주체가 GA 법인이라 수령 설계사를 지정할 수 없고
+     *       (validateRecipientAgent · DB ck_transaction_recipient), 그 결과 귀속행 agent_id 가
+     *       항상 null 이 되었다. InsurerGaReconciliationMapper 는 원수사 설계사코드가 없으면
+     *       ta.agent_id 를 실제 설계사로 쓰므로, 수기 등록 건은 설계사를 식별하지 못해
+     *       금액이 정확히 일치해도 REVIEW_REQUIRED 로 빠졌다.
+     * 개선: V3 시드의 COALESCE(수취인, 계약 모집설계사)와 같은 규칙을 적용한다.
+     *
+     * transaction_attribution.agent_id 는 지급단계에 따라 뜻이 다르다.
+     *   GA_TO_FC        : 이 돈을 받은 사람(수취인)
+     *   INSURER_TO_GA   : 이 계약을 모집한 사람(수취인이 아니다)
+     * 원수사→GA 대사는 원수사 명세의 설계사코드 매핑 결과가 계약 모집설계사와 같은지를
+     * 검증하는 것이므로(시드명세 REC-06) 모집설계사를 남기는 것이 맞다.
+     */
+    private Long resolveAttributionAgentId(Long agentId, Long contractId) {
+        if (agentId != null || contractId == null) {
+            return agentId;
+        }
+        ContractReference contract = mapper.findContract(contractId);
+        return contract == null ? null : contract.agentId();
     }
 
     private Long resolveAllocationPolicy(
@@ -1523,6 +1563,33 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     || attribution.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
                 invalid("attributionMethod", "원수사→GA 지급 건에는 설계사 지원 귀속방식을 사용할 수 없습니다.");
             }
+        }
+    }
+
+    /**
+     * @author hjKang
+     * @since 2026-08-19
+     *
+     * 수취인이 귀속계약 조직의 정당한 관리자인지 확인한다.
+     * 계약일 기준으로 계약 소속 조직에서 상위 조직으로 올라가며 수취인 직급의 활성 설계사를 찾고,
+     * 그 결과가 수취인과 같을 때만 통과시킨다(AgentMapper.findActiveAgentIdFromOrganizationHierarchy —
+     * ScheduleService 가 예상 스케줄의 관리자수수료 수취인을 정할 때 쓰는 것과 같은 판정).
+     * 직급이 FC 이면 모집설계사 본인이어야 하므로 허용하지 않는다.
+     */
+    private void requireManagerOfContractOrganization(ContractReference target, Long agentId) {
+        AgentRankCode rankCode = mapper.findAgentRankCode(agentId);
+        if (rankCode == null || rankCode == AgentRankCode.FC || target.organizationId() == null) {
+            invalid("attributedContractId", "귀속계약의 설계사가 지급 대상 설계사와 다릅니다.");
+            return;
+        }
+        Long expectedManagerId = agentMapper.findActiveAgentIdFromOrganizationHierarchy(
+                target.organizationId(),
+                rankCode,
+                target.contractDate()
+        );
+        if (!agentId.equals(expectedManagerId)) {
+            invalid("attributedContractId",
+                    "지급 대상 설계사가 귀속계약 조직의 " + rankCode.name() + " 관리자가 아닙니다.");
         }
     }
 

@@ -60,15 +60,27 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         keys.addAll(expectedByKey.keySet());
         keys.addAll(actualByKey.keySet());
 
+        // 2026-08-19 hjKang - 그룹 안에서 수취인 단위로 짝을 지어 판정한다(운영정책서 제36조).
+        // 기존 코드: 그룹 하나를 통째로 합산해 후보 1건을 만들었다.
+        // 문제: 관리자수수료처럼 수취인이 여럿인 정상 지급에서 수취인을 하나로 좁히지 못해
+        //       REVIEW_REQUIRED 로 빠지고, 팀장 몫이 다른 사람에게 가도 합계가 같으면 통과했다.
+        // 개선: RecipientPairing 이 수취인별 짝을 만들고 짝마다 후보를 만든다.
+        //       createCandidate 내부 판정은 그대로 두어도 각 짝의 수취인이 단일해 정상 동작한다.
         return keys.stream()
                 .sorted(BaseMatchKey.ORDER)
-                .map(key -> createCandidate(
-                        request,
-                        key,
-                        expectedByKey.getOrDefault(key, List.of()),
-                        actualByKey.getOrDefault(key, List.of()),
-                        actualAlignment.ambiguousKeys().contains(key)
-                ))
+                .flatMap(key -> RecipientPairing.byRecipient(
+                                expectedByKey.getOrDefault(key, List.of()),
+                                GaFcExpectedSourceRow::getExpectedAgentId,
+                                actualByKey.getOrDefault(key, List.of()),
+                                GaFcActualSourceRow::getActualAgentId)
+                        .stream()
+                        .map(pair -> createCandidate(
+                                request,
+                                key,
+                                pair.expected(),
+                                pair.actual(),
+                                actualAlignment.ambiguousKeys().contains(key)
+                        )))
                 .toList();
     }
 
@@ -237,14 +249,19 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         if (installmentResolutionIssue || agentResolutionIssue) {
             return ReconciliationResultType.REVIEW_REQUIRED;
         }
-        if (expectedSources.size() > 1 || actualSources.size() > 1) {
-            return ReconciliationResultType.DUPLICATE;
-        }
+        // 2026-08-19 hjKang - 누락 판정을 중복 판정보다 앞에 둔다.
+        // 기존 코드: 행 수가 2 이상이면 한쪽이 비어 있어도 DUPLICATE 로 확정했다.
+        // 문제: 관리자수수료 예상 3행에 실제가 0건인 미지급 상태가 "중복 지급"으로 보고돼
+        //       사실과 반대되는 문구가 예외함에 남았다.
+        // 개선: 한쪽이 비어 있으면 중복일 수 없으므로 누락을 먼저 판정한다.
         if (expectedSources.isEmpty()) {
             return ReconciliationResultType.EXPECTED_MISSING;
         }
         if (actualSources.isEmpty()) {
             return ReconciliationResultType.ACTUAL_MISSING;
+        }
+        if (expectedSources.size() > 1 || actualSources.size() > 1) {
+            return ReconciliationResultType.DUPLICATE;
         }
         if (installmentMismatch) {
             return ReconciliationResultType.INSTALLMENT_MISMATCH;
@@ -273,7 +290,9 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         if (installmentResolutionIssue || installmentMismatch) {
             reasons.add(ReconciliationResultType.INSTALLMENT_MISMATCH.name());
         }
-        if (expectedSources.size() > 1 || actualSources.size() > 1) {
+        // 한쪽이 비어 있으면 중복이 아니다 — 주 사유와 모순되는 보조 사유를 만들지 않는다.
+        if (!expectedSources.isEmpty() && !actualSources.isEmpty()
+                && (expectedSources.size() > 1 || actualSources.size() > 1)) {
             reasons.add(ReconciliationResultType.DUPLICATE.name());
         }
         // 2026-08-13 yslee - FGC-FUN-048-03 설계사 식별 불가 보조 사유 보존

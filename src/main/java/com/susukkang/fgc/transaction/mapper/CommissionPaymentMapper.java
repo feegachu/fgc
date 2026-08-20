@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.mapper;
 
+import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
@@ -47,6 +48,9 @@ public interface CommissionPaymentMapper {
     );
 
     LocalDate findAgentAppointmentDate(@Param("agentId") Long agentId);
+
+    /** 관리자수수료 수취인 검증용 직급 조회. */
+    AgentRankCode findAgentRankCode(@Param("agentId") Long agentId);
 
     ContractReference findContract(@Param("contractId") Long contractId);
 

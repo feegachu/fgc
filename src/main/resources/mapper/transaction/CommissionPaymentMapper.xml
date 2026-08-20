@@ -145,9 +145,22 @@
             resultType="com.susukkang.fgc.transaction.domain.ContractReference">
         SELECT contract_id,
                agent_id,
+               organization_id,
                contract_date
           FROM fgc.insurance_contract
          WHERE contract_id = #{contractId}
+    </select>
+
+    <!--
+      2026-08-19 hjKang - FGC-FUN-065 관리자수수료 수취인 검증용 직급 조회
+      관리자수수료는 계약 모집설계사가 아니라 조직 계층의 상위 관리자에게 지급된다
+      (운영정책서 제20조 패턴 GA-LIFE-A). 수취인이 그 계약 조직의 정당한 관리자인지
+      판정하려면 직급이 필요하다.
+    -->
+    <select id="findAgentRankCode" resultType="com.susukkang.fgc.common.code.AgentRankCode">
+        SELECT rank_code
+          FROM fgc.agent
+         WHERE agent_id = #{agentId}
     </select>
 
     <select id="countContractsBeforeMonth" resultType="int">
@@ -233,6 +246,7 @@
             source_type,
             source_business_key,
             source_contract_id,
+            insurer_id,
             recipient_agent_id,
             commission_item_id,
             policy_version_id,
@@ -249,6 +263,7 @@
             #{sourceType},
             #{sourceBusinessKey},
             #{naturalContractId},
+            (SELECT c.insurer_id FROM fgc.insurance_contract c WHERE c.contract_id = #{naturalContractId}),
             #{agentId},
             #{commissionItemId},
             #{policyVersionId},
@@ -269,6 +284,10 @@
                source_type = #{sourceType},
                source_business_key = #{sourceBusinessKey},
                source_contract_id = #{naturalContractId},
+               -- 2026-08-19 hjKang - 수기 INSURER_TO_GA 지급 건도 원수사 대사 대상이 되도록 보험회사를 채운다.
+               -- InsurerGaReconciliationMapper.findActualSources 가 ct.insurer_id 로 대상을 좁히는데
+               -- 기존에는 이 컬럼이 항상 NULL 이라 수기 건이 전부 탈락했다.
+               insurer_id = (SELECT c.insurer_id FROM fgc.insurance_contract c WHERE c.contract_id = #{naturalContractId}),
                recipient_agent_id = #{agentId},
                commission_item_id = #{commissionItemId},
                policy_version_id = #{policyVersionId},
