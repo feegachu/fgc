@@ -781,10 +781,6 @@
     flex-direction: column;
   }
 
-  .contract-history-times {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .contract-tab-body {
     padding-inline: var(--space-3);
   }
@@ -1092,10 +1088,6 @@
 .contract-history-empty.is-error .material-symbols-rounded,
 .contract-history-empty.is-error strong {
   color: var(--color-status-error-text);
-}
-
-.contract-history-times {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 /* 표 안 긴 값 — 셀 전체가 nowrap 이라 disclosure 만 wrap 을 되살린다. */

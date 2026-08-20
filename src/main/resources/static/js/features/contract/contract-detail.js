@@ -28,9 +28,17 @@
   /*
    * 상태 배지 매핑 1벌 (마이그레이션 가이드 §9).
    *
-   * 색 배정 근거는 화면정의서 4장 규칙 4 —
-   *   정상=초록 / 주의=주황 / 위반·차단=빨강 / 검토필요=review / 진행중=파랑.
-   * 그 5색에 들어가지 않는 종료 상태(해지·만기·청약철회)는 neutral 로 둔다.
+   * 색 배정 근거는 화면정의서 4장 규칙 4 (:212) —
+   *   정상=초록 / 주의=주황 / 위반·차단=빨강 / 검토필요=회색 / 진행중=파랑.
+   * 그 5색에 들어가지 않는 종료 상태(해지·만기·청약철회)도 neutral 로 둔다.
+   *
+   * 단 REVIEW_REQUIRED 는 문서의 "회색"(neutral)이 아니라 status-badge-review 로 둔다.
+   * 이건 이 화면의 선택이 아니라 저장소 전반의 기존 관행이다 —
+   *   features/arbitrage/arbitrage-list.js:19 · features/cap/cap-list.js:29
+   *   features/policy/policy-list.js:102 · features/reco/reco.js:191
+   * 여기만 neutral 로 바꾸면 같은 코드가 화면마다 다른 색이 되어 더 나빠진다.
+   * 문서와 구현 중 어느 쪽을 정본으로 삼을지는 이 PR 범위 밖이므로 별도 이슈로 올린다.
+   * (transaction-form.js:599 는 회색 계열이라 저장소 안에서도 이미 갈려 있다.)
    *
    * 서버 렌더링 배지(templates/contract/list.html 의 th:classappend)도 같은 결과를 내야 한다.
    * 한쪽을 고치면 반드시 다른 쪽도 같이 고친다.
@@ -254,20 +262,26 @@
     source.textContent = (event.sourceSystem || "계약 상태 사건") + (hasProcessings ? "" : " · 처리 대기");
     header.append(title, source);
 
+    /*
+     * 사유는 표시하지 않는다.
+     *
+     * contract_status_event.reason_code 컬럼은 있지만(V1__baseline_v2_1_2.sql:663)
+     * IF-API-16 응답 규격(인터페이스정의서 :305)·ContractStatusEventResponse·
+     * ContractStatusEventMapper.selectByContractId 어디에도 없어 화면까지 오지 않는다.
+     * 넣어 두면 영구히 "—" 만 보이는 칸이 된다 — 백엔드 요청 항목으로 남긴다.
+     */
     var times = document.createElement("dl");
     times.className = "contract-history-times";
     [
       { label: "효력", value: dateTime(event.effectiveAt) },
-      { label: "수신", value: dateTime(event.receivedAt) },
-      { label: "사유", value: event.reason || EMPTY }
+      { label: "수신", value: dateTime(event.receivedAt) }
     ].forEach(function (pair) {
       var group = document.createElement("div");
       var term = document.createElement("dt");
       var description = document.createElement("dd");
       term.textContent = pair.label;
-      description.className = pair.label === "사유" ? "" : "tabular-nums";
+      description.className = "tabular-nums";
       description.textContent = pair.value;
-      description.title = pair.value;
       group.append(term, description);
       times.append(group);
     });
