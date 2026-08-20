@@ -51,3 +51,12 @@
 .stack-6 > * + * {
   margin-top: var(--space-6);
 }
+
+/*
+ * 음수 금액 — 화면정의서 4장 규칙 1 "음수는 빨강 + 괄호".
+ * 괄호는 FgcUi.format.won() 이 값에 넣고, 색은 여기서 준다.
+ * 규칙 4 가 "색만 쓰지 않고 색 + 글자" 이므로 색은 괄호의 보조 수단이다 — 색만으로 뜻을 전하지 않는다.
+ */
+.is-negative-amount {
+  color: var(--color-status-error-text);
+}
