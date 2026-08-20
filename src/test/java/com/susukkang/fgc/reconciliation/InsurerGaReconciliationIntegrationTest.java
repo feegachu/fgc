@@ -333,7 +333,7 @@ class InsurerGaReconciliationIntegrationTest {
     }
 
     @Test
-    void FUN_050_원수사_지급일이_하루_다르면_정확일치로_합치지_않는다() {
+    void FUN_050_같은_월이면_원수사_지급일이_달라도_같은_그룹으로_대사한다() {
         Long insurerId = id("SELECT insurer_id FROM fgc.insurer WHERE active_yn = true ORDER BY insurer_id LIMIT 1");
         Long contractId = id("SELECT contract_id FROM fgc.insurance_contract WHERE insurer_id = ? ORDER BY contract_id LIMIT 1", insurerId);
         Long policyVersionId = id("SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1");
@@ -355,8 +355,9 @@ class InsurerGaReconciliationIntegrationTest {
         List<InsurerGaMatchCandidate> results = matcher.match(new ReconciliationExecutionRequest(
                 50L, null, TEST_MONTH, PaymentStage.INSURER_TO_GA, insurerId, null));
 
+        // 제36조 기본 매칭키는 due_month = settlement_month 다. 지급예정일은 매칭키가 아니다.
         assertThat(results).extracting(InsurerGaMatchCandidate::resultType)
-                .containsExactly(ReconciliationResultType.ACTUAL_MISSING, ReconciliationResultType.EXPECTED_MISSING);
+                .containsExactly(ReconciliationResultType.MATCHED);
     }
 
     private Long insertSchedule(
