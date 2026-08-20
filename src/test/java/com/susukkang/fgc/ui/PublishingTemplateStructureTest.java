@@ -608,6 +608,12 @@ class PublishingTemplateStructureTest {
                 // 라벨은 서버 enum label() 하나만 쓴다.
                 .contains("data-label-group=\"contractStatus\"")
                 .contains("data-label-group=\"paymentCycle\"")
+                // 1,200% 와 차익거래 판정은 그룹을 나눈다. 둘 다 REVIEW_REQUIRED 를 쓰는데
+                // 라벨이 "검토필요"·"자료부족" 으로 달라, 합치면 labelMap() 이 뒤엣것으로 덮어써
+                // 1,200% 탭이 화면정의서 4-2 대조표(:277 검토필요)와 다른 라벨을 표시한다.
+                .contains("data-label-group=\"capResultStatus\"")
+                .contains("data-label-group=\"arbitrageResultStatus\"")
+                .doesNotContain("data-label-group=\"resultStatus\"")
                 // 구현이 끝난 탭에 "API 연동 대기" 를 남겨 두지 않는다.
                 .doesNotContain("API 연동 대기")
                 .doesNotContain("연동 대기 상태로 표시됩니다")
@@ -640,6 +646,10 @@ class PublishingTemplateStructureTest {
                 .contains("th.scope = \"col\"")
                 .contains("detail.badgeClass(status)")
                 .contains("format.won")
+                // 라벨 폴백은 판정 종류를 명시해서 읽는다 — 그룹을 안 주면 두 판정이 섞인다.
+                .contains("statusBadge(row.resultStatusLabel, row.resultStatus, \"capResultStatus\")")
+                .contains("statusBadge(row.resultStatusLabel, row.resultStatus, \"arbitrageResultStatus\")")
+                .doesNotContain("codeLabel(\"resultStatus\"")
                 .doesNotContain("fetch(");
 
         assertThat(resource("templates/layout/default.html"))
@@ -672,6 +682,13 @@ class PublishingTemplateStructureTest {
                 // 납입주기·계약상태 라벨은 서버 enum 하나만 쓴다.
                 .contains("T(com.susukkang.fgc.contract.domain.PaymentCycleCode).values()")
                 .contains("T(com.susukkang.fgc.contract.domain.ContractStatus).values()")
+                /*
+                 * 등록 모드는 청약·정상만 고를 수 있다. 저장이 같은 트랜잭션에서 예상 스케줄과
+                 * 1,200% 한도 검증을 연쇄 실행하므로 이미 끝난 계약을 새로 등록하면 안 된다.
+                 * 수정 모드는 전 상태를 남긴다 — 상태 사건 이력(CONT-W04·FUN-026)이 2차라
+                 * 1차에서는 계약 수정이 상태를 바꾸는 유일한 경로다.
+                 */
+                .contains("th:if=\"${isEditMode or status.name() == 'APPLIED' or status.name() == 'ACTIVE'}\"")
                 .doesNotContain("3개월납")
                 .doesNotContain("style=\"")
                 .doesNotContain("onclick=")

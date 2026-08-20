@@ -7,6 +7,7 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.contract.domain.ContractStatus;
 import com.susukkang.fgc.contract.domain.DataOrigin;
 import com.susukkang.fgc.contract.domain.PaymentCycleCode;
 import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
@@ -275,6 +276,57 @@ class ContractServiceTest {
 
         assertThatThrownBy(() -> contractService.createContract(request))
                 .isInstanceOf(FgcBusinessException.class);
+    }
+
+    /*
+     * 등록 직후 같은 트랜잭션에서 초회 재무 스냅샷·예상 스케줄(FUN-036)·1,200% 한도 검증(FUN-030)이
+     * 연쇄 실행되므로, 이미 끝난 계약을 그대로 받으면 앞으로 받을 수수료를 새로 만들게 된다.
+     * 화면에서 선택지를 줄이는 것만으로는 API 직접 호출을 막지 못해 서버에서도 막는다 (PR #315 리뷰).
+     */
+    @ParameterizedTest
+    @EnumSource(
+            value = ContractStatus.class,
+            names = {"APPLIED", "ACTIVE"},
+            mode = EnumSource.Mode.EXCLUDE
+    )
+    @DisplayName("청약·정상이 아닌 계약상태로는 계약 생성을 거절한다")
+    void createContractRejectsNonInitialContractStatus(ContractStatus contractStatus) {
+        ContractCreateRequest request = createRequest();
+        request.setContractStatus(contractStatus);
+
+        assertThatThrownBy(() -> contractService.createContract(request))
+                .isInstanceOf(FgcBusinessException.class)
+                .extracting(exception -> ((FgcBusinessException) exception).getField())
+                .isEqualTo("contractStatus");
+
+        verify(contractMapper, never()).insertContract(any(InsuranceContract.class));
+        verify(scheduleService, never()).generateSchedules(any(InsuranceContract.class));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"APPLIED", "ACTIVE"})
+    @DisplayName("청약·정상 계약상태는 계약 생성을 통과한다")
+    void createContractAcceptsInitialContractStatus(ContractStatus contractStatus) {
+        ContractCreateRequest request = createRequest();
+        request.setContractStatus(contractStatus);
+        givenValidReferences(request);
+        given(contractMapper.existsContractNo(request.getInsurerId(), request.getContractNo()))
+                .willReturn(false);
+        given(contractMapper.insertContract(any(InsuranceContract.class))).willAnswer(invocation -> {
+            InsuranceContract contract = invocation.getArgument(0);
+            ReflectionTestUtils.setField(contract, "contractId", 21L);
+            return 1;
+        });
+        given(scheduleService.generateSchedules(any(InsuranceContract.class)))
+                .willReturn(new ScheduleGenerationResult(List.of(100L, 101L), 3));
+        given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.INSURER_TO_GA)).willReturn(true);
+        given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.GA_TO_FC)).willReturn(true);
+
+        contractService.createContract(request);
+
+        ArgumentCaptor<InsuranceContract> captor = ArgumentCaptor.forClass(InsuranceContract.class);
+        verify(contractMapper).insertContract(captor.capture());
+        assertThat(captor.getValue().getCurrentStatus()).isEqualTo(contractStatus);
     }
 
     @Test

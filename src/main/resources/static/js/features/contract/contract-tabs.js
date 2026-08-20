@@ -137,7 +137,8 @@
           var row = entry.result || {};
           return [stageLabel(row.paymentStage), date(row.asOfDate), money(row.limitAmount),
             capDetailButton(entry.capCheckId, money(row.includedAmount)), money(row.remainingAmount),
-            usageGauge(row.usagePct, row.resultStatus), statusBadge(row.resultStatusLabel, row.resultStatus)];
+            usageGauge(row.usagePct, row.resultStatus),
+            statusBadge(row.resultStatusLabel, row.resultStatus, "capResultStatus")];
         })));
       return root;
     });
@@ -153,7 +154,7 @@
           return [date(row.asOfDate), value(row.contractMonthNo), money(row.cumulativePaidPremium),
             money(row.paidCommissionAmount), money(row.plannedCommissionAmount),
             money(row.includedSurrenderValueAmount), money(row.netDifferenceAmount),
-            statusBadge(row.resultStatusLabel, row.resultStatus)];
+            statusBadge(row.resultStatusLabel, row.resultStatus, "arbitrageResultStatus")];
         })));
       return root;
     });
@@ -492,9 +493,16 @@
   }
   /* 배지 매핑은 contract-detail.js 한 곳에만 둔다 (가이드 §9). */
   function capStatusClass(status) { return detail.badgeClass(status); }
-  function statusBadge(labelText, status) {
+  /*
+   * labelGroup 은 서버가 라벨을 안 내려줄 때만 쓰는 폴백 사전이다.
+   * 같은 REVIEW_REQUIRED 라도 1,200% 는 "검토필요", 차익거래는 "자료부족" 이라
+   * 부르는 쪽이 어느 판정인지 반드시 지정한다. 분개·지급 건처럼 서버가
+   * statusLabel 을 항상 채워 주는 표는 그룹 없이 부른다.
+   */
+  function statusBadge(labelText, status, labelGroup) {
     var badge = document.createElement("span");
-    detail.applyBadge(badge, status, value(labelText || detail.codeLabel("resultStatus", status) || status));
+    var fallback = labelGroup ? detail.codeLabel(labelGroup, status) : null;
+    detail.applyBadge(badge, status, value(labelText || fallback || status));
     return badge;
   }
   function capClassificationLabel(status) {

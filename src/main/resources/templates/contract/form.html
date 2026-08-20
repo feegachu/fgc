@@ -78,11 +78,21 @@
 
           <label class="field" data-field="contractStatus">
             <span class="field-label">계약상태 <span class="field-required" aria-hidden="true">*</span></span>
+            <!--
+              등록 모드에서는 청약·정상만 고를 수 있다. 저장이 같은 트랜잭션에서 예상 스케줄과
+              1,200% 한도 검증을 연쇄 실행하므로, 이미 끝난 계약(실효·해지·만기)을 새로 등록하면
+              앞으로 받을 수수료를 새로 계산하게 된다. 서버도 같은 규칙으로 막는다
+              (ContractService.CREATABLE_STATUSES) — 화면 제한만으로는 API 직접 호출을 못 막는다.
+              수정 모드는 전 상태를 그대로 둔다. 상태 사건 이력(CONT-W04 · FUN-026)이 2차라
+              1차에서는 계약 수정이 상태를 바꾸는 유일한 경로다.
+            -->
             <select id="contract-status" name="contractStatus" class="select-control" required>
               <option th:each="status : ${T(com.susukkang.fgc.contract.domain.ContractStatus).values()}"
+                      th:if="${isEditMode or status.name() == 'APPLIED' or status.name() == 'ACTIVE'}"
                       th:value="${status.name()}" th:text="${status.label()}"
                       th:selected="${status.name() == 'ACTIVE'}">정상</option>
             </select>
+            <span class="field-helper" th:if="${!isEditMode}">신규 등록은 청약·정상만 선택할 수 있습니다. 이후 상태 변경은 계약 수정에서 처리합니다.</span>
             <span class="field-error" data-field-error="contractStatus"></span>
           </label>
         </div>

@@ -116,9 +116,14 @@
    * 판정·스케줄 상태 라벨 (화면정의서 4-2 대조표). contract-tabs.js 가 만드는 배지도 여기서 읽는다.
    * SIR-008 은 "서버가 라벨을 만든다" 이지만 cap-checks·arbitrage-checks·schedules 응답에는
    * resultStatusLabel 이 없어 코드값이 그대로 노출됐다 — 백엔드 요청 항목으로 남긴다.
+   *
+   * 1,200% 와 차익거래는 그룹을 나눠 둔다. 둘 다 REVIEW_REQUIRED 코드를 쓰는데 라벨이
+   * "검토필요"·"자료부족" 으로 다르므로, 한 그룹이면 labelMap() 이 뒤엣것으로 덮어쓴다.
+   * 부르는 쪽이 어느 판정인지 알고 있으므로 그룹 이름으로 구분해서 읽는다 (detail.html:47-60).
    */
   var codeLabels = {
-    resultStatus: labelMap("resultStatus"),
+    capResultStatus: labelMap("capResultStatus"),
+    arbitrageResultStatus: labelMap("arbitrageResultStatus"),
     lineStatus: labelMap("lineStatus")
   };
 

@@ -44,11 +44,19 @@
     <span data-label-group="processingStatus" data-code="SUCCEEDED">완료</span>
     <span data-label-group="processingStatus" data-code="FAILED">실패</span>
     <span data-label-group="processingStatus" data-code="SKIPPED">건너뜀</span>
+    <!--
+      1,200% 판정과 차익거래 판정은 그룹을 나눈다 — 합치면 안 된다.
+      두 enum 모두 REVIEW_REQUIRED 코드를 갖지만 한글 라벨이 다르다
+      (CapResultStatus:19 "검토필요" / ArbitrageCheckStatus:12 "자료부족").
+      한 그룹에 넣으면 contract-detail.js 의 labelMap() 이 DOM 순서대로 덮어써
+      나중에 렌더링되는 "자료부족" 이 이겨, 1,200% 탭이 화면정의서 4-2 대조표
+      (:277 REVIEW_REQUIRED → 검토필요) 와 다른 라벨을 표시한다.
+    -->
     <span th:each="result : ${T(com.susukkang.fgc.common.code.CapResultStatus).values()}"
-          data-label-group="resultStatus"
+          data-label-group="capResultStatus"
           th:attr="data-code=${result.name()}" th:text="${result.label()}">정상</span>
     <span th:each="result : ${T(com.susukkang.fgc.common.code.ArbitrageCheckStatus).values()}"
-          data-label-group="resultStatus"
+          data-label-group="arbitrageResultStatus"
           th:attr="data-code=${result.name()}" th:text="${result.label()}">이상없음</span>
     <!-- 스케줄 상태는 대응하는 label() 이 서버에 없다 — 화면정의서 4-2 대조표를 그대로 옮긴다. -->
     <span data-label-group="lineStatus" data-code="PLANNED">예정</span>
