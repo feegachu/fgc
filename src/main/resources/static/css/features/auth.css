@@ -30,7 +30,6 @@
 
 .auth-brand-identity,
 .auth-brand-message,
-.auth-capability-list,
 .auth-brand-footer {
   position: relative;
   z-index: 1;
@@ -68,45 +67,6 @@
   color: rgb(255 255 255 / 82%);
   font-size: 0.875rem;
   line-height: 1.714;
-}
-
-.auth-capability-list {
-  display: grid;
-  gap: 1.375rem;
-  margin-top: 3.65rem;
-}
-
-.auth-capability-item {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr);
-  gap: 0.875rem;
-  align-items: start;
-}
-
-.auth-capability-item > .material-symbols-rounded {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: var(--radius-8);
-  color: rgb(255 255 255 / 94%);
-  background: rgb(255 255 255 / 9%);
-  font-size: 1.125rem;
-}
-
-.auth-capability-item strong {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 700;
-  line-height: 1.375rem;
-}
-
-.auth-capability-item p {
-  margin-top: 0.125rem;
-  color: rgb(255 255 255 / 72%);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
 }
 
 .auth-brand-footer {
@@ -241,34 +201,6 @@
   font-weight: 700;
 }
 
-.auth-security-notice {
-  display: grid;
-  grid-template-columns: 1.25rem minmax(0, 1fr);
-  gap: 0.75rem;
-  margin-top: 2rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid rgb(203 213 225 / 78%);
-  color: var(--color-text-tertiary);
-}
-
-.auth-security-notice > .material-symbols-rounded {
-  color: var(--color-steel-500);
-  font-size: 1.125rem;
-}
-
-.auth-security-notice strong {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.125rem;
-}
-
-.auth-security-notice p {
-  font-size: 0.6875rem;
-  line-height: 1.125rem;
-}
-
 @media (max-width: 67.5rem) {
   .auth-layout {
     grid-template-columns: minmax(24rem, 40%) minmax(30rem, 60%);
@@ -295,10 +227,6 @@
 @media (max-height: 48rem) and (min-width: 54.01rem) {
   .auth-brand-message {
     margin-top: 4rem;
-  }
-
-  .auth-capability-list {
-    margin-top: 2.5rem;
   }
 
   .auth-brand-footer {

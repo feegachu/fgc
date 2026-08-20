@@ -2,16 +2,23 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ERR-404', '찾을 수 없음', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main class="fgc-main">
-  <div class="fgc-card" style="max-width:560px;margin-top:40px">
-    <div class="fgc-card__head"><span class="fgc-card__title">404 · 찾을 수 없음</span></div>
-    <div class="fgc-card__body">
-      <p>요청한 화면이 없습니다.</p>
+<main id="main-content" class="page-content error-page">
+  <section class="surface error-card" aria-labelledby="error-title">
+    <header class="surface-header"><h1 id="error-title" class="surface-title">404 · 찾을 수 없음</h1></header>
+    <div class="surface-body error-card-body">
+      <p class="error-message" th:text="#{error.common.pageNotFound}">요청한 화면이 없습니다.</p>
+      <!-- 오류코드 없이 요청 ID 만 보여준다 (2026-08-20, PR #313 리뷰 판정).
+           3-2 오류코드 표준 매핑표에 404 계열 공통 코드가 없다. FgcErrorCode.COMMON_004 는
+           3-1 절이 규정한 "그 ID 의 자료가 없음" 이라 경로 자체가 없는 이 화면과 상황이 다르고,
+           같은 코드에 문구 둘을 매달면 SIR-007 규칙 3 을 오히려 어긴다.
+           "경로 없음" 전용 코드가 필요하면 3-2 표 등재가 먼저다 — 자세한 판정은 FgcErrorAttributes 주석. -->
+      <p class="error-trace tabular-nums" th:if="${requestId != null}"
+         th:text="'요청 ID: ' + ${requestId}">요청 ID: -</p>
       <!-- 2차 화면은 사이드바에서 회색 + '2차' 배지로 막아 두었다. 여기로 왔다면 주소를 직접 친 경우다. -->
-      <p class="fgc-help">사이드바에서 회색으로 표시된 메뉴는 2차 범위라 아직 만들어지지 않았습니다.</p>
-      <a class="fgc-btn fgc-btn--ghost" th:href="@{/}" style="margin-top:16px;text-decoration:none">대시보드로</a>
+      <p class="error-help" th:text="#{error.common.pageNotFoundHelp}">사이드바에서 회색으로 표시된 메뉴는 2차 범위라 아직 만들어지지 않았습니다.</p>
+      <a class="button button-secondary error-action" th:href="@{/}">대시보드로</a>
     </div>
-  </div>
+  </section>
 </main>
 </body>
 </html>

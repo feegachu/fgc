@@ -28,6 +28,37 @@ class FgcErrorAttributesTest {
         assertThat(attributesOf(request)).doesNotContainKey("requestId");
     }
 
+    /*
+     * SIR-007 규칙 3 — 화면과 Ajax 가 같은 코드를 보여야 한다.
+     * 코드 문자열을 템플릿에 직접 적지 않으려고 여기서 FgcErrorCode 를 꺼내 모델에 담는다.
+     */
+    @Test
+    void maps_http_status_to_the_error_code_shown_on_the_error_page() {
+        assertThat(attributesOf(errorRequest(403))).containsEntry("errorCode", "FGC-AUTH-003");
+        assertThat(attributesOf(errorRequest(500))).containsEntry("errorCode", "FGC-COMMON-500");
+    }
+
+    /*
+     * 3-2 오류코드 표준 매핑표(05_인터페이스정의서 :242~261)에 없는 상태에는 코드를 붙이지 않는다.
+     *
+     * 404 가 특히 중요하다 — FgcErrorCode.COMMON_004 는 enum 에만 있고 3-1 절(:205)의 404 는
+     * "그 ID 의 자료가 없음" 이다. 경로 자체가 없는 MPA 404 에 그 코드를 재사용하면 한 코드가
+     * 문구 둘을 갖게 되어 SIR-007 규칙 3 을 오히려 어긴다 (2026-08-20 PR #313 리뷰 판정).
+     * 아무 코드나 붙이지 않고 비워 두어야 화면이 요청 ID 만 보여준다.
+     */
+    @Test
+    void omits_error_code_for_statuses_absent_from_the_standard_mapping_table() {
+        assertThat(attributesOf(errorRequest(404))).doesNotContainKey("errorCode");
+        assertThat(attributesOf(errorRequest(502))).doesNotContainKey("errorCode");
+        assertThat(attributesOf(errorRequest(200))).doesNotContainKey("errorCode");
+    }
+
+    private MockHttpServletRequest errorRequest(int status) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/boom");
+        request.setAttribute("jakarta.servlet.error.status_code", status);
+        return request;
+    }
+
     private java.util.Map<String, Object> attributesOf(MockHttpServletRequest request) {
         return errorAttributes.getErrorAttributes(
                 new ServletWebRequest(request), ErrorAttributeOptions.defaults());

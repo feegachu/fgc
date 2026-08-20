@@ -1,0 +1,55 @@
+/*
+ * 오류 화면 3종(403·404·500) 공용.
+ *
+ * 업무 화면과 달리 page-header 를 두지 않는다 — 오류 화면에는 필터도 액션도 없고,
+ * 카드 자체가 본문이다. 대신 셸 안에서 가운데 정렬된 좁은 카드로 두어
+ * "여기서 할 일은 돌아가는 것뿐" 이라는 것이 한눈에 보이게 한다.
+ *
+ * 색은 전부 variables.css 토큰이다. 예전에는 publishing-page 스코프 밖이라
+ * assets/fgc.css 의 원본 HEX 팔레트가 그대로 나와 업무 화면과 색이 어긋났다 (#291).
+ */
+.error-page {
+  display: grid;
+  justify-items: center;
+}
+
+.error-card {
+  width: 100%;
+  max-width: 35rem;
+  margin-top: var(--space-10);
+}
+
+.error-card-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.error-message {
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+/* 오류코드·요청 ID — 담당자에게 그대로 읽어 주는 값이라 본문보다 낮은 대비로 둔다. */
+.error-trace {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.error-help {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.error-action {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 47.9375rem) {
+  .error-card {
+    margin-top: var(--space-4);
+  }
+}
