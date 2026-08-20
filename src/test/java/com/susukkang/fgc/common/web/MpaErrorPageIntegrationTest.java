@@ -68,6 +68,7 @@ class MpaErrorPageIntegrationTest {
                 // 자리표시자가 그대로 남아 있으면 치환이 안 된 것이다.
                 // 템플릿 주석에도 {requestId} 가 나오므로 문장째로 본다.
                 .doesNotContain("요청번호 {requestId}")
+                .contains("FGC-COMMON-500")                    // SIR-007 규칙 3 — Ajax 토스트와 같은 코드
                 .contains("수수료 정산·검증 Workspace");         // 셸까지 끝까지 렌더링됨
     }
 
@@ -115,6 +116,8 @@ class MpaErrorPageIntegrationTest {
         assertThat(response.body())
                 .contains("403 · 권한 없음")                       // error/403.html
                 .contains("이 작업을 할 권한이 없습니다.")            // error.auth.forbidden 이 실제로 풀렸다
+                .contains("FGC-AUTH-003")                          // SIR-007 규칙 3 — Ajax 403 JSON 과 같은 코드
+                .contains("요청 ID: " + response.headers().firstValue("X-Request-Id").orElseThrow())
                 .contains("수수료 정산·검증 Workspace");             // 셸 레이아웃까지 렌더링됨
     }
 
@@ -135,7 +138,12 @@ class MpaErrorPageIntegrationTest {
         assertThat(response.headers().firstValue("Content-Type").orElse("")).startsWith("text/html");
         assertThat(response.body())
                 .contains("404 · 찾을 수 없음")                    // error/404.html
+                .contains("요청한 화면이 없습니다.")                  // error.common.pageNotFound 가 실제로 풀렸다
+                .contains("요청 ID: " + response.headers().firstValue("X-Request-Id").orElseThrow())
                 .contains("수수료 정산·검증 Workspace")              // 셸 레이아웃까지 렌더링됨
-                .doesNotContain("FGC-COMMON-004");                // JSON 봉투가 아니다
+                .doesNotContain("\"error\":")                      // JSON 봉투가 아니다
+                // 3-2 표에 404 공통 코드가 없다. COMMON_004("그 ID 의 자료가 없음")를 경로 없음에
+                // 재사용하면 한 코드가 문구 둘을 갖는다 — 2026-08-20 PR #313 리뷰 판정.
+                .doesNotContain("FGC-COMMON-004");
     }
 }
