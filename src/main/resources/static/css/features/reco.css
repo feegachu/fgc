@@ -46,6 +46,11 @@
   line-height: 1.25rem;
 }
 
+.reco-summary-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .reco-summary-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
@@ -85,17 +90,37 @@
 }
 
 .reco-result-table {
-  min-width: 82rem;
+  min-width: 78rem;
 }
 
-.reco-col-contract { width: 7rem; }
-.reco-col-item { width: 9rem; }
-.reco-col-installment { width: 4rem; }
-.reco-col-agent { width: 8.5rem; }
-.reco-col-amount { width: 7rem; }
-.reco-col-result { width: 8.5rem; }
-.reco-col-reason { width: 10rem; }
-.reco-col-action { width: 7rem; }
+/* 계약번호를 한 줄로 다 보여주기 위해 셀 안쪽 여백을 줄이고, 그만큼 확보한 공간을
+   계약 컬럼에 몰아준다 — 설계사·금액·사유 컬럼은 실제 값 길이에 비해 여유가 있었다. */
+.reco-result-table th,
+.reco-result-table td {
+  padding-inline: 0.5rem;
+}
+
+/* 실제 설계사(5번째 칼럼)·예상 금액(6번째 칼럼) 사이 간격만 한 번 더 좁힌다 —
+   두 칼럼 다 값이 짧아 여백이 유독 도드라져 보였다. */
+.reco-result-table td:nth-child(5),
+.reco-result-table th:nth-child(5) {
+  padding-right: 0.25rem;
+}
+
+.reco-result-table td:nth-child(6),
+.reco-result-table th:nth-child(6) {
+  padding-left: 0.25rem;
+}
+
+.reco-col-contract { width: 13rem; }
+.reco-col-item { width: 8rem; }
+.reco-col-installment { width: 3.5rem; }
+.reco-col-agent { width: 7rem; }
+.reco-col-amount { width: 6.5rem; }
+.reco-col-result { width: 7.5rem; }
+.reco-col-reason { width: 8.5rem; }
+.reco-col-reason-secondary { width: 6rem; }
+.reco-col-action { width: 4rem; }
 
 .data-table td.reco-disclosure-cell {
   padding-block: var(--space-2);
@@ -162,6 +187,15 @@
   justify-content: flex-end;
   padding: var(--space-2) var(--space-4);
   border-top: 1px solid var(--color-border-subtle);
+}
+
+.reco-pagination .icon-button:disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.reco-pagination .icon-button:disabled:hover {
+  background: transparent;
 }
 
 .reco-pagination-nav {
@@ -635,9 +669,5 @@
   .reco-compare-modal {
     width: 100%;
     transform: none;
-  }
-
-  .reco-compare-footer .button {
-    width: 100%;
   }
 }

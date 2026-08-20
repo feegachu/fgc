@@ -22,7 +22,7 @@ public enum ReconResultType {
         return switch (this) {
             case MATCHED -> "일치";
             case AMOUNT_DIFFERENCE -> "금액 차이";
-            case EXPECTED_MISSING -> "예상 없음(실제만 있음)";
+            case EXPECTED_MISSING -> "예상 금액 없음";
             case ACTUAL_MISSING -> "실제 없음(누락)";
             case DUPLICATE -> "중복 지급";
             case AGENT_MISMATCH -> "설계사 불일치";
