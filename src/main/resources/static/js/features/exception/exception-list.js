@@ -186,6 +186,7 @@
     input.className = "fgc-input";
     input.type = "number";
     input.min = "0";
+    input.max = "9999999999999";
     input.step = "1";
     input.required = true;
     input.dataset[kind] = "true";
@@ -203,29 +204,46 @@
     return label;
   }
 
+  function refreshCorrectionLineTitles(container) {
+    Array.from(container.querySelectorAll(".journal-correction-line")).forEach((row, index) => {
+      row.querySelector(".journal-correction-line__title").textContent = `${index + 1}번 라인`;
+    });
+  }
+
+  function appendCorrectionLine(container, line = {}) {
+    const row = document.createElement("div");
+    row.className = "journal-correction-line";
+    row.dataset.originalLineNo = line.lineNo || "";
+    const heading = document.createElement("strong");
+    heading.className = "journal-correction-line__title";
+    const removeButton = document.createElement("button");
+    removeButton.className = "fgc-btn fgc-btn--ghost journal-correction-line__remove";
+    removeButton.type = "button";
+    removeButton.textContent = "라인 삭제";
+    removeButton.addEventListener("click", () => {
+      row.remove();
+      refreshCorrectionLineTitles(container);
+    });
+    const memo = document.createElement("input");
+    memo.className = "fgc-input";
+    memo.maxLength = 500;
+    memo.dataset.correctionDescription = "true";
+    memo.value = line.memo || "";
+    row.append(
+      heading,
+      removeButton,
+      correctionField("계정과목", accountSelect(line.accountCode)),
+      correctionField("차변", amountInput("correctionDebit", line.debitAmount)),
+      correctionField("대변", amountInput("correctionCredit", line.creditAmount)),
+      correctionField("라인 설명", memo)
+    );
+    container.append(row);
+    refreshCorrectionLineTitles(container);
+  }
+
   function renderCorrectionLines(container, lines) {
     container.replaceChildren();
-    lines.forEach((line) => {
-      const row = document.createElement("div");
-      row.className = "journal-correction-line";
-      row.dataset.originalLineNo = line.lineNo;
-      const heading = document.createElement("strong");
-      heading.textContent = `${line.lineNo}번 라인`;
-      heading.className = "journal-correction-line__title";
-      const memo = document.createElement("input");
-      memo.className = "fgc-input";
-      memo.maxLength = 500;
-      memo.dataset.correctionDescription = "true";
-      memo.value = line.memo || "";
-      row.append(
-        heading,
-        correctionField("계정과목", accountSelect(line.accountCode)),
-        correctionField("차변", amountInput("correctionDebit", line.debitAmount)),
-        correctionField("대변", amountInput("correctionCredit", line.creditAmount)),
-        correctionField("라인 설명", memo)
-      );
-      container.append(row);
-    });
+    lines.forEach((line) => appendCorrectionLine(container, line));
   }
 
   function bindJournalCorrectionForm(form, row) {
@@ -234,6 +252,11 @@
     const error = form.querySelector("[data-correction-error]");
     const originalContainer = form.querySelector("[data-original-journal]");
     const linesContainer = form.querySelector("[data-correction-lines]");
+    const addLineButton = form.querySelector("[data-add-correction-line]");
+
+    addLineButton?.addEventListener("click", () => {
+      appendCorrectionLine(linesContainer);
+    });
 
     apiClient.request(`/api/v1/journals/${encodeURIComponent(form.dataset.journalId)}`)
       .then((envelope) => {
@@ -252,6 +275,7 @@
         renderCorrectionLines(linesContainer, journal.lines || []);
         form.dataset.loaded = "true";
         submitButton.disabled = false;
+        if (addLineButton) addLineButton.disabled = false;
       }).catch((requestError) => {
         originalContainer.replaceChildren();
         error.textContent = requestError.message || "원분개를 불러오지 못했습니다.";
@@ -262,7 +286,8 @@
       if (form.dataset.loaded !== "true" || submitButton.disabled) return;
       const lineRows = Array.from(linesContainer.querySelectorAll(".journal-correction-line"));
       const lines = lineRows.map((lineRow) => ({
-        originalLineNo: Number(lineRow.dataset.originalLineNo),
+        originalLineNo: lineRow.dataset.originalLineNo
+          ? Number(lineRow.dataset.originalLineNo) : null,
         accountCode: lineRow.querySelector("[data-correction-account]").value,
         debitAmount: Number(lineRow.querySelector("[data-correction-debit]").value),
         creditAmount: Number(lineRow.querySelector("[data-correction-credit]").value),
@@ -283,11 +308,14 @@
       }).then((envelope) => {
         const result = envelope.data;
         appendHistory(result, "정정");
-        setStatus(row, result.toStatus);
+        setStatus(row, result.status);
         const completed = document.createElement("div");
         completed.className = "fgc-banner fgc-banner--success journal-correction-result";
         const message = document.createElement("span");
         message.textContent = "역분개와 재기표를 완료했습니다.";
+        const correctionGroup = document.createElement("span");
+        correctionGroup.className = "fgc-muted";
+        correctionGroup.textContent = `정정그룹 ${result.correctionGroupKey}`;
         const originalLink = document.createElement("a");
         originalLink.className = "fgc-btn fgc-btn--ghost";
         originalLink.href = `/journals?selected=${result.originalJournalHeaderId}`;
@@ -300,7 +328,9 @@
         repostedLink.className = "fgc-btn fgc-btn--ghost";
         repostedLink.href = `/journals?selected=${result.repostedJournalHeaderId}`;
         repostedLink.textContent = `재기표 #${result.repostedJournalHeaderId}`;
-        completed.append(message, originalLink, reversalLink, repostedLink);
+        completed.append(
+          message, correctionGroup, originalLink, reversalLink, repostedLink
+        );
         form.replaceWith(completed);
         if (toast) toast("원장 정정을 완료했습니다.", "success");
       }).catch((requestError) => {

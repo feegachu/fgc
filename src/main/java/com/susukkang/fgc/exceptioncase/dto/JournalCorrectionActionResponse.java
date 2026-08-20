@@ -1,5 +1,6 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
 
@@ -37,5 +38,11 @@ public record JournalCorrectionActionResponse(
                 action.actionByLoginId(), action.actionAt(), correction.reversalOfId(),
                 correction.journalHeaderId(), correction.repostedJournalHeaderId(),
                 correction.correctionGroupKey());
+    }
+
+    /** IF-API-44A가 명시한 최종 상태 필드. 처리이력 호환을 위해 toStatus도 함께 유지한다. */
+    @JsonProperty("status")
+    public ExceptionStatus status() {
+        return toStatus;
     }
 }

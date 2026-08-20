@@ -1,6 +1,8 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -16,10 +18,12 @@ import java.math.BigDecimal;
  * @version 1.2
  */
 public record JournalCorrectionActionLineRequest(
-        @NotNull @Positive Integer originalLineNo,
+        @Positive Integer originalLineNo,
         @NotBlank String accountCode,
-        @NotNull @DecimalMin("0") BigDecimal debitAmount,
-        @NotNull @DecimalMin("0") BigDecimal creditAmount,
+        @NotNull @DecimalMin("0") @DecimalMax("9999999999999")
+        @Digits(integer = 13, fraction = 2) BigDecimal debitAmount,
+        @NotNull @DecimalMin("0") @DecimalMax("9999999999999")
+        @Digits(integer = 13, fraction = 2) BigDecimal creditAmount,
         @Size(max = 500) String lineDescription
 ) {
 }

@@ -17,6 +17,29 @@
         ON CONFLICT ON CONSTRAINT uq_exception_key DO NOTHING
     </insert>
 
+    <select id="findActiveBySource"
+            resultType="com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow">
+        SELECT exception_case_id AS exceptionCaseId,
+               status
+          FROM fgc.exception_case
+         WHERE source_entity_type = 'JOURNAL_HEADER'
+           AND source_entity_id = CAST(#{journalHeaderId} AS varchar)
+           AND exception_type = 'JOURNAL_CORRECTION_REQUIRED'
+           AND policy_version_id IS NOT DISTINCT FROM #{policyVersionId}
+           AND status IN ('NEW', 'IN_REVIEW')
+         ORDER BY exception_case_id DESC
+         LIMIT 1
+    </select>
+
+    <select id="countBySource" resultType="int">
+        SELECT COUNT(*)
+          FROM fgc.exception_case
+         WHERE source_entity_type = 'JOURNAL_HEADER'
+           AND source_entity_id = CAST(#{journalHeaderId} AS varchar)
+           AND exception_type = 'JOURNAL_CORRECTION_REQUIRED'
+           AND policy_version_id IS NOT DISTINCT FROM #{policyVersionId}
+    </select>
+
     <select id="findByExceptionKey"
             resultType="com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow">
         SELECT exception_case_id AS exceptionCaseId,

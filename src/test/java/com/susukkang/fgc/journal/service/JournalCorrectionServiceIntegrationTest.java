@@ -2,6 +2,7 @@ package com.susukkang.fgc.journal.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ExceptionActionType;
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
@@ -278,6 +279,118 @@ class JournalCorrectionServiceIntegrationTest {
                 SELECT COUNT(*) FROM fgc.journal_correction_group
                 WHERE original_journal_header_id = ?
                 """, Integer.class, originalId)).isZero();
+    }
+
+    @Test
+    @Transactional
+    void rejectedCorrectionRequestCreatesNewActiveCaseAndPreservesHistory() {
+        Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(650_000));
+        String loginId = jdbcTemplate.queryForObject(
+                "SELECT login_id FROM fgc.app_user WHERE user_id = ?", String.class, ACTOR_ID);
+
+        var rejected = journalCorrectionExceptionService.createOrGet(
+                originalId,
+                new JournalCorrectionExceptionRequest("오탐 검토", "DOC-REJECTED"),
+                ACTOR_ID);
+        exceptionCaseService.action(
+                rejected.exceptionCaseId(),
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "오탐 여부 검토", null),
+                ACTOR_ID,
+                loginId);
+        exceptionCaseService.action(
+                rejected.exceptionCaseId(),
+                new ExceptionActionRequest(
+                        ExceptionActionType.REJECT, "이번 요청은 반려", "DOC-REJECTED"),
+                ACTOR_ID,
+                loginId);
+
+        var recreated = journalCorrectionExceptionService.createOrGet(
+                originalId,
+                new JournalCorrectionExceptionRequest("새 정정 요청", "DOC-NEW"),
+                ACTOR_ID);
+
+        assertThat(recreated.created()).isTrue();
+        assertThat(recreated.status()).isEqualTo(ExceptionStatus.NEW);
+        assertThat(recreated.exceptionCaseId()).isNotEqualTo(rejected.exceptionCaseId());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM fgc.exception_case
+                WHERE source_entity_type = 'JOURNAL_HEADER'
+                  AND source_entity_id = ?
+                  AND exception_type = 'JOURNAL_CORRECTION_REQUIRED'
+                """, Integer.class, String.valueOf(originalId))).isEqualTo(2);
+    }
+
+    @Test
+    @Transactional
+    void activeCorrectionCaseIsUniqueAtDatabaseBoundary() {
+        Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(650_000));
+        journalCorrectionExceptionService.createOrGet(
+                originalId,
+                new JournalCorrectionExceptionRequest("첫 정정 요청", null),
+                ACTOR_ID);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO fgc.exception_case (
+                    exception_key, exception_type, reason_code, severity, status,
+                    validation_month, source_entity_type, source_entity_id, title
+                ) VALUES (
+                    ?, 'JOURNAL_CORRECTION_REQUIRED', 'JOURNAL_CORRECTION_REQUIRED',
+                    'HIGH', 'NEW', ?, 'JOURNAL_HEADER', ?, '중복 활성 정정 예외'
+                )
+                """, "FUN047-DUPLICATE-" + UUID.randomUUID(), JOURNAL_DATE,
+                String.valueOf(originalId)))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    @Transactional
+    void repostRoundsEachLineHalfUpAndAllowsChangedLineComposition() {
+        Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(650_000));
+        String loginId = jdbcTemplate.queryForObject(
+                "SELECT login_id FROM fgc.app_user WHERE user_id = ?", String.class, ACTOR_ID);
+        var created = journalCorrectionExceptionService.createOrGet(
+                originalId,
+                new JournalCorrectionExceptionRequest("라인 구성 정정", null),
+                ACTOR_ID);
+        exceptionCaseService.action(
+                created.exceptionCaseId(),
+                new ExceptionActionRequest(
+                        ExceptionActionType.START_REVIEW, "신규 분개 구성 검토", null),
+                ACTOR_ID,
+                loginId);
+
+        JournalCorrectionActionRequest request = new JournalCorrectionActionRequest(
+                "상세행 반올림 정정", null, JOURNAL_DATE, "FUN-047 라인 재구성",
+                List.of(
+                        new JournalCorrectionActionLineRequest(
+                                1, JournalAccountCode.EXPECTED_RECEIVABLE.name(),
+                                new BigDecimal("100.5"), BigDecimal.ZERO, "0.5 올림"),
+                        new JournalCorrectionActionLineRequest(
+                                2, JournalAccountCode.EXPECTED_RECEIVABLE.name(),
+                                new BigDecimal("100.4"), BigDecimal.ZERO, "0.4 절사"),
+                        new JournalCorrectionActionLineRequest(
+                                null, JournalAccountCode.EXPECTED_INCOME.name(),
+                                BigDecimal.ZERO, new BigDecimal("200.5"), "신규 대변 라인")
+                ));
+
+        var corrected = correctionExceptionActionService.correct(
+                created.exceptionCaseId(), request, ACTOR_ID, loginId);
+        List<Map<String, Object>> repostedLines = jdbcTemplate.queryForList("""
+                SELECT line_no, debit_amount, credit_amount
+                FROM fgc.journal_line
+                WHERE journal_header_id = ?
+                ORDER BY line_no
+                """, corrected.repostedJournalHeaderId());
+
+        assertThat(repostedLines).hasSize(3);
+        assertThat((BigDecimal) repostedLines.get(0).get("debit_amount"))
+                .isEqualByComparingTo("101");
+        assertThat((BigDecimal) repostedLines.get(1).get("debit_amount"))
+                .isEqualByComparingTo("100");
+        assertThat((BigDecimal) repostedLines.get(2).get("credit_amount"))
+                .isEqualByComparingTo("201");
     }
 
     @Test

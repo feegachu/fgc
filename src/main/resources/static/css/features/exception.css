@@ -163,9 +163,21 @@
   border-radius: var(--radius-md);
 }
 
-.journal-correction-line__title,
+.journal-correction-line__title {
+  grid-column: 1 / -2;
+}
+
+.journal-correction-line__remove {
+  grid-column: -2 / -1;
+  justify-self: end;
+}
+
 .journal-correction-line .fgc-field:last-child {
   grid-column: 1 / -1;
+}
+
+.journal-correction-add-line {
+  justify-self: start;
 }
 
 .journal-correction-original,
@@ -250,6 +262,7 @@
   }
 
   .journal-correction-line__title,
+  .journal-correction-line__remove,
   .journal-correction-line .fgc-field:last-child {
     grid-column: auto;
   }

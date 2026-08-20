@@ -52,9 +52,11 @@ class JournalCorrectionExceptionServiceTest {
     @Test
     void createsCaseAndInitialEvidenceActionOnce() {
         given(journalCorrectionMapper.findHeaderForUpdate(10L)).willReturn(postedHeader());
+        given(exceptionMapper.findActiveBySource(10L, 9L)).willReturn(null);
+        given(exceptionMapper.countBySource(10L, 9L)).willReturn(0);
         given(exceptionMapper.insertCase(any())).willReturn(1);
         given(exceptionMapper.findByExceptionKey(
-                "JOURNAL_CORRECTION_REQUIRED:JOURNAL_HEADER:10"))
+                "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:9:REQUEST:1"))
                 .willReturn(new JournalCorrectionExceptionRow(30L, ExceptionStatus.NEW));
         given(exceptionMapper.insertInitialAction(any())).willReturn(1);
 
@@ -71,9 +73,7 @@ class JournalCorrectionExceptionServiceTest {
     @Test
     void repeatedRequestReturnsExistingCaseWithoutDuplicateHistory() {
         given(journalCorrectionMapper.findHeaderForUpdate(10L)).willReturn(postedHeader());
-        given(exceptionMapper.insertCase(any())).willReturn(0);
-        given(exceptionMapper.findByExceptionKey(
-                "JOURNAL_CORRECTION_REQUIRED:JOURNAL_HEADER:10"))
+        given(exceptionMapper.findActiveBySource(10L, 9L))
                 .willReturn(new JournalCorrectionExceptionRow(30L, ExceptionStatus.IN_REVIEW));
 
         var response = service.createOrGet(
@@ -81,6 +81,7 @@ class JournalCorrectionExceptionServiceTest {
 
         assertThat(response.created()).isFalse();
         assertThat(response.status()).isEqualTo(ExceptionStatus.IN_REVIEW);
+        verify(exceptionMapper, never()).insertCase(any());
         verify(exceptionMapper, never()).insertInitialAction(any());
         verify(auditLogService, never()).record(any());
     }

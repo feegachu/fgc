@@ -106,7 +106,7 @@ class ExceptionCaseViewControllerTest {
     @Test
     void journalCorrectionCaseRendersDedicatedFormWithDatabaseAccounts() throws Exception {
         ExceptionCaseResponseDTO correction = new ExceptionCaseResponseDTO(
-                30L, "JOURNAL_CORRECTION_REQUIRED:JOURNAL_HEADER:10",
+                30L, "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:NONE:REQUEST:1",
                 ExceptionType.JOURNAL_CORRECTION_REQUIRED,
                 "JOURNAL_CORRECTION_REQUIRED", ExceptionSeverity.HIGH,
                 ExceptionStatus.IN_REVIEW, "원장 정정 필요", "금액 오류", 5L, "C001",
@@ -126,6 +126,7 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-journal-correction-form")))
                 .andExpect(content().string(containsString("data-journal-id=\"10\"")))
+                .andExpect(content().string(containsString("data-add-correction-line")))
                 .andExpect(content().string(containsString("EXPECTED_RECEIVABLE · 예상 미수금")))
                 .andExpect(content().string(containsString("정정 실행")))
                 .andExpect(content().string(containsString("href=\"/journals?selected=10\"")));

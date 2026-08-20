@@ -4,6 +4,7 @@ import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.journal.domain.JournalType;
 import com.susukkang.fgc.journal.domain.JournalAccountCode;
 import com.susukkang.fgc.journal.dto.JournalAccountRow;
@@ -54,7 +55,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     private static final int REASON_MAX_LENGTH = 1000;
     private static final int EVIDENCE_MAX_LENGTH = 500;
     private static final int DESCRIPTION_MAX_LENGTH = 1000;
+    private static final int LINE_DESCRIPTION_MAX_LENGTH = 500;
     private static final int MAX_MONTHLY_SEQ = 9999;
+    private static final BigDecimal MAX_JOURNAL_AMOUNT =
+            new BigDecimal("9999999999999");
 
     private final JournalCorrectionMapper correctionMapper;
     private final JournalMapper journalMapper;
@@ -90,7 +94,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
         return correct(new ReverseJournalCommand(
                         command.journalHeaderId(), command.reason(), command.evidenceRef(),
                         command.requestedBy()),
-                correctedDraft);
+                correctedDraft, original, originalLines);
     }
 
     private void validateRepostCommand(JournalRepostCommand command) {
@@ -108,21 +112,28 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
             List<JournalCorrectionLineRow> originalLines,
             JournalRepostCommand command
     ) {
-        if (originalLines.size() != command.lines().size()) {
-            throw validationFailure("lines");
-        }
         Map<Integer, JournalCorrectionLineRow> originalByLineNo = new HashMap<>();
         originalLines.forEach(line -> originalByLineNo.put(line.getLineNo(), line));
         HashSet<Integer> usedLineNumbers = new HashSet<>();
         List<JournalLineDraft> correctedLines = new ArrayList<>();
 
-        for (JournalRepostLineCommand input : command.lines()) {
-            if (input == null || input.originalLineNo() == null
-                    || !usedLineNumbers.add(input.originalLineNo())) {
-                throw validationFailure("lines.originalLineNo");
+        // 2026-08-20 yslee - 재기표 라인을 원분개 라인 수에 종속하지 않고 상세행별 원 단위로 정규화
+        // 기존 코드: 원분개와 같은 라인 수·라인 번호만 허용하고 입력 소수 금액을 그대로 저장
+        // 문제: 올바른 신규 분개가 라인을 추가·삭제할 수 없고 원 단위 HALF_UP 정책도 재현되지 않음
+        // 개선: 제출 순서로 신규 라인 번호를 부여하고 선택적 원본 참조의 추적값만 승계하며 금액을 먼저 반올림
+        for (int index = 0; index < command.lines().size(); index++) {
+            JournalRepostLineCommand input = command.lines().get(index);
+            if (input == null) {
+                throw validationFailure("lines");
             }
-            JournalCorrectionLineRow source = originalByLineNo.get(input.originalLineNo());
-            if (source == null) {
+            JournalCorrectionLineRow source = null;
+            if (input.originalLineNo() != null) {
+                if (!usedLineNumbers.add(input.originalLineNo())) {
+                    throw validationFailure("lines.originalLineNo");
+                }
+                source = originalByLineNo.get(input.originalLineNo());
+            }
+            if (input.originalLineNo() != null && source == null) {
                 throw validationFailure("lines.originalLineNo");
             }
             JournalAccountCode accountCode;
@@ -131,24 +142,32 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
             } catch (IllegalArgumentException | NullPointerException exception) {
                 throw validationFailure("lines.accountCode");
             }
-            PaymentStage paymentStage = source.getPaymentStage() == null
+            BigDecimal debitAmount = normalizeWonAmount(
+                    input.debitAmount(), "lines.debitAmount");
+            BigDecimal creditAmount = normalizeWonAmount(
+                    input.creditAmount(), "lines.creditAmount");
+            if (input.lineDescription() != null
+                    && input.lineDescription().length() > LINE_DESCRIPTION_MAX_LENGTH) {
+                throw validationFailure("lines.lineDescription");
+            }
+            PaymentStage paymentStage = source == null || source.getPaymentStage() == null
                     ? null
                     : PaymentStage.valueOf(source.getPaymentStage());
             correctedLines.add(JournalLineDraft.builder()
-                    .lineNo(source.getLineNo())
+                    .lineNo(index + 1)
                     .accountCode(accountCode)
-                    .debitAmount(input.debitAmount())
-                    .creditAmount(input.creditAmount())
-                    .contractId(source.getContractId())
-                    .agentId(source.getAgentId())
+                    .debitAmount(debitAmount)
+                    .creditAmount(creditAmount)
+                    .contractId(source == null
+                            ? original.getContractId() : source.getContractId())
+                    .agentId(source == null ? null : source.getAgentId())
                     .paymentStage(paymentStage)
-                    .commissionItemId(source.getCommissionItemId())
+                    .commissionItemId(source == null ? null : source.getCommissionItemId())
                     .memo(input.lineDescription() == null
-                            ? source.getMemo()
+                            ? source == null ? null : source.getMemo()
                             : input.lineDescription().trim())
                     .build());
         }
-        correctedLines.sort(Comparator.comparingInt(JournalLineDraft::getLineNo));
         return JournalHeaderDraft.builder()
                 .journalType(JournalType.valueOf(original.getJournalType()))
                 .journalDate(command.journalDate())
@@ -165,13 +184,24 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
 
     private JournalCorrectionResult correct(ReverseJournalCommand command,
                                               JournalHeaderDraft correctedDraft) {
+        return correct(command, correctedDraft, null, null);
+    }
+
+    private JournalCorrectionResult correct(
+            ReverseJournalCommand command,
+            JournalHeaderDraft correctedDraft,
+            JournalCorrectionHeaderRow lockedOriginal,
+            List<JournalCorrectionLineRow> lockedOriginalLines
+    ) {
         ValidatedRequest request = validateRequest(command);
-        JournalCorrectionHeaderRow original = correctionMapper.findHeaderForUpdate(
-                command.journalHeaderId());
+        JournalCorrectionHeaderRow original = lockedOriginal == null
+                ? correctionMapper.findHeaderForUpdate(command.journalHeaderId())
+                : lockedOriginal;
         validateOriginal(original, command.journalHeaderId());
 
-        List<JournalCorrectionLineRow> originalLines = correctionMapper.findLines(
-                original.getJournalHeaderId());
+        List<JournalCorrectionLineRow> originalLines = lockedOriginalLines == null
+                ? correctionMapper.findLines(original.getJournalHeaderId())
+                : lockedOriginalLines;
         assertBalanced(originalLines);
 
         List<Long> correctedAccountIds = correctedDraft == null
@@ -291,6 +321,19 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 || (line.getDebitAmount().signum() > 0) == (line.getCreditAmount().signum() > 0)) {
             throw validationFailure("correctedDraft.lines");
         }
+    }
+
+    private BigDecimal normalizeWonAmount(BigDecimal amount, String field) {
+        if (amount == null || amount.signum() < 0
+                || amount.stripTrailingZeros().scale() > 2
+                || amount.compareTo(MAX_JOURNAL_AMOUNT) > 0) {
+            throw validationFailure(field);
+        }
+        BigDecimal rounded = MoneyUtil.roundWon(amount);
+        if (rounded.compareTo(MAX_JOURNAL_AMOUNT) > 0) {
+            throw validationFailure(field);
+        }
+        return rounded;
     }
 
     private void assertBalanced(List<JournalCorrectionLineRow> lines) {

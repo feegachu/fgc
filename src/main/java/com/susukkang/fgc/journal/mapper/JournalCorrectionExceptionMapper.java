@@ -17,6 +17,14 @@ public interface JournalCorrectionExceptionMapper {
 
     int insertCase(JournalCorrectionExceptionInsertCommand command);
 
+    JournalCorrectionExceptionRow findActiveBySource(
+            @Param("journalHeaderId") Long journalHeaderId,
+            @Param("policyVersionId") Long policyVersionId);
+
+    int countBySource(
+            @Param("journalHeaderId") Long journalHeaderId,
+            @Param("policyVersionId") Long policyVersionId);
+
     JournalCorrectionExceptionRow findByExceptionKey(
             @Param("exceptionKey") String exceptionKey);
 

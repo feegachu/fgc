@@ -90,6 +90,7 @@ class JournalCorrectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.exceptionCaseId").value(30L))
                 .andExpect(jsonPath("$.data.created").value(true))
+                .andExpect(jsonPath("$.data.status").value("NEW"))
                 .andExpect(jsonPath("$.data.redirectUrl").value("/exceptions?selected=30"));
     }
 

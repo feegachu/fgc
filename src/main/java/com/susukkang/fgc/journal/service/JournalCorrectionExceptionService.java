@@ -29,8 +29,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class JournalCorrectionExceptionService {
 
-    private static final String EXCEPTION_KEY_PREFIX =
-            "JOURNAL_CORRECTION_REQUIRED:JOURNAL_HEADER:";
+    private static final String EXCEPTION_KEY_PREFIX = "JOURNAL_HEADER:";
 
     private final JournalCorrectionMapper journalCorrectionMapper;
     private final JournalCorrectionExceptionMapper correctionExceptionMapper;
@@ -49,7 +48,20 @@ public class JournalCorrectionExceptionService {
 
         String reason = request.reason().trim();
         String evidenceRef = normalizeOptional(request.evidenceRef());
-        String exceptionKey = EXCEPTION_KEY_PREFIX + journalHeaderId;
+
+        // 2026-08-20 yslee - 미종결 원장 정정 예외만 멱등 재사용하도록 생명주기 키 분리
+        // 기존 코드: 원분개 ID 하나를 영구 exception_key로 사용해 REJECTED 이후에도 종결 건을 반환
+        // 문제: 종결 예외에는 재처리 폼이 없어 같은 원분개의 정정을 다시 요청할 수 없음
+        // 개선: 원분개 잠금 안에서 활성 건을 먼저 조회하고 종결 이력 다음 요청은 새 순번 키로 생성
+        JournalCorrectionExceptionRow active = correctionExceptionMapper.findActiveBySource(
+                journalHeaderId, original.getPolicyVersionId());
+        if (active != null) {
+            return JournalCorrectionExceptionResponse.from(active, false);
+        }
+        int requestNo = correctionExceptionMapper.countBySource(
+                journalHeaderId, original.getPolicyVersionId()) + 1;
+        String exceptionKey = buildExceptionKey(
+                journalHeaderId, original.getPolicyVersionId(), requestNo);
         JournalCorrectionExceptionInsertCommand command =
                 JournalCorrectionExceptionInsertCommand.builder()
                         .exceptionKey(exceptionKey)
@@ -88,6 +100,15 @@ public class JournalCorrectionExceptionService {
                     .build());
         }
         return JournalCorrectionExceptionResponse.from(row, created);
+    }
+
+    private String buildExceptionKey(Long journalHeaderId,
+                                     Long policyVersionId,
+                                     int requestNo) {
+        return EXCEPTION_KEY_PREFIX + journalHeaderId
+                + ":JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:"
+                + (policyVersionId == null ? "NONE" : policyVersionId)
+                + ":REQUEST:" + requestNo;
     }
 
     private void validateRequest(Long journalHeaderId,
