@@ -103,8 +103,9 @@
   width: 5rem;
 }
 
+/* 차익거래 검증 화면(.arb-col-contract)과 동일한 폭으로 맞춰 토글 없이 항상 전체를 보여준다(이슈 326). */
 .exception-col-contract {
-  width: 7.5rem;
+  width: 12rem;
 }
 
 .exception-col-title {

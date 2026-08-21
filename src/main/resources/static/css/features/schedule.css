@@ -68,7 +68,8 @@
   min-width: 79rem;
 }
 
-.schedule-col-contract { width: 7.5rem; }
+/* 계약번호는 차익거래 검증 화면(.arb-col-contract)과 동일한 폭으로 맞춰 토글 없이 항상 전체를 보여준다(이슈 326). */
+.schedule-col-contract { width: 12rem; }
 .schedule-col-stage { width: 7.5rem; }
 .schedule-col-regime { width: 7.75rem; }
 .schedule-col-purpose { width: 6.5rem; }
@@ -89,9 +90,14 @@
 }
 
 /*
- * 정책버전·계약번호는 table-cell-disclosure 로 접었다 펴므로 셀이 줄바꿈을 허용해야 한다.
+ * 정책버전은 table-cell-disclosure 로 접었다 펴므로 셀이 줄바꿈을 허용해야 한다.
  * 예전에는 여기서 ellipsis 로 자르고 title 속성으로만 전체 값을 줬는데, 가이드 §10.2 가
- * "잘라 놓거나 title 속성만 제공하면 안 된다" 고 금지한다.
+ * "잘라 놓거나 title 속성만 제공하면 안 된다" 고 금지해서 disclosure 로 되돌렸었다.
+ *
+ * 계약번호는 이슈 326에서 이 규칙의 예외로 정했다 — 계약번호는 길이가 사실상 고정적이라
+ * 컬럼 폭만 넉넉히 잡으면(차익거래 검증 화면과 동일) 실제로 잘릴 일이 없고, 매번 클릭해야
+ * 보이는 토글보다 항상 보이는 값이 계약번호 같은 조회 키에는 더 낫다는 판단이다.
+ * 자유텍스트(정책버전 사유 등)처럼 길이가 들쭉날쭉한 값에는 이 예외를 적용하지 않는다.
  */
 .schedule-table .table-cell-disclosure {
   font-size: 0.75rem;

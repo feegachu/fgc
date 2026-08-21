@@ -58,7 +58,8 @@
 .transaction-list-table { min-width: 71.25rem; }
 .transaction-col-stage { width: 6.5rem; }
 .transaction-col-source { width: 7rem; }
-.transaction-col-business-key { width: 10.5rem; }
+/* 업무키는 토글 없이 title 툴팁으로 보완해 항상 값을 보여준다(이슈 326과 같은 방식). */
+.transaction-col-business-key { width: 12rem; }
 .transaction-col-month { width: 5.5rem; }
 .transaction-col-agent { width: 9rem; }
 .transaction-col-item { width: 8.5rem; }
