@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
+import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
@@ -29,6 +32,7 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentCommand;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
+import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentAttributionRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
@@ -75,6 +79,8 @@ class CommissionPaymentServiceImplTest {
     @Mock
     private CommissionPaymentMapper mapper;
     @Mock
+    private CapCheckMapper capCheckMapper;
+    @Mock
     private AgentMapper agentMapper;
     @Mock
     private CapCalculator capCalculator;
@@ -98,6 +104,7 @@ class CommissionPaymentServiceImplTest {
         messageResolver = new FgcMessageResolver(messageSource);
         service = new CommissionPaymentServiceImpl(
                 mapper,
+                capCheckMapper,
                 agentMapper,
                 new ObjectMapper(),
                 capValidator,
@@ -815,7 +822,7 @@ class CommissionPaymentServiceImplTest {
 
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         verify(mapper, org.mockito.Mockito.times(2)).insertCapCheck(any());
-        verify(mapper, org.mockito.Mockito.times(2)).insertCapCheckDetail(any());
+        verify(capCheckMapper, org.mockito.Mockito.times(2)).insertCapCheckDetails(any());
         verify(mapper).lockAttributedContracts(101L);
         verify(mapper).confirm(101L, null, "55,55");
     }
@@ -935,6 +942,116 @@ class CommissionPaymentServiceImplTest {
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
 
         verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    // 2026-08-21 yslee - FUN-035 · CAP-W02 계산근거 정합 (#255 F-11)
+    // 기존 코드: PRE_CONFIRM cap_check에 후보 1행만 저장돼 상세 합계 ≠ included_amount
+    // 문제: 확정 차단 근거 팝업(심사위원 필수 화면)이 스스로 합계 불일치 경고를 띄움
+    // 개선: 기존 확정 산입 귀속행을 항목화해 상세 합계 = included_amount 를 만든다
+    @Test
+    void persistsFullIncludedBreakdownWhenConfirmationBlockedByCapViolation() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "250000", "250000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("1000000", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        given(mapper.findExistingIncludedDetails(101L, 201L)).willReturn(List.of(
+                existingDetail(301L, "FC 기본수수료", "650000"),
+                existingDetail(302L, "시책수수료", "350000")
+        ));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(64L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+
+        assertThatThrownBy(() -> service.confirm(101L, "full-breakdown"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
+
+        List<CapCheckDetailInsertRow> rows = capturedDetailRows();
+        assertThat(rows).hasSize(3);
+        assertThat(rows).extracting(CapCheckDetailInsertRow::getDetailSeq).containsExactly(1, 2, 3);
+        assertThat(rows.get(0).getTransactionAttributionId()).isEqualTo(301L);
+        assertThat(rows.get(1).getTransactionAttributionId()).isEqualTo(302L);
+        assertThat(rows.get(2).getTransactionAttributionId()).isEqualTo(201L);
+        assertThat(rows.stream().map(CapCheckDetailInsertRow::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo("1250000");
+    }
+
+    // 스케줄 산입액이 실제 누계보다 큰 경우 헤더가 스케줄 값으로 정해지므로(merge max)
+    // 상세도 REALTIME 경로와 동일하게 스케줄 내역을 저장해야 합계가 맞는다.
+    @Test
+    void persistsScheduleBreakdownWhenScheduleIncludedDominates() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "50000", "50000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        BigDecimal limit = new BigDecimal("1200000");
+        BigDecimal scheduleIncluded = new BigDecimal("1300000");
+        CapCalculationResult scheduleDominant = new CapCalculationResult(
+                3L,
+                PaymentStage.GA_TO_FC,
+                CapCheckKind.REALTIME,
+                LocalDate.of(2026, 7, 1),
+                31L,
+                null,
+                new BigDecimal("100000"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                limit,
+                scheduleIncluded,
+                limit.subtract(scheduleIncluded),
+                new BigDecimal("108.333333"),
+                CapResultStatus.VIOLATION,
+                List.of(
+                        new CapCheckDetailLine(1, 11L, "BASE_COMMISSION", "FC 기본수수료",
+                                501L, 1, "INCLUDED", new BigDecimal("900000"), "산입", null),
+                        new CapCheckDetailLine(2, 12L, "INCENTIVE", "시책수수료",
+                                502L, 2, "INCLUDED", new BigDecimal("400000"), "산입", null)
+                ),
+                Map.of()
+        );
+        given(capCalculator.calculate(any())).willReturn(scheduleDominant);
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(65L);
+            return null;
+        }).when(mapper).insertCapCheck(any());
+
+        assertThatThrownBy(() -> service.confirm(101L, "schedule-dominant"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
+
+        List<CapCheckDetailInsertRow> rows = capturedDetailRows();
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).getScheduleLineId()).isEqualTo(501L);
+        assertThat(rows.get(0).getTransactionAttributionId()).isNull();
+        assertThat(rows.stream().map(CapCheckDetailInsertRow::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo(scheduleIncluded);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<CapCheckDetailInsertRow> capturedDetailRows() {
+        ArgumentCaptor<List<CapCheckDetailInsertRow>> captor =
+                (ArgumentCaptor<List<CapCheckDetailInsertRow>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(List.class);
+        verify(capCheckMapper).insertCapCheckDetails(captor.capture());
+        return captor.getValue();
+    }
+
+    private ExistingIncludedDetail existingDetail(Long attributionId, String itemName, String amount) {
+        return ExistingIncludedDetail.builder()
+                .transactionAttributionId(attributionId)
+                .commissionItemId(11L)
+                .itemCode("BASE_COMMISSION")
+                .itemName(itemName)
+                .classificationSnapshot("INCLUDED")
+                .amount(new BigDecimal(amount))
+                .decisionReason("확정 당시 산입 판정 스냅샷")
+                .evidenceRef(null)
+                .build();
     }
 
     // 2026-08-11 yslee - WARNING 경고율 직전 89% 경계 검증
@@ -1250,7 +1367,7 @@ class CommissionPaymentServiceImplTest {
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
         assertThat(captor.getValue().getCalculationSnapshotJson())
                 .contains("complianceMaximumAmount", "3000", "complianceAppliedAmount");
-        verify(mapper).insertCapCheckDetail(any());
+        verify(capCheckMapper).insertCapCheckDetails(any());
         verify(mapper).insertExceptionCase(any());
         verify(mapper, never()).confirm(any(), any(), any());
     }
@@ -1856,7 +1973,7 @@ class CommissionPaymentServiceImplTest {
     /** precheck의 무저장·무잠금 계약 — 확정 경로 전용 부작용이 하나도 호출되지 않아야 한다. */
     private void assertPrecheckSavesNothing() {
         verify(mapper, never()).insertCapCheck(any());
-        verify(mapper, never()).insertCapCheckDetail(any());
+        verify(capCheckMapper, never()).insertCapCheckDetails(any());
         verify(mapper, never()).insertExceptionCase(any());
         verify(mapper, never()).confirm(any(), any(), any());
         verify(mapper, never()).lockAttributedContracts(any());
