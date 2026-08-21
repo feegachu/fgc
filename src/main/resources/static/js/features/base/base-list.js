@@ -60,10 +60,31 @@
     if (text.length <= limit) return safeText;
     return '<div class="table-cell-disclosure">' +
       '<span class="table-cell-preview' + (singleLine ? " is-single-line" : "") + '">' + safeText + "</span>" +
-      '<details class="table-cell-details"><summary>' +
+      '<details class="table-cell-details" hidden><summary>' +
       '<span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>' +
       '<span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>' +
       '</summary><p class="table-cell-full">' + safeText + "</p></details></div>";
+  }
+
+  /* 실제로 잘린 셀에만 컨트롤을 노출한다 (policy-list.js·exception-list.js 와 같은 방식).
+     text.length 만으로는 실제 화면 폭 대비 잘림 여부와 어긋날 수 있어 scrollWidth로 다시 검증한다. */
+  function syncTableCellDisclosures(scope) {
+    (scope || document).querySelectorAll(".table-cell-disclosure").forEach(function (disclosure) {
+      var preview = disclosure.querySelector(".table-cell-preview");
+      var details = disclosure.querySelector(".table-cell-details");
+      if (!preview || !details || preview.clientWidth === 0) return;
+
+      var isTruncated = preview.scrollWidth > preview.clientWidth + 1
+        || preview.scrollHeight > preview.clientHeight + 1;
+      details.hidden = !isTruncated;
+      if (!isTruncated) details.open = false;
+    });
+  }
+
+  function scheduleDisclosureSync(scope) {
+    window.requestAnimationFrame(function () {
+      syncTableCellDisclosures(scope);
+    });
   }
 
   function booleanLabel(value) {
@@ -259,6 +280,7 @@
       panelElement(key, "body").innerHTML = content.map(rowRenderers[key]).join("");
       message.hidden = true;
       table.hidden = false;
+      scheduleDisclosureSync(panelElement(key, "panel"));
     }
     if (!isCommissionItem) {
       state.pages[key] = data && data.page || state.pages[key];
@@ -402,6 +424,7 @@
     panels.forEach(function (panel) { panel.hidden = panel.dataset.basePanel !== state.activeTab; });
     if (shouldLoad && !state.loaded[state.activeTab]) prepareAndLoad(state.activeTab);
     else writeLocation(state.activeTab);
+    scheduleDisclosureSync(panelElement(state.activeTab, "panel"));
   }
 
   function applyInitialQuery() {
@@ -464,4 +487,19 @@
   });
 
   activateTab(state.activeTab, true);
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      syncTableCellDisclosures(panelElement(state.activeTab, "panel"));
+    });
+  }
+
+  var disclosureResizeFrame = null;
+  window.addEventListener("resize", function () {
+    if (disclosureResizeFrame != null) window.cancelAnimationFrame(disclosureResizeFrame);
+    disclosureResizeFrame = window.requestAnimationFrame(function () {
+      disclosureResizeFrame = null;
+      syncTableCellDisclosures(panelElement(state.activeTab, "panel"));
+    });
+  });
 })();

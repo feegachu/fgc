@@ -171,7 +171,7 @@ if (typeof module !== "undefined" && module.exports) {
       var row = document.createElement("tr");
       appendCell(row, item.paymentStageLabel || item.paymentStage);
       appendDisclosureCell(row, item.sourceTypeLabel || item.sourceType);
-      appendDisclosureCell(row, item.sourceBusinessKey, "transaction-mono");
+      appendTitleCell(row, item.sourceBusinessKey, "transaction-mono");
       appendCell(row, format.month(item.settlementMonth));
       appendDisclosureCell(row, item.recipientAgentName || "-");
       appendDisclosureCell(row, item.commissionItemName || item.commissionItemCode);
@@ -409,6 +409,16 @@ if (typeof module !== "undefined" && module.exports) {
     var cell = document.createElement("td");
     if (className) cell.className = className;
     cell.textContent = content == null || content === "" ? "-" : String(content);
+    row.appendChild(cell);
+  }
+
+  // 업무키는 컬럼 폭을 넓게 잡고 title 툴팁으로 보완해 토글 없이 값을 보여준다(#326와 같은 방식).
+  function appendTitleCell(row, content, className) {
+    var cell = document.createElement("td");
+    if (className) cell.className = className;
+    var value = content == null || content === "" ? "-" : String(content);
+    cell.textContent = value;
+    cell.title = value;
     row.appendChild(cell);
   }
 

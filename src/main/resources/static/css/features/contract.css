@@ -867,7 +867,8 @@
  * 보험회사도 한글 4~5자를 담지 못했다 — [전체 보기]가 대부분의 행에 뜨는 상태였다.
  * 자주 잘리는 두 컬럼을 넓히고 판정·출처처럼 배지만 들어가는 컬럼에서 폭을 회수한다.
  */
-.contract-col-number { width: 8.5rem; }
+/* 계약번호는 차익거래 검증 화면(.arb-col-contract)과 동일한 폭으로 맞춰 토글 없이 항상 전체를 보여준다(이슈 326). */
+.contract-col-number { width: 12rem; }
 .contract-col-insurer { width: 6.5rem; }
 .contract-col-product { width: 11.75rem; }
 .contract-col-date { width: 5.75rem; }

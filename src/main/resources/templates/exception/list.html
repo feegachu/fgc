@@ -208,19 +208,8 @@
               <td><span class="status-badge"
                         th:classappend="${severityCode == 'WARNING'} ? ' status-badge-warning' : (${severityCode == 'HIGH' or severityCode == 'CRITICAL'} ? ' status-badge-error' : ' status-badge-neutral')"
                         th:title="${severityCode}" th:text="${c.severity().label()}">-</span></td>
-              <td class="tabular-nums exception-disclosure-cell">
-                <div class="table-cell-disclosure">
-                  <span class="table-cell-preview is-single-line" th:text="${c.contractNo()} ?: '-'">계약번호</span>
-                  <details class="table-cell-details" hidden>
-                    <summary>
-                      <span class="table-cell-more">전체 보기</span>
-                      <span class="table-cell-less">접기</span>
-                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
-                    </summary>
-                    <p class="table-cell-full" th:text="${c.contractNo()}">계약번호</p>
-                  </details>
-                </div>
-              </td>
+              <!-- 계약번호는 컬럼 폭을 넓게 잡아(차익거래 검증 화면과 동일) 토글 없이 항상 전체를 보여준다(#326). -->
+              <td class="tabular-nums" th:title="${c.contractNo()}" th:text="${c.contractNo()} ?: '-'">계약번호</td>
               <td class="exception-title-cell exception-disclosure-cell">
                 <div class="table-cell-disclosure">
                   <span class="table-cell-preview" th:text="${c.title()} ?: '-'">예외 내용</span>

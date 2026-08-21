@@ -41,10 +41,11 @@
             계약상태 배지 색은 화면정의서 4장 규칙 4 (정상=초록·주의=주황·위반=빨강·진행중=파랑) 를 따르고,
             그 5색에 없는 종료 상태(해지·만기·청약철회)는 neutral 로 둔다.
             같은 매핑이 contract-detail.js 의 STATUS_BADGE_CLASSES 에도 있다 — 한쪽만 고치지 말 것.
-            긴 값(계약번호·보험회사·상품명·설계사)은 contract-list.js 가 실제로 잘린 셀만 [전체 보기]로 바꾼다.
+            긴 값(보험회사·상품명·설계사)은 contract-list.js 가 실제로 잘린 셀만 [전체 보기]로 바꾼다.
+            계약번호는 폭을 넉넉히 잡아(차익거래 검증 화면과 동일) 토글 없이 항상 전체를 보여준다(#326).
           -->
           <tr th:each="contract : ${contracts.content()}">
-            <td data-disclosure th:title="${contract.contractNo}"><a th:href="@{/contracts/{id}(id=${contract.contractId})}" th:text="${contract.contractNo}">-</a></td>
+            <td class="tabular-nums" th:title="${contract.contractNo}"><a th:href="@{/contracts/{id}(id=${contract.contractId})}" th:text="${contract.contractNo}">-</a></td>
             <td data-disclosure th:title="${contract.insurerName}" th:text="${contract.insurerName}">-</td>
             <td data-disclosure th:title="${contract.productName}" th:text="${contract.productName}">-</td>
             <td class="tabular-nums" th:text="${contract.contractDate}">-</td>
