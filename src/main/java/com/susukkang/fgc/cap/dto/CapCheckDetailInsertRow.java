@@ -29,6 +29,8 @@ public class CapCheckDetailInsertRow {
     private String itemCode;
     private String itemName;
     private Long scheduleLineId;
+    /** 실제 지급 건 귀속행 출처(PRE_CONFIRM)일 때만 채운다 — scheduleLineId 와 동시 설정 금지(ck_cap_detail_source). */
+    private Long transactionAttributionId;
     private Integer contractMonthNo;
     private String classificationSnapshot;
     private BigDecimal amount;

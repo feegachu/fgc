@@ -701,7 +701,7 @@
   margin: 0 var(--space-4);
 }
 
-.cap-detail-col-seq { width: 2rem; }
+.cap-detail-col-seq { width: 2.75rem; }
 .cap-detail-col-item { width: 7rem; }
 .cap-detail-col-amount { width: 5.5rem; }
 .cap-detail-col-status { width: 5rem; }

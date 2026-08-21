@@ -8,6 +8,9 @@ import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
+import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
+import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
+import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
@@ -39,6 +42,7 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
+import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
 import com.susukkang.fgc.transaction.dto.*;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import lombok.RequiredArgsConstructor;
@@ -84,6 +88,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private static final String AUDIT_PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
 
     private final CommissionPaymentMapper mapper;
+    private final CapCheckMapper capCheckMapper;
     private final AgentMapper agentMapper;
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
@@ -232,7 +237,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
             CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
             mapper.insertCapCheck(check);
-            mapper.insertCapCheckDetail(check);
+            insertCapCheckDetails(check, data, calculation);
             capCheckIds.add(check.getCapCheckId());
             capChecks.add(check);
 
@@ -1284,6 +1289,94 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             );
         }
         return null;
+    }
+
+    /**
+     * PRE_CONFIRM cap_check 의 항목별 내역(cap_check_detail)을 저장한다 (FUN-035 · CAP-W02).
+     *
+     * cap_check.included_amount 는 max(스케줄 산입액, 기존 확정 누계 + 이번 후보) 인데,
+     * 종전에는 후보 1행만 저장해 CAP-W02 가 "저장 산입금액과 항목별 산입 합계 불일치"
+     * 경고를 띄웠다(#255 F-11). 헤더가 어느 쪽 값으로 정해졌는지에 맞춰 같은 쪽의
+     * 행 단위 내역을 저장해 상세 합계 = included_amount 를 만든다:
+     *  - 실제(기존 확정 귀속행 + 후보) 합계가 헤더와 같으면 → 실제 귀속행 항목화 + 후보 행
+     *  - 그 외(스케줄 우세 등)          → REALTIME 경로와 동일하게 calculation.details() 저장
+     *
+     * ponytail: cap_check_detail.amount 는 CHECK(>=0) 라 DEDUCTION(환수) 음수 기여가 섞이면
+     * 실제 쪽 항목화를 표현할 수 없어 스케줄 내역으로 폴백한다(헤더가 실제 우세면 경고는 남는다).
+     * 업그레이드 경로: amount 부호 허용 또는 부호 컬럼 추가 마이그레이션.
+     */
+    private void insertCapCheckDetails(
+            CapCheckCommand check,
+            ConfirmationData data,
+            CapCalculationResult calculation
+    ) {
+        List<ExistingIncludedDetail> existing = mapper.findExistingIncludedDetails(
+                data.paymentId(),
+                data.transactionAttributionId()
+        );
+        boolean representable = check.getCandidateAmount() != null
+                && check.getCandidateAmount().signum() >= 0
+                && existing.stream().allMatch(d -> d.getAmount() != null && d.getAmount().signum() >= 0);
+        BigDecimal actualSum = existing.stream()
+                .map(ExistingIncludedDetail::getAmount)
+                .reduce(check.getCandidateAmount() == null ? BigDecimal.ZERO : check.getCandidateAmount(),
+                        BigDecimal::add);
+
+        List<CapCheckDetailInsertRow> rows = new ArrayList<>();
+        if (representable && actualSum.compareTo(check.getIncludedAmount()) == 0) {
+            int seq = 1;
+            for (ExistingIncludedDetail d : existing) {
+                rows.add(CapCheckDetailInsertRow.builder()
+                        .capCheckId(check.getCapCheckId())
+                        .detailSeq(seq++)
+                        .commissionItemId(d.getCommissionItemId())
+                        .itemCode(d.getItemCode())
+                        .itemName(d.getItemName())
+                        .transactionAttributionId(d.getTransactionAttributionId())
+                        .classificationSnapshot(d.getClassificationSnapshot())
+                        .amount(d.getAmount())
+                        .decisionReason(d.getDecisionReason())
+                        .evidenceRef(d.getEvidenceRef())
+                        .build());
+            }
+            rows.add(candidateDetailRow(check, seq));
+        } else {
+            for (CapCheckDetailLine d : calculation.details()) {
+                rows.add(CapCheckDetailInsertRow.builder()
+                        .capCheckId(check.getCapCheckId())
+                        .detailSeq(d.detailSeq())
+                        .commissionItemId(d.commissionItemId())
+                        .itemCode(d.itemCode())
+                        .itemName(d.itemName())
+                        .scheduleLineId(d.scheduleLineId())
+                        .contractMonthNo(d.contractMonthNo())
+                        .classificationSnapshot(d.classification())
+                        .amount(d.amount())
+                        .decisionReason(d.decisionReason())
+                        .evidenceRef(d.evidenceRef())
+                        .build());
+            }
+            if (rows.isEmpty()) {
+                // 스케줄 내역조차 없으면 종전 동작(후보 1행)으로 최소한의 근거를 남긴다.
+                rows.add(candidateDetailRow(check, 1));
+            }
+        }
+        capCheckMapper.insertCapCheckDetails(rows);
+    }
+
+    private CapCheckDetailInsertRow candidateDetailRow(CapCheckCommand check, int detailSeq) {
+        return CapCheckDetailInsertRow.builder()
+                .capCheckId(check.getCapCheckId())
+                .detailSeq(detailSeq)
+                .commissionItemId(check.getCommissionItemId())
+                .itemCode(check.getItemCode())
+                .itemName(check.getItemName())
+                .transactionAttributionId(check.getTransactionAttributionId())
+                .classificationSnapshot(check.getClassificationSnapshot())
+                .amount(check.getCandidateAmount())
+                .decisionReason(check.getDecisionReason())
+                .evidenceRef(check.getEvidenceRef())
+                .build();
     }
 
     private CapCheckCommand buildCapCheck(

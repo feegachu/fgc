@@ -13,6 +13,7 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
+import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentListResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentSearchCondition;
 import org.apache.ibatis.annotations.Mapper;
@@ -134,7 +135,15 @@ public interface CommissionPaymentMapper {
 
     void insertCapCheck(CapCheckCommand command);
 
-    void insertCapCheckDetail(CapCheckCommand command);
+    /**
+     * findCapRuleSnapshot 의 existing_included_amount 합계를 행 단위로 풀어낸 항목별 내역.
+     * WHERE 조건은 그 집계 서브쿼리와 반드시 동일해야 한다 — 어긋나면 CAP-W02 가
+     * "저장 산입금액과 항목별 산입 합계가 일치하지 않습니다" 를 띄운다 (FUN-035).
+     */
+    List<ExistingIncludedDetail> findExistingIncludedDetails(
+            @Param("paymentId") Long paymentId,
+            @Param("transactionAttributionId") Long transactionAttributionId
+    );
 
     void insertExceptionCase(ExceptionCaseCommand command);
 
