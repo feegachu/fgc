@@ -1,8 +1,6 @@
 package com.susukkang.fgc.auth.controller;
 
 import org.springframework.stereotype.Controller;
-import org.springframework.core.env.Environment;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 // FUN-001 개발 순서 7
@@ -15,16 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class AuthViewController {
 
-    private final Environment environment;
-
-    public AuthViewController(Environment environment) {
-        this.environment = environment;
-    }
-
     @GetMapping("/login")
-    public String loginPage(Model model) {
-        // QA-10 로컬 런타임 실측 도구. 운영 로그인 화면에는 진단용 요청 UI를 노출하지 않는다.
-        model.addAttribute("qaRequestLabEnabled", environment.matchesProfiles("local", "test"));
+    public String loginPage() {
         return "auth/login";
     }
 }
