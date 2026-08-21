@@ -39,8 +39,6 @@ class PublishingTemplateStructureTest {
      * — 그래야 화면 하나를 전환할 때 다른 화면 담당자의 테스트가 함께 깨지지 않는다 (#138).
      */
     private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of(
-            "templates/transaction/list.html",
-            "templates/transaction/form.html",
             "templates/ledger/list.html"
     );
 
@@ -58,6 +56,8 @@ class PublishingTemplateStructureTest {
             "templates/contract/list.html",
             "templates/contract/detail.html",
             "templates/contract/form.html",
+            "templates/transaction/list.html",
+            "templates/transaction/form.html",
             "templates/schedule/list.html",
             "templates/schedule/detail.html",
             "templates/exception/list.html",
@@ -293,6 +293,115 @@ class PublishingTemplateStructureTest {
                 .contains("function usageRate(")
                 .contains("truncateDecimal(value, 4)")
                 .contains("truncateDecimal(value, 6)");
+    }
+
+    // FGC-UI-TRAN-W01·W02: 지급 목록·등록 화면은 공통 컴포넌트와 TRAN 전용 자산만 사용한다.
+    @Test
+    void transactionScreensUseCommonComponentsAndPreserveCriticalContracts() throws IOException {
+        assertThat(resource("templates/transaction/list.html"))
+                .contains("class=\"page-content publishing-page transaction-page transaction-list-page\"")
+                .contains("class=\"page-header transaction-page-header\"")
+                .contains("class=\"filter-bar transaction-filter-bar\"")
+                .contains("class=\"surface transaction-list-panel\"")
+                .contains("class=\"data-table transaction-list-table\"")
+                .contains("class=\"transaction-pagination\"")
+                .contains("data-transaction-filter-form")
+                .contains("data-transaction-page-numbers")
+                .contains("<caption class=\"visually-hidden\"")
+                .contains("scope=\"col\"")
+                .doesNotContain("schedule-")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("templates/transaction/form.html"))
+                .contains("class=\"page-content publishing-page transaction-page transaction-form-page\"")
+                .contains("data-transaction-form aria-busy=\"true\"")
+                .contains("class=\"surface transaction-form-panel\"")
+                .contains("class=\"data-table transaction-attribution-table\"")
+                .contains("data-modal=\"transaction-confirm\"")
+                .contains("확정 후에는 이 화면에서 되돌릴 수 없습니다")
+                .contains("초년도 구간은 [계약일, 1주년일)입니다")
+                .contains("id=\"transaction-permission-help\"")
+                .contains("id=\"err-bizKey\"")
+                .contains("id=\"err-attributions\"")
+                // 게이트 패널 제목은 화면정의서 :718 "위 6단계" 와 제31조를 그대로 인용한다.
+                .contains("확정 게이트 6단계")
+                // 내려줄 ID 가 없어 영구히 hidden 이던 링크는 두지 않는다.
+                .doesNotContain("transaction-confirm-links")
+                .doesNotContain("계산근거 보기")
+                .doesNotContain("예외함으로 이동")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("static/css/features/transaction.css"))
+                .contains(".transaction-form-layout")
+                .contains(".transaction-pagination")
+                .contains(".transaction-gate-step")
+                .contains("@media (max-width: 63.9375rem)")
+                .contains("@media (max-width: 47.9375rem)")
+                .contains("var(--color-status-error-solid)")
+                .doesNotContainPattern("#[0-9a-fA-F]{3,8}\\b");
+
+        assertThat(resource("static/css/common/components.css"))
+                .doesNotContain("[data-transaction-page-numbers]")
+                .doesNotContain("[data-transaction-pagination]");
+
+        assertThat(resource("static/js/features/transaction/transaction-list.js"))
+                .contains("buildTransactionFilterState(fields, page, attributionImbalanceOnly)")
+                .contains("attributionImbalanceOnly: attributionImbalanceOnly === true")
+                .contains("format.won(")
+                .contains("status-badge ")
+                .contains("aria-disabled")
+                .contains("다시 시도")
+                .doesNotContain("new Intl.NumberFormat")
+                .doesNotContain("style.")
+                .doesNotContain("fetch(");
+
+        assertThat(resource("static/js/features/transaction/transaction-form.js"))
+                .contains("modal.open(\"transaction-confirm\")")
+                .contains("modal.close(\"transaction-confirm\")")
+                .contains("idempotencyKey: \"TRAN-CONFIRM-\" + paymentId")
+                .contains("var GATES = [")
+                .contains("renderGates([], null)")
+                /*
+                 * 확정 게이트는 화면정의서 :710-718 · 운영정책서 제31조의 6단계 그대로다.
+                 * 문서에 없는 게이트(차익거래·업무키)를 만들어 넣지 않는다 —
+                 * precheck 가 그런 코드를 발행하지 않아 영구히 판정되지 않는 칸이 된다.
+                 */
+                .contains("{ label: \"작성중(DRAFT) 저장\", codes: [\"FGC-TRAN-005\"] }")
+                .contains("{ label: \"귀속행 입력\", codes: [\"FGC-TRAN-002\"] }")
+                .contains("{ label: \"귀속합계 = 지급액\", codes: [\"FGC-TRAN-003\"] }")
+                .contains("{ label: \"검토필요 귀속 해소\", codes: [\"FGC-CAP-002\"] }")
+                .contains("{ label: \"1,200% 사전검증\", codes: [\"FGC-CAP-001\", \"FGC-CAP-003\", \"FGC-CAP-004\"] }")
+                .doesNotContain("차익거래 검증")
+                .doesNotContain("증빙·업무키 검증")
+                /*
+                 * blocker 분류는 오류 카탈로그 코드로 한다. Blocker.message 는 부록 A 한글 문구라
+                 * 영문 키워드 부분일치는 "FGC-CAP-*" 가 전부 "CAP" 에 걸리는 오분류를 낳았다.
+                 */
+                .doesNotContain("ATTRIBUTION_REQUIRED")
+                .doesNotContain("haystack")
+                /*
+                 * 계산근거·예외함 링크는 내려줄 ID 가 없어 제거했다 (capCheckId 는 IF-API-24 에서 항상 null).
+                 * 동작하지 않는 버튼을 되살리지 않는다.
+                 */
+                .doesNotContain("configureResultLinks")
+                .doesNotContain("transaction-cap-link")
+                .doesNotContain("transaction-exception-link")
+                .contains("format.today().slice(0, 7)")
+                .contains("format.won(")
+                .contains("showValidationError")
+                .doesNotContain("new Intl.NumberFormat")
+                .doesNotContain("statusStyle(")
+                .doesNotContain("statusColor(")
+                .doesNotContain("style.")
+                .doesNotContain("fetch(");
     }
 
     /*
