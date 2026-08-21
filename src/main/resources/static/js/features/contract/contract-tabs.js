@@ -265,6 +265,10 @@
         }
         var cell = document.createElement("td");
         cell.textContent = value(cellValue);
+        /* format.won() 의 음수 표기 "(1,234)원" 에만 매칭 — 잔여액·차액 음수를 빨강으로 (규칙 1, #256 F-A) */
+        if (typeof cellValue === "string" && /^\(\d[\d,]*\)원$/.test(cellValue)) {
+          cell.classList.add("is-negative-amount");
+        }
         row.appendChild(cell);
       });
       body.appendChild(row);
