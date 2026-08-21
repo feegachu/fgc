@@ -266,7 +266,7 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("static/css/features/ledger.css"))
                 .contains(".ledger-work-grid")
-                .contains("grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 1fr)")
+                .contains("grid-template-columns: minmax(0, 1.7fr) minmax(20rem, 0.9fr)")
                 .contains("@media (max-width: 63.9375rem)")
                 .contains("@media (max-width: 47.9375rem)")
                 .contains(".ledger-page :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible")

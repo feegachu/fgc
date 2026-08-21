@@ -39,7 +39,7 @@
 .ledger-work-grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 1fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(20rem, 0.9fr);
   gap: var(--space-4);
   align-items: start;
 }
@@ -156,6 +156,10 @@
 
 .ledger-detail-empty {
   min-height: 7rem;
+}
+
+.ledger-detail-imbalance {
+  margin: 0 0 var(--space-4);
 }
 
 .ledger-detail-actions {

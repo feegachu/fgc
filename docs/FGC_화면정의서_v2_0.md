@@ -1167,7 +1167,8 @@ FGC — GA 수수료 정산·검증 플랫폼
 
 화면에 안내 문구를 고정합니다: **"수정·삭제는 없습니다. 잘못됐으면 역분개로 고칩니다."**
 
-**권한** 전체 조회 / 역분개는 `SETTLEMENT`·`GA_ADMIN`
+**권한** 전체 조회 / 역분개는 `SETTLEMENT`·`GA_ADMIN`·`SYSTEM_ADMIN`
+> #323 개정: `Roles.CAN_REVERSE_JOURNAL`과 화면 노출 조건(`data-can-reverse`)이 이미 SYSTEM_ADMIN을 포함하고 있어 실제 코드 기준으로 문서를 맞춘다.
 
 **데이터**
 - 읽기: `journal_header`, `journal_line`, `journal_account`, `vw_journal_imbalance`
