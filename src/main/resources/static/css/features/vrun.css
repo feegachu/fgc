@@ -1,16 +1,482 @@
 /*
- * VRUN-W01·W02 화면 전용 스타일 (#138).
+ * VRUN-W01·W02 화면 전용 스타일 (#286, #138).
  *
- * 지금은 루트 레이아웃만 둔다. 스텝퍼·결과 요약·컬럼 폭은 VRUN 담당 이슈에서 채운다.
- * 공통 컴포넌트(components.css)의 디자인을 여기에 다시 복사하지 않는다.
+ * 선행 정비(#293)가 루트 레이아웃만 두고 나머지를 이 이슈로 넘겼다. 여기서 채운다.
+ *   · templates/vrun/detail.html 의 <style>·<script> 블록
+ *   · 두 템플릿의 인라인 style 60개 이상
+ *   · assets/fgc.css 의 .fgc-stepper (원본은 지우지 않고 .vrun-stepper 로 새로 정의)
+ *   · publishing.css 의 .publishing-result-placeholder 의존 → 공통 kpi-card 로 교체
  *
- * 이관 예정: templates/vrun/detail.html 의 <style>·<script> 블록, 두 템플릿의 인라인 style,
- *           assets/fgc.css 의 .fgc-stepper (원본은 지우지 않고 .vrun-stepper 로 새로 정의),
- *           publishing.css 의 .publishing-result-placeholder 의존 → kpi-card 로 교체.
+ * 공통 컴포넌트(components.css)의 디자인을 여기에 다시 복사하지 않는다 — 폭·간격만 얹는다.
  */
 
 .vrun-page {
   display: grid;
   min-width: 0;
   gap: var(--space-4);
+}
+
+/* ───────────────────────────── 공통 ───────────────────────────── */
+
+.vrun-card-note {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+}
+
+/* 규칙 8 확정 후 잠금 — 배지 안 자물쇠. SCHE-W01·W02(#285)와 같은 표현. */
+.vrun-badge-lock {
+  margin-left: 0.125rem;
+  font-size: 0.875rem;
+}
+
+.vrun-kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr));
+  gap: 0.75rem 1.25rem;
+  padding: var(--space-3) var(--space-4);
+}
+
+.vrun-kv dt {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+}
+
+.vrun-kv dd {
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * 로딩 · 빈 결과 · 오류를 클래스로 구분한다.
+ * 전에는 셋 다 .fgc-empty publishing-empty-state 하나였고 색을 인라인으로 칠했다.
+ */
+.vrun-inline-state {
+  display: grid;
+  min-height: 5rem;
+  place-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.vrun-inline-state.is-error {
+  color: var(--color-status-error-text);
+}
+
+.vrun-inline-state.is-empty {
+  color: var(--color-text-tertiary);
+}
+
+/*
+ * 비활성 버튼의 사유를 담는 가시 텍스트.
+ * disabled 요소는 포커스가 가지 않아 title 로는 스크린리더에 닿지 않는다 —
+ * 버튼 바깥 텍스트 + aria-describedby 조합으로 옮겼다 (reco/list.html:73-86 패턴).
+ */
+.vrun-action-note {
+  color: var(--color-status-warning-text);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.vrun-modal {
+  width: min(32rem, 100%);
+}
+
+.vrun-modal-description {
+  margin-bottom: var(--space-4);
+  line-height: 1.65;
+}
+
+.vrun-modal-points {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-8);
+  background: var(--color-bg-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+/* ─────────────────────── VRUN-W01 실행 목록 ─────────────────────── */
+
+.vrun-create-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.vrun-create-month {
+  width: 10rem;
+}
+
+.vrun-create-type {
+  width: 12rem;
+}
+
+.vrun-create-hint {
+  flex: 1 1 16rem;
+  align-self: center;
+}
+
+.vrun-filter-fields {
+  flex: 1 1 auto;
+}
+
+.vrun-filter-status {
+  width: 10rem;
+}
+
+.vrun-filter-actions {
+  flex: 0 0 auto;
+}
+
+.vrun-run-table {
+  min-width: 71rem;
+}
+
+.vrun-col-month { width: 5.5rem; }
+.vrun-col-runno { width: 3.5rem; }
+.vrun-col-type { width: 7rem; }
+.vrun-col-status { width: 7rem; }
+.vrun-col-progress { width: 9.5rem; }
+.vrun-col-actor { width: 6rem; }
+.vrun-col-started { width: 8.5rem; }
+.vrun-col-completed { width: 8.5rem; }
+.vrun-col-finalized { width: 10.5rem; }
+.vrun-col-failure { width: 14rem; }
+.vrun-col-open { width: 5rem; }
+
+.vrun-row-button {
+  min-width: 3.75rem;
+  height: 1.75rem;
+  padding-inline: 0.625rem;
+  font-size: 0.75rem;
+}
+
+.vrun-run-table .table-cell-disclosure,
+.vrun-target-table .table-cell-disclosure {
+  font-size: 0.75rem;
+}
+
+.vrun-failure-text {
+  color: var(--color-status-error-text);
+}
+
+.vrun-pagination {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+/* ───────────────────── VRUN-W02 상세 · 확정 ───────────────────── */
+
+.vrun-run-picker {
+  gap: 0.25rem;
+}
+
+.vrun-run-picker .select-control {
+  width: min(18rem, 60vw);
+  height: 1.75rem;
+  padding-block: 0;
+  font-size: 0.75rem;
+}
+
+/*
+ * 10단계 스텝퍼.
+ * assets/fgc.css:159-182 의 .fgc-stepper 를 여기로 옮겨 토큰화한 것이다.
+ * 원본은 다른 화면이 참조할 수 있으므로 지우지 않고 이름을 바꿔 새로 정의했다.
+ * 상태는 색만으로 전달하지 않는다 — 각 칸이 visually-hidden 텍스트로 상태를 함께 읽어 준다.
+ */
+/*
+ * 칸을 카드로 나열하지 않고 한 줄로 잇는다 — 10단계가 순서대로 진행된다는 사실이
+ * 형태로 드러나야 한다. 칸마다 테두리를 두면 서로 독립된 항목처럼 읽힌다.
+ * 좁은 화면에서는 줄바꿈 대신 가로 스크롤한다. 줄이 바뀌면 연결선이 끊겨
+ * 순서가 오히려 안 보인다.
+ */
+.vrun-stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: var(--space-4);
+  list-style: none;
+  overflow-x: auto;
+}
+
+.vrun-stepper-step {
+  position: relative;
+  min-width: 5.75rem;
+  flex: 1 1 0;
+  text-align: center;
+}
+
+/*
+ * 단계를 잇는 수평선. 완료된 칸의 선만 초록으로 바뀌므로 채워진 길이가 곧 진행률이다.
+ * 위쪽 진행률 텍스트(current_step/10)와 같은 값을 형태로 한 번 더 보여 주는 것이고,
+ * 판정은 서버가 준 stepClasses 를 그대로 따른다 — 화면에서 다시 계산하지 않는다.
+ */
+.vrun-stepper-step::after {
+  position: absolute;
+  z-index: 0;
+  top: 0.875rem; /* dot 1.75rem 의 세로 중앙 */
+  right: -50%;
+  left: 50%;
+  height: 2px;
+  background: var(--color-border-default);
+  content: "";
+}
+
+.vrun-stepper-step:last-child::after {
+  display: none;
+}
+
+.vrun-stepper-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0 auto var(--space-1);
+  place-items: center;
+  border: 2px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.vrun-stepper-label {
+  display: block;
+  padding: 0 var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-wrap: pretty;
+}
+
+.vrun-stepper-manual {
+  display: block;
+  color: var(--color-status-warning-text);
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/*
+ * 상태 수식어는 서버가 주는 이름을 그대로 받는다.
+ * ValidationRunViewController:168-192 의 stepClasses() 가 fgc-stepper__step--* 문자열을
+ * 계산해 내려주고 vrun-detail.js 의 stepClass() 가 폴링 중 같은 이름을 붙인다.
+ * 이름을 바꾸려면 Controller 를 고쳐야 하는데 이 이슈에서는 백엔드 수정이 금지라
+ * (그리고 진행 상태를 화면에서 재계산하는 것도 금지라) 이름은 두고 스타일만 여기로 옮겼다.
+ */
+/* 완료된 칸의 오른쪽 선까지 초록으로 채워진다 — 이게 진행 바 역할을 한다. */
+.vrun-stepper-step.fgc-stepper__step--done::after {
+  background: var(--color-status-success-solid);
+}
+
+.vrun-stepper-step.fgc-stepper__step--done .vrun-stepper-dot {
+  border-color: var(--color-status-success-solid);
+  color: var(--color-text-inverse);
+  background: var(--color-status-success-solid);
+}
+
+.vrun-stepper-step.fgc-stepper__step--running .vrun-stepper-dot {
+  border-color: var(--color-status-info-solid);
+  color: var(--color-text-inverse);
+  background: var(--color-status-info-solid);
+}
+
+/* 지나온 단계와 지금 단계의 이름은 또렷하게 — 색만으로 구분하지 않는다(규칙 4). */
+.vrun-stepper-step.fgc-stepper__step--done .vrun-stepper-label,
+.vrun-stepper-step.fgc-stepper__step--running .vrun-stepper-label {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.vrun-stepper-step.fgc-stepper__step--failed .vrun-stepper-dot {
+  border-color: var(--color-status-error-solid);
+  color: var(--color-text-inverse);
+  background: var(--color-status-error-solid);
+}
+
+.vrun-progress-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.vrun-progress-value {
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/*
+ * ③대상 선별 · ④결과 요약을 나란히 두는 2단 그리드.
+ * 전에는 detail.html 의 인라인 <script> 가 resize 리스너로 폭을 재서 제어했는데,
+ * 그 기준값(1150px)이 프로젝트 브레이크포인트와 달랐고 JS 가 없으면 항상 2단이었다.
+ */
+.vrun-mid-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.vrun-target-table {
+  min-width: 38rem;
+}
+
+.vrun-target-col-contract { width: 8rem; }
+.vrun-target-col-status { width: 6rem; }
+.vrun-target-col-offering { width: 11rem; }
+.vrun-target-col-refund { width: 6.5rem; }
+.vrun-target-col-reason { width: 12rem; }
+
+/*
+ * 공통 .kpi-grid 는 3열이라 4블록이 3+1 로 떨어져 마지막 칸만 홀로 남는다.
+ * 결과 요약은 항상 4개(1,200%·차익거래·원장·대사)이므로 2열로 고정해 2×2 로 맞춘다.
+ * 좁은 화면 1열 전환은 아래 반응형 블록에서 다시 푼다 — 여기 기본 규칙이
+ * components.css 의 미디어쿼리보다 뒤에 오므로 그쪽 값이 이기지 못한다.
+ */
+.vrun-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: var(--space-3) var(--space-4);
+}
+
+.vrun-exception-grid {
+  grid-template-columns: repeat(auto-fit, minmax(8.125rem, 1fr));
+  padding: var(--space-3) var(--space-4);
+}
+
+.vrun-checklist {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.vrun-checklist-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--color-bg-surface);
+}
+
+.vrun-checklist-label {
+  min-width: 0;
+  flex: 1 1 18rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.vrun-checklist-result {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.vrun-finalize-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+}
+
+.vrun-finalize-copy {
+  max-width: 40rem;
+}
+
+.vrun-finalize-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+
+.vrun-finalize-guide {
+  margin-top: var(--space-1);
+}
+
+/* ─────────────────────────── 포커스 ─────────────────────────── */
+
+/*
+ * 이 화면들에는 :focus-visible 규칙이 하나도 없었다.
+ * 가로 스크롤 뷰포트와 화면 전용 요소는 공통 규칙이 닿지 않아 Tab 위치를 알 수 없었다.
+ */
+.vrun-table-viewport:focus-visible,
+.vrun-row-button:focus-visible,
+.vrun-pagination .pagination-button:focus-visible,
+.vrun-checklist-result a:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.vrun-create-form :focus-visible,
+.vrun-filter-bar :focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* ─────────────────────────── 반응형 ─────────────────────────── */
+
+@media (max-width: 63.9375rem) {
+  .vrun-mid-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  /* 2열 고정을 여기서 푼다 — 폭이 좁으면 카드 안 숫자가 줄바꿈된다. */
+  .vrun-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vrun-create-month,
+  .vrun-create-type,
+  .vrun-filter-status {
+    width: 100%;
+  }
+
+  .vrun-filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vrun-run-picker .select-control {
+    width: 100%;
+  }
+
+  .vrun-finalize-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
