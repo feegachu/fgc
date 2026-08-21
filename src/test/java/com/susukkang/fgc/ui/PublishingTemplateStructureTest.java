@@ -460,6 +460,12 @@ class PublishingTemplateStructureTest {
                  * 차단 사유일 때 링크가 사라지고 다중 귀속행일 때 다른 계약을 가리킨다.
                  */
                 .contains("renderFollowUpLinks(blockedContractNo(lastPrecheckResult, error.code)")
+                /*
+                 * 인터페이스정의서 :219-220 — 두 코드의 "사용자가 할 일" 이 다르다.
+                 * CAP-001 은 예외함, CAP-002 는 귀속행 판정 확정이 주 동선이다.
+                 */
+                .contains("귀속행 판정 다시 확인")
+                .contains("예외함에서 처리하기")
                 .contains("RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0")
                 .doesNotContain("(result.capPreview || []).filter")
                 /*

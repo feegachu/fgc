@@ -779,6 +779,20 @@
 
     var actions = document.createElement("div");
     actions.className = "transaction-confirm-followup-actions";
+    /*
+     * 두 코드는 "사용자가 할 일" 이 다르다 — 인터페이스정의서 :219-220 오류코드 대조표.
+     *   FGC-CAP-001 → 예외함으로 이동   (한도 초과는 감액·정정·취소라 예외함 일이다)
+     *   FGC-CAP-002 → 귀속행 판정 확정  (검토필요는 산입 판정을 고치면 풀린다)
+     * 같은 표의 "화면 문구" 열은 CAP-002 도 "예외함에서 먼저 처리하세요" 라 두 열이 어긋나는데,
+     * 예외는 실제로 기록되므로 예외함 링크를 없애지 않고 주 동선만 귀속행 쪽으로 둔다.
+     * 초안은 저장 시 잠기므로(lockDraftInputs) 편집하려면 다시 열어야 한다 — 그 링크를 준다.
+     */
+    if (reviewRequired) {
+      actions.appendChild(followUpLink(
+        "귀속행 판정 다시 확인",
+        "/transactions/new?id=" + encodeURIComponent(paymentId)
+      ));
+    }
     actions.appendChild(followUpLink("예외함에서 처리하기", "/exceptions?" + excParams.toString()));
     confirmFollowUp.appendChild(actions);
     confirmFollowUp.hidden = false;
