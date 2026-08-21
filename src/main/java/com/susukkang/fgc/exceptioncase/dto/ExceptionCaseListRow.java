@@ -36,7 +36,6 @@ public record ExceptionCaseListRow(
             case "ARBITRAGE_CHECK" -> "/arbitrage-checks";
             case "COMMISSION_TRANSACTION" -> "/transactions/new?id=" + sourceEntityId;
             case "SCHEDULE_HEADER" -> "/schedules/" + sourceEntityId;
-            case "CAP_CHECK" -> "/cap-checks?capCheckId=" + sourceEntityId;
             default -> null;
         };
     }

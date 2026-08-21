@@ -88,7 +88,7 @@ class ExceptionCaseViewControllerTest {
         given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
                 .willReturn(response(List.of(realtime, batch), 1, 20, 2, 2));
 
-        mockMvc.perform(get("/exceptions").with(user(SETTLE)))
+        String html = mockMvc.perform(get("/exceptions").with(user(SETTLE)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("1,200% 계산근거 열기")))
                 // 실시간 경로 — cap_check_id 컬럼에서
@@ -96,7 +96,26 @@ class ExceptionCaseViewControllerTest {
                 // 배치 경로 — source_entity 에서
                 .andExpect(content().string(containsString("href=\"/cap-checks?capCheckId=502\"")))
                 // 지급 건 참조는 그대로 남는다 — 예외에서 "어느 지급 시도였나" 를 잃지 않는다
-                .andExpect(content().string(containsString("href=\"/transactions/new?id=77\"")));
+                .andExpect(content().string(containsString("href=\"/transactions/new?id=77\"")))
+                .andReturn().getResponse().getContentAsString();
+
+        /*
+         * 배치 경로(source_entity = CAP_CHECK)에서 "참조" 와 "계산근거" 가 같은 목적지로
+         * 두 번 렌더되면 안 된다. 화면정의서 :1395 는 참조 버튼의 원천 유형을 계약·지급 건·
+         * 스케줄 헤더·차익거래·JOURNAL_HEADER·대사 결과로 한정하고 CAP_CHECK 는 목록에 없다 —
+         * 계산근거는 capBasisLink 하나로만 연결한다.
+         * containsString 은 2개여도 통과하므로 건수를 센다.
+         */
+        assertThat(countOccurrences(html, "href=\"/cap-checks?capCheckId=502\"")).isEqualTo(1);
+        assertThat(countOccurrences(html, "href=\"/cap-checks?capCheckId=501\"")).isEqualTo(1);
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        for (int from = haystack.indexOf(needle); from >= 0; from = haystack.indexOf(needle, from + needle.length())) {
+            count++;
+        }
+        return count;
     }
 
     @Test
