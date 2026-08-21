@@ -19,7 +19,7 @@
 --
 -- 배치 경로(ExceptionCaseMapper)는 이미 source_entity 에 CAP_CHECK:{cap_check_id} 를 넣으므로
 -- 이 컬럼 없이도 계산근거를 찾을 수 있다. 화면은 컬럼을 우선 보고 없으면 source_entity 로
--- 물러선다(ExceptionCaseListRow.capCheckReference).
+-- 물러선다(ExceptionCaseListRow.capBasisLink).
 
 ALTER TABLE fgc.exception_case
     ADD COLUMN cap_check_id bigint;
