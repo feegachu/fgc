@@ -8,79 +8,25 @@
   align-items: center;
 }
 
-.schedule-guidance {
-  display: grid;
-  grid-template-columns: 1.25rem minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: start;
-  padding: 0.875rem 1rem;
-  border: 1px solid var(--color-status-info-border);
-  border-radius: var(--radius-8);
-  color: var(--color-status-info-text);
-  background: var(--color-status-info-bg);
-}
-
-.schedule-guidance > .material-symbols-rounded {
-  margin-top: 0.125rem;
-  font-size: 1.25rem;
-}
-
-.schedule-guidance h2 {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  line-height: 1.25rem;
-}
-
-.schedule-guidance p {
-  margin-top: 0.25rem;
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  text-wrap: pretty;
-}
-
-.schedule-filter-card,
 .schedule-results-card {
   overflow: hidden;
 }
 
-.schedule-section-header {
-  display: flex;
-  min-height: 2.75rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0 1rem;
-  border-bottom: 1px solid var(--color-border-subtle);
+/* 공통 filter-bar 위의 폭 지정만 화면 전용으로 둔다 — RECO-W01 reco.css:17-40 과 같은 방식. */
+.schedule-filter-fields {
+  flex: 1 1 auto;
 }
 
-.schedule-reset-button {
-  height: 1.75rem;
+.schedule-filter-fields .filter-field {
+  width: 9.5rem;
 }
 
-.schedule-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(8.75rem, 1fr));
-  gap: 0.75rem;
-  padding: 0.875rem 1rem 0.75rem;
-}
-
-.schedule-filter-grid .field {
-  gap: 0.25rem;
-}
-
-.schedule-filter-grid .field-label {
-  color: var(--color-text-secondary);
+.schedule-filter-contract {
+  width: 12rem;
 }
 
 .schedule-filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 1rem 1rem;
-}
-
-.schedule-filter-actions .button {
-  min-width: 6.5rem;
+  flex: 0 0 auto;
 }
 
 .schedule-results-header {
@@ -142,12 +88,19 @@
   max-width: 100%;
 }
 
-.schedule-policy-value {
-  display: block;
-  overflow: hidden;
+/*
+ * 정책버전·계약번호는 table-cell-disclosure 로 접었다 펴므로 셀이 줄바꿈을 허용해야 한다.
+ * 예전에는 여기서 ellipsis 로 자르고 title 속성으로만 전체 값을 줬는데, 가이드 §10.2 가
+ * "잘라 놓거나 title 속성만 제공하면 안 된다" 고 금지한다.
+ */
+.schedule-table .table-cell-disclosure {
   font-size: 0.75rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* 규칙 8 확정 후 잠금 — 배지 안 자물쇠. VRUN-W01 vrun/list.html:116-118 과 같은 표현. */
+.schedule-badge-lock {
+  margin-left: 0.125rem;
+  font-size: 0.875rem;
 }
 
 .schedule-row-button {
@@ -245,29 +198,23 @@
   to { background-position: -200% 0; }
 }
 
-@media (max-width: 79.9375rem) {
-  .schedule-filter-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 63.9375rem) {
-  .schedule-filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 47.9375rem) {
   .schedule-page-header {
     align-items: stretch;
   }
 
-  .schedule-filter-grid {
-    grid-template-columns: 1fr;
+  .schedule-filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .schedule-filter-fields .filter-field,
+  .schedule-filter-contract {
+    width: 100%;
   }
 
   .schedule-filter-actions .button {
-    width: 100%;
+    flex: 1 1 auto;
   }
 
   .schedule-pagination {
@@ -282,4 +229,223 @@
   .schedule-pagination .pagination-controls {
     justify-content: center;
   }
+}
+
+/* ───────────────────────── SCHE-W02 예상 스케줄 상세 ───────────────────────── */
+
+.schedule-detail-page {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.schedule-detail-card {
+  overflow: hidden;
+}
+
+.schedule-detail-note {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+/*
+ * 헤더 정의목록 — 목업 head 에 있던 인라인 <style> 의 .kv 를 옮긴 것이다.
+ * 원래 dt 색이 HEX 하드코딩이었다. 같은 뜻의 토큰으로 바꿨다.
+ */
+.schedule-detail-kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.25rem, 1fr));
+  gap: 0.75rem 1.25rem;
+  padding: 0.875rem 1rem;
+}
+
+.schedule-detail-kv dt {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+}
+
+.schedule-detail-kv dd {
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.schedule-stage-field {
+  gap: 0.25rem;
+}
+
+.schedule-stage-field .select-control {
+  height: 1.75rem;
+  padding-block: 0;
+  font-size: 0.75rem;
+}
+
+/*
+ * 로딩 · 빈 결과 · 오류를 클래스로 구분한다.
+ * 전에는 셋 다 같은 .fgc-empty 였고 오류만 JS 가 인라인으로 색을 칠했다 —
+ * 화면에서 셋을 구분할 수 없었고 오류 색이 HEX 하드코딩이었다.
+ */
+.schedule-inline-state {
+  display: grid;
+  min-height: 6rem;
+  place-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.schedule-inline-state.is-error {
+  color: var(--color-status-error-text);
+}
+
+.schedule-inline-state.is-empty {
+  color: var(--color-text-tertiary);
+}
+
+.schedule-action-note {
+  margin: 0 0 0.25rem;
+  color: var(--color-status-warning-text);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.schedule-modal {
+  width: min(30rem, 100%);
+}
+
+.schedule-modal-description {
+  margin-bottom: 1.125rem;
+  line-height: 1.65;
+}
+
+.schedule-confirm-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem 1rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-8);
+  background: var(--color-bg-subtle);
+}
+
+.schedule-confirm-summary dt {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.schedule-confirm-summary dd {
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+}
+
+/* 회차 표는 길어서 세로로도 가둔다 — 예전 인라인 max-height:520px 을 여기로 옮겼다. */
+.schedule-line-viewport {
+  max-height: 32.5rem;
+}
+
+.schedule-line-table {
+  min-width: 88rem;
+}
+
+/*
+ * 머리글과 합계를 뷰포트에 붙여 둔다.
+ *
+ * 회차 표는 관리자수수료 3행까지 붙어 16줄 넘게 나오는데 뷰포트가 32.5rem 에서 잘린다.
+ * 가운데를 스크롤하는 동안 머리글이 밀려 올라가면 어느 열이 요율이고 어느 열이 예상금액인지
+ * 알 수 없고, 합계가 아래로 밀리면 지금 보는 회차가 합계에서 얼마를 차지하는지 볼 수 없다.
+ *
+ * sticky 는 <thead>·<tfoot> 이나 <tr> 이 아니라 셀에 건다 — 행·행그룹 단위 sticky 를
+ * 무시하는 브라우저가 있다.
+ *
+ * 경계선은 border 가 아니라 inset box-shadow 로 긋는다. reset.css:68 이
+ * border-collapse: collapse 라 테두리가 셀이 아니라 표에 속하고, 그래서 sticky 셀에
+ * border 를 줘도 함께 붙어 오지 않아 스크롤 중에 선이 사라진다.
+ */
+.schedule-line-table thead th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  box-shadow: inset 0 -1px 0 var(--color-border-default);
+}
+
+.schedule-line-table tfoot td {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  /*
+   * 합계는 데이터 한 줄이 아니라 머리글과 같은 성격의 고정 줄이므로 배경을 맞춘다.
+   * 불투명 배경은 sticky 에 필수이기도 하다 — 투명하면 밑을 지나가는 데이터가 비친다.
+   */
+  background: var(--color-bg-subtle);
+  box-shadow: inset 0 1px 0 var(--color-border-default);
+  font-weight: 600;
+}
+
+.schedule-line-col-no { width: 3.25rem; }
+.schedule-line-col-installment { width: 3.75rem; }
+.schedule-line-col-month { width: 5rem; }
+.schedule-line-col-due { width: 6.5rem; }
+.schedule-line-col-item { width: 10rem; }
+.schedule-line-col-recipient { width: 9rem; }
+.schedule-line-col-basis { width: 9rem; }
+.schedule-line-col-amount { width: 8.5rem; }
+.schedule-line-col-calc { width: 5.5rem; }
+.schedule-line-col-rate { width: 6.5rem; }
+.schedule-line-col-expected { width: 8.5rem; }
+.schedule-line-col-status { width: 5.5rem; }
+.schedule-line-col-rule { width: 5.5rem; }
+
+.schedule-version-table {
+  min-width: 62rem;
+}
+
+.schedule-version-col-no { width: 4.5rem; }
+.schedule-version-col-status { width: 6rem; }
+.schedule-version-col-active { width: 5.5rem; }
+.schedule-version-col-policy { width: 11rem; }
+.schedule-version-col-reason { width: 14rem; }
+.schedule-version-col-generated { width: 9.5rem; }
+.schedule-version-col-lines { width: 5.5rem; }
+.schedule-version-col-total { width: 8.5rem; }
+
+.schedule-line-table .table-cell-disclosure,
+.schedule-version-table .table-cell-disclosure {
+  font-size: 0.75rem;
+}
+
+/* 현재 보고 있는 버전 — 굵기만으로 구분하지 않는다. .is-selected 는 components.css:572. */
+.schedule-version-table tbody tr.is-selected td {
+  font-weight: 600;
+}
+
+@media (max-width: 47.9375rem) {
+  .schedule-confirm-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * 키보드 포커스 링 — 이 파일에는 :focus-visible 규칙이 하나도 없었다.
+ * 공통 컴포넌트(button·field-control·table-cell-details summary)는 자체 규칙이 있지만
+ * 화면 전용 요소와 가로 스크롤 뷰포트에는 없어서 Tab 으로 어디에 있는지 알 수 없었다.
+ */
+.schedule-table-viewport:focus-visible,
+.schedule-line-viewport:focus-visible,
+.schedule-version-viewport:focus-visible,
+.schedule-row-button:focus-visible,
+.schedule-pagination .pagination-button:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.schedule-filter-bar :focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
 }
