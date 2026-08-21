@@ -6,7 +6,10 @@
   - 상태이력은 GET /api/v1/contracts/{id}/status-events 응답을 수용한다.
     effectiveAt, receivedAt, processings[]를 사용하며 이벤트와 처리 작업을 분리해 표시한다.
   - 상태이력 기본 정렬은 효력일시 오름차순이며 도착일시 오름차순으로 전환할 수 있다.
-  - 예상 스케줄·1,200% 탭은 선택 시 각각 IF-API-13·14로 lazy load한다.
+  - 6개 탭은 선택 시 IF-API-13~17로 lazy load한다 (static/js/features/contract/contract-tabs.js).
+  - 화면 동작은 전부 static/js/features/contract/contract-detail.js 에 있다.
+    layout/default.html 의 page(...) fragment 는 ~{::main} 만 삽입하므로
+    main 바깥의 스크립트 태그는 렌더링에서 사라진다 — 인라인이 아니라 외부 파일이어야 하는 이유다 (#283).
 -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W02', '보험계약 상세', '보험계약', '/contracts')}">
@@ -17,6 +20,53 @@
       <h1 class="page-title">보험계약 상세</h1>
     </div>
   </header>
+
+  <!--
+    코드 → 한글 라벨의 단일 출처.
+    계약상태·납입주기는 서버 enum 의 label() 을 그대로 찍는다 — 화면이 라벨을 새로 만들지 않는다.
+    데이터 출처·처리 상태는 대응하는 label() 이 서버에 없어 여기서만 정의한다
+    (DataOrigin.label() 추가는 백엔드 정리 요청 항목).
+  -->
+  <div id="contract-code-labels" hidden aria-hidden="true">
+    <span th:each="status : ${T(com.susukkang.fgc.contract.domain.ContractStatus).values()}"
+          data-label-group="contractStatus"
+          th:attr="data-code=${status.name()}" th:text="${status.label()}">정상</span>
+    <span th:each="cycle : ${T(com.susukkang.fgc.contract.domain.PaymentCycleCode).values()}"
+          data-label-group="paymentCycle"
+          th:attr="data-code=${cycle.name()}" th:text="${cycle.label()}">월납</span>
+    <span data-label-group="dataOrigin" data-code="SEED">시드</span>
+    <span data-label-group="dataOrigin" data-code="NORMALIZED_DB">정규화 DB</span>
+    <span data-label-group="dataOrigin" data-code="MANUAL">수동 입력</span>
+    <span data-label-group="processingStatus" data-code="PENDING">처리 대기</span>
+    <span data-label-group="processingStatus" data-code="RUNNING">처리 중</span>
+    <span data-label-group="processingStatus" data-code="COMPLETED">완료</span>
+    <span data-label-group="processingStatus" data-code="SUCCESS">완료</span>
+    <span data-label-group="processingStatus" data-code="SUCCEEDED">완료</span>
+    <span data-label-group="processingStatus" data-code="FAILED">실패</span>
+    <span data-label-group="processingStatus" data-code="SKIPPED">건너뜀</span>
+    <!--
+      1,200% 판정과 차익거래 판정은 그룹을 나눈다 — 합치면 안 된다.
+      두 enum 모두 REVIEW_REQUIRED 코드를 갖지만 한글 라벨이 다르다
+      (CapResultStatus:19 "검토필요" / ArbitrageCheckStatus:12 "자료부족").
+      한 그룹에 넣으면 contract-detail.js 의 labelMap() 이 DOM 순서대로 덮어써
+      나중에 렌더링되는 "자료부족" 이 이겨, 1,200% 탭이 화면정의서 4-2 대조표
+      (:277 REVIEW_REQUIRED → 검토필요) 와 다른 라벨을 표시한다.
+    -->
+    <span th:each="result : ${T(com.susukkang.fgc.common.code.CapResultStatus).values()}"
+          data-label-group="capResultStatus"
+          th:attr="data-code=${result.name()}" th:text="${result.label()}">정상</span>
+    <span th:each="result : ${T(com.susukkang.fgc.common.code.ArbitrageCheckStatus).values()}"
+          data-label-group="arbitrageResultStatus"
+          th:attr="data-code=${result.name()}" th:text="${result.label()}">이상없음</span>
+    <!-- 스케줄 상태는 대응하는 label() 이 서버에 없다 — 화면정의서 4-2 대조표를 그대로 옮긴다. -->
+    <span data-label-group="lineStatus" data-code="PLANNED">예정</span>
+    <span data-label-group="lineStatus" data-code="CONFIRMED">확정</span>
+    <span data-label-group="lineStatus" data-code="MATCHED">대사일치</span>
+    <span data-label-group="lineStatus" data-code="ADJUSTED">조정</span>
+    <span data-label-group="lineStatus" data-code="HOLD">보류</span>
+    <span data-label-group="lineStatus" data-code="CANCELLED">취소</span>
+    <span data-label-group="lineStatus" data-code="RESTARTED">재개</span>
+  </div>
 
   <section class="surface contract-summary-card" aria-labelledby="contract-summary-title">
     <div class="contract-summary-primary">
@@ -29,52 +79,60 @@
         </div>
       </div>
       <div class="contract-summary-actions" aria-label="계약 작업">
-        <button id="contract-edit-button" class="button button-secondary" type="button" data-fgc-action="edit" th:disabled="${!canProcess}">
+        <button id="contract-edit-button" class="button button-secondary" type="button" data-fgc-action="edit"
+                th:disabled="${!canProcess}"
+                th:attr="aria-describedby=${canProcess} ? null : 'contract-actions-pending'">
           <span class="material-symbols-rounded" aria-hidden="true">edit</span>수정
         </button>
-        <button id="contract-schedule-regenerate-button" class="button button-secondary" type="button" data-fgc-action="regenerate" th:disabled="${!canProcess}"
-                aria-label="스케줄 재생성">
+        <button id="contract-schedule-regenerate-button" class="button button-secondary" type="button" data-fgc-action="regenerate"
+                th:disabled="${!canProcess}" aria-label="스케줄 재생성"
+                th:attr="aria-describedby=${canProcess} ? null : 'contract-actions-pending'">
           <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>스케줄 재생성
         </button>
-        <button id="contract-cap-recheck-button" class="button button-primary" type="button" data-fgc-action="recheck" th:disabled="${!canProcess}"
-                aria-label="한도 재검증">
+        <button id="contract-cap-recheck-button" class="button button-primary" type="button" data-fgc-action="recheck"
+                th:disabled="${!canProcess}" aria-label="한도 재검증"
+                th:attr="aria-describedby=${canProcess} ? null : 'contract-actions-pending'">
           <span class="material-symbols-rounded" aria-hidden="true">speed</span>한도 재검증
         </button>
       </div>
     </div>
+    <p class="contract-permission-note" id="contract-actions-pending" th:if="${!canProcess}">
+      수정·스케줄 재생성·한도 재검증은 SETTLEMENT 권한이 필요합니다.
+    </p>
+    <!-- 화면정의서 CONT-W02 ① 계약 요약 헤더 — 계약번호·보험사·상품·계약일·월납환산 초회보험료·계약상태·담당 설계사 -->
     <dl class="contract-summary-grid">
+      <div class="contract-summary-item"><dt>보험회사</dt><dd id="contract-summary-insurer">—</dd></div>
       <div class="contract-summary-item"><dt>상품</dt><dd id="contract-summary-product">—</dd></div>
       <div class="contract-summary-item"><dt>계약일</dt><dd id="contract-summary-date" class="tabular-nums">—</dd></div>
       <div class="contract-summary-item"><dt>월납환산 초회보험료</dt><dd id="contract-summary-premium" class="tabular-nums">—</dd></div>
+      <div class="contract-summary-item"><dt>담당 설계사</dt><dd id="contract-summary-agent">—</dd></div>
+      <div class="contract-summary-item"><dt>소속 조직</dt><dd id="contract-summary-organization">—</dd></div>
       <div class="contract-summary-item"><dt>납입기간</dt><dd id="contract-summary-term">—</dd></div>
     </dl>
   </section>
 
-  <nav class="contract-detail-tabs" aria-label="계약 상세 영역">
-    <div class="contract-detail-tab-list" role="tablist">
-      <button class="contract-detail-tab is-active" id="contract-tab-basic" type="button" role="tab"
-              aria-selected="true" aria-controls="contract-panel-basic">기본정보</button>
-      <button class="contract-detail-tab" id="contract-tab-schedules" type="button" role="tab"
-              aria-selected="false" aria-controls="contract-panel-schedules" tabindex="-1">예상 스케줄</button>
-      <button class="contract-detail-tab" id="contract-tab-cap" type="button" role="tab"
-              aria-selected="false" aria-controls="contract-panel-cap" tabindex="-1">1,200%</button>
-      <button class="contract-detail-tab" id="contract-tab-arbitrage" type="button" role="tab"
-              aria-selected="false" aria-controls="contract-panel-arbitrage" tabindex="-1">차익거래</button>
-      <button class="contract-detail-tab" id="contract-tab-ledger" type="button" role="tab"
-              aria-selected="false" aria-controls="contract-panel-ledger" tabindex="-1">원장</button>
-      <button class="contract-detail-tab" id="contract-tab-payment" type="button" role="tab"
-              aria-selected="false" aria-controls="contract-panel-payment" tabindex="-1">지급·대사</button>
-    </div>
-  </nav>
+  <div class="tab-list contract-detail-tabs" role="tablist" aria-label="계약 상세 영역">
+    <button class="tab-button contract-detail-tab" id="contract-tab-basic" type="button" role="tab"
+            aria-selected="true" aria-controls="contract-panel-basic">기본정보</button>
+    <button class="tab-button contract-detail-tab" id="contract-tab-schedules" type="button" role="tab"
+            aria-selected="false" aria-controls="contract-panel-schedules" tabindex="-1">예상 스케줄</button>
+    <button class="tab-button contract-detail-tab" id="contract-tab-cap" type="button" role="tab"
+            aria-selected="false" aria-controls="contract-panel-cap" tabindex="-1">1,200%</button>
+    <button class="tab-button contract-detail-tab" id="contract-tab-arbitrage" type="button" role="tab"
+            aria-selected="false" aria-controls="contract-panel-arbitrage" tabindex="-1">차익거래</button>
+    <button class="tab-button contract-detail-tab" id="contract-tab-ledger" type="button" role="tab"
+            aria-selected="false" aria-controls="contract-panel-ledger" tabindex="-1">원장</button>
+    <button class="tab-button contract-detail-tab" id="contract-tab-payment" type="button" role="tab"
+            aria-selected="false" aria-controls="contract-panel-payment" tabindex="-1">지급·대사</button>
+  </div>
 
   <section id="contract-panel-basic" class="surface contract-basic-card" role="tabpanel"
-           aria-labelledby="contract-tab-basic">
-    <header class="contract-basic-header">
+           aria-labelledby="contract-tab-basic" tabindex="0">
+    <header class="surface-header contract-basic-header">
       <div>
         <h2 class="surface-title">계약 기본정보</h2>
-        <p>검증 기준이 되는 계약·보험료 정보와 상태 사건 처리 이력을 확인합니다.</p>
       </div>
-      <p id="contract-detail-load-state" class="contract-lazy-note" role="status" aria-live="polite">계약 정보를 불러오는 중입니다.</p>
+      <p id="contract-detail-load-state" class="contract-lazy-note is-loading" role="status">계약 정보를 불러오는 중입니다.</p>
     </header>
 
     <div class="contract-basic-layout">
@@ -84,14 +142,14 @@
           <div class="contract-information-item"><dt>계약번호</dt><dd id="contract-info-number" class="tabular-nums">—</dd></div>
           <div class="contract-information-item"><dt>상품명</dt><dd id="contract-info-product">—</dd></div>
           <div class="contract-information-item"><dt>계약일</dt><dd id="contract-info-date" class="tabular-nums">—</dd></div>
-          <div class="contract-information-item"><dt>계약상태</dt><dd id="contract-info-status">—</dd></div>
+          <div class="contract-information-item"><dt>계약상태</dt><dd><span id="contract-info-status" class="status-badge status-badge-neutral">—</span></dd></div>
           <div class="contract-information-item"><dt>주기 보험료</dt><dd id="contract-info-cycle-premium" class="tabular-nums">—</dd></div>
           <div class="contract-information-item"><dt>납입주기</dt><dd id="contract-info-cycle">—</dd></div>
           <div class="contract-information-item"><dt>초회보험료</dt><dd id="contract-info-first-premium" class="tabular-nums">—</dd></div>
           <div class="contract-information-item"><dt>월납환산 초회보험료</dt><dd id="contract-info-monthly-premium" class="tabular-nums">—</dd></div>
           <div class="contract-information-item"><dt>납입기간</dt><dd id="contract-info-term">—</dd></div>
           <div class="contract-information-item"><dt>표준해약공제액</dt><dd id="contract-info-deduction" class="tabular-nums">—</dd></div>
-          <div class="contract-information-item"><dt>데이터 출처</dt><dd id="contract-info-origin">—</dd></div>
+          <div class="contract-information-item"><dt>데이터 출처</dt><dd><span id="contract-info-origin" class="status-badge status-badge-neutral">—</span></dd></div>
           <div class="contract-information-item"><dt>통화 단위</dt><dd>KRW (원)</dd></div>
         </dl>
       </section>
@@ -111,7 +169,7 @@
           <ol id="contract-history-list" class="contract-history-list" aria-live="polite">
             <li class="contract-history-empty">
               <span class="material-symbols-rounded" aria-hidden="true">hourglass_top</span>
-              <div><strong>상태이력을 확인하는 중입니다.</strong><p>조회 인터페이스가 준비되지 않은 경우 연동 대기 상태로 표시됩니다.</p></div>
+              <div><strong>상태이력을 확인하는 중입니다.</strong><p>효력일시 오름차순으로 표시합니다.</p></div>
             </li>
           </ol>
         </section>
@@ -128,24 +186,56 @@
     </div>
   </section>
 
+  <!--
+    lazy 탭 5개는 같은 구조를 쓴다 — 헤더는 그대로 두고 [data-tab-body] 안만 교체한다.
+    예전에는 contract-tabs.js 가 panel.replaceChildren() 로 패널 전체를 갈아 끼워
+    첫 로드에 제목·설명이 사라졌다 (#283 ⑤).
+  -->
   <section id="contract-panel-schedules" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-schedules" hidden>
-    <header class="contract-lazy-panel-header"><div><h2 class="surface-title">예상 스케줄</h2><p>지급단계별 현재 운영 스케줄과 회차를 조회합니다.</p></div></header>
-    <p class="contract-lazy-note" data-schedule-load-state aria-live="polite">탭을 선택하면 스케줄을 불러옵니다.</p>
-    <div data-contract-schedules></div>
+           aria-labelledby="contract-tab-schedules" tabindex="0" hidden>
+    <header class="surface-header contract-basic-header contract-lazy-panel-header">
+      <div><h2 class="surface-title">예상 스케줄</h2><p>지급단계별 현재 운영 스케줄과 회차를 조회합니다.</p></div>
+      <p class="contract-lazy-note is-loading" data-tab-state role="status">탭을 선택하면 스케줄을 불러옵니다.</p>
+    </header>
+    <div class="contract-tab-body" data-tab-body></div>
   </section>
   <section id="contract-panel-cap" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-cap" hidden>
-    <header class="contract-lazy-panel-header"><div><h2 class="surface-title">1,200% 한도 검증</h2><p>지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.</p></div></header>
-    <p class="contract-lazy-note" data-cap-load-state aria-live="polite">탭을 선택하면 한도 판정을 불러옵니다.</p>
-    <div class="contract-cap-result-grid" data-contract-cap-results></div>
+           aria-labelledby="contract-tab-cap" tabindex="0" hidden>
+    <header class="surface-header contract-basic-header contract-lazy-panel-header">
+      <div><h2 class="surface-title">1,200% 한도 검증</h2><p>지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.</p></div>
+      <p class="contract-lazy-note is-loading" data-tab-state role="status">탭을 선택하면 한도 판정을 불러옵니다.</p>
+    </header>
+    <!-- REG-08 — 원수사→GA 와 GA→설계사는 서로 다른 규제다. 합산 금지는 경고 톤으로 고정 노출한다. -->
+    <p class="guidance guidance-warning contract-tab-guidance">
+      <span class="material-symbols-rounded guidance-icon" aria-hidden="true">warning</span>
+      <span class="guidance-copy">두 규제를 더하지 마세요 — 원수사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.</span>
+    </p>
+    <div class="contract-tab-body" data-tab-body></div>
   </section>
   <section id="contract-panel-arbitrage" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-arbitrage" hidden><div class="empty-state">차익거래 검증 탭 API 연동 대기 중입니다.</div></section>
+           aria-labelledby="contract-tab-arbitrage" tabindex="0" hidden>
+    <header class="surface-header contract-basic-header contract-lazy-panel-header">
+      <div><h2 class="surface-title">차익거래 검증</h2><p>계약 전 기간의 납입보험료와 지급 수수료등을 대조합니다.</p></div>
+      <p class="contract-lazy-note is-loading" data-tab-state role="status">탭을 선택하면 차익거래 판정을 불러옵니다.</p>
+    </header>
+    <div class="contract-tab-body" data-tab-body></div>
+  </section>
   <section id="contract-panel-ledger" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-ledger" hidden><div class="empty-state">원장 탭 API 연동 대기 중입니다.</div></section>
+           aria-labelledby="contract-tab-ledger" tabindex="0" hidden>
+    <header class="surface-header contract-basic-header contract-lazy-panel-header">
+      <div><h2 class="surface-title">원장</h2><p>이 계약에서 만들어진 분개를 조회합니다.</p></div>
+      <p class="contract-lazy-note is-loading" data-tab-state role="status">탭을 선택하면 분개를 불러옵니다.</p>
+    </header>
+    <div class="contract-tab-body" data-tab-body></div>
+  </section>
   <section id="contract-panel-payment" class="surface contract-basic-card contract-lazy-panel" role="tabpanel"
-           aria-labelledby="contract-tab-payment" hidden><div class="empty-state">지급·대사 탭 API 연동 대기 중입니다.</div></section>
+           aria-labelledby="contract-tab-payment" tabindex="0" hidden>
+    <header class="surface-header contract-basic-header contract-lazy-panel-header">
+      <div><h2 class="surface-title">지급·대사</h2><p>수수료 지급 건과 대사 결과를 함께 표시합니다.</p></div>
+      <p class="contract-lazy-note is-loading" data-tab-state role="status">탭을 선택하면 지급·대사를 불러옵니다.</p>
+    </header>
+    <div class="contract-tab-body" data-tab-body></div>
+  </section>
 
   <div class="modal-backdrop" data-modal="cap-detail" data-close-on-backdrop="true" hidden aria-hidden="true">
     <section class="modal modal-large cap-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cap-detail-title">
@@ -166,329 +256,6 @@
       </footer>
     </section>
   </div>
-
-  <script>
-  (function () {
-    "use strict";
-
-    var contractId = null;
-    var apiClient = null;
-    var statusEvents = [];
-    var currentStatusSort = "effectiveAt";
-
-    var contractStatusLabels = {
-      APPLIED: "청약", ACTIVE: "유지", UNPAID: "미납", LAPSED: "실효",
-      REVIVED: "부활", CANCELLED: "청약철회", TERMINATED: "해지", MATURED: "만기"
-    };
-    var dataOriginLabels = { SEED: "시드", NORMALIZED_DB: "정규화 DB", MANUAL: "수동 입력" };
-    var paymentCycleLabels = {
-      MONTHLY: "월납", QUARTERLY: "분기납", SEMI_ANNUAL: "반기납", ANNUAL: "연납",
-      SINGLE: "일시납", OTHER: "기타"
-    };
-    var processingStatusLabels = {
-      PENDING: "처리 대기", RUNNING: "처리 중", COMPLETED: "완료", SUCCESS: "완료", SUCCEEDED: "완료",
-      FAILED: "실패", SKIPPED: "건너뜀"
-    };
-
-    function text(id, value) {
-      var element = document.getElementById(id);
-      if (element) element.textContent = value === null || value === undefined || value === "" ? "—" : value;
-    }
-
-    function money(value) {
-      if (value === null || value === undefined || value === "") return "—";
-      var number = Number(value);
-      return Number.isFinite(number) ? number.toLocaleString("ko-KR") + "원" : String(value);
-    }
-
-    function dateTime(value) {
-      if (!value) return "—";
-      var parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) return String(value);
-      return parsed.toLocaleString("ko-KR", {
-        timeZone: "Asia/Seoul",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false
-      });
-    }
-
-    function statusBadgeClass(status) {
-      if (["ACTIVE", "COMPLETED", "SUCCESS", "SUCCEEDED", "NORMAL"].indexOf(status) >= 0) return "status-badge-success";
-      if (["UNPAID", "LAPSED", "FAILED", "VIOLATION"].indexOf(status) >= 0) return "status-badge-error";
-      if (["APPLIED", "RUNNING", "PENDING", "WARNING", "REVIEW_REQUIRED"].indexOf(status) >= 0) return "status-badge-review";
-      return "status-badge-neutral";
-    }
-
-    function populateContract(data) {
-      var statusLabel = contractStatusLabels[data.contractStatus] || data.contractStatus || "—";
-      var originLabel = dataOriginLabels[data.dataOrigin] || data.dataOrigin || "—";
-
-      text("contract-summary-title", data.contractNo);
-      text("contract-summary-product", data.productName);
-      text("contract-summary-date", data.contractDate);
-      text("contract-summary-premium", money(data.monthlyEquivalentFirstPremium));
-      text("contract-summary-term", data.paymentTermMonths ? data.paymentTermMonths + "개월" : "—");
-
-      var statusBadge = document.getElementById("contract-summary-status");
-      statusBadge.textContent = statusLabel;
-      statusBadge.className = "status-badge " + statusBadgeClass(data.contractStatus);
-      text("contract-summary-origin", originLabel);
-
-      text("contract-info-number", data.contractNo);
-      text("contract-info-product", data.productName);
-      text("contract-info-date", data.contractDate);
-      text("contract-info-status", statusLabel);
-      text("contract-info-cycle-premium", money(data.premiumPerCycleAmount));
-      text("contract-info-cycle", paymentCycleLabels[data.paymentCycleCode] || data.paymentCycleCode);
-      text("contract-info-first-premium", money(data.firstPremiumAmount));
-      text("contract-info-monthly-premium", money(data.monthlyEquivalentFirstPremium));
-      text("contract-info-term", data.paymentTermMonths ? data.paymentTermMonths + "개월" : "—");
-      text("contract-info-deduction", money(data.standardSurrenderDeductionAmount));
-      text("contract-info-origin", originLabel);
-      text("contract-detail-load-state", "계약 정보를 불러왔습니다.");
-      text("contract-data-fetched-at", new Date().toLocaleString("ko-KR"));
-    }
-
-    function historyEmpty(title, description) {
-      var list = document.getElementById("contract-history-list");
-      list.replaceChildren();
-      var item = document.createElement("li");
-      item.className = "contract-history-empty";
-      var icon = document.createElement("span");
-      icon.className = "material-symbols-rounded";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = "history";
-      var copy = document.createElement("div");
-      var strong = document.createElement("strong");
-      var paragraph = document.createElement("p");
-      strong.textContent = title;
-      paragraph.textContent = description;
-      copy.append(strong, paragraph);
-      item.append(icon, copy);
-      list.append(item);
-    }
-
-    function processingRow(processing) {
-      var row = document.createElement("li");
-      row.className = "contract-processing-row";
-      var job = document.createElement("span");
-      job.className = "contract-processing-job";
-      job.textContent = processing.processingJob || "처리 작업";
-      var status = document.createElement("span");
-      status.className = "status-badge " + statusBadgeClass(processing.processingStatus);
-      status.textContent = processingStatusLabels[processing.processingStatus] || processing.processingStatus || "처리 대기";
-      var processedAt = document.createElement("time");
-      processedAt.className = "tabular-nums";
-      processedAt.dateTime = processing.processedAt || "";
-      processedAt.textContent = dateTime(processing.processedAt);
-      row.append(job, status, processedAt);
-      return row;
-    }
-
-    function historyEvent(event) {
-      var item = document.createElement("li");
-      item.className = "contract-history-event";
-      var marker = document.createElement("span");
-      marker.className = "contract-history-marker";
-      marker.setAttribute("aria-hidden", "true");
-      var card = document.createElement("article");
-      card.className = "contract-history-event-card";
-
-      var header = document.createElement("header");
-      var title = document.createElement("strong");
-      var previousStatus = contractStatusLabels[event.previousStatus] || event.previousStatus || "최초";
-      var newStatus = contractStatusLabels[event.newStatus] || event.newStatus || "상태 변경";
-      title.textContent = previousStatus + " → " + newStatus;
-      var source = document.createElement("span");
-      var hasProcessings = Array.isArray(event.processings) && event.processings.length > 0;
-      source.textContent = (event.sourceSystem || "계약 상태 사건") + (hasProcessings ? "" : " · 처리 대기");
-      header.append(title, source);
-
-      var times = document.createElement("dl");
-      times.className = "contract-history-times";
-      [
-        { label: "효력", value: event.effectiveAt },
-        { label: "수신", value: event.receivedAt }
-      ].forEach(function (pair) {
-        var group = document.createElement("div");
-        var term = document.createElement("dt");
-        var description = document.createElement("dd");
-        term.textContent = pair.label;
-        description.className = "tabular-nums";
-        description.textContent = dateTime(pair.value);
-        group.append(term, description);
-        times.append(group);
-      });
-
-      var processings = document.createElement("ul");
-      processings.className = "contract-processing-list";
-      if (hasProcessings) {
-        event.processings.forEach(function (processing) { processings.append(processingRow(processing)); });
-      }
-
-      card.append(header, times, processings);
-      item.append(marker, card);
-      return item;
-    }
-
-    function renderHistory() {
-      if (!statusEvents.length) {
-        historyEmpty("등록된 상태이력이 없습니다.", "상태 사건이 수신되면 효력일시 기준으로 표시됩니다.");
-        return;
-      }
-      var sorted = statusEvents.slice().sort(function (a, b) {
-        var left = Date.parse(a[currentStatusSort] || "");
-        var right = Date.parse(b[currentStatusSort] || "");
-        var leftInvalid = Number.isNaN(left);
-        var rightInvalid = Number.isNaN(right);
-        if (leftInvalid !== rightInvalid) return leftInvalid ? 1 : -1;
-        if (!leftInvalid && left !== right) return left - right;
-        return (Number(a.eventSeq) || 0) - (Number(b.eventSeq) || 0);
-      });
-      var list = document.getElementById("contract-history-list");
-      list.replaceChildren();
-      sorted.forEach(function (event) { list.append(historyEvent(event)); });
-    }
-
-    function loadStatusHistory(apiClient) {
-      return apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/status-events")
-        .then(function (response) {
-          var data = response.data;
-          statusEvents = Array.isArray(data) ? data : (data && Array.isArray(data.events) ? data.events : []);
-          renderHistory();
-        })
-        .catch(function (error) {
-          if (error && error.status === 404) {
-            historyEmpty("상태이력 연동 대기", "최신 인터페이스의 status-events API가 구현되면 이 영역에 자동으로 표시됩니다.");
-            return;
-          }
-          historyEmpty("상태이력을 불러오지 못했습니다.", error && error.message ? error.message : "잠시 후 다시 시도해 주세요.");
-        });
-    }
-
-    function activateTab(tab) {
-      document.querySelectorAll(".contract-detail-tab").forEach(function (candidate) {
-        var active = candidate === tab;
-        candidate.classList.toggle("is-active", active);
-        candidate.setAttribute("aria-selected", active ? "true" : "false");
-        candidate.tabIndex = active ? 0 : -1;
-        document.getElementById(candidate.getAttribute("aria-controls")).hidden = !active;
-      });
-    }
-
-    function initializeTabs() {
-      document.querySelectorAll(".contract-detail-tab").forEach(function (tab) {
-        tab.addEventListener("click", function () { activateTab(tab); });
-        tab.addEventListener("keydown", function (event) {
-          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-          var tabs = Array.from(document.querySelectorAll(".contract-detail-tab"));
-          var direction = event.key === "ArrowRight" ? 1 : -1;
-          var next = tabs[(tabs.indexOf(tab) + direction + tabs.length) % tabs.length];
-          activateTab(next);
-          next.focus();
-        });
-      });
-
-      var requestedTab = new URLSearchParams(window.location.search).get("tab");
-      var requestedTabElement = requestedTab
-        ? document.getElementById("contract-tab-" + requestedTab)
-        : null;
-      if (requestedTabElement && requestedTabElement.classList.contains("contract-detail-tab")) {
-        activateTab(requestedTabElement);
-      }
-    }
-
-    function initializeSort() {
-      document.querySelectorAll("[data-status-sort]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          currentStatusSort = button.getAttribute("data-status-sort");
-          document.querySelectorAll("[data-status-sort]").forEach(function (candidate) {
-            var active = candidate === button;
-            candidate.classList.toggle("is-active", active);
-            candidate.setAttribute("aria-pressed", active ? "true" : "false");
-          });
-          renderHistory();
-        });
-      });
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-      var pathMatch = window.location.pathname.match(/^\/contracts\/([^/]+)$/);
-      contractId = pathMatch ? decodeURIComponent(pathMatch[1]) : null;
-      initializeTabs();
-      initializeSort();
-
-      if (!contractId) {
-        text("contract-detail-load-state", "계약 식별자를 확인할 수 없습니다.");
-        historyEmpty("상태이력을 조회할 수 없습니다.", "계약 상세 경로를 확인해 주세요.");
-        return;
-      }
-
-      text("contract-data-endpoint", "/api/v1/contracts/" + contractId);
-      document.getElementById("contract-edit-button").addEventListener("click", function () {
-        window.location.assign("/contracts/" + encodeURIComponent(contractId) + "/edit");
-      });
-
-      apiClient = window.FgcUi && window.FgcUi.apiClient;
-      if (!apiClient) {
-        text("contract-detail-load-state", "공통 API 클라이언트를 불러오지 못했습니다.");
-        historyEmpty("상태이력 연동 대기", "공통 API 클라이언트 로드를 확인해 주세요.");
-        return;
-      }
-
-      var capRecheckButton = document.getElementById("contract-cap-recheck-button");
-      if (capRecheckButton && !capRecheckButton.disabled) {
-        capRecheckButton.addEventListener("click", function () {
-          capRecheckButton.disabled = true;
-          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId) + "/cap-check", { method: "POST" })
-            .then(function () {
-              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast("1,200% 한도 재검증을 완료했습니다.", "success");
-              var capTab = document.getElementById("contract-tab-cap");
-              var capPanel = document.getElementById("contract-panel-cap");
-              if (capPanel) capPanel.dataset.loaded = "false";
-              if (capTab) capTab.click();
-            })
-            .catch(function (error) {
-              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(error && error.message ? error.message : "한도 재검증에 실패했습니다.", "error");
-            })
-            .finally(function () { capRecheckButton.disabled = false; });
-        });
-      }
-
-      var scheduleRegenerateButton = document.getElementById("contract-schedule-regenerate-button");
-      if (scheduleRegenerateButton && !scheduleRegenerateButton.disabled) {
-        scheduleRegenerateButton.addEventListener("click", function () {
-          scheduleRegenerateButton.disabled = true;
-          apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId)
-            + "/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL", { method: "POST" })
-            .then(function () {
-              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast("예상 스케줄을 새 버전으로 재생성했습니다.", "success");
-              var schedulesPanel = document.getElementById("contract-panel-schedules");
-              var schedulesTab = document.getElementById("contract-tab-schedules");
-              if (schedulesPanel) schedulesPanel.dataset.loaded = "false";
-              if (schedulesTab) schedulesTab.click();
-            })
-            .catch(function (error) {
-              if (window.FgcUi && window.FgcUi.toast) window.FgcUi.toast(error && error.message ? error.message : "스케줄 재생성에 실패했습니다.", "error");
-            })
-            .finally(function () { scheduleRegenerateButton.disabled = false; });
-        });
-      }
-
-      apiClient.request("/api/v1/contracts/" + encodeURIComponent(contractId))
-        .then(function (response) { populateContract(response.data || {}); })
-        .catch(function (error) {
-          text("contract-detail-load-state", error && error.message ? error.message : "계약 정보를 불러오지 못했습니다.");
-        });
-      loadStatusHistory(apiClient);
-    });
-  })();
-  </script>
 </main>
 </body>
 </html>

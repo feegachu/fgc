@@ -65,6 +65,8 @@
   <script th:if="${screenId == 'FGC-UI-CAP-W01'}" th:src="@{/js/features/cap/cap-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-ARB-W01'}" th:src="@{/js/features/arbitrage/arbitrage-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-CONT-W01'}" th:src="@{/js/features/contract/contract-list.js}" defer></script>
+  <!-- CONT-W02 는 순서가 중요하다 — contract-tabs.js 가 contract-detail.js 의 window.FgcUi.contractDetail 을 읽는다. -->
+  <script th:if="${screenId == 'FGC-UI-CONT-W02'}" th:src="@{/js/features/contract/contract-detail.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-CONT-W02'}" th:src="@{/js/features/contract/contract-tabs.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-POL-W01'}" th:src="@{/js/features/policy/policy-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-CONT-W03'}" th:src="@{/js/features/contract/contract-api.js}" defer></script>
