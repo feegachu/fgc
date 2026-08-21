@@ -744,7 +744,7 @@ class PublishingTemplateStructureTest {
     }
 
     /*
-     * FGC-UI-CONT-W01 보험계약 목록 (#283) — FGC-FUN-018 (화면정의서 :1691).
+     * FGC-UI-CONT-W01 보험계약 목록 (#283) — FGC-FUN-018 (화면정의서 화면목록표 CONT-W01 행).
      * 자체 필터 카드·표 뷰포트를 공통 컴포넌트로 바꾸고, 계약상태·데이터 출처를 배지로 세웠다.
      */
     @Test
@@ -789,7 +789,7 @@ class PublishingTemplateStructureTest {
     }
 
     /*
-     * FGC-UI-CONT-W02 보험계약 상세 (#283) — FGC-FUN-018·032·035·036·063, REG-08·12 (화면정의서 :1692).
+     * FGC-UI-CONT-W02 보험계약 상세 (#283) — FGC-FUN-018·032·035·036·063, REG-08·12 (화면정의서 화면목록표 CONT-W02 행).
      * 인라인 <script> 321줄을 contract-detail.js 로 뺐다. layout 의 page(...) fragment 는
      * ~{::main} 만 삽입하므로 <main> 밖 <script>는 사라진다 — 인라인이 되살아나면 안 된다.
      */
@@ -874,7 +874,7 @@ class PublishingTemplateStructureTest {
     }
 
     /*
-     * FGC-UI-CONT-W03 보험계약 등록·수정 (#283) — FGC-FUN-018·036·040 (화면정의서 :1693), IF-API-18·19.
+     * FGC-UI-CONT-W03 보험계약 등록·수정 (#283) — FGC-FUN-018·036·040 (화면정의서 화면목록표 CONT-W03 행), IF-API-18·19.
      * 인라인 동작을 contract-api.js · contract-form.js 로 분리한 상태를 고정한다.
      */
     @Test
@@ -928,6 +928,12 @@ class PublishingTemplateStructureTest {
                 .contains("scheduleHeaderIds")
                 .contains("format.today()")
                 .contains("aria-busy")
+                /*
+                 * 등록(POST)·수정(PUT) 두 경로 모두 이동이 시작될 때까지 프라미스를 붙들어야 한다.
+                 * 반환하지 않으면 finally 가 먼저 돌아 저장 버튼이 다시 열리고 두 번째 요청이 나간다.
+                 */
+                .contains("function redirectAfter(")
+                .contains("if (isEditMode) return redirectAfter(0, redirect);")
                 .doesNotContain("fetch(");
     }
 

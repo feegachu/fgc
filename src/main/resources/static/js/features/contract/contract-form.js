@@ -467,6 +467,19 @@
     updateSaveState();
   }
 
+  /*
+   * 이동을 시작할 때까지 프라미스를 붙들어 둔다.
+   *
+   * 반환하지 않으면 .finally() 가 window.location.assign 보다 먼저 돌아 저장 버튼이
+   * 다시 열리고, 두 번째 요청이 실제로 나간다. 등록(POST)·수정(PUT) 두 경로 모두
+   * 같은 문제라 한 곳으로 모았다 — 한쪽만 고치면 다른 쪽에 그대로 남는다 (#325 리뷰).
+   */
+  function redirectAfter(delayMs, go) {
+    return new Promise(function (resolve) {
+      window.setTimeout(function () { go(); resolve(); }, delayMs);
+    });
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
     clearErrors();
@@ -497,18 +510,9 @@
        * IF-API-18·19 가 내려 주는 scheduleHeaderIds 로 "스케줄이 함께 만들어졌다"까지 알린다.
        */
       rememberSaveMessage(saveMessage(saved));
-      if (isEditMode) {
-        redirect();
-        return;
-      }
-      /*
-       * 이 Promise 를 반환해야 finally 가 이동 전에 돌지 않는다 —
-       * 반환하지 않으면 저장 버튼이 최대 1.8초 동안 다시 눌려 계약이 중복 생성된다.
-       */
+      if (isEditMode) return redirectAfter(0, redirect);
       return warnIfRefundRateTableIsMissing().then(function (warned) {
-        return new Promise(function (resolve) {
-          window.setTimeout(function () { redirect(); resolve(); }, warned ? 1800 : 0);
-        });
+        return redirectAfter(warned ? 1800 : 0, redirect);
       });
     }).catch(function (error) {
       showError(error, "보험계약을 저장하지 못했습니다.");
