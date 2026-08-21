@@ -2,11 +2,10 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-SCHE-W01', '예상 스케줄 목록', null, null)}">
 <body>
-<main id="main-content" class="page-content publishing-page publishing-page-list schedule-list-page">
+<main id="main-content" class="page-content schedule-list-page">
   <header class="page-header schedule-page-header">
     <div class="page-header-copy">
       <h1 class="page-title">예상 스케줄 목록</h1>
-      <p class="page-description">계약별 지급 방향과 적용 정책에 따라 생성된 예상 지급 계획을 조회합니다.</p>
     </div>
     <div class="page-header-actions">
       <button class="button button-secondary" type="button" id="btn-schedule-export">
@@ -15,54 +14,47 @@
     </div>
   </header>
 
-  <aside class="schedule-guidance" aria-labelledby="schedule-guidance-title">
-    <span class="material-symbols-rounded" aria-hidden="true">gavel</span>
-    <div>
-      <h2 id="schedule-guidance-title">적용 체계는 계약 체결연도만으로 정하지 않습니다</h2>
-      <p>상품 판매개시일, 기초서류 버전과 판매채널을 함께 반영합니다. 운영 스케줄이 기본으로 조회되며 비교·시뮬레이션 스케줄은 용도를 선택해 구분합니다.</p>
-    </div>
-  </aside>
-
-  <form class="surface schedule-filter-card" method="get" action="/schedules" data-schedule-filter-form>
+  <!-- 가이드 §8 표준 필터 구조 (참조 기준 RECO-W01 reco/list.html:48-70).
+       name·쿼리 파라미터·data-schedule-filter-* 훅은 그대로 두고 골격만 공통 컴포넌트로 바꿨다.
+       보이는 "검색 조건" 제목이 사라지므로 form 에 aria-label 로 같은 이름을 남긴다. -->
+  <form class="filter-bar schedule-filter-bar" method="get" action="/schedules"
+        aria-label="검색 조건" data-schedule-filter-form>
     <input type="hidden" name="month" th:value="${month}">
-    <header class="schedule-section-header">
-      <h2 class="surface-title">검색 조건</h2>
-      <button class="button button-ghost schedule-reset-button" type="reset" data-schedule-filter-reset>초기화</button>
-    </header>
-    <div class="schedule-filter-grid">
-      <label class="field">
-        <span class="field-label">계약번호</span>
-        <input class="field-control" type="search" name="contractNo" placeholder="계약번호 입력" autocomplete="off">
-      </label>
-      <label class="field">
-        <span class="field-label">지급단계</span>
-        <select class="select-control" name="stage">
+    <div class="filter-fields schedule-filter-fields">
+      <div class="filter-field schedule-filter-contract">
+        <label class="filter-field-label" for="schedule-filter-contract-no">계약번호</label>
+        <input class="field-control" id="schedule-filter-contract-no" type="search" name="contractNo"
+               placeholder="계약번호 입력" autocomplete="off">
+      </div>
+      <div class="filter-field">
+        <label class="filter-field-label" for="schedule-filter-stage">지급단계</label>
+        <select class="select-control" id="schedule-filter-stage" name="stage">
           <option value="">전체</option>
           <option value="INSURER_TO_GA">원수사→GA</option>
           <option value="GA_TO_FC">GA→설계사</option>
         </select>
-      </label>
-      <label class="field">
-        <span class="field-label">적용 체계</span>
-        <select class="select-control" name="regime">
+      </div>
+      <div class="filter-field">
+        <label class="filter-field-label" for="schedule-filter-regime">적용 체계</label>
+        <select class="select-control" id="schedule-filter-regime" name="regime">
           <option value="">전체</option>
           <option value="CURRENT">현행</option>
           <option value="FOUR_YEAR_2027">4년 분급(2027)</option>
           <option value="SEVEN_YEAR_2029">7년 분급(2029)</option>
           <option value="TM_SPECIAL">TM 특례</option>
         </select>
-      </label>
-      <label class="field">
-        <span class="field-label">용도</span>
-        <select class="select-control" name="purpose">
+      </div>
+      <div class="filter-field">
+        <label class="filter-field-label" for="schedule-filter-purpose">용도</label>
+        <select class="select-control" id="schedule-filter-purpose" name="purpose">
           <option value="OPERATIONAL" selected>운영</option>
           <option value="COMPARISON">비교</option>
           <option value="SIMULATION">시뮬레이션</option>
         </select>
-      </label>
-      <label class="field">
-        <span class="field-label">상태</span>
-        <select class="select-control" name="status">
+      </div>
+      <div class="filter-field">
+        <label class="filter-field-label" for="schedule-filter-status">상태</label>
+        <select class="select-control" id="schedule-filter-status" name="status">
           <option value="">전체</option>
           <option value="PLANNED">예정</option>
           <option value="CONFIRMED">확정</option>
@@ -72,9 +64,10 @@
           <option value="CANCELLED">취소</option>
           <option value="RESTARTED">재개</option>
         </select>
-      </label>
+      </div>
     </div>
-    <div class="schedule-filter-actions">
+    <div class="filter-actions schedule-filter-actions">
+      <button class="button button-ghost" type="reset" data-schedule-filter-reset>초기화</button>
       <button class="button button-primary" type="submit">
         <span class="material-symbols-rounded" aria-hidden="true">search</span>
         조회
@@ -115,7 +108,13 @@
         <tr>
           <th scope="col">계약번호</th>
           <th scope="col">지급단계</th>
-          <th scope="col">적용 체계</th>
+          <th scope="col">
+            <span class="evidence" data-evidence>적용 체계<button class="evidence-trigger" type="button"
+                  aria-describedby="schedule-regime-evidence" aria-label="적용 체계 판정 근거"><span
+                  class="material-symbols-rounded" aria-hidden="true">info</span></button><span
+                  class="evidence-popover" id="schedule-regime-evidence" popover><strong>REG-19 · 적용 체계 판정</strong>
+              <span>적용 체계는 계약 체결연도만으로 정하지 않습니다. 상품 판매개시일 · 기초서류 버전 · 판매채널을 함께 보고 정합니다.</span></span></span>
+          </th>
           <th scope="col">용도</th>
           <th scope="col" class="is-center">버전</th>
           <th scope="col" class="is-center">상태</th>

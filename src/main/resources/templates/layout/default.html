@@ -56,6 +56,8 @@
   <script th:if="${screenId == 'FGC-UI-BASE-W01'}" th:src="@{/js/features/base/base-api.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-BASE-W01'}" th:src="@{/js/features/base/base-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-DASH-W01'}" th:src="@{/js/features/dashboard/dashboard.js}" defer></script>
+  <!-- SCHE 는 순서가 중요하다 — 두 화면 스크립트가 schedule-labels.js 의 window.FgcUi.scheduleLabels 를 읽는다. -->
+  <script th:if="${#strings.startsWith(screenId, 'FGC-UI-SCHE-')}" th:src="@{/js/features/schedule/schedule-labels.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-SCHE-W01'}" th:src="@{/js/features/schedule/schedule-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-SCHE-W02'}" th:src="@{/js/features/schedule/schedule-detail.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-TRAN-W01'}" th:src="@{/js/features/transaction/transaction-list.js}" defer></script>
@@ -63,6 +65,8 @@
   <script th:if="${screenId == 'FGC-UI-CAP-W01'}" th:src="@{/js/features/cap/cap-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-ARB-W01'}" th:src="@{/js/features/arbitrage/arbitrage-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-CONT-W01'}" th:src="@{/js/features/contract/contract-list.js}" defer></script>
+  <!-- CONT-W02 는 순서가 중요하다 — contract-tabs.js 가 contract-detail.js 의 window.FgcUi.contractDetail 을 읽는다. -->
+  <script th:if="${screenId == 'FGC-UI-CONT-W02'}" th:src="@{/js/features/contract/contract-detail.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-CONT-W02'}" th:src="@{/js/features/contract/contract-tabs.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-POL-W01'}" th:src="@{/js/features/policy/policy-list.js}" defer></script>
   <script th:if="${screenId == 'FGC-UI-CONT-W03'}" th:src="@{/js/features/contract/contract-api.js}" defer></script>

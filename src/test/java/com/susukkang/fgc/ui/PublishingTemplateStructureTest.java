@@ -41,7 +41,6 @@ class PublishingTemplateStructureTest {
     private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of(
             "templates/transaction/list.html",
             "templates/transaction/form.html",
-            "templates/schedule/detail.html",
             "templates/ledger/list.html",
             "templates/exception/list.html"
     );
@@ -57,8 +56,11 @@ class PublishingTemplateStructureTest {
             "templates/policy/list.html",
             "templates/reco/list.html",
             "templates/audit/list.html",
+            "templates/contract/list.html",
+            "templates/contract/detail.html",
             "templates/contract/form.html",
             "templates/schedule/list.html",
+            "templates/schedule/detail.html",
             "templates/vrun/list.html",
             "templates/vrun/detail.html",
             "templates/arbitrage/list.html",
@@ -535,7 +537,7 @@ class PublishingTemplateStructureTest {
     void contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior() throws IOException {
         assertThat(resource("templates/contract/form.html"))
                 .contains("name=\"premiumPerCycleAmount\"")
-                .contains("value=\"SINGLE\"")
+                .contains("cycle.name() != 'OTHER'")
                 .contains("data-field-error=\"organizationId\"")
                 .doesNotContain("style=\"")
                 .doesNotContain("onclick=")
@@ -908,6 +910,175 @@ class PublishingTemplateStructureTest {
 
         assertThat(resource("templates/layout/default.html"))
                 .contains("th:src=\"@{/js/features/vrun/vrun-list.js}\" defer");
+    }
+
+    /*
+     * SCHE-W01 예상 스케줄 목록 (#285).
+     *
+     * 이 화면은 레거시가 이미 0건이었고 남은 것은 화면 설명문·자체 필터 골격·title 안티패턴이었다.
+     * 가장 중요한 회귀 방지 대상은 잘린 값을 title 속성으로만 알리던 부분이다 —
+     * 가이드 §10.2 가 "잘라 놓거나 title 속성만 제공하면 안 된다" 고 금지한다.
+     */
+    @Test
+    void scheduleListUsesCommonFilterBarAndDisclosureInsteadOfTitleTooltips() throws IOException {
+        assertThat(resource("templates/schedule/list.html"))
+                .contains("class=\"page-content schedule-list-page\"")
+                .contains("class=\"filter-bar schedule-filter-bar\"")
+                .contains("class=\"filter-fields schedule-filter-fields\"")
+                .contains("class=\"filter-field-label\"")
+                .contains("class=\"filter-actions schedule-filter-actions\"")
+                // 필터 계약(name·쿼리 파라미터·JS 훅)은 골격이 바뀌어도 그대로여야 한다
+                .contains("data-schedule-filter-form")
+                .contains("data-schedule-filter-reset")
+                .contains("name=\"contractNo\"")
+                .contains("name=\"stage\"")
+                .contains("name=\"regime\"")
+                .contains("name=\"purpose\"")
+                .contains("name=\"status\"")
+                // 화면 설명문·설명 배너는 지우되 REG-19 근거는 근거 툴팁으로 남긴다
+                .contains("id=\"schedule-regime-evidence\"")
+                .contains("REG-19 · 적용 체계 판정")
+                .doesNotContain("class=\"page-description\"")
+                .doesNotContain("schedule-guidance")
+                .doesNotContain("publishing-page");
+
+        assertThat(resource("static/css/features/schedule.css"))
+                .contains(".schedule-filter-bar")
+                .contains(".schedule-filter-fields")
+                .contains(":focus-visible")
+                // Guidance 를 지우면서 전용 CSS 4블록도 함께 걷어냈다
+                .doesNotContain(".schedule-guidance")
+                .doesNotContain(".schedule-filter-grid")
+                .doesNotContain(".schedule-policy-value");
+
+        assertThat(resource("static/js/features/schedule/schedule-list.js"))
+                .contains("table-cell-disclosure")
+                .contains("table-cell-preview is-single-line")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("format.won(")
+                .contains("format.int(")
+                .contains("scheduleLabels.statusTone(schedule.status)")
+                .contains("scheduleLabels.isLocked(schedule.status)")
+                // CSV 는 성공·실패 모두 알린다 — 전에는 location.assign 만 있었다
+                .contains("function exportCsv(url)")
+                .contains("예상 스케줄 CSV를 내려받았습니다.")
+                // src/test/js/schedule-list.test.cjs 가 require 하는 export 계약
+                .contains("normalizePage: normalizePage")
+                .contains("responseLabel: require(\"./schedule-labels.js\").responseLabel")
+                // title 안티패턴과 자체 포맷 구현이 되살아나면 안 된다
+                .doesNotContain("policyValue.title")
+                .doesNotContain("function formatWon")
+                .doesNotContain("function formatInteger");
+    }
+
+    /*
+     * SCHE-W02 예상 스케줄 상세 (#285).
+     *
+     * 이 화면에서 가장 실질적인 결함 두 가지를 인수조건으로 고정한다.
+     *   · 비가역인 확정에 확인 절차가 없었다 — 가역인 재생성에만 모달이 있었다
+     *   · 금액에 소수 4자리를 허용하고 날짜를 YYYY.MM.DD 로 찍고 시간대가 없었다
+     */
+    @Test
+    void scheduleDetailAddsConfirmDialogAndDropsLegacyShell() throws IOException {
+        assertThat(resource("templates/schedule/detail.html"))
+                .contains("class=\"page-content schedule-detail-page\"")
+                .contains("class=\"surface schedule-detail-card\"")
+                .contains("class=\"data-table-viewport schedule-line-viewport\" tabindex=\"0\" role=\"region\"")
+                .contains("class=\"visually-hidden\">회차별 예상 지급 금액")
+                .contains("<colgroup>")
+                .contains("scope=\"col\"")
+                // 확정 확인 모달 — 재생성 모달과 같은 공통 Modal 계약을 쓴다
+                .contains("data-modal=\"schedule-confirm\"")
+                .contains("data-close-on-backdrop=\"true\"")
+                .contains("role=\"dialog\" aria-modal=\"true\"")
+                .contains("id=\"btn-confirm-submit\"")
+                .contains("되돌릴 수 없습니다 — 확정된 스케줄은 새 버전으로만 바꿉니다.")
+                // 재생성 모달 구조는 그대로 두되 사유 오류 슬롯을 더했다
+                .contains("data-modal=\"schedule-regenerate\"")
+                .contains("data-modal-initial-focus")
+                .contains("id=\"regenerate-reason-error\"")
+                .contains("class=\"field-error\"")
+                // ruleRef 는 IF-API-28 응답에 이미 있는데 표에 없었다
+                .contains(">규칙 ID<")
+                // 권한 검증(ScreenViewControllerTest)과 API 훅은 보존
+                .contains("id=\"btn-regenerate\"")
+                .contains("data-fgc-action=\"regenerate\"")
+                .contains("data-fgc-action=\"confirm\"")
+                .contains("th:disabled=\"${!canProcess}\"")
+                // 비활성 사유는 title 이 아니라 가시 텍스트 + aria-describedby 로 전달한다
+                .contains("id=\"schedule-action-note\"")
+                .contains("aria-describedby=\"schedule-action-note\"")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("fgc-banner")
+                .doesNotContain("style=\"")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContain("<script>");
+
+        assertThat(resource("static/js/features/schedule/schedule-detail.js"))
+                // 표시 형식은 공통 유틸만 쓴다 (FGC-SIR-008)
+                .contains("format.won(")
+                .contains("format.date(")
+                .contains("format.dateTime(")
+                .contains("format.rate(")
+                .doesNotContain("maximumFractionDigits")
+                .doesNotContain("replace(/-/g")
+                .doesNotContain("Intl.")
+                // 확정은 모달을 거친다 — 클릭 즉시 POST 가 나가면 안 된다
+                .contains("confirmButton.addEventListener(\"click\", openConfirmDialog)")
+                .contains("confirmSubmit.addEventListener(\"click\", confirmSchedule)")
+                .contains("openModal(\"schedule-confirm\")")
+                // 로딩·빈·오류를 클래스로 나누고 오류에는 재시도를 붙인다
+                .contains("schedule-inline-state")
+                .contains("is-loading")
+                .contains("is-empty")
+                .contains("is-error")
+                .contains("retry.textContent = \"다시 시도\"")
+                // 현재 버전은 굵기가 아니라 공통 선택 상태로 표시한다
+                .contains("row.className = \"is-selected\"")
+                .contains("row.setAttribute(\"aria-current\", \"true\")")
+                .doesNotContain("row.style.fontWeight")
+                // 라벨·톤은 공용 모듈 한 벌만 쓴다
+                .contains("window.FgcUi.scheduleLabels")
+                .doesNotContain("SCHEDULE_STATUS_LABELS = {")
+                // 업무 판정을 화면에서 다시 계산하지 않는다
+                .doesNotContain("contractMonthNo) >= 1")
+                // 사용자에게 안 보이는 채널로만 오류를 흘리지 않는다
+                .doesNotContain("console.error");
+
+        assertThat(resource("static/js/features/schedule/schedule-labels.js"))
+                .contains("module.exports = api")
+                .contains("window.FgcUi.scheduleLabels = api")
+                .contains("CONFIRMED: \"status-badge-review\"")
+                .contains("HOLD: \"status-badge-review\"")
+                .contains("CANCELLED: \"status-badge-neutral\"")
+                .contains("LOCKED_STATUSES");
+
+        assertThat(resource("static/css/features/schedule.css"))
+                .contains(".schedule-detail-kv")
+                .contains(".schedule-inline-state")
+                .contains(".schedule-line-viewport")
+                .contains(".schedule-version-table tbody tr.is-selected")
+                .doesNotContainPattern("#[0-9a-fA-F]{3,8}\\b");
+    }
+
+    /*
+     * 로드 순서 고정 — schedule-list.js · schedule-detail.js 가 schedule-labels.js 의
+     * window.FgcUi.scheduleLabels 를 읽는다. 순서가 바뀌면 두 화면이 예외 없이 조용히 멈춘다
+     * (두 파일 모두 모듈이 없으면 early return 한다).
+     */
+    @Test
+    void productionLayoutLoadsScheduleLabelsBeforeScheduleScreens() throws IOException {
+        String layout = resource("templates/layout/default.html");
+
+        assertThat(layout)
+                .contains("th:src=\"@{/js/features/schedule/schedule-labels.js}\" defer");
+
+        assertThat(layout.indexOf("schedule-labels.js"))
+                .as("schedule-labels.js 는 schedule-list.js 보다 먼저 등록되어야 한다")
+                .isLessThan(layout.indexOf("schedule-list.js"));
+        assertThat(layout.indexOf("schedule-labels.js"))
+                .as("schedule-labels.js 는 schedule-detail.js 보다 먼저 등록되어야 한다")
+                .isLessThan(layout.indexOf("schedule-detail.js"));
     }
 
     private static String resource(String path) throws IOException {
