@@ -48,13 +48,18 @@
   </aside>
 
   <!-- 확정 분개를 직접 고치지 않는 업무 제약도 오용 방지를 위해 유지한다. -->
-  <aside class="guidance guidance-warning">
-    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">edit_off</span>
-    <div>
-      <strong class="guidance-title">수정·삭제는 없습니다. 잘못됐으면 역분개로 고칩니다.</strong>
-      <p class="guidance-copy">잘못된 분개를 지우면 그때 무슨 일이 있었는지 확인할 수 없기 때문입니다.</p>
-    </div>
-  </aside>
+  <!--
+    안내문구는 모두 제거하고 완전히 실무에서 쓴다는 생각으로 아래 요소 제거하기로
+    2026.08.21 팀 회의에서 정함.
+    나머지 화면에서도 아래 요소와 같이 안내문구 발견 시 모두 제거할 예정.
+  -->
+<!--  <aside class="guidance guidance-warning">-->
+<!--    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">edit_off</span>-->
+<!--    <div>-->
+<!--      <strong class="guidance-title">수정·삭제는 없습니다. 잘못됐으면 역분개로 고칩니다.</strong>-->
+<!--      <p class="guidance-copy">잘못된 분개를 지우면 그때 무슨 일이 있었는지 확인할 수 없기 때문입니다.</p>-->
+<!--    </div>-->
+<!--  </aside>-->
 
   <!-- IF-API-34 검색은 이 폼을 명시적으로 제출할 때만 실행한다. -->
   <form class="filter-bar ledger-filter-bar" id="ledger-filter-form" method="get" th:action="@{/journals}"
