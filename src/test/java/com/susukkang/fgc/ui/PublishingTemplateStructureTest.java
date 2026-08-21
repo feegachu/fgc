@@ -41,8 +41,7 @@ class PublishingTemplateStructureTest {
     private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of(
             "templates/transaction/list.html",
             "templates/transaction/form.html",
-            "templates/ledger/list.html",
-            "templates/exception/list.html"
+            "templates/ledger/list.html"
     );
 
     /*
@@ -61,6 +60,7 @@ class PublishingTemplateStructureTest {
             "templates/contract/form.html",
             "templates/schedule/list.html",
             "templates/schedule/detail.html",
+            "templates/exception/list.html",
             "templates/vrun/list.html",
             "templates/vrun/detail.html",
             "templates/arbitrage/list.html",
@@ -413,6 +413,33 @@ class PublishingTemplateStructureTest {
 
     @Test
     void exceptionListUsesFlexibleColumnsSharedBadgesAndProductionToast() throws IOException {
+        // 페이지 셸 전환 (#290) — 전에는 셸이 레거시인 채로 이 테스트를 통과했다.
+        assertThat(resource("templates/exception/list.html"))
+                .contains("class=\"page-content exception-page\"")
+                .contains("class=\"page-header\"")
+                .contains("class=\"page-title\"")
+                .contains("class=\"surface\"")
+                .contains("class=\"filter-bar exception-filter-bar\"")
+                .contains("class=\"filter-field-label\"")
+                .contains("class=\"data-table-viewport exception-table-viewport\"")
+                .contains("class=\"data-table exception-table\"")
+                .contains("class=\"empty-state")
+                // 상세 원인 컬럼에도 disclosure 를 넣었다 (PR #269 리뷰 지적)
+                .contains("th:text=\"${c.reasonLabel()} ?: '-'\"")
+                // 필터·행 선택 계약은 골격이 바뀌어도 그대로여야 한다
+                .contains("data-selected-exception-id=${selectedExceptionId}")
+                .contains("id=\"summary-cards\"")
+                .contains("id=\"f-type\"")
+                .contains("id=\"f-reason\"")
+                .contains("id=\"f-reset\"")
+                // select 변경만으로 제출되던 동작을 조회 버튼으로 바꿨다
+                .doesNotContain("onchange=")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("publishing-page")
+                .doesNotContain("style=\"")
+                .doesNotContainPattern("(?i)<style[\s>]")
+                .doesNotContainPattern("(?i)<script[\s>]");
+
         assertThat(resource("templates/exception/list.html"))
                 .contains("<colgroup>")
                 .contains("class=\"exception-col-title\"")
@@ -440,6 +467,11 @@ class PublishingTemplateStructureTest {
                 .doesNotContain("<th style=\"width:");
 
         assertThat(resource("static/css/features/exception.css"))
+                // 공통 data-table-viewport 를 복제하던 정의를 걷어냈다 (가이드 §4.2)
+                .doesNotContain("overscroll-behavior-inline")
+                .doesNotContain(".publishing-page .exception-table")
+                .contains(".exception-page")
+                .contains(".exception-filter-fields")
                 .contains(".exception-col-title")
                 .contains(".journal-correction-original-lines")
                 .contains(".journal-correction-original-line.is-heading")
@@ -465,6 +497,10 @@ class PublishingTemplateStructureTest {
                 .contains("preview.scrollHeight > preview.clientHeight")
                 .contains("document.fonts.ready")
                 .contains("toast(message, \"error\")")
+                // 표시 형식과 오류코드·요청 ID 를 공통 유틸로 통일했다 (#290)
+                .contains("format.dateTime(value)")
+                .contains("format.errorText(error, fallback)")
+                .doesNotContain("Number(journal.debitTotal).toLocaleString")
                 .contains("action.actionType === \"START_REVIEW\"")
                 .contains("action.actionType === \"REOPEN\"")
                 .contains("action.toStatus === \"IN_REVIEW\"")
