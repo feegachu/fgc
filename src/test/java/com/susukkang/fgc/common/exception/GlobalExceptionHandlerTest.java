@@ -75,11 +75,11 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().error().message()).contains("CALLER-SET");
     }
 
-    // 주입 범위를 COMMON_500 으로 좁힌 전제(리뷰 반영)를 지키는 가드 —
+    // 주입 범위를 문구 키(error.common.internal)로 좁힌 전제(리뷰 반영)를 지키는 가드 —
     // messages.properties 에서 {requestId} 를 쓰는 문구가 늘어나면 여기가 깨져
-    // withRequestId 의 대상 목록을 함께 갱신하게 된다.
+    // withRequestId 의 판정 기준을 함께 갱신하게 된다.
     @Test
-    void requestIdPlaceholderIsOnlyUsedByCommon500() throws Exception {
+    void requestIdPlaceholderIsOnlyUsedByInternalMessage() throws Exception {
         java.util.Properties messages = new java.util.Properties();
         try (java.io.InputStreamReader reader = new java.io.InputStreamReader(
                 getClass().getResourceAsStream("/messages.properties"),
@@ -91,6 +91,25 @@ class GlobalExceptionHandlerTest {
                 .sorted()
                 .toList();
         assertThat(usingRequestId).containsExactly("error.common.internal");
+    }
+
+    // 같은 문구 키를 공유하는 모든 코드(COMMON_500·AUDT_001)가 보호되는지 enum 전수로 검증 —
+    // enum 동일성 판정이 문구 키 공유를 놓친다는 2차 리뷰 지적의 재발 방지.
+    @Test
+    void fillsRequestIdForEveryErrorCodeUsingTheInternalMessage() {
+        RequestIdContext.set("20260821-test01");
+        java.util.List<FgcErrorCode> internalMessageCodes = java.util.Arrays.stream(FgcErrorCode.values())
+                .filter(code -> "error.common.internal".equals(code.getMessageKey()))
+                .toList();
+        assertThat(internalMessageCodes).contains(FgcErrorCode.COMMON_500, FgcErrorCode.AUDT_001);
+
+        for (FgcErrorCode code : internalMessageCodes) {
+            ResponseEntity<ApiResponse<Void>> response = handler()
+                    .handleBusinessException(new FgcBusinessException(code));
+            String message = response.getBody().error().message();
+            assertThat(message).doesNotContain("{requestId}");
+            assertThat(message).contains("20260821-test01");
+        }
     }
 
     @Test
