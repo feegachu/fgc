@@ -193,18 +193,12 @@ public class GlobalExceptionHandler {
                 exception
         );
 
-        Map<String, Object> params =
-                errorCode == FgcErrorCode.COMMON_500
-                        ? Map.of(
-                        "requestId",
-                        RequestIdContext.current()
-                )
-                        : Map.of();
-
+        // withRequestId 와 같은 messageKey 기준 판정을 재사용한다 (3차 리뷰 반영) —
+        // resolver 매핑이 AUDT_001 같은 internal 문구 공유 코드로 확장돼도 이 경로가 놓치지 않는다.
         ApiError apiError = createApiError(
                 errorCode,
                 null,
-                params,
+                withRequestId(errorCode, Map.of()),
                 productionDetail(exception.getMostSpecificCause().getMessage())
         );
 

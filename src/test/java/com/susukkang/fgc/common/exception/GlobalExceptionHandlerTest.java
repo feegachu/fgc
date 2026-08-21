@@ -112,6 +112,23 @@ class GlobalExceptionHandlerTest {
         }
     }
 
+    // DataIntegrityViolation 폴백 경로도 같은 판정을 타는지 검증 (3차 리뷰 반영 —
+    // handleBusinessException 만 커버하던 기존 테스트의 사각지대).
+    @Test
+    void fillsRequestIdOnDataIntegrityFallbackPath() {
+        RequestIdContext.set("20260821-test01");
+        org.mockito.BDDMockito.given(constraintResolver.resolve(org.mockito.ArgumentMatchers.any()))
+                .willReturn(java.util.Optional.empty());
+
+        ResponseEntity<ApiResponse<Void>> response = handler().handleDataIntegrityViolation(
+                new org.springframework.dao.DataIntegrityViolationException("boom",
+                        new RuntimeException("root")));
+
+        String message = response.getBody().error().message();
+        assertThat(message).doesNotContain("{requestId}");
+        assertThat(message).contains("20260821-test01");
+    }
+
     @Test
     void doesNotInjectRequestIdIntoOtherErrorCodesParams() {
         ResponseEntity<ApiResponse<Void>> response = handler()
