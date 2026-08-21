@@ -88,12 +88,20 @@ class ScreenViewControllerTest {
 
     @Test
     void contract_detail_uses_status_event_contract_without_consumer_name() throws Exception {
+        // 상태이력 렌더링과 시간대 처리는 #283 에서 static/js/features/contract/contract-detail.js 로 옮겼다.
+        // 템플릿에는 화면 셸과 스크립트 등록만 남아야 한다 (인라인 <script> 가 되살아나면 구조 테스트가 잡는다).
         mvc.perform(get("/contracts/1").with(user(settleUser())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "/status-events")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("event.newStatus")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("event.sourceSystem")))
+                        "/js/features/contract/contract-detail.js")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "/js/features/contract/contract-tabs.js")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "id=\"contract-history-list\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-status-sort=\"effectiveAt\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-status-sort=\"receivedAt\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "id=\"contract-schedule-regenerate-button\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
@@ -102,10 +110,9 @@ class ScreenViewControllerTest {
                         "id=\"contract-cap-recheck-button\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "aria-label=\"한도 재검증\"")))
+                // 계약상태 라벨은 서버 enum 이 유일한 출처다 — 화면이 라벨을 새로 만들지 않는다.
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "timeZone: \"Asia/Seoul\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "new URLSearchParams(window.location.search).get(\"tab\")")))
+                        "data-code=\"ACTIVE\">정상</span>")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
