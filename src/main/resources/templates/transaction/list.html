@@ -81,7 +81,7 @@
       <span class="transaction-result-count"><span class="tabular-nums" id="row-count">0</span>건 · 한 화면 20행</span>
     </header>
     <div class="data-table-viewport transaction-table-viewport">
-      <table class="data-table transaction-list-table">
+      <table class="data-table transaction-list-table" th:data-can-process="${canProcess}">
         <caption class="visually-hidden">검색 조건에 해당하는 수수료 지급 건</caption>
         <colgroup>
           <col class="transaction-col-stage"><col class="transaction-col-source">

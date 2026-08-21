@@ -32,6 +32,10 @@ if (typeof module !== "undefined" && module.exports) {
   var format = window.FgcUi && window.FgcUi.format;
   var form = document.querySelector("[data-transaction-filter-form]");
   var body = document.getElementById("list-body");
+  /* COMPLIANCE 는 조회 전용 — 처리 버튼을 만들지 않는다 (화면정의서 4-1, #255 F-09).
+     서버(ShellAdvice.canProcess)가 판정한 값을 표의 data 속성으로 받는다. CONT-W01 의
+     신규 등록 버튼(th:if="${canProcess}")과 같은 기준이다. */
+  var canProcess = !!(body && body.closest("table") && body.closest("table").dataset.canProcess === "true");
   var pagination = document.querySelector("[data-transaction-pagination]");
   var previousButton = document.querySelector("[data-transaction-page-prev]");
   var nextButton = document.querySelector("[data-transaction-page-next]");
@@ -175,7 +179,8 @@ if (typeof module !== "undefined" && module.exports) {
       appendCell(row, format.month(item.settlementMonth));
       appendDisclosureCell(row, item.recipientAgentName || "-");
       appendDisclosureCell(row, item.commissionItemName || item.commissionItemCode);
-      appendCell(row, format.won(item.amount), "is-number tabular-nums");
+      appendCell(row, format.won(item.amount),
+        "is-number tabular-nums" + (format.isNegative(item.amount) ? " is-negative-amount" : ""));
       appendBadgeCell(row, item.cashflowTypeLabel || item.cashflowType, cashflowBadge(item.cashflowType));
       appendBadgeCell(row, item.statusLabel || item.status, statusBadge(item.status));
       appendAttributionCell(row, item.attributionCount, item.differenceAmount);
@@ -186,6 +191,8 @@ if (typeof module !== "undefined" && module.exports) {
     refreshDynamicOptions();
     setText("row-count", rows.length);
       setText("sum-amount", format.won(sum));
+    var sumElement = document.getElementById("sum-amount");
+    if (sumElement) sumElement.classList.toggle("is-negative-amount", format.isNegative(sum));
     syncTableCellDisclosures();
   }
 
@@ -202,7 +209,7 @@ if (typeof module !== "undefined" && module.exports) {
 
   function appendActionCell(row, item) {
     var cell = document.createElement("td");
-    if (item.status === "DRAFT") {
+    if (canProcess && item.status === "DRAFT") {
       var link = document.createElement("a");
       link.className = "button button-ghost";
       link.href = "/transactions/new?id=" + encodeURIComponent(item.commissionTransactionId);
