@@ -183,6 +183,7 @@
             SELECT 1
             FROM fgc.insurer
             WHERE insurer_id = #{insurerId}
+              AND active_yn = TRUE
         )
     </select>
     <!-- 보험상품 존재 여부 확인 -->

@@ -676,31 +676,49 @@
         )
     </insert>
 
-    <insert id="insertCapCheckDetail">
-        INSERT INTO fgc.cap_check_detail (
-            cap_check_id,
-            detail_seq,
-            commission_item_id,
-            item_code,
-            item_name,
-            transaction_attribution_id,
-            classification_snapshot,
-            amount,
-            decision_reason,
-            evidence_ref
-        ) VALUES (
-            #{capCheckId},
-            1,
-            #{commissionItemId},
-            #{itemCode},
-            #{itemName},
-            #{transactionAttributionId},
-            #{classificationSnapshot},
-            #{candidateAmount},
-            #{decisionReason},
-            #{evidenceRef}
-        )
-    </insert>
+    <!-- findCapRuleSnapshot 의 existing_included_amount 집계를 행 단위로 풀어낸 항목별 내역.
+         WHERE 절은 그 집계 서브쿼리와 글자 그대로 같아야 한다 — 어긋나면 상세 합계가
+         cap_check.included_amount 와 달라져 CAP-W02 가 불일치 경고를 띄운다 (FUN-035).
+         DEDUCTION(환수 등)은 집계와 같은 규칙으로 음수로 내려간다 — 저장 가능 여부는
+         서비스가 판단한다 (cap_check_detail.amount CHECK(>=0)). -->
+    <select id="findExistingIncludedDetails"
+            resultType="com.susukkang.fgc.transaction.domain.ExistingIncludedDetail">
+        SELECT other_ta.transaction_attribution_id AS transactionAttributionId,
+               other_ct.commission_item_id         AS commissionItemId,
+               ci.item_code                        AS itemCode,
+               ci.item_name                        AS itemName,
+               other_ta.inclusion_status_snapshot  AS classificationSnapshot,
+               CASE
+                   WHEN other_ct.cashflow_type = 'DEDUCTION'
+                       THEN -ROUND(other_ta.attributed_amount, 0)
+                   ELSE ROUND(other_ta.attributed_amount, 0)
+               END                                 AS amount,
+               COALESCE(NULLIF(BTRIM(cri.decision_reason), ''),
+                        '확정 당시 산입 판정 스냅샷') AS decisionReason,
+               other_ta.evidence_ref               AS evidenceRef
+          FROM fgc.commission_transaction ct
+          JOIN fgc.transaction_attribution ta
+            ON ta.commission_transaction_id = ct.commission_transaction_id
+           AND ta.transaction_attribution_id = #{transactionAttributionId}
+          JOIN fgc.insurance_contract c
+            ON c.contract_id = ta.contract_id
+          JOIN fgc.transaction_attribution other_ta
+            ON other_ta.contract_id = ta.contract_id
+          JOIN fgc.commission_transaction other_ct
+            ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
+          JOIN fgc.commission_item ci
+            ON ci.commission_item_id = other_ct.commission_item_id
+          LEFT JOIN fgc.cap_rule_item cri
+            ON cri.cap_rule_item_id = other_ta.cap_rule_item_id
+         WHERE ct.commission_transaction_id = #{paymentId}
+           AND other_ta.inclusion_status_snapshot = 'INCLUDED'
+           AND other_ct.payment_stage = ct.payment_stage
+           AND other_ct.status = 'CONFIRMED'
+           AND other_ct.commission_transaction_id &lt;&gt; ct.commission_transaction_id
+           AND other_ta.attribution_date &gt;= c.contract_date
+           AND other_ta.attribution_date &lt; c.contract_date + INTERVAL '12 months'
+         ORDER BY other_ta.attribution_date, other_ta.transaction_attribution_id
+    </select>
 
     <insert id="insertExceptionCase">
         <!-- 2026-08-10 yslee - 종결 예외의 상태를 동일 키 재발로부터 보호 -->
