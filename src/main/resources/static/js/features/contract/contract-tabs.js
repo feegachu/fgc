@@ -276,7 +276,8 @@
 
   function disclosureCell(input) {
     var cell = capDisclosureCell(input, false);
-    cell.className = "contract-disclosure-cell";
+    /* className 을 덮으면 cap-disclosure-cell 의 .table-cell-details 규칙까지 잃는다. */
+    cell.classList.add("contract-disclosure-cell");
     return cell;
   }
 
