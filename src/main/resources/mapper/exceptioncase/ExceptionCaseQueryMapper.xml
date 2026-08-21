@@ -23,7 +23,8 @@
                au.login_id            AS assignedTo,
                ec.created_at          AS createdAt,
                ec.source_entity_type  AS sourceEntityType,
-               ec.source_entity_id    AS sourceEntityId
+               ec.source_entity_id    AS sourceEntityId,
+               ec.cap_check_id        AS capCheckId
           FROM fgc.exception_case ec
           LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
           LEFT JOIN fgc.app_user au ON au.user_id = ec.assigned_to
@@ -96,6 +97,7 @@
                assignee.login_id     AS assigneeLoginId,
                ec.source_entity_type AS sourceEntityType,
                ec.source_entity_id   AS sourceEntityId,
+               ec.cap_check_id       AS capCheckId,
                reconciliation.result_type AS reconciliationResultType,
                ec.validation_month   AS validationMonth,
                ec.first_detected_run_id AS firstDetectedRunId,

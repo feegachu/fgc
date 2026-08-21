@@ -965,6 +965,8 @@ FGC — GA 수수료 정산·검증 플랫폼
 **만들 때 주의**
 사용률은 소수점 6자리까지 저장됩니다(`numeric(12,6)`). 화면에서 반올림해 표시하되, **판정 색은 저장된 판정값(`result_status`)을 그대로** 쓰세요. 화면에서 사용률로 다시 판정하면 경계값에서 어긋납니다.
 
+(#331 추가) `?capCheckId={id}` 로 진입하면 목록·필터와 무관하게 CAP-W02 모달을 바로 엽니다. 예외함(EXCP-W01)이 확정 거절된 DRAFT 후보의 계산근거로 보낼 때 쓰는 딥링크입니다 — 그 판정은 이 목록에서 candidate_transaction_id 조건으로 제외되어 표에서 찾아 누를 수 없기 때문입니다.
+
 **시연 데이터 (시드명세서 제26항)**
 
 | 시나리오 | 계약 | 산입금액 | 기대 결과 |
@@ -1389,10 +1391,14 @@ FGC — GA 수수료 정산·검증 플랫폼
 - 읽기·쓰기: `exception_case`, `exception_action`
 - API: `GET /api/v1/exceptions?...`, `POST /api/v1/exceptions/{id}/actions`, `POST /api/v1/exceptions/{id}/journal-correction`
 
-**관련 요구사항** FUN-052, FUN-053, FUN-034
+**관련 요구사항** FUN-052, FUN-053, FUN-034, FUN-035 / REG-08
 
 **만들 때 주의**
 목록과 상세 패널의 "참조" 버튼은 원천 화면으로 바로 이동합니다. 계약은 계약 상세, 지급 건은 해당 지급 건 수정 화면, 스케줄 헤더는 스케줄 상세, 차익거래(계약 금융 스냅샷 없음 포함)는 차익거래 목록으로 연결합니다. `JOURNAL_HEADER` 원천은 해당 분개가 선택된 원장 조회로 연결합니다. 대사 결과는 예상 지급 없음이면 해당 계약번호로 필터링한 스케줄 목록, 실제 지급 없음이면 수수료 지급 건 등록 화면, 무효·취소 계약 지급·정책 버전 오류면 계약 상세, 분개 불균형이면 원장 조회, 그 밖의 대사 사유(중복·금액·회차·조직·설계사 불일치, 검토 필요, 분류 불가)는 해당 대사 결과의 비교 상세 팝업으로 연결합니다. 지원하지 않는 원천 유형만 `source_entity_type:source_entity_id` 텍스트로 유지합니다.
+
+(#331 추가) 「참조」와 별개로, CAP 계열 예외에는 **「1,200% 계산근거 열기」** 버튼을 둡니다 — `/cap-checks?capCheckId={id}` 로 CAP-W02 팝업을 바로 엽니다. `CAP_CHECK` 를 「참조」 목록에 넣지 않는 이유는 같은 목적지 버튼이 두 개가 되기 때문입니다. 실시간 확정 경로(FUN-034)는 `exception_case.cap_check_id` 를, 배치 경로는 `source_entity` 를 쓰며 컬럼이 우선합니다.
+
+**이 버튼이 필요한 이유** — 확정이 거절된 DRAFT 후보의 `cap_check` 은 CAP-W01 과 CONT-W02 「1,200%」 탭 목록에서 제외됩니다(거절된 후보가 계약의 현재 판정을 덮지 않게 하려는 것). 그래서 그 판정의 계산근거에 도달할 수 있는 곳은 예외함뿐입니다. IF-API-31 은 제외 조건이 없어 팝업 자체는 정상 동작하므로, CAP-W01 목록이 0건이어도 이 링크로는 계산근거가 열립니다.
 
 ---
 
@@ -1693,7 +1699,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | LEDG-W01 | 검증원장 조회 | 1차 | FUN-046, 047 | journal_header, journal_line, journal_account | — |
 | RECO-W01 | 대사 실행·결과 | 1차 | FUN-048~052 | reconciliation_run, reconciliation_result | — |
 | RECO-W02 | 대사 비교 상세 | 1차 | FUN-049 | reconciliation_match, schedule_line, transaction_attribution | — |
-| EXCP-W01 | 예외함 | 1차 | FUN-052, 053, 034 | exception_case, exception_action | — |
+| EXCP-W01 | 예외함 | 1차 | FUN-052, 053, 034, 035 | exception_case, exception_action, cap_check | REG-08 |
 | VRUN-W01 | 월 통합검증 목록 | 1차 | FUN-041 | validation_run | — |
 | VRUN-W02 | 월 통합검증 상세·확정 | 1차 | FUN-042, 043, 044 | validation_run, validation_target | — |
 | AUDT-W01 | 감사로그 | 1차 | FUN-061 | audit_log | REG-22 |

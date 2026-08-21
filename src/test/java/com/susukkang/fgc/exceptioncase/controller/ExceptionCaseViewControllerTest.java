@@ -75,6 +75,73 @@ class ExceptionCaseViewControllerTest {
                 .isEqualTo("검토 필요");
     }
 
+    /*
+     * FGC-FUN-035(계산근거)·FGC-FUN-034 / REG-08 — #331.
+     * 확정 거절된 DRAFT 후보의 cap_check 는 CAP-W01·CONT-W02 목록에서 제외되므로
+     * (CapCheckMapper 의 candidate_transaction_id 조건) 예외함이 계산근거로 가는 유일한 자리다.
+     * 실시간 경로는 cap_check_id 컬럼, 배치 경로는 source_entity 를 쓴다 — 둘 다 열려야 한다.
+     */
+    @Test
+    void rendersCapBasisLinkFromColumnAndFromSourceEntity() throws Exception {
+        ExceptionCaseResponseDTO realtime = rowWithCapCheck(11L, "COMMISSION_TRANSACTION", "77", 501L);
+        ExceptionCaseResponseDTO batch = rowWithCapCheck(12L, "CAP_CHECK", "502", null);
+        given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(realtime, batch), 1, 20, 2, 2));
+
+        String html = mockMvc.perform(get("/exceptions").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("1,200% 계산근거 열기")))
+                // 실시간 경로 — cap_check_id 컬럼에서
+                .andExpect(content().string(containsString("href=\"/cap-checks?capCheckId=501\"")))
+                // 배치 경로 — source_entity 에서
+                .andExpect(content().string(containsString("href=\"/cap-checks?capCheckId=502\"")))
+                // 지급 건 참조는 그대로 남는다 — 예외에서 "어느 지급 시도였나" 를 잃지 않는다
+                .andExpect(content().string(containsString("href=\"/transactions/new?id=77\"")))
+                .andReturn().getResponse().getContentAsString();
+
+        /*
+         * 배치 경로(source_entity = CAP_CHECK)에서 "참조" 와 "계산근거" 가 같은 목적지로
+         * 두 번 렌더되면 안 된다. 화면정의서 :1395 는 참조 버튼의 원천 유형을 계약·지급 건·
+         * 스케줄 헤더·차익거래·JOURNAL_HEADER·대사 결과로 한정하고 CAP_CHECK 는 목록에 없다 —
+         * 계산근거는 capBasisLink 하나로만 연결한다.
+         * containsString 은 2개여도 통과하므로 건수를 센다.
+         */
+        assertThat(countOccurrences(html, "href=\"/cap-checks?capCheckId=502\"")).isEqualTo(1);
+        assertThat(countOccurrences(html, "href=\"/cap-checks?capCheckId=501\"")).isEqualTo(1);
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        for (int from = haystack.indexOf(needle); from >= 0; from = haystack.indexOf(needle, from + needle.length())) {
+            count++;
+        }
+        return count;
+    }
+
+    @Test
+    void omitsCapBasisLinkWhenNoCapCheckReference() throws Exception {
+        given(service.search(argThat(c -> "OPEN".equals(c.getStatus())), eq(1), eq(20)))
+                .willReturn(response(List.of(
+                        row(13L, ExceptionStatus.NEW, "JOURNAL_HEADER", "9", "원장 불균형")), 1, 20, 1, 1));
+
+        mockMvc.perform(get("/exceptions").with(user(SETTLE)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("1,200% 계산근거 열기"))));
+    }
+
+    private static ExceptionCaseResponseDTO rowWithCapCheck(
+            long id, String sourceType, String sourceId, Long capCheckId
+    ) {
+        return new ExceptionCaseResponseDTO(
+                id, "KEY-" + id, ExceptionType.CAP_VIOLATION, "CAP_LIMIT_VIOLATION",
+                ExceptionSeverity.CRITICAL, ExceptionStatus.NEW, "1,200% 한도 초과", "상세",
+                5L, "C001", "김정산", null, null, sourceType, sourceId, capCheckId, null,
+                LocalDate.of(2026, 8, 1), null, null,
+                OffsetDateTime.parse("2026-08-21T09:00:00+09:00"),
+                OffsetDateTime.parse("2026-08-21T09:00:00+09:00"), 1,
+                OffsetDateTime.parse("2026-08-21T09:00:00+09:00"), List.of(), List.of());
+    }
+
     @Test
     void defaultsToOpenAndRendersPagedRowsWithSelectableDetails() throws Exception {
         ExceptionCaseResponseDTO row = row(10L, ExceptionStatus.IN_REVIEW,
@@ -339,7 +406,7 @@ class ExceptionCaseViewControllerTest {
                 ExceptionType.JOURNAL_CORRECTION_REQUIRED,
                 "JOURNAL_CORRECTION_REQUIRED", ExceptionSeverity.HIGH,
                 status, "원장 정정 필요", "금액 오류", 5L, "C001",
-                null, 1L, "settle01", "JOURNAL_HEADER", "10", null,
+                null, 1L, "settle01", "JOURNAL_HEADER", "10", null, null,
                 LocalDate.of(2026, 8, 1), null, null,
                 OffsetDateTime.parse("2026-08-20T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), 1,
@@ -383,7 +450,7 @@ class ExceptionCaseViewControllerTest {
         return new ExceptionCaseResponseDTO(
                 id, "KEY-" + id, ExceptionType.DATA_QUALITY, "FINANCIAL_SNAPSHOT_MISSING",
                 ExceptionSeverity.WARNING, status, title, "상세 설명", 5L, "C001", "김정산",
-                null, null, sourceType, sourceId, null, LocalDate.of(2026, 7, 1), 1505L, 1506L,
+                null, null, sourceType, sourceId, null, null, LocalDate.of(2026, 7, 1), 1505L, 1506L,
                 OffsetDateTime.parse("2026-07-10T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-07-11T09:00:00+09:00"), 2,
                 OffsetDateTime.parse("2026-07-10T09:00:00+09:00"),
