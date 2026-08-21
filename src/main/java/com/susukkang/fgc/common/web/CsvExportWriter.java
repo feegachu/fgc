@@ -29,8 +29,20 @@ public final class CsvExportWriter {
                 csv.append(',');
             }
             String value = values.get(index) == null ? "" : String.valueOf(values.get(index));
+            if (startsWithFormulaOperator(value)) {
+                value = "'" + value;
+            }
             csv.append('"').append(value.replace("\"", "\"\"")).append('"');
         }
         csv.append("\r\n");
+    }
+
+    /** Spreadsheet programs must treat exported user text as text, not as a formula (SRC-028). */
+    private static boolean startsWithFormulaOperator(String value) {
+        if (value.isEmpty()) {
+            return false;
+        }
+        char first = value.charAt(0);
+        return first == '=' || first == '+' || first == '-' || first == '@';
     }
 }
