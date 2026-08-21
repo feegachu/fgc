@@ -460,6 +460,8 @@
     if (event.target === elements.premiumPerCycleAmount) {
       /* 비우면 다시 자동 채움 대상으로 돌아간다. */
       isPremiumPerCycleUserValue = event.target.value !== "";
+      /* 비운 즉시 채워야 안내 문구("비워 두면 … 채웁니다")와 동작이 맞다 — 필수 항목이라 빈 채로 두면 저장이 막힌다. */
+      if (!isPremiumPerCycleUserValue) syncPremiumPerCycleAmount();
     }
     if (event.target === elements.monthlyEquivalentFirstPremium) syncPremiumPerCycleAmount();
     updateSaveState();
@@ -499,8 +501,14 @@
         redirect();
         return;
       }
-      warnIfRefundRateTableIsMissing(savedContractId).then(function (warned) {
-        window.setTimeout(redirect, warned ? 1800 : 0);
+      /*
+       * 이 Promise 를 반환해야 finally 가 이동 전에 돌지 않는다 —
+       * 반환하지 않으면 저장 버튼이 최대 1.8초 동안 다시 눌려 계약이 중복 생성된다.
+       */
+      return warnIfRefundRateTableIsMissing().then(function (warned) {
+        return new Promise(function (resolve) {
+          window.setTimeout(function () { redirect(); resolve(); }, warned ? 1800 : 0);
+        });
       });
     }).catch(function (error) {
       showError(error, "보험계약을 저장하지 못했습니다.");

@@ -871,7 +871,8 @@
 .contract-col-insurer { width: 6.5rem; }
 .contract-col-product { width: 11.75rem; }
 .contract-col-date { width: 5.75rem; }
-.contract-col-premium { width: 8.25rem; }
+/* 근거 팝오버 트리거(1.25rem)까지 들어가는 폭 — th 는 overflow:hidden 이라 모자라면 잘린다. */
+.contract-col-premium { width: 10.25rem; }
 .contract-col-agent { width: 8.5rem; }
 .contract-col-status { width: 5.25rem; }
 .contract-col-cap { width: 7rem; }
@@ -922,6 +923,16 @@
   margin: var(--space-10) var(--space-4) 0;
   padding-inline: var(--space-3);
   border-top: 1px solid var(--color-border-default);
+}
+
+/*
+ * 필터 필드 기본 폭. 아래 미디어쿼리가 이 값을 재정의하므로 반드시 앞에 둔다 —
+ * 셀렉터 특정성이 같아 뒤에 두면 좁은 폭 규칙이 진다.
+ */
+.contract-filter-fields > .filter-field {
+  min-width: 11rem;
+  max-width: 16rem;
+  flex: 1 1 11rem;
 }
 
 @media (max-width: 63.9375rem) {
@@ -982,12 +993,6 @@
 
 .contract-filter-fields {
   flex: 1 1 auto;
-}
-
-.contract-filter-fields > .filter-field {
-  min-width: 11rem;
-  max-width: 16rem;
-  flex: 1 1 11rem;
 }
 
 .contract-filter-fields .field-control,

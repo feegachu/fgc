@@ -191,7 +191,7 @@
         .then(function (response) {
           if (!response.ok) return failedExport(response);
           return response.blob().then(function (blob) {
-            saveBlob(blob, "contracts.csv");
+            saveBlob(blob, exportFilename(response));
             toast("CSV 파일을 내려받았습니다.", "success");
           });
         })
@@ -220,7 +220,24 @@
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
+    /* 다운로드를 비동기로 시작하는 브라우저가 있다 — 같은 태스크에서 해제하면 저장이 실패한다. */
+    window.setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  }
+
+  /*
+   * 서버가 Content-Disposition 으로 "보험계약목록_yyyyMMdd_HHmmss.csv" 를 내려준다.
+   * 헤더가 없거나 읽지 못할 때만 기본 이름을 쓴다.
+   */
+  function exportFilename(response) {
+    var header = response.headers.get("Content-Disposition") || "";
+    var encoded = header.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+    if (encoded) {
+      try { return decodeURIComponent(encoded[1].trim()); } catch (error) { /* 아래 기본값으로 */ }
+    }
+    /* 남는 filename= 은 RFC 2047 인코딩워드(=?UTF-8?Q?…?=)일 수 있다 — 그대로 쓰면 파일명이 깨진다. */
+    var plain = header.match(/filename\s*=\s*"?([^";]+)"?/i);
+    if (plain && plain[1].indexOf("=?") === -1) return plain[1].trim();
+    return "contracts.csv";
   }
 
   /*
@@ -239,8 +256,9 @@
       full.className = "table-cell-full";
       Array.from(cell.childNodes).forEach(function (node) {
         preview.appendChild(node.cloneNode(true));
-        full.appendChild(node.cloneNode(true));
       });
+      /* 전체 보기는 값 확인용이다 — 링크까지 복제하면 스크린리더가 같은 목적지를 두 번 읽는다. */
+      full.textContent = cell.textContent.trim();
 
       var details = document.createElement("details");
       details.className = "table-cell-details";
@@ -284,6 +302,8 @@
 
   function scheduleDisclosureSync() {
     window.requestAnimationFrame(syncTableCellDisclosures);
+    /* 폰트가 바뀌면 폭이 달라진다 — policy-list.js·exception-list.js 와 같이 한 번 더 맞춘다. */
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncTableCellDisclosures);
   }
 
   var resizeFrame = null;

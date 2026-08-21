@@ -112,7 +112,11 @@ class ScreenViewControllerTest {
                         "aria-label=\"한도 재검증\"")))
                 // 계약상태 라벨은 서버 enum 이 유일한 출처다 — 화면이 라벨을 새로 만들지 않는다.
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "data-code=\"ACTIVE\">정상</span>")))
+                        "data-label-group=\"contractStatus\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "data-code=\"ACTIVE\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        ">정상<")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
