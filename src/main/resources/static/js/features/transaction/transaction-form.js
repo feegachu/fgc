@@ -732,15 +732,19 @@
   }
 
   /**
-   * 확정이 거부되어 판정이 기록된 뒤의 후속 동선 — 계산근거(CAP-W01→W02)와 예외함(EXCP-W01).
+   * 확정이 거부되어 판정이 기록된 뒤의 후속 동선 — 예외함(EXCP-W01).
    * 확정 실패 응답에는 cap_check·exception_case ID 가 없으므로(응답 계약상 문구 치환값만 온다)
-   * 두 화면이 이미 지원하는 검색조건(contractNo·status·type)으로 그 건까지 좁혀 보낸다.
+   * EXCP-W01 이 이미 지원하는 검색조건(type·contractNo)으로 그 건까지 좁혀 보낸다.
+   *
+   * CAP-W01(계산근거) 링크는 두지 않는다 — 확정 거절된 DRAFT 후보의 cap_check 는
+   * CapCheckMapper.latestScopedCapChecks 가 candidate_transaction_id 조건으로 목록에서
+   * 제외하므로(계약의 현재 판정을 덮어쓰지 않게 하려는 의도) 링크를 걸면 빈 목록으로 보내게 된다.
+   * 같은 행을 DashboardMapper 는 세고 CAP-W01 은 세지 않아 위반 KPI 와 CAP-W01 건수가
+   * 어긋나는 문제(화면정의서 :402 "클릭하면 CAP-W01 위반 필터")가 별도로 있으며,
+   * 그 판단이 정리된 뒤에 이 링크를 추가한다.
    */
   function renderFollowUpLinks(contractNo, reviewRequired) {
     if (!contractNo) return;
-    var month = (settlementMonth.value || "").slice(0, 7);
-    var capParams = new URLSearchParams({ contractNo: contractNo, status: reviewRequired ? "REVIEW_REQUIRED" : "VIOLATION" });
-    if (month) capParams.set("month", month);
     var excParams = new URLSearchParams({
       type: reviewRequired ? "CAP_REVIEW_REQUIRED" : "CAP_VIOLATION",
       contractNo: contractNo
@@ -748,7 +752,6 @@
 
     var actions = document.createElement("div");
     actions.className = "transaction-confirm-followup-actions";
-    actions.appendChild(followUpLink("계산근거 열기", "/cap-checks?" + capParams.toString()));
     actions.appendChild(followUpLink("예외함에서 처리하기", "/exceptions?" + excParams.toString()));
     confirmFollowUp.appendChild(actions);
     confirmFollowUp.hidden = false;
