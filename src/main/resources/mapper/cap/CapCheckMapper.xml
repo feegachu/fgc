@@ -59,11 +59,11 @@
     <insert id="insertCapCheckDetails">
         INSERT INTO fgc.cap_check_detail (
             cap_check_id, detail_seq, commission_item_id, item_code, item_name,
-            schedule_line_id, contract_month_no, classification_snapshot, amount, decision_reason, evidence_ref
+            schedule_line_id, transaction_attribution_id, contract_month_no, classification_snapshot, amount, decision_reason, evidence_ref
         ) VALUES
         <foreach collection="details" item="d" separator=",">
             (#{d.capCheckId}, #{d.detailSeq}, #{d.commissionItemId}, #{d.itemCode}, #{d.itemName},
-             #{d.scheduleLineId}, #{d.contractMonthNo}, #{d.classificationSnapshot}, #{d.amount},
+             #{d.scheduleLineId}, #{d.transactionAttributionId}, #{d.contractMonthNo}, #{d.classificationSnapshot}, #{d.amount},
              #{d.decisionReason}, #{d.evidenceRef})
         </foreach>
         ON CONFLICT ON CONSTRAINT uq_cap_check_detail DO UPDATE SET
@@ -71,6 +71,7 @@
             item_code                = EXCLUDED.item_code,
             item_name                = EXCLUDED.item_name,
             schedule_line_id         = EXCLUDED.schedule_line_id,
+            transaction_attribution_id = EXCLUDED.transaction_attribution_id,
             contract_month_no        = EXCLUDED.contract_month_no,
             classification_snapshot  = EXCLUDED.classification_snapshot,
             amount                   = EXCLUDED.amount,
