@@ -682,11 +682,24 @@
     modal.open("transaction-confirm");
   }
 
-  /** 서버에 보내야 판정이 기록되는 차단인가 — RECORDABLE_BLOCKER_CODES 주석 참고. */
+  /**
+   * 서버가 실제로 던질 차단 사유가 기록 대상인가 — RECORDABLE_BLOCKER_CODES 주석 참고.
+   *
+   * "하나라도 있으면" 이 아니라 **첫 번째만** 본다. confirm 은 failFirst 로 게이트 순서상
+   * 먼저 걸리는 사유 하나만 기록·거부한다. precheck 의 수집 순서는 confirm 의 평가 순서와
+   * 같으므로(hasUnresolvedViolation → requiredValueFailures → 귀속행 루프의
+   * attributionFailures → newcomer → capRule → ruleConsistency → capResult)
+   * blockers[0] 이 곧 confirm 이 던질 코드다.
+   *
+   * 실제로 어긋나는 경우가 있다 — 계약 귀속행에 contractId 가 없으면 attributionFailures 가
+   * 같은 행에 TRAN_002 와 CAP_002 를 함께 넣는다(CommissionPaymentServiceImpl:1161-1185).
+   * confirm 은 TRAN_002 를 던져 DATA_QUALITY 를 기록하는데, "하나라도" 로 보면 화면은
+   * 1,200% 판정이 기록된다고 안내하게 된다.
+   */
   function hasRecordableBlocker(result) {
-    return (result.blockers || []).some(function (blocker) {
-      return RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0;
-    });
+    var blockers = result.blockers || [];
+    return blockers.length > 0
+      && RECORDABLE_BLOCKER_CODES.indexOf(blockers[0].code) >= 0;
   }
 
   /*

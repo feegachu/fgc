@@ -452,6 +452,13 @@ class PublishingTemplateStructureTest {
                  */
                 .contains("var RECORDABLE_BLOCKER_CODES = [\"FGC-CAP-001\", \"FGC-CAP-002\"]")
                 .contains("hasRecordableBlocker(lastPrecheckResult)")
+                /*
+                 * confirm 은 failFirst 로 첫 사유 하나만 기록·거부하므로 화면도 blockers[0] 만 본다.
+                 * "하나라도" 로 보면 TRAN_002 + CAP_002 가 함께 실리는 행에서
+                 * (attributionFailures, contractId 누락) 화면 안내와 실제 기록이 어긋난다.
+                 */
+                .contains("RECORDABLE_BLOCKER_CODES.indexOf(blockers[0].code) >= 0")
+                .doesNotContain("(result.blockers || []).some(")
                 .contains("확정 시도 · 예외 등록")
                 /*
                  * 후속 링크의 계약은 blockers[] 에서 뽑아야 한다 — capPreview 가 아니다.
