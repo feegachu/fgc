@@ -36,7 +36,7 @@
    * cap_check(VIOLATION·REVIEW_REQUIRED) 와 exception_case 가 남는다.
    * IF-API-24 사전검증은 아무것도 저장하지 않으므로(TransactionPrecheckResponse)
    * 이 코드들에서 확정 요청을 막아 버리면 위반 이력이 영구히 생기지 않는다 —
-   * 화면정의서 TRAN-W02 :775 "한도 초과인데 확정 → 서버가 거부 + 예외 자동 생성",
+   * 화면정의서 TRAN-W02 :771 "한도 초과인데 확정 → 서버가 거부 + 예외 자동 생성",
    * CommissionPaymentServiceImpl 의 insertCapCheck → createIfNecessary → failFirst 순서와
    * @Transactional(noRollbackFor = ...Rejected) 가 이 동작을 보장한다.
    * 확정을 허용하는 게 아니라 "서버 판정을 받으러 보내는" 것이며 상태는 DRAFT 그대로다.
