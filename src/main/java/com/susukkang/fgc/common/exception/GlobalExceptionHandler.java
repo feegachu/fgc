@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
@@ -73,13 +74,41 @@ public class GlobalExceptionHandler {
         ApiError apiError = createApiError(
                 errorCode,
                 exception.getField(),
-                exception.getParams(),
+                withRequestId(errorCode, exception.getParams()),
                 productionDetail(exception.getDetail())
         );
 
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ApiResponse.failure(apiError));
+    }
+
+    /** {requestId} 를 쓰는 유일한 문구 — 이 키는 COMMON_500 과 AUDT_001 이 공유한다 (코드리뷰 2차 반영). */
+    private static final String INTERNAL_MESSAGE_KEY = "error.common.internal";
+
+    /**
+     * {requestId} 자리표시자를 쓰는 문구가 호출부의 파라미터 누락으로
+     * "요청번호 {requestId}를…" 원문 그대로 노출되지 않게 기본값을 주입한다 (QA-07 · #259).
+     *
+     * 대상을 문구 키 기준으로 좁히는 이유(코드리뷰 반영, 2차) — error.params 는 문서상
+     * "문구의 치환값"(인터페이스정의서 :157)이라, 문구가 쓰지 않는 키를 모든 오류에 얹으면
+     * 응답 계약이 문서 예시(:143~148)와 달라진다. enum 동일성(COMMON_500)으로 좁히면
+     * 같은 문구 키를 공유하는 AUDT_001 이 빠진다(FgcErrorCode :197·:229) — 그래서
+     * messageKey 기준으로 판정한다. 이 전제는 GlobalExceptionHandlerTest 의
+     * requestIdPlaceholderIsOnlyUsedByInternalMessage(properties 스캔)와
+     * fillsRequestIdForEveryErrorCodeUsingTheInternalMessage(enum 전수)가 지킨다.
+     * 호출부가 이미 requestId 를 넣었으면 그대로 둔다.
+     */
+    private Map<String, Object> withRequestId(FgcErrorCode errorCode, Map<String, Object> params) {
+        if (!INTERNAL_MESSAGE_KEY.equals(errorCode.getMessageKey())) {
+            return params;
+        }
+        if (params != null && params.containsKey("requestId")) {
+            return params;
+        }
+        Map<String, Object> merged = new LinkedHashMap<>(params == null ? Map.of() : params);
+        merged.put("requestId", RequestIdContext.current());
+        return merged;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -164,18 +193,12 @@ public class GlobalExceptionHandler {
                 exception
         );
 
-        Map<String, Object> params =
-                errorCode == FgcErrorCode.COMMON_500
-                        ? Map.of(
-                        "requestId",
-                        RequestIdContext.current()
-                )
-                        : Map.of();
-
+        // withRequestId 와 같은 messageKey 기준 판정을 재사용한다 (3차 리뷰 반영) —
+        // resolver 매핑이 AUDT_001 같은 internal 문구 공유 코드로 확장돼도 이 경로가 놓치지 않는다.
         ApiError apiError = createApiError(
                 errorCode,
                 null,
-                params,
+                withRequestId(errorCode, Map.of()),
                 productionDetail(exception.getMostSpecificCause().getMessage())
         );
 

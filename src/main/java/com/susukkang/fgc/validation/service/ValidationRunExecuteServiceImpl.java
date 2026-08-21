@@ -27,7 +27,7 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
     public ValidationRunRow execute(Long validationRunId, Long executedBy, String requestId) {
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
         if (row == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004);
+            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
         }
         if (ValidationRunStatus.FINALIZED.name().equals(row.getStatus())) {
             // "수정 불가 — 확정된 검증 결과입니다. 새 실행을 만드세요." (§3-2)

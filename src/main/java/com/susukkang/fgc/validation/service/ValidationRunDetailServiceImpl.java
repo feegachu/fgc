@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +33,7 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
     public ValidationRunDetailResponse detail(Long validationRunId) {
         ValidationRunListRow header = validationRunDetailMapper.findHeaderById(validationRunId);
         if (header == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004);
+            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
         }
 
         List<ValidationTargetItemResponse> targets =
@@ -81,7 +82,7 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
     public ValidationRunProgressResponse progress(Long validationRunId) {
         ValidationRunRow row = validationRunMapper.findById(validationRunId);
         if (row == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004);
+            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
         }
         return ValidationRunProgressResponse.from(row);
     }
