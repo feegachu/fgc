@@ -229,11 +229,18 @@ class ValidationRunMapperIntegrationTest {
 
     @Test
     // 조건에 맞는 실행이 없으면 빈 리스트(에러 아님).
-    // "아무 실행도 없는 월"이어야 하므로 다른 테스트가 커밋해 두는 월을 쓰면 안 된다 —
-    // 2099-01은 ReconciliationRunIntegrationTest가 실제로 커밋하는 월이라 실행 순서에 따라
-    // 비어 있지 않을 수 있었다(CI 2026-08-19 bee042b4). 아무도 안 쓰는 월로 옮긴다.
+    // "아무도 안 쓰는 월" 상수는 다른 테스트가 그 월을 쓰기 시작하면 또 깨진다 —
+    // 2099-01(ReconciliationRunIntegrationTest 커밋 월)에서 한 번(CI 2026-08-19 bee042b4),
+    // 2094-01로 옮긴 뒤에도 재발했다(#333 CI, 문서만 바뀐 커밋에서 실패). 공유 DB에
+    // 트랜잭션 없이 커밋하는 테스트가 존재하는 한 상수는 전부 시한부다.
+    // 상수 대신 실행 시점의 DB 최댓값에서 100년 뒤 월을 쓴다 — 무엇이 커밋돼 있어도 항상 빈 월이다.
     void searchReturnsEmptyListWhenNoMatch() {
-        List<ValidationRunListRow> rows = validationRunMapper.search(LocalDate.of(2094, 1, 1), null, 0, 20);
+        LocalDate maxMonth = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(validation_month), DATE '2026-01-01') FROM fgc.validation_run",
+                LocalDate.class);
+        LocalDate unusedMonth = maxMonth.plusYears(100).withDayOfMonth(1);
+
+        List<ValidationRunListRow> rows = validationRunMapper.search(unusedMonth, null, 0, 20);
 
         assertThat(rows).isEmpty();
     }

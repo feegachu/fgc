@@ -32,6 +32,10 @@ if (typeof module !== "undefined" && module.exports) {
   var format = window.FgcUi && window.FgcUi.format;
   var form = document.querySelector("[data-transaction-filter-form]");
   var body = document.getElementById("list-body");
+  /* COMPLIANCE 는 조회 전용 — 처리 버튼을 만들지 않는다 (화면정의서 4-1, #255 F-09).
+     서버(ShellAdvice.canProcess)가 판정한 값을 표의 data 속성으로 받는다. CONT-W01 의
+     신규 등록 버튼(th:if="${canProcess}")과 같은 기준이다. */
+  var canProcess = !!(body && body.closest("table") && body.closest("table").dataset.canProcess === "true");
   var pagination = document.querySelector("[data-transaction-pagination]");
   var previousButton = document.querySelector("[data-transaction-page-prev]");
   var nextButton = document.querySelector("[data-transaction-page-next]");
@@ -175,6 +179,8 @@ if (typeof module !== "undefined" && module.exports) {
       appendCell(row, format.month(item.settlementMonth));
       appendDisclosureCell(row, item.recipientAgentName || "-");
       appendDisclosureCell(row, item.commissionItemName || item.commissionItemCode);
+      /* amount 는 CHECK(amount >= 0) — 방향은 cashflow_type 배지가 표시한다 (화면정의서 :697).
+         음수 빨강은 구조적으로 음수가 가능한 필드(차액·잔여 등)에만 붙인다. */
       appendCell(row, format.won(item.amount), "is-number tabular-nums");
       appendBadgeCell(row, item.cashflowTypeLabel || item.cashflowType, cashflowBadge(item.cashflowType));
       appendBadgeCell(row, item.statusLabel || item.status, statusBadge(item.status));
@@ -203,12 +209,24 @@ if (typeof module !== "undefined" && module.exports) {
   function appendActionCell(row, item) {
     var cell = document.createElement("td");
     if (item.status === "DRAFT") {
-      var link = document.createElement("a");
-      link.className = "button button-ghost";
-      link.href = "/transactions/new?id=" + encodeURIComponent(item.commissionTransactionId);
-      link.textContent = "수정";
-      link.setAttribute("aria-label", (item.sourceBusinessKey || "선택한 지급 건") + " 수정");
-      cell.appendChild(link);
+      if (canProcess) {
+        var link = document.createElement("a");
+        link.className = "button button-ghost";
+        link.href = "/transactions/new?id=" + encodeURIComponent(item.commissionTransactionId);
+        link.textContent = "수정";
+        link.setAttribute("aria-label", (item.sourceBusinessKey || "선택한 지급 건") + " 수정");
+        cell.appendChild(link);
+      } else {
+        /* COMPLIANCE 는 조회 전용 — 처리 버튼은 회색으로 남긴다 (화면정의서 4-1 "모든 처리 버튼이 회색",
+           contract/detail·reco/list 등의 th:disabled=${!canProcess} 패턴과 동일. 리뷰 반영: 숨김→비활성). */
+        var disabledButton = document.createElement("button");
+        disabledButton.type = "button";
+        disabledButton.className = "button button-ghost";
+        disabledButton.disabled = true;
+        disabledButton.textContent = "수정";
+        disabledButton.setAttribute("aria-label", (item.sourceBusinessKey || "선택한 지급 건") + " 수정 (조회 전용 권한)");
+        cell.appendChild(disabledButton);
+      }
     } else {
       cell.textContent = "-";
     }
