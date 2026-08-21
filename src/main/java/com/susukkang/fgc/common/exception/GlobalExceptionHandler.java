@@ -74,7 +74,7 @@ public class GlobalExceptionHandler {
         ApiError apiError = createApiError(
                 errorCode,
                 exception.getField(),
-                withRequestId(exception.getParams()),
+                withRequestId(errorCode, exception.getParams()),
                 productionDetail(exception.getDetail())
         );
 
@@ -84,12 +84,21 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * {requestId} 자리표시자를 쓰는 문구(COMMON_500 등)가 호출부의 파라미터 누락으로
+     * {requestId} 자리표시자를 쓰는 문구가 호출부의 파라미터 누락으로
      * "요청번호 {requestId}를…" 원문 그대로 노출되지 않게 기본값을 주입한다 (QA-07 · #259).
-     * 호출부가 이미 requestId 를 넣었으면 그대로 둔다. {requestId} 가 없는 문구에는
-     * 남는 파라미터일 뿐이라 무해하다.
+     *
+     * COMMON_500 에만 주입하는 이유(코드리뷰 반영) — error.params 는 문서상 "문구의
+     * 치환값"(인터페이스정의서 :157)이라, 문구가 쓰지 않는 키를 모든 오류에 얹으면
+     * 응답 계약이 문서 예시(:143~148)와 달라진다. 현재 {requestId} 를 쓰는 문구는
+     * error.common.internal(COMMON_500) 하나뿐이며, 이 전제는
+     * GlobalExceptionHandlerTest.requestIdPlaceholderIsOnlyUsedByCommon500 이 지킨다 —
+     * 새 문구가 {requestId} 를 쓰기 시작하면 그 테스트가 깨져 이 목록을 갱신하게 된다.
+     * 호출부가 이미 requestId 를 넣었으면 그대로 둔다.
      */
-    private Map<String, Object> withRequestId(Map<String, Object> params) {
+    private Map<String, Object> withRequestId(FgcErrorCode errorCode, Map<String, Object> params) {
+        if (errorCode != FgcErrorCode.COMMON_500) {
+            return params;
+        }
         if (params != null && params.containsKey("requestId")) {
             return params;
         }

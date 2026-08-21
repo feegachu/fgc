@@ -75,6 +75,35 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().error().message()).contains("CALLER-SET");
     }
 
+    // 주입 범위를 COMMON_500 으로 좁힌 전제(리뷰 반영)를 지키는 가드 —
+    // messages.properties 에서 {requestId} 를 쓰는 문구가 늘어나면 여기가 깨져
+    // withRequestId 의 대상 목록을 함께 갱신하게 된다.
+    @Test
+    void requestIdPlaceholderIsOnlyUsedByCommon500() throws Exception {
+        java.util.Properties messages = new java.util.Properties();
+        try (java.io.InputStreamReader reader = new java.io.InputStreamReader(
+                getClass().getResourceAsStream("/messages.properties"),
+                java.nio.charset.StandardCharsets.UTF_8)) {
+            messages.load(reader);
+        }
+        java.util.List<String> usingRequestId = messages.stringPropertyNames().stream()
+                .filter(key -> messages.getProperty(key).contains("{requestId}"))
+                .sorted()
+                .toList();
+        assertThat(usingRequestId).containsExactly("error.common.internal");
+    }
+
+    @Test
+    void doesNotInjectRequestIdIntoOtherErrorCodesParams() {
+        ResponseEntity<ApiResponse<Void>> response = handler()
+                .handleBusinessException(new FgcBusinessException(
+                        FgcErrorCode.COMMON_004,
+                        Map.of("id", 7L)
+                ));
+
+        assertThat(response.getBody().error().params()).doesNotContainKey("requestId");
+    }
+
     @Test
     void notFoundMessageResolvesIdPlaceholderWhenProvided() {
         ResponseEntity<ApiResponse<Void>> response = handler()
