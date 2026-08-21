@@ -20,6 +20,7 @@ public record ExceptionCaseSearchRow(
         String assigneeLoginId,
         String sourceEntityType,
         String sourceEntityId,
+        Long capCheckId,
         String reconciliationResultType,
         LocalDate validationMonth,
         Long firstDetectedRunId,

@@ -134,6 +134,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
                 .validationRunId(command.validationRunId())
                 .contractId(command.contractId())
                 .agentId(command.agentId())
+                .capCheckId(command.capCheckId())
                 .policyVersionId(command.policyVersionId())
                 .paymentId(command.paymentId())
                 .title(title)

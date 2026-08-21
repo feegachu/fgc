@@ -27,6 +27,7 @@ public class CapExceptionInsertDTO {
     private Long agentId;                 // 관련 설계사 ID
     private Long policyVersionId;         // 적용 정책 버전 ID
     private Long paymentId;               // 관련 지급 건 ID
+    private Long capCheckId;              // 판정 근거가 된 cap_check (#331 — 예외에서 계산근거로 이동)
     private String title;                 // 예외 제목
     private String description;           // 예외 상세 및 계산 근거
 }
