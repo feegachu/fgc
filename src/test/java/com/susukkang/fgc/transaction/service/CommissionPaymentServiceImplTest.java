@@ -12,6 +12,7 @@ import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -751,6 +752,76 @@ class CommissionPaymentServiceImplTest {
         verify(mapper).insertExceptionCase(captor.capture());
         assertThat(captor.getValue().getExceptionType()).isEqualTo("DATA_QUALITY");
         verify(capCalculator, never()).calculate(any());
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    /*
+     * FGC-FUN-033·FGC-FUN-034 / REG-08 (#257) — 룰셋은 있으나 그 수수료 항목의 산입 기준이 없는 경우.
+     * 기존 코드: exceptionType 으로 "CAP_ITEM_UNCLASSIFIED" 를 썼다.
+     * 문제: ExceptionType enum 에도 exception_case_exception_type_check 제약에도 없는 값이라
+     *      saveException 이 CHECK 제약 위반으로 실패하고, DataIntegrityViolationException 은
+     *      noRollbackFor 대상이 아니라 트랜잭션이 통째로 롤백되며 500 이 난다 —
+     *      "기록 후 거부" 계약이 깨진다. 룰셋마다 미분류 항목이 실재해 도달 가능하다
+     *      (RECOVERY, LONG_TERM_MAINTENANCE).
+     * 개선: 유효한 CAP_REVIEW_REQUIRED 로 기록하고 구체적 사유는 reasonCode 로 남긴다.
+     */
+    /*
+     * FGC-FUN-034 / REG-21 (#257) — 신인비계약 귀속행의 지원 적격성 확인 필요.
+     * 기존 코드: exceptionType 으로 "NEWCOMER_SUPPORT_REVIEW" 를 썼다.
+     * 문제: ExceptionType enum 에도 exception_case_exception_type_check 제약에도 없어
+     *      saveException 이 CHECK 제약 위반으로 실패하고 트랜잭션이 통째로 롤백되며 500 이 났다.
+     *      CAP_ITEM_UNCLASSIFIED 와 같은 클래스의 버그다.
+     * 개선: 확정 게이트의 CAP_002 로 올라오는 판정이므로 CAP_REVIEW_REQUIRED 로 기록하고
+     *      구체적 사유는 reasonCode 로 남긴다. GateFailure.exceptionType 을 enum 으로 바꿔
+     *      이제 무효한 값은 컴파일 자체가 되지 않는다.
+     */
+    @Test
+    void recordsNewcomerSupportReviewWithValidExceptionType() {
+        ConfirmationData newcomer = confirmation(
+                201L, null, "500000", "500000", InclusionDecisionStatus.EXCLUDED,
+                ExclusionType.NEW_AGENT_SUPPORT, AttributionMethod.NEWCOMER_NON_CONTRACT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
+        given(mapper.existsEligibleNewcomerSupportAgent(any(), any())).willReturn(false);
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.CAP_002));
+
+        ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
+                ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
+        verify(mapper).insertExceptionCase(captor.capture());
+        // DB CHECK 제약이 허용하는 값이어야 한다 — 문자열이 아니라 enum 으로 검증한다.
+        assertThat(ExceptionType.valueOf(captor.getValue().getExceptionType()))
+                .isEqualTo(ExceptionType.CAP_REVIEW_REQUIRED);
+        assertThat(captor.getValue().getReasonCode()).isEqualTo("NEWCOMER_SUPPORT_REVIEW");
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
+    @Test
+    void recordsUnclassifiedCapItemAsReviewRequiredWithReasonCode() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "10000", "10000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        // 룰셋은 있는데(exists=true) 그 항목의 룰이 없다(snapshot=null) — 미분류 경로
+        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(null);
+        given(mapper.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.CAP_002));
+
+        ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
+                ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
+        verify(mapper).insertExceptionCase(captor.capture());
+        // DB CHECK 제약이 허용하는 값이어야 한다 — 문자열 비교가 아니라 enum 으로 검증한다.
+        assertThat(ExceptionType.valueOf(captor.getValue().getExceptionType()))
+                .isEqualTo(ExceptionType.CAP_REVIEW_REQUIRED);
+        assertThat(captor.getValue().getReasonCode()).isEqualTo("CAP_ITEM_UNCLASSIFIED");
         verify(mapper, never()).confirm(any(), any(), any());
     }
 

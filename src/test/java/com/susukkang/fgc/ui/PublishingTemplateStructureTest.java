@@ -394,10 +394,14 @@ class PublishingTemplateStructureTest {
                 .contains("id=\"err-attributions\"")
                 // 게이트 패널 제목은 화면정의서 :718 "위 6단계" 와 제31조를 그대로 인용한다.
                 .contains("확정 게이트 6단계")
-                // 내려줄 ID 가 없어 영구히 hidden 이던 링크는 두지 않는다.
+                /*
+                 * FGC-FUN-034(한도 예외 생성)·FGC-FUN-052(예외함) / REG-08 — 확정 거부 후 후속 동선(#257).
+                 * ID 링크는 여전히 만들 수 없다 — 미리보기는 capCheckId 를 내려주지 않고
+                 * 확정 실패 응답에도 exceptionCaseId 가 없다.
+                 * 대신 EXCP-W01 이 이미 받는 검색조건(type·contractNo)으로 연다.
+                 */
+                .contains("id=\"transaction-confirm-followup\"")
                 .doesNotContain("transaction-confirm-links")
-                .doesNotContain("계산근거 보기")
-                .doesNotContain("예외함으로 이동")
                 .doesNotContain("page-description")
                 .doesNotContain("fgc-page-desc")
                 .doesNotContain("style=")
@@ -434,6 +438,43 @@ class PublishingTemplateStructureTest {
                 .contains("idempotencyKey: \"TRAN-CONFIRM-\" + paymentId")
                 .contains("var GATES = [")
                 .contains("renderGates([], null)")
+                /*
+                 * FGC-FUN-033(1,200% 사전검증)·FGC-FUN-034(한도 예외 생성) / REG-08(초년도 1,200%) — #257.
+                 * 규제 판정 차단(FGC-CAP-001·002)은 확정 요청이 서버에 닿아야
+                 * cap_check 과 exception_case 가 남는다. 화면이 요청을 막으면 위반 이력이
+                 * 영구히 생기지 않아 DASH-W01 위반 KPI 가 항상 0 이 된다.
+                 * 입력 오류(FGC-TRAN-*)는 여기 넣지 않는다 — 보내면 DATA_QUALITY 예외만 쌓인다.
+                 *
+                 * 한도·초년도 경계값 자체는 여기서 검사하지 않는다 — 이 테스트는 소스 문자열
+                 * 구조만 본다. 경계는 실 DB 통합테스트가 검증한다:
+                 * CapIncludedAmountMapperIntegrationTest(계약일+1년-1일 포함 / +1년 제외),
+                 * CapCheckMapperIntegrationTest(1주년 당일 집계 제외).
+                 */
+                .contains("var RECORDABLE_BLOCKER_CODES = [\"FGC-CAP-001\", \"FGC-CAP-002\"]")
+                .contains("hasRecordableBlocker(lastPrecheckResult)")
+                /*
+                 * confirm 은 failFirst 로 첫 사유 하나만 기록·거부하므로 화면도 blockers[0] 만 본다.
+                 * "하나라도" 로 보면 TRAN_002 + CAP_002 가 함께 실리는 행에서
+                 * (attributionFailures, contractId 누락) 화면 안내와 실제 기록이 어긋난다.
+                 */
+                .contains("RECORDABLE_BLOCKER_CODES.indexOf(blockers[0].code) >= 0")
+                .doesNotContain("(result.blockers || []).some(")
+                .contains("확정 시도 · 예외 등록")
+                /*
+                 * 후속 링크의 계약은 blockers[] 에서 뽑아야 한다 — capPreview 가 아니다.
+                 * precheck 는 rule == null(미분류) 귀속행을 capPreview 에 넣지 않고 건너뛰므로
+                 * (CommissionPaymentServiceImpl:330), capPreview 기준으로 고르면 미분류가 유일한
+                 * 차단 사유일 때 링크가 사라지고 다중 귀속행일 때 다른 계약을 가리킨다.
+                 */
+                .contains("renderFollowUpLinks(blockedContractNo(lastPrecheckResult, error.code)")
+                /*
+                 * 인터페이스정의서 :219-220 — 두 코드의 "사용자가 할 일" 이 다르다.
+                 * CAP-001 은 예외함, CAP-002 는 귀속행 판정 확정이 주 동선이다.
+                 */
+                .contains("귀속행 판정 다시 확인")
+                .contains("예외함에서 처리하기")
+                .contains("RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0")
+                .doesNotContain("(result.capPreview || []).filter")
                 /*
                  * 확정 게이트는 화면정의서 :710-718 · 운영정책서 제31조의 6단계 그대로다.
                  * 문서에 없는 게이트(차익거래·업무키)를 만들어 넣지 않는다 —

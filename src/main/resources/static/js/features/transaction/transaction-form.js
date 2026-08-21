@@ -31,6 +31,19 @@
    * 6단계는 검사가 아니라 "앞 단계를 전부 통과하면 확정" 이라는 결과다 —
    * 앞의 어느 게이트에도 속하지 않는 차단 사유(증빙 누락·정책버전 없음 등)를 여기서 받는다.
    */
+  /*
+   * 서버가 "거부하면서 기록하는" 차단 사유 — 확정 요청이 서버에 닿아야만
+   * cap_check(VIOLATION·REVIEW_REQUIRED) 와 exception_case 가 남는다.
+   * IF-API-24 사전검증은 아무것도 저장하지 않으므로(TransactionPrecheckResponse)
+   * 이 코드들에서 확정 요청을 막아 버리면 위반 이력이 영구히 생기지 않는다 —
+   * 화면정의서 TRAN-W02 :771 "한도 초과인데 확정 → 서버가 거부 + 예외 자동 생성",
+   * CommissionPaymentServiceImpl 의 insertCapCheck → createIfNecessary → failFirst 순서와
+   * @Transactional(noRollbackFor = ...Rejected) 가 이 동작을 보장한다.
+   * 확정을 허용하는 게 아니라 "서버 판정을 받으러 보내는" 것이며 상태는 DRAFT 그대로다.
+   * 입력 오류(FGC-TRAN-*)는 여기 넣지 않는다 — 보내 봐야 DATA_QUALITY 예외만 쌓인다.
+   */
+  var RECORDABLE_BLOCKER_CODES = ["FGC-CAP-001", "FGC-CAP-002"];
+
   var GATES = [
     { label: "작성중(DRAFT) 저장", codes: ["FGC-TRAN-005"] },
     { label: "귀속행 입력", codes: ["FGC-TRAN-002"] },
@@ -60,6 +73,7 @@
   var confirmSubmitButton = document.getElementById("btn-confirm-submit");
   var confirmSummary = document.getElementById("transaction-confirm-summary");
   var confirmBlockers = document.getElementById("transaction-confirm-blockers");
+  var confirmFollowUp = document.getElementById("transaction-confirm-followup");
   var canProcess = !saveButton.disabled;
   var previousPaymentStage = stage.value;
 
@@ -668,6 +682,61 @@
     modal.open("transaction-confirm");
   }
 
+  /**
+   * 서버가 실제로 던질 차단 사유가 기록 대상인가 — RECORDABLE_BLOCKER_CODES 주석 참고.
+   *
+   * "하나라도 있으면" 이 아니라 **첫 번째만** 본다. confirm 은 failFirst 로 게이트 순서상
+   * 먼저 걸리는 사유 하나만 기록·거부한다. precheck 의 수집 순서는 confirm 의 평가 순서와
+   * 같으므로(hasUnresolvedViolation → requiredValueFailures → 귀속행 루프의
+   * attributionFailures → newcomer → capRule → ruleConsistency → capResult)
+   * blockers[0] 이 곧 confirm 이 던질 코드다.
+   *
+   * 실제로 어긋나는 경우가 있다 — 계약 귀속행에 contractId 가 없으면 attributionFailures 가
+   * 같은 행에 TRAN_002 와 CAP_002 를 함께 넣는다(CommissionPaymentServiceImpl:1161-1185).
+   * confirm 은 TRAN_002 를 던져 DATA_QUALITY 를 기록하는데, "하나라도" 로 보면 화면은
+   * 1,200% 판정이 기록된다고 안내하게 된다.
+   */
+  function hasRecordableBlocker(result) {
+    var blockers = result.blockers || [];
+    return blockers.length > 0
+      && RECORDABLE_BLOCKER_CODES.indexOf(blockers[0].code) >= 0;
+  }
+
+  /*
+   * 후속 링크가 가리킬 계약 — 서버가 실제로 거부한 그 귀속행의 계약이어야 한다.
+   *
+   * capPreview 에서 찾으면 안 된다. precheck 는 rule == null(룰셋은 있으나 그 항목의 산입
+   * 기준이 없는 미분류 경로) 귀속행을 capPreview 에 넣지 않고 건너뛴다
+   * (CommissionPaymentServiceImpl:330 `if (rule == null) { continue; }`) — 차단 사유는
+   * blockers[] 에만 실린다. 그래서 capPreview 기준으로 고르면
+   *  - 미분류가 유일한 차단 사유일 때 capPreview 가 비어 링크가 통째로 사라지고,
+   *  - 다중 귀속행일 때 confirm 이 먼저 막히는 행(attribution_seq 순, failFirst)과
+   *    다른 계약을 가리킬 수 있다.
+   * Blocker 는 contractId 를 그대로 실어 오므로(TransactionPrecheckResponse.Blocker) 그것을 쓴다.
+   *
+   * errorCode 를 주면 서버가 실제로 던진 그 코드의 blocker 를 우선한다 — 확정 거부 응답의
+   * 코드가 곧 confirm 이 멈춘 지점이라 가장 정확하다.
+   */
+  function blockedContractNo(result, errorCode) {
+    var blockers = (result.blockers || []).filter(function (blocker) {
+      return blocker.contractId != null
+        && RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0;
+    });
+    if (!blockers.length) return null;
+    var matched = errorCode
+      ? blockers.filter(function (blocker) { return blocker.code === errorCode; })
+      : [];
+    var target = matched.length ? matched[0] : blockers[0];
+    return contractNoById(target.contractId);
+  }
+
+  function contractNoById(contractId) {
+    var found = contracts.filter(function (contract) {
+      return String(contract.contractId) === String(contractId);
+    });
+    return found.length ? found[0].contractNo : null;
+  }
+
   function prepareConfirmation(result) {
     clear(confirmSummary);
     confirmSummary.appendChild(summaryLine("업무키", bizKey.value || "-"));
@@ -681,22 +750,88 @@
       confirmBlockers.appendChild(textElement("p", (blocker.code ? blocker.code + " · " : "") + (blocker.message || "확정 차단 사유를 확인하세요.")));
     });
     confirmBlockers.hidden = blockers.length === 0;
-    confirmSubmitButton.hidden = result.confirmable !== true;
-    confirmSubmitButton.disabled = result.confirmable !== true;
+
+    /*
+     * 확정 가능하면 그대로 확정한다. 확정은 불가하지만 서버가 기록해야 하는 규제 판정이면
+     * "확정 시도" 로 보낸다 — 확정되지 않고 DRAFT 로 남으며, 서버가 위반을 기록하고 예외를 만든다.
+     * 규제 위반을 승인으로 넘기는 버튼이 아니다(화면정의서 TRAN-W02 "관리자 권한으로 강제 통과 —
+     * 그런 버튼을 만들지 않습니다"). 입력 오류는 화면에서 고쳐야 하므로 여전히 숨긴다.
+     */
+    var recordable = result.confirmable !== true && hasRecordableBlocker(result);
+    confirmSubmitButton.hidden = result.confirmable !== true && !recordable;
+    confirmSubmitButton.disabled = confirmSubmitButton.hidden;
+    setButtonLabel(confirmSubmitButton, recordable ? "확정 시도 · 예외 등록" : "확정 실행");
+
+    clear(confirmFollowUp);
+    if (recordable) {
+      var notice = textElement("p", "확정되지 않습니다. 서버가 이 판정을 기록하고 예외함에 등록한 뒤 확정을 거부합니다. 지급 건은 작성중으로 남습니다.");
+      notice.className = "transaction-confirm-notice";
+      confirmFollowUp.appendChild(notice);
+    }
+    confirmFollowUp.hidden = !confirmFollowUp.childElementCount;
+  }
+
+  /**
+   * 확정이 거부되어 판정이 기록된 뒤의 후속 동선 — 예외함(EXCP-W01).
+   * 확정 실패 응답에는 cap_check·exception_case ID 가 없으므로(응답 계약상 문구 치환값만 온다)
+   * EXCP-W01 이 이미 지원하는 검색조건(type·contractNo)으로 그 건까지 좁혀 보낸다.
+   *
+   * CAP-W01(계산근거) 링크는 두지 않는다 — 확정 거절된 DRAFT 후보의 cap_check 는
+   * CapCheckMapper.latestScopedCapChecks 가 candidate_transaction_id 조건으로 목록에서
+   * 제외하므로(계약의 현재 판정을 덮어쓰지 않게 하려는 의도) 링크를 걸면 빈 목록으로 보내게 된다.
+   * 같은 행을 DashboardMapper 는 세고 CAP-W01 은 세지 않아 위반 KPI 와 CAP-W01 건수가
+   * 어긋나는 문제(화면정의서 :402 "클릭하면 CAP-W01 위반 필터")가 별도로 있으며,
+   * 그 판단이 정리된 뒤에 이 링크를 추가한다.
+   */
+  function renderFollowUpLinks(contractNo, reviewRequired) {
+    if (!contractNo) return;
+    var excParams = new URLSearchParams({
+      type: reviewRequired ? "CAP_REVIEW_REQUIRED" : "CAP_VIOLATION",
+      contractNo: contractNo
+    });
+
+    var actions = document.createElement("div");
+    actions.className = "transaction-confirm-followup-actions";
+    /*
+     * 두 코드는 "사용자가 할 일" 이 다르다 — 인터페이스정의서 :219-220 오류코드 대조표.
+     *   FGC-CAP-001 → 예외함으로 이동   (한도 초과는 감액·정정·취소라 예외함 일이다)
+     *   FGC-CAP-002 → 귀속행 판정 확정  (검토필요는 산입 판정을 고치면 풀린다)
+     * 같은 표의 "화면 문구" 열은 CAP-002 도 "예외함에서 먼저 처리하세요" 라 두 열이 어긋나는데,
+     * 예외는 실제로 기록되므로 예외함 링크를 없애지 않고 주 동선만 귀속행 쪽으로 둔다.
+     * 초안은 저장 시 잠기므로(lockDraftInputs) 편집하려면 다시 열어야 한다 — 그 링크를 준다.
+     */
+    if (reviewRequired) {
+      actions.appendChild(followUpLink(
+        "귀속행 판정 다시 확인",
+        "/transactions/new?id=" + encodeURIComponent(paymentId)
+      ));
+    }
+    actions.appendChild(followUpLink("예외함에서 처리하기", "/exceptions?" + excParams.toString()));
+    confirmFollowUp.appendChild(actions);
+    confirmFollowUp.hidden = false;
+  }
+
+  function followUpLink(label, href) {
+    var link = document.createElement("a");
+    link.className = "button button-secondary";
+    link.href = href;
+    link.textContent = label;
+    return link;
   }
 
   /*
-   * 계산근거·예외함 링크는 두지 않는다 — 내려줄 ID 가 없다.
-   * IF-API-24 는 아무것도 저장하지 않는 미리보기라 CapPreviewItem.capCheckId 는 항상 null 이고
-   * (TransactionPrecheckResponse 주석), 응답에 exceptionCaseId 자체가 없다.
-   * 확정 실패 응답의 params 도 문구 치환값(a·b·c)만 담아 링크용 ID 가 오지 않는다.
-   * 세 경로 모두 막혀 있어 버튼은 영구히 hidden 이었다 —
-   * "API 없는 기능을 동작하는 것처럼 만들지 않는다"(이슈 #283).
-   * 확정 경로에서 cap_check·exception_case ID 를 내려주게 되면 그때 별도 이슈로 되살린다.
+   * 계산근거·예외함 링크는 ID 대신 검색조건으로 연다(#257).
+   * IF-API-24 미리보기는 아무것도 저장하지 않아 capCheckId 가 항상 null 이고 확정 실패 응답에도
+   * exceptionCaseId 가 없다 — 그래서 ID 링크는 여전히 만들 수 없다. 대신 CAP-W01 은
+   * contractNo·status·month 를, EXCP-W01 은 type·contractNo 를 이미 검색조건으로 받으므로
+   * (cap-list.js queryFromLocation · ExceptionCaseSearchDTO) 그 건까지 좁혀 보낸다.
+   * 없는 API 를 있는 척하는 게 아니라 있는 API 로 여는 것이라 #283 원칙과 어긋나지 않는다.
+   * 링크는 서버가 실제로 판정을 기록한 뒤(확정 거부 응답)에만 노출한다.
    */
 
   function confirmPayment() {
-    if (!paymentId || !lastPrecheckResult || lastPrecheckResult.confirmable !== true) return;
+    if (!paymentId || !lastPrecheckResult) return;
+    if (lastPrecheckResult.confirmable !== true && !hasRecordableBlocker(lastPrecheckResult)) return;
     confirmSubmitButton.disabled = true;
     confirmButton.disabled = true;
     main.setAttribute("aria-busy", "true");
@@ -719,6 +854,16 @@
         capPreview: []
       };
       prepareConfirmation(failedResult);
+      /*
+       * 서버가 판정을 기록하고 거부한 경우에만 후속 동선을 연다 — 이 시점에는
+       * cap_check 과 exception_case 가 실제로 존재하므로 빈 화면으로 보내지 않는다.
+       * 재시도는 의미가 없다(같은 판정 + 미해결 위반 게이트 FGC-CAP-003 에 걸린다).
+       */
+      if (RECORDABLE_BLOCKER_CODES.indexOf(error.code) >= 0) {
+        renderFollowUpLinks(blockedContractNo(lastPrecheckResult, error.code), error.code === "FGC-CAP-002");
+        confirmSubmitButton.hidden = true;
+        confirmSubmitButton.disabled = true;
+      }
       precheckButton.disabled = !canProcess;
     }).finally(function () {
       main.setAttribute("aria-busy", "false");
