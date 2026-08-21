@@ -49,6 +49,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -316,6 +317,7 @@ class ContractControllerTest {
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
@@ -337,6 +339,7 @@ class ContractControllerTest {
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -351,6 +354,7 @@ class ContractControllerTest {
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -366,6 +370,7 @@ class ContractControllerTest {
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("admin").roles("SYSTEM_ADMIN"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
@@ -387,6 +392,7 @@ class ContractControllerTest {
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("admin").roles("SYSTEM_ADMIN"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
@@ -406,6 +412,7 @@ class ContractControllerTest {
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
@@ -453,6 +460,7 @@ class ContractControllerTest {
     void createContractRejectsNonSettlementUser() throws Exception {
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("admin").roles("GA_ADMIN"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 createRequest()
@@ -465,6 +473,7 @@ class ContractControllerTest {
     void updateContractRejectsNonSettlementUser() throws Exception {
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("admin").roles("GA_ADMIN"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 updateRequest()
@@ -482,6 +491,7 @@ class ContractControllerTest {
     void createContractRejectsComplianceUser() throws Exception {
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("comp01").roles("COMPLIANCE"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 createRequest()
@@ -496,6 +506,7 @@ class ContractControllerTest {
     void updateContractRejectsComplianceUser() throws Exception {
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("comp01").roles("COMPLIANCE"))
+                        .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 updateRequest()

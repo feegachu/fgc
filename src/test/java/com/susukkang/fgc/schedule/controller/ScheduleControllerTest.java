@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -125,7 +126,7 @@ class ScheduleControllerTest {
         );
 
         mockMvc.perform(post("/api/v1/schedules/{id}/confirm", 10L)
-                        .with(user("settlement").roles("SETTLEMENT")))
+                        .with(user("settlement").roles("SETTLEMENT")).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.header.scheduleHeaderId").value(10))
                 .andExpect(jsonPath("$.data.header.status").value("CONFIRMED"))
@@ -147,7 +148,7 @@ class ScheduleControllerTest {
     void regeneratesScheduleWithReason() throws Exception {
         when(scheduleService.regenerateSchedules(10L, "정책 변경 반영")).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).versionNo(2L).build());
 
-        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).with(csrf()).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.scheduleHeaderId").value(11))
                 .andExpect(jsonPath("$.data.versionNo").value(2));
@@ -157,9 +158,9 @@ class ScheduleControllerTest {
 
     @Test
     void rejectsBlankOrTooLongReason() throws Exception {
-        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).contentType(APPLICATION_JSON).content("{\"reason\":\" \"}"))
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).with(csrf()).contentType(APPLICATION_JSON).content("{\"reason\":\" \"}"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).contentType(APPLICATION_JSON).content("{\"reason\":\"" + "가".repeat(41) + "\"}"))
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).with(csrf()).contentType(APPLICATION_JSON).content("{\"reason\":\"" + "가".repeat(41) + "\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -168,7 +169,7 @@ class ScheduleControllerTest {
         String reason = "가".repeat(40);
         when(scheduleService.regenerateSchedules(10L, reason)).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).versionNo(2L).build());
 
-        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).contentType(APPLICATION_JSON).content("{\"reason\":\"" + reason + "\"}"))
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("settlement").roles("SETTLEMENT")).with(csrf()).contentType(APPLICATION_JSON).content("{\"reason\":\"" + reason + "\"}"))
                 .andExpect(status().isOk());
 
         verify(scheduleService).regenerateSchedules(10L, reason);
@@ -192,7 +193,7 @@ class ScheduleControllerTest {
     void allowsRegenerationForSystemAdmin() throws Exception {
         when(scheduleService.regenerateSchedules(10L, "정책 변경 반영")).thenReturn(ScheduleRegenResponse.builder().scheduleHeaderId(11L).versionNo(2L).build());
 
-        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("admin").roles("SYSTEM_ADMIN")).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
+        mockMvc.perform(post("/api/v1/schedules/{id}/regenerate", 10L).with(user("admin").roles("SYSTEM_ADMIN")).with(csrf()).contentType(APPLICATION_JSON).content("{\"reason\":\"정책 변경 반영\"}"))
                 .andExpect(status().isOk());
     }
 

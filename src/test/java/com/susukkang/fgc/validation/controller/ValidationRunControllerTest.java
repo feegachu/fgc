@@ -39,6 +39,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -118,6 +119,7 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs")
                         .with(user(new FgcUserDetails(adminView, true, true)))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateValidationRunRequest("2026-08", "MONTHLY"))))
                 .andExpect(status().isCreated());
@@ -132,6 +134,7 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs")
                         .with(user(settlementPrincipal()))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -147,6 +150,7 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs")
                         .with(user("settle01").roles("SETTLEMENT"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -161,6 +165,7 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs")
                         .with(user("settle01").roles("SETTLEMENT"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -187,6 +192,7 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs")
                         .with(user("someone").roles("GA_ADMIN"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -199,6 +205,7 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs")
                         .with(user("comp01").roles("COMPLIANCE"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -214,6 +221,7 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs")
                         .with(user(settlementPrincipal()))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict());
@@ -242,7 +250,8 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
                         .header("Idempotency-Key", "finalize-100")
-                        .with(user(principal(4L, "admin", "SYSTEM_ADMIN"))))
+                        .with(user(principal(4L, "admin", "SYSTEM_ADMIN")))
+                        .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("FINALIZED"))
                 .andExpect(jsonPath("$.data.finalizedBy").value("admin"))
@@ -257,7 +266,8 @@ class ValidationRunControllerTest {
 
         mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
                         .header("Idempotency-Key", "ga-finalize-100")
-                        .with(user(principal(2L, "gaadmin", "GA_ADMIN"))))
+                        .with(user(principal(2L, "gaadmin", "GA_ADMIN")))
+                        .with(csrf()))
                 .andExpect(status().isOk());
     }
 
@@ -265,7 +275,8 @@ class ValidationRunControllerTest {
     void settlementCannotFinalize() throws Exception {
         mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
                         .header("Idempotency-Key", "finalize-100")
-                        .with(user(settlementPrincipal())))
+                        .with(user(settlementPrincipal()))
+                        .with(csrf()))
                 .andExpect(status().isForbidden());
 
         verify(validationRunFinalizationService, never())
@@ -279,7 +290,8 @@ class ValidationRunControllerTest {
                         "FINALIZED", OffsetDateTime.parse("2026-08-16T12:34:56+09:00"), "admin"));
 
         mockMvc.perform(post("/api/v1/validation-runs/100/finalize")
-                        .with(user(principal(4L, "admin", "SYSTEM_ADMIN"))))
+                        .with(user(principal(4L, "admin", "SYSTEM_ADMIN")))
+                        .with(csrf()))
                 .andExpect(status().isOk());
 
         verify(validationRunFinalizationService).finalizeRun(100L, 4L, null);
