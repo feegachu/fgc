@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
@@ -73,13 +74,28 @@ public class GlobalExceptionHandler {
         ApiError apiError = createApiError(
                 errorCode,
                 exception.getField(),
-                exception.getParams(),
+                withRequestId(exception.getParams()),
                 productionDetail(exception.getDetail())
         );
 
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ApiResponse.failure(apiError));
+    }
+
+    /**
+     * {requestId} 자리표시자를 쓰는 문구(COMMON_500 등)가 호출부의 파라미터 누락으로
+     * "요청번호 {requestId}를…" 원문 그대로 노출되지 않게 기본값을 주입한다 (QA-07 · #259).
+     * 호출부가 이미 requestId 를 넣었으면 그대로 둔다. {requestId} 가 없는 문구에는
+     * 남는 파라미터일 뿐이라 무해하다.
+     */
+    private Map<String, Object> withRequestId(Map<String, Object> params) {
+        if (params != null && params.containsKey("requestId")) {
+            return params;
+        }
+        Map<String, Object> merged = new LinkedHashMap<>(params == null ? Map.of() : params);
+        merged.put("requestId", RequestIdContext.current());
+        return merged;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

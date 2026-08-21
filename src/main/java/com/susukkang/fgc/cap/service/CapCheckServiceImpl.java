@@ -216,7 +216,7 @@ public class CapCheckServiceImpl implements CapCheckService {
             // "{}"로 조용히 넘기면 근거(계산 스냅샷) 없는 cap_check가 성공한 것처럼 저장된다.
             // calculateAndSave는 @Transactional이라 여기서 던지면 INSERT까지 통째로 롤백된다.
             throw new FgcBusinessException(FgcErrorCode.COMMON_500,
-                    Map.of("requestId", "calculation_snapshot 직렬화 실패: " + e.getMessage()));
+                    null, Map.of(), "calculation_snapshot 직렬화 실패: " + e.getMessage());
         }
     }
 
@@ -231,7 +231,7 @@ public class CapCheckServiceImpl implements CapCheckService {
             // 빈 맵으로 감추면 저장된 판정이 근거 없이 조회되는 것처럼 보인다 — 데이터가 깨졌다는
             // 사실을 그대로 드러내야 원인 파악이 된다.
             throw new FgcBusinessException(FgcErrorCode.COMMON_500,
-                    Map.of("requestId", "calculation_snapshot 역직렬화 실패: " + e.getMessage()));
+                    null, Map.of(), "calculation_snapshot 역직렬화 실패: " + e.getMessage());
         }
     }
 }

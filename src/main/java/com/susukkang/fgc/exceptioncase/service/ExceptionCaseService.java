@@ -213,7 +213,7 @@ public class ExceptionCaseService {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_004,
                     "exceptionCaseId",
-                    Map.of("field", "exceptionCaseId"),
+                    Map.of("field", "exceptionCaseId", "id", exceptionCaseId),
                     null
             );
         }

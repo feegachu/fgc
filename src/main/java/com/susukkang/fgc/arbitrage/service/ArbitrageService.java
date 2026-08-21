@@ -222,7 +222,7 @@ public class ArbitrageService {
         ArbitrageCalculationSource source =
                 arbitrageMapper.selectCalculationSource(contractId, request.getAsOfDate());
         if (source == null)
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("contractId", contractId));
+            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", contractId));
 
         // 확정 지급·차감 순액과 활성 스케줄의 남은 지급예정액 조회
         ConfirmedCommissionSummary confirmedCommission = arbitrageMapper.sumConfirmedCommissionAmount(

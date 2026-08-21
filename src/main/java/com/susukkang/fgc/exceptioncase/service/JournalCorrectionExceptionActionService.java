@@ -49,7 +49,7 @@ public class JournalCorrectionExceptionActionService {
                 .findJournalCorrectionTargetForUpdate(exceptionCaseId);
         if (target == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_004,
-                    "exceptionCaseId", Map.of("field", "exceptionCaseId"), null);
+                    "exceptionCaseId", Map.of("field", "exceptionCaseId", "id", exceptionCaseId), null);
         }
         validateTarget(target);
 

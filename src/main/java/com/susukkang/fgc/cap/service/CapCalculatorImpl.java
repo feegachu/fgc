@@ -54,7 +54,7 @@ public class CapCalculatorImpl implements CapCalculator {
         CapContractView contract = capContractMapper.findById(command.contractId());
         if (contract == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500,
-                    Map.of("requestId", "contractId=" + command.contractId() + " not found"));
+                    null, Map.of(), "contractId=" + command.contractId() + " not found");
         }
 
         // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)
