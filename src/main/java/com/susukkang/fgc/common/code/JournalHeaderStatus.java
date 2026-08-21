@@ -17,4 +17,13 @@ public enum JournalHeaderStatus {
             case REVERSED -> "역분개됨";
         };
     }
+
+    /** LEDG-W01 목록·상세의 상태 뱃지 톤 클래스. ledger.js의 statusTone()과 값을 맞춘다. */
+    public String tone() {
+        return switch (this) {
+            case POSTED -> "fgc-badge--normal";
+            case REVERSED -> "fgc-badge--review";
+            case DRAFT -> "fgc-badge--neutral";
+        };
+    }
 }

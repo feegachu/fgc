@@ -72,7 +72,9 @@
     var head = document.createElement("thead");
     var headerRow = document.createElement("tr");
     ["번호", "계정", "차변", "대변", "설계사", "항목"].forEach(function (label) {
-      headerRow.appendChild(element("th", "", label));
+      var th = element("th", "", label);
+      th.setAttribute("scope", "col");
+      headerRow.appendChild(th);
     });
     head.appendChild(headerRow);
     table.appendChild(head);
@@ -90,6 +92,20 @@
     table.appendChild(body);
     wrapper.appendChild(table);
     return wrapper;
+  }
+
+  // vrun-detail.js의 safeInternalLink()와 동일한 규칙 — 서버 응답의 redirectUrl도
+  // 클라이언트에서 같은 오리진 상대경로인지 검증한 뒤에만 이동한다.
+  function safeInternalLink(linkUrl) {
+    if (!linkUrl || typeof linkUrl !== "string" || !linkUrl.startsWith("/") || linkUrl.startsWith("//")) {
+      return null;
+    }
+    try {
+      var url = new URL(linkUrl, window.location.origin);
+      return url.origin === window.location.origin ? url.pathname + url.search + url.hash : null;
+    } catch (error) {
+      return null;
+    }
   }
 
   function reverseAllowed(detail) {
@@ -152,6 +168,12 @@
     appendKeyValue(summary, "원분개", detail.reversalOfJournalNo);
     appendKeyValue(summary, "역분개", detail.reversedByJournalNo);
     detailBody.appendChild(summary);
+    if (!detail.balanced) {
+      var mismatch = element("p", "fgc-banner fgc-banner--error",
+        "차변·대변이 맞지 않습니다. 차액 " + won(detail.differenceAmount));
+      mismatch.style.marginTop = "12px";
+      detailBody.appendChild(mismatch);
+    }
     detailBody.appendChild(renderLines(detail.lines || []));
 
     var actions = element("div", "", "");
@@ -264,7 +286,12 @@
       method: "POST",
       body: { reason: reason, evidenceRef: correctionEvidence.value.trim() || null }
     }).then(function (envelope) {
-      window.location.assign(envelope.data.redirectUrl);
+      var target = safeInternalLink(envelope.data.redirectUrl);
+      if (target) {
+        window.location.assign(target);
+      } else if (window.FgcUi.toast) {
+        window.FgcUi.toast("원장 정정 예외는 생성됐지만 이동할 주소가 올바르지 않습니다. 예외함에서 직접 확인하세요.", "error");
+      }
     }).catch(function (error) {
       if (window.FgcUi.toast) window.FgcUi.toast(error && error.message
         ? error.message : "원장 정정 요청을 만들지 못했습니다.", "error");

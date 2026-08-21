@@ -2,6 +2,7 @@ package com.susukkang.fgc.journal.controller;
 
 import com.susukkang.fgc.common.code.JournalHeaderStatus;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.journal.domain.JournalAccountCode;
 import com.susukkang.fgc.journal.domain.JournalType;
 import com.susukkang.fgc.journal.dto.JournalListRow;
 import com.susukkang.fgc.journal.dto.JournalSearchCriteria;
@@ -51,6 +52,7 @@ public class JournalViewController {
         // 개선: 조회 버튼을 누른 경우에만 서버에서 검색하고 Thymeleaf 모델로 결과를 렌더링
         String safeType = enumNameOrNull(JournalType.class, journalType);
         String safeStatus = enumNameOrNull(JournalHeaderStatus.class, status);
+        String safeAccount = enumNameOrNull(JournalAccountCode.class, accountCode);
         LocalDate safeFrom = dateOrNull(from);
         LocalDate safeTo = dateOrNull(to);
         int safePage = Math.max(page, 1);
@@ -58,7 +60,7 @@ public class JournalViewController {
         JournalSearchResponse journals = emptyPage(safePage);
         if (searched) {
             JournalSearchCriteria criteria = new JournalSearchCriteria(
-                    safeFrom, safeTo, safeType, blankToNull(accountCode), contractId, safeStatus);
+                    safeFrom, safeTo, safeType, safeAccount, contractId, safeStatus);
             PageResponse<JournalListRow> result = journalSearchService.search(criteria, safePage, PAGE_SIZE);
             journals = JournalSearchResponse.from(result);
         }
@@ -68,11 +70,12 @@ public class JournalViewController {
         model.addAttribute("fromFilter", from);
         model.addAttribute("toFilter", to);
         model.addAttribute("typeFilter", safeType);
-        model.addAttribute("accountFilter", accountCode);
+        model.addAttribute("accountFilter", safeAccount);
         model.addAttribute("contractFilter", contractId);
         model.addAttribute("statusFilter", safeStatus);
         model.addAttribute("journalTypes", JournalType.values());
         model.addAttribute("journalStatuses", JournalHeaderStatus.values());
+        model.addAttribute("journalAccounts", JournalAccountCode.values());
         model.addAttribute("selectedJournalId", selected);
         return "ledger/list";
     }
@@ -90,10 +93,6 @@ public class JournalViewController {
         } catch (DateTimeException ignored) {
             return null;
         }
-    }
-
-    private String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private <E extends Enum<E>> String enumNameOrNull(Class<E> enumType, String value) {

@@ -36,20 +36,6 @@
     <span><strong id="notice-ledger">이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.</strong></span>
   </div>
 
-  <!-- ② 불균형 경고 배너 — validationRunId가 있는 상세 조회 후 IF-API-37로 확인한다. -->
-  <div class="fgc-banner fgc-banner--error" id="imbalance-banner" style="margin-top:10px" hidden>
-    <span class="material-symbols-outlined" style="font-size:18px">error</span>
-    <span id="imbalance-text"></span>
-  </div>
-  <!-- 데이터 미연동 상태를 검증 완료(0건 성공)로 표시하지 않는다 — 집계 결과가 있을 때만 성공/오류 배너로 전환 -->
-  <div class="fgc-banner fgc-banner--muted" id="balance-banner" style="margin-top:10px">
-    <span class="material-symbols-outlined" style="font-size:18px">info</span>
-    <span>
-      원장 균형(차변=대변, <span class="fgc-mono">vw_journal_imbalance</span> 0건 여부)은 상세 분개의 검증실행 기준으로 표시합니다.
-      기표(POSTED) 전에는 반드시 0건이어야 하며 월 통합검증 확정 조건 ②번입니다.
-    </span>
-  </div>
-
   <!-- 고정 문구 -->
   <div class="fgc-banner fgc-banner--warn" style="margin-top:10px">
     <span class="material-symbols-outlined" style="font-size:18px">edit_off</span>
@@ -78,10 +64,13 @@
                   th:selected="${type.name() == typeFilter}"></option>
         </select>
       </div>
-      <div class="fgc-field" style="min-width:150px">
+      <div class="fgc-field" style="min-width:200px">
         <label class="fgc-label" for="f-account">계정과목</label>
-        <input class="fgc-input" id="f-account" name="account" type="text" placeholder="계정코드"
-               th:value="${accountFilter}">
+        <select class="fgc-select" id="f-account" name="account">
+          <option value="" th:selected="${accountFilter == null}">전체</option>
+          <option th:each="account : ${journalAccounts}" th:value="${account.name()}" th:text="${account.description()}"
+                  th:selected="${account.name() == accountFilter}"></option>
+        </select>
       </div>
       <div class="fgc-field" style="min-width:120px">
         <label class="fgc-label" for="f-contract">계약 ID</label>
@@ -105,7 +94,21 @@
     </form>
   </section>
 
-  <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.35fr 1fr;gap:16px" id="ledger-grid">
+  <!-- ② 불균형 경고 배너 — validationRunId가 있는 상세 조회 후 IF-API-37로 확인한다. -->
+  <div class="fgc-banner fgc-banner--error" id="imbalance-banner" style="margin-top:10px" hidden>
+    <span class="material-symbols-outlined" style="font-size:18px">error</span>
+    <span id="imbalance-text"></span>
+  </div>
+  <!-- 데이터 미연동 상태를 검증 완료(0건 성공)로 표시하지 않는다 — 집계 결과가 있을 때만 성공/오류 배너로 전환 -->
+  <div class="fgc-banner fgc-banner--muted" id="balance-banner" style="margin-top:10px">
+    <span class="material-symbols-outlined" style="font-size:18px">info</span>
+    <span>
+      원장 균형(차변=대변, <span class="fgc-mono">vw_journal_imbalance</span> 0건 여부)은 상세 분개의 검증실행 기준으로 표시합니다.
+      기표(POSTED) 전에는 반드시 0건이어야 하며 월 통합검증 확정 조건 ②번입니다.
+    </span>
+  </div>
+
+  <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.7fr 0.9fr;gap:16px" id="ledger-grid">
 
     <!-- ③ 분개 목록 -->
     <section class="fgc-card">
@@ -117,15 +120,15 @@
         <table class="fgc-table">
           <thead>
             <tr>
-              <th style="width:126px">분개번호</th>
-              <th style="width:92px">분개일</th>
-              <th style="width:170px">유형</th>
-              <th style="width:170px">원천</th>
-              <th style="width:66px">계약</th>
-              <th class="fgc-th-num" style="width:104px">차변 합계</th>
-              <th class="fgc-th-num" style="width:104px">대변 합계</th>
-              <th style="width:88px">상태</th>
-              <th style="width:126px">역분개 표시</th>
+              <th scope="col" style="width:120px">분개번호</th>
+              <th scope="col" style="width:88px">분개일</th>
+              <th scope="col" style="width:110px">유형</th>
+              <th scope="col" style="width:130px">원천</th>
+              <th scope="col" style="width:74px">계약번호</th>
+              <th scope="col" class="fgc-th-num" style="width:100px">차변 합계</th>
+              <th scope="col" class="fgc-th-num" style="width:100px">대변 합계</th>
+              <th scope="col" style="width:80px">상태</th>
+              <th scope="col" style="width:110px">역분개 표시</th>
             </tr>
           </thead>
           <tbody id="list-body">
@@ -141,15 +144,15 @@
               <td th:text="${journal.journalDate}">2026-07-31</td>
               <td th:text="${journal.journalTypeLabel}">실제 지급</td>
               <td class="fgc-mono"
-                  th:text="${journal.sourceEntityType + ' #' + journal.sourceEntityId}">COMMISSION_TRANSACTION #1</td>
+                  th:text="${journal.sourceEntityTypeLabel + ' #' + journal.sourceEntityId}">지급거래 #1</td>
               <td class="fgc-mono" th:text="${journal.contractNo ?: journal.contractId}">C-001</td>
               <td class="fgc-td-num"
-                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-error'"
+                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-td-mismatch'"
                   th:text="${#numbers.formatDecimal(journal.debitTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
               <td class="fgc-td-num"
-                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-error'"
+                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-td-mismatch'"
                   th:text="${#numbers.formatDecimal(journal.creditTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
-              <td><span class="fgc-badge" th:text="${journal.statusLabel}">기표</span></td>
+              <td><span class="fgc-badge" th:classappend="${journal.statusTone}" th:text="${journal.statusLabel}">기표</span></td>
               <td>
                 <span class="fgc-badge fgc-badge--review" th:if="${journal.reversalOfJournalNo != null}"
                       th:text="${'원분개 ' + journal.reversalOfJournalNo}">원분개 JRN-001</span>
@@ -159,13 +162,13 @@
           </tbody>
         </table>
       </div>
-      <footer class="fgc-pagination" id="ledger-pagination" style="padding:10px 16px;display:flex;justify-content:flex-end;gap:8px">
-        <a class="fgc-btn fgc-btn--ghost" id="ledger-prev" th:if="${journals.page > 1}"
-           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page - 1})}">이전</a>
-        <span id="ledger-page-info" class="fgc-muted" style="align-self:center"
+      <footer class="fgc-pagination" id="ledger-pagination" style="padding:10px 16px;display:flex;justify-content:flex-end;align-items:center;gap:8px">
+        <a class="icon-button" id="ledger-prev" aria-label="이전 페이지" th:if="${journals.page > 1}"
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page - 1})}"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></a>
+        <span id="ledger-page-info" class="fgc-muted tabular-nums" style="align-self:center"
               th:text="${journals.page + ' / ' + (journals.totalPages > 0 ? journals.totalPages : 1)}">1 / 1</span>
-        <a class="fgc-btn fgc-btn--ghost" id="ledger-next" th:if="${journals.page < journals.totalPages}"
-           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page + 1})}">다음</a>
+        <a class="icon-button" id="ledger-next" aria-label="다음 페이지" th:if="${journals.page < journals.totalPages}"
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page + 1})}"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></a>
       </footer>
     </section>
 
@@ -232,7 +235,7 @@
   "use strict";
   function reflow() {
     document.getElementById("ledger-grid").style.gridTemplateColumns =
-      window.innerWidth < 1150 ? "1fr" : "1.35fr 1fr";
+      window.innerWidth < 1150 ? "1fr" : "1.7fr 0.9fr";
   }
   reflow();
   window.addEventListener("resize", reflow);

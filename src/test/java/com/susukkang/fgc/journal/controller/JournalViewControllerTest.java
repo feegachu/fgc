@@ -80,7 +80,7 @@ class JournalViewControllerTest {
                         .with(user(userWithRole("SETTLEMENT"))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("JRN-202607-001")))
-                .andExpect(content().string(containsString("COMMISSION_TRANSACTION #91")))
+                .andExpect(content().string(containsString("지급거래 #91")))
                 .andExpect(content().string(containsString("원분개 JRN-202607-000")));
 
         var captor = org.mockito.ArgumentCaptor.forClass(JournalSearchCriteria.class);
