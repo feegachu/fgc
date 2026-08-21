@@ -43,8 +43,13 @@ class ScheduleListViewTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("FGC-UI-SCHE-W01")))
                 .andExpect(content().string(containsString("id=\"main-content\"")))
-                .andExpect(content().string(containsString("publishing-page publishing-page-list schedule-list-page")))
+                // publishing.css 브리지를 뗐다 (#285) — 이 화면엔 fgc-* 가 0건이라 브리지가 하는 일이 없고,
+                // 컨테이너 레이아웃은 layout.css 의 .page-content 가 같은 값으로 준다.
+                .andExpect(content().string(containsString("class=\"page-content schedule-list-page\"")))
+                .andExpect(content().string(not(containsString("publishing-page"))))
                 .andExpect(content().string(containsString("data-schedule-filter-form")))
+                // 라벨·톤 공용 모듈은 화면 스크립트보다 먼저 실려야 한다
+                .andExpect(content().string(containsString("/js/features/schedule/schedule-labels.js")))
                 .andExpect(content().string(containsString("name=\"contractNo\"")))
                 .andExpect(content().string(containsString("name=\"stage\"")))
                 .andExpect(content().string(containsString("name=\"regime\"")))

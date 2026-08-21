@@ -3,11 +3,10 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-CONT-W03', '보험계약 등록·수정', '보험계약', '/contracts')}">
 <body>
-<main id="main-content" class="page-content publishing-page contract-form-page">
+<main id="main-content" class="page-content contract-form-page">
   <header class="page-header contract-form-page-header">
     <div class="page-header-copy">
       <h1 class="page-title" th:text="${isEditMode ? '보험계약 수정' : '보험계약 등록'}">보험계약 등록</h1>
-      <p class="page-description">계약을 저장하면 같은 트랜잭션에서 예상 스케줄을 생성하고 1,200% 한도를 계산합니다.</p>
     </div>
     <div class="page-header-actions">
       <a class="button button-secondary" th:href="@{/contracts}">
@@ -16,6 +15,7 @@
     </div>
   </header>
 
+  <!-- 유효성 오류 표시 영역. 설명용 Guidance 가 아니므로 유지한다 (가이드 §7.2). -->
   <div id="contract-form-error-summary" class="form-error-summary" role="alert" hidden>
     <strong>입력 내용을 확인해 주세요.</strong>
     <p id="contract-form-error-message"></p>
@@ -26,9 +26,11 @@
         th:attr="data-mode=${isEditMode ? 'edit' : 'create'},data-contract-id=${contractId}">
     <div class="contract-form-left-column">
       <section class="surface contract-form-card contract-basic-form-card" aria-labelledby="contract-basic-title">
-        <header class="contract-form-card-header">
-          <h2 id="contract-basic-title">계약 기본</h2>
-          <p>보험회사와 계약일을 먼저 선택하면 판매 가능한 상품 버전을 조회합니다.</p>
+        <header class="surface-header contract-form-card-header">
+          <div>
+            <h2 id="contract-basic-title">계약 기본</h2>
+            <p>보험회사와 계약일을 먼저 선택하면 판매 가능한 상품 버전을 조회합니다.</p>
+          </div>
         </header>
         <div class="contract-form-fields">
           <label class="field" data-field="insurerId">
@@ -39,13 +41,25 @@
             <span class="field-error" data-field-error="insurerId"></span>
           </label>
 
-          <label class="field" data-field="productOfferingId">
-            <span class="field-label">상품 판매버전 <span class="field-required" aria-hidden="true">*</span></span>
+          <div class="field" data-field="productOfferingId">
+            <span class="field-label">
+              <label for="product-offering-id">상품 판매버전 <span class="field-required" aria-hidden="true">*</span></label>
+              <!-- REG-19 근거는 목업에서 툴팁으로 있던 내용이다. Guidance 를 지우면서 잃지 않도록 옮겼다. -->
+              <span class="evidence" data-evidence>
+                <button class="evidence-trigger" type="button" aria-describedby="evidence-reg-19" aria-label="판매버전 근거 보기">
+                  <span class="material-symbols-rounded" aria-hidden="true">help</span>
+                </button>
+                <div class="evidence-popover" id="evidence-reg-19" popover>
+                  <p class="evidence-code">REG-19 · 부칙 제2조 [개정고시]</p>
+                  <p class="evidence-body">분급 관련 조항은 판매개시일이 일반 2027-01-01, TM 2028-01-01 이후인 상품부터 적용합니다. 1,200%룰·차익거래 적용 여부는 계약 체결일 기준으로 별도 판단하므로 계약일에 유효한 판매버전을 선택해야 합니다.</p>
+                </div>
+              </span>
+            </span>
             <select id="product-offering-id" name="productOfferingId" class="select-control" required disabled>
               <option value="">보험회사와 계약일을 먼저 선택하세요</option>
             </select>
             <span class="field-error" data-field-error="productOfferingId"></span>
-          </label>
+          </div>
 
           <label class="field" data-field="contractNo">
             <span class="field-label">계약번호 <span class="field-required" aria-hidden="true">*</span></span>
@@ -65,14 +79,9 @@
           <label class="field" data-field="contractStatus">
             <span class="field-label">계약상태 <span class="field-required" aria-hidden="true">*</span></span>
             <select id="contract-status" name="contractStatus" class="select-control" required>
-              <option value="APPLIED">청약</option>
-              <option value="ACTIVE" selected>유지</option>
-              <option value="UNPAID">미납</option>
-              <option value="LAPSED">실효</option>
-              <option value="REVIVED">부활</option>
-              <option value="CANCELLED">청약철회</option>
-              <option value="TERMINATED">해지</option>
-              <option value="MATURED">만기</option>
+              <option th:each="status : ${T(com.susukkang.fgc.contract.domain.ContractStatus).values()}"
+                      th:value="${status.name()}" th:text="${status.label()}"
+                      th:selected="${status.name() == 'ACTIVE'}">정상</option>
             </select>
             <span class="field-error" data-field-error="contractStatus"></span>
           </label>
@@ -80,51 +89,61 @@
       </section>
 
       <section class="surface contract-form-card contract-agent-card" aria-labelledby="contract-agent-title">
-        <header class="contract-form-card-header">
-          <h2 id="contract-agent-title">모집 설계사 · 소속</h2>
-          <p>설계사를 선택하면 계약일 기준 소속 조직을 자동으로 채웁니다.</p>
+        <header class="surface-header contract-form-card-header">
+          <div>
+            <h2 id="contract-agent-title">모집 설계사 · 소속</h2>
+            <p>설계사를 선택하면 계약일 기준 소속 조직을 자동으로 채웁니다.</p>
+          </div>
         </header>
         <div class="contract-form-fields contract-agent-fields">
-          <label class="field" data-field="agentId">
-            <span class="field-label">모집 설계사 <span class="field-required" aria-hidden="true">*</span></span>
+          <div class="field" data-field="agentId">
+            <span class="field-label">
+              <label for="agent-id">모집 설계사 <span class="field-required" aria-hidden="true">*</span></label>
+              <span class="evidence" data-evidence>
+                <button class="evidence-trigger" type="button" aria-describedby="evidence-reg-07" aria-label="모집 설계사 근거 보기">
+                  <span class="material-symbols-rounded" aria-hidden="true">help</span>
+                </button>
+                <div class="evidence-popover" id="evidence-reg-07" popover>
+                  <p class="evidence-code">REG-07 · 제4-32조제12항제1·2호 [현행규정]</p>
+                  <p class="evidence-body">여기서 저장하는 값은 <strong>모집 설계사</strong>입니다. 지급 대상은 최초 모집자로 고정되지 않고 계약을 유지관리하는 모집종사자이므로, 유지관리 담당 설계사는 별도로 관리합니다.</p>
+                </div>
+              </span>
+            </span>
             <select id="agent-id" name="agentId" class="select-control" required disabled>
               <option value="">계약일을 먼저 선택하세요</option>
             </select>
             <span class="field-error" data-field-error="agentId"></span>
-          </label>
+          </div>
 
           <label class="field" data-field="organizationId">
             <span class="field-label">소속 조직 <span class="field-required" aria-hidden="true">*</span></span>
             <input id="organization-name" class="field-control contract-filled-control" type="text"
-                   readonly placeholder="설계사를 선택하면 자동으로 채워집니다">
+                   readonly aria-readonly="true" aria-describedby="organization-helper"
+                   placeholder="설계사를 선택하면 자동으로 채워집니다">
             <input id="organization-id" name="organizationId" type="hidden">
+            <span class="field-helper" id="organization-helper">직접 수정하지 않습니다. 계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다.</span>
             <span class="field-error" data-field-error="organizationId"></span>
           </label>
         </div>
-        <aside class="contract-form-guidance">
-          <span class="material-symbols-rounded" aria-hidden="true">groups</span>
-          <div>
-            <h3>소속 조직은 직접 수정하지 않습니다.</h3>
-            <p>계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다.</p>
-          </div>
-        </aside>
       </section>
     </div>
 
     <section class="surface contract-form-card contract-premium-card" aria-labelledby="contract-premium-title">
-      <header class="contract-form-card-header">
-        <h2 id="contract-premium-title">보험료 · 납입 조건</h2>
-        <p>원주기 보험료와 월납환산 초회보험료를 구분해 입력합니다.</p>
+      <header class="surface-header contract-form-card-header">
+        <div>
+          <h2 id="contract-premium-title">보험료 · 납입 조건</h2>
+          <p>원주기 보험료와 월납환산 초회보험료를 구분해 입력합니다.</p>
+        </div>
       </header>
       <div class="contract-form-fields contract-premium-fields">
         <label class="field" data-field="paymentCycleCode">
           <span class="field-label">납입주기 <span class="field-required" aria-hidden="true">*</span></span>
+          <!-- 라벨은 서버 enum 의 label() 하나만 쓴다 — CONT-W02 상세와 표기가 갈리지 않게 한다. -->
           <select id="payment-cycle-code" name="paymentCycleCode" class="select-control" required>
-            <option value="MONTHLY">월납</option>
-            <option value="QUARTERLY">3개월납</option>
-            <option value="SEMI_ANNUAL">6개월납</option>
-            <option value="ANNUAL">연납</option>
-            <option value="SINGLE">일시납</option>
+            <option th:each="cycle : ${T(com.susukkang.fgc.contract.domain.PaymentCycleCode).values()}"
+                    th:if="${cycle.name() != 'OTHER'}"
+                    th:value="${cycle.name()}" th:text="${cycle.label()}"
+                    th:selected="${cycle.name() == 'MONTHLY'}">월납</option>
           </select>
           <span class="field-error" data-field-error="paymentCycleCode"></span>
         </label>
@@ -133,7 +152,7 @@
           <span class="field-label">주기 보험료(원) <span class="field-required" aria-hidden="true">*</span></span>
           <input id="premium-per-cycle-amount" name="premiumPerCycleAmount"
                  class="field-control tabular-nums" type="number" min="0" step="1" inputmode="numeric" required>
-          <span id="premium-per-cycle-help" class="field-helper">월납환산 초회보험료와 납입주기에 따라 자동 계산됩니다.</span>
+          <span id="premium-per-cycle-help" class="field-helper">비워 두면 월납환산 초회보험료 × 납입주기로 채웁니다. 실제 청구액이 다르면 직접 고치세요.</span>
           <span class="field-error" data-field-error="premiumPerCycleAmount"></span>
         </label>
 
@@ -159,14 +178,27 @@
           <span class="field-error" data-field-error="paymentTermMonths"></span>
         </label>
 
-        <label class="field" data-field="standardSurrenderDeductionAmount">
-          <span class="field-label">표준해약공제액(원)</span>
+        <div class="field" data-field="standardSurrenderDeductionAmount">
+          <span class="field-label">
+            <label for="standard-surrender-deduction-amount">표준해약공제액(원)</label>
+            <span class="evidence" data-evidence>
+              <button class="evidence-trigger" type="button" aria-describedby="evidence-reg-08-12" aria-label="표준해약공제액 근거 보기">
+                <span class="material-symbols-rounded" aria-hidden="true">help</span>
+              </button>
+              <div class="evidence-popover" id="evidence-reg-08-12" popover>
+                <p class="evidence-code">REG-08 · 제4-32조제5항 [현행규정]</p>
+                <p class="evidence-body">표준해약공제액 80% 이상을 공제하는 상품은 1,200% 한도 계산에서 1년 경과시점 예상 해약환급금을 합산합니다.</p>
+                <p class="evidence-code">REG-12 · 제4-32조제6항 [현행규정]</p>
+                <p class="evidence-body">차익거래 판정에서도 일정 상품의 36개월 이내 해지는 해약환급금을 합산합니다.</p>
+              </div>
+            </span>
+          </span>
           <input id="standard-surrender-deduction-amount" name="standardSurrenderDeductionAmount"
                  class="field-control tabular-nums" type="number" min="0" step="1" inputmode="numeric"
                  placeholder="해당 상품만 입력">
           <span class="field-helper">비워 두면 한도 가산에 사용하지 않습니다.</span>
           <span class="field-error" data-field-error="standardSurrenderDeductionAmount"></span>
-        </label>
+        </div>
       </div>
 
       <aside class="contract-limit-preview" aria-label="1,200% 한도 참고 미리보기">
@@ -180,16 +212,12 @@
     </section>
 
     <section class="surface contract-form-actions" aria-label="계약 저장 작업">
-      <div class="contract-action-guidance">
-        <span class="material-symbols-rounded" aria-hidden="true">info</span>
-        <div>
-          <strong>필수 항목을 모두 입력하면 저장할 수 있습니다.</strong>
-          <p id="contract-save-hint">기준정보를 불러오는 중입니다.</p>
-        </div>
-      </div>
+      <!-- 필수 입력 안내는 Guidance 가 아니다 (가이드 §7.2). 저장 버튼의 aria-describedby 로 연결해 유지한다. -->
+      <p id="contract-save-hint" class="contract-save-hint" role="status">기준정보를 불러오는 중입니다.</p>
       <div class="contract-action-buttons">
         <a class="button button-secondary" th:href="@{/contracts}">취소</a>
-        <button id="contract-save-button" class="button button-primary contract-save-button" type="submit" disabled>
+        <button id="contract-save-button" class="button button-primary contract-save-button" type="submit"
+                aria-describedby="contract-save-hint" disabled>
           <span class="material-symbols-rounded" aria-hidden="true">save</span>
           <span th:text="${isEditMode ? '수정하고 스케줄 재생성' : '저장하고 예상 스케줄 만들기'}">저장하고 예상 스케줄 만들기</span>
         </button>
