@@ -64,6 +64,32 @@
   white-space: normal;
 }
 
+/*
+ * 펼친 내용은 반드시 칸 폭 안에서 줄바꿈한다.
+ *
+ * 이 칸은 세로로 늘어나야 해서 overflow: visible 이라 넘친 내용이 잘리지 않고 그대로 흘러나간다.
+ * 그런데 참조는 마지막 열이라 오른쪽으로 흘러나가면 표 바깥이고, 뷰포트의 가로 스크롤 범위는
+ * 표 너비로만 잡히므로 스크롤을 끝까지 밀어도 닿지 않는 영역에서 잘린다.
+ * (계약·상세 원인 칸도 같은 disclosure 를 쓰므로 함께 묶는다.)
+ */
+.exception-table .table-cell-full {
+  max-width: 100%;
+}
+
+/*
+ * 참조 링크는 버튼 모양인데 .button 의 min-width: 6rem 과 white-space: nowrap 때문에
+ * 8rem 짜리 참조 칸을 그대로 넘어선다. 여기서는 줄바꿈되는 링크로 쓴다.
+ */
+.exception-table .table-cell-full .button {
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  padding-block: var(--space-1);
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
+}
+
 .exception-col-number {
   width: 4rem;
 }

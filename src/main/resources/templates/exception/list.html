@@ -256,8 +256,8 @@
                       <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
                     </summary>
                     <p class="table-cell-full">
+                      <!-- 아이콘은 두지 않는다 — 참조 값 자체가 링크라 같은 뜻을 두 번 말한다. -->
                       <a class="button button-secondary" th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}">
-                        <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
                         <span th:text="${referenceValue}">참조</span>
                       </a>
                       <span th:if="${c.sourceLink() == null}" th:text="${referenceValue}">참조</span>
