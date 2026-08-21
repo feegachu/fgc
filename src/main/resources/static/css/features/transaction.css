@@ -277,3 +277,8 @@
   .transaction-filter-checkbox { padding-block: var(--space-2); }
   .transaction-add-attribution { width: 100%; }
 }
+
+/* 확정 거부 후 후속 동선 — 계산근거·예외함 (이슈 257) */
+.transaction-confirm-followup { display: grid; gap: var(--space-3); }
+.transaction-confirm-notice { margin: 0; color: var(--color-text-secondary); }
+.transaction-confirm-followup-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
