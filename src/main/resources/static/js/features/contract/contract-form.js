@@ -460,9 +460,24 @@
     if (event.target === elements.premiumPerCycleAmount) {
       /* 비우면 다시 자동 채움 대상으로 돌아간다. */
       isPremiumPerCycleUserValue = event.target.value !== "";
+      /* 비운 즉시 채워야 안내 문구("비워 두면 … 채웁니다")와 동작이 맞다 — 필수 항목이라 빈 채로 두면 저장이 막힌다. */
+      if (!isPremiumPerCycleUserValue) syncPremiumPerCycleAmount();
     }
     if (event.target === elements.monthlyEquivalentFirstPremium) syncPremiumPerCycleAmount();
     updateSaveState();
+  }
+
+  /*
+   * 이동을 시작할 때까지 프라미스를 붙들어 둔다.
+   *
+   * 반환하지 않으면 .finally() 가 window.location.assign 보다 먼저 돌아 저장 버튼이
+   * 다시 열리고, 두 번째 요청이 실제로 나간다. 등록(POST)·수정(PUT) 두 경로 모두
+   * 같은 문제라 한 곳으로 모았다 — 한쪽만 고치면 다른 쪽에 그대로 남는다 (#325 리뷰).
+   */
+  function redirectAfter(delayMs, go) {
+    return new Promise(function (resolve) {
+      window.setTimeout(function () { go(); resolve(); }, delayMs);
+    });
   }
 
   function handleSubmit(event) {
@@ -495,12 +510,9 @@
        * IF-API-18·19 가 내려 주는 scheduleHeaderIds 로 "스케줄이 함께 만들어졌다"까지 알린다.
        */
       rememberSaveMessage(saveMessage(saved));
-      if (isEditMode) {
-        redirect();
-        return;
-      }
-      warnIfRefundRateTableIsMissing(savedContractId).then(function (warned) {
-        window.setTimeout(redirect, warned ? 1800 : 0);
+      if (isEditMode) return redirectAfter(0, redirect);
+      return warnIfRefundRateTableIsMissing().then(function (warned) {
+        return redirectAfter(warned ? 1800 : 0, redirect);
       });
     }).catch(function (error) {
       showError(error, "보험계약을 저장하지 못했습니다.");
