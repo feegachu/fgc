@@ -282,8 +282,9 @@
     var deduction = isAgent ? '<span class="cap-not-applicable">적용하지 않음</span>' : won(item.complianceDeductionAmount);
     var contractHref = "/contracts/" + encodeURIComponent(item.contractId) + "?tab=cap";
     var contractLink = '<a class="cap-contract-link" href="' + contractHref + '">' + escapeHtml(item.contractNo) + '</a>';
+    // 계약번호는 컬럼 폭을 넓게 잡아(차익거래 검증 화면과 동일) 토글 없이 항상 전체를 보여준다(#326).
     return "<tr>" +
-      '<td class="cap-disclosure-cell">' + tableCellDisclosure(item.contractNo, true, contractLink) + '</td>' +
+      '<td class="tabular-nums" title="' + escapeHtml(item.contractNo) + '">' + contractLink + '</td>' +
       '<td><span class="cap-stage-label"><span class="cap-stage-dot' + (isAgent ? " is-agent" : "") + '"></span>' + escapeHtml(item.paymentStageLabel) + '</span></td>' +
       '<td class="tabular-nums">' + escapeHtml(item.asOfDate) + '</td>' +
       '<td class="text-right tabular-nums">' + won(item.basePremiumAmount) + '</td>' +

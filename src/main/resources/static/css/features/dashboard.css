@@ -38,9 +38,10 @@
   width: 7rem;
 }
 
+/* 계약번호는 차익거래 검증 화면(.arb-col-contract)과 동일한 폭으로 맞춰 토글 없이 항상 전체를 보여준다(이슈 326). */
 .priority-table th:nth-child(3),
 .priority-table td:nth-child(3) {
-  width: 7.5rem;
+  width: 12rem;
 }
 
 .priority-table th:nth-child(4),
@@ -59,9 +60,10 @@
   width: 5.625rem;
 }
 
-/* 계약번호·예외 내용은 자유 텍스트라 잘리면 볼 방법이 없다 — table-cell-disclosure가
+/* 예외 내용은 자유 텍스트라 잘리면 볼 방법이 없다 — table-cell-disclosure가
    실제로 넘칠 때만 "전체 보기"를 드러내려면 이 셀은 nowrap 잘라내기 규칙에서 빠져야 한다
-   (exception.css의 .exception-disclosure-cell과 같은 패턴). */
+   (exception.css의 .exception-disclosure-cell과 같은 패턴). 계약번호는 #326에서
+   폭을 넓혀 토글 자체를 없앴다. */
 .priority-table td.dashboard-disclosure-cell {
   height: auto;
   padding-block: var(--space-2);
