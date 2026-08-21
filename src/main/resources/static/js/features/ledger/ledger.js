@@ -59,6 +59,19 @@
     return format ? format.errorText(error, fallback) : ((error && error.message) || fallback);
   }
 
+  // 서버 응답의 이동 주소도 현재 오리진의 상대 경로인지 확인한 뒤 사용한다.
+  function safeInternalLink(linkUrl) {
+    if (!linkUrl || typeof linkUrl !== "string" || !linkUrl.startsWith("/") || linkUrl.startsWith("//")) {
+      return null;
+    }
+    try {
+      const url = new URL(linkUrl, window.location.origin);
+      return url.origin === window.location.origin ? url.pathname + url.search + url.hash : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function element(tag, className, content) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -315,6 +328,12 @@
     appendDetailItem(summary, "적요", detail.description,
       { disclosure: true, singleLine: false, wide: true });
     detailBody.appendChild(summary);
+    if (!detail.balanced) {
+      const mismatch = element("p", "guidance guidance-warning ledger-detail-imbalance",
+        "차변·대변이 맞지 않습니다. 차액 " + money(detail.differenceAmount));
+      mismatch.setAttribute("role", "alert");
+      detailBody.appendChild(mismatch);
+    }
     detailBody.appendChild(renderLines(detail.lines || []));
     detailBody.appendChild(renderActions(detail));
     scheduleDisclosureSync();
@@ -423,7 +442,15 @@
       method: "POST",
       body: { reason: reason, evidenceRef: correctionEvidence.value.trim() || null }
     }).then(function (envelope) {
-      window.location.assign(envelope.data.redirectUrl);
+      const target = safeInternalLink(envelope.data.redirectUrl);
+      if (target) {
+        window.location.assign(target);
+      } else if (window.FgcUi.toast) {
+        window.FgcUi.toast(
+          "원장 정정 예외는 생성됐지만 이동할 주소가 올바르지 않습니다. 예외함에서 직접 확인하세요.",
+          "error"
+        );
+      }
     }).catch(function (error) {
       const message = errorText(error, "원장 정정 요청을 만들지 못했습니다.");
       if (window.FgcUi.toast) window.FgcUi.toast(message, "error");

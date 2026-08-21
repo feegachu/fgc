@@ -80,8 +80,11 @@
       </div>
       <div class="filter-field ledger-filter-account">
         <label class="filter-field-label" for="f-account">계정과목</label>
-        <input class="field-control" id="f-account" name="account" type="text" placeholder="계정코드"
-               th:value="${accountFilter}">
+        <select class="select-control" id="f-account" name="account">
+          <option value="" th:selected="${accountFilter == null}">전체</option>
+          <option th:each="account : ${journalAccounts}" th:value="${account.name()}"
+                  th:text="${account.description()}" th:selected="${account.name() == accountFilter}"></option>
+        </select>
       </div>
       <div class="filter-field ledger-filter-contract">
         <label class="filter-field-label" for="f-contract">계약 ID</label>
@@ -166,12 +169,12 @@
               <td class="ledger-disclosure-cell">
                 <div class="table-cell-disclosure">
                   <span class="table-cell-preview is-single-line tabular-nums"
-                        th:text="${journal.sourceEntityType + ' #' + journal.sourceEntityId}">COMMISSION_TRANSACTION #1</span>
+                        th:text="${journal.sourceEntityTypeLabel + ' #' + journal.sourceEntityId}">지급거래 #1</span>
                   <details class="table-cell-details" hidden>
                     <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>
                       <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
                     <p class="table-cell-full tabular-nums"
-                       th:text="${journal.sourceEntityType + ' #' + journal.sourceEntityId}">COMMISSION_TRANSACTION #1</p>
+                       th:text="${journal.sourceEntityTypeLabel + ' #' + journal.sourceEntityId}">지급거래 #1</p>
                   </details>
                 </div>
               </td>
