@@ -45,8 +45,27 @@
 
   if (!detailBody || !occurrenceBody || !historyBody || !selectedBadge) return;
 
+  const format = window.FgcUi && window.FgcUi.format;
+
+  /*
+   * 표시 형식은 공통 유틸만 쓴다 (FGC-SIR-008).
+   * 전에는 문자열을 잘라 쓰느라 서버가 UTC 로 준 값이 그대로 노출됐다 — format.dateTime 은
+   * Asia/Seoul 로 환산한다. 유틸이 없으면 예전 동작으로 떨어진다.
+   */
   function formatActionTime(value) {
+    if (format) return format.dateTime(value);
     return value ? value.replace("T", " ").slice(0, 16) : "-";
+  }
+
+  function money(value) {
+    if (format) return format.won(value);
+    return `${Number(value).toLocaleString("ko-KR")}원`;
+  }
+
+  /* 오류 문구에 오류코드와 요청 ID 를 병기한다 (FGC-SIR-007). */
+  function errorText(error, fallback) {
+    if (format) return format.errorText(error, fallback);
+    return (error && error.message) || fallback;
   }
 
   function appendHistory(action, actionLabel) {
@@ -172,7 +191,7 @@
           window.FgcUi.modal.open(`journal-correction-${form.dataset.exceptionId}`);
         }
       }).catch((requestError) => {
-        const message = requestError.message || "처리 내용을 저장하지 못했습니다.";
+        const message = errorText(requestError, "처리 내용을 저장하지 못했습니다.");
         error.textContent = message;
         if (toast) toast(message, "error");
         updateSubmit();
@@ -271,7 +290,7 @@
     date.textContent = `분개일 ${journal.journalDate}`;
     const amount = document.createElement("span");
     amount.className = "fgc-muted";
-    amount.textContent = `차변 ${Number(journal.debitTotal).toLocaleString("ko-KR")}원 · 대변 ${Number(journal.creditTotal).toLocaleString("ko-KR")}원`;
+    amount.textContent = `차변 ${money(journal.debitTotal)} · 대변 ${money(journal.creditTotal)}`;
     const status = document.createElement("span");
     status.className = "fgc-muted";
     status.textContent = `원장상태 ${journal.statusLabel}`;
@@ -312,8 +331,8 @@
       const values = [
         line.lineNo,
         `${line.accountCode} · ${line.accountName || "-"}`,
-        `${Number(line.debitAmount).toLocaleString("ko-KR")}원`,
-        `${Number(line.creditAmount).toLocaleString("ko-KR")}원`,
+        money(line.debitAmount),
+        money(line.creditAmount),
         line.memo || "-"
       ];
       values.forEach((value) => {
@@ -456,7 +475,9 @@
         form.replaceWith(completed);
         if (toast) toast("원장 정정을 완료했습니다.", "success");
       }).catch((requestError) => {
-        error.textContent = requestError.message || "원장 정정을 완료하지 못했습니다.";
+        const message = errorText(requestError, "원장 정정을 완료하지 못했습니다.");
+        error.textContent = message;
+        if (toast) toast(message, "error");
         submitButton.disabled = false;
       });
     });

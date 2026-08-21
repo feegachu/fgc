@@ -16,54 +16,58 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-VRUN-W01', '월 통합검증 실행 목록', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-validation-list">
+<main id="main-content" class="page-content vrun-page vrun-list-page"
+      th:attr="data-success-message=${successMessage},data-error-message=${errorMessage}">
 
-  <h1 class="fgc-page-title">월 통합검증 실행 목록</h1>
-  <p class="fgc-page-desc">
-    한 달치 계약을 한 번에 검사하는 작업을 <strong>실행</strong>이라고 부릅니다.
-    같은 달을 여러 번 돌릴 수 있고, 각각을 <strong>회차</strong>로 구분합니다.
-  </p>
+  <header class="page-header">
+    <div class="page-header-copy">
+      <h1 class="page-title">월 통합검증 실행 목록</h1>
+    </div>
+  </header>
 
-  <!-- PRG 플래시 배너 — 생성 성공/실패(VRUN_001 등)를 500 화면 대신 여기로 안내 -->
-  <div class="fgc-banner fgc-banner--info" style="margin-top:12px" th:if="${successMessage}">
-    <span class="material-symbols-outlined" style="font-size:18px">check_circle</span>
-    <span th:text="${successMessage}">실행이 생성되었습니다.</span>
-  </div>
-  <div class="fgc-banner fgc-banner--error" style="margin-top:12px" th:if="${errorMessage}">
-    <span class="material-symbols-outlined" style="font-size:18px">error</span>
-    <span th:text="${errorMessage}">실행 생성에 실패했습니다.</span>
-  </div>
-
-  <div class="fgc-banner fgc-banner--info" style="margin-top:12px">
-    <span class="material-symbols-outlined" style="font-size:18px">engineering</span>
-    <span>
-      실행을 만들면 <strong>Spring Batch</strong>의 <span class="fgc-mono">MonthlyValidationJob</span>이
-      1~8단계를 순서대로 돌립니다. 9단계(담당자 검토)와 10단계(확정)는 사람이 합니다.
-      실패하면 새 실행을 만들어 다시 돌립니다.
-    </span>
+  <!--
+    PRG 결과는 배너가 아니라 Toast 로 알린다 (가이드 §11).
+    문구는 위 <main> 의 data-*-message 로 넘기고 vrun-list.js 가 한 번 꺼내 띄운다 —
+    리다이렉트로 들어오는 화면이라 서버가 직접 Toast 를 띄울 수 없다.
+    상시 설명이던 Spring Batch 안내는 결과 알림이 아니므로 guidance 로 역할을 옮겼다.
+  -->
+  <div class="guidance guidance-neutral">
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">engineering</span>
+    <div>
+      <p>
+        실행을 만들면 <strong>Spring Batch</strong>의 <span class="tabular-nums">MonthlyValidationJob</span>이
+        1~8단계를 순서대로 돌립니다. 9단계(담당자 검토)와 10단계(확정)는 사람이 합니다.
+        실패하면 새 실행을 만들어 다시 돌립니다.
+      </p>
+    </div>
   </div>
 
   <!-- ① 새 실행 만들기 — 폼 제출(PRG), Thymeleaf 가 CSRF hidden 을 자동 삽입한다 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__head"><span class="fgc-card__title">① 새 실행 만들기</span></div>
-    <form class="fgc-card__body fgc-toolbar" th:action="@{/validation-runs}" method="post">
-      <div class="fgc-field" style="min-width:150px">
-        <label class="fgc-label fgc-label--required" for="new-month">검증월</label>
-        <input class="fgc-input" id="new-month" name="month" type="month" th:value="${month}" value="2026-08" required>
+  <section class="surface" aria-labelledby="vrun-create-title">
+    <header class="surface-header">
+      <h2 class="surface-title" id="vrun-create-title">① 새 실행 만들기</h2>
+    </header>
+    <form class="vrun-create-form" th:action="@{/validation-runs}" method="post">
+      <div class="field vrun-create-month">
+        <label class="field-label" for="new-month">검증월
+          <span class="field-required" aria-hidden="true">*</span></label>
+        <input class="field-control" id="new-month" name="month" type="month" th:value="${month}"
+               value="2026-08" required>
       </div>
-      <div class="fgc-field" style="min-width:170px">
-        <label class="fgc-label fgc-label--required" for="new-type">실행 유형</label>
-        <select class="fgc-select" id="new-type" name="runType">
+      <div class="field vrun-create-type">
+        <label class="field-label" for="new-type">실행 유형
+          <span class="field-required" aria-hidden="true">*</span></label>
+        <select class="select-control" id="new-type" name="runType">
           <option value="MONTHLY">월간 (MONTHLY)</option>
           <option value="MANUAL_CONTRACT">계약 수동 (MANUAL_CONTRACT)</option>
         </select>
       </div>
       <!-- 실행 생성은 SETTLEMENT (화면정의서 :1379, IF-API-45). 기준월에 활성 MONTHLY 가 있으면 비활성 -->
-      <button class="fgc-btn fgc-btn--primary" id="btn-create" data-fgc-action="create" type="submit"
+      <button class="button button-primary" id="btn-create" data-fgc-action="create" type="submit"
               aria-describedby="create-hint" th:disabled="${!canProcess or existsActiveMonthly}">
-        <span class="material-symbols-outlined" style="font-size:18px">add</span> 실행 생성
+        <span class="material-symbols-rounded" aria-hidden="true">add</span>실행 생성
       </button>
-      <p class="fgc-help" id="create-hint" style="margin:0;padding-bottom:6px"
+      <p class="field-helper vrun-create-hint" id="create-hint"
          th:text="${existsActiveMonthly}
                   ? '기준월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.'
                   : '같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.'">
@@ -72,86 +76,141 @@
   </section>
 
   <!-- ② 실행 목록 — 서버 렌더링, 상태 필터는 GET 폼 리로드(Ajax 없음) -->
-  <section class="fgc-card" style="margin-top:16px">
-    <div class="fgc-card__head">
-      <span class="fgc-card__title">② 실행 목록</span>
-      <form class="publishing-inline-controls" style="display:flex;gap:8px;align-items:center"
-            th:action="@{/validation-runs}" method="get">
-        <label class="fgc-label" for="f-status" style="margin:0">상태</label>
-        <select class="fgc-select" id="f-status" name="status" style="padding:4px 8px" onchange="this.form.submit()">
-          <option value="">전체</option>
-          <option th:each="opt : ${statusOptions}" th:value="${opt.name()}" th:text="${opt.label()}"
-                  th:selected="${opt.name() == statusFilter}">생성됨</option>
-        </select>
-      </form>
-    </div>
-    <div style="overflow-x:auto">
-      <table class="fgc-table" style="min-width:1080px">
+  <section class="surface" aria-labelledby="vrun-list-title">
+    <header class="surface-header">
+      <h2 class="surface-title" id="vrun-list-title">② 실행 목록</h2>
+    </header>
+
+    <!--
+      전에는 select 의 onchange 가 곧바로 폼을 제출했다. 키보드로 값을 훑기만 해도 제출되고
+      JS 가 없으면 조회할 방법 자체가 없었다. LEDG-W01 선례대로 명시적 조회 버튼을 둔다.
+    -->
+    <form class="filter-bar vrun-filter-bar" th:action="@{/validation-runs}" method="get"
+          aria-label="실행 목록 검색 조건">
+      <div class="filter-fields vrun-filter-fields">
+        <div class="filter-field vrun-filter-status">
+          <label class="filter-field-label" for="f-status">상태</label>
+          <select class="select-control" id="f-status" name="status">
+            <option value="">전체</option>
+            <option th:each="opt : ${statusOptions}" th:value="${opt.name()}" th:text="${opt.label()}"
+                    th:selected="${opt.name() == statusFilter}">생성됨</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-actions vrun-filter-actions">
+        <button class="button button-primary" type="submit">
+          <span class="material-symbols-rounded" aria-hidden="true">search</span>조회
+        </button>
+      </div>
+    </form>
+
+    <div class="data-table-viewport vrun-table-viewport" tabindex="0" role="region"
+         aria-label="월 통합검증 실행 목록 표">
+      <table class="data-table vrun-run-table">
+        <caption class="visually-hidden">월 통합검증 실행 목록</caption>
+        <colgroup>
+          <col class="vrun-col-month">
+          <col class="vrun-col-runno">
+          <col class="vrun-col-type">
+          <col class="vrun-col-status">
+          <col class="vrun-col-progress">
+          <col class="vrun-col-actor">
+          <col class="vrun-col-started">
+          <col class="vrun-col-completed">
+          <col class="vrun-col-finalized">
+          <col class="vrun-col-failure">
+          <col class="vrun-col-open">
+        </colgroup>
         <thead>
           <tr>
-            <th style="width:80px">검증월</th>
-            <th style="width:56px">회차</th>
-            <th style="width:110px">실행 유형</th>
-            <th style="width:100px">상태</th>
-            <th style="width:130px">진행</th>
-            <th style="width:80px">실행자</th>
-            <th style="width:130px">시작</th>
-            <th style="width:130px">완료</th>
-            <th style="width:150px">확정자 · 확정시각</th>
-            <th>실패 사유</th>
-            <th style="width:70px"></th>
+            <th scope="col">검증월</th>
+            <th scope="col" class="is-number">회차</th>
+            <th scope="col">실행 유형</th>
+            <th scope="col" class="is-center">상태</th>
+            <th scope="col">진행</th>
+            <th scope="col">실행자</th>
+            <th scope="col">시작</th>
+            <th scope="col">완료</th>
+            <th scope="col">확정자 · 확정시각</th>
+            <th scope="col">실패 사유</th>
+            <th scope="col" class="is-center">상세</th>
           </tr>
         </thead>
         <tbody id="list-body">
           <tr th:each="run : ${runs.content()}">
-            <td class="fgc-mono" th:text="${#temporals.format(run.validationMonth(), 'yyyy-MM')}">2026-07</td>
-            <td class="fgc-mono" th:text="${run.runNo()}">1</td>
+            <td class="tabular-nums" th:text="${#temporals.format(run.validationMonth(), 'yyyy-MM')}">2026-07</td>
+            <td class="is-number tabular-nums" th:text="${run.runNo()}">1</td>
             <td th:text="${run.runTypeLabel()}">월간</td>
-            <td>
-              <!-- 톤 매핑은 화면 MVP(FGC-UI-VRUN-W01)와 동일: 실패=violation, 확정=review, 계산완료=normal, 그 외=warning -->
-              <span class="fgc-badge"
-                    th:classappend="${run.status().name() == 'FAILED'} ? 'fgc-badge--violation'
-                                    : (${run.status().name() == 'FINALIZED'} ? 'fgc-badge--review'
-                                    : (${run.status().name() == 'COMPLETED'} ? 'fgc-badge--normal' : 'fgc-badge--warning'))"
-                    ><span th:text="${run.status().name() == 'FINALIZED' ? '확정' : run.statusLabel()}">생성됨</span><span class="material-symbols-outlined"
-                    style="font-size:14px;vertical-align:-2px;margin-left:2px"
-                    th:if="${run.status().name() == 'FINALIZED'}">lock</span></span>
+            <td class="is-center">
+              <th:block th:replace="~{vrun/status-badge :: runStatusBadge(${run.status().name()}, ${run.statusLabel()})}"></th:block>
             </td>
-            <td class="fgc-mono"
+            <td class="tabular-nums"
                 th:text="|${run.currentStep()}/10 단계 (${run.currentStep() * 10}%)|">0/10 단계 (0%)</td>
-            <td class="fgc-mono" th:text="${run.triggeredBy()} ?: '—'">admin</td>
-            <td class="fgc-mono"
-                th:text="${run.startedAt() != null} ? ${#temporals.format(run.startedAt(), 'MM-dd HH:mm')} : '—'">—</td>
-            <td class="fgc-mono"
-                th:text="${run.completedAt() != null} ? ${#temporals.format(run.completedAt(), 'MM-dd HH:mm')} : '—'">—</td>
-            <td class="fgc-mono"
-                th:text="${run.finalizedAt() != null}
-                         ? ${run.finalizedBy()} + ' · ' + ${#temporals.format(run.finalizedAt(), 'MM-dd HH:mm')} : '—'">—</td>
+            <td th:text="${run.triggeredBy()} ?: '-'">admin</td>
+            <!-- 목록·상세의 일시 포맷을 yyyy-MM-dd HH:mm 하나로 통일했다 (FGC-SIR-008) -->
+            <td class="tabular-nums"
+                th:text="${run.startedAt() != null} ? ${#temporals.format(run.startedAt(), 'yyyy-MM-dd HH:mm')} : '-'">-</td>
+            <td class="tabular-nums"
+                th:text="${run.completedAt() != null} ? ${#temporals.format(run.completedAt(), 'yyyy-MM-dd HH:mm')} : '-'">-</td>
             <td>
-              <span class="fgc-error" th:if="${run.status().name() == 'FAILED'}"
-                    th:text="${run.failureMessage()}">실패 사유</span>
+              <div class="table-cell-disclosure"
+                   th:with="finalized=${run.finalizedAt() != null}
+                            ? ${run.finalizedBy()} + ' · ' + ${#temporals.format(run.finalizedAt(), 'yyyy-MM-dd HH:mm')} : '-'">
+                <span class="table-cell-preview is-single-line tabular-nums" th:text="${finalized}">-</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span
+                        class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${finalized}">-</p>
+                </details>
+              </div>
             </td>
-            <td><a class="fgc-btn fgc-btn--ghost" style="padding:2px 10px;font-size:12px"
-                   th:href="@{/validation-runs/{id}(id=${run.validationRunId()})}">열기</a></td>
+            <td>
+              <div class="table-cell-disclosure" th:if="${run.status().name() == 'FAILED'}">
+                <span class="table-cell-preview is-single-line vrun-failure-text"
+                      th:text="${run.failureMessage()} ?: '-'">실패 사유</span>
+                <details class="table-cell-details" hidden>
+                  <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span
+                        class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                  <p class="table-cell-full" th:text="${run.failureMessage()} ?: '-'">실패 사유</p>
+                </details>
+              </div>
+              <span th:unless="${run.status().name() == 'FAILED'}">-</span>
+            </td>
+            <td class="is-center">
+              <a class="button button-secondary vrun-row-button"
+                 th:href="@{/validation-runs/{id}(id=${run.validationRunId()})}"
+                 th:aria-label="|${#temporals.format(run.validationMonth(), 'yyyy-MM')} ${run.runNo()}회차 실행 열기|">열기</a>
+            </td>
           </tr>
           <tr th:if="${runs.content().isEmpty()}">
-            <td colspan="11"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td>
+            <td colspan="11">
+              <p class="vrun-inline-state is-empty" role="status" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</p>
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <!-- 페이징 — audit/list.html 과 같은 링크 방식 -->
-    <div class="fgc-card__body" style="display:flex;gap:8px;justify-content:center"
-         th:if="${runs.totalPages() > 1}">
-      <a class="fgc-btn fgc-btn--ghost" style="padding:4px 12px;font-size:12px"
-         th:if="${runs.page() > 1}"
-         th:href="@{/validation-runs(status=${statusFilter}, page=${runs.page() - 1})}">이전</a>
-      <span class="fgc-muted" style="font-size:12px;align-self:center"
-            th:text="|${runs.page()} / ${runs.totalPages()}|">1 / 1</span>
-      <a class="fgc-btn fgc-btn--ghost" style="padding:4px 12px;font-size:12px"
-         th:if="${runs.page() lt runs.totalPages()}"
-         th:href="@{/validation-runs(status=${statusFilter}, page=${runs.page() + 1})}">다음</a>
-    </div>
+
+    <!-- 페이징 — 공통 pagination-controls. 전에는 레거시 버튼 링크 2개로 수제 구현이었다. -->
+    <nav class="vrun-pagination" aria-label="월 통합검증 실행 목록 페이지" th:if="${runs.totalPages() > 1}">
+      <div class="pagination-controls">
+        <a class="pagination-button" th:if="${runs.page() > 1}"
+           th:href="@{/validation-runs(status=${statusFilter}, page=${runs.page() - 1})}" aria-label="이전 페이지">
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+        </a>
+        <span class="pagination-button is-disabled" th:unless="${runs.page() > 1}" aria-hidden="true">
+          <span class="material-symbols-rounded">chevron_left</span>
+        </span>
+        <span class="tabular-nums" th:text="|${runs.page()} / ${runs.totalPages()}|">1 / 1</span>
+        <a class="pagination-button" th:if="${runs.page() lt runs.totalPages()}"
+           th:href="@{/validation-runs(status=${statusFilter}, page=${runs.page() + 1})}" aria-label="다음 페이지">
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+        </a>
+        <span class="pagination-button is-disabled" th:unless="${runs.page() lt runs.totalPages()}" aria-hidden="true">
+          <span class="material-symbols-rounded">chevron_right</span>
+        </span>
+      </div>
+    </nav>
   </section>
 
 </main>
