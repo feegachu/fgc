@@ -689,12 +689,39 @@
     });
   }
 
-  /** 차단된 계약 — 판정이 걸린 귀속 계약을 계산근거·예외함 링크의 검색조건으로 쓴다. */
-  function blockedContractNo(result) {
-    var blocked = (result.capPreview || []).filter(function (preview) {
-      return preview.resultStatus === "VIOLATION" || preview.resultStatus === "REVIEW_REQUIRED";
+  /*
+   * 후속 링크가 가리킬 계약 — 서버가 실제로 거부한 그 귀속행의 계약이어야 한다.
+   *
+   * capPreview 에서 찾으면 안 된다. precheck 는 rule == null(룰셋은 있으나 그 항목의 산입
+   * 기준이 없는 미분류 경로) 귀속행을 capPreview 에 넣지 않고 건너뛴다
+   * (CommissionPaymentServiceImpl:330 `if (rule == null) { continue; }`) — 차단 사유는
+   * blockers[] 에만 실린다. 그래서 capPreview 기준으로 고르면
+   *  - 미분류가 유일한 차단 사유일 때 capPreview 가 비어 링크가 통째로 사라지고,
+   *  - 다중 귀속행일 때 confirm 이 먼저 막히는 행(attribution_seq 순, failFirst)과
+   *    다른 계약을 가리킬 수 있다.
+   * Blocker 는 contractId 를 그대로 실어 오므로(TransactionPrecheckResponse.Blocker) 그것을 쓴다.
+   *
+   * errorCode 를 주면 서버가 실제로 던진 그 코드의 blocker 를 우선한다 — 확정 거부 응답의
+   * 코드가 곧 confirm 이 멈춘 지점이라 가장 정확하다.
+   */
+  function blockedContractNo(result, errorCode) {
+    var blockers = (result.blockers || []).filter(function (blocker) {
+      return blocker.contractId != null
+        && RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0;
     });
-    return blocked.length ? blocked[0].contractNo : null;
+    if (!blockers.length) return null;
+    var matched = errorCode
+      ? blockers.filter(function (blocker) { return blocker.code === errorCode; })
+      : [];
+    var target = matched.length ? matched[0] : blockers[0];
+    return contractNoById(target.contractId);
+  }
+
+  function contractNoById(contractId) {
+    var found = contracts.filter(function (contract) {
+      return String(contract.contractId) === String(contractId);
+    });
+    return found.length ? found[0].contractNo : null;
   }
 
   function prepareConfirmation(result) {
@@ -778,7 +805,6 @@
   function confirmPayment() {
     if (!paymentId || !lastPrecheckResult) return;
     if (lastPrecheckResult.confirmable !== true && !hasRecordableBlocker(lastPrecheckResult)) return;
-    var attemptedContractNo = blockedContractNo(lastPrecheckResult);
     confirmSubmitButton.disabled = true;
     confirmButton.disabled = true;
     main.setAttribute("aria-busy", "true");
@@ -807,7 +833,7 @@
        * 재시도는 의미가 없다(같은 판정 + 미해결 위반 게이트 FGC-CAP-003 에 걸린다).
        */
       if (RECORDABLE_BLOCKER_CODES.indexOf(error.code) >= 0) {
-        renderFollowUpLinks(attemptedContractNo, error.code === "FGC-CAP-002");
+        renderFollowUpLinks(blockedContractNo(lastPrecheckResult, error.code), error.code === "FGC-CAP-002");
         confirmSubmitButton.hidden = true;
         confirmSubmitButton.disabled = true;
       }

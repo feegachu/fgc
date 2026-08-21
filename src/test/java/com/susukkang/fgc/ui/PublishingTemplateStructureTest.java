@@ -453,7 +453,15 @@ class PublishingTemplateStructureTest {
                 .contains("var RECORDABLE_BLOCKER_CODES = [\"FGC-CAP-001\", \"FGC-CAP-002\"]")
                 .contains("hasRecordableBlocker(lastPrecheckResult)")
                 .contains("확정 시도 · 예외 등록")
-                .contains("renderFollowUpLinks(")
+                /*
+                 * 후속 링크의 계약은 blockers[] 에서 뽑아야 한다 — capPreview 가 아니다.
+                 * precheck 는 rule == null(미분류) 귀속행을 capPreview 에 넣지 않고 건너뛰므로
+                 * (CommissionPaymentServiceImpl:330), capPreview 기준으로 고르면 미분류가 유일한
+                 * 차단 사유일 때 링크가 사라지고 다중 귀속행일 때 다른 계약을 가리킨다.
+                 */
+                .contains("renderFollowUpLinks(blockedContractNo(lastPrecheckResult, error.code)")
+                .contains("RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0")
+                .doesNotContain("(result.capPreview || []).filter")
                 /*
                  * 확정 게이트는 화면정의서 :710-718 · 운영정책서 제31조의 6단계 그대로다.
                  * 문서에 없는 게이트(차익거래·업무키)를 만들어 넣지 않는다 —
