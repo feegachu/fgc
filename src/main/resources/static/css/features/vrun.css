@@ -205,41 +205,68 @@
  * 원본은 다른 화면이 참조할 수 있으므로 지우지 않고 이름을 바꿔 새로 정의했다.
  * 상태는 색만으로 전달하지 않는다 — 각 칸이 visually-hidden 텍스트로 상태를 함께 읽어 준다.
  */
+/*
+ * 칸을 카드로 나열하지 않고 한 줄로 잇는다 — 10단계가 순서대로 진행된다는 사실이
+ * 형태로 드러나야 한다. 칸마다 테두리를 두면 서로 독립된 항목처럼 읽힌다.
+ * 좁은 화면에서는 줄바꿈 대신 가로 스크롤한다. 줄이 바뀌면 연결선이 끊겨
+ * 순서가 오히려 안 보인다.
+ */
 .vrun-stepper {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: flex-start;
+  gap: 0;
   padding: var(--space-4);
   list-style: none;
+  overflow-x: auto;
 }
 
 .vrun-stepper-step {
-  display: grid;
-  min-width: 5.5rem;
-  flex: 1 1 5.5rem;
-  justify-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-1);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-8);
-  background: var(--color-bg-surface);
+  position: relative;
+  min-width: 5.75rem;
+  flex: 1 1 0;
   text-align: center;
 }
 
+/*
+ * 단계를 잇는 수평선. 완료된 칸의 선만 초록으로 바뀌므로 채워진 길이가 곧 진행률이다.
+ * 위쪽 진행률 텍스트(current_step/10)와 같은 값을 형태로 한 번 더 보여 주는 것이고,
+ * 판정은 서버가 준 stepClasses 를 그대로 따른다 — 화면에서 다시 계산하지 않는다.
+ */
+.vrun-stepper-step::after {
+  position: absolute;
+  z-index: 0;
+  top: 0.875rem; /* dot 1.75rem 의 세로 중앙 */
+  right: -50%;
+  left: 50%;
+  height: 2px;
+  background: var(--color-border-default);
+  content: "";
+}
+
+.vrun-stepper-step:last-child::after {
+  display: none;
+}
+
 .vrun-stepper-dot {
+  position: relative;
+  z-index: 1;
   display: grid;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0 auto var(--space-1);
   place-items: center;
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-full);
   color: var(--color-text-secondary);
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-surface);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .vrun-stepper-label {
+  display: block;
+  padding: 0 var(--space-1);
   color: var(--color-text-secondary);
   font-size: 0.6875rem;
   line-height: 1rem;
@@ -260,32 +287,32 @@
  * 이름을 바꾸려면 Controller 를 고쳐야 하는데 이 이슈에서는 백엔드 수정이 금지라
  * (그리고 진행 상태를 화면에서 재계산하는 것도 금지라) 이름은 두고 스타일만 여기로 옮겼다.
  */
-.vrun-stepper-step.fgc-stepper__step--done {
-  border-color: var(--color-status-success-border);
-  background: var(--color-status-success-bg);
+/* 완료된 칸의 오른쪽 선까지 초록으로 채워진다 — 이게 진행 바 역할을 한다. */
+.vrun-stepper-step.fgc-stepper__step--done::after {
+  background: var(--color-status-success-solid);
 }
 
 .vrun-stepper-step.fgc-stepper__step--done .vrun-stepper-dot {
+  border-color: var(--color-status-success-solid);
   color: var(--color-text-inverse);
   background: var(--color-status-success-solid);
 }
 
-.vrun-stepper-step.fgc-stepper__step--running {
-  border-color: var(--color-status-info-border);
-  background: var(--color-status-info-bg);
-}
-
 .vrun-stepper-step.fgc-stepper__step--running .vrun-stepper-dot {
+  border-color: var(--color-status-info-solid);
   color: var(--color-text-inverse);
   background: var(--color-status-info-solid);
 }
 
-.vrun-stepper-step.fgc-stepper__step--failed {
-  border-color: var(--color-status-error-border);
-  background: var(--color-status-error-bg);
+/* 지나온 단계와 지금 단계의 이름은 또렷하게 — 색만으로 구분하지 않는다(규칙 4). */
+.vrun-stepper-step.fgc-stepper__step--done .vrun-stepper-label,
+.vrun-stepper-step.fgc-stepper__step--running .vrun-stepper-label {
+  color: var(--color-text-primary);
+  font-weight: 600;
 }
 
 .vrun-stepper-step.fgc-stepper__step--failed .vrun-stepper-dot {
+  border-color: var(--color-status-error-solid);
   color: var(--color-text-inverse);
   background: var(--color-status-error-solid);
 }
@@ -328,7 +355,14 @@
 .vrun-target-col-refund { width: 6.5rem; }
 .vrun-target-col-reason { width: 12rem; }
 
+/*
+ * 공통 .kpi-grid 는 3열이라 4블록이 3+1 로 떨어져 마지막 칸만 홀로 남는다.
+ * 결과 요약은 항상 4개(1,200%·차익거래·원장·대사)이므로 2열로 고정해 2×2 로 맞춘다.
+ * 좁은 화면 1열 전환은 아래 반응형 블록에서 다시 푼다 — 여기 기본 규칙이
+ * components.css 의 미디어쿼리보다 뒤에 오므로 그쪽 값이 이기지 못한다.
+ */
 .vrun-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: var(--space-3) var(--space-4);
 }
 
@@ -421,6 +455,11 @@
 }
 
 @media (max-width: 47.9375rem) {
+  /* 2열 고정을 여기서 푼다 — 폭이 좁으면 카드 안 숫자가 줄바꿈된다. */
+  .vrun-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .vrun-create-month,
   .vrun-create-type,
   .vrun-filter-status {
