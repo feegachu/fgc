@@ -1,16 +1,16 @@
 .contract-list-page {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .contract-detail-page {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .contract-form-page {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .contract-form-page-header {
@@ -19,7 +19,7 @@
 }
 
 .form-error-summary {
-  padding: 0.75rem 1rem;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-status-error-border);
   border-radius: var(--radius-8);
   color: var(--color-status-error-text);
@@ -29,27 +29,28 @@
 }
 
 .form-error-summary p {
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
 }
 
 .contract-request-id {
-  font-family: var(--font-mono);
   font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .contract-form-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.03fr);
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .contract-form-left-column {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .contract-form-card {
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 4px;
   border-radius: var(--radius-12);
 }
 
@@ -67,8 +68,8 @@
 
 .contract-form-card-header {
   min-height: 4rem;
-  margin-inline: 1.25rem;
-  padding-top: 0.875rem;
+  margin-inline: var(--space-5);
+  padding-top: var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -87,13 +88,13 @@
 .contract-form-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  padding: 0.75rem 1.25rem 1rem;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) var(--space-4);
 }
 
 .contract-form-fields .field {
   align-content: start;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .contract-form-fields .field-label {
@@ -128,50 +129,20 @@
 }
 
 .contract-agent-fields {
-  padding-bottom: 0.75rem;
-}
-
-.contract-form-guidance {
-  display: grid;
-  min-height: 7.75rem;
-  grid-template-columns: 1.25rem minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: center;
-  margin: 0 1.25rem 1rem;
-  padding: 1rem;
-  border: 1px solid var(--color-status-info-border);
-  border-radius: var(--radius-8);
-  color: var(--color-status-info-text);
-  background: var(--color-status-info-bg);
-}
-
-.contract-form-guidance > .material-symbols-rounded {
-  font-size: 1.25rem;
-}
-
-.contract-form-guidance h3 {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  line-height: 1.25rem;
-}
-
-.contract-form-guidance p {
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  line-height: 1.125rem;
+  padding-bottom: var(--space-3);
 }
 
 .contract-premium-fields {
-  padding-bottom: 0.75rem;
+  padding-bottom: var(--space-3);
 }
 
 .contract-limit-preview {
   display: grid;
   min-height: 8rem;
   align-content: center;
-  gap: 0.5rem;
-  margin: 0 1.25rem;
-  padding: 1.25rem;
+  gap: var(--space-2);
+  margin: 0 var(--space-5);
+  padding: var(--space-5);
   border: 1px solid var(--color-border-focus);
   border-radius: var(--radius-12);
   background: var(--color-bg-surface);
@@ -187,7 +158,7 @@
 .contract-limit-value-row {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .contract-limit-value-row strong {
@@ -204,58 +175,22 @@
   line-height: 1.125rem;
 }
 
-.contract-save-flow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--color-text-link);
-  font-size: 0.875rem;
-  font-weight: 700;
-  line-height: 1.25rem;
-}
-
-.contract-atomic-guidance {
-  min-height: 7.75rem;
-  margin-top: 2.5rem;
-}
-
 .contract-form-actions {
   display: flex;
   min-height: 5.125rem;
   grid-column: 1 / -1;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
-  padding: 0.75rem 1rem 0.75rem 1.25rem;
+  gap: var(--space-6);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
   border-radius: var(--radius-12);
-}
-
-.contract-action-guidance {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.contract-action-guidance strong {
-  display: block;
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
-}
-
-.contract-action-guidance p {
-  margin-top: 0.25rem;
-  color: var(--color-text-secondary);
-  font-size: 0.6875rem;
-  line-height: 1rem;
 }
 
 .contract-action-buttons {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .contract-save-button {
@@ -276,34 +211,25 @@
   .contract-premium-card {
     min-height: 0;
   }
-
-  .contract-atomic-guidance {
-    margin-top: 1rem;
-  }
 }
 
 @media (max-width: 47.9375rem) {
   .contract-form-fields {
     grid-template-columns: 1fr;
-    padding-inline: 1rem;
+    padding-inline: var(--space-4);
   }
 
   .contract-form-card-header {
-    margin-inline: 1rem;
+    margin-inline: var(--space-4);
   }
 
-  .contract-form-guidance,
   .contract-limit-preview {
-    margin-inline: 1rem;
+    margin-inline: var(--space-4);
   }
 
   .contract-form-actions {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .contract-action-guidance {
-    align-items: flex-start;
   }
 
   .contract-action-buttons,
@@ -327,7 +253,8 @@
 }
 
 .contract-summary-card {
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 4px;
 }
 
 .contract-summary-primary {
@@ -335,8 +262,8 @@
   min-height: 4.75rem;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
-  padding: 0.875rem 1rem 0.75rem;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-4) var(--space-3);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -358,12 +285,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .contract-summary-number {
-  margin-right: 0.25rem;
+  margin-right: var(--space-1);
   font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.75rem;
@@ -376,7 +303,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .contract-summary-actions .button {
@@ -394,16 +321,12 @@
   pointer-events: none;
 }
 
-.contract-recheck-form {
-  display: contents;
-}
-
 .contract-summary-grid {
   display: grid;
   grid-template-columns: 0.8fr 1.45fr 0.8fr 1.15fr;
-  column-gap: 1.5rem;
-  row-gap: 0.75rem;
-  padding: 0.75rem 1rem 1rem;
+  column-gap: var(--space-6);
+  row-gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .contract-summary-item {
@@ -412,7 +335,7 @@
 
 .contract-summary-item dd {
   overflow: hidden;
-  margin-top: 0.125rem;
+  margin-top: var(--space-1);
   color: var(--color-text-primary);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -422,60 +345,12 @@
 }
 
 .contract-detail-tabs {
-  width: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--color-border-default);
-  scrollbar-width: thin;
-}
-
-.contract-detail-tab-list {
-  display: flex;
-  width: max-content;
-  min-width: 100%;
-  align-items: flex-end;
-  gap: 0.25rem;
-}
-
-.contract-detail-tab {
-  position: relative;
-  display: inline-flex;
-  min-width: 6.5rem;
-  height: 2.5rem;
-  align-items: center;
-  justify-content: center;
-  padding: 0 1rem;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.contract-detail-tab:hover {
-  color: var(--color-text-primary);
-  text-decoration: none;
-  background: var(--color-bg-surface);
-}
-
-.contract-detail-tab.is-active {
-  color: var(--color-text-primary);
-  font-weight: 700;
-}
-
-.contract-detail-tab.is-active::after {
-  position: absolute;
-  right: 50%;
-  bottom: -1px;
-  width: 2.5rem;
-  height: 0.125rem;
-  border-radius: var(--radius-full);
-  background: var(--color-action-primary);
-  content: "";
-  transform: translateX(50%);
+  scrollbar-color: var(--color-neutral-300) transparent;
 }
 
 .contract-basic-card {
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 4px;
 }
 
 .contract-basic-header {
@@ -483,14 +358,14 @@
   min-height: 4rem;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.625rem 1rem;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .contract-basic-header > div > p,
 .contract-lazy-note {
-  margin-top: 0.125rem;
+  margin-top: var(--space-1);
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   line-height: 1.125rem;
@@ -504,14 +379,15 @@
 .contract-basic-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.85fr) minmax(18rem, 0.95fr);
-  gap: 1rem;
-  padding: 1rem;
+  gap: var(--space-4);
+  padding: var(--space-4);
 }
 
 .contract-information-panel,
 .contract-history-panel,
 .contract-data-panel {
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 4px;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-8);
   background: var(--color-bg-surface);
@@ -522,7 +398,7 @@
   display: flex;
   min-height: 3rem;
   align-items: center;
-  padding: 0 1rem;
+  padding: 0 var(--space-4);
   border-bottom: 1px solid var(--color-border-default);
   background: var(--color-bg-subtle);
   font-size: 0.8125rem;
@@ -535,8 +411,8 @@
   min-height: 4.125rem;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.625rem 0.75rem 0.625rem 1rem;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-default);
   background: var(--color-bg-subtle);
 }
@@ -548,7 +424,7 @@
 }
 
 .contract-history-panel-header p {
-  margin-top: 0.125rem;
+  margin-top: var(--space-1);
   color: var(--color-text-secondary);
   font-size: 0.6875rem;
   line-height: 1rem;
@@ -557,8 +433,8 @@
 .contract-history-sort {
   display: inline-flex;
   flex: 0 0 auto;
-  gap: 0.125rem;
-  padding: 0.125rem;
+  gap: var(--space-1);
+  padding: var(--space-1);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-8);
   background: var(--color-bg-surface);
@@ -567,8 +443,8 @@
 .contract-history-sort-button {
   min-width: 3.25rem;
   height: 1.625rem;
-  padding-inline: 0.5rem;
-  border-radius: calc(var(--radius-8) - 2px);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-6);
   color: var(--color-text-secondary);
   font-size: 0.6875rem;
   font-weight: 500;
@@ -593,7 +469,7 @@
 .contract-information-item {
   min-width: 0;
   min-height: 3.5rem;
-  padding: 0.625rem 1rem;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -607,7 +483,7 @@
 
 .contract-information-item dd {
   overflow: hidden;
-  margin-top: 0.125rem;
+  margin-top: var(--space-1);
   color: var(--color-text-primary);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -619,16 +495,16 @@
 .contract-side-panels {
   display: grid;
   align-content: start;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .contract-history-list {
   position: relative;
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
   max-height: 25rem;
   overflow-y: auto;
-  padding: 0.875rem 1rem 1rem;
+  padding: var(--space-4) var(--space-4) var(--space-4);
 }
 
 .contract-history-list::before {
@@ -645,7 +521,7 @@
   position: relative;
   display: grid;
   grid-template-columns: 0.75rem minmax(0, 1fr);
-  gap: 0.625rem;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -654,14 +530,15 @@
   z-index: 1;
   width: 0.75rem;
   height: 0.75rem;
-  margin-top: 0.625rem;
+  margin-top: var(--space-3);
   border: 3px solid var(--color-action-primary);
   border-radius: var(--radius-full);
   background: var(--color-bg-surface);
 }
 
 .contract-history-event-card {
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 4px;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-8);
   background: var(--color-bg-surface);
@@ -672,8 +549,8 @@
   min-height: 2.5rem;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-subtle);
 }
@@ -692,8 +569,8 @@
 .contract-history-times {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-  padding: 0.625rem 0.75rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3);
 }
 
 .contract-history-times > div {
@@ -709,7 +586,7 @@
 
 .contract-history-times dd {
   overflow: hidden;
-  margin-top: 0.125rem;
+  margin-top: var(--space-1);
   font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1rem;
@@ -725,10 +602,10 @@
 .contract-processing-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(6.75rem, auto);
-  gap: 0.5rem;
+  gap: var(--space-2);
   min-height: 2.25rem;
   align-items: center;
-  padding: 0.375rem 0.75rem;
+  padding: var(--space-2) var(--space-3);
 }
 
 .contract-processing-row + .contract-processing-row {
@@ -765,10 +642,10 @@
   z-index: 1;
   display: grid;
   grid-template-columns: 1.25rem minmax(0, 1fr);
-  gap: 0.625rem;
+  gap: var(--space-3);
   min-height: 5rem;
   align-content: center;
-  padding: 0.75rem;
+  padding: var(--space-3);
   border: 1px dashed var(--color-border-default);
   border-radius: var(--radius-8);
   background: var(--color-bg-surface);
@@ -784,7 +661,7 @@
 }
 
 .contract-history-empty p {
-  margin-top: 0.125rem;
+  margin-top: var(--space-1);
   color: var(--color-text-secondary);
   font-size: 0.6875rem;
   line-height: 1rem;
@@ -797,80 +674,37 @@
 .contract-lazy-panel .empty-state {
   min-height: 12rem;
   align-content: center;
-  padding: 2rem;
-}
-
-.contract-lazy-panel-header,
-.contract-tab-result-section > header,
-.contract-cap-result-card > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  padding: var(--space-8);
 }
 
 .contract-lazy-panel-header {
-  padding-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.contract-lazy-panel-header {
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.contract-lazy-panel-header p,
-.contract-tab-meta,
-.contract-tab-empty {
-  margin-top: 0.25rem;
+.contract-lazy-panel-header > div > p {
+  margin-top: var(--space-1);
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   line-height: 1.125rem;
 }
 
-.contract-tab-result-section + .contract-tab-result-section {
-  margin-top: 1rem;
-}
-
-.contract-tab-table {
-  width: 100%;
-  margin-top: 0.625rem;
-}
-
-.contract-cap-result-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.contract-cap-result-card {
-  padding: 1rem;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-8);
-}
-
-.contract-cap-result-card dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.contract-cap-result-card dt {
-  color: var(--color-text-secondary);
-  font-size: 0.6875rem;
-}
-
-.contract-cap-result-card dd {
-  margin-top: 0.125rem;
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .contract-data-panel dl {
   display: grid;
-  padding: 0.5rem 1rem 0.75rem;
+  padding: var(--space-2) var(--space-4) var(--space-3);
 }
 
 .contract-data-panel dl > div {
   display: grid;
   grid-template-columns: 5.25rem minmax(0, 1fr);
-  gap: 0.75rem;
+  gap: var(--space-3);
   min-height: 1.75rem;
   align-items: center;
 }
@@ -899,7 +733,7 @@
   .contract-summary-primary {
     align-items: flex-start;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .contract-summary-actions {
@@ -914,7 +748,7 @@
 
 @media (max-width: 47.9375rem) {
   .contract-detail-page {
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .contract-summary-actions {
@@ -923,16 +757,9 @@
   }
 
   .contract-summary-actions .button,
-  .contract-summary-actions .button:nth-child(2),
-  .contract-summary-actions .contract-recheck-form,
-  .contract-summary-actions .contract-recheck-form .button {
+  .contract-summary-actions .button:nth-child(2) {
     width: 100%;
     min-width: 0;
-  }
-
-  .contract-recheck-form {
-    display: block;
-    grid-column: 1 / -1;
   }
 
   .contract-summary-grid,
@@ -952,6 +779,14 @@
   .contract-basic-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .contract-tab-body {
+    padding-inline: var(--space-3);
+  }
+
+  .contract-tab-guidance {
+    margin-inline: var(--space-3);
   }
 
   .contract-history-panel-header {
@@ -980,7 +815,8 @@
 
 .contract-filter-card,
 .contract-results-card {
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 4px;
 }
 
 .contract-section-header {
@@ -988,32 +824,14 @@
   min-height: 2.25rem;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.375rem 1rem 0;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4) 0;
 }
 
 .contract-reset-button {
   min-width: 4.25rem;
   height: 1.75rem;
   font-size: 0.75rem;
-}
-
-.contract-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
-  padding: 0.25rem 1rem 1rem;
-}
-
-.contract-filter-grid .field-control,
-.contract-filter-grid .select-control {
-  width: 100%;
-}
-
-.contract-filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 1rem 1rem;
 }
 
 .contract-results-header {
@@ -1031,7 +849,7 @@
 
 .contract-table-viewport {
   width: calc(100% - 2rem);
-  margin-inline: 1rem;
+  margin-inline: var(--space-4);
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-color: var(--color-neutral-300) transparent;
@@ -1044,15 +862,20 @@
   table-layout: fixed;
 }
 
-.contract-col-number { width: 4.625rem; }
-.contract-col-insurer { width: 4.5rem; }
+/*
+ * contract_no 는 최대 80자(form.html maxlength)라 4.625rem 에서는 거의 항상 잘렸고
+ * 보험회사도 한글 4~5자를 담지 못했다 — [전체 보기]가 대부분의 행에 뜨는 상태였다.
+ * 자주 잘리는 두 컬럼을 넓히고 판정·출처처럼 배지만 들어가는 컬럼에서 폭을 회수한다.
+ */
+.contract-col-number { width: 8.5rem; }
+.contract-col-insurer { width: 6.5rem; }
 .contract-col-product { width: 11.75rem; }
 .contract-col-date { width: 5.75rem; }
 .contract-col-premium { width: 8.25rem; }
 .contract-col-agent { width: 8.5rem; }
 .contract-col-status { width: 5.25rem; }
-.contract-col-cap { width: 8.25rem; }
-.contract-col-origin { width: 6.625rem; }
+.contract-col-cap { width: 7rem; }
+.contract-col-origin { width: 6rem; }
 
 .contract-table th,
 .contract-table td {
@@ -1066,7 +889,7 @@
 
 .contract-table th:first-child,
 .contract-table td:first-child {
-  padding-left: 0.75rem;
+  padding-left: var(--space-3);
 }
 
 .contract-table td a {
@@ -1081,10 +904,6 @@
   border-bottom-color: var(--color-border-strong);
 }
 
-.contract-server-row:not(.is-rendered) {
-  display: none;
-}
-
 .contract-empty-row td {
   height: auto;
   padding: 0;
@@ -1094,60 +913,26 @@
   min-height: 16.5rem;
 }
 
-.contract-premium-help {
-  display: grid;
-  width: 100%;
-  min-width: 68rem;
-  min-height: 2.75rem;
-  grid-template-columns: 1.25rem minmax(0, 1fr);
-  gap: 0.625rem;
-  align-items: center;
-  margin-top: 0.125rem;
-  padding: 0.5rem 0.75rem;
-  border-top: 1px solid var(--color-neutral-0);
-  border-radius: var(--radius-6);
-  color: var(--color-text-secondary);
-  background: #edf4ff;
-  box-shadow: 0 -1px 0 var(--color-border-default);
-}
-
-.contract-premium-help > .material-symbols-rounded {
-  color: var(--color-action-primary);
-  font-size: 1rem;
-}
-
-.contract-premium-help h3 {
-  color: var(--color-text-primary);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.125rem;
-}
-
-.contract-premium-help p {
-  font-size: 0.6875rem;
-  line-height: 1rem;
-}
-
 .contract-pagination {
   display: flex;
   min-height: 2.5rem;
   align-items: center;
   justify-content: flex-end;
-  gap: 1rem;
-  margin: 2.5rem 1rem 0;
-  padding-inline: 0.75rem;
+  gap: var(--space-4);
+  margin: var(--space-10) var(--space-4) 0;
+  padding-inline: var(--space-3);
   border-top: 1px solid var(--color-border-default);
 }
 
 @media (max-width: 63.9375rem) {
-  .contract-filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .contract-filter-fields > .filter-field {
+    min-width: 10rem;
   }
 }
 
 @media (max-width: 47.9375rem) {
   .contract-list-page {
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .contract-page-header .page-header-actions,
@@ -1155,17 +940,189 @@
     width: 100%;
   }
 
-  .contract-filter-grid {
-    grid-template-columns: 1fr;
+  .contract-filter-fields,
+  .contract-filter-fields > .filter-field {
+    width: 100%;
+    /* 공통 .filter-field 의 width:100% 를 max-width 가 이기지 않도록 여기서 푼다. */
+    max-width: none;
   }
 
   .contract-table-viewport {
     width: calc(100% - 1.5rem);
-    margin-inline: 0.75rem;
+    margin-inline: var(--space-3);
   }
 
   .contract-pagination {
-    margin-inline: 0.75rem;
+    margin-inline: var(--space-3);
     padding-inline: 0;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * #283 공통 컴포넌트 전환으로 추가된 화면 전용 보정.
+ * 공통 클래스(filter-bar · tab-list · data-table-viewport · guidance)가
+ * 담지 못하는 폭·여백만 여기서 덮는다.
+ * ───────────────────────────────────────────────────────────────────── */
+
+/* surface-header 의 padding-inline 을 상쇄한다 — 이 헤더는 margin-inline 으로 들여쓴다. */
+.contract-form-card-header {
+  padding-inline: 0;
+}
+
+.contract-form-card-header > div {
+  min-width: 0;
+}
+
+.contract-filter-bar {
+  align-items: flex-end;
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-1) var(--space-4) var(--space-4);
+}
+
+.contract-filter-fields {
+  flex: 1 1 auto;
+}
+
+.contract-filter-fields > .filter-field {
+  min-width: 11rem;
+  max-width: 16rem;
+  flex: 1 1 11rem;
+}
+
+.contract-filter-fields .field-control,
+.contract-filter-fields .select-control {
+  width: 100%;
+}
+
+.contract-filter-actions {
+  flex: 0 0 auto;
+}
+
+.contract-filter-retry {
+  justify-self: start;
+  min-width: 0;
+  height: 1.5rem;
+  padding-inline: var(--space-1);
+  font-size: 0.6875rem;
+}
+
+/* 로딩과 실패가 시각적으로 같아 보이면 사용자는 기다려야 할지 다시 눌러야 할지 모른다. */
+.select-control.is-loading {
+  color: var(--color-text-secondary);
+  background-image: none;
+}
+
+.select-control.is-error {
+  border-color: var(--color-status-error-border);
+  color: var(--color-status-error-text);
+}
+
+/* 권한이 없어 버튼이 비활성인 이유 — aria-describedby 로 버튼과 연결한다 (가이드 §7.2). */
+.contract-permission-note {
+  padding: 0 var(--space-4) var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.contract-save-hint {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-wrap: pretty;
+}
+
+/* 탭 패널 본문 — 헤더는 그대로 두고 이 안만 교체한다. */
+.contract-tab-body {
+  padding: var(--space-4);
+}
+
+.contract-tab-guidance {
+  margin: var(--space-4) var(--space-4) 0;
+}
+
+.contract-tab-section + .contract-tab-section {
+  margin-top: var(--space-4);
+}
+
+.contract-tab-section > .surface-header {
+  padding-inline: 0;
+}
+
+.contract-tab-viewport {
+  margin-top: var(--space-3);
+}
+
+/* 로딩 · 빈 · 오류를 한 클래스로 처리하지 않는다. */
+.contract-tab-state {
+  min-height: 9rem;
+  gap: var(--space-3);
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-8);
+}
+
+.contract-tab-state.is-error {
+  border-style: solid;
+  border-color: var(--color-status-error-border);
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
+.contract-lazy-note.is-error {
+  color: var(--color-status-error-text);
+  font-weight: 500;
+}
+
+.contract-lazy-note.is-done {
+  color: var(--color-text-tertiary);
+}
+
+.contract-history-empty.is-error {
+  border-style: solid;
+  border-color: var(--color-status-error-border);
+  background: var(--color-status-error-bg);
+}
+
+.contract-history-empty.is-error .material-symbols-rounded,
+.contract-history-empty.is-error strong {
+  color: var(--color-status-error-text);
+}
+
+/* 표 안 긴 값 — 셀 전체가 nowrap 이라 disclosure 만 wrap 을 되살린다. */
+.contract-disclosure-cell {
+  white-space: normal;
+}
+
+.contract-table .contract-disclosure-cell .table-cell-preview {
+  line-height: 1.25rem;
+}
+
+.contract-table .table-cell-full {
+  font-size: 0.75rem;
+}
+
+/*
+ * 포커스 링.
+ * 공통 :focus-visible 은 outline + box-shadow 로 그리는데, 이 화면의 카드들은
+ * overflow: clip 이라 clip-margin 밖으로 나가면 잘린다 — 위쪽에서 4px 여유를 줬다.
+ */
+.contract-detail-tabs .tab-button:focus-visible,
+.contract-history-sort-button:focus-visible,
+.contract-reset-button:focus-visible,
+.contract-summary-actions .button:focus-visible,
+.contract-filter-retry:focus-visible,
+.contract-table-viewport:focus-visible,
+.contract-tab-viewport:focus-visible,
+.contract-lazy-panel:focus-visible,
+.contract-basic-card:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: -2px;
+  box-shadow: var(--shadow-focus);
+}
+
+.contract-table-viewport:focus-visible,
+.contract-tab-viewport:focus-visible {
+  border-radius: var(--radius-6);
 }
