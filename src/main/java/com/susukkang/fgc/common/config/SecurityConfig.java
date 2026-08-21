@@ -17,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 // FUN-001 개발 순서 1
 
@@ -43,6 +44,10 @@ public class SecurityConfig {
     public AccessDeniedHandler apiAccessDeniedHandler(
             GlobalExceptionHandler globalExceptionHandler, ObjectMapper objectMapper) {
         return (request, response, exception) -> {
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                return;
+            }
             var entity = globalExceptionHandler.handleAccessDenied(exception);
             response.setStatus(entity.getStatusCode().value());
             response.setCharacterEncoding("UTF-8");
@@ -63,7 +68,8 @@ public class SecurityConfig {
                 // 기존 코드: 지급 API 경로만 CSRF 보호 체인에 포함
                 // 문제: 세션 쿠키를 사용하는 대사 실행 POST가 위조 요청에 노출
                 // 개선: IF-API-38 경로를 동일한 보호 체인에 추가
-                .securityMatcher("/api/v1/transactions/**", "/api/v1/reconciliations/**",
+                .securityMatcher("/api/v1/transactions/**",
+                        "/api/v1/reconciliations/**",
                         "/api/v1/journals/**")
                 // 2026-08-11 yslee - 세션 쿠키 기반 지급 API의 CSRF 보호 활성화
                 // 기존 코드: /api/** 전체에서 CSRF 검증을 비활성화
@@ -96,9 +102,8 @@ public class SecurityConfig {
      *  적어 두었다. 즉 화면이 세션 쿠키로 /api/** 를 Ajax 호출하는 것이 설계된 동작이다.
      *  STATELESS 를 켜면 로그인한 사용자의 화면 Ajax 가 전부 401 이 된다.
      *
-     * ⚠ 이 체인은 아직 CSRF 전환을 마치지 않은 나머지 /api/**의 호환용 체인이다.
-     *  FUN-065 지급 API는 위의 우선 체인에서 CSRF를 검증한다. 다른 상태 변경 API도
-     *  담당 화면이 X-CSRF-TOKEN을 전송하도록 준비한 뒤 보호 체인으로 전환해야 한다.
+     * 화면 Ajax가 세션 쿠키로 /api/**를 호출하므로, Spring Security 기본 CSRF
+     * 검증을 모든 상태 변경 요청에 적용한다(SRC-028).
      */
     @Bean
     @Order(2)
@@ -106,7 +111,6 @@ public class SecurityConfig {
             HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler) throws Exception {
         http
                 .securityMatcher("/api/**")
-                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         // 감사로그 API(IF-API-52)는 아직 미구현이지만 구현 시점에 바로
                         // 적용되도록 선제 등록한다.

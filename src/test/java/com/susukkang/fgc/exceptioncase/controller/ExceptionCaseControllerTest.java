@@ -38,6 +38,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -116,7 +117,7 @@ class ExceptionCaseControllerTest {
                 eq(1L), eq("settle01"))).willReturn(response);
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -152,7 +153,7 @@ class ExceptionCaseControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -189,7 +190,7 @@ class ExceptionCaseControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isBadRequest())
@@ -205,7 +206,7 @@ class ExceptionCaseControllerTest {
                 "\"reason\":\"금액 정정\"", "\"reason\":\" \"");
 
         mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isBadRequest())
@@ -221,7 +222,7 @@ class ExceptionCaseControllerTest {
                 "\"debitAmount\":1000", "\"debitAmount\":10000000000000");
 
         mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isBadRequest())
@@ -241,7 +242,7 @@ class ExceptionCaseControllerTest {
                         eq(1L), eq("settle01"));
 
         mockMvc.perform(post("/api/v1/exceptions/30/journal-correction")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCorrectionRequest()))
                 .andExpect(status().isConflict())
@@ -273,7 +274,7 @@ class ExceptionCaseControllerTest {
                 .action(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isBadRequest())
@@ -296,7 +297,7 @@ class ExceptionCaseControllerTest {
                 eq(1L), eq("settle01"))).willReturn(response);
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -315,7 +316,7 @@ class ExceptionCaseControllerTest {
                 null);
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -338,7 +339,7 @@ class ExceptionCaseControllerTest {
                 .action(eq(10L), any(ExceptionActionRequest.class), eq(1L), eq("settle01"));
 
         mockMvc.perform(post("/api/v1/exceptions/10/actions")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .with(user(principal(1L, "settle01", "SETTLEMENT"))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())

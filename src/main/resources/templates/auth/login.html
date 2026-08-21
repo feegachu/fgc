@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="FGC GA 수수료 정산·검증 플랫폼 로그인">
   <meta name="theme-color" content="#467AA2">
+  <meta name="_csrf" th:if="${qaRequestLabEnabled and _csrf != null}" th:content="${_csrf.token}">
+  <meta name="_csrf_header" th:if="${qaRequestLabEnabled and _csrf != null}" th:content="${_csrf.headerName}">
   <title>로그인 | FGC</title>
   <link rel="icon" type="image/png" th:href="@{/images/brand/favicon-32.png}">
   <link rel="stylesheet" th:href="@{/css/common/variables.css}">
@@ -12,6 +14,7 @@
   <link rel="stylesheet" th:href="@{/css/common/components.css}">
   <link rel="stylesheet" th:href="@{/css/features/auth.css}">
   <script th:src="@{/js/features/auth/login.js}" defer></script>
+  <script th:if="${qaRequestLabEnabled}" th:src="@{/js/features/auth/qa-request-lab.js}" defer></script>
 </head>
 <body class="auth-page">
 <main class="auth-layout">
@@ -27,7 +30,7 @@
     <footer class="auth-brand-footer"><p>접속 기록과 주요 변경 이력은 감사로그에 안전하게 남습니다.</p><p>FGC v2.0</p></footer>
   </aside>
 
-  <section class="auth-surface" aria-labelledby="login-title">
+  <section class="auth-surface" aria-labelledby="login-title" th:classappend="${qaRequestLabEnabled} ? ' auth-surface--with-qa'">
     <div class="auth-login-content">
       <img class="auth-mobile-logo" th:src="@{/images/brand/logo-horizontal-flat.png}" alt="FGC" width="96" height="40">
       <div class="auth-heading-anchor" aria-hidden="true"></div>
@@ -43,6 +46,46 @@
         </span></label>
         <button class="button button-primary button-large auth-submit" type="submit">로그인</button>
       </form>
+
+      <details class="auth-request-lab" data-qa-request-lab th:if="${qaRequestLabEnabled}">
+        <summary>로컬 QA · HTTP 요청 보내기</summary>
+        <div class="auth-request-lab-body">
+          <p class="auth-request-lab-help">미로그인 상태를 검사하거나, 로그인 후 다시 <code>/login</code>으로 돌아와 현재 역할의 요청을 보낼 수 있습니다. 쓰기 요청은 테스트 DB에서만 실행하세요.</p>
+
+          <div class="auth-request-presets" aria-label="자주 쓰는 QA 경로">
+            <button type="button" data-qa-path="/api/v1/contracts">계약 목록</button>
+            <button type="button" data-qa-path="/api/v1/contracts/1/cap-check">계약 한도 재검증</button>
+            <button type="button" data-qa-path="/api/v1/validation-runs">통합검증</button>
+            <button type="button" data-qa-path="/api/v1/validation-runs/1/execute">검증 실행</button>
+            <button type="button" data-qa-path="/api/v1/audit-logs">감사로그</button>
+          </div>
+
+          <label class="field auth-request-field">
+            <span class="field-label">API 경로</span>
+            <input class="field-control auth-control" type="text" value="/api/v1/contracts" data-qa-path-input spellcheck="false">
+          </label>
+
+          <label class="field auth-request-field">
+            <span class="field-label">JSON 바디 <span>(없으면 비워 두기)</span></span>
+            <textarea class="field-control auth-request-body" data-qa-body-input spellcheck="false" placeholder='{"field":"value"}'></textarea>
+          </label>
+
+          <label class="auth-request-csrf">
+            <input type="checkbox" data-qa-include-csrf checked>
+            <span>CSRF 헤더 포함</span>
+          </label>
+
+          <div class="auth-request-methods" aria-label="HTTP 메서드">
+            <button type="button" data-qa-method="GET">GET</button>
+            <button type="button" data-qa-method="POST">POST</button>
+            <button type="button" data-qa-method="PUT">PUT</button>
+            <button type="button" data-qa-method="PATCH">PATCH</button>
+            <button type="button" data-qa-method="DELETE">DELETE</button>
+          </div>
+
+          <pre class="auth-request-result" data-qa-result aria-live="polite">요청 결과가 여기에 표시됩니다.</pre>
+        </div>
+      </details>
     </div>
   </section>
 </main>

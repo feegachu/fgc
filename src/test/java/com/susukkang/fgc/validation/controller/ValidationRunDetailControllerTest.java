@@ -39,6 +39,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -177,7 +178,7 @@ class ValidationRunDetailControllerTest {
     void executeReturns202WithSpecLiteralRunningStatus() throws Exception {
         given(validationRunExecuteService.execute(eq(100L), eq(1L), anyString())).willReturn(createdRow());
 
-        mockMvc.perform(post("/api/v1/validation-runs/100/execute").with(user(settlementPrincipal())))
+        mockMvc.perform(post("/api/v1/validation-runs/100/execute").with(user(settlementPrincipal())).with(csrf()))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.data.validationRunId").value(100))
                 // 202 바디의 status는 스펙 리터럴 "RUNNING"(§4-2) — DB 진실은 IF-API-49 폴링이 본다
@@ -210,7 +211,7 @@ class ValidationRunDetailControllerTest {
         given(validationRunExecuteService.execute(eq(100L), eq(1L), anyString()))
                 .willThrow(new FgcBusinessException(FgcErrorCode.VRUN_003));
 
-        mockMvc.perform(post("/api/v1/validation-runs/100/execute").with(user(settlementPrincipal())))
+        mockMvc.perform(post("/api/v1/validation-runs/100/execute").with(user(settlementPrincipal())).with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("FGC-VRUN-003"));
     }
@@ -221,7 +222,7 @@ class ValidationRunDetailControllerTest {
                 .willThrow(new FgcBusinessException(FgcErrorCode.VRUN_004,
                         Map.of("from", "RUNNING", "to", "RUNNING")));
 
-        mockMvc.perform(post("/api/v1/validation-runs/100/execute").with(user(settlementPrincipal())))
+        mockMvc.perform(post("/api/v1/validation-runs/100/execute").with(user(settlementPrincipal())).with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("FGC-VRUN-004"));
     }
