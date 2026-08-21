@@ -20,227 +20,271 @@
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-LEDG-W01', '검증원장 조회', null, null)}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-list publishing-page-ledger"
+<main id="main-content" class="page-content ledger-page"
       th:attr="data-can-reverse=${roleCode == 'SETTLEMENT' or roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'},data-selected-journal-id=${selectedJournalId}">
 
-  <h1 class="fgc-page-title">검증원장 조회</h1>
-  <p class="fgc-page-desc">
-    <strong>복식부기</strong>(하나의 거래를 차변·대변 두 쪽에 같은 금액으로 적는 방식)로
-    돈의 흐름을 기록해 두고, 양쪽 합계가 맞는지 확인합니다.
-  </p>
+  <header class="page-header">
+    <div class="page-header-copy">
+      <h1 class="page-title">검증원장 조회</h1>
+    </div>
+  </header>
 
-  <!-- 상단 고정 안내 -->
-  <div class="fgc-banner fgc-banner--muted" style="margin-top:12px">
-    <span class="material-symbols-outlined" style="font-size:18px">menu_book</span>
-    <!-- 원장 안내 문구(FGC.NOTICE.LEDGER)는 메시지 프로퍼티로 채운다 -->
-    <span><strong id="notice-ledger">이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.</strong></span>
-  </div>
+  <!-- 정식 회계장부 오인 방지 문구는 인터페이스정의서가 지정한 고정 안내라 삭제하지 않는다. -->
+  <aside class="guidance guidance-neutral" aria-labelledby="notice-ledger">
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">menu_book</span>
+    <div>
+      <strong class="guidance-title" id="notice-ledger">이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.</strong>
+    </div>
+  </aside>
 
-  <!-- 고정 문구 -->
-  <div class="fgc-banner fgc-banner--warn" style="margin-top:10px">
-    <span class="material-symbols-outlined" style="font-size:18px">edit_off</span>
-    <span><strong>수정·삭제는 없습니다. 잘못됐으면 역분개로 고칩니다.</strong>
-      잘못된 분개를 지우면 "그때 무슨 일이 있었는지"가 사라지기 때문입니다.</span>
-  </div>
+  <!-- IF-API-37 결과가 있을 때만 표시한다. 미연동을 0건 성공으로 표현하지 않는다. -->
+  <aside class="guidance guidance-warning" id="imbalance-banner" role="alert" hidden>
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">error</span>
+    <p class="guidance-copy" id="imbalance-text"></p>
+  </aside>
+  <aside class="guidance guidance-neutral" id="balance-banner" role="status" aria-live="polite" hidden>
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">info</span>
+    <p class="guidance-copy" data-balance-message></p>
+  </aside>
 
-  <!-- ① 검색 -->
-  <section class="fgc-card" style="margin-top:16px">
-    <form class="fgc-card__body fgc-toolbar" id="ledger-filter-form" method="get" th:action="@{/journals}">
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-from">분개일 (시작)</label>
-        <input class="fgc-input" id="f-from" name="from" type="date"
+  <!-- 확정 분개를 직접 고치지 않는 업무 제약도 오용 방지를 위해 유지한다. -->
+  <aside class="guidance guidance-warning">
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">edit_off</span>
+    <div>
+      <strong class="guidance-title">수정·삭제는 없습니다. 잘못됐으면 역분개로 고칩니다.</strong>
+      <p class="guidance-copy">잘못된 분개를 지우면 그때 무슨 일이 있었는지 확인할 수 없기 때문입니다.</p>
+    </div>
+  </aside>
+
+  <!-- IF-API-34 검색은 이 폼을 명시적으로 제출할 때만 실행한다. -->
+  <form class="filter-bar ledger-filter-bar" id="ledger-filter-form" method="get" th:action="@{/journals}"
+        aria-label="검증원장 검색 조건">
+    <div class="filter-fields ledger-filter-fields">
+      <div class="filter-field ledger-filter-date">
+        <label class="filter-field-label" for="f-from">분개일 (시작)</label>
+        <input class="field-control" id="f-from" name="from" type="date"
                th:value="${fromFilter ?: month + '-01'}" value="2026-07-01">
       </div>
-      <div class="fgc-field" style="min-width:130px">
-        <label class="fgc-label" for="f-to">분개일 (끝)</label>
-        <input class="fgc-input" id="f-to" name="to" type="date"
+      <div class="filter-field ledger-filter-date">
+        <label class="filter-field-label" for="f-to">분개일 (끝)</label>
+        <input class="field-control" id="f-to" name="to" type="date"
                th:value="${toFilter ?: T(java.time.YearMonth).parse(month).atEndOfMonth()}" value="2026-07-31">
       </div>
-      <div class="fgc-field" style="min-width:220px">
-        <label class="fgc-label" for="f-type">분개 유형</label>
-        <select class="fgc-select" id="f-type" name="type">
+      <div class="filter-field ledger-filter-type">
+        <label class="filter-field-label" for="f-type">분개 유형</label>
+        <select class="select-control" id="f-type" name="type">
           <option value="" th:selected="${typeFilter == null}">전체</option>
           <option th:each="type : ${journalTypes}" th:value="${type.name()}" th:text="${type.label()}"
                   th:selected="${type.name() == typeFilter}"></option>
         </select>
       </div>
-      <div class="fgc-field" style="min-width:200px">
-        <label class="fgc-label" for="f-account">계정과목</label>
-        <select class="fgc-select" id="f-account" name="account">
+      <div class="filter-field ledger-filter-account">
+        <label class="filter-field-label" for="f-account">계정과목</label>
+        <select class="select-control" id="f-account" name="account">
           <option value="" th:selected="${accountFilter == null}">전체</option>
-          <option th:each="account : ${journalAccounts}" th:value="${account.name()}" th:text="${account.description()}"
-                  th:selected="${account.name() == accountFilter}"></option>
+          <option th:each="account : ${journalAccounts}" th:value="${account.name()}"
+                  th:text="${account.description()}" th:selected="${account.name() == accountFilter}"></option>
         </select>
       </div>
-      <div class="fgc-field" style="min-width:120px">
-        <label class="fgc-label" for="f-contract">계약 ID</label>
-        <input class="fgc-input" id="f-contract" name="contract" type="number" min="1" inputmode="numeric"
+      <div class="filter-field ledger-filter-contract">
+        <label class="filter-field-label" for="f-contract">계약 ID</label>
+        <input class="field-control" id="f-contract" name="contract" type="number" min="1" inputmode="numeric"
                th:value="${contractFilter}">
       </div>
-      <div class="fgc-field" style="min-width:120px">
-        <label class="fgc-label" for="f-status">상태</label>
-        <select class="fgc-select" id="f-status" name="status">
+      <div class="filter-field ledger-filter-status">
+        <label class="filter-field-label" for="f-status">상태</label>
+        <select class="select-control" id="f-status" name="status">
           <option value="" th:selected="${statusFilter == null}">전체</option>
           <option th:each="status : ${journalStatuses}" th:value="${status.name()}" th:text="${status.label()}"
                   th:selected="${status.name() == statusFilter}"></option>
         </select>
       </div>
-      <button class="fgc-btn fgc-btn--primary" id="f-search" name="searched" value="true" type="submit">
-        <span class="material-symbols-outlined" style="font-size:18px">search</span> 조회
-      </button>
-      <a class="fgc-btn fgc-btn--ghost" id="f-reset" th:href="@{/journals}">
-        <span class="material-symbols-outlined" style="font-size:18px">restart_alt</span> 초기화
+    </div>
+    <div class="filter-actions ledger-filter-actions">
+      <a class="button button-secondary" id="f-reset" th:href="@{/journals}">
+        <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>초기화
       </a>
-    </form>
-  </section>
+      <button class="button button-primary" id="f-search" name="searched" value="true" type="submit">
+        <span class="material-symbols-rounded" aria-hidden="true">search</span>조회
+      </button>
+    </div>
+  </form>
 
-  <!-- ② 불균형 경고 배너 — validationRunId가 있는 상세 조회 후 IF-API-37로 확인한다. -->
-  <div class="fgc-banner fgc-banner--error" id="imbalance-banner" style="margin-top:10px" hidden>
-    <span class="material-symbols-outlined" style="font-size:18px">error</span>
-    <span id="imbalance-text"></span>
-  </div>
-  <!-- 데이터 미연동 상태를 검증 완료(0건 성공)로 표시하지 않는다 — 집계 결과가 있을 때만 성공/오류 배너로 전환 -->
-  <div class="fgc-banner fgc-banner--muted" id="balance-banner" style="margin-top:10px">
-    <span class="material-symbols-outlined" style="font-size:18px">info</span>
-    <span>
-      원장 균형(차변=대변, <span class="fgc-mono">vw_journal_imbalance</span> 0건 여부)은 상세 분개의 검증실행 기준으로 표시합니다.
-      기표(POSTED) 전에는 반드시 0건이어야 하며 월 통합검증 확정 조건 ②번입니다.
-    </span>
-  </div>
-
-  <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.7fr 0.9fr;gap:16px" id="ledger-grid">
-
+  <div class="ledger-work-grid" id="ledger-grid">
     <!-- ③ 분개 목록 -->
-    <section class="fgc-card">
-      <div class="fgc-card__head">
-        <span class="fgc-card__title">분개 목록</span>
-        <span class="fgc-muted" style="font-size:12px"><span id="row-count" th:text="${journals.totalElements}">0</span>건 · 한 화면 20행</span>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="fgc-table">
+    <section class="surface">
+      <header class="surface-header">
+        <h2 class="surface-title">분개 목록</h2>
+        <span class="text-secondary ledger-count-note"><span id="row-count" class="tabular-nums"
+              th:text="${journals.totalElements}">0</span>건 · 한 화면 20행</span>
+      </header>
+      <div class="data-table-viewport ledger-table-viewport" tabindex="0" role="region" aria-label="분개 목록 표">
+        <table class="data-table ledger-table">
+          <caption class="visually-hidden">조회 조건에 해당하는 검증원장 분개 목록</caption>
+          <colgroup>
+            <col class="ledger-col-number">
+            <col class="ledger-col-date">
+            <col class="ledger-col-type">
+            <col class="ledger-col-source">
+            <col class="ledger-col-contract">
+            <col class="ledger-col-amount">
+            <col class="ledger-col-amount">
+            <col class="ledger-col-status">
+            <col class="ledger-col-reversal">
+          </colgroup>
           <thead>
             <tr>
-              <th scope="col" style="width:120px">분개번호</th>
-              <th scope="col" style="width:88px">분개일</th>
-              <th scope="col" style="width:110px">유형</th>
-              <th scope="col" style="width:130px">원천</th>
-              <th scope="col" style="width:74px">계약번호</th>
-              <th scope="col" class="fgc-th-num" style="width:100px">차변 합계</th>
-              <th scope="col" class="fgc-th-num" style="width:100px">대변 합계</th>
-              <th scope="col" style="width:80px">상태</th>
-              <th scope="col" style="width:110px">역분개 표시</th>
+              <th scope="col">분개번호</th>
+              <th scope="col">분개일</th>
+              <th scope="col">유형</th>
+              <th scope="col">원천</th>
+              <th scope="col">계약</th>
+              <th class="is-number" scope="col">차변 합계</th>
+              <th class="is-number" scope="col">대변 합계</th>
+              <th scope="col">상태</th>
+              <th scope="col">역분개 표시</th>
             </tr>
           </thead>
           <tbody id="list-body">
             <tr th:if="${!searched}">
-              <td colspan="9"><div class="fgc-empty">조회 조건을 설정하고 조회 버튼을 눌러 주세요.</div></td>
+              <td colspan="9"><p class="empty-state">조회 조건을 설정하고 조회 버튼을 눌러 주세요.</p></td>
             </tr>
             <tr th:if="${searched and journals.content.empty}">
-              <td colspan="9"><div class="fgc-empty">조건에 맞는 자료가 없습니다.</div></td>
+              <td colspan="9"><p class="empty-state">조건에 맞는 자료가 없습니다.</p></td>
             </tr>
-            <tr th:each="journal : ${journals.content}" tabindex="0"
+            <tr class="ledger-row" th:each="journal : ${journals.content}" tabindex="0" aria-selected="false"
                 th:data-journal-id="${journal.journalHeaderId}">
-              <td class="fgc-mono" th:text="${journal.journalNo}">JRN-001</td>
-              <td th:text="${journal.journalDate}">2026-07-31</td>
+              <td class="ledger-disclosure-cell">
+                <div class="table-cell-disclosure">
+                  <span class="table-cell-preview is-single-line tabular-nums" th:text="${journal.journalNo}">JRN-001</span>
+                  <details class="table-cell-details" hidden>
+                    <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                    <p class="table-cell-full tabular-nums" th:text="${journal.journalNo}">JRN-001</p>
+                  </details>
+                </div>
+              </td>
+              <td class="tabular-nums" th:text="${journal.journalDate}">2026-07-31</td>
               <td th:text="${journal.journalTypeLabel}">실제 지급</td>
-              <td class="fgc-mono"
-                  th:text="${journal.sourceEntityTypeLabel + ' #' + journal.sourceEntityId}">지급거래 #1</td>
-              <td class="fgc-mono" th:text="${journal.contractNo ?: journal.contractId}">C-001</td>
-              <td class="fgc-td-num"
-                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-td-mismatch'"
-                  th:text="${#numbers.formatDecimal(journal.debitTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
-              <td class="fgc-td-num"
-                  th:classappend="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' fgc-td-mismatch'"
-                  th:text="${#numbers.formatDecimal(journal.creditTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
-              <td><span class="fgc-badge" th:classappend="${journal.statusTone}" th:text="${journal.statusLabel}">기표</span></td>
-              <td>
-                <span class="fgc-badge fgc-badge--review" th:if="${journal.reversalOfJournalNo != null}"
-                      th:text="${'원분개 ' + journal.reversalOfJournalNo}">원분개 JRN-001</span>
+              <td class="ledger-disclosure-cell">
+                <div class="table-cell-disclosure">
+                  <span class="table-cell-preview is-single-line tabular-nums"
+                        th:text="${journal.sourceEntityTypeLabel + ' #' + journal.sourceEntityId}">지급거래 #1</span>
+                  <details class="table-cell-details" hidden>
+                    <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                    <p class="table-cell-full tabular-nums"
+                       th:text="${journal.sourceEntityTypeLabel + ' #' + journal.sourceEntityId}">지급거래 #1</p>
+                  </details>
+                </div>
+              </td>
+              <td class="tabular-nums" th:text="${journal.contractNo ?: journal.contractId}">C-001</td>
+              <td class="is-number tabular-nums"
+                  th:classappend="${journal.debitTotal.signum() < 0} ? ' is-negative-amount' : (${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' ledger-imbalanced-amount' : '')"
+                  th:title="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? '차변·대변 합계 불일치' : null"
+                  th:text="${journal.debitTotal.signum() < 0 ? '(' + #numbers.formatDecimal(journal.debitTotal.abs(), 1, 'COMMA', 0, 'POINT') + ')원' : #numbers.formatDecimal(journal.debitTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
+              <td class="is-number tabular-nums"
+                  th:classappend="${journal.creditTotal.signum() < 0} ? ' is-negative-amount' : (${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' ledger-imbalanced-amount' : '')"
+                  th:title="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? '차변·대변 합계 불일치' : null"
+                  th:text="${journal.creditTotal.signum() < 0 ? '(' + #numbers.formatDecimal(journal.creditTotal.abs(), 1, 'COMMA', 0, 'POINT') + ')원' : #numbers.formatDecimal(journal.creditTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
+              <td><span class="status-badge"
+                        th:classappend="${journal.status.name() == 'POSTED'} ? ' status-badge-success' : (${journal.status.name() == 'REVERSED'} ? ' status-badge-review' : ' status-badge-neutral')"
+                        th:text="${journal.statusLabel}">기표됨</span></td>
+              <td class="ledger-disclosure-cell">
+                <div class="table-cell-disclosure" th:if="${journal.reversalOfJournalNo != null}">
+                  <span class="table-cell-preview is-single-line" th:text="${'원분개 ' + journal.reversalOfJournalNo}">원분개 JRN-001</span>
+                  <details class="table-cell-details" hidden>
+                    <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span>
+                      <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
+                    <p class="table-cell-full" th:text="${'원분개 ' + journal.reversalOfJournalNo}">원분개 JRN-001</p>
+                  </details>
+                </div>
                 <span th:unless="${journal.reversalOfJournalNo != null}">—</span>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <footer class="fgc-pagination" id="ledger-pagination" style="padding:10px 16px;display:flex;justify-content:flex-end;align-items:center;gap:8px">
-        <a class="icon-button" id="ledger-prev" aria-label="이전 페이지" th:if="${journals.page > 1}"
-           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page - 1})}"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></a>
-        <span id="ledger-page-info" class="fgc-muted tabular-nums" style="align-self:center"
+      <nav class="pagination-controls ledger-pagination" id="ledger-pagination" aria-label="검증원장 페이지 이동">
+        <a class="pagination-button ledger-pagination-text" id="ledger-prev" th:if="${journals.page > 1}"
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},selected=${selectedJournalId},searched=true,page=${journals.page - 1})}">이전</a>
+        <span id="ledger-page-info" class="text-secondary tabular-nums"
               th:text="${journals.page + ' / ' + (journals.totalPages > 0 ? journals.totalPages : 1)}">1 / 1</span>
-        <a class="icon-button" id="ledger-next" aria-label="다음 페이지" th:if="${journals.page < journals.totalPages}"
-           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},searched=true,page=${journals.page + 1})}"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></a>
-      </footer>
+        <a class="pagination-button ledger-pagination-text" id="ledger-next" th:if="${journals.page < journals.totalPages}"
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},selected=${selectedJournalId},searched=true,page=${journals.page + 1})}">다음</a>
+      </nav>
     </section>
 
     <!-- ④ 상세 패널 -->
-    <section class="fgc-card" style="align-self:start">
-      <div class="fgc-card__head">
-        <span class="fgc-card__title">분개 상세</span>
+    <section class="surface ledger-detail-panel" aria-labelledby="ledger-detail-title">
+      <header class="surface-header">
+        <h2 class="surface-title" id="ledger-detail-title">분개 상세</h2>
         <span id="detail-badge"></span>
-      </div>
-      <div class="fgc-card__body" id="detail-body">
-        <p class="fgc-muted" style="font-size:13px;margin:0">왼쪽 목록에서 분개를 고르세요.</p>
+      </header>
+      <div class="surface-body ledger-detail-body" id="detail-body" aria-live="polite">
+        <p class="text-secondary ledger-placeholder">왼쪽 목록에서 분개를 고르세요.</p>
       </div>
     </section>
   </div>
 
+  <!-- 공통 Modal 구조와 data-* 계약은 기존 동작을 위해 그대로 유지한다. -->
   <div class="modal-backdrop" data-modal="journal-reverse" data-close-on-backdrop="true" hidden aria-hidden="true">
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="journal-reverse-title" style="width:min(520px,100%)">
+    <section class="modal ledger-reverse-modal" role="dialog" aria-modal="true" aria-labelledby="journal-reverse-title">
       <header class="modal-header"><h2 class="modal-title" id="journal-reverse-title">원분개 역분개</h2></header>
       <div class="modal-body">
-        <p class="fgc-muted" id="journal-reverse-target" style="margin-top:0"></p>
-        <div class="fgc-banner fgc-banner--warn">
-          원분개를 수정하거나 삭제하지 않고 반대 차변·대변의 새 분개를 만듭니다. 처리 후 되돌리려면 별도 정정 절차가 필요합니다.
-        </div>
-        <label class="fgc-label fgc-label--required" for="journal-reverse-reason" style="display:block;margin-top:16px">역분개 사유</label>
-        <textarea class="textarea-control" id="journal-reverse-reason" maxlength="1000" rows="5" required
-                  data-modal-initial-focus placeholder="역분개가 필요한 업무 사유를 입력하세요."></textarea>
-        <p class="fgc-error" id="journal-reverse-reason-error" hidden>역분개 사유를 입력하세요.</p>
-        <label class="fgc-label" for="journal-reverse-evidence" style="display:block;margin-top:16px">증빙 참조</label>
-        <input class="fgc-input" id="journal-reverse-evidence" maxlength="500" type="text" placeholder="문서번호 또는 내부 증빙 경로">
+        <p class="text-secondary ledger-modal-target" id="journal-reverse-target"></p>
+        <aside class="guidance guidance-warning">
+          <span class="material-symbols-rounded guidance-icon" aria-hidden="true">warning</span>
+          <p class="guidance-copy">원분개를 수정하거나 삭제하지 않고 반대 차변·대변의 새 분개를 만듭니다. 처리 후 되돌리려면 별도 정정 절차가 필요합니다.</p>
+        </aside>
+        <label class="field ledger-modal-field" for="journal-reverse-reason">
+          <span class="field-label">역분개 사유 <span class="field-required" aria-hidden="true">*</span></span>
+          <textarea class="textarea-control" id="journal-reverse-reason" maxlength="1000" rows="5" required
+                    aria-describedby="journal-reverse-reason-error" data-modal-initial-focus
+                    placeholder="역분개가 필요한 업무 사유를 입력하세요."></textarea>
+          <span class="field-error" id="journal-reverse-reason-error" role="alert" hidden>역분개 사유를 입력하세요.</span>
+        </label>
+        <label class="field ledger-modal-field" for="journal-reverse-evidence">
+          <span class="field-label">증빙 참조</span>
+          <input class="field-control" id="journal-reverse-evidence" maxlength="500" type="text"
+                 placeholder="문서번호 또는 내부 증빙 경로">
+        </label>
       </div>
       <footer class="modal-footer">
-        <button class="fgc-btn fgc-btn--ghost" type="button" data-modal-close>취소</button>
-        <button class="fgc-btn fgc-btn--primary" id="journal-reverse-submit" type="button">역분개 생성</button>
+        <button class="button button-secondary" type="button" data-modal-close>취소</button>
+        <button class="button button-primary" id="journal-reverse-submit" type="button">역분개 생성</button>
       </footer>
     </section>
   </div>
 
   <div class="modal-backdrop" data-modal="journal-correction-request" data-close-on-backdrop="true" hidden aria-hidden="true">
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="journal-correction-title" style="width:min(560px,100%)">
+    <section class="modal ledger-correction-modal" role="dialog" aria-modal="true" aria-labelledby="journal-correction-title">
       <header class="modal-header"><h2 class="modal-title" id="journal-correction-title">역분개 + 재기표 요청</h2></header>
       <div class="modal-body">
-        <p class="fgc-muted" id="journal-correction-target" style="margin-top:0"></p>
-        <div class="fgc-banner fgc-banner--muted">
-          원분개를 바로 바꾸지 않고 원장 정정 예외를 만든 뒤 예외함에서 올바른 신규 분개를 입력합니다.
-        </div>
-        <label class="fgc-label fgc-label--required" for="journal-correction-reason" style="display:block;margin-top:16px">정정 요청 사유</label>
-        <textarea class="textarea-control" id="journal-correction-reason" maxlength="1000" rows="5" required
-                  data-modal-initial-focus placeholder="잘못된 내용과 필요한 정정을 입력하세요."></textarea>
-        <p class="fgc-error" id="journal-correction-reason-error" hidden>정정 요청 사유를 입력하세요.</p>
-        <label class="fgc-label" for="journal-correction-evidence" style="display:block;margin-top:16px">증빙 참조</label>
-        <input class="fgc-input" id="journal-correction-evidence" maxlength="500" type="text" placeholder="문서번호 또는 내부 증빙 경로">
+        <p class="text-secondary ledger-modal-target" id="journal-correction-target"></p>
+        <aside class="guidance guidance-neutral">
+          <span class="material-symbols-rounded guidance-icon" aria-hidden="true">info</span>
+          <p class="guidance-copy">원분개를 바로 바꾸지 않고 원장 정정 예외를 만든 뒤 예외함에서 올바른 신규 분개를 입력합니다.</p>
+        </aside>
+        <label class="field ledger-modal-field" for="journal-correction-reason">
+          <span class="field-label">정정 요청 사유 <span class="field-required" aria-hidden="true">*</span></span>
+          <textarea class="textarea-control" id="journal-correction-reason" maxlength="1000" rows="5" required
+                    aria-describedby="journal-correction-reason-error" data-modal-initial-focus
+                    placeholder="잘못된 내용과 필요한 정정을 입력하세요."></textarea>
+          <span class="field-error" id="journal-correction-reason-error" role="alert" hidden>정정 요청 사유를 입력하세요.</span>
+        </label>
+        <label class="field ledger-modal-field" for="journal-correction-evidence">
+          <span class="field-label">증빙 참조</span>
+          <input class="field-control" id="journal-correction-evidence" maxlength="500" type="text"
+                 placeholder="문서번호 또는 내부 증빙 경로">
+        </label>
       </div>
       <footer class="modal-footer">
-        <button class="fgc-btn fgc-btn--ghost" type="button" data-modal-close>취소</button>
-        <button class="fgc-btn fgc-btn--primary" id="journal-correction-submit" type="button">예외함에서 정정 계속</button>
+        <button class="button button-secondary" type="button" data-modal-close>취소</button>
+        <button class="button button-primary" id="journal-correction-submit" type="button">예외함에서 정정 계속</button>
       </footer>
     </section>
   </div>
-
-<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
-<script>
-/* 화면 폭이 좁으면 목록·상세 2단 그리드를 세로로 표시한다. */
-(function () {
-  "use strict";
-  function reflow() {
-    document.getElementById("ledger-grid").style.gridTemplateColumns =
-      window.innerWidth < 1150 ? "1fr" : "1.7fr 0.9fr";
-  }
-  reflow();
-  window.addEventListener("resize", reflow);
-})();
-</script>
 </main>
 </body>
 </html>
