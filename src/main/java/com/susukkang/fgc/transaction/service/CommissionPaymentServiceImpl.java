@@ -443,7 +443,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private ExceptionCaseCommand exceptionCommand(
             ConfirmationData data,
-            String exceptionType,
+            ExceptionType exceptionType,
             String reasonCode,
             String severity,
             String title,
@@ -451,8 +451,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     ) {
         return ExceptionCaseCommand.builder()
                 .exceptionKey("PRE_CONFIRM:" + data.paymentId() + ":"
-                        + data.transactionAttributionId() + ":" + exceptionType)
-                .exceptionType(exceptionType)
+                        + data.transactionAttributionId() + ":" + exceptionType.name())
+                .exceptionType(exceptionType.name())
                 .reasonCode(reasonCode)
                 .severity(severity)
                 .contractId(data.contractId())
@@ -1045,7 +1045,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      */
     private record GateFailure(
             ConfirmationData data,
-            String exceptionType,
+            ExceptionType exceptionType,
             String reasonCode,
             String severity,
             String title,
@@ -1058,7 +1058,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 흡수·재분류된 경우에만 8-인자 정식 생성자로 reasonCode를 명시한다.
         GateFailure(
                 ConfirmationData data,
-                String exceptionType,
+                ExceptionType exceptionType,
                 String severity,
                 String title,
                 String description,
@@ -1106,7 +1106,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (first.totalAttributedAmount() == null) {
             failures.add(new GateFailure(
                     first,
-                    "DATA_QUALITY",
+                    ExceptionType.DATA_QUALITY,
                     "HIGH",
                     "귀속정보 누락",
                     "지급 건을 확정하려면 하나 이상의 귀속행이 필요합니다.",
@@ -1119,7 +1119,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     .abs();
             failures.add(new GateFailure(
                     first,
-                    "DATA_QUALITY",
+                    ExceptionType.DATA_QUALITY,
                     "HIGH",
                     "귀속금액 불일치",
                     "귀속금액 합계가 지급액과 다릅니다.",
@@ -1144,6 +1144,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (first.policyVersionId() == null && !isNonContractNewcomerAttribution(first)) {
             failures.add(new GateFailure(
                     first,
+                    // "POLICY_VERSION_MISSING" 은 ExceptionType 에 없어 CHECK 제약 위반 → 500 이었다(#257).
+                    // 적용 정책이 없는 상황이므로 POLICY_MISSING 이 맞고, 구체 사유는 reasonCode 로 남긴다.
+                    ExceptionType.POLICY_MISSING,
                     "POLICY_VERSION_MISSING",
                     "HIGH",
                     "정책 버전 누락",
@@ -1163,7 +1166,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
-                    "DATA_QUALITY",
+                    ExceptionType.DATA_QUALITY,
                     "HIGH",
                     "귀속계약 누락",
                     "계약 귀속행에는 귀속계약이 필요합니다.",
@@ -1175,7 +1178,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 || (data.contractId() == null && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
-                    "CAP_REVIEW_REQUIRED",
+                    ExceptionType.CAP_REVIEW_REQUIRED,
                     "HIGH",
                     "산입 판단 검토 필요",
                     "검토필요 또는 비계약 귀속행은 자동 확정할 수 없습니다.",
@@ -1189,7 +1192,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 && data.attributionDate().isBefore(data.contractDate())) {
             failures.add(new GateFailure(
                     data,
-                    "DATA_QUALITY",
+                    ExceptionType.DATA_QUALITY,
                     "HIGH",
                     "계약일 전 귀속",
                     "귀속일은 계약일 이후여야 합니다. 계약일: " + data.contractDate()
@@ -1208,7 +1211,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (allocationBasisRequired && !StringUtils.hasText(data.allocationBasis())) {
             failures.add(new GateFailure(
                     data,
-                    "ALLOCATION_EVIDENCE_MISSING",
+                    ExceptionType.ALLOCATION_EVIDENCE_MISSING,
                     "HIGH",
                     "배부 근거 누락",
                     "배부 귀속행에는 배부기준이 필요합니다.",
@@ -1221,7 +1224,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 || !StringUtils.hasText(data.evidenceRef()))) {
             failures.add(new GateFailure(
                     data,
-                    "ALLOCATION_EVIDENCE_MISSING",
+                    ExceptionType.ALLOCATION_EVIDENCE_MISSING,
                     "HIGH",
                     "제외 증빙 누락",
                     "산입 제외 건에는 증빙 참조 정보가 필요합니다.",
@@ -1247,6 +1250,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
         return new GateFailure(
                 data,
+                // "NEWCOMER_SUPPORT_REVIEW" 도 ExceptionType 에 없어 같은 500 경로였다(#257).
+                // 확정 게이트의 CAP_002(검토필요)로 올라오는 판정이라 CAP_RULE_MISMATCH 와 같은
+                // 재분류 패턴을 쓴다 — 유형은 CAP_REVIEW_REQUIRED, 구체 사유는 reasonCode.
+                ExceptionType.CAP_REVIEW_REQUIRED,
                 "NEWCOMER_SUPPORT_REVIEW",
                 "HIGH",
                 "신인활동지원 적격성 확인 필요",
@@ -1261,7 +1268,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (check.getResultStatus() == CapResultStatus.REVIEW_REQUIRED) {
             return new GateFailure(
                     data,
-                    ExceptionType.CAP_REVIEW_REQUIRED.name(),
+                    ExceptionType.CAP_REVIEW_REQUIRED,
                     ExceptionSeverity.HIGH.name(),
                     "산입 판단 검토 필요",
                     "검토필요 귀속행 또는 준법경영비 증빙을 확인해야 합니다.",
@@ -1439,7 +1446,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             // 결정이 필요해 이번 수정 범위에 넣지 않았다.
             return new GateFailure(
                     data,
-                    "CAP_REVIEW_REQUIRED",
+                    ExceptionType.CAP_REVIEW_REQUIRED,
                     "CAP_RULE_MISMATCH",
                     "HIGH",
                     "한도 정책 불일치",
@@ -1474,7 +1481,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
              */
             return new GateFailure(
                     data,
-                    missingRuleSet ? "POLICY_MISSING" : "CAP_REVIEW_REQUIRED",
+                    missingRuleSet ? ExceptionType.POLICY_MISSING : ExceptionType.CAP_REVIEW_REQUIRED,
                     missingRuleSet ? null : "CAP_ITEM_UNCLASSIFIED",
                     "HIGH",
                     missingRuleSet ? "1,200% 룰셋 누락" : "한도 산입 항목 미분류",
@@ -1489,7 +1496,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 || rule.ruleInclusionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED) {
             return new GateFailure(
                     data,
-                    "CAP_REVIEW_REQUIRED",
+                    ExceptionType.CAP_REVIEW_REQUIRED,
                     "HIGH",
                     "산입 판단 검토 필요",
                     rule.decisionReason(),
@@ -1502,7 +1509,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private void saveException(
             ConfirmationData data,
-            String exceptionType,
+            ExceptionType exceptionType,
             String reasonCode,
             String severity,
             String title,

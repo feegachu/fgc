@@ -765,6 +765,40 @@ class CommissionPaymentServiceImplTest {
      *      (RECOVERY, LONG_TERM_MAINTENANCE).
      * 개선: 유효한 CAP_REVIEW_REQUIRED 로 기록하고 구체적 사유는 reasonCode 로 남긴다.
      */
+    /*
+     * FGC-FUN-034 / REG-21 (#257) — 신인비계약 귀속행의 지원 적격성 확인 필요.
+     * 기존 코드: exceptionType 으로 "NEWCOMER_SUPPORT_REVIEW" 를 썼다.
+     * 문제: ExceptionType enum 에도 exception_case_exception_type_check 제약에도 없어
+     *      saveException 이 CHECK 제약 위반으로 실패하고 트랜잭션이 통째로 롤백되며 500 이 났다.
+     *      CAP_ITEM_UNCLASSIFIED 와 같은 클래스의 버그다.
+     * 개선: 확정 게이트의 CAP_002 로 올라오는 판정이므로 CAP_REVIEW_REQUIRED 로 기록하고
+     *      구체적 사유는 reasonCode 로 남긴다. GateFailure.exceptionType 을 enum 으로 바꿔
+     *      이제 무효한 값은 컴파일 자체가 되지 않는다.
+     */
+    @Test
+    void recordsNewcomerSupportReviewWithValidExceptionType() {
+        ConfirmationData newcomer = confirmation(
+                201L, null, "500000", "500000", InclusionDecisionStatus.EXCLUDED,
+                ExclusionType.NEW_AGENT_SUPPORT, AttributionMethod.NEWCOMER_NON_CONTRACT, "EVIDENCE"
+        );
+        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
+        given(mapper.existsEligibleNewcomerSupportAgent(any(), any())).willReturn(false);
+
+        assertThatThrownBy(() -> service.confirm(101L, null))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(FgcErrorCode.CAP_002));
+
+        ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
+                ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
+        verify(mapper).insertExceptionCase(captor.capture());
+        // DB CHECK 제약이 허용하는 값이어야 한다 — 문자열이 아니라 enum 으로 검증한다.
+        assertThat(ExceptionType.valueOf(captor.getValue().getExceptionType()))
+                .isEqualTo(ExceptionType.CAP_REVIEW_REQUIRED);
+        assertThat(captor.getValue().getReasonCode()).isEqualTo("NEWCOMER_SUPPORT_REVIEW");
+        verify(mapper, never()).confirm(any(), any(), any());
+    }
+
     @Test
     void recordsUnclassifiedCapItemAsReviewRequiredWithReasonCode() {
         ConfirmationData data = confirmation(
