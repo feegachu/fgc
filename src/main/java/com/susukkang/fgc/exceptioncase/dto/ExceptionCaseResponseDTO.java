@@ -29,6 +29,7 @@ public record ExceptionCaseResponseDTO(
         String assigneeLoginId,
         String sourceEntityType,
         String sourceEntityId,
+        Long capCheckId,
         String reconciliationResultType,
         LocalDate validationMonth,
         Long firstDetectedRunId,
@@ -56,7 +57,7 @@ public record ExceptionCaseResponseDTO(
                 ExceptionStatus.valueOf(row.status()),
                 row.title(), row.description(), row.contractId(), row.contractNo(), row.agentName(),
                 row.assignedTo(), row.assigneeLoginId(), row.sourceEntityType(),
-                row.sourceEntityId(), row.reconciliationResultType(), row.validationMonth(), row.firstDetectedRunId(),
+                row.sourceEntityId(), row.capCheckId(), row.reconciliationResultType(), row.validationMonth(), row.firstDetectedRunId(),
                 row.lastDetectedRunId(), DateUtil.toSeoul(row.firstDetectedAt()),
                 DateUtil.toSeoul(row.lastDetectedAt()), row.detectionCount(),
                 DateUtil.toSeoul(row.createdAt()), occurrences, actions
@@ -116,9 +117,30 @@ public record ExceptionCaseResponseDTO(
             case "COMMISSION_TRANSACTION" -> "/transactions/new?id=" + sourceEntityId;
             case "SCHEDULE_HEADER" -> "/schedules/" + sourceEntityId;
             case "JOURNAL_HEADER" -> "/journals?selected=" + sourceEntityId;
+            case "CAP_CHECK" -> "/cap-checks?capCheckId=" + sourceEntityId;
             case "RECONCILIATION_RESULT" -> reconciliationSourceLink();
             default -> null;
         };
+    }
+
+    /**
+     * 계산근거(CAP-W02) 링크 — #331.
+     *
+     * CapCheckMapper 의 목록 두 곳은 확정 거절된 DRAFT 후보의 cap_check 를 제외하므로
+     * (latestScopedCapChecks · findLatestByContractAndStage 의 candidate_transaction_id 조건)
+     * CAP-W01·CONT-W02 에서는 그 판정에 도달할 수 없다 — 주석이 정한 대로 예외함이 그 자리다.
+     * IF-API-31(findById)은 제외 조건이 없어 팝업 자체는 정상 동작한다.
+     *
+     * 실시간 경로(FUN-034)는 cap_check_id 컬럼을, 배치 경로는 source_entity 를 쓴다.
+     */
+    public String capBasisLink() {
+        if (capCheckId != null) {
+            return "/cap-checks?capCheckId=" + capCheckId;
+        }
+        if ("CAP_CHECK".equals(sourceEntityType) && sourceEntityId != null && !sourceEntityId.isBlank()) {
+            return "/cap-checks?capCheckId=" + sourceEntityId;
+        }
+        return null;
     }
 
     private String reconciliationSourceLink() {

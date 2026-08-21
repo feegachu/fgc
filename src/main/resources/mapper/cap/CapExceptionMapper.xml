@@ -20,6 +20,7 @@
             policy_version_id,
             source_entity_type,
             source_entity_id,
+            cap_check_id,
             title,
             description
         )
@@ -39,8 +40,13 @@
             #{contractId},
             #{agentId},
             #{policyVersionId},
+            <!-- source_entity 는 지급 건을 가리킨 채로 둔다 — exception_case 에 payment_id 컬럼이
+                 없어 여기가 "어느 지급 시도에서 나왔는가" 를 남기는 유일한 자리다(#331). -->
             'COMMISSION_TRANSACTION',
             CAST(#{paymentId} AS varchar),
+            <!-- 계산근거로 가는 포인터. 목록 두 곳이 거절된 후보를 제외하므로
+                 IF-API-31(findById, 제외 조건 없음)로 여는 경로가 여기서만 열린다. -->
+            #{capCheckId},
             #{title},
             #{description}
             )
@@ -54,6 +60,8 @@
             validation_run_id = COALESCE(EXCLUDED.validation_run_id, existing.validation_run_id),
             contract_id = EXCLUDED.contract_id,
             agent_id = EXCLUDED.agent_id,
+            <!-- 재확정 시도 시 최신 판정의 계산근거를 가리키게 한다(#331). -->
+            cap_check_id = EXCLUDED.cap_check_id,
             title = EXCLUDED.title,
             description = EXCLUDED.description,
             updated_at = clock_timestamp()

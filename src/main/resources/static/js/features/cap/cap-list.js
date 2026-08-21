@@ -130,6 +130,17 @@
     if (params.has("size")) controls.size.value = params.get("size");
   }
 
+  /*
+   * ?capCheckId= 딥링크 — #331. 예외함이 확정 차단 건의 계산근거로 보낼 때 쓴다.
+   * 그 판정은 목록(latestScopedCapChecks)에서 candidate_transaction_id 조건으로 제외되므로
+   * 표에서 찾아 누를 수 없다. IF-API-31(findById)은 제외 조건이 없어 팝업은 정상 동작하므로
+   * 목록과 무관하게 바로 연다 — 목록이 0건이어도 계산근거는 보인다.
+   */
+  function openDetailFromLocation() {
+    var capCheckId = new URLSearchParams(window.location.search).get("capCheckId");
+    if (capCheckId) openDetail(capCheckId);
+  }
+
   function currentParams() {
     var params = new URLSearchParams();
     ["month", "stage", "status", "insurerId", "orgId", "contractNo"].forEach(function (key) {
@@ -564,7 +575,7 @@
   });
 
   queryFromLocation();
-  loadReferenceData().then(load);
+  loadReferenceData().then(load).then(openDetailFromLocation);
   window.addEventListener("resize", function () { scheduleDisclosureSync(root); });
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { scheduleDisclosureSync(root); });
