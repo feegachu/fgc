@@ -29,6 +29,7 @@ if (typeof module !== "undefined" && module.exports) {
   if (typeof window === "undefined" || typeof document === "undefined") return;
 
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
+  var format = window.FgcUi && window.FgcUi.format;
   var form = document.querySelector("[data-transaction-filter-form]");
   var body = document.getElementById("list-body");
   var pagination = document.querySelector("[data-transaction-pagination]");
@@ -37,8 +38,9 @@ if (typeof module !== "undefined" && module.exports) {
   var currentPageText = document.querySelector("[data-transaction-current-page]");
   var totalPagesText = document.querySelector("[data-transaction-total-pages]");
   var pageNumbers = document.querySelector("[data-transaction-page-numbers]");
+  var filterStatus = document.getElementById("transaction-filter-status");
 
-  if (!apiClient || !form || !body || !pagination || !previousButton || !nextButton) return;
+  if (!apiClient || !format || !form || !body || !pagination || !previousButton || !nextButton) return;
 
   var fields = {
     month: document.getElementById("f-month"),
@@ -83,6 +85,8 @@ if (typeof module !== "undefined" && module.exports) {
   });
   previousButton.addEventListener("click", function () { changePage(pageGroupStart(state.page) - 1); });
   nextButton.addEventListener("click", function () { changePage(pageGroupStart(state.page) + 5); });
+  window.addEventListener("resize", syncTableCellDisclosures);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncTableCellDisclosures);
 
   load();
 
@@ -121,7 +125,8 @@ if (typeof module !== "undefined" && module.exports) {
     var sequence = ++requestSequence;
     if (activeRequest) activeRequest.abort();
     activeRequest = new AbortController();
-    renderMessage("수수료 지급 건을 불러오는 중입니다.", false);
+    body.setAttribute("aria-busy", "true");
+    renderState("loading", "불러오는 중", "수수료 지급 건을 불러오는 중입니다.");
     pagination.hidden = true;
 
     apiClient.request(apiPath(), { signal: activeRequest.signal })
@@ -135,11 +140,14 @@ if (typeof module !== "undefined" && module.exports) {
       .catch(function (error) {
         if (error && error.name === "AbortError") return;
         if (sequence !== requestSequence) return;
-        var message = error && error.message ? error.message : "수수료 지급 건을 불러오지 못했습니다.";
-        if (error && error.requestId) message += " 요청번호 " + error.requestId;
-        renderMessage(message, true);
+        var message = format.errorText(error, "수수료 지급 건을 불러오지 못했습니다. 잠시 후 다시 시도하세요.");
+        renderState("error", "목록을 불러오지 못했습니다", message, load);
+        toast(message, "error");
         setText("row-count", 0);
-        setText("sum-amount", formatMoney(0));
+        setText("sum-amount", format.won(0));
+      })
+      .finally(function () {
+        if (sequence === requestSequence) body.setAttribute("aria-busy", "false");
       });
   }
 
@@ -155,21 +163,21 @@ if (typeof module !== "undefined" && module.exports) {
   function renderRows(rows) {
     clear(body);
     var sum = 0;
-    if (rows.length === 0) renderMessage("조건에 맞는 자료가 없습니다.", false);
+    if (rows.length === 0) renderState("empty", "조회 결과가 없습니다", "검색 조건을 바꾸어 다시 조회하세요.");
 
     rows.forEach(function (item) {
       rememberFilterOptions(item);
       sum += number(item.amount);
       var row = document.createElement("tr");
       appendCell(row, item.paymentStageLabel || item.paymentStage);
-      appendCell(row, item.sourceTypeLabel || item.sourceType);
-      appendCell(row, item.sourceBusinessKey, "fgc-mono");
-      appendCell(row, formatMonth(item.settlementMonth));
-      appendCell(row, item.recipientAgentName || "—");
-      appendCell(row, item.commissionItemName || item.commissionItemCode);
-      appendCell(row, formatMoney(item.amount), "fgc-td-num");
-      appendCell(row, item.cashflowTypeLabel || item.cashflowType);
-      appendCell(row, item.statusLabel || item.status);
+      appendDisclosureCell(row, item.sourceTypeLabel || item.sourceType);
+      appendDisclosureCell(row, item.sourceBusinessKey, "transaction-mono");
+      appendCell(row, format.month(item.settlementMonth));
+      appendDisclosureCell(row, item.recipientAgentName || "-");
+      appendDisclosureCell(row, item.commissionItemName || item.commissionItemCode);
+      appendCell(row, format.won(item.amount), "is-number tabular-nums");
+      appendBadgeCell(row, item.cashflowTypeLabel || item.cashflowType, cashflowBadge(item.cashflowType));
+      appendBadgeCell(row, item.statusLabel || item.status, statusBadge(item.status));
       appendAttributionCell(row, item.attributionCount, item.differenceAmount);
       appendActionCell(row, item);
       body.appendChild(row);
@@ -177,17 +185,18 @@ if (typeof module !== "undefined" && module.exports) {
 
     refreshDynamicOptions();
     setText("row-count", rows.length);
-    setText("sum-amount", formatMoney(sum));
+      setText("sum-amount", format.won(sum));
+    syncTableCellDisclosures();
   }
 
   function appendAttributionCell(row, count, difference) {
     var cell = document.createElement("td");
     var value = number(count);
-    cell.textContent = value + "건";
-    if (value === 0 || number(difference) !== 0) {
-      cell.style.color = "#d92d20";
-      cell.style.fontWeight = "700";
-    }
+    var imbalanced = value === 0 || number(difference) !== 0;
+    var badge = document.createElement("span");
+    badge.className = "status-badge " + (imbalanced ? "status-badge-error" : "status-badge-success");
+    badge.textContent = imbalanced ? value + "건 · 확인필요" : value + "건 · 일치";
+    cell.appendChild(badge);
     row.appendChild(cell);
   }
 
@@ -195,12 +204,13 @@ if (typeof module !== "undefined" && module.exports) {
     var cell = document.createElement("td");
     if (item.status === "DRAFT") {
       var link = document.createElement("a");
-      link.className = "fgc-btn fgc-btn--ghost";
+      link.className = "button button-ghost";
       link.href = "/transactions/new?id=" + encodeURIComponent(item.commissionTransactionId);
       link.textContent = "수정";
+      link.setAttribute("aria-label", (item.sourceBusinessKey || "선택한 지급 건") + " 수정");
       cell.appendChild(link);
     } else {
-      cell.textContent = "—";
+      cell.textContent = "-";
     }
     row.appendChild(cell);
   }
@@ -214,6 +224,8 @@ if (typeof module !== "undefined" && module.exports) {
     renderPageNumbers(page, totalPages);
     previousButton.disabled = pageGroupStart(page) === 1;
     nextButton.disabled = pageGroupStart(page) + 5 > totalPages;
+    previousButton.setAttribute("aria-disabled", String(previousButton.disabled));
+    nextButton.setAttribute("aria-disabled", String(nextButton.disabled));
     pagination.hidden = number(pageData.totalElements) === 0;
   }
 
@@ -265,9 +277,15 @@ if (typeof module !== "undefined" && module.exports) {
           addOption(fields.insurer, row.insurerId, row.insurerCode + " · " + row.insurerName);
         });
         fields.insurer.value = state.insurerId;
+        fields.insurer.removeAttribute("aria-invalid");
+        filterStatus.hidden = true;
       })
-      .catch(function () {
-        fields.insurer.title = "보험회사 목록을 불러오지 못했습니다.";
+      .catch(function (error) {
+        var message = format.errorText(error, "보험회사 목록을 불러오지 못했습니다. 잠시 후 화면을 새로고침하세요.");
+        fields.insurer.setAttribute("aria-invalid", "true");
+        filterStatus.textContent = message;
+        filterStatus.hidden = false;
+        toast(message, "error");
       })
       .finally(function () { fields.insurer.disabled = false; });
   }
@@ -304,29 +322,98 @@ if (typeof module !== "undefined" && module.exports) {
     select.appendChild(option);
   }
 
-  function renderMessage(message, error) {
+  function renderState(kind, title, message, retry) {
     clear(body);
     var row = document.createElement("tr");
+    row.className = "transaction-state-row";
     var cell = document.createElement("td");
     var content = document.createElement("div");
     cell.colSpan = 11;
-    content.className = "fgc-empty";
-    content.textContent = message;
-    if (error) content.style.color = "#d92d20";
+    content.className = "transaction-state transaction-state-" + kind;
+    content.setAttribute("role", kind === "error" ? "alert" : "status");
+    var icon = textElement("span", kind === "loading" ? "progress_activity" : kind === "error" ? "error" : "inbox");
+    icon.className = "material-symbols-rounded transaction-state-icon";
+    icon.setAttribute("aria-hidden", "true");
+    content.appendChild(icon);
+    var heading = textElement("strong", title);
+    heading.className = "transaction-state-title";
+    content.appendChild(heading);
+    var copy = textElement("span", message);
+    copy.className = "transaction-state-copy";
+    content.appendChild(copy);
+    if (retry) {
+      var retryButton = textElement("button", "다시 시도");
+      retryButton.type = "button";
+      retryButton.className = "button button-secondary";
+      retryButton.addEventListener("click", retry);
+      content.appendChild(retryButton);
+    }
     cell.appendChild(content);
     row.appendChild(cell);
     body.appendChild(row);
   }
 
-  function appendCell(row, content, className) {
+  function appendBadgeCell(row, label, tone) {
     var cell = document.createElement("td");
-    if (className) cell.className = className;
-    cell.textContent = content == null || content === "" ? "—" : String(content);
+    var badge = textElement("span", label || "-");
+    badge.className = "status-badge " + tone;
+    cell.appendChild(badge);
     row.appendChild(cell);
   }
 
-  function formatMonth(value) { return value ? String(value).slice(0, 7) : "—"; }
-  function formatMoney(value) { return new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(number(value)) + "원"; }
+  function cashflowBadge(value) { return value === "DEDUCTION" ? "status-badge-warning" : "status-badge-info"; }
+  function statusBadge(value) {
+    return { DRAFT: "status-badge-neutral", CONFIRMED: "status-badge-success", CANCELLED: "status-badge-error" }[value]
+      || "status-badge-neutral";
+  }
+
+  function appendDisclosureCell(row, content, className) {
+    var cell = document.createElement("td");
+    cell.className = "table-cell-disclosure" + (className ? " " + className : "");
+    var value = content == null || content === "" ? "-" : String(content);
+    var preview = textElement("span", value);
+    preview.className = "table-cell-preview is-single-line";
+    var details = document.createElement("details");
+    details.className = "table-cell-details";
+    details.hidden = true;
+    var summary = document.createElement("summary");
+    summary.appendChild(textElement("span", "전체 보기"));
+    summary.firstChild.className = "table-cell-more";
+    var less = textElement("span", "접기");
+    less.className = "table-cell-less";
+    summary.appendChild(less);
+    var chevron = textElement("span", "expand_more");
+    chevron.className = "material-symbols-rounded table-cell-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    summary.appendChild(chevron);
+    var full = textElement("div", value);
+    full.className = "table-cell-full";
+    details.appendChild(summary);
+    details.appendChild(full);
+    cell.appendChild(preview);
+    cell.appendChild(details);
+    row.appendChild(cell);
+  }
+
+  function syncTableCellDisclosures() {
+    window.requestAnimationFrame(function () {
+      body.querySelectorAll(".table-cell-disclosure").forEach(function (cell) {
+        var preview = cell.querySelector(".table-cell-preview");
+        var details = cell.querySelector(".table-cell-details");
+        details.hidden = preview.scrollWidth <= preview.clientWidth && preview.scrollHeight <= preview.clientHeight;
+      });
+    });
+  }
+
+  function appendCell(row, content, className) {
+    var cell = document.createElement("td");
+    if (className) cell.className = className;
+    cell.textContent = content == null || content === "" ? "-" : String(content);
+    row.appendChild(cell);
+  }
+
+  function textElement(tag, value) { var element = document.createElement(tag); element.textContent = value; return element; }
+  function toast(message, tone) { if (window.FgcUi && typeof window.FgcUi.toast === "function") window.FgcUi.toast(message, tone); }
   function number(value) { var parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
   function positivePage(value) { var parsed = Number.parseInt(value, 10); return Number.isInteger(parsed) && parsed > 0 ? parsed : 1; }
   function setText(id, value) { var element = document.getElementById(id); if (element) element.textContent = value; }
