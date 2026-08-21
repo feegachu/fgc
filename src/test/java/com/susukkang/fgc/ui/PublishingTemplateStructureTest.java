@@ -395,9 +395,10 @@ class PublishingTemplateStructureTest {
                 // 게이트 패널 제목은 화면정의서 :718 "위 6단계" 와 제31조를 그대로 인용한다.
                 .contains("확정 게이트 6단계")
                 /*
-                 * 확정 거부 후 후속 동선(#257). ID 링크는 여전히 만들 수 없다 —
-                 * 미리보기는 capCheckId 를 내려주지 않고 확정 실패 응답에도 exceptionCaseId 가 없다.
-                 * 대신 CAP-W01·EXCP-W01 이 이미 받는 검색조건(contractNo·status·type)으로 연다.
+                 * FGC-FUN-034(한도 예외 생성)·FGC-FUN-052(예외함) / REG-08 — 확정 거부 후 후속 동선(#257).
+                 * ID 링크는 여전히 만들 수 없다 — 미리보기는 capCheckId 를 내려주지 않고
+                 * 확정 실패 응답에도 exceptionCaseId 가 없다.
+                 * 대신 EXCP-W01 이 이미 받는 검색조건(type·contractNo)으로 연다.
                  */
                 .contains("id=\"transaction-confirm-followup\"")
                 .doesNotContain("transaction-confirm-links")
@@ -438,10 +439,16 @@ class PublishingTemplateStructureTest {
                 .contains("var GATES = [")
                 .contains("renderGates([], null)")
                 /*
-                 * #257 — 규제 판정 차단(FGC-CAP-001·002)은 확정 요청이 서버에 닿아야
+                 * FGC-FUN-033(1,200% 사전검증)·FGC-FUN-034(한도 예외 생성) / REG-08(초년도 1,200%) — #257.
+                 * 규제 판정 차단(FGC-CAP-001·002)은 확정 요청이 서버에 닿아야
                  * cap_check 과 exception_case 가 남는다. 화면이 요청을 막으면 위반 이력이
                  * 영구히 생기지 않아 DASH-W01 위반 KPI 가 항상 0 이 된다.
                  * 입력 오류(FGC-TRAN-*)는 여기 넣지 않는다 — 보내면 DATA_QUALITY 예외만 쌓인다.
+                 *
+                 * 한도·초년도 경계값 자체는 여기서 검사하지 않는다 — 이 테스트는 소스 문자열
+                 * 구조만 본다. 경계는 실 DB 통합테스트가 검증한다:
+                 * CapIncludedAmountMapperIntegrationTest(계약일+1년-1일 포함 / +1년 제외),
+                 * CapCheckMapperIntegrationTest(1주년 당일 집계 제외).
                  */
                 .contains("var RECORDABLE_BLOCKER_CODES = [\"FGC-CAP-001\", \"FGC-CAP-002\"]")
                 .contains("hasRecordableBlocker(lastPrecheckResult)")
