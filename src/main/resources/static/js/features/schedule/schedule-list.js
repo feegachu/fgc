@@ -361,18 +361,20 @@
 
     rows.forEach(function (schedule) {
       var row = document.createElement("tr");
+      // 계약번호는 컬럼 폭을 넓게 잡아(차익거래 검증 화면과 동일) 토글 없이 항상 전체를 보여준다(#326).
       var contractCell = document.createElement("td");
+      contractCell.className = "tabular-nums";
       var hasId = schedule.scheduleHeaderId !== null && schedule.scheduleHeaderId !== undefined;
       var contractNo = schedule.contractNo || EMPTY;
+      contractCell.title = contractNo;
 
       if (hasId) {
         var contractLink = document.createElement("a");
         contractLink.href = detailHref(schedule.scheduleHeaderId);
-        contractLink.className = "tabular-nums";
         contractLink.textContent = contractNo;
-        contractCell.appendChild(disclosure(contractNo, contractLink));
+        contractCell.appendChild(contractLink);
       } else {
-        contractCell.appendChild(disclosure(contractNo));
+        contractCell.textContent = contractNo;
       }
 
       row.appendChild(contractCell);

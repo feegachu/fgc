@@ -284,7 +284,8 @@
   min-width: 64rem;
 }
 
-.cap-col-contract { width: 8.5rem; }
+/* 계약번호는 차익거래 검증 화면(.arb-col-contract)과 동일한 폭으로 맞춰 토글 없이 항상 전체를 보여준다(이슈 326). */
+.cap-col-contract { width: 12rem; }
 .cap-col-stage { width: 8.75rem; }
 .cap-col-date { width: 6.75rem; }
 .cap-col-money { width: 7.5rem; }
