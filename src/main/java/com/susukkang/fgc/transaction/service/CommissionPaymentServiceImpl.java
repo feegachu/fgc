@@ -1460,9 +1460,22 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     ) {
         if (rule == null) {
             boolean missingRuleSet = !applicableCapRuleSetExists;
+            /*
+             * 2026-08-21 — "CAP_ITEM_UNCLASSIFIED" 는 ExceptionType enum 에도
+             * exception_case_exception_type_check 제약(CAP 계열은 WARNING·VIOLATION·REVIEW_REQUIRED)
+             * 에도 없는 값이라, 이 경로가 confirm 에 닿으면 saveException 이 CHECK 제약 위반으로
+             * 실패한다. DataIntegrityViolationException 은 noRollbackFor 대상이 아니라 트랜잭션이
+             * 통째로 롤백되고 500 이 난다 — "기록 후 거부" 계약이 깨진다.
+             * 룰셋에 산입 기준이 없는 항목은 사람이 판단할 대상이므로 CAP_REVIEW_REQUIRED 가 맞다
+             * (CapResultStatus javadoc "REVIEW_REQUIRED — 룰셋 미분류 항목 …").
+             * 구체적 사유는 reasonCode 로 남긴다 — GateFailure 주석이 정한 재분류 패턴이며
+             * EXCP-W01 「상세 원인」 컬럼이 이 값을 표시하므로 정보 손실이 없다.
+             * 도달 가능성: 룰셋마다 미분류 수수료 항목이 실재한다(RECOVERY, LONG_TERM_MAINTENANCE).
+             */
             return new GateFailure(
                     data,
-                    missingRuleSet ? "POLICY_MISSING" : "CAP_ITEM_UNCLASSIFIED",
+                    missingRuleSet ? "POLICY_MISSING" : "CAP_REVIEW_REQUIRED",
+                    missingRuleSet ? null : "CAP_ITEM_UNCLASSIFIED",
                     "HIGH",
                     missingRuleSet ? "1,200% 룰셋 누락" : "한도 산입 항목 미분류",
                     missingRuleSet
