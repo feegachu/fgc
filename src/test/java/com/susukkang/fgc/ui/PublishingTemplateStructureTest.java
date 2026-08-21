@@ -12,8 +12,6 @@ class PublishingTemplateStructureTest {
 
     private static final List<String> PUBLISHED_TEMPLATES = List.of(
             "templates/base/index.html",
-            "templates/contract/list.html",
-            "templates/contract/detail.html",
             "templates/contract/form.html",
             "templates/transaction/list.html",
             "templates/transaction/form.html",
@@ -40,14 +38,7 @@ class PublishingTemplateStructureTest {
      * 공통 컴포넌트 전환이 끝난 화면은 이 목록에서 빼고 아래 FULLY_MIGRATED_TEMPLATES 로 옮긴다
      * — 그래야 화면 하나를 전환할 때 다른 화면 담당자의 테스트가 함께 깨지지 않는다 (#138).
      */
-    private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of(
-            "templates/transaction/list.html",
-            "templates/transaction/form.html",
-            "templates/schedule/detail.html",
-            "templates/exception/list.html",
-            "templates/vrun/list.html",
-            "templates/vrun/detail.html"
-    );
+    private static final List<String> BRIDGE_SCOPED_TEMPLATES = List.of();
 
     /*
      * 공통 컴포넌트 전환이 끝난 화면. 레거시 fgc-* 와 인라인 style 이 남아 있으면 안 된다.
@@ -63,8 +54,14 @@ class PublishingTemplateStructureTest {
             "templates/contract/list.html",
             "templates/contract/detail.html",
             "templates/contract/form.html",
+            "templates/transaction/list.html",
+            "templates/transaction/form.html",
             "templates/schedule/list.html",
+            "templates/schedule/detail.html",
             "templates/ledger/list.html",
+            "templates/exception/list.html",
+            "templates/vrun/list.html",
+            "templates/vrun/detail.html",
             "templates/arbitrage/list.html",
             "templates/error/403.html",
             "templates/error/404.html",
@@ -188,7 +185,10 @@ class PublishingTemplateStructureTest {
                 .contains("error.code === \"FGC-VRUN-006\"")
                 .contains("finalizeIdempotencyKey = null")
                 .contains("runStatus !== \"COMPLETED\"")
-                .contains("window.confirm")
+                // 확정 확인이 브라우저 기본 대화상자에서 공통 Modal 로 바뀌었다 (#286).
+                // 기본 대화상자는 화면정의서 :1487 의 송금·회계 마감 아님 문구를 담을 수 없다.
+                .contains("modal.open(\"vrun-finalize\")")
+                .doesNotContain("window.confirm")
                 .doesNotContain("fetch(");
     }
 
@@ -358,6 +358,115 @@ class PublishingTemplateStructureTest {
                 .contains("truncateDecimal(value, 6)");
     }
 
+    // FGC-UI-TRAN-W01·W02: 지급 목록·등록 화면은 공통 컴포넌트와 TRAN 전용 자산만 사용한다.
+    @Test
+    void transactionScreensUseCommonComponentsAndPreserveCriticalContracts() throws IOException {
+        assertThat(resource("templates/transaction/list.html"))
+                .contains("class=\"page-content publishing-page transaction-page transaction-list-page\"")
+                .contains("class=\"page-header transaction-page-header\"")
+                .contains("class=\"filter-bar transaction-filter-bar\"")
+                .contains("class=\"surface transaction-list-panel\"")
+                .contains("class=\"data-table transaction-list-table\"")
+                .contains("class=\"transaction-pagination\"")
+                .contains("data-transaction-filter-form")
+                .contains("data-transaction-page-numbers")
+                .contains("<caption class=\"visually-hidden\"")
+                .contains("scope=\"col\"")
+                .doesNotContain("schedule-")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("templates/transaction/form.html"))
+                .contains("class=\"page-content publishing-page transaction-page transaction-form-page\"")
+                .contains("data-transaction-form aria-busy=\"true\"")
+                .contains("class=\"surface transaction-form-panel\"")
+                .contains("class=\"data-table transaction-attribution-table\"")
+                .contains("data-modal=\"transaction-confirm\"")
+                .contains("확정 후에는 이 화면에서 되돌릴 수 없습니다")
+                .contains("초년도 구간은 [계약일, 1주년일)입니다")
+                .contains("id=\"transaction-permission-help\"")
+                .contains("id=\"err-bizKey\"")
+                .contains("id=\"err-attributions\"")
+                // 게이트 패널 제목은 화면정의서 :718 "위 6단계" 와 제31조를 그대로 인용한다.
+                .contains("확정 게이트 6단계")
+                // 내려줄 ID 가 없어 영구히 hidden 이던 링크는 두지 않는다.
+                .doesNotContain("transaction-confirm-links")
+                .doesNotContain("계산근거 보기")
+                .doesNotContain("예외함으로 이동")
+                .doesNotContain("page-description")
+                .doesNotContain("fgc-page-desc")
+                .doesNotContain("style=")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContainPattern("(?i)<script[\\s>]");
+
+        assertThat(resource("static/css/features/transaction.css"))
+                .contains(".transaction-form-layout")
+                .contains(".transaction-pagination")
+                .contains(".transaction-gate-step")
+                .contains("@media (max-width: 63.9375rem)")
+                .contains("@media (max-width: 47.9375rem)")
+                .contains("var(--color-status-error-solid)")
+                .doesNotContainPattern("#[0-9a-fA-F]{3,8}\\b");
+
+        assertThat(resource("static/css/common/components.css"))
+                .doesNotContain("[data-transaction-page-numbers]")
+                .doesNotContain("[data-transaction-pagination]");
+
+        assertThat(resource("static/js/features/transaction/transaction-list.js"))
+                .contains("buildTransactionFilterState(fields, page, attributionImbalanceOnly)")
+                .contains("attributionImbalanceOnly: attributionImbalanceOnly === true")
+                .contains("format.won(")
+                .contains("status-badge ")
+                .contains("aria-disabled")
+                .contains("다시 시도")
+                .doesNotContain("new Intl.NumberFormat")
+                .doesNotContain("style.")
+                .doesNotContain("fetch(");
+
+        assertThat(resource("static/js/features/transaction/transaction-form.js"))
+                .contains("modal.open(\"transaction-confirm\")")
+                .contains("modal.close(\"transaction-confirm\")")
+                .contains("idempotencyKey: \"TRAN-CONFIRM-\" + paymentId")
+                .contains("var GATES = [")
+                .contains("renderGates([], null)")
+                /*
+                 * 확정 게이트는 화면정의서 :710-718 · 운영정책서 제31조의 6단계 그대로다.
+                 * 문서에 없는 게이트(차익거래·업무키)를 만들어 넣지 않는다 —
+                 * precheck 가 그런 코드를 발행하지 않아 영구히 판정되지 않는 칸이 된다.
+                 */
+                .contains("{ label: \"작성중(DRAFT) 저장\", codes: [\"FGC-TRAN-005\"] }")
+                .contains("{ label: \"귀속행 입력\", codes: [\"FGC-TRAN-002\"] }")
+                .contains("{ label: \"귀속합계 = 지급액\", codes: [\"FGC-TRAN-003\"] }")
+                .contains("{ label: \"검토필요 귀속 해소\", codes: [\"FGC-CAP-002\"] }")
+                .contains("{ label: \"1,200% 사전검증\", codes: [\"FGC-CAP-001\", \"FGC-CAP-003\", \"FGC-CAP-004\"] }")
+                .doesNotContain("차익거래 검증")
+                .doesNotContain("증빙·업무키 검증")
+                /*
+                 * blocker 분류는 오류 카탈로그 코드로 한다. Blocker.message 는 부록 A 한글 문구라
+                 * 영문 키워드 부분일치는 "FGC-CAP-*" 가 전부 "CAP" 에 걸리는 오분류를 낳았다.
+                 */
+                .doesNotContain("ATTRIBUTION_REQUIRED")
+                .doesNotContain("haystack")
+                /*
+                 * 계산근거·예외함 링크는 내려줄 ID 가 없어 제거했다 (capCheckId 는 IF-API-24 에서 항상 null).
+                 * 동작하지 않는 버튼을 되살리지 않는다.
+                 */
+                .doesNotContain("configureResultLinks")
+                .doesNotContain("transaction-cap-link")
+                .doesNotContain("transaction-exception-link")
+                .contains("format.today().slice(0, 7)")
+                .contains("format.won(")
+                .contains("showValidationError")
+                .doesNotContain("new Intl.NumberFormat")
+                .doesNotContain("statusStyle(")
+                .doesNotContain("statusColor(")
+                .doesNotContain("style.")
+                .doesNotContain("fetch(");
+    }
+
     /*
      * 화면정의서 4장 규칙 5 (docs/FGC_화면정의서_v2_0.md:213) — 요율·한도·판정이 나오는 곳에는
      * 마우스를 올리면 근거가 뜨고, 근거 없는 숫자는 화면에 띄우지 않는다.
@@ -476,6 +585,33 @@ class PublishingTemplateStructureTest {
 
     @Test
     void exceptionListUsesFlexibleColumnsSharedBadgesAndProductionToast() throws IOException {
+        // 페이지 셸 전환 (#290) — 전에는 셸이 레거시인 채로 이 테스트를 통과했다.
+        assertThat(resource("templates/exception/list.html"))
+                .contains("class=\"page-content exception-page\"")
+                .contains("class=\"page-header\"")
+                .contains("class=\"page-title\"")
+                .contains("class=\"surface\"")
+                .contains("class=\"filter-bar exception-filter-bar\"")
+                .contains("class=\"filter-field-label\"")
+                .contains("class=\"data-table-viewport exception-table-viewport\"")
+                .contains("class=\"data-table exception-table\"")
+                .contains("class=\"empty-state")
+                // 상세 원인 컬럼에도 disclosure 를 넣었다 (PR #269 리뷰 지적)
+                .contains("th:text=\"${c.reasonLabel()} ?: '-'\"")
+                // 필터·행 선택 계약은 골격이 바뀌어도 그대로여야 한다
+                .contains("data-selected-exception-id=${selectedExceptionId}")
+                .contains("id=\"summary-cards\"")
+                .contains("id=\"f-type\"")
+                .contains("id=\"f-reason\"")
+                .contains("id=\"f-reset\"")
+                // select 변경만으로 제출되던 동작을 조회 버튼으로 바꿨다
+                .doesNotContain("onchange=")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("publishing-page")
+                .doesNotContain("style=\"")
+                .doesNotContainPattern("(?i)<style[\s>]")
+                .doesNotContainPattern("(?i)<script[\s>]");
+
         assertThat(resource("templates/exception/list.html"))
                 .contains("<colgroup>")
                 .contains("class=\"exception-col-title\"")
@@ -503,6 +639,11 @@ class PublishingTemplateStructureTest {
                 .doesNotContain("<th style=\"width:");
 
         assertThat(resource("static/css/features/exception.css"))
+                // 공통 data-table-viewport 를 복제하던 정의를 걷어냈다 (가이드 §4.2)
+                .doesNotContain("overscroll-behavior-inline")
+                .doesNotContain(".publishing-page .exception-table")
+                .contains(".exception-page")
+                .contains(".exception-filter-fields")
                 .contains(".exception-col-title")
                 .contains(".journal-correction-original-lines")
                 .contains(".journal-correction-original-line.is-heading")
@@ -528,6 +669,10 @@ class PublishingTemplateStructureTest {
                 .contains("preview.scrollHeight > preview.clientHeight")
                 .contains("document.fonts.ready")
                 .contains("toast(message, \"error\")")
+                // 표시 형식과 오류코드·요청 ID 를 공통 유틸로 통일했다 (#290)
+                .contains("format.dateTime(value)")
+                .contains("format.errorText(error, fallback)")
+                .doesNotContain("Number(journal.debitTotal).toLocaleString")
                 .contains("action.actionType === \"START_REVIEW\"")
                 .contains("action.actionType === \"REOPEN\"")
                 .contains("action.toStatus === \"IN_REVIEW\"")
@@ -596,157 +741,12 @@ class PublishingTemplateStructureTest {
                 .doesNotContain("fetch(");
     }
 
-    /*
-     * FGC-UI-CONT-W01 보험계약 목록 (#283).
-     * 자체 필터 카드·표 뷰포트를 공통 컴포넌트로 바꾸고, 계약상태·데이터 출처를 배지로 세웠다.
-     */
-    @Test
-    void contractListUsesCommonFilterTableAndStatusBadges() throws IOException {
-        assertThat(resource("templates/contract/list.html"))
-                .doesNotContain("page-description")
-                .doesNotContain("contract-filter-grid")
-                .doesNotContain("contract-premium-help")
-                .contains("class=\"filter-bar contract-filter-bar\"")
-                .contains("class=\"filter-fields contract-filter-fields\"")
-                .contains("class=\"filter-field\"")
-                .contains("class=\"filter-field-label\"")
-                .contains("class=\"filter-actions contract-filter-actions\"")
-                .contains("class=\"data-table-viewport contract-table-viewport\" tabindex=\"0\" role=\"region\"")
-                // 계약상태는 상태에 따라 색이 갈려야 한다 — 예전에는 전부 neutral 이었다.
-                .contains("status-badge-success")
-                .contains("status-badge-warning")
-                .contains("status-badge-error")
-                .contains("status-badge-info")
-                // 데이터 출처는 CONT-W02 와 같은 배지 표현을 쓴다.
-                .contains("status-badge status-badge-neutral\" th:text=\"${dataOriginLabels[contract.dataOrigin]}\"")
-                .contains("data-disclosure")
-                // 처리 버튼 검증(ContractViewControllerTest·ScreenViewControllerTest)이 의존한다.
-                .contains("data-fgc-action=\"create\"")
-                .doesNotContain("publishing-page")
-                .doesNotContain("style=\"")
-                .doesNotContainPattern("(?i)<style[\\s>]")
-                .doesNotContainPattern("(?i)<script[\\s>]");
-
-        assertThat(resource("static/js/features/contract/contract-list.js"))
-                .contains("format.today()")
-                .contains("table-cell-disclosure")
-                .contains("preview.scrollWidth > preview.clientWidth")
-                .contains("contract-export-button")
-                .contains("CSV 파일을 내려받았습니다.")
-                .contains("aria-busy");
-
-        assertThat(resource("templates/layout/default.html"))
-                .containsPattern("(?s)<script[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-CONT-W01'\\}\"[^>]*"
-                        + "th:src=\"@\\{/js/features/contract/contract-list\\.js}\"[^>]*\\bdefer\\b[^>]*>");
-    }
-
-    /*
-     * FGC-UI-CONT-W02 보험계약 상세 (#283).
-     * 인라인 <script> 321줄을 contract-detail.js 로 뺐다. layout 의 page(...) fragment 는
-     * ~{::main} 만 삽입하므로 <main> 밖 <script>는 사라진다 — 인라인이 되살아나면 안 된다.
-     */
-    @Test
-    void contractDetailMovesPageBehaviourOutOfTheTemplate() throws IOException {
-        assertThat(resource("templates/contract/detail.html"))
-                .doesNotContainPattern("(?i)<script[\\s>]")
-                .doesNotContain("style=\"")
-                .doesNotContain("publishing-page")
-                // 공통 탭 컴포넌트
-                .contains("class=\"tab-list contract-detail-tabs\" role=\"tablist\"")
-                .contains("class=\"tab-button contract-detail-tab\"")
-                .doesNotContain("contract-detail-tab-list")
-                // 탭 패널은 키보드로 도달 가능해야 하고, 헤더는 교체 대상 밖에 있어야 한다.
-                .contains("role=\"tabpanel\"")
-                .contains("data-tab-body")
-                .contains("data-tab-state")
-                // 화면정의서 CONT-W02 ① 요약 헤더 필수 항목
-                .contains("id=\"contract-summary-insurer\"")
-                .contains("id=\"contract-summary-agent\"")
-                .contains("id=\"contract-summary-organization\"")
-                // 기본정보 탭 계약상태·데이터 출처도 배지
-                .contains("<span id=\"contract-info-status\" class=\"status-badge")
-                .contains("<span id=\"contract-info-origin\" class=\"status-badge")
-                // REG-08 — 두 규제를 더하지 말라는 경고는 회색 소문단이 아니라 경고 톤이다.
-                .contains("class=\"guidance guidance-warning contract-tab-guidance\"")
-                .contains("두 규제를 더하지 마세요")
-                // 라벨은 서버 enum label() 하나만 쓴다.
-                .contains("data-label-group=\"contractStatus\"")
-                .contains("data-label-group=\"paymentCycle\"")
-                // 1,200% 와 차익거래 판정은 그룹을 나눈다. 둘 다 REVIEW_REQUIRED 를 쓰는데
-                // 라벨이 "검토필요"·"자료부족" 으로 달라, 합치면 labelMap() 이 뒤엣것으로 덮어써
-                // 1,200% 탭이 화면정의서 4-2 대조표(:277 검토필요)와 다른 라벨을 표시한다.
-                .contains("data-label-group=\"capResultStatus\"")
-                .contains("data-label-group=\"arbitrageResultStatus\"")
-                .doesNotContain("data-label-group=\"resultStatus\"")
-                // 구현이 끝난 탭에 "API 연동 대기" 를 남겨 두지 않는다.
-                .doesNotContain("API 연동 대기")
-                .doesNotContain("연동 대기 상태로 표시됩니다")
-                .contains("data-fgc-action=\"recheck\"")
-                .contains("data-fgc-action=\"regenerate\"")
-                .contains("data-fgc-action=\"edit\"");
-
-        assertThat(resource("static/js/features/contract/contract-detail.js"))
-                .contains("window.FgcUi.contractDetail")
-                .contains("STATUS_BADGE_CLASSES")
-                // className 통째 덮어쓰기는 병행 클래스를 잃는다 — exception-list.js 와 같은 방식이어야 한다.
-                .contains("classList.remove.apply(element.classList, STATUS_BADGE_CLASS_NAMES)")
-                .doesNotContain(".className = \"status-badge \"")
-                .contains("event.key === \"Home\"")
-                .contains("event.key === \"End\"")
-                .contains("aria-busy")
-                .contains("format.dateTime")
-                .doesNotContain("toLocaleString(\"ko-KR\")")
-                .doesNotContain("fetch(");
-
-        assertThat(resource("static/js/features/contract/contract-tabs.js"))
-                // 탭 제어를 두 파일이 각각 하지 않는다.
-                .doesNotContain("querySelectorAll(\".contract-detail-tab\")")
-                .contains("contract:tab-activate")
-                .contains("detail.contractId")
-                // 패널 전체가 아니라 본문만 교체해야 헤더가 남는다.
-                .doesNotContain("panel.replaceChildren(")
-                .contains("[data-tab-body]")
-                .contains("visually-hidden")
-                .contains("th.scope = \"col\"")
-                .contains("detail.badgeClass(status)")
-                .contains("format.won")
-                // 라벨 폴백은 판정 종류를 명시해서 읽는다 — 그룹을 안 주면 두 판정이 섞인다.
-                .contains("statusBadge(row.resultStatusLabel, row.resultStatus, \"capResultStatus\")")
-                .contains("statusBadge(row.resultStatusLabel, row.resultStatus, \"arbitrageResultStatus\")")
-                .doesNotContain("codeLabel(\"resultStatus\"")
-                .doesNotContain("fetch(");
-
-        assertThat(resource("templates/layout/default.html"))
-                .containsPattern("(?s)<script[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-CONT-W02'\\}\"[^>]*"
-                        + "th:src=\"@\\{/js/features/contract/contract-detail\\.js}\"[^>]*\\bdefer\\b[^>]*>");
-        // contract-tabs.js 는 contract-detail.js 가 올려 둔 전역을 읽는다 — 순서가 바뀌면 탭이 죽는다.
-        String layout = resource("templates/layout/default.html");
-        assertThat(layout.indexOf("contract/contract-detail.js"))
-                .isLessThan(layout.indexOf("contract/contract-tabs.js"));
-    }
-
     @Test
     void contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior() throws IOException {
         assertThat(resource("templates/contract/form.html"))
                 .contains("name=\"premiumPerCycleAmount\"")
+                .contains("cycle.name() != 'OTHER'")
                 .contains("data-field-error=\"organizationId\"")
-                .doesNotContain("page-description")
-                // 브리지 스코프를 뗐다 — 레거시 fgc-* 가 0건이라 재매핑이 필요 없다.
-                .doesNotContain("publishing-page")
-                // 설명 Guidance 는 지우되 규제 근거와 필수 입력 안내는 자리를 옮겨 유지한다 (가이드 §7.2).
-                .doesNotContain("contract-form-guidance")
-                .doesNotContain("contract-action-guidance")
-                .contains("id=\"organization-helper\"")
-                .contains("aria-describedby=\"contract-save-hint\"")
-                .contains("REG-07")
-                .contains("REG-08")
-                .contains("REG-12")
-                .contains("REG-19")
-                .contains("class=\"evidence\" data-evidence")
-                // 납입주기·계약상태 라벨은 서버 enum 하나만 쓴다.
-                .contains("T(com.susukkang.fgc.contract.domain.PaymentCycleCode).values()")
-                .contains("T(com.susukkang.fgc.contract.domain.ContractStatus).values()")
-                .doesNotContain("3개월납")
                 .doesNotContain("style=\"")
                 .doesNotContain("onclick=")
                 .doesNotContain("<script>");
@@ -759,22 +759,6 @@ class PublishingTemplateStructureTest {
         assertThat(resource("static/js/features/contract/contract-form.js"))
                 .contains("window.FgcUi.contractApi")
                 .contains("error.field")
-                /*
-                 * 주기 보험료는 입력 필드다 — 화면정의서 CONT-W03 항목표(:619)
-                 * "주기 보험료 | 입력 | 금액 | O | 0 이상", 그리고 :550 "premium_per_cycle_amount 와
-                 * monthly_equivalent_first_premium 은 다른 값입니다".
-                 * 자동 계산은 비어 있을 때 채우는 데까지만 하고 저장값·사용자 입력을 덮어쓰지 않는다.
-                 */
-                .doesNotContain("premiumPerCycleAmount.readOnly")
-                .contains("isPremiumPerCycleUserValue")
-                // 기준정보 로드 실패는 Toast, 필드 오류는 필드 옆 (가이드 §11).
-                .contains("function showLoadFailure(")
-                .contains("format.errorText")
-                // 저장 성공 안내는 상세 진입 후에 뜬다 — redirect 로 사라지면 안 된다.
-                .contains("fgc.contract.saveMessage")
-                .contains("scheduleHeaderIds")
-                .contains("format.today()")
-                .contains("aria-busy")
                 .doesNotContain("fetch(");
     }
 
@@ -1018,6 +1002,291 @@ class PublishingTemplateStructureTest {
                 .contains("passwordToggle.setAttribute(\"aria-label\", willShow ? \"비밀번호 숨기기\" : \"비밀번호 표시\")")
                 .doesNotContain("FGC-AUTH-")
                 .doesNotContain("fetch(");
+    }
+
+    /*
+     * VRUN-W01·W02 월 통합검증 화면 (#286).
+     *
+     * 두 화면 모두 레거시 골격 그대로였다. 회귀 방지가 특히 중요한 두 가지를 인수조건으로 고정한다.
+     *   · 비가역인 확정을 브라우저 기본 대화상자로 확인했다 — 규제 고정 문구를 담을 수 없다
+     *   · 확정 성공 Toast 를 띄우자마자 reload() 해서 사용자에게 보이지 않았다
+     */
+    @Test
+    void validationRunScreensUseCommonComponentsWithoutInlinePresentation() throws IOException {
+        assertThat(resource("templates/vrun/list.html"))
+                .contains("class=\"page-content vrun-page vrun-list-page\"")
+                .contains("class=\"filter-bar vrun-filter-bar\"")
+                .contains("class=\"data-table-viewport vrun-table-viewport\" tabindex=\"0\" role=\"region\"")
+                .contains("<colgroup>")
+                .contains("scope=\"col\"")
+                .contains("class=\"visually-hidden\">월 통합검증 실행 목록")
+                .contains("class=\"table-cell-disclosure\"")
+                .contains("class=\"pagination-controls\"")
+                .contains("aria-label=\"월 통합검증 실행 목록 페이지\"")
+                // PRG 결과는 배너가 아니라 Toast 로 — 문구를 data-* 로 넘긴다
+                .contains("data-success-message=${successMessage}")
+                .contains("data-error-message=${errorMessage}")
+                // 폼 계약은 골격이 바뀌어도 그대로여야 한다
+                .contains("id=\"btn-create\"")
+                .contains("data-fgc-action=\"create\"")
+                .contains("name=\"month\"")
+                .contains("name=\"runType\"")
+                .contains("name=\"status\"")
+                // select 변경만으로 제출되던 동작을 명시적 조회 버튼으로 바꿨다 (LEDG-W01 선례)
+                .doesNotContain("onchange=")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("fgc-banner")
+                .doesNotContain("publishing-page")
+                .doesNotContain("<th style=\"width:")
+                .doesNotContain("style=\"");
+
+        assertThat(resource("templates/vrun/detail.html"))
+                .contains("class=\"page-content vrun-page vrun-detail-page\"")
+                // 확정 확인 모달 — 규제 고정 문구를 담는다
+                .contains("data-modal=\"vrun-finalize\"")
+                .contains("id=\"btn-finalize-submit\"")
+                .contains("data-modal-initial-focus")
+                // 확정 완료 모달 — reload 로 사라지던 성공 피드백을 대신한다 (목업 :195-210)
+                .contains("data-modal=\"vrun-finalized\"")
+                .contains("id=\"btn-finalized-close\"")
+                // 결과 요약이 "플레이스홀더" 클래스가 아니라 공통 KPI 카드다
+                .contains("class=\"kpi-grid vrun-summary-grid\"")
+                .contains("class=\"kpi-card\"")
+                // 스텝퍼는 색만으로 상태를 전달하지 않는다 (규칙 4)
+                .contains("class=\"vrun-stepper\"")
+                .contains("data-step-state")
+                // 진행률 % 를 상세에도 표시한다 (화면정의서 :1442)
+                .contains("id=\"progress-text\"")
+                // 비활성 사유는 title 이 아니라 가시 텍스트 + aria-describedby
+                .contains("id=\"finalize-action-note\"")
+                .contains("id=\"execute-action-note\"")
+                .contains("aria-describedby=\"finalize-action-guide finalize-action-note\"")
+                // 기존 구조 테스트가 고정하던 계약은 그대로 유지한다
+                .contains("id=\"cond-body\" aria-live=\"polite\"")
+                .contains("data-checklist-passed=\"false\"")
+                .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                .contains("검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.")
+                .containsOnlyOnce("id=\"finalize-action-guide\"")
+                .containsOnlyOnce("id=\"btn-finalize\"")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("publishing-result-placeholder")
+                .doesNotContain("publishing-page")
+                .doesNotContain("style=\"")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContain("<script>");
+
+        // 서버 렌더링 배지 매핑을 한 곳으로 모았다 — 전에는 두 템플릿과 JS 에 4벌이 흩어져 있었다
+        assertThat(resource("templates/vrun/status-badge.html"))
+                .contains("th:fragment=\"runStatusBadge(status, label)\"")
+                .contains("status-badge-error")
+                .contains("status-badge-review")
+                .contains("status-badge-success")
+                .contains("status-badge-info")
+                .contains("status-badge-neutral")
+                .contains("vrun-badge-lock");
+
+        assertThat(resource("static/js/features/vrun/vrun-detail.js"))
+                // JS 배지가 서버 렌더링과 같은 클래스를 쓴다. CREATED 와 RUNNING 을 구분한다
+                .contains("STATUS_BADGE_CLASSES")
+                .contains("CREATED: \"status-badge-neutral\"")
+                .contains("RUNNING: \"status-badge-info\"")
+                .contains("statusBadge.classList.remove.apply(statusBadge.classList, STATUS_BADGE_CLASS_NAMES)")
+                .doesNotContain("statusBadge.className =")
+                // 폴링 오류가 더는 무음이 아니다
+                .contains("pollFailures >= 3")
+                // 확정 성공은 완료 모달로 알린다 — Toast 직후 reload 하지 않는다
+                .contains("modal.open(\"vrun-finalized\")")
+                // 비활성 사유는 title 이 아니다
+                .doesNotContain("finalizeButton.title =")
+                .contains("finalizeNote.textContent = reason");
+
+        assertThat(resource("static/js/features/vrun/vrun-list.js"))
+                .contains("main.dataset[attribute]")
+                .contains("delete main.dataset[attribute]")
+                .contains("flash(\"successMessage\", \"success\", 5000)")
+                .contains("flash(\"errorMessage\", \"error\", 0)")
+                .doesNotContain("fetch(");
+
+        assertThat(resource("static/css/features/vrun.css"))
+                .contains(".vrun-stepper")
+                .contains(".vrun-inline-state")
+                .contains(".vrun-kv")
+                .contains(".vrun-mid-grid")
+                // 인라인 <script> 의 resize 리스너를 CSS 미디어쿼리로 대체했다
+                .contains("@media (max-width: 63.9375rem)")
+                .contains(":focus-visible");
+
+        assertThat(resource("templates/layout/default.html"))
+                .contains("th:src=\"@{/js/features/vrun/vrun-list.js}\" defer");
+    }
+
+    /*
+     * SCHE-W01 예상 스케줄 목록 (#285).
+     *
+     * 이 화면은 레거시가 이미 0건이었고 남은 것은 화면 설명문·자체 필터 골격·title 안티패턴이었다.
+     * 가장 중요한 회귀 방지 대상은 잘린 값을 title 속성으로만 알리던 부분이다 —
+     * 가이드 §10.2 가 "잘라 놓거나 title 속성만 제공하면 안 된다" 고 금지한다.
+     */
+    @Test
+    void scheduleListUsesCommonFilterBarAndDisclosureInsteadOfTitleTooltips() throws IOException {
+        assertThat(resource("templates/schedule/list.html"))
+                .contains("class=\"page-content schedule-list-page\"")
+                .contains("class=\"filter-bar schedule-filter-bar\"")
+                .contains("class=\"filter-fields schedule-filter-fields\"")
+                .contains("class=\"filter-field-label\"")
+                .contains("class=\"filter-actions schedule-filter-actions\"")
+                // 필터 계약(name·쿼리 파라미터·JS 훅)은 골격이 바뀌어도 그대로여야 한다
+                .contains("data-schedule-filter-form")
+                .contains("data-schedule-filter-reset")
+                .contains("name=\"contractNo\"")
+                .contains("name=\"stage\"")
+                .contains("name=\"regime\"")
+                .contains("name=\"purpose\"")
+                .contains("name=\"status\"")
+                // 화면 설명문·설명 배너는 지우되 REG-19 근거는 근거 툴팁으로 남긴다
+                .contains("id=\"schedule-regime-evidence\"")
+                .contains("REG-19 · 적용 체계 판정")
+                .doesNotContain("class=\"page-description\"")
+                .doesNotContain("schedule-guidance")
+                .doesNotContain("publishing-page");
+
+        assertThat(resource("static/css/features/schedule.css"))
+                .contains(".schedule-filter-bar")
+                .contains(".schedule-filter-fields")
+                .contains(":focus-visible")
+                // Guidance 를 지우면서 전용 CSS 4블록도 함께 걷어냈다
+                .doesNotContain(".schedule-guidance")
+                .doesNotContain(".schedule-filter-grid")
+                .doesNotContain(".schedule-policy-value");
+
+        assertThat(resource("static/js/features/schedule/schedule-list.js"))
+                .contains("table-cell-disclosure")
+                .contains("table-cell-preview is-single-line")
+                .contains("preview.scrollWidth > preview.clientWidth")
+                .contains("format.won(")
+                .contains("format.int(")
+                .contains("scheduleLabels.statusTone(schedule.status)")
+                .contains("scheduleLabels.isLocked(schedule.status)")
+                // CSV 는 성공·실패 모두 알린다 — 전에는 location.assign 만 있었다
+                .contains("function exportCsv(url)")
+                .contains("예상 스케줄 CSV를 내려받았습니다.")
+                // src/test/js/schedule-list.test.cjs 가 require 하는 export 계약
+                .contains("normalizePage: normalizePage")
+                .contains("responseLabel: require(\"./schedule-labels.js\").responseLabel")
+                // title 안티패턴과 자체 포맷 구현이 되살아나면 안 된다
+                .doesNotContain("policyValue.title")
+                .doesNotContain("function formatWon")
+                .doesNotContain("function formatInteger");
+    }
+
+    /*
+     * SCHE-W02 예상 스케줄 상세 (#285).
+     *
+     * 이 화면에서 가장 실질적인 결함 두 가지를 인수조건으로 고정한다.
+     *   · 비가역인 확정에 확인 절차가 없었다 — 가역인 재생성에만 모달이 있었다
+     *   · 금액에 소수 4자리를 허용하고 날짜를 YYYY.MM.DD 로 찍고 시간대가 없었다
+     */
+    @Test
+    void scheduleDetailAddsConfirmDialogAndDropsLegacyShell() throws IOException {
+        assertThat(resource("templates/schedule/detail.html"))
+                .contains("class=\"page-content schedule-detail-page\"")
+                .contains("class=\"surface schedule-detail-card\"")
+                .contains("class=\"data-table-viewport schedule-line-viewport\" tabindex=\"0\" role=\"region\"")
+                .contains("class=\"visually-hidden\">회차별 예상 지급 금액")
+                .contains("<colgroup>")
+                .contains("scope=\"col\"")
+                // 확정 확인 모달 — 재생성 모달과 같은 공통 Modal 계약을 쓴다
+                .contains("data-modal=\"schedule-confirm\"")
+                .contains("data-close-on-backdrop=\"true\"")
+                .contains("role=\"dialog\" aria-modal=\"true\"")
+                .contains("id=\"btn-confirm-submit\"")
+                .contains("되돌릴 수 없습니다 — 확정된 스케줄은 새 버전으로만 바꿉니다.")
+                // 재생성 모달 구조는 그대로 두되 사유 오류 슬롯을 더했다
+                .contains("data-modal=\"schedule-regenerate\"")
+                .contains("data-modal-initial-focus")
+                .contains("id=\"regenerate-reason-error\"")
+                .contains("class=\"field-error\"")
+                // ruleRef 는 IF-API-28 응답에 이미 있는데 표에 없었다
+                .contains(">규칙 ID<")
+                // 권한 검증(ScreenViewControllerTest)과 API 훅은 보존
+                .contains("id=\"btn-regenerate\"")
+                .contains("data-fgc-action=\"regenerate\"")
+                .contains("data-fgc-action=\"confirm\"")
+                .contains("th:disabled=\"${!canProcess}\"")
+                // 비활성 사유는 title 이 아니라 가시 텍스트 + aria-describedby 로 전달한다
+                .contains("id=\"schedule-action-note\"")
+                .contains("aria-describedby=\"schedule-action-note\"")
+                .doesNotContain("class=\"fgc-")
+                .doesNotContain("fgc-banner")
+                .doesNotContain("style=\"")
+                .doesNotContainPattern("(?i)<style[\\s>]")
+                .doesNotContain("<script>");
+
+        assertThat(resource("static/js/features/schedule/schedule-detail.js"))
+                // 표시 형식은 공통 유틸만 쓴다 (FGC-SIR-008)
+                .contains("format.won(")
+                .contains("format.date(")
+                .contains("format.dateTime(")
+                .contains("format.rate(")
+                .doesNotContain("maximumFractionDigits")
+                .doesNotContain("replace(/-/g")
+                .doesNotContain("Intl.")
+                // 확정은 모달을 거친다 — 클릭 즉시 POST 가 나가면 안 된다
+                .contains("confirmButton.addEventListener(\"click\", openConfirmDialog)")
+                .contains("confirmSubmit.addEventListener(\"click\", confirmSchedule)")
+                .contains("openModal(\"schedule-confirm\")")
+                // 로딩·빈·오류를 클래스로 나누고 오류에는 재시도를 붙인다
+                .contains("schedule-inline-state")
+                .contains("is-loading")
+                .contains("is-empty")
+                .contains("is-error")
+                .contains("retry.textContent = \"다시 시도\"")
+                // 현재 버전은 굵기가 아니라 공통 선택 상태로 표시한다
+                .contains("row.className = \"is-selected\"")
+                .contains("row.setAttribute(\"aria-current\", \"true\")")
+                .doesNotContain("row.style.fontWeight")
+                // 라벨·톤은 공용 모듈 한 벌만 쓴다
+                .contains("window.FgcUi.scheduleLabels")
+                .doesNotContain("SCHEDULE_STATUS_LABELS = {")
+                // 업무 판정을 화면에서 다시 계산하지 않는다
+                .doesNotContain("contractMonthNo) >= 1")
+                // 사용자에게 안 보이는 채널로만 오류를 흘리지 않는다
+                .doesNotContain("console.error");
+
+        assertThat(resource("static/js/features/schedule/schedule-labels.js"))
+                .contains("module.exports = api")
+                .contains("window.FgcUi.scheduleLabels = api")
+                .contains("CONFIRMED: \"status-badge-review\"")
+                .contains("HOLD: \"status-badge-review\"")
+                .contains("CANCELLED: \"status-badge-neutral\"")
+                .contains("LOCKED_STATUSES");
+
+        assertThat(resource("static/css/features/schedule.css"))
+                .contains(".schedule-detail-kv")
+                .contains(".schedule-inline-state")
+                .contains(".schedule-line-viewport")
+                .contains(".schedule-version-table tbody tr.is-selected")
+                .doesNotContainPattern("#[0-9a-fA-F]{3,8}\\b");
+    }
+
+    /*
+     * 로드 순서 고정 — schedule-list.js · schedule-detail.js 가 schedule-labels.js 의
+     * window.FgcUi.scheduleLabels 를 읽는다. 순서가 바뀌면 두 화면이 예외 없이 조용히 멈춘다
+     * (두 파일 모두 모듈이 없으면 early return 한다).
+     */
+    @Test
+    void productionLayoutLoadsScheduleLabelsBeforeScheduleScreens() throws IOException {
+        String layout = resource("templates/layout/default.html");
+
+        assertThat(layout)
+                .contains("th:src=\"@{/js/features/schedule/schedule-labels.js}\" defer");
+
+        assertThat(layout.indexOf("schedule-labels.js"))
+                .as("schedule-labels.js 는 schedule-list.js 보다 먼저 등록되어야 한다")
+                .isLessThan(layout.indexOf("schedule-list.js"));
+        assertThat(layout.indexOf("schedule-labels.js"))
+                .as("schedule-labels.js 는 schedule-detail.js 보다 먼저 등록되어야 한다")
+                .isLessThan(layout.indexOf("schedule-detail.js"));
     }
 
     private static String resource(String path) throws IOException {

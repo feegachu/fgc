@@ -1,266 +1,144 @@
 <!DOCTYPE html>
-<!--
-  FGC-UI-TRAN-W02 지급 건 등록·귀속·확정  ★ 이 프로젝트의 핵심 화면
-  요구사항 FUN-065 · FUN-031 · FUN-033 · FUN-034 / REG-08 · 09 · 11 · 20 · 21
-  데이터  쓰기 commission_transaction, transaction_attribution
-          검증 시 생성 cap_check(check_kind='PRE_CONFIRM'), cap_check_detail, exception_case
-  API     POST /api/v1/transactions              (저장 — 검증 없음)
-          POST /api/v1/transactions/{id}/precheck (사전검증 — 저장 없이 계산만)
-          POST /api/v1/transactions/{id}/confirm  (확정 — 6단계 게이트 전부 통과해야 함)
-  라우트  GET /transactions/new → transaction/form.html
-
-  [★ 저장 API와 확정 API를 반드시 분리합니다]
-    하나로 합치면 임시저장을 할 수 없고, 검증 실패 시 입력한 내용이 날아갑니다.
-
-  [막을 것]
-   · 귀속 없이 확정 · 귀속합계 ≠ 지급액 · 검토필요 귀속이 남은 채 확정
-   · 한도를 넘은 채 확정 → 거부하고 예외를 자동 생성합니다
-   · 근거(증빙) 없는 "제외" 선택
-   · 확정된 건의 금액 수정 → 취소 후 다시 만듭니다
-   · 초년도 지급을 13회차로 미뤄 적기 → 귀속일 기준으로 판정하므로 통하지 않습니다
-   · ★ "관리자 강제 통과" 버튼은 만들지 않습니다. 규제 위반은 승인으로 넘길 수 없습니다.
-
-  [정적 부착 단계] 목업(30_산출물/화면_MVP/FGC-UI-TRAN-W02)의 정적 골격만 옮겼다.
-  저장·사전검증·확정 동작은 IF-API-22~25 연동 시 붙인다. 폼 필드는 정적 값 그대로다.
--->
+<!-- FGC-UI-TRAN-W02 지급 건 등록·귀속·확정 · FUN-065 · FUN-031 · FUN-033 · FUN-034 -->
 <html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-TRAN-W02', '지급 건 등록·귀속·확정', '수수료 지급 건', '/transactions')}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="main-content" class="fgc-main publishing-page publishing-page-form publishing-page-transaction-form"
-      data-transaction-form>
-
-  <!-- 목업 head 의 화면 전용 스타일 — 셸 조각은 main 만 가져가므로 여기로 옮겼다 -->
-  <style>
-    .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
-    @media (max-width: 1000px) { .form-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-    @media (max-width: 680px)  { .form-grid { grid-template-columns: 1fr; } }
-    .gate-step { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-bottom:1px solid #e8edf2; }
-    .gate-step:last-child { border-bottom:0; }
-    .gate-no { flex:none; width:22px; height:22px; border-radius:9999px; display:flex; align-items:center;
-               justify-content:center; font-size:11px; font-weight:700; background:#eaeef2; color:#43474d; }
-    .gate--pass .gate-no { background:#22C55E; color:#fff; }
-    .gate--fail .gate-no { background:#EF4444; color:#fff; }
-    .gate--todo .gate-no { background:#eaeef2; color:#43474d; }
-    .attr-table input, .attr-table select { width: 100%; font-size: 12px; padding: 4px 6px; }
-  </style>
-
-  <div class="publishing-page-head" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div>
-      <h1 class="fgc-page-title">지급 건 등록 · 귀속 · 확정</h1>
-      <p class="fgc-page-desc">
-        "누구에게 · 어떤 계약 몫으로 · 어떤 명목으로 · 얼마를" 주는지 한 건 적습니다.
-        <strong>확정</strong>을 누르면 규제 검사를 통과해야만 상태가 바뀝니다.
-      </p>
+<main id="main-content" class="page-content publishing-page transaction-page transaction-form-page"
+      data-transaction-form aria-busy="true">
+  <header class="page-header transaction-page-header">
+    <div class="page-header-copy"><h1 class="page-title">지급 건 등록 · 귀속 · 확정</h1></div>
+    <div class="page-header-actions">
+      <a class="button button-secondary" th:href="@{/transactions}">
+        <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span> 목록으로
+      </a>
     </div>
-    <a class="fgc-btn fgc-btn--ghost" th:href="@{/transactions}" style="text-decoration:none">
-      <span class="material-symbols-outlined" style="font-size:18px">arrow_back</span> 목록으로
-    </a>
+  </header>
+
+  <aside class="guidance guidance-info transaction-boundary-guidance" aria-labelledby="transaction-boundary-title">
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">event</span>
+    <div>
+      <h2 class="guidance-title" id="transaction-boundary-title">초년도 구간은 [계약일, 1주년일)입니다</h2>
+      <p class="guidance-copy">계약일이 2026-07-18이면 귀속일 2027-07-17까지 초년도이고, 2027-07-18부터는 아닙니다. 회차 번호가 아닌 귀속일로 판단하므로 초년도 지급을 13회차로 미뤄도 한도를 피할 수 없습니다.</p>
+    </div>
+  </aside>
+
+  <div id="transaction-form-status" class="transaction-screen-state" role="status" aria-live="polite">기준정보를 불러오는 중입니다.</div>
+  <div id="draft-lock-notice" class="guidance guidance-neutral transaction-lock-notice" role="status" hidden>
+    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">lock</span>
+    <div><strong class="guidance-title">저장된 초안을 검증하는 동안 입력이 잠겼습니다</strong><p class="guidance-copy">내용을 다시 편집하려면 목록에서 이 초안을 다시 여세요.</p></div>
   </div>
 
-  <!-- 초년도 경계 안내 -->
-  <div class="fgc-banner fgc-banner--info" style="margin-top:14px">
-    <span class="material-symbols-outlined" style="font-size:18px">event</span>
-    <span>
-      <strong>초년도 구간은 [계약일, 1주년일) 입니다.</strong>
-      계약일이 2026-07-18이면 귀속일 2027-07-17까지는 초년도, 2027-07-18부터는 초년도가 아닙니다.
-      회차 번호가 아니라 <strong>귀속일</strong>로 판단하므로, 초년도 지급을 13회차로 미뤄 적어도 한도를 피할 수 없습니다.
-    </span>
-  </div>
-
-  <div class="fgc-responsive-split" style="margin-top:16px;display:grid;grid-template-columns:1.55fr 1fr;gap:16px" id="main-grid">
-
-    <div style="display:flex;flex-direction:column;gap:16px">
-
-      <!-- ① 지급 건 입력 — 제출 동작은 IF-API-22(저장)·IF-API-25(확정) 연동 시 붙인다 -->
-      <section class="fgc-card">
-        <div class="fgc-card__head">
-          <span class="fgc-card__title">① 지급 건</span>
-          <span id="tx-status">—</span>
-        </div>
-        <div class="fgc-card__body form-grid">
-
-          <div class="fgc-field">
-            <label class="fgc-label fgc-label--required" for="stage">지급단계</label>
-            <select class="fgc-select" id="stage">
-              <option value="GA_TO_FC">GA→설계사</option>
-              <option value="INSURER_TO_GA">원수사→GA</option>
-            </select>
+  <div class="transaction-form-layout" id="main-grid">
+    <div class="transaction-form-column">
+      <section class="surface transaction-form-panel" aria-labelledby="transaction-input-title">
+        <header class="surface-header transaction-surface-header">
+          <h2 class="surface-title" id="transaction-input-title">① 지급 건</h2>
+          <span id="tx-status" class="status-badge status-badge-neutral">미저장</span>
+        </header>
+        <div class="surface-body transaction-form-grid">
+          <div class="field">
+            <label class="field-label" for="stage">지급단계 <span class="field-required" aria-hidden="true">*</span></label>
+            <select class="select-control" id="stage"><option value="GA_TO_FC">GA→설계사</option><option value="INSURER_TO_GA">원수사→GA</option></select>
+            <span class="field-error" id="err-stage" hidden></span>
           </div>
-
-          <div class="fgc-field">
-            <label class="fgc-label fgc-label--required" for="sourceType">원천유형</label>
-            <select class="fgc-select" id="sourceType"></select>
+          <div class="field">
+            <label class="field-label" for="sourceType">원천유형 <span class="field-required" aria-hidden="true">*</span></label>
+            <select class="select-control" id="sourceType"></select><span class="field-error" id="err-sourceType" hidden></span>
           </div>
-
-          <div class="fgc-field">
-            <label class="fgc-label fgc-label--required" for="bizKey">업무키</label>
-            <input class="fgc-input fgc-mono" id="bizKey" type="text" maxlength="160" placeholder="자동 생성됩니다">
-            <span class="fgc-help">같은 원천유형 안에서 중복될 수 없습니다.</span>
-            <span class="fgc-error" id="err-bizKey" hidden></span>
+          <div class="field">
+            <label class="field-label" for="bizKey">업무키 <span class="field-required" aria-hidden="true">*</span></label>
+            <input class="field-control transaction-mono" id="bizKey" type="text" maxlength="160" placeholder="자동 생성됩니다" aria-describedby="help-bizKey err-bizKey">
+            <span class="field-helper" id="help-bizKey">같은 원천유형 안에서 중복될 수 없습니다.</span><span class="field-error" id="err-bizKey" hidden></span>
           </div>
-
-          <div class="fgc-field">
-            <label class="fgc-label fgc-label--required" for="settlementMonth">정산월</label>
-            <input class="fgc-input" id="settlementMonth" type="month" th:value="${month}" value="">
-            <span class="fgc-help">DB에는 항상 그 달 1일로 저장됩니다.</span>
+          <div class="field">
+            <label class="field-label" for="settlementMonth">정산월 <span class="field-required" aria-hidden="true">*</span></label>
+            <input class="field-control" id="settlementMonth" type="month" th:value="${month}" value="" aria-describedby="help-settlementMonth err-settlementMonth">
+            <span class="field-helper" id="help-settlementMonth">DB에는 항상 그 달 1일로 저장됩니다.</span><span class="field-error" id="err-settlementMonth" hidden></span>
           </div>
-
-          <div class="fgc-field" id="recipient-field">
-            <label class="fgc-label fgc-label--required" for="recipient">수령 설계사</label>
-            <!-- 설계사 선택지는 IF-API-22 연동 시 채운다 -->
-            <select class="fgc-select" id="recipient"></select>
-            <span class="fgc-help">GA→설계사 단계에서는 반드시 있어야 합니다.</span>
+          <div class="field" id="recipient-field">
+            <label class="field-label" for="recipient">수령 설계사 <span class="field-required" aria-hidden="true">*</span></label>
+            <select class="select-control" id="recipient" aria-describedby="help-recipient err-recipient"></select>
+            <span class="field-helper" id="help-recipient">GA→설계사 단계에서는 반드시 있어야 합니다.</span><span class="field-error" id="err-recipient" hidden></span>
           </div>
-
-          <div class="fgc-field">
-            <label class="fgc-label fgc-label--required" for="item">수수료 항목</label>
-            <!-- 수수료 항목 선택지는 IF-API-22 연동 시 채운다 -->
-            <select class="fgc-select" id="item"></select>
+          <div class="field">
+            <label class="field-label" for="item">수수료 항목 <span class="field-required" aria-hidden="true">*</span></label>
+            <select class="select-control" id="item"></select><span class="field-error" id="err-item" hidden></span>
           </div>
-
-          <div class="fgc-field">
-            <label class="fgc-label fgc-label--required" for="amount">금액 (원)</label>
-            <input class="fgc-input fgc-num" id="amount" type="number" min="0" step="1" value="250000">
-            <span class="fgc-help">
-              항상 0 이상입니다. 주는 돈인지 빼는 돈인지는 아래 <strong>흐름</strong>으로 구분합니다. 음수를 저장하지 않습니다.
-            </span>
+          <div class="field">
+            <label class="field-label" for="amount">금액 (원) <span class="field-required" aria-hidden="true">*</span></label>
+            <input class="field-control transaction-number" id="amount" type="number" min="0" step="1" value="250000" aria-describedby="help-amount err-amount">
+            <span class="field-helper" id="help-amount">금액은 0 이상으로 입력하고 지급·차감은 흐름으로 구분합니다.</span><span class="field-error" id="err-amount" hidden></span>
           </div>
-
-          <div class="fgc-field">
-            <label class="fgc-label fgc-label--required" for="cashflow">흐름</label>
-            <select class="fgc-select" id="cashflow">
-              <option value="PAYMENT">지급</option>
-              <option value="DEDUCTION">차감</option>
-            </select>
+          <div class="field">
+            <label class="field-label" for="cashflow">흐름 <span class="field-required" aria-hidden="true">*</span></label>
+            <select class="select-control" id="cashflow"><option value="PAYMENT">지급</option><option value="DEDUCTION">차감</option></select>
           </div>
-
-          <div class="fgc-field">
-            <label class="fgc-label" for="evidence">증빙</label>
-            <input class="fgc-input" id="evidence" type="text" maxlength="200" placeholder="문서번호 · 링크">
-            <span class="fgc-help">귀속행에서 "제외"를 고르면 증빙이 반드시 필요합니다.</span>
+          <div class="field">
+            <label class="field-label" for="evidence">증빙</label>
+            <input class="field-control" id="evidence" type="text" maxlength="200" placeholder="문서번호 · 링크" aria-describedby="help-evidence err-evidence">
+            <span class="field-helper" id="help-evidence">귀속행에서 제외를 고르면 증빙이 반드시 필요합니다.</span><span class="field-error" id="err-evidence" hidden></span>
           </div>
         </div>
       </section>
 
-      <!-- ② 귀속행 -->
-      <section class="fgc-card">
-        <div class="fgc-card__head">
-          <span class="fgc-card__title">② 귀속행 — 이 돈이 어느 계약 몫인가</span>
-          <button class="fgc-btn fgc-btn--ghost" id="btn-add-attr" type="button"
-                  style="padding:4px 10px;font-size:12px">
-            <span class="material-symbols-outlined" style="font-size:16px">add</span> 귀속행 추가
-          </button>
-        </div>
-        <div style="overflow-x:auto">
-          <table class="fgc-table attr-table" style="min-width:1360px">
-            <thead>
-              <tr>
-                <th style="width:36px">#</th>
-                <th style="width:96px">귀속 범위</th>
-                <th style="width:100px">계약번호</th>
-                <th style="width:150px">설계사</th>
-                <th style="width:120px">귀속일</th>
-                <th style="width:132px">귀속월</th>
-                <th style="width:120px" class="fgc-th-num">귀속금액</th>
-                <th style="width:118px">산입 판정</th>
-                <th style="width:150px">귀속 방법</th>
-                <th style="width:110px">배부정책</th>
-                <th style="width:300px">증빙</th>
-                <th style="width:40px"></th>
-              </tr>
-            </thead>
-            <tbody id="attr-body">
-              <tr><td colspan="12"><div class="fgc-empty" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="6">귀속금액 합계</td>
-                <td class="fgc-td-num"><span class="fgc-amount" id="attr-sum">0</span></td>
-                <td colspan="5" id="attr-diff" class="fgc-muted"></td>
-              </tr>
-            </tfoot>
+      <section class="surface transaction-attribution-panel" aria-labelledby="transaction-attribution-title">
+        <header class="surface-header transaction-surface-header">
+          <h2 class="surface-title" id="transaction-attribution-title">② 귀속행 — 이 돈이 어느 계약 몫인가</h2>
+          <button class="button button-secondary transaction-add-attribution" id="btn-add-attr" type="button"><span class="material-symbols-rounded" aria-hidden="true">add</span> 귀속행 추가</button>
+        </header>
+        <div class="data-table-viewport transaction-attribution-viewport">
+          <table class="data-table transaction-attribution-table">
+            <caption class="visually-hidden">지급 건에 연결할 계약별 귀속행</caption>
+            <colgroup>
+              <col class="transaction-attr-col-index"><col class="transaction-attr-col-scope"><col class="transaction-attr-col-contract"><col class="transaction-attr-col-agent">
+              <col class="transaction-attr-col-date"><col class="transaction-attr-col-month"><col class="transaction-attr-col-amount"><col class="transaction-attr-col-decision">
+              <col class="transaction-attr-col-method"><col class="transaction-attr-col-policy"><col class="transaction-attr-col-evidence"><col class="transaction-attr-col-action">
+            </colgroup>
+            <thead><tr>
+              <th scope="col">#</th><th scope="col">귀속 범위</th><th scope="col">계약번호</th><th scope="col">설계사</th><th scope="col">귀속일</th><th scope="col">귀속월</th>
+              <th scope="col" class="is-number">귀속금액</th><th scope="col">산입 판정</th><th scope="col">귀속 방법</th><th scope="col">배부정책</th><th scope="col">증빙</th><th scope="col" aria-label="행 삭제"></th>
+            </tr></thead>
+            <tbody id="attr-body" aria-live="polite"><tr><td colspan="12"><div class="empty-state" th:text="#{info.common.empty}">조건에 맞는 자료가 없습니다.</div></td></tr></tbody>
+            <tfoot><tr><td colspan="6">귀속금액 합계</td><td class="is-number"><span class="tabular-nums" id="attr-sum">0원</span></td><td colspan="5"><span id="attr-diff" class="status-badge status-badge-neutral">미확인</span></td></tr></tfoot>
           </table>
         </div>
-        <div class="fgc-card__body" style="padding-top:12px">
-          <div class="fgc-banner fgc-banner--muted">
-            <span class="material-symbols-outlined" style="font-size:18px">help</span>
-            <span>
-              <strong>귀속(歸屬)</strong>이란 "이 돈이 어느 계약 때문에 나갔는지 연결하는 것"입니다.
-              시책처럼 여러 계약에 걸친 돈은 계약별로 나눠 적고,
-              <strong>나눈 금액의 합이 실제 지급액과 반드시 같아야</strong> 합니다.
-              나누는 기준을 모르면 임의로 나누지 말고 <strong>검토필요</strong>로 두세요(REG-20 · REG-06C).
-            </span>
-          </div>
-        </div>
+        <p class="field-error transaction-attribution-error" id="err-attributions" role="alert" hidden></p>
       </section>
     </div>
 
-    <!-- ③ 검증 결과 패널 -->
-    <div style="display:flex;flex-direction:column;gap:16px">
-
-      <section class="fgc-card">
-        <div class="fgc-card__head">
-          <span class="fgc-card__title">③ 확정 게이트 6단계</span>
-          <span class="fgc-muted" style="font-size:11px">운영정책서 제31조</span>
-        </div>
-        <!-- 게이트 6단계 표시는 IF-API-25 확정 응답(blockers[])으로 채운다 -->
-        <div class="fgc-card__body" style="padding:8px 16px" id="gate-list"></div>
+    <div class="transaction-form-column">
+      <section class="surface transaction-gate-panel" aria-labelledby="transaction-gate-title">
+        <header class="surface-header transaction-surface-header"><h2 class="surface-title" id="transaction-gate-title">③ 확정 게이트 6단계</h2><span class="transaction-panel-meta">운영정책서 제31조</span></header>
+        <div class="surface-body transaction-gate-list" id="gate-list" aria-live="polite"></div>
       </section>
-
-      <section class="fgc-card" id="cap-panel">
-        <div class="fgc-card__head">
-          <span class="fgc-card__title">1,200% 사전검증</span>
-          <span class="fgc-muted" style="font-size:11px">저장하지 않고 계산만</span>
-        </div>
-        <!-- 사전검증 결과(계약별 게이지)는 IF-API-24 Ajax 응답으로 채운다 -->
-        <div class="fgc-card__body" id="cap-body">
-          <p class="fgc-muted" style="font-size:13px;margin:0">
-            [사전검증] 버튼을 누르면 이 지급 건을 더했을 때 한도를 넘는지 미리 계산합니다.
-            아무것도 저장하지 않습니다.
-          </p>
-        </div>
+      <section class="surface transaction-cap-panel" id="cap-panel" aria-labelledby="transaction-cap-title">
+        <header class="surface-header transaction-surface-header"><h2 class="surface-title" id="transaction-cap-title">1,200% 사전검증</h2><span class="transaction-panel-meta">저장하지 않고 계산만</span></header>
+        <div class="surface-body transaction-cap-body" id="cap-body" role="status" aria-live="polite" aria-busy="false"><p class="transaction-panel-placeholder">[사전검증]을 누르면 한도 초과 여부를 미리 계산하며 아무것도 저장하지 않습니다.</p></div>
       </section>
-
-      <!-- ④ 버튼 — 동작은 IF-API-22(저장)·24(사전검증)·25(확정) 연동 시 붙인다 -->
-      <section class="fgc-card">
-        <div class="fgc-card__body" style="display:flex;flex-direction:column;gap:8px">
-          <button type="button" class="fgc-btn fgc-btn--ghost" id="btn-save" data-fgc-action="save" th:disabled="${!canProcess}">
-            <span class="material-symbols-outlined" style="font-size:18px">save</span> 임시저장 (검증 없음)
-          </button>
-          <button type="button" class="fgc-btn fgc-btn--ghost" id="btn-precheck" data-fgc-action="precheck" th:disabled="${!canProcess}">
-            <span class="material-symbols-outlined" style="font-size:18px">calculate</span> 사전검증
-          </button>
-          <button type="button" class="fgc-btn fgc-btn--primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${!canProcess}">
-            <span class="material-symbols-outlined" style="font-size:18px">verified</span> 확정
-          </button>
-          <p class="fgc-help" style="margin:4px 0 0">
-            확정은 6단계를 <strong>전부</strong> 통과해야 합니다.
-            한 단계라도 걸리면 상태가 바뀌지 않습니다.
-          </p>
-          <!--
-            [의도적으로 만들지 않은 것]
-            "관리자 승인으로 강제 통과" 버튼이 여기 없습니다.
-            규제 위반은 승인으로 넘길 수 없기 때문입니다.
-            대신 예외함에서 정정 · 감액 · 취소 중 하나를 고릅니다.
-          -->
+      <section class="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
+        <h2 class="visually-hidden" id="transaction-actions-title">지급 건 작업</h2>
+        <div class="surface-body transaction-action-list">
+          <button type="button" class="button button-secondary" id="btn-save" data-fgc-action="save" th:disabled="${!canProcess}" aria-describedby="transaction-action-help transaction-permission-help"><span class="material-symbols-rounded" aria-hidden="true">save</span><span data-button-label>임시저장 (검증 없음)</span></button>
+          <button type="button" class="button button-secondary" id="btn-precheck" data-fgc-action="precheck" th:disabled="${!canProcess}" aria-describedby="transaction-action-help transaction-permission-help"><span class="material-symbols-rounded" aria-hidden="true">calculate</span><span data-button-label>사전검증</span></button>
+          <button type="button" class="button button-primary" id="btn-confirm" data-fgc-action="confirm" th:disabled="${!canProcess}" aria-describedby="transaction-action-help transaction-permission-help"><span class="material-symbols-rounded" aria-hidden="true">verified</span><span data-button-label>확정</span></button>
+          <p class="field-helper" id="transaction-action-help">확정은 서버가 판정한 6단계를 모두 통과해야 합니다.</p>
+          <p class="field-error" id="transaction-permission-help" th:if="${!canProcess}">현재 계정은 조회만 가능하며 저장·사전검증·확정을 실행할 수 없습니다.</p>
         </div>
       </section>
     </div>
   </div>
 
-<!-- 스크립트는 main 안에 둔다 - 셸의 page()는 ~{::main}만 삽입하므로 main 밖 스크립트는 렌더링에서 사라진다 -->
-<script>
-/* 화면 폭이 좁으면 좌우 2단을 세로로 — 데이터·검증 동작은 IF-API-22~25 연동 시 추가 */
-(function () {
-  "use strict";
-  function reflow() {
-    document.getElementById("main-grid").style.gridTemplateColumns =
-      window.innerWidth < 1150 ? "1fr" : "1.55fr 1fr";
-  }
-  reflow();
-  window.addEventListener("resize", reflow);
-})();
-</script>
+  <div class="modal-backdrop" data-modal="transaction-confirm" data-close-on-backdrop="true" hidden aria-hidden="true">
+    <section class="modal transaction-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="transaction-confirm-title" aria-describedby="transaction-confirm-description">
+      <header class="modal-header"><h2 class="modal-title" id="transaction-confirm-title">지급 건 확정</h2></header>
+      <div class="modal-body transaction-confirm-body">
+        <div class="guidance guidance-warning"><span class="material-symbols-rounded guidance-icon" aria-hidden="true">warning</span><div><strong class="guidance-title">확정 후에는 이 화면에서 되돌릴 수 없습니다</strong><p class="guidance-copy" id="transaction-confirm-description">취소가 필요하면 별도의 IF-API-26 절차로 처리해야 합니다. 현재 내용을 확인한 뒤 확정하세요.</p></div></div>
+        <div id="transaction-confirm-summary" class="transaction-confirm-summary"></div>
+        <div id="transaction-confirm-blockers" class="transaction-confirm-blockers" role="alert" hidden></div>
+      </div>
+      <footer class="modal-footer"><button class="button button-secondary" type="button" data-modal-close data-modal-initial-focus>취소</button><button class="button button-primary" id="btn-confirm-submit" type="button"><span data-button-label>확정 실행</span></button></footer>
+    </section>
+  </div>
 </main>
 </body>
 </html>
