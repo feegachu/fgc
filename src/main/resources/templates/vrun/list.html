@@ -31,16 +31,21 @@
     리다이렉트로 들어오는 화면이라 서버가 직접 Toast 를 띄울 수 없다.
     상시 설명이던 Spring Batch 안내는 결과 알림이 아니므로 guidance 로 역할을 옮겼다.
   -->
-  <div class="guidance guidance-neutral">
-    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">engineering</span>
-    <div>
-      <p>
-        실행을 만들면 <strong>Spring Batch</strong>의 <span class="tabular-nums">MonthlyValidationJob</span>이
-        1~8단계를 순서대로 돌립니다. 9단계(담당자 검토)와 10단계(확정)는 사람이 합니다.
-        실패하면 새 실행을 만들어 다시 돌립니다.
-      </p>
-    </div>
-  </div>
+  <!--
+    안내문구는 모두 제거하고 완전히 실무에서 쓴다는 생각으로 아래 요소 제거하기로
+    2026.08.21 팀 회의에서 정함.
+    나머지 화면에서도 아래 요소와 같이 안내문구 발견 시 모두 제거할 예정.
+  -->
+<!--  <div class="guidance guidance-neutral">-->
+<!--    <span class="material-symbols-rounded guidance-icon" aria-hidden="true">engineering</span>-->
+<!--    <div>-->
+<!--      <p>-->
+<!--        실행을 만들면 <strong>Spring Batch</strong>의 <span class="tabular-nums">MonthlyValidationJob</span>이-->
+<!--        1~8단계를 순서대로 돌립니다. 9단계(담당자 검토)와 10단계(확정)는 사람이 합니다.-->
+<!--        실패하면 새 실행을 만들어 다시 돌립니다.-->
+<!--      </p>-->
+<!--    </div>-->
+<!--  </div>-->
 
   <!-- ① 새 실행 만들기 — 폼 제출(PRG), Thymeleaf 가 CSRF hidden 을 자동 삽입한다 -->
   <section class="surface" aria-labelledby="vrun-create-title">
