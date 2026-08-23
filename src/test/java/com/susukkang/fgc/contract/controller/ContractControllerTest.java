@@ -7,24 +7,14 @@ import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.PageResponse;
-import com.susukkang.fgc.contract.domain.DataOrigin;
+import com.susukkang.fgc.contract.code.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.dto.ContractCreateResponse;
 import com.susukkang.fgc.contract.dto.ContractUpdateResponse;
-import com.susukkang.fgc.contract.dto.ContractDetailResponse;
-import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.service.ContractService;
-import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
-import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
-import com.susukkang.fgc.schedule.service.ScheduleService;
-import com.susukkang.fgc.arbitrage.service.ArbitrageService;
-import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckView;
-import com.susukkang.fgc.cap.service.CapCheckService;
-import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
-import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -37,11 +27,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 
-import static com.susukkang.fgc.contract.domain.ContractStatus.ACTIVE;
-import static com.susukkang.fgc.contract.domain.PaymentCycleCode.MONTHLY;
+import static com.susukkang.fgc.contract.code.ContractStatus.ACTIVE;
+import static com.susukkang.fgc.contract.code.PaymentCycleCode.MONTHLY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -83,76 +72,6 @@ class ContractControllerTest {
 
     @MockitoBean
     private ContractService contractService;
-
-    @MockitoBean
-    private ScheduleService scheduleService;
-
-    @MockitoBean
-    private ArbitrageService arbitrageService;
-
-    @MockitoBean
-    private CapCheckService capCheckService;
-
-    @Test
-    @DisplayName("계약별 지급단계 최신 1,200% 판정을 조회한다")
-    void getContractCapChecksReturnsSuccess() throws Exception {
-        when(capCheckService.findLatest(eq(21L), any(PaymentStage.class)))
-                .thenReturn(java.util.Optional.empty());
-
-        mockMvc.perform(get("/api/v1/contracts/{id}/cap-checks", 21L)
-                        .with(user("admin").roles("GA_ADMIN")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data").isEmpty());
-    }
-
-    @Test
-    @DisplayName("계약별 차익거래 검증 시계열을 조회한다")
-    void getContractArbitrageChecksReturnsSuccess() throws Exception {
-        when(arbitrageService.selectByContractId(21L, PaymentStage.GA_TO_FC))
-                .thenReturn(List.of(ArbitrageCheckView.builder()
-                        .arbitrageCheckId(100L)
-                        .contractId(21L)
-                        .paymentStage(PaymentStage.GA_TO_FC)
-                        .resultStatus(ArbitrageCheckStatus.CLEAR)
-                        .build()));
-
-        mockMvc.perform(get("/api/v1/contracts/{id}/arbitrage-checks", 21L)
-                        .with(user("admin").roles("GA_ADMIN")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].arbitrageCheckId").value(100))
-                .andExpect(jsonPath("$.data[0].resultStatus").value("CLEAR"))
-                .andExpect(jsonPath("$.data[0].resultStatusLabel").value("이상없음"))
-                .andExpect(jsonPath("$.data[0].paymentStageLabel").value("GA→설계사"));
-    }
-
-    @Test
-    @DisplayName("계약 ID로 운영용 예상 스케줄 목록을 조회한다")
-    void getContractSchedulesReturnsSuccess() throws Exception {
-        ScheduleHeaderResponse schedule = ScheduleHeaderResponse.builder()
-                .scheduleHeaderId(100L)
-                .contractNo("TEST-20260806-001")
-                .build();
-
-        ScheduleLineResponse line = ScheduleLineResponse.builder()
-                .lineNo(1)
-                .installmentNo(1)
-                .build();
-        when(scheduleService.selectByContractId(
-                21L, com.susukkang.fgc.common.code.PaymentStage.INSURER_TO_GA))
-                .thenReturn(ContractScheduleResponse.builder()
-                        .headers(List.of(schedule))
-                        .lines(List.of(line))
-                        .build());
-
-        mockMvc.perform(get("/api/v1/contracts/{contractId}/schedules", 21L)
-                        .param("paymentStage", "INSURER_TO_GA")
-                        .with(user("admin").roles("GA_ADMIN")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.headers[0].scheduleHeaderId").value(100))
-                .andExpect(jsonPath("$.data.headers[0].contractNo").value("TEST-20260806-001"))
-                .andExpect(jsonPath("$.data.lines[0].installmentNo").value(1));
-    }
 
     @Test
     @DisplayName("보험계약 목록을 조회한다")
@@ -214,99 +133,6 @@ class ContractControllerTest {
     }
 
     @Test
-    @DisplayName("보험계약 상세정보를 조회한다")
-    void getContractDetailReturnsSuccess() throws Exception {
-        ContractDetailResponse detail =
-                ContractDetailResponse.builder()
-                        .contractNo("TEST-20260806-001")
-                        .contractId(21L)
-                        .insurerId(1L)
-                        .insurerName("미래가상생명")
-                        .productOfferingId(3L)
-                        .productName("가상 건강보장보험 A")
-                        .offeringVersion("2026-A")
-                        .contractDate(LocalDate.of(2026, 8, 6))
-                        .agentId(4L)
-                        .agentName("김설계")
-                        .organizationId(5L)
-                        .organizationName("서울지사")
-                        .premiumPerCycleAmount(
-                                new BigDecimal("100000")
-                        )
-                        .paymentCycleCode(MONTHLY)
-                        .firstPremiumAmount(
-                                new BigDecimal("100000")
-                        )
-                        .monthlyEquivalentFirstPremium(
-                                new BigDecimal("100000")
-                        )
-                        .paymentTermMonths(120)
-                        .standardSurrenderDeductionAmount(
-                                new BigDecimal("50000")
-                        )
-                        .contractStatus(ACTIVE)
-                        .dataOrigin(DataOrigin.MANUAL)
-                        .build();
-
-        when(contractService.selectContractDetailById(21L))
-                .thenReturn(detail);
-
-        mockMvc.perform(
-                        get("/api/v1/contracts/{id}", 21L)
-                                .with(
-                                        user("settlement")
-                                                .roles("SETTLEMENT")
-                                )
-                )
-                .andExpect(status().isOk())
-                .andExpect(
-                        jsonPath("$.data.contractNo")
-                                .value("TEST-20260806-001")
-                )
-                .andExpect(
-                        jsonPath("$.data.productName")
-                                .value("가상 건강보장보험 A")
-                )
-                .andExpect(jsonPath("$.data.insurerId").value(1))
-                .andExpect(jsonPath("$.data.productOfferingId").value(3))
-                .andExpect(jsonPath("$.data.agentId").value(4))
-                .andExpect(jsonPath("$.data.organizationId").value(5));
-    }
-
-    @Test
-    @DisplayName("계약 상태 사건과 Job별 처리 이력을 조회한다")
-    void getContractStatusEventsReturnsSuccess() throws Exception {
-        OffsetDateTime effectiveAt = OffsetDateTime.parse("2026-07-15T00:00:00+09:00");
-        OffsetDateTime receivedAt = OffsetDateTime.parse("2026-07-16T06:00:00+09:00");
-        OffsetDateTime processedAt = OffsetDateTime.parse("2026-07-16T06:30:00+09:00");
-        when(contractService.selectStatusEventsByContractId(21L)).thenReturn(List.of(
-                new com.susukkang.fgc.contract.dto.ContractStatusEventResponse(
-                        2, ACTIVE, com.susukkang.fgc.contract.domain.ContractStatus.TERMINATED,
-                        effectiveAt, receivedAt,
-                        List.of(new com.susukkang.fgc.contract.dto.ContractStatusEventProcessingResponse(
-                                "DailyChangedContractJob", "SUCCEEDED", processedAt)),
-                        "INSURER_FEED", "EVENT-21-2"
-                )
-        ));
-
-        mockMvc.perform(get("/api/v1/contracts/{id}/status-events", 21L)
-                        .with(user("settlement").roles("SETTLEMENT")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].eventSeq").value(2))
-                .andExpect(jsonPath("$.data[0].previousStatus").value("ACTIVE"))
-                .andExpect(jsonPath("$.data[0].newStatus").value("TERMINATED"))
-                .andExpect(jsonPath("$.data[0].effectiveAt").value("2026-07-15T00:00:00+09:00"))
-                .andExpect(jsonPath("$.data[0].receivedAt").value("2026-07-16T06:00:00+09:00"))
-                .andExpect(jsonPath("$.data[0].processings[0].processingJob")
-                        .value("DailyChangedContractJob"))
-                .andExpect(jsonPath("$.data[0].processings[0].processingStatus").value("SUCCEEDED"))
-                .andExpect(jsonPath("$.data[0].processings[0].processedAt")
-                        .value("2026-07-16T06:30:00+09:00"))
-                .andExpect(jsonPath("$.data[0].sourceSystem").value("INSURER_FEED"))
-                .andExpect(jsonPath("$.data[0].sourceEventKey").value("EVENT-21-2"));
-    }
-
-    @Test
     @DisplayName("보험계약을 생성한다")
     void createContractReturnsSuccess() throws Exception {
         when(contractService.createContract(any(ContractCreateRequest.class)))
@@ -330,7 +156,7 @@ class ContractControllerTest {
     @DisplayName("일시납과 0원 경계값으로 보험계약을 생성할 수 있다")
     void createContractAcceptsSinglePaymentAndZeroPremiums() throws Exception {
         ContractCreateRequest request = createRequest();
-        request.setPaymentCycleCode(com.susukkang.fgc.contract.domain.PaymentCycleCode.SINGLE);
+        request.setPaymentCycleCode(com.susukkang.fgc.contract.code.PaymentCycleCode.SINGLE);
         request.setPremiumPerCycleAmount(BigDecimal.ZERO);
         request.setFirstPremiumAmount(BigDecimal.ZERO);
         request.setMonthlyEquivalentFirstPremium(BigDecimal.ZERO);
@@ -514,14 +340,4 @@ class ContractControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** FUN-002(#82) — 차익거래 수동 검증도 CAN_PROCESS(SETTLEMENT·SYSTEM_ADMIN) 전용이다. */
-    @Test
-    @DisplayName("준법·감사는 차익거래 수동 검증을 실행할 수 없다")
-    void reArbitrageCheckRejectsComplianceUser() throws Exception {
-        mockMvc.perform(post("/api/v1/contracts/{id}/arbitrage-check", 21L)
-                        .with(user("comp01").roles("COMPLIANCE"))
-                        .contentType(APPLICATION_JSON)
-                        .content("{\"asOfDate\":\"2026-08-13\",\"reason\":\"정기 점검\"}"))
-                .andExpect(status().isForbidden());
-    }
 }

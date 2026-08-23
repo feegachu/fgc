@@ -1,6 +1,6 @@
 package com.susukkang.fgc.contract.mapper;
 
-import com.susukkang.fgc.contract.domain.DataOrigin;
+import com.susukkang.fgc.contract.code.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.dto.InsuranceContract;
@@ -18,10 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.susukkang.fgc.contract.domain.ContractStatus.ACTIVE;
-import static com.susukkang.fgc.contract.domain.ContractStatus.TERMINATED;
-import static com.susukkang.fgc.contract.domain.PaymentCycleCode.MONTHLY;
-import static com.susukkang.fgc.contract.domain.PremiumConversionRuleCode.MONTHLY_AS_IS;
+import static com.susukkang.fgc.contract.code.ContractStatus.ACTIVE;
+import static com.susukkang.fgc.contract.code.ContractStatus.TERMINATED;
+import static com.susukkang.fgc.contract.code.PaymentCycleCode.MONTHLY;
+import static com.susukkang.fgc.contract.code.PremiumConversionRuleCode.MONTHLY_AS_IS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**

@@ -1,4 +1,4 @@
-package com.susukkang.fgc.contract.domain;
+package com.susukkang.fgc.contract.code;
 
 /**
  * 설명 : DataOrigin

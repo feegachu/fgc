@@ -2,7 +2,8 @@ package com.susukkang.fgc.contract.controller;
 
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.security.Roles;
-import com.susukkang.fgc.contract.domain.ContractStatus;
+import com.susukkang.fgc.contract.code.ContractStatus;
+import com.susukkang.fgc.contract.code.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.service.ContractService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,13 @@ import java.util.Map;
 public class ContractViewController {
 
     private final ContractService contractService;
+
+    /** CONT-W02 계약 상세 화면. 탭 데이터는 ContractDetailController의 Ajax API로 조회한다. */
+    @GetMapping("/contracts/{id}")
+    public String detail(@PathVariable Long id, Model model) {
+        model.addAttribute("contractId", id);
+        return "contract/detail";
+    }
 
     /** CONT-W03 신규 등록 폼. 기준정보와 저장은 화면 전용 JavaScript가 API로 연결한다. */
     @PreAuthorize(Roles.CAN_PROCESS)
@@ -62,9 +70,9 @@ public class ContractViewController {
                 ContractStatus.MATURED, "만기"
         ));
         model.addAttribute("dataOriginLabels", Map.of(
-                com.susukkang.fgc.contract.domain.DataOrigin.SEED, "시드",
-                com.susukkang.fgc.contract.domain.DataOrigin.NORMALIZED_DB, "정규화 DB",
-                com.susukkang.fgc.contract.domain.DataOrigin.MANUAL, "수동 입력"
+                DataOrigin.SEED, "시드",
+                DataOrigin.NORMALIZED_DB, "정규화 DB",
+                DataOrigin.MANUAL, "수동 입력"
         ));
         return "contract/list";
     }
