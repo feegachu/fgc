@@ -226,6 +226,7 @@ class ContractServiceTest {
                 .willReturn(new ScheduleGenerationResult(List.of(100L, 101L), 3));
         given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.INSURER_TO_GA)).willReturn(true);
         given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.GA_TO_FC)).willReturn(true);
+        given(contractStatusEventMapper.insertInitialEvent(any(), any(), any(), any())).willReturn(1);
 
         ContractCreateResponse response = contractService.createContract(request);
 
@@ -239,6 +240,17 @@ class ContractServiceTest {
         assertThat(saved.getDataOrigin()).isEqualTo(DataOrigin.MANUAL);
         assertThat(response.contractId()).isEqualTo(21L);
         assertThat(response.scheduleHeaderIds()).containsExactly(100L, 101L);
+        ArgumentCaptor<OffsetDateTime> effectiveAtCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
+        verify(contractStatusEventMapper).insertInitialEvent(
+                org.mockito.ArgumentMatchers.eq(21L),
+                org.mockito.ArgumentMatchers.eq(ACTIVE),
+                effectiveAtCaptor.capture(),
+                any(OffsetDateTime.class)
+        );
+        assertThat(effectiveAtCaptor.getValue())
+                .isEqualTo(request.getContractDate()
+                        .atStartOfDay(com.susukkang.fgc.common.util.DateUtil.SEOUL_ZONE)
+                        .toOffsetDateTime());
         verify(scheduleService).generateSchedules(saved);
         ArgumentCaptor<CapCalculationCommand> capCaptor =
                 ArgumentCaptor.forClass(CapCalculationCommand.class);
