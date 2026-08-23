@@ -50,7 +50,7 @@ class CapExceptionMapperIntegrationTest {
                 exceptionKey, paymentId, reference, ExceptionType.CAP_VIOLATION, ExceptionSeverity.CRITICAL));
 
         Map<String, Object> stored = jdbcTemplate.queryForMap("""
-                SELECT exception_case_id, exception_type, severity, status
+                SELECT exception_case_id, exception_type, severity, status, validation_month
                   FROM fgc.exception_case
                  WHERE exception_key = ?
                 """, exceptionKey);
@@ -64,7 +64,10 @@ class CapExceptionMapperIntegrationTest {
         assertThat(stored)
                 .containsEntry("exception_type", "CAP_VIOLATION")
                 .containsEntry("severity", "CRITICAL")
-                .containsEntry("status", "NEW");
+                .containsEntry("status", "NEW")
+                // #330: 실시간 예외도 지급 건의 정산월을 검출 검증월로 남겨
+                //       월 통합검증 확정 게이트(제44조)가 셀 수 있어야 한다
+                .containsEntry("validation_month", java.sql.Date.valueOf("2026-08-01"));
         assertThat(capExceptionService.hasUnresolvedViolation(paymentId)).isTrue();
 
         capExceptionService.resolve(CapExceptionResolveCommand.builder()

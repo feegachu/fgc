@@ -73,6 +73,49 @@ class ValidationTargetSelectionMapperIntegrationTest {
         assertThat(withoutStandardCodeEvidence).isZero();
     }
 
+    /**
+     * #332 회귀 — CONT-W03 에서 선택 가능한 STD-SAV-A(V4 경계시험 판매버전)에
+     * 환급률표 시드(V42)가 없으면 등록 계약이 "예상 해약환급률표 없음" REVIEW_REQUIRED 로
+     * 빠져 시연 컷③→⑧ 이음매가 끊어진다. 시드 추가 후 SELECTED 로 선정되는지 고정한다.
+     */
+    @Test
+    void fgc332SavContractIsSelectedWithSeededRefundRateTable() {
+        Long contractId = insertSavContract();
+        Long runId = insertValidationRun(LocalDate.of(2098, 3, 1));
+
+        mapper.insertTargets(runId, LocalDate.of(2098, 3, 1), LocalDate.of(2098, 3, 31));
+
+        var target = jdbcTemplate.queryForMap("""
+                SELECT selection_status, selection_reason, refund_rate_table_id
+                  FROM fgc.validation_target
+                 WHERE validation_run_id = ? AND contract_id = ?
+                """, runId, contractId);
+        assertThat(target.get("selection_status")).isEqualTo("SELECTED");
+        assertThat(target.get("selection_reason")).isEqualTo("월 통합검증 대상");
+        assertThat(target.get("refund_rate_table_id")).isNotNull();
+    }
+
+    private Long insertSavContract() {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.insurance_contract (
+                    insurer_id, product_offering_id, contract_no, contract_date,
+                    agent_id, organization_id, premium_per_cycle_amount,
+                    first_premium_amount, monthly_equivalent_first_premium, payment_term_months
+                )
+                SELECT p.insurer_id, po.product_offering_id, 'IT-332-SAV-0001', DATE '2098-02-15',
+                       a.agent_id, a.organization_id, 200000, 200000, 200000, 120
+                  FROM fgc.product p
+                  JOIN fgc.product_offering po ON po.product_id = p.product_id
+                                              AND po.offering_version = '2026-CURRENT-A'
+                                              AND po.channel_code = 'FACE_TO_FACE'
+                  CROSS JOIN LATERAL (
+                       SELECT agent_id, organization_id FROM fgc.agent ORDER BY agent_id LIMIT 1
+                  ) a
+                 WHERE p.standard_product_code = 'STD-SAV-A'
+                RETURNING contract_id
+                """, Long.class);
+    }
+
     @Test
     void selectsOnlySelectedContractsFromRequestedRunInContractOrder() {
         Long requestedRunId = insertValidationRun(LocalDate.of(2097, 1, 1));

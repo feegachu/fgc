@@ -65,13 +65,16 @@ class ValidationRunFinalizationServiceIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "SYSTEM_ADMIN")
     void leavesRunCompletedWhenChecklistHasAnUnresolvedCriticalException() {
-        Long runId = createCompletedRun(LocalDate.of(2087, 2, 1));
+        LocalDate month = LocalDate.of(2087, 2, 1);
+        Long runId = createCompletedRun(month);
+        // #330: 배치 검출 경로(record_exception_detection)는 항상 validation_month 를 남기고,
+        // 확정 게이트 조건 3도 그 월 기준으로 센다 — 픽스처도 실제 검출 행과 같게 월을 채운다.
         jdbcTemplate.update("""
                 INSERT INTO fgc.exception_case (
                     exception_key, exception_type, severity, status, validation_run_id,
-                    source_entity_type, source_entity_id, title
-                ) VALUES (?, 'OTHER', 'CRITICAL', 'NEW', ?, 'VALIDATION_RUN', ?, '확정 차단 예외')
-                """, "FUN044-BLOCK-" + UUID.randomUUID(), runId, String.valueOf(runId));
+                    validation_month, source_entity_type, source_entity_id, title
+                ) VALUES (?, 'OTHER', 'CRITICAL', 'NEW', ?, ?, 'VALIDATION_RUN', ?, '확정 차단 예외')
+                """, "FUN044-BLOCK-" + UUID.randomUUID(), runId, month, String.valueOf(runId));
 
         assertThatThrownBy(() -> validationRunFinalizationService.finalizeRun(
                 runId, systemAdminUserId(), "FUN044-BLOCK-KEY-" + UUID.randomUUID()))

@@ -34,8 +34,12 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    // 2026-08-23 yslee - #330 확정 게이트 예외 조건을 실행 범위 → 검증월 범위로 교정
+    // 기존 코드: 조건 3·4가 validation_run_id 범위라 실시간 경로(run_id NULL)의
+    //           CRITICAL·POLICY_* 미처리 예외가 있어도 6/6 통과로 FINALIZED 될 수 있었음
+    // 개선: 같은 검증월이면 실행이 달라도, 실행이 없어도(실시간) 확정을 막는지 검증
     @Test
-    void countsOnlyFailuresInTheDocumentedRunAndMonthScopes() {
+    void countsFailuresInTheDocumentedScopesIncludingRealtimeExceptions() {
         Long currentRunId = createCompletedRun(TEST_MONTH);
         Long otherRunId = createCompletedRun(TEST_MONTH);
         Long contractId = jdbcTemplate.queryForObject(
@@ -44,11 +48,17 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
         insertJournalImbalance(currentRunId, contractId, "current");
         insertJournalImbalance(otherRunId, contractId, "other");
 
-        insertException(currentRunId, "CRITICAL", "OTHER", "NEW", "critical-open");
-        insertException(currentRunId, "CRITICAL", "OTHER", "RESOLVED", "critical-resolved");
-        insertException(otherRunId, "CRITICAL", "OTHER", "NEW", "critical-other-run");
-        insertException(currentRunId, "WARNING", "POLICY_MISSING", "IN_REVIEW", "policy-open");
-        insertException(currentRunId, "WARNING", "POLICY_DUPLICATE", "REJECTED", "policy-rejected");
+        insertException(currentRunId, TEST_MONTH, "CRITICAL", "OTHER", "NEW", "critical-open");
+        insertException(currentRunId, TEST_MONTH, "CRITICAL", "OTHER", "RESOLVED", "critical-resolved");
+        insertException(otherRunId, TEST_MONTH, "CRITICAL", "OTHER", "NEW", "critical-other-run");
+        // #330 핵심 회귀: 실시간 확정 경로(FUN-034)는 validation_run_id 가 NULL 이다
+        insertException(null, TEST_MONTH, "CRITICAL", "CAP_VIOLATION", "NEW", "critical-realtime");
+        insertException(null, TEST_MONTH.plusMonths(1), "CRITICAL", "CAP_VIOLATION", "NEW",
+                "critical-other-month");
+        insertException(currentRunId, TEST_MONTH, "WARNING", "POLICY_MISSING", "IN_REVIEW", "policy-open");
+        insertException(currentRunId, TEST_MONTH, "WARNING", "POLICY_DUPLICATE", "REJECTED",
+                "policy-rejected");
+        insertException(null, TEST_MONTH, "HIGH", "POLICY_MISSING", "NEW", "policy-realtime");
 
         insertAttributionImbalancedTransaction(TEST_MONTH, "current-month");
         insertAttributionImbalancedTransaction(TEST_MONTH.plusMonths(1), "other-month");
@@ -60,8 +70,11 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
 
         assertThat(counts.getIncompleteRunCount()).isZero();
         assertThat(counts.getJournalImbalanceCount()).isEqualTo(1);
-        assertThat(counts.getUnresolvedCriticalExceptionCount()).isEqualTo(1);
-        assertThat(counts.getUnresolvedPolicyExceptionCount()).isEqualTo(1);
+        // 같은 검증월의 미처리 CRITICAL 3건: 현재 실행 1 + 다른 실행 1 + 실시간(run_id NULL) 1.
+        // 다른 검증월·해결(RESOLVED) 건은 세지 않는다.
+        assertThat(counts.getUnresolvedCriticalExceptionCount()).isEqualTo(3);
+        // 같은 검증월의 미처리 정책 예외 2건: 배치 IN_REVIEW 1 + 실시간 NEW 1. 종결(REJECTED) 제외.
+        assertThat(counts.getUnresolvedPolicyExceptionCount()).isEqualTo(2);
         assertThat(counts.getAttributionImbalanceCount()).isEqualTo(1);
         assertThat(counts.getCapDetailMismatchCount()).isEqualTo(1);
     }
@@ -140,14 +153,16 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
                 """, headerId, accounts.get(0), headerId, accounts.get(1));
     }
 
-    private void insertException(Long runId, String severity, String type, String status, String suffix) {
+    /** runId 가 NULL 이면 실시간 확정 경로, 아니면 배치 검출 경로를 흉내 낸다. 월은 두 경로 모두 남긴다(#330). */
+    private void insertException(Long runId, LocalDate month, String severity, String type,
+                                 String status, String suffix) {
         jdbcTemplate.update("""
                 INSERT INTO fgc.exception_case (
                     exception_key, exception_type, severity, status, validation_run_id,
-                    source_entity_type, source_entity_id, title
-                ) VALUES (?, ?, ?, ?, ?, 'VALIDATION_RUN', ?, 'FUN-044 checklist test')
+                    validation_month, source_entity_type, source_entity_id, title
+                ) VALUES (?, ?, ?, ?, ?, ?, 'VALIDATION_RUN', ?, 'FUN-044 checklist test')
                 """, "FUN044-EX-" + suffix + "-" + UUID.randomUUID(), type, severity, status,
-                runId, runId + "-" + suffix);
+                runId, month, runId + "-" + suffix);
     }
 
     private void insertAttributionImbalancedTransaction(LocalDate month, String suffix) {
