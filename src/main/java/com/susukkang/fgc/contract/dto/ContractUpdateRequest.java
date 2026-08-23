@@ -1,7 +1,7 @@
 package com.susukkang.fgc.contract.dto;
 
-import com.susukkang.fgc.contract.domain.ContractStatus;
-import com.susukkang.fgc.contract.domain.PaymentCycleCode;
+import com.susukkang.fgc.contract.code.ContractStatus;
+import com.susukkang.fgc.contract.code.PaymentCycleCode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
