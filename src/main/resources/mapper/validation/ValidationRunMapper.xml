@@ -46,7 +46,9 @@
     <!--
       IF-API-50 / FUN-044-01
       한 SELECT의 MVCC 스냅샷에서 6개 실패 건수를 함께 읽어 조건별 조회 시점 차이를 없앤다.
-      전표·예외·한도는 validation_run_id 범위, 귀속합계는 문서 정의대로 validation_month 범위다.
+      전표·한도는 validation_run_id 범위, 예외·귀속합계는 문서 정의대로 validation_month 범위다.
+      예외를 실행 범위로 좁히면 실시간 경로(run_id NULL)의 CRITICAL·POLICY_* 가 빠진 채
+      확정되므로(제44조 위반, #330) 상세 화면 KPI(ValidationRunDetailMapper)와 같은 월 기준을 쓴다.
       서비스는 이 집계값을 0건 여부로만 판정하고 화면 문구와 이동 링크를 조립한다.
     -->
     <select id="findFinalizeChecklistCounts"
@@ -63,13 +65,13 @@
                    AS journalImbalanceCount,
                (SELECT COUNT(*)
                   FROM fgc.exception_case exception
-                 WHERE exception.validation_run_id = vr.validation_run_id
+                 WHERE exception.validation_month = vr.validation_month
                    AND exception.severity = 'CRITICAL'
                    AND exception.status IN ('NEW', 'IN_REVIEW'))
                    AS unresolvedCriticalExceptionCount,
                (SELECT COUNT(*)
                   FROM fgc.exception_case exception
-                 WHERE exception.validation_run_id = vr.validation_run_id
+                 WHERE exception.validation_month = vr.validation_month
                    AND exception.exception_type IN ('POLICY_MISSING', 'POLICY_DUPLICATE')
                    AND exception.status IN ('NEW', 'IN_REVIEW'))
                    AS unresolvedPolicyExceptionCount,

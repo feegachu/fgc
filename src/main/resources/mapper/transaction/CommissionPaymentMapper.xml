@@ -736,6 +736,7 @@
             policy_version_id,
             source_entity_type,
             source_entity_id,
+            validation_month,
             title,
             description
         ) VALUES (
@@ -749,12 +750,19 @@
             #{policyVersionId},
             'COMMISSION_TRANSACTION',
             COALESCE(CAST(#{paymentId} AS varchar), #{sourceEntityId}),
+            <!-- 실시간 확정 경로(run_id NULL)의 POLICY_MISSING 등도 확정 게이트(제44조)가
+                 월 기준으로 세도록 지급 건의 정산월을 검출 검증월로 남긴다(#330).
+                 paymentId 가 NULL 이면 서브쿼리도 NULL — 현행과 동일하게 비워 둔다. -->
+            (SELECT ct.settlement_month
+               FROM fgc.commission_transaction ct
+              WHERE ct.commission_transaction_id = #{paymentId}),
             #{title},
             #{description}
         )
         ON CONFLICT (exception_key) DO UPDATE
            SET status = 'NEW',
                reason_code = EXCLUDED.reason_code,
+               validation_month = COALESCE(EXCLUDED.validation_month, existing.validation_month),
                title = EXCLUDED.title,
                description = EXCLUDED.description,
                updated_at = clock_timestamp()
