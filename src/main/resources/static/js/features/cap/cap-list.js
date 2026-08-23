@@ -135,10 +135,13 @@
    * 그 판정은 목록(latestScopedCapChecks)에서 candidate_transaction_id 조건으로 제외되므로
    * 표에서 찾아 누를 수 없다. IF-API-31(findById)은 제외 조건이 없어 팝업은 정상 동작하므로
    * 목록과 무관하게 바로 연다 — 목록이 0건이어도 계산근거는 보인다.
+   * 값은 스크립트 로드 시점에 읽어 둔다 — load()의 replaceLocation()이
+   * capCheckId 없는 URL로 재작성한 뒤에 실행되기 때문이다.
    */
+  var deepLinkCapCheckId = new URLSearchParams(window.location.search).get("capCheckId");
+
   function openDetailFromLocation() {
-    var capCheckId = new URLSearchParams(window.location.search).get("capCheckId");
-    if (capCheckId) openDetail(capCheckId);
+    if (deepLinkCapCheckId) openDetail(deepLinkCapCheckId);
   }
 
   function currentParams() {
