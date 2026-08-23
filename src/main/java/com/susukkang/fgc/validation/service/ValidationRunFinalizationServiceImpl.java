@@ -140,12 +140,15 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                 condition(2, "원장 불균형(차변≠대변)이 0건인가",
                         counts.getJournalImbalanceCount(),
                         "/api/v1/journals/imbalances?validationRunId=" + id),
+                // 조건 3·4는 집계 쿼리와 같은 월(validation_month) 기준으로 조회해야
+                // 미충족 건수와 바로가기 목록이 일치한다(#330). 파라미터는 ISO 날짜(월 1일)다.
                 condition(3, "심각도 긴급(CRITICAL) 미처리 예외가 0건인가",
                         counts.getUnresolvedCriticalExceptionCount(),
-                        "/exceptions?validationRunId=" + id + "&severity=CRITICAL&status=OPEN"),
+                        "/exceptions?validationMonth=" + counts.getValidationMonth()
+                                + "&severity=CRITICAL&status=OPEN"),
                 condition(4, "정책 없음 · 정책 중복이 0건인가",
                         counts.getUnresolvedPolicyExceptionCount(),
-                        "/exceptions?validationRunId=" + id
+                        "/exceptions?validationMonth=" + counts.getValidationMonth()
                                 + "&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN"),
                 condition(5, "귀속합계 오류가 0건인가",
                         counts.getAttributionImbalanceCount(),

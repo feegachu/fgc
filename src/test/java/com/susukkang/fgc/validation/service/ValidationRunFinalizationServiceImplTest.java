@@ -72,8 +72,9 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.conditions()).extracting("linkUrl").containsExactly(
                 "/validation-runs/44",
                 "/api/v1/journals/imbalances?validationRunId=44",
-                "/exceptions?validationRunId=44&severity=CRITICAL&status=OPEN",
-                "/exceptions?validationRunId=44&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN",
+                // #330: 조건 3·4는 집계와 같은 월 기준으로 이동해야 건수와 목록이 일치한다
+                "/exceptions?validationMonth=2026-08-01&severity=CRITICAL&status=OPEN",
+                "/exceptions?validationMonth=2026-08-01&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN",
                 "/transactions?settlementMonth=2026-08&attributionImbalanceOnly=true",
                 "/validation-runs/44");
     }
