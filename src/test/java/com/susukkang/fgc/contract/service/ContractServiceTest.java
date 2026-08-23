@@ -7,9 +7,9 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
-import com.susukkang.fgc.contract.domain.DataOrigin;
-import com.susukkang.fgc.contract.domain.PaymentCycleCode;
-import com.susukkang.fgc.contract.domain.PremiumConversionRuleCode;
+import com.susukkang.fgc.contract.code.DataOrigin;
+import com.susukkang.fgc.contract.code.PaymentCycleCode;
+import com.susukkang.fgc.contract.code.PremiumConversionRuleCode;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractInput;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
@@ -42,8 +42,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static com.susukkang.fgc.contract.domain.ContractStatus.ACTIVE;
-import static com.susukkang.fgc.contract.domain.PaymentCycleCode.MONTHLY;
+import static com.susukkang.fgc.contract.code.ContractStatus.ACTIVE;
+import static com.susukkang.fgc.contract.code.PaymentCycleCode.MONTHLY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -97,7 +97,7 @@ class ContractServiceTest {
                 new ContractStatusEventRow(101L, 1, null, ACTIVE, firstEffective,
                         firstEffective.plusDays(1), "INSURER_FEED", "EVENT-1"),
                 new ContractStatusEventRow(102L, 2, ACTIVE,
-                        com.susukkang.fgc.contract.domain.ContractStatus.TERMINATED,
+                        com.susukkang.fgc.contract.code.ContractStatus.TERMINATED,
                         secondEffective, secondEffective.plusDays(1), "INSURER_FEED", "EVENT-2")
         ));
         given(contractStatusEventMapper.selectProcessingsByContractId(21L)).willReturn(List.of(

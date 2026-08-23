@@ -9,8 +9,8 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.web.ShellAdvice;
-import com.susukkang.fgc.contract.domain.ContractStatus;
-import com.susukkang.fgc.contract.domain.DataOrigin;
+import com.susukkang.fgc.contract.code.ContractStatus;
+import com.susukkang.fgc.contract.code.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.service.ContractService;
@@ -60,6 +60,37 @@ class ContractViewControllerTest {
         user.setUserId(1L); user.setLoginId("settle01"); user.setPasswordHash("x");
         user.setUserName("테스트 사용자"); user.setRoleCode(role); user.setAccountStatus("ACTIVE");
         return new FgcUserDetails(user, true, true);
+    }
+
+    @Test
+    void 계약_상세_화면은_계약_ID와_상세_탭_스크립트를_렌더링한다() throws Exception {
+        mockMvc.perform(get("/contracts/{id}", 21L).with(user(userDetails())))
+                .andExpect(status().isOk())
+                .andExpect(view().name("contract/detail"))
+                .andExpect(model().attribute("contractId", 21L))
+                .andExpect(content().string(containsString("FGC-UI-CONT-W02")))
+                .andExpect(content().string(containsString("/js/features/contract/contract-detail.js")))
+                .andExpect(content().string(containsString("/js/features/contract/contract-tabs.js")))
+                .andExpect(content().string(containsString("id=\"contract-history-list\"")))
+                .andExpect(content().string(containsString("data-status-sort=\"effectiveAt\"")))
+                .andExpect(content().string(containsString("data-status-sort=\"receivedAt\"")))
+                .andExpect(content().string(containsString("id=\"contract-schedule-regenerate-button\"")))
+                .andExpect(content().string(containsString("aria-label=\"스케줄 재생성\"")))
+                .andExpect(content().string(containsString("id=\"contract-cap-recheck-button\"")))
+                .andExpect(content().string(containsString("aria-label=\"한도 재검증\"")))
+                .andExpect(content().string(containsString("data-label-group=\"contractStatus\"")))
+                .andExpect(content().string(containsString("data-code=\"ACTIVE\"")))
+                .andExpect(content().string(containsString(">정상<")))
+                .andExpect(content().string(not(containsString("processingJob: \"후속 처리\""))))
+                .andExpect(content().string(not(containsString("consumerName"))));
+    }
+
+    @Test
+    void 계약_상세_처리_버튼은_처리_권한에_따라_활성화된다() throws Exception {
+        mockMvc.perform(get("/contracts/{id}", 21L).with(user(userDetails("GA_ADMIN"))))
+                .andExpect(content().string(containsString("disabled=\"disabled\"")));
+        mockMvc.perform(get("/contracts/{id}", 21L).with(user(userDetails("SYSTEM_ADMIN"))))
+                .andExpect(content().string(not(containsString("disabled=\"disabled\""))));
     }
 
     @Test

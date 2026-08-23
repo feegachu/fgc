@@ -1,7 +1,7 @@
 package com.susukkang.fgc.contract.dto;
 
 import com.susukkang.fgc.common.code.CapResultStatus;
-import com.susukkang.fgc.contract.domain.ContractStatus;
+import com.susukkang.fgc.contract.code.ContractStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

@@ -28,10 +28,10 @@
     (DataOrigin.label() 추가는 백엔드 정리 요청 항목).
   -->
   <div id="contract-code-labels" hidden aria-hidden="true">
-    <span th:each="status : ${T(com.susukkang.fgc.contract.domain.ContractStatus).values()}"
+    <span th:each="status : ${T(com.susukkang.fgc.contract.code.ContractStatus).values()}"
           data-label-group="contractStatus"
           th:attr="data-code=${status.name()}" th:text="${status.label()}">정상</span>
-    <span th:each="cycle : ${T(com.susukkang.fgc.contract.domain.PaymentCycleCode).values()}"
+    <span th:each="cycle : ${T(com.susukkang.fgc.contract.code.PaymentCycleCode).values()}"
           data-label-group="paymentCycle"
           th:attr="data-code=${cycle.name()}" th:text="${cycle.label()}">월납</span>
     <span data-label-group="dataOrigin" data-code="SEED">시드</span>

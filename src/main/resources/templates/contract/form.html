@@ -79,7 +79,7 @@
           <label class="field" data-field="contractStatus">
             <span class="field-label">계약상태 <span class="field-required" aria-hidden="true">*</span></span>
             <select id="contract-status" name="contractStatus" class="select-control" required>
-              <option th:each="status : ${T(com.susukkang.fgc.contract.domain.ContractStatus).values()}"
+              <option th:each="status : ${T(com.susukkang.fgc.contract.code.ContractStatus).values()}"
                       th:value="${status.name()}" th:text="${status.label()}"
                       th:selected="${status.name() == 'ACTIVE'}">정상</option>
             </select>
@@ -140,7 +140,7 @@
           <span class="field-label">납입주기 <span class="field-required" aria-hidden="true">*</span></span>
           <!-- 라벨은 서버 enum 의 label() 하나만 쓴다 — CONT-W02 상세와 표기가 갈리지 않게 한다. -->
           <select id="payment-cycle-code" name="paymentCycleCode" class="select-control" required>
-            <option th:each="cycle : ${T(com.susukkang.fgc.contract.domain.PaymentCycleCode).values()}"
+            <option th:each="cycle : ${T(com.susukkang.fgc.contract.code.PaymentCycleCode).values()}"
                     th:if="${cycle.name() != 'OTHER'}"
                     th:value="${cycle.name()}" th:text="${cycle.label()}"
                     th:selected="${cycle.name() == 'MONTHLY'}">월납</option>

@@ -1,8 +1,6 @@
 package com.susukkang.fgc.common.web;
 
 import com.susukkang.fgc.common.config.SecurityConfig;
-import com.susukkang.fgc.contract.controller.ContractViewController;
-import com.susukkang.fgc.contract.service.ContractService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -11,7 +9,6 @@ import org.springframework.boot.autoconfigure.context.MessageSourceAutoConfigura
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -33,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * LEDG 046/047 · RECO 048~051 · VRUN 041~044 · AUDT 061.
  * /audit-logs 만 역할 제한(FUN-002·화면정의서 :1530)이라 별도 테스트로 뺐다.
  */
-@WebMvcTest({ScreenViewController.class, ContractViewController.class})
+@WebMvcTest(ScreenViewController.class)
 @Import({ShellAdvice.class, SecurityConfig.class, MessageSourceAutoConfiguration.class,
         com.susukkang.fgc.common.exception.FgcMessageResolver.class,
         com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver.class})
@@ -42,9 +39,6 @@ class ScreenViewControllerTest {
 
     @Autowired
     MockMvc mvc;
-
-    @MockitoBean
-    ContractService contractService;
 
     private static com.susukkang.fgc.auth.dto.FgcUserDetails settleUser() {
         var view = new com.susukkang.fgc.auth.dto.AppUserView();
@@ -58,7 +52,6 @@ class ScreenViewControllerTest {
 
     @ParameterizedTest(name = "{0} → {1}")
     @CsvSource({
-            "/contracts/1,         FGC-UI-CONT-W02",
             "/transactions,        FGC-UI-TRAN-W01",
             "/transactions/new,    FGC-UI-TRAN-W02",
             "/schedules,           FGC-UI-SCHE-W01",
@@ -85,43 +78,6 @@ class ScreenViewControllerTest {
     // AUDT-W01(/audit-logs) 스모크·역할 테스트는 데이터 바인딩 이관과 함께
     // audit.controller.AuditLogViewControllerTest 로, RECO-W01(/reconciliations)은
     // reconciliation.controller.ReconciliationViewControllerTest 로 옮겼다 (FUN-061, #205).
-
-    @Test
-    void contract_detail_uses_status_event_contract_without_consumer_name() throws Exception {
-        // 상태이력 렌더링과 시간대 처리는 #283 에서 static/js/features/contract/contract-detail.js 로 옮겼다.
-        // 템플릿에는 화면 셸과 스크립트 등록만 남아야 한다 (인라인 <script> 가 되살아나면 구조 테스트가 잡는다).
-        mvc.perform(get("/contracts/1").with(user(settleUser())))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "/js/features/contract/contract-detail.js")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "/js/features/contract/contract-tabs.js")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id=\"contract-history-list\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "data-status-sort=\"effectiveAt\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "data-status-sort=\"receivedAt\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id=\"contract-schedule-regenerate-button\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "aria-label=\"스케줄 재생성\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "id=\"contract-cap-recheck-button\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "aria-label=\"한도 재검증\"")))
-                // 계약상태 라벨은 서버 enum 이 유일한 출처다 — 화면이 라벨을 새로 만들지 않는다.
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "data-label-group=\"contractStatus\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "data-code=\"ACTIVE\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        ">정상<")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("processingJob: \"후속 처리\""))))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("consumerName"))));
-    }
 
     /**
      * 시연 사실감을 위해 교육용 프로토타입 문구를 화면에 노출하지 않는다
@@ -212,20 +168,6 @@ class ScreenViewControllerTest {
         var marker = org.hamcrest.Matchers.containsString("data-fgc-action=\"create\"");
         mvc.perform(get(route).with(user(userFor(role))))
                 .andExpect(content().string(visible ? marker : org.hamcrest.Matchers.not(marker)));
-    }
-
-    /**
-     * FGC-FUN-002 — GA_ADMIN 은 readOnly=false 지만 등록·실행은 못 한다(§4-1 "정책·조직 조회, 검증 실행 확정").
-     * readOnly 만 보던 시절 GA_ADMIN 에게 처리 버튼이 활성이던 회귀를 막는다 — 대표로
-     * CONT-W02 처리 버튼(IF-API-19/29/33).
-     */
-    @Test
-    void contract_process_buttons_disabled_for_ga_admin() throws Exception {
-        mvc.perform(get("/contracts/1").with(user(gaAdminUser())))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("disabled=\"disabled\"")));
-        mvc.perform(get("/contracts/1").with(user(adminUser())))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("disabled=\"disabled\""))));
     }
 
     /**
