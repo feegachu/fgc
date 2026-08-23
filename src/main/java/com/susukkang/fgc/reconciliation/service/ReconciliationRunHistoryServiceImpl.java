@@ -4,6 +4,7 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow;
@@ -92,9 +93,9 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
                 row.getInsurerId(), row.getInsurerName(),
                 row.getStatus(), status.label(),
                 row.getTolerancePolicyVersionId(),
-                row.getCreatedBy(), row.getCreatedAt(),
-                row.getStartedAt(), row.getCompletedAt(),
-                row.getFinalizedAt(), row.getFinalizedBy(),
+                row.getCreatedBy(), DateUtil.toSeoul(row.getCreatedAt()),
+                DateUtil.toSeoul(row.getStartedAt()), DateUtil.toSeoul(row.getCompletedAt()),
+                DateUtil.toSeoul(row.getFinalizedAt()), row.getFinalizedBy(),
                 row.getTargetCount(), row.getMatchedCount(), row.getExceptionCount(),
                 row.getExpectedTotal(), row.getActualTotal(), row.getDifferenceTotal(),
                 matchRatePct);
