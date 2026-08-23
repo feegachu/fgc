@@ -25,6 +25,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -201,7 +202,21 @@ public class ContractService {
             calculateCapCheckOrRegisterReview(contractId, paymentStage, command);
         }
 
-        // TODO(FUN-026, 2차): 계약 생성 상태 사건 이력을 등록한다.
+        // 계약 상세의 상태 변경 이력에서 생성 당시의 최초 상태도 확인할 수 있도록
+        // 계약일을 효력일로 하는 event_seq=1 사건을 같은 트랜잭션에 남긴다.
+        OffsetDateTime receivedAt = DateUtil.nowSeoul();
+        OffsetDateTime effectiveAt = request.getContractDate()
+                .atStartOfDay(DateUtil.SEOUL_ZONE)
+                .toOffsetDateTime();
+        int insertedStatusEvents = contractStatusEventMapper.insertInitialEvent(
+                contractId,
+                request.getContractStatus(),
+                effectiveAt,
+                receivedAt
+        );
+        if (insertedStatusEvents != 1) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        }
 
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_CONTRACT_CREATED)

@@ -5,6 +5,17 @@
 
 <mapper namespace="com.susukkang.fgc.contract.mapper.ContractStatusEventMapper">
 
+    <insert id="insertInitialEvent">
+        INSERT INTO fgc.contract_status_event
+            (contract_id, event_seq, previous_status, new_status,
+             effective_at, received_at, reason_code,
+             source_system, source_event_key, data_origin)
+        VALUES
+            (#{contractId}, 1, NULL, #{newStatus},
+             #{effectiveAt}, #{receivedAt}, 'NEW_CONTRACT',
+             'FGC_MANUAL', CONCAT('CONTRACT_CREATED:', #{contractId}), 'MANUAL')
+    </insert>
+
     <select id="selectByContractId"
             resultType="com.susukkang.fgc.contract.dto.ContractStatusEventRow">
         SELECT contract_status_event_id,
