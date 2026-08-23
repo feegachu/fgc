@@ -392,8 +392,7 @@
         return true;
       })
       .catch(function (error) {
-        if (requestId !== state.organizationOptionsRequestId) return false;
-        setError("agent", error);
+        if (requestId === state.organizationOptionsRequestId) setError("agent", error);
         return false;
       })
       .finally(function () {
