@@ -1,5 +1,6 @@
 package com.susukkang.fgc.audit.dto;
 
+import com.susukkang.fgc.common.util.DateUtil;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.OffsetDateTime;
@@ -40,7 +41,7 @@ public record AuditLogResponse(
     public static AuditLogResponse from(AuditLogRow row) {
         return new AuditLogResponse(
                 row.auditLogId(),
-                row.occurredAt(),
+                DateUtil.toSeoul(row.occurredAt()),
                 row.userId(),
                 row.userLoginId(),
                 row.actionCode(),

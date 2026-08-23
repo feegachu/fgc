@@ -1,6 +1,7 @@
 package com.susukkang.fgc.dashboard.dto;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.util.DateUtil;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -35,9 +36,9 @@ public record RecentValidationRunResponse(
                 ValidationRunStatus.valueOf(row.status()).label(),
                 row.currentStep(),
                 row.triggeredBy(),
-                row.startedAt(),
-                row.completedAt(),
-                row.finalizedAt(),
+                DateUtil.toSeoul(row.startedAt()),
+                DateUtil.toSeoul(row.completedAt()),
+                DateUtil.toSeoul(row.finalizedAt()),
                 row.finalizedBy(),
                 row.failureMessage()
         );
