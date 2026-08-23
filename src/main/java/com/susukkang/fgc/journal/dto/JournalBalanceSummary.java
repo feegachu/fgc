@@ -17,14 +17,24 @@ public class JournalBalanceSummary {
     private BigDecimal debitTotal;
     private BigDecimal creditTotal;
 
-    /** 이슈 #98 균형 조건: 차변>0, 대변>0, 차변==대변을 모두 만족해야 한다. */
+    /**
+     * 이슈 #98 균형 조건: 차변>0, 대변>0, 차변==대변을 모두 만족해야 한다.
+     * debitTotal/creditTotal 중 하나라도 null이면(값을 안 채우고 호출한 경우) 0으로 취급한다 —
+     * summarize()의 null 헤더 처리와 동일하게 "미균형"으로만 판정하고 NPE는 내지 않는다.
+     */
     public boolean isBalanced() {
-        return debitTotal.compareTo(BigDecimal.ZERO) > 0
-                && creditTotal.compareTo(BigDecimal.ZERO) > 0
-                && debitTotal.compareTo(creditTotal) == 0;
+        BigDecimal debit = nullToZero(debitTotal);
+        BigDecimal credit = nullToZero(creditTotal);
+        return debit.compareTo(BigDecimal.ZERO) > 0
+                && credit.compareTo(BigDecimal.ZERO) > 0
+                && debit.compareTo(credit) == 0;
     }
 
     public BigDecimal differenceAmount() {
-        return debitTotal.subtract(creditTotal).abs();
+        return nullToZero(debitTotal).subtract(nullToZero(creditTotal)).abs();
+    }
+
+    private static BigDecimal nullToZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }
