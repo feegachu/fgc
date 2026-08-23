@@ -3,6 +3,7 @@ package com.susukkang.fgc.dashboard.dto;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
+import com.susukkang.fgc.common.util.DateUtil;
 
 import java.time.OffsetDateTime;
 
@@ -35,7 +36,7 @@ public record RecentExceptionResponse(
                 row.title(),
                 row.status(),
                 ExceptionStatus.valueOf(row.status()).label(),
-                row.createdAt()
+                DateUtil.toSeoul(row.createdAt())
         );
     }
 }
