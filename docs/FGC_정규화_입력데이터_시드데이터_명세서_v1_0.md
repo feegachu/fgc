@@ -562,6 +562,13 @@ approved_basis_ref = SYNTHETIC:COMMON-COST-POLICY-2026-001
 | STD-LIFE-B | 240개월 | FACE_TO_FACE | true |
 | STD-TERM-A | 120개월 | FACE_TO_FACE | true |
 | STD-NL-A | 240개월 | FACE_TO_FACE | false |
+| STD-SAV-A | 120개월 | FACE_TO_FACE | false |
+
+> STD-SAV-A 행은 #332 로 추가되었다(근거: REG-23 — 36개월 표·상품코드 일치).
+> §11 경계시험용 판매버전(V4) 중 CONT-W03 에서 선택 가능한 상품이 환급률표 없이
+> 남으면 등록 계약이 월 통합검증 선별에서 검토필요로 빠지기 때문이다.
+> STD-TERM-A 의 TM 채널은 §11 이 `REVIEW_REQUIRED` 를 기대값으로 명시하므로
+> 의도적으로 표를 두지 않는다.
 
 환급률은 합성값이지만 다음 조건을 만족해야 한다.
 
