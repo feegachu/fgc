@@ -84,7 +84,7 @@ jobs:
           retention-days: 1
 
       - name: Publish test report (쓰기 가능한 실행)
-        uses: mikepenz/action-junit-report@d9f48fc87bc235f7e214acf696ca5abc0a986f16 # v6
+        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)) }}
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
@@ -94,7 +94,7 @@ jobs:
       # Dependabot/fork PR에서도 현재 job summary와 로그 annotation은 즉시 남긴다.
       # 별도 체크 게시 자체는 test-report.yml의 workflow_run이 담당한다.
       - name: Annotate test report (Dependabot/fork PR)
-        uses: mikepenz/action-junit-report@d9f48fc87bc235f7e214acf696ca5abc0a986f16 # v6
+        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
         if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository) }}
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
