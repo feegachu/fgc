@@ -1,0 +1,15 @@
+# fgc DB 이미지 (랩 실습용).
+#
+#   podman build -f Containerfile.db -t localhost/fgc/db:v1 .
+#   podman run -d --name fgc-db -p 5433:5432 localhost/fgc/db:v1
+#
+# 스키마·시드는 이 이미지가 아니라 앱의 Flyway(db/migration, db/demo)가 만든다.
+# 그래서 /docker-entrypoint-initdb.d 에 SQL을 넣지 않는다 — 넣으면 Flyway 이력과 충돌한다.
+# 버전 17 고정: docker-compose.yml·ci.yml과 동일 (FGC-ECR-003).
+# 비밀번호가 이미지에 박히는 것은 실습용 타협. 실전은 실행 시 Secret 주입.
+FROM docker.io/library/postgres:17
+
+ENV POSTGRES_DB=fgc \
+    POSTGRES_USER=fgc \
+    POSTGRES_PASSWORD=fgc_local_only \
+    TZ=Asia/Seoul
