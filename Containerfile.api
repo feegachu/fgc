@@ -1,11 +1,12 @@
-# fgc 앱 이미지 (랩 실습용: WAR + 외장 Tomcat).
-# 1단계에서 소스를 빌드하고, 2단계에는 결과 WAR만 담는다 (멀티스테이지).
+# fgc 미들웨어 이미지 (WAR + 외장 Tomcat). 1단계에서 소스를 빌드하고, 2단계에는 결과 WAR만 담는다.
 #
 #   podman build -f Containerfile.api -t localhost/fgc/api:v1 .
-#   podman run -d --name fgc-api -p 8082:8080 localhost/fgc/api:v1
+#   (Pod 안, 기본값)  podman run -d --pod fgc --name fgc-api localhost/fgc/api:v1
+#   (따로 띄울 때)     podman run -d --name fgc-api -p 8082:8080 \
+#                        -e SPRING_DATASOURCE_URL='jdbc:postgresql://host.containers.internal:5433/fgc?currentSchema=fgc' localhost/fgc/api:v1
 #
-# DB 주소·계정은 아래 ENV가 기본값이고, 실행 시 -e 로 덮어쓸 수 있다.
-# 기본값의 host.containers.internal = "이 컨테이너를 띄운 기계" (Podman/Docker 공통).
+# 이미지에는 특정 기계 주소를 박지 않는다. 기본값은 "같은 Pod 의 DB(localhost:5432)" 이고,
+# Kubernetes 에서는 Service 이름을 -e 로 넘긴다 (ConfigMap/Secret). 로그의 기동 완료 줄: "Started ServletInitializer".
 
 # ---------- 1단계: 빌드 ----------
 FROM docker.io/library/eclipse-temurin:21-jdk AS build
@@ -20,7 +21,7 @@ RUN rm -rf /usr/local/tomcat/webapps/*
 COPY --from=build /src/build/libs/fgc-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
 
 # application-local.yml 은 .gitignore 라 이미지에 없다. 대신 환경변수로 같은 값을 준다.
-ENV SPRING_DATASOURCE_URL="jdbc:postgresql://host.containers.internal:5433/fgc?currentSchema=fgc" \
+ENV SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/fgc?currentSchema=fgc" \
     SPRING_DATASOURCE_USERNAME=fgc \
     SPRING_DATASOURCE_PASSWORD=fgc_local_only \
     SPRING_FLYWAY_LOCATIONS="classpath:db/migration,classpath:db/demo" \

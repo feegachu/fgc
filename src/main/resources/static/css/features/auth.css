@@ -2,7 +2,7 @@
   overflow-x: hidden;
   background:
     linear-gradient(rgb(8 25 42 / 12%), rgb(8 25 42 / 12%)),
-    url("/images/auth/login-background.png") center / cover no-repeat fixed;
+    url("/images/auth/login-background.jpg") center / cover no-repeat fixed;
 }
 
 .auth-layout {
