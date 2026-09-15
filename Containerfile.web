@@ -1,0 +1,15 @@
+# fgc 웹 tier 이미지 (www 분리). Nginx 가 정적 파일을 내주고 나머지는 미들웨어(fgc-api)로 프록시한다.
+#
+#   podman build -f Containerfile.web -t localhost/fgc/web:v1 .
+#   (Pod 안)  podman run -d --pod fgc --name fgc-web localhost/fgc/web:v1
+#   (따로)    podman run -d --name fgc-web -p 8088:80 -e API_UPSTREAM=host.containers.internal:8082 localhost/fgc/web:v1
+#
+# 2차 React 전환 때는 1단계(node 빌드)를 앞에 붙이고 dist/ 를 html 로 복사하면 된다 — 이 파일의 자리는 그대로.
+FROM docker.io/library/nginx:stable-alpine
+
+# templates/*.template 은 컨테이너 시작 시 ${VAR} 를 환경변수로 치환해 conf.d/ 로 복사된다
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY src/main/resources/static/ /usr/share/nginx/html/
+
+ENV API_UPSTREAM=127.0.0.1:8080
+EXPOSE 80

@@ -31,6 +31,8 @@ mybatis:
 
 server:
   port: 8081
+  # 앞에 Nginx(웹 tier)가 있을 때 X-Forwarded-* 를 믿고 리다이렉트 주소를 만든다 (Containerfile.web)
+  forward-headers-strategy: native
   servlet:
     session:
       timeout: 30m               # 인터페이스정의서 2-1-1

@@ -163,19 +163,45 @@ For building and running the application you need:
 docker compose down -v && docker compose up -d && ./gradlew bootRun
 
 ## 컨테이너로 띄우기 (Podman / Docker, Java 설치 불필요)
-`Containerfile.db`(PostgreSQL 17) + `Containerfile.api`(WAR + 외장 Tomcat 10.1, JRE 21). 스키마·시드는 앱의 Flyway가 만든다.
+3-tier 를 컨테이너 3개로 나눈다. 이미지마다 Containerfile 하나.
+
+| 객체 | 파일 | 이미지 | 안에서 듣는 포트 |
+|---|---|---|---|
+| 웹 | `Containerfile.web` | Nginx: 정적 파일(`static/`) 직접, 나머지는 미들웨어로 프록시 | 80 |
+| 미들웨어 | `Containerfile.api` | WAR + 외장 Tomcat 10.1 (JRE 21). Gradle 빌드는 이미지 안에서 | 8080 |
+| DB | `Containerfile.db` | PostgreSQL 17. 스키마·시드는 앱의 Flyway 가 만든다 | 5432 |
+
 ```bash
 podman build -f Containerfile.db  -t localhost/fgc/db:v1  .
 podman build -f Containerfile.api -t localhost/fgc/api:v1 .     # 처음 3~5분 (Gradle 다운로드)
-podman run -d --name fgc-db  -p 5433:5432 localhost/fgc/db:v1
-sleep 5
-podman run -d --name fgc-api -p 8082:8080 localhost/fgc/api:v1
-podman logs -f fgc-api            # "Started FgcApplication" 이 보이면 Ctrl+C
-curl -I http://localhost:8082/login    # HTTP/1.1 200
+podman build -f Containerfile.web -t localhost/fgc/web:v1 .
 ```
-- 접속: http://localhost:8082 (admin / fgc1234!). 앱 컨테이너는 `host.containers.internal:5433`으로 DB를 찾는다(Containerfile.api ENV). 다른 DB를 쓰려면 `-e SPRING_DATASOURCE_URL=...`로 덮어쓴다.
-- 통합 테스트는 이미지 빌드에서 제외(`-x test`). CI(`.github/workflows/ci.yml`)가 PostgreSQL을 붙여 돌린다.
-- 되돌리기: `podman rm -f fgc-api fgc-db`
+
+### Pod 하나로 띄우기 (기본)
+같은 Pod 의 컨테이너는 `localhost` 로 서로를 본다. 이미지 기본값이 그 전제(api→`127.0.0.1:5432`, web→`127.0.0.1:8080`)라 `-e` 가 필요 없다.
+```bash
+podman pod create --name fgc -p 8088:80 -v fgc-pgdata:/var/lib/postgresql/data:Z
+podman run -d --pod fgc --name fgc-db  localhost/fgc/db:v1
+sleep 5
+podman run -d --pod fgc --name fgc-api localhost/fgc/api:v1
+podman run -d --pod fgc --name fgc-web localhost/fgc/web:v1
+podman pod ps && podman ps --pod
+podman logs -f fgc-api              # "Started ServletInitializer" 가 보이면 Ctrl+C
+curl -I http://localhost:8088/login                    # 200 (Nginx → Tomcat)
+curl -I http://localhost:8088/css/common/layout.css    # 200 (Nginx 가 직접)
+```
+- 접속: http://localhost:8088 (admin / fgc1234!). Pod 밖으로 열린 포트는 **80 하나**(→8088). Tomcat 8080·PostgreSQL 5432 는 Pod 안에서만 보인다.
+- DB 데이터는 볼륨 `fgc-pgdata` 에 남는다. 되돌리기: `podman pod rm -f fgc`
+
+### 따로 띄우기 (Pod 없이, 디버깅용)
+컨테이너마다 네트워크가 다르므로 주소를 `-e` 로 넘긴다. `host.containers.internal` = 컨테이너를 띄운 기계.
+```bash
+podman run -d --name fgc-db  -p 5433:5432 localhost/fgc/db:v1
+podman run -d --name fgc-api -p 8082:8080 -e SPRING_DATASOURCE_URL='jdbc:postgresql://host.containers.internal:5433/fgc?currentSchema=fgc' localhost/fgc/api:v1
+podman run -d --name fgc-web -p 8088:80   -e API_UPSTREAM=host.containers.internal:8082 localhost/fgc/web:v1
+```
+- Kubernetes 에서는 같은 자리에 Service 이름이 들어간다 (`fgc-db:5432`, `fgc-api:8080`). 이미지에 기계 주소를 박지 않는 이유.
+- 통합 테스트는 이미지 빌드에서 제외(`-x test`). CI(`.github/workflows/ci.yml`)가 PostgreSQL 을 붙여 돌린다.
 
 ## 문서
 - 화면정의서 v2.0 / 화면 목업: `FGC_화면_MVP/`

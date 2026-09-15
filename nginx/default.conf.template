@@ -1,0 +1,38 @@
+# fgc 웹 tier (Nginx). 정적 파일은 여기서 직접 내주고, 나머지는 미들웨어(Tomcat)로 넘긴다.
+# ${API_UPSTREAM} 은 컨테이너 시작 때 환경변수로 치환된다 (nginx 공식 이미지의 templates 기능).
+#   같은 Pod 안:      API_UPSTREAM=127.0.0.1:8080  (기본값)
+#   따로 띄웠을 때:   API_UPSTREAM=host.containers.internal:8082
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+
+    # css·js·html 압축 전송 (woff2·jpg 는 이미 압축돼 있어 대상 아님)
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # 정적 리소스: Nginx 가 직접 (Thymeleaf 화면이 /css /js ... 절대경로로 참조한다)
+    location ~ ^/(css|js|images|fonts|assets)/ {
+        expires 1h;
+        add_header Cache-Control "public";
+        try_files $uri =404;
+    }
+    location = /favicon.ico {
+        try_files $uri =404;
+    }
+
+    # 그 외 전부: 미들웨어로 프록시 (화면 렌더링 · /api · /login · /actuator)
+    location / {
+        proxy_pass http://${API_UPSTREAM};
+        proxy_http_version 1.1;
+        # $http_host = 포트 포함 (예: localhost:8088). $host 는 포트를 떼서 리다이렉트가 :80 으로 튄다.
+        proxy_set_header Host              $http_host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $http_host;
+        proxy_read_timeout 60s;
+    }
+}
