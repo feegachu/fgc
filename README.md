@@ -162,6 +162,21 @@ For building and running the application you need:
 ## DB 초기화 (뭔가 꼬였을 때)
 docker compose down -v && docker compose up -d && ./gradlew bootRun
 
+## 컨테이너로 띄우기 (Podman / Docker, Java 설치 불필요)
+`Containerfile.db`(PostgreSQL 17) + `Containerfile.api`(WAR + 외장 Tomcat 10.1, JRE 21). 스키마·시드는 앱의 Flyway가 만든다.
+```bash
+podman build -f Containerfile.db  -t localhost/fgc/db:v1  .
+podman build -f Containerfile.api -t localhost/fgc/api:v1 .     # 처음 3~5분 (Gradle 다운로드)
+podman run -d --name fgc-db  -p 5433:5432 localhost/fgc/db:v1
+sleep 5
+podman run -d --name fgc-api -p 8082:8080 localhost/fgc/api:v1
+podman logs -f fgc-api            # "Started FgcApplication" 이 보이면 Ctrl+C
+curl -I http://localhost:8082/login    # HTTP/1.1 200
+```
+- 접속: http://localhost:8082 (admin / fgc1234!). 앱 컨테이너는 `host.containers.internal:5433`으로 DB를 찾는다(Containerfile.api ENV). 다른 DB를 쓰려면 `-e SPRING_DATASOURCE_URL=...`로 덮어쓴다.
+- 통합 테스트는 이미지 빌드에서 제외(`-x test`). CI(`.github/workflows/ci.yml`)가 PostgreSQL을 붙여 돌린다.
+- 되돌리기: `podman rm -f fgc-api fgc-db`
+
 ## 문서
 - 화면정의서 v2.0 / 화면 목업: `FGC_화면_MVP/`
 - API·배치 계약: `docs/05_인터페이스정의서_v2_0.md`
