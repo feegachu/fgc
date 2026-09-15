@@ -1,0 +1,13 @@
+# podman/docker build 컨텍스트에서 뺄 것 (COPY . . 을 가볍게)
+.git
+.gradle
+build
+docs
+qa-findings
+graphify-out
+skill-observations
+*.png
+*.jpg
+*.log
+.idea
+*.iml

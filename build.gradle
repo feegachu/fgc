@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'war'   // 랩 실습: bootWar → 외장 Tomcat(Containerfile.api). bootJar·bootRun 은 그대로 된다.
     id 'org.springframework.boot' version '3.5.16'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -20,6 +21,8 @@ repositories {
 dependencies {
     // Web / 화면
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    // WAR 로 외장 Tomcat 에 올릴 때 내장 Tomcat 은 WEB-INF/lib 에서 뺀다 (jar 실행에는 영향 없음)
+    providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 
     // 인증·인가
