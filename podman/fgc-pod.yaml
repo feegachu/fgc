@@ -1,0 +1,25 @@
+# fgc 3-tier Pod — README "Pod 하나로 띄우기" 와 같은 구성을 파일로 (podman kube play 용)
+# 실행: podman kube play --tls-verify=false --replace podman/fgc-pod.yaml   (__TAG__ 는 Jenkins 가 sed 로 치환)
+# 이미지는 dev VM 에서 본 zot(localhost:5000). 컨테이너끼리는 같은 Pod 의 localhost.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fgc
+spec:
+  containers:
+    - name: db
+      image: localhost:5000/fgc/db:__TAG__
+      volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+    - name: api
+      image: localhost:5000/fgc/api:__TAG__
+    - name: web
+      image: localhost:5000/fgc/web:__TAG__
+      ports:
+        - containerPort: 80
+          hostPort: 8088
+  volumes:
+    - name: pgdata
+      persistentVolumeClaim:
+        claimName: fgc-pgdata-alpine
