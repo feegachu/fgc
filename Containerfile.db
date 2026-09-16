@@ -7,7 +7,18 @@
 # 그래서 /docker-entrypoint-initdb.d 에 SQL을 넣지 않는다 — 넣으면 Flyway 이력과 충돌한다.
 # 버전 17 고정: docker-compose.yml·ci.yml과 동일 (FGC-ECR-003).
 # 비밀번호가 이미지에 박히는 것은 실습용 타협. 실전은 실행 시 Secret 주입.
-FROM docker.io/library/postgres:17
+#
+# alpine 을 쓰는 이유(2026-09-16 zot 스캔): Debian 판 postgres:17 은 CVE 182건(CRITICAL 5·HIGH 42),
+# 거의 전부 perl·util-linux·Go stdlib 같은 OS 패키지. alpine 판은 그 패키지가 없다.
+# ⚠️ Debian 판으로 만든 기존 볼륨(fgc-pgdata)과 텍스트 정렬(collation, glibc↔musl) 규칙이 달라
+#    같은 볼륨을 그대로 붙이지 않는다 — 새 볼륨으로 시작한다(데이터는 Flyway 시드가 다시 만든다).
+FROM docker.io/library/postgres:17-alpine
+# alpine 패키지 보안 패치(09-16 스캔: libssl3·libcrypto3·libuuid HIGH)
+RUN apk upgrade --no-cache \
+ # gosu 는 root 로 시작한 컨테이너가 postgres 사용자로 내려갈 때만 쓰는 도구. 아래 USER 로 처음부터
+ # postgres 로 시작하면 entrypoint 가 gosu 를 부르지 않는다 → 지운다 (스캔에 남던 Go stdlib CRITICAL 1·HIGH 21 이 이 바이너리)
+ && rm -f /usr/local/bin/gosu
+USER postgres
 
 ENV POSTGRES_DB=fgc \
     POSTGRES_USER=fgc \

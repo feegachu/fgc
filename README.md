@@ -169,7 +169,7 @@ docker compose down -v && docker compose up -d && ./gradlew bootRun
 |---|---|---|---|
 | 웹 | `Containerfile.web` | Nginx: 정적 파일(`static/`) 직접, 나머지는 미들웨어로 프록시 | 80 |
 | 미들웨어 | `Containerfile.api` | WAR + 외장 Tomcat 10.1 (JRE 21). Gradle 빌드는 이미지 안에서 | 8080 |
-| DB | `Containerfile.db` | PostgreSQL 17. 스키마·시드는 앱의 Flyway 가 만든다 | 5432 |
+| DB | `Containerfile.db` | PostgreSQL 17 **alpine, 비root**. 스키마·시드는 앱의 Flyway 가 만든다 | 5432 |
 
 ```bash
 podman build -f Containerfile.db  -t localhost/fgc/db:v1  .
@@ -180,7 +180,7 @@ podman build -f Containerfile.web -t localhost/fgc/web:v1 .
 ### Pod 하나로 띄우기 (기본)
 같은 Pod 의 컨테이너는 `localhost` 로 서로를 본다. 이미지 기본값이 그 전제(api→`127.0.0.1:5432`, web→`127.0.0.1:8080`)라 `-e` 가 필요 없다.
 ```bash
-podman pod create --name fgc -p 8088:80 -v fgc-pgdata:/var/lib/postgresql/data:Z
+podman pod create --name fgc -p 8088:80 -v fgc-pgdata-alpine:/var/lib/postgresql/data:Z
 podman run -d --pod fgc --name fgc-db  localhost/fgc/db:v1
 sleep 5
 podman run -d --pod fgc --name fgc-api localhost/fgc/api:v1
@@ -191,7 +191,8 @@ curl -I http://localhost:8088/login                    # 200 (Nginx → Tomcat)
 curl -I http://localhost:8088/css/common/layout.css    # 200 (Nginx 가 직접)
 ```
 - 접속: http://localhost:8088 (admin / fgc1234!). Pod 밖으로 열린 포트는 **80 하나**(→8088). Tomcat 8080·PostgreSQL 5432 는 Pod 안에서만 보인다.
-- DB 데이터는 볼륨 `fgc-pgdata` 에 남는다. 되돌리기: `podman pod rm -f fgc`
+- DB 데이터는 볼륨 `fgc-pgdata-alpine` 에 남는다. 되돌리기: `podman pod rm -f fgc`
+- ⚠️ 2026-09-16 부터 DB 이미지가 `postgres:17-alpine` + 비root(uid 70) 다. Debian 판(uid 999)으로 만든 옛 볼륨 `fgc-pgdata` 는 **붙이지 않는다**(권한·collation 불일치). 새 볼륨으로 시작하면 Flyway 가 스키마·시드를 다시 만든다.
 
 ### 따로 띄우기 (Pod 없이, 디버깅용)
 컨테이너마다 네트워크가 다르므로 주소를 `-e` 로 넘긴다. `host.containers.internal` = 컨테이너를 띄운 기계.
