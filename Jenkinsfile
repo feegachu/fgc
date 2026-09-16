@@ -61,7 +61,14 @@ pipeline {
                     sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${DEV_HOST}:/tmp/fgc-pod.yaml
                     # Pod 는 root 소유(수동 배포와 동일). sudo -S 로 비밀번호를 stdin 으로 넘긴다 — Console 에 안 찍힘
                     sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${DEV_HOST} \
-                      "echo '${SSH_PASS}' | sudo -S podman kube play --network podman --tls-verify=false --replace /tmp/fgc-pod.yaml && for i in \$(seq 1 40); do curl -sf -o /dev/null http://localhost:8088/login && break; sleep 3; done && curl -sfI http://localhost:8088/login | head -1"
+                      "echo '${SSH_PASS}' | sudo -S podman kube play --network podman --tls-verify=false --replace /tmp/fgc-pod.yaml"
+                    # 배포 확인은 Jenkins 쪽에서 VM 8088 로 직접 — 원격 명령 안에 루프를 넣으면 따옴표·확장 문제(빌드 #10)
+                    i=0
+                    until curl -sf -o /dev/null http://${DEV_HOST}:8088/login; do
+                      i=$((i+1)); [ $i -ge 40 ] && { echo "login page not up after 120s"; exit 1; }
+                      sleep 3
+                    done
+                    curl -sI http://${DEV_HOST}:8088/login | head -1
                     '''
                 }
             }
