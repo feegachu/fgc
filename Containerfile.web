@@ -6,6 +6,8 @@
 #
 # 2차 React 전환 때는 1단계(node 빌드)를 앞에 붙이고 dist/ 를 html 로 복사하면 된다 — 이 파일의 자리는 그대로.
 FROM docker.io/library/nginx:stable-alpine
+# base 패키지 CVE (2026-09-16 zot 스캔: libuuid HIGH 7건, 2.42.1-r0 → 2.42.3-r0) — 빌드 시점 패치 반영
+RUN apk upgrade --no-cache
 
 # templates/*.template 은 컨테이너 시작 시 ${VAR} 를 환경변수로 치환해 conf.d/ 로 복사된다
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template

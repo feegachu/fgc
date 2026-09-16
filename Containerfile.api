@@ -16,8 +16,11 @@ COPY . .
 RUN chmod +x gradlew && ./gradlew bootWar -x test --no-daemon
 
 # ---------- 2단계: 실행 ----------
-FROM docker.io/library/tomcat:10.1-jre21
-RUN rm -rf /usr/local/tomcat/webapps/*
+# 태그를 고정한다 — "10.1-jre21" 은 날마다 다른 이미지라 스캔 결과가 재현되지 않는다 (교안: 리허설 후 Digest 고정)
+FROM docker.io/library/tomcat:10.1.59-jre21
+# base OS(Ubuntu) 패키지 CVE — 빌드 시점의 보안 패치 반영
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/tomcat/webapps/*
 COPY --from=build /src/build/libs/fgc-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
 
 # application-local.yml 은 .gitignore 라 이미지에 없다. 대신 환경변수로 같은 값을 준다.
