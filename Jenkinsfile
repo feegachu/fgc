@@ -1,6 +1,6 @@
 // fgc CI/CD (Jenkins, 교안 3일차) — Checkout → Build 3 images → Push zot → Deploy dev VM Pod
 // Jenkins 는 dev VM 의 컨테이너(localhost/jenkins/jenkins:v1, podman·buildah·sshpass 포함)로 돈다.
-// 컨테이너 안에서 본 dev VM = host.containers.internal. zot 은 인증 없음(--tls-verify=false, http).
+// dev VM /etc/hosts 의 이름(dev.example.com·registry.example.com)으로 VM 과 zot 을 부른다. zot 은 인증 없음(--tls-verify=false, http).
 // Credentials: gitea(Gitea 계정), vdi-user(VM ssh 계정). Docker Hub 로그인은 pull 제한이 날 때만(docker).
 pipeline {
     agent any
@@ -10,9 +10,11 @@ pipeline {
     }
 
     environment {
-        REGISTRY   = 'host.containers.internal:5000'     // Jenkins 컨테이너에서 본 zot
+        // 이름은 dev VM /etc/hosts 에 적는다: "<node-1 IP> dev dev.example.com registry.example.com" (교안 '임시 도메인').
+        // Podman 이 컨테이너 생성 시 VM 의 /etc/hosts 를 복사하므로 Jenkins 컨테이너 안에서도 풀린다.
+        REGISTRY   = 'registry.example.com:5000'         // zot (dev VM 의 5000)
         IMAGE_BASE = "${REGISTRY}/fgc"
-        DEV_HOST   = 'host.containers.internal'          // Jenkins 컨테이너에서 본 dev VM
+        DEV_HOST   = 'dev.example.com'                   // 배포 대상 VM (Alpha). stage.example.com 은 Beta 단계에 추가
         POD_YAML   = 'podman/fgc-pod.yaml'
     }
 
