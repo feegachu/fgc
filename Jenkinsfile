@@ -61,7 +61,7 @@ pipeline {
                     sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${DEV_HOST}:/tmp/fgc-pod.yaml
                     # Pod 는 root 소유(수동 배포와 동일). sudo -S 로 비밀번호를 stdin 으로 넘긴다 — Console 에 안 찍힘
                     sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${DEV_HOST} \
-                      "echo '${SSH_PASS}' | sudo -S podman kube play --tls-verify=false --replace /tmp/fgc-pod.yaml && sleep 20 && curl -sI http://localhost:8088/login | head -1"
+                      "echo '${SSH_PASS}' | sudo -S podman kube play --network podman --tls-verify=false --replace /tmp/fgc-pod.yaml && sleep 20 && curl -sI http://localhost:8088/login | head -1"
                     '''
                 }
             }
