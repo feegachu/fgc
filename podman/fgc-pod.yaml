@@ -14,6 +14,8 @@ spec:
           mountPath: /var/lib/postgresql/data
     - name: api
       image: localhost:5000/fgc/api:__TAG__
+      # db 가 5432 를 열 때까지 기다린 뒤 Tomcat 시작 (kube play 는 컨테이너 순서를 보장하지 않는다 — 09-16 Connection refused)
+      command: ["bash", "-c", "until (echo > /dev/tcp/127.0.0.1/5432) 2>/dev/null; do sleep 2; done; exec catalina.sh run"]
     - name: web
       image: localhost:5000/fgc/web:__TAG__
       ports:
