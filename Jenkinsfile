@@ -1,6 +1,6 @@
 // fgc CI/CD (Jenkins, 교안 3일차) — Checkout → Build 3 images → Push zot → Deploy dev VM Pod
 // Jenkins 는 dev VM 의 컨테이너(localhost/jenkins/jenkins:v1, podman·buildah·sshpass 포함)로 돈다.
-// dev VM /etc/hosts 의 이름(dev.example.com·registry.example.com)으로 VM 과 zot 을 부른다. zot 은 인증 없음(--tls-verify=false, http).
+// dev VM /etc/hosts 의 이름(dev.example.com·registry.example.com)으로 VM 과 레지스트리를 부른다. Harbor 는 push 에 로그인 필요(Credentials registry), 프로젝트 fgc 는 Public 이라 pull 은 무인증.
 // Credentials: gitea(Gitea 계정), vdi-user(dev VM ssh 계정), deploy-user(stage VM 의 deploy 계정, rootless). Docker Hub 로그인은 pull 제한이 날 때만(docker).
 pipeline {
     agent any
@@ -12,7 +12,7 @@ pipeline {
     environment {
         // 이름은 dev VM /etc/hosts 에 적는다: "<node-1 IP> dev dev.example.com registry.example.com" (교안 '임시 도메인').
         // Podman 이 컨테이너 생성 시 VM 의 /etc/hosts 를 복사하므로 Jenkins 컨테이너 안에서도 풀린다.
-        REGISTRY   = 'registry.example.com:5000'         // zot (dev VM 의 5000)
+        REGISTRY   = 'registry.example.com'              // Harbor (infra-registry, http 80). zot 시절은 ':5000'
         IMAGE_BASE = "${REGISTRY}/fgc"
         DEV_HOST   = 'dev.example.com'                   // Alpha. root Pod(sudo)
         STAGE_HOST = 'stage.example.com'                 // Beta. rootless: stage VM 의 deploy 사용자 Pod (교안 4일차)
@@ -41,12 +41,20 @@ pipeline {
 
         stage('Push Images') {
             steps {
-                sh '''
-                set -e
-                for i in db api web; do
-                  podman push --tls-verify=false ${IMAGE_BASE}/$i:${TAG:-v1}
-                done
-                '''
+                withCredentials([usernamePassword(
+                    credentialsId: 'registry',
+                    usernameVariable: 'REG_USER',
+                    passwordVariable: 'REG_PASS'
+                )]) {
+                    sh '''
+                    set +x
+                    set -e
+                    printf '%s' "${REG_PASS}" | podman login --tls-verify=false -u "${REG_USER}" --password-stdin "${REGISTRY}"
+                    for i in db api web; do
+                      podman push --tls-verify=false ${IMAGE_BASE}/$i:${TAG:-v1}
+                    done
+                    '''
+                }
             }
         }
 
