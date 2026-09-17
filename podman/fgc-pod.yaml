@@ -1,6 +1,7 @@
 # fgc 3-tier Pod — README "Pod 하나로 띄우기" 와 같은 구성을 파일로 (podman kube play 용)
 # 실행: podman kube play --tls-verify=false --replace podman/fgc-pod.yaml   (__TAG__ 는 Jenkins 가 sed 로 치환)
-# 이미지는 dev VM 에서 본 zot(localhost:5000). 컨테이너끼리는 같은 Pod 의 localhost.
+# 이미지는 registry.example.com:5000(dev VM 의 zot). dev·stage 모두 /etc/hosts 에 이 이름이 있어 같은 파일로 배포한다(http → kube play --tls-verify=false).
+# 컨테이너끼리는 같은 Pod 의 localhost.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -8,16 +9,16 @@ metadata:
 spec:
   containers:
     - name: db
-      image: localhost:5000/fgc/db:__TAG__
+      image: registry.example.com:5000/fgc/db:__TAG__
       volumeMounts:
         - name: pgdata
           mountPath: /var/lib/postgresql/data
     - name: api
-      image: localhost:5000/fgc/api:__TAG__
+      image: registry.example.com:5000/fgc/api:__TAG__
       # db 가 5432 를 열 때까지 기다린 뒤 Tomcat 시작 (kube play 는 컨테이너 순서를 보장하지 않는다 — 09-16 Connection refused)
       command: ["bash", "-c", "until (echo > /dev/tcp/127.0.0.1/5432) 2>/dev/null; do sleep 2; done; exec catalina.sh run"]
     - name: web
-      image: localhost:5000/fgc/web:__TAG__
+      image: registry.example.com:5000/fgc/web:__TAG__
       ports:
         - containerPort: 80
           hostPort: 8088

@@ -1,7 +1,7 @@
 // fgc CI/CD (Jenkins, 교안 3일차) — Checkout → Build 3 images → Push zot → Deploy dev VM Pod
 // Jenkins 는 dev VM 의 컨테이너(localhost/jenkins/jenkins:v1, podman·buildah·sshpass 포함)로 돈다.
 // dev VM /etc/hosts 의 이름(dev.example.com·registry.example.com)으로 VM 과 zot 을 부른다. zot 은 인증 없음(--tls-verify=false, http).
-// Credentials: gitea(Gitea 계정), vdi-user(VM ssh 계정). Docker Hub 로그인은 pull 제한이 날 때만(docker).
+// Credentials: gitea(Gitea 계정), vdi-user(dev VM ssh 계정), deploy-user(stage VM 의 deploy 계정, rootless). Docker Hub 로그인은 pull 제한이 날 때만(docker).
 pipeline {
     agent any
 
@@ -14,7 +14,8 @@ pipeline {
         // Podman 이 컨테이너 생성 시 VM 의 /etc/hosts 를 복사하므로 Jenkins 컨테이너 안에서도 풀린다.
         REGISTRY   = 'registry.example.com:5000'         // zot (dev VM 의 5000)
         IMAGE_BASE = "${REGISTRY}/fgc"
-        DEV_HOST   = 'dev.example.com'                   // 배포 대상 VM (Alpha). stage.example.com 은 Beta 단계에 추가
+        DEV_HOST   = 'dev.example.com'                   // Alpha. root Pod(sudo)
+        STAGE_HOST = 'stage.example.com'                 // Beta. rootless: stage VM 의 deploy 사용자 Pod (교안 4일차)
         POD_YAML   = 'podman/fgc-pod.yaml'
     }
 
@@ -71,6 +72,29 @@ pipeline {
                       sleep 3
                     done
                     curl -sI http://${DEV_HOST}:8088/login | head -1
+                    '''
+                }
+            }
+        }
+        stage('Deploy to stage.example.com') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'deploy-user',
+                    usernameVariable: 'SSH_USER',
+                    passwordVariable: 'SSH_PASS'
+                )]) {
+                    sh '''
+                    set +x
+                    set -e
+                    # stage 는 rootless: deploy 사용자 자신의 Pod. sudo 없음. 볼륨·포트(8088>1024) 모두 사용자 소유
+                    sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${STAGE_HOST}:/tmp/fgc-pod.yaml
+                    sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${STAGE_HOST} "podman kube play --network podman --tls-verify=false --replace /tmp/fgc-pod.yaml"
+                    i=0
+                    until curl -sf -o /dev/null http://${STAGE_HOST}:8088/login; do
+                      i=$((i+1)); [ $i -ge 40 ] && { echo "stage login page not up after 120s"; exit 1; }
+                      sleep 3
+                    done
+                    curl -sI http://${STAGE_HOST}:8088/login | head -1
                     '''
                 }
             }
