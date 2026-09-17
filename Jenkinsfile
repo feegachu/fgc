@@ -6,7 +6,7 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'TAG', defaultValue: 'v1', description: 'Image tag (dev: v1 / 단계: a0.1, b0.1, r0.1)')
+        string(name: 'TAG', defaultValue: 'v1', description: 'Image tag (dev: v1 / 단계: a0.1, b0.1, r0.1). 쉘에서는 ${TAG:-v1} — 새 Job 의 첫 빌드는 파라미터가 비어 온다')
     }
 
     environment {
@@ -32,7 +32,7 @@ pipeline {
                 sh '''
                 set -e
                 for i in db api web; do
-                  podman build --cgroup-manager=cgroupfs -f Containerfile.$i -t ${IMAGE_BASE}/$i:${TAG} .
+                  podman build --cgroup-manager=cgroupfs -f Containerfile.$i -t ${IMAGE_BASE}/$i:${TAG:-v1} .
                 done
                 podman images | grep fgc
                 '''
@@ -44,7 +44,7 @@ pipeline {
                 sh '''
                 set -e
                 for i in db api web; do
-                  podman push --tls-verify=false ${IMAGE_BASE}/$i:${TAG}
+                  podman push --tls-verify=false ${IMAGE_BASE}/$i:${TAG:-v1}
                 done
                 '''
             }
@@ -60,11 +60,12 @@ pipeline {
                     sh '''
                     set +x   # 비밀번호가 Console 에 안 찍히게(마스킹 외 이중 안전장치)
                     set -e
-                    sed "s/__TAG__/${TAG}/g" ${POD_YAML} > /tmp/fgc-pod.yaml
-                    sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${DEV_HOST}:/tmp/fgc-pod.yaml
+                    sed "s/__TAG__/${TAG:-v1}/g" ${POD_YAML} > /tmp/fgc-pod.yaml
+                    sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${DEV_HOST}:fgc-pod.yaml
+                    # yaml 은 접속 사용자 홈(상대경로)에 둔다 — /tmp 는 다른 사용자(root 수동 배포)가 먼저 만들면 Permission denied(09-17 #2)
                     # Pod 는 root 소유(수동 배포와 동일). sudo -S 로 비밀번호를 stdin 으로 넘긴다 — Console 에 안 찍힘
                     sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${DEV_HOST} \
-                      "echo '${SSH_PASS}' | sudo -S podman kube play --network podman --tls-verify=false --replace /tmp/fgc-pod.yaml"
+                      "echo '${SSH_PASS}' | sudo -S podman kube play --network podman --tls-verify=false --replace fgc-pod.yaml"
                     # 배포 확인은 Jenkins 쪽에서 VM 8088 로 직접 — 원격 명령 안에 루프를 넣으면 따옴표·확장 문제(빌드 #10)
                     i=0
                     until curl -sf -o /dev/null http://${DEV_HOST}:8088/login; do
@@ -87,8 +88,8 @@ pipeline {
                     set +x
                     set -e
                     # stage 는 rootless: deploy 사용자 자신의 Pod. sudo 없음. 볼륨·포트(8088>1024) 모두 사용자 소유
-                    sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${STAGE_HOST}:/tmp/fgc-pod.yaml
-                    sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${STAGE_HOST} "podman kube play --network podman --tls-verify=false --replace /tmp/fgc-pod.yaml"
+                    sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${STAGE_HOST}:fgc-pod.yaml
+                    sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${STAGE_HOST} "podman kube play --network podman --tls-verify=false --replace fgc-pod.yaml"
                     i=0
                     until curl -sf -o /dev/null http://${STAGE_HOST}:8088/login; do
                       i=$((i+1)); [ $i -ge 40 ] && { echo "stage login page not up after 120s"; exit 1; }
