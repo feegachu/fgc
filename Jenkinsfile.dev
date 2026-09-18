@@ -1,0 +1,87 @@
+// fgc Dev 파이프라인 (Alpha) — main 브랜치 push → 3 이미지 빌드 → 레지스트리 push(a0.N) → dev.example.com Pod 갱신
+// 환경별 Jenkinsfile 3개(dev/stage/release, 강사 09-18): 코드는 하나, 절차만 다르다. Pod 정의(podman/fgc-pod.yaml)는 하나이고 __REGISTRY__·__TAG__ 를 sed 로 치환.
+// 레지스트리: zot = registry.example.com:5000(무인증) / Harbor = registry.example.com(push 로그인, Credentials 'registry'). 파라미터로 고른다.
+// Credentials: gitea(Gitea 계정), vdi-user(dev VM ssh 계정, sudo), registry(Harbor 일 때만).
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'TAG',           defaultValue: 'a0.1',                      description: 'Alpha 태그 a0.N')
+        string(name: 'REGISTRY',      defaultValue: 'registry.example.com:5000', description: 'zot: registry.example.com:5000 / Harbor: registry.example.com')
+        string(name: 'REGISTRY_CRED', defaultValue: '',                          description: 'push 로그인 Credentials ID. zot 이면 비움, Harbor 면 registry')
+    }
+
+    environment {
+        DEV_HOST = 'dev.example.com'
+        POD_YAML = 'podman/fgc-pod.yaml'
+        // 새 Job 의 첫 빌드는 파라미터가 비어 올 수 있어 기본값을 한 번 더 건다
+        TAG      = "${params.TAG ?: 'a0.1'}"
+        REGISTRY = "${params.REGISTRY ?: 'registry.example.com:5000'}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git rev-parse --short=12 HEAD'
+            }
+        }
+
+        stage('Build Images') {
+            steps {
+                sh '''
+                set -e
+                for i in db api web; do
+                  podman build --cgroup-manager=cgroupfs -f Containerfile.$i -t ${REGISTRY}/fgc/$i:${TAG} .
+                done
+                podman images | grep fgc
+                '''
+            }
+        }
+
+        stage('Push Images') {
+            steps {
+                script {
+                    if (params.REGISTRY_CRED?.trim()) {
+                        withCredentials([usernamePassword(credentialsId: params.REGISTRY_CRED, usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                            sh 'set +x; printf "%s" "${REG_PASS}" | podman login --tls-verify=false -u "${REG_USER}" --password-stdin "${REGISTRY}"'
+                        }
+                    }
+                }
+                sh '''
+                set -e
+                for i in db api web; do
+                  podman push --tls-verify=false ${REGISTRY}/fgc/$i:${TAG}
+                done
+                '''
+            }
+        }
+
+        stage('Deploy to dev.example.com') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'vdi-user', usernameVariable: 'SSH_USER', passwordVariable: 'SSH_PASS')]) {
+                    sh '''
+                    set +x
+                    set -e
+                    sed "s|__REGISTRY__|${REGISTRY}|g; s|__TAG__|${TAG}|g" ${POD_YAML} > /tmp/fgc-pod.yaml
+                    # yaml 은 접속 사용자 홈에 둔다(/tmp 는 root 수동 배포와 충돌, 09-17). Pod 는 root 소유 → sudo -S 로 비밀번호를 stdin 으로.
+                    sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${DEV_HOST}:fgc-pod.yaml
+                    sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${DEV_HOST} \
+                      "echo '${SSH_PASS}' | sudo -S podman kube play --network podman --tls-verify=false --replace fgc-pod.yaml"
+                    i=0
+                    until curl -sf -o /dev/null http://${DEV_HOST}:8088/login; do
+                      i=$((i+1)); [ $i -ge 40 ] && { echo "login page not up after 120s"; exit 1; }
+                      sleep 3
+                    done
+                    curl -sI http://${DEV_HOST}:8088/login | head -1
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success { echo "Alpha deployed: ${REGISTRY}/fgc/{db,api,web}:${TAG} -> ${DEV_HOST}:8088" }
+        failure { echo "Dev pipeline failed" }
+    }
+}

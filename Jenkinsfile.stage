@@ -1,0 +1,84 @@
+// fgc Stage 파이프라인 (Beta) — stage 브랜치 push → Alpha 이미지(a0.N)를 다시 빌드하지 않고 b0.N 으로 승격(같은 digest) → stage.example.com rootless Pod 갱신
+// "dev 에서 검증한 그 이미지를 올린다"(GitOps_수업_다이어그램 §3). skopeo copy 는 레지스트리 안에서 태그만 더하므로 digest 가 보존된다.
+// Credentials: gitea, deploy-user(stage VM 의 deploy 계정, sudo 없음), registry(Harbor 일 때만).
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'SRC_TAG',       defaultValue: 'a0.1',                      description: '승격할 Alpha 태그')
+        string(name: 'TAG',           defaultValue: 'b0.1',                      description: 'Beta 태그 b0.N')
+        string(name: 'REGISTRY',      defaultValue: 'registry.example.com:5000', description: 'zot: registry.example.com:5000 / Harbor: registry.example.com')
+        string(name: 'REGISTRY_CRED', defaultValue: '',                          description: 'Credentials ID. zot 이면 비움, Harbor 면 registry')
+    }
+
+    environment {
+        STAGE_HOST = 'stage.example.com'
+        POD_YAML   = 'podman/fgc-pod.yaml'
+        SRC_TAG    = "${params.SRC_TAG ?: 'a0.1'}"
+        TAG        = "${params.TAG ?: 'b0.1'}"
+        REGISTRY   = "${params.REGISTRY ?: 'registry.example.com:5000'}"
+        CREDS      = ''   // Harbor 면 아래 stage 에서 채운다
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git rev-parse --short=12 HEAD'
+            }
+        }
+
+        stage('Promote a->b (same digest)') {
+            steps {
+                script {
+                    if (params.REGISTRY_CRED?.trim()) {
+                        withCredentials([usernamePassword(credentialsId: params.REGISTRY_CRED, usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                            withEnv(["CREDS=--src-creds ${REG_USER}:${REG_PASS} --dest-creds ${REG_USER}:${REG_PASS}"]) { promote() }
+                        }
+                    } else {
+                        promote()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to stage.example.com') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'deploy-user', usernameVariable: 'SSH_USER', passwordVariable: 'SSH_PASS')]) {
+                    sh '''
+                    set +x
+                    set -e
+                    sed "s|__REGISTRY__|${REGISTRY}|g; s|__TAG__|${TAG}|g" ${POD_YAML} > /tmp/fgc-pod.yaml
+                    # stage 는 rootless: deploy 사용자 자신의 Pod. 볼륨·포트(8088>1024) 모두 사용자 소유.
+                    sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${STAGE_HOST}:fgc-pod.yaml
+                    sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${STAGE_HOST} "podman kube play --network podman --tls-verify=false --replace fgc-pod.yaml"
+                    i=0
+                    until curl -sf -o /dev/null http://${STAGE_HOST}:8088/login; do
+                      i=$((i+1)); [ $i -ge 40 ] && { echo "stage login page not up after 120s"; exit 1; }
+                      sleep 3
+                    done
+                    curl -sI http://${STAGE_HOST}:8088/login | head -1
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success { echo "Beta promoted: ${REGISTRY}/fgc/{db,api,web}:${SRC_TAG} -> :${TAG} -> ${STAGE_HOST}:8088" }
+        failure { echo "Stage pipeline failed" }
+    }
+}
+
+// 레지스트리 안에서 태그만 복사(digest 보존). set +x 라 CREDS 의 비밀번호는 Console 에 안 찍힌다.
+def promote() {
+    sh '''
+    set +x
+    set -e
+    for i in db api web; do
+      skopeo copy --src-tls-verify=false --dest-tls-verify=false ${CREDS} \
+        docker://${REGISTRY}/fgc/$i:${SRC_TAG} docker://${REGISTRY}/fgc/$i:${TAG}
+    done
+    # digest 가 같은지는 레지스트리 UI(Harbor: 프로젝트 fgc → 저장소 → Artifacts 의 태그 목록)에서 두 태그가 한 줄에 붙어 있는 것으로 확인
+    '''
+}

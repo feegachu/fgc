@@ -68,7 +68,7 @@ pipeline {
                     sh '''
                     set +x   # 비밀번호가 Console 에 안 찍히게(마스킹 외 이중 안전장치)
                     set -e
-                    sed "s/__TAG__/${TAG:-v1}/g" ${POD_YAML} > /tmp/fgc-pod.yaml
+                    sed "s|__REGISTRY__|${REGISTRY}|g; s|__TAG__|${TAG:-v1}|g" ${POD_YAML} > /tmp/fgc-pod.yaml
                     sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no /tmp/fgc-pod.yaml ${SSH_USER}@${DEV_HOST}:fgc-pod.yaml
                     # yaml 은 접속 사용자 홈(상대경로)에 둔다 — /tmp 는 다른 사용자(root 수동 배포)가 먼저 만들면 Permission denied(09-17 #2)
                     # Pod 는 root 소유(수동 배포와 동일). sudo -S 로 비밀번호를 stdin 으로 넘긴다 — Console 에 안 찍힘
