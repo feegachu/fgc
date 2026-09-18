@@ -1,0 +1,12 @@
+{
+  "name": "fgc build/test (CI 와 같은 컨테이너)",
+  "image": "docker.io/library/eclipse-temurin:21-jdk",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=fgc-gradle,target=/root/.gradle,type=volume"
+  ],
+  "postCreateCommand": "chmod +x gradlew && ./gradlew --version",
+  "customizations": {
+    "vscode": { "extensions": ["vscjava.vscode-java-pack", "vscjava.vscode-gradle"] }
+  }
+}
