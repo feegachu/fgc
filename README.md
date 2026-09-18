@@ -177,6 +177,16 @@ podman build -f Containerfile.api -t localhost/fgc/api:v1 .     # 처음 3~5분 
 podman build -f Containerfile.web -t localhost/fgc/web:v1 .
 ```
 
+### 컨테이너 안에서 빌드·테스트 (IDE 공통, 2026-09-17)
+PC 의 JDK 대신 **CI 와 같은 이미지**(`eclipse-temurin:21-jdk`, `Containerfile.api` 1단계와 동일) 안에서 Gradle 을 돌린다. 설정 파일은 `.devcontainer/devcontainer.json` 하나.
+- **VS Code**: Dev Containers 확장 → `Ctrl+Shift+P` → "Dev Containers: Reopen in Container" → 터미널에서 `./gradlew test`.
+- **IntelliJ**: 프로젝트 열기 화면 → Remote Development → Dev Containers → 이 저장소의 `.devcontainer/devcontainer.json` 선택.
+- **IDE 없이 한 줄** (PowerShell, Docker Desktop 실행 중):
+```powershell
+docker run --rm -v "${PWD}:/src" -w /src -v fgc-gradle:/root/.gradle -v //var/run/docker.sock:/var/run/docker.sock docker.io/library/eclipse-temurin:21-jdk sh -c "chmod +x gradlew && ./gradlew test --no-daemon"
+```
+docker.sock 을 넘기는 이유: 통합 테스트가 Testcontainers 로 PostgreSQL 컨테이너를 띄운다. `fgc-gradle` 볼륨은 의존성 캐시(두 번째부터 빠름).
+
 ### Pod 하나로 띄우기 (기본)
 같은 Pod 의 컨테이너는 `localhost` 로 서로를 본다. 이미지 기본값이 그 전제(api→`127.0.0.1:5432`, web→`127.0.0.1:8080`)라 `-e` 가 필요 없다.
 ```bash

@@ -1,0 +1,52 @@
+// fgc Release 파이프라인 (RC) — 수동 실행(Build with Parameters). Beta 이미지(b0.N)를 r0.N 으로 승격(같은 digest).
+// live.example.com 은 아직 없으므로 배포 단계는 없다. 운영 서버가 생기면 Jenkinsfile.stage 의 Deploy 단계를 복사해 LIVE_HOST 로 바꾼다.
+// Credentials: registry(Harbor 일 때만).
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'SRC_TAG',       defaultValue: 'b0.1',                      description: '승격할 Beta 태그')
+        string(name: 'TAG',           defaultValue: 'r0.1',                      description: 'RC 태그 r0.N')
+        string(name: 'REGISTRY',      defaultValue: 'registry.example.com:5000', description: 'zot: registry.example.com:5000 / Harbor: registry.example.com')
+        string(name: 'REGISTRY_CRED', defaultValue: '',                          description: 'Credentials ID. zot 이면 비움, Harbor 면 registry')
+    }
+
+    environment {
+        SRC_TAG  = "${params.SRC_TAG ?: 'b0.1'}"
+        TAG      = "${params.TAG ?: 'r0.1'}"
+        REGISTRY = "${params.REGISTRY ?: 'registry.example.com:5000'}"
+        CREDS    = ''
+    }
+
+    stages {
+        stage('Promote b->r (same digest)') {
+            steps {
+                script {
+                    if (params.REGISTRY_CRED?.trim()) {
+                        withCredentials([usernamePassword(credentialsId: params.REGISTRY_CRED, usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                            withEnv(["CREDS=--src-creds ${REG_USER}:${REG_PASS} --dest-creds ${REG_USER}:${REG_PASS}"]) { promote() }
+                        }
+                    } else {
+                        promote()
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success { echo "RC ready: ${REGISTRY}/fgc/{db,api,web}:${SRC_TAG} -> :${TAG}" }
+        failure { echo "Release pipeline failed" }
+    }
+}
+
+def promote() {
+    sh '''
+    set +x
+    set -e
+    for i in db api web; do
+      skopeo copy --src-tls-verify=false --dest-tls-verify=false ${CREDS} \
+        docker://${REGISTRY}/fgc/$i:${SRC_TAG} docker://${REGISTRY}/fgc/$i:${TAG}
+    done
+    '''
+}
