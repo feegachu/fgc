@@ -4,8 +4,6 @@
 
 
 > 보험 판매수수료 규제 대응 · 분급 · 환수 · 정산 검증 플랫폼
-
-[![정합성 회귀 방지](https://img.shields.io/github/actions/workflow/status/feegachu/fgc/ci.yml?branch=develop&label=%EC%A0%95%ED%95%A9%EC%84%B1%20%ED%9A%8C%EA%B7%80%20%EB%B0%A9%EC%A7%80&logo=github)](https://github.com/feegachu/fgc/actions/workflows/ci.yml)
 ![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
@@ -33,47 +31,6 @@
 
 <br>
 
-## 🔒 정합성 보증
-
-수수료 계산은 틀리면 안 되는 코드입니다. 그래서 **정합성을 사람의 주의력이 아니라 CI로 강제**합니다.
-
-`develop`·`main`을 대상으로 하는 모든 PR에서 실제 PostgreSQL 17(로컬 `docker-compose`와 동일 버전)을
-띄워 통합테스트를 실행하며, **하나라도 깨지면 머지가 차단**됩니다.
-
-`develop`에는 브랜치 보호가 적용되어 있어 `build` 체크 통과와 리뷰 승인 1인이 **필수**입니다.
-확인: `gh api repos/feegachu/fgc/branches/develop/protection`
-
-| 보장 | 근거 |
-|---|---|
-| H2 등 대체 DB 없이 실제 PostgreSQL로 검증 | `FGC-TER-004` |
-| 로컬과 CI가 같은 DB 버전(`postgres:17`)을 사용 | `FGC-ECR-003` |
-| `db/migration`·`db/demo` 간 Flyway 버전 중복 시 즉시 실패 | PR #30 재발 방지 |
-| 보호 브랜치 + 리뷰 승인 1인 필수 | `FGC-ECR-004` · `FGC-QUR-004` |
-| 의존성 취약점 탐지·자동 수정 PR (Dependabot) | `FGC-SER-010` |
-
-깨진 테스트는 PR의 **"테스트 결과"** 체크에서 어느 테스트가 왜 실패했는지 바로 확인할 수 있습니다.
-같은 저장소의 브랜치 PR은 CI가 직접 게시하고, 읽기 전용 토큰을 쓰는 Dependabot·외부 fork PR은
-JUnit XML을 넘겨받은 별도 `workflow_run`이 동일 커밋에 게시합니다.
-
-### 취약점 검사 범위
-
-`FGC-SER-010`에 대한 실제 적용 범위입니다. `.github/dependabot.yml`은 **버전 업데이트 주기만** 정하고,
-취약점 탐지 자체는 저장소 보안 설정과 해석된 Gradle 의존성 그래프 제출이 모두 필요하므로 나눠서 적습니다.
-
-| 항목 | 상태 | 관리 위치 |
-|---|---|---|
-| Gradle 의존성 버전 업데이트 | 주 1회 | `.github/dependabot.yml` |
-| GitHub Actions 버전 업데이트 | 월 1회 | `.github/dependabot.yml` |
-| Gradle 의존성 그래프 제출 | `develop` push마다 | `.github/workflows/dependency-submission.yml` |
-| Dependabot alerts (CVE 탐지) | 활성 | Settings → Code security |
-| Dependabot security updates (자동 수정 PR) | 활성 | Settings → Code security |
-| 컨테이너 이미지 스캔 | **2차** (`FGC-ECR-005`) | — |
-
-이미지 스캔이 1차에 없는 이유: FGC는 Dockerfile이 없어 자체 빌드 이미지가 없고,
-CI의 `postgres:17`은 테스트용 업스트림 공식 이미지입니다. 이미지 빌드·배포가 도입되는
-`FGC-ECR-005`(2차) 시점에 스캐너를 함께 넣습니다.
-
-<br>
 
 ## 📆 프로젝트 기간
 - 전체 기간: `2026.07.08 - 2026.11.17`
@@ -152,71 +109,3 @@ For building and running the application you need:
 - PostgreSQL 17 (docker-compose)
 - Gradle Wrapper 사용 (`./gradlew`, 로컬 Gradle 설치 불필요)
 
-## 5분 만에 띄우기
-1. Docker Desktop 실행
-2. `docker compose up -d`
-3. `./gradlew bootRun`     (Windows: `gradlew.bat bootRun`)
-4. http://localhost:8080 접속
-5. Swagger: http://localhost:8080/swagger-ui.html
-
-## DB 초기화 (뭔가 꼬였을 때)
-docker compose down -v && docker compose up -d && ./gradlew bootRun
-
-## 컨테이너로 띄우기 (Podman / Docker, Java 설치 불필요)
-3-tier 를 컨테이너 3개로 나눈다. 이미지마다 Containerfile 하나.
-
-| 객체 | 파일 | 이미지 | 안에서 듣는 포트 |
-|---|---|---|---|
-| 웹 | `Containerfile.web` | Nginx: 정적 파일(`static/`) 직접, 나머지는 미들웨어로 프록시 | 80 |
-| 미들웨어 | `Containerfile.api` | WAR + 외장 Tomcat 10.1 (JRE 21). Gradle 빌드는 이미지 안에서 | 8080 |
-| DB | `Containerfile.db` | PostgreSQL 17 **alpine, 비root**. 스키마·시드는 앱의 Flyway 가 만든다 | 5432 |
-
-```bash
-podman build -f Containerfile.db  -t localhost/fgc/db:v1  .
-podman build -f Containerfile.api -t localhost/fgc/api:v1 .     # 처음 3~5분 (Gradle 다운로드)
-podman build -f Containerfile.web -t localhost/fgc/web:v1 .
-```
-
-### 컨테이너 안에서 빌드·테스트 (IDE 공통, 2026-09-17)
-PC 의 JDK 대신 **CI 와 같은 이미지**(`eclipse-temurin:21-jdk`, `Containerfile.api` 1단계와 동일) 안에서 Gradle 을 돌린다. 설정 파일은 `.devcontainer/devcontainer.json` 하나.
-- **VS Code**: Dev Containers 확장 → `Ctrl+Shift+P` → "Dev Containers: Reopen in Container" → 터미널에서 `./gradlew test`.
-- **IntelliJ**: 프로젝트 열기 화면 → Remote Development → Dev Containers → 이 저장소의 `.devcontainer/devcontainer.json` 선택.
-- **IDE 없이 한 줄** (PowerShell, Docker Desktop 실행 중):
-```powershell
-docker run --rm -v "${PWD}:/src" -w /src -v fgc-gradle:/root/.gradle -v //var/run/docker.sock:/var/run/docker.sock docker.io/library/eclipse-temurin:21-jdk sh -c "chmod +x gradlew && ./gradlew test --no-daemon"
-```
-docker.sock 을 넘기는 이유: 통합 테스트가 Testcontainers 로 PostgreSQL 컨테이너를 띄운다. `fgc-gradle` 볼륨은 의존성 캐시(두 번째부터 빠름).
-
-### Pod 하나로 띄우기 (기본)
-같은 Pod 의 컨테이너는 `localhost` 로 서로를 본다. 이미지 기본값이 그 전제(api→`127.0.0.1:5432`, web→`127.0.0.1:8080`)라 `-e` 가 필요 없다.
-```bash
-podman pod create --name fgc -p 8088:80 -v fgc-pgdata-alpine:/var/lib/postgresql/data:z
-podman run -d --pod fgc --name fgc-db  localhost/fgc/db:v1
-sleep 5
-podman run -d --pod fgc --name fgc-api localhost/fgc/api:v1
-podman run -d --pod fgc --name fgc-web localhost/fgc/web:v1
-podman pod ps && podman ps --pod
-podman logs -f fgc-api              # "Started ServletInitializer" 가 보이면 Ctrl+C
-curl -I http://localhost:8088/login                    # 200 (Nginx → Tomcat)
-curl -I http://localhost:8088/css/common/layout.css    # 200 (Nginx 가 직접)
-```
-- 접속: http://localhost:8088 (admin / fgc1234!). Pod 밖으로 열린 포트는 **80 하나**(→8088). Tomcat 8080·PostgreSQL 5432 는 Pod 안에서만 보인다.
-- DB 데이터는 볼륨 `fgc-pgdata-alpine` 에 남는다. 되돌리기: `podman pod rm -f fgc`
-- 볼륨 옵션은 `:z`(소문자, 공용 SELinux 라벨). `:Z` 를 쓰면 그 컨테이너 전용 라벨이 붙어, 나중에 Jenkins `podman kube play` 가 같은 볼륨을 열 때 `Permission denied` 가 난다(2026-09-16).
-- ⚠️ 2026-09-16 부터 DB 이미지가 `postgres:17-alpine` + 비root(uid 70) 다. Debian 판(uid 999)으로 만든 옛 볼륨 `fgc-pgdata` 는 **붙이지 않는다**(권한·collation 불일치). 새 볼륨으로 시작하면 Flyway 가 스키마·시드를 다시 만든다.
-
-### 따로 띄우기 (Pod 없이, 디버깅용)
-컨테이너마다 네트워크가 다르므로 주소를 `-e` 로 넘긴다. `host.containers.internal` = 컨테이너를 띄운 기계.
-```bash
-podman run -d --name fgc-db  -p 5433:5432 localhost/fgc/db:v1
-podman run -d --name fgc-api -p 8082:8080 -e SPRING_DATASOURCE_URL='jdbc:postgresql://host.containers.internal:5433/fgc?currentSchema=fgc' localhost/fgc/api:v1
-podman run -d --name fgc-web -p 8088:80   -e API_UPSTREAM=host.containers.internal:8082 localhost/fgc/web:v1
-```
-- Kubernetes 에서는 같은 자리에 Service 이름이 들어간다 (`fgc-db:5432`, `fgc-api:8080`). 이미지에 기계 주소를 박지 않는 이유.
-- 통합 테스트는 이미지 빌드에서 제외(`-x test`). CI(`.github/workflows/ci.yml`)가 PostgreSQL 을 붙여 돌린다.
-
-## 문서
-- 화면정의서 v2.0 / 화면 목업: `FGC_화면_MVP/`
-- API·배치 계약: `docs/05_인터페이스정의서_v2_0.md`
-- 규제 근거: `docs/07_규제조문표_v0.2.1.md`
-- 컨벤션: `docs/컨벤션/`
