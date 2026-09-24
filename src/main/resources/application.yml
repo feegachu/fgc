@@ -3,6 +3,13 @@ spring:
     name: feegachu
   profiles:
     active: local
+  jpa:
+    open-in-view: false         # 엔티티 조회·DTO 변환은 서비스 트랜잭션 안에서 처리
+    hibernate:
+      ddl-auto: validate       # 스키마 변경은 Flyway가 담당하고 JPA는 매핑만 검증
+    properties:
+      hibernate:
+        default_schema: fgc
   flyway:
     enabled: true
     schemas: fgc
