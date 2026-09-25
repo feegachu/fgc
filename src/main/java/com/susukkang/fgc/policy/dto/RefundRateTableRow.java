@@ -5,7 +5,10 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * POL-W01 예상 해약환급률표 탭 1행. refund_rate_table + insurer/product 이름 + 차월 라인 중첩 투영.
@@ -26,4 +29,33 @@ public class RefundRateTableRow {
     private String sourceProductCode;
     private String sourceDocumentRef;
     private List<RefundRateLineRow> lines;
+
+    public static List<RefundRateTableRow> fromDetails(List<RefundRateTableDetailRow> details) {
+        Map<Long, RefundRateTableRow> tables = new LinkedHashMap<>();
+        for (RefundRateTableDetailRow detail : details) {
+            RefundRateTableRow table = tables.computeIfAbsent(detail.refundRateTableId(), id -> {
+                RefundRateTableRow row = new RefundRateTableRow();
+                row.refundRateTableId = id;
+                row.insurerName = detail.insurerName();
+                row.productName = detail.productName();
+                row.paymentTermMonths = detail.paymentTermMonths();
+                row.channelCode = detail.channelCode();
+                row.averageDeclaredRatePct = detail.averageDeclaredRatePct();
+                row.standardDeduction80Yn = detail.standardDeduction80Yn();
+                row.effectiveFrom = detail.effectiveFrom();
+                row.effectiveTo = detail.effectiveTo();
+                row.sourceProductCode = detail.sourceProductCode();
+                row.sourceDocumentRef = detail.sourceDocumentRef();
+                row.lines = new ArrayList<>();
+                return row;
+            });
+            if (detail.contractMonthNo() != null) {
+                RefundRateLineRow line = new RefundRateLineRow();
+                line.setContractMonthNo(detail.contractMonthNo());
+                line.setRefundRatePct(detail.refundRatePct());
+                table.lines.add(line);
+            }
+        }
+        return List.copyOf(tables.values());
+    }
 }

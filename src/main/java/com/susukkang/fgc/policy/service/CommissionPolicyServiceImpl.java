@@ -9,8 +9,9 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
-import com.susukkang.fgc.policy.dto.PolicyVersionRow;
-import com.susukkang.fgc.policy.mapper.PolicyMapper;
+import com.susukkang.fgc.policy.entity.PolicyVersion;
+import com.susukkang.fgc.policy.repository.CommissionRuleRepository;
+import com.susukkang.fgc.policy.repository.PolicyVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +43,8 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
     // 현재 시스템이 지원하는 7년 체계의 최대 회차이며 비정상 범위 확장을 방지한다.
     private static final int MAX_SUPPORTED_INSTALLMENT_NO = 84;
-    private final PolicyMapper policyMapper;
+    private final PolicyVersionRepository policyVersionRepository;
+    private final CommissionRuleRepository commissionRuleRepository;
 
     // 운영정책서 제21조의 규칙 선택 순서: 상품 판매버전 > 보험사 > 설계사 직급 > 조직 > priorityNo
     private static final Comparator<ResolvedCommissionRule> RULE_SELECTION_ORDER =
@@ -66,7 +68,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
         validateQueryCondition(contractId, paymentStage);
 
         List<ResolvedCommissionPolicy> policies =
-                policyMapper.findApplicableCurrentCommissionPolicies(contractId, paymentStage);
+                policyVersionRepository.findApplicableCurrentCommissionPolicies(contractId, paymentStage);
 
         if (policies == null || policies.isEmpty()) {
             throw new FgcBusinessException(
@@ -111,7 +113,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
         }
 
         List<ResolvedCommissionRule> rules =
-                policyMapper.findApplicableCommissionRules(
+                commissionRuleRepository.findApplicableCommissionRules(
                         policy.getPolicyVersionId(),
                         contractId,
                         paymentStage
@@ -142,7 +144,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
     @Override
     public Long resolveCurrentAllocationPolicyVersion(LocalDate asOf) {
-        List<PolicyVersionRow> policies = policyMapper.selectPolicyVersions(
+        List<PolicyVersion> policies = policyVersionRepository.selectPolicyVersions(
                 PolicyType.ALLOCATION,
                 asOf,
                 PolicyStatus.ACTIVE
