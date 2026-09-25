@@ -252,6 +252,46 @@ class AgentRepositoryIntegrationTest {
                 organizationId, null, AS_OF)).isNull();
     }
 
+    @Test
+    @DisplayName("기준일에 유효한 데모 모집설계사마다 팀장·지사장·본부장을 조회한다")
+    void everyActiveSeedFcHasTeamBranchAndDivisionManagers() {
+        LocalDate asOf = LocalDate.of(2026, 8, 20);
+        List<SeedFc> activeFcs = jdbcTemplate.query("""
+                SELECT agent_code, organization_id
+                  FROM fgc.agent
+                 WHERE rank_code = 'FC'
+                   AND agent_status = 'ACTIVE'
+                   AND active_yn = TRUE
+                   AND appointment_date <= ?
+                   AND (termination_date IS NULL OR termination_date >= ?)
+                 ORDER BY agent_code
+                """, (rs, rowNum) -> new SeedFc(
+                        rs.getString("agent_code"),
+                        rs.getLong("organization_id")
+                ), asOf, asOf);
+
+        assertThat(activeFcs).extracting(SeedFc::agentCode)
+                .containsExactly("A-FC-001", "A-FC-002", "A-FC-003");
+
+        activeFcs.forEach(fc -> {
+            assertThat(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
+                    fc.organizationId(), AgentRankCode.TEAM_LEADER, asOf))
+                    .as("%s의 팀장", fc.agentCode())
+                    .isNotNull();
+            assertThat(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
+                    fc.organizationId(), AgentRankCode.BRANCH_MANAGER, asOf))
+                    .as("%s의 지사장", fc.agentCode())
+                    .isNotNull();
+            assertThat(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
+                    fc.organizationId(), AgentRankCode.DIVISION_HEAD, asOf))
+                    .as("%s의 본부장", fc.agentCode())
+                    .isNotNull();
+        });
+    }
+
+    private record SeedFc(String agentCode, long organizationId) {
+    }
+
     private long insertOrganization(String code, Long parentId) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.organization (

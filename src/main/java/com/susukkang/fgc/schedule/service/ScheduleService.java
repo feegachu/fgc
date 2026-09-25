@@ -1,7 +1,7 @@
 package com.susukkang.fgc.schedule.service;
 
-import com.susukkang.fgc.base.mapper.AgentMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
@@ -45,7 +45,7 @@ public class ScheduleService {
     private final CommissionPolicyService commissionPolicyService;
     private final ScheduleMapper scheduleMapper;
     private final ContractMapper contractMapper;
-    private final AgentMapper agentMapper;
+    private final AgentRepository agentRepository;
     private final CapCheckService capCheckService;
     private final CapCheckMapper capCheckMapper;
     private final AuditLogService auditLogService;
@@ -946,7 +946,7 @@ public class ScheduleService {
             );
         }
         Long agentId =
-                agentMapper.findActiveAgentIdFromOrganizationHierarchy(
+                agentRepository.findActiveAgentIdFromOrganizationHierarchy(
                         organizationId,
                         agentRankCode,
                         contractDate

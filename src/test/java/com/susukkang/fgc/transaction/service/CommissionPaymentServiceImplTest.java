@@ -2,6 +2,7 @@ package com.susukkang.fgc.transaction.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
@@ -12,6 +13,7 @@ import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.cap.service.CapValidatorImpl;
 import com.susukkang.fgc.common.code.AttributionMethod;
+import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
@@ -39,11 +41,14 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
 import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
-import com.susukkang.fgc.base.mapper.AgentMapper;
 import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -82,7 +87,7 @@ class CommissionPaymentServiceImplTest {
     @Mock
     private CapCheckMapper capCheckMapper;
     @Mock
-    private AgentMapper agentMapper;
+    private AgentRepository agentRepository;
     @Mock
     private CapCalculator capCalculator;
     @Mock
@@ -106,7 +111,7 @@ class CommissionPaymentServiceImplTest {
         service = new CommissionPaymentServiceImpl(
                 mapper,
                 capCheckMapper,
-                agentMapper,
+                agentRepository,
                 new ObjectMapper(),
                 capValidator,
                 capCalculator,
@@ -182,6 +187,50 @@ class CommissionPaymentServiceImplTest {
         assertThat(captor.getValue())
                 .extracting(CommissionPaymentAttributionCommand::getAmount)
                 .containsExactly(new BigDecimal("300000"), new BigDecimal("200000"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = AgentRankCode.class, names = {"TEAM_LEADER", "BRANCH_MANAGER", "DIVISION_HEAD"})
+    void createsDraftForContractManagerFoundByRepository(AgentRankCode rank) {
+        stubReferences(3L);
+        LocalDate contractDate = LocalDate.of(2026, 7, 3);
+        given(mapper.findContract(3L)).willReturn(new ContractReference(3L, 20L, 30L, contractDate));
+        given(mapper.findAgentRankCode(7L)).willReturn(rank);
+        given(agentRepository.findActiveAgentIdFromOrganizationHierarchy(30L, rank, contractDate))
+                .willReturn(7L);
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+
+        CommissionPaymentResponse response = service.create(createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        )));
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        ArgumentCaptor<CommissionPaymentCommand> captor = ArgumentCaptor.forClass(CommissionPaymentCommand.class);
+        verify(mapper).insertTransaction(captor.capture());
+        assertThat(captor.getValue().getAgentId()).isEqualTo(7L);
+        verify(agentRepository).findActiveAgentIdFromOrganizationHierarchy(30L, rank, contractDate);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(longs = 99L)
+    void rejectsManagerPaymentWhenRepositoryFindsNoManagerOrDifferentRecipient(Long expectedManagerId) {
+        stubReferences(3L);
+        LocalDate contractDate = LocalDate.of(2026, 7, 3);
+        given(mapper.findContract(3L)).willReturn(new ContractReference(3L, 20L, 30L, contractDate));
+        given(mapper.findAgentRankCode(7L)).willReturn(AgentRankCode.TEAM_LEADER);
+        given(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
+                30L, AgentRankCode.TEAM_LEADER, contractDate)).willReturn(expectedManagerId);
+
+        assertThatThrownBy(() -> service.create(createRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        )))).isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+            assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_002);
+            assertThat(exception.getField()).isEqualTo("attributedContractId");
+            assertThat(exception.getDetail()).contains("관리자가 아닙니다");
+        });
+        verify(mapper, never()).insertTransaction(any());
+        verify(mapper, never()).insertAttributions(any());
     }
 
     @Test

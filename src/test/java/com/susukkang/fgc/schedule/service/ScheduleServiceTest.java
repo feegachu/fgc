@@ -1,7 +1,7 @@
 package com.susukkang.fgc.schedule.service;
 
-import com.susukkang.fgc.base.mapper.AgentMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.mapper.CapCheckMapper;
@@ -32,6 +32,8 @@ import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -70,7 +72,7 @@ class ScheduleServiceTest {
     private CommissionPolicyService commissionPolicyService;
 
     @Mock
-    private AgentMapper agentMapper;
+    private AgentRepository agentRepository;
 
     @Mock
     private CapCheckService capCheckService;
@@ -600,8 +602,74 @@ class ScheduleServiceTest {
         assertThat(gaLines.getFirst().getExpectedAmount())
                 .isEqualByComparingTo("650000");
         assertThat(gaLines.getFirst().getBeneficiaryAgentId()).isEqualTo(20L);
-        verify(agentMapper, never()).findActiveAgentIdFromOrganizationHierarchy(
+        verify(agentRepository, never()).findActiveAgentIdFromOrganizationHierarchy(
                 any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = AgentRankCode.class, names = {"TEAM_LEADER", "BRANCH_MANAGER", "DIVISION_HEAD"})
+    void generatesManagerScheduleForRecipientFoundByRepository(AgentRankCode rank) {
+        InsuranceContract contract = stubManagerSchedule(rank);
+        given(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
+                30L, rank, contract.getContractDate())).willReturn(40L);
+        given(scheduleMapper.insertAllScheduleLines(any()))
+                .willAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        ScheduleGenerationResult result = scheduleService.generateSchedules(contract);
+
+        assertThat(result.createdLineCount()).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ScheduleLineInsertDTO>> captor = ArgumentCaptor.forClass(List.class);
+        verify(scheduleMapper).insertAllScheduleLines(captor.capture());
+        assertThat(captor.getValue()).singleElement().satisfies(line -> {
+            assertThat(line.getBeneficiaryAgentId()).isEqualTo(40L);
+            assertThat(line.getExpectedAmount()).isEqualByComparingTo("100000");
+        });
+        verify(agentRepository).findActiveAgentIdFromOrganizationHierarchy(
+                30L, rank, contract.getContractDate());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = AgentRankCode.class, names = {"TEAM_LEADER", "BRANCH_MANAGER", "DIVISION_HEAD"})
+    void rejectsManagerScheduleWhenRepositoryFindsNoRecipient(AgentRankCode rank) {
+        InsuranceContract contract = stubManagerSchedule(rank);
+        given(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
+                30L, rank, contract.getContractDate())).willReturn(null);
+
+        assertThatThrownBy(() -> scheduleService.generateSchedules(contract))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_002);
+                    assertThat(exception.getField()).isEqualTo("beneficiaryAgentId");
+                    assertThat(exception.getParams()).containsEntry("agentRankCode", rank.name());
+                });
+        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+    }
+
+    private InsuranceContract stubManagerSchedule(AgentRankCode rank) {
+        InsuranceContract contract = InsuranceContract.builder()
+                .contractId(10L)
+                .contractDate(LocalDate.of(2026, 8, 10))
+                .agentId(20L)
+                .organizationId(30L)
+                .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
+                .build();
+        given(contractMapper.selectContractById(10L)).willReturn(contract);
+        given(commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.INSURER_TO_GA))
+                .willReturn(policy(100L, PaymentStage.INSURER_TO_GA,
+                        rule(1000L, null, 1, 1, "900.000000")));
+        // 원수사 단계는 이미 생성되어 있고, 관리자 지급 단계만 새로 생성한다.
+        given(scheduleMapper.selectActiveOperationalPolicyVersionId(10L, PaymentStage.INSURER_TO_GA))
+                .willReturn(100L);
+        given(commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC))
+                .willReturn(policy(200L, PaymentStage.GA_TO_FC,
+                        rule(2000L, rank, 1, 1, "100.000000")));
+        given(scheduleMapper.insertScheduleHeader(any(ScheduleHeaderInsertDTO.class)))
+                .willAnswer(invocation -> {
+                    ScheduleHeaderInsertDTO header = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(header, "scheduleHeaderId", 1001L);
+                    return 1;
+                });
+        return contract;
     }
 
     @Test
