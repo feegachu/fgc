@@ -3,7 +3,7 @@ package com.susukkang.fgc.base.service;
 import com.susukkang.fgc.base.dto.ProductResponse;
 import com.susukkang.fgc.base.dto.ProductRow;
 import com.susukkang.fgc.base.dto.ProductSearchCriteria;
-import com.susukkang.fgc.base.mapper.ProductMapper;
+import com.susukkang.fgc.base.repository.ProductRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.web.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -27,13 +30,13 @@ class ProductServiceImplTest {
             "insurerProductCode,asc;offeringVersion,asc;channelCode,asc;productOfferingId,asc";
 
     @Mock
-    private ProductMapper productMapper;
+    private ProductRepository productRepository;
 
     private ProductServiceImpl productService;
 
     @BeforeEach
     void setUp() {
-        productService = new ProductServiceImpl(productMapper);
+        productService = new ProductServiceImpl(productRepository);
     }
 
     @Test
@@ -45,13 +48,13 @@ class ProductServiceImplTest {
                 LocalDate.of(2026, 7, 1), null, "BD-2026-07",
                 LocalDate.of(2026, 7, 1), "FACE_TO_FACE", false, "CURRENT", true, 240
         );
-        when(productMapper.selectProducts(criteria, 20, 20)).thenReturn(List.of(row));
-        when(productMapper.countProducts(criteria)).thenReturn(21L);
+        PageRequest pageable = PageRequest.of(1, 20);
+        when(productRepository.search(criteria.insurerId(), criteria.asOf(), pageable))
+                .thenReturn(new PageImpl<>(List.of(row), pageable, 21L));
 
         PageResponse<ProductResponse> result = productService.search(criteria, 2, 20);
 
-        verify(productMapper).selectProducts(criteria, 20, 20);
-        verify(productMapper).countProducts(criteria);
+        verify(productRepository).search(criteria.insurerId(), criteria.asOf(), pageable);
         assertThat(result.page()).isEqualTo(2);
         assertThat(result.size()).isEqualTo(20);
         assertThat(result.totalElements()).isEqualTo(21);
@@ -68,14 +71,30 @@ class ProductServiceImplTest {
     @Test
     void returnsEmptyPageForUnknownPositiveInsurer() {
         ProductSearchCriteria criteria = criteria(999_999L);
-        when(productMapper.selectProducts(criteria, 0, 20)).thenReturn(List.of());
-        when(productMapper.countProducts(criteria)).thenReturn(0L);
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(productRepository.search(criteria.insurerId(), criteria.asOf(), pageable))
+                .thenReturn(Page.empty(pageable));
 
         PageResponse<ProductResponse> result = productService.search(criteria, 1, 20);
 
         assertThat(result.content()).isEmpty();
         assertThat(result.totalElements()).isZero();
         assertThat(result.totalPages()).isZero();
+    }
+
+    @Test
+    void preservesTotalCountWhenRequestedPageIsBeyondLastPage() {
+        ProductSearchCriteria criteria = criteria(2L);
+        PageRequest pageable = PageRequest.of(2, 20);
+        when(productRepository.search(criteria.insurerId(), criteria.asOf(), pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 21L));
+
+        PageResponse<ProductResponse> result = productService.search(criteria, 3, 20);
+
+        assertThat(result.content()).isEmpty();
+        assertThat(result.page()).isEqualTo(3);
+        assertThat(result.totalElements()).isEqualTo(21);
+        assertThat(result.totalPages()).isEqualTo(2);
     }
 
     @Test
