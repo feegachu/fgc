@@ -27,4 +27,12 @@ public class ResolvedCommissionPolicy {
     private PaymentStage paymentStage;            // 정책이 적용되는 지급 단계
     private ScheduleRegime scheduleRegime;         // 상품 판매버전에 적용되는 수수료 체계
     private List<ResolvedCommissionRule> rules;   // 지급 단계에 적용할 수수료 규칙 목록
+
+    public ResolvedCommissionPolicy(Long policyVersionId, String policyType,
+                                    String paymentStage, String scheduleRegime) {
+        this.policyVersionId = policyVersionId;
+        this.policyType = PolicyType.valueOf(policyType);
+        this.paymentStage = PaymentStage.valueOf(paymentStage);
+        this.scheduleRegime = ScheduleRegime.valueOf(scheduleRegime);
+    }
 }

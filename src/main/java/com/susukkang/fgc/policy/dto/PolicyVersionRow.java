@@ -1,5 +1,6 @@
 package com.susukkang.fgc.policy.dto;
 
+import com.susukkang.fgc.policy.entity.PolicyVersion;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -27,4 +28,23 @@ public class PolicyVersionRow {
     private String createdBy;
     private String approvedBy;
     private OffsetDateTime approvedAt;
+
+    public static PolicyVersionRow from(PolicyVersion policy, String createdBy, String approvedBy) {
+        PolicyVersionRow row = new PolicyVersionRow();
+        row.setPolicyVersionId(policy.getPolicyVersionId());
+        row.setPolicyCode(policy.getPolicyCode());
+        row.setPolicyName(policy.getPolicyName());
+        row.setPolicyType(policy.getPolicyType().name());
+        row.setSourceClass(policy.getSourceClass().name());
+        row.setVersionNo(policy.getVersionNo());
+        row.setStatus(policy.getStatus().name());
+        row.setEffectiveFrom(policy.getEffectiveFrom());
+        row.setEffectiveTo(policy.getEffectiveTo());
+        row.setRegulationRefs(policy.getRegulationRefs());
+        row.setSourceRefs(policy.getSourceRefs());
+        row.setCreatedBy(createdBy);
+        row.setApprovedBy(approvedBy);
+        row.setApprovedAt(policy.getApprovedAt());
+        return row;
+    }
 }

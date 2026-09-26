@@ -23,11 +23,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * FUN-001 로그인·로그아웃 / 인터페이스정의서 2-1-1(1차는 세션 방식), 5-3(MPA 302·Ajax 401).
- *
+ * <p>
  * 체인을 둘로 나눈 이유
- *  한 체인에 formLogin(loginPage)과 httpBasic을 같이 두면 인증 진입점이 하나로 합쳐진다.
- *  그러면 미인증 REST 호출까지 로그인 화면으로 302 되어 화면 스크립트가 401을 구분할 수 없다.
- *  인터페이스정의서 5-3의 "MPA = /login 302 / Ajax = 401 JSON" 규칙을 체인 분리로 강제한다.
+ * 한 체인에 formLogin(loginPage)과 httpBasic을 같이 두면 인증 진입점이 하나로 합쳐진다.
+ * 그러면 미인증 REST 호출까지 로그인 화면으로 302 되어 화면 스크립트가 401을 구분할 수 없다.
+ * 인터페이스정의서 5-3의 "MPA = /login 302 / Ajax = 401 JSON" 규칙을 체인 분리로 강제한다.
  */
 @Configuration
 @EnableMethodSecurity
@@ -35,6 +35,7 @@ public class SecurityConfig {
 
     /**
      * FUN-002(#82) — 필터 단계(아래 URL 굵은 규칙·CSRF)에서 거부된 /api/** 요청도 컨트롤러
+     *
      * @PreAuthorize 거부와 같은 ApiResponse 봉투(FGC-AUTH-003)로 나가게 한다.
      * 기본 핸들러는 sendError(403) → Boot 기본 오류 JSON이라 인터페이스정의서 3-3의
      * 봉투 규칙(이슈 #82 인수조건 "403 + ApiResponse 오류 봉투")을 깬다.
@@ -95,13 +96,13 @@ public class SecurityConfig {
 
     /**
      * /api/** - 미인증이면 리다이렉트 대신 항상 401을 돌려준다.
-     *
+     * <p>
      * 세션 인증을 막지 않는 이유
-     *  SessionCreationPolicy.STATELESS 를 걸면 폼 로그인 세션으로는 /api/** 를 못 부른다.
-     *  그런데 인터페이스정의서 3-4 는 "화면 스크립트가 401 을 받으면 location='/login'" 이라고
-     *  적어 두었다. 즉 화면이 세션 쿠키로 /api/** 를 Ajax 호출하는 것이 설계된 동작이다.
-     *  STATELESS 를 켜면 로그인한 사용자의 화면 Ajax 가 전부 401 이 된다.
-     *
+     * SessionCreationPolicy.STATELESS 를 걸면 폼 로그인 세션으로는 /api/** 를 못 부른다.
+     * 그런데 인터페이스정의서 3-4 는 "화면 스크립트가 401 을 받으면 location='/login'" 이라고
+     * 적어 두었다. 즉 화면이 세션 쿠키로 /api/** 를 Ajax 호출하는 것이 설계된 동작이다.
+     * STATELESS 를 켜면 로그인한 사용자의 화면 Ajax 가 전부 401 이 된다.
+     * <p>
      * 화면 Ajax가 세션 쿠키로 /api/**를 호출하므로, Spring Security 기본 CSRF
      * 검증을 모든 상태 변경 요청에 적용한다(SRC-028).
      */
@@ -131,7 +132,7 @@ public class SecurityConfig {
 
     /**
      * 화면(MPA) - 세션 쿠키 기반 폼 로그인. CSRF는 켜 둔다(Thymeleaf th:action이 토큰을 자동 주입).
-     *
+     * <p>
      * 실패 시 /login?error 하나로만 보낸다. 아이디 없음 / 비밀번호 틀림 / 잠긴 계정을 화면에서
      * 구분하면 계정 존재 여부가 새어 나간다(화면정의서 AUTH-W01 "막아야 할 것").
      */

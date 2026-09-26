@@ -2,13 +2,16 @@ package com.susukkang.fgc.policy.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicyType;
+import com.susukkang.fgc.common.code.PolicyStatus;
 import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.CalculationType;
 import com.susukkang.fgc.common.code.FeeComponentType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
-import com.susukkang.fgc.policy.mapper.PolicyMapper;
+import com.susukkang.fgc.policy.entity.PolicyVersion;
+import com.susukkang.fgc.policy.repository.CommissionRuleRepository;
+import com.susukkang.fgc.policy.repository.PolicyVersionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -31,7 +36,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class CommissionPolicyServiceImplTest {
 
     @Mock
-    private PolicyMapper policyMapper;
+    private PolicyVersionRepository policyVersionRepository;
+
+    @Mock
+    private CommissionRuleRepository commissionRuleRepository;
 
     @InjectMocks
     private CommissionPolicyServiceImpl commissionPolicyService;
@@ -59,12 +67,12 @@ class CommissionPolicyServiceImplTest {
                         .priorityNo(100)
                         .build();
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(
                 contractId,
                 paymentStage
         )).willReturn(List.of(policy));
 
-        given(policyMapper.findApplicableCommissionRules(
+        given(commissionRuleRepository.findApplicableCommissionRules(
                 policyVersionId,
                 contractId,
                 paymentStage
@@ -84,11 +92,11 @@ class CommissionPolicyServiceImplTest {
                 .extracting(ResolvedCommissionRule::getCommissionRuleId)
                 .containsExactly(rule.getCommissionRuleId());
 
-        verify(policyMapper).findApplicableCurrentCommissionPolicies(
+        verify(policyVersionRepository).findApplicableCurrentCommissionPolicies(
                 contractId,
                 paymentStage
         );
-        verify(policyMapper).findApplicableCommissionRules(
+        verify(commissionRuleRepository).findApplicableCommissionRules(
                 policyVersionId,
                 contractId,
                 paymentStage
@@ -104,7 +112,7 @@ class CommissionPolicyServiceImplTest {
                 ))
                 .isInstanceOf(FgcBusinessException.class);
 
-        verifyNoInteractions(policyMapper);
+        verifyNoInteractions(policyVersionRepository, commissionRuleRepository);
     }
 
     @Test
@@ -112,7 +120,7 @@ class CommissionPolicyServiceImplTest {
         Long contractId = 10L;
         PaymentStage paymentStage = PaymentStage.INSURER_TO_GA;
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(
                 contractId,
                 paymentStage
         )).willReturn(List.of());
@@ -124,7 +132,7 @@ class CommissionPolicyServiceImplTest {
                 ))
                 .isInstanceOf(FgcBusinessException.class);
 
-        verify(policyMapper, never()).findApplicableCommissionRules(
+        verify(commissionRuleRepository, never()).findApplicableCommissionRules(
                 any(),
                 any(),
                 any()
@@ -150,7 +158,7 @@ class CommissionPolicyServiceImplTest {
                         .paymentStage(paymentStage)
                         .build();
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(
                 contractId,
                 paymentStage
         )).willReturn(List.of(firstPolicy, secondPolicy));
@@ -162,7 +170,7 @@ class CommissionPolicyServiceImplTest {
                 ))
                 .isInstanceOf(FgcBusinessException.class);
 
-        verify(policyMapper, never()).findApplicableCommissionRules(
+        verify(commissionRuleRepository, never()).findApplicableCommissionRules(
                 any(),
                 any(),
                 any()
@@ -182,12 +190,12 @@ class CommissionPolicyServiceImplTest {
                         .paymentStage(paymentStage)
                         .build();
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(
                 contractId,
                 paymentStage
         )).willReturn(List.of(policy));
 
-        given(policyMapper.findApplicableCommissionRules(
+        given(commissionRuleRepository.findApplicableCommissionRules(
                 policyVersionId,
                 contractId,
                 paymentStage
@@ -226,9 +234,9 @@ class CommissionPolicyServiceImplTest {
                 .installmentTo(1)
                 .build();
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(
                 contractId, paymentStage)).willReturn(List.of(policy));
-        given(policyMapper.findApplicableCommissionRules(
+        given(commissionRuleRepository.findApplicableCommissionRules(
                 policyVersionId, contractId, paymentStage))
                 .willReturn(List.of(generalRule, organizationRule));
 
@@ -271,9 +279,9 @@ class CommissionPolicyServiceImplTest {
                 .priorityNo(10)
                 .build();
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(
                 contractId, paymentStage)).willReturn(List.of(policy));
-        given(policyMapper.findApplicableCommissionRules(
+        given(commissionRuleRepository.findApplicableCommissionRules(
                 policyVersionId, contractId, paymentStage))
                 .willReturn(List.of(insurerRule, organizationRule));
 
@@ -295,8 +303,8 @@ class CommissionPolicyServiceImplTest {
         ResolvedCommissionRule productOfferingRule = validRule().toBuilder().commissionRuleId(1000L).commissionItemId(2000L).agentRankCode(AgentRankCode.FC).installmentFrom(1).installmentTo(1).productOfferingId(3L).priorityNo(20).build();
         ResolvedCommissionRule insurerRule = productOfferingRule.toBuilder().commissionRuleId(1001L).productOfferingId(null).insurerId(1L).priorityNo(10).build();
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(contractId, paymentStage)).willReturn(List.of(policy));
-        given(policyMapper.findApplicableCommissionRules(policyVersionId, contractId, paymentStage)).willReturn(List.of(productOfferingRule, insurerRule));
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(contractId, paymentStage)).willReturn(List.of(policy));
+        given(commissionRuleRepository.findApplicableCommissionRules(policyVersionId, contractId, paymentStage)).willReturn(List.of(productOfferingRule, insurerRule));
 
         ResolvedCommissionPolicy result = commissionPolicyService.resolveCurrentCommission(contractId, paymentStage);
 
@@ -346,9 +354,9 @@ class CommissionPolicyServiceImplTest {
                 .commissionRuleId(1001L)
                 .build();
 
-        given(policyMapper.findApplicableCurrentCommissionPolicies(
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(
                 contractId, paymentStage)).willReturn(List.of(policy));
-        given(policyMapper.findApplicableCommissionRules(
+        given(commissionRuleRepository.findApplicableCommissionRules(
                 policyVersionId, contractId, paymentStage))
                 .willReturn(List.of(firstRule, secondRule));
 
@@ -418,13 +426,52 @@ class CommissionPolicyServiceImplTest {
     @Test
     void rejectsPolicyWhenPolicyVersionIdIsMissing() {
         ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(null).build();
-        given(policyMapper.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
 
         assertThatThrownBy(() -> commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC))
                 .isInstanceOf(FgcBusinessException.class)
                 .satisfies(exception -> assertThat(((FgcBusinessException) exception).getParams()).containsEntry("reason", "INVALID_POLICY"));
 
-        verify(policyMapper, never()).findApplicableCommissionRules(any(), any(), any());
+        verify(commissionRuleRepository, never()).findApplicableCommissionRules(any(), any(), any());
+    }
+
+    @Test
+    void resolvesOnlyActiveAllocationPolicyOnRequestedDate() {
+        LocalDate asOf = LocalDate.of(2026, 7, 1);
+        PolicyVersion policy = mock(PolicyVersion.class);
+        given(policy.getPolicyVersionId()).willReturn(300L);
+        given(policyVersionRepository.selectPolicyVersions(PolicyType.ALLOCATION, asOf, PolicyStatus.ACTIVE))
+                .willReturn(List.of(policy));
+
+        assertThat(commissionPolicyService.resolveCurrentAllocationPolicyVersion(asOf)).isEqualTo(300L);
+        verifyNoInteractions(commissionRuleRepository);
+    }
+
+    @Test
+    void rejectsMissingAllocationPolicy() {
+        LocalDate asOf = LocalDate.of(2026, 7, 1);
+        given(policyVersionRepository.selectPolicyVersions(PolicyType.ALLOCATION, asOf, PolicyStatus.ACTIVE))
+                .willReturn(List.of());
+
+        assertThatThrownBy(() -> commissionPolicyService.resolveCurrentAllocationPolicyVersion(asOf))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception -> assertThat(((FgcBusinessException) exception).getParams())
+                        .containsEntry("reason", "POLICY_MISSING"));
+    }
+
+    @Test
+    void rejectsDuplicateAllocationPolicies() {
+        LocalDate asOf = LocalDate.of(2026, 7, 1);
+        PolicyVersion first = mock(PolicyVersion.class);
+        PolicyVersion second = mock(PolicyVersion.class);
+        given(policyVersionRepository.selectPolicyVersions(PolicyType.ALLOCATION, asOf, PolicyStatus.ACTIVE))
+                .willReturn(List.of(first, second));
+
+        assertThatThrownBy(() -> commissionPolicyService.resolveCurrentAllocationPolicyVersion(asOf))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(exception -> assertThat(((FgcBusinessException) exception).getParams())
+                        .containsEntry("reason", "POLICY_DUPLICATE")
+                        .containsEntry("policyCount", 2));
     }
 
     // 정상 규칙의 공통 필드를 생성해 각 테스트가 검증 대상만 변경하도록 한다.
@@ -447,8 +494,8 @@ class CommissionPolicyServiceImplTest {
     // 여러 후보 규칙을 조회하는 공통 정책 시나리오를 실행한다.
     private ResolvedCommissionPolicy resolveRules(List<ResolvedCommissionRule> rules) {
         ResolvedCommissionPolicy policy = ResolvedCommissionPolicy.builder().policyVersionId(100L).build();
-        given(policyMapper.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
-        given(policyMapper.findApplicableCommissionRules(100L, 10L, PaymentStage.GA_TO_FC)).willReturn(rules);
+        given(policyVersionRepository.findApplicableCurrentCommissionPolicies(10L, PaymentStage.GA_TO_FC)).willReturn(List.of(policy));
+        given(commissionRuleRepository.findApplicableCommissionRules(100L, 10L, PaymentStage.GA_TO_FC)).willReturn(rules);
         return commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC);
     }
 }

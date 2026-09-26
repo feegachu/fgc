@@ -3,6 +3,7 @@ package com.susukkang.fgc.transaction.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
@@ -14,7 +15,6 @@ import com.susukkang.fgc.cap.mapper.CapCheckMapper;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
-import com.susukkang.fgc.base.mapper.AgentMapper;
 import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CapResultStatus;
@@ -89,7 +89,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private final CommissionPaymentMapper mapper;
     private final CapCheckMapper capCheckMapper;
-    private final AgentMapper agentMapper;
+    private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
     private final CapCalculator capCalculator;
@@ -1692,7 +1692,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      *
      * 수취인이 귀속계약 조직의 정당한 관리자인지 확인한다.
      * 계약일 기준으로 계약 소속 조직에서 상위 조직으로 올라가며 수취인 직급의 활성 설계사를 찾고,
-     * 그 결과가 수취인과 같을 때만 통과시킨다(AgentMapper.findActiveAgentIdFromOrganizationHierarchy —
+     * 그 결과가 수취인과 같을 때만 통과시킨다(AgentRepository.findActiveAgentIdFromOrganizationHierarchy —
      * ScheduleService 가 예상 스케줄의 관리자수수료 수취인을 정할 때 쓰는 것과 같은 판정).
      * 직급이 FC 이면 모집설계사 본인이어야 하므로 허용하지 않는다.
      */
@@ -1702,7 +1702,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             invalid("attributedContractId", "귀속계약의 설계사가 지급 대상 설계사와 다릅니다.");
             return;
         }
-        Long expectedManagerId = agentMapper.findActiveAgentIdFromOrganizationHierarchy(
+        Long expectedManagerId = agentRepository.findActiveAgentIdFromOrganizationHierarchy(
                 target.organizationId(),
                 rankCode,
                 target.contractDate()

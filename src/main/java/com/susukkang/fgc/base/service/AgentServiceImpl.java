@@ -2,15 +2,18 @@ package com.susukkang.fgc.base.service;
 
 import com.susukkang.fgc.base.dto.AgentResponse;
 import com.susukkang.fgc.base.dto.AgentSearchCriteria;
-import com.susukkang.fgc.base.mapper.AgentMapper;
+import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -22,7 +25,7 @@ public class AgentServiceImpl implements AgentService {
     private static final int MAX_SIZE = 100;
     private static final String SORT = "agentCode,asc";
 
-    private final AgentMapper agentMapper;
+    private final AgentRepository agentRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -30,26 +33,18 @@ public class AgentServiceImpl implements AgentService {
         validateCriteria(criteria);
         validatePaging(page, size);
 
-        AgentSearchCriteria normalizedCriteria = new AgentSearchCriteria(
-                criteria.organizationId(),
-                normalizeKeyword(criteria.keyword()),
-                criteria.asOf()
+        String normalizedKeyword = normalizeKeyword(criteria.keyword());
+        Pageable pageable = PageRequest.of(
+                page - 1,
+                size,
+                Sort.by(Sort.Direction.ASC, "agentCode")
         );
 
-        long offsetLong = (long) (page - 1) * size;
-        if (offsetLong > Integer.MAX_VALUE) {
-            throw validationException("page");
-        }
-        int offset = (int) offsetLong;
+        Page<AgentResponse> result = agentRepository
+                .search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), pageable)
+                .map(AgentResponse::from);
 
-        List<AgentResponse> content = agentMapper
-                .selectAgents(normalizedCriteria, offset, size)
-                .stream()
-                .map(AgentResponse::from)
-                .toList();
-        long totalElements = agentMapper.countAgents(normalizedCriteria);
-
-        return PageResponse.of(content, page, size, totalElements, SORT);
+        return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), SORT);
     }
 
     private void validateCriteria(AgentSearchCriteria criteria) {
@@ -64,6 +59,10 @@ public class AgentServiceImpl implements AgentService {
         }
         if (size < MIN_SIZE || size > MAX_SIZE) {
             throw validationException("size");
+        }
+        long offset = (long) (page - 1) * size;
+        if (offset > Integer.MAX_VALUE) {
+            throw validationException("page");
         }
     }
 

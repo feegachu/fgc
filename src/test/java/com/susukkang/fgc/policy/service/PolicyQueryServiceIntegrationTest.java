@@ -1,11 +1,18 @@
-package com.susukkang.fgc.policy.mapper;
+package com.susukkang.fgc.policy.service;
 
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.PolicySourceClass;
 import com.susukkang.fgc.common.code.PolicyStatus;
 import com.susukkang.fgc.common.code.PolicyType;
-import com.susukkang.fgc.policy.dto.CapRuleSetRow;
-import com.susukkang.fgc.policy.dto.CommissionRuleRow;
-import com.susukkang.fgc.policy.dto.PolicyVersionRow;
-import com.susukkang.fgc.policy.dto.RefundRateTableRow;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.policy.dto.CapRuleItemResponse;
+import com.susukkang.fgc.policy.dto.CapRuleSetResponse;
+import com.susukkang.fgc.policy.dto.CommissionRuleResponse;
+import com.susukkang.fgc.policy.dto.PolicyDetailResponse;
+import com.susukkang.fgc.policy.dto.PolicyVersionResponse;
+import com.susukkang.fgc.policy.dto.RefundRateLineResponse;
+import com.susukkang.fgc.policy.dto.RefundRateTableResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,18 +25,19 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * FGC-FUN-012·013: 정책·룰셋 조회 매퍼 통합 테스트.
+ * FGC-FUN-012·013: 정책·룰셋 조회 서비스의 JPA 통합 테스트.
  * 픽스처는 DRAFT 상태에서 자식 행을 넣는다 — APPROVED/ACTIVE 정책의 자식은
  * DB 트리거(fgc.guard_policy_child_mutation)가 INSERT 도 거부한다.
  */
 @SpringBootTest
 @Transactional
-class PolicyMapperIntegrationTest {
+class PolicyQueryServiceIntegrationTest {
 
     @Autowired
-    private PolicyMapper policyMapper;
+    private PolicyQueryService policyQueryService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -66,29 +74,29 @@ class PolicyMapperIntegrationTest {
     /** REG-19: 적용 시작일과 종료일은 모두 조회 기준일에 포함된다. */
     @Test
     void asOfFilterSelectsOnlyVersionsEffectiveOnThatDate() {
-        List<PolicyVersionRow> onEffectiveFrom = policyMapper.selectPolicyVersions(
+        List<PolicyVersionResponse> onEffectiveFrom = policyQueryService.findPolicyVersions(
                 PolicyType.CAP_1200, LocalDate.of(2026, 1, 1), null);
-        assertThat(onEffectiveFrom).extracting(PolicyVersionRow::getPolicyCode)
+        assertThat(onEffectiveFrom).extracting(PolicyVersionResponse::policyCode)
                 .contains(cap2026Code)
                 .doesNotContain(cap2027Code);
 
-        List<PolicyVersionRow> onEffectiveTo = policyMapper.selectPolicyVersions(
+        List<PolicyVersionResponse> onEffectiveTo = policyQueryService.findPolicyVersions(
                 PolicyType.CAP_1200, LocalDate.of(2026, 12, 31), null);
-        assertThat(onEffectiveTo).extracting(PolicyVersionRow::getPolicyCode)
+        assertThat(onEffectiveTo).extracting(PolicyVersionResponse::policyCode)
                 .contains(cap2026Code)
                 .doesNotContain(cap2027Code);
 
-        List<PolicyVersionRow> afterEffectiveTo = policyMapper.selectPolicyVersions(
+        List<PolicyVersionResponse> afterEffectiveTo = policyQueryService.findPolicyVersions(
                 PolicyType.CAP_1200, LocalDate.of(2027, 1, 1), null);
-        assertThat(afterEffectiveTo).extracting(PolicyVersionRow::getPolicyCode)
+        assertThat(afterEffectiveTo).extracting(PolicyVersionResponse::policyCode)
                 .contains(cap2027Code)
                 .doesNotContain(cap2026Code);
     }
 
     @Test
     void typeAndStatusFiltersNarrowTheList() {
-        List<PolicyVersionRow> capOnly = policyMapper.selectPolicyVersions(PolicyType.CAP_1200, null, null);
-        assertThat(capOnly).extracting(PolicyVersionRow::getPolicyCode)
+        List<PolicyVersionResponse> capOnly = policyQueryService.findPolicyVersions(PolicyType.CAP_1200, null, null);
+        assertThat(capOnly).extracting(PolicyVersionResponse::policyCode)
                 .contains(cap2026Code, cap2027Code)
                 .doesNotContain(currentCode);
 
@@ -104,54 +112,95 @@ class PolicyMapperIntegrationTest {
                 """, writerId, approverId, currentId);
         jdbcTemplate.update("UPDATE fgc.policy_version SET status = 'ACTIVE' WHERE policy_version_id = ?", currentId);
 
-        List<PolicyVersionRow> activeOnly = policyMapper.selectPolicyVersions(null, null, PolicyStatus.ACTIVE);
-        assertThat(activeOnly).extracting(PolicyVersionRow::getPolicyCode)
+        List<PolicyVersionResponse> activeOnly = policyQueryService.findPolicyVersions(null, null, PolicyStatus.ACTIVE);
+        assertThat(activeOnly).extracting(PolicyVersionResponse::policyCode)
                 .contains(currentCode)
                 .doesNotContain(cap2026Code, cap2027Code);
+
+        assertThat(activeOnly).filteredOn(row -> row.policyVersionId().equals(currentId))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.createdBy()).isEqualTo("it_writer_" + suffix);
+                    assertThat(row.approvedBy()).isEqualTo("it_approver_" + suffix);
+                    assertThat(row.approvedAt()).isNotNull();
+                    assertThat(row.status()).isEqualTo(PolicyStatus.ACTIVE);
+                    assertThat(row.statusLabel()).isEqualTo(PolicyStatus.ACTIVE.label());
+                });
+        PolicyVersionResponse header = policyQueryService.findPolicyDetail(currentId).header();
+        assertThat(header.createdBy()).isEqualTo("it_writer_" + suffix);
+        assertThat(header.approvedBy()).isEqualTo("it_approver_" + suffix);
+        assertThat(header.approvedAt()).isNotNull();
     }
 
     @Test
     void textArrayColumnsAreMappedToLists() {
-        PolicyVersionRow row = policyMapper.selectPolicyVersionById(cap2026Id);
+        PolicyDetailResponse detail = policyQueryService.findPolicyDetail(cap2026Id);
+        PolicyVersionResponse row = detail.header();
 
         assertThat(row).isNotNull();
-        assertThat(row.getRegulationRefs()).containsExactly("REG-08", "REG-09");
-        assertThat(row.getSourceRefs()).containsExactly("SRC-002");
-        assertThat(row.getStatus()).isEqualTo("DRAFT");
+        assertThat(row.regulationRefs()).containsExactly("REG-08", "REG-09");
+        assertThat(detail.sourceRefs()).containsExactly("SRC-002");
+        assertThat(row.status()).isEqualTo(PolicyStatus.DRAFT);
+        assertThat(row.statusLabel()).isEqualTo(PolicyStatus.DRAFT.label());
+        assertThat(row.policyType()).isEqualTo(PolicyType.CAP_1200);
+        assertThat(row.policyTypeLabel()).isEqualTo(PolicyType.CAP_1200.label());
+        assertThat(row.sourceClass()).isEqualTo(PolicySourceClass.GA_POLICY);
+        assertThat(row.sourceClassLabel()).isEqualTo(PolicySourceClass.GA_POLICY.label());
+        assertThat(row.createdBy()).isNull();
+        assertThat(row.approvedBy()).isNull();
+        assertThat(row.approvedAt()).isNull();
 
-        PolicyVersionRow empty = policyMapper.selectPolicyVersionById(cap2027Id);
-        assertThat(empty.getSourceRefs()).isEmpty();
+        PolicyDetailResponse empty = policyQueryService.findPolicyDetail(currentId);
+        assertThat(empty.sourceRefs()).isEmpty();
+        assertThat(empty.header().regulationRefs()).isEmpty();
+        assertThat(empty.commissionRules()).isEmpty();
+        assertThat(empty.capRuleSets()).isEmpty();
+        assertThat(empty.refundRateTables()).isEmpty();
+
+        assertThat(policyQueryService.findPolicyVersions(PolicyType.CAP_1200, null, null))
+                .filteredOn(version -> version.policyVersionId().equals(cap2026Id))
+                .singleElement()
+                .satisfies(version -> assertThat(version.regulationRefs()).containsExactly("REG-08", "REG-09"));
     }
 
     @Test
-    void returnsNullForAnUnknownPolicyVersionId() {
-        assertThat(policyMapper.selectPolicyVersionById(-1L)).isNull();
+    void rejectsAnUnknownPolicyVersionIdWithTheExistingNotFoundError() {
+        assertThatThrownBy(() -> policyQueryService.findPolicyDetail(-1L))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_004);
+                    assertThat(exception.getParams()).containsEntry("id", -1L);
+                });
     }
 
     @Test
     void selectsCommissionRulesWithItemNames() {
         Long itemId = insertCommissionItem("IT_RULE_" + suffix, "통합 테스트 규칙 항목");
-        insertCommissionRule(currentId, itemId, "RATE", "650.000000", null, 100);
         insertCommissionRule(currentId, itemId, "FIXED", null, "500000.00", 200);
+        insertCommissionRule(currentId, itemId, "RATE", "650.000000", null, 100);
 
-        List<CommissionRuleRow> rules = policyMapper.selectCommissionRules(currentId);
+        List<CommissionRuleResponse> rules = policyQueryService.findPolicyDetail(currentId).commissionRules();
 
         assertThat(rules).hasSize(2);
+        assertThat(rules).extracting(CommissionRuleResponse::calculationType)
+                .containsExactly("RATE", "FIXED");
         assertThat(rules).allSatisfy(rule -> {
-            assertThat(rule.getItemName()).isEqualTo("통합 테스트 규칙 항목");
-            assertThat(rule.getPaymentStage()).isEqualTo("GA_TO_FC");
+            assertThat(rule.itemName()).isEqualTo("통합 테스트 규칙 항목");
+            assertThat(rule.paymentStage()).isEqualTo(PaymentStage.GA_TO_FC);
+            assertThat(rule.paymentStageLabel()).isEqualTo(PaymentStage.GA_TO_FC.label());
+            assertThat(rule.insurerName()).isNull();
+            assertThat(rule.productName()).isNull();
         });
-        assertThat(rules).filteredOn(r -> "RATE".equals(r.getCalculationType()))
+        assertThat(rules).filteredOn(r -> "RATE".equals(r.calculationType()))
                 .singleElement()
                 .satisfies(r -> {
-                    assertThat(r.getRatePct()).isEqualByComparingTo("650.000000");
-                    assertThat(r.getFixedAmount()).isNull();
+                    assertThat(r.ratePct()).isEqualTo("650.000000");
+                    assertThat(r.fixedAmount()).isNull();
                 });
-        assertThat(rules).filteredOn(r -> "FIXED".equals(r.getCalculationType()))
+        assertThat(rules).filteredOn(r -> "FIXED".equals(r.calculationType()))
                 .singleElement()
                 .satisfies(r -> {
-                    assertThat(r.getFixedAmount()).isEqualByComparingTo("500000.00");
-                    assertThat(r.getRatePct()).isNull();
+                    assertThat(r.fixedAmount()).isEqualTo(500000L);
+                    assertThat(r.ratePct()).isNull();
                 });
     }
 
@@ -166,27 +215,28 @@ class PolicyMapperIntegrationTest {
         insertCapRuleItem(insToGaSetId, excludedItemId, false);
         insertCapRuleItem(gaToFcSetId, includedItemId, true);
 
-        List<CapRuleSetRow> sets = policyMapper.selectCapRuleSets(cap2026Id);
+        List<CapRuleSetResponse> sets = policyQueryService.findPolicyDetail(cap2026Id).capRuleSets();
 
         assertThat(sets).hasSize(2);
-        assertThat(sets).extracting(CapRuleSetRow::getPaymentStage)
-                .containsExactly("GA_TO_FC", "INSURER_TO_GA");
-        assertThat(sets).filteredOn(s -> "INSURER_TO_GA".equals(s.getPaymentStage()))
+        assertThat(sets).extracting(CapRuleSetResponse::paymentStage)
+                .containsExactly(PaymentStage.GA_TO_FC, PaymentStage.INSURER_TO_GA);
+        assertThat(sets).filteredOn(s -> PaymentStage.INSURER_TO_GA == s.paymentStage())
                 .singleElement()
                 .satisfies(s -> {
-                    assertThat(s.getComplianceDeductionPct()).isEqualByComparingTo("3.0000");
-                    assertThat(s.getItems()).hasSize(2);
-                    assertThat(s.getItems())
-                            .filteredOn(i -> "EXCLUDED".equals(i.getInclusionStatus()))
+                    assertThat(s.complianceDeductionPct()).isEqualTo("3.0000");
+                    assertThat(s.items()).extracting(CapRuleItemResponse::itemCode)
+                            .containsExactly("IT_EXC_" + suffix, "IT_INC_" + suffix);
+                    assertThat(s.items())
+                            .filteredOn(i -> "EXCLUDED".equals(i.inclusionStatus()))
                             .singleElement()
                             .satisfies(i -> {
-                                assertThat(i.getExclusionType()).isEqualTo("NEWCOMER_SUPPORT");
-                                assertThat(i.getEvidenceRequiredYn()).isTrue();
+                                assertThat(i.exclusionType()).isEqualTo("NEWCOMER_SUPPORT");
+                                assertThat(i.evidenceRequiredYn()).isTrue();
                             });
                 });
-        assertThat(sets).filteredOn(s -> "GA_TO_FC".equals(s.getPaymentStage()))
+        assertThat(sets).filteredOn(s -> PaymentStage.GA_TO_FC == s.paymentStage())
                 .singleElement()
-                .satisfies(s -> assertThat(s.getItems()).hasSize(1));
+                .satisfies(s -> assertThat(s.items()).hasSize(1));
     }
 
     @Test
@@ -199,20 +249,64 @@ class PolicyMapperIntegrationTest {
         insertRefundRateLine(table240Id, 1, "2.900000");
         insertRefundRateLine(table120Id, 1, "3.100000");
 
-        List<RefundRateTableRow> tables = policyMapper.selectRefundRateTables(cap2026Id);
+        List<RefundRateTableResponse> tables = policyQueryService.findPolicyDetail(cap2026Id).refundRateTables();
 
         assertThat(tables).hasSize(2);
-        assertThat(tables).extracting(RefundRateTableRow::getPaymentTermMonths)
+        assertThat(tables).extracting(RefundRateTableResponse::paymentTermMonths)
                 .containsExactly(120, 240);
-        assertThat(tables).filteredOn(t -> t.getPaymentTermMonths() == 240)
+        assertThat(tables).filteredOn(t -> t.paymentTermMonths() == 240)
                 .singleElement()
                 .satisfies(t -> {
-                    assertThat(t.getInsurerName()).isEqualTo("통합 테스트 보험");
-                    assertThat(t.getProductName()).isEqualTo("통합 테스트 종신");
+                    assertThat(t.insurerName()).isEqualTo("통합 테스트 보험");
+                    assertThat(t.productName()).isEqualTo("통합 테스트 종신");
                     // 차월 순 정렬 — 입력은 2, 1 순서였다
-                    assertThat(t.getLines()).extracting(l -> l.getContractMonthNo())
+                    assertThat(t.lines()).extracting(RefundRateLineResponse::contractMonthNo)
                             .containsExactly(1, 2);
+                    assertThat(t.lines()).extracting(RefundRateLineResponse::refundRatePct)
+                            .containsExactly("2.900000", "5.800000");
                 });
+    }
+
+    @Test
+    void retainsCapRuleSetsAndRefundRateTablesWithoutChildren() {
+        Long capRuleSetId = insertCapRuleSet(cap2026Id, "GA_TO_FC", "0");
+        Long insurerId = insertInsurer();
+        Long productId = insertProduct(insurerId);
+        Long refundRateTableId = insertRefundRateTable(cap2026Id, insurerId, productId, 240);
+
+        PolicyDetailResponse detail = policyQueryService.findPolicyDetail(cap2026Id);
+
+        assertThat(detail.capRuleSets()).singleElement().satisfies(set -> {
+            assertThat(set.capRuleSetId()).isEqualTo(capRuleSetId);
+            assertThat(set.items()).isEmpty();
+        });
+        assertThat(detail.refundRateTables()).singleElement().satisfies(table -> {
+            assertThat(table.refundRateTableId()).isEqualTo(refundRateTableId);
+            assertThat(table.lines()).isEmpty();
+        });
+    }
+
+    @Test
+    void ordersVersionsByPolicyCodeThenVersionNumber() {
+        Long laterVersionId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.policy_version (
+                    policy_code, policy_name, policy_type, source_class, version_no,
+                    effective_from, status
+                ) VALUES (?, '두 번째 버전', 'CAP_1200', 'GA_POLICY', 2, DATE '2027-01-01', 'DRAFT')
+                RETURNING policy_version_id
+                """, Long.class, cap2026Code);
+
+        assertThat(policyQueryService.findPolicyVersions(null, null, null))
+                .filteredOn(version -> List.of(cap2026Id, laterVersionId, cap2027Id, currentId)
+                        .contains(version.policyVersionId()))
+                .extracting(PolicyVersionResponse::policyVersionId)
+                .containsExactly(cap2026Id, laterVersionId, cap2027Id, currentId);
+    }
+
+    @Test
+    void returnsAnEmptyListWhenNoPolicyIsEffective() {
+        assertThat(policyQueryService.findPolicyVersions(null, LocalDate.of(1900, 1, 1), null))
+                .isEmpty();
     }
 
     private Long insertPolicyVersion(String code, PolicyType type, LocalDate from, LocalDate to,

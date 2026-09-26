@@ -29,7 +29,9 @@ public record OrganizationResponse(
         boolean activeYn
 ) {
     public static OrganizationResponse from(OrganizationRow row) {
-        OrganizationType type = OrganizationType.valueOf(row.organizationType());
+        OrganizationType type =
+                OrganizationType.valueOf(row.organizationType());
+
         return new OrganizationResponse(
                 row.organizationId(),
                 row.organizationCode(),

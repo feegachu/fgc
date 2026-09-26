@@ -2,15 +2,16 @@ package com.susukkang.fgc.base.service;
 
 import com.susukkang.fgc.base.dto.ProductResponse;
 import com.susukkang.fgc.base.dto.ProductSearchCriteria;
-import com.susukkang.fgc.base.mapper.ProductMapper;
+import com.susukkang.fgc.base.repository.ProductRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -23,7 +24,7 @@ public class ProductServiceImpl implements ProductService {
     private static final String SORT =
             "insurerProductCode,asc;offeringVersion,asc;channelCode,asc;productOfferingId,asc";
 
-    private final ProductMapper productMapper;
+    private final ProductRepository productRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -39,16 +40,11 @@ public class ProductServiceImpl implements ProductService {
         if (offsetLong > Integer.MAX_VALUE) {
             throw validationException("page");
         }
-        int offset = (int) offsetLong;
+        Page<ProductResponse> result = productRepository
+                .search(criteria.insurerId(), criteria.asOf(), PageRequest.of(page - 1, size))
+                .map(ProductResponse::from);
 
-        List<ProductResponse> content = productMapper
-                .selectProducts(criteria, offset, size)
-                .stream()
-                .map(ProductResponse::from)
-                .toList();
-        long totalElements = productMapper.countProducts(criteria);
-
-        return PageResponse.of(content, page, size, totalElements, SORT);
+        return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), SORT);
     }
 
     private void validateCriteria(ProductSearchCriteria criteria) {
