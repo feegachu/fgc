@@ -1,7 +1,7 @@
 package com.susukkang.fgc.journal.service;
 
-import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
-import com.susukkang.fgc.audit.mapper.AuditLogMapper;
+import com.susukkang.fgc.audit.entity.AuditLog;
+import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -27,6 +27,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * 설명 : 분개 초안과 라인 및 감사로그를 같은 독립 트랜잭션에서 저장한다.
+ *
+ * @author hjKang
+ * @version 1.0
+ * @since 2026-09-27
+ */
 @Slf4j
 @Service
 public class JournalPersistenceServiceImpl implements JournalPersistenceService {
@@ -38,18 +45,25 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
 
     private final JournalMapper journalMapper;
     private final JournalAccountMapper journalAccountMapper;
-    private final AuditLogMapper auditLogMapper;
+    private final AuditLogRepository auditLogRepository;
     private final ConstraintErrorCodeResolver constraintErrorCodeResolver;
     private final TransactionTemplate requiresNewTransactionTemplate;
 
+    /**
+     * 설명 : 분개 저장 의존성과 감사 Repository를 주입하고 REQUIRES_NEW 트랜잭션을 준비한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
     public JournalPersistenceServiceImpl(JournalMapper journalMapper,
                                           JournalAccountMapper journalAccountMapper,
-                                          AuditLogMapper auditLogMapper,
+                                          AuditLogRepository auditLogRepository,
                                           ConstraintErrorCodeResolver constraintErrorCodeResolver,
                                           PlatformTransactionManager transactionManager) {
         this.journalMapper = journalMapper;
         this.journalAccountMapper = journalAccountMapper;
-        this.auditLogMapper = auditLogMapper;
+        this.auditLogRepository = auditLogRepository;
         this.constraintErrorCodeResolver = constraintErrorCodeResolver;
         this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
         this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -143,6 +157,13 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
         return message.contains(constraintName);
     }
 
+    /**
+     * 설명 : 분개 번호를 채번하고 헤더·라인·감사로그를 저장하며 오류는 트랜잭션 호출자에게 전파한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
     private JournalHeaderRow attemptSave(JournalHeaderDraft draft, List<Long> journalAccountIds,
                                           Long createdBy, String requestId) {
         // 4. journal_no 채번
@@ -193,18 +214,17 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
             journalMapper.insertLine(lineRow);
         }
 
-        // 8. 감사 로그
-        auditLogMapper.insert(AuditLogInsertRow.builder()
-                .userId(createdBy)
-                .actionCode("JOURNAL_DRAFT_SAVED")
-                .entityType("JOURNAL_HEADER")
-                .entityId(String.valueOf(journalHeaderId))
-                .requestId(requestId)
-                .reason("journalType=" + draft.getJournalType()
-                        + ",sourceEntityType=" + draft.getSourceEntityType()
-                        + ",sourceEntityId=" + draft.getSourceEntityId()
-                        + ",validationRunId=" + draft.getValidationRunId())
-                .build());
+        // 2026-09-27 hjKang - 분개 감사 저장을 JPA Repository로 전환한다.
+        // 기존 코드: 저장 DTO를 MyBatis Mapper에 전달해 감사행을 추가했다.
+        // 문제: 공용 감사 저장이 JPA로 전환된 뒤에도 분개 저장은 XML 쿼리에 의존했다.
+        // 개선: 현재 REQUIRES_NEW 트랜잭션에서 엔티티를 저장·동기화해 헤더·라인과 함께 커밋하거나 롤백한다.
+        String reason = "journalType=" + draft.getJournalType()
+                + ",sourceEntityType=" + draft.getSourceEntityType()
+                + ",sourceEntityId=" + draft.getSourceEntityId()
+                + ",validationRunId=" + draft.getValidationRunId();
+        AuditLog auditLog = AuditLog.create(createdBy, "JOURNAL_DRAFT_SAVED", "JOURNAL_HEADER",
+                String.valueOf(journalHeaderId), null, null, reason, requestId, null, null);
+        auditLogRepository.saveAndFlush(auditLog);
 
         // 9. FINALIZED / POSTED / REVERSED 불변성
         return journalMapper.findBySourceKey(draft.getJournalType().name(),

@@ -15,7 +15,7 @@ import org.springframework.batch.core.JobExecutionListener;
  * 전이), 여기서 하는 일은 두 가지뿐이다.
  *
  *   1) beforeJob: RequestIdContext에 이번 실행의 requestId를 심어서, Step 안에서
- *      AuditLogMapper 등이 남기는 감사로그의 request_id가 이 배치 실행과 같은 값을 갖게함
+ *      감사 서비스가 남기는 감사로그의 request_id가 이 배치 실행과 같은 값을 갖게함
  *      afterJob의 finally에서 반드시 지움
  *
  *   2) afterJob: 9개 Step이 전부 BatchStatus.COMPLETED로 끝났으면 validation_run을
