@@ -8,6 +8,13 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
+/**
+ * 설명 : 정책 버전별 예상 해약환급률표와 차월별 환급률을 조회하는 Repository
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 public interface RefundRateTableRepository extends JpaRepository<RefundRateTable, Long> {
 
     // productOfferingId는 대표 예시이므로 상품명은 productId로 조회한다.

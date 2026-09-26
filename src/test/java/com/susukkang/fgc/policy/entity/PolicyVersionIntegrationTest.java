@@ -16,6 +16,13 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 설명 : 정책 버전의 enum·배열 및 DB 기본값 매핑을 검증하는 통합 테스트
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

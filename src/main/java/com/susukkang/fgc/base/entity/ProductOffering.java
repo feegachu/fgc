@@ -13,8 +13,9 @@ import java.time.LocalDate;
 /**
  * 설명 : 상품의 판매버전·채널 및 적용기간 매핑
  *
- * @version 1.0
- * @since 2026-09-25
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "product_offering")

@@ -7,11 +7,11 @@ import lombok.Getter;
 import java.time.LocalDate;
 
 /**
- * 설명 : Organization
+ * 설명 : 조직 기준정보 및 적용기간을 매핑하는 엔티티
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "organization")

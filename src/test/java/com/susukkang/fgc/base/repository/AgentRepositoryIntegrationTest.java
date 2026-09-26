@@ -23,7 +23,13 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 실제 PostgreSQL과 Flyway 스키마에서 설계사 조회 계약을 검증한다. */
+/**
+ * 설명 : 실제 PostgreSQL과 Flyway 스키마에서 설계사 조회 계약을 검증한다.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

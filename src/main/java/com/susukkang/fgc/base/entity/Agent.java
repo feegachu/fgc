@@ -16,11 +16,11 @@ import org.hibernate.annotations.Check;
 import java.time.LocalDate;
 
 /**
- * 설명 : Agent
+ * 설명 : 설계사 기준정보 및 재직·지원 자격 정보를 매핑하는 엔티티
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "agent", uniqueConstraints = {

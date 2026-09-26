@@ -30,7 +30,7 @@ import java.util.List;
  * 설명 : 정책 버전 및 적용기간·승인 정보
  *
  * @author hjKang
- * @version 1.0
+ * @version 1.1
  * @since 2026-09-26
  */
 @Entity

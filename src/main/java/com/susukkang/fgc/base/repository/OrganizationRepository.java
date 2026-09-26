@@ -11,11 +11,11 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 
 /**
- * 설명 : OrganizationRepository
+ * 설명 : 조직 기준정보 및 적용기간별 유효 조직을 조회하는 Repository
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 public interface OrganizationRepository extends JpaRepository<Organization,Long> {
     @Query(value = """

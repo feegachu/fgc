@@ -13,7 +13,11 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
- * 예상 해약환급률표의 차월별 환급률.
+ * 설명 : 예상 해약환급률표의 차월별 환급률.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "refund_rate_line", uniqueConstraints = {

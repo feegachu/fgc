@@ -13,7 +13,11 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * 지급단계·계약일·적용범위별 초년도 1,200% 한도 룰셋.
+ * 설명 : 지급단계·계약일·적용범위별 초년도 1,200% 한도 룰셋.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "cap_rule_set")

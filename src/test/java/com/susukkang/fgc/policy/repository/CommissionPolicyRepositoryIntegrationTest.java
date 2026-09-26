@@ -25,6 +25,13 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 설명 : 계약 조건에 따른 현행 수수료 정책 및 수수료 규칙 조회를 검증하는 통합 테스트
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

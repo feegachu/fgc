@@ -8,6 +8,13 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
+/**
+ * 설명 : 정책 버전별 한도 룰셋과 수수료 항목별 판정을 조회하는 Repository
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 public interface CapRuleSetRepository extends JpaRepository<CapRuleSet, Long> {
 
     @Query("""

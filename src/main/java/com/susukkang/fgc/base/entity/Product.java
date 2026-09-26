@@ -7,11 +7,11 @@ import lombok.Getter;
 import java.time.LocalDate;
 
 /**
- * 설명 : Product
+ * 설명 : 보험사별 상품 기준정보를 매핑하는 엔티티
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "product")

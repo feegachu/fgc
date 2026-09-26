@@ -11,11 +11,11 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 
 /**
- * 설명 : ProductRepository
+ * 설명 : 상품 판매버전 및 적용 환급률표의 납입기간을 조회하는 Repository
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 public interface ProductRepository extends JpaRepository<Product, Long> {
 

@@ -13,11 +13,11 @@ import org.hibernate.annotations.Check;
 import java.time.LocalDate;
 
 /**
- * 설명 : CommissionItem
+ * 설명 : 수수료 항목의 코드·분류 및 적용기간을 매핑하는 엔티티
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "commission_item", uniqueConstraints = {

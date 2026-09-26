@@ -17,7 +17,13 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 실제 PostgreSQL 행을 읽어 기존 직급 enum과 설계사 엔티티의 매핑을 검증한다. */
+/**
+ * 설명 : 실제 PostgreSQL 행을 읽어 기존 직급 enum과 설계사 엔티티의 매핑을 검증한다.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

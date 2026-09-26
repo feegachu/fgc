@@ -10,11 +10,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 설명 : CommissionItemRepository
+ * 설명 : 기준일에 유효한 수수료 항목을 조회하는 Repository
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 public interface CommissionItemRepository extends JpaRepository<CommissionItem,Long> {
     @Query(value = """

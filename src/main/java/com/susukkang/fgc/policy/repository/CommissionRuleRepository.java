@@ -11,7 +11,13 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-/** 정책 상세 및 계약에 적용할 수수료 규칙 조회. */
+/**
+ * 설명 : 정책 상세 및 계약에 적용할 수수료 규칙 조회.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 public interface CommissionRuleRepository extends JpaRepository<CommissionRule, Long> {
 
     @Query("""

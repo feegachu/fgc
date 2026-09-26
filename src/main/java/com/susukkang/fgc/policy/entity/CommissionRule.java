@@ -26,7 +26,13 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/** 정책 버전의 적용 범위 및 회차별 수수료 계산 규칙. */
+/**
+ * 설명 : 정책 버전의 적용 범위 및 회차별 수수료 계산 규칙.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 @Entity
 @Table(name = "commission_rule")
 @SqlResultSetMapping(

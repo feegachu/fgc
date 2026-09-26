@@ -15,8 +15,8 @@ import java.time.LocalDate;
  * 설명 : 설계사 기준정보 및 조직 계층별 활성 설계사 조회 Repository
  *
  * @author hjKang
- * @version 1.0
- * @since 2026-09-25
+ * @version 1.1
+ * @since 2026-09-26
  */
 public interface AgentRepository extends JpaRepository<Agent, Long> {
 

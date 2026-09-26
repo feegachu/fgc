@@ -25,8 +25,12 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 실제 PostgreSQL과 Flyway 스키마에서 조직 조회 계약을 검증한다.
+ * 설명 : 실제 PostgreSQL과 Flyway 스키마에서 조직 조회 계약을 검증한다.
  * 테스트 데이터는 각 테스트의 트랜잭션이 끝날 때 롤백된다.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
  */
 @DataJpaTest
 @ActiveProfiles("test")

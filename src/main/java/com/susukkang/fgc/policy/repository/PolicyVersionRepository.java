@@ -14,6 +14,13 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * 설명 : 정책 버전 목록 및 계약에 적용할 현행 수수료 정책을 조회하는 Repository
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
+ */
 public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Long> {
 
     @Query("""

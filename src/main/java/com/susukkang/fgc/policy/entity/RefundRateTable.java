@@ -18,7 +18,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 상품·납입기간·채널별 예상 해약환급률표의 헤더.
+ * 설명 : 상품·납입기간·채널별 예상 해약환급률표의 헤더.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "refund_rate_table", uniqueConstraints = {

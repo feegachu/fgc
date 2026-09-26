@@ -12,7 +12,11 @@ import lombok.Getter;
 import java.time.OffsetDateTime;
 
 /**
- * 한도 룰셋에 속한 수수료 항목별 산입·제외·검토 판정.
+ * 설명 : 한도 룰셋에 속한 수수료 항목별 산입·제외·검토 판정.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
  */
 @Entity
 @Table(name = "cap_rule_item", uniqueConstraints = {

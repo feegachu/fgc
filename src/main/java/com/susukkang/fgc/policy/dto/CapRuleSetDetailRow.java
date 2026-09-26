@@ -4,7 +4,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 룰셋과 항목을 함께 조회한 한 행. 항목이 없는 룰셋은 항목 필드가 null이다.
+ * 설명 : 룰셋과 항목을 함께 조회한 한 행. 항목이 없는 룰셋은 항목 필드가 null이다.
+ *
+ * @author hjKang
+ * @version 1.1
+ * @since 2026-09-26
  */
 public record CapRuleSetDetailRow(
         Long capRuleSetId,
