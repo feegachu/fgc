@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * #75 "상태 전이와 필수 감사 로그 저장은 동일 트랜잭션 경계에서 처리하여 감사 로그 누락
  * 상태가 발생하지 않도록 한다"를 실제 DB로 증명한다. mock으로는 진짜 롤백 여부를 증명할
- * 수 없다 — @Transactional이 실제로 두 매퍼 호출을 하나의 커밋 단위로 묶는지는 실제
+ * 수 없다 — @Transactional이 실제로 업무 Mapper와 감사 Repository를 하나의 커밋 단위로 묶는지는 실제
  * PlatformTransactionManager와 실제 커넥션이 있어야만 확인된다.
  *
  * 감사로그(audit_log) INSERT를 일부러 실패시키는 방법: audit_log.user_id는

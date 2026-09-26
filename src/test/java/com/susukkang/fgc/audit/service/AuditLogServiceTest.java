@@ -1,8 +1,8 @@
 package com.susukkang.fgc.audit.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
-import com.susukkang.fgc.audit.mapper.AuditLogMapper;
+import com.susukkang.fgc.audit.entity.AuditLog;
+import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import org.junit.jupiter.api.AfterEach;
@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Map;
@@ -25,33 +26,56 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 /**
- * FUN-061 공통 감사 기록 서비스 단위 테스트.
+ * 설명 : FUN-061 공통 감사 기록 서비스 단위 테스트.
  * 기록 실패가 예외로 전파되는지(기록률 100% — 업무 트랜잭션 동반 롤백)와
  * 컬럼 길이 clamp(감사행 조용한 유실 방지)를 검증한다.
+ *
+ * @author hjKang
+ * @version 1.0
+ * @since 2026-09-26
  */
 @ExtendWith(MockitoExtension.class)
 class AuditLogServiceTest {
 
     @Mock
-    private AuditLogMapper auditLogMapper;
+    private AuditLogRepository auditLogRepository;
 
     private AuditLogService auditLogService;
 
+    /**
+     * 설명 : 감사 저장 Repository 모의 객체와 JSON 변환기를 사용하는 서비스를 준비한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-26
+     */
     @BeforeEach
     void setUp() {
-        auditLogService = new AuditLogService(auditLogMapper, new ObjectMapper());
+        auditLogService = new AuditLogService(auditLogRepository, new ObjectMapper());
     }
 
+    /**
+     * 설명 : 테스트 간 인증 정보가 공유되지 않도록 SecurityContext를 비운다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-26
+     */
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
     }
 
+    /**
+     * 설명 : 변경 전후 값의 JSON 직렬화와 감사 대상 및 사유의 컬럼 길이 제한을 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-26
+     */
     @Test
     @DisplayName("before/after 를 JSON 으로 직렬화하고 entityId·reason 을 컬럼 길이로 자른다")
     void serializesValuesAndClampsLengths() {
-        given(auditLogMapper.insert(any())).willReturn(1);
-
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode("CONTRACT_CREATED")
                 .entityType("CONTRACT")
@@ -63,23 +87,25 @@ class AuditLogServiceTest {
                 .policyVersionId(3L)
                 .build());
 
-        ArgumentCaptor<AuditLogInsertRow> captor = ArgumentCaptor.forClass(AuditLogInsertRow.class);
-        verify(auditLogMapper).insert(captor.capture());
-        AuditLogInsertRow row = captor.getValue();
-        assertThat(row.getActionCode()).isEqualTo("CONTRACT_CREATED");
-        assertThat(row.getEntityType()).isEqualTo("CONTRACT");
-        assertThat(row.getEntityId()).hasSize(100);
-        assertThat(row.getReason()).hasSize(1000);
-        assertThat(row.getUserId()).isEqualTo(12L);
-        assertThat(row.getBeforeValue()).isEqualTo("{\"status\":\"DRAFT\"}");
-        assertThat(row.getAfterValue()).isEqualTo("{\"status\":\"CONFIRMED\"}");
-        assertThat(row.getPolicyVersionId()).isEqualTo(3L);
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue())
+                .extracting("auditLogId", "actionCode", "entityType", "entityId", "reason", "userId",
+                        "beforeValue", "afterValue", "policyVersionId")
+                .containsExactly(null, "CONTRACT_CREATED", "CONTRACT", "x".repeat(100), "r".repeat(1000),
+                        12L, "{\"status\":\"DRAFT\"}", "{\"status\":\"CONFIRMED\"}", 3L);
     }
 
+    /**
+     * 설명 : 사용자 ID가 지정되지 않으면 인증 주체의 사용자 ID로 기록되는지 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-26
+     */
     @Test
     @DisplayName("userId 를 지정하지 않으면 SecurityContext 의 로그인 사용자로 해석한다")
     void resolvesUserIdFromSecurityContext() {
-        given(auditLogMapper.insert(any())).willReturn(1);
         AppUserView view = new AppUserView();
         view.setUserId(7L);
         view.setLoginId("settle01");
@@ -96,40 +122,47 @@ class AuditLogServiceTest {
                 .entityId("1")
                 .build());
 
-        ArgumentCaptor<AuditLogInsertRow> captor = ArgumentCaptor.forClass(AuditLogInsertRow.class);
-        verify(auditLogMapper).insert(captor.capture());
-        assertThat(captor.getValue().getUserId()).isEqualTo(7L);
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue()).extracting("userId").isEqualTo(7L);
     }
 
+    /**
+     * 설명 : 사용자 및 인증 정보가 없는 감사 기록의 사용자 ID와 변경 값이 null로 유지되는지 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-26
+     */
     @Test
     @DisplayName("로그인 사용자도 명시 userId 도 없으면 null(배치 표기 BATCH)로 남긴다")
     void leavesUserIdNullWithoutAuthentication() {
-        given(auditLogMapper.insert(any())).willReturn(1);
-
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode("VALIDATION_RUN_STARTED")
                 .entityType("VALIDATION_RUN")
                 .entityId("1")
                 .build());
 
-        ArgumentCaptor<AuditLogInsertRow> captor = ArgumentCaptor.forClass(AuditLogInsertRow.class);
-        verify(auditLogMapper).insert(captor.capture());
-        assertThat(captor.getValue().getUserId()).isNull();
-        assertThat(captor.getValue().getBeforeValue()).isNull();
-        assertThat(captor.getValue().getAfterValue()).isNull();
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue()).extracting("userId", "beforeValue", "afterValue")
+                .containsOnlyNulls();
     }
 
+    /**
+     * 설명 : 감사 저장 중 발생한 DB 예외가 업무 호출자에게 그대로 전파되는지 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-26
+     */
     @Test
-    @DisplayName("INSERT 가 1행이 아니면 예외를 던져 호출자 트랜잭션을 롤백시킨다 — 기록률 100% 인수조건")
-    void throwsWhenInsertDoesNotAffectOneRow() {
-        given(auditLogMapper.insert(any())).willReturn(0);
+    void propagatesDatabaseFailureToBusinessCaller() {
+        var failure = new DataIntegrityViolationException("audit unavailable");
+        given(auditLogRepository.saveAndFlush(any())).willThrow(failure);
 
         assertThatThrownBy(() -> auditLogService.record(AuditLogService.AuditEvent.builder()
-                .actionCode("CONTRACT_UPDATED")
-                .entityType("CONTRACT")
-                .entityId("9")
-                .build()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("CONTRACT_UPDATED");
+                .actionCode("CONTRACT_UPDATED").entityType("CONTRACT").entityId("9").build()))
+                .isSameAs(failure);
     }
 }
