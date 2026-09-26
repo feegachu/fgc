@@ -12,11 +12,23 @@ public interface CapRuleSetRepository extends JpaRepository<CapRuleSet, Long> {
 
     @Query("""
             SELECT new com.susukkang.fgc.policy.dto.CapRuleSetDetailRow(
-                crs.capRuleSetId, crs.paymentStage, crs.contractDateFrom, crs.contractDateTo,
-                crs.firstYearMonths, crs.premiumMultiplier, crs.complianceDeductionPct,
-                crs.refundAdditionCondition, crs.warningUsagePct,
-                cri.capRuleItemId, ci.itemCode, ci.itemName, cri.inclusionStatus,
-                cri.exclusionType, cri.evidenceRequiredYn, cri.attributionMethod, cri.decisionReason)
+                crs.capRuleSetId,
+                crs.paymentStage,
+                crs.contractDateFrom,
+                crs.contractDateTo,
+                crs.firstYearMonths,
+                crs.premiumMultiplier,
+                crs.complianceDeductionPct,
+                crs.refundAdditionCondition,
+                crs.warningUsagePct,
+                cri.capRuleItemId,
+                ci.itemCode,
+                ci.itemName,
+                cri.inclusionStatus,
+                cri.exclusionType,
+                cri.evidenceRequiredYn,
+                cri.attributionMethod,
+                cri.decisionReason)
             FROM CapRuleSet crs
             LEFT JOIN CapRuleItem cri ON cri.capRuleSetId = crs.capRuleSetId
             LEFT JOIN CommissionItem ci ON ci.commissionItemId = cri.commissionItemId

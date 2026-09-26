@@ -13,11 +13,19 @@ public interface RefundRateTableRepository extends JpaRepository<RefundRateTable
     // productOfferingId는 대표 예시이므로 상품명은 productId로 조회한다.
     @Query("""
             SELECT new com.susukkang.fgc.policy.dto.RefundRateTableDetailRow(
-                rrt.refundRateTableId, i.insurerName, p.productName,
-                rrt.paymentTermMonths, rrt.channelCode, rrt.averageDeclaredRatePct,
-                rrt.standardDeduction80Yn, rrt.effectiveFrom, rrt.effectiveTo,
-                rrt.sourceProductCode, rrt.sourceDocumentRef,
-                rrl.contractMonthNo, rrl.refundRatePct)
+                rrt.refundRateTableId,
+                i.insurerName,
+                p.productName,
+                rrt.paymentTermMonths,
+                rrt.channelCode,
+                rrt.averageDeclaredRatePct,
+                rrt.standardDeduction80Yn,
+                rrt.effectiveFrom,
+                rrt.effectiveTo,
+                rrt.sourceProductCode,
+                rrt.sourceDocumentRef,
+                rrl.contractMonthNo,
+                rrl.refundRatePct)
             FROM RefundRateTable rrt
             JOIN Insurer i ON i.insurerId = rrt.insurerId
             JOIN Product p ON p.productId = rrt.productId

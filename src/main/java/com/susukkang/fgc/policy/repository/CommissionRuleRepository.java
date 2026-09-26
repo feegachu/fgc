@@ -16,10 +16,21 @@ public interface CommissionRuleRepository extends JpaRepository<CommissionRule, 
 
     @Query("""
             SELECT new com.susukkang.fgc.policy.dto.CommissionRuleRow(
-                cr.commissionRuleId, CAST(cr.paymentStage AS String), i.insurerName, p.productName,
-                CAST(cr.agentRankCode AS String), ci.itemCode, ci.itemName,
-                CAST(cr.feeComponentType AS String), cr.installmentFrom, cr.installmentTo,
-                CAST(cr.calculationType AS String), cr.basisCode, cr.ratePct, cr.fixedAmount, cr.priorityNo
+                cr.commissionRuleId,
+                CAST(cr.paymentStage AS String),
+                i.insurerName,
+                p.productName,
+                CAST(cr.agentRankCode AS String),
+                ci.itemCode,
+                ci.itemName,
+                CAST(cr.feeComponentType AS String),
+                cr.installmentFrom,
+                cr.installmentTo,
+                CAST(cr.calculationType AS String),
+                cr.basisCode,
+                cr.ratePct,
+                cr.fixedAmount,
+                cr.priorityNo
             )
             FROM CommissionRule cr
             JOIN CommissionItem ci ON ci.commissionItemId = cr.commissionItemId
