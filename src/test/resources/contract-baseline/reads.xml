@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- Read-only benchmark fixture from 99abe1d13dfb36bc22ba73b83c41ea73edd3a9e5.
+     SQL is unchanged; only namespace and the deleted DTO's test-only type name differ.
+     Kept outside mapper/** so application MapperScan never loads these statements. -->
+<mapper namespace="contractBaseline">
+<select id="selectByCondition"
+            resultType="com.susukkang.fgc.contract.dto.ContractView">
+        SELECT
+            ic.contract_id AS contract_id,
+            ic.contract_no AS contract_no,
+            i.insurer_name AS insurer_name,
+            p.product_name AS product_name,
+            ic.contract_date AS contract_date,
+            ic.monthly_equivalent_first_premium AS monthly_equivalent_first_premium,
+            CONCAT('FC-', LPAD(a.agent_id::text, 4, '0'), ' ', a.agent_name) AS agent_id_name,
+            ic.current_status AS contract_status,
+            cc.result_status AS cap_result_status,
+            ic.data_origin AS data_origin
+        FROM insurance_contract ic --계약
+            JOIN insurer i         --보험회사 이름 가져와야함
+                ON i.insurer_id = ic.insurer_id
+            JOIN product_offering po --상품판매 버전을 가져와서 상품 테이블 JOIN
+                ON po.product_offering_id = ic.product_offering_id
+            JOIN product p           --상품판매 버전 id로
+                ON p.product_id = po.product_id
+            JOIN agent a              -- 설계사 번호 , 이름
+                ON a.agent_id = ic.agent_id
+            LEFT JOIN fgc.vw_latest_cap_check cc --1200% 한도 가장 최근껄 가져옴
+                ON cc.contract_id = ic.contract_id
+            AND cc.payment_stage = 'GA_TO_FC'
+            -- mapper로 받는 매개변수가 2개 이상일 경우 condition. 을 붙여 명시
+        <where>
+            <if test="condition.contractNo != null and condition.contractNo != ''">
+                AND ic.contract_no
+                LIKE CONCAT('%', #{condition.contractNo}, '%')
+            </if>
+
+            <if test="condition.insurerId != null">
+                AND ic.insurer_id = #{condition.insurerId}
+            </if>
+
+            <if test="condition.productOfferingId != null">
+                AND ic.product_offering_id = #{condition.productOfferingId}
+            </if>
+
+            <if test="condition.agentId != null">
+                AND ic.agent_id = #{condition.agentId}
+            </if>
+
+            <if test="condition.orgId != null">
+                AND ic.organization_id = #{condition.orgId}
+            </if>
+
+            <if test="condition.capResultStatus != null">
+                AND cc.result_status = #{condition.capResultStatus}
+            </if>
+
+            <if test="condition.currentStatus != null">
+                AND ic.current_status = #{condition.currentStatus}
+            </if>
+
+            <if test="condition.contractDateFrom != null">
+                AND ic.contract_date
+                <![CDATA[ >= ]]>
+                #{condition.contractDateFrom}
+            </if>
+
+            <if test="condition.contractDateTo != null">
+                AND ic.contract_date
+                <![CDATA[ <= ]]>
+                #{condition.contractDateTo}
+            </if>
+        </where>
+        ORDER BY ic.contract_id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+<select id="countByCondition"
+            parameterType="com.susukkang.fgc.contract.dto.ContractSearchCondition"
+            resultType="long">
+        SELECT COUNT(*)
+        FROM fgc.insurance_contract ic
+        JOIN fgc.insurer i
+        ON i.insurer_id = ic.insurer_id
+        JOIN fgc.product_offering po
+        ON po.product_offering_id = ic.product_offering_id
+        JOIN fgc.product p
+        ON p.product_id = po.product_id
+        JOIN fgc.agent a
+        ON a.agent_id = ic.agent_id
+        LEFT JOIN fgc.vw_latest_cap_check cc
+        ON cc.contract_id = ic.contract_id
+        AND cc.payment_stage = 'GA_TO_FC'
+
+        <where>
+            <if test="contractNo != null and contractNo != ''">
+                AND ic.contract_no
+                LIKE CONCAT('%', #{contractNo}, '%')
+            </if>
+
+            <if test="insurerId != null">
+                AND ic.insurer_id = #{insurerId}
+            </if>
+
+            <if test="productOfferingId != null">
+                AND ic.product_offering_id =
+                #{productOfferingId}
+            </if>
+
+            <if test="agentId != null">
+                AND ic.agent_id = #{agentId}
+            </if>
+
+            <if test="orgId != null">
+                AND ic.organization_id = #{orgId}
+            </if>
+
+            <if test="capResultStatus != null">
+                AND cc.result_status =
+                #{capResultStatus}
+            </if>
+
+            <if test="currentStatus != null">
+                AND ic.current_status =
+                #{currentStatus}
+            </if>
+
+            <if test="contractDateFrom != null">
+                AND ic.contract_date
+                <![CDATA[ >= ]]>
+                #{contractDateFrom}
+            </if>
+
+            <if test="contractDateTo != null">
+                AND ic.contract_date
+                <![CDATA[ <= ]]>
+                #{contractDateTo}
+            </if>
+        </where>
+    </select>
+<select id="selectAllByCondition"
+            resultType="com.susukkang.fgc.contract.dto.ContractView">
+        SELECT ic.contract_id AS contract_id,
+               ic.contract_no AS contract_no,
+               i.insurer_name AS insurer_name,
+               p.product_name AS product_name,
+               ic.contract_date AS contract_date,
+               ic.monthly_equivalent_first_premium AS monthly_equivalent_first_premium,
+               CONCAT('FC-', LPAD(a.agent_id::text, 4, '0'), ' ', a.agent_name) AS agent_id_name,
+               ic.current_status AS contract_status,
+               cc.result_status AS cap_result_status,
+               ic.data_origin AS data_origin
+          FROM insurance_contract ic
+          JOIN insurer i ON i.insurer_id = ic.insurer_id
+          JOIN product_offering po ON po.product_offering_id = ic.product_offering_id
+          JOIN product p ON p.product_id = po.product_id
+          JOIN agent a ON a.agent_id = ic.agent_id
+          LEFT JOIN fgc.vw_latest_cap_check cc
+            ON cc.contract_id = ic.contract_id
+           AND cc.payment_stage = 'GA_TO_FC'
+        <where>
+            <if test="condition.contractNo != null and condition.contractNo != ''">AND ic.contract_no LIKE CONCAT('%', #{condition.contractNo}, '%')</if>
+            <if test="condition.insurerId != null">AND ic.insurer_id = #{condition.insurerId}</if>
+            <if test="condition.productOfferingId != null">AND ic.product_offering_id = #{condition.productOfferingId}</if>
+            <if test="condition.agentId != null">AND ic.agent_id = #{condition.agentId}</if>
+            <if test="condition.orgId != null">AND ic.organization_id = #{condition.orgId}</if>
+            <if test="condition.capResultStatus != null">AND cc.result_status = #{condition.capResultStatus}</if>
+            <if test="condition.currentStatus != null">AND ic.current_status = #{condition.currentStatus}</if>
+            <if test="condition.contractDateFrom != null">AND ic.contract_date <![CDATA[ >= ]]> #{condition.contractDateFrom}</if>
+            <if test="condition.contractDateTo != null">AND ic.contract_date <![CDATA[ <= ]]> #{condition.contractDateTo}</if>
+        </where>
+        ORDER BY ic.contract_id DESC
+    </select>
+<select id="selectContractDetailById"
+            resultType="com.susukkang.fgc.contract.dto.ContractDetailResponse">
+        SELECT
+            ic.contract_id,
+            ic.insurer_id,
+            i.insurer_name,
+            ic.product_offering_id,
+            ic.contract_no,
+            p.product_name,
+            po.offering_version,
+            ic.contract_date,
+            ic.agent_id,
+            a.agent_name,
+            ic.organization_id,
+            o.organization_name,
+            ic.premium_per_cycle_amount,
+            ic.payment_cycle_code,
+            ic.first_premium_amount,
+            ic.monthly_equivalent_first_premium,
+            ic.payment_term_months,
+            ic.standard_surrender_deduction_amount,
+            ic.current_status AS contract_status,
+            ic.data_origin
+        FROM insurance_contract ic
+                 JOIN insurer i
+                      ON i.insurer_id = ic.insurer_id
+                 JOIN product_offering po
+                      ON ic.product_offering_id = po.product_offering_id
+                 JOIN product p
+                      ON p.product_id = po.product_id
+                 JOIN agent a
+                      ON a.agent_id = ic.agent_id
+                 JOIN organization o
+                      ON o.organization_id = ic.organization_id
+        WHERE ic.contract_id = #{contractId}
+    </select>
+<select id="selectContractById" parameterType="long" resultType="com.susukkang.fgc.contract.repository.BaselineContractRow">
+            SELECT
+                contract_id,
+                insurer_id,
+                product_offering_id,
+                contract_no,
+                contract_date,
+                agent_id,
+                organization_id,
+                premium_per_cycle_amount,
+                first_premium_amount,
+                monthly_equivalent_first_premium,
+                premium_conversion_rule_code,
+                payment_cycle_code,
+                payment_term_months,
+                standard_surrender_deduction_amount,
+                current_status,
+                data_origin,
+                updated_at
+            FROM insurance_contract
+            WHERE contract_id = #{id}
+    </select>
+<select id="findTransactionAttributionsByContractId" resultType="com.susukkang.fgc.contract.dto.ContractTransactionAttributionRow">
+        SELECT ct.commission_transaction_id, ct.settlement_month, ct.payment_stage,
+               ct.amount, ct.status, ct.source_type,
+               ta.transaction_attribution_id, ta.attributed_amount, ta.attribution_date,
+               ta.inclusion_status_snapshot AS inclusion_status,
+               ag.agent_id, ag.agent_name, ag.agent_code,
+               (SELECT COALESCE(SUM(ta2.attributed_amount), 0)
+                  FROM fgc.transaction_attribution ta2
+                 WHERE ta2.commission_transaction_id = ct.commission_transaction_id
+               ) AS transaction_attributed_total
+        FROM fgc.transaction_attribution ta
+        JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
+        LEFT JOIN fgc.agent ag ON ag.agent_id = ta.agent_id
+        WHERE ta.contract_id = #{contractId}
+        ORDER BY ct.commission_transaction_id, ta.attribution_seq
+    </select>
+<select id="findReconciliationResultsByContractId" resultType="com.susukkang.fgc.contract.dto.ContractReconciliationRow">
+        SELECT reconciliation_result_id, match_group_key, result_type,
+               expected_total_amount, actual_total_amount, difference_amount,
+               primary_reason_code, installment_no, commission_item_id, created_at
+        FROM fgc.reconciliation_result
+        WHERE contract_id = #{contractId}
+        ORDER BY created_at DESC, reconciliation_result_id DESC
+    </select>
+<select id="findJournalLinesByContractId" resultType="com.susukkang.fgc.contract.dto.ContractJournalLineRow">
+        SELECT h.journal_header_id, h.journal_no, h.journal_date, h.journal_type,
+               h.source_entity_type, h.source_entity_id, h.revision_no,
+               h.policy_version_id, h.validation_run_id, h.status, h.description,
+               l.line_no, a.account_code, a.account_name,
+               l.debit_amount, l.credit_amount, l.agent_id, l.payment_stage,
+               l.commission_item_id, l.memo
+        FROM fgc.journal_header h
+        JOIN fgc.journal_line l ON l.journal_header_id = h.journal_header_id
+        JOIN fgc.journal_account a ON a.journal_account_id = l.journal_account_id
+        WHERE h.contract_id = #{contractId}
+        ORDER BY h.journal_header_id, l.line_no
+    </select>
+</mapper>
