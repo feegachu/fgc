@@ -1,16 +1,23 @@
 package com.susukkang.fgc.validation.service;
 
-import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
-import com.susukkang.fgc.audit.mapper.AuditLogMapper;
+import com.susukkang.fgc.audit.entity.AuditLog;
+import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * 설명 : 검증 배치의 상태 전이를 감사로그로 기록하고 저장 실패를 호출자에게 전파한다.
+ *
+ * @author hjKang
+ * @version 1.0
+ * @since 2026-09-27
+ */
 @Service
 @RequiredArgsConstructor
 public class ValidationRunBatchAuditServiceImpl implements ValidationRunBatchAuditService {
 
-    private final AuditLogMapper auditLogMapper;
+    private final AuditLogRepository auditLogRepository;
 
     @Override
     public void recordStarted(Long validationRunId, MonthlyValidationJobParameters parameters) {
@@ -44,15 +51,23 @@ public class ValidationRunBatchAuditServiceImpl implements ValidationRunBatchAud
                 "FAILED validation_run retried (status reverted to RUNNING)");
     }
 
+    /**
+     * 설명 : 배치 실행자와 요청 식별자를 담은 감사 엔티티를 생성해 호출자의 트랜잭션에서 저장한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
     private void record(String actionCode, String entityType, Long entityId,
                         MonthlyValidationJobParameters parameters, String reason) {
-        int affected = auditLogMapper.insert(AuditLogInsertRow.builder()
-                .userId(parameters.triggeredBy()).actionCode(actionCode).entityType(entityType)
-                .entityId(String.valueOf(entityId)).reason(limit(reason, 1000))
-                .requestId(limit(parameters.requestId(), 80)).clientIp(null).build());
-        if (affected != 1) {
-            throw new IllegalStateException("Batch audit log insert failed: " + actionCode);
-        }
+        // 2026-09-27 hjKang - 배치 감사 저장을 JPA Repository로 전환한다.
+        // 기존 코드: MyBatis 저장 DTO와 INSERT 영향 행 수로 저장 결과를 확인했다.
+        // 문제: 배치 감사 경로만 별도의 XML 쿼리에 의존했다.
+        // 개선: 길이 보정과 배치 문맥을 유지하고 saveAndFlush 오류를 전파해 상태 변경도 함께 롤백한다.
+        AuditLog auditLog = AuditLog.create(parameters.triggeredBy(), actionCode, entityType,
+                String.valueOf(entityId), null, null, limit(reason, 1000),
+                limit(parameters.requestId(), 80), null, null);
+        auditLogRepository.saveAndFlush(auditLog);
     }
 
     private static String limit(String value, int length) {

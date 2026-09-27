@@ -1,7 +1,7 @@
 package com.susukkang.fgc.exceptioncase.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.susukkang.fgc.audit.mapper.AuditLogMapper;
+import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
@@ -42,13 +42,13 @@ class ExceptionCaseServiceTest {
     private ExceptionCaseActionMapper actionMapper;
 
     @Mock
-    private AuditLogMapper auditLogMapper;
+    private AuditLogRepository auditLogRepository;
 
     private ExceptionCaseService service;
 
     @BeforeEach
     void setUp() {
-        service = new ExceptionCaseService(queryMapper, actionMapper, auditLogMapper, new ObjectMapper());
+        service = new ExceptionCaseService(queryMapper, actionMapper, auditLogRepository, new ObjectMapper());
     }
 
     @Test

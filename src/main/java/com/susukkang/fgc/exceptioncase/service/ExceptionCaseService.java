@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
-import com.susukkang.fgc.audit.dto.AuditLogInsertRow;
-import com.susukkang.fgc.audit.mapper.AuditLogMapper;
+import com.susukkang.fgc.audit.entity.AuditLog;
+import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
@@ -43,7 +43,7 @@ public class ExceptionCaseService {
 
     private final ExceptionCaseQueryMapper exceptionCaseQueryMapper;
     private final ExceptionCaseActionMapper exceptionCaseActionMapper;
-    private final AuditLogMapper auditLogMapper;
+    private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
     /**
@@ -194,6 +194,13 @@ public class ExceptionCaseService {
                 exceptionCaseId, request, actionUserId, actionUserLoginId, true);
     }
 
+    /**
+     * 설명 : 예외 조치와 상태 변경 및 감사로그를 호출자의 같은 트랜잭션에서 저장한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
     private ExceptionActionResponse actionInternal(
             Long exceptionCaseId,
             ExceptionActionRequest request,
@@ -287,24 +294,16 @@ public class ExceptionCaseService {
             );
         }
 
-        // 6. 감사로그 INSERT
-        int audited = auditLogMapper.insert(
-                AuditLogInsertRow.builder()
-                        .actionCode("EXCEPTION_ACTION")
-                        .entityType("EXCEPTION_CASE")
-                        .entityId(String.valueOf(exceptionCaseId))
-                        .userId(actionUserId)
-                        .beforeValue(toJson(new ExceptionAuditValue(
-                                fromStatus, target.assignedTo(), null, null)))
-                        .afterValue(toJson(new ExceptionAuditValue(
-                                toStatus, assignedTo, actionType, request.evidenceRef())))
-                        .reason(request.reason())
-                        .requestId(RequestIdContext.current())
-                        .clientIp(null)
-                        .build());
-        if (audited != 1) {
-            throw new IllegalStateException("예외 처리 감사로그 저장에 실패했습니다.");
-        }
+        // 2026-09-27 hjKang - 예외 조치 감사 저장을 JPA Repository로 전환한다.
+        // 기존 코드: MyBatis 저장 DTO를 전달하고 INSERT 영향 행 수를 검사했다.
+        // 문제: 예외 처리 감사 경로가 별도의 XML 저장 쿼리에 의존했다.
+        // 개선: 변경 전후 JSON을 그대로 엔티티에 담고 저장 오류를 전파해 예외 상태·이력도 함께 롤백한다.
+        AuditLog auditLog = AuditLog.create(actionUserId, "EXCEPTION_ACTION", "EXCEPTION_CASE",
+                String.valueOf(exceptionCaseId),
+                toJson(new ExceptionAuditValue(fromStatus, target.assignedTo(), null, null)),
+                toJson(new ExceptionAuditValue(toStatus, assignedTo, actionType, request.evidenceRef())),
+                request.reason(), RequestIdContext.current(), null, null);
+        auditLogRepository.saveAndFlush(auditLog);
 
         return new ExceptionActionResponse(
                 null, // Mapper에서 generated key를 받으면 exceptionActionId 설정
