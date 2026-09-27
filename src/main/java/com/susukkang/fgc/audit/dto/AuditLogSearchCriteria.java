@@ -1,5 +1,7 @@
 package com.susukkang.fgc.audit.dto;
 
+import com.susukkang.fgc.common.util.DateUtil;
+
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -28,7 +30,7 @@ public record AuditLogSearchCriteria(
      * @since 2026-09-26
      */
     public OffsetDateTime fromTimestamp() {
-        return from == null ? null : from.atZone(ZoneId.systemDefault()).toOffsetDateTime();
+        return from == null ? null : from.atZone(DateUtil.SEOUL_ZONE).toOffsetDateTime();
     }
 
     /**
@@ -39,6 +41,6 @@ public record AuditLogSearchCriteria(
      * @since 2026-09-26
      */
     public OffsetDateTime toExclusiveTimestamp() {
-        return toExclusive == null ? null : toExclusive.atZone(ZoneId.systemDefault()).toOffsetDateTime();
+        return toExclusive == null ? null : toExclusive.atZone(DateUtil.SEOUL_ZONE).toOffsetDateTime();
     }
 }

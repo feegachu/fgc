@@ -5,6 +5,7 @@ import com.susukkang.fgc.audit.dto.AuditLogResponse;
 import com.susukkang.fgc.audit.dto.AuditLogSearchCriteria;
 import com.susukkang.fgc.audit.entity.AuditLog;
 import com.susukkang.fgc.audit.service.AuditLogQueryService;
+import com.susukkang.fgc.common.util.DateUtil;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,10 +21,11 @@ import org.springframework.jdbc.core.DataClassRowMapper;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,11 +80,55 @@ class AuditLogQueryRepositoryIntegrationTest {
     @Test
     void supportsSearchWithEveryOptionalFilterAbsent() {
         AuditLogSearchCriteria search = criteria(null, null, null, null, null, null);
-        long expected = jdbcTemplate.queryForObject("select count(*) from fgc.audit_log", Long.class);
 
-        assertThat(queryRepository.countAuditLogs(search)).isEqualTo(expected);
+        // 2026-09-27 hjKang - NULL 조건 검증을 다른 트랜잭션의 감사행 추가와 분리한다.
+        // 기존 코드: 별도 SELECT의 전체 건수를 기대값으로 비교했다.
+        // 문제: 두 조회 사이에 다른 트랜잭션이 커밋하면 기대 건수가 달라질 수 있었다.
+        // 개선: 현재 테스트의 fixture 3건 이상과 요청한 페이지 크기만 검증한다.
+        assertThat(queryRepository.countAuditLogs(search)).isGreaterThanOrEqualTo(3L);
         assertThat(queryRepository.selectAuditLogs(search, PageRequest.of(0, 2)))
-                .hasSize((int) Math.min(expected, 2));
+                .hasSize(2);
+    }
+
+    /**
+     * 설명 : 애플리케이션의 실제 DB 연결이 업무 기준 시간대인 Asia/Seoul을 사용하는지 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
+    @Test
+    void usesSeoulTimeZoneForDatabaseSession() {
+        assertThat(jdbcTemplate.queryForObject("SHOW TIME ZONE", String.class))
+                .isEqualTo("Asia/Seoul");
+    }
+
+    /**
+     * 설명 : UTC로 저장한 감사행을 서울 날짜로 검색하여 자정 포함과 다음 날 자정 제외를 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
+    @Test
+    void searchesWholeSeoulDateUsingUtcStoredInstants() {
+        String boundaryType = "T_SEOUL_" + marker;
+        Map<String, String> utcInstants = Map.of(
+                "before-start", "2097-01-10T14:59:59.999999Z",
+                "at-start", "2097-01-10T15:00:00Z",
+                "before-end", "2097-01-11T14:59:59.999999Z",
+                "at-end", "2097-01-11T15:00:00Z");
+        utcInstants.forEach((entityId, occurredAt) -> jdbcTemplate.update("""
+                INSERT INTO fgc.audit_log (occurred_at, action_code, entity_type, entity_id, request_id)
+                VALUES (?, ?, ?, ?, ?)
+                """, OffsetDateTime.parse(occurredAt), actionA, boundaryType, entityId, "req-" + marker));
+
+        LocalDate searchDate = LocalDate.of(2097, 1, 11);
+        var page = queryService.search(boundaryType, null, null, null, searchDate, searchDate, 1, 20);
+
+        assertThat(page.totalElements()).isEqualTo(2);
+        assertThat(page.content()).extracting(AuditLogResponse::entityId)
+                .containsExactly("before-end", "at-start");
     }
 
     /**
@@ -400,7 +446,7 @@ class AuditLogQueryRepositoryIntegrationTest {
                 .extracting(AuditLogRow::reason).containsExactly("newer id", "older id");
         assertThat(queryRepository.selectAuditLogs(search, PageRequest.of(1, 1))).singleElement().satisfies(row -> {
             assertThat(row.reason()).isEqualTo("older id");
-            assertThat(row.occurredAt().toInstant()).isEqualTo(time.atZone(ZoneId.systemDefault()).toInstant());
+            assertThat(row.occurredAt().toInstant()).isEqualTo(time.atZone(DateUtil.SEOUL_ZONE).toInstant());
         });
         assertThat(queryRepository.selectAuditLogs(search, PageRequest.of(2, 1))).isEmpty();
         var empty = criteria(entityTypeA, "missing", userId, actionA, time, time.plusNanos(1000));
