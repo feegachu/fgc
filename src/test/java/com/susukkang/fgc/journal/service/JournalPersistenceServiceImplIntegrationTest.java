@@ -144,6 +144,33 @@ class JournalPersistenceServiceImplIntegrationTest {
         assertThat(count).isEqualTo(0);
     }
 
+    /**
+     * 설명 : 감사 저장 오류가 REQUIRES_NEW 안에서 앞서 저장한 분개 헤더와 라인까지 롤백시키는지 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
+    @Test
+    void auditInsertFailureRollsBackHeaderAndLines() {
+        JournalHeaderDraft draft = newDraft(System.nanoTime());
+        String invalidRequestId = "r".repeat(81);
+        Long linesBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.journal_line", Long.class);
+
+        assertThatThrownBy(() -> journalPersistenceService.saveDraft(draft, 3L, invalidRequestId))
+                .isInstanceOf(DataAccessException.class);
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.journal_header
+                 WHERE journal_type = ? AND source_entity_type = ? AND source_entity_id = ? AND revision_no = ?
+                """, Long.class, draft.getJournalType().name(), draft.getSourceEntityType(),
+                draft.getSourceEntityId(), draft.getRevisionNo())).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.journal_line", Long.class))
+                .isEqualTo(linesBefore);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.audit_log WHERE request_id = ?",
+                Long.class, invalidRequestId)).isZero();
+    }
+
     @Test
     void imbalancedDraftIsRejectedBeforeAnyInsert() {
         // 대변 줄만 금액을 늘려 차변합계≠대변합계로 만든다(코드리뷰 반영 — 저장 시점부터

@@ -10,6 +10,9 @@ spring:
     properties:
       hibernate:
         default_schema: fgc
+  datasource:
+    hikari:
+      connection-init-sql: "SET TIME ZONE 'Asia/Seoul'"
   flyway:
     enabled: true
     schemas: fgc

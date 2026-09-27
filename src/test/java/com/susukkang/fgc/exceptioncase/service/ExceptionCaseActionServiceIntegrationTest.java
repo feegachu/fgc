@@ -10,8 +10,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -300,6 +302,33 @@ class ExceptionCaseActionServiceIntegrationTest {
                 .satisfies(exception -> assertThat(
                         ((FgcBusinessException) exception).getErrorCode())
                         .isEqualTo(FgcErrorCode.EXCP_001));
+    }
+
+    /**
+     * 설명 : 감사 저장 실패 후 별도 조회로 예외 상태와 처리 이력이 실제로 롤백되었는지 검증한다.
+     *
+     * @author hjKang
+     * @version 1.0
+     * @since 2026-09-27
+     */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void auditInsertFailureRollsBackStatusAndActionHistory() {
+        Long exceptionCaseId = insertNewCase();
+        Long userId = firstUserId();
+        RequestIdContext.set("r".repeat(81));
+        try {
+            assertThatThrownBy(() -> exceptionCaseService.action(exceptionCaseId,
+                    new ExceptionActionRequest(ExceptionActionType.START_REVIEW, "감사 롤백 검증", "DOC-ROLLBACK"),
+                    userId, loginIdOf(userId))).isInstanceOf(DataAccessException.class);
+
+            assertThat(currentStatus(exceptionCaseId)).isEqualTo("NEW");
+            assertThat(actionCount(exceptionCaseId)).isZero();
+            assertThat(auditCount(exceptionCaseId)).isZero();
+        } finally {
+            jdbcTemplate.update("DELETE FROM fgc.exception_action WHERE exception_case_id = ?", exceptionCaseId);
+            jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE exception_case_id = ?", exceptionCaseId);
+        }
     }
 
     private Long insertNewCase() {
