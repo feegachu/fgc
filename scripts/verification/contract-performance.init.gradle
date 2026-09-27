@@ -1,0 +1,9 @@
+// 명시적으로 선택한 계약 조회 성능 테스트만 활성화한다.
+// 사용: gradlew -I scripts/verification/contract-performance.init.gradle test --tests '*ContractReadPerformanceTest'
+allprojects {
+    tasks.withType(Test).configureEach {
+        systemProperty 'fgc.contract.performance', 'true'
+        maxHeapSize = '1g'
+        testLogging.showStandardStreams = true
+    }
+}

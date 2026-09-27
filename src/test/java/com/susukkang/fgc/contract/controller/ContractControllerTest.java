@@ -7,7 +7,7 @@ import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.web.PageResponse;
-import com.susukkang.fgc.contract.code.DataOrigin;
+import com.susukkang.fgc.common.code.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
@@ -29,8 +29,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.susukkang.fgc.contract.code.ContractStatus.ACTIVE;
-import static com.susukkang.fgc.contract.code.PaymentCycleCode.MONTHLY;
+import static com.susukkang.fgc.common.code.ContractStatus.ACTIVE;
+import static com.susukkang.fgc.common.code.PaymentCycleCode.MONTHLY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -156,7 +156,7 @@ class ContractControllerTest {
     @DisplayName("일시납과 0원 경계값으로 보험계약을 생성할 수 있다")
     void createContractAcceptsSinglePaymentAndZeroPremiums() throws Exception {
         ContractCreateRequest request = createRequest();
-        request.setPaymentCycleCode(com.susukkang.fgc.contract.code.PaymentCycleCode.SINGLE);
+        request.setPaymentCycleCode(com.susukkang.fgc.common.code.PaymentCycleCode.SINGLE);
         request.setPremiumPerCycleAmount(BigDecimal.ZERO);
         request.setFirstPremiumAmount(BigDecimal.ZERO);
         request.setMonthlyEquivalentFirstPremium(BigDecimal.ZERO);

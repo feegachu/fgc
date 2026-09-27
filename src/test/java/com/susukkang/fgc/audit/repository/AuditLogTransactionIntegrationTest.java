@@ -2,8 +2,8 @@ package com.susukkang.fgc.audit.repository;
 
 import com.susukkang.fgc.audit.entity.AuditLog;
 import com.susukkang.fgc.audit.service.AuditLogService;
-import com.susukkang.fgc.contract.dto.InsuranceContract;
-import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.entity.InsuranceContract;
+import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 설명 : 테스트 트랜잭션 밖에서 실제 커밋/롤백 결과를 읽어 JPA·MyBatis의 연결 공유를 검증한다.
+ * 설명 : 테스트 트랜잭션 밖에서 실제 커밋/롤백 결과를 읽어 계약·감사 저장의 트랜잭션 참여를 검증한다.
  *
  * @author hjKang
  * @version 1.0
@@ -32,7 +32,7 @@ class AuditLogTransactionIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
     @Autowired
-    private ContractMapper contractMapper;
+    private InsuranceContractRepository contractRepository;
     @Autowired
     private AuditLogRepository repository;
     @Autowired
@@ -58,18 +58,18 @@ class AuditLogTransactionIntegrationTest {
     }
 
     /**
-     * 설명 : MyBatis 업무 저장과 서비스·Repository를 통한 JPA 감사 저장이 함께 커밋되는지 검증한다.
+     * 설명 : JPA 계약 저장과 서비스·Repository를 통한 JPA 감사 저장이 함께 커밋되는지 검증한다.
      *
      * @author hjKang
      * @version 1.0
      * @since 2026-09-26
      */
     @Test
-    void commitsMyBatisBusinessAndJpaAuditsTogether() {
+    void commitsJpaContractAndAuditsTogether() {
         InsuranceContract contract = contract();
         try {
             transaction.executeWithoutResult(status -> {
-                assertThat(contractMapper.insertContract(contract)).isEqualTo(1);
+                assertThat(contractRepository.saveAndFlush(contract).getContractId()).isNotNull();
                 record(marker);
                 repository.saveAndFlush(auditLog(marker + "-direct"));
             });
@@ -92,7 +92,7 @@ class AuditLogTransactionIntegrationTest {
     @Test
     void rollsBackBusinessAndBothJpaAuditCallsWhenBusinessFails() {
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
-            contractMapper.insertContract(contract());
+            contractRepository.saveAndFlush(contract());
             record(marker);
             repository.saveAndFlush(auditLog(marker + "-direct"));
             throw new IllegalStateException("business failed");
@@ -113,7 +113,7 @@ class AuditLogTransactionIntegrationTest {
     @Test
     void auditDatabaseFailureRollsBackBusinessAndEarlierAudit() {
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
-            contractMapper.insertContract(contract());
+            contractRepository.saveAndFlush(contract());
             record(marker);
             service.record(AuditLogService.AuditEvent.builder().entityType("TEST_TX").entityId(marker)
                     .actionCode("X".repeat(51)).build());
@@ -135,7 +135,7 @@ class AuditLogTransactionIntegrationTest {
         TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
         requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transaction.executeWithoutResult(status -> {
-            contractMapper.insertContract(contract());
+            contractRepository.saveAndFlush(contract());
             record(marker);
             requiresNew.executeWithoutResult(inner -> record(marker + "-new"));
             status.setRollbackOnly();
@@ -217,7 +217,7 @@ class AuditLogTransactionIntegrationTest {
     private InsuranceContract contract() {
         Long id = jdbc.queryForObject("select contract_id from fgc.insurance_contract order by contract_id limit 1",
                 Long.class);
-        InsuranceContract source = contractMapper.selectContractById(id);
+        InsuranceContract source = contractRepository.findById(id).orElseThrow();
         return InsuranceContract.builder()
                 .contractNo(marker).insurerId(source.getInsurerId()).productOfferingId(source.getProductOfferingId())
                 .contractDate(source.getContractDate()).agentId(source.getAgentId())

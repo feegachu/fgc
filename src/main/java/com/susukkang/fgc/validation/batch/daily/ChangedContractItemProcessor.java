@@ -5,8 +5,8 @@ import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.util.DateUtil;
-import com.susukkang.fgc.contract.dto.InsuranceContract;
-import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.entity.InsuranceContract;
+import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
 import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
@@ -28,7 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChangedContractItemProcessor implements ItemProcessor<Long, ChangedContractResult> {
 
-    private final ContractMapper contractMapper;
+    private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
     private final ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
@@ -49,13 +49,16 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
                 contractId, DailyChangedContractJobNames.JOB_NAME);
 
         try {
-            InsuranceContract contract = contractMapper.selectContractById(contractId);
+            InsuranceContract contract = insuranceContractRepository
+                    .findById(contractId)
+                    .orElse(null);
+
             if (contract == null) {
-                // Reader가 목록을 뽑은 시점과 Processor가 실제로 조회하는 시점 사이에 계약이
-                // 삭제될 일은 이 도메인에서는 없지만(계약은 논리 삭제/상태변경만 함), 방어적으로
-                // 데이터 품질 스킵으로 처리한다.
                 return ChangedContractResult.dataQualitySkip(
-                        contractId, "계약을 찾을 수 없음: " + contractId, pendingEventIds);
+                        contractId,
+                        "계약을 찾을 수 없음: " + contractId,
+                        pendingEventIds
+                );
             }
 
             boolean contractItselfChanged = contract.getUpdatedAt() != null

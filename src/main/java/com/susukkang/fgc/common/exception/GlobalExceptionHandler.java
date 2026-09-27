@@ -11,6 +11,8 @@ import com.susukkang.fgc.common.web.RequestIdContext;
 import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,10 +24,6 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-@Slf4j
-@RestControllerAdvice(annotations = RestController.class)
-@RequiredArgsConstructor
 
 /**
  * 애플리케이션에서 발생한 예외를 공통 ApiResponse 오류 형식으로 변환한다.
@@ -44,15 +42,14 @@ import java.util.Map;
  *   규칙 1 과 규칙 3 은 한 advice 로 동시에 만족할 수 없다. 범위를 안 걸면 MPA 도 JSON 을 받아
  *   규칙 3 이 깨지고, 걸면 "한 클래스"가 아니게 된다. 규칙 3 이 사용자가 보는 결과이므로 그쪽을 택했다.
  *
- *  아직 안 메운 구멍 — MPA 저장 화면이 생길 때
- *   지금 상태를 바꾸는 엔드포인트는 전부 @RestController 위에 있다(ContractController,
- *   ValidationRunController). @Controller 는 로그인 화면·대시보드·정적 화면뿐이고 전부 GET 이라
- *   업무 예외를 던지지 않는다. 그래서 이 제한이 현재 잃는 것은 없다.
- *   CONT-W03·TRAN-W02 같은 MPA 저장 화면이 @Controller 로 붙는 순간, 그 화면의
- *   FgcBusinessException(예: FGC-CONT-001 계약번호 중복)이 3-2 매핑표를 못 타고
- *   error/500.html 의 일반 문구로만 나간다. 그때는 이 클래스의 매핑을 재사용해 오류 화면을
- *   렌더링하는 @ControllerAdvice 를 따로 두어야 한다 — 매핑을 복사하지 말 것.
+ *  MPA 목록 조회의 page=0 같은 업무 예외는 {@link MpaExceptionHandler}가 이 클래스의
+ *  상태·코드·문구 매핑을 재사용해 HTML로 반환한다. MPA advice의 @Controller 범위에는
+ *  @RestController도 포함되므로, API 요청은 이 advice가 먼저 처리하도록 순서를 명시한다.
  */
+@Slf4j
+@RestControllerAdvice(annotations = RestController.class)
+@Order(Ordered.HIGHEST_PRECEDENCE)
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
     private final FgcMessageResolver messageResolver;

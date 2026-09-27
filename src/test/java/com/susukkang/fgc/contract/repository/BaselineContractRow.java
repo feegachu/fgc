@@ -1,9 +1,9 @@
-package com.susukkang.fgc.contract.dto;
+package com.susukkang.fgc.contract.repository;
 
-import com.susukkang.fgc.contract.code.ContractStatus;
-import com.susukkang.fgc.contract.code.DataOrigin;
-import com.susukkang.fgc.contract.code.PaymentCycleCode;
-import com.susukkang.fgc.contract.code.PremiumConversionRuleCode;
+import com.susukkang.fgc.common.code.ContractStatus;
+import com.susukkang.fgc.common.code.DataOrigin;
+import com.susukkang.fgc.common.code.PaymentCycleCode;
+import com.susukkang.fgc.common.code.PremiumConversionRuleCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,7 +14,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * 설명 : InsuranceContract
+ * 설명 : 성능 비교용 기존 계약 DTO (운영 코드에서 사용하지 않음)
  *  ContractRequest를 가공후
  *  insuranceContract에 저장되는 Entity
  *
@@ -26,7 +26,7 @@ import java.time.OffsetDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InsuranceContract {
+public class BaselineContractRow {
 
     private Long contractId;
 

@@ -1,7 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.cap.service.CapCheckService;
-import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.MonthlyValidationJobExecutionListener;
 import com.susukkang.fgc.validation.batch.ValidationRunStepProgressListener;
@@ -53,7 +53,7 @@ public class DailyChangedContractJobConfig {
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
     private final BatchWatermarkMapper batchWatermarkMapper;
-    private final ContractMapper contractMapper;
+    private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
     private final ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
@@ -145,9 +145,14 @@ public class DailyChangedContractJobConfig {
         return reader;
     }
 
+    // Processor 생성자에 전달하는 인자 교체
     private ChangedContractItemProcessor changedContractItemProcessor() {
         return new ChangedContractItemProcessor(
-                contractMapper, scheduleService, capCheckService, contractStatusEventProcessingMapper);
+                insuranceContractRepository,
+                scheduleService,
+                capCheckService,
+                contractStatusEventProcessingMapper
+        );
     }
 
     private ChangedContractItemWriter changedContractItemWriter() {
