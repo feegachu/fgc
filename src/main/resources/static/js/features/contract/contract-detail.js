@@ -270,10 +270,9 @@
     /*
      * 사유는 표시하지 않는다.
      *
-     * contract_status_event.reason_code 컬럼은 있지만(V1__baseline_v2_1_2.sql:663)
-     * IF-API-16 응답 규격(인터페이스정의서 :305)·ContractStatusEventResponse·
-     * ContractStatusEventMapper.selectByContractId 어디에도 없어 화면까지 오지 않는다.
-     * 넣어 두면 영구히 "—" 만 보이는 칸이 된다 — 백엔드 요청 항목으로 남긴다.
+     * DB와 상태사건 엔티티에는 reasonCode가 있지만, IF-API-16의
+     * ContractStatusEventResponse에는 포함되지 않는다.
+     * 응답에 사유가 추가되면 화면 표시도 함께 반영한다.
      */
     var times = document.createElement("dl");
     times.className = "contract-history-times";

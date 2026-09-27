@@ -1,6 +1,5 @@
 package com.susukkang.fgc.validation.service;
 
-import com.susukkang.fgc.contract.dto.InsuranceContract;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
@@ -34,14 +33,16 @@ public class ScheduleRegenerationBatchItemService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ScheduleGenerationResult process(Long contractId, Long validationRunId) {
-        InsuranceContract contract = InsuranceContract.builder()
-                .contractId(contractId)
-                .build();
+        ScheduleGenerationResult result =
+                scheduleService.generateSchedulesByContractId(contractId);
 
-        ScheduleGenerationResult result = scheduleService.generateSchedules(contract);
         if (!result.scheduleHeaderIds().isEmpty()) {
-            scheduleMapper.linkHeadersToValidationRun(result.scheduleHeaderIds(), validationRunId);
+            scheduleMapper.linkHeadersToValidationRun(
+                    result.scheduleHeaderIds(),
+                    validationRunId
+            );
         }
+
         return result;
     }
 }

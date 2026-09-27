@@ -8,7 +8,8 @@ import com.susukkang.fgc.contract.dto.ContractJournalLineResponse;
 import com.susukkang.fgc.contract.dto.ContractJournalLineRow;
 import com.susukkang.fgc.contract.dto.ContractJournalResponse;
 import com.susukkang.fgc.contract.mapper.ContractJournalProjectionMapper;
-import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -22,22 +23,20 @@ import java.util.Map;
  * 조회해 헤더 단위로 묶어 돌려주는 조회 전용 서비스.
  */
 @Service
+@RequiredArgsConstructor
 public class ContractJournalProjectionServiceImpl implements ContractJournalProjectionService {
 
     private final ContractJournalProjectionMapper contractJournalProjectionMapper;
-    private final ContractMapper contractMapper;
-
-    public ContractJournalProjectionServiceImpl(ContractJournalProjectionMapper contractJournalProjectionMapper,
-                                                  ContractMapper contractMapper) {
-        this.contractJournalProjectionMapper = contractJournalProjectionMapper;
-        this.contractMapper = contractMapper;
-    }
+    private final InsuranceContractRepository insuranceContractRepository;
 
     @Override
     public List<ContractJournalResponse> findJournalsByContractId(Long contractId) {
         // 1. 계약 존재 확인
-        if (contractMapper.selectContractById(contractId) == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", contractId));
+        if (!insuranceContractRepository.existsById(contractId)) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_004,
+                    Map.of("id", contractId)
+            );
         }
 
         // 2. 이 계약에 연결된 모든 분개 라인을 한 번에 조회(journal_header_id, line_no 순 정렬)

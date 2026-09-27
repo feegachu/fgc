@@ -12,8 +12,8 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
-import com.susukkang.fgc.contract.dto.InsuranceContract;
-import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.entity.InsuranceContract;
+import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
@@ -44,12 +44,12 @@ public class ScheduleService {
 
     private final CommissionPolicyService commissionPolicyService;
     private final ScheduleMapper scheduleMapper;
-    private final ContractMapper contractMapper;
     private final AgentRepository agentRepository;
     private final CapCheckService capCheckService;
     private final CapCheckMapper capCheckMapper;
     private final AuditLogService auditLogService;
     private final ScheduleReviewService scheduleReviewService;
+    private final InsuranceContractRepository insuranceContractRepository;
 
     /**
      * 설명 : 검색 조건에 따라 스케줄 헤더를 조회한다.
@@ -182,8 +182,14 @@ public class ScheduleService {
      */
     @Transactional
     public ScheduleGenerationResult generateSchedules(InsuranceContract contract) {
+        return generateSchedulesByContractId(contract == null ? null : contract.getContractId());
+    }
+
+    /** 계약 DTO에 의존하지 않는 호출자를 위한 스케줄 생성 진입점. */
+    @Transactional
+    public ScheduleGenerationResult generateSchedulesByContractId(Long contractId) {
         // 입력값 검증
-        if (contract == null || contract.getContractId() == null) {
+        if (contractId == null) {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_002,
                     "contractId",
@@ -192,19 +198,15 @@ public class ScheduleService {
             );
         }
 
-        Long contractId = contract.getContractId();
-
         // 계약 존재 여부 확인
-        InsuranceContract savedContract = contractMapper.selectContractById(contractId);
-
-        if (savedContract == null) {   //일단 보류 001은 계약 중복 코드이므로 이따 추가함
-            throw new FgcBusinessException(
-                    FgcErrorCode.CONT_001,
-                    "contractId",
-                    Map.of("contractId", contractId),
-                    "계약ID가 존재하지 않습니다."
-            );
-        }
+        InsuranceContract savedContract = insuranceContractRepository
+                .findById(contractId)
+                .orElseThrow(() -> new FgcBusinessException(
+                        FgcErrorCode.CONT_001,
+                        "contractId",
+                        Map.of("contractId", contractId),
+                        "계약ID가 존재하지 않습니다."
+                ));
 
         List<PaymentStage> paymentStages = List.of(
                 PaymentStage.INSURER_TO_GA,
@@ -280,10 +282,12 @@ public class ScheduleService {
             }
         }
 
-        InsuranceContract updatedContract = contractMapper.selectContractById(contractId);
-        if (updatedContract == null) {
-            throw validationException("contractId", "존재하지 않는 계약입니다.");
-        }
+        InsuranceContract updatedContract = insuranceContractRepository
+                .findById(contractId)
+                .orElseThrow(() -> validationException(
+                        "contractId",
+                        "존재하지 않는 계약입니다."
+                ));
 
         ScheduleGenerationResult missingStageResult = generateSchedules(updatedContract);
         regeneratedScheduleIds.addAll(missingStageResult.scheduleHeaderIds());
@@ -1081,9 +1085,12 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
 
         // 기존 스케줄에 연결된 계약 조회 및 존재 여부 검증
-        InsuranceContract contract = contractMapper.selectContractById(oldHeader.getContractId());
-        if (contract == null)
-            throw validationException("contractId", "존재하지 않는 계약입니다.");
+        InsuranceContract contract = insuranceContractRepository
+                .findById(oldHeader.getContractId())
+                .orElseThrow(() -> validationException(
+                        "contractId",
+                        "존재하지 않는 계약입니다."
+                ));
 
         // 계약과 지급단계에 현재 적용되는 수수료 정책 조회 및 검증
         ResolvedCommissionPolicy policy = resolvePolicyOrRegisterReview(
@@ -1195,10 +1202,13 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
         }
 
-        InsuranceContract contract = contractMapper.selectContractById(header.getContractId());
-        if (contract == null) {
-            throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        if (!insuranceContractRepository.existsById(header.getContractId())) {
+            throw validationException(
+                    "contractId",
+                    "존재하지 않는 보험계약입니다."
+            );
         }
+
         BigDecimal evidenceAmount = header.getPaymentStage() == PaymentStage.INSURER_TO_GA
                 ? capCheckMapper.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
                 : null;

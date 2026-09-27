@@ -15,8 +15,8 @@ import com.susukkang.fgc.common.code.ScheduleLineStatus;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
-import com.susukkang.fgc.contract.dto.InsuranceContract;
-import com.susukkang.fgc.contract.mapper.ContractMapper;
+import com.susukkang.fgc.contract.entity.InsuranceContract;
+import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
@@ -45,6 +45,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,7 +67,7 @@ class ScheduleServiceTest {
     private ScheduleMapper scheduleMapper;
 
     @Mock
-    private ContractMapper contractMapper;
+    private InsuranceContractRepository insuranceContractRepository;
 
     @Mock
     private CommissionPolicyService commissionPolicyService;
@@ -166,13 +167,13 @@ class ScheduleServiceTest {
     @Test
     void regeneratesScheduleAsNewVersionAndPreservesConfirmedLine() {
         ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).policyVersionId(100L).scheduleVersionNo(1).status(ScheduleHeaderStatus.CONFIRMED).activeYn(true).build();
-        InsuranceContract contract = InsuranceContract.builder().contractId(20L).contractDate(LocalDate.of(2026, 8, 10)).monthlyEquivalentFirstPremium(new BigDecimal("200000")).build();
+        InsuranceContract contract = withContractId(20L, InsuranceContract.builder().contractDate(LocalDate.of(2026, 8, 10)).monthlyEquivalentFirstPremium(new BigDecimal("200000")).build());
         ResolvedCommissionRule currentRule = rule(1000L, null, 1, 2, "100.000000");
         ResolvedCommissionPolicy currentPolicy = policy(200L, PaymentStage.INSURER_TO_GA, currentRule);
         ScheduleLineInsertDTO confirmedLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(10L).lineNo(1).installmentNo(1).contractMonthNo(1).dueDate(LocalDate.of(2026, 8, 10)).commissionItemId(1000L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("100000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("100000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.CONFIRMED).sourceCommissionRuleId(1000L).build();
 
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(oldHeader);
-        given(contractMapper.selectContractById(20L)).willReturn(contract);
+        given(insuranceContractRepository.findById(20L)).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willReturn(currentPolicy);
         given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(confirmedLine));
         given(scheduleMapper.updateScheduleHeaderStatus(10L, ScheduleHeaderStatus.ADJUSTED, false)).willReturn(1);
@@ -226,8 +227,7 @@ class ScheduleServiceTest {
                 .build();
 
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
-        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
-                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.PLANNED).build()));
         given(scheduleMapper.confirmPlannedScheduleLines(10L)).willReturn(2);
@@ -262,8 +262,7 @@ class ScheduleServiceTest {
                 .build();
 
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
-        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
-                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.CONFIRMED).build(),
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.MATCHED).build(),
@@ -314,8 +313,7 @@ class ScheduleServiceTest {
                 .activeYn(true)
                 .build();
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
-        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
-                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(capCheckService.calculateAndSave(any())).willThrow(new FgcBusinessException(
                 FgcErrorCode.CAP_004,
                 "paymentStage",
@@ -369,8 +367,7 @@ class ScheduleServiceTest {
         given(result.resultStatus()).willReturn(CapResultStatus.REVIEW_REQUIRED);
         given(result.calculationSnapshot()).willReturn(Map.of("refundTableMissing", true));
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
-        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
-                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(capCheckService.calculateAndSave(any())).willReturn(new CapCheckSaveResult(1L, result));
 
         assertThatThrownBy(() -> scheduleService.confirmSchedule(10L))
@@ -437,10 +434,9 @@ class ScheduleServiceTest {
 
     @Test
     void generatesFixedRulesWithoutResolvingRateBasis() {
-        InsuranceContract contract = InsuranceContract.builder()
-                .contractId(10L)
+        InsuranceContract contract = withContractId(10L, InsuranceContract.builder()
                 .contractDate(LocalDate.of(2026, 8, 10))
-                .build();
+                .build());
         ResolvedCommissionRule fixedRule = ResolvedCommissionRule.builder()
                 .commissionRuleId(1000L)
                 .commissionItemId(1000L)
@@ -531,14 +527,13 @@ class ScheduleServiceTest {
 
     @Test
     void generatesInsurerAndGaSchedulesFromResolvedPolicies() {
-        InsuranceContract contract = InsuranceContract.builder()
-                .contractId(10L)
+        InsuranceContract contract = withContractId(10L, InsuranceContract.builder()
                 .contractNo("C-2026-001")
                 .contractDate(LocalDate.of(2026, 8, 10))
                 .agentId(20L)
                 .organizationId(30L)
                 .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
-                .build();
+                .build());
 
         ResolvedCommissionPolicy insurerPolicy = policy(
                 100L,
@@ -551,7 +546,7 @@ class ScheduleServiceTest {
                 rule(2000L, AgentRankCode.FC, 1, 1, "650.000000")
         );
 
-        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
+        given(insuranceContractRepository.findById(contract.getContractId())).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -646,14 +641,13 @@ class ScheduleServiceTest {
     }
 
     private InsuranceContract stubManagerSchedule(AgentRankCode rank) {
-        InsuranceContract contract = InsuranceContract.builder()
-                .contractId(10L)
+        InsuranceContract contract = withContractId(10L, InsuranceContract.builder()
                 .contractDate(LocalDate.of(2026, 8, 10))
                 .agentId(20L)
                 .organizationId(30L)
                 .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
-                .build();
-        given(contractMapper.selectContractById(10L)).willReturn(contract);
+                .build());
+        given(insuranceContractRepository.findById(10L)).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.INSURER_TO_GA))
                 .willReturn(policy(100L, PaymentStage.INSURER_TO_GA,
                         rule(1000L, null, 1, 1, "900.000000")));
@@ -674,13 +668,12 @@ class ScheduleServiceTest {
 
     @Test
     void rejectsOverlappingRulesForSameCommissionItemAndBeneficiary() {
-        InsuranceContract contract = InsuranceContract.builder()
-                .contractId(10L)
+        InsuranceContract contract = withContractId(10L, InsuranceContract.builder()
                 .contractDate(LocalDate.of(2026, 8, 10))
                 .agentId(20L)
                 .organizationId(30L)
                 .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
-                .build();
+                .build());
 
         ResolvedCommissionRule firstRule =
                 rule(1000L, AgentRankCode.FC, 1, 12, "100.000000");
@@ -708,7 +701,7 @@ class ScheduleServiceTest {
                 .rules(List.of(firstRule, overlappingRule))
                 .build();
 
-        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
+        given(insuranceContractRepository.findById(contract.getContractId())).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -726,12 +719,11 @@ class ScheduleServiceTest {
 
     @Test
     void registersReviewCasesAndSkipsSchedulesWhenPoliciesCannotBeResolved() {
-        InsuranceContract contract = InsuranceContract.builder()
-                .contractId(10L)
+        InsuranceContract contract = withContractId(10L, InsuranceContract.builder()
                 .contractDate(LocalDate.of(2026, 8, 10))
-                .build();
+                .build());
 
-        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
+        given(insuranceContractRepository.findById(contract.getContractId())).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willThrow(policyResolutionException(
@@ -762,10 +754,9 @@ class ScheduleServiceTest {
 
     @Test
     void skipsGenerationWhenSamePoliciesAreAlreadyActive() {
-        InsuranceContract contract = InsuranceContract.builder()
-                .contractId(10L)
+        InsuranceContract contract = withContractId(10L, InsuranceContract.builder()
                 .contractDate(LocalDate.of(2026, 8, 10))
-                .build();
+                .build());
         ResolvedCommissionPolicy insurerPolicy = policy(
                 100L,
                 PaymentStage.INSURER_TO_GA,
@@ -777,7 +768,7 @@ class ScheduleServiceTest {
                 rule(2000L, AgentRankCode.FC, 1, 1, "100.000000")
         );
 
-        given(contractMapper.selectContractById(contract.getContractId())).willReturn(contract);
+        given(insuranceContractRepository.findById(contract.getContractId())).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(insurerPolicy);
@@ -833,8 +824,7 @@ class ScheduleServiceTest {
         CapCalculationResult result = mock(CapCalculationResult.class);
         given(result.resultStatus()).willReturn(resultStatus);
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
-        given(contractMapper.selectContractById(20L)).willReturn(InsuranceContract.builder()
-                .contractId(20L).contractDate(LocalDate.of(2026, 8, 1)).build());
+        given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(capCheckService.calculateAndSave(any())).willReturn(new CapCheckSaveResult(1L, result));
 
         assertThatThrownBy(() -> scheduleService.confirmSchedule(10L))
@@ -849,9 +839,9 @@ class ScheduleServiceTest {
 
     private void assertRegenerationRegistersReview(String reason) {
         ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).scheduleVersionNo(1).status(ScheduleHeaderStatus.CONFIRMED).activeYn(true).build();
-        InsuranceContract contract = InsuranceContract.builder().contractId(20L).build();
+        InsuranceContract contract = withContractId(20L, InsuranceContract.builder().build());
         given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(oldHeader);
-        given(contractMapper.selectContractById(20L)).willReturn(contract);
+        given(insuranceContractRepository.findById(20L)).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willThrow(policyResolutionException(20L, PaymentStage.INSURER_TO_GA, reason));
         given(scheduleMapper.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
 
@@ -864,6 +854,11 @@ class ScheduleServiceTest {
                 anyLong(), any(ScheduleHeaderStatus.class), anyBoolean());
         verify(scheduleMapper, never()).insertScheduleHeader(any());
         verify(scheduleMapper, never()).insertAllScheduleLines(any());
+    }
+
+    private InsuranceContract withContractId(Long id, InsuranceContract contract) {
+        ReflectionTestUtils.setField(contract, "contractId", id);
+        return contract;
     }
 
     private ResolvedCommissionPolicy policy(

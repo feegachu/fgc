@@ -10,8 +10,9 @@ import com.susukkang.fgc.contract.dto.ContractTransactionAttributionResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionAttributionRow;
 import com.susukkang.fgc.contract.dto.ContractTransactionResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
-import com.susukkang.fgc.contract.mapper.ContractMapper;
 import com.susukkang.fgc.contract.mapper.ContractTransactionProjectionMapper;
+import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -25,23 +26,20 @@ import java.util.Map;
  * 계약 기준으로 조회해 지급 건 단위로 묶고, reconciliation_result도 함께 조회하는 조회 전용 서비스.
  */
 @Service
+@RequiredArgsConstructor
 public class ContractTransactionProjectionServiceImpl implements ContractTransactionProjectionService {
 
     private final ContractTransactionProjectionMapper contractTransactionProjectionMapper;
-    private final ContractMapper contractMapper;
-
-    public ContractTransactionProjectionServiceImpl(
-            ContractTransactionProjectionMapper contractTransactionProjectionMapper,
-            ContractMapper contractMapper) {
-        this.contractTransactionProjectionMapper = contractTransactionProjectionMapper;
-        this.contractMapper = contractMapper;
-    }
+    private final InsuranceContractRepository insuranceContractRepository;
 
     @Override
     public ContractTransactionTabResponse findTransactionsByContractId(Long contractId) {
         // 1. 계약 존재 확인
-        if (contractMapper.selectContractById(contractId) == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", contractId));
+        if (!insuranceContractRepository.existsById(contractId)) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_004,
+                    Map.of("id", contractId)
+            );
         }
 
         // 2. 이 계약에 귀속된 모든 귀속행을 한 번에 조회(commission_transaction_id, attribution_seq 순 정렬)
