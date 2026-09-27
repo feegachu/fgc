@@ -152,6 +152,67 @@ class ContractRepositoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("조건 객체와 검색값이 비어 있으면 목록·총건수·CSV를 조건 없이 조회한다")
+    void supportsNullAndEmptySearchConditions() {
+        InsuranceContract contract = insuranceContractRepository.saveAndFlush(newContract(references()));
+        List<ContractView> expected = contractQueryRepository.searchAll(null);
+        assertThat(expected).extracting(ContractView::getContractId).contains(contract.getContractId());
+
+        ContractSearchCondition emptyContractNo = new ContractSearchCondition();
+        emptyContractNo.setContractNo("");
+        for (ContractSearchCondition condition : new ContractSearchCondition[] {
+                null, new ContractSearchCondition(), emptyContractNo
+        }) {
+            Page<ContractView> page = contractQueryRepository.search(condition, PageRequest.of(0, 2));
+            assertThat(page.getTotalElements()).isEqualTo(expected.size());
+            assertThat(page.getContent()).extracting(ContractView::getContractId)
+                    .containsExactlyElementsOf(expected.stream().limit(2).map(ContractView::getContractId).toList());
+            assertThat(contractQueryRepository.searchAll(condition)).extracting(ContractView::getContractId)
+                    .containsExactlyElementsOf(expected.stream().map(ContractView::getContractId).toList());
+        }
+    }
+
+    @Test
+    @DisplayName("SQL 구문처럼 보이는 계약번호도 검색값으로만 바인딩한다")
+    void bindsSqlLikeContractNumberAsData() {
+        References refs = references();
+        String prefix = "IT-QUOTE-" + UUID.randomUUID();
+        InsuranceContract quoted = insuranceContractRepository.saveAndFlush(
+                newContract(refs, prefix + "' OR 1=1 --"));
+        insuranceContractRepository.saveAndFlush(newContract(refs, prefix + "-OTHER"));
+        ContractSearchCondition condition = new ContractSearchCondition();
+        condition.setContractNo(quoted.getContractNo());
+
+        Page<ContractView> page = contractQueryRepository.search(condition, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(ContractView::getContractId)
+                .containsExactly(quoted.getContractId());
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(contractQueryRepository.searchAll(condition)).extracting(ContractView::getContractId)
+                .containsExactly(quoted.getContractId());
+    }
+
+    @Test
+    @DisplayName("계약번호 검색의 공백과 기존 LIKE 와일드카드 의미를 유지한다")
+    void preservesWhitespaceAndLikeWildcards() {
+        References refs = references();
+        String prefix = "IT-SPACE-" + UUID.randomUUID();
+        InsuranceContract plain = insuranceContractRepository.saveAndFlush(newContract(refs, prefix + "-1"));
+        InsuranceContract spaced = insuranceContractRepository.saveAndFlush(newContract(refs, prefix + "-1 "));
+        ContractSearchCondition condition = new ContractSearchCondition();
+        condition.setContractNo(spaced.getContractNo());
+
+        assertThat(contractQueryRepository.search(condition, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
+        assertThat(contractQueryRepository.searchAll(condition)).extracting(ContractView::getContractId)
+                .containsExactly(spaced.getContractId());
+
+        condition.setContractNo(prefix + "-_%");
+        assertThat(contractQueryRepository.search(condition, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(2);
+        assertThat(contractQueryRepository.searchAll(condition)).extracting(ContractView::getContractId)
+                .containsExactly(spaced.getContractId(), plain.getContractId());
+    }
+
+    @Test
     @DisplayName("계약을 수정하면 변경 감지로 계약번호와 수정값이 반영된다")
     void updatesContractIncludingContractNumber() {
         References refs = references();

@@ -268,6 +268,10 @@ public class ContractQueryRepository {
                AND cc.payment_stage = 'GA_TO_FC'
             """;
 
+    // S2077 검토: buildWhere는 코드에 정의된 조건식만 조합하며 사용자 입력은 모두 setParameter로 바인딩한다.
+    // ORDER BY도 고정이고 페이징은 JPA API를 사용한다. 조건식에 검색값을 직접 연결하지 않는다.
+    // 회귀 검증: ContractRepositoryIntegrationTest.bindsSqlLikeContractNumberAsData
+    @SuppressWarnings("java:S2077")
     @Transactional(readOnly = true)
     public Page<ContractView> search(
             ContractSearchCondition condition,
