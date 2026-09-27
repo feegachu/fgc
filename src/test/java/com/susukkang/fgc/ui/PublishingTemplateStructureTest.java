@@ -938,8 +938,8 @@ class PublishingTemplateStructureTest {
                 .contains("REG-19")
                 .contains("class=\"evidence\" data-evidence")
                 // 납입주기·계약상태 라벨은 서버 enum 하나만 쓴다.
-                .contains("T(com.susukkang.fgc.contract.code.PaymentCycleCode).values()")
-                .contains("T(com.susukkang.fgc.contract.code.ContractStatus).values()")
+                .contains("T(com.susukkang.fgc.common.code.PaymentCycleCode).values()")
+                .contains("T(com.susukkang.fgc.common.code.ContractStatus).values()")
                 .doesNotContain("3개월납")
                 .doesNotContain("style=\"")
                 .doesNotContain("onclick=")

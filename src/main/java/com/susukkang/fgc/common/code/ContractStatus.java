@@ -1,4 +1,4 @@
-package com.susukkang.fgc.contract.code;
+package com.susukkang.fgc.common.code;
 
 /**
  * 설명 : ContractStatus , 계약 상태 컬럼

@@ -1,8 +1,8 @@
 package com.susukkang.fgc.contract.dto;
 
-import com.susukkang.fgc.contract.code.ContractStatus;
-import com.susukkang.fgc.contract.code.DataOrigin;
-import com.susukkang.fgc.contract.code.PaymentCycleCode;
+import com.susukkang.fgc.common.code.ContractStatus;
+import com.susukkang.fgc.common.code.DataOrigin;
+import com.susukkang.fgc.common.code.PaymentCycleCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

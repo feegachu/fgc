@@ -2,7 +2,7 @@ package com.susukkang.fgc.contract.mapper;
 
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
 import com.susukkang.fgc.contract.dto.ContractStatusEventRow;
-import com.susukkang.fgc.contract.code.ContractStatus;
+import com.susukkang.fgc.common.code.ContractStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

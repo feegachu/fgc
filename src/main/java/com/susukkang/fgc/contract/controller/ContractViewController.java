@@ -2,8 +2,8 @@ package com.susukkang.fgc.contract.controller;
 
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.security.Roles;
-import com.susukkang.fgc.contract.code.ContractStatus;
-import com.susukkang.fgc.contract.code.DataOrigin;
+import com.susukkang.fgc.common.code.ContractStatus;
+import com.susukkang.fgc.common.code.DataOrigin;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.service.ContractService;
 import lombok.RequiredArgsConstructor;

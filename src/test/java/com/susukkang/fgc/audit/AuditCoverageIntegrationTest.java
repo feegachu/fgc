@@ -1,7 +1,7 @@
 package com.susukkang.fgc.audit;
 
-import com.susukkang.fgc.contract.code.ContractStatus;
-import com.susukkang.fgc.contract.code.PaymentCycleCode;
+import com.susukkang.fgc.common.code.ContractStatus;
+import com.susukkang.fgc.common.code.PaymentCycleCode;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractCreateResponse;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;

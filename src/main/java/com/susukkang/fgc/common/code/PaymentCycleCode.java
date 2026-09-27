@@ -1,4 +1,4 @@
-package com.susukkang.fgc.contract.code;
+package com.susukkang.fgc.common.code;
 /**
  * 설명 : PaymentCycleCode
  *  계약에서 월납주기가 어느정도 나타내는 데이터
