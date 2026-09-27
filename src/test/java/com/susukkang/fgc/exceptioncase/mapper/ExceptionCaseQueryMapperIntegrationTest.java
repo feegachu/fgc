@@ -1,7 +1,7 @@
 package com.susukkang.fgc.exceptioncase.mapper;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
-import com.susukkang.fgc.dashboard.mapper.DashboardMapper;
+import com.susukkang.fgc.dashboard.repository.DashboardQueryRepository;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseListRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * #83: EXCP-W01 예외함 목록 조회 — 화면 필터 3가지 경로(OPEN / 개별 상태값 / 필터 없음)가
  * ExceptionStatus.dbStatuses() 로 풀려 실제 SQL 에서 맞게 걸리는지, 그리고 미처리 건수가
- * 대시보드 KPI(DashboardMapper.countOpenException)와 같은 기준인지 지킨다.
+ * 대시보드 KPI(DashboardQueryRepository.countOpenException)와 같은 기준인지 지킨다.
  */
 @SpringBootTest
 @Transactional
@@ -29,7 +29,7 @@ class ExceptionCaseQueryMapperIntegrationTest {
     private ExceptionCaseQueryMapper mapper;
 
     @Autowired
-    private DashboardMapper dashboardMapper;
+    private DashboardQueryRepository dashboardQueryRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -110,7 +110,7 @@ class ExceptionCaseQueryMapperIntegrationTest {
     @Test
     void 미처리_건수는_대시보드_KPI_집계와_일치한다() {
         long screen = mapper.countByStatuses(ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER));
-        assertThat(screen).isEqualTo(dashboardMapper.countOpenException());
+        assertThat(screen).isEqualTo(dashboardQueryRepository.countOpenException());
     }
 
     /** EXCP-W01 담당자 필터 — 배정 건만 / 미배정 건만, 그리고 선택지에는 배정 이력 사용자만. */

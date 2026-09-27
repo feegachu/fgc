@@ -3,7 +3,7 @@ package com.susukkang.fgc.dashboard.service;
 import com.susukkang.fgc.dashboard.dto.DashboardSummaryResult;
 import com.susukkang.fgc.dashboard.dto.RecentExceptionRow;
 import com.susukkang.fgc.dashboard.dto.RecentValidationRunRow;
-import com.susukkang.fgc.dashboard.mapper.DashboardMapper;
+import com.susukkang.fgc.dashboard.repository.DashboardQueryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,37 +15,39 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
  * DashboardServiceImpl 단위테스트
- * DashboardMapper를 mock으로 대체해 "매퍼 결과를 어떻게 조립하는지"만 검증
+ * DashboardQueryRepository를 mock으로 대체해 조회 결과 조립과 호출 조건을 검증
  */
 @ExtendWith(MockitoExtension.class)
 class DashboardServiceImplTest {
 
     @Mock
-    private DashboardMapper dashboardMapper;
+    private DashboardQueryRepository dashboardQueryRepository;
 
     private DashboardServiceImpl dashboardService;
 
     @BeforeEach
     void setUp() {
-        dashboardService = new DashboardServiceImpl(dashboardMapper);
+        dashboardService = new DashboardServiceImpl(dashboardQueryRepository);
     }
 
     @Test
     void summarizeAssemblesKpiCountsInDeclaredFieldOrder() {
         LocalDate month = LocalDate.of(2026, 7, 1);
         // 6개 값을 서로 다르게 줘서, 조립 순서가 하나라도 틀리면 바로 드러나게 함
-        when(dashboardMapper.countCapViolation(month)).thenReturn(1L);
-        when(dashboardMapper.countCapWarning(month)).thenReturn(2L);
-        when(dashboardMapper.countArbitrageCandidate(month)).thenReturn(3L);
-        when(dashboardMapper.countReconciliationMismatch(month)).thenReturn(4L);
-        when(dashboardMapper.countJournalImbalance()).thenReturn(5L);
-        when(dashboardMapper.countOpenException()).thenReturn(6L);
-        when(dashboardMapper.findRecentExceptions(5)).thenReturn(List.of());
-        when(dashboardMapper.findRecentValidationRuns(3)).thenReturn(List.of());
+        when(dashboardQueryRepository.countCapViolation(month)).thenReturn(1L);
+        when(dashboardQueryRepository.countCapWarning(month)).thenReturn(2L);
+        when(dashboardQueryRepository.countArbitrageCandidate(month)).thenReturn(3L);
+        when(dashboardQueryRepository.countReconciliationMismatch(month)).thenReturn(4L);
+        when(dashboardQueryRepository.countJournalImbalance()).thenReturn(5L);
+        when(dashboardQueryRepository.countOpenException()).thenReturn(6L);
+        when(dashboardQueryRepository.findRecentExceptions(5)).thenReturn(List.of());
+        when(dashboardQueryRepository.findRecentValidationRuns(3)).thenReturn(List.of());
 
         DashboardSummaryResult result = dashboardService.summarize(month);
 
@@ -66,17 +68,20 @@ class DashboardServiceImplTest {
     @Test
     void summarizeCallsMonthIndependentCountsWithoutMonthParameter() {
         LocalDate month = LocalDate.of(2026, 7, 1);
-        when(dashboardMapper.findRecentExceptions(5)).thenReturn(List.of());
-        when(dashboardMapper.findRecentValidationRuns(3)).thenReturn(List.of());
+        when(dashboardQueryRepository.findRecentExceptions(5)).thenReturn(List.of());
+        when(dashboardQueryRepository.findRecentValidationRuns(3)).thenReturn(List.of());
 
         dashboardService.summarize(month);
 
-        org.mockito.Mockito.verify(dashboardMapper).countJournalImbalance();
-        org.mockito.Mockito.verify(dashboardMapper).countOpenException();
-        org.mockito.Mockito.verify(dashboardMapper).countCapViolation(month);
-        org.mockito.Mockito.verify(dashboardMapper).countCapWarning(month);
-        org.mockito.Mockito.verify(dashboardMapper).countArbitrageCandidate(month);
-        org.mockito.Mockito.verify(dashboardMapper).countReconciliationMismatch(month);
+        verify(dashboardQueryRepository).countJournalImbalance();
+        verify(dashboardQueryRepository).countOpenException();
+        verify(dashboardQueryRepository).countCapViolation(month);
+        verify(dashboardQueryRepository).countCapWarning(month);
+        verify(dashboardQueryRepository).countArbitrageCandidate(month);
+        verify(dashboardQueryRepository).countReconciliationMismatch(month);
+        verify(dashboardQueryRepository).findRecentExceptions(5);
+        verify(dashboardQueryRepository).findRecentValidationRuns(3);
+        verifyNoMoreInteractions(dashboardQueryRepository);
     }
 
     @Test
@@ -88,8 +93,8 @@ class DashboardServiceImplTest {
         List<RecentValidationRunRow> runs = List.of(
                 new RecentValidationRunRow(1L, month, 1, "MONTHLY", "COMPLETED", 8, "gaadmin",
                         null, null, null, null, null));
-        when(dashboardMapper.findRecentExceptions(5)).thenReturn(exceptions);
-        when(dashboardMapper.findRecentValidationRuns(3)).thenReturn(runs);
+        when(dashboardQueryRepository.findRecentExceptions(5)).thenReturn(exceptions);
+        when(dashboardQueryRepository.findRecentValidationRuns(3)).thenReturn(runs);
 
         DashboardSummaryResult result = dashboardService.summarize(month);
 
