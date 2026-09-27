@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ERR-' + ${status}, ${errorTitle}, null, null)}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main id="main-content" class="page-content error-page">
+  <section class="surface error-card" aria-labelledby="error-title">
+    <header class="surface-header">
+      <h1 id="error-title" class="surface-title" th:text="${status} + ' · ' + ${errorTitle}">요청 오류</h1>
+    </header>
+    <div class="surface-body error-card-body">
+      <p class="error-message" th:text="${errorMessage}">요청 내용을 확인하세요.</p>
+      <p class="error-help" th:if="${errorDetail != null}" th:text="${errorDetail}"></p>
+      <p class="error-trace tabular-nums"><span th:text="${errorCode}"></span><span
+        th:if="${requestId != null}" th:text="' · 요청 ID: ' + ${requestId}"></span></p>
+      <a class="button button-secondary error-action" th:href="@{/}">대시보드로</a>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,6 +1,10 @@
 package com.susukkang.fgc.common.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
@@ -37,6 +41,9 @@ class MpaErrorPageIntegrationTest {
 
     @LocalServerPort
     int port;
+
+    @Autowired
+    ObjectMapper objectMapper;
 
     private HttpResponse<String> getHtml(String path) throws Exception {
         return HttpClient.newHttpClient().send(
@@ -84,6 +91,77 @@ class MpaErrorPageIntegrationTest {
      */
     @Test
     void forbidden_screen_url_renders_403_page_not_menu_hiding() throws Exception {
+        HttpClient client = authenticatedClient();
+
+        // 감사로그 화면 직접 호출 — 메뉴 숨김이 아니라 서버가 403 화면으로 막아야 한다.
+        HttpResponse<String> response = getHtmlWith(client, "/audit-logs");
+
+        assertThat(response.statusCode()).isEqualTo(403);
+        assertThat(response.headers().firstValue("Content-Type").orElse("")).startsWith("text/html");
+        assertThat(response.body())
+                .contains("403 · 권한 없음")
+                .contains("이 작업을 할 권한이 없습니다.")
+                .contains("FGC-AUTH-003")
+                .contains("요청 ID: " + response.headers().firstValue("X-Request-Id").orElseThrow())
+                .contains("수수료 정산·검증 Workspace");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "page=0&size=20, page",
+            "page=-1&size=20, page",
+            "page=1&size=0, size",
+            "page=1&size=101, size",
+            "page=2147483647&size=100, page"
+    })
+    void invalid_contract_paging_returns_400_html_and_preserves_api_json(String query, String field)
+            throws Exception {
+        HttpClient client = authenticatedClient();
+        // 목록 검색 폼에서 선택하지 않은 조건도 실제 화면 요청처럼 빈 값으로 전달한다.
+        String parameters = "?" + query + "&contractNo=&insurerId=&productOfferingId=&agentId=&orgId="
+                + "&contractDateFrom=&contractDateTo=&currentStatus=&capResultStatus=";
+
+        HttpResponse<String> screen = getHtmlWith(client, "/contracts" + parameters);
+
+        assertThat(screen.statusCode()).isEqualTo(400);
+        assertThat(screen.headers().firstValue("Content-Type").orElse("")).startsWith("text/html");
+        assertThat(screen.body())
+                .contains("400 · 입력 오류")
+                .contains("입력값을 확인하세요. (" + field + ")")
+                .contains("FGC-COMMON-002")
+                .contains("요청 ID: " + screen.headers().firstValue("X-Request-Id").orElseThrow())
+                .contains("수수료 정산·검증 Workspace")
+                .doesNotContain("FGC-COMMON-500", "\"error\":");
+
+        // API 오류가 HTML advice에 가로채지 않고 기존 JSON 응답 형식을 유지하는지 확인한다.
+        HttpResponse<String> api = client.send(
+                HttpRequest.newBuilder()
+                        .uri(URI.create("http://localhost:" + port + "/api/v1/contracts" + parameters))
+                        .header("Accept", "application/json")
+                        .GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(api.statusCode()).isEqualTo(400);
+        assertThat(api.headers().firstValue("Content-Type").orElse("")).startsWith("application/json");
+        var body = objectMapper.readTree(api.body());
+        assertThat(body.path("error").path("code").asText()).isEqualTo("FGC-COMMON-002");
+        assertThat(body.path("error").path("field").asText()).isEqualTo(field);
+        assertThat(body.path("error").path("message").asText())
+                .isEqualTo("입력값을 확인하세요. (" + field + ")");
+        assertThat(body.path("requestId").asText())
+                .isEqualTo(api.headers().firstValue("X-Request-Id").orElseThrow());
+    }
+
+    @Test
+    void valid_contract_paging_still_renders_list() throws Exception {
+        HttpResponse<String> response = getHtmlWith(authenticatedClient(), "/contracts?page=1&size=20");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Content-Type").orElse("")).startsWith("text/html");
+        assertThat(response.body()).contains("보험계약 목록").doesNotContain("FGC-COMMON-500");
+    }
+
+    private HttpClient authenticatedClient() throws Exception {
         HttpClient client = HttpClient.newBuilder().cookieHandler(new CookieManager()).build();
         String base = "http://localhost:" + port;
 
@@ -108,17 +186,7 @@ class MpaErrorPageIntegrationTest {
                 .as("로그인 성공 리다이렉트 — /login?error 면 자격증명·CSRF 문제")
                 .endsWith("/");
 
-        // 3) 감사로그 화면 직접 호출 — 메뉴 숨김이 아니라 서버가 403 화면으로 막아야 한다
-        HttpResponse<String> response = getHtmlWith(client, "/audit-logs");
-
-        assertThat(response.statusCode()).isEqualTo(403);
-        assertThat(response.headers().firstValue("Content-Type").orElse("")).startsWith("text/html");
-        assertThat(response.body())
-                .contains("403 · 권한 없음")                       // error/403.html
-                .contains("이 작업을 할 권한이 없습니다.")            // error.auth.forbidden 이 실제로 풀렸다
-                .contains("FGC-AUTH-003")                          // SIR-007 규칙 3 — Ajax 403 JSON 과 같은 코드
-                .contains("요청 ID: " + response.headers().firstValue("X-Request-Id").orElseThrow())
-                .contains("수수료 정산·검증 Workspace");             // 셸 레이아웃까지 렌더링됨
+        return client;
     }
 
     private HttpResponse<String> getHtmlWith(HttpClient client, String path) throws Exception {
