@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -141,5 +142,47 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
         assertThat(reconciliation.resultType().name()).isEqualTo("AMOUNT_DIFFERENCE");
         assertThat(reconciliation.resultTypeLabel()).isEqualTo("금액 차이");
         assertThat(reconciliation.differenceAmount()).isEqualByComparingTo(BigDecimal.valueOf(10000));
+        assertThat(reconciliation.expectedTotalAmount()).isEqualByComparingTo("100000");
+        assertThat(reconciliation.actualTotalAmount()).isEqualByComparingTo("90000");
+        assertThat(reconciliation.primaryReasonCode()).isEqualTo("TEST_REASON");
+        assertThat(reconciliation.installmentNo()).isNull();
+        assertThat(reconciliation.commissionItemId()).isNull();
+        assertThat(reconciliation.createdAt()).isNotNull();
+    }
+
+    @Test
+    @Transactional
+    void reconciliationResultsKeepTimestampAndSortByNewestThenId() {
+        Long contractId = contractId("FGC-FGL01-202703-0001");
+        Long runId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (settlement_month, payment_stage, status)
+                VALUES ('2026-07-01', 'GA_TO_FC', 'CREATED')
+                RETURNING reconciliation_run_id
+                """, Long.class);
+        OffsetDateTime newest = OffsetDateTime.parse("2026-07-15T00:30:00+09:00");
+        String insertSql = """
+                INSERT INTO fgc.reconciliation_result
+                       (reconciliation_run_id, match_group_key, contract_id, result_type,
+                        expected_total_amount, actual_total_amount, difference_amount,
+                        installment_no, created_at)
+                VALUES (?, ?, ?, 'AMOUNT_DIFFERENCE', 100000, 90000, 10000, 3, ?)
+                RETURNING reconciliation_result_id
+                """;
+        Long firstNewestId = jdbcTemplate.queryForObject(
+                insertSql, Long.class, runId, "latest-first", contractId, newest);
+        Long olderId = jdbcTemplate.queryForObject(
+                insertSql, Long.class, runId, "older", contractId, newest.minusDays(1));
+        Long lastNewestId = jdbcTemplate.queryForObject(
+                insertSql, Long.class, runId, "latest-last", contractId, newest);
+
+        ContractTransactionTabResponse response =
+                contractTransactionProjectionService.findTransactionsByContractId(contractId);
+
+        // 귀속된 지급 건이 없어도 대사 결과는 반환되어야 한다.
+        assertThat(response.transactions()).isEmpty();
+        assertThat(response.reconciliations()).extracting(ContractReconciliationResponse::reconciliationResultId)
+                .containsExactly(lastNewestId, firstNewestId, olderId);
+        assertThat(response.reconciliations().getFirst().createdAt().toInstant()).isEqualTo(newest.toInstant());
+        assertThat(response.reconciliations().getFirst().installmentNo()).isEqualTo(3);
     }
 }

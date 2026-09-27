@@ -120,6 +120,9 @@ class ContractJournalProjectionServiceImplIntegrationTest {
 
         assertThat(result).hasSize(1);
         ContractJournalResponse response = result.get(0);
+        assertThat(response.getJournalDate()).isEqualTo(journalDate);
+        assertThat(response.getRevisionNo()).isEqualTo(1);
+        assertThat(response.getDescription()).isEqualTo(TEST_MARKER);
         assertThat(response.getJournalType()).isEqualTo("EXPECTED_INSURER_INCOME");
         assertThat(response.getSourceEntityType()).isEqualTo("SCHEDULE_LINE");
         assertThat(response.getStatus()).isEqualTo("DRAFT");
@@ -132,6 +135,7 @@ class ContractJournalProjectionServiceImplIntegrationTest {
         assertThat(response.getPaymentStage()).isEqualTo("INSURER_TO_GA");
         assertThat(response.getPaymentStageLabel()).isEqualTo("원수사→GA");
         assertThat(response.getLines()).hasSize(2);
+        assertThat(response.getLines()).extracting("lineNo").containsExactly(1, 2);
         assertThat(response.getLines()).extracting("accountCode")
                 .containsExactlyInAnyOrder("EXPECTED_RECEIVABLE", "EXPECTED_INCOME");
     }
@@ -213,5 +217,13 @@ class ContractJournalProjectionServiceImplIntegrationTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getStatus()).isEqualTo("POSTED");
         assertThat(result.get(0).getStatusLabel()).isEqualTo("기표됨");
+        assertThat(result.get(0).getPaymentStage()).isNull();
+        assertThat(result.get(0).getPaymentStageLabel()).isNull();
+        assertThat(result.get(0).getLines()).allSatisfy(line -> {
+            assertThat(line.getAgentId()).isNull();
+            assertThat(line.getPaymentStage()).isNull();
+            assertThat(line.getCommissionItemId()).isNull();
+            assertThat(line.getMemo()).isNull();
+        });
     }
 }

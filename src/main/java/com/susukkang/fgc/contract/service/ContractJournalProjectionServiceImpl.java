@@ -7,7 +7,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.contract.dto.ContractJournalLineResponse;
 import com.susukkang.fgc.contract.dto.ContractJournalLineRow;
 import com.susukkang.fgc.contract.dto.ContractJournalResponse;
-import com.susukkang.fgc.contract.mapper.ContractJournalProjectionMapper;
+import com.susukkang.fgc.contract.repository.ContractJournalProjectionRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ContractJournalProjectionServiceImpl implements ContractJournalProjectionService {
 
-    private final ContractJournalProjectionMapper contractJournalProjectionMapper;
+    private final ContractJournalProjectionRepository contractJournalProjectionRepository;
     private final InsuranceContractRepository insuranceContractRepository;
 
     @Override
@@ -40,7 +40,7 @@ public class ContractJournalProjectionServiceImpl implements ContractJournalProj
         }
 
         // 2. 이 계약에 연결된 모든 분개 라인을 한 번에 조회(journal_header_id, line_no 순 정렬)
-        List<ContractJournalLineRow> rows = contractJournalProjectionMapper.findJournalLinesByContractId(contractId);
+        List<ContractJournalLineRow> rows = contractJournalProjectionRepository.findJournalLinesByContractId(contractId);
 
         // 3. 연결된 분개가 없으면 빈 목록 반환
         if (rows.isEmpty()) {
@@ -106,7 +106,7 @@ public class ContractJournalProjectionServiceImpl implements ContractJournalProj
                     .build());
         }
 
-        // 6. 헤더 등장 순서(Mapper 정렬 그대로) 그대로 반환
+        // 6. Repository에서 조회한 헤더 ID 순서대로 반환
         return result;
     }
 }

@@ -1,6 +1,8 @@
 package com.susukkang.fgc.contract.service;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
+import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -58,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
@@ -74,7 +77,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
  * @since 2026-08-06
  */
 @ExtendWith(MockitoExtension.class)
-class ContractServiceTest {
+class ContractServiceImplTest {
 
     @Mock
     private InsuranceContractRepository insuranceContractRepository;
@@ -98,7 +101,7 @@ class ContractServiceTest {
     private AuditLogService auditLogService;
 
     @InjectMocks
-    private ContractService contractService;
+    private ContractServiceImpl contractService;
 
     @Test
     @DisplayName("계약 상태 사건에 Job별 처리 이력을 묶고 미처리는 빈 배열로 반환한다")
@@ -243,6 +246,11 @@ class ContractServiceTest {
         assertThat(capCaptor.getAllValues())
                 .extracting(CapCalculationCommand::paymentStage)
                 .containsExactly(PaymentStage.INSURER_TO_GA, PaymentStage.GA_TO_FC);
+        assertThat(capCaptor.getAllValues()).allSatisfy(command -> {
+            assertThat(command.checkKind()).isEqualTo(CapCheckKind.REALTIME);
+            assertThat(command.validationRunId()).isNull();
+            assertThat(command.asOfDate()).isBetween(beforeCreation.toLocalDate(), afterCreation.toLocalDate());
+        });
     }
 
     @ParameterizedTest
@@ -402,6 +410,8 @@ class ContractServiceTest {
         verify(scheduleService).regenerateContractSchedules(21L, "CONTRACT_UPDATED");
         ArgumentCaptor<CapCalculationCommand> capCaptor = ArgumentCaptor.forClass(CapCalculationCommand.class);
         verify(capCheckService, org.mockito.Mockito.times(2)).calculateAndSave(capCaptor.capture());
+        assertThat(capCaptor.getAllValues()).allSatisfy(command ->
+                assertThat(command.checkKind()).isEqualTo(CapCheckKind.REALTIME));
         assertThat(capCaptor.getAllValues())
                 .extracting(CapCalculationCommand::paymentStage)
                 .containsExactly(PaymentStage.INSURER_TO_GA, PaymentStage.GA_TO_FC);
@@ -503,6 +513,93 @@ class ContractServiceTest {
                 .isInstanceOf(FgcBusinessException.class);
     }
 
+    @Test
+    @DisplayName("스케줄 산정 정보가 그대로면 계약번호만 수정하고 스케줄·한도 검증을 건너뛴다")
+    void updateContractSkipsScheduleAndCapWhenOnlyContractNumberChanges() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = contractMatching(request, request.getAgentId(), request.getOrganizationId());
+        request.setContractNo("CHANGED-001");
+        given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
+        givenValidReferences(request);
+
+        ContractUpdateResponse response = contractService.updateContract(21L, request);
+
+        assertThat(current.getContractNo()).isEqualTo("CHANGED-001");
+        assertThat(response.scheduleHeaderIds()).isEmpty();
+        assertThat(response.regeneratedScheduleIds()).isEmpty();
+        verify(insuranceContractRepository).flush();
+        verify(contractFinancialSnapshotRepository).insertInitialIfAbsent(21L);
+        verifyNoInteractions(scheduleService, capCheckService);
+    }
+
+    @ParameterizedTest
+    @EnumSource(PaymentStage.class)
+    @DisplayName("수동 재검증은 활성 지급단계만 MANUAL로 계산하고 원수사 단계에만 증빙액을 반영한다")
+    void recheckCapUsesManualKindAndEvidenceOnlyForActiveStage(PaymentStage activeStage) {
+        given(insuranceContractRepository.existsById(21L)).willReturn(true);
+        givenActiveSchedule(activeStage);
+        BigDecimal evidenceAmount = new BigDecimal("3000");
+        if (activeStage == PaymentStage.INSURER_TO_GA) {
+            given(contractQueryRepository.findComplianceEvidenceAmount(21L, activeStage)).willReturn(evidenceAmount);
+        }
+        CapCheckSaveResult latest = new CapCheckSaveResult(99L, null);
+        given(capCheckService.findLatest(eq(21L), any(PaymentStage.class)))
+                .willAnswer(invocation -> invocation.getArgument(1) == activeStage
+                        ? Optional.of(latest) : Optional.empty());
+        LocalDate before = LocalDate.now(DateUtil.SEOUL_ZONE);
+
+        List<CapCheckSaveResult> results = contractService.recheckCap(21L);
+
+        assertThat(results).containsExactly(latest);
+        ArgumentCaptor<CapCalculationCommand> capCaptor = ArgumentCaptor.forClass(CapCalculationCommand.class);
+        verify(capCheckService).calculateAndSave(capCaptor.capture());
+        CapCalculationCommand command = capCaptor.getValue();
+        assertThat(command.contractId()).isEqualTo(21L);
+        assertThat(command.paymentStage()).isEqualTo(activeStage);
+        assertThat(command.checkKind()).isEqualTo(CapCheckKind.MANUAL);
+        assertThat(command.validationRunId()).isNull();
+        assertThat(command.asOfDate()).isBetween(before, LocalDate.now(DateUtil.SEOUL_ZONE));
+        if (activeStage == PaymentStage.INSURER_TO_GA) {
+            assertThat(command.complianceEvidenceAmount()).isEqualByComparingTo(evidenceAmount);
+        } else {
+            assertThat(command.complianceEvidenceAmount()).isNull();
+            verifyNoInteractions(contractQueryRepository);
+        }
+        verify(contractQueryRepository, never()).findComplianceEvidenceAmount(21L, PaymentStage.GA_TO_FC);
+        ArgumentCaptor<AuditLogService.AuditEvent> auditCaptor =
+                ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().actionCode()).isEqualTo("CONTRACT_CAP_RECHECKED");
+        assertThat(auditCaptor.getValue().after()).isEqualTo(results);
+    }
+
+    @Test
+    @DisplayName("수동 재검증에서 룰셋이 없으면 검토 큐를 등록하고 계속 처리한다")
+    void recheckCapRegistersReviewWhenRuleIsMissing() {
+        given(insuranceContractRepository.existsById(21L)).willReturn(true);
+        givenActiveSchedule(PaymentStage.GA_TO_FC);
+        given(capCheckService.calculateAndSave(any())).willThrow(new FgcBusinessException(FgcErrorCode.CAP_004));
+
+        assertThat(contractService.recheckCap(21L)).isEmpty();
+
+        verify(scheduleService).registerCapRuleReview(21L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 룰셋이 없습니다.");
+        verify(auditLogService).record(any());
+    }
+
+    @Test
+    @DisplayName("수동 재검증에서 룰셋 누락 이외의 업무 오류는 호출자에게 전달한다")
+    void recheckCapPropagatesOtherBusinessFailures() {
+        given(insuranceContractRepository.existsById(21L)).willReturn(true);
+        givenActiveSchedule(PaymentStage.GA_TO_FC);
+        FgcBusinessException failure = new FgcBusinessException(FgcErrorCode.COMMON_500);
+        given(capCheckService.calculateAndSave(any())).willThrow(failure);
+
+        assertThatThrownBy(() -> contractService.recheckCap(21L)).isSameAs(failure);
+
+        verify(scheduleService, never()).registerCapRuleReview(any(), any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
     private void assertScheduleRegeneratedForRecipientChange(
             ContractUpdateRequest request,
             InsuranceContract current
@@ -575,6 +672,11 @@ class ContractServiceTest {
                 .build();
         ReflectionTestUtils.setField(event, "contractStatusEventId", id);
         return event;
+    }
+
+    private void givenActiveSchedule(PaymentStage activeStage) {
+        given(scheduleService.hasActiveOperationalSchedule(eq(21L), any(PaymentStage.class)))
+                .willAnswer(invocation -> invocation.getArgument(1) == activeStage);
     }
 
     private void givenValidReferences(ContractInput request) {
