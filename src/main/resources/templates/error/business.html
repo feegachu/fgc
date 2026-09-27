@@ -1,6 +1,11 @@
 <!DOCTYPE html>
-<html th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ERR-' + ${status}, ${errorTitle}, null, null)}"
+<html lang="ko"
+      th:replace="~{layout/default :: page(~{::main}, 'FGC-UI-ERR-' + ${status}, ${errorTitle}, null, null)}"
       xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title th:text="${errorTitle}">요청 오류 · FGC</title>
+</head>
 <body>
 <main id="main-content" class="page-content error-page">
   <section class="surface error-card" aria-labelledby="error-title">
