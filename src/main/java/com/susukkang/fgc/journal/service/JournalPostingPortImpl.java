@@ -124,20 +124,20 @@ public class JournalPostingPortImpl implements JournalPostingPort {
     }
 
     /**
-     * 저장(멱등) 후 아직 DRAFT면 POSTED로 전이한다. 이미 POSTED/REVERSED면 손대지 않고
-     * ALREADY_POSTED skip으로 기록한다.
+     * 저장(멱등) 후 아직 DRAFT면 POSTED로 전이한다. 이미 POSTED/REVERSED이거나 다른 실행이
+     * 먼저 기표해 상태 변경이 0건이면 ALREADY_POSTED skip으로 기록한다.
      *
      * @return 이번 호출로 새로 POSTED가 됐으면 1, 이전 실행에서 이미 처리돼 있었으면 0
      */
     private long postAndCommit(JournalHeaderDraft draft, Long contractId, Long triggeredBy,
                                 String requestId, List<ContractSkip> skips) {
         JournalHeaderRow saved = persistenceService.saveDraft(draft, triggeredBy, requestId);
-        if ("DRAFT".equals(saved.getStatus())) {
-            journalHeaderRepository.markPosted(saved.getJournalHeaderId(), triggeredBy);
+        if ("DRAFT".equals(saved.getStatus())
+                && journalHeaderRepository.markPosted(saved.getJournalHeaderId(), triggeredBy) == 1) {
             return 1;
         }
         skips.add(new ContractSkip(contractId, ALREADY_POSTED_REASON,
-                "journalHeaderId=" + saved.getJournalHeaderId() + " status=" + saved.getStatus()));
+                "journalHeaderId=" + saved.getJournalHeaderId() + " statusAtRead=" + saved.getStatus()));
         return 0;
     }
 }

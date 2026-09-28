@@ -10,12 +10,14 @@ import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.journal.domain.JournalAccountCode;
 import com.susukkang.fgc.journal.domain.JournalType;
 import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
+import com.susukkang.fgc.journal.dto.JournalDetailHeaderRow;
 import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
 import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRequest;
 import com.susukkang.fgc.journal.entity.JournalHeader;
+import com.susukkang.fgc.journal.repository.JournalQueryRepository;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionLineRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
@@ -24,6 +26,8 @@ import com.susukkang.fgc.exceptioncase.service.JournalCorrectionExceptionActionS
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
@@ -49,6 +53,9 @@ class JournalCorrectionServiceIntegrationTest {
 
     @Autowired
     private JournalCorrectionService journalCorrectionService;
+
+    @Autowired
+    private JournalQueryRepository journalQueryRepository;
 
     @Autowired
     private JournalCorrectionExceptionService journalCorrectionExceptionService;
@@ -206,6 +213,79 @@ class JournalCorrectionServiceIntegrationTest {
                 .isEqualByComparingTo("650000");
         assertThat(new BigDecimal((String) auditAmounts.get("after_debit")))
                 .isEqualByComparingTo("600000");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Transactional
+    void detailRemainsUniqueWhenRepostedJournalIsCorrectedAgain(boolean repostAgain) {
+        String sourceId = newSourceId();
+        Long originalId = insertPostedOriginal(sourceId, BigDecimal.valueOf(650_000));
+        JournalCorrectionResult first = journalCorrectionService.reverseAndRepost(
+                new ReverseAndRepostJournalCommand(
+                        new ReverseJournalCommand(originalId, "첫 정정", "DOC-FIRST", ACTOR_ID),
+                        correctedDraft(sourceId, contractId(), BigDecimal.valueOf(600_000), 1, 2)));
+        Long firstRepostId = first.repostedJournalHeaderId();
+        ReverseJournalCommand secondCommand = new ReverseJournalCommand(
+                firstRepostId, "재기표 분개 정정", "DOC-SECOND", ACTOR_ID);
+        JournalCorrectionResult second = repostAgain
+                ? journalCorrectionService.reverseAndRepost(new ReverseAndRepostJournalCommand(
+                        secondCommand,
+                        correctedDraft(sourceId, contractId(), BigDecimal.valueOf(550_000), 1, 2)
+                                .toBuilder().revisionNo(3).build()))
+                : journalCorrectionService.reverse(secondCommand);
+        entityManager.flush();
+        entityManager.clear();
+
+        JournalDetailHeaderRow firstRepost = journalQueryRepository.findHeaderById(firstRepostId);
+        assertThat(firstRepost.getJournalHeaderId()).isEqualTo(firstRepostId);
+        assertThat(firstRepost.getStatus()).isEqualTo("REVERSED");
+        assertThat(firstRepost.getRevisionNo()).isEqualTo(2);
+        assertThat(firstRepost.getCorrectionGroupKey()).isEqualTo(first.correctionGroupKey());
+        assertThat(firstRepost.getRepostedJournalHeaderId()).isEqualTo(firstRepostId);
+        assertThat(firstRepost.getRepostedJournalNo()).isEqualTo(firstRepost.getJournalNo());
+        assertThat(firstRepost.getReversalOfId()).isNull();
+        assertThat(firstRepost.getReversedByJournalHeaderId()).isEqualTo(second.journalHeaderId());
+
+        JournalDetailHeaderRow original = journalQueryRepository.findHeaderById(originalId);
+        JournalDetailHeaderRow firstReversal = journalQueryRepository.findHeaderById(first.journalHeaderId());
+        assertThat(original.getCorrectionGroupKey()).isEqualTo(first.correctionGroupKey());
+        assertThat(original.getReversedByJournalHeaderId()).isEqualTo(first.journalHeaderId());
+        assertThat(original.getReversedByJournalNo()).isEqualTo(firstReversal.getJournalNo());
+        assertThat(original.getRepostedJournalHeaderId()).isEqualTo(firstRepostId);
+        assertThat(original.getRepostedJournalNo()).isEqualTo(firstRepost.getJournalNo());
+        assertThat(firstReversal.getCorrectionGroupKey()).isEqualTo(first.correctionGroupKey());
+        assertThat(firstReversal.getReversalOfId()).isEqualTo(originalId);
+        assertThat(firstReversal.getReversalOfJournalNo()).isEqualTo(original.getJournalNo());
+        assertThat(firstReversal.getRepostedJournalHeaderId()).isEqualTo(firstRepostId);
+        assertThat(firstReversal.getRepostedJournalNo()).isEqualTo(firstRepost.getJournalNo());
+        assertThat(firstReversal.getReversedByJournalHeaderId()).isNull();
+
+        JournalDetailHeaderRow secondReversal = journalQueryRepository.findHeaderById(second.journalHeaderId());
+        assertThat(secondReversal.getCorrectionGroupKey()).isEqualTo(second.correctionGroupKey());
+        assertThat(secondReversal.getReversalOfId()).isEqualTo(firstRepostId);
+        assertThat(secondReversal.getReversalOfJournalNo()).isEqualTo(firstRepost.getJournalNo());
+        assertThat(secondReversal.getReversedByJournalHeaderId()).isNull();
+        assertThat(firstRepost.getReversedByJournalNo()).isEqualTo(secondReversal.getJournalNo());
+        assertThat(second.correctionGroupKey()).isNotEqualTo(first.correctionGroupKey());
+        if (repostAgain) {
+            JournalDetailHeaderRow secondRepost = journalQueryRepository.findHeaderById(
+                    second.repostedJournalHeaderId());
+            assertThat(secondRepost.getJournalHeaderId()).isEqualTo(second.repostedJournalHeaderId());
+            assertThat(secondRepost.getStatus()).isEqualTo("POSTED");
+            assertThat(secondRepost.getRevisionNo()).isEqualTo(3);
+            assertThat(secondRepost.getCorrectionGroupKey()).isEqualTo(second.correctionGroupKey());
+            assertThat(secondRepost.getRepostedJournalHeaderId()).isEqualTo(second.repostedJournalHeaderId());
+            assertThat(secondRepost.getRepostedJournalNo()).isEqualTo(secondRepost.getJournalNo());
+            assertThat(secondRepost.getReversalOfId()).isNull();
+            assertThat(secondRepost.getReversedByJournalHeaderId()).isNull();
+            assertThat(secondReversal.getRepostedJournalHeaderId()).isEqualTo(second.repostedJournalHeaderId());
+            assertThat(secondReversal.getRepostedJournalNo()).isEqualTo(secondRepost.getJournalNo());
+        } else {
+            assertThat(second.repostedJournalHeaderId()).isNull();
+            assertThat(secondReversal.getRepostedJournalHeaderId()).isNull();
+            assertThat(secondReversal.getRepostedJournalNo()).isNull();
+        }
     }
 
     @Test

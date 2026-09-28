@@ -97,6 +97,7 @@ class JournalPostingPortImplTest {
 
         given(persistenceService.saveDraft(any(), any(), any()))
                 .willReturn(draftHeaderRow(101L), draftHeaderRow(102L), draftHeaderRow(103L), draftHeaderRow(104L));
+        given(journalHeaderRepository.markPosted(any(), any())).willReturn(1);
 
         JournalPostingResult result = port().post(newContext(42L));
 
@@ -133,6 +134,26 @@ class JournalPostingPortImplTest {
     }
 
     @Test
+    void skipsWhenAnotherExecutionPostsAfterDraftWasRead() {
+        given(sourceRepository.findExpectedInsurerIncomeSources(any(), any())).willReturn(List.of(scheduleRow(1L)));
+        given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
+        given(persistenceService.saveDraft(any(), any(), any())).willReturn(draftHeaderRow(101L));
+        given(journalHeaderRepository.markPosted(101L, 3L)).willReturn(0);
+
+        JournalPostingResult result = port().post(newContext(42L));
+
+        assertThat(result.postedJournalCount()).isZero();
+        assertThat(result.skippedCount()).isEqualTo(1);
+        assertThat(result.failureCount()).isZero();
+        assertThat(result.skips()).singleElement().satisfies(skip -> {
+            assertThat(skip.contractId()).isEqualTo(10L);
+            assertThat(skip.reasonCode()).isEqualTo("ALREADY_POSTED");
+            assertThat(skip.message()).contains("journalHeaderId=101").doesNotContain("status=DRAFT");
+        });
+        verify(journalHeaderRepository).markPosted(101L, 3L);
+    }
+
+    @Test
     // EXPECTED_INSURER_INCOME 원천 필드가 커맨드에 그대로 매핑되는지
     void mapsScheduleRowFieldsIntoCommand() {
         ScheduleJournalSourceRow row = scheduleRow(7L);
@@ -142,6 +163,7 @@ class JournalPostingPortImplTest {
         given(sourceRepository.findConfirmedFcPayoutSources(any(), any())).willReturn(List.of());
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
         given(persistenceService.saveDraft(any(), any(), any())).willReturn(draftHeaderRow(200L));
+        given(journalHeaderRepository.markPosted(200L, 3L)).willReturn(1);
 
         port().post(newContext(99L));
 

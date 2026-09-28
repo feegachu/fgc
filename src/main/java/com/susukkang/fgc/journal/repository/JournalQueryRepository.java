@@ -106,7 +106,7 @@ public class JournalQueryRepository {
 
     /**
      * 미조회 시 기존 상세 Mapper와 동일하게 null을 반환한다.
-     * 원분개·역분개·재기표를 함께 연결하는 기존 조인 조건은 네이티브 SQL로 유지한다.
+     * 재기표를 다시 정정해도 자신의 정정그룹을 우선하여 헤더 한 건만 반환한다.
      */
     public JournalDetailHeaderRow findHeaderById(Long journalHeaderId) {
         NativeQuery<?> query = entityManager.createNativeQuery("""
@@ -114,7 +114,7 @@ public class JournalQueryRepository {
                        h.source_entity_type, h.source_entity_id, h.revision_no,
                        h.contract_id, c.contract_no,
                        h.validation_run_id, h.policy_version_id,
-                       COALESCE(h.correction_group_key, correction_group.correction_group_key) AS correction_group_key,
+                       COALESCE(h.correction_group_key, original_group.correction_group_key) AS correction_group_key,
                        h.status, h.description,
                        creator.login_id AS created_by, h.created_at,
                        poster.login_id AS posted_by, h.posted_at,
@@ -129,11 +129,11 @@ public class JournalQueryRepository {
                   LEFT JOIN fgc.app_user poster ON poster.user_id = h.posted_by
                   LEFT JOIN fgc.journal_header rev ON rev.journal_header_id = h.reversal_of_id
                   LEFT JOIN fgc.journal_header successor ON successor.reversal_of_id = h.journal_header_id
-                  LEFT JOIN fgc.journal_correction_group correction_group
-                         ON correction_group.original_journal_header_id = h.journal_header_id
-                         OR correction_group.correction_group_key = h.correction_group_key
+                  LEFT JOIN fgc.journal_correction_group original_group
+                         ON original_group.original_journal_header_id = h.journal_header_id
                   LEFT JOIN fgc.journal_header repost
-                         ON repost.correction_group_key = correction_group.correction_group_key
+                         ON repost.correction_group_key =
+                            COALESCE(h.correction_group_key, original_group.correction_group_key)
                         AND repost.journal_type <> 'REVERSAL'
                  WHERE h.journal_header_id = :journalHeaderId
                 """).unwrap(NativeQuery.class);
