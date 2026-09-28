@@ -9,7 +9,7 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionLineRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionExceptionTarget;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseActionMapper;
+import com.susukkang.fgc.journal.repository.JournalCorrectionExceptionRepository;
 import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
 import com.susukkang.fgc.journal.dto.JournalRepostCommand;
 import com.susukkang.fgc.journal.service.JournalCorrectionService;
@@ -46,7 +46,7 @@ import static org.mockito.Mockito.verify;
 class JournalCorrectionExceptionActionServiceTest {
 
     @Mock
-    private ExceptionCaseActionMapper actionMapper;
+    private JournalCorrectionExceptionRepository exceptionRepository;
     @Mock
     private JournalCorrectionService journalCorrectionService;
     @Mock
@@ -57,12 +57,12 @@ class JournalCorrectionExceptionActionServiceTest {
     @BeforeEach
     void setUp() {
         service = new JournalCorrectionExceptionActionService(
-                actionMapper, journalCorrectionService, exceptionCaseService);
+                exceptionRepository, journalCorrectionService, exceptionCaseService);
     }
 
     @Test
     void resolvesExceptionOnlyAfterReverseAndRepostSucceeds() {
-        given(actionMapper.findJournalCorrectionTargetForUpdate(30L))
+        given(exceptionRepository.findJournalCorrectionTargetForUpdate(30L))
                 .willReturn(target("JOURNAL_CORRECTION_REQUIRED", ExceptionStatus.IN_REVIEW));
         given(journalCorrectionService.reverseAndRepost(any(JournalRepostCommand.class)))
                 .willReturn(new JournalCorrectionResult(21L, 10L, 22L, "JCG-10-test"));
@@ -87,7 +87,7 @@ class JournalCorrectionExceptionActionServiceTest {
 
     @Test
     void failedRepostDoesNotWriteResolutionAction() {
-        given(actionMapper.findJournalCorrectionTargetForUpdate(30L))
+        given(exceptionRepository.findJournalCorrectionTargetForUpdate(30L))
                 .willReturn(target("JOURNAL_CORRECTION_REQUIRED", ExceptionStatus.IN_REVIEW));
         willThrow(new FgcBusinessException(FgcErrorCode.LEDG_001))
                 .given(journalCorrectionService)
@@ -101,7 +101,7 @@ class JournalCorrectionExceptionActionServiceTest {
 
     @Test
     void rejectsNonJournalCorrectionException() {
-        given(actionMapper.findJournalCorrectionTargetForUpdate(30L))
+        given(exceptionRepository.findJournalCorrectionTargetForUpdate(30L))
                 .willReturn(target("JOURNAL_IMBALANCE", ExceptionStatus.IN_REVIEW));
 
         assertThatThrownBy(() -> service.correct(30L, request(), 1L, "settle01"))
@@ -110,6 +110,33 @@ class JournalCorrectionExceptionActionServiceTest {
                         .isEqualTo(FgcErrorCode.EXCP_004));
 
         verify(journalCorrectionService, never()).reverseAndRepost(any(JournalRepostCommand.class));
+    }
+
+    @Test
+    void missingCorrectionExceptionDoesNotStartJournalCorrection() {
+        given(exceptionRepository.findJournalCorrectionTargetForUpdate(30L)).willReturn(null);
+
+        assertThatThrownBy(() -> service.correct(30L, request(), 1L, "settle01"))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(error -> assertThat(((FgcBusinessException) error).getErrorCode())
+                        .isEqualTo(FgcErrorCode.COMMON_004));
+
+        verify(journalCorrectionService, never()).reverseAndRepost(any(JournalRepostCommand.class));
+        verify(exceptionCaseService, never()).actionAfterJournalCorrection(any(), any(), any(), any());
+    }
+
+    @Test
+    void unresolvedReviewStatePreventsCorrectionAndResolution() {
+        given(exceptionRepository.findJournalCorrectionTargetForUpdate(30L))
+                .willReturn(target("JOURNAL_CORRECTION_REQUIRED", ExceptionStatus.NEW));
+
+        assertThatThrownBy(() -> service.correct(30L, request(), 1L, "settle01"))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(error -> assertThat(((FgcBusinessException) error).getErrorCode())
+                        .isEqualTo(FgcErrorCode.EXCP_003));
+
+        verify(journalCorrectionService, never()).reverseAndRepost(any(JournalRepostCommand.class));
+        verify(exceptionCaseService, never()).actionAfterJournalCorrection(any(), any(), any(), any());
     }
 
     private JournalCorrectionExceptionTarget target(String type, ExceptionStatus status) {

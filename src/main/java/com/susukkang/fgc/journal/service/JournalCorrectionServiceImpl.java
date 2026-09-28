@@ -7,22 +7,23 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.journal.domain.JournalType;
 import com.susukkang.fgc.journal.domain.JournalAccountCode;
-import com.susukkang.fgc.journal.dto.JournalAccountRow;
-import com.susukkang.fgc.journal.dto.JournalCorrectionGroupInsertRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionHeaderRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionLineRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
 import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
-import com.susukkang.fgc.journal.dto.JournalHeaderInsertRow;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
-import com.susukkang.fgc.journal.dto.JournalLineInsertRow;
 import com.susukkang.fgc.journal.dto.JournalRepostCommand;
 import com.susukkang.fgc.journal.dto.JournalRepostLineCommand;
 import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
-import com.susukkang.fgc.journal.mapper.JournalAccountMapper;
-import com.susukkang.fgc.journal.mapper.JournalCorrectionMapper;
-import com.susukkang.fgc.journal.mapper.JournalMapper;
+import com.susukkang.fgc.journal.entity.JournalAccount;
+import com.susukkang.fgc.journal.entity.JournalCorrectionGroup;
+import com.susukkang.fgc.journal.entity.JournalHeader;
+import com.susukkang.fgc.journal.entity.JournalLine;
+import com.susukkang.fgc.journal.repository.JournalAccountRepository;
+import com.susukkang.fgc.journal.repository.JournalCorrectionRepository;
+import com.susukkang.fgc.journal.repository.JournalHeaderRepository;
+import com.susukkang.fgc.journal.repository.JournalLineRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,9 +61,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     private static final BigDecimal MAX_JOURNAL_AMOUNT =
             new BigDecimal("9999999999999");
 
-    private final JournalCorrectionMapper correctionMapper;
-    private final JournalMapper journalMapper;
-    private final JournalAccountMapper journalAccountMapper;
+    private final JournalCorrectionRepository correctionRepository;
+    private final JournalHeaderRepository journalHeaderRepository;
+    private final JournalLineRepository journalLineRepository;
+    private final JournalAccountRepository journalAccountRepository;
     private final AuditLogService auditLogService;
 
     @Override
@@ -84,10 +86,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     @Transactional
     public JournalCorrectionResult reverseAndRepost(JournalRepostCommand command) {
         validateRepostCommand(command);
-        JournalCorrectionHeaderRow original = correctionMapper.findHeaderForUpdate(
+        JournalCorrectionHeaderRow original = correctionRepository.findHeaderForUpdate(
                 command.journalHeaderId());
         validateOriginal(original, command.journalHeaderId());
-        List<JournalCorrectionLineRow> originalLines = correctionMapper.findLines(
+        List<JournalCorrectionLineRow> originalLines = correctionRepository.findLines(
                 command.journalHeaderId());
         JournalHeaderDraft correctedDraft = buildCorrectedDraft(
                 original, originalLines, command);
@@ -195,12 +197,12 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     ) {
         ValidatedRequest request = validateRequest(command);
         JournalCorrectionHeaderRow original = lockedOriginal == null
-                ? correctionMapper.findHeaderForUpdate(command.journalHeaderId())
+                ? correctionRepository.findHeaderForUpdate(command.journalHeaderId())
                 : lockedOriginal;
         validateOriginal(original, command.journalHeaderId());
 
         List<JournalCorrectionLineRow> originalLines = lockedOriginalLines == null
-                ? correctionMapper.findLines(original.getJournalHeaderId())
+                ? correctionRepository.findLines(original.getJournalHeaderId())
                 : lockedOriginalLines;
         assertBalanced(originalLines);
 
@@ -212,7 +214,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 correctedDraft == null ? null : correctedDraft.getJournalDate());
 
         String correctionGroupKey = newCorrectionGroupKey(original.getJournalHeaderId());
-        correctionMapper.insertGroup(JournalCorrectionGroupInsertRow.builder()
+        correctionRepository.insertGroup(JournalCorrectionGroup.builder()
                 .correctionGroupKey(correctionGroupKey)
                 .originalJournalHeaderId(original.getJournalHeaderId())
                 .reason(request.reason())
@@ -222,10 +224,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
 
         Long reversalId = insertReversal(
                 original, originalLines, correctionGroupKey, request.reason(), command.requestedBy());
-        if (correctionMapper.markPosted(reversalId, command.requestedBy()) != 1) {
+        if (journalHeaderRepository.markPosted(reversalId, command.requestedBy()) != 1) {
             throw conflict(original.getJournalHeaderId());
         }
-        if (correctionMapper.markReversed(original.getJournalHeaderId()) != 1) {
+        if (journalHeaderRepository.markReversed(original.getJournalHeaderId()) != 1) {
             throw conflict(original.getJournalHeaderId());
         }
 
@@ -233,7 +235,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
         if (correctedDraft != null) {
             repostedId = insertRepost(
                     correctedDraft, correctedAccountIds, correctionGroupKey, command.requestedBy());
-            if (correctionMapper.markPosted(repostedId, command.requestedBy()) != 1) {
+            if (journalHeaderRepository.markPosted(repostedId, command.requestedBy()) != 1) {
                 throw conflict(original.getJournalHeaderId());
             }
         }
@@ -300,12 +302,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
         List<Long> accountIds = new ArrayList<>();
         for (JournalLineDraft line : correctedDraft.getLines()) {
             validateCorrectedLine(line);
-            JournalAccountRow account = journalAccountMapper.findActiveByCode(
-                    line.getAccountCode().name());
-            if (account == null) {
-                throw new FgcBusinessException(FgcErrorCode.JOURNAL_001,
-                        Map.of("accountCode", line.getAccountCode()));
-            }
+            JournalAccount account = journalAccountRepository.findByAccountCodeAndActiveYnTrue(
+                            line.getAccountCode().name())
+                    .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.JOURNAL_001,
+                            Map.of("accountCode", line.getAccountCode())));
             accountIds.add(account.getJournalAccountId());
             debitTotal = debitTotal.add(line.getDebitAmount());
             creditTotal = creditTotal.add(line.getCreditAmount());
@@ -358,10 +358,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                                 String correctionGroupKey,
                                 String reason,
                                 Long requestedBy) {
-        JournalHeaderInsertRow header = JournalHeaderInsertRow.builder()
+        JournalHeader header = JournalHeader.builder()
                 .journalNo(nextJournalNo(original.getJournalDate()))
                 .journalDate(original.getJournalDate())
-                .journalType(JournalType.REVERSAL.name())
+                .journalType(JournalType.REVERSAL)
                 .sourceEntityType("JOURNAL_HEADER")
                 .sourceEntityId(String.valueOf(original.getJournalHeaderId()))
                 .revisionNo(1)
@@ -373,10 +373,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 .description(reason)
                 .createdBy(requestedBy)
                 .build();
-        journalMapper.insert(header);
+        journalHeaderRepository.save(header);
 
         for (JournalCorrectionLineRow line : originalLines) {
-            journalMapper.insertLine(JournalLineInsertRow.builder()
+            journalLineRepository.save(JournalLine.builder()
                     .journalHeaderId(header.getJournalHeaderId())
                     .lineNo(line.getLineNo())
                     .journalAccountId(line.getJournalAccountId())
@@ -384,7 +384,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                     .creditAmount(line.getDebitAmount())
                     .contractId(line.getContractId())
                     .agentId(line.getAgentId())
-                    .paymentStage(line.getPaymentStage())
+                    .paymentStage(line.getPaymentStage() == null ? null : PaymentStage.valueOf(line.getPaymentStage()))
                     .commissionItemId(line.getCommissionItemId())
                     .memo(line.getMemo())
                     .build());
@@ -396,10 +396,10 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                               List<Long> accountIds,
                               String correctionGroupKey,
                               Long requestedBy) {
-        JournalHeaderInsertRow header = JournalHeaderInsertRow.builder()
+        JournalHeader header = JournalHeader.builder()
                 .journalNo(nextJournalNo(draft.getJournalDate()))
                 .journalDate(draft.getJournalDate())
-                .journalType(draft.getJournalType().name())
+                .journalType(draft.getJournalType())
                 .sourceEntityType(draft.getSourceEntityType())
                 .sourceEntityId(draft.getSourceEntityId())
                 .revisionNo(draft.getRevisionNo())
@@ -410,12 +410,12 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 .description(draft.getDescription())
                 .createdBy(requestedBy)
                 .build();
-        journalMapper.insert(header);
+        journalHeaderRepository.save(header);
 
         for (int i = 0; i < draft.getLines().size(); i++) {
             JournalLineDraft line = draft.getLines().get(i);
             PaymentStage paymentStage = line.getPaymentStage();
-            journalMapper.insertLine(JournalLineInsertRow.builder()
+            journalLineRepository.save(JournalLine.builder()
                     .journalHeaderId(header.getJournalHeaderId())
                     .lineNo(line.getLineNo())
                     .journalAccountId(accountIds.get(i))
@@ -423,7 +423,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                     .creditAmount(line.getCreditAmount())
                     .contractId(line.getContractId())
                     .agentId(line.getAgentId())
-                    .paymentStage(paymentStage == null ? null : paymentStage.name())
+                    .paymentStage(paymentStage)
                     .commissionItemId(line.getCommissionItemId())
                     .memo(line.getMemo())
                     .build());
@@ -438,13 +438,13 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 .map(date -> "journal-no:" + YearMonth.from(date))
                 .sorted(Comparator.naturalOrder())
                 .forEach(keys::add);
-        keys.forEach(correctionMapper::lockJournalNumbering);
+        keys.forEach(correctionRepository::lockJournalNumbering);
     }
 
     private String nextJournalNo(LocalDate journalDate) {
         String year = String.valueOf(journalDate.getYear());
         String month = String.format("%02d", journalDate.getMonthValue());
-        int seq = journalMapper.findNextJournalSeq(year, month);
+        int seq = journalHeaderRepository.findNextJournalSeq(year, month);
         if (seq > MAX_MONTHLY_SEQ) {
             throw new IllegalStateException("journal_no 월간 일련번호 상한 초과");
         }

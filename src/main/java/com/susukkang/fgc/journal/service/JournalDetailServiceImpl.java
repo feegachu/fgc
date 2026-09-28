@@ -8,7 +8,7 @@ import com.susukkang.fgc.journal.dto.JournalDetailHeaderRow;
 import com.susukkang.fgc.journal.dto.JournalDetailLineResponse;
 import com.susukkang.fgc.journal.dto.JournalDetailLineRow;
 import com.susukkang.fgc.journal.dto.JournalDetailResponse;
-import com.susukkang.fgc.journal.mapper.JournalDetailMapper;
+import com.susukkang.fgc.journal.repository.JournalQueryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,19 +21,19 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class JournalDetailServiceImpl implements JournalDetailService {
 
-    private final JournalDetailMapper journalDetailMapper;
+    private final JournalQueryRepository journalQueryRepository;
 
     @Override
     @Transactional(readOnly = true)
     public JournalDetailResponse findByJournalHeaderId(Long journalHeaderId) {
         // 헤더가 없으면 그 ID의 분개가 아예 존재하지 않는다는 뜻이라 404로 던진다.
-        JournalDetailHeaderRow row = journalDetailMapper.findHeaderById(journalHeaderId);
+        JournalDetailHeaderRow row = journalQueryRepository.findHeaderById(journalHeaderId);
         if (row == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", journalHeaderId));
         }
 
-        // Mapper가 line_no 오름차순으로 정렬해서 주므로 여기서 다시 정렬할 필요는 없다.
-        List<JournalDetailLineRow> lineRows = journalDetailMapper.findLinesByHeaderId(journalHeaderId);
+        // Repository가 line_no 오름차순으로 정렬해서 주므로 여기서 다시 정렬할 필요는 없다.
+        List<JournalDetailLineRow> lineRows = journalQueryRepository.findLinesByHeaderId(journalHeaderId);
 
         List<JournalDetailLineResponse> lines = lineRows.stream()
                 .map(JournalDetailLineResponse::from)
@@ -58,7 +58,7 @@ public class JournalDetailServiceImpl implements JournalDetailService {
         JournalHeaderStatus status = JournalHeaderStatus.valueOf(row.getStatus());
 
         // reversalOfId(이 분개가 역분개일 때 원분개)와 reversedByJournalHeaderId(이 분개가
-        // 나중에 역분개당했을 때 그 후속 분개)는 Mapper가 자기참조 조인 2건으로 이미 양쪽 다
+        // 나중에 역분개당했을 때 그 후속 분개)는 Repository가 자기참조 조인 2건으로 이미 양쪽 다
         // 채워서 준다 — 여기서는 그대로 옮기기만 하면 된다.
         return new JournalDetailResponse(
                 row.getJournalHeaderId(), row.getJournalNo(), row.getJournalDate(),

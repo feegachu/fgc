@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- Frozen baseline: f7a82c78, original SQL retained for opt-in performance comparison. -->
 <mapper namespace="com.susukkang.fgc.journal.mapper.JournalImbalanceMapper">
     <select id="findBalanceSummary" resultType="com.susukkang.fgc.journal.dto.JournalBalanceSummary">
         SELECT journal_header_id,
@@ -18,7 +19,7 @@
         WHERE h.validation_run_id = #{validationRunId}
         ORDER BY vw.journal_header_id
     </select>
-    
+
     <!--
       status 필터를 걸지 않는다(코드리뷰 반영) — 이전엔 status <> 'DRAFT'로 좁혔는데,
       journalPostingStep(Step 6a)이 아직 PlaceholderStepTasklet이라 이 배치가 만든 분개는

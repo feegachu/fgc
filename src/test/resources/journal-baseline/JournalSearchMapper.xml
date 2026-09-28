@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- Frozen baseline: f7a82c78, original SQL retained for opt-in performance comparison. -->
 <mapper namespace="com.susukkang.fgc.journal.mapper.JournalSearchMapper">
     <!-- from은 시작일이라 journal_date >= #{from}, to는 종료일이라 <= #{to}다(반대로 걸면
          범위가 항상 비어 있게 된다). -->

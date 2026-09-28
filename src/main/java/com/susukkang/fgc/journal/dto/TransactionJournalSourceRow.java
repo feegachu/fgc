@@ -11,7 +11,7 @@ import java.time.LocalDate;
  * CONFIRMED_FC_PAYOUT) 원천 1행. contractId는 commission_transaction.source_contract_id가
  * 아니라 transaction_attribution.contract_id(attribution_scope='CONTRACT')에서 가져온다
  * — source_contract_id는 GA_MANUAL_PAYMENT 원천만 채워져 다른 원천에서는 항상 NULL이다
- * (JournalPostingSourceMapper.xml 주석 참고, 코드리뷰로 발견).
+ * (JournalPostingSourceQueryRepository 참고, 코드리뷰로 발견).
  */
 @Getter
 @Setter

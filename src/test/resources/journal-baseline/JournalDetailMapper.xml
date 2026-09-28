@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- Frozen baseline: f7a82c78, original SQL retained for opt-in performance comparison. -->
 <mapper namespace="com.susukkang.fgc.journal.mapper.JournalDetailMapper">
     <!--
       creator/poster: created_by/posted_by(user_id)를 화면에 바로 쓸 수 있는 login_id로

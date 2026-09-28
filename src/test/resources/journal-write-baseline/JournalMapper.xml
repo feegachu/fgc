@@ -6,7 +6,7 @@
       넣지 않는다 — guard_journal_header_write가 INSERT 시 status<>'DRAFT'를 거부한다
       (JournalHeaderInsertRow Javadoc 참고).
     -->
-    <insert id="insert" parameterType="com.susukkang.fgc.journal.dto.JournalHeaderInsertRow"
+    <insert id="insert" parameterType="map"
             useGeneratedKeys="true" keyProperty="journalHeaderId" keyColumn="journal_header_id">
         INSERT INTO fgc.journal_header
             (journal_no, journal_date, journal_type, source_entity_type, source_entity_id,
@@ -18,7 +18,7 @@
              #{reversalOfId}, #{correctionGroupKey}, #{description}, #{createdBy})
     </insert>
 
-    <insert id="insertLine" parameterType="com.susukkang.fgc.journal.dto.JournalLineInsertRow"
+    <insert id="insertLine" parameterType="map"
             useGeneratedKeys="true" keyProperty="journalLineId" keyColumn="journal_line_id">
         INSERT INTO fgc.journal_line
             (journal_header_id, line_no, journal_account_id, debit_amount, credit_amount,
