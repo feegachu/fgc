@@ -73,6 +73,10 @@ public class JournalQueryRepository {
     }
 
     /** 계정과목 조건은 EXISTS로 검사하고 합계는 해당 헤더의 모든 라인으로 계산한다. */
+    // S2077 검토: searchWhere는 코드에 고정된 조건식만 조합하며 검색값은 모두 setParameter로 바인딩한다.
+    // ORDER BY는 고정이고 페이징은 JPA API를 사용한다. 사용자 입력을 JPQL 문자열에 연결하지 않는다.
+    // 회귀 검증: JournalSearchQueryRepositoryIntegrationTest의 bindsSqlLikeSearchValuesAsData/bindsSqlLikeAccountCodeAsData.
+    @SuppressWarnings("java:S2077")
     public List<JournalListRow> search(LocalDate from, LocalDate to, String journalType,
                                        String accountCode, Long contractId, String status,
                                        int offset, int limit) {
@@ -87,6 +91,9 @@ public class JournalQueryRepository {
     }
 
     /** 목록과 같은 조건을 사용해 페이징 전 전체 헤더 수를 조회한다. */
+    // S2077 검토: search와 동일한 고정 조건식만 사용하며 모든 검색값은 setParameter로 바인딩한다.
+    // 회귀 검증: JournalSearchQueryRepositoryIntegrationTest에서 SQL 형태 입력의 목록과 count를 함께 확인한다.
+    @SuppressWarnings("java:S2077")
     public long count(LocalDate from, LocalDate to, String journalType,
                       String accountCode, Long contractId, String status) {
         Map<String, Object> parameters = new LinkedHashMap<>();

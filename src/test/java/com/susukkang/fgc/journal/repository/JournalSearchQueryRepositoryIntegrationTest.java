@@ -2,6 +2,8 @@ package com.susukkang.fgc.journal.repository;
 
 import com.susukkang.fgc.journal.dto.JournalListRow;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -154,5 +156,48 @@ class JournalSearchQueryRepositoryIntegrationTest {
 
         long after = journalQueryRepository.count(null, null, null, null, contractId, null);
         assertThat(after).isEqualTo(before + 1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"journalType", "accountCode", "status"})
+    void bindsSqlLikeSearchValuesAsData(String field) {
+        Long contractId = anyContractId();
+        insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1),
+                "TEST-SEARCH-BIND-" + field);
+        assertThat(journalQueryRepository.count(null, null, "ADJUSTMENT", "EXPECTED_RECEIVABLE", contractId, "DRAFT"))
+                .isPositive();
+
+        String journalType = "journalType".equals(field) ? "ADJUSTMENT' OR '1'='1" : null;
+        String accountCode = "accountCode".equals(field) ? "EXPECTED_RECEIVABLE' OR '1'='1" : null;
+        String status = "status".equals(field) ? "DRAFT' OR '1'='1" : null;
+
+        assertThat(journalQueryRepository.search(null, null, journalType, accountCode, contractId, status, 0, 20))
+                .isEmpty();
+        assertThat(journalQueryRepository.count(null, null, journalType, accountCode, contractId, status))
+                .isZero();
+    }
+
+    @Test
+    void bindsSqlLikeAccountCodeAsData() {
+        String accountCode = "TEST' OR 1=1 --";
+        Long accountId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.journal_account (account_code, account_name, normal_balance)
+                VALUES (?, '검색 파라미터 바인딩 검증', 'DEBIT') RETURNING journal_account_id
+                """, Long.class, accountCode);
+        Long contractId = anyContractId();
+        Long matchingId = insertHeader(contractId, LocalDate.of(2026, 8, 1),
+                "TEST-SEARCH-QUOTED-ACCOUNT", "ADJUSTMENT");
+        jdbcTemplate.update("""
+                INSERT INTO fgc.journal_line (journal_header_id, line_no, journal_account_id, debit_amount, credit_amount)
+                VALUES (?, 1, ?, 50000, 0)
+                """, matchingId, accountId);
+        insertLine(matchingId, 2, "EXPECTED_INCOME", BigDecimal.ZERO, new BigDecimal("50000"));
+        insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-OTHER-ACCOUNT");
+
+        // 따옴표·OR·주석 기호도 계정코드의 일부다. 다른 계정의 원장이 함께 조회되면 안 된다.
+        assertThat(journalQueryRepository.search(null, null, null, accountCode, contractId, null, 0, 20))
+                .extracting(JournalListRow::getJournalHeaderId).containsExactly(matchingId);
+        assertThat(journalQueryRepository.count(null, null, null, accountCode, contractId, null))
+                .isEqualTo(1);
     }
 }
