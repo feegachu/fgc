@@ -16,8 +16,9 @@ import java.util.List;
 
 /**
  * FGC-UI-EXCP-W01 예외함 조회 매퍼 (IF-API-43 의 목록 부분).
- * 쓰기는 validation 쪽 {@link com.susukkang.fgc.validation.mapper.ExceptionCaseMapper} —
- * 화면 조회와 배치 생성을 섞지 않는다.
+ * 공용 저장·조치는 exceptioncase.repository의 JPA Repository를 사용한다.
+ * 배치 생성의 {@link com.susukkang.fgc.validation.mapper.ExceptionCaseMapper} 전환은 #380,
+ * 이 조회 Mapper의 전환은 #381에서 진행한다.
  *
  * statuses 는 {@link ExceptionStatus#dbStatuses} 가 화면 필터에서 이미 풀어 준
  * DB 상태값 목록이다. 빈 목록이면 상태 필터 없음(전체).

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseActionMapper">
+<mapper namespace="correction-action-baseline">
 
     <!-- 같은 예외의 상태와 action_seq를 두 요청이 동시에 바꾸지 못하도록 행을 잠근다. -->
     <select id="findByIdForUpdate"
-            resultType="com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget">
+            resultType="com.susukkang.fgc.exceptioncase.service.CorrectionActionBaseline$Target">
         SELECT exception_case_id AS exceptionCaseId,
                exception_type    AS exceptionType,
                status,
@@ -16,7 +16,7 @@
     </select>
 
     <select id="findJournalCorrectionTargetForUpdate"
-            resultType="com.susukkang.fgc.exceptioncase.dto.JournalCorrectionExceptionTarget">
+            resultType="map">
         SELECT exception_case_id  AS exceptionCaseId,
                exception_type     AS exceptionType,
                status,

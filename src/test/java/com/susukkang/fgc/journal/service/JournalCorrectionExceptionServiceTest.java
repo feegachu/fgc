@@ -16,13 +16,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -60,7 +63,6 @@ class JournalCorrectionExceptionServiceTest {
         given(exceptionRepository.findByExceptionKey(
                 "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:9:REQUEST:1"))
                 .willReturn(new JournalCorrectionExceptionRow(30L, ExceptionStatus.NEW));
-        given(exceptionRepository.insertInitialAction(any())).willReturn(1);
 
         var response = service.createOrGet(
                 10L, new JournalCorrectionExceptionRequest("금액 오류", "DOC-10"), 1L);
@@ -68,7 +70,7 @@ class JournalCorrectionExceptionServiceTest {
         assertThat(response.exceptionCaseId()).isEqualTo(30L);
         assertThat(response.created()).isTrue();
         assertThat(response.redirectUrl()).isEqualTo("/exceptions?selected=30");
-        verify(exceptionRepository).insertInitialAction(any());
+        verify(exceptionRepository).insertInitialAction(eq(30L), any());
         verify(auditLogService).record(any());
     }
 
@@ -85,7 +87,7 @@ class JournalCorrectionExceptionServiceTest {
         assertThat(response.created()).isFalse();
         assertThat(response.status()).isEqualTo(ExceptionStatus.IN_REVIEW);
         verify(exceptionRepository, never()).insertCase(any());
-        verify(exceptionRepository, never()).insertInitialAction(any());
+        verify(exceptionRepository, never()).insertInitialAction(any(), any());
         verify(auditLogService, never()).record(any());
     }
 
@@ -102,7 +104,7 @@ class JournalCorrectionExceptionServiceTest {
 
         assertThat(response.exceptionCaseId()).isEqualTo(30L);
         assertThat(response.created()).isFalse();
-        verify(exceptionRepository, never()).insertInitialAction(any());
+        verify(exceptionRepository, never()).insertInitialAction(any(), any());
         verify(auditLogService, never()).record(any());
     }
 
@@ -117,7 +119,6 @@ class JournalCorrectionExceptionServiceTest {
         given(exceptionRepository.findByExceptionKey(
                 "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:NONE:REQUEST:3"))
                 .willReturn(new JournalCorrectionExceptionRow(31L, ExceptionStatus.NEW));
-        given(exceptionRepository.insertInitialAction(any())).willReturn(1);
 
         service.createOrGet(10L, new JournalCorrectionExceptionRequest("  재검토 사유  ", "  "), 1L);
 
@@ -132,7 +133,7 @@ class JournalCorrectionExceptionServiceTest {
         assertThat(command.description()).isEqualTo("재검토 사유");
         assertThat(command.evidenceRef()).isNull();
         assertThat(command.requestedBy()).isEqualTo(1L);
-        verify(exceptionRepository).insertInitialAction(command);
+        verify(exceptionRepository).insertInitialAction(31L, command);
     }
 
     @Test
@@ -142,12 +143,13 @@ class JournalCorrectionExceptionServiceTest {
         given(exceptionRepository.findByExceptionKey(
                 "JOURNAL_HEADER:10:JOURNAL_CORRECTION_REQUIRED:POLICY_VERSION:9:REQUEST:1"))
                 .willReturn(new JournalCorrectionExceptionRow(30L, ExceptionStatus.NEW));
-        given(exceptionRepository.insertInitialAction(any())).willReturn(0);
+        doThrow(new DataIntegrityViolationException("initial action constraint failure"))
+                .when(exceptionRepository).insertInitialAction(eq(30L), any());
 
         assertThatThrownBy(() -> service.createOrGet(
                 10L, new JournalCorrectionExceptionRequest("정정 요청", null), 1L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("원장 정정 요청 이력 저장에 실패했습니다.");
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessage("initial action constraint failure");
 
         verify(auditLogService, never()).record(any());
     }

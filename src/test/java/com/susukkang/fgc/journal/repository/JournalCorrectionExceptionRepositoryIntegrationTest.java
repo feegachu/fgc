@@ -66,7 +66,7 @@ class JournalCorrectionExceptionRepositoryIntegrationTest {
                 .containsEntry("description", "금액 정정 사유");
         assertThat(storedCase.get("validation_month").toString()).isEqualTo("2094-08-01");
 
-        assertThat(repository.insertInitialAction(command)).isEqualTo(1);
+        repository.insertInitialAction(row.exceptionCaseId(), command);
         Map<String, Object> action = jdbcTemplate.queryForMap("""
                 SELECT action_seq, from_status, to_status, action_type, reason, evidence_ref, action_by
                   FROM fgc.exception_action WHERE exception_case_id = ?

@@ -1,0 +1,12 @@
+// bc35de82의 잔여 MyBatis 예외 조치와 JPA 전환 후를 비교한다. 일반 test 실행에서는 비활성이다.
+// 원장 reverseAndRepost는 기준 리비전에서도 JPA이므로 양쪽에서 동일한 실제 서비스를 호출한다.
+// SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:<port>/fgc_correction_perf_<suffix>?currentSchema=fgc
+// 실행: gradlew -I scripts/verification/correction-action-performance.init.gradle test --tests '*CorrectionActionPerformanceTest'
+// 실제 commit/행 잠금 대기를 측정한다. 감사 로그를 삭제하지 않으며 측정 후 전용 DB 전체를 폐기한다.
+allprojects {
+    tasks.withType(Test).configureEach {
+        systemProperty 'fgc.correction.action.performance', 'true'
+        maxHeapSize = '1g'
+        testLogging.showStandardStreams = true
+    }
+}

@@ -85,9 +85,7 @@ public class JournalCorrectionExceptionService {
         }
 
         if (created) {
-            if (correctionExceptionRepository.insertInitialAction(command) != 1) {
-                throw new IllegalStateException("원장 정정 요청 이력 저장에 실패했습니다.");
-            }
+            correctionExceptionRepository.insertInitialAction(row.exceptionCaseId(), command);
             auditLogService.record(AuditLogService.AuditEvent.builder()
                     .actionCode("JOURNAL_CORRECTION_REQUESTED")
                     .entityType("EXCEPTION_CASE")
