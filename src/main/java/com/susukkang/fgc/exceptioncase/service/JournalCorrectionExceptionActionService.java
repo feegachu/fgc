@@ -10,10 +10,10 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionExceptionTarget;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseActionMapper;
 import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
 import com.susukkang.fgc.journal.dto.JournalRepostCommand;
 import com.susukkang.fgc.journal.dto.JournalRepostLineCommand;
+import com.susukkang.fgc.journal.repository.JournalCorrectionExceptionRepository;
 import com.susukkang.fgc.journal.service.JournalCorrectionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,7 +34,7 @@ public class JournalCorrectionExceptionActionService {
 
     private static final String JOURNAL_HEADER = "JOURNAL_HEADER";
 
-    private final ExceptionCaseActionMapper exceptionCaseActionMapper;
+    private final JournalCorrectionExceptionRepository journalCorrectionExceptionRepository;
     private final JournalCorrectionService journalCorrectionService;
     private final ExceptionCaseService exceptionCaseService;
 
@@ -45,7 +45,7 @@ public class JournalCorrectionExceptionActionService {
             Long actionUserId,
             String actionUserLoginId
     ) {
-        JournalCorrectionExceptionTarget target = exceptionCaseActionMapper
+        JournalCorrectionExceptionTarget target = journalCorrectionExceptionRepository
                 .findJournalCorrectionTargetForUpdate(exceptionCaseId);
         if (target == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_004,

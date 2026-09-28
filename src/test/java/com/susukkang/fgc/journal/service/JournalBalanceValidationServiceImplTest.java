@@ -3,7 +3,7 @@ package com.susukkang.fgc.journal.service;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.journal.dto.JournalBalanceSummary;
-import com.susukkang.fgc.journal.mapper.JournalImbalanceMapper;
+import com.susukkang.fgc.journal.repository.JournalQueryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -17,16 +17,16 @@ import static org.mockito.BDDMockito.given;
 
 /**
  * #98 이슈 To-do "균형 분개 기표 성공, 불균형 기표 거절, 0원 분개 거절 테스트".
- * JournalImbalanceMapper를 모킹하는 순수 단위테스트라 DB가 필요 없다.
+ * JournalQueryRepository를 모킹하는 순수 단위테스트라 DB가 필요 없다.
  */
 @ExtendWith(MockitoExtension.class)
 class JournalBalanceValidationServiceImplTest {
 
     @Mock
-    private JournalImbalanceMapper journalImbalanceMapper;
+    private JournalQueryRepository journalQueryRepository;
 
     private JournalBalanceValidationServiceImpl service() {
-        return new JournalBalanceValidationServiceImpl(journalImbalanceMapper);
+        return new JournalBalanceValidationServiceImpl(journalQueryRepository);
     }
 
     private static JournalBalanceSummary summaryOf(BigDecimal debit, BigDecimal credit) {
@@ -39,7 +39,7 @@ class JournalBalanceValidationServiceImplTest {
 
     @Test
     void balancedJournalPassesAssertBalancedWithoutException() {
-        given(journalImbalanceMapper.findBalanceSummary(1L))
+        given(journalQueryRepository.findBalanceSummary(1L))
                 .willReturn(summaryOf(BigDecimal.valueOf(50_000), BigDecimal.valueOf(50_000)));
 
         service().assertBalanced(1L);
@@ -48,7 +48,7 @@ class JournalBalanceValidationServiceImplTest {
 
     @Test
     void imbalancedJournalIsRejectedWithLedg001AndAmounts() {
-        given(journalImbalanceMapper.findBalanceSummary(1L))
+        given(journalQueryRepository.findBalanceSummary(1L))
                 .willReturn(summaryOf(BigDecimal.valueOf(50_000), BigDecimal.valueOf(48_000)));
 
         assertThatThrownBy(() -> service().assertBalanced(1L))
@@ -70,7 +70,7 @@ class JournalBalanceValidationServiceImplTest {
         // 차변==대변이어도 둘 다 0이면 균형이 아니다(이슈 #98: "차변 합계가 0보다 큼"
         // 조건이 따로 있다) — 0/0은 애초에 아무 거래도 없다는 뜻이라 "균형 잡힌 분개"로
         // 인정하면 안 된다.
-        given(journalImbalanceMapper.findBalanceSummary(1L))
+        given(journalQueryRepository.findBalanceSummary(1L))
                 .willReturn(summaryOf(BigDecimal.ZERO, BigDecimal.ZERO));
 
         assertThatThrownBy(() -> service().assertBalanced(1L))
@@ -81,9 +81,9 @@ class JournalBalanceValidationServiceImplTest {
 
     @Test
     void headerWithNoLinesIsTreatedAsImbalancedInsteadOfThrowingNpe() {
-        // journal_line이 하나도 없는 헤더는 Mapper가 null을 돌려준다(GROUP BY 결과 없음).
+        // journal_line이 하나도 없는 헤더는 Repository가 null을 돌려준다(GROUP BY 결과 없음).
         // summarize()가 null을 그대로 넘기면 isBalanced() 호출에서 NPE가 났을 것이다.
-        given(journalImbalanceMapper.findBalanceSummary(1L)).willReturn(null);
+        given(journalQueryRepository.findBalanceSummary(1L)).willReturn(null);
 
         JournalBalanceSummary summary = service().summarize(1L);
         assertThat(summary.getDebitTotal()).isEqualByComparingTo(BigDecimal.ZERO);

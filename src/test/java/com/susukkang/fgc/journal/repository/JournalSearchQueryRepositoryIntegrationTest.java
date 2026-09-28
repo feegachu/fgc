@@ -1,4 +1,4 @@
-package com.susukkang.fgc.journal.mapper;
+package com.susukkang.fgc.journal.repository;
 
 import com.susukkang.fgc.journal.dto.JournalListRow;
 import org.junit.jupiter.api.Test;
@@ -14,7 +14,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * FGC-FUN-046 / IF-API-34 — 검증원장 목록 조회 Mapper. 조건 필터링과 차변/대변 합계
+ * FGC-FUN-046 / IF-API-34 — 검증원장 목록 조회 Repository. 조건 필터링과 차변/대변 합계
  * 서브쿼리가 실제 DB에서 동작하는지 확인한다. CI/로컬 환경마다 journal_header 시드
  * 데이터가 다를 수 있어(로컬 개발 중 남은 테스트 데이터 등) 기존 행에 기대지 않고,
  * 매 테스트가 @Transactional 롤백으로 자기 데이터를 직접 만들고 지운다(journal_account는
@@ -23,10 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @Transactional
-class JournalSearchMapperIntegrationTest {
+class JournalSearchQueryRepositoryIntegrationTest {
 
     @Autowired
-    private JournalSearchMapper journalSearchMapper;
+    private JournalQueryRepository journalQueryRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -71,7 +71,7 @@ class JournalSearchMapperIntegrationTest {
         Long contractId = anyContractId();
         Long headerId = insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-0001");
 
-        List<JournalListRow> rows = journalSearchMapper.search(
+        List<JournalListRow> rows = journalQueryRepository.search(
                 null, null, null, null, contractId, null, 0, 20);
 
         assertThat(rows).anySatisfy(row -> {
@@ -88,7 +88,7 @@ class JournalSearchMapperIntegrationTest {
         Long contractId = anyContractId();
         Long headerId = insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-0002");
 
-        List<JournalListRow> rows = journalSearchMapper.search(
+        List<JournalListRow> rows = journalQueryRepository.search(
                 null, null, null, null, contractId, "POSTED", 0, 20);
 
         assertThat(rows).noneMatch(row -> row.getJournalHeaderId().equals(headerId));
@@ -100,7 +100,7 @@ class JournalSearchMapperIntegrationTest {
         Long adjustmentId = insertHeader(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-TYPE-0001", "ADJUSTMENT");
         Long clawbackId = insertHeader(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-TYPE-0002", "CLAWBACK");
 
-        List<JournalListRow> rows = journalSearchMapper.search(
+        List<JournalListRow> rows = journalQueryRepository.search(
                 null, null, "ADJUSTMENT", null, contractId, null, 0, 20);
 
         assertThat(rows).extracting(JournalListRow::getJournalHeaderId)
@@ -118,9 +118,9 @@ class JournalSearchMapperIntegrationTest {
         insertLine(headerId, 2, "EXPECTED_RECEIVABLE", new BigDecimal("20000.00"), BigDecimal.ZERO);
         insertLine(headerId, 3, "EXPECTED_INCOME", BigDecimal.ZERO, new BigDecimal("50000.00"));
 
-        List<JournalListRow> matching = journalSearchMapper.search(
+        List<JournalListRow> matching = journalQueryRepository.search(
                 null, null, null, "EXPECTED_RECEIVABLE", contractId, null, 0, 20);
-        List<JournalListRow> nonMatching = journalSearchMapper.search(
+        List<JournalListRow> nonMatching = journalQueryRepository.search(
                 null, null, null, "ACTUAL_RECEIVABLE", contractId, null, 0, 20);
 
         assertThat(matching).filteredOn(row -> row.getJournalHeaderId().equals(headerId)).hasSize(1);
@@ -132,9 +132,9 @@ class JournalSearchMapperIntegrationTest {
         Long contractId = anyContractId();
         Long headerId = insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-0003");
 
-        List<JournalListRow> inRange = journalSearchMapper.search(
+        List<JournalListRow> inRange = journalQueryRepository.search(
                 LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 1), null, null, contractId, null, 0, 20);
-        List<JournalListRow> outOfRange = journalSearchMapper.search(
+        List<JournalListRow> outOfRange = journalQueryRepository.search(
                 LocalDate.of(2026, 8, 2), null, null, null, contractId, null, 0, 20);
 
         assertThat(inRange).extracting(JournalListRow::getJournalHeaderId).contains(headerId);
@@ -148,11 +148,11 @@ class JournalSearchMapperIntegrationTest {
         // 넘는 환경에서 페이지가 잘려도 통과해 버려 count 자체의 정확성을 증명하지 못한다.
         // 그래서 삽입 전후의 count 증가량(델타)만 비교한다.
         Long contractId = anyContractId();
-        long before = journalSearchMapper.count(null, null, null, null, contractId, null);
+        long before = journalQueryRepository.count(null, null, null, null, contractId, null);
 
         insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-0004");
 
-        long after = journalSearchMapper.count(null, null, null, null, contractId, null);
+        long after = journalQueryRepository.count(null, null, null, null, contractId, null);
         assertThat(after).isEqualTo(before + 1);
     }
 }

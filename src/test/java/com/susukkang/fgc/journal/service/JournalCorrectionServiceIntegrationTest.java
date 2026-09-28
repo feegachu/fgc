@@ -3,6 +3,7 @@ package com.susukkang.fgc.journal.service;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.JournalHeaderStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
@@ -14,11 +15,13 @@ import com.susukkang.fgc.journal.dto.JournalLineDraft;
 import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRequest;
+import com.susukkang.fgc.journal.entity.JournalHeader;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionLineRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import com.susukkang.fgc.exceptioncase.service.JournalCorrectionExceptionActionService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +64,9 @@ class JournalCorrectionServiceIntegrationTest {
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @AfterEach
     void clearRequestId() {
@@ -426,6 +432,9 @@ class JournalCorrectionServiceIntegrationTest {
     @Transactional
     void duplicateRequestDoesNotCreateAnotherReversal() {
         Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(100_000));
+        // 기존에 로드한 POSTED 엔티티가 있어도 정정 후 잠금 조회는 DB의 REVERSED를 읽어야 한다.
+        JournalHeader managedOriginal = entityManager.find(JournalHeader.class, originalId);
+        assertThat(managedOriginal.getStatus()).isEqualTo(JournalHeaderStatus.POSTED);
         ReverseJournalCommand command = new ReverseJournalCommand(
                 originalId, "중복 요청 검증", null, ACTOR_ID);
 
@@ -440,6 +449,109 @@ class JournalCorrectionServiceIntegrationTest {
                 SELECT COUNT(*) FROM fgc.journal_header WHERE reversal_of_id = ?
                 """, Integer.class, originalId);
         assertThat(reversalCount).isEqualTo(1);
+        entityManager.flush();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.journal_header WHERE journal_header_id = ?", String.class, originalId))
+                .isEqualTo("REVERSED");
+    }
+
+    @Test
+    @Transactional
+    void reversalPreservesLineDimensionsIncludingNullableFieldsAndHeaderPolicy() {
+        Long policyId = jdbcTemplate.queryForObject(
+                "SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 1", Long.class);
+        Long agentId = jdbcTemplate.queryForObject(
+                "SELECT agent_id FROM fgc.agent ORDER BY agent_id LIMIT 1", Long.class);
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1", Long.class);
+        Long originalId = insertPostedOriginal(newSourceId(), new BigDecimal("12345.67"), policyId, null, agentId, itemId);
+
+        JournalCorrectionResult result = journalCorrectionService.reverse(
+                new ReverseJournalCommand(originalId, "추적값 보존", null, ACTOR_ID));
+
+        List<Map<String, Object>> dimensions = jdbcTemplate.queryForList("""
+                SELECT line_no, journal_account_id, contract_id, agent_id, payment_stage, commission_item_id, memo
+                  FROM fgc.journal_line WHERE journal_header_id = ? ORDER BY line_no
+                """, result.journalHeaderId());
+        assertThat(dimensions).isEqualTo(jdbcTemplate.queryForList("""
+                SELECT line_no, journal_account_id, contract_id, agent_id, payment_stage, commission_item_id, memo
+                  FROM fgc.journal_line WHERE journal_header_id = ? ORDER BY line_no
+                """, originalId));
+        assertThat(dimensions.get(0)).containsEntry("agent_id", agentId)
+                .containsEntry("commission_item_id", itemId).containsEntry("memo", "정정 라인 추적");
+        assertThat(dimensions.get(1)).containsEntry("agent_id", null).containsEntry("commission_item_id", null);
+        Map<String, Object> header = jdbcTemplate.queryForMap("""
+                SELECT policy_version_id, contract_id, created_by, posted_by, created_at, posted_at
+                  FROM fgc.journal_header WHERE journal_header_id = ?
+                """, result.journalHeaderId());
+        assertThat(header).containsEntry("policy_version_id", policyId).containsEntry("contract_id", contractId())
+                .containsEntry("created_by", ACTOR_ID).containsEntry("posted_by", ACTOR_ID);
+        assertThat(header.get("created_at")).isNotNull();
+        assertThat(header.get("posted_at")).isNotNull();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT created_at IS NOT NULL FROM fgc.journal_correction_group WHERE correction_group_key = ?
+                """, Boolean.class, result.correctionGroupKey())).isTrue();
+    }
+
+    @Test
+    @Transactional
+    void repostInAnotherMonthUsesEachMonthNumberingAndHoldsBothAdvisoryLocks() {
+        String sourceId = newSourceId();
+        Long originalId = insertPostedOriginal(sourceId, BigDecimal.valueOf(100_000));
+        LocalDate correctedDate = JOURNAL_DATE.minusMonths(1);
+        JournalHeaderDraft draft = correctedDraft(sourceId, contractId(), BigDecimal.valueOf(90_000), 1, 2)
+                .toBuilder().journalDate(correctedDate).build();
+
+        JournalCorrectionResult result = journalCorrectionService.reverseAndRepost(new ReverseAndRepostJournalCommand(
+                new ReverseJournalCommand(originalId, "다른 월에 재기표", null, ACTOR_ID), draft));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT journal_no FROM fgc.journal_header WHERE journal_header_id = ?",
+                String.class, result.journalHeaderId())).matches("JV-2026-08-\\d{4}");
+        assertThat(jdbcTemplate.queryForObject("SELECT journal_no FROM fgc.journal_header WHERE journal_header_id = ?",
+                String.class, result.repostedJournalHeaderId())).matches("JV-2026-07-\\d{4}");
+        assertThat(jdbcTemplate.queryForObject("SELECT journal_date FROM fgc.journal_header WHERE journal_header_id = ?",
+                LocalDate.class, result.repostedJournalHeaderId())).isEqualTo(correctedDate);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.journal_header
+                 WHERE correction_group_key = ? AND status = 'POSTED' AND posted_at IS NOT NULL
+                """, Long.class, result.correctionGroupKey())).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pg_locks
+                 WHERE pid = pg_backend_pid() AND locktype = 'advisory' AND granted AND objsubid = 1
+                   AND ((classid::bigint << 32) | objid::bigint) IN
+                       (hashtextextended('journal-no:2026-07', 0), hashtextextended('journal-no:2026-08', 0))
+                """, Long.class)).isEqualTo(2);
+    }
+
+    @Test
+    @Transactional
+    void finalizedValidationRunRejectsCorrectionBeforeWritingGroupOrReversal() {
+        LocalDate validationMonth = LocalDate.of(2098, 6, 1);
+        Long runId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, status)
+                SELECT ?, COALESCE(MAX(run_no), 0) + 1, 'CREATED'
+                  FROM fgc.validation_run WHERE validation_month = ? RETURNING validation_run_id
+                """, Long.class, validationMonth, validationMonth);
+        Long originalId = insertPostedOriginal(newSourceId(), BigDecimal.valueOf(100_000), null, runId, null, null);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status = 'RUNNING' WHERE validation_run_id = ?", runId);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status = 'COMPLETED', current_step = 8 WHERE validation_run_id = ?", runId);
+        jdbcTemplate.update("""
+                UPDATE fgc.validation_run SET status = 'FINALIZED', current_step = 10, finalized_at = clock_timestamp()
+                 WHERE validation_run_id = ?
+                """, runId);
+
+        assertThatThrownBy(() -> journalCorrectionService.reverse(
+                new ReverseJournalCommand(originalId, "확정 실행 정정 거절", null, ACTOR_ID)))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(error -> assertThat(((FgcBusinessException) error).getErrorCode()).isEqualTo(FgcErrorCode.VRUN_003));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.journal_header WHERE journal_header_id = ?",
+                String.class, originalId)).isEqualTo("POSTED");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.journal_header WHERE reversal_of_id = ?",
+                Long.class, originalId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.journal_correction_group WHERE original_journal_header_id = ?
+                """, Long.class, originalId)).isZero();
     }
 
     @Test
@@ -470,16 +582,21 @@ class JournalCorrectionServiceIntegrationTest {
     }
 
     private Long insertPostedOriginal(String sourceId, BigDecimal amount, Long policyVersionId) {
+        return insertPostedOriginal(sourceId, amount, policyVersionId, null, null, null);
+    }
+
+    private Long insertPostedOriginal(String sourceId, BigDecimal amount, Long policyVersionId,
+                                      Long validationRunId, Long agentId, Long itemId) {
         Long contractId = contractId();
         String journalNo = "TEST-CORR-" + UUID.randomUUID();
         Long headerId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.journal_header
                     (journal_no, journal_date, journal_type, source_entity_type,
-                     source_entity_id, revision_no, contract_id, policy_version_id,
+                     source_entity_id, revision_no, contract_id, policy_version_id, validation_run_id,
                      description, created_by)
-                VALUES (?, ?, 'EXPECTED_INSURER_INCOME', 'SCHEDULE_LINE', ?, 1, ?, ?, ?, ?)
+                VALUES (?, ?, 'EXPECTED_INSURER_INCOME', 'SCHEDULE_LINE', ?, 1, ?, ?, ?, ?, ?)
                 RETURNING journal_header_id
-                """, Long.class, journalNo, JOURNAL_DATE, sourceId, contractId, policyVersionId,
+                """, Long.class, journalNo, JOURNAL_DATE, sourceId, contractId, policyVersionId, validationRunId,
                 "FUN-047 통합테스트", ACTOR_ID);
 
         Long debitAccountId = accountId(JournalAccountCode.EXPECTED_RECEIVABLE);
@@ -487,10 +604,10 @@ class JournalCorrectionServiceIntegrationTest {
         jdbcTemplate.update("""
                 INSERT INTO fgc.journal_line
                     (journal_header_id, line_no, journal_account_id, debit_amount,
-                     credit_amount, contract_id, payment_stage)
-                VALUES (?, 1, ?, ?, 0, ?, 'INSURER_TO_GA'),
-                       (?, 2, ?, 0, ?, ?, 'INSURER_TO_GA')
-                """, headerId, debitAccountId, amount, contractId,
+                     credit_amount, contract_id, payment_stage, agent_id, commission_item_id, memo)
+                VALUES (?, 1, ?, ?, 0, ?, 'INSURER_TO_GA', ?, ?, '정정 라인 추적'),
+                       (?, 2, ?, 0, ?, ?, 'INSURER_TO_GA', NULL, NULL, NULL)
+                """, headerId, debitAccountId, amount, contractId, agentId, itemId,
                 headerId, creditAccountId, amount, contractId);
         assertThat(jdbcTemplate.update("""
                 UPDATE fgc.journal_header SET status = 'POSTED', posted_by = ?

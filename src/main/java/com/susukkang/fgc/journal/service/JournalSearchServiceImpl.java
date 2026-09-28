@@ -5,7 +5,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.journal.dto.JournalListRow;
 import com.susukkang.fgc.journal.dto.JournalSearchCriteria;
-import com.susukkang.fgc.journal.mapper.JournalSearchMapper;
+import com.susukkang.fgc.journal.repository.JournalQueryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +17,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class JournalSearchServiceImpl implements JournalSearchService {
 
-    private final JournalSearchMapper journalSearchMapper;
+    private final JournalQueryRepository journalQueryRepository;
 
     private static final int MIN_PAGE = 1;
     private static final int MIN_SIZE = 1;
@@ -39,12 +39,12 @@ public class JournalSearchServiceImpl implements JournalSearchService {
         }
         int offset = (int) offLong;
 
-        List<JournalListRow> rows = journalSearchMapper.search(
+        List<JournalListRow> rows = journalQueryRepository.search(
                 criteria.from(), criteria.to(), criteria.journalType(), criteria.accountCode(),
                 criteria.contractId(), criteria.status(), offset, size
         );
 
-        Long total = journalSearchMapper.count(criteria.from(), criteria.to(), criteria.journalType(),
+        long total = journalQueryRepository.count(criteria.from(), criteria.to(), criteria.journalType(),
                 criteria.accountCode(), criteria.contractId(), criteria.status());
 
         return PageResponse.of(rows, page, size, total, "journalDate,desc");

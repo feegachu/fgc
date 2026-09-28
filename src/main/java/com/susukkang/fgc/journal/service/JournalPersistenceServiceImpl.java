@@ -2,17 +2,19 @@ package com.susukkang.fgc.journal.service;
 
 import com.susukkang.fgc.audit.entity.AuditLog;
 import com.susukkang.fgc.audit.repository.AuditLogRepository;
+import com.susukkang.fgc.common.code.JournalHeaderStatus;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
-import com.susukkang.fgc.journal.dto.JournalAccountRow;
 import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
-import com.susukkang.fgc.journal.dto.JournalHeaderInsertRow;
 import com.susukkang.fgc.journal.dto.JournalHeaderRow;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
-import com.susukkang.fgc.journal.dto.JournalLineInsertRow;
-import com.susukkang.fgc.journal.mapper.JournalAccountMapper;
-import com.susukkang.fgc.journal.mapper.JournalMapper;
+import com.susukkang.fgc.journal.entity.JournalAccount;
+import com.susukkang.fgc.journal.entity.JournalHeader;
+import com.susukkang.fgc.journal.entity.JournalLine;
+import com.susukkang.fgc.journal.repository.JournalAccountRepository;
+import com.susukkang.fgc.journal.repository.JournalHeaderRepository;
+import com.susukkang.fgc.journal.repository.JournalLineRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -43,8 +45,9 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
     private static final int MAX_JOURNAL_NO_RETRIES = 3;
     private static final int MAX_MONTHLY_SEQ = 9999;
 
-    private final JournalMapper journalMapper;
-    private final JournalAccountMapper journalAccountMapper;
+    private final JournalHeaderRepository journalHeaderRepository;
+    private final JournalLineRepository journalLineRepository;
+    private final JournalAccountRepository journalAccountRepository;
     private final AuditLogRepository auditLogRepository;
     private final ConstraintErrorCodeResolver constraintErrorCodeResolver;
     private final TransactionTemplate requiresNewTransactionTemplate;
@@ -56,13 +59,15 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
      * @version 1.0
      * @since 2026-09-27
      */
-    public JournalPersistenceServiceImpl(JournalMapper journalMapper,
-                                          JournalAccountMapper journalAccountMapper,
+    public JournalPersistenceServiceImpl(JournalHeaderRepository journalHeaderRepository,
+                                          JournalLineRepository journalLineRepository,
+                                          JournalAccountRepository journalAccountRepository,
                                           AuditLogRepository auditLogRepository,
                                           ConstraintErrorCodeResolver constraintErrorCodeResolver,
                                           PlatformTransactionManager transactionManager) {
-        this.journalMapper = journalMapper;
-        this.journalAccountMapper = journalAccountMapper;
+        this.journalHeaderRepository = journalHeaderRepository;
+        this.journalLineRepository = journalLineRepository;
+        this.journalAccountRepository = journalAccountRepository;
         this.auditLogRepository = auditLogRepository;
         this.constraintErrorCodeResolver = constraintErrorCodeResolver;
         this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
@@ -72,16 +77,17 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
     @Override
     public JournalHeaderRow saveDraft(JournalHeaderDraft draft, Long createdBy, String requestId) {
         // 1. 멱등 체크
-        JournalHeaderRow existing = journalMapper.findBySourceKey(
-                draft.getJournalType().name(), draft.getSourceEntityType(),
+        Optional<JournalHeaderRow> existing = journalHeaderRepository.findBySourceKey(
+                draft.getJournalType(), draft.getSourceEntityType(),
                 draft.getSourceEntityId(), draft.getRevisionNo());
-        if (existing != null) {
-            return existing;
+        if (existing.isPresent()) {
+            return existing.get();
         }
 
         // 2. POSTED 중복 기표 선제 체크
-        if (journalMapper.existsPostedForSource(draft.getJournalType().name(),
-                draft.getSourceEntityType(), draft.getSourceEntityId())) {
+        if (journalHeaderRepository.existsByJournalTypeAndSourceEntityTypeAndSourceEntityIdAndStatus(
+                draft.getJournalType(), draft.getSourceEntityType(), draft.getSourceEntityId(),
+                JournalHeaderStatus.POSTED)) {
             throw new FgcBusinessException(FgcErrorCode.LEDG_002, Map.of(
                     "journalType", draft.getJournalType(),
                     "sourceEntityType", draft.getSourceEntityType(),
@@ -91,13 +97,10 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
         // 3. 계정과목 조회·검증
         List<Long> journalAccountIds = new ArrayList<>();
         for (JournalLineDraft line : draft.getLines()) {
-            JournalAccountRow account = journalAccountMapper.findActiveByCode(
-                    line.getAccountCode().name()
-            );
-            if (account == null) {
-                throw new FgcBusinessException(FgcErrorCode.JOURNAL_001, Map.of(
-                        "accountCode", line.getAccountCode()));
-            }
+            JournalAccount account = journalAccountRepository
+                    .findByAccountCodeAndActiveYnTrue(line.getAccountCode().name())
+                    .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.JOURNAL_001,
+                            Map.of("accountCode", line.getAccountCode())));
             journalAccountIds.add(account.getJournalAccountId());
         }
 
@@ -123,11 +126,11 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
                         status -> attemptSave(draft, journalAccountIds, createdBy, requestId));
             } catch (DataIntegrityViolationException e) {
                 if (matchesConstraint(e, CONSTRAINT_SOURCE_REVISION)) {
-                    JournalHeaderRow racedWinner = journalMapper.findBySourceKey(
-                            draft.getJournalType().name(), draft.getSourceEntityType(),
+                    Optional<JournalHeaderRow> racedWinner = journalHeaderRepository.findBySourceKey(
+                            draft.getJournalType(), draft.getSourceEntityType(),
                             draft.getSourceEntityId(), draft.getRevisionNo());
-                    if (racedWinner != null) {
-                        return racedWinner;
+                    if (racedWinner.isPresent()) {
+                        return racedWinner.get();
                     }
                     throw e;
                 }
@@ -169,7 +172,7 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
         // 4. journal_no 채번
         String year = String.valueOf(draft.getJournalDate().getYear());
         String month = String.format("%02d", draft.getJournalDate().getMonthValue());
-        int seq = journalMapper.findNextJournalSeq(year, month);
+        int seq = journalHeaderRepository.findNextJournalSeq(year, month);
         if (seq > MAX_MONTHLY_SEQ) {
             throw new IllegalStateException(
                     "journal_no 월간 일련번호 상한(" + MAX_MONTHLY_SEQ + ") 초과 — year=" + year
@@ -177,12 +180,11 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
         }
         String journalNo = String.format("JV-%s-%s-%04d", year, month, seq);
 
-        // 5. 헤더 INSERT — useGeneratedKeys라 insert(row) 호출 한 번으로 row 객체 자체에
-        // journal_header_id가 채워져 돌아온다.
-        JournalHeaderInsertRow headerRow = JournalHeaderInsertRow.builder()
+        // 5. 헤더 저장 — IDENTITY INSERT로 발급된 ID를 라인 저장에 사용한다.
+        JournalHeader header = JournalHeader.builder()
                 .journalNo(journalNo)
                 .journalDate(draft.getJournalDate())
-                .journalType(draft.getJournalType().name())
+                .journalType(draft.getJournalType())
                 .sourceEntityType(draft.getSourceEntityType())
                 .sourceEntityId(draft.getSourceEntityId())
                 .revisionNo(draft.getRevisionNo())
@@ -192,14 +194,14 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
                 .description(draft.getDescription())
                 .createdBy(createdBy)
                 .build();
-        journalMapper.insert(headerRow);
-        Long journalHeaderId = headerRow.getJournalHeaderId();
+        journalHeaderRepository.save(header);
+        Long journalHeaderId = header.getJournalHeaderId();
 
         // 6. 라인 INSERT
         List<JournalLineDraft> lines = draft.getLines();
         for (int i = 0; i < lines.size(); i++) {
             JournalLineDraft line = lines.get(i);
-            JournalLineInsertRow lineRow = JournalLineInsertRow.builder()
+            JournalLine journalLine = JournalLine.builder()
                     .journalHeaderId(journalHeaderId)
                     .lineNo(line.getLineNo())
                     .journalAccountId(journalAccountIds.get(i))
@@ -207,17 +209,14 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
                     .creditAmount(line.getCreditAmount())
                     .contractId(line.getContractId())
                     .agentId(line.getAgentId())
-                    .paymentStage(line.getPaymentStage() == null ? null : line.getPaymentStage().name())
+                    .paymentStage(line.getPaymentStage())
                     .commissionItemId(line.getCommissionItemId())
                     .memo(line.getMemo())
                     .build();
-            journalMapper.insertLine(lineRow);
+            journalLineRepository.save(journalLine);
         }
 
-        // 2026-09-27 hjKang - 분개 감사 저장을 JPA Repository로 전환한다.
-        // 기존 코드: 저장 DTO를 MyBatis Mapper에 전달해 감사행을 추가했다.
-        // 문제: 공용 감사 저장이 JPA로 전환된 뒤에도 분개 저장은 XML 쿼리에 의존했다.
-        // 개선: 현재 REQUIRES_NEW 트랜잭션에서 엔티티를 저장·동기화해 헤더·라인과 함께 커밋하거나 롤백한다.
+        // 7. 감사 저장과 flush를 같은 REQUIRES_NEW에 묶어 헤더·라인과 함께 커밋하거나 롤백한다.
         String reason = "journalType=" + draft.getJournalType()
                 + ",sourceEntityType=" + draft.getSourceEntityType()
                 + ",sourceEntityId=" + draft.getSourceEntityId()
@@ -226,8 +225,9 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
                 String.valueOf(journalHeaderId), null, null, reason, requestId, null, null);
         auditLogRepository.saveAndFlush(auditLog);
 
-        // 9. FINALIZED / POSTED / REVERSED 불변성
-        return journalMapper.findBySourceKey(draft.getJournalType().name(),
-                draft.getSourceEntityType(), draft.getSourceEntityId(), draft.getRevisionNo());
+        // 8. DB에서 생성한 시각까지 조회한다. 엔티티 캐시 대신 DTO projection을 사용한다.
+        return journalHeaderRepository.findBySourceKey(draft.getJournalType(),
+                        draft.getSourceEntityType(), draft.getSourceEntityId(), draft.getRevisionNo())
+                .orElseThrow(() -> new IllegalStateException("저장한 분개 헤더를 조회할 수 없습니다"));
     }
 }

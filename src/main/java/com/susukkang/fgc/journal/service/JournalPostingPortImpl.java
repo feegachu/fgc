@@ -8,8 +8,8 @@ import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
 import com.susukkang.fgc.journal.dto.JournalHeaderRow;
 import com.susukkang.fgc.journal.dto.ScheduleJournalSourceRow;
 import com.susukkang.fgc.journal.dto.TransactionJournalSourceRow;
-import com.susukkang.fgc.journal.mapper.JournalMapper;
-import com.susukkang.fgc.journal.mapper.JournalPostingSourceMapper;
+import com.susukkang.fgc.journal.repository.JournalHeaderRepository;
+import com.susukkang.fgc.journal.repository.JournalPostingSourceQueryRepository;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
 import com.susukkang.fgc.validation.batch.contract.JournalPostingPort;
 import com.susukkang.fgc.validation.batch.contract.JournalPostingResult;
@@ -42,10 +42,10 @@ public class JournalPostingPortImpl implements JournalPostingPort {
 
     private static final String ALREADY_POSTED_REASON = "ALREADY_POSTED";
 
-    private final JournalPostingSourceMapper sourceMapper;
+    private final JournalPostingSourceQueryRepository sourceRepository;
     private final JournalEntryDraftService draftService;
     private final JournalPersistenceService persistenceService;
-    private final JournalMapper journalMapper;
+    private final JournalHeaderRepository journalHeaderRepository;
 
     @Override
     @Transactional
@@ -58,7 +58,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
         long newlyPostedCount = 0;
         List<ContractSkip> skips = new ArrayList<>();
 
-        for (ScheduleJournalSourceRow row : sourceMapper.findExpectedInsurerIncomeSources(validationRunId, validationMonth)) {
+        for (ScheduleJournalSourceRow row : sourceRepository.findExpectedInsurerIncomeSources(validationRunId, validationMonth)) {
             JournalHeaderDraft draft = draftService.draftExpectedInsurerIncome(
                     ExpectedInsurerIncomeJournalCommand.builder()
                             .scheduleLineId(row.getScheduleLineId())
@@ -73,7 +73,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
             newlyPostedCount += postAndCommit(draft, row.getContractId(), triggeredBy, requestId, skips);
         }
 
-        for (ScheduleJournalSourceRow row : sourceMapper.findExpectedFcPayoutSources(validationRunId, validationMonth)) {
+        for (ScheduleJournalSourceRow row : sourceRepository.findExpectedFcPayoutSources(validationRunId, validationMonth)) {
             JournalHeaderDraft draft = draftService.draftExpectedFcPayout(
                     ExpectedFcPayoutJournalCommand.builder()
                             .scheduleLineId(row.getScheduleLineId())
@@ -89,7 +89,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
             newlyPostedCount += postAndCommit(draft, row.getContractId(), triggeredBy, requestId, skips);
         }
 
-        for (TransactionJournalSourceRow row : sourceMapper.findActualInsurerStatementSources(validationRunId, validationMonth)) {
+        for (TransactionJournalSourceRow row : sourceRepository.findActualInsurerStatementSources(validationRunId, validationMonth)) {
             JournalHeaderDraft draft = draftService.draftActualInsurerStatement(
                     ActualInsurerStatementJournalCommand.builder()
                             .commissionTransactionId(row.getCommissionTransactionId())
@@ -104,7 +104,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
             newlyPostedCount += postAndCommit(draft, row.getContractId(), triggeredBy, requestId, skips);
         }
 
-        for (TransactionJournalSourceRow row : sourceMapper.findConfirmedFcPayoutSources(validationRunId, validationMonth)) {
+        for (TransactionJournalSourceRow row : sourceRepository.findConfirmedFcPayoutSources(validationRunId, validationMonth)) {
             JournalHeaderDraft draft = draftService.draftConfirmedFcPayout(
                     ConfirmedFcPayoutJournalCommand.builder()
                             .commissionTransactionId(row.getCommissionTransactionId())
@@ -133,7 +133,7 @@ public class JournalPostingPortImpl implements JournalPostingPort {
                                 String requestId, List<ContractSkip> skips) {
         JournalHeaderRow saved = persistenceService.saveDraft(draft, triggeredBy, requestId);
         if ("DRAFT".equals(saved.getStatus())) {
-            journalMapper.markPosted(saved.getJournalHeaderId(), triggeredBy);
+            journalHeaderRepository.markPosted(saved.getJournalHeaderId(), triggeredBy);
             return 1;
         }
         skips.add(new ContractSkip(contractId, ALREADY_POSTED_REASON,
