@@ -13,6 +13,8 @@ import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -110,17 +112,20 @@ class JournalPostingPortImplTest {
         verify(journalHeaderRepository).markPosted(104L, 3L);
     }
 
-    @Test
-    // 재실행 멱등성: saveDraft가 이미 POSTED인 기존 행을 그대로 돌려주면 markPosted를 다시 부르지 않고,
+    @ParameterizedTest
+    @ValueSource(strings = {"POSTED", "REVERSED"})
+    // 재실행 멱등성: saveDraft가 이미 POSTED/REVERSED인 기존 행을 돌려주면 markPosted를 다시 부르지 않고,
     // postedJournalCount(신규 기표)가 아니라 skippedCount(ALREADY_POSTED)로 집계한다(코드리뷰 반영)
-    void rerunSkipsMarkPostedWhenAlreadyPosted() {
+    void rerunSkipsMarkPostedWhenAlreadyProcessed(String status) {
         given(sourceRepository.findExpectedInsurerIncomeSources(any(), any())).willReturn(List.of(scheduleRow(1L)));
         given(sourceRepository.findExpectedFcPayoutSources(any(), any())).willReturn(List.of());
         given(sourceRepository.findActualInsurerStatementSources(any(), any())).willReturn(List.of());
         given(sourceRepository.findConfirmedFcPayoutSources(any(), any())).willReturn(List.of());
 
         given(draftService.draftExpectedInsurerIncome(any())).willReturn(mock(JournalHeaderDraft.class));
-        given(persistenceService.saveDraft(any(), any(), any())).willReturn(postedHeaderRow(101L));
+        JournalHeaderRow existing = postedHeaderRow(101L);
+        existing.setStatus(status);
+        given(persistenceService.saveDraft(any(), any(), any())).willReturn(existing);
 
         JournalPostingResult result = port().post(newContext(42L));
 
