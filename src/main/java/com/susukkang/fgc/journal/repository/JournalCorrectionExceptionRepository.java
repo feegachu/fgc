@@ -12,6 +12,7 @@ import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -19,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 공용 예외 엔티티로 조회·이력을 처리하며, ON CONFLICT 멱등 INSERT는 네이티브 SQL로 유지한다.
  *
  * @author hjKang
- * @version 1.0
+ * @version 1.1
  * @since 2026-09-28
  */
 @Repository
@@ -120,7 +121,8 @@ public class JournalCorrectionExceptionRepository {
                 .build());
     }
 
-    @Transactional
+    // 이 위임 메서드가 단독 트랜잭션을 만들면 반환 시 잠금이 풀리므로 공용 조회와 같은 계약을 적용한다.
+    @Transactional(propagation = Propagation.MANDATORY)
     public JournalCorrectionExceptionTarget findJournalCorrectionTargetForUpdate(Long exceptionCaseId) {
         return exceptionCaseRepository.findJournalCorrectionTargetForUpdate(exceptionCaseId);
     }

@@ -8,6 +8,8 @@ import jakarta.persistence.Tuple;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,7 +19,7 @@ import java.util.List;
  * 설명 : 원분개 잠금·정정그룹 저장·월별 채번 잠금을 호출자의 정정 트랜잭션에서 처리한다.
  *
  * @author hjKang
- * @version 1.0
+ * @version 1.1
  * @since 2026-09-28
  */
 @Repository
@@ -27,6 +29,8 @@ public class JournalCorrectionRepository {
     private final EntityManager entityManager;
 
     /** 검증 실행은 아직 미매핑이므로 native 조회를 유지하고 원분개 행만 잠근다. */
+    // 잠금은 후속 정정·예외 생성까지 유지돼야 하므로 호출자의 트랜잭션이 필수다.
+    @Transactional(propagation = Propagation.MANDATORY)
     public JournalCorrectionHeaderRow findHeaderForUpdate(Long journalHeaderId) {
         NativeQuery<?> query = entityManager.createNativeQuery("""
                 SELECT h.journal_header_id, h.journal_date, h.journal_type,
@@ -103,6 +107,8 @@ public class JournalCorrectionRepository {
         entityManager.flush();
     }
 
+    // 채번 잠금만 별도로 완료되면 뒤따르는 MAX+1 조회·저장을 직렬화할 수 없다.
+    @Transactional(propagation = Propagation.MANDATORY)
     public void lockJournalNumbering(String lockKey) {
         entityManager.createNativeQuery("""
                 SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:lockKey, 0))
