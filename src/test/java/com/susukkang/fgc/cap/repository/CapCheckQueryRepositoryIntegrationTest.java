@@ -2,10 +2,13 @@ package com.susukkang.fgc.cap.repository;
 
 import com.susukkang.fgc.cap.dto.CapAgentSummaryRow;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
+import com.susukkang.fgc.cap.dto.CapCheckRow;
 import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
 import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -25,6 +28,61 @@ class CapCheckQueryRepositoryIntegrationTest {
 
     @Autowired CapCheckQueryRepository capCheckQueryRepository;
     @Autowired JdbcTemplate jdbcTemplate;
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void latestAndDetailPreserveEveryMappedFieldAndTheirContractNumberDifference(boolean includeNullableValues) {
+        TestContract contract = insertTestContract();
+        LocalDate asOfDate = LocalDate.of(2035, 1, 31);
+        Long capRuleSetId = jdbcTemplate.queryForObject("""
+                SELECT cap_rule_set_id FROM fgc.cap_rule_set
+                 WHERE payment_stage = 'INSURER_TO_GA' ORDER BY cap_rule_set_id LIMIT 1
+                """, Long.class);
+        Long refundRateTableId = includeNullableValues ? jdbcTemplate.queryForObject("""
+                SELECT refund_rate_table_id FROM fgc.refund_rate_table ORDER BY refund_rate_table_id LIMIT 1
+                """, Long.class) : null;
+        BigDecimal usagePct = includeNullableValues ? new BigDecimal("105.016199") : null;
+        Long capCheckId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.cap_check (
+                    contract_id, payment_stage, cap_rule_set_id, refund_rate_table_id, check_kind,
+                    as_of_date, base_premium_amount, refund_12m_amount, compliance_deduction_amount,
+                    limit_amount, included_amount, remaining_amount, usage_pct, result_status, calculation_snapshot
+                ) VALUES (?, 'INSURER_TO_GA', ?, ?, 'REALTIME', ?, 1234.56, 78.90, 12.34,
+                          2000.12, 2100.45, -100.33, ?, 'VIOLATION', '{"source":"mapping-test"}'::jsonb)
+                RETURNING cap_check_id
+                """, Long.class, contract.contractId(), capRuleSetId, refundRateTableId, asOfDate, usagePct);
+
+        CapCheckRow latest = capCheckQueryRepository.findLatestByContractAndStage(
+                contract.contractId(), PaymentStage.INSURER_TO_GA.name());
+        CapCheckRow detail = capCheckQueryRepository.findById(capCheckId);
+
+        assertThat(detail).isNotNull();
+        assertThat(detail).extracting(
+                CapCheckRow::getCapCheckId, CapCheckRow::getContractId,
+                CapCheckRow::getPaymentStage, CapCheckRow::getCheckKind, CapCheckRow::getAsOfDate,
+                CapCheckRow::getCapRuleSetId, CapCheckRow::getRefundRateTableId,
+                CapCheckRow::getBasePremiumAmount, CapCheckRow::getRefund12mAmount,
+                CapCheckRow::getComplianceDeductionAmount, CapCheckRow::getLimitAmount,
+                CapCheckRow::getIncludedAmount, CapCheckRow::getRemainingAmount,
+                CapCheckRow::getUsagePct, CapCheckRow::getResultStatus, CapCheckRow::getCalculationSnapshotJson
+        ).containsExactly(
+                capCheckId, contract.contractId(), "INSURER_TO_GA", "REALTIME", asOfDate,
+                capRuleSetId, refundRateTableId, new BigDecimal("1234.56"), new BigDecimal("78.90"),
+                new BigDecimal("12.34"), new BigDecimal("2000.12"), new BigDecimal("2100.45"),
+                new BigDecimal("-100.33"), usagePct, "VIOLATION", "{\"source\": \"mapping-test\"}");
+        assertThat(latest).usingRecursiveComparison().ignoringFields("contractNo").isEqualTo(detail);
+        assertThat(latest.getContractNo()).isNull();
+        assertThat(detail.getContractNo()).isEqualTo(contract.contractNo());
+    }
+
+    @Test
+    void latestAndDetailReturnNullWhenNoCapCheckExists() {
+        TestContract contract = insertTestContract();
+
+        assertThat(capCheckQueryRepository.findLatestByContractAndStage(
+                contract.contractId(), PaymentStage.GA_TO_FC.name())).isNull();
+        assertThat(capCheckQueryRepository.findById(-1L)).isNull();
+    }
 
     // REG-10, 운영정책 §7-2: 귀속행별 원 단위 반올림 후 DEDUCTION을 차감한다.
     @Test

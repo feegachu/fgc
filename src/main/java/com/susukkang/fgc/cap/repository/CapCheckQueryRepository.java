@@ -320,51 +320,19 @@ public class CapCheckQueryRepository {
         parameters.put("contractId", contractId);
         parameters.put("paymentStage", paymentStage);
         NativeQuery<?> query = prepare(FIND_LATEST_BY_CONTRACT_AND_STAGE, parameters);
-        query.addScalar("capCheckId", Long.class);
-        query.addScalar("contractId", Long.class);
-        query.addScalar("paymentStage", String.class);
-        query.addScalar("checkKind", String.class);
-        query.addScalar("asOfDate", LocalDate.class);
-        query.addScalar("capRuleSetId", Long.class);
-        query.addScalar("refundRateTableId", Long.class);
-        query.addScalar("basePremiumAmount", BigDecimal.class);
-        query.addScalar("refund12mAmount", BigDecimal.class);
-        query.addScalar("complianceDeductionAmount", BigDecimal.class);
-        query.addScalar("limitAmount", BigDecimal.class);
-        query.addScalar("includedAmount", BigDecimal.class);
-        query.addScalar("remainingAmount", BigDecimal.class);
-        query.addScalar("usagePct", BigDecimal.class);
-        query.addScalar("resultStatus", String.class);
-        query.addScalar("calculationSnapshotJson", String.class);
-        return query.setTupleTransformer((tuple, aliases) -> {
-            CapCheckRow row = new CapCheckRow();
-            row.setCapCheckId((Long) tuple[0]);
-            row.setContractId((Long) tuple[1]);
-            row.setPaymentStage((String) tuple[2]);
-            row.setCheckKind((String) tuple[3]);
-            row.setAsOfDate((LocalDate) tuple[4]);
-            row.setCapRuleSetId((Long) tuple[5]);
-            row.setRefundRateTableId((Long) tuple[6]);
-            row.setBasePremiumAmount((BigDecimal) tuple[7]);
-            row.setRefund12mAmount((BigDecimal) tuple[8]);
-            row.setComplianceDeductionAmount((BigDecimal) tuple[9]);
-            row.setLimitAmount((BigDecimal) tuple[10]);
-            row.setIncludedAmount((BigDecimal) tuple[11]);
-            row.setRemainingAmount((BigDecimal) tuple[12]);
-            row.setUsagePct((BigDecimal) tuple[13]);
-            row.setResultStatus((String) tuple[14]);
-            row.setCalculationSnapshotJson((String) tuple[15]);
-            return row;
-        }).getResultList().stream().findFirst().orElse(null);
+        return findCapCheckRow(query, false);
     }
 
     public CapCheckRow findById(Long capCheckId) {
         Map<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("capCheckId", capCheckId);
         NativeQuery<?> query = prepare(FIND_BY_ID, parameters);
+        return findCapCheckRow(query, true);
+    }
+
+    private CapCheckRow findCapCheckRow(NativeQuery<?> query, boolean includeContractNo) {
         query.addScalar("capCheckId", Long.class);
         query.addScalar("contractId", Long.class);
-        query.addScalar("contractNo", String.class);
         query.addScalar("paymentStage", String.class);
         query.addScalar("checkKind", String.class);
         query.addScalar("asOfDate", LocalDate.class);
@@ -379,27 +347,36 @@ public class CapCheckQueryRepository {
         query.addScalar("usagePct", BigDecimal.class);
         query.addScalar("resultStatus", String.class);
         query.addScalar("calculationSnapshotJson", String.class);
-        return query.setTupleTransformer((tuple, aliases) -> {
-            CapCheckRow row = new CapCheckRow();
-            row.setCapCheckId((Long) tuple[0]);
-            row.setContractId((Long) tuple[1]);
-            row.setContractNo((String) tuple[2]);
-            row.setPaymentStage((String) tuple[3]);
-            row.setCheckKind((String) tuple[4]);
-            row.setAsOfDate((LocalDate) tuple[5]);
-            row.setCapRuleSetId((Long) tuple[6]);
-            row.setRefundRateTableId((Long) tuple[7]);
-            row.setBasePremiumAmount((BigDecimal) tuple[8]);
-            row.setRefund12mAmount((BigDecimal) tuple[9]);
-            row.setComplianceDeductionAmount((BigDecimal) tuple[10]);
-            row.setLimitAmount((BigDecimal) tuple[11]);
-            row.setIncludedAmount((BigDecimal) tuple[12]);
-            row.setRemainingAmount((BigDecimal) tuple[13]);
-            row.setUsagePct((BigDecimal) tuple[14]);
-            row.setResultStatus((String) tuple[15]);
-            row.setCalculationSnapshotJson((String) tuple[16]);
-            return row;
-        }).getResultList().stream().findFirst().orElse(null);
+        // 튜플은 SELECT 위치가 아니라 addScalar 등록 순서를 따른다. 상세 전용 계약번호를 끝에 둔다.
+        if (includeContractNo) {
+            query.addScalar("contractNo", String.class);
+        }
+        return query.setTupleTransformer((tuple, aliases) -> toCapCheckRow(tuple, includeContractNo))
+                .getResultList().stream().findFirst().orElse(null);
+    }
+
+    private CapCheckRow toCapCheckRow(Object[] tuple, boolean includeContractNo) {
+        CapCheckRow row = new CapCheckRow();
+        row.setCapCheckId((Long) tuple[0]);
+        row.setContractId((Long) tuple[1]);
+        row.setPaymentStage((String) tuple[2]);
+        row.setCheckKind((String) tuple[3]);
+        row.setAsOfDate((LocalDate) tuple[4]);
+        row.setCapRuleSetId((Long) tuple[5]);
+        row.setRefundRateTableId((Long) tuple[6]);
+        row.setBasePremiumAmount((BigDecimal) tuple[7]);
+        row.setRefund12mAmount((BigDecimal) tuple[8]);
+        row.setComplianceDeductionAmount((BigDecimal) tuple[9]);
+        row.setLimitAmount((BigDecimal) tuple[10]);
+        row.setIncludedAmount((BigDecimal) tuple[11]);
+        row.setRemainingAmount((BigDecimal) tuple[12]);
+        row.setUsagePct((BigDecimal) tuple[13]);
+        row.setResultStatus((String) tuple[14]);
+        row.setCalculationSnapshotJson((String) tuple[15]);
+        if (includeContractNo) {
+            row.setContractNo((String) tuple[16]);
+        }
+        return row;
     }
 
     public List<CapCheckListRow> search(LocalDate month, String paymentStage, String resultStatus, Long insurerId, Long organizationId, String contractNo, int offset, int limit) {

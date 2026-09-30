@@ -259,60 +259,15 @@ public class CommissionPaymentQueryRepository {
     }
 
     public List<ConfirmationData> findConfirmationDataForUpdate(Long paymentId) {
-        NativeQuery<?> query = nativeQuery(FIND_CONFIRMATION_DATA_FOR_UPDATE);
-        query.setParameter("paymentId", paymentId);
-        query.addScalar("payment_id", Long.class);
-        query.addScalar("status", String.class);
-        query.addScalar("amount", BigDecimal.class);
-        query.addScalar("attributed_amount", BigDecimal.class);
-        query.addScalar("total_attributed_amount", BigDecimal.class);
-        query.addScalar("confirm_idempotency_key", String.class);
-        query.addScalar("attribution_date", LocalDate.class);
-        query.addScalar("attribution_month", LocalDate.class);
-        query.addScalar("transaction_attribution_id", Long.class);
-        query.addScalar("contract_id", Long.class);
-        query.addScalar("agent_id", Long.class);
-        query.addScalar("payment_stage", String.class);
-        query.addScalar("commission_item_id", Long.class);
-        query.addScalar("item_code", String.class);
-        query.addScalar("item_name", String.class);
-        query.addScalar("policy_version_id", Long.class);
-        query.addScalar("inclusion_decision_status", String.class);
-        query.addScalar("exclusion_type", String.class);
-        query.addScalar("inclusion_decision_reason", String.class);
-        query.addScalar("allocation_basis", String.class);
-        query.addScalar("evidence_ref", String.class);
-        query.addScalar("attribution_method", String.class);
-        query.addScalar("contract_date", LocalDate.class);
-        return query.setTupleTransformer((row, aliases) -> new ConfirmationData(
-                (Long) row[0],
-                enumValue(CommissionPaymentStatus.class, row[1]),
-                (BigDecimal) row[2],
-                (BigDecimal) row[3],
-                (BigDecimal) row[4],
-                (String) row[5],
-                (LocalDate) row[6],
-                (LocalDate) row[7],
-                (Long) row[8],
-                (Long) row[9],
-                (Long) row[10],
-                enumValue(PaymentStage.class, row[11]),
-                (Long) row[12],
-                (String) row[13],
-                (String) row[14],
-                (Long) row[15],
-                enumValue(InclusionDecisionStatus.class, row[16]),
-                enumValue(ExclusionType.class, row[17]),
-                (String) row[18],
-                (String) row[19],
-                (String) row[20],
-                enumValue(AttributionMethod.class, row[21]),
-                (LocalDate) row[22]
-        )).getResultList();
+        return queryConfirmationData(FIND_CONFIRMATION_DATA_FOR_UPDATE, paymentId);
     }
 
     public List<ConfirmationData> findConfirmationData(Long paymentId) {
-        NativeQuery<?> query = nativeQuery(FIND_CONFIRMATION_DATA);
+        return queryConfirmationData(FIND_CONFIRMATION_DATA, paymentId);
+    }
+
+    private List<ConfirmationData> queryConfirmationData(String sql, Long paymentId) {
+        NativeQuery<?> query = nativeQuery(sql);
         query.setParameter("paymentId", paymentId);
         query.addScalar("payment_id", Long.class);
         query.addScalar("status", String.class);
