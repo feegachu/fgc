@@ -1,21 +1,26 @@
 package com.susukkang.fgc.journal.repository;
 
+import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionExceptionTarget;
+import com.susukkang.fgc.exceptioncase.entity.ExceptionAction;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionActionRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionInsertCommand;
 import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 설명 : 원장 정정 예외의 활성 요청 조회와 멱등 생성을 담당한다.
- * 예외 도메인에 엔티티가 없어 네이티브 SQL로 업무건과 최초 처리 이력을 저장한다.
+ * 공용 예외 엔티티로 조회·이력을 처리하며, ON CONFLICT 멱등 INSERT는 네이티브 SQL로 유지한다.
  *
  * @author hjKang
- * @version 1.0
+ * @version 1.1
  * @since 2026-09-28
  */
 @Repository
@@ -24,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class JournalCorrectionExceptionRepository {
 
     private final EntityManager entityManager;
+    private final ExceptionCaseRepository exceptionCaseRepository;
+    private final ExceptionActionRepository exceptionActionRepository;
 
     @Transactional
     public int insertCase(JournalCorrectionExceptionInsertCommand command) {
@@ -53,99 +60,70 @@ public class JournalCorrectionExceptionRepository {
     }
 
     public JournalCorrectionExceptionRow findActiveBySource(Long journalHeaderId, Long policyVersionId) {
-        NativeQuery<?> query = createRowQuery("""
-                SELECT exception_case_id, status
-                  FROM fgc.exception_case
-                 WHERE source_entity_type = 'JOURNAL_HEADER'
-                   AND source_entity_id = CAST(:journalHeaderId AS varchar)
-                   AND exception_type = 'JOURNAL_CORRECTION_REQUIRED'
-                   AND policy_version_id IS NOT DISTINCT FROM :policyVersionId
-                   AND status IN ('NEW', 'IN_REVIEW')
-                 ORDER BY exception_case_id DESC
-                 LIMIT 1
-                """);
-        query.setParameter("journalHeaderId", journalHeaderId);
-        query.setParameter("policyVersionId", policyVersionId);
-        return findRow(query);
+        return entityManager.createQuery("""
+                SELECT new com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow(e.exceptionCaseId, e.status)
+                  FROM ExceptionCase e
+                 WHERE e.sourceEntityType = 'JOURNAL_HEADER'
+                   AND e.sourceEntityId = :sourceId
+                   AND e.exceptionType = :exceptionType
+                   AND (e.policyVersionId = :policyVersionId
+                        OR (e.policyVersionId IS NULL AND :policyVersionId IS NULL))
+                   AND e.status IN (:newStatus, :reviewStatus)
+                 ORDER BY e.exceptionCaseId DESC
+                """, JournalCorrectionExceptionRow.class)
+                .setParameter("sourceId", String.valueOf(journalHeaderId))
+                .setParameter("exceptionType", ExceptionType.JOURNAL_CORRECTION_REQUIRED)
+                .setParameter("policyVersionId", policyVersionId)
+                .setParameter("newStatus", ExceptionStatus.NEW)
+                .setParameter("reviewStatus", ExceptionStatus.IN_REVIEW)
+                .setMaxResults(1)
+                .getResultList().stream().findFirst().orElse(null);
     }
 
     public int countBySource(Long journalHeaderId, Long policyVersionId) {
-        return ((Number) entityManager.createNativeQuery("""
-                SELECT COUNT(*)
-                  FROM fgc.exception_case
-                 WHERE source_entity_type = 'JOURNAL_HEADER'
-                   AND source_entity_id = CAST(:journalHeaderId AS varchar)
-                   AND exception_type = 'JOURNAL_CORRECTION_REQUIRED'
-                   AND policy_version_id IS NOT DISTINCT FROM :policyVersionId
-                """)
-                .setParameter("journalHeaderId", journalHeaderId)
+        return entityManager.createQuery("""
+                SELECT COUNT(e)
+                  FROM ExceptionCase e
+                 WHERE e.sourceEntityType = 'JOURNAL_HEADER'
+                   AND e.sourceEntityId = :sourceId
+                   AND e.exceptionType = :exceptionType
+                   AND (e.policyVersionId = :policyVersionId
+                        OR (e.policyVersionId IS NULL AND :policyVersionId IS NULL))
+                """, Long.class)
+                .setParameter("sourceId", String.valueOf(journalHeaderId))
+                .setParameter("exceptionType", ExceptionType.JOURNAL_CORRECTION_REQUIRED)
                 .setParameter("policyVersionId", policyVersionId)
-                .getSingleResult()).intValue();
+                .getSingleResult().intValue();
     }
 
     public JournalCorrectionExceptionRow findByExceptionKey(String exceptionKey) {
-        NativeQuery<?> query = createRowQuery("""
-                SELECT exception_case_id, status
-                  FROM fgc.exception_case
-                 WHERE exception_key = :exceptionKey
-                """);
-        query.setParameter("exceptionKey", exceptionKey);
-        return findRow(query);
+        return entityManager.createQuery("""
+                SELECT new com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow(e.exceptionCaseId, e.status)
+                  FROM ExceptionCase e WHERE e.exceptionKey = :exceptionKey
+                """, JournalCorrectionExceptionRow.class)
+                .setParameter("exceptionKey", exceptionKey)
+                .getResultList().stream().findFirst().orElse(null);
     }
 
     @Transactional
-    public int insertInitialAction(JournalCorrectionExceptionInsertCommand command) {
-        return entityManager.createNativeQuery("""
-                INSERT INTO fgc.exception_action (
-                    exception_case_id, action_seq, from_status, to_status,
-                    action_type, reason, evidence_ref, action_by
-                )
-                SELECT exception_case_id, 1, 'NEW', 'NEW',
-                       'COMMENT', :reason, :evidenceRef, :requestedBy
-                  FROM fgc.exception_case
-                 WHERE exception_key = :exceptionKey
-                """)
-                .setParameter("reason", command.reason())
-                .setParameter("evidenceRef", command.evidenceRef())
-                .setParameter("requestedBy", command.requestedBy())
-                .setParameter("exceptionKey", command.exceptionKey())
-                .executeUpdate();
+    public void insertInitialAction(Long exceptionCaseId, JournalCorrectionExceptionInsertCommand command) {
+        // 앞서 조회한 업무건 ID를 재사용하여 추가 SELECT 없이 공용 엔티티를 저장한다.
+        // actionAt은 생략하여 기존 초기 이력의 DB clock_timestamp() 기본값을 유지한다.
+        exceptionActionRepository.save(ExceptionAction.builder()
+                .exceptionCaseId(exceptionCaseId)
+                .actionSeq(1)
+                .fromStatus(ExceptionStatus.NEW)
+                .toStatus(ExceptionStatus.NEW)
+                .actionType(ExceptionActionType.COMMENT)
+                .reason(command.reason())
+                .evidenceRef(command.evidenceRef())
+                .actionBy(command.requestedBy())
+                .build());
     }
 
-    @Transactional
+    // 이 위임 메서드가 단독 트랜잭션을 만들면 반환 시 잠금이 풀리므로 공용 조회와 같은 계약을 적용한다.
+    @Transactional(propagation = Propagation.MANDATORY)
     public JournalCorrectionExceptionTarget findJournalCorrectionTargetForUpdate(Long exceptionCaseId) {
-        NativeQuery<?> query = entityManager.createNativeQuery("""
-                SELECT exception_case_id, exception_type, status, source_entity_type, source_entity_id
-                  FROM fgc.exception_case
-                 WHERE exception_case_id = :exceptionCaseId
-                   FOR UPDATE
-                """).unwrap(NativeQuery.class);
-        query.setParameter("exceptionCaseId", exceptionCaseId);
-        query.addScalar("exception_case_id", Long.class);
-        query.addScalar("exception_type", String.class);
-        query.addScalar("status", String.class);
-        query.addScalar("source_entity_type", String.class);
-        query.addScalar("source_entity_id", String.class);
-        return query.setTupleTransformer((row, aliases) -> new JournalCorrectionExceptionTarget(
-                        (Long) row[0], (String) row[1], ExceptionStatus.valueOf((String) row[2]),
-                        (String) row[3], (String) row[4]))
-                .getResultList().stream()
-                .findFirst()
-                .orElse(null);
-    }
-
-    private NativeQuery<?> createRowQuery(String sql) {
-        NativeQuery<?> query = entityManager.createNativeQuery(sql).unwrap(NativeQuery.class);
-        query.addScalar("exception_case_id", Long.class);
-        query.addScalar("status", String.class);
-        return query;
-    }
-
-    private JournalCorrectionExceptionRow findRow(NativeQuery<?> query) {
-        return query.setTupleTransformer((row, aliases) -> new JournalCorrectionExceptionRow(
-                        (Long) row[0], ExceptionStatus.valueOf((String) row[1])))
-                .getResultList().stream()
-                .findFirst()
-                .orElse(null);
+        return exceptionCaseRepository.findJournalCorrectionTargetForUpdate(exceptionCaseId);
     }
 }

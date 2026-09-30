@@ -281,6 +281,9 @@ class DashboardServiceIntegrationTest {
     // 5. 미처리 예외: 월 필터 없음, NEW+IN_REVIEW만
     @Test
     void summarizeCountsOpenExceptionsRegardlessOfMonth() {
+        long existingOpenCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case WHERE status IN ('NEW', 'IN_REVIEW')
+                """, Long.class);
         OffsetDateTime old = OffsetDateTime.parse("2026-01-01T09:00:00+09:00");
         insertExceptionCase("DASH-TEST-EXC-NEW", "NEW", old);
         insertExceptionCase("DASH-TEST-EXC-REVIEW", "IN_REVIEW", old);
@@ -289,7 +292,7 @@ class DashboardServiceIntegrationTest {
         // 예외 발생월(1월)과 무관하게 조회월(7월) 기준으로도 NEW/IN_REVIEW 2건이 그대로 잡혀야 한다
         DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
 
-        assertThat(result.kpis().openException()).isEqualTo(2);
+        assertThat(result.kpis().openException()).isEqualTo(existingOpenCount + 2);
     }
 
     // 6. 월 필터가 있는 KPI(1,200%·차익거래·대사불일치)는 미래월(2099-01)에 0이어야 한다.
@@ -318,17 +321,25 @@ class DashboardServiceIntegrationTest {
     // 7. 최근 예외 5건: 최신순, 5건 제한
     @Test
     void summarizeReturnsAtMostFiveRecentExceptionsSortedByLatest() {
+        // 별도 트랜잭션을 커밋하는 다른 테스트의 예외보다 뒤에 fixture를 배치한다.
+        OffsetDateTime latest = jdbcTemplate.queryForObject(
+                "SELECT MAX(created_at) FROM fgc.exception_case",
+                (rs, rowNum) -> rs.getObject(1, OffsetDateTime.class));
+        OffsetDateTime firstCreatedAt = latest == null
+                ? OffsetDateTime.parse("2026-07-01T09:00:00+09:00") : latest.plusDays(1);
         for (int i = 1; i <= 6; i++) {
             insertExceptionCase("DASH-TEST-RECENT-EXC-" + i, "NEW",
-                    OffsetDateTime.parse("2026-07-0" + i + "T09:00:00+09:00"));
+                    firstCreatedAt.plusDays(i - 1));
         }
 
         DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
         List<RecentExceptionRow> recent = result.recentExceptions();
 
         assertThat(recent).hasSize(5);
-        // 가장 최근(7월 6일)이 맨 앞
-        assertThat(recent.get(0).createdAt()).isEqualTo(OffsetDateTime.parse("2026-07-06T09:00:00+09:00"));
+        assertThat(recent).extracting(RecentExceptionRow::createdAt)
+                .usingElementComparator(OffsetDateTime.timeLineOrder())
+                .containsExactly(firstCreatedAt.plusDays(5), firstCreatedAt.plusDays(4),
+                        firstCreatedAt.plusDays(3), firstCreatedAt.plusDays(2), firstCreatedAt.plusDays(1));
     }
 
 
@@ -337,7 +348,11 @@ class DashboardServiceIntegrationTest {
     // 결정적으로 만든다 — 동일 시각 6건 중 최신 id 5개가 항상 같은 순서로 나와야 한다.
     @Test
     void summarizeBreaksRecentExceptionTiesByIdWhenCreatedAtIsIdentical() {
-        OffsetDateTime sameInstant = OffsetDateTime.parse("2026-07-10T09:00:00+09:00");
+        OffsetDateTime latest = jdbcTemplate.queryForObject(
+                "SELECT MAX(created_at) FROM fgc.exception_case",
+                (rs, rowNum) -> rs.getObject(1, OffsetDateTime.class));
+        OffsetDateTime sameInstant = latest == null
+                ? OffsetDateTime.parse("2026-07-10T09:00:00+09:00") : latest.plusDays(1);
         List<Long> ids = new java.util.ArrayList<>();
         for (int i = 1; i <= 6; i++) {
             ids.add(insertExceptionCase("DASH-TEST-TIE-EXC-" + i, "NEW", sameInstant));

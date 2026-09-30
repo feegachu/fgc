@@ -5,7 +5,8 @@ import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseActionMapper;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionActionRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,10 @@ class ExceptionCaseServiceTest {
     private ExceptionCaseQueryMapper queryMapper;
 
     @Mock
-    private ExceptionCaseActionMapper actionMapper;
+    private ExceptionCaseRepository exceptionCaseRepository;
+
+    @Mock
+    private ExceptionActionRepository exceptionActionRepository;
 
     @Mock
     private AuditLogRepository auditLogRepository;
@@ -48,7 +52,8 @@ class ExceptionCaseServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ExceptionCaseService(queryMapper, actionMapper, auditLogRepository, new ObjectMapper());
+        service = new ExceptionCaseService(queryMapper, exceptionCaseRepository, exceptionActionRepository,
+                auditLogRepository, new ObjectMapper());
     }
 
     @Test

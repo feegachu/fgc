@@ -13,7 +13,9 @@ import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.exceptioncase.dto.*;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseActionMapper;
+import com.susukkang.fgc.exceptioncase.entity.ExceptionAction;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionActionRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,7 +44,8 @@ public class ExceptionCaseService {
     private static final String SORT = "severity,asc,createdAt,desc";
 
     private final ExceptionCaseQueryMapper exceptionCaseQueryMapper;
-    private final ExceptionCaseActionMapper exceptionCaseActionMapper;
+    private final ExceptionCaseRepository exceptionCaseRepository;
+    private final ExceptionActionRepository exceptionActionRepository;
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
@@ -214,7 +217,7 @@ public class ExceptionCaseService {
 
         // 1. 동시에 같은 예외를 처리하지 못하도록 행 잠금
         ExceptionCaseActionTarget target =
-                exceptionCaseActionMapper.findByIdForUpdate(exceptionCaseId);
+                exceptionCaseRepository.findByIdForUpdate(exceptionCaseId);
 
         if (target == null) {
             throw new FgcBusinessException(
@@ -255,14 +258,17 @@ public class ExceptionCaseService {
 
         // 3. 잠금을 획득한 상태에서 다음 이력 순번 계산
         int nextActionSeq =
-                exceptionCaseActionMapper.findNextActionSeq(exceptionCaseId);
+                exceptionActionRepository.findNextActionSeq(exceptionCaseId);
 
         // 응답이 즉시 화면에 표시되므로 GET 조회 경로(DateUtil.toSeoul)와 같은 기준으로 맞춘다 — SIR-008
         OffsetDateTime actionAt = DateUtil.nowSeoul();
 
-        // 4. 처리 이력 INSERT
-        int inserted = exceptionCaseActionMapper.insertAction(
-                ExceptionActionInsertCommand.builder()
+        // 2026-09-28 hjKang - 예외 조치 저장을 공용 JPA 엔티티로 전환한다.
+        // 기존 코드: Mapper가 처리 이력 INSERT와 상태 UPDATE를 실행했다.
+        // 문제: 공용 예외 저장 계약이 XML에 남아 있었다.
+        // 개선: 부모 행 잠금과 이력 → 상태 → 감사 순서를 유지하고 하나의 트랜잭션에 참여한다.
+        exceptionActionRepository.save(
+                ExceptionAction.builder()
                         .exceptionCaseId(exceptionCaseId)
                         .actionSeq(nextActionSeq)
                         .fromStatus(fromStatus)
@@ -273,16 +279,13 @@ public class ExceptionCaseService {
                         .actionBy(actionUserId)
                         .actionAt(actionAt)
                         .build());
-        if (inserted != 1) {
-            throw new IllegalStateException("예외 처리 이력 저장에 실패했습니다.");
-        }
 
         // 5. exception_case의 현재 상태 UPDATE
         Long assignedTo = actionType == ExceptionActionType.ASSIGN
                 ? actionUserId
                 : target.assignedTo();
         OffsetDateTime resolvedAt = isClosed(toStatus) ? actionAt : null;
-        int updated = exceptionCaseActionMapper.updateCaseAfterAction(
+        int updated = exceptionCaseRepository.updateCaseAfterAction(
                 exceptionCaseId,
                 toStatus,
                 assignedTo,
@@ -306,7 +309,7 @@ public class ExceptionCaseService {
         auditLogRepository.saveAndFlush(auditLog);
 
         return new ExceptionActionResponse(
-                null, // Mapper에서 generated key를 받으면 exceptionActionId 설정
+                null, // 기존 조치 응답의 null 계약을 유지하며 생성 ID는 이력 조회에서 제공한다.
                 nextActionSeq,
                 fromStatus,
                 toStatus,
