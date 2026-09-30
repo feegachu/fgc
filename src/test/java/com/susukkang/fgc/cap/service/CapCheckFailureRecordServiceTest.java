@@ -1,7 +1,7 @@
 package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -13,16 +13,16 @@ import static org.mockito.Mockito.verify;
 class CapCheckFailureRecordServiceTest {
 
     @Mock
-    ExceptionCaseMapper exceptionCaseMapper;
+    CapExceptionRepository capExceptionRepository;
 
     @Test
     void recordsFailureWithPaymentStage() {
         CapCheckFailureRecordService service =
-                new CapCheckFailureRecordService(exceptionCaseMapper);
+                new CapCheckFailureRecordService(capExceptionRepository);
 
         service.record(118L, 10L, PaymentStage.GA_TO_FC, "계산 데이터 누락");
 
-        verify(exceptionCaseMapper).insertCapCheckFailure(
+        verify(capExceptionRepository).recordCapCheckFailure(
                 118L, 10L, "GA_TO_FC", "계산 데이터 누락");
     }
 }

@@ -3,13 +3,13 @@ package com.susukkang.fgc.cap.service;
 import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapExceptionInsertDTO;
 import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
-import com.susukkang.fgc.cap.dto.CapExceptionStatusRow;
-import com.susukkang.fgc.cap.mapper.CapExceptionMapper;
+import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +29,7 @@ import java.text.DecimalFormat;
 @RequiredArgsConstructor
 public class CapExceptionServiceImpl implements CapExceptionService {
 
-    private final CapExceptionMapper capExceptionMapper;
+    private final CapExceptionRepository capExceptionRepository;
 
     /**
      * 설명 : 실시간·배치 한도 판정 결과가 주의 또는 위반인 경우 예외 건을 생성한다
@@ -50,7 +50,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         ExceptionType exceptionType = resolveExceptionType(command.resultStatus());
         if (exceptionType == null) return;
 
-        capExceptionMapper.insertException(createExceptionDTO(command, exceptionType));
+        capExceptionRepository.insertException(createExceptionDTO(command, exceptionType));
     }
 
     /**
@@ -67,18 +67,18 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         // 연계 요구사항 : FGC-FUN-052, FGC-FUN-053
         // FUN-034 한도 예외는 REJECTED를 사용하지 않고 RESOLVED만 종결 상태로 사용한다.
         validateResolveCommand(command);
-        CapExceptionStatusRow exception = capExceptionMapper.selectExceptionForUpdate(command.exceptionCaseId());
+        ExceptionCaseActionTarget exception = capExceptionRepository.selectExceptionForUpdate(command.exceptionCaseId());
         if (exception == null) throw new IllegalArgumentException("존재하지 않는 한도 예외입니다.");
-        if ("RESOLVED".equals(exception.status())) return;
+        if (ExceptionStatus.RESOLVED == exception.status()) return;
         // 미처리(OPEN = NEW + IN_REVIEW) 정의는 ExceptionStatus 한 곳만 쓴다(#83).
-        if (!ExceptionStatus.isOpen(exception.status())) {
+        if (!ExceptionStatus.isOpen(exception.status().name())) {
             throw new IllegalStateException("해결할 수 없는 예외 상태입니다.");
         }
 
-        if (capExceptionMapper.insertExceptionAction(command) != 1) {
+        if (capExceptionRepository.insertExceptionAction(command, exception) != 1) {
             throw new IllegalStateException("한도 예외 해결조치 저장에 실패했습니다.");
         }
-        if (capExceptionMapper.updateExceptionResolved(command.exceptionCaseId()) != 1) {
+        if (capExceptionRepository.updateExceptionResolved(exception) != 1) {
             throw new IllegalStateException("한도 예외 상태 변경에 실패했습니다.");
         }
     }
@@ -95,9 +95,9 @@ public class CapExceptionServiceImpl implements CapExceptionService {
     @Transactional(readOnly = true)
     public boolean hasUnresolvedViolation(Long paymentId) {
         // FUN-034의 OPEN은 공통 예외 상태인 NEW와 IN_REVIEW로 해석한다(정의: ExceptionStatus).
-        // SQL 은 CapExceptionMapper.existsUnresolvedViolation 의 IN ('NEW','IN_REVIEW') — 같은 정의.
+        // Repository도 NEW와 IN_REVIEW를 같은 미처리 상태로 조회한다.
         if (paymentId == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
-        return capExceptionMapper.existsUnresolvedViolation(paymentId);
+        return capExceptionRepository.existsUnresolvedViolation(paymentId);
     }
 
     private ExceptionType resolveExceptionType(CapResultStatus resultStatus) {

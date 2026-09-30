@@ -1,0 +1,8 @@
+// 격리 PostgreSQL에서만 실행한다. 각 측정 트랜잭션은 롤백한다.
+// gradlew -I scripts/verification/payment-performance.init.gradle test --tests '*CommissionPaymentPersistencePerformanceTest'
+allprojects {
+    tasks.withType(Test).configureEach {
+        systemProperty 'fgc.payment.performance', 'true'
+        testLogging.showStandardStreams = true
+    }
+}

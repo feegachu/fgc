@@ -3,6 +3,7 @@ package com.susukkang.fgc.transaction;
 import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.common.code.AttributionMethod;
+import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.ExceptionActionType;
@@ -16,6 +17,12 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
 import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
+import com.susukkang.fgc.transaction.entity.CommissionTransaction;
+import com.susukkang.fgc.transaction.entity.TransactionAttribution;
+import com.susukkang.fgc.transaction.repository.CommissionTransactionRepository;
+import com.susukkang.fgc.transaction.repository.CommissionPaymentWriteRepository;
+import com.susukkang.fgc.transaction.domain.CommissionPaymentCommand;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -69,6 +76,73 @@ class CommissionPaymentIntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private CommissionTransactionRepository transactionRepository;
+
+    @Autowired
+    private CommissionPaymentWriteRepository paymentWriteRepository;
+
+    @Test
+    void identicalDraftUpdateStillRunsDatabaseTimestampTrigger() {
+        CommissionPaymentCreateRequest request = request("IT-JPA-NOOP-" + UUID.randomUUID());
+        CommissionPaymentResponse created = commissionPaymentService.create(request);
+
+        CommissionPaymentResponse updated = commissionPaymentService.update(created.paymentId(), updateRequest(request, request.amount()));
+
+        assertThat(updated.amount()).isEqualByComparingTo(created.amount());
+        assertThat(updated.updatedAt()).isAfter(created.updatedAt());
+        assertThat(transactionRepository.findById(created.paymentId()).orElseThrow().getUpdatedAt())
+                .isEqualTo(updated.updatedAt());
+    }
+
+    @Test
+    void nativeConfirmationReloadsManagedPaymentAndPreservesArrayOrder() {
+        CommissionPaymentResponse created = commissionPaymentService.create(request("IT-JPA-CONFIRM-" + UUID.randomUUID()));
+        CommissionTransaction before = transactionRepository.findById(created.paymentId()).orElseThrow();
+        assertThat(entityManager.contains(before)).isTrue();
+        assertThat(before.getStatus()).isEqualTo(CommissionPaymentStatus.DRAFT);
+
+        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-JPA-" + created.paymentId());
+
+        assertThat(entityManager.contains(before)).isFalse();
+        CommissionTransaction reloaded = transactionRepository.findById(created.paymentId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(reloaded.getConfirmCapCheckIds()).containsExactlyElementsOf(confirmed.capCheckIds());
+        assertThat(reloaded.getConfirmIdempotencyKey()).isEqualTo("IT-JPA-" + created.paymentId());
+        assertThat(paymentWriteRepository.updateTransaction(CommissionPaymentCommand.builder()
+                .paymentId(created.paymentId()).build())).isZero();
+        assertThat(transactionRepository.findById(created.paymentId()).orElseThrow().getStatus())
+                .isEqualTo(CommissionPaymentStatus.CONFIRMED);
+    }
+
+    @Test
+    void attributionReplacementFlushesJpaChangesAndEvictsDeletedEntities() {
+        CommissionPaymentCreateRequest request = request("IT-JPA-REPLACE-" + UUID.randomUUID());
+        CommissionPaymentResponse created = commissionPaymentService.create(request);
+        Long attributionId = jdbcTemplate.queryForObject("""
+                SELECT transaction_attribution_id FROM fgc.transaction_attribution
+                 WHERE commission_transaction_id = ?
+                """, Long.class, created.paymentId());
+        TransactionAttribution previous = entityManager.find(TransactionAttribution.class, attributionId);
+        assertThat(entityManager.contains(previous)).isTrue();
+        assertThat(previous.getExclusionTypeSnapshot()).isNull();
+
+        CommissionPaymentResponse updated = commissionPaymentService.update(created.paymentId(), updateRequest(request, BigDecimal.ONE));
+
+        assertThat(entityManager.contains(previous)).isFalse();
+        assertThat(entityManager.find(TransactionAttribution.class, attributionId)).isNull();
+        assertThat(updated.amount()).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(transactionRepository.findById(created.paymentId()).orElseThrow().getAmount())
+                .isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT attributed_amount FROM fgc.transaction_attribution
+                 WHERE commission_transaction_id = ?
+                """, BigDecimal.class, created.paymentId())).isEqualByComparingTo(BigDecimal.ONE);
+    }
 
     @Test
     void persistsAndConfirmsPaymentAgainstProjectErd() {
@@ -468,6 +542,9 @@ class CommissionPaymentIntegrationTest {
                 new BigDecimal("999")
         );
 
+        assertThat(paymentWriteRepository.updateTransaction(CommissionPaymentCommand.builder()
+                .paymentId(paymentId).build())).isZero();
+
         assertThatThrownBy(() -> commissionPaymentService.update(
                 paymentId,
                 updateRequest(manualRequest, new BigDecimal("999"))
@@ -534,6 +611,56 @@ class CommissionPaymentIntegrationTest {
         assertThat(confirmedCount).isEqualTo(1);
     }
 
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentRetriesForSamePaymentReturnOneCommittedCheckSet() throws Exception {
+        String runId = UUID.randomUUID().toString();
+        CommissionPaymentResponse created = commissionPaymentService.create(request(
+                "IT-FUN065-IDEM-CONCURRENT-" + runId));
+        String idempotencyKey = "IT-IDEM-CONCURRENT-" + runId;
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2));
+        try {
+            Future<CommissionPaymentResponse> first = executor.submit(() -> confirmResponse(
+                    created.paymentId(), idempotencyKey, ready, start));
+            Future<CommissionPaymentResponse> second = executor.submit(() -> confirmResponse(
+                    created.paymentId(), idempotencyKey, ready, start));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            CommissionPaymentResponse firstResponse = first.get(10, TimeUnit.SECONDS);
+            CommissionPaymentResponse secondResponse = second.get(10, TimeUnit.SECONDS);
+            assertThat(firstResponse.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+            assertThat(secondResponse.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+            assertThat(firstResponse.capCheckIds()).hasSize(1);
+            assertThat(secondResponse.capCheckIds()).containsExactlyElementsOf(firstResponse.capCheckIds());
+            assertThat(jdbcTemplate.queryForList("""
+                    SELECT cap_check_id FROM fgc.cap_check
+                     WHERE candidate_transaction_id = ? AND check_kind = 'PRE_CONFIRM'
+                     ORDER BY cap_check_id
+                    """, Long.class, created.paymentId())).containsExactlyElementsOf(firstResponse.capCheckIds());
+            Long checkId = firstResponse.capCheckIds().getFirst();
+            Integer details = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM fgc.cap_check_detail WHERE cap_check_id = ?
+                    """, Integer.class, checkId);
+            assertThat(details).isPositive();
+            assertThat(jdbcTemplate.queryForObject("""
+                    SELECT COUNT(DISTINCT detail_seq) FROM fgc.cap_check_detail WHERE cap_check_id = ?
+                    """, Integer.class, checkId)).isEqualTo(details);
+            assertThat(commissionPaymentService.confirm(created.paymentId(), idempotencyKey).capCheckIds())
+                    .containsExactlyElementsOf(firstResponse.capCheckIds());
+            assertThat(jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM fgc.cap_check_detail WHERE cap_check_id = ?
+                    """, Integer.class, checkId)).isEqualTo(details);
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     // 2026-08-11 yslee - 성공한 확정의 멱등키와 cap_check 응답을 실제 DB에서 재현
     // 기존 코드: 동일 요청 재전송 시 DRAFT 상태 오류로 끝나 최초 cap_check 결과를 알 수 없음
     // 문제: 응답 유실 후 재시도에서 중복 검증 이력이 생기거나 성공 여부를 복구하지 못함
@@ -578,13 +705,27 @@ class CommissionPaymentIntegrationTest {
                 "IT-FUN065-IDEM-CROSS-A-" + runId,
                 BigDecimal.ZERO
         ));
-        CommissionPaymentResponse second = commissionPaymentService.create(request(
+        CommissionPaymentCreateRequest secondRequest = request(
                 "IT-FUN065-IDEM-CROSS-B-" + runId,
                 BigDecimal.ZERO
-        ));
+        );
+        CommissionPaymentResponse second = commissionPaymentService.create(secondRequest);
         String idempotencyKey = "IT-IDEM-CROSS-" + runId;
 
         commissionPaymentService.confirm(first.paymentId(), idempotencyKey);
+
+        // WARNING은 예외를 저장한 후에도 확정을 허용한다. 최종 UPDATE의 UNIQUE 실패가
+        // 앞서 저장한 점검·상세뿐 아니라 CAP_WARNING 예외까지 롤백하는지 확인한다.
+        TransactionPrecheckResponse.CapPreviewItem before = commissionPaymentService.precheck(second.paymentId())
+                .capPreview().getFirst();
+        BigDecimal amountAtLimit = BigDecimal.valueOf(before.limitAmount() - before.existingIncludedAmount());
+        assertThat(amountAtLimit).isNotNegative();
+        commissionPaymentService.update(second.paymentId(), updateRequest(secondRequest, amountAtLimit));
+        TransactionPrecheckResponse warning = commissionPaymentService.precheck(second.paymentId());
+        assertThat(warning.confirmable()).isTrue();
+        assertThat(warning.capPreview()).singleElement()
+                .extracting(TransactionPrecheckResponse.CapPreviewItem::resultStatus)
+                .isEqualTo(CapResultStatus.WARNING);
 
         assertThatThrownBy(() -> commissionPaymentService.confirm(
                 second.paymentId(), idempotencyKey
@@ -595,6 +736,23 @@ class CommissionPaymentIntegrationTest {
                   FROM fgc.cap_check
                  WHERE candidate_transaction_id = ?
                 """, Integer.class, second.paymentId())).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.cap_check_detail d
+                  JOIN fgc.transaction_attribution a
+                    ON a.transaction_attribution_id = d.transaction_attribution_id
+                 WHERE a.commission_transaction_id = ?
+                """, Integer.class, second.paymentId())).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case
+                 WHERE source_entity_type = 'COMMISSION_TRANSACTION' AND source_entity_id = ?
+                """, Integer.class, second.paymentId().toString())).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT confirm_idempotency_key FROM fgc.commission_transaction WHERE commission_transaction_id = ?
+                """, String.class, second.paymentId())).isNull();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT cardinality(confirm_cap_check_ids) FROM fgc.commission_transaction WHERE commission_transaction_id = ?
+                """, Integer.class, second.paymentId())).isZero();
+        assertThat(paymentStatus(first.paymentId())).isEqualTo("CONFIRMED");
     }
 
     // 2026-08-11 yslee - 실패 점검이 있는 DRAFT 수정 후 성공 확정의 멱등 응답 분리 검증
@@ -920,15 +1078,25 @@ class CommissionPaymentIntegrationTest {
             CountDownLatch ready,
             CountDownLatch start
     ) throws InterruptedException {
-        ready.countDown();
-        start.await();
         try {
-            return commissionPaymentService.confirm(paymentId, idempotencyKey)
+            return confirmResponse(paymentId, idempotencyKey, ready, start)
                     .status()
                     .name();
         } catch (FgcBusinessException exception) {
             return exception.getErrorCode().name();
         }
+    }
+
+    private CommissionPaymentResponse confirmResponse(
+            Long paymentId,
+            String idempotencyKey,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws InterruptedException {
+        ready.countDown();
+        start.await();
+        // 호출 스레드마다 서비스 프록시가 별도 PostgreSQL 트랜잭션을 연다.
+        return commissionPaymentService.confirm(paymentId, idempotencyKey);
     }
 
     private Long commissionItemId() {
