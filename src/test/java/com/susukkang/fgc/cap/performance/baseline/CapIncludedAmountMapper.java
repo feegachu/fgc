@@ -1,8 +1,7 @@
-package com.susukkang.fgc.cap.mapper;
+package com.susukkang.fgc.cap.performance.baseline;
 
 import com.susukkang.fgc.cap.dto.CapIncludedAmountSummary;
 import com.susukkang.fgc.common.code.PaymentStage;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -14,7 +13,6 @@ import java.util.List;
  * @version 1.0
  * @since 2026-08-12
  */
-@Mapper
 public interface CapIncludedAmountMapper {
 
     /**

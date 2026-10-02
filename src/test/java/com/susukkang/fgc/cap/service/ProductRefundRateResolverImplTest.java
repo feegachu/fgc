@@ -3,7 +3,7 @@ package com.susukkang.fgc.cap.service;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.dto.RefundRateTableView;
-import com.susukkang.fgc.cap.mapper.RefundRateMapper;
+import com.susukkang.fgc.cap.repository.RefundRateQueryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -23,10 +23,10 @@ import static org.mockito.Mockito.when;
 class ProductRefundRateResolverImplTest {
 
     @Mock
-    private RefundRateMapper refundRateMapper;
+    private RefundRateQueryRepository refundRateQueryRepository;
 
-    private ProductRefundRateResolverImpl resolverWithMapper() {
-        return new ProductRefundRateResolverImpl(refundRateMapper);
+    private ProductRefundRateResolverImpl resolverWithRepository() {
+        return new ProductRefundRateResolverImpl(refundRateQueryRepository);
     }
 
     // 표와 12차월 값이 있으면 표버전과 환급률을 돌려준다
@@ -41,11 +41,11 @@ class ProductRefundRateResolverImplTest {
 
         RefundRateQuery query = new RefundRateQuery(10L, 100L, 240, "FACE_TO_FACE", LocalDate.of(2026, 1, 15));
 
-        when(refundRateMapper.findApplicableTable(10L, 100L, 240, "FACE_TO_FACE", query.asOfDate()))
+        when(refundRateQueryRepository.findApplicableTable(10L, 100L, 240, "FACE_TO_FACE", query.asOfDate()))
                 .thenReturn(table);
-        when(refundRateMapper.findRateAtMonth(eq(777L), eq(12))).thenReturn(new BigDecimal("24.000000"));
+        when(refundRateQueryRepository.findRateAtMonth(eq(777L), eq(12))).thenReturn(new BigDecimal("24.000000"));
 
-        Optional<RefundRateResolution> result = resolverWithMapper().resolve(query);
+        Optional<RefundRateResolution> result = resolverWithRepository().resolve(query);
 
         assertThat(result).isPresent();
         assertThat(result.get().refundRateTableId()).isEqualTo(777L);
@@ -58,9 +58,9 @@ class ProductRefundRateResolverImplTest {
     @Test
     void returnsEmptyWhenTableNotFound() {
         RefundRateQuery query = new RefundRateQuery(10L, 999L, 240, "FACE_TO_FACE", LocalDate.of(2026, 1, 15));
-        when(refundRateMapper.findApplicableTable(any(), any(), any(), any(), any())).thenReturn(null);
+        when(refundRateQueryRepository.findApplicableTable(any(), any(), any(), any(), any())).thenReturn(null);
 
-        assertThat(resolverWithMapper().resolve(query)).isEmpty();
+        assertThat(resolverWithRepository().resolve(query)).isEmpty();
     }
 
     // 표는 있지만 12차월 값이 없으면 빈값을 돌려준다
@@ -72,9 +72,9 @@ class ProductRefundRateResolverImplTest {
         table.setVersionNo(1);
 
         RefundRateQuery query = new RefundRateQuery(10L, 100L, 120, "FACE_TO_FACE", LocalDate.of(2026, 1, 15));
-        when(refundRateMapper.findApplicableTable(any(), any(), any(), any(), any())).thenReturn(table);
-        when(refundRateMapper.findRateAtMonth(eq(777L), anyInt())).thenReturn(null);
+        when(refundRateQueryRepository.findApplicableTable(any(), any(), any(), any(), any())).thenReturn(table);
+        when(refundRateQueryRepository.findRateAtMonth(eq(777L), anyInt())).thenReturn(null);
 
-        assertThat(resolverWithMapper().resolve(query)).isEmpty();
+        assertThat(resolverWithRepository().resolve(query)).isEmpty();
     }
 }

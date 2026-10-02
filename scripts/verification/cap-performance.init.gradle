@@ -1,0 +1,17 @@
+// 동일 JVM·격리 PostgreSQL에서 원본 MyBatis와 현재 조회 저장소를 AB/BA 교대로 측정한다.
+// gradlew -I scripts/verification/cap-performance.init.gradle test --tests '*CapReferenceReadPerformanceTest' -PcapRound=ab
+// 반대 시작 순서: -PcapRound=ba -PcapCurrentFirst=true
+allprojects {
+    tasks.withType(Test).configureEach {
+        systemProperty 'fgc.cap.performance', 'true'
+        systemProperty 'fgc.cap.performance.warmups', project.findProperty('capWarmups') ?: '25'
+        systemProperty 'fgc.cap.performance.samples', project.findProperty('capSamples') ?: '80'
+        systemProperty 'fgc.cap.performance.round', project.findProperty('capRound') ?: 'comparison'
+        systemProperty 'fgc.cap.performance.currentFirst', project.findProperty('capCurrentFirst') ?: 'false'
+        minHeapSize = '1g'
+        maxHeapSize = '1g'
+        maxParallelForks = 1
+        outputs.upToDateWhen { false }
+        testLogging.showStandardStreams = true
+    }
+}
