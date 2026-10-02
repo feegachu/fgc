@@ -3,11 +3,12 @@ package com.susukkang.fgc.cap.service;
 import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapExceptionInsertDTO;
 import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
-import com.susukkang.fgc.cap.dto.CapExceptionStatusRow;
-import com.susukkang.fgc.cap.mapper.CapExceptionMapper;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseActionTarget;
+import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,13 +38,13 @@ import static org.mockito.Mockito.verify;
 class CapExceptionServiceImplTest {
 
     @Mock
-    private CapExceptionMapper capExceptionMapper;
+    private CapExceptionRepository capExceptionRepository;
 
     private CapExceptionServiceImpl capExceptionService;
 
     @BeforeEach
     void setUp() {
-        capExceptionService = new CapExceptionServiceImpl(capExceptionMapper);
+        capExceptionService = new CapExceptionServiceImpl(capExceptionRepository);
     }
 
     @Test
@@ -51,7 +52,7 @@ class CapExceptionServiceImplTest {
         capExceptionService.createIfNecessary(command(CapResultStatus.NORMAL, 10L, 3L, null));
         capExceptionService.createIfNecessary(command(CapResultStatus.REVIEW_REQUIRED, 10L, 3L, null));
 
-        verify(capExceptionMapper, never()).insertException(org.mockito.ArgumentMatchers.any());
+        verify(capExceptionRepository, never()).insertException(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -60,7 +61,7 @@ class CapExceptionServiceImplTest {
 
         capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 10L, 3L, 77L));
 
-        verify(capExceptionMapper).insertException(captor.capture());
+        verify(capExceptionRepository).insertException(captor.capture());
         CapExceptionInsertDTO inserted = captor.getValue();
         assertThat(inserted.getExceptionKey())
                 .isEqualTo("CAP_WARNING:77:COMMISSION_TRANSACTION:10:GA_TO_FC:3");
@@ -85,7 +86,7 @@ class CapExceptionServiceImplTest {
 
         capExceptionService.createIfNecessary(command(CapResultStatus.VIOLATION, 10L, 3L, null));
 
-        verify(capExceptionMapper).insertException(captor.capture());
+        verify(capExceptionRepository).insertException(captor.capture());
         assertThat(captor.getValue().getExceptionKey())
                 .isEqualTo("CAP_VIOLATION:null:COMMISSION_TRANSACTION:10:GA_TO_FC:3");
         assertThat(captor.getValue().getExceptionType()).isEqualTo(ExceptionType.CAP_VIOLATION);
@@ -113,7 +114,7 @@ class CapExceptionServiceImplTest {
 
         capExceptionService.createIfNecessary(command);
 
-        verify(capExceptionMapper).insertException(org.mockito.ArgumentMatchers.any());
+        verify(capExceptionRepository).insertException(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -124,7 +125,7 @@ class CapExceptionServiceImplTest {
         capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 11L, 3L, null));
         capExceptionService.createIfNecessary(command(CapResultStatus.WARNING, 10L, 4L, 77L));
 
-        verify(capExceptionMapper, org.mockito.Mockito.times(3)).insertException(captor.capture());
+        verify(capExceptionRepository, org.mockito.Mockito.times(3)).insertException(captor.capture());
         assertThat(captor.getAllValues())
                 .extracting(CapExceptionInsertDTO::getExceptionKey)
                 .containsExactly(
@@ -143,28 +144,32 @@ class CapExceptionServiceImplTest {
     @Test
     void resolvesExceptionWithRequiredAction() {
         CapExceptionResolveCommand command = resolveCommand();
-        given(capExceptionMapper.selectExceptionForUpdate(5L))
-                .willReturn(new CapExceptionStatusRow(5L, "NEW"));
-        given(capExceptionMapper.insertExceptionAction(command)).willReturn(1);
-        given(capExceptionMapper.updateExceptionResolved(5L)).willReturn(1);
+        ExceptionCaseActionTarget exception = new ExceptionCaseActionTarget(
+                5L, "CAP_VIOLATION", ExceptionStatus.NEW, 1L);
+        given(capExceptionRepository.selectExceptionForUpdate(5L))
+                .willReturn(exception);
+        given(capExceptionRepository.insertExceptionAction(command, exception)).willReturn(1);
+        given(capExceptionRepository.updateExceptionResolved(exception)).willReturn(1);
 
         capExceptionService.resolve(command);
 
-        verify(capExceptionMapper).insertExceptionAction(command);
-        verify(capExceptionMapper).updateExceptionResolved(5L);
+        verify(capExceptionRepository).insertExceptionAction(command, exception);
+        verify(capExceptionRepository).updateExceptionResolved(exception);
     }
 
     @Test
     void rejectsResolutionForStatusOutsideAllowedOpenStatuses() {
         CapExceptionResolveCommand command = resolveCommand();
-        given(capExceptionMapper.selectExceptionForUpdate(5L))
-                .willReturn(new CapExceptionStatusRow(5L, "REJECTED"));
+        ExceptionCaseActionTarget exception = new ExceptionCaseActionTarget(
+                5L, "CAP_VIOLATION", ExceptionStatus.REJECTED, null);
+        given(capExceptionRepository.selectExceptionForUpdate(5L))
+                .willReturn(exception);
 
         assertThatThrownBy(() -> capExceptionService.resolve(command))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("해결할 수 없는 예외 상태입니다.");
-        verify(capExceptionMapper, never()).insertExceptionAction(command);
-        verify(capExceptionMapper, never()).updateExceptionResolved(5L);
+        verify(capExceptionRepository, never()).insertExceptionAction(command, exception);
+        verify(capExceptionRepository, never()).updateExceptionResolved(exception);
     }
 
     @Test
@@ -176,12 +181,12 @@ class CapExceptionServiceImplTest {
 
         assertThatThrownBy(() -> capExceptionService.resolve(command))
                 .isInstanceOf(IllegalArgumentException.class);
-        verify(capExceptionMapper, never()).selectExceptionForUpdate(5L);
+        verify(capExceptionRepository, never()).selectExceptionForUpdate(5L);
     }
 
     @Test
     void checksUnresolvedViolationByPaymentId() {
-        given(capExceptionMapper.existsUnresolvedViolation(10L)).willReturn(true);
+        given(capExceptionRepository.existsUnresolvedViolation(10L)).willReturn(true);
 
         assertThat(capExceptionService.hasUnresolvedViolation(10L)).isTrue();
     }

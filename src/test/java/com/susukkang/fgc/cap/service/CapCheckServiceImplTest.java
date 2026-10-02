@@ -14,7 +14,8 @@ import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
 import com.susukkang.fgc.cap.dto.CapAgentSummaryRow;
 import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.repository.CapCheckQueryRepository;
+import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -40,7 +41,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * CapCheckService(오케스트레이션 계층) 단위테스트.
- * CapCalculator/CapCheckMapper 를 mock 으로 대체해, "계산 결과를 어떻게 저장·조회로 조립하는지"만 검증한다.
+ * CapCalculator와 결과 저장소 를 mock 으로 대체해, "계산 결과를 어떻게 저장·조회로 조립하는지"만 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class CapCheckServiceImplTest {
@@ -48,7 +49,10 @@ class CapCheckServiceImplTest {
     @Mock
     private CapCalculator capCalculator;
     @Mock
-    private CapCheckMapper capCheckMapper;
+    private CapCheckQueryRepository capCheckQueryRepository;
+
+    @Mock
+    private CapCheckWriteRepository capCheckWriteRepository;
 
     private CapCheckServiceImpl capCheckService;
 
@@ -63,7 +67,7 @@ class CapCheckServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        capCheckService = new CapCheckServiceImpl(capCalculator, capCheckMapper, new ObjectMapper());
+        capCheckService = new CapCheckServiceImpl(capCalculator, capCheckQueryRepository, capCheckWriteRepository, new ObjectMapper());
     }
 
     @Test
@@ -80,7 +84,7 @@ class CapCheckServiceImplTest {
             CapCheckInsertRow row = invocation.getArgument(0);
             row.setCapCheckId(999L);
             return null;
-        }).when(capCheckMapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckInsertRow.class));
 
         CapCheckSaveResult saved = capCheckService.calculateAndSave(command);
 
@@ -88,12 +92,12 @@ class CapCheckServiceImplTest {
         assertThat(saved.result()).isSameAs(result);
 
         ArgumentCaptor<CapCheckInsertRow> rowCaptor = ArgumentCaptor.forClass(CapCheckInsertRow.class);
-        verify(capCheckMapper).insertCapCheck(rowCaptor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(rowCaptor.capture());
         assertThat(rowCaptor.getValue().getContractId()).isEqualTo(1L);
         assertThat(rowCaptor.getValue().getLimitAmount()).isEqualByComparingTo("1200000");
         assertThat(rowCaptor.getValue().getResultStatus()).isEqualTo("NORMAL");
 
-        verify(capCheckMapper).insertCapCheckDetails(argThatDetailListHasCapCheckId(999L));
+        verify(capCheckWriteRepository).insertCapCheckDetails(argThatDetailListHasCapCheckId(999L));
     }
 
     // insertCapCheck가 ON CONFLICT DO UPDATE로 기존 행을 재사용할 수 있게 되면서(코드리뷰 반영,
@@ -113,15 +117,15 @@ class CapCheckServiceImplTest {
             CapCheckInsertRow row = invocation.getArgument(0);
             row.setCapCheckId(999L);
             return null;
-        }).when(capCheckMapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckInsertRow.class));
 
         capCheckService.calculateAndSave(command);
 
-        verify(capCheckMapper).pruneCapCheckDetails(999L, 1);
-        org.mockito.InOrder order = org.mockito.Mockito.inOrder(capCheckMapper);
-        order.verify(capCheckMapper).insertCapCheck(any());
-        order.verify(capCheckMapper).pruneCapCheckDetails(999L, 1);
-        order.verify(capCheckMapper).insertCapCheckDetails(any());
+        verify(capCheckWriteRepository).pruneCapCheckDetails(999L, 1);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(capCheckWriteRepository);
+        order.verify(capCheckWriteRepository).insertCapCheck(any(CapCheckInsertRow.class));
+        order.verify(capCheckWriteRepository).pruneCapCheckDetails(999L, 1);
+        order.verify(capCheckWriteRepository).insertCapCheckDetails(any());
     }
 
     // 재계산 결과 항목이 하나도 없으면(maxDetailSeq=0) 예전 detail 전부가 잘려나가야 한다.
@@ -135,12 +139,12 @@ class CapCheckServiceImplTest {
             CapCheckInsertRow row = invocation.getArgument(0);
             row.setCapCheckId(999L);
             return null;
-        }).when(capCheckMapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckInsertRow.class));
 
         capCheckService.calculateAndSave(command);
 
-        verify(capCheckMapper).pruneCapCheckDetails(999L, 0);
-        verify(capCheckMapper, org.mockito.Mockito.never()).insertCapCheckDetails(any());
+        verify(capCheckWriteRepository).pruneCapCheckDetails(999L, 0);
+        verify(capCheckWriteRepository, org.mockito.Mockito.never()).insertCapCheckDetails(any());
     }
 
     // item_code/item_name/contract_month_no/evidence_ref는 계산 당시 값을 cap_check_detail에 그대로 스냅샷해야
@@ -158,14 +162,14 @@ class CapCheckServiceImplTest {
             CapCheckInsertRow row = invocation.getArgument(0);
             row.setCapCheckId(999L);
             return null;
-        }).when(capCheckMapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckInsertRow.class));
 
         capCheckService.calculateAndSave(command);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow>> detailsCaptor =
                 ArgumentCaptor.forClass(List.class);
-        verify(capCheckMapper).insertCapCheckDetails(detailsCaptor.capture());
+        verify(capCheckWriteRepository).insertCapCheckDetails(detailsCaptor.capture());
 
         com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow insertedDetail = detailsCaptor.getValue().get(0);
         assertThat(insertedDetail.getItemCode()).isEqualTo("BASE_COMMISSION");
@@ -182,12 +186,12 @@ class CapCheckServiceImplTest {
 
         capCheckService.calculateAndSave(command);
 
-        verify(capCheckMapper, org.mockito.Mockito.never()).insertCapCheckDetails(any());
+        verify(capCheckWriteRepository, org.mockito.Mockito.never()).insertCapCheckDetails(any());
     }
 
     @Test
     void findLatestReturnsEmptyWhenNoCapCheckExists() {
-        when(capCheckMapper.findLatestByContractAndStage(1L, "GA_TO_FC")).thenReturn(null);
+        when(capCheckQueryRepository.findLatestByContractAndStage(1L, "GA_TO_FC")).thenReturn(null);
 
         Optional<CapCheckSaveResult> found = capCheckService.findLatest(1L, PaymentStage.GA_TO_FC);
 
@@ -217,8 +221,8 @@ class CapCheckServiceImplTest {
         List<CapCheckDetailLine> details = List.of(new CapCheckDetailLine(
                 1, 1L, "BASE_COMMISSION", "FC 기본수수료", 11L, 1, "INCLUDED", new BigDecimal("650000"), "산입", null));
 
-        when(capCheckMapper.findLatestByContractAndStage(1L, "GA_TO_FC")).thenReturn(row);
-        when(capCheckMapper.findDetailsByCapCheckId(999L)).thenReturn(details);
+        when(capCheckQueryRepository.findLatestByContractAndStage(1L, "GA_TO_FC")).thenReturn(row);
+        when(capCheckQueryRepository.findDetailsByCapCheckId(999L)).thenReturn(details);
 
         CapCheckSaveResult found = capCheckService.findLatest(1L, PaymentStage.GA_TO_FC).orElseThrow();
 
@@ -231,7 +235,7 @@ class CapCheckServiceImplTest {
 
     @Test
     void findDetailReturnsEmptyWhenCapCheckIdDoesNotExist() {
-        when(capCheckMapper.findById(999L)).thenReturn(null);
+        when(capCheckQueryRepository.findById(999L)).thenReturn(null);
 
         Optional<CapCheckBasisResponse> found = capCheckService.findDetail(999L);
 
@@ -267,8 +271,8 @@ class CapCheckServiceImplTest {
                 new CapCheckDetailLine(
                         2, 2L, "EDU_SUPPORT", "교육비", null, 1, "EXCLUDED", new BigDecimal("50000"), "제외", "SRC-004"));
 
-        when(capCheckMapper.findById(999L)).thenReturn(row);
-        when(capCheckMapper.findDetailsByCapCheckId(999L)).thenReturn(details);
+        when(capCheckQueryRepository.findById(999L)).thenReturn(row);
+        when(capCheckQueryRepository.findDetailsByCapCheckId(999L)).thenReturn(details);
 
         CapCheckBasisResponse basis = capCheckService.findDetail(999L).orElseThrow();
 
@@ -284,7 +288,7 @@ class CapCheckServiceImplTest {
     }
 
     @Test
-    void searchBuildsPageResponseAndSummaryFromMapperResults() {
+    void searchBuildsPageResponseAndSummaryFromRepositoryResults() {
         CapCheckListRow row = new CapCheckListRow();
         row.setCapCheckId(999L);
         row.setContractId(1L);
@@ -307,11 +311,11 @@ class CapCheckServiceImplTest {
 
         CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(
                 LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, 21L, null);
-        when(capCheckMapper.search(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
+        when(capCheckQueryRepository.search(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
                 criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), 0, 20)).thenReturn(List.of(row));
-        when(capCheckMapper.count(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
+        when(capCheckQueryRepository.count(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
                 criteria.insurerId(), criteria.organizationId(), criteria.contractNo())).thenReturn(1L);
-        when(capCheckMapper.summarize(criteria.month(), criteria.paymentStage(),
+        when(capCheckQueryRepository.summarize(criteria.month(), criteria.paymentStage(),
                 criteria.insurerId(), criteria.organizationId(), criteria.contractNo())).thenReturn(List.of(normalCount));
 
         CapStageSummaryRow agentStage = new CapStageSummaryRow();
@@ -321,7 +325,7 @@ class CapCheckServiceImplTest {
         agentStage.setIncludedAmountTotal(new BigDecimal("650000"));
         agentStage.setComplianceDeductionAmountTotal(BigDecimal.ZERO);
         agentStage.setUsagePct(new BigDecimal("54.166667"));
-        when(capCheckMapper.summarizeByStage(criteria.month(), criteria.insurerId(),
+        when(capCheckQueryRepository.summarizeByStage(criteria.month(), criteria.insurerId(),
                 criteria.organizationId(), criteria.contractNo())).thenReturn(List.of(agentStage));
 
         CapAgentSummaryRow agent = new CapAgentSummaryRow();
@@ -340,7 +344,7 @@ class CapCheckServiceImplTest {
         agent.setReviewRequiredCount(1);
         agent.setWorstContractNo("C004");
         agent.setWorstUsagePct(new BigDecimal("104.166667"));
-        when(capCheckMapper.summarizeByAgent(criteria.month(), criteria.insurerId(),
+        when(capCheckQueryRepository.summarizeByAgent(criteria.month(), criteria.insurerId(),
                 criteria.organizationId(), criteria.contractNo())).thenReturn(List.of(agent));
 
         CapCheckSearchResult result = capCheckService.search(criteria, 1, 20);

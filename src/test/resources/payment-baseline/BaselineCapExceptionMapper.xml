@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.susukkang.fgc.cap.mapper.CapExceptionMapper">
+<mapper namespace="com.susukkang.fgc.transaction.performance.baseline.BaselineCapExceptionMapper">
 
     <!-- 한도 주의 또는 위반 예외 건을 등록하고 진행 중인 동일 예외는 최신 내용으로 갱신한다. -->
     <insert id="insertException">
@@ -79,7 +79,7 @@
 
     <!-- 한도 예외 해결 전 현재 상태를 잠금 조회한다. -->
     <select id="selectExceptionForUpdate"
-            resultType="com.susukkang.fgc.cap.dto.CapExceptionStatusRow">
+            resultType="com.susukkang.fgc.transaction.performance.baseline.BaselineCapExceptionStatusRow">
         SELECT
             exception_case_id,
             status

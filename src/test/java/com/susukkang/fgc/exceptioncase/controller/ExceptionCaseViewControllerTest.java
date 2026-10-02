@@ -78,7 +78,7 @@ class ExceptionCaseViewControllerTest {
     /*
      * FGC-FUN-035(계산근거)·FGC-FUN-034 / REG-08 — #331.
      * 확정 거절된 DRAFT 후보의 cap_check 는 CAP-W01·CONT-W02 목록에서 제외되므로
-     * (CapCheckMapper 의 candidate_transaction_id 조건) 예외함이 계산근거로 가는 유일한 자리다.
+     * (CapCheckQueryRepository 의 candidate_transaction_id 조건) 예외함이 계산근거로 가는 유일한 자리다.
      * 실시간 경로는 cap_check_id 컬럼, 배치 경로는 source_entity 를 쓴다 — 둘 다 열려야 한다.
      */
     @Test

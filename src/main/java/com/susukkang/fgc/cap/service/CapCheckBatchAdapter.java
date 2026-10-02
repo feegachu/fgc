@@ -1,7 +1,7 @@
 package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.repository.CapCheckQueryRepository;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -29,7 +29,7 @@ import java.util.List;
 @Service
 public class CapCheckBatchAdapter implements CapCheckBatchPort {
     private final ValidationTargetSelectionMapper validationMapper;
-    private final CapCheckMapper capCheckMapper;
+    private final CapCheckQueryRepository capCheckQueryRepository;
     private final CapCheckBatchItemService itemService;
     private final CapCheckFailureRecordService failureRecordService;
     /**
@@ -63,12 +63,12 @@ public class CapCheckBatchAdapter implements CapCheckBatchPort {
         List<ContractSkip> skips = new ArrayList<>();
 
         for (Long contractId : contractIds) {
-            if (!capCheckMapper.existsApplicableRuleSet(contractId, paymentStage)) {
+            if (!capCheckQueryRepository.existsApplicableRuleSet(contractId, paymentStage)) {
                 continue;
             }
             try {
                 BigDecimal complianceEvidenceAmount =
-                        capCheckMapper.selectComplianceEvidenceAmount(
+                        capCheckQueryRepository.selectComplianceEvidenceAmount(
                                 contractId,
                                 paymentStage
                         );

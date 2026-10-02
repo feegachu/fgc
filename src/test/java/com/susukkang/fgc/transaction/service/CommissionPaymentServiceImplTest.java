@@ -7,7 +7,7 @@ import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
@@ -41,7 +41,9 @@ import com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentUpdateRequest;
 import com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse;
-import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
+import com.susukkang.fgc.transaction.repository.CommissionPaymentQueryRepository;
+import com.susukkang.fgc.transaction.repository.CommissionPaymentWriteRepository;
+import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -83,9 +85,13 @@ import static org.mockito.Mockito.verify;
 class CommissionPaymentServiceImplTest {
 
     @Mock
-    private CommissionPaymentMapper mapper;
+    private CommissionPaymentQueryRepository queryRepository;
     @Mock
-    private CapCheckMapper capCheckMapper;
+    private CommissionPaymentWriteRepository writeRepository;
+    @Mock
+    private CapExceptionRepository capExceptionRepository;
+    @Mock
+    private CapCheckWriteRepository capCheckWriteRepository;
     @Mock
     private AgentRepository agentRepository;
     @Mock
@@ -109,8 +115,10 @@ class CommissionPaymentServiceImplTest {
         messageSource.setDefaultEncoding("UTF-8");
         messageResolver = new FgcMessageResolver(messageSource);
         service = new CommissionPaymentServiceImpl(
-                mapper,
-                capCheckMapper,
+                queryRepository,
+                writeRepository,
+                capExceptionRepository,
+                capCheckWriteRepository,
                 agentRepository,
                 new ObjectMapper(),
                 capValidator,
@@ -124,16 +132,16 @@ class CommissionPaymentServiceImplTest {
 
     @Test
     void resolvesAllocationPolicyWhenApprovedAllocationOmitsPolicyVersion() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
-        given(mapper.findContract(3L))
+        given(queryRepository.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
                 .willReturn(4L);
-        given(mapper.existsPolicyVersion(4L)).willReturn(true);
-        given(mapper.findAllocationPolicyId(4L, "DIRECT")).willReturn(77L);
+        given(queryRepository.existsPolicyVersion(4L)).willReturn(true);
+        given(queryRepository.findAllocationPolicyId(4L, "DIRECT")).willReturn(77L);
 
         CommissionPaymentCreateRequest source = createRequest(List.of(
                 attribution(3L, "500000", AttributionMethod.APPROVED_ALLOCATION)
@@ -159,7 +167,7 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<CommissionPaymentCommand> captor =
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(captor.capture());
+        verify(writeRepository).insertTransaction(captor.capture());
         assertThat(captor.getValue().getPolicyVersionId()).isEqualTo(4L);
         verify(commissionPolicyService, never()).resolveCurrentCommission(any(Long.class), any(PaymentStage.class));
     }
@@ -180,7 +188,7 @@ class CommissionPaymentServiceImplTest {
         assertThat(response.attributions()).hasSize(2);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(mapper).insertAttributions(captor.capture());
+        verify(writeRepository).insertAttributions(captor.capture());
         assertThat(captor.getValue())
                 .extracting(CommissionPaymentAttributionCommand::getAttributionSequence)
                 .containsExactly(1, 2);
@@ -194,8 +202,8 @@ class CommissionPaymentServiceImplTest {
     void createsDraftForContractManagerFoundByRepository(AgentRankCode rank) {
         stubReferences(3L);
         LocalDate contractDate = LocalDate.of(2026, 7, 3);
-        given(mapper.findContract(3L)).willReturn(new ContractReference(3L, 20L, 30L, contractDate));
-        given(mapper.findAgentRankCode(7L)).willReturn(rank);
+        given(queryRepository.findContract(3L)).willReturn(new ContractReference(3L, 20L, 30L, contractDate));
+        given(queryRepository.findAgentRankCode(7L)).willReturn(rank);
         given(agentRepository.findActiveAgentIdFromOrganizationHierarchy(30L, rank, contractDate))
                 .willReturn(7L);
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
@@ -206,7 +214,7 @@ class CommissionPaymentServiceImplTest {
 
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         ArgumentCaptor<CommissionPaymentCommand> captor = ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(captor.capture());
+        verify(writeRepository).insertTransaction(captor.capture());
         assertThat(captor.getValue().getAgentId()).isEqualTo(7L);
         verify(agentRepository).findActiveAgentIdFromOrganizationHierarchy(30L, rank, contractDate);
     }
@@ -217,8 +225,8 @@ class CommissionPaymentServiceImplTest {
     void rejectsManagerPaymentWhenRepositoryFindsNoManagerOrDifferentRecipient(Long expectedManagerId) {
         stubReferences(3L);
         LocalDate contractDate = LocalDate.of(2026, 7, 3);
-        given(mapper.findContract(3L)).willReturn(new ContractReference(3L, 20L, 30L, contractDate));
-        given(mapper.findAgentRankCode(7L)).willReturn(AgentRankCode.TEAM_LEADER);
+        given(queryRepository.findContract(3L)).willReturn(new ContractReference(3L, 20L, 30L, contractDate));
+        given(queryRepository.findAgentRankCode(7L)).willReturn(AgentRankCode.TEAM_LEADER);
         given(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
                 30L, AgentRankCode.TEAM_LEADER, contractDate)).willReturn(expectedManagerId);
 
@@ -229,14 +237,14 @@ class CommissionPaymentServiceImplTest {
             assertThat(exception.getField()).isEqualTo("attributedContractId");
             assertThat(exception.getDetail()).contains("관리자가 아닙니다");
         });
-        verify(mapper, never()).insertTransaction(any());
-        verify(mapper, never()).insertAttributions(any());
+        verify(writeRepository, never()).insertTransaction(any());
+        verify(writeRepository, never()).insertAttributions(any());
     }
 
     @Test
     void createsNonContractNewcomerSupportDraftWithoutContractOrPolicyVersion() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "NEWCOMER_SUPPORT", "PAYMENT"));
         stubInsertAndResponse(List.of(new CommissionPaymentAttributionRow(
                 1, null, LocalDate.of(2026, 7, 3), LocalDate.of(2026, 7, 1),
@@ -261,22 +269,22 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(paymentCaptor.capture());
+        verify(writeRepository).insertTransaction(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getSourceContractId()).isNull();
         assertThat(paymentCaptor.getValue().getPolicyVersionId()).isNull();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> attributionCaptor = ArgumentCaptor.forClass(List.class);
-        verify(mapper).insertAttributions(attributionCaptor.capture());
+        verify(writeRepository).insertAttributions(attributionCaptor.capture());
         assertThat(attributionCaptor.getValue().get(0).getContractId()).isNull();
         assertThat(attributionCaptor.getValue().get(0).getAttributionScope()).isEqualTo("AGENT");
     }
 
     @Test
     void savesDraftWhenAutomaticCommissionPolicyResolutionFails() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
-        given(mapper.findContract(3L))
+        given(queryRepository.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         given(commissionPolicyService.resolveCurrentCommission(3L, PaymentStage.GA_TO_FC))
@@ -301,16 +309,16 @@ class CommissionPaymentServiceImplTest {
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         ArgumentCaptor<CommissionPaymentCommand> captor =
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(captor.capture());
+        verify(writeRepository).insertTransaction(captor.capture());
         assertThat(captor.getValue().getPolicyVersionId()).isNull();
     }
 
     @Test
     void savesApprovedAllocationDraftWithPendingPolicyResolution() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
-        given(mapper.findContract(3L))
+        given(queryRepository.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         given(commissionPolicyService.resolveCurrentAllocationPolicyVersion(LocalDate.of(2026, 7, 1)))
@@ -335,7 +343,7 @@ class CommissionPaymentServiceImplTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(mapper).insertAttributions(captor.capture());
+        verify(writeRepository).insertAttributions(captor.capture());
         CommissionPaymentAttributionCommand saved = captor.getValue().get(0);
         assertThat(saved.getAllocationPolicyId()).isNull();
         assertThat(saved.getAllocationBasisJson()).contains("\"policyVersionResolutionPending\":true");
@@ -343,10 +351,10 @@ class CommissionPaymentServiceImplTest {
 
     @Test
     void createsInsurerToGaDraftWithoutRecipientAgent() {
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
-        given(mapper.existsPolicyVersion(3L)).willReturn(true);
-        given(mapper.findContract(3L))
+        given(queryRepository.existsPolicyVersion(3L)).willReturn(true);
+        given(queryRepository.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 7, 3)));
         stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
         CommissionPaymentCreateRequest source = createRequest(List.of(
@@ -362,7 +370,7 @@ class CommissionPaymentServiceImplTest {
         service.create(request);
 
         ArgumentCaptor<CommissionPaymentCommand> captor = ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(captor.capture());
+        verify(writeRepository).insertTransaction(captor.capture());
         assertThat(captor.getValue().getAgentId()).isNull();
     }
 
@@ -379,14 +387,14 @@ class CommissionPaymentServiceImplTest {
 
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         assertThat(response.attributions()).isEmpty();
-        verify(mapper).insertTransaction(any());
-        verify(mapper, never()).insertAttributions(anyList());
+        verify(writeRepository).insertTransaction(any());
+        verify(writeRepository, never()).insertAttributions(anyList());
     }
 
     @Test
     void createsDraftWithoutContractOrAttributionsWhenPolicyVersionIsUnresolved() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
         stubInsertAndResponse(List.of());
         CommissionPaymentCreateRequest request = new CommissionPaymentCreateRequest(
@@ -401,10 +409,10 @@ class CommissionPaymentServiceImplTest {
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(paymentCaptor.capture());
+        verify(writeRepository).insertTransaction(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getSourceContractId()).isNull();
         assertThat(paymentCaptor.getValue().getPolicyVersionId()).isNull();
-        verify(mapper, never()).insertAttributions(anyList());
+        verify(writeRepository, never()).insertAttributions(anyList());
     }
 
     // 2026-08-11 yslee - 최신 FUN-065의 저장·확정 분리 계약 검증
@@ -443,8 +451,8 @@ class CommissionPaymentServiceImplTest {
 
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         verify(capCalculator, never()).calculate(any());
-        verify(mapper, never()).findCapRuleSnapshot(any(), any());
-        verify(mapper, never()).insertCapCheck(any());
+        verify(queryRepository, never()).findCapRuleSnapshot(any(), any());
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
     }
 
     // 2026-08-11 yslee - 지급액과 상세 귀속액을 저장 전에 각각 원 단위 HALF_UP 처리
@@ -467,14 +475,14 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(paymentCaptor.capture());
+        verify(writeRepository).insertTransaction(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getAmount()).isEqualByComparingTo("301");
         assertThat(paymentCaptor.getValue().getEvidenceRef()).isEqualTo("PAYMENT-EVIDENCE");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> attributionCaptor =
                 ArgumentCaptor.forClass(List.class);
-        verify(mapper).insertAttributions(attributionCaptor.capture());
+        verify(writeRepository).insertAttributions(attributionCaptor.capture());
         assertThat(attributionCaptor.getValue())
                 .extracting(CommissionPaymentAttributionCommand::getAmount)
                 .containsExactly(new BigDecimal("101"), new BigDecimal("200"));
@@ -523,13 +531,13 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<CommissionPaymentCommand> paymentCaptor =
                 ArgumentCaptor.forClass(CommissionPaymentCommand.class);
-        verify(mapper).insertTransaction(paymentCaptor.capture());
+        verify(writeRepository).insertTransaction(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getAmount()).isEqualByComparingTo("202");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> attributionCaptor =
                 ArgumentCaptor.forClass(List.class);
-        verify(mapper).insertAttributions(attributionCaptor.capture());
+        verify(writeRepository).insertAttributions(attributionCaptor.capture());
         assertThat(attributionCaptor.getValue())
                 .extracting(CommissionPaymentAttributionCommand::getAmount)
                 .containsExactly(new BigDecimal("101"), new BigDecimal("101"));
@@ -551,7 +559,7 @@ class CommissionPaymentServiceImplTest {
                 exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(FgcErrorCode.COMMON_002));
 
-        verify(mapper, never()).insertTransaction(any());
+        verify(writeRepository, never()).insertTransaction(any());
     }
 
     // 2026-08-11 yslee - REG-20 지급월 신계약 귀속 정상 시나리오 검증
@@ -561,7 +569,7 @@ class CommissionPaymentServiceImplTest {
     @Test
     void attributesSettlementSupportToNewContractInSettlementMonth() {
         stubReferences(3L);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(
                         11L, "SETTLEMENT_SUPPORT", "PAYMENT"
                 ));
@@ -574,7 +582,7 @@ class CommissionPaymentServiceImplTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> captor =
                 ArgumentCaptor.forClass(List.class);
-        verify(mapper).insertAttributions(captor.capture());
+        verify(writeRepository).insertAttributions(captor.capture());
         assertThat(captor.getValue()).singleElement().satisfies(attribution -> {
             assertThat(attribution.getAttributionDate()).isEqualTo(LocalDate.of(2026, 7, 3));
             assertThat(attribution.getAttributionMonth()).isEqualTo(LocalDate.of(2026, 7, 1));
@@ -583,8 +591,8 @@ class CommissionPaymentServiceImplTest {
 
     @Test
     void rejectsSettlementAttributionMethodForOtherCommissionItem() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(
                         11L, "BASE_COMMISSION", "PAYMENT"
                 ));
@@ -595,19 +603,19 @@ class CommissionPaymentServiceImplTest {
                 exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(FgcErrorCode.COMMON_002));
 
-        verify(mapper, never()).insertTransaction(any());
+        verify(writeRepository, never()).insertTransaction(any());
     }
 
     @Test
     void rejectsCarryForwardWhenEarlierContractMonthExists() {
         stubReferences(3L);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(
                         11L, "SETTLEMENT_SUPPORT", "PAYMENT"
                 ));
-        given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.countContractsBeforeMonth(7L, LocalDate.of(2026, 7, 1)))
                 .willReturn(1);
-        given(mapper.findAgentAppointmentDate(7L))
+        given(queryRepository.findAgentAppointmentDate(7L))
                 .willReturn(LocalDate.of(2026, 7, 15));
 
         assertThatThrownBy(() -> service.create(createRequest(List.of(
@@ -616,7 +624,7 @@ class CommissionPaymentServiceImplTest {
                 exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(FgcErrorCode.COMMON_002));
 
-        verify(mapper, never()).insertTransaction(any());
+        verify(writeRepository, never()).insertTransaction(any());
     }
 
     // 2026-08-11 yslee - REG-20 최초 신계약 모집월 이월 정상 시나리오 검증
@@ -625,17 +633,17 @@ class CommissionPaymentServiceImplTest {
     // 개선: 7월 무실적 지급분을 계약이 처음 생긴 8월 실제 일자로 귀속하고 월초 파생을 확인
     @Test
     void carriesForwardSettlementSupportToFirstContractMonthAfterSettlementMonth() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(
                         11L, "SETTLEMENT_SUPPORT", "PAYMENT"
                 ));
-        given(mapper.existsPolicyVersion(3L)).willReturn(true);
-        given(mapper.findContract(3L))
+        given(queryRepository.existsPolicyVersion(3L)).willReturn(true);
+        given(queryRepository.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 8, 5)));
-        given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 8, 1)))
+        given(queryRepository.countContractsBeforeMonth(7L, LocalDate.of(2026, 8, 1)))
                 .willReturn(0);
-        given(mapper.findAgentAppointmentDate(7L))
+        given(queryRepository.findAgentAppointmentDate(7L))
                 .willReturn(LocalDate.of(2026, 7, 15));
         stubInsertAndResponse(List.of(new CommissionPaymentAttributionRow(
                 1,
@@ -667,7 +675,7 @@ class CommissionPaymentServiceImplTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionPaymentAttributionCommand>> captor =
                 ArgumentCaptor.forClass(List.class);
-        verify(mapper).insertAttributions(captor.capture());
+        verify(writeRepository).insertAttributions(captor.capture());
         assertThat(captor.getValue()).singleElement().satisfies(saved -> {
             assertThat(saved.getAttributionDate()).isEqualTo(LocalDate.of(2026, 8, 5));
             assertThat(saved.getAttributionMonth()).isEqualTo(LocalDate.of(2026, 8, 1));
@@ -677,13 +685,13 @@ class CommissionPaymentServiceImplTest {
     @Test
     void rejectsCarryForwardWhenFirstContractIsInSettlementMonth() {
         stubReferences(3L);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(
                         11L, "SETTLEMENT_SUPPORT", "PAYMENT"
                 ));
-        given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.countContractsBeforeMonth(7L, LocalDate.of(2026, 7, 1)))
                 .willReturn(0);
-        given(mapper.findAgentAppointmentDate(7L))
+        given(queryRepository.findAgentAppointmentDate(7L))
                 .willReturn(LocalDate.of(2026, 7, 15));
 
         assertThatThrownBy(() -> service.create(createRequest(List.of(
@@ -692,22 +700,22 @@ class CommissionPaymentServiceImplTest {
                 exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(FgcErrorCode.COMMON_002));
 
-        verify(mapper, never()).insertTransaction(any());
+        verify(writeRepository, never()).insertTransaction(any());
     }
 
     @Test
     void rejectsCarryForwardWhenSettlementMonthIsNotAppointmentMonth() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(
                         11L, "SETTLEMENT_SUPPORT", "PAYMENT"
                 ));
-        given(mapper.existsPolicyVersion(3L)).willReturn(true);
-        given(mapper.findContract(3L))
+        given(queryRepository.existsPolicyVersion(3L)).willReturn(true);
+        given(queryRepository.findContract(3L))
                 .willReturn(new ContractReference(3L, 7L, 11L, LocalDate.of(2026, 8, 5)));
-        given(mapper.countContractsBeforeMonth(7L, LocalDate.of(2026, 8, 1)))
+        given(queryRepository.countContractsBeforeMonth(7L, LocalDate.of(2026, 8, 1)))
                 .willReturn(0);
-        given(mapper.findAgentAppointmentDate(7L))
+        given(queryRepository.findAgentAppointmentDate(7L))
                 .willReturn(LocalDate.of(2026, 6, 15));
         CommissionPaymentAttributionRequest attribution = new CommissionPaymentAttributionRequest(
                 3L,
@@ -726,19 +734,19 @@ class CommissionPaymentServiceImplTest {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(FgcErrorCode.COMMON_002));
 
-        verify(mapper, never()).insertTransaction(any());
+        verify(writeRepository, never()).insertTransaction(any());
     }
 
     @Test
     void updateReplacesAttributionsOnlyWhileDraft() {
         stubReferences(3L, 9L);
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         )));
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 9L, "500000")));
-        given(mapper.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 9L, "500000")));
+        given(writeRepository.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
 
         CommissionPaymentUpdateRequest request = updateRequest(List.of(
                 attribution(9L, "500000", AttributionMethod.APPROVED_ALLOCATION)
@@ -747,10 +755,10 @@ class CommissionPaymentServiceImplTest {
         CommissionPaymentResponse response = service.update(101L, request);
 
         assertThat(response.attributions()).extracting(a -> a.contractId()).containsExactly(9L);
-        verify(mapper).updateTransaction(any(CommissionPaymentCommand.class));
-        verify(mapper).detachPreConfirmDetails(101L);
-        verify(mapper).deleteAttributions(101L);
-        verify(mapper).insertAttributions(anyList());
+        verify(writeRepository).updateTransaction(any(CommissionPaymentCommand.class));
+        verify(capCheckWriteRepository).detachPreConfirmDetails(101L);
+        verify(writeRepository).deleteAttributions(101L);
+        verify(writeRepository).insertAttributions(anyList());
     }
 
     // 2026-08-11 yslee - 기존 귀속을 모두 지운 DRAFT 수정 검증
@@ -760,24 +768,24 @@ class CommissionPaymentServiceImplTest {
     @Test
     void updatesDraftToEmptyAttributionList() {
         stubReferences(3L);
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         )));
-        given(mapper.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
-        given(mapper.findAttributions(101L)).willReturn(List.of());
+        given(writeRepository.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of());
 
         CommissionPaymentResponse response = service.update(101L, updateRequest(List.of()));
 
         assertThat(response.attributions()).isEmpty();
-        verify(mapper).deleteAttributions(101L);
-        verify(mapper, never()).insertAttributions(anyList());
+        verify(writeRepository).deleteAttributions(101L);
+        verify(writeRepository, never()).insertAttributions(anyList());
     }
 
     @Test
     void rejectsUpdateWhenPaymentIsNotDraft() {
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(withStatus(confirmation(
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(withStatus(confirmation(
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         ), CommissionPaymentStatus.CONFIRMED)));
@@ -794,7 +802,7 @@ class CommissionPaymentServiceImplTest {
     // 개선: 지급 본문을 조회한 뒤 TRAN-002와 DATA_QUALITY 예외를 생성
     @Test
     void blocksConfirmationWhenDraftHasNoAttributions() {
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(
                 emptyDraftConfirmation()
         ));
 
@@ -805,10 +813,10 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
                 ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
-        verify(mapper).insertExceptionCase(captor.capture());
+        verify(capExceptionRepository).insertExceptionCase(captor.capture());
         assertThat(captor.getValue().getExceptionType()).isEqualTo("DATA_QUALITY");
         verify(capCalculator, never()).calculate(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     /*
@@ -837,8 +845,8 @@ class CommissionPaymentServiceImplTest {
                 201L, null, "500000", "500000", InclusionDecisionStatus.EXCLUDED,
                 ExclusionType.NEW_AGENT_SUPPORT, AttributionMethod.NEWCOMER_NON_CONTRACT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
-        given(mapper.existsEligibleNewcomerSupportAgent(any(), any())).willReturn(false);
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
+        given(queryRepository.existsEligibleNewcomerSupportAgent(any(), any())).willReturn(false);
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
@@ -847,12 +855,12 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
                 ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
-        verify(mapper).insertExceptionCase(captor.capture());
+        verify(capExceptionRepository).insertExceptionCase(captor.capture());
         // DB CHECK 제약이 허용하는 값이어야 한다 — 문자열이 아니라 enum 으로 검증한다.
         assertThat(ExceptionType.valueOf(captor.getValue().getExceptionType()))
                 .isEqualTo(ExceptionType.CAP_REVIEW_REQUIRED);
         assertThat(captor.getValue().getReasonCode()).isEqualTo("NEWCOMER_SUPPORT_REVIEW");
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -861,10 +869,10 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "10000", "10000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
         // 룰셋은 있는데(exists=true) 그 항목의 룰이 없다(snapshot=null) — 미분류 경로
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(null);
-        given(mapper.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(null);
+        given(queryRepository.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
@@ -873,12 +881,12 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
                 ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
-        verify(mapper).insertExceptionCase(captor.capture());
+        verify(capExceptionRepository).insertExceptionCase(captor.capture());
         // DB CHECK 제약이 허용하는 값이어야 한다 — 문자열 비교가 아니라 enum 으로 검증한다.
         assertThat(ExceptionType.valueOf(captor.getValue().getExceptionType()))
                 .isEqualTo(ExceptionType.CAP_REVIEW_REQUIRED);
         assertThat(captor.getValue().getReasonCode()).isEqualTo("CAP_ITEM_UNCLASSIFIED");
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -887,16 +895,16 @@ class CommissionPaymentServiceImplTest {
                 201L, null, "500000", "500000", InclusionDecisionStatus.EXCLUDED,
                 ExclusionType.NEW_AGENT_SUPPORT, AttributionMethod.NEWCOMER_NON_CONTRACT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
-        given(mapper.existsEligibleNewcomerSupportAgent(7L, LocalDate.of(2026, 7, 3))).willReturn(false);
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(newcomer));
+        given(queryRepository.existsEligibleNewcomerSupportAgent(7L, LocalDate.of(2026, 7, 3))).willReturn(false);
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
 
-        verify(mapper).insertExceptionCase(any());
-        verify(mapper, never()).findCapRuleSnapshot(any(), any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(capExceptionRepository).insertExceptionCase(any());
+        verify(queryRepository, never()).findCapRuleSnapshot(any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -905,14 +913,14 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         ), null);
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(withoutPolicy));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(withoutPolicy));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_007));
 
-        verify(mapper).insertExceptionCase(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(capExceptionRepository).insertExceptionCase(any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -923,17 +931,17 @@ class CommissionPaymentServiceImplTest {
                 confirmation(202L, 9L, "200000", "500000", InclusionDecisionStatus.INCLUDED,
                         ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION, "EVIDENCE-2")
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(data);
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
-        given(mapper.findCapRuleSnapshot(101L, 202L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(data);
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findCapRuleSnapshot(101L, 202L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L), capCalculation(9L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(55L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, null, "55,55")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, null, "55,55")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(
                 attributionRow(1, 3L, "300000"),
                 attributionRow(2, 9L, "200000")
         ));
@@ -941,10 +949,10 @@ class CommissionPaymentServiceImplTest {
         CommissionPaymentResponse response = service.confirm(101L, null);
 
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
-        verify(mapper, org.mockito.Mockito.times(2)).insertCapCheck(any());
-        verify(capCheckMapper, org.mockito.Mockito.times(2)).insertCapCheckDetails(any());
-        verify(mapper).lockAttributedContracts(101L);
-        verify(mapper).confirm(101L, null, "55,55");
+        verify(capCheckWriteRepository, org.mockito.Mockito.times(2)).insertCapCheck(any(CapCheckCommand.class));
+        verify(capCheckWriteRepository, org.mockito.Mockito.times(2)).insertCapCheckDetails(any());
+        verify(queryRepository).lockAttributedContracts(101L);
+        verify(writeRepository).confirm(101L, null, "55,55");
     }
 
     // 2026-08-11 yslee - IF-API-25 멱등키 재요청은 최초 확정 결과를 재사용
@@ -961,16 +969,16 @@ class CommissionPaymentServiceImplTest {
                 CommissionPaymentStatus.CONFIRMED,
                 "confirm-101"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmed));
-        given(mapper.findCapCheckIds(101L)).willReturn(List.of(55L));
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "500000")));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmed));
+        given(queryRepository.findCapCheckIds(101L)).willReturn(List.of(55L));
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "500000")));
 
         CommissionPaymentResponse response = service.confirm(101L, "confirm-101");
 
         assertThat(response.capCheckIds()).containsExactly(55L);
         verify(capCalculator, never()).calculate(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     // 2026-08-12 hjKang - FGC-FUN-031 합산액과 FGC-FUN-033 한도 판정의 1원 미만 경계 검증
@@ -983,25 +991,25 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1199999", "1199999", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(60L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, "boundary-below", "60")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1199999")));
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "boundary-below", "60")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1199999")));
 
         CommissionPaymentResponse response = service.confirm(101L, "boundary-below");
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
-        verify(mapper).insertCapCheck(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
         assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("1199999");
         assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(response.capCheckIds()).containsExactly(60L);
-        verify(mapper).confirm(101L, "boundary-below", "60");
+        verify(writeRepository).confirm(101L, "boundary-below", "60");
     }
 
     @Test
@@ -1010,16 +1018,16 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1200000", "1200000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(61L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, "boundary-ok", "61")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1200000")));
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "boundary-ok", "61")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1200000")));
 
         CommissionPaymentResponse response = service.confirm(101L, "boundary-ok");
 
@@ -1033,14 +1041,14 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "100000", "100000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         ), LocalDate.of(2026, 7, 4));
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
 
         assertThatThrownBy(() -> service.confirm(101L, "before-contract"))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_008));
 
-        verify(mapper, never()).findCapRuleSnapshot(any(), any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(queryRepository, never()).findCapRuleSnapshot(any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -1049,19 +1057,19 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1200001", "1200001", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(62L);
             return null;
-        }).when(mapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
 
         assertThatThrownBy(() -> service.confirm(101L, "boundary-block"))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
 
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     // 2026-08-21 yslee - FUN-035 · CAP-W02 계산근거 정합 (#255 F-11)
@@ -1074,17 +1082,17 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "250000", "250000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("1000000", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("1000000", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
-        given(mapper.findExistingIncludedDetails(101L, 201L)).willReturn(List.of(
+        given(queryRepository.findExistingIncludedDetails(101L, 201L)).willReturn(List.of(
                 existingDetail(301L, "FC 기본수수료", "650000"),
                 existingDetail(302L, "시책수수료", "350000")
         ));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(64L);
             return null;
-        }).when(mapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
 
         assertThatThrownBy(() -> service.confirm(101L, "full-breakdown"))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
@@ -1108,8 +1116,8 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "50000", "50000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         BigDecimal limit = new BigDecimal("1200000");
         BigDecimal scheduleIncluded = new BigDecimal("1300000");
         CapCalculationResult scheduleDominant = new CapCalculationResult(
@@ -1139,7 +1147,7 @@ class CommissionPaymentServiceImplTest {
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(65L);
             return null;
-        }).when(mapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
 
         assertThatThrownBy(() -> service.confirm(101L, "schedule-dominant"))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
@@ -1157,7 +1165,7 @@ class CommissionPaymentServiceImplTest {
     private List<CapCheckDetailInsertRow> capturedDetailRows() {
         ArgumentCaptor<List<CapCheckDetailInsertRow>> captor =
                 (ArgumentCaptor<List<CapCheckDetailInsertRow>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(List.class);
-        verify(capCheckMapper).insertCapCheckDetails(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheckDetails(captor.capture());
         return captor.getValue();
     }
 
@@ -1184,24 +1192,24 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1068000", "1068000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(63L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, "warning-89", "63")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1068000")));
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "warning-89", "63")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1068000")));
 
         service.confirm(101L, "warning-89");
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
-        verify(mapper).insertCapCheck(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
         assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("89");
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.NORMAL);
-        verify(mapper, never()).insertExceptionCase(any());
+        verify(capExceptionRepository, never()).insertExceptionCase(any());
     }
 
     // 2026-08-11 yslee - WARNING 경고율 정확히 90% 경계 검증
@@ -1214,21 +1222,21 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1080000", "1080000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(64L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, "warning-90", "64")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1080000")));
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "warning-90", "64")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "1080000")));
 
         service.confirm(101L, "warning-90");
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
-        verify(mapper).insertCapCheck(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
         assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("90");
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.WARNING);
         verify(capExceptionService).createIfNecessary(any());
@@ -1259,8 +1267,8 @@ class CommissionPaymentServiceImplTest {
                 BigDecimal.ZERO,
                 null
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(mismatchedRule);
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(mismatchedRule);
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
@@ -1270,10 +1278,10 @@ class CommissionPaymentServiceImplTest {
 
         ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
                 ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
-        verify(mapper).insertExceptionCase(captor.capture());
+        verify(capExceptionRepository).insertExceptionCase(captor.capture());
         assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_REVIEW_REQUIRED");
-        verify(mapper, never()).insertCapCheck(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -1282,15 +1290,15 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.REVIEW_REQUIRED,
                 ExclusionType.NONE, AttributionMethod.MANUAL_REVIEW, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
 
         verify(capCalculator, never()).calculate(any());
-        verify(mapper).insertExceptionCase(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(capExceptionRepository).insertExceptionCase(any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     // 2026-08-11 yslee - 정착지원금 배부근거 누락의 확정 차단 검증
@@ -1303,16 +1311,16 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY, "EVIDENCE"
         ), null);
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(FgcErrorCode.TRAN_004));
 
-        verify(mapper).insertExceptionCase(any());
+        verify(capExceptionRepository).insertExceptionCase(any());
         verify(capCalculator, never()).calculate(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -1321,20 +1329,20 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1300000", "1300000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(56L);
             return null;
-        }).when(mapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
 
         verify(capExceptionService).createIfNecessary(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -1343,7 +1351,7 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
         given(capExceptionService.hasUnresolvedViolation(101L)).willReturn(true);
 
         assertThatThrownBy(() -> service.confirm(101L, null))
@@ -1351,7 +1359,7 @@ class CommissionPaymentServiceImplTest {
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_003));
 
         verify(capCalculator, never()).calculate(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     // 2026-08-10 yslee - 지급기준 스케줄이 이미 한도를 넘은 후보 지급 확정 차단
@@ -1364,8 +1372,8 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "10000", "10000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(
                 3L,
                 CapResultStatus.VIOLATION,
@@ -1375,19 +1383,19 @@ class CommissionPaymentServiceImplTest {
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(59L);
             return null;
-        }).when(mapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_001));
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
-        verify(mapper).insertCapCheck(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
         assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("1428000");
         assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("119");
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.VIOLATION);
         verify(capExceptionService).createIfNecessary(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     // 2026-08-10 yslee - 스케줄과 실제 지급을 같은 금액 흐름의 병렬 관점으로 결합
@@ -1400,8 +1408,8 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "50000", "50000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("850000", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("850000", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(
                 3L,
                 CapResultStatus.NORMAL,
@@ -1411,20 +1419,20 @@ class CommissionPaymentServiceImplTest {
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(60L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, null, "60")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "50000")));
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, null, "60")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "50000")));
 
         service.confirm(101L, null);
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
-        verify(mapper).insertCapCheck(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
         assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("900000");
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.NORMAL);
         assertThat(captor.getValue().getCalculationSnapshotJson())
                 .contains("scheduledIncludedAmount", "existingIncludedAmount", "effectiveIncludedAmount");
-        verify(mapper).confirm(101L, null, "60");
+        verify(writeRepository).confirm(101L, null, "60");
     }
 
     @Test
@@ -1433,17 +1441,17 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L))
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L))
                 .willReturn(capRule("0", new BigDecimal("2500")));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(57L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, null, "57")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "500000")));
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, null, "57")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "500000")));
 
         service.confirm(101L, null);
 
@@ -1463,8 +1471,8 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(
                 3L,
                 CapResultStatus.REVIEW_REQUIRED,
@@ -1476,20 +1484,20 @@ class CommissionPaymentServiceImplTest {
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(58L);
             return null;
-        }).when(mapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
-        verify(mapper).insertCapCheck(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
         assertThat(captor.getValue().getCalculationSnapshotJson())
                 .contains("complianceMaximumAmount", "3000", "complianceAppliedAmount");
-        verify(capCheckMapper).insertCapCheckDetails(any());
-        verify(mapper).insertExceptionCase(any());
-        verify(mapper, never()).confirm(any(), any(), any());
+        verify(capCheckWriteRepository).insertCapCheckDetails(any());
+        verify(capExceptionRepository).insertExceptionCase(any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
     @Test
@@ -1518,8 +1526,8 @@ class CommissionPaymentServiceImplTest {
     // 개선: 제외 귀속행 자체에 증빙이 있어도 지급 건 evidenceRef가 없으면 TRAN-004로 차단
     @Test
     void rejectsExcludedAttributionWithoutPaymentEvidence() {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(11L, "BASE_COMMISSION", "PAYMENT"));
         CommissionPaymentAttributionRequest excluded = new CommissionPaymentAttributionRequest(
                 3L,
@@ -1554,7 +1562,7 @@ class CommissionPaymentServiceImplTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_004));
 
-        verify(mapper, never()).insertTransaction(any());
+        verify(writeRepository, never()).insertTransaction(any());
     }
 
     @Test
@@ -1615,13 +1623,13 @@ class CommissionPaymentServiceImplTest {
     @Test
     void recordsPaymentUpdatedAuditWithBeforeSnapshot() {
         stubReferences(3L, 9L);
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         )));
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 9L, "500000")));
-        given(mapper.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 9L, "500000")));
+        given(writeRepository.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
 
         service.update(101L, updateRequest(List.of(
                 attribution(9L, "500000", AttributionMethod.APPROVED_ALLOCATION))));
@@ -1656,17 +1664,17 @@ class CommissionPaymentServiceImplTest {
                 confirmation(202L, 9L, "200000", "500000", InclusionDecisionStatus.INCLUDED,
                         ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION, "EVIDENCE-2")
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(data);
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
-        given(mapper.findCapRuleSnapshot(101L, 202L)).willReturn(capRule("0", null));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(data);
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findCapRuleSnapshot(101L, 202L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L), capCalculation(9L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(55L);
             return null;
-        }).when(mapper).insertCapCheck(any());
-        given(mapper.confirm(101L, null, "55,55")).willReturn(1);
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, null, "55,55")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(
                 attributionRow(1, 3L, "300000"),
                 attributionRow(2, 9L, "200000")
         ));
@@ -1696,10 +1704,10 @@ class CommissionPaymentServiceImplTest {
                 CommissionPaymentStatus.CONFIRMED,
                 "confirm-101"
         );
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmed));
-        given(mapper.findCapCheckIds(101L)).willReturn(List.of(55L));
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
-        given(mapper.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "500000")));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmed));
+        given(queryRepository.findCapCheckIds(101L)).willReturn(List.of(55L));
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "500000")));
 
         service.confirm(101L, "confirm-101");
 
@@ -1707,15 +1715,15 @@ class CommissionPaymentServiceImplTest {
     }
 
     private void stubReferences(Long... contractIds) {
-        given(mapper.existsAgent(7L)).willReturn(true);
-        given(mapper.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+        given(queryRepository.existsAgent(7L)).willReturn(true);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
                 .willReturn(new CommissionItemReference(
                         11L, "BASE_COMMISSION", "PAYMENT"
                 ));
-        given(mapper.existsPolicyVersion(3L)).willReturn(true);
-        lenient().when(mapper.findAllocationPolicyId(3L, "DIRECT")).thenReturn(77L);
+        given(queryRepository.existsPolicyVersion(3L)).willReturn(true);
+        lenient().when(queryRepository.findAllocationPolicyId(3L, "DIRECT")).thenReturn(77L);
         for (Long contractId : contractIds) {
-            lenient().when(mapper.findContract(contractId))
+            lenient().when(queryRepository.findContract(contractId))
                     .thenReturn(new ContractReference(contractId, 7L, 11L, LocalDate.of(2026, 7, 3)));
         }
     }
@@ -1724,9 +1732,9 @@ class CommissionPaymentServiceImplTest {
         doAnswer(invocation -> {
             invocation.<CommissionPaymentCommand>getArgument(0).setPaymentId(101L);
             return null;
-        }).when(mapper).insertTransaction(any());
-        given(mapper.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
-        given(mapper.findAttributions(101L)).willReturn(attributions);
+        }).when(writeRepository).insertTransaction(any());
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(queryRepository.findAttributions(101L)).willReturn(attributions);
     }
 
     private CommissionPaymentCreateRequest createRequest(
@@ -1825,10 +1833,10 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
 
         TransactionPrecheckResponse response = service.precheck(101L);
@@ -1857,10 +1865,10 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1300000", "1300000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
 
         TransactionPrecheckResponse response = service.precheck(101L);
@@ -1882,16 +1890,16 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "1300000", "1300000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
-        given(mapper.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
         doAnswer(invocation -> {
             invocation.<CapCheckCommand>getArgument(0).setCapCheckId(56L);
             return null;
-        }).when(mapper).insertCapCheck(any());
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
 
         TransactionPrecheckResponse preview = service.precheck(101L);
 
@@ -1905,7 +1913,7 @@ class CommissionPaymentServiceImplTest {
                 });
 
         ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
-        verify(mapper).insertCapCheck(captor.capture());
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
         assertThat(preview.capPreview().get(0).usagePct())
                 .isEqualTo(captor.getValue().getUsagePct().toPlainString());
     }
@@ -1913,7 +1921,7 @@ class CommissionPaymentServiceImplTest {
     // FGC-FUN-033 · 제31조 게이트 ② — 귀속행 없는 DRAFT는 FGC-TRAN-002 blocker로 표시된다
     @Test
     void precheckReportsMissingAttributionBlocker() {
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(emptyDraftConfirmation()));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(emptyDraftConfirmation()));
 
         TransactionPrecheckResponse response = service.precheck(101L);
 
@@ -1933,10 +1941,10 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "400000", "400000", InclusionDecisionStatus.REVIEW_REQUIRED,
                 ExclusionType.NONE, AttributionMethod.MANUAL_REVIEW, "EVIDENCE"
         ), "500000");
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
 
         TransactionPrecheckResponse response = service.precheck(101L);
@@ -1957,11 +1965,11 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
         given(capExceptionService.hasUnresolvedViolation(101L)).willReturn(true);
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
 
         TransactionPrecheckResponse response = service.precheck(101L);
@@ -1987,10 +1995,10 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(null);
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(null);
 
         TransactionPrecheckResponse response = service.precheck(101L);
 
@@ -2009,11 +2017,11 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(null);
-        given(mapper.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(null);
+        given(queryRepository.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
 
         TransactionPrecheckResponse response = service.precheck(101L);
 
@@ -2032,7 +2040,7 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         ), CommissionPaymentStatus.CONFIRMED);
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(confirmed));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(confirmed));
 
         assertThatThrownBy(() -> service.precheck(101L))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
@@ -2044,7 +2052,7 @@ class CommissionPaymentServiceImplTest {
     // IF-API-24 — 미존재 지급 건은 FGC-COMMON-002(400), 이 경로에서도 아무것도 저장하지 않는다
     @Test
     void precheckRejectsUnknownPayment() {
-        given(mapper.findConfirmationData(999L)).willReturn(List.of());
+        given(queryRepository.findConfirmationData(999L)).willReturn(List.of());
 
         assertThatThrownBy(() -> service.precheck(999L))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
@@ -2062,10 +2070,10 @@ class CommissionPaymentServiceImplTest {
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
-        given(mapper.findConfirmationData(101L)).willReturn(List.of(data));
-        given(mapper.findAttributedContractNumbers(101L))
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
-        given(mapper.findCapRuleSnapshot(101L, 201L)).willReturn(new CapRuleSnapshot(
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(new CapRuleSnapshot(
                 31L,
                 41L,
                 InclusionDecisionStatus.EXCLUDED,
@@ -2092,12 +2100,12 @@ class CommissionPaymentServiceImplTest {
 
     /** precheck의 무저장·무잠금 계약 — 확정 경로 전용 부작용이 하나도 호출되지 않아야 한다. */
     private void assertPrecheckSavesNothing() {
-        verify(mapper, never()).insertCapCheck(any());
-        verify(capCheckMapper, never()).insertCapCheckDetails(any());
-        verify(mapper, never()).insertExceptionCase(any());
-        verify(mapper, never()).confirm(any(), any(), any());
-        verify(mapper, never()).lockAttributedContracts(any());
-        verify(mapper, never()).findConfirmationDataForUpdate(any());
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+        verify(capCheckWriteRepository, never()).insertCapCheckDetails(any());
+        verify(capExceptionRepository, never()).insertExceptionCase(any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
+        verify(queryRepository, never()).lockAttributedContracts(any());
+        verify(queryRepository, never()).findConfirmationDataForUpdate(any());
         verify(capExceptionService, never()).createIfNecessary(any());
     }
 

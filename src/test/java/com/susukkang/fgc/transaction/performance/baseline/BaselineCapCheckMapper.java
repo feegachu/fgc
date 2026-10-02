@@ -1,4 +1,7 @@
-package com.susukkang.fgc.cap.mapper;
+package com.susukkang.fgc.transaction.performance.baseline;
+
+/* Test-only snapshot of src/main/java/com/susukkang/fgc/cap/mapper/CapCheckMapper.java at d1a603df.
+ * Only package/type names and component registration differ; business logic is preserved. */
 
 import com.susukkang.fgc.cap.dto.CapAgentSummaryRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
@@ -9,15 +12,13 @@ import com.susukkang.fgc.cap.dto.CapCheckRow;
 import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
 import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
 import com.susukkang.fgc.common.code.PaymentStage;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-@Mapper
-public interface CapCheckMapper {
+public interface BaselineCapCheckMapper {
 
     /**
      * cap_check upsert — INSERT 후 row.capCheckId에 생성/갱신된 PK가 채워짐
@@ -94,7 +95,7 @@ public interface CapCheckMapper {
      * 조회한다. 없으면 null.
      */
     CapCheckRow findById(@Param("capCheckId") Long capCheckId);
-    
+
     /**
      * 설명 : DB에 이미 저장된 준법감시 증빙 대상 금액을 조회
      *

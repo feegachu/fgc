@@ -1,4 +1,7 @@
-package com.susukkang.fgc.transaction.mapper;
+package com.susukkang.fgc.transaction.performance.baseline;
+
+/* Test-only snapshot of src/main/java/com/susukkang/fgc/transaction/mapper/CommissionPaymentMapper.java at d1a603df.
+ * Only package/type names and component registration differ; business logic is preserved. */
 
 import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -16,7 +19,6 @@ import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
 import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentListResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentSearchCondition;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
@@ -29,8 +31,7 @@ import java.util.List;
  * @since 2026-08-06
  * @version 1.2
  */
-@Mapper
-public interface CommissionPaymentMapper {
+public interface BaselineCommissionPaymentMapper {
 
     List<CommissionPaymentListResponse> selectByCondition(
             @Param("condition") CommissionPaymentSearchCondition condition,

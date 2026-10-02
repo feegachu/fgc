@@ -448,7 +448,7 @@ class PublishingTemplateStructureTest {
                  * 한도·초년도 경계값 자체는 여기서 검사하지 않는다 — 이 테스트는 소스 문자열
                  * 구조만 본다. 경계는 실 DB 통합테스트가 검증한다:
                  * CapIncludedAmountMapperIntegrationTest(계약일+1년-1일 포함 / +1년 제외),
-                 * CapCheckMapperIntegrationTest(1주년 당일 집계 제외).
+                 * CapCheckQueryRepositoryIntegrationTest(1주년 당일 집계 제외).
                  */
                 .contains("var RECORDABLE_BLOCKER_CODES = [\"FGC-CAP-001\", \"FGC-CAP-002\"]")
                 .contains("hasRecordableBlocker(lastPrecheckResult)")

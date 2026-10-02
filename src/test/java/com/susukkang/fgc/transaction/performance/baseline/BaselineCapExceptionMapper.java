@@ -1,9 +1,11 @@
-package com.susukkang.fgc.cap.mapper;
+package com.susukkang.fgc.transaction.performance.baseline;
+
+/* Test-only snapshot of src/main/java/com/susukkang/fgc/cap/mapper/CapExceptionMapper.java at d1a603df.
+ * Only package/type names and component registration differ; business logic is preserved. */
 
 import com.susukkang.fgc.cap.dto.CapExceptionInsertDTO;
 import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
-import com.susukkang.fgc.cap.dto.CapExceptionStatusRow;
-import org.apache.ibatis.annotations.Mapper;
+import com.susukkang.fgc.transaction.performance.baseline.BaselineCapExceptionStatusRow;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -13,8 +15,7 @@ import org.apache.ibatis.annotations.Param;
  * @version 1.0
  * @since 2026-08-12
  */
-@Mapper
-public interface CapExceptionMapper {
+public interface BaselineCapExceptionMapper {
 
     /**
      * 설명 : 한도 주의 또는 위반 예외 건을 등록한다
@@ -27,7 +28,7 @@ public interface CapExceptionMapper {
     int insertException(CapExceptionInsertDTO capExceptionInsertDTO);
 
     /** 설명 : 해결할 한도 예외의 현재 상태를 잠금 조회한다. */
-    CapExceptionStatusRow selectExceptionForUpdate(
+    BaselineCapExceptionStatusRow selectExceptionForUpdate(
             @Param("exceptionCaseId") Long exceptionCaseId
     );
 

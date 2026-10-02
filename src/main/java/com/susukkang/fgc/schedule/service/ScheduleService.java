@@ -4,7 +4,7 @@ import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.repository.CapCheckQueryRepository;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -46,7 +46,7 @@ public class ScheduleService {
     private final ScheduleMapper scheduleMapper;
     private final AgentRepository agentRepository;
     private final CapCheckService capCheckService;
-    private final CapCheckMapper capCheckMapper;
+    private final CapCheckQueryRepository capCheckQueryRepository;
     private final AuditLogService auditLogService;
     private final ScheduleReviewService scheduleReviewService;
     private final InsuranceContractRepository insuranceContractRepository;
@@ -1210,7 +1210,7 @@ public class ScheduleService {
         }
 
         BigDecimal evidenceAmount = header.getPaymentStage() == PaymentStage.INSURER_TO_GA
-                ? capCheckMapper.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
+                ? capCheckQueryRepository.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
                 : null;
         CapCheckSaveResult capCheck;
         try {
