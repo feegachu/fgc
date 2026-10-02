@@ -50,33 +50,42 @@ public class CapIncludedAmountQueryRepository {
              GROUP BY ta.contract_id, ta.agent_id, ct.payment_stage
             """;
 
+    // 2026-10-02 hjKang - 조회별 SQL을 컴파일 시점 상수로 고정한다.
+    // 기존 코드: 메서드 인자로 받은 상태 조건을 SQL에 연결했다.
+    // 문제: 임의 문자열 조건을 받을 수 있는 구조여서 Sonar S2077이 지적됐다.
+    // 개선: 완성된 상수 SQL만 실행하고 조회 값은 setParameter로 바인딩한다.
+    private static final String PRE_CONFIRM_SQL = BASE_SQL + """
+               AND (ct.status = 'CONFIRMED' OR ct.commission_transaction_id = :transactionId)
+            """ + GROUP_BY;
+
+    private static final String CONFIRMED_SQL = BASE_SQL + """
+               AND ct.status = 'CONFIRMED'
+            """ + GROUP_BY;
+
     private final EntityManager entityManager;
 
     /** 기존 확정 지급과 현재 지급 건의 산입액을 합산하며, 현재 건이 이미 확정됐어도 한 번만 포함한다. */
     public List<CapIncludedAmountSummary> sumIncludedAmountByContractAndAgent(
             Long contractId, Long transactionId, PaymentStage paymentStage
     ) {
-        NativeQuery<CapIncludedAmountSummary> query = createSummaryQuery("""
-                   AND (ct.status = 'CONFIRMED' OR ct.commission_transaction_id = :transactionId)
-                """, contractId, paymentStage);
+        NativeQuery<?> query = entityManager.createNativeQuery(PRE_CONFIRM_SQL)
+                .unwrap(NativeQuery.class);
         query.setParameter("transactionId", transactionId, Long.class);
-        return query.getResultList();
+        return mapSummaryQuery(query, contractId, paymentStage).getResultList();
     }
 
     /** 월 검증 시 확정 지급의 산입액만 재합산한다. */
     public List<CapIncludedAmountSummary> sumConfirmedIncludedAmountByContractAndAgent(
             Long contractId, PaymentStage paymentStage
     ) {
-        return createSummaryQuery("""
-                   AND ct.status = 'CONFIRMED'
-                """, contractId, paymentStage).getResultList();
+        NativeQuery<?> query = entityManager.createNativeQuery(CONFIRMED_SQL)
+                .unwrap(NativeQuery.class);
+        return mapSummaryQuery(query, contractId, paymentStage).getResultList();
     }
 
-    private NativeQuery<CapIncludedAmountSummary> createSummaryQuery(
-            String statusCondition, Long contractId, PaymentStage paymentStage
+    private NativeQuery<CapIncludedAmountSummary> mapSummaryQuery(
+            NativeQuery<?> query, Long contractId, PaymentStage paymentStage
     ) {
-        NativeQuery<?> query = entityManager.createNativeQuery(BASE_SQL + statusCondition + GROUP_BY)
-                .unwrap(NativeQuery.class);
         query.setParameter("contractId", contractId, Long.class);
         query.setParameter("paymentStage", paymentStage == null ? null : paymentStage.name(), String.class);
         query.addScalar("contract_id", Long.class);
