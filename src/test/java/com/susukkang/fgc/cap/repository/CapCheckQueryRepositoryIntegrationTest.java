@@ -8,6 +8,7 @@ import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -85,41 +86,45 @@ class CapCheckQueryRepositoryIntegrationTest {
     }
 
     // REG-10, 운영정책 §7-2: 귀속행별 원 단위 반올림 후 DEDUCTION을 차감한다.
-    @Test
-    void sumsRoundedComplianceEvidenceWithDeductionSignWithinFirstYearAndStage() {
+    @ParameterizedTest
+    @EnumSource(PaymentStage.class)
+    void sumsRoundedComplianceEvidenceWithDeductionSignWithinFirstYearAndStage(PaymentStage paymentStage) {
         TestContract contract = insertTestContract();
+        PaymentStage otherStage = paymentStage == PaymentStage.INSURER_TO_GA
+                ? PaymentStage.GA_TO_FC : PaymentStage.INSURER_TO_GA;
 
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("10.50"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("10.50"),
                 contract.contractDate(), "EVIDENCE-1");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("10.50"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("10.50"),
                 contract.contractDate().plusMonths(1), "EVIDENCE-2");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "DEDUCTION", new BigDecimal("3.50"),
+        insertEvidence(contract, paymentStage, "DEDUCTION", new BigDecimal("3.50"),
                 contract.contractDate().plusMonths(2), "EVIDENCE-3");
 
         // 초년도 마지막 날은 포함한다.
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("5.50"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("5.50"),
                 contract.contractDate().plusMonths(12).minusDays(1), "LAST-DAY-FIRST-YEAR");
 
         // 다른 지급 단계, 1주년 당일, 증빙 없는 행은 집계에서 제외한다.
-        insertEvidence(contract, PaymentStage.INSURER_TO_GA, "PAYMENT", new BigDecimal("100.00"),
+        insertEvidence(contract, otherStage, "PAYMENT", new BigDecimal("100.00"),
                 contract.contractDate(), "OTHER-STAGE");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("100.00"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("100.00"),
                 contract.contractDate().plusMonths(12), "OUTSIDE-FIRST-YEAR");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("100.00"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("100.00"),
                 contract.contractDate().plusMonths(3), null);
 
         BigDecimal amount = capCheckQueryRepository.selectComplianceEvidenceAmount(
-                contract.contractId(), PaymentStage.GA_TO_FC);
+                contract.contractId(), paymentStage);
 
         assertThat(amount).isEqualByComparingTo("24"); // ROUND(10.5)+ROUND(10.5)-ROUND(3.5)+ROUND(5.5)
     }
 
-    @Test
-    void returnsNullWhenNoComplianceEvidenceExists() {
+    @ParameterizedTest
+    @EnumSource(PaymentStage.class)
+    void returnsNullWhenNoComplianceEvidenceExists(PaymentStage paymentStage) {
         TestContract contract = insertTestContract();
 
         assertThat(capCheckQueryRepository.selectComplianceEvidenceAmount(
-                contract.contractId(), PaymentStage.GA_TO_FC)).isNull();
+                contract.contractId(), paymentStage)).isNull();
     }
 
     // REG-19: GA_TO_FC 룰 시행일 이전 계약은 실패가 아니라 해당 단계 검증 미적용이다.
