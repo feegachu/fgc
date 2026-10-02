@@ -1,0 +1,19 @@
+// 동일 JVM·격리 PostgreSQL에서 baseline/JPA를 교대 실행한다. 각 트랜잭션은 롤백한다.
+// gradlew -I scripts/verification/payment-performance.init.gradle test --tests '*CommissionPaymentPersistencePerformanceTest'
+allprojects {
+    tasks.withType(Test).configureEach {
+        systemProperty 'fgc.payment.performance', 'true'
+        systemProperty 'fgc.payment.performance.warmups', project.findProperty('paymentWarmups') ?: '40'
+        systemProperty 'fgc.payment.performance.samples', project.findProperty('paymentSamples') ?: '120'
+        systemProperty 'fgc.payment.performance.run', project.findProperty('paymentRun') ?: 'comparison'
+        systemProperty 'fgc.payment.performance.jpaFirst', project.findProperty('paymentJpaFirst') ?: 'false'
+        minHeapSize = '1g'
+        maxHeapSize = '1g'
+        if (project.hasProperty('paymentJfr')) {
+            def recording = project.layout.buildDirectory.file("reports/payment-performance/${project.findProperty('paymentRun') ?: 'comparison'}.jfr").get().asFile
+            doFirst { recording.parentFile.mkdirs() }
+            jvmArgs "-XX:StartFlightRecording=filename=${recording.absolutePath},settings=profile,dumponexit=true"
+        }
+        testLogging.showStandardStreams = true
+    }
+}

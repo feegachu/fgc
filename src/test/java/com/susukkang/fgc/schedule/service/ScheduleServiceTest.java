@@ -2,9 +2,10 @@ package com.susukkang.fgc.schedule.service;
 
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.base.repository.AgentRepository;
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.repository.CapCheckQueryRepository;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.AgentRankCode;
@@ -34,6 +35,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -59,6 +62,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ScheduleServiceTest {
@@ -79,7 +83,7 @@ class ScheduleServiceTest {
     private CapCheckService capCheckService;
 
     @Mock
-    private CapCheckMapper capCheckMapper;
+    private CapCheckQueryRepository capCheckQueryRepository;
 
     @Mock
     private AuditLogService auditLogService;
@@ -239,6 +243,52 @@ class ScheduleServiceTest {
         assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
         verify(scheduleMapper).lockContractForScheduleGeneration(20L);
         verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
+        verify(scheduleMapper).confirmPlannedScheduleLines(10L);
+        verify(scheduleMapper).confirmScheduleHeader(10L);
+
+        ArgumentCaptor<CapCalculationCommand> commandCaptor = ArgumentCaptor.forClass(CapCalculationCommand.class);
+        verify(capCheckService).calculateAndSave(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().complianceEvidenceAmount()).isNull();
+        verifyNoInteractions(capCheckQueryRepository);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"12500.50", "0"})
+    void confirmsInsurerScheduleUsingComplianceEvidenceAmount(BigDecimal evidenceAmount) {
+        ScheduleHeaderInsertDTO plannedHeader = ScheduleHeaderInsertDTO.builder()
+                .scheduleHeaderId(10L)
+                .contractId(20L)
+                .paymentStage(PaymentStage.INSURER_TO_GA)
+                .policyVersionId(30L)
+                .status(ScheduleHeaderStatus.PLANNED)
+                .activeYn(true)
+                .build();
+        ScheduleDetailResponse confirmedDetail = ScheduleDetailResponse.builder()
+                .header(ScheduleHeaderResponse.builder()
+                        .scheduleHeaderId(10L)
+                        .status(ScheduleHeaderStatus.CONFIRMED)
+                        .build())
+                .lines(List.of())
+                .build();
+
+        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(insuranceContractRepository.existsById(20L)).willReturn(true);
+        given(capCheckQueryRepository.selectComplianceEvidenceAmount(20L, PaymentStage.INSURER_TO_GA))
+                .willReturn(evidenceAmount);
+        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
+                ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.PLANNED).build()));
+        given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
+        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
+
+        ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
+
+        ArgumentCaptor<CapCalculationCommand> commandCaptor = ArgumentCaptor.forClass(CapCalculationCommand.class);
+        verify(capCheckService).calculateAndSave(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().contractId()).isEqualTo(20L);
+        assertThat(commandCaptor.getValue().paymentStage()).isEqualTo(PaymentStage.INSURER_TO_GA);
+        assertThat(commandCaptor.getValue().complianceEvidenceAmount()).isEqualTo(evidenceAmount);
+        assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
         verify(scheduleMapper).confirmPlannedScheduleLines(10L);
         verify(scheduleMapper).confirmScheduleHeader(10L);
     }

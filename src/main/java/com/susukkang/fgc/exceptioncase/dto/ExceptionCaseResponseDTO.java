@@ -125,8 +125,8 @@ public record ExceptionCaseResponseDTO(
     /**
      * 계산근거(CAP-W02) 링크 — #331.
      *
-     * CapCheckMapper 의 목록 두 곳은 확정 거절된 DRAFT 후보의 cap_check 를 제외하므로
-     * (latestScopedCapChecks · findLatestByContractAndStage 의 candidate_transaction_id 조건)
+     * CapCheckQueryRepository 의 목록 두 곳은 확정 거절된 DRAFT 후보의 cap_check 를 제외하므로
+     * (LATEST_SCOPED_CAP_CHECKS · findLatestByContractAndStage 의 candidate_transaction_id 조건)
      * CAP-W01·CONT-W02 에서는 그 판정에 도달할 수 없다 — 주석이 정한 대로 예외함이 그 자리다.
      * IF-API-31(findById)은 제외 조건이 없어 팝업 자체는 정상 동작한다.
      *

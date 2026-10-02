@@ -10,8 +10,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * cap_check 1행 INSERT 파라미터
- * MyBatis useGeneratedKeys 로 capCheckId 를 되받음
+ * cap_check 업무키 UPSERT 입력. 저장소가 생성하거나 재사용한 capCheckId를 채운다.
+ * CapCheckWriteRepository와 소비자 전환이 남은 공유 Mapper가 같은 DTO를 사용한다.
  */
 @Getter
 @Setter

@@ -16,7 +16,8 @@ import com.susukkang.fgc.cap.dto.CapCheckSearchCriteria;
 import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.CapCheckSummary;
 import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.repository.CapCheckQueryRepository;
+import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -45,7 +46,8 @@ public class CapCheckServiceImpl implements CapCheckService {
     private static final int MAX_SIZE = 100;
 
     private final CapCalculator capCalculator;
-    private final CapCheckMapper capCheckMapper;
+    private final CapCheckQueryRepository capCheckQueryRepository;
+    private final CapCheckWriteRepository capCheckWriteRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -55,7 +57,7 @@ public class CapCheckServiceImpl implements CapCheckService {
     // 호출한 상위 서비스까지 전파되어 그 상위 트랜잭션의 기본 롤백 규칙을 그대로 따른다.
     @Transactional(noRollbackFor = FgcBusinessException.class)
     public CapCheckSaveResult calculateAndSave(CapCalculationCommand command) {
-        // 계산(CapCalculator)과 저장(capCheckMapper)을 하나의 트랜잭션으로 묶는다.
+        // 계산(CapCalculator)과 저장(capCheckWriteRepository)을 하나의 트랜잭션으로 묶는다.
         // 계산 중 예외가 나면 당연히 저장도 안 되고, 저장이 실패해도 계산 결과가 반쪽만 남지 않는다.
         CapCalculationResult result = capCalculator.calculate(command);
 
@@ -77,7 +79,7 @@ public class CapCheckServiceImpl implements CapCheckService {
                 .resultStatus(result.resultStatus().name())
                 .calculationSnapshotJson(writeJson(result.calculationSnapshot()))
                 .build();
-        capCheckMapper.insertCapCheck(row);
+        capCheckWriteRepository.insertCapCheck(row);
 
         // insertCapCheckDetails가 (cap_check_id, detail_seq) 기준 upsert라 자리별로 최신값을
         // 덮어써 주지만, 이번 재계산이 이전보다 항목 수가 "줄었을" 경우 그 초과분은 upsert만으로
@@ -85,7 +87,7 @@ public class CapCheckServiceImpl implements CapCheckService {
         // 공통규칙 1 준수, 코드리뷰 반영 2026-08-11). 새로 INSERT된 행(재사용이 아님)이면 어차피
         // 지울 뒷자리가 없어 안전한 no-op이다.
         int maxDetailSeq = result.details().stream().mapToInt(CapCheckDetailLine::detailSeq).max().orElse(0);
-        capCheckMapper.pruneCapCheckDetails(row.getCapCheckId(), maxDetailSeq);
+        capCheckWriteRepository.pruneCapCheckDetails(row.getCapCheckId(), maxDetailSeq);
 
         if (!result.details().isEmpty()) {
             List<CapCheckDetailInsertRow> detailRows = new ArrayList<>(result.details().size());
@@ -104,7 +106,7 @@ public class CapCheckServiceImpl implements CapCheckService {
                         .evidenceRef(d.evidenceRef())
                         .build());
             }
-            capCheckMapper.insertCapCheckDetails(detailRows);
+            capCheckWriteRepository.insertCapCheckDetails(detailRows);
         }
 
         return new CapCheckSaveResult(row.getCapCheckId(), result);
@@ -113,7 +115,7 @@ public class CapCheckServiceImpl implements CapCheckService {
     @Override
     @Transactional(readOnly = true)
     public Optional<CapCheckSaveResult> findLatest(Long contractId, PaymentStage paymentStage) {
-        CapCheckRow row = capCheckMapper.findLatestByContractAndStage(contractId, paymentStage.name());
+        CapCheckRow row = capCheckQueryRepository.findLatestByContractAndStage(contractId, paymentStage.name());
         return Optional.ofNullable(row).map(this::toSaveResult);
     }
 
@@ -128,25 +130,25 @@ public class CapCheckServiceImpl implements CapCheckService {
         }
 
         // size는 100 이하로 막혀 있지만 page는 위쪽 한도가 없어 (page-1)*size가 int 범위를 넘길 수
-        // 있다 — long으로 먼저 계산해 오버플로를 걸러낸 뒤에만 매퍼로 넘긴다.
+        // 있다 — long으로 먼저 계산해 오버플로를 걸러낸 뒤에만 조회 저장소로 넘긴다.
         long offsetLong = (long) (page - 1) * size;
         if (offsetLong > Integer.MAX_VALUE) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "page", Map.of("field", "page"), null);
         }
         int offset = (int) offsetLong;
 
-        List<CapCheckListRow> rows = capCheckMapper.search(
+        List<CapCheckListRow> rows = capCheckQueryRepository.search(
                 criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
                 criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), offset, size);
-        long total = capCheckMapper.count(
+        long total = capCheckQueryRepository.count(
                 criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
                 criteria.insurerId(), criteria.organizationId(), criteria.contractNo());
-        CapCheckSummary summary = CapCheckSummary.from(capCheckMapper.summarize(
+        CapCheckSummary summary = CapCheckSummary.from(capCheckQueryRepository.summarize(
                 criteria.month(), criteria.paymentStage(), criteria.insurerId(),
                 criteria.organizationId(), criteria.contractNo()));
-        List<CapStageSummaryRow> stageSummary = completeStageSummary(capCheckMapper.summarizeByStage(
+        List<CapStageSummaryRow> stageSummary = completeStageSummary(capCheckQueryRepository.summarizeByStage(
                 criteria.month(), criteria.insurerId(), criteria.organizationId(), criteria.contractNo()));
-        List<CapAgentSummaryRow> agentSummary = capCheckMapper.summarizeByAgent(
+        List<CapAgentSummaryRow> agentSummary = capCheckQueryRepository.summarizeByAgent(
                 criteria.month(), criteria.insurerId(), criteria.organizationId(), criteria.contractNo());
 
         PageResponse<CapCheckListRow> pageResponse =
@@ -177,7 +179,7 @@ public class CapCheckServiceImpl implements CapCheckService {
     @Override
     @Transactional(readOnly = true)
     public Optional<CapCheckBasisResponse> findDetail(Long capCheckId) {
-        CapCheckRow row = capCheckMapper.findById(capCheckId);
+        CapCheckRow row = capCheckQueryRepository.findById(capCheckId);
         if (row == null) {
             return Optional.empty();
         }
@@ -185,7 +187,7 @@ public class CapCheckServiceImpl implements CapCheckService {
     }
 
     private CapCheckSaveResult toSaveResult(CapCheckRow row) {
-        List<CapCheckDetailLine> details = capCheckMapper.findDetailsByCapCheckId(row.getCapCheckId());
+        List<CapCheckDetailLine> details = capCheckQueryRepository.findDetailsByCapCheckId(row.getCapCheckId());
 
         CapCalculationResult result = new CapCalculationResult(
                 row.getContractId(),

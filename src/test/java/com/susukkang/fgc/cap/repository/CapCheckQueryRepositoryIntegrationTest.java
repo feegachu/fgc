@@ -1,11 +1,15 @@
-package com.susukkang.fgc.cap.mapper;
+package com.susukkang.fgc.cap.repository;
 
 import com.susukkang.fgc.cap.dto.CapAgentSummaryRow;
 import com.susukkang.fgc.cap.dto.CapCheckListRow;
+import com.susukkang.fgc.cap.dto.CapCheckRow;
 import com.susukkang.fgc.cap.dto.CapCheckStatusCount;
 import com.susukkang.fgc.cap.dto.CapStageSummaryRow;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,47 +25,106 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-class CapCheckMapperIntegrationTest {
+class CapCheckQueryRepositoryIntegrationTest {
 
-    @Autowired CapCheckMapper capCheckMapper;
+    @Autowired CapCheckQueryRepository capCheckQueryRepository;
     @Autowired JdbcTemplate jdbcTemplate;
 
-    // REG-10, 운영정책 §7-2: 귀속행별 원 단위 반올림 후 DEDUCTION을 차감한다.
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void latestAndDetailPreserveEveryMappedFieldAndTheirContractNumberDifference(boolean includeNullableValues) {
+        TestContract contract = insertTestContract();
+        LocalDate asOfDate = LocalDate.of(2035, 1, 31);
+        Long capRuleSetId = jdbcTemplate.queryForObject("""
+                SELECT cap_rule_set_id FROM fgc.cap_rule_set
+                 WHERE payment_stage = 'INSURER_TO_GA' ORDER BY cap_rule_set_id LIMIT 1
+                """, Long.class);
+        Long refundRateTableId = includeNullableValues ? jdbcTemplate.queryForObject("""
+                SELECT refund_rate_table_id FROM fgc.refund_rate_table ORDER BY refund_rate_table_id LIMIT 1
+                """, Long.class) : null;
+        BigDecimal usagePct = includeNullableValues ? new BigDecimal("105.016199") : null;
+        Long capCheckId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.cap_check (
+                    contract_id, payment_stage, cap_rule_set_id, refund_rate_table_id, check_kind,
+                    as_of_date, base_premium_amount, refund_12m_amount, compliance_deduction_amount,
+                    limit_amount, included_amount, remaining_amount, usage_pct, result_status, calculation_snapshot
+                ) VALUES (?, 'INSURER_TO_GA', ?, ?, 'REALTIME', ?, 1234.56, 78.90, 12.34,
+                          2000.12, 2100.45, -100.33, ?, 'VIOLATION', '{"source":"mapping-test"}'::jsonb)
+                RETURNING cap_check_id
+                """, Long.class, contract.contractId(), capRuleSetId, refundRateTableId, asOfDate, usagePct);
+
+        CapCheckRow latest = capCheckQueryRepository.findLatestByContractAndStage(
+                contract.contractId(), PaymentStage.INSURER_TO_GA.name());
+        CapCheckRow detail = capCheckQueryRepository.findById(capCheckId);
+
+        assertThat(detail).isNotNull();
+        assertThat(detail).extracting(
+                CapCheckRow::getCapCheckId, CapCheckRow::getContractId,
+                CapCheckRow::getPaymentStage, CapCheckRow::getCheckKind, CapCheckRow::getAsOfDate,
+                CapCheckRow::getCapRuleSetId, CapCheckRow::getRefundRateTableId,
+                CapCheckRow::getBasePremiumAmount, CapCheckRow::getRefund12mAmount,
+                CapCheckRow::getComplianceDeductionAmount, CapCheckRow::getLimitAmount,
+                CapCheckRow::getIncludedAmount, CapCheckRow::getRemainingAmount,
+                CapCheckRow::getUsagePct, CapCheckRow::getResultStatus, CapCheckRow::getCalculationSnapshotJson
+        ).containsExactly(
+                capCheckId, contract.contractId(), "INSURER_TO_GA", "REALTIME", asOfDate,
+                capRuleSetId, refundRateTableId, new BigDecimal("1234.56"), new BigDecimal("78.90"),
+                new BigDecimal("12.34"), new BigDecimal("2000.12"), new BigDecimal("2100.45"),
+                new BigDecimal("-100.33"), usagePct, "VIOLATION", "{\"source\": \"mapping-test\"}");
+        assertThat(latest).usingRecursiveComparison().ignoringFields("contractNo").isEqualTo(detail);
+        assertThat(latest.getContractNo()).isNull();
+        assertThat(detail.getContractNo()).isEqualTo(contract.contractNo());
+    }
+
     @Test
-    void sumsRoundedComplianceEvidenceWithDeductionSignWithinFirstYearAndStage() {
+    void latestAndDetailReturnNullWhenNoCapCheckExists() {
         TestContract contract = insertTestContract();
 
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("10.50"),
+        assertThat(capCheckQueryRepository.findLatestByContractAndStage(
+                contract.contractId(), PaymentStage.GA_TO_FC.name())).isNull();
+        assertThat(capCheckQueryRepository.findById(-1L)).isNull();
+    }
+
+    // REG-10, 운영정책 §7-2: 귀속행별 원 단위 반올림 후 DEDUCTION을 차감한다.
+    @ParameterizedTest
+    @EnumSource(PaymentStage.class)
+    void sumsRoundedComplianceEvidenceWithDeductionSignWithinFirstYearAndStage(PaymentStage paymentStage) {
+        TestContract contract = insertTestContract();
+        PaymentStage otherStage = paymentStage == PaymentStage.INSURER_TO_GA
+                ? PaymentStage.GA_TO_FC : PaymentStage.INSURER_TO_GA;
+
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("10.50"),
                 contract.contractDate(), "EVIDENCE-1");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("10.50"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("10.50"),
                 contract.contractDate().plusMonths(1), "EVIDENCE-2");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "DEDUCTION", new BigDecimal("3.50"),
+        insertEvidence(contract, paymentStage, "DEDUCTION", new BigDecimal("3.50"),
                 contract.contractDate().plusMonths(2), "EVIDENCE-3");
 
         // 초년도 마지막 날은 포함한다.
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("5.50"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("5.50"),
                 contract.contractDate().plusMonths(12).minusDays(1), "LAST-DAY-FIRST-YEAR");
 
         // 다른 지급 단계, 1주년 당일, 증빙 없는 행은 집계에서 제외한다.
-        insertEvidence(contract, PaymentStage.INSURER_TO_GA, "PAYMENT", new BigDecimal("100.00"),
+        insertEvidence(contract, otherStage, "PAYMENT", new BigDecimal("100.00"),
                 contract.contractDate(), "OTHER-STAGE");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("100.00"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("100.00"),
                 contract.contractDate().plusMonths(12), "OUTSIDE-FIRST-YEAR");
-        insertEvidence(contract, PaymentStage.GA_TO_FC, "PAYMENT", new BigDecimal("100.00"),
+        insertEvidence(contract, paymentStage, "PAYMENT", new BigDecimal("100.00"),
                 contract.contractDate().plusMonths(3), null);
 
-        BigDecimal amount = capCheckMapper.selectComplianceEvidenceAmount(
-                contract.contractId(), PaymentStage.GA_TO_FC);
+        BigDecimal amount = capCheckQueryRepository.selectComplianceEvidenceAmount(
+                contract.contractId(), paymentStage);
 
         assertThat(amount).isEqualByComparingTo("24"); // ROUND(10.5)+ROUND(10.5)-ROUND(3.5)+ROUND(5.5)
     }
 
-    @Test
-    void returnsNullWhenNoComplianceEvidenceExists() {
+    @ParameterizedTest
+    @EnumSource(PaymentStage.class)
+    void returnsNullWhenNoComplianceEvidenceExists(PaymentStage paymentStage) {
         TestContract contract = insertTestContract();
 
-        assertThat(capCheckMapper.selectComplianceEvidenceAmount(
-                contract.contractId(), PaymentStage.GA_TO_FC)).isNull();
+        assertThat(capCheckQueryRepository.selectComplianceEvidenceAmount(
+                contract.contractId(), paymentStage)).isNull();
     }
 
     // REG-19: GA_TO_FC 룰 시행일 이전 계약은 실패가 아니라 해당 단계 검증 미적용이다.
@@ -74,9 +137,9 @@ class CapCheckMapperIntegrationTest {
                 "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL01-202607-0001'",
                 Long.class);
 
-        assertThat(capCheckMapper.existsApplicableRuleSet(
+        assertThat(capCheckQueryRepository.existsApplicableRuleSet(
                 beforeEffectiveDate, PaymentStage.GA_TO_FC)).isFalse();
-        assertThat(capCheckMapper.existsApplicableRuleSet(
+        assertThat(capCheckQueryRepository.existsApplicableRuleSet(
                 afterEffectiveDate, PaymentStage.GA_TO_FC)).isTrue();
     }
 
@@ -100,17 +163,17 @@ class CapCheckMapperIntegrationTest {
                 "2000", "1000", "0", "50.000000", "NORMAL",
                 OffsetDateTime.parse("2035-01-04T00:00:00Z"));
 
-        List<CapCheckListRow> oldNormalRows = capCheckMapper.search(
+        List<CapCheckListRow> oldNormalRows = capCheckQueryRepository.search(
                 LocalDate.of(2035, 1, 1), PaymentStage.GA_TO_FC.name(), "NORMAL",
                 null, first.organizationId(), null, 0, 20);
         assertThat(oldNormalRows).isEmpty();
 
-        long organizationTotal = capCheckMapper.count(
+        long organizationTotal = capCheckQueryRepository.count(
                 LocalDate.of(2035, 1, 1), null, null,
                 null, first.organizationId(), null);
         assertThat(organizationTotal).isEqualTo(2);
 
-        List<CapCheckStatusCount> agentStageKpis = capCheckMapper.summarize(
+        List<CapCheckStatusCount> agentStageKpis = capCheckQueryRepository.summarize(
                 LocalDate.of(2035, 1, 1), PaymentStage.GA_TO_FC.name(),
                 null, first.organizationId(), null);
         assertThat(agentStageKpis).singleElement().satisfies(count -> {
@@ -118,7 +181,7 @@ class CapCheckMapperIntegrationTest {
             assertThat(count.getCount()).isEqualTo(1);
         });
 
-        List<CapStageSummaryRow> stages = capCheckMapper.summarizeByStage(
+        List<CapStageSummaryRow> stages = capCheckQueryRepository.summarizeByStage(
                 LocalDate.of(2035, 1, 1), null, first.organizationId(), null);
         assertThat(stages).hasSize(2);
 
@@ -138,7 +201,7 @@ class CapCheckMapperIntegrationTest {
         assertThat(agentStage.getUsagePct()).isEqualByComparingTo("90.000000");
         assertThat(agentStage.getWarningCount()).isEqualTo(1);
 
-        List<CapAgentSummaryRow> agents = capCheckMapper.summarizeByAgent(
+        List<CapAgentSummaryRow> agents = capCheckQueryRepository.summarizeByAgent(
                 LocalDate.of(2035, 1, 1), null, first.organizationId(), null);
         assertThat(agents).singleElement().satisfies(agent -> {
             assertThat(agent.getAgentId()).isEqualTo(first.agentId());
@@ -153,22 +216,22 @@ class CapCheckMapperIntegrationTest {
             assertThat(agent.getWorstUsagePct()).isEqualByComparingTo("90.000000");
         });
 
-        assertThat(capCheckMapper.count(
+        assertThat(capCheckQueryRepository.count(
                 LocalDate.of(2035, 1, 1), null, null,
                 null, null, null)).isEqualTo(3);
 
-        List<CapCheckStatusCount> fullScopeKpis = capCheckMapper.summarize(
+        List<CapCheckStatusCount> fullScopeKpis = capCheckQueryRepository.summarize(
                 LocalDate.of(2035, 1, 1), null,
                 null, null, null);
         assertThat(fullScopeKpis).extracting(CapCheckStatusCount::getResultStatus)
                 .containsExactlyInAnyOrder("NORMAL", "WARNING", "VIOLATION");
 
-        List<CapStageSummaryRow> fullScopeStages = capCheckMapper.summarizeByStage(
+        List<CapStageSummaryRow> fullScopeStages = capCheckQueryRepository.summarizeByStage(
                 LocalDate.of(2035, 1, 1), null, null, null);
         assertThat(stage(fullScopeStages, PaymentStage.GA_TO_FC).getContractCount()).isEqualTo(2);
         assertThat(stage(fullScopeStages, PaymentStage.GA_TO_FC).getIncludedAmountTotal())
                 .isEqualByComparingTo("1900");
-        assertThat(capCheckMapper.summarizeByAgent(
+        assertThat(capCheckQueryRepository.summarizeByAgent(
                 LocalDate.of(2035, 1, 1), null, null, null)).hasSize(2);
     }
 
@@ -187,7 +250,7 @@ class CapCheckMapperIntegrationTest {
                 "1000", "1100", "0", "110.000000", "VIOLATION",
                 OffsetDateTime.parse("2035-02-28T01:00:00Z"));
 
-        List<CapCheckListRow> rows = capCheckMapper.search(
+        List<CapCheckListRow> rows = capCheckQueryRepository.search(
                 null, PaymentStage.GA_TO_FC.name(), null,
                 null, null, contract.contractNo(), 0, 20);
 
@@ -195,17 +258,17 @@ class CapCheckMapperIntegrationTest {
                 .containsExactly(LocalDate.of(2035, 2, 28), LocalDate.of(2035, 1, 31));
         assertThat(rows).extracting(CapCheckListRow::getResultStatus)
                 .containsExactly("VIOLATION", "WARNING");
-        assertThat(capCheckMapper.count(
+        assertThat(capCheckQueryRepository.count(
                 null, PaymentStage.GA_TO_FC.name(), null,
                 null, null, contract.contractNo())).isEqualTo(2);
 
-        List<CapCheckStatusCount> kpis = capCheckMapper.summarize(
+        List<CapCheckStatusCount> kpis = capCheckQueryRepository.summarize(
                 null, PaymentStage.GA_TO_FC.name(),
                 null, null, contract.contractNo());
         assertThat(kpis).extracting(CapCheckStatusCount::getResultStatus)
                 .containsExactlyInAnyOrder("WARNING", "VIOLATION");
 
-        List<CapStageSummaryRow> stages = capCheckMapper.summarizeByStage(
+        List<CapStageSummaryRow> stages = capCheckQueryRepository.summarizeByStage(
                 null, null, null, contract.contractNo());
         CapStageSummaryRow agentStage = stage(stages, PaymentStage.GA_TO_FC);
         assertThat(agentStage.getContractCount()).isEqualTo(2);
@@ -214,7 +277,7 @@ class CapCheckMapperIntegrationTest {
         assertThat(agentStage.getWarningCount()).isEqualTo(1);
         assertThat(agentStage.getViolationCount()).isEqualTo(1);
 
-        assertThat(capCheckMapper.summarizeByAgent(
+        assertThat(capCheckQueryRepository.summarizeByAgent(
                 null, null, null, contract.contractNo())).singleElement().satisfies(agent -> {
                     assertThat(agent.getContractCount()).isEqualTo(2);
                     assertThat(agent.getLimitAmountTotal()).isEqualByComparingTo("2000");
@@ -240,13 +303,13 @@ class CapCheckMapperIntegrationTest {
                 "10.50", "5.50", "0", "52.380952", "NORMAL",
                 OffsetDateTime.parse("2035-03-31T02:00:00Z"));
 
-        CapStageSummaryRow stage = stage(capCheckMapper.summarizeByStage(
+        CapStageSummaryRow stage = stage(capCheckQueryRepository.summarizeByStage(
                 LocalDate.of(2035, 3, 1), null, first.organizationId(), null), PaymentStage.GA_TO_FC);
         assertThat(stage.getLimitAmountTotal()).isEqualByComparingTo("22");
         assertThat(stage.getIncludedAmountTotal()).isEqualByComparingTo("12");
         assertThat(stage.getUsagePct()).isEqualByComparingTo("54.545455");
 
-        assertThat(capCheckMapper.summarizeByAgent(
+        assertThat(capCheckQueryRepository.summarizeByAgent(
                 LocalDate.of(2035, 3, 1), null, first.organizationId(), null))
                 .singleElement()
                 .satisfies(agent -> {
