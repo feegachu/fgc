@@ -10,13 +10,17 @@ import com.susukkang.fgc.cap.dto.CapCheckSearchResult;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.dto.ScheduleAmountView;
-import com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper;
+import com.susukkang.fgc.cap.repository.CapScheduleAmountQueryRepository;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.cap.service.ProductRefundRateResolver;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,16 +30,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 설명 : 실제 PostgreSQL 정책·스케줄·준법경영비 계산 통합 테스트
- * 실제 로컬 PostgreSQL(docker-compose fgc-db)에 적용된 시드데이터(V3/V4)를 대상으로
- * CapCalculator/ProductRefundRateResolver 매퍼 SQL이 실제로 맞물려 동작하는지 검증한다.
+ * test 프로필의 임시 PostgreSQL에 적용된 시드데이터를 대상으로
+ * CapCalculator/ProductRefundRateResolver의 JPA 조회와 계산이 맞물려 동작하는지 검증한다.
  *
- * schedule_line 은 ScheduleGenerator(FGC-FUN-012/013/018)가 아직 없어 seed 에 없으므로,
- * 이 테스트가 직접 최소한의 예상 스케줄 1건을 만들어 넣는다. 트랜잭션은 끝나면 롤백된다.
+ * 각 테스트가 필요한 예상 스케줄과 지급·증빙을 직접 구성하며 트랜잭션은 끝나면 롤백된다.
  *
  * @author yslee
  * @since 2026-08-10
@@ -54,7 +58,7 @@ class CapCalculatorIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
-    private CapScheduleAmountMapper capScheduleAmountMapper;
+    private CapScheduleAmountQueryRepository capScheduleAmountQueryRepository;
 
     private Long contractId(String contractNo) {
         return jdbcTemplate.queryForObject(
@@ -222,11 +226,137 @@ class CapCalculatorIntegrationTest {
                 """, paymentId, contractId, agentId, lineIds.get(0));
         jdbcTemplate.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", paymentId);
 
-        List<ScheduleAmountView> lines = capScheduleAmountMapper.findFirstYearScheduleAmounts(
+        List<ScheduleAmountView> lines = capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(
                 contractId, PaymentStage.GA_TO_FC.name(), 12);
 
-        assertThat(lines).extracting(ScheduleAmountView::getEvidenceRef)
-                .containsExactly("EVD-LINE-1", null);
+        assertThat(lines).hasSize(2);
+        assertThat(lines).filteredOn(line -> line.getScheduleLineId().equals(lineIds.get(0)))
+                .singleElement().extracting(ScheduleAmountView::getEvidenceRef).isEqualTo("EVD-LINE-1");
+        assertThat(lines).filteredOn(line -> line.getScheduleLineId().equals(lineIds.get(1)))
+                .singleElement().extracting(ScheduleAmountView::getEvidenceRef).isNull();
+    }
+
+    @Test
+    void usesTrimmedMinimumOfOnlyMatchingConfirmedExclusionEvidence() {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("123.45"), new BigDecimal("678.90"));
+        List<Long> lineIds = scheduleLineIds(headerId);
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.schedule_line WHERE schedule_line_id = ?",
+                Long.class, lineIds.get(0));
+        Long otherItemId = jdbcTemplate.queryForObject(
+                "SELECT min(commission_item_id) FROM fgc.commission_item WHERE commission_item_id <> ?",
+                Long.class, itemId);
+        insertScheduleEvidence(contractId, lineIds.get(0), itemId, "GA_TO_FC", "EXCLUDED", "  EVD-Z  ", true);
+        insertScheduleEvidence(contractId, lineIds.get(0), itemId, "GA_TO_FC", "EXCLUDED", "  EVD-A  ", true);
+        insertScheduleEvidence(contractId, lineIds.get(0), itemId, "INSURER_TO_GA", "EXCLUDED", null, true);
+        insertScheduleEvidence(contractId, lineIds.get(0), otherItemId, "GA_TO_FC", "EXCLUDED", null, true);
+        insertScheduleEvidence(contractId, lineIds.get(0), itemId, "GA_TO_FC", "EXCLUDED", null, false);
+        insertScheduleEvidence(contractId, lineIds.get(0), itemId, "GA_TO_FC", "INCLUDED", null, true);
+        insertScheduleEvidence(contractId, lineIds.get(1), itemId, "GA_TO_FC", "EXCLUDED", null, true);
+
+        List<ScheduleAmountView> lines = capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(
+                contractId, "GA_TO_FC", 12);
+
+        assertThat(lines).hasSize(2);
+        assertThat(lines).filteredOn(line -> line.getScheduleLineId().equals(lineIds.get(0)))
+                .singleElement().satisfies(line -> {
+                    assertThat(line.getCommissionItemId()).isEqualTo(itemId);
+                    assertThat(line.getContractMonthNo()).isEqualTo(1);
+                    assertThat(line.getAmount()).isEqualByComparingTo("123.45");
+                    assertThat(line.getEvidenceRef()).isEqualTo("EVD-A");
+                });
+        assertThat(lines).filteredOn(line -> line.getScheduleLineId().equals(lineIds.get(1)))
+                .singleElement().extracting(ScheduleAmountView::getEvidenceRef).isNull();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void requiresEveryMatchingConfirmedExclusionToHaveNonblankEvidence(String missingEvidence) {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("100"));
+        Long lineId = scheduleLineIds(headerId).get(0);
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.schedule_line WHERE schedule_line_id = ?", Long.class, lineId);
+        insertScheduleEvidence(contractId, lineId, itemId, "GA_TO_FC", "EXCLUDED", "EVD-VALID", true);
+        insertScheduleEvidence(contractId, lineId, itemId, "GA_TO_FC", "EXCLUDED", missingEvidence, true);
+
+        assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12))
+                .singleElement().extracting(ScheduleAmountView::getEvidenceRef).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "OPERATIONAL, true, PLANNED, 6, 6, true",
+            "OPERATIONAL, true, PLANNED, 7, 6, false",
+            "OPERATIONAL, true, PLANNED, 1, 0, false",
+            "OPERATIONAL, true, CANCELLED, 1, 12, false",
+            "OPERATIONAL, false, PLANNED, 1, 12, false",
+            "COMPARISON, true, PLANNED, 1, 12, false",
+            "SIMULATION, true, PLANNED, 1, 12, false"
+    })
+    void selectsActiveOperationalUncancelledLinesWithinRequestedMonthRange(
+            String purpose, boolean active, String lineStatus, int month, int firstYearMonths, boolean included
+    ) {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("100.50"));
+        jdbcTemplate.update("""
+                UPDATE fgc.schedule_header SET schedule_purpose = ?, scenario_code = ?, active_yn = ?
+                 WHERE schedule_header_id = ?
+                """, purpose, purpose.equals("OPERATIONAL") ? null : "CAP-QUERY-TEST", active, headerId);
+        jdbcTemplate.update("""
+                UPDATE fgc.schedule_line SET line_status = ?, contract_month_no = ? WHERE schedule_header_id = ?
+                """, lineStatus, month, headerId);
+
+        List<ScheduleAmountView> actual = capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(
+                contractId, "GA_TO_FC", firstYearMonths);
+
+        assertThat(actual).hasSize(included ? 1 : 0);
+        if (included) {
+            assertThat(actual.get(0).getContractMonthNo()).isEqualTo(month);
+            assertThat(actual.get(0).getAmount()).isEqualByComparingTo("100.50");
+            assertThat(actual.get(0).getEvidenceRef()).isNull();
+        }
+        assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(-1L, "GA_TO_FC", 12)).isEmpty();
+        assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "INSURER_TO_GA", 12))
+                .isEmpty();
+    }
+
+    private List<Long> scheduleLineIds(Long headerId) {
+        return jdbcTemplate.queryForList("""
+                SELECT schedule_line_id FROM fgc.schedule_line WHERE schedule_header_id = ? ORDER BY line_no
+                """, Long.class, headerId);
+    }
+
+    private void insertScheduleEvidence(Long contractId, Long lineId, Long itemId, String paymentStage,
+                                        String inclusionStatus, String evidence, boolean confirmed) {
+        Long agentId = jdbcTemplate.queryForObject(
+                "SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", Long.class, contractId);
+        Long paymentId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction (
+                    payment_stage, source_type, source_business_key, recipient_agent_id,
+                    commission_item_id, settlement_month, amount, cashflow_type, status
+                ) VALUES (?, 'GA_MANUAL_PAYMENT', ?, ?, ?, DATE '2026-07-01', 100, 'PAYMENT', 'DRAFT')
+                RETURNING commission_transaction_id
+                """, Long.class, paymentStage, "IT-CAP-EVD-" + UUID.randomUUID(), agentId, itemId);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.transaction_attribution (
+                    commission_transaction_id, attribution_seq, attribution_scope, contract_id, agent_id,
+                    schedule_line_id, attribution_date, attribution_month, attributed_amount,
+                    inclusion_status_snapshot, exclusion_type_snapshot, attribution_method,
+                    allocation_basis_snapshot, evidence_ref
+                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, DATE '2026-07-10', DATE '2026-07-01', 100,
+                          ?, ?, 'DIRECT', '{}'::jsonb, ?)
+                """, paymentId, contractId, agentId, lineId, inclusionStatus,
+                inclusionStatus.equals("EXCLUDED") ? "NEW_AGENT_SUPPORT" : null, evidence);
+        if (confirmed) {
+            jdbcTemplate.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?",
+                    paymentId);
+        }
     }
 
     private String savedResultStatus(Long capCheckId) {

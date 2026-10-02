@@ -12,8 +12,8 @@ import java.util.List;
 /**
  * ValidationRunCreateServiceImpl이 policy_snapshot을 조립할 때 쓰는 조회 전용 Mapper
  * (FUN-041 #2). 결정된 스냅샷 범위: "asOfDate 시점에 유효한(활성) 전체" — 특정 계약이
- * 실제로 그 룰셋/환급률표/상품판매버전을 쓰는지는 안 따진다(CapRuleMapper#findApplicableRuleSet·
- * RefundRateMapper#findApplicableTable처럼 계약 1건 기준 "가장 구체적인 것 1건"을 찾는
+ * 실제로 그 룰셋/환급률표/상품판매버전을 쓰는지는 안 따진다(CapRuleQueryRepository#findApplicableRuleSet·
+ * RefundRateQueryRepository#findApplicableTable처럼 계약 1건에 적용할 규칙·표 한 건을 찾는
  * 조회와는 목적이 다르다 — 여기는 "그 시점에 존재하는 것 전부"를 나열한다).
  *
  * CapRuleSetView/RefundRateTableView(cap.dto)를 그대로 재사용한다 — 이미 필요한 필드를

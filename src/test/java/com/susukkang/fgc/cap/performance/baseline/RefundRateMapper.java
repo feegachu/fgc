@@ -1,13 +1,11 @@
-package com.susukkang.fgc.cap.mapper;
+package com.susukkang.fgc.cap.performance.baseline;
 
 import com.susukkang.fgc.cap.dto.RefundRateTableView;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-@Mapper
 public interface RefundRateMapper {
 
     /**

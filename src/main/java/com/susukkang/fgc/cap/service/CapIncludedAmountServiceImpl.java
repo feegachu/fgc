@@ -1,7 +1,7 @@
 package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.cap.dto.CapIncludedAmountSummary;
-import com.susukkang.fgc.cap.mapper.CapIncludedAmountMapper;
+import com.susukkang.fgc.cap.repository.CapIncludedAmountQueryRepository;
 import com.susukkang.fgc.common.code.PaymentStage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class CapIncludedAmountServiceImpl implements CapIncludedAmountService {
 
-    private final CapIncludedAmountMapper capIncludedAmountMapper;
+    private final CapIncludedAmountQueryRepository capIncludedAmountQueryRepository;
 
     /**
      * 설명 : 지급 확정 전 기존 확정액과 현재 지급 건의 산입액을 합산한다
@@ -37,7 +37,7 @@ public class CapIncludedAmountServiceImpl implements CapIncludedAmountService {
     @Override
     public BigDecimal calculatePreConfirmAmount(Long contractId, Long transactionId, PaymentStage paymentStage) {
         List<CapIncludedAmountSummary> summaries =
-                capIncludedAmountMapper.sumIncludedAmountByContractAndAgent(contractId, transactionId, paymentStage);
+                capIncludedAmountQueryRepository.sumIncludedAmountByContractAndAgent(contractId, transactionId, paymentStage);
         return sumIncludedAmounts(summaries);
     }
 
@@ -53,7 +53,7 @@ public class CapIncludedAmountServiceImpl implements CapIncludedAmountService {
     @Override
     public BigDecimal recalculateTotalAmount(Long contractId, PaymentStage paymentStage) {
         List<CapIncludedAmountSummary> summaries =
-                capIncludedAmountMapper.sumConfirmedIncludedAmountByContractAndAgent(contractId, paymentStage);
+                capIncludedAmountQueryRepository.sumConfirmedIncludedAmountByContractAndAgent(contractId, paymentStage);
         return sumIncludedAmounts(summaries);
     }
 

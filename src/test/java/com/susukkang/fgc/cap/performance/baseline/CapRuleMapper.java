@@ -1,14 +1,12 @@
-package com.susukkang.fgc.cap.mapper;
+package com.susukkang.fgc.cap.performance.baseline;
 
 import com.susukkang.fgc.cap.dto.CapRuleItemView;
 import com.susukkang.fgc.cap.dto.CapRuleSetView;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@Mapper
 public interface CapRuleMapper {
 
     /**
