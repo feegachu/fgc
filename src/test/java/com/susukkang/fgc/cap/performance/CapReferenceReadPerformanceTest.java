@@ -73,6 +73,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfSystemProperty(named = "fgc.cap.performance", matches = "true")
 class CapReferenceReadPerformanceTest {
     private static final Logger log = LoggerFactory.getLogger(CapReferenceReadPerformanceTest.class);
+    // 비교 기준·재현 방법·측정 기록: https://www.notion.so/3ed7211a7b30815f8e4bd39f5ce604ab
+    // 별도 문서 리소스 없이도 비교 테스트를 실행하도록 기준 커밋을 코드와 보고서에 보존한다.
     private static final String BASELINE_SHA = "8941047fc4b52e7e698f925cbc41467f8689c6d8";
     private static final int WARMUPS = Integer.getInteger("fgc.cap.performance.warmups", 25);
     private static final int SAMPLES = Integer.getInteger("fgc.cap.performance.samples", 80);
@@ -108,8 +110,6 @@ class CapReferenceReadPerformanceTest {
         assertThat(WARMUPS).isGreaterThanOrEqualTo(0);
         assertThat(SAMPLES).isGreaterThanOrEqualTo(5);
         assertThat(ROUND).matches("[A-Za-z0-9_-]+");
-        assertThat(new ClassPathResource("cap-baseline/baseline-sha.txt").getContentAsString(StandardCharsets.UTF_8).trim())
-                .isEqualTo(BASELINE_SHA);
         rowsBefore = rowCounts();
         try {
             Baseline baseline = baseline();
