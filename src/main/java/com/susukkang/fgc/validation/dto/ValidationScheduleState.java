@@ -30,4 +30,24 @@ public class ValidationScheduleState {
     private Integer lineCount;
     private Integer distinctLineCount;
     private BigDecimal totalAmount;
+
+    /**
+     * #380 — ValidationTargetRepository의 {@code @SqlResultSetMapping} 네이티브 쿼리가
+     * enum/bigint 컬럼을 String/Long으로 돌려주므로, 그 결과를 이 DTO로 변환하는 전용 생성자.
+     */
+    public ValidationScheduleState(Long contractId, String paymentStage, Long scheduleHeaderId,
+                                    Long policyVersionId, Integer scheduleVersion, String scheduleStatus,
+                                    Long activeHeaderCount, Long lineCount, Long distinctLineCount,
+                                    BigDecimal totalAmount) {
+        this.contractId = contractId;
+        this.paymentStage = PaymentStage.valueOf(paymentStage);
+        this.scheduleHeaderId = scheduleHeaderId;
+        this.policyVersionId = policyVersionId;
+        this.scheduleVersion = scheduleVersion;
+        this.scheduleStatus = scheduleStatus == null ? null : ScheduleHeaderStatus.valueOf(scheduleStatus);
+        this.activeHeaderCount = activeHeaderCount == null ? null : Math.toIntExact(activeHeaderCount);
+        this.lineCount = lineCount == null ? null : Math.toIntExact(lineCount);
+        this.distinctLineCount = distinctLineCount == null ? null : Math.toIntExact(distinctLineCount);
+        this.totalAmount = totalAmount;
+    }
 }

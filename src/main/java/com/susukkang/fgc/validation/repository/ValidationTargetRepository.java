@@ -1,10 +1,12 @@
 package com.susukkang.fgc.validation.repository;
 
+import com.susukkang.fgc.validation.dto.ValidationScheduleState;
 import com.susukkang.fgc.validation.dto.ValidationTargetListRow;
 import com.susukkang.fgc.validation.entity.ValidationTarget;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.NativeQuery;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -165,4 +167,54 @@ public interface ValidationTargetRepository extends JpaRepository<ValidationTarg
                      END, t.validationTargetId
             """)
     List<ValidationTargetListRow> findTargets(@Param("validationRunId") Long validationRunId, Pageable pageable);
+
+    /**
+     * #380 — 선별된(SELECTED) 계약의 지급 단계별(INSURER_TO_GA/GA_TO_FC) 예상 스케줄 상태를
+     * 검사한다. unnest로 두 지급 단계를 CROSS JOIN하고, ROW() 기반 DISTINCT COUNT로 회차
+     * 업무키 중복을 집계하는 집합 연산이라 JPQL 대신 네이티브 SQL + {@code @SqlResultSetMapping}
+     * (ValidationTarget 엔티티에 선언)으로 원본 MyBatis SQL을 그대로 유지한다. schedule_header/
+     * schedule_line은 schedule 패키지 소유 테이블이라 별도 엔티티를 두지 않고 테이블명으로 직접 조회한다.
+     */
+    @NativeQuery(value = """
+            WITH payment_stage AS (
+                SELECT unnest(ARRAY['INSURER_TO_GA', 'GA_TO_FC']) AS payment_stage
+            ),
+            line_summary AS (
+                SELECT schedule_header_id,
+                       COUNT(*) AS line_count,
+                       COUNT(DISTINCT ROW(
+                           installment_no,
+                           contract_month_no,
+                           commission_item_id,
+                           beneficiary_agent_id
+                       )) AS distinct_line_count,
+                       COALESCE(SUM(ROUND(expected_amount, 0)), 0) AS total_amount
+                  FROM fgc.schedule_line
+                 GROUP BY schedule_header_id
+            )
+            SELECT vt.contract_id AS contractId,
+                   ps.payment_stage AS paymentStage,
+                   MIN(sh.schedule_header_id) AS scheduleHeaderId,
+                   MIN(sh.policy_version_id) AS policyVersionId,
+                   MIN(sh.schedule_version_no) AS scheduleVersion,
+                   MIN(sh.status) AS scheduleStatus,
+                   COUNT(sh.schedule_header_id) AS activeHeaderCount,
+                   COALESCE(SUM(ls.line_count), 0) AS lineCount,
+                   COALESCE(SUM(ls.distinct_line_count), 0) AS distinctLineCount,
+                   COALESCE(SUM(ls.total_amount), 0) AS totalAmount
+              FROM fgc.validation_target vt
+             CROSS JOIN payment_stage ps
+              LEFT JOIN fgc.schedule_header sh
+                ON sh.contract_id = vt.contract_id
+               AND sh.payment_stage = ps.payment_stage
+               AND sh.schedule_purpose = 'OPERATIONAL'
+               AND sh.active_yn = true
+              LEFT JOIN line_summary ls
+                ON ls.schedule_header_id = sh.schedule_header_id
+             WHERE vt.validation_run_id = :validationRunId
+               AND vt.selection_status = 'SELECTED'
+             GROUP BY vt.validation_target_id, vt.contract_id, ps.payment_stage
+             ORDER BY vt.validation_target_id, ps.payment_stage
+            """, sqlResultSetMapping = "ValidationScheduleStateMapping")
+    List<ValidationScheduleState> selectScheduleStates(@Param("validationRunId") Long validationRunId);
 }
