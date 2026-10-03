@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
@@ -9,6 +11,8 @@ import lombok.Setter;
  */
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class ValidationTargetListRow {
     private Long validationTargetId;
     private String contractNo;

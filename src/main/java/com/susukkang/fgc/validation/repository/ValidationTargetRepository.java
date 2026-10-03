@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.repository;
 
+import com.susukkang.fgc.validation.dto.ValidationTargetListRow;
 import com.susukkang.fgc.validation.entity.ValidationTarget;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -141,4 +143,26 @@ public interface ValidationTargetRepository extends JpaRepository<ValidationTarg
              ORDER BY t.contractId
             """)
     List<Long> selectSelectedContractIds(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * IF-API-47 상세 화면 ③ 대상 선별 결과. 검토필요·제외 먼저, 이후 id 순으로 limit건.
+     * product_offering은 계약이 아니라 validation_target 자신의 productOfferingId로 조인한다
+     * (원본 SQL과 동일 — 계약이 그 사이 다른 판매버전으로 바뀌어도 선별 시점 스냅샷을 보여준다).
+     */
+    @Query("""
+            SELECT new com.susukkang.fgc.validation.dto.ValidationTargetListRow(
+                t.validationTargetId, c.contractNo, t.selectionStatus, p.productName,
+                po.offeringVersion, t.refundRateTableId, t.selectionReason)
+            FROM ValidationTarget t
+            JOIN InsuranceContract c ON c.contractId = t.contractId
+            JOIN ProductOffering po ON po.productOfferingId = t.productOfferingId
+            JOIN Product p ON p.productId = po.productId
+            WHERE t.validationRunId = :validationRunId
+            ORDER BY CASE t.selectionStatus
+                         WHEN 'REVIEW_REQUIRED' THEN 0
+                         WHEN 'EXCLUDED' THEN 1
+                         ELSE 2
+                     END, t.validationTargetId
+            """)
+    List<ValidationTargetListRow> findTargets(@Param("validationRunId") Long validationRunId, Pageable pageable);
 }

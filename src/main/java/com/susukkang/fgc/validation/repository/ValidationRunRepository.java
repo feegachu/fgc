@@ -1,9 +1,11 @@
 package com.susukkang.fgc.validation.repository;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.validation.dto.AgentCapMonitoringRow;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
+import com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -18,6 +20,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -82,6 +85,20 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
     Page<ValidationRunListRow> search(@Param("month") LocalDate month,
                                        @Param("status") ValidationRunStatus status,
                                        Pageable pageable);
+
+    /** IF-API-47 상세 화면 헤더 — search와 같은 app_user 조인(login_id)을 id 조건으로. */
+    @Query("""
+            SELECT new com.susukkang.fgc.validation.dto.ValidationRunListRow(
+                v.validationRunId, v.validationMonth, v.runNo, v.runType,
+                CAST(v.status AS string), v.currentStep,
+                triggered.loginId, v.startedAt, v.completedAt,
+                finalized.loginId, v.finalizedAt, v.failureMessage)
+            FROM ValidationRun v
+            LEFT JOIN AppUser triggered ON triggered.userId = v.triggeredBy
+            LEFT JOIN AppUser finalized ON finalized.userId = v.finalizedBy
+            WHERE v.validationRunId = :validationRunId
+            """)
+    Optional<ValidationRunListRow> findHeaderById(@Param("validationRunId") Long validationRunId);
 
     /**
      * DailyChangedContractJob "하루 1건" 규칙 지원용 — [dayStart, dayEnd) 구간의 최근(run_no 최대) 1건.
@@ -246,4 +263,113 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
             WHERE v.validationRunId = :validationRunId
             """)
     Optional<FinalizedValidationRunRow> findFinalizationById(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * VRUN-W02 ③건수·④결과 요약 4블록. 결과 테이블 5곳(validation_target, cap_check,
+     * arbitrage_check, journal_header+vw_journal_imbalance, reconciliation_run+result,
+     * schedule_header, exception_occurrence+exception_case)을 validation_run_id로 스코프해
+     * 한 번에 센다. arbitrage_check·reconciliation_*·schedule_header·exception_*는 아직
+     * JPA 엔티티가 없는(#377·#378·#380 소유) 테이블이라 JPQL로 옮길 수 없어 네이티브 SQL +
+     * {@code @SqlResultSetMapping}(ValidationRun 엔티티)으로 원본 SQL을 그대로 유지한다.
+     * GROUP BY 없는 집계라 결과가 없는 실행도 0이 채워진 1행이 나온다.
+     */
+    @NativeQuery(value = """
+            SELECT vt.targetSelectedCount, vt.targetExcludedCount, vt.targetReviewRequiredCount,
+                   cc.capCheckedCount, cc.capViolationCount, cc.capWarningCount, cc.capReviewRequiredCount,
+                   ac.arbitrageCheckedCount, ac.arbitrageCandidateCount, ac.arbitrageReviewRequiredCount,
+                   jh.journalCount, jh.journalImbalanceCount,
+                   rr.reconciliationResultCount, rr.reconciliationMismatchCount,
+                   sh.scheduleGeneratedCount,
+                   rr.reconciliationMatchedCount, rr.reconciliationMismatchedCount,
+                   rr.reconciliationUnmatchedCount, rr.reconciliationDifferenceAmountTotal,
+                   ex.exceptionDetectedCount, ex.exceptionNewCount, ex.exceptionRecurringCount,
+                   ex.exceptionReopenedCount, ex.exceptionNotDetectedCount,
+                   ex.exceptionOpenWorkItemCount
+              FROM (SELECT COUNT(*) FILTER (WHERE selection_status = 'SELECTED')        AS targetSelectedCount,
+                           COUNT(*) FILTER (WHERE selection_status = 'EXCLUDED')        AS targetExcludedCount,
+                           COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
+                      FROM fgc.validation_target
+                     WHERE validation_run_id = :validationRunId) vt
+             CROSS JOIN (SELECT COUNT(*)                                                  AS capCheckedCount,
+                                COUNT(*) FILTER (WHERE result_status = 'VIOLATION')       AS capViolationCount,
+                                COUNT(*) FILTER (WHERE result_status = 'WARNING')         AS capWarningCount,
+                                COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS capReviewRequiredCount
+                           FROM fgc.cap_check
+                          WHERE validation_run_id = :validationRunId) cc
+             CROSS JOIN (SELECT COUNT(*)                                                  AS arbitrageCheckedCount,
+                                COUNT(*) FILTER (WHERE result_status = 'CANDIDATE')       AS arbitrageCandidateCount,
+                                COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS arbitrageReviewRequiredCount
+                           FROM fgc.arbitrage_check
+                          WHERE validation_run_id = :validationRunId) ac
+             CROSS JOIN (SELECT COUNT(*)                     AS journalCount,
+                                COUNT(vji.journal_header_id) AS journalImbalanceCount
+                           FROM fgc.journal_header j
+                           LEFT JOIN fgc.vw_journal_imbalance vji ON vji.journal_header_id = j.journal_header_id
+                          WHERE j.validation_run_id = :validationRunId) jh
+             CROSS JOIN (SELECT COUNT(r.reconciliation_result_id)                                    AS reconciliationResultCount,
+                                COUNT(*) FILTER (WHERE r.result_type <> 'MATCHED')                   AS reconciliationMismatchCount,
+                                COUNT(*) FILTER (WHERE r.result_type = 'MATCHED')                     AS reconciliationMatchedCount,
+                                COUNT(*) FILTER (WHERE r.result_type NOT IN
+                                    ('MATCHED', 'EXPECTED_MISSING', 'ACTUAL_MISSING'))                AS reconciliationMismatchedCount,
+                                COUNT(*) FILTER (WHERE r.result_type IN
+                                    ('EXPECTED_MISSING', 'ACTUAL_MISSING'))                            AS reconciliationUnmatchedCount,
+                                COALESCE(SUM(ROUND(r.difference_amount, 0)) FILTER (WHERE r.result_type <> 'MATCHED'), 0)
+                                                                                                        AS reconciliationDifferenceAmountTotal
+                           FROM fgc.reconciliation_run recon
+                           LEFT JOIN fgc.reconciliation_result r ON r.reconciliation_run_id = recon.reconciliation_run_id
+                          WHERE recon.validation_run_id = :validationRunId) rr
+             CROSS JOIN (SELECT COUNT(*) AS scheduleGeneratedCount
+                           FROM fgc.schedule_header
+                          WHERE validation_run_id = :validationRunId) sh
+             CROSS JOIN (
+                 SELECT COUNT(occurrence.exception_occurrence_id) AS exceptionDetectedCount,
+                        COUNT(*) FILTER (WHERE occurrence.is_new_case) AS exceptionNewCount,
+                        COUNT(*) FILTER (WHERE NOT occurrence.is_new_case) AS exceptionRecurringCount,
+                        COUNT(*) FILTER (WHERE occurrence.was_reopened) AS exceptionReopenedCount,
+                        (SELECT COUNT(*)
+                           FROM fgc.exception_case ec
+                           JOIN fgc.validation_run target_run
+                             ON target_run.validation_run_id = :validationRunId
+                          WHERE ec.validation_month = target_run.validation_month
+                            AND ec.status IN ('NEW', 'IN_REVIEW')
+                            AND NOT EXISTS (
+                                SELECT 1
+                                  FROM fgc.exception_occurrence current_occurrence
+                                 WHERE current_occurrence.exception_case_id = ec.exception_case_id
+                                   AND current_occurrence.validation_run_id = :validationRunId
+                            )) AS exceptionNotDetectedCount,
+                        (SELECT COUNT(*)
+                           FROM fgc.exception_case ec
+                           JOIN fgc.validation_run target_run
+                             ON target_run.validation_run_id = :validationRunId
+                          WHERE ec.validation_month = target_run.validation_month
+                            AND ec.status IN ('NEW', 'IN_REVIEW')) AS exceptionOpenWorkItemCount
+                   FROM fgc.exception_occurrence occurrence
+                  WHERE occurrence.validation_run_id = :validationRunId
+             ) ex
+            """, sqlResultSetMapping = "ValidationRunResultSummaryRowMapping")
+    Optional<ValidationRunResultSummaryRow> summarize(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * FGC-FUN-043 설계사 단위 1,200% 모니터링 참고용 집계. payment_stage로 반드시 나눈다 —
+     * 원수사→GA와 GA→설계사 1,200%는 계산 규칙이 달라 합치면 안 된다. cap_check가
+     * (validation_run_id, contract_id, payment_stage)로 유일해(uq_cap_check_monthly)
+     * GROUP BY에서 빠지면 같은 계약의 두 지급단계 행이 하나로 합산된다.
+     */
+    @NativeQuery(value = """
+            SELECT ag.agent_id                                                    AS agentId,
+                   ag.agent_name                                                  AS agentName,
+                   cc.payment_stage                                               AS paymentStage,
+                   COUNT(*)                                                       AS checkedCount,
+                   COUNT(*) FILTER (WHERE cc.result_status = 'VIOLATION')         AS violationCount,
+                   COUNT(*) FILTER (WHERE cc.result_status = 'WARNING')           AS warningCount,
+                   COUNT(*) FILTER (WHERE cc.result_status = 'REVIEW_REQUIRED')   AS reviewRequiredCount
+              FROM fgc.cap_check cc
+              JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
+              JOIN fgc.agent ag ON ag.agent_id = ic.agent_id
+             WHERE cc.validation_run_id = :validationRunId
+             GROUP BY ag.agent_id, ag.agent_name, cc.payment_stage
+             ORDER BY ag.agent_id, cc.payment_stage
+            """, sqlResultSetMapping = "AgentCapMonitoringRowMapping")
+    List<AgentCapMonitoringRow> summarizeCapByAgent(@Param("validationRunId") Long validationRunId);
 }

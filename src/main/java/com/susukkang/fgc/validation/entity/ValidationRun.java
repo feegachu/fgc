@@ -1,7 +1,9 @@
 package com.susukkang.fgc.validation.entity;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.validation.dto.AgentCapMonitoringRow;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
+import com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow;
 import jakarta.persistence.Column;
 import jakarta.persistence.ColumnResult;
 import jakarta.persistence.ConstructorResult;
@@ -23,6 +25,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -47,6 +50,48 @@ import java.time.OffsetDateTime;
                 @ColumnResult(name = "unresolvedPolicyExceptionCount", type = Long.class),
                 @ColumnResult(name = "attributionImbalanceCount", type = Long.class),
                 @ColumnResult(name = "capDetailMismatchCount", type = Long.class)
+        }
+))
+@SqlResultSetMapping(name = "ValidationRunResultSummaryRowMapping", classes = @ConstructorResult(
+        targetClass = ValidationRunResultSummaryRow.class,
+        columns = {
+                @ColumnResult(name = "targetSelectedCount", type = Long.class),
+                @ColumnResult(name = "targetExcludedCount", type = Long.class),
+                @ColumnResult(name = "targetReviewRequiredCount", type = Long.class),
+                @ColumnResult(name = "capCheckedCount", type = Long.class),
+                @ColumnResult(name = "capViolationCount", type = Long.class),
+                @ColumnResult(name = "capWarningCount", type = Long.class),
+                @ColumnResult(name = "capReviewRequiredCount", type = Long.class),
+                @ColumnResult(name = "arbitrageCheckedCount", type = Long.class),
+                @ColumnResult(name = "arbitrageCandidateCount", type = Long.class),
+                @ColumnResult(name = "arbitrageReviewRequiredCount", type = Long.class),
+                @ColumnResult(name = "journalCount", type = Long.class),
+                @ColumnResult(name = "journalImbalanceCount", type = Long.class),
+                @ColumnResult(name = "reconciliationResultCount", type = Long.class),
+                @ColumnResult(name = "reconciliationMismatchCount", type = Long.class),
+                @ColumnResult(name = "scheduleGeneratedCount", type = Long.class),
+                @ColumnResult(name = "reconciliationMatchedCount", type = Long.class),
+                @ColumnResult(name = "reconciliationMismatchedCount", type = Long.class),
+                @ColumnResult(name = "reconciliationUnmatchedCount", type = Long.class),
+                @ColumnResult(name = "reconciliationDifferenceAmountTotal", type = BigDecimal.class),
+                @ColumnResult(name = "exceptionDetectedCount", type = Long.class),
+                @ColumnResult(name = "exceptionNewCount", type = Long.class),
+                @ColumnResult(name = "exceptionRecurringCount", type = Long.class),
+                @ColumnResult(name = "exceptionReopenedCount", type = Long.class),
+                @ColumnResult(name = "exceptionNotDetectedCount", type = Long.class),
+                @ColumnResult(name = "exceptionOpenWorkItemCount", type = Long.class)
+        }
+))
+@SqlResultSetMapping(name = "AgentCapMonitoringRowMapping", classes = @ConstructorResult(
+        targetClass = AgentCapMonitoringRow.class,
+        columns = {
+                @ColumnResult(name = "agentId", type = Long.class),
+                @ColumnResult(name = "agentName", type = String.class),
+                @ColumnResult(name = "paymentStage", type = String.class),
+                @ColumnResult(name = "checkedCount", type = Long.class),
+                @ColumnResult(name = "violationCount", type = Long.class),
+                @ColumnResult(name = "warningCount", type = Long.class),
+                @ColumnResult(name = "reviewRequiredCount", type = Long.class)
         }
 ))
 @Table(
