@@ -2,13 +2,13 @@ package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.MonthlyValidationJobExecutionListener;
 import com.susukkang.fgc.validation.batch.ValidationRunStepProgressListener;
-import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
-import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.BatchWatermarkRepository;
+import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -47,17 +47,17 @@ public class DailyChangedContractJobConfig {
 
     private static final int CHUNK_SIZE = 100;
 
-    private final ValidationRunMapper validationRunMapper;
+    private final ValidationRunRepository validationRunRepository;
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunTransitionService validationRunTransitionService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
-    private final BatchWatermarkMapper batchWatermarkMapper;
+    private final BatchWatermarkRepository batchWatermarkRepository;
     private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
-    private final ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
-    private final ExceptionCaseMapper exceptionCaseMapper;
+    private final ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
+    private final ExceptionCaseRepository exceptionCaseRepository;
 
     @Bean
     public Job dailyChangedContractJob(JobRepository jobRepository,
@@ -74,12 +74,12 @@ public class DailyChangedContractJobConfig {
     @Bean
     public Step createDailyRunStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         CreateDailyRunTasklet tasklet = new CreateDailyRunTasklet(
-                validationRunMapper,
+                validationRunRepository,
                 validationRunCreateService,
                 validationRunTransitionService,
                 validationRunBatchLifecycleService,
                 validationRunBatchAuditService,
-                batchWatermarkMapper);
+                batchWatermarkRepository);
         return new StepBuilder("createDailyRunStep", jobRepository)
                 .tasklet(tasklet, transactionManager)
                 .build();
@@ -95,7 +95,7 @@ public class DailyChangedContractJobConfig {
                 .processor(changedContractItemProcessor())
                 .writer(changedContractItemWriter())
                 .listener(progressListener(2, false))
-                .listener(new WatermarkAdvanceStepListener(batchWatermarkMapper))
+                .listener(new WatermarkAdvanceStepListener(batchWatermarkRepository))
                 .build();
     }
 
@@ -151,12 +151,12 @@ public class DailyChangedContractJobConfig {
                 insuranceContractRepository,
                 scheduleService,
                 capCheckService,
-                contractStatusEventProcessingMapper
+                contractStatusEventProcessingRepository
         );
     }
 
     private ChangedContractItemWriter changedContractItemWriter() {
-        return new ChangedContractItemWriter(contractStatusEventProcessingMapper, exceptionCaseMapper);
+        return new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository);
     }
 
     private ValidationRunStepProgressListener progressListener(int stepNo, boolean initialStep) {

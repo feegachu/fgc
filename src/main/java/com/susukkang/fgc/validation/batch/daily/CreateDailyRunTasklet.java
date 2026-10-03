@@ -4,12 +4,13 @@ import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
-import com.susukkang.fgc.validation.dto.BatchWatermarkRow;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.entity.BatchWatermark;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.validation.repository.BatchWatermarkRepository;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -22,6 +23,7 @@ import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 
 /**
  * DailyChangedContractJob의 1번째 Step
@@ -30,12 +32,12 @@ import java.time.OffsetDateTime;
 @RequiredArgsConstructor
 public class CreateDailyRunTasklet implements Tasklet {
 
-    private final ValidationRunMapper validationRunMapper;
+    private final ValidationRunRepository validationRunRepository;
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunTransitionService validationRunTransitionService;
     private final ValidationRunBatchLifecycleService lifecycleService;
     private final ValidationRunBatchAuditService auditService;
-    private final BatchWatermarkMapper batchWatermarkMapper;
+    private final BatchWatermarkRepository batchWatermarkRepository;
 
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
@@ -63,8 +65,11 @@ public class CreateDailyRunTasklet implements Tasklet {
         // 있으므로 findByJobNameAndStepName은 null을 반환하지 않는다(운영 정책서 §9-1: watermark
         // 행은 배치가 최초 실행되기 전에 이미 만들어져 있어야 함). batch_watermark의 PK가
         // (job_name, step_name)이라(V2_1 마이그레이션) 두 값을 모두 넘긴다.
-        BatchWatermarkRow watermark = batchWatermarkMapper.findByJobNameAndStepName(
-                DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME);
+        BatchWatermark watermark = batchWatermarkRepository.findByJobNameAndStepName(
+                        DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME)
+                .orElseThrow(() -> new IllegalStateException(
+                        "batch_watermark 시드 행이 없습니다(job_name=" + DailyChangedContractJobNames.JOB_NAME
+                                + ", step_name=" + DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME + ")"));
         DailyBatchContext.putLastProcessedAt(chunkContext, watermark.getLastProcessedAt());
 
         // watermark를 이번 실행이 끝난 뒤 어디로 전진시킬지는 "이 Step이 실행되기 시작한 시각"으로
@@ -78,8 +83,10 @@ public class CreateDailyRunTasklet implements Tasklet {
     private Long resolveOrCreateTodaysRun(MonthlyValidationJobParameters params, OffsetDateTime now) {
         OffsetDateTime dayStart = now.toLocalDate().atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime();
         OffsetDateTime dayEnd = dayStart.plusDays(1);
-        ValidationRunRow existing = validationRunMapper.findManualContractRunCreatedBetween(dayStart, dayEnd);
-        return existing == null ? createAndStart(params) : reuseOrRecreate(existing, params);
+        Optional<ValidationRun> existing = validationRunRepository
+                .findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                        ValidationRunType.MANUAL_CONTRACT.name(), dayStart, dayEnd);
+        return existing.isEmpty() ? createAndStart(params) : reuseOrRecreate(existing.get(), params);
     }
 
     /**
@@ -89,16 +96,16 @@ public class CreateDailyRunTasklet implements Tasklet {
      * 경쟁을 여기서 한 번 더 막는다(MonthlyValidationJobTrigger.runOrWrap()과 같은 패턴).
      */
     private Long resumeRequestedRun(Long validationRunId, MonthlyValidationJobParameters params) {
-        ValidationRunRow requested = validationRunMapper.findById(validationRunId);
-        if (requested == null
-                || !ValidationRunType.MANUAL_CONTRACT.name().equals(requested.getRunType())
-                || !ValidationRunStatus.CREATED.name().equals(requested.getStatus())) {
+        Optional<ValidationRun> requested = validationRunRepository.findById(validationRunId);
+        if (requested.isEmpty()
+                || !ValidationRunType.MANUAL_CONTRACT.name().equals(requested.get().getRunType())
+                || requested.get().getStatus() != ValidationRunStatus.CREATED) {
             throw new IllegalStateException("validation_run " + validationRunId
                     + " 은 수동 재실행 대상이 아닙니다(runType=계약수동·status=CREATED 이어야 함, 실제 status="
-                    + (requested == null ? "삭제됨" : requested.getStatus()) + ")");
+                    + (requested.isEmpty() ? "삭제됨" : requested.get().getStatus()) + ")");
         }
-        lifecycleService.start(requested.getValidationRunId(), params);
-        return requested.getValidationRunId();
+        lifecycleService.start(requested.get().getValidationRunId(), params);
+        return requested.get().getValidationRunId();
     }
 
     private Long createAndStart(MonthlyValidationJobParameters params) {
@@ -109,8 +116,8 @@ public class CreateDailyRunTasklet implements Tasklet {
         return created.getValidationRunId();
     }
 
-    private Long reuseOrRecreate(ValidationRunRow existing, MonthlyValidationJobParameters params) {
-        ValidationRunStatus status = ValidationRunStatus.valueOf(existing.getStatus());
+    private Long reuseOrRecreate(ValidationRun existing, MonthlyValidationJobParameters params) {
+        ValidationRunStatus status = existing.getStatus();
         return switch (status) {
             // CREATED는 lifecycleService.start()로 보낸다 — transitionToRunning()이 CREATED만
             // 받아주고, current_step=1·started_at·감사로그까지 한 번에 해주기 때문이다.

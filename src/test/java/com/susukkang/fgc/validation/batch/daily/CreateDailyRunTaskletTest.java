@@ -1,11 +1,13 @@
 package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
-import com.susukkang.fgc.validation.dto.BatchWatermarkRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.entity.BatchWatermark;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.validation.repository.BatchWatermarkRepository;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -23,8 +25,11 @@ import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.scope.context.StepContext;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,7 +47,7 @@ import static org.mockito.Mockito.verify;
 class CreateDailyRunTaskletTest {
 
     @Mock
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
     @Mock
     private ValidationRunCreateService validationRunCreateService;
     @Mock
@@ -52,7 +57,7 @@ class CreateDailyRunTaskletTest {
     @Mock
     private ValidationRunBatchAuditService auditService;
     @Mock
-    private BatchWatermarkMapper batchWatermarkMapper;
+    private BatchWatermarkRepository batchWatermarkRepository;
 
     private CreateDailyRunTasklet tasklet;
     private final OffsetDateTime seededWatermark = OffsetDateTime.parse("2026-07-01T00:00:00+09:00");
@@ -60,17 +65,32 @@ class CreateDailyRunTaskletTest {
     @BeforeEach
     void setUp() {
         tasklet = new CreateDailyRunTasklet(
-                validationRunMapper, validationRunCreateService, validationRunTransitionService,
-                lifecycleService, auditService, batchWatermarkMapper);
+                validationRunRepository, validationRunCreateService, validationRunTransitionService,
+                lifecycleService, auditService, batchWatermarkRepository);
 
-        BatchWatermarkRow watermark = new BatchWatermarkRow();
-        watermark.setJobName(DailyChangedContractJobNames.JOB_NAME);
-        watermark.setLastProcessedAt(seededWatermark);
+        BatchWatermark watermark = watermark(seededWatermark);
         // lenient — 요청된 validationRunId가 재실행 대상이 아니어서 조기 실패하는 테스트들은
         // 이 지점까지 도달하지 않아 스텁이 안 쓰인다.
-        org.mockito.Mockito.lenient().when(batchWatermarkMapper.findByJobNameAndStepName(
+        org.mockito.Mockito.lenient().when(batchWatermarkRepository.findByJobNameAndStepName(
                         DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME))
-                .thenReturn(watermark);
+                .thenReturn(Optional.of(watermark));
+    }
+
+    private BatchWatermark watermark(OffsetDateTime lastProcessedAt) {
+        // BatchWatermark의 no-arg 생성자는 Hibernate용 protected라 테스트 패키지에서
+        // 직접 new 할 수 없다 — 리플렉션으로 인스턴스를 만들고 필드를 채운다.
+        BatchWatermark watermark;
+        try {
+            var ctor = BatchWatermark.class.getDeclaredConstructor();
+            ctor.setAccessible(true);
+            watermark = ctor.newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+        ReflectionTestUtils.setField(watermark, "jobName", DailyChangedContractJobNames.JOB_NAME);
+        ReflectionTestUtils.setField(watermark, "stepName", DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME);
+        ReflectionTestUtils.setField(watermark, "lastProcessedAt", lastProcessedAt);
+        return watermark;
     }
 
     private ChunkContext newChunkContext() {
@@ -93,22 +113,44 @@ class CreateDailyRunTaskletTest {
         return new ChunkContext(new StepContext(stepExecution));
     }
 
-    private ValidationRunRow runWithStatus(ValidationRunStatus status) {
-        return runWithStatus(status, "MANUAL_CONTRACT");
+    private ValidationRunRow runRowWithStatus(ValidationRunStatus status) {
+        return runRowWithStatus(status, "MANUAL_CONTRACT");
     }
 
-    private ValidationRunRow runWithStatus(ValidationRunStatus status, String runType) {
+    private ValidationRunRow runRowWithStatus(ValidationRunStatus status, String runType) {
         ValidationRunRow row = new ValidationRunRow();
-        row.setValidationRunId(42L);
+        row.setValidationRunId(99L);
         row.setRunType(runType);
         row.setStatus(status.name());
         return row;
     }
 
+    private ValidationRun entityWithStatus(Long id, ValidationRunStatus status) {
+        return entityWithStatus(id, status, "MANUAL_CONTRACT");
+    }
+
+    private ValidationRun entityWithStatus(Long id, ValidationRunStatus status, String runType) {
+        ValidationRun run = ValidationRun.builder()
+                .validationMonth(LocalDate.of(2026, 8, 1))
+                .runNo(1)
+                .runType(runType)
+                .triggeredBy(1L)
+                .build();
+        ReflectionTestUtils.setField(run, "validationRunId", id);
+        ReflectionTestUtils.setField(run, "status", status);
+        return run;
+    }
+
+    private Optional<ValidationRun> noExistingRun() {
+        return Optional.empty();
+    }
+
     @Test
     void noExistingRunTodayCreatesAndStartsNewRun() {
-        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any())).willReturn(null);
-        ValidationRunRow created = runWithStatus(ValidationRunStatus.CREATED);
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any())).willReturn(noExistingRun());
+        ValidationRunRow created = runRowWithStatus(ValidationRunStatus.CREATED);
+        created.setValidationRunId(42L);
         given(validationRunCreateService.create(any())).willReturn(created);
 
         ChunkContext chunkContext = newChunkContext();
@@ -121,8 +163,9 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingCreatedRunIsStarted() {
-        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))
-                .willReturn(runWithStatus(ValidationRunStatus.CREATED));
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.CREATED)));
 
         tasklet.execute(null, newChunkContext());
 
@@ -132,8 +175,9 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingFailedRunIsRetriedViaTransition() {
-        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))
-                .willReturn(runWithStatus(ValidationRunStatus.FAILED));
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.FAILED)));
 
         tasklet.execute(null, newChunkContext());
 
@@ -146,8 +190,9 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingRunningRunIsReusedAsIs() {
-        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))
-                .willReturn(runWithStatus(ValidationRunStatus.RUNNING));
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.RUNNING)));
 
         ChunkContext chunkContext = newChunkContext();
         tasklet.execute(null, chunkContext);
@@ -159,9 +204,10 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingCompletedRunCausesFreshRunToBeCreated() {
-        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))
-                .willReturn(runWithStatus(ValidationRunStatus.COMPLETED));
-        ValidationRunRow freshRun = runWithStatus(ValidationRunStatus.CREATED);
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.COMPLETED)));
+        ValidationRunRow freshRun = runRowWithStatus(ValidationRunStatus.CREATED);
         freshRun.setValidationRunId(99L);
         given(validationRunCreateService.create(any())).willReturn(freshRun);
 
@@ -178,9 +224,10 @@ class CreateDailyRunTaskletTest {
     // 나누면서 FINALIZED 케이스를 실수로 빠뜨리는 회귀를 잡기 위해 별도로 고정해 둔다.
     @Test
     void existingFinalizedRunCausesFreshRunToBeCreatedWithoutTouchingTheFinalizedRow() {
-        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))
-                .willReturn(runWithStatus(ValidationRunStatus.FINALIZED));
-        ValidationRunRow freshRun = runWithStatus(ValidationRunStatus.CREATED);
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.FINALIZED)));
+        ValidationRunRow freshRun = runRowWithStatus(ValidationRunStatus.CREATED);
         freshRun.setValidationRunId(77L);
         given(validationRunCreateService.create(any())).willReturn(freshRun);
 
@@ -197,22 +244,25 @@ class CreateDailyRunTaskletTest {
     /** validationRunId가 지정되면 날짜창 조회 없이 그 행을 바로 이어받는다(코드리뷰 반영). */
     @Test
     void requestedValidationRunIdResumesThatRowDirectly() {
-        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.CREATED));
+        given(validationRunRepository.findById(42L))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.CREATED)));
 
         ChunkContext chunkContext = newChunkContext(42L);
         RepeatStatus result = tasklet.execute(null, chunkContext);
 
         assertThat(result).isEqualTo(RepeatStatus.FINISHED);
         verify(lifecycleService).start(eq(42L), any());
-        verify(validationRunMapper, never()).findManualContractRunCreatedBetween(any(), any());
+        verify(validationRunRepository, never())
+                .findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(any(), any(), any());
         assertThat(ValidationRunBatchContext.getValidationRunId(chunkContext)).isEqualTo(42L);
     }
 
     /** 지정된 행이 오늘 생성분이 아니어도(=날짜창 조회로는 못 찾는 행이어도) 그대로 이어받는다. */
     @Test
     void requestedValidationRunIdResumesRowNotCreatedToday() {
-        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.CREATED));
-        // 날짜창 조회는 아예 스텁하지 않는다 — 호출되면 Mockito가 null을 돌려주므로
+        given(validationRunRepository.findById(42L))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.CREATED)));
+        // 날짜창 조회는 아예 스텁하지 않는다 — 호출되면 Mockito가 empty를 돌려주므로
         // resolveOrCreateTodaysRun 경로로 잘못 빠지면 이 테스트가 실패한다(create 미스텁이라 NPE).
 
         tasklet.execute(null, newChunkContext(42L));
@@ -224,7 +274,8 @@ class CreateDailyRunTaskletTest {
     /** 지정된 행이 이미 다른 상태로 넘어갔으면(경쟁 등) 조용히 다른 행을 만들지 않고 명확히 실패한다. */
     @Test
     void requestedValidationRunIdThatIsNoLongerCreatedFailsLoudly() {
-        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.RUNNING));
+        given(validationRunRepository.findById(42L))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.RUNNING)));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> tasklet.execute(null, newChunkContext(42L)))
                 .isInstanceOf(IllegalStateException.class);
@@ -236,7 +287,8 @@ class CreateDailyRunTaskletTest {
     /** 지정된 행이 MANUAL_CONTRACT가 아니면(운영 실수로 잘못된 id가 넘어온 경우) 명확히 실패한다. */
     @Test
     void requestedValidationRunIdWithWrongRunTypeFailsLoudly() {
-        given(validationRunMapper.findById(42L)).willReturn(runWithStatus(ValidationRunStatus.CREATED, "MONTHLY"));
+        given(validationRunRepository.findById(42L))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.CREATED, "MONTHLY")));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> tasklet.execute(null, newChunkContext(42L)))
                 .isInstanceOf(IllegalStateException.class);
@@ -246,8 +298,9 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void watermarkAndRunStartedAtAreStoredInJobExecutionContext() {
-        given(validationRunMapper.findManualContractRunCreatedBetween(any(), any()))
-                .willReturn(runWithStatus(ValidationRunStatus.RUNNING));
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
+                .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.RUNNING)));
 
         ChunkContext chunkContext = newChunkContext();
         tasklet.execute(null, chunkContext);

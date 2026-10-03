@@ -9,8 +9,8 @@ import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.dto.ValidationScheduleState;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
-import com.susukkang.fgc.validation.mapper.ValidationScheduleMapper;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,10 +32,10 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class ValidationRunScheduleServiceTest {
 
-    @Mock ValidationScheduleMapper validationScheduleMapper;
+    @Mock ValidationTargetRepository validationTargetRepository;
     @Mock CommissionPolicyService commissionPolicyService;
     @Mock ScheduleMapper scheduleMapper;
-    @Mock ExceptionCaseMapper exceptionCaseMapper;
+    @Mock ExceptionCaseRepository exceptionCaseRepository;
     @Mock ScheduleRegenerationBatchItemService itemService;
 
     private ValidationRunScheduleService service;
@@ -43,16 +43,16 @@ class ValidationRunScheduleServiceTest {
     @BeforeEach
     void setUp() {
         service = new ValidationRunScheduleService(
-                validationScheduleMapper,
+                validationTargetRepository,
                 commissionPolicyService,
                 scheduleMapper,
-                exceptionCaseMapper,
+                exceptionCaseRepository,
                 itemService);
     }
 
     @Test
     void delegatesValidContractToExistingScheduleServiceWithValidationRunId() {
-        given(validationScheduleMapper.selectScheduleStates(118L))
+        given(validationTargetRepository.selectScheduleStates(118L))
                 .willReturn(List.of(validState(10L, PaymentStage.INSURER_TO_GA),
                         validState(10L, PaymentStage.GA_TO_FC)));
         given(itemService.process(10L, 118L))
@@ -73,14 +73,14 @@ class ValidationRunScheduleServiceTest {
     void skipsContractWithDuplicateActiveHeaderAndCreatesException() {
         ValidationScheduleState duplicate = validState(10L, PaymentStage.GA_TO_FC);
         duplicate.setActiveHeaderCount(2);
-        given(validationScheduleMapper.selectScheduleStates(118L))
+        given(validationTargetRepository.selectScheduleStates(118L))
                 .willReturn(List.of(duplicate));
 
         StepProcessingResult result = service.validateContractSchedules(118L);
 
         assertThat(result.skippedCount()).isEqualTo(1);
         assertThat(result.skips().getFirst().reasonCode()).isEqualTo("DATA_QUALITY");
-        verify(exceptionCaseMapper).insertDataQualityCase(
+        verify(exceptionCaseRepository).insertDataQualityCase(
                 118L, 10L, "예상 스케줄 정합성 오류",
                 "GA_TO_FC 활성 OPERATIONAL 스케줄 헤더가 중복되었습니다.");
         verify(itemService, never()).process(any(), any());
@@ -88,7 +88,7 @@ class ValidationRunScheduleServiceTest {
 
     @Test
     void skipsContractWhenApplicablePolicyIsMissing() {
-        given(validationScheduleMapper.selectScheduleStates(118L))
+        given(validationTargetRepository.selectScheduleStates(118L))
                 .willReturn(List.of(validState(10L, PaymentStage.GA_TO_FC)));
         given(commissionPolicyService.resolveCurrentCommission(
                 10L, PaymentStage.INSURER_TO_GA))
@@ -108,7 +108,7 @@ class ValidationRunScheduleServiceTest {
 
     @Test
     void continuesWithNextContractWhenOneScheduleRegenerationFails() {
-        given(validationScheduleMapper.selectScheduleStates(118L))
+        given(validationTargetRepository.selectScheduleStates(118L))
                 .willReturn(List.of(
                         validState(10L, PaymentStage.INSURER_TO_GA),
                         validState(10L, PaymentStage.GA_TO_FC),
@@ -130,7 +130,7 @@ class ValidationRunScheduleServiceTest {
         // 스케줄 생성 실패는 무음 스킵이 아니라 예외함에 떠야 한다.
         // 직급 공석 등으로 수취인을 찾지 못하면 계약 전체의 예상 스케줄이 0행이 되는데,
         // 케이스를 남기지 않으면 담당자가 그 사실을 알 수 없고 대사가 엉뚱한 판정을 낸다.
-        verify(exceptionCaseMapper).insertDataQualityCase(
+        verify(exceptionCaseRepository).insertDataQualityCase(
                 eq(118L), eq(10L), eq("예상 스케줄 생성 실패"), any());
         verify(itemService).process(10L, 118L);
         verify(itemService).process(20L, 118L);
