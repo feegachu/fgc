@@ -1,8 +1,11 @@
 package com.susukkang.fgc.validation.repository;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -49,6 +52,33 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
      * uq_validation_run_active_manual_contract(V13)의 애플리케이션측 사전 확인용 — month로 좁히지 않는다.
      */
     boolean existsByRunTypeAndStatusIn(String runType, Collection<ValidationRunStatus> statuses);
+
+    /**
+     * FGC-FUN-041 목록 조회. month/status는 null이면 그 조건을 걸지 않는다.
+     * Pageable에 Sort를 주지 않아야 한다 — 쿼리 자체에 고정 ORDER BY가 있어 동적 정렬과
+     * 충돌한다. 목록/전체건수를 Page 하나로 묶어 기존 search+count 두 메서드를 대체한다.
+     */
+    @Query(value = """
+            SELECT new com.susukkang.fgc.validation.dto.ValidationRunListRow(
+                v.validationRunId, v.validationMonth, v.runNo, v.runType,
+                CAST(v.status AS string), v.currentStep,
+                triggered.loginId, v.startedAt, v.completedAt,
+                finalized.loginId, v.finalizedAt, v.failureMessage)
+            FROM ValidationRun v
+            LEFT JOIN AppUser triggered ON triggered.userId = v.triggeredBy
+            LEFT JOIN AppUser finalized ON finalized.userId = v.finalizedBy
+            WHERE (CAST(:month AS LocalDate) IS NULL OR v.validationMonth = :month)
+              AND (:status IS NULL OR v.status = :status)
+            ORDER BY v.validationMonth DESC, v.runNo DESC
+            """,
+            countQuery = """
+            SELECT COUNT(v) FROM ValidationRun v
+            WHERE (CAST(:month AS LocalDate) IS NULL OR v.validationMonth = :month)
+              AND (:status IS NULL OR v.status = :status)
+            """)
+    Page<ValidationRunListRow> search(@Param("month") LocalDate month,
+                                       @Param("status") ValidationRunStatus status,
+                                       Pageable pageable);
 
     /**
      * DailyChangedContractJob "하루 1건" 규칙 지원용 — [dayStart, dayEnd) 구간의 최근(run_no 최대) 1건.

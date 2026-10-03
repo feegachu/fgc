@@ -1,11 +1,14 @@
 package com.susukkang.fgc.validation.repository;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -362,5 +365,98 @@ class ValidationRunRepositoryIntegrationTest {
                 VALUES (?, 'test-only', '확정 테스트 사용자', (SELECT min(role_id) FROM fgc.app_role))
                 RETURNING user_id
                 """, Long.class, loginId);
+    }
+
+    // ── #41 목록 조회(search) — ValidationRunMapperIntegrationTest의 search/count와 같은 시나리오 ──
+
+    @Test
+    void searchFiltersByMonth() {
+        insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        insertCreatedRun(LocalDate.of(2026, 10, 1), 1);
+
+        Page<ValidationRunListRow> page = validationRunRepository.search(
+                LocalDate.of(2026, 9, 1), null, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getValidationMonth()).isEqualTo(LocalDate.of(2026, 9, 1));
+    }
+
+    @Test
+    void searchFiltersByStatus() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        Long runningId = insertCreatedRun(month, 1);
+        validationRunRepository.updateStatusIfCurrent(runningId, CREATED, RUNNING);
+        // uq_validation_run_active_month는 월당 활성(CREATED/RUNNING) MONTHLY 실행을 1건만
+        // 허용한다 — 위에서 이미 RUNNING 하나를 썼으니 두 번째는 MANUAL_CONTRACT로 넣는다.
+        insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+
+        Page<ValidationRunListRow> page = validationRunRepository.search(
+                month, RUNNING, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getValidationRunId()).isEqualTo(runningId);
+        assertThat(page.getContent().get(0).getStatus()).isEqualTo("RUNNING");
+    }
+
+    @Test
+    void searchReturnsEmptyPageWhenNoMatch() {
+        LocalDate maxMonth = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(validation_month), DATE '2026-01-01') FROM fgc.validation_run",
+                LocalDate.class);
+        LocalDate unusedMonth = maxMonth.plusYears(100).withDayOfMonth(1);
+
+        Page<ValidationRunListRow> page = validationRunRepository.search(
+                unusedMonth, null, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).isEmpty();
+        assertThat(page.getTotalElements()).isZero();
+    }
+
+    @Test
+    void searchAndCountReturnAllRowsWhenNoFilterGiven() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        Long firstId = insertCreatedRun(month, 1);
+        // uq_validation_run_active_month 때문에 같은 달 두 번째 MONTHLY 활성 실행은 못 넣는다.
+        Long secondId = insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+
+        Page<ValidationRunListRow> page = validationRunRepository.search(null, null, PageRequest.of(0, 1000));
+
+        assertThat(page.getContent()).extracting(ValidationRunListRow::getValidationRunId)
+                .contains(firstId, secondId);
+        assertThat(page.getTotalElements()).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void searchRespectsPageableOffsetAndLimit() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        insertCreatedRun(month, 1);
+        insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+        insertCreatedRun(month, 3, "PRE_CONFIRM");
+
+        Page<ValidationRunListRow> page = validationRunRepository.search(month, null, PageRequest.of(1, 1));
+
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getRunNo()).isEqualTo(2);
+    }
+
+    @Test
+    void searchJoinsTriggeredAndFinalizedLoginIds() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        Long triggeredByUserId = insertAppUser("triggerer-1");
+        Long finalizedByUserId = insertAppUser("finalizer-4");
+        Long id = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status, triggered_by)
+                VALUES (?, 1, 'MONTHLY', 'CREATED', ?)
+                RETURNING validation_run_id
+                """, Long.class, month, triggeredByUserId);
+        validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+        validationRunRepository.transitionToCompleted(id, RUNNING, COMPLETED);
+        validationRunRepository.finalizeIfCompleted(id, finalizedByUserId, "idem-key-search-1", COMPLETED, FINALIZED);
+
+        Page<ValidationRunListRow> page = validationRunRepository.search(month, FINALIZED, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getTriggeredBy()).isEqualTo("triggerer-1");
+        assertThat(page.getContent().get(0).getFinalizedBy()).isEqualTo("finalizer-4");
     }
 }
