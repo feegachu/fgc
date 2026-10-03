@@ -14,7 +14,9 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
@@ -90,7 +92,11 @@ public class ValidationRun {
     @Column(name = "finalize_idempotency_key", length = 160)
     private String finalizeIdempotencyKey;
 
-    // 생성·수정 시각은 DB 기본값(clock_timestamp())으로만 채워진다.
+    // 생성 시각은 DB 기본값(clock_timestamp())으로만 채워진다. @Generated가 없으면 save()
+    // 직후의 createdAt은 null로 남는다 — INSERT 뒤 findById를 다시 불러도 1차 캐시가 이미
+    // 관리 중인 같은 인스턴스를 그대로 돌려줘서 갱신되지 않는다(Hibernate 세션 identity map).
+    // @Generated(INSERT)는 INSERT 직후 Hibernate가 이 컬럼만 자동으로 재조회해 채워준다.
+    @Generated(event = EventType.INSERT)
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
