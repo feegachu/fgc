@@ -7,7 +7,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
-import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
+import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +45,7 @@ class ChangedContractItemProcessorTest {
     @Mock
     private CapCheckService capCheckService;
     @Mock
-    private ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
+    private ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
 
     private ChangedContractItemProcessor processor;
     private final OffsetDateTime watermark = OffsetDateTime.parse("2026-08-10T02:00:00+09:00");
@@ -53,7 +53,7 @@ class ChangedContractItemProcessorTest {
     @BeforeEach
     void setUp() {
         processor = new ChangedContractItemProcessor(
-                insuranceContractRepository, scheduleService, capCheckService, contractStatusEventProcessingMapper);
+                insuranceContractRepository, scheduleService, capCheckService, contractStatusEventProcessingRepository);
 
         JobExecution jobExecution = new JobExecution(
                 new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), new JobParameters());
@@ -74,7 +74,7 @@ class ChangedContractItemProcessorTest {
     @Test
     void pendingStatusEventTriggersScheduleRegenerationAndChecksBothPaymentStages() {
         given(insuranceContractRepository.findById(1L)).willReturn(Optional.of(contract(1L)));
-        given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of(100L));
 
         ChangedContractResult result = processor.process(1L);
@@ -98,7 +98,7 @@ class ChangedContractItemProcessorTest {
     @Test
     void noPendingStatusEventSkipsScheduleRegenerationButStillChecksCap() {
         given(insuranceContractRepository.findById(1L)).willReturn(Optional.of(contract(1L)));
-        given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of());
 
         ChangedContractResult result = processor.process(1L);
@@ -117,7 +117,7 @@ class ChangedContractItemProcessorTest {
         InsuranceContract contract = contract(1L);
         ReflectionTestUtils.setField(contract, "updatedAt", watermark.plusHours(1));
         given(insuranceContractRepository.findById(1L)).willReturn(Optional.of(contract));
-        given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of());
 
         ChangedContractResult result = processor.process(1L);
@@ -139,7 +139,7 @@ class ChangedContractItemProcessorTest {
     @Test
     void businessExceptionDuringScheduleGenerationIsTreatedAsDataQualitySkipNotStepFailure() {
         given(insuranceContractRepository.findById(3L)).willReturn(Optional.of(contract(3L)));
-        given(contractStatusEventProcessingMapper.findPendingEventIds(anyLong(), anyString()))
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of(100L));
         willThrow(new FgcBusinessException(FgcErrorCode.CONT_001, Map.of()))
                 .given(scheduleService).generateSchedulesInNewTransaction(any());

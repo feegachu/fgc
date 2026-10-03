@@ -1,7 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
-import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
+import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,15 +28,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class ChangedContractItemWriterTest {
 
     @Mock
-    private ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
+    private ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
     @Mock
-    private ExceptionCaseMapper exceptionCaseMapper;
+    private ExceptionCaseRepository exceptionCaseRepository;
 
     private ChangedContractItemWriter writer;
 
     @BeforeEach
     void setUp() {
-        writer = new ChangedContractItemWriter(contractStatusEventProcessingMapper, exceptionCaseMapper);
+        writer = new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository);
 
         JobExecution jobExecution = new JobExecution(
                 new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), new JobParameters());
@@ -50,9 +50,9 @@ class ChangedContractItemWriterTest {
         // 쓴다(TOCTOU 레이스 방지, 코드리뷰 반영) — 그래서 결과 자체에 담아 전달한다.
         writer.write(new Chunk<>(List.of(ChangedContractResult.success(1L, List.of(10L, 11L)))));
 
-        verify(contractStatusEventProcessingMapper).insertProcessing(10L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
-        verify(contractStatusEventProcessingMapper).insertProcessing(11L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
-        verifyNoInteractions(exceptionCaseMapper);
+        verify(contractStatusEventProcessingRepository).insertProcessing(10L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
+        verify(contractStatusEventProcessingRepository).insertProcessing(11L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
+        verifyNoInteractions(exceptionCaseRepository);
     }
 
     @Test
@@ -60,7 +60,7 @@ class ChangedContractItemWriterTest {
         writer.write(new Chunk<>(List.of(
                 ChangedContractResult.dataQualitySkip(2L, "FGC-CONT-001", List.of(20L)))));
 
-        verify(exceptionCaseMapper).insertDataQualityCase(eq(777L), eq(2L), eq("일일 변경 계약 재검증 실패"), eq("FGC-CONT-001"));
-        verify(contractStatusEventProcessingMapper).insertProcessing(20L, DailyChangedContractJobNames.JOB_NAME, "FAILED", 777L, "FGC-CONT-001");
+        verify(exceptionCaseRepository).insertDataQualityCase(eq(777L), eq(2L), eq("일일 변경 계약 재검증 실패"), eq("FGC-CONT-001"));
+        verify(contractStatusEventProcessingRepository).insertProcessing(20L, DailyChangedContractJobNames.JOB_NAME, "FAILED", 777L, "FGC-CONT-001");
     }
 }
