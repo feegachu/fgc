@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
@@ -11,6 +13,8 @@ import java.time.OffsetDateTime;
  */
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class ValidationRunListRow {
     private Long validationRunId;
     private LocalDate validationMonth;
