@@ -5,10 +5,10 @@ import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.MonthlyValidationJobExecutionListener;
 import com.susukkang.fgc.validation.batch.ValidationRunStepProgressListener;
-import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
 import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
 import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.BatchWatermarkRepository;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
@@ -47,12 +47,12 @@ public class DailyChangedContractJobConfig {
 
     private static final int CHUNK_SIZE = 100;
 
-    private final ValidationRunMapper validationRunMapper;
+    private final ValidationRunRepository validationRunRepository;
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunTransitionService validationRunTransitionService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
-    private final BatchWatermarkMapper batchWatermarkMapper;
+    private final BatchWatermarkRepository batchWatermarkRepository;
     private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
@@ -74,12 +74,12 @@ public class DailyChangedContractJobConfig {
     @Bean
     public Step createDailyRunStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         CreateDailyRunTasklet tasklet = new CreateDailyRunTasklet(
-                validationRunMapper,
+                validationRunRepository,
                 validationRunCreateService,
                 validationRunTransitionService,
                 validationRunBatchLifecycleService,
                 validationRunBatchAuditService,
-                batchWatermarkMapper);
+                batchWatermarkRepository);
         return new StepBuilder("createDailyRunStep", jobRepository)
                 .tasklet(tasklet, transactionManager)
                 .build();
@@ -95,7 +95,7 @@ public class DailyChangedContractJobConfig {
                 .processor(changedContractItemProcessor())
                 .writer(changedContractItemWriter())
                 .listener(progressListener(2, false))
-                .listener(new WatermarkAdvanceStepListener(batchWatermarkMapper))
+                .listener(new WatermarkAdvanceStepListener(batchWatermarkRepository))
                 .build();
     }
 

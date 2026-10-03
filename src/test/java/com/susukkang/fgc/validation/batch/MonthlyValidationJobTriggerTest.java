@@ -1,7 +1,9 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,8 +15,10 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.concurrent.CompletionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +45,7 @@ class MonthlyValidationJobTriggerTest {
     private JobLauncher jobLauncher;
 
     @Mock
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
 
     @InjectMocks
     private MonthlyValidationJobTrigger trigger;
@@ -62,10 +66,22 @@ class MonthlyValidationJobTriggerTest {
         return row;
     }
 
+    private ValidationRun entity(ValidationRunStatus status) {
+        ValidationRun run = ValidationRun.builder()
+                .validationMonth(LocalDate.of(2026, 7, 1))
+                .runNo(2)
+                .runType("MONTHLY")
+                .triggeredBy(7L)
+                .build();
+        ReflectionTestUtils.setField(run, "validationRunId", 100L);
+        ReflectionTestUtils.setField(run, "status", status);
+        return run;
+    }
+
     @Test
     void buildsJobParametersFromRowValues() throws Exception {
         ValidationRunRow created = row("CREATED");
-        given(validationRunMapper.findById(100L)).willReturn(created);
+        given(validationRunRepository.findById(100L)).willReturn(Optional.of(entity(ValidationRunStatus.CREATED)));
         given(jobLauncher.run(eq(monthlyValidationJob), any())).willReturn(mock(JobExecution.class));
 
         trigger.launch(created, "20260817-abc123").join();
@@ -84,7 +100,7 @@ class MonthlyValidationJobTriggerTest {
     void skipsLaunchWhenRunIsNoLongerCreated() throws Exception {
         ValidationRunRow created = row("CREATED");
         // API guard 통과 후 executor 태스크가 돌기 전에 다른 요청이 먼저 기동한 상황
-        given(validationRunMapper.findById(100L)).willReturn(row("RUNNING"));
+        given(validationRunRepository.findById(100L)).willReturn(Optional.of(entity(ValidationRunStatus.RUNNING)));
 
         assertThatThrownBy(() -> trigger.launch(created, "req-1").join())
                 .isInstanceOf(CompletionException.class)
