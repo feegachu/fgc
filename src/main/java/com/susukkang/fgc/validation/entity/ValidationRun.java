@@ -1,13 +1,17 @@
 package com.susukkang.fgc.validation.entity;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import jakarta.persistence.Column;
+import jakarta.persistence.ColumnResult;
+import jakarta.persistence.ConstructorResult;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SqlResultSetMapping;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -32,6 +36,19 @@ import java.time.OffsetDateTime;
  * 그대로 유지하기 위함이다.
  */
 @Entity
+@SqlResultSetMapping(name = "FinalizeChecklistCountsMapping", classes = @ConstructorResult(
+        targetClass = FinalizeChecklistCounts.class,
+        columns = {
+                @ColumnResult(name = "validationRunId", type = Long.class),
+                @ColumnResult(name = "validationMonth", type = LocalDate.class),
+                @ColumnResult(name = "incompleteRunCount", type = Integer.class),
+                @ColumnResult(name = "journalImbalanceCount", type = Long.class),
+                @ColumnResult(name = "unresolvedCriticalExceptionCount", type = Long.class),
+                @ColumnResult(name = "unresolvedPolicyExceptionCount", type = Long.class),
+                @ColumnResult(name = "attributionImbalanceCount", type = Long.class),
+                @ColumnResult(name = "capDetailMismatchCount", type = Long.class)
+        }
+))
 @Table(
         name = "validation_run",
         schema = "fgc",

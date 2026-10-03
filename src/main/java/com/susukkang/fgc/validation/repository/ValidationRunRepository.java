@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.repository;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
+import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import jakarta.persistence.LockModeType;
@@ -9,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.NativeQuery;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -178,4 +181,69 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                              @Param("idempotencyKey") String idempotencyKey,
                              @Param("completed") ValidationRunStatus completed,
                              @Param("finalized") ValidationRunStatus finalized);
+
+    /**
+     * IF-API-50 / FUN-044-01. 한 네이티브 쿼리의 MVCC 스냅샷에서 여섯 확정 조건의 실패
+     * 건수를 함께 읽어 조건별 조회 시점 차이를 없앤다. 전표·한도는 validation_run_id 범위,
+     * 예외·귀속합계는 문서 정의대로 validation_month 범위다(#330 — 예외를 실행 범위로
+     * 좁히면 실시간 경로의 CRITICAL·POLICY_*가 빠진 채 확정됨). 집계가 여러 이미 JPA로
+     * 전환된 테이블(journal_header, exception_case, cap_check 등)을 넘나드는 다중
+     * 서브쿼리라 JPQL 대신 네이티브 SQL + {@code @SqlResultSetMapping}(ValidationRun
+     * 엔티티에 선언)으로 유지한다.
+     */
+    @NativeQuery(value = """
+            SELECT vr.validation_run_id AS validationRunId,
+                   vr.validation_month AS validationMonth,
+                   CASE WHEN vr.status = 'COMPLETED' AND vr.current_step = 8 THEN 0 ELSE 1 END
+                       AS incompleteRunCount,
+                   (SELECT COUNT(*)
+                      FROM fgc.vw_journal_imbalance imbalance
+                      JOIN fgc.journal_header header
+                        ON header.journal_header_id = imbalance.journal_header_id
+                     WHERE header.validation_run_id = vr.validation_run_id)
+                       AS journalImbalanceCount,
+                   (SELECT COUNT(*)
+                      FROM fgc.exception_case exception
+                     WHERE exception.validation_month = vr.validation_month
+                       AND exception.severity = 'CRITICAL'
+                       AND exception.status IN ('NEW', 'IN_REVIEW'))
+                       AS unresolvedCriticalExceptionCount,
+                   (SELECT COUNT(*)
+                      FROM fgc.exception_case exception
+                     WHERE exception.validation_month = vr.validation_month
+                       AND exception.exception_type IN ('POLICY_MISSING', 'POLICY_DUPLICATE')
+                       AND exception.status IN ('NEW', 'IN_REVIEW'))
+                       AS unresolvedPolicyExceptionCount,
+                   (SELECT COUNT(*)
+                      FROM fgc.vw_transaction_attribution_balance balance
+                      JOIN fgc.commission_transaction ct
+                        ON ct.commission_transaction_id = balance.commission_transaction_id
+                     WHERE ct.settlement_month = vr.validation_month)
+                       AS attributionImbalanceCount,
+                   (SELECT COUNT(*)
+                      FROM (
+                           SELECT cc.cap_check_id
+                             FROM fgc.cap_check cc
+                             LEFT JOIN fgc.cap_check_detail detail
+                               ON detail.cap_check_id = cc.cap_check_id
+                              AND detail.classification_snapshot = 'INCLUDED'
+                            WHERE cc.validation_run_id = vr.validation_run_id
+                            GROUP BY cc.cap_check_id, cc.included_amount
+                           HAVING cc.included_amount <> COALESCE(SUM(ROUND(detail.amount, 0)), 0)
+                      ) mismatch)
+                       AS capDetailMismatchCount
+              FROM fgc.validation_run vr
+             WHERE vr.validation_run_id = :validationRunId
+            """, sqlResultSetMapping = "FinalizeChecklistCountsMapping")
+    Optional<FinalizeChecklistCounts> findFinalizeChecklistCounts(@Param("validationRunId") Long validationRunId);
+
+    /** 확정 응답 재조회용. finalizedBy는 내부 user_id가 아니라 화면 표시용 login_id를 반환한다. */
+    @Query("""
+            SELECT new com.susukkang.fgc.validation.dto.FinalizedValidationRunRow(
+                v.validationRunId, CAST(v.status AS string), v.finalizedAt, u.loginId, v.finalizeIdempotencyKey)
+            FROM ValidationRun v
+            LEFT JOIN AppUser u ON u.userId = v.finalizedBy
+            WHERE v.validationRunId = :validationRunId
+            """)
+    Optional<FinalizedValidationRunRow> findFinalizationById(@Param("validationRunId") Long validationRunId);
 }

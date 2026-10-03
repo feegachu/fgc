@@ -1,6 +1,7 @@
 package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
@@ -9,9 +10,9 @@ import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import com.susukkang.fgc.validation.dto.FinalizeChecklistResponse;
 import com.susukkang.fgc.validation.dto.FinalizeValidationRunResponse;
 import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
-import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import com.susukkang.fgc.validation.entity.ValidationRun;
 import com.susukkang.fgc.validation.event.ValidationRunFinalized;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +23,7 @@ import org.springframework.util.StringUtils;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** FGC-FUN-044 검증 실행 확정 체크리스트와 원자적 확정 처리. */
 @Service
@@ -30,7 +32,7 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
 
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 160;
 
-    private final ValidationRunMapper validationRunMapper;
+    private final ValidationRunRepository validationRunRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -59,8 +61,8 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         // 문제: IF-API-51 명세는 앱 사전검사와 DB UNIQUE 제약 모두 FGC-VRUN-006을 반환하도록 규정함
         // 개선: 사전 조회 충돌도 FGC-VRUN-006으로 통일해 클라이언트가 새 키로 재시도하게 함
         if (normalizedKey != null) {
-            Long keyOwner = validationRunMapper.findValidationRunIdByFinalizeIdempotencyKey(normalizedKey);
-            if (keyOwner != null && !keyOwner.equals(validationRunId)) {
+            Optional<Long> keyOwner = validationRunRepository.findValidationRunIdByFinalizeIdempotencyKey(normalizedKey);
+            if (keyOwner.isPresent() && !keyOwner.get().equals(validationRunId)) {
                 throw new FgcBusinessException(FgcErrorCode.VRUN_006,
                         Map.of("id", validationRunId, "idempotencyKey", normalizedKey));
             }
@@ -68,12 +70,10 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
 
         // 체크리스트 재조회부터 FINALIZED 전이까지 같은 부모 행을 잠가 확정 사이에
         // 다른 요청이 상태나 결과 스냅샷을 바꾸지 못하도록 직렬화한다.
-        ValidationRunRow lockedRun = validationRunMapper.findByIdForUpdate(validationRunId);
-        if (lockedRun == null) {
-            throw notFound(validationRunId);
-        }
+        ValidationRun lockedRun = validationRunRepository.findByIdForUpdate(validationRunId)
+                .orElseThrow(() -> notFound(validationRunId));
 
-        if ("FINALIZED".equals(lockedRun.getStatus())) {
+        if (lockedRun.getStatus() == ValidationRunStatus.FINALIZED) {
             FinalizedValidationRunRow finalized = requireFinalization(validationRunId);
             if (normalizedKey != null && normalizedKey.equals(finalized.getFinalizeIdempotencyKey())) {
                 return response(finalized);
@@ -81,7 +81,7 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
             throw new FgcBusinessException(FgcErrorCode.VRUN_003, Map.of("id", validationRunId));
         }
 
-        if (!"COMPLETED".equals(lockedRun.getStatus()) || lockedRun.getCurrentStep() != 8) {
+        if (lockedRun.getStatus() != ValidationRunStatus.COMPLETED || lockedRun.getCurrentStep() != 8) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
                     Map.of("from", lockedRun.getStatus(), "to", "FINALIZED"));
         }
@@ -93,8 +93,12 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
             throw new FgcBusinessException(FgcErrorCode.VRUN_002, Map.of("n", remaining));
         }
 
-        if (validationRunMapper.finalizeIfCompleted(validationRunId, finalizedBy, normalizedKey) != 1) {
-            FinalizedValidationRunRow concurrent = validationRunMapper.findFinalizationById(validationRunId);
+        int affected = validationRunRepository.finalizeIfCompleted(
+                validationRunId, finalizedBy, normalizedKey,
+                ValidationRunStatus.COMPLETED, ValidationRunStatus.FINALIZED);
+        if (affected != 1) {
+            FinalizedValidationRunRow concurrent =
+                    validationRunRepository.findFinalizationById(validationRunId).orElse(null);
             if (concurrent != null
                     && "FINALIZED".equals(concurrent.getStatus())
                     && normalizedKey != null
@@ -116,19 +120,13 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
     }
 
     private FinalizeChecklistCounts requireChecklistCounts(Long validationRunId) {
-        FinalizeChecklistCounts counts = validationRunMapper.findFinalizeChecklistCounts(validationRunId);
-        if (counts == null) {
-            throw notFound(validationRunId);
-        }
-        return counts;
+        return validationRunRepository.findFinalizeChecklistCounts(validationRunId)
+                .orElseThrow(() -> notFound(validationRunId));
     }
 
     private FinalizedValidationRunRow requireFinalization(Long validationRunId) {
-        FinalizedValidationRunRow row = validationRunMapper.findFinalizationById(validationRunId);
-        if (row == null) {
-            throw notFound(validationRunId);
-        }
-        return row;
+        return validationRunRepository.findFinalizationById(validationRunId)
+                .orElseThrow(() -> notFound(validationRunId));
     }
 
     private FinalizeChecklistResponse buildChecklist(FinalizeChecklistCounts counts) {
