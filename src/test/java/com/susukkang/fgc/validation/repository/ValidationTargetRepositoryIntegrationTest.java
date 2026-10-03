@@ -2,7 +2,6 @@ package com.susukkang.fgc.validation.repository;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.validation.dto.ValidationScheduleState;
-import com.susukkang.fgc.validation.mapper.ValidationScheduleMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,8 +24,6 @@ class ValidationTargetRepositoryIntegrationTest {
 
     @Autowired
     private ValidationTargetRepository validationTargetRepository;
-    @Autowired
-    private ValidationScheduleMapper validationScheduleMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -130,13 +127,13 @@ class ValidationTargetRepositoryIntegrationTest {
     }
 
     /**
-     * #380 Phase 4 — 아직 남아있는 구 MyBatis {@code ValidationScheduleMapper}와 새
-     * {@code ValidationTargetRepository.selectScheduleStates}(unnest + ROW() 기반 DISTINCT
-     * COUNT를 네이티브 쿼리로 그대로 옮긴 메서드)가 같은 입력에 대해 완전히 동일한 결과를
-     * 내는지 직접 비교한다.
+     * #380 Phase 4 — ValidationTargetRepository.selectScheduleStates(unnest + ROW() 기반
+     * DISTINCT COUNT를 네이티브 쿼리로 옮긴 메서드)가 선별된 계약의 두 지급 단계를 모두
+     * 반환하는지 검증한다. 구 MyBatis ValidationScheduleMapper는 이 전환 완료 후 다른
+     * 패키지에서 참조가 없어 삭제되었다 — 이 테스트가 그 검증 책임을 이어받는다.
      */
     @Test
-    void selectScheduleStatesReturnsSameResultAsLegacyMapperForBothPaymentStages() {
+    void selectScheduleStatesReturnsBothPaymentStagesForSelectedContract() {
         LocalDate validationMonth = LocalDate.of(2098, 7, 1);
         Long validationRunId = insertValidationRun(validationMonth);
         Long contractId = jdbcTemplate.queryForObject(
@@ -144,17 +141,21 @@ class ValidationTargetRepositoryIntegrationTest {
                 Long.class);
         insertTarget(validationRunId, contractId, "SELECTED");
 
-        List<ValidationScheduleState> legacyStates = validationScheduleMapper.selectScheduleStates(validationRunId);
-        List<ValidationScheduleState> newStates = validationTargetRepository.selectScheduleStates(validationRunId);
+        List<ValidationScheduleState> states = validationTargetRepository.selectScheduleStates(validationRunId);
 
-        assertThat(newStates).hasSize(2);
-        assertThat(toComparableRows(newStates)).containsExactlyElementsOf(toComparableRows(legacyStates));
-        assertThat(newStates).extracting(ValidationScheduleState::getPaymentStage)
+        assertThat(states).hasSize(2);
+        assertThat(states).extracting(ValidationScheduleState::getPaymentStage)
                 .containsExactlyInAnyOrder(PaymentStage.INSURER_TO_GA, PaymentStage.GA_TO_FC);
+        assertThat(states).allSatisfy(state -> {
+            assertThat(state.getContractId()).isEqualTo(contractId);
+            assertThat(state.getActiveHeaderCount()).isNotNull();
+            assertThat(state.getLineCount()).isNotNull();
+            assertThat(state.getDistinctLineCount()).isNotNull();
+        });
     }
 
     @Test
-    void selectScheduleStatesSumsScheduleAmountsAfterRoundingSameAsLegacyMapper() {
+    void selectScheduleStatesSumsScheduleAmountsAfterRoundingEachLineToWon() {
         LocalDate validationMonth = LocalDate.of(2098, 8, 1);
         Long validationRunId = insertValidationRun(validationMonth);
         Long contractId = jdbcTemplate.queryForObject(
@@ -197,27 +198,12 @@ class ValidationTargetRepositoryIntegrationTest {
                 """, scheduleHeaderId, contractDate, commissionItemId,
                 scheduleHeaderId, contractDate, commissionItemId);
 
-        ValidationScheduleState legacyGaToFc = validationScheduleMapper.selectScheduleStates(validationRunId).stream()
-                .filter(state -> state.getPaymentStage() == PaymentStage.GA_TO_FC)
-                .findFirst()
-                .orElseThrow();
-        ValidationScheduleState newGaToFc = validationTargetRepository.selectScheduleStates(validationRunId).stream()
+        ValidationScheduleState gaToFc = validationTargetRepository.selectScheduleStates(validationRunId).stream()
                 .filter(state -> state.getPaymentStage() == PaymentStage.GA_TO_FC)
                 .findFirst()
                 .orElseThrow();
 
-        assertThat(newGaToFc.getTotalAmount()).isEqualByComparingTo(new BigDecimal("20"));
-        assertThat(newGaToFc.getTotalAmount()).isEqualByComparingTo(legacyGaToFc.getTotalAmount());
-    }
-
-    private List<String> toComparableRows(List<ValidationScheduleState> states) {
-        return states.stream()
-                .map(state -> state.getPaymentStage() + "|" + state.getScheduleHeaderId() + "|"
-                        + state.getPolicyVersionId() + "|" + state.getScheduleVersion() + "|"
-                        + state.getScheduleStatus() + "|" + state.getActiveHeaderCount() + "|"
-                        + state.getLineCount() + "|" + state.getDistinctLineCount() + "|"
-                        + state.getTotalAmount())
-                .toList();
+        assertThat(gaToFc.getTotalAmount()).isEqualByComparingTo(new BigDecimal("20"));
     }
 
     private Long insertSavContract() {

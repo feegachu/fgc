@@ -1,6 +1,5 @@
 package com.susukkang.fgc.validation.repository;
 
-import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,10 +11,11 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * #380 Phase 3 — 아직 남아있는 구 MyBatis {@code ContractStatusEventProcessingMapper}와
- * 새 {@code ContractStatusEventProcessingRepository}가 findPendingEventIds의 상관 서브쿼리
- * (NOT EXISTS ... SUCCEEDED)와 insertProcessing의 ON CONFLICT DO NOTHING 멱등성에서
- * 완전히 동일하게 동작하는지 직접 비교한다.
+ * #380 Phase 3 — ContractStatusEventProcessingRepository가 findPendingEventIds의
+ * 상관 서브쿼리(NOT EXISTS ... SUCCEEDED)와 insertProcessing의 ON CONFLICT DO NOTHING
+ * 멱등성을 올바르게 구현하는지 검증한다. 구 MyBatis ContractStatusEventProcessingMapper는
+ * 이 전환 완료 후(#380 Phase 4) 다른 패키지에서 참조가 없어 삭제되었다 — 이 테스트가
+ * 그 검증 책임을 이어받는다.
  *
  * contract_status_event / contract_status_event_processing은 append-only라 명시적
  * DELETE로 정리할 수 없다(reject_update_delete 트리거) — @Transactional로 테스트 종료 시
@@ -27,8 +27,6 @@ class ContractStatusEventProcessingRepositoryIntegrationTest {
 
     private static final String JOB_NAME = "ComparisonTestJob";
 
-    @Autowired
-    private ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
     @Autowired
     private ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
     @Autowired
@@ -52,21 +50,17 @@ class ContractStatusEventProcessingRepositoryIntegrationTest {
     }
 
     @Test
-    void findPendingEventIdsReturnsSameResultAsLegacyMapperBeforeAndAfterSucceeded() {
+    void findPendingEventIdsExcludesEventAfterItIsMarkedSucceeded() {
         Long contractId = seedContractId();
         Long eventId = seedContractStatusEvent(contractId);
 
-        List<Long> legacyBefore = contractStatusEventProcessingMapper.findPendingEventIds(contractId, JOB_NAME);
-        List<Long> newBefore = contractStatusEventProcessingRepository.findPendingEventIds(contractId, JOB_NAME);
-        assertThat(newBefore).isEqualTo(legacyBefore);
-        assertThat(newBefore).contains(eventId);
+        List<Long> before = contractStatusEventProcessingRepository.findPendingEventIds(contractId, JOB_NAME);
+        assertThat(before).contains(eventId);
 
         contractStatusEventProcessingRepository.insertProcessing(eventId, JOB_NAME, "SUCCEEDED", null, null);
 
-        List<Long> legacyAfter = contractStatusEventProcessingMapper.findPendingEventIds(contractId, JOB_NAME);
-        List<Long> newAfter = contractStatusEventProcessingRepository.findPendingEventIds(contractId, JOB_NAME);
-        assertThat(newAfter).isEqualTo(legacyAfter);
-        assertThat(newAfter).doesNotContain(eventId);
+        List<Long> after = contractStatusEventProcessingRepository.findPendingEventIds(contractId, JOB_NAME);
+        assertThat(after).doesNotContain(eventId);
     }
 
     @Test
