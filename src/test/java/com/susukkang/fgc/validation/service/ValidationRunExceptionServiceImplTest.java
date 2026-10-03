@@ -1,10 +1,10 @@
 package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -21,17 +21,17 @@ import static org.mockito.Mockito.inOrder;
 class ValidationRunExceptionServiceImplTest {
 
     @Mock
-    private ExceptionCaseMapper exceptionCaseMapper;
+    private ExceptionCaseRepository exceptionCaseRepository;
 
     @Test
     void generatesAllExceptionSourcesAndReturnsCreatedCount() {
         Long validationRunId = 118L;
-        given(exceptionCaseMapper.insertFromCapChecks(validationRunId)).willReturn(2L);
-        given(exceptionCaseMapper.insertFromArbitrageChecks(validationRunId)).willReturn(3L);
-        given(exceptionCaseMapper.insertFromReconciliationResults(validationRunId)).willReturn(4L);
-        given(exceptionCaseMapper.insertFromJournalImbalances(validationRunId)).willReturn(5L);
+        given(exceptionCaseRepository.insertFromCapChecks(validationRunId)).willReturn(2L);
+        given(exceptionCaseRepository.insertFromArbitrageChecks(validationRunId)).willReturn(3L);
+        given(exceptionCaseRepository.insertFromReconciliationResults(validationRunId)).willReturn(4L);
+        given(exceptionCaseRepository.insertFromJournalImbalances(validationRunId)).willReturn(5L);
 
-        StepProcessingResult result = new ValidationRunExceptionServiceImpl(exceptionCaseMapper)
+        StepProcessingResult result = new ValidationRunExceptionServiceImpl(exceptionCaseRepository)
                 .generate(context(validationRunId));
 
         assertThat(result.processedCount()).isEqualTo(14L);
@@ -39,18 +39,18 @@ class ValidationRunExceptionServiceImplTest {
         assertThat(result.failureCount()).isZero();
         assertThat(result.skips()).isEmpty();
 
-        InOrder calls = inOrder(exceptionCaseMapper);
-        calls.verify(exceptionCaseMapper).insertFromCapChecks(validationRunId);
-        calls.verify(exceptionCaseMapper).insertFromArbitrageChecks(validationRunId);
-        calls.verify(exceptionCaseMapper).insertFromReconciliationResults(validationRunId);
-        calls.verify(exceptionCaseMapper).insertFromJournalImbalances(validationRunId);
+        InOrder calls = inOrder(exceptionCaseRepository);
+        calls.verify(exceptionCaseRepository).insertFromCapChecks(validationRunId);
+        calls.verify(exceptionCaseRepository).insertFromArbitrageChecks(validationRunId);
+        calls.verify(exceptionCaseRepository).insertFromReconciliationResults(validationRunId);
+        calls.verify(exceptionCaseRepository).insertFromJournalImbalances(validationRunId);
     }
 
     @Test
     void succeedsWithZeroWhenNoExceptionIsCreated() {
         Long validationRunId = 119L;
 
-        StepProcessingResult result = new ValidationRunExceptionServiceImpl(exceptionCaseMapper)
+        StepProcessingResult result = new ValidationRunExceptionServiceImpl(exceptionCaseRepository)
                 .generate(context(validationRunId));
 
         assertThat(result).isEqualTo(StepProcessingResult.success(0));
