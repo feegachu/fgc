@@ -1,6 +1,6 @@
 package com.susukkang.fgc.validation.service;
 
-import com.susukkang.fgc.validation.mapper.ValidationTargetSelectionMapper;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +18,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class ValidationTargetSelectionService {
 
-    private final ValidationTargetSelectionMapper validationTargetSelectionMapper;
+    private final ValidationTargetRepository validationTargetRepository;
 
     /**
      * 설명 : 월 통합검증 실행의 검증월과 실행 유형을 기준으로 검증 대상 계약 및 관련 데이터를 선별한다.
@@ -41,7 +41,7 @@ public class ValidationTargetSelectionService {
         LocalDate asOfDate =
                 validationMonth.withDayOfMonth(validationMonth.lengthOfMonth());
 
-        return validationTargetSelectionMapper.insertTargets(
+        return validationTargetRepository.insertTargets(
                 validationRunId,
                 validationMonth,
                 asOfDate
