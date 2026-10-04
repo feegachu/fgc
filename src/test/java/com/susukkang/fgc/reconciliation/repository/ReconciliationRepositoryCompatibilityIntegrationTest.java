@@ -236,7 +236,7 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
                         ((Number) baseline.selectOne(NS + "ReconciliationResultMapper.countResults", parameters)).longValue());
             }
         }
-        createRun();
+        createRun(TEST_MONTH.plusMonths(1));
         for (String stage : new String[]{null, "GA_TO_FC", "", "' OR 1=1 --"}) {
             for (String direction : List.of("asc", "desc")) {
                 Map<String, Object> p = params("settlementMonth", null, "paymentStage", stage, "insurerId", null,
@@ -259,8 +259,12 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
     }
 
     private Long createRun() {
+        return createRun(TEST_MONTH);
+    }
+
+    private Long createRun(LocalDate month) {
         ReconciliationRunInsertRow row = new ReconciliationRunInsertRow();
-        row.setSettlementMonth(TEST_MONTH);
+        row.setSettlementMonth(month);
         row.setPaymentStage(PaymentStage.GA_TO_FC);
         runs.insert(row);
         return row.getReconciliationRunId();
