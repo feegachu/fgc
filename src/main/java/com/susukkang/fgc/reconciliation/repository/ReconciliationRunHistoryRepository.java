@@ -27,7 +27,6 @@ public class ReconciliationRunHistoryRepository {
 
     public List<ReconciliationRunHistoryRow> search(LocalDate settlementMonth, String paymentStage, Long insurerId, String sortDirection, int offset, int limit) {
         // 검색값은 모두 바인딩하며 정렬 키워드는 고정된 ASC/DESC 중에서만 선택한다.
-        String direction = "asc".equals(sortDirection) ? "ASC" : "DESC";
         NativeQuery<?> query = entityManager.createNativeQuery("""
                 SELECT rr.reconciliation_run_id, rr.validation_run_id, rr.settlement_month, rr.payment_stage,
                 rr.insurer_id, ins.insurer_name AS insurerName,
@@ -48,11 +47,12 @@ public class ReconciliationRunHistoryRepository {
                 AND (CAST(:settlementMonth AS date) IS NULL OR rr.settlement_month = :settlementMonth)
                 AND (CAST(:paymentStage AS varchar) IS NULL OR rr.payment_stage = :paymentStage)
                 AND (CAST(:insurerId AS bigint) IS NULL OR rr.insurer_id = :insurerId)
-                ORDER BY rr.created_at
-                %s,
-                rr.reconciliation_run_id
-                %s
-                """.formatted(direction, direction)).unwrap(NativeQuery.class);
+                ORDER BY CASE WHEN :ascending THEN rr.created_at END ASC,
+                         CASE WHEN NOT :ascending THEN rr.created_at END DESC,
+                         CASE WHEN :ascending THEN rr.reconciliation_run_id END ASC,
+                         CASE WHEN NOT :ascending THEN rr.reconciliation_run_id END DESC
+                """).unwrap(NativeQuery.class);
+        query.setParameter("ascending", "asc".equals(sortDirection));
         query.setParameter("settlementMonth", settlementMonth);
         query.setParameter("paymentStage", paymentStage);
         query.setParameter("insurerId", insurerId);

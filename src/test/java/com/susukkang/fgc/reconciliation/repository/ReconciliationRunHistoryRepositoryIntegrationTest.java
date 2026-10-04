@@ -38,12 +38,11 @@ class ReconciliationRunHistoryRepositoryIntegrationTest {
 
     /** guard_run_lifecycle이 INSERT 시 CREATED만 허용한다 — 다른 상태는 UPDATE로 전이시킨다. */
     private Long insertReconciliationRun(String paymentStage, Long insurerId, Long validationRunId) {
-        Long id = jdbcTemplate.queryForObject("""
+        return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.reconciliation_run (settlement_month, payment_stage, insurer_id, validation_run_id)
                 VALUES (?, ?, ?, ?)
                 RETURNING reconciliation_run_id
                 """, Long.class, TEST_MONTH, paymentStage, insurerId, validationRunId);
-        return id;
     }
 
     private void insertReconciliationResult(Long reconRunId, String matchGroupKey, String resultType) {

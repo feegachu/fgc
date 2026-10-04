@@ -29,6 +29,30 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReconciliationResultRepository {
+    private static final String RESULT_TYPE_PARAM = "resultType";
+    private static final String RECONCILIATION_RUN_ID_PARAM = "reconciliationRunId";
+    private static final List<ReconciliationNativeProjection.Column> RESULT_COLUMNS = List.of(
+            new ReconciliationNativeProjection.Column("reconciliationResultId", Long.class),
+            new ReconciliationNativeProjection.Column("contractNo", String.class),
+            new ReconciliationNativeProjection.Column("commissionItemCode", String.class),
+            new ReconciliationNativeProjection.Column("commissionItemName", String.class),
+            new ReconciliationNativeProjection.Column("installmentNo", Integer.class),
+            new ReconciliationNativeProjection.Column("expectedAgentId", Long.class),
+            new ReconciliationNativeProjection.Column("expectedAgentCode", String.class),
+            new ReconciliationNativeProjection.Column("expectedAgentName", String.class),
+            new ReconciliationNativeProjection.Column("expectedOrganizationName", String.class),
+            new ReconciliationNativeProjection.Column("actualAgentId", Long.class),
+            new ReconciliationNativeProjection.Column("actualAgentCode", String.class),
+            new ReconciliationNativeProjection.Column("actualAgentName", String.class),
+            new ReconciliationNativeProjection.Column("actualOrganizationName", String.class),
+            new ReconciliationNativeProjection.Column("actualSourceAgentCode", String.class),
+            new ReconciliationNativeProjection.Column("expectedTotalAmount", BigDecimal.class),
+            new ReconciliationNativeProjection.Column("actualTotalAmount", BigDecimal.class),
+            new ReconciliationNativeProjection.Column("differenceAmount", BigDecimal.class),
+            new ReconciliationNativeProjection.Column(RESULT_TYPE_PARAM, String.class),
+            new ReconciliationNativeProjection.Column("primaryReasonCode", String.class),
+            new ReconciliationNativeProjection.Column("secondaryReasonCodesCsv", String.class),
+            new ReconciliationNativeProjection.Column("createdAt", OffsetDateTime.class));
     private final EntityManager entityManager;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
@@ -60,7 +84,7 @@ public class ReconciliationResultRepository {
         query.setParameter("sourceAgentCode", row.getActualSourceAgentCode());
         query.setParameter("itemId", row.getCommissionItemId());
         query.setParameter("installmentNo", row.getInstallmentNo());
-        query.setParameter("resultType", row.getResultType());
+        query.setParameter(RESULT_TYPE_PARAM, row.getResultType());
         query.setParameter("expectedAmount", row.getExpectedTotalAmount());
         query.setParameter("actualAmount", row.getActualTotalAmount());
         query.setParameter("differenceAmount", row.getDifferenceAmount());
@@ -97,13 +121,6 @@ public class ReconciliationResultRepository {
     public ReconciliationClassificationContext findClassificationContext(
             Long contractId, Long expectedAgentId, Long actualAgentId, List<Long> journalHeaderIds) {
         boolean hasJournals = journalHeaderIds != null && !journalHeaderIds.isEmpty();
-        String journalSignals = hasJournals ? """
-                (SELECT COUNT(DISTINCT policy_version_id) > 1 FROM fgc.journal_header
-                  WHERE journal_header_id IN (:journalHeaderIds) AND policy_version_id IS NOT NULL)
-                    AS policyVersionError,
-                EXISTS (SELECT 1 FROM fgc.vw_journal_imbalance
-                         WHERE journal_header_id IN (:journalHeaderIds)) AS journalImbalance
-                """ : "FALSE AS policyVersionError, FALSE AS journalImbalance";
         NativeQuery<?> query = entityManager.createNativeQuery("""
                 SELECT EXISTS (SELECT 1 FROM fgc.insurance_contract
                                 WHERE contract_id = :contractId
@@ -116,11 +133,19 @@ public class ReconciliationResultRepository {
                                      WHERE expected.agent_id = :expectedAgentId
                                        AND actual.agent_id = :actualAgentId), FALSE)
                 END AS organizationMismatch,
-                """ + journalSignals).unwrap(NativeQuery.class);
+                (:hasJournals AND (SELECT COUNT(DISTINCT policy_version_id) > 1
+                                    FROM fgc.journal_header
+                                   WHERE journal_header_id IN (:journalHeaderIds)
+                                     AND policy_version_id IS NOT NULL)) AS policyVersionError,
+                (:hasJournals AND EXISTS (SELECT 1 FROM fgc.vw_journal_imbalance
+                                          WHERE journal_header_id IN (:journalHeaderIds))) AS journalImbalance
+                """).unwrap(NativeQuery.class);
         query.setParameter("contractId", contractId);
         query.setParameter("expectedAgentId", expectedAgentId);
         query.setParameter("actualAgentId", actualAgentId);
-        if (hasJournals) query.setParameterList("journalHeaderIds", journalHeaderIds);
+        query.setParameter("hasJournals", hasJournals);
+        // 빈 IN 목록을 만들지 않으며 hasJournals=false가 두 신호를 항상 FALSE로 고정한다.
+        query.setParameterList("journalHeaderIds", hasJournals ? journalHeaderIds : List.of(0L));
         query.addScalar("invalidcontractpayment", Boolean.class);
         query.addScalar("organizationmismatch", Boolean.class);
         query.addScalar("policyversionerror", Boolean.class);
@@ -150,7 +175,7 @@ public class ReconciliationResultRepository {
                 WHERE reconciliation_run_id = :reconciliationRunId
                 AND match_group_key = :matchGroupKey
                 """).unwrap(NativeQuery.class);
-        query.setParameter("reconciliationRunId", reconciliationRunId);
+        query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
         query.setParameter("matchGroupKey", matchGroupKey);
         query.addScalar("reconciliation_result_id", Long.class);
         return (Long) query.uniqueResult();
@@ -162,13 +187,12 @@ public class ReconciliationResultRepository {
                 FROM fgc.reconciliation_result
                 WHERE reconciliation_run_id = :reconciliationRunId
                 """).unwrap(NativeQuery.class);
-        query.setParameter("reconciliationRunId", reconciliationRunId);
+        query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
         return ((Number) query.getSingleResult()).longValue();
     }
 
     public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, String sortDirection, int offset, int limit) {
-        // 정렬은 고정 키워드만 조합하고 결과 유형과 식별자는 바인딩한다.
-        String direction = "asc".equals(sortDirection) ? "ASC" : "DESC";
+        // 정렬 방향·결과 유형·식별자는 고정 SQL의 파라미터로 바인딩한다.
         NativeQuery<?> query = entityManager.createNativeQuery("""
                 SELECT result.reconciliation_result_id AS reconciliationResultId,
                 contract.contract_no AS contractNo,
@@ -202,60 +226,16 @@ public class ReconciliationResultRepository {
                 ON actual_org.organization_id = actual_agent.organization_id
                 WHERE result.reconciliation_run_id = :reconciliationRunId
                 AND (CAST(:resultType AS varchar) IS NULL OR result.result_type = :resultType)
-                ORDER BY result.created_at
-                %s,
-                result.reconciliation_result_id
-                %s
-                """.formatted(direction, direction)).unwrap(NativeQuery.class);
-        query.setParameter("reconciliationRunId", reconciliationRunId);
-        query.setParameter("resultType", resultType);
+                ORDER BY CASE WHEN :ascending THEN result.created_at END ASC,
+                         CASE WHEN NOT :ascending THEN result.created_at END DESC,
+                         CASE WHEN :ascending THEN result.reconciliation_result_id END ASC,
+                         CASE WHEN NOT :ascending THEN result.reconciliation_result_id END DESC
+                """).unwrap(NativeQuery.class);
+        query.setParameter("ascending", "asc".equals(sortDirection));
+        query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
+        query.setParameter(RESULT_TYPE_PARAM, resultType);
         query.setFirstResult(offset).setMaxResults(limit);
-        query.addScalar("reconciliationresultid", Long.class);
-        query.addScalar("contractno", String.class);
-        query.addScalar("commissionitemcode", String.class);
-        query.addScalar("commissionitemname", String.class);
-        query.addScalar("installmentno", Integer.class);
-        query.addScalar("expectedagentid", Long.class);
-        query.addScalar("expectedagentcode", String.class);
-        query.addScalar("expectedagentname", String.class);
-        query.addScalar("expectedorganizationname", String.class);
-        query.addScalar("actualagentid", Long.class);
-        query.addScalar("actualagentcode", String.class);
-        query.addScalar("actualagentname", String.class);
-        query.addScalar("actualorganizationname", String.class);
-        query.addScalar("actualsourceagentcode", String.class);
-        query.addScalar("expectedtotalamount", BigDecimal.class);
-        query.addScalar("actualtotalamount", BigDecimal.class);
-        query.addScalar("differenceamount", BigDecimal.class);
-        query.addScalar("resulttype", String.class);
-        query.addScalar("primaryreasoncode", String.class);
-        query.addScalar("secondaryreasoncodescsv", String.class);
-        query.addScalar("createdat", OffsetDateTime.class);
-        return query.setTupleTransformer((values, aliases) -> {
-            ReconciliationResultListRow row = new ReconciliationResultListRow();
-            row.setReconciliationResultId((Long) values[0]);
-            row.setContractNo((String) values[1]);
-            row.setCommissionItemCode((String) values[2]);
-            row.setCommissionItemName((String) values[3]);
-            row.setInstallmentNo((Integer) values[4]);
-            row.setExpectedAgentId((Long) values[5]);
-            row.setExpectedAgentCode((String) values[6]);
-            row.setExpectedAgentName((String) values[7]);
-            row.setExpectedOrganizationName((String) values[8]);
-            row.setActualAgentId((Long) values[9]);
-            row.setActualAgentCode((String) values[10]);
-            row.setActualAgentName((String) values[11]);
-            row.setActualOrganizationName((String) values[12]);
-            row.setActualSourceAgentCode((String) values[13]);
-            row.setExpectedTotalAmount((BigDecimal) values[14]);
-            row.setActualTotalAmount((BigDecimal) values[15]);
-            row.setDifferenceAmount((BigDecimal) values[16]);
-            row.setResultType((String) values[17]);
-            row.setPrimaryReasonCode((String) values[18]);
-            row.setSecondaryReasonCodesCsv((String) values[19]);
-            row.setCreatedAt((OffsetDateTime) values[20]);
-            return row;
-        }).getResultList();
+        return ReconciliationNativeProjection.map(query, ReconciliationResultListRow::new, RESULT_COLUMNS).getResultList();
     }
 
     public long countResults(Long reconciliationRunId, String resultType) {
@@ -265,8 +245,8 @@ public class ReconciliationResultRepository {
                 WHERE result.reconciliation_run_id = :reconciliationRunId
                 AND (CAST(:resultType AS varchar) IS NULL OR result.result_type = :resultType)
                 """).unwrap(NativeQuery.class);
-        query.setParameter("reconciliationRunId", reconciliationRunId);
-        query.setParameter("resultType", resultType);
+        query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
+        query.setParameter(RESULT_TYPE_PARAM, resultType);
         return ((Number) query.getSingleResult()).longValue();
     }
 
@@ -281,7 +261,7 @@ public class ReconciliationResultRepository {
                 FROM fgc.vw_reconciliation_summary
                 WHERE reconciliation_run_id = :reconciliationRunId
                 """).unwrap(NativeQuery.class);
-        query.setParameter("reconciliationRunId", reconciliationRunId);
+        query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
         query.addScalar("resultcount", Long.class);
         query.addScalar("matchedcount", Long.class);
         query.addScalar("exceptioncount", Long.class);
@@ -340,62 +320,13 @@ public class ReconciliationResultRepository {
                 WHERE result.reconciliation_result_id = :reconciliationResultId
                 """).unwrap(NativeQuery.class);
         query.setParameter("reconciliationResultId", reconciliationResultId);
-        query.addScalar("reconciliationresultid", Long.class);
-        query.addScalar("reconciliationrunid", Long.class);
-        query.addScalar("matchgroupkey", String.class);
-        query.addScalar("contractid", Long.class);
-        query.addScalar("contractno", String.class);
-        query.addScalar("commissionitemid", Long.class);
-        query.addScalar("commissionitemcode", String.class);
-        query.addScalar("commissionitemname", String.class);
-        query.addScalar("installmentno", Integer.class);
-        query.addScalar("expectedagentid", Long.class);
-        query.addScalar("expectedagentcode", String.class);
-        query.addScalar("expectedagentname", String.class);
-        query.addScalar("expectedorganizationname", String.class);
-        query.addScalar("actualagentid", Long.class);
-        query.addScalar("actualagentcode", String.class);
-        query.addScalar("actualagentname", String.class);
-        query.addScalar("actualorganizationname", String.class);
-        query.addScalar("actualsourceagentcode", String.class);
-        query.addScalar("expectedtotalamount", BigDecimal.class);
-        query.addScalar("actualtotalamount", BigDecimal.class);
-        query.addScalar("differenceamount", BigDecimal.class);
-        query.addScalar("resulttype", String.class);
-        query.addScalar("primaryreasoncode", String.class);
-        query.addScalar("secondaryreasoncodescsv", String.class);
-        query.addScalar("detailsnapshotjson", String.class);
-        query.addScalar("createdat", OffsetDateTime.class);
-        return query.setTupleTransformer((values, aliases) -> {
-            ReconciliationResultDetailRow row = new ReconciliationResultDetailRow();
-            row.setReconciliationResultId((Long) values[0]);
-            row.setReconciliationRunId((Long) values[1]);
-            row.setMatchGroupKey((String) values[2]);
-            row.setContractId((Long) values[3]);
-            row.setContractNo((String) values[4]);
-            row.setCommissionItemId((Long) values[5]);
-            row.setCommissionItemCode((String) values[6]);
-            row.setCommissionItemName((String) values[7]);
-            row.setInstallmentNo((Integer) values[8]);
-            row.setExpectedAgentId((Long) values[9]);
-            row.setExpectedAgentCode((String) values[10]);
-            row.setExpectedAgentName((String) values[11]);
-            row.setExpectedOrganizationName((String) values[12]);
-            row.setActualAgentId((Long) values[13]);
-            row.setActualAgentCode((String) values[14]);
-            row.setActualAgentName((String) values[15]);
-            row.setActualOrganizationName((String) values[16]);
-            row.setActualSourceAgentCode((String) values[17]);
-            row.setExpectedTotalAmount((BigDecimal) values[18]);
-            row.setActualTotalAmount((BigDecimal) values[19]);
-            row.setDifferenceAmount((BigDecimal) values[20]);
-            row.setResultType((String) values[21]);
-            row.setPrimaryReasonCode((String) values[22]);
-            row.setSecondaryReasonCodesCsv((String) values[23]);
-            row.setDetailSnapshotJson((String) values[24]);
-            row.setCreatedAt((OffsetDateTime) values[25]);
-            return row;
-        }).uniqueResult();
+        var columns = new java.util.ArrayList<>(RESULT_COLUMNS);
+        columns.addAll(List.of(new ReconciliationNativeProjection.Column(RECONCILIATION_RUN_ID_PARAM, Long.class),
+                new ReconciliationNativeProjection.Column("matchGroupKey", String.class),
+                new ReconciliationNativeProjection.Column("contractId", Long.class),
+                new ReconciliationNativeProjection.Column("commissionItemId", Long.class),
+                new ReconciliationNativeProjection.Column("detailSnapshotJson", String.class)));
+        return ReconciliationNativeProjection.map(query, ReconciliationResultDetailRow::new, columns).uniqueResult();
     }
 
     public List<ReconciliationMatchDetailRow> findMatches(Long reconciliationResultId) {

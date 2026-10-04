@@ -25,6 +25,20 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReconciliationRunRepository {
+    private static final String INSURER_ID_PARAM = "insurerId";
+    private static final String RECONCILIATION_RUN_ID_PARAM = "reconciliationRunId";
+    private static final String VALIDATION_RUN_ID_PARAM = "validationRunId";
+    private static final List<ReconciliationNativeProjection.Column> RUN_COLUMNS = List.of(
+            new ReconciliationNativeProjection.Column(RECONCILIATION_RUN_ID_PARAM, Long.class),
+            new ReconciliationNativeProjection.Column(VALIDATION_RUN_ID_PARAM, Long.class),
+            new ReconciliationNativeProjection.Column("settlementMonth", LocalDate.class),
+            new ReconciliationNativeProjection.Column("paymentStage", String.class),
+            new ReconciliationNativeProjection.Column(INSURER_ID_PARAM, Long.class),
+            new ReconciliationNativeProjection.Column("status", String.class),
+            new ReconciliationNativeProjection.Column("startedAt", OffsetDateTime.class),
+            new ReconciliationNativeProjection.Column("completedAt", OffsetDateTime.class),
+            new ReconciliationNativeProjection.Column("createdBy", Long.class),
+            new ReconciliationNativeProjection.Column("createdAt", OffsetDateTime.class));
     private final EntityManager entityManager;
     private final ReconciliationRunJpaRepository runs;
 
@@ -32,7 +46,7 @@ public class ReconciliationRunRepository {
         return entityManager.createQuery("""
                 SELECT COUNT(i) FROM Insurer i
                  WHERE i.insurerId = :insurerId AND i.activeYn = true
-                """, Long.class).setParameter("insurerId", insurerId).getSingleResult() > 0;
+                """, Long.class).setParameter(INSURER_ID_PARAM, insurerId).getSingleResult() > 0;
     }
 
     @Transactional
@@ -45,7 +59,7 @@ public class ReconciliationRunRepository {
                 completed_at = NULL
                 WHERE reconciliation_run_id = :reconciliationRunId
                 AND status IN ('CREATED', 'FAILED')
-                """).setParameter("reconciliationRunId", reconciliationRunId).executeUpdate();
+                """).setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId).executeUpdate();
         detachRun(reconciliationRunId);
         return affected;
     }
@@ -59,7 +73,7 @@ public class ReconciliationRunRepository {
                 completed_at = clock_timestamp()
                 WHERE reconciliation_run_id = :reconciliationRunId
                 AND status = 'RUNNING'
-                """).setParameter("reconciliationRunId", reconciliationRunId).executeUpdate();
+                """).setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId).executeUpdate();
         detachRun(reconciliationRunId);
         return affected;
     }
@@ -73,7 +87,7 @@ public class ReconciliationRunRepository {
                 completed_at = clock_timestamp()
                 WHERE reconciliation_run_id = :reconciliationRunId
                 AND status = 'RUNNING'
-                """).setParameter("reconciliationRunId", reconciliationRunId).executeUpdate();
+                """).setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId).executeUpdate();
         detachRun(reconciliationRunId);
         return affected;
     }
@@ -93,31 +107,8 @@ public class ReconciliationRunRepository {
                 FROM fgc.reconciliation_run
                 WHERE reconciliation_run_id = :reconciliationRunId
                 """).unwrap(NativeQuery.class);
-        query.setParameter("reconciliationRunId", reconciliationRunId);
-        query.addScalar("reconciliationrunid", Long.class);
-        query.addScalar("validationrunid", Long.class);
-        query.addScalar("settlementmonth", LocalDate.class);
-        query.addScalar("paymentstage", String.class);
-        query.addScalar("insurerid", Long.class);
-        query.addScalar("status", String.class);
-        query.addScalar("startedat", OffsetDateTime.class);
-        query.addScalar("completedat", OffsetDateTime.class);
-        query.addScalar("createdby", Long.class);
-        query.addScalar("createdat", OffsetDateTime.class);
-        return query.setTupleTransformer((values, aliases) -> {
-            ReconciliationRunRow row = new ReconciliationRunRow();
-            row.setReconciliationRunId((Long) values[0]);
-            row.setValidationRunId((Long) values[1]);
-            row.setSettlementMonth((LocalDate) values[2]);
-            row.setPaymentStage((String) values[3]);
-            row.setInsurerId((Long) values[4]);
-            row.setStatus((String) values[5]);
-            row.setStartedAt((OffsetDateTime) values[6]);
-            row.setCompletedAt((OffsetDateTime) values[7]);
-            row.setCreatedBy((Long) values[8]);
-            row.setCreatedAt((OffsetDateTime) values[9]);
-            return row;
-        }).uniqueResult();
+        query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
+        return ReconciliationNativeProjection.map(query, ReconciliationRunRow::new, RUN_COLUMNS).uniqueResult();
     }
 
     public ReconciliationRunRow findByNaturalKey(LocalDate settlementMonth, PaymentStage paymentStage, Long insurerId, Long validationRunId) {
@@ -140,32 +131,9 @@ public class ReconciliationRunRepository {
                 """).unwrap(NativeQuery.class);
         query.setParameter("settlementMonth", settlementMonth);
         query.setParameter("paymentStage", paymentStage == null ? null : paymentStage.name());
-        query.setParameter("insurerId", insurerId);
-        query.setParameter("validationRunId", validationRunId);
-        query.addScalar("reconciliationrunid", Long.class);
-        query.addScalar("validationrunid", Long.class);
-        query.addScalar("settlementmonth", LocalDate.class);
-        query.addScalar("paymentstage", String.class);
-        query.addScalar("insurerid", Long.class);
-        query.addScalar("status", String.class);
-        query.addScalar("startedat", OffsetDateTime.class);
-        query.addScalar("completedat", OffsetDateTime.class);
-        query.addScalar("createdby", Long.class);
-        query.addScalar("createdat", OffsetDateTime.class);
-        return query.setTupleTransformer((values, aliases) -> {
-            ReconciliationRunRow row = new ReconciliationRunRow();
-            row.setReconciliationRunId((Long) values[0]);
-            row.setValidationRunId((Long) values[1]);
-            row.setSettlementMonth((LocalDate) values[2]);
-            row.setPaymentStage((String) values[3]);
-            row.setInsurerId((Long) values[4]);
-            row.setStatus((String) values[5]);
-            row.setStartedAt((OffsetDateTime) values[6]);
-            row.setCompletedAt((OffsetDateTime) values[7]);
-            row.setCreatedBy((Long) values[8]);
-            row.setCreatedAt((OffsetDateTime) values[9]);
-            return row;
-        }).uniqueResult();
+        query.setParameter(INSURER_ID_PARAM, insurerId);
+        query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId);
+        return ReconciliationNativeProjection.map(query, ReconciliationRunRow::new, RUN_COLUMNS).uniqueResult();
     }
 
     public List<Long> findSelectedInsurerIds(Long validationRunId) {
@@ -181,7 +149,7 @@ public class ReconciliationRunRepository {
                 AND insurer.active_yn = TRUE
                 ORDER BY contract.insurer_id
                 """).unwrap(NativeQuery.class);
-        query.setParameter("validationRunId", validationRunId);
+        query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId);
         query.addScalar("insurer_id", Long.class);
         return query.setTupleTransformer((values, aliases) -> (Long) values[0]).getResultList();
     }
@@ -200,8 +168,8 @@ public class ReconciliationRunRepository {
                 AND insurer.active_yn = TRUE
                 ORDER BY target.contract_id
                 """).unwrap(NativeQuery.class);
-        query.setParameter("validationRunId", validationRunId);
-        query.setParameter("insurerId", insurerId);
+        query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId);
+        query.setParameter(INSURER_ID_PARAM, insurerId);
         query.addScalar("contract_id", Long.class);
         return query.setTupleTransformer((values, aliases) -> (Long) values[0]).getResultList();
     }
@@ -215,7 +183,7 @@ public class ReconciliationRunRepository {
                 WHERE validation_run_id = :validationRunId
                 FOR UPDATE
                 """).unwrap(NativeQuery.class);
-        query.setParameter("validationRunId", validationRunId);
+        query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId);
         query.addScalar("validation_run_id", Long.class);
         return (Long) query.uniqueResult();
     }

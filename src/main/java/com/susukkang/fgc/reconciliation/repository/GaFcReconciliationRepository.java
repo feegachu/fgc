@@ -24,62 +24,11 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class GaFcReconciliationRepository {
     private final EntityManager entityManager;
+    private final ReconciliationExpectedSourceQuery expectedSources;
 
     public List<GaFcExpectedSourceRow> findExpectedSources(LocalDate settlementMonth, Long insurerId) {
-        NativeQuery<?> query = entityManager.createNativeQuery("""
-                SELECT sl.schedule_line_id AS scheduleLineId,
-                jh.journal_header_id AS journalHeaderId,
-                sh.contract_id AS contractId,
-                sl.beneficiary_agent_id AS expectedAgentId,
-                sl.commission_item_id AS commissionItemId,
-                sl.installment_no AS installmentNo,
-                sl.due_date AS dueDate,
-                sl.due_month AS dueMonth,
-                sl.expected_amount AS expectedAmount
-                FROM fgc.schedule_header sh
-                JOIN fgc.schedule_line sl
-                ON sl.schedule_header_id = sh.schedule_header_id
-                JOIN fgc.insurance_contract c
-                ON c.contract_id = sh.contract_id
-                LEFT JOIN fgc.journal_header jh
-                ON jh.journal_type = 'EXPECTED_FC_PAYOUT'
-                AND jh.source_entity_type = 'SCHEDULE_LINE'
-                AND jh.source_entity_id = CAST(sl.schedule_line_id AS varchar)
-                AND jh.status = 'POSTED'
-                WHERE sh.payment_stage = 'GA_TO_FC'
-                AND sh.schedule_purpose = 'OPERATIONAL'
-                AND sh.active_yn = TRUE
-                AND sh.status NOT IN ('HOLD', 'CANCELLED')
-                AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
-                AND sl.due_month = :settlementMonth
-                AND c.insurer_id = :insurerId
-                ORDER BY sh.contract_id, sl.commission_item_id, sl.due_month,
-                sl.installment_no, sl.schedule_line_id
-                """).unwrap(NativeQuery.class);
-        query.setParameter("settlementMonth", settlementMonth);
-        query.setParameter("insurerId", insurerId);
-        query.addScalar("schedulelineid", Long.class);
-        query.addScalar("journalheaderid", Long.class);
-        query.addScalar("contractid", Long.class);
-        query.addScalar("expectedagentid", Long.class);
-        query.addScalar("commissionitemid", Long.class);
-        query.addScalar("installmentno", Integer.class);
-        query.addScalar("duedate", LocalDate.class);
-        query.addScalar("duemonth", LocalDate.class);
-        query.addScalar("expectedamount", BigDecimal.class);
-        return query.setTupleTransformer((values, aliases) -> {
-            GaFcExpectedSourceRow row = new GaFcExpectedSourceRow();
-            row.setScheduleLineId((Long) values[0]);
-            row.setJournalHeaderId((Long) values[1]);
-            row.setContractId((Long) values[2]);
-            row.setExpectedAgentId((Long) values[3]);
-            row.setCommissionItemId((Long) values[4]);
-            row.setInstallmentNo((Integer) values[5]);
-            row.setDueDate((LocalDate) values[6]);
-            row.setDueMonth((LocalDate) values[7]);
-            row.setExpectedAmount((BigDecimal) values[8]);
-            return row;
-        }).getResultList();
+        return expectedSources.find(settlementMonth, insurerId,
+                com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC, GaFcExpectedSourceRow::new);
     }
 
     public List<GaFcActualSourceRow> findActualSources(LocalDate settlementMonth, Long insurerId) {
