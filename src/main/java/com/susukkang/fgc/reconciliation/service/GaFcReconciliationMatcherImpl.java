@@ -7,7 +7,7 @@ import com.susukkang.fgc.reconciliation.dto.GaFcActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcExpectedSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcMatchCandidate;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
-import com.susukkang.fgc.reconciliation.mapper.GaFcReconciliationMapper;
+import com.susukkang.fgc.reconciliation.repository.GaFcReconciliationRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,7 +39,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
 
-    private final GaFcReconciliationMapper reconciliationMapper;
+    private final GaFcReconciliationRepository sourceRepository;
     private final TolerancePolicy tolerancePolicy;
 
     @Override
@@ -47,9 +47,9 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
     public List<GaFcMatchCandidate> match(ReconciliationExecutionRequest request) {
         validateRequest(request);
 
-        List<GaFcExpectedSourceRow> expectedSources = reconciliationMapper.findExpectedSources(
+        List<GaFcExpectedSourceRow> expectedSources = sourceRepository.findExpectedSources(
                 request.settlementMonth(), request.insurerId());
-        List<GaFcActualSourceRow> actualSources = reconciliationMapper.findActualSources(
+        List<GaFcActualSourceRow> actualSources = sourceRepository.findActualSources(
                 request.settlementMonth(), request.insurerId());
 
         Map<BaseMatchKey, List<GaFcExpectedSourceRow>> expectedByKey = groupExpected(expectedSources);

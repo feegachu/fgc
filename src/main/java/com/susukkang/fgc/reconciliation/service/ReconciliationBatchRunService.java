@@ -3,7 +3,7 @@ package com.susukkang.fgc.reconciliation.service;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunInsertRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReconciliationBatchRunService {
 
-    private final ReconciliationRunMapper reconciliationRunMapper;
+    private final ReconciliationRunRepository reconciliationRunRepository;
     private final ReconciliationRunLifecycleService lifecycleService;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -33,12 +33,12 @@ public class ReconciliationBatchRunService {
             ValidationStepContext context,
             PaymentStage paymentStage
     ) {
-        if (reconciliationRunMapper.lockValidationRun(context.validationRunId()) == null) {
+        if (reconciliationRunRepository.lockValidationRun(context.validationRunId()) == null) {
             throw new IllegalStateException("FGC-FUN-041 검증 실행을 찾을 수 없습니다.");
         }
         List<ReconciliationExecutionRequest> requests = new ArrayList<>();
-        for (Long insurerId : reconciliationRunMapper.findSelectedInsurerIds(context.validationRunId())) {
-            ReconciliationRunRow run = reconciliationRunMapper.findByNaturalKey(
+        for (Long insurerId : reconciliationRunRepository.findSelectedInsurerIds(context.validationRunId())) {
+            ReconciliationRunRow run = reconciliationRunRepository.findByNaturalKey(
                     context.job().validationMonth(), paymentStage, insurerId, context.validationRunId());
             if (run == null) {
                 ReconciliationRunInsertRow insertRow = new ReconciliationRunInsertRow();
@@ -47,7 +47,7 @@ public class ReconciliationBatchRunService {
                 insertRow.setPaymentStage(paymentStage);
                 insertRow.setInsurerId(insurerId);
                 insertRow.setCreatedBy(context.job().triggeredBy());
-                reconciliationRunMapper.insert(insertRow);
+                reconciliationRunRepository.insert(insertRow);
                 lifecycleService.start(insertRow.getReconciliationRunId());
                 requests.add(request(context, paymentStage, insurerId, insertRow.getReconciliationRunId()));
                 continue;
@@ -65,7 +65,7 @@ public class ReconciliationBatchRunService {
 
     @Transactional(readOnly = true)
     public List<Long> findSelectedContractIds(Long validationRunId, Long insurerId) {
-        return List.copyOf(reconciliationRunMapper.findSelectedContractIds(validationRunId, insurerId));
+        return List.copyOf(reconciliationRunRepository.findSelectedContractIds(validationRunId, insurerId));
     }
 
     private static ReconciliationExecutionRequest request(

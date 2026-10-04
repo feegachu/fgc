@@ -1,0 +1,493 @@
+package com.susukkang.fgc.reconciliation.repository;
+
+import com.susukkang.fgc.reconciliation.dto.ReconciliationClassificationContext;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchDetailRow;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchInsertRow;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailRow;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationResultInsertRow;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationResultListRow;
+import com.susukkang.fgc.reconciliation.dto.ReconciliationSummaryRow;
+import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
+import org.hibernate.query.NativeQuery;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
+
+/**
+ * 설명 : 대사 결과·원천 연결의 멱등 저장과 분류 문맥·목록·상세·요약 조회.
+ * PostgreSQL 원천·집계·잠금 계약을 보존하며 타입 지정 projection으로 조회한다.
+ *
+ * @author C4t4ddict
+ * @since 2026-10-05
+ * @version 1.0
+ */
+@Repository
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ReconciliationResultRepository {
+    private final EntityManager entityManager;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    /** 충돌은 예외를 발생시키지 않으므로 호출 트랜잭션이 rollback-only가 되지 않는다. */
+    @Transactional
+    public int insertResult(ReconciliationResultInsertRow row) {
+        entityManager.flush();
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                INSERT INTO fgc.reconciliation_result (
+                    reconciliation_run_id, match_group_key, contract_id, expected_agent_id,
+                    actual_agent_id, actual_source_agent_code, commission_item_id, installment_no,
+                    result_type, expected_total_amount, actual_total_amount, difference_amount,
+                    primary_reason_code, secondary_reason_codes, detail_snapshot
+                ) VALUES (
+                    :runId, :matchKey, :contractId, :expectedAgentId,
+                    :actualAgentId, :sourceAgentCode, :itemId, :installmentNo,
+                    :resultType, :expectedAmount, :actualAmount, :differenceAmount,
+                    :primaryReason, ARRAY(SELECT jsonb_array_elements_text(CAST(:reasons AS jsonb))),
+                    CAST(:snapshot AS jsonb)
+                )
+                ON CONFLICT ON CONSTRAINT uq_reconciliation_result DO NOTHING
+                RETURNING reconciliation_result_id
+                """).unwrap(NativeQuery.class);
+        query.setParameter("runId", row.getReconciliationRunId());
+        query.setParameter("matchKey", row.getMatchGroupKey());
+        query.setParameter("contractId", row.getContractId());
+        query.setParameter("expectedAgentId", row.getExpectedAgentId());
+        query.setParameter("actualAgentId", row.getActualAgentId());
+        query.setParameter("sourceAgentCode", row.getActualSourceAgentCode());
+        query.setParameter("itemId", row.getCommissionItemId());
+        query.setParameter("installmentNo", row.getInstallmentNo());
+        query.setParameter("resultType", row.getResultType());
+        query.setParameter("expectedAmount", row.getExpectedTotalAmount());
+        query.setParameter("actualAmount", row.getActualTotalAmount());
+        query.setParameter("differenceAmount", row.getDifferenceAmount());
+        query.setParameter("primaryReason", row.getPrimaryReasonCode());
+        query.setParameter("reasons", writeReasons(row.getSecondaryReasonCodes()));
+        query.setParameter("snapshot", row.getDetailSnapshotJson());
+        query.addScalar("reconciliation_result_id", Long.class);
+        List<?> inserted = query.getResultList();
+        row.setReconciliationResultId(inserted.isEmpty() ? null : (Long) inserted.getFirst());
+        return inserted.size();
+    }
+
+    /** 동일 결과·순번 재입력은 원천 연결과 기존 금액을 덮어쓰지 않는다. */
+    @Transactional
+    public int insertMatch(ReconciliationMatchInsertRow row) {
+        entityManager.flush();
+        return entityManager.createNativeQuery("""
+                INSERT INTO fgc.reconciliation_match (
+                    reconciliation_result_id, match_seq, schedule_line_id,
+                    transaction_attribution_id, matched_amount, match_role
+                ) VALUES (:resultId, :seq, :lineId, :attributionId, :amount, :role)
+                ON CONFLICT ON CONSTRAINT uq_reconciliation_match DO NOTHING
+                """)
+                .setParameter("resultId", row.reconciliationResultId())
+                .setParameter("seq", row.matchSeq())
+                .setParameter("lineId", row.scheduleLineId())
+                .setParameter("attributionId", row.transactionAttributionId())
+                .setParameter("amount", row.matchedAmount())
+                .setParameter("role", row.matchRole())
+                .executeUpdate();
+    }
+
+    /** 빈 ID 목록과 null 참조에서도 SQL 신호가 항상 boolean으로 반환된다. */
+    public ReconciliationClassificationContext findClassificationContext(
+            Long contractId, Long expectedAgentId, Long actualAgentId, List<Long> journalHeaderIds) {
+        boolean hasJournals = journalHeaderIds != null && !journalHeaderIds.isEmpty();
+        String journalSignals = hasJournals ? """
+                (SELECT COUNT(DISTINCT policy_version_id) > 1 FROM fgc.journal_header
+                  WHERE journal_header_id IN (:journalHeaderIds) AND policy_version_id IS NOT NULL)
+                    AS policyVersionError,
+                EXISTS (SELECT 1 FROM fgc.vw_journal_imbalance
+                         WHERE journal_header_id IN (:journalHeaderIds)) AS journalImbalance
+                """ : "FALSE AS policyVersionError, FALSE AS journalImbalance";
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT EXISTS (SELECT 1 FROM fgc.insurance_contract
+                                WHERE contract_id = :contractId
+                                  AND current_status IN ('CANCELLED','TERMINATED','MATURED','LAPSED'))
+                    AS invalidContractPayment,
+                CASE WHEN CAST(:expectedAgentId AS bigint) IS NULL
+                       OR CAST(:actualAgentId AS bigint) IS NULL THEN FALSE
+                     ELSE COALESCE((SELECT expected.organization_id <> actual.organization_id
+                                      FROM fgc.agent expected, fgc.agent actual
+                                     WHERE expected.agent_id = :expectedAgentId
+                                       AND actual.agent_id = :actualAgentId), FALSE)
+                END AS organizationMismatch,
+                """ + journalSignals).unwrap(NativeQuery.class);
+        query.setParameter("contractId", contractId);
+        query.setParameter("expectedAgentId", expectedAgentId);
+        query.setParameter("actualAgentId", actualAgentId);
+        if (hasJournals) query.setParameterList("journalHeaderIds", journalHeaderIds);
+        query.addScalar("invalidcontractpayment", Boolean.class);
+        query.addScalar("organizationmismatch", Boolean.class);
+        query.addScalar("policyversionerror", Boolean.class);
+        query.addScalar("journalimbalance", Boolean.class);
+        return query.setTupleTransformer((values, aliases) -> {
+            ReconciliationClassificationContext row = new ReconciliationClassificationContext();
+            row.setInvalidContractPayment((Boolean) values[0]);
+            row.setOrganizationMismatch((Boolean) values[1]);
+            row.setPolicyVersionError((Boolean) values[2]);
+            row.setJournalImbalance((Boolean) values[3]);
+            return row;
+        }).uniqueResult();
+    }
+
+    private String writeReasons(List<String> reasons) {
+        try {
+            return objectMapper.writeValueAsString(reasons == null ? List.of() : reasons);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new IllegalStateException("대사 보조 사유를 직렬화하지 못했습니다.", exception);
+        }
+    }
+
+    public Long findResultId(Long reconciliationRunId, String matchGroupKey) {
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT reconciliation_result_id
+                FROM fgc.reconciliation_result
+                WHERE reconciliation_run_id = :reconciliationRunId
+                AND match_group_key = :matchGroupKey
+                """).unwrap(NativeQuery.class);
+        query.setParameter("reconciliationRunId", reconciliationRunId);
+        query.setParameter("matchGroupKey", matchGroupKey);
+        query.addScalar("reconciliation_result_id", Long.class);
+        return (Long) query.uniqueResult();
+    }
+
+    public long countByRunId(Long reconciliationRunId) {
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT COUNT(*)
+                FROM fgc.reconciliation_result
+                WHERE reconciliation_run_id = :reconciliationRunId
+                """).unwrap(NativeQuery.class);
+        query.setParameter("reconciliationRunId", reconciliationRunId);
+        return ((Number) query.getSingleResult()).longValue();
+    }
+
+    public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, String sortDirection, int offset, int limit) {
+        // 정렬은 고정 키워드만 조합하고 결과 유형과 식별자는 바인딩한다.
+        String direction = "asc".equals(sortDirection) ? "ASC" : "DESC";
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT result.reconciliation_result_id AS reconciliationResultId,
+                contract.contract_no AS contractNo,
+                item.item_code AS commissionItemCode,
+                item.item_name AS commissionItemName,
+                result.installment_no AS installmentNo,
+                expected_agent.agent_id AS expectedAgentId,
+                expected_agent.agent_code AS expectedAgentCode,
+                expected_agent.agent_name AS expectedAgentName,
+                expected_org.organization_name AS expectedOrganizationName,
+                actual_agent.agent_id AS actualAgentId,
+                actual_agent.agent_code AS actualAgentCode,
+                actual_agent.agent_name AS actualAgentName,
+                actual_org.organization_name AS actualOrganizationName,
+                result.actual_source_agent_code AS actualSourceAgentCode,
+                result.expected_total_amount AS expectedTotalAmount,
+                result.actual_total_amount AS actualTotalAmount,
+                result.difference_amount AS differenceAmount,
+                result.result_type AS resultType,
+                result.primary_reason_code AS primaryReasonCode,
+                array_to_string(result.secondary_reason_codes, ',') AS secondaryReasonCodesCsv,
+                result.created_at AS createdAt
+                FROM fgc.reconciliation_result result
+                LEFT JOIN fgc.insurance_contract contract ON contract.contract_id = result.contract_id
+                LEFT JOIN fgc.commission_item item ON item.commission_item_id = result.commission_item_id
+                LEFT JOIN fgc.agent expected_agent ON expected_agent.agent_id = result.expected_agent_id
+                LEFT JOIN fgc.organization expected_org
+                ON expected_org.organization_id = expected_agent.organization_id
+                LEFT JOIN fgc.agent actual_agent ON actual_agent.agent_id = result.actual_agent_id
+                LEFT JOIN fgc.organization actual_org
+                ON actual_org.organization_id = actual_agent.organization_id
+                WHERE result.reconciliation_run_id = :reconciliationRunId
+                AND (CAST(:resultType AS varchar) IS NULL OR result.result_type = :resultType)
+                ORDER BY result.created_at
+                %s,
+                result.reconciliation_result_id
+                %s
+                """.formatted(direction, direction)).unwrap(NativeQuery.class);
+        query.setParameter("reconciliationRunId", reconciliationRunId);
+        query.setParameter("resultType", resultType);
+        query.setFirstResult(offset).setMaxResults(limit);
+        query.addScalar("reconciliationresultid", Long.class);
+        query.addScalar("contractno", String.class);
+        query.addScalar("commissionitemcode", String.class);
+        query.addScalar("commissionitemname", String.class);
+        query.addScalar("installmentno", Integer.class);
+        query.addScalar("expectedagentid", Long.class);
+        query.addScalar("expectedagentcode", String.class);
+        query.addScalar("expectedagentname", String.class);
+        query.addScalar("expectedorganizationname", String.class);
+        query.addScalar("actualagentid", Long.class);
+        query.addScalar("actualagentcode", String.class);
+        query.addScalar("actualagentname", String.class);
+        query.addScalar("actualorganizationname", String.class);
+        query.addScalar("actualsourceagentcode", String.class);
+        query.addScalar("expectedtotalamount", BigDecimal.class);
+        query.addScalar("actualtotalamount", BigDecimal.class);
+        query.addScalar("differenceamount", BigDecimal.class);
+        query.addScalar("resulttype", String.class);
+        query.addScalar("primaryreasoncode", String.class);
+        query.addScalar("secondaryreasoncodescsv", String.class);
+        query.addScalar("createdat", OffsetDateTime.class);
+        return query.setTupleTransformer((values, aliases) -> {
+            ReconciliationResultListRow row = new ReconciliationResultListRow();
+            row.setReconciliationResultId((Long) values[0]);
+            row.setContractNo((String) values[1]);
+            row.setCommissionItemCode((String) values[2]);
+            row.setCommissionItemName((String) values[3]);
+            row.setInstallmentNo((Integer) values[4]);
+            row.setExpectedAgentId((Long) values[5]);
+            row.setExpectedAgentCode((String) values[6]);
+            row.setExpectedAgentName((String) values[7]);
+            row.setExpectedOrganizationName((String) values[8]);
+            row.setActualAgentId((Long) values[9]);
+            row.setActualAgentCode((String) values[10]);
+            row.setActualAgentName((String) values[11]);
+            row.setActualOrganizationName((String) values[12]);
+            row.setActualSourceAgentCode((String) values[13]);
+            row.setExpectedTotalAmount((BigDecimal) values[14]);
+            row.setActualTotalAmount((BigDecimal) values[15]);
+            row.setDifferenceAmount((BigDecimal) values[16]);
+            row.setResultType((String) values[17]);
+            row.setPrimaryReasonCode((String) values[18]);
+            row.setSecondaryReasonCodesCsv((String) values[19]);
+            row.setCreatedAt((OffsetDateTime) values[20]);
+            return row;
+        }).getResultList();
+    }
+
+    public long countResults(Long reconciliationRunId, String resultType) {
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT COUNT(*)
+                FROM fgc.reconciliation_result result
+                WHERE result.reconciliation_run_id = :reconciliationRunId
+                AND (CAST(:resultType AS varchar) IS NULL OR result.result_type = :resultType)
+                """).unwrap(NativeQuery.class);
+        query.setParameter("reconciliationRunId", reconciliationRunId);
+        query.setParameter("resultType", resultType);
+        return ((Number) query.getSingleResult()).longValue();
+    }
+
+    public ReconciliationSummaryRow findSummary(Long reconciliationRunId) {
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT result_count AS resultCount,
+                matched_count AS matchedCount,
+                exception_count AS exceptionCount,
+                expected_total AS expectedTotal,
+                actual_total AS actualTotal,
+                difference_total AS differenceTotal
+                FROM fgc.vw_reconciliation_summary
+                WHERE reconciliation_run_id = :reconciliationRunId
+                """).unwrap(NativeQuery.class);
+        query.setParameter("reconciliationRunId", reconciliationRunId);
+        query.addScalar("resultcount", Long.class);
+        query.addScalar("matchedcount", Long.class);
+        query.addScalar("exceptioncount", Long.class);
+        query.addScalar("expectedtotal", BigDecimal.class);
+        query.addScalar("actualtotal", BigDecimal.class);
+        query.addScalar("differencetotal", BigDecimal.class);
+        return query.setTupleTransformer((values, aliases) -> {
+            ReconciliationSummaryRow row = new ReconciliationSummaryRow();
+            row.setResultCount((Long) values[0]);
+            row.setMatchedCount((Long) values[1]);
+            row.setExceptionCount((Long) values[2]);
+            row.setExpectedTotal((BigDecimal) values[3]);
+            row.setActualTotal((BigDecimal) values[4]);
+            row.setDifferenceTotal((BigDecimal) values[5]);
+            return row;
+        }).uniqueResult();
+    }
+
+    public ReconciliationResultDetailRow findDetail(Long reconciliationResultId) {
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT result.reconciliation_result_id AS reconciliationResultId,
+                result.reconciliation_run_id AS reconciliationRunId,
+                result.match_group_key AS matchGroupKey,
+                result.contract_id AS contractId,
+                contract.contract_no AS contractNo,
+                result.commission_item_id AS commissionItemId,
+                item.item_code AS commissionItemCode,
+                item.item_name AS commissionItemName,
+                result.installment_no AS installmentNo,
+                expected_agent.agent_id AS expectedAgentId,
+                expected_agent.agent_code AS expectedAgentCode,
+                expected_agent.agent_name AS expectedAgentName,
+                expected_org.organization_name AS expectedOrganizationName,
+                actual_agent.agent_id AS actualAgentId,
+                actual_agent.agent_code AS actualAgentCode,
+                actual_agent.agent_name AS actualAgentName,
+                actual_org.organization_name AS actualOrganizationName,
+                result.actual_source_agent_code AS actualSourceAgentCode,
+                result.expected_total_amount AS expectedTotalAmount,
+                result.actual_total_amount AS actualTotalAmount,
+                result.difference_amount AS differenceAmount,
+                result.result_type AS resultType,
+                result.primary_reason_code AS primaryReasonCode,
+                array_to_string(result.secondary_reason_codes, ',') AS secondaryReasonCodesCsv,
+                result.detail_snapshot::text AS detailSnapshotJson,
+                result.created_at AS createdAt
+                FROM fgc.reconciliation_result result
+                LEFT JOIN fgc.insurance_contract contract ON contract.contract_id = result.contract_id
+                LEFT JOIN fgc.commission_item item ON item.commission_item_id = result.commission_item_id
+                LEFT JOIN fgc.agent expected_agent ON expected_agent.agent_id = result.expected_agent_id
+                LEFT JOIN fgc.organization expected_org
+                ON expected_org.organization_id = expected_agent.organization_id
+                LEFT JOIN fgc.agent actual_agent ON actual_agent.agent_id = result.actual_agent_id
+                LEFT JOIN fgc.organization actual_org
+                ON actual_org.organization_id = actual_agent.organization_id
+                WHERE result.reconciliation_result_id = :reconciliationResultId
+                """).unwrap(NativeQuery.class);
+        query.setParameter("reconciliationResultId", reconciliationResultId);
+        query.addScalar("reconciliationresultid", Long.class);
+        query.addScalar("reconciliationrunid", Long.class);
+        query.addScalar("matchgroupkey", String.class);
+        query.addScalar("contractid", Long.class);
+        query.addScalar("contractno", String.class);
+        query.addScalar("commissionitemid", Long.class);
+        query.addScalar("commissionitemcode", String.class);
+        query.addScalar("commissionitemname", String.class);
+        query.addScalar("installmentno", Integer.class);
+        query.addScalar("expectedagentid", Long.class);
+        query.addScalar("expectedagentcode", String.class);
+        query.addScalar("expectedagentname", String.class);
+        query.addScalar("expectedorganizationname", String.class);
+        query.addScalar("actualagentid", Long.class);
+        query.addScalar("actualagentcode", String.class);
+        query.addScalar("actualagentname", String.class);
+        query.addScalar("actualorganizationname", String.class);
+        query.addScalar("actualsourceagentcode", String.class);
+        query.addScalar("expectedtotalamount", BigDecimal.class);
+        query.addScalar("actualtotalamount", BigDecimal.class);
+        query.addScalar("differenceamount", BigDecimal.class);
+        query.addScalar("resulttype", String.class);
+        query.addScalar("primaryreasoncode", String.class);
+        query.addScalar("secondaryreasoncodescsv", String.class);
+        query.addScalar("detailsnapshotjson", String.class);
+        query.addScalar("createdat", OffsetDateTime.class);
+        return query.setTupleTransformer((values, aliases) -> {
+            ReconciliationResultDetailRow row = new ReconciliationResultDetailRow();
+            row.setReconciliationResultId((Long) values[0]);
+            row.setReconciliationRunId((Long) values[1]);
+            row.setMatchGroupKey((String) values[2]);
+            row.setContractId((Long) values[3]);
+            row.setContractNo((String) values[4]);
+            row.setCommissionItemId((Long) values[5]);
+            row.setCommissionItemCode((String) values[6]);
+            row.setCommissionItemName((String) values[7]);
+            row.setInstallmentNo((Integer) values[8]);
+            row.setExpectedAgentId((Long) values[9]);
+            row.setExpectedAgentCode((String) values[10]);
+            row.setExpectedAgentName((String) values[11]);
+            row.setExpectedOrganizationName((String) values[12]);
+            row.setActualAgentId((Long) values[13]);
+            row.setActualAgentCode((String) values[14]);
+            row.setActualAgentName((String) values[15]);
+            row.setActualOrganizationName((String) values[16]);
+            row.setActualSourceAgentCode((String) values[17]);
+            row.setExpectedTotalAmount((BigDecimal) values[18]);
+            row.setActualTotalAmount((BigDecimal) values[19]);
+            row.setDifferenceAmount((BigDecimal) values[20]);
+            row.setResultType((String) values[21]);
+            row.setPrimaryReasonCode((String) values[22]);
+            row.setSecondaryReasonCodesCsv((String) values[23]);
+            row.setDetailSnapshotJson((String) values[24]);
+            row.setCreatedAt((OffsetDateTime) values[25]);
+            return row;
+        }).uniqueResult();
+    }
+
+    public List<ReconciliationMatchDetailRow> findMatches(Long reconciliationResultId) {
+        NativeQuery<?> query = entityManager.createNativeQuery("""
+                SELECT match.match_seq AS matchSeq,
+                match.match_role AS matchRole,
+                match.schedule_line_id AS scheduleLineId,
+                line.schedule_header_id AS scheduleHeaderId,
+                match.transaction_attribution_id AS transactionAttributionId,
+                transaction.commission_transaction_id AS commissionTransactionId,
+                COALESCE(expected_journal.journal_header_id, actual_journal.journal_header_id) AS journalHeaderId,
+                COALESCE(schedule.contract_id, attribution.contract_id) AS contractId,
+                COALESCE(line.beneficiary_agent_id, attribution.agent_id, transaction.recipient_agent_id) AS agentId,
+                COALESCE(line.commission_item_id, transaction.commission_item_id) AS commissionItemId,
+                COALESCE(line.installment_no, transaction.installment_no) AS installmentNo,
+                line.due_date AS dueDate,
+                line.basis_amount AS basisAmount,
+                line.rate_pct AS ratePct,
+                attribution.attribution_date AS attributionDate,
+                transaction.settlement_month AS settlementMonth,
+                COALESCE(line.due_date, attribution.attribution_date) AS referenceDate,
+                match.matched_amount AS matchedAmount
+                FROM fgc.reconciliation_match match
+                JOIN fgc.reconciliation_result result
+                ON result.reconciliation_result_id = match.reconciliation_result_id
+                JOIN fgc.reconciliation_run run
+                ON run.reconciliation_run_id = result.reconciliation_run_id
+                LEFT JOIN fgc.schedule_line line ON line.schedule_line_id = match.schedule_line_id
+                LEFT JOIN fgc.schedule_header schedule ON schedule.schedule_header_id = line.schedule_header_id
+                LEFT JOIN fgc.journal_header expected_journal
+                ON expected_journal.source_entity_type = 'SCHEDULE_LINE'
+                AND expected_journal.source_entity_id = CAST(line.schedule_line_id AS varchar)
+                AND expected_journal.status = 'POSTED'
+                AND expected_journal.journal_type = CASE run.payment_stage
+                WHEN 'INSURER_TO_GA' THEN 'EXPECTED_INSURER_INCOME'
+                ELSE 'EXPECTED_FC_PAYOUT'
+                END
+                LEFT JOIN fgc.transaction_attribution attribution
+                ON attribution.transaction_attribution_id = match.transaction_attribution_id
+                LEFT JOIN fgc.commission_transaction transaction
+                ON transaction.commission_transaction_id = attribution.commission_transaction_id
+                LEFT JOIN fgc.journal_header actual_journal
+                ON actual_journal.source_entity_type = 'COMMISSION_TRANSACTION'
+                AND actual_journal.source_entity_id = CAST(transaction.commission_transaction_id AS varchar)
+                AND actual_journal.status = 'POSTED'
+                AND actual_journal.journal_type = CASE run.payment_stage
+                WHEN 'INSURER_TO_GA' THEN 'ACTUAL_INSURER_STATEMENT'
+                ELSE 'CONFIRMED_FC_PAYOUT'
+                END
+                WHERE match.reconciliation_result_id = :reconciliationResultId
+                ORDER BY match.match_seq
+                """).unwrap(NativeQuery.class);
+        query.setParameter("reconciliationResultId", reconciliationResultId);
+        query.addScalar("matchseq", Integer.class);
+        query.addScalar("matchrole", String.class);
+        query.addScalar("schedulelineid", Long.class);
+        query.addScalar("scheduleheaderid", Long.class);
+        query.addScalar("transactionattributionid", Long.class);
+        query.addScalar("commissiontransactionid", Long.class);
+        query.addScalar("journalheaderid", Long.class);
+        query.addScalar("contractid", Long.class);
+        query.addScalar("agentid", Long.class);
+        query.addScalar("commissionitemid", Long.class);
+        query.addScalar("installmentno", Integer.class);
+        query.addScalar("duedate", LocalDate.class);
+        query.addScalar("basisamount", BigDecimal.class);
+        query.addScalar("ratepct", BigDecimal.class);
+        query.addScalar("attributiondate", LocalDate.class);
+        query.addScalar("settlementmonth", LocalDate.class);
+        query.addScalar("referencedate", LocalDate.class);
+        query.addScalar("matchedamount", BigDecimal.class);
+        return query.setTupleTransformer((values, aliases) -> {
+            ReconciliationMatchDetailRow row = new ReconciliationMatchDetailRow();
+            row.setMatchSeq((Integer) values[0]);
+            row.setMatchRole((String) values[1]);
+            row.setScheduleLineId((Long) values[2]);
+            row.setScheduleHeaderId((Long) values[3]);
+            row.setTransactionAttributionId((Long) values[4]);
+            row.setCommissionTransactionId((Long) values[5]);
+            row.setJournalHeaderId((Long) values[6]);
+            row.setContractId((Long) values[7]);
+            row.setAgentId((Long) values[8]);
+            row.setCommissionItemId((Long) values[9]);
+            row.setInstallmentNo((Integer) values[10]);
+            row.setDueDate((LocalDate) values[11]);
+            row.setBasisAmount((BigDecimal) values[12]);
+            row.setRatePct((BigDecimal) values[13]);
+            row.setAttributionDate((LocalDate) values[14]);
+            row.setSettlementMonth((LocalDate) values[15]);
+            row.setReferenceDate((LocalDate) values[16]);
+            row.setMatchedAmount((BigDecimal) values[17]);
+            return row;
+        }).getResultList();
+    }
+}

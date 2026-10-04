@@ -1,4 +1,4 @@
-package com.susukkang.fgc.reconciliation.mapper;
+package com.susukkang.fgc.reconciliation.repository;
 
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow;
 import org.junit.jupiter.api.Test;
@@ -13,18 +13,18 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * FGC-FUN-051 / IF-API-39 — 대사 실행 이력 Mapper. vw_reconciliation_summary 조인이
+ * FGC-FUN-051 / IF-API-39 — 대사 실행 이력 Repository. vw_reconciliation_summary 조인이
  * 결과 0건 실행도 빠뜨리지 않는지, 정산월·지급단계 필터가 맞는지, 같은 정산월·지급단계라도
  * 보험회사·월 검증 실행이 다르면 별도 행으로 나오는지(재실행 이력) 확인한다.
  */
 @SpringBootTest
 @Transactional
-class ReconciliationRunHistoryMapperIntegrationTest {
+class ReconciliationRunHistoryRepositoryIntegrationTest {
 
     private static final LocalDate TEST_MONTH = LocalDate.of(2098, 6, 1);
 
     @Autowired
-    private ReconciliationRunHistoryMapper mapper;
+    private ReconciliationRunHistoryRepository mapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 

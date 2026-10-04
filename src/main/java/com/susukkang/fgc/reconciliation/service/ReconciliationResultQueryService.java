@@ -12,8 +12,8 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationResultListItemResponse
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultSearchResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationSummaryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationSummaryRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationResultMapper;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationResultRepository;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,8 +30,8 @@ public class ReconciliationResultQueryService {
     private static final int MAX_PAGE_SIZE = 100;
     private static final Set<String> SUPPORTED_SORTS = Set.of("createdAt,desc", "createdAt,asc");
 
-    private final ReconciliationRunMapper reconciliationRunMapper;
-    private final ReconciliationResultMapper reconciliationResultMapper;
+    private final ReconciliationRunRepository reconciliationRunRepository;
+    private final ReconciliationResultRepository reconciliationResultRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -43,7 +43,7 @@ public class ReconciliationResultQueryService {
             String sort
     ) {
         validatePage(page, size, sort);
-        if (reconciliationRunMapper.findById(reconciliationRunId) == null) {
+        if (reconciliationRunRepository.findById(reconciliationRunId) == null) {
             throw notFound(reconciliationRunId);
         }
         long offsetLong = (long) (page - 1) * size;
@@ -51,13 +51,13 @@ public class ReconciliationResultQueryService {
             throw invalid("page");
         }
         String direction = sort.endsWith(",asc") ? "asc" : "desc";
-        List<ReconciliationResultListItemResponse> content = reconciliationResultMapper
+        List<ReconciliationResultListItemResponse> content = reconciliationResultRepository
                 .findResults(reconciliationRunId, resultType, direction, (int) offsetLong, size)
                 .stream()
                 .map(ReconciliationResultListItemResponse::from)
                 .toList();
-        long total = reconciliationResultMapper.countResults(reconciliationRunId, resultType);
-        ReconciliationSummaryRow summary = reconciliationResultMapper.findSummary(reconciliationRunId);
+        long total = reconciliationResultRepository.countResults(reconciliationRunId, resultType);
+        ReconciliationSummaryRow summary = reconciliationResultRepository.findSummary(reconciliationRunId);
         return new ReconciliationResultSearchResponse(
                 ReconciliationSummaryResponse.from(summary),
                 PageResponse.of(content, page, size, total, sort));
@@ -65,13 +65,13 @@ public class ReconciliationResultQueryService {
 
     @Transactional(readOnly = true)
     public ReconciliationResultDetailResponse get(long reconciliationResultId) {
-        ReconciliationResultDetailRow row = reconciliationResultMapper.findDetail(reconciliationResultId);
+        ReconciliationResultDetailRow row = reconciliationResultRepository.findDetail(reconciliationResultId);
         if (row == null) {
             throw notFound(reconciliationResultId);
         }
         return ReconciliationResultDetailResponse.from(
                 row,
-                reconciliationResultMapper.findMatches(reconciliationResultId),
+                reconciliationResultRepository.findMatches(reconciliationResultId),
                 readSnapshot(row.getDetailSnapshotJson()));
     }
 

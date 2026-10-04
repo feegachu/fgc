@@ -2,7 +2,7 @@ package com.susukkang.fgc.reconciliation.service;
 
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,33 +25,33 @@ import static org.mockito.Mockito.verify;
 class ReconciliationRunLifecycleServiceImplTest {
 
     @Mock
-    private ReconciliationRunMapper reconciliationRunMapper;
+    private ReconciliationRunRepository reconciliationRunRepository;
 
     private ReconciliationRunLifecycleServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new ReconciliationRunLifecycleServiceImpl(reconciliationRunMapper);
+        service = new ReconciliationRunLifecycleServiceImpl(reconciliationRunRepository);
     }
 
     @Test
     void 기존_DB_전이로_시작_완료_실패를_처리한다() {
-        given(reconciliationRunMapper.transitionToRunning(11L)).willReturn(1);
-        given(reconciliationRunMapper.transitionToCompleted(12L)).willReturn(1);
-        given(reconciliationRunMapper.transitionToFailed(13L)).willReturn(1);
+        given(reconciliationRunRepository.transitionToRunning(11L)).willReturn(1);
+        given(reconciliationRunRepository.transitionToCompleted(12L)).willReturn(1);
+        given(reconciliationRunRepository.transitionToFailed(13L)).willReturn(1);
 
         service.start(11L);
         service.complete(12L);
         service.fail(13L);
 
-        verify(reconciliationRunMapper).transitionToRunning(11L);
-        verify(reconciliationRunMapper).transitionToCompleted(12L);
-        verify(reconciliationRunMapper).transitionToFailed(13L);
+        verify(reconciliationRunRepository).transitionToRunning(11L);
+        verify(reconciliationRunRepository).transitionToCompleted(12L);
+        verify(reconciliationRunRepository).transitionToFailed(13L);
     }
 
     @Test
     void 허용되지_않은_상태전이는_공통_서버오류로_중단한다() {
-        given(reconciliationRunMapper.transitionToCompleted(11L)).willReturn(0);
+        given(reconciliationRunRepository.transitionToCompleted(11L)).willReturn(0);
 
         assertThatThrownBy(() -> service.complete(11L))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception ->

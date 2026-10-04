@@ -5,7 +5,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,12 +25,12 @@ public class ReconciliationExceptionService {
     // 수 있었다).
     private static final Set<String> ELIGIBLE_STATUSES = Set.of("COMPLETED", "FINALIZED");
 
-    private final ReconciliationRunMapper reconciliationRunMapper;
+    private final ReconciliationRunRepository reconciliationRunRepository;
     private final ExceptionCaseMapper exceptionCaseMapper;
 
     @Transactional
     public ReconciliationExceptionBulkCreateResponse bulkCreate(Long reconciliationRunId) {
-        ReconciliationRunRow reconciliationRun = reconciliationRunMapper.findById(reconciliationRunId);
+        ReconciliationRunRow reconciliationRun = reconciliationRunRepository.findById(reconciliationRunId);
         if (reconciliationRun == null) {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_004, Map.of("id", reconciliationRunId));

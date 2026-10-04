@@ -7,8 +7,8 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchDetailRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationSummaryRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationResultMapper;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationResultRepository;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,9 +27,9 @@ import static org.mockito.BDDMockito.given;
 class ReconciliationResultQueryServiceTest {
 
     @Mock
-    private ReconciliationRunMapper runMapper;
+    private ReconciliationRunRepository runMapper;
     @Mock
-    private ReconciliationResultMapper resultMapper;
+    private ReconciliationResultRepository resultMapper;
 
     private ReconciliationResultQueryService service;
 

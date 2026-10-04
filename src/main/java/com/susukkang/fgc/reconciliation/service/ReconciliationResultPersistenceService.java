@@ -9,7 +9,7 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationClassificationContext;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchInsertRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultInsertRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationResultMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationResultRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,7 +28,7 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class ReconciliationResultPersistenceService {
 
-    private final ReconciliationResultMapper reconciliationResultMapper;
+    private final ReconciliationResultRepository reconciliationResultRepository;
     private final ObjectMapper objectMapper;
     private final ReconciliationReasonClassifier reasonClassifier;
 
@@ -44,10 +44,10 @@ public class ReconciliationResultPersistenceService {
 
     private void persistCandidate(ReconciliationExecutionRequest request, ReconciliationCandidate candidate) {
         ReconciliationResultInsertRow row = toInsertRow(request, candidate);
-        int inserted = reconciliationResultMapper.insertResult(row);
+        int inserted = reconciliationResultRepository.insertResult(row);
         Long resultId = row.getReconciliationResultId();
         if (resultId == null) {
-            resultId = reconciliationResultMapper.findResultId(
+            resultId = reconciliationResultRepository.findResultId(
                     request.reconciliationRunId(), candidate.matchGroupKey());
         }
         if (resultId == null) {
@@ -58,7 +58,7 @@ public class ReconciliationResultPersistenceService {
         if (inserted == 1) {
             int matchSeq = 1;
             for (ReconciliationMatchSource source : candidate.sourceMatches()) {
-                reconciliationResultMapper.insertMatch(new ReconciliationMatchInsertRow(
+                reconciliationResultRepository.insertMatch(new ReconciliationMatchInsertRow(
                         resultId,
                         matchSeq++,
                         source.scheduleLineId(),
@@ -81,7 +81,7 @@ public class ReconciliationResultPersistenceService {
                 .distinct()
                 .sorted()
                 .toList();
-        ReconciliationClassificationContext context = reconciliationResultMapper.findClassificationContext(
+        ReconciliationClassificationContext context = reconciliationResultRepository.findClassificationContext(
                 candidate.contractId(),
                 candidate.expectedAgentId(),
                 candidate.actualAgentId(),

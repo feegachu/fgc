@@ -5,7 +5,7 @@ import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.GaFcActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcExpectedSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcMatchCandidate;
-import com.susukkang.fgc.reconciliation.mapper.GaFcReconciliationMapper;
+import com.susukkang.fgc.reconciliation.repository.GaFcReconciliationRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class GaFcReconciliationMatcherImplTest {
     private static final LocalDate MONTH = LocalDate.of(2026, 8, 1);
 
     @Mock
-    private GaFcReconciliationMapper reconciliationMapper;
+    private GaFcReconciliationRepository reconciliationMapper;
 
     private GaFcReconciliationMatcherImpl matcher;
 
