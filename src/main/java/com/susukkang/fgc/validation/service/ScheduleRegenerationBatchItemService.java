@@ -1,7 +1,7 @@
 package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ScheduleRegenerationBatchItemService {
     private final ScheduleService scheduleService;
-    private final ScheduleMapper scheduleMapper;
+    private final ScheduleWriteRepository scheduleWriteRepository;
 
     /**
      * 스케줄 생성·재생성과 validation_run_id 연결(FGC-FUN-043 결과 집계)을 같은
@@ -37,7 +37,7 @@ public class ScheduleRegenerationBatchItemService {
                 scheduleService.generateSchedulesByContractId(contractId);
 
         if (!result.scheduleHeaderIds().isEmpty()) {
-            scheduleMapper.linkHeadersToValidationRun(
+            scheduleWriteRepository.linkHeadersToValidationRun(
                     result.scheduleHeaderIds(),
                     validationRunId
             );
