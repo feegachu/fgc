@@ -27,7 +27,7 @@ server {
     location = /app {
         # 상대 Location 으로 보낸다. 절대 주소면 터널(8088)에서 :80 으로 튄다 ($http_host 주석과 같은 이유)
         absolute_redirect off;
-        return 301 /app/;
+        return 301 /app/$is_args$args;
     }
     # vite 산출물은 파일명에 해시가 있어 오래 캐시해도 된다. 없는 파일은 index.html 로 넘기지 않고 404.
     location ^~ /app/assets/ {

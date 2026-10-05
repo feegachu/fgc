@@ -7,10 +7,13 @@ on:
   push:
     branches: [develop, main]     # 머지 후 develop 검증 + README 뱃지 소스
 
-# 같은 PR에 새 푸시가 오면 진행 중 실행을 취소한다(러너 절약).
-# develop·main push는 취소하지 않는다 — 머지마다 검증 결과(와 2차 이미지 publish)가 남아야 한다.
+# PR: 같은 PR에 새 푸시가 오면 진행 중 실행을 취소한다(러너 절약).
+# develop·main push: run마다 별도 그룹이라 서로 취소·대체하지 않는다 — 머지마다 검증 결과
+# (와 2차 이미지 publish)가 남아야 한다. 그룹을 ref로 두면 cancel-in-progress가 false여도
+# GitHub가 그룹당 "실행 1 + 대기 1"만 두어, 연속 머지 때 대기 중이던 run이 최신 run으로 대체(취소)된다.
+# 순서가 중요한 단계(publish 등)가 생기면 그 job에만 따로 concurrency(취소 없이)를 건다.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
