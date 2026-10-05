@@ -1,15 +1,18 @@
 package com.susukkang.fgc.validation.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.base.repository.ProductOfferingRepository;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.policy.repository.CapRuleSetRepository;
+import com.susukkang.fgc.policy.repository.RefundRateTableRepository;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
-import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.PolicySnapshotMapper;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,18 +20,20 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -37,13 +42,14 @@ import static org.mockito.Mockito.when;
 
 /**
  * ValidationRunCreateServiceImpl 단위테스트
- * ValidationRunMapper를 mock으로 대체해 "중복 체크 → run_no 채번 → INSERT" 흐름만 검증
+ * ValidationRunRepository/CapRuleSetRepository/RefundRateTableRepository/ProductOfferingRepository를
+ * mock으로 대체해 "중복 체크 → run_no 채번 → save" 흐름만 검증
  *
  * NoOpTransactionManager: create()가 이제 TransactionTemplate(REQUIRES_NEW)로 재시도
  * 트랜잭션을 직접 여는 구조라, 진짜 DataSource 없이도 TransactionTemplate.execute()가
  * 동작하려면 PlatformTransactionManager가 하나 있어야 한다. 여기서는 실제로 커밋·롤백할
- * 대상이 없으므로(ValidationRunMapper 자체가 mock) 아무 것도 안 하는 최소 구현을 쓴다 —
- * ValidationRunMapperIntegrationTest가 실제 DB·실제 트랜잭션 매니저로 이 부분까지 검증한다.
+ * 대상이 없으므로(Repository 자체가 mock) 아무 것도 안 하는 최소 구현을 쓴다 —
+ * ValidationRunRepositoryIntegrationTest가 실제 DB·실제 트랜잭션 매니저로 이 부분까지 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class ValidationRunCreateServiceImplTest {
@@ -68,47 +74,59 @@ class ValidationRunCreateServiceImplTest {
     }
 
     @Mock
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
 
     @Mock
-    private PolicySnapshotMapper policySnapshotMapper;
+    private CapRuleSetRepository capRuleSetRepository;
+
+    @Mock
+    private RefundRateTableRepository refundRateTableRepository;
+
+    @Mock
+    private ProductOfferingRepository productOfferingRepository;
 
     private ValidationRunCreateServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        lenient().when(policySnapshotMapper.findActiveCapRuleSets(any()))
-                .thenReturn(List.of());
-        lenient().when(policySnapshotMapper.findActiveRefundRateTables(any()))
-                .thenReturn(List.of());
-        lenient().when(policySnapshotMapper.findActiveProductOfferings(any()))
-                .thenReturn(List.of());
+        lenient().when(capRuleSetRepository.findActiveCapRuleSets(any())).thenReturn(List.of());
+        lenient().when(refundRateTableRepository.findActiveRefundRateTables(any())).thenReturn(List.of());
+        lenient().when(productOfferingRepository.findActiveProductOfferings(any())).thenReturn(List.of());
 
         service = new ValidationRunCreateServiceImpl(
-                validationRunMapper, policySnapshotMapper, new ObjectMapper(),
+                validationRunRepository, capRuleSetRepository, refundRateTableRepository,
+                productOfferingRepository, new ObjectMapper(),
                 new ConstraintErrorCodeResolver(), new NoOpTransactionManager());
     }
 
-    // insert가 useGeneratedKeys로 row.validationRunId를 채우는 것을 mock에서 흉내낸다.
-    // 실제 동작은 ValidationRunMapperIntegrationTest#insertGeneratesIdAndAppliesDefaults가 증명한다.
-    private void stubSuccessfulInsert(Long generatedId, String status) {
-        doAnswer(invocation -> {
-            ValidationRunInsertRow insertedRow = invocation.getArgument(0);
-            insertedRow.setValidationRunId(generatedId);
-            return null;
-        }).when(validationRunMapper).insert(any());
+    // save()가 IDENTITY로 validationRunId를 채우는 것을 mock에서 흉내낸다.
+    // 실제 동작은 ValidationRunRepositoryIntegrationTest#saveGeneratesIdAndAppliesBuilderDefaults가 증명한다.
+    private void stubSuccessfulSave(Long generatedId) {
+        when(validationRunRepository.save(any())).thenAnswer(invocation -> {
+            ValidationRun run = invocation.getArgument(0);
+            ReflectionTestUtils.setField(run, "validationRunId", generatedId);
+            return run;
+        });
+    }
 
-        ValidationRunRow found = new ValidationRunRow();
-        found.setValidationRunId(generatedId);
-        found.setStatus(status);
-        when(validationRunMapper.findById(generatedId)).thenReturn(found);
+    private ValidationRun existingRun(Long id, ValidationRunStatus status, String runType, Long triggeredBy) {
+        ValidationRun run = ValidationRun.builder()
+                .validationMonth(LocalDate.of(2026, 8, 1))
+                .runNo(7)
+                .runType(runType)
+                .triggeredBy(triggeredBy)
+                .build();
+        ReflectionTestUtils.setField(run, "validationRunId", id);
+        ReflectionTestUtils.setField(run, "status", status);
+        return run;
     }
 
     @Test
-    // MONTHLY + 동일 월 활성 실행 있음 → VRUN_001, insert는 호출 안 됨
+    // MONTHLY + 동일 월 활성 실행 있음 → VRUN_001, save는 호출 안 됨
     void throwsAlreadyRunningForDuplicateActiveMonthlyRun() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(true);
+        when(validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(eq(month), eq("MONTHLY"), anyList()))
+                .thenReturn(true);
 
         CreateValidationRunCommand command =
                 new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 1L);
@@ -118,16 +136,16 @@ class ValidationRunCreateServiceImplTest {
                 .extracting(e -> ((FgcBusinessException) e).getErrorCode())
                 .isEqualTo(FgcErrorCode.VRUN_001);
 
-        verify(validationRunMapper, never()).insert(any());
+        verify(validationRunRepository, never()).save(any());
     }
 
     @Test
     // MANUAL_CONTRACT/PRE_CONFIRM은 활성 MONTHLY 실행이 있어도 통과해야 함
     void allowsNonMonthlyRunTypeEvenWhenMonthlyRunIsActive() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        // MONTHLY가 아니면 existsActiveMonthlyRun을 아예 안 부르므로 스텁 X
-        when(validationRunMapper.findNextRunNo(month)).thenReturn(1);
-        stubSuccessfulInsert(100L, "CREATED");
+        // MONTHLY가 아니면 existsByValidationMonthAndRunTypeAndStatusIn을 아예 안 부르므로 스텁 X
+        when(validationRunRepository.findNextRunNo(month)).thenReturn(1);
+        stubSuccessfulSave(100L);
 
         CreateValidationRunCommand command =
                 new CreateValidationRunCommand(month, ValidationRunType.MANUAL_CONTRACT, 1L);
@@ -135,24 +153,26 @@ class ValidationRunCreateServiceImplTest {
         ValidationRunRow result = service.create(command);
 
         assertThat(result.getStatus()).isEqualTo("CREATED");
-        verify(validationRunMapper, never()).existsActiveMonthlyRun(any());
+        verify(validationRunRepository, never())
+                .existsByValidationMonthAndRunTypeAndStatusIn(any(), any(), anyList());
     }
 
     @Test
-    // 정상 생성 — findNextRunNo 결과가 insert에 그대로 전달되는지, 반환된 행의 status가 CREATED인지
+    // 정상 생성 — findNextRunNo 결과가 save에 그대로 전달되는지, 반환된 행의 status가 CREATED인지
     void createsRunWithNextRunNo() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
-        when(validationRunMapper.findNextRunNo(month)).thenReturn(3);
-        stubSuccessfulInsert(100L, "CREATED");
+        when(validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(eq(month), eq("MONTHLY"), anyList()))
+                .thenReturn(false);
+        when(validationRunRepository.findNextRunNo(month)).thenReturn(3);
+        stubSuccessfulSave(100L);
 
         CreateValidationRunCommand command =
                 new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L);
 
         ValidationRunRow result = service.create(command);
 
-        ArgumentCaptor<ValidationRunInsertRow> captor = ArgumentCaptor.forClass(ValidationRunInsertRow.class);
-        verify(validationRunMapper).insert(captor.capture());
+        ArgumentCaptor<ValidationRun> captor = ArgumentCaptor.forClass(ValidationRun.class);
+        verify(validationRunRepository).save(captor.capture());
 
         assertThat(captor.getValue().getRunNo()).isEqualTo(3);
         assertThat(captor.getValue().getValidationMonth()).isEqualTo(month);
@@ -165,15 +185,16 @@ class ValidationRunCreateServiceImplTest {
     // MonthlyValidationJob은 JobParameters의 runNo와 validation_run.run_no가 반드시 같아야 한다.
     void createsRunWithExplicitRunNoForBatch() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
-        stubSuccessfulInsert(100L, "CREATED");
+        when(validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(eq(month), eq("MONTHLY"), anyList()))
+                .thenReturn(false);
+        stubSuccessfulSave(100L);
 
         ValidationRunRow result = service.create(
                 new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L, 7));
 
-        ArgumentCaptor<ValidationRunInsertRow> captor = ArgumentCaptor.forClass(ValidationRunInsertRow.class);
-        verify(validationRunMapper).insert(captor.capture());
-        verify(validationRunMapper, never()).findNextRunNo(month);
+        ArgumentCaptor<ValidationRun> captor = ArgumentCaptor.forClass(ValidationRun.class);
+        verify(validationRunRepository).save(captor.capture());
+        verify(validationRunRepository, never()).findNextRunNo(month);
 
         assertThat(captor.getValue().getRunNo()).isEqualTo(7);
         assertThat(result.getStatus()).isEqualTo("CREATED");
@@ -185,19 +206,17 @@ class ValidationRunCreateServiceImplTest {
     // 기존 행을 그대로 재사용해야 한다(멱등성).
     void reusesExistingRunOnRestartWithSameExplicitRunNo() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        ValidationRunRow existing = new ValidationRunRow();
-        existing.setValidationRunId(100L);
-        existing.setStatus("RUNNING");
-        existing.setRunType("MONTHLY");
-        existing.setTriggeredBy(42L);
-        when(validationRunMapper.findByMonthAndRunNo(month, 7)).thenReturn(existing);
+        ValidationRun existing = existingRun(100L, ValidationRunStatus.RUNNING, "MONTHLY", 42L);
+        when(validationRunRepository.findByValidationMonthAndRunNo(month, 7)).thenReturn(Optional.of(existing));
 
         ValidationRunRow result = service.create(
                 new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L, 7));
 
-        assertThat(result).isSameAs(existing);
-        verify(validationRunMapper, never()).insert(any());
-        verify(validationRunMapper, never()).existsActiveMonthlyRun(any());
+        assertThat(result.getValidationRunId()).isEqualTo(100L);
+        assertThat(result.getStatus()).isEqualTo("RUNNING");
+        verify(validationRunRepository, never()).save(any());
+        verify(validationRunRepository, never())
+                .existsByValidationMonthAndRunTypeAndStatusIn(any(), any(), anyList());
     }
 
     @Test
@@ -205,12 +224,8 @@ class ValidationRunCreateServiceImplTest {
     // 있으면 재시작이 아니라 진짜 충돌이므로 VRUN_005로 막아야 한다
     void throwsStateConflictWhenExistingRunDoesNotMatchTheRequest() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        ValidationRunRow existing = new ValidationRunRow();
-        existing.setValidationRunId(100L);
-        existing.setStatus("RUNNING");
-        existing.setRunType("MONTHLY");
-        existing.setTriggeredBy(999L);
-        when(validationRunMapper.findByMonthAndRunNo(month, 7)).thenReturn(existing);
+        ValidationRun existing = existingRun(100L, ValidationRunStatus.RUNNING, "MONTHLY", 999L);
+        when(validationRunRepository.findByValidationMonthAndRunNo(month, 7)).thenReturn(Optional.of(existing));
 
         CreateValidationRunCommand command =
                 new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 42L, 7);
@@ -220,29 +235,25 @@ class ValidationRunCreateServiceImplTest {
                 .extracting(e -> ((FgcBusinessException) e).getErrorCode())
                 .isEqualTo(FgcErrorCode.VRUN_005);
 
-        verify(validationRunMapper, never()).insert(any());
+        verify(validationRunRepository, never()).save(any());
     }
 
     @Test
     // run_no 채번 경합(uq_validation_run 위반)은 활성 월 중복이 아니므로 재시도해서 결국 성공해야 한다
     void retriesOnRunNoCollisionAndSucceeds() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
+        when(validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(eq(month), eq("MONTHLY"), anyList()))
+                .thenReturn(false);
         // 1차 시도(run_no=3)는 경쟁자와 충돌, 2차 시도(run_no=4)는 성공한다고 가정.
-        when(validationRunMapper.findNextRunNo(month)).thenReturn(3, 4);
-        doThrow(new DataIntegrityViolationException(
-                "duplicate key value violates unique constraint \"uq_validation_run\""))
-                .doAnswer(invocation -> {
-                    ValidationRunInsertRow insertedRow = invocation.getArgument(0);
-                    insertedRow.setValidationRunId(100L);
-                    return null;
-                })
-                .when(validationRunMapper).insert(any());
-
-        ValidationRunRow found = new ValidationRunRow();
-        found.setValidationRunId(100L);
-        found.setStatus("CREATED");
-        when(validationRunMapper.findById(100L)).thenReturn(found);
+        when(validationRunRepository.findNextRunNo(month)).thenReturn(3, 4);
+        when(validationRunRepository.save(any()))
+                .thenThrow(new DataIntegrityViolationException(
+                        "duplicate key value violates unique constraint \"uq_validation_run\""))
+                .thenAnswer(invocation -> {
+                    ValidationRun run = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(run, "validationRunId", 100L);
+                    return run;
+                });
 
         CreateValidationRunCommand command =
                 new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 1L);
@@ -250,8 +261,8 @@ class ValidationRunCreateServiceImplTest {
         ValidationRunRow result = service.create(command);
 
         assertThat(result.getStatus()).isEqualTo("CREATED");
-        verify(validationRunMapper, times(2)).insert(any());
-        verify(validationRunMapper, times(2)).findNextRunNo(month);
+        verify(validationRunRepository, times(2)).save(any());
+        verify(validationRunRepository, times(2)).findNextRunNo(month);
     }
 
     @Test
@@ -259,11 +270,11 @@ class ValidationRunCreateServiceImplTest {
     // 해결되지 않는다 — 재시도 없이 그대로 던져야 한다(GlobalExceptionHandler가 VRUN_001/409로 변환)
     void doesNotRetryOnActiveMonthlyRunConflict() {
         LocalDate month = LocalDate.of(2026, 8, 1);
-        when(validationRunMapper.existsActiveMonthlyRun(month)).thenReturn(false);
-        when(validationRunMapper.findNextRunNo(month)).thenReturn(1);
-        doThrow(new DataIntegrityViolationException(
-                "duplicate key value violates unique constraint \"uq_validation_run_active_month\""))
-                .when(validationRunMapper).insert(any());
+        when(validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(eq(month), eq("MONTHLY"), anyList()))
+                .thenReturn(false);
+        when(validationRunRepository.findNextRunNo(month)).thenReturn(1);
+        when(validationRunRepository.save(any())).thenThrow(new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint \"uq_validation_run_active_month\""));
 
         CreateValidationRunCommand command =
                 new CreateValidationRunCommand(month, ValidationRunType.MONTHLY, 1L);
@@ -271,6 +282,6 @@ class ValidationRunCreateServiceImplTest {
         assertThatThrownBy(() -> service.create(command))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
-        verify(validationRunMapper, times(1)).insert(any());
+        verify(validationRunRepository, times(1)).save(any());
     }
 }

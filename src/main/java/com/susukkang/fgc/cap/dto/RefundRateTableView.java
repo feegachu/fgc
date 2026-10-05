@@ -12,8 +12,8 @@ import java.time.LocalDate;
  */
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 public class RefundRateTableView {
     private Long refundRateTableId;
     private Long policyVersionId;

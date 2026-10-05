@@ -2,19 +2,22 @@ package com.susukkang.fgc.validation.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.base.repository.ProductOfferingRepository;
 import com.susukkang.fgc.cap.dto.CapRuleSetView;
 import com.susukkang.fgc.cap.dto.RefundRateTableView;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
+import com.susukkang.fgc.policy.repository.CapRuleSetRepository;
+import com.susukkang.fgc.policy.repository.RefundRateTableRepository;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.ProductOfferingSnapshotView;
-import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.PolicySnapshotMapper;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -34,23 +37,31 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
 
     private static final String CONSTRAINT_ACTIVE_MONTHLY_RUN = "uq_validation_run_active_month";
     private static final String CONSTRAINT_RUN_NO = "uq_validation_run";
+    private static final List<ValidationRunStatus> ACTIVE_STATUSES =
+            List.of(ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING);
 
     // findNextRunNo(사전 조회)와 insert(실제 반영) 사이는 잠기지 X
     private static final int MAX_RUN_NO_RETRIES = 3;
 
-    private final ValidationRunMapper validationRunMapper;
-    private final PolicySnapshotMapper policySnapshotMapper;
+    private final ValidationRunRepository validationRunRepository;
+    private final CapRuleSetRepository capRuleSetRepository;
+    private final RefundRateTableRepository refundRateTableRepository;
+    private final ProductOfferingRepository productOfferingRepository;
     private final ObjectMapper objectMapper;
     private final ConstraintErrorCodeResolver constraintErrorCodeResolver;
     private final TransactionTemplate requiresNewTransactionTemplate;
 
-    public ValidationRunCreateServiceImpl(ValidationRunMapper validationRunMapper,
-                                           PolicySnapshotMapper policySnapshotMapper,
+    public ValidationRunCreateServiceImpl(ValidationRunRepository validationRunRepository,
+                                           CapRuleSetRepository capRuleSetRepository,
+                                           RefundRateTableRepository refundRateTableRepository,
+                                           ProductOfferingRepository productOfferingRepository,
                                            ObjectMapper objectMapper,
                                            ConstraintErrorCodeResolver constraintErrorCodeResolver,
                                            PlatformTransactionManager transactionManager) {
-        this.validationRunMapper = validationRunMapper;
-        this.policySnapshotMapper = policySnapshotMapper;
+        this.validationRunRepository = validationRunRepository;
+        this.capRuleSetRepository = capRuleSetRepository;
+        this.refundRateTableRepository = refundRateTableRepository;
+        this.productOfferingRepository = productOfferingRepository;
         this.objectMapper = objectMapper;
         this.constraintErrorCodeResolver = constraintErrorCodeResolver;
         // PostgreSQL은 제약 위반이 한 번 나면 그 트랜잭션 전체가 "aborted" 상태가 되어 같은
@@ -93,10 +104,11 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
      * 다투는 것이므로 충돌로 처리한다.
      */
     private ValidationRunRow createWithExplicitRunNo(CreateValidationRunCommand command) {
-        ValidationRunRow existing = validationRunMapper.findByMonthAndRunNo(command.validationMonth(), command.runNo());
-        if (existing != null) {
-            if (matchesRequest(existing, command)) {
-                return existing;
+        Optional<ValidationRun> existing =
+                validationRunRepository.findByValidationMonthAndRunNo(command.validationMonth(), command.runNo());
+        if (existing.isPresent()) {
+            if (matchesRequest(existing.get(), command)) {
+                return toRow(existing.get());
             }
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of(
                     "validationMonth", command.validationMonth(), "runNo", command.runNo()));
@@ -104,7 +116,7 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
         return requiresNewTransactionTemplate.execute(status -> attemptCreate(command));
     }
 
-    private boolean matchesRequest(ValidationRunRow existing, CreateValidationRunCommand command) {
+    private boolean matchesRequest(ValidationRun existing, CreateValidationRunCommand command) {
         return command.runType().name().equals(existing.getRunType())
                 && command.triggeredBy().equals(existing.getTriggeredBy());
     }
@@ -129,45 +141,68 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     private ValidationRunRow attemptCreate(CreateValidationRunCommand command) {
         // 1. MONTHLY 중복 체크
         if (command.runType() == ValidationRunType.MONTHLY
-                && validationRunMapper.existsActiveMonthlyRun(command.validationMonth())) {
+                && validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(
+                        command.validationMonth(), ValidationRunType.MONTHLY.name(), ACTIVE_STATUSES)) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_001, Map.of());
         }
-        // 1-1. MANUAL_CONTRACT 중복 체크 — uq_validation_run_active_manual_contract(V8)의
+        // 1-1. MANUAL_CONTRACT 중복 체크 — uq_validation_run_active_manual_contract(V13)의
         // 사전 확인. DB 제약이 최후 방어선이고, 여기서 미리 걸러야 CreateDailyRunTasklet에
         // 원시 DataIntegrityViolationException 대신 다른 검증 실패와 같은 형태의
         // FgcBusinessException(VRUN_001)이 올라간다(코드리뷰 반영, 2026-08-11).
         if (command.runType() == ValidationRunType.MANUAL_CONTRACT
-                && validationRunMapper.existsActiveManualContractRun()) {
+                && validationRunRepository.existsByRunTypeAndStatusIn(
+                        ValidationRunType.MANUAL_CONTRACT.name(), ACTIVE_STATUSES)) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_001, Map.of());
         }
 
         // 2. run_no 채번
         int runNo = command.runNo() != null
                 ? command.runNo()
-                : validationRunMapper.findNextRunNo(command.validationMonth());
+                : validationRunRepository.findNextRunNo(command.validationMonth());
 
         // 3. policy_snapshot
-        List<CapRuleSetView> capRuleSets = policySnapshotMapper.findActiveCapRuleSets(command.validationMonth());
-        List<RefundRateTableView> refundRateTables = policySnapshotMapper.findActiveRefundRateTables(command.validationMonth());
-        List<ProductOfferingSnapshotView> productOfferings = policySnapshotMapper.findActiveProductOfferings(command.validationMonth());
+        List<CapRuleSetView> capRuleSets = capRuleSetRepository.findActiveCapRuleSets(command.validationMonth());
+        List<RefundRateTableView> refundRateTables =
+                refundRateTableRepository.findActiveRefundRateTables(command.validationMonth());
+        List<ProductOfferingSnapshotView> productOfferings =
+                productOfferingRepository.findActiveProductOfferings(command.validationMonth());
 
         Map<String, Object> policySnapshot = new HashMap<>();
         policySnapshot.put("capRuleSets", capRuleSets);
         policySnapshot.put("refundRateTables", refundRateTables);
         policySnapshot.put("productOfferings", productOfferings);
 
-        // 4. INSERT
-        ValidationRunInsertRow row = ValidationRunInsertRow.builder()
+        // 4. INSERT — IDENTITY 전략이라 save() 시점에 바로 INSERT가 실행된다
+        // (run_no 충돌 DataIntegrityViolationException이 여기서 즉시 올라와야 재시도 루프가 잡는다).
+        ValidationRun run = ValidationRun.builder()
                 .validationMonth(command.validationMonth())
                 .runType(command.runType().name())
                 .runNo(runNo)
                 .triggeredBy(command.triggeredBy())
                 .policySnapshotJson(writeJson(policySnapshot))
                 .build();
-        validationRunMapper.insert(row);
+        ValidationRun saved = validationRunRepository.save(run);
 
         // 5. 반환
-        return validationRunMapper.findById(row.getValidationRunId());
+        return toRow(saved);
+    }
+
+    private ValidationRunRow toRow(ValidationRun run) {
+        ValidationRunRow row = new ValidationRunRow();
+        row.setValidationRunId(run.getValidationRunId());
+        row.setValidationMonth(run.getValidationMonth());
+        row.setRunNo(run.getRunNo());
+        row.setRunType(run.getRunType());
+        row.setStatus(run.getStatus().name());
+        row.setCurrentStep(run.getCurrentStep());
+        row.setStartedAt(run.getStartedAt());
+        row.setCompletedAt(run.getCompletedAt());
+        row.setFinalizedAt(run.getFinalizedAt());
+        row.setTriggeredBy(run.getTriggeredBy());
+        row.setFinalizedBy(run.getFinalizedBy());
+        row.setFailureMessage(run.getFailureMessage());
+        row.setCreatedAt(run.getCreatedAt());
+        return row;
     }
 
     // 정책 스냅샷 Map을 JSON 문자열로 직렬화
