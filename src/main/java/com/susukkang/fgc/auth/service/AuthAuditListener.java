@@ -11,6 +11,7 @@ import org.springframework.security.authentication.event.AbstractAuthenticationF
 import org.springframework.security.authentication.event.InteractiveAuthenticationSuccessEvent;
 import org.springframework.security.authentication.event.LogoutSuccessEvent;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -82,6 +83,13 @@ public class AuthAuditListener {
      */
     @EventListener
     public void onLoginFailure(AbstractAuthenticationFailureEvent event) {
+        // 2026-10-06 yslee - Bearer 토큰 인증 실패는 로그인 실패로 남기지 않는다(#400)
+        // 문제: BearerTokenAuthenticationToken.getName() 은 토큰 원문이라 entity_id 에 JWT 가 그대로 적힌다.
+        //      만료 토큰을 든 화면이 요청할 때마다 LOGIN_FAIL 이 쌓이기도 한다.
+        // 개선: 로그인 시도(폼·httpBasic·POST /api/v1/auth/login)만 기록한다.
+        if (event.getAuthentication() instanceof BearerTokenAuthenticationToken) {
+            return;
+        }
         String reason = event.getException() == null
                 ? null
                 : event.getException().getClass().getSimpleName();
@@ -99,6 +107,14 @@ public class AuthAuditListener {
     public void onLogoutSuccess(LogoutSuccessEvent event) {
         Authentication authentication = event.getAuthentication();
         record("LOGOUT", userIdOf(authentication), authentication.getName(), null);
+    }
+
+    /**
+     * 설명 : 2차 JWT 토큰 API(#400)의 로그인·갱신·로그아웃·재사용 탐지·중복 로그인 무효화를 같은 audit_log 에 남긴다.
+     * 호출자 트랜잭션 안에서 저장하므로 토큰 상태 변경과 감사 행이 함께 커밋되거나 함께 롤백된다.
+     */
+    public void recordTokenEvent(String actionCode, Long userId, String loginId, String reason) {
+        record(actionCode, userId, loginId, reason);
     }
 
     /**

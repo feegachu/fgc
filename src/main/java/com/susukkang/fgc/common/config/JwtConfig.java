@@ -34,6 +34,7 @@ public class JwtConfig {
 
     /** HS256 은 256비트 이상 키를 요구한다(RFC 7518 §3.2). */
     private static final int MIN_SECRET_BYTES = 32;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final SecretKey key;
 
@@ -48,7 +49,7 @@ public class JwtConfig {
             }
             log.warn("fgc.jwt.secret 이 비어 있어 임의 서명키를 생성했습니다. 재기동하면 발급된 JWT 가 모두 무효가 됩니다.");
             byte[] random = new byte[MIN_SECRET_BYTES];
-            new SecureRandom().nextBytes(random);
+            RANDOM.nextBytes(random);
             return random;
         }
         byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);

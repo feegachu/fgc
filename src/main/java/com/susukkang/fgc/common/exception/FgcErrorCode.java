@@ -215,6 +215,11 @@ public enum FgcErrorCode {
             HttpStatus.FORBIDDEN,
             "error.auth.forbidden"
     ),
+    AUTH_004(
+            "FGC-AUTH-004",
+            HttpStatus.UNAUTHORIZED,
+            "error.auth.superseded"
+    ),
 
     COMMON_002(
             "FGC-COMMON-002",
