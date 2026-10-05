@@ -70,8 +70,23 @@ jobs:
             7. DB 관련 변경이 있으면 다음 항목이 서로 일치하는가
                - 정규화·시드 명세의 ERD·요구사항 매핑
                - Flyway 마이그레이션의 테이블·컬럼·타입·NULL/FK/UNIQUE 제약
-               - MyBatis SQL/resultMap과 Java 도메인·DTO 필드
+               - MyBatis SQL/resultMap 또는 JPA 엔티티·JPQL과 Java 도메인·DTO 필드
                기존 마이그레이션 전체를 기준으로 PR 적용 후 유효 스키마를 판단한다.
+            8. 데이터 접근 계층(MyBatis→JPA 전환, Repository·트랜잭션) 변경이 있으면
+               기존 동작의 데이터 정합성이 유지되는가. 근거는 diff에서 삭제·변경된
+               Mapper XML 줄과 새 코드 줄을 양쪽 모두 밝힌다.
+               - 잠금(FOR UPDATE·PESSIMISTIC) 뒤 재조회를 findById 등 엔티티로 해서
+                 1차 캐시의 이전 상태를 읽지 않는가 (DTO 투영·refresh로 DB를 다시 보는가)
+               - 네이티브·벌크 변경 전후 flush/clear가 있고, clear 이후 분리된 엔티티를
+                 고쳐 저장(더티 체킹 유실)하는 코드가 없는가
+               - 조건부 상태 전이(UPDATE ... WHERE status=..., 갱신 건수 검사)가
+                 기존 SQL의 조건·건수 판정과 같은가
+               - @Transactional 전파·readOnly·noRollbackFor·REQUIRES_NEW 경계가
+                 기존 커밋/롤백 범위와 같은가
+               - 대량 INSERT가 건별 INSERT로 바뀌지 않았는가 (IDENTITY 키는 JDBC 배치 불가)
+               - 정렬·NULL·COALESCE·LIKE·BigDecimal scale·OffsetDateTime 오프셋 등
+                 조회 결과 표현이 기존과 같은가
+               - 위 위험을 검증하는 PostgreSQL 통합 테스트가 PR에 있는가 (없으면 지적)
 
             ## 규칙
             - 지적마다 근거 파일 경로와 줄 번호를 밝힌다. 예: docs/07_규제조문표_v0.2.1.md:412
