@@ -17,9 +17,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -39,8 +37,9 @@ public class ScheduleQueryRepository {
     private final EntityManager entityManager;
 
     // 목록·버전·상세가 공유하는 헤더 집계. 헤더 PK로 묶으므로 헤더 컬럼은 함수 종속으로 선택된다.
-    private static final String HEADER_SELECT = """
-            SELECT sh.scheduleHeaderId, c.contractNo, %s, sh.paymentStage, sh.scheduleRegime,
+    // 모든 쿼리는 리터럴만 이어 붙인 컴파일 시점 상수다. 입력값은 전부 바인딩 파라미터로만 전달한다.
+    private static final String HEADER_COLUMNS = """
+             sh.paymentStage, sh.scheduleRegime,
                    sh.schedulePurpose, sh.scheduleVersionNo, sh.status, sh.activeYn, sh.generatedAt,
                    sh.generationReason, COUNT(sl.scheduleLineId), SUM(sl.expectedAmount),
                    pv.policyCode, pv.versionNo
@@ -48,8 +47,10 @@ public class ScheduleQueryRepository {
               JOIN InsuranceContract c ON c.contractId = sh.contractId
               JOIN PolicyVersion pv ON pv.policyVersionId = sh.policyVersionId
             """;
-    private static final String HEADER_SELECT_SIMPLE = HEADER_SELECT.formatted("CAST(NULL AS String), CAST(NULL AS String)");
-    private static final String HEADER_SELECT_DETAIL = HEADER_SELECT.formatted("i.insurerName, p.productName") + """
+    private static final String HEADER_SELECT_SIMPLE = "SELECT sh.scheduleHeaderId, c.contractNo,"
+            + " CAST(NULL AS String), CAST(NULL AS String)," + HEADER_COLUMNS;
+    private static final String HEADER_SELECT_DETAIL = "SELECT sh.scheduleHeaderId, c.contractNo,"
+            + " i.insurerName, p.productName," + HEADER_COLUMNS + """
               JOIN Insurer i ON i.insurerId = c.insurerId
               JOIN ProductOffering po ON po.productOfferingId = c.productOfferingId
               JOIN Product p ON p.productId = po.productId
@@ -58,7 +59,37 @@ public class ScheduleQueryRepository {
               LEFT JOIN ScheduleLine sl ON sl.scheduleHeaderId = sh.scheduleHeaderId
             """;
     private static final String GROUP_BY = " GROUP BY sh.scheduleHeaderId, c.contractNo, pv.policyCode, pv.versionNo";
-    private static final String GROUP_BY_DETAIL = GROUP_BY + ", i.insurerName, p.productName";
+    // 값이 없는(null) 조건은 필터에서 제외한다. 계약번호는 기존처럼 부분 일치(LIKE '%값%')다.
+    // 문자열 null 파라미터는 PostgreSQL에 bytea로 전달돼 LIKE가 실패하므로 명시적으로 형변환한다.
+    private static final String SEARCH_WHERE = """
+             WHERE (CAST(:contractNo AS String) IS NULL
+                    OR c.contractNo LIKE CONCAT('%', CAST(:contractNo AS String), '%'))
+               AND (:stage IS NULL OR sh.paymentStage = :stage)
+               AND (:regime IS NULL OR sh.scheduleRegime = :regime)
+               AND (:purpose IS NULL OR sh.schedulePurpose = :purpose)
+               AND (:status IS NULL OR sh.status = :status)
+            """;
+    private static final String SEARCH_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + SEARCH_WHERE
+            + GROUP_BY + " ORDER BY sh.scheduleHeaderId DESC";
+    private static final String COUNT_QUERY = """
+            SELECT COUNT(sh)
+              FROM ScheduleHeader sh
+              JOIN InsuranceContract c ON c.contractId = sh.contractId
+            """ + SEARCH_WHERE;
+    private static final String VERSIONS_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + """
+             WHERE EXISTS (SELECT 1 FROM ScheduleHeader t
+                            WHERE t.scheduleHeaderId = :scheduleHeaderId
+                              AND t.contractId = sh.contractId
+                              AND t.paymentStage = sh.paymentStage)
+            """ + GROUP_BY + " ORDER BY sh.scheduleVersionNo DESC, sh.scheduleHeaderId DESC";
+    private static final String DETAIL_QUERY = HEADER_SELECT_DETAIL + LINE_JOIN
+            + " WHERE sh.scheduleHeaderId = :scheduleHeaderId" + GROUP_BY + ", i.insurerName, p.productName";
+    private static final String ACTIVE_DETAIL_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + """
+             WHERE sh.contractId = :contractId
+               AND sh.paymentStage = :paymentStage
+               AND sh.schedulePurpose = :operational
+               AND sh.activeYn = TRUE
+            """ + GROUP_BY;
 
     public List<ScheduleHeaderResponse> selectByCondition(ScheduleSearchCondition condition, int size, long offset) {
         // ponytail: JPA의 시작 위치는 int다. 21억 행을 넘는 offset은 기존처럼 빈 페이지가 되도록 조회를 생략한다.
@@ -76,33 +107,19 @@ public class ScheduleQueryRepository {
     }
 
     public long countByCondition(ScheduleSearchCondition condition) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        String where = where(condition, params);
-        TypedQuery<Long> query = entityManager.createQuery("""
-                SELECT COUNT(sh)
-                  FROM ScheduleHeader sh
-                  JOIN InsuranceContract c ON c.contractId = sh.contractId
-                """ + where, Long.class);
-        params.forEach(query::setParameter);
-        return query.getSingleResult();
+        return bindSearch(entityManager.createQuery(COUNT_QUERY, Long.class), condition).getSingleResult();
     }
 
     /** 대상 헤더와 같은 계약·지급단계의 모든 버전(용도 무관)을 최신 버전부터 조회한다. */
     public List<ScheduleHeaderResponse> selectVersionsByScheduleHeaderId(Long scheduleHeaderId) {
-        return entityManager.createQuery(HEADER_SELECT_SIMPLE + LINE_JOIN + """
-                 WHERE EXISTS (SELECT 1 FROM ScheduleHeader t
-                                WHERE t.scheduleHeaderId = :scheduleHeaderId
-                                  AND t.contractId = sh.contractId
-                                  AND t.paymentStage = sh.paymentStage)
-                """ + GROUP_BY + " ORDER BY sh.scheduleVersionNo DESC, sh.scheduleHeaderId DESC", Object[].class)
+        return entityManager.createQuery(VERSIONS_QUERY, Object[].class)
                 .setParameter("scheduleHeaderId", scheduleHeaderId)
                 .getResultList().stream().map(ScheduleQueryRepository::toHeader).toList();
     }
 
     /** 헤더(보험사·상품 포함) 1건과 회차를 줄 번호 순으로 조회한다. 헤더가 없으면 null. */
     public ScheduleDetailResponse selectScheduleDetailById(Long scheduleHeaderId) {
-        List<Object[]> rows = entityManager.createQuery(HEADER_SELECT_DETAIL + LINE_JOIN
-                        + " WHERE sh.scheduleHeaderId = :scheduleHeaderId" + GROUP_BY_DETAIL, Object[].class)
+        List<Object[]> rows = entityManager.createQuery(DETAIL_QUERY, Object[].class)
                 .setParameter("scheduleHeaderId", scheduleHeaderId)
                 .getResultList();
         return rows.isEmpty() ? null : toDetail(toHeader(rows.getFirst()));
@@ -110,12 +127,7 @@ public class ScheduleQueryRepository {
 
     /** 계약·지급단계의 활성 운영 스케줄 상세. 없으면 null. 보험사·상품명은 기존처럼 채우지 않는다. */
     public ScheduleDetailResponse selectByContractIdAndPaymentStage(Long contractId, PaymentStage paymentStage) {
-        List<Object[]> rows = entityManager.createQuery(HEADER_SELECT_SIMPLE + LINE_JOIN + """
-                 WHERE sh.contractId = :contractId
-                   AND sh.paymentStage = :paymentStage
-                   AND sh.schedulePurpose = :operational
-                   AND sh.activeYn = TRUE
-                """ + GROUP_BY, Object[].class)
+        List<Object[]> rows = entityManager.createQuery(ACTIVE_DETAIL_QUERY, Object[].class)
                 .setParameter("contractId", contractId)
                 .setParameter("paymentStage", paymentStage)
                 .setParameter("operational", SchedulePurpose.OPERATIONAL)
@@ -233,38 +245,17 @@ public class ScheduleQueryRepository {
     }
 
     private TypedQuery<Object[]> headerQuery(ScheduleSearchCondition condition) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        String where = where(condition, params);
-        TypedQuery<Object[]> query = entityManager.createQuery(HEADER_SELECT_SIMPLE + LINE_JOIN + where
-                + GROUP_BY + " ORDER BY sh.scheduleHeaderId DESC", Object[].class);
-        params.forEach(query::setParameter);
-        return query;
+        return bindSearch(entityManager.createQuery(SEARCH_QUERY, Object[].class), condition);
     }
 
-    // 값이 없는 조건은 필터에서 제외한다. 계약번호는 기존처럼 부분 일치(LIKE '%값%')다.
-    private static String where(ScheduleSearchCondition condition, Map<String, Object> params) {
-        StringBuilder where = new StringBuilder(" WHERE 1 = 1");
-        if (condition.getContractNo() != null && !condition.getContractNo().isEmpty()) {
-            where.append(" AND c.contractNo LIKE CONCAT('%', :contractNo, '%')");
-            params.put("contractNo", condition.getContractNo());
-        }
-        if (condition.getStage() != null) {
-            where.append(" AND sh.paymentStage = :stage");
-            params.put("stage", condition.getStage());
-        }
-        if (condition.getRegime() != null) {
-            where.append(" AND sh.scheduleRegime = :regime");
-            params.put("regime", condition.getRegime());
-        }
-        if (condition.getPurpose() != null) {
-            where.append(" AND sh.schedulePurpose = :purpose");
-            params.put("purpose", condition.getPurpose());
-        }
-        if (condition.getStatus() != null) {
-            where.append(" AND sh.status = :status");
-            params.put("status", condition.getStatus());
-        }
-        return where.toString();
+    private static <T> TypedQuery<T> bindSearch(TypedQuery<T> query, ScheduleSearchCondition condition) {
+        String contractNo = condition.getContractNo();
+        // 기존처럼 빈 문자열은 조건 없음으로 본다.
+        return query.setParameter("contractNo", contractNo == null || contractNo.isEmpty() ? null : contractNo)
+                .setParameter("stage", condition.getStage())
+                .setParameter("regime", condition.getRegime())
+                .setParameter("purpose", condition.getPurpose())
+                .setParameter("status", condition.getStatus());
     }
 
     private static ScheduleHeaderResponse toHeader(Object[] row) {
