@@ -29,7 +29,8 @@ import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleQueryRepository;
+import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,7 +69,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class ScheduleServiceTest {
 
     @Mock
-    private ScheduleMapper scheduleMapper;
+    private ScheduleQueryRepository scheduleQueryRepository;
+
+    @Mock
+    private ScheduleWriteRepository scheduleWriteRepository;
 
     @Mock
     private InsuranceContractRepository insuranceContractRepository;
@@ -96,11 +100,11 @@ class ScheduleServiceTest {
 
     @BeforeEach
     void setUpScheduleGenerationDefaults() {
-        lenient().when(scheduleMapper.lockContractForScheduleGeneration(any()))
+        lenient().when(scheduleWriteRepository.lockContractForScheduleGeneration(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(scheduleMapper.selectNextScheduleVersionNo(any(), any()))
+        lenient().when(scheduleQueryRepository.selectNextScheduleVersionNo(any(), any()))
                 .thenReturn(1);
-        lenient().when(scheduleMapper.selectActiveOperationalPolicyVersionId(any(), any()))
+        lenient().when(scheduleQueryRepository.selectActiveOperationalPolicyVersionId(any(), any()))
                 .thenReturn(null);
         CapCalculationResult result = mock(CapCalculationResult.class);
         lenient().when(result.resultStatus()).thenReturn(CapResultStatus.NORMAL);
@@ -111,15 +115,15 @@ class ScheduleServiceTest {
     @Test
     void defaultsSchedulePurposeToOperational() {
         ScheduleSearchCondition condition = new ScheduleSearchCondition();
-        given(scheduleMapper.selectByCondition(condition, 20, 0L))
+        given(scheduleQueryRepository.selectByCondition(condition, 20, 0L))
                 .willReturn(List.of());
-        given(scheduleMapper.countByCondition(condition)).willReturn(0L);
+        given(scheduleQueryRepository.countByCondition(condition)).willReturn(0L);
 
         scheduleService.selectByCondition(condition, 1, 20);
 
         assertThat(condition.getPurpose()).isEqualTo(SchedulePurpose.OPERATIONAL);
-        verify(scheduleMapper).selectByCondition(condition, 20, 0L);
-        verify(scheduleMapper).countByCondition(condition);
+        verify(scheduleQueryRepository).selectByCondition(condition, 20, 0L);
+        verify(scheduleQueryRepository).countByCondition(condition);
     }
 
     @Test
@@ -176,34 +180,34 @@ class ScheduleServiceTest {
         ResolvedCommissionPolicy currentPolicy = policy(200L, PaymentStage.INSURER_TO_GA, currentRule);
         ScheduleLineInsertDTO confirmedLine = ScheduleLineInsertDTO.builder().scheduleHeaderId(10L).lineNo(1).installmentNo(1).contractMonthNo(1).dueDate(LocalDate.of(2026, 8, 10)).commissionItemId(1000L).basisCode("MONTHLY_EQUIVALENT_FIRST_PREMIUM").basisAmount(new BigDecimal("100000")).calculationType(CalculationType.RATE).ratePct(new BigDecimal("100")).expectedAmount(new BigDecimal("100000")).roundingScale(0).roundingMode(RoundingMode.HALF_UP).lineStatus(ScheduleLineStatus.CONFIRMED).sourceCommissionRuleId(1000L).build();
 
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(oldHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(oldHeader);
         given(insuranceContractRepository.findById(20L)).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willReturn(currentPolicy);
-        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(confirmedLine));
-        given(scheduleMapper.updateScheduleHeaderStatus(10L, ScheduleHeaderStatus.ADJUSTED, false)).willReturn(1);
-        given(scheduleMapper.selectNextScheduleVersionNo(20L, PaymentStage.INSURER_TO_GA)).willReturn(2);
-        given(scheduleMapper.insertScheduleHeader(any())).willAnswer(invocation -> {
+        given(scheduleQueryRepository.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(confirmedLine));
+        given(scheduleWriteRepository.updateScheduleHeaderStatus(10L, ScheduleHeaderStatus.ADJUSTED, false)).willReturn(1);
+        given(scheduleQueryRepository.selectNextScheduleVersionNo(20L, PaymentStage.INSURER_TO_GA)).willReturn(2);
+        given(scheduleWriteRepository.insertScheduleHeader(any())).willAnswer(invocation -> {
             ScheduleHeaderInsertDTO insertedHeader = invocation.getArgument(0);
             ReflectionTestUtils.setField(insertedHeader, "scheduleHeaderId", 11L);
             return 1;
         });
-        given(scheduleMapper.insertAllScheduleLines(any())).willAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+        given(scheduleWriteRepository.insertAllScheduleLines(any())).willAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
 
         ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "정책 변경 반영");
 
         assertThat(response.getScheduleHeaderId()).isEqualTo(11L);
         assertThat(response.getVersionNo()).isEqualTo(2L);
-        verify(scheduleMapper).lockContractForScheduleGeneration(20L);
-        verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
+        verify(scheduleWriteRepository).lockContractForScheduleGeneration(20L);
+        verify(scheduleQueryRepository, times(2)).selectScheduleHeaderById(10L);
         ArgumentCaptor<ScheduleHeaderInsertDTO> headerCaptor = ArgumentCaptor.forClass(ScheduleHeaderInsertDTO.class);
-        verify(scheduleMapper).insertScheduleHeader(headerCaptor.capture());
+        verify(scheduleWriteRepository).insertScheduleHeader(headerCaptor.capture());
         assertThat(headerCaptor.getValue().getRegeneratedFromId()).isEqualTo(10L);
         assertThat(headerCaptor.getValue().getGenerationReason()).isEqualTo("정책 변경 반영");
         assertThat(headerCaptor.getValue().getStatus()).isEqualTo(ScheduleHeaderStatus.PLANNED);
         assertThat(headerCaptor.getValue().getActiveYn()).isTrue();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ScheduleLineInsertDTO>> lineCaptor = ArgumentCaptor.forClass(List.class);
-        verify(scheduleMapper).insertAllScheduleLines(lineCaptor.capture());
+        verify(scheduleWriteRepository).insertAllScheduleLines(lineCaptor.capture());
         assertThat(lineCaptor.getValue()).hasSize(2);
         assertThat(lineCaptor.getValue().get(0).getScheduleHeaderId()).isEqualTo(11L);
         assertThat(lineCaptor.getValue().get(0).getExpectedAmount()).isEqualByComparingTo("100000");
@@ -230,21 +234,21 @@ class ScheduleServiceTest {
                 .lines(List.of())
                 .build();
 
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
         given(insuranceContractRepository.existsById(20L)).willReturn(true);
-        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
+        given(scheduleQueryRepository.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.PLANNED).build()));
-        given(scheduleMapper.confirmPlannedScheduleLines(10L)).willReturn(2);
-        given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
-        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
+        given(scheduleWriteRepository.confirmPlannedScheduleLines(10L)).willReturn(2);
+        given(scheduleWriteRepository.confirmScheduleHeader(10L)).willReturn(1);
+        given(scheduleQueryRepository.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
 
         ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
 
         assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
-        verify(scheduleMapper).lockContractForScheduleGeneration(20L);
-        verify(scheduleMapper, times(2)).selectScheduleHeaderById(10L);
-        verify(scheduleMapper).confirmPlannedScheduleLines(10L);
-        verify(scheduleMapper).confirmScheduleHeader(10L);
+        verify(scheduleWriteRepository).lockContractForScheduleGeneration(20L);
+        verify(scheduleQueryRepository, times(2)).selectScheduleHeaderById(10L);
+        verify(scheduleWriteRepository).confirmPlannedScheduleLines(10L);
+        verify(scheduleWriteRepository).confirmScheduleHeader(10L);
 
         ArgumentCaptor<CapCalculationCommand> commandCaptor = ArgumentCaptor.forClass(CapCalculationCommand.class);
         verify(capCheckService).calculateAndSave(commandCaptor.capture());
@@ -272,14 +276,14 @@ class ScheduleServiceTest {
                 .lines(List.of())
                 .build();
 
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
         given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(capCheckQueryRepository.selectComplianceEvidenceAmount(20L, PaymentStage.INSURER_TO_GA))
                 .willReturn(evidenceAmount);
-        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
+        given(scheduleQueryRepository.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.PLANNED).build()));
-        given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
-        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
+        given(scheduleWriteRepository.confirmScheduleHeader(10L)).willReturn(1);
+        given(scheduleQueryRepository.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
 
         ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
 
@@ -289,8 +293,8 @@ class ScheduleServiceTest {
         assertThat(commandCaptor.getValue().paymentStage()).isEqualTo(PaymentStage.INSURER_TO_GA);
         assertThat(commandCaptor.getValue().complianceEvidenceAmount()).isEqualTo(evidenceAmount);
         assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
-        verify(scheduleMapper).confirmPlannedScheduleLines(10L);
-        verify(scheduleMapper).confirmScheduleHeader(10L);
+        verify(scheduleWriteRepository).confirmPlannedScheduleLines(10L);
+        verify(scheduleWriteRepository).confirmScheduleHeader(10L);
     }
 
     @Test
@@ -311,20 +315,20 @@ class ScheduleServiceTest {
                 .lines(List.of())
                 .build();
 
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
         given(insuranceContractRepository.existsById(20L)).willReturn(true);
-        given(scheduleMapper.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
+        given(scheduleQueryRepository.selectScheduleLinesByScheduleId(10L)).willReturn(List.of(
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.CONFIRMED).build(),
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.MATCHED).build(),
                 ScheduleLineInsertDTO.builder().lineStatus(ScheduleLineStatus.ADJUSTED).build()));
-        given(scheduleMapper.confirmScheduleHeader(10L)).willReturn(1);
-        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
+        given(scheduleWriteRepository.confirmScheduleHeader(10L)).willReturn(1);
+        given(scheduleQueryRepository.selectScheduleDetailById(10L)).willReturn(confirmedDetail);
 
         ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
 
         assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
-        verify(scheduleMapper, never()).confirmPlannedScheduleLines(10L);
-        verify(scheduleMapper).confirmScheduleHeader(10L);
+        verify(scheduleWriteRepository, never()).confirmPlannedScheduleLines(10L);
+        verify(scheduleWriteRepository).confirmScheduleHeader(10L);
     }
 
     @Test
@@ -343,14 +347,14 @@ class ScheduleServiceTest {
                 .lines(List.of())
                 .build();
 
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(confirmedHeader);
-        given(scheduleMapper.selectScheduleDetailById(10L)).willReturn(detail);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(confirmedHeader);
+        given(scheduleQueryRepository.selectScheduleDetailById(10L)).willReturn(detail);
 
         ScheduleDetailResponse response = scheduleService.confirmSchedule(10L);
 
         assertThat(response.getHeader().getStatus()).isEqualTo(ScheduleHeaderStatus.CONFIRMED);
-        verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
-        verify(scheduleMapper, never()).confirmScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).confirmPlannedScheduleLines(any());
+        verify(scheduleWriteRepository, never()).confirmScheduleHeader(any());
     }
 
     @Test
@@ -362,7 +366,7 @@ class ScheduleServiceTest {
                 .status(ScheduleHeaderStatus.PLANNED)
                 .activeYn(true)
                 .build();
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
         given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(capCheckService.calculateAndSave(any())).willThrow(new FgcBusinessException(
                 FgcErrorCode.CAP_004,
@@ -378,8 +382,8 @@ class ScheduleServiceTest {
         verify(scheduleReviewService).registerCapReviewBeforeCommit(
                 20L, PaymentStage.GA_TO_FC, "POLICY_MISSING",
                 "1,200% 룰셋 검토 필요 - GA_TO_FC", "적용 가능한 1,200% 룰셋이 없습니다.");
-        verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
-        verify(scheduleMapper, never()).confirmScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).confirmPlannedScheduleLines(any());
+        verify(scheduleWriteRepository, never()).confirmScheduleHeader(any());
     }
 
     @Test
@@ -416,7 +420,7 @@ class ScheduleServiceTest {
         CapCalculationResult result = mock(CapCalculationResult.class);
         given(result.resultStatus()).willReturn(CapResultStatus.REVIEW_REQUIRED);
         given(result.calculationSnapshot()).willReturn(Map.of("refundTableMissing", true));
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
         given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(capCheckService.calculateAndSave(any())).willReturn(new CapCheckSaveResult(1L, result));
 
@@ -447,7 +451,7 @@ class ScheduleServiceTest {
     void rejectsInvalidRegenerationReasonBeforeAccessingDatabase() {
         assertThatThrownBy(() -> scheduleService.regenerateSchedules(10L, " ")).isInstanceOf(FgcBusinessException.class);
         assertThatThrownBy(() -> scheduleService.regenerateSchedules(10L, "가".repeat(41))).isInstanceOf(FgcBusinessException.class);
-        verify(scheduleMapper, never()).selectScheduleHeaderById(any());
+        verify(scheduleQueryRepository, never()).selectScheduleHeaderById(any());
     }
 
     @Test
@@ -457,7 +461,7 @@ class ScheduleServiceTest {
                 .header(ScheduleHeaderResponse.builder().scheduleHeaderId(100L).build())
                 .lines(List.of())
                 .build();
-        given(scheduleMapper.selectByContractIdAndPaymentStage(
+        given(scheduleQueryRepository.selectByContractIdAndPaymentStage(
                 contractId, PaymentStage.INSURER_TO_GA))
                 .willReturn(detail);
 
@@ -466,7 +470,7 @@ class ScheduleServiceTest {
 
         assertThat(result.getHeaders()).hasSize(1);
         assertThat(result.getLines()).isEmpty();
-        verify(scheduleMapper).selectByContractIdAndPaymentStage(
+        verify(scheduleQueryRepository).selectByContractIdAndPaymentStage(
                 contractId, PaymentStage.INSURER_TO_GA);
     }
 
@@ -476,10 +480,10 @@ class ScheduleServiceTest {
                 ScheduleHeaderResponse.builder().scheduleHeaderId(11L).scheduleVersionNo(2).build(),
                 ScheduleHeaderResponse.builder().scheduleHeaderId(10L).scheduleVersionNo(1).build()
         );
-        given(scheduleMapper.selectVersionsByScheduleHeaderId(10L)).willReturn(versions);
+        given(scheduleQueryRepository.selectVersionsByScheduleHeaderId(10L)).willReturn(versions);
 
         assertThat(scheduleService.selectScheduleVersions(10L)).containsExactlyElementsOf(versions);
-        verify(scheduleMapper).selectVersionsByScheduleHeaderId(10L);
+        verify(scheduleQueryRepository).selectVersionsByScheduleHeaderId(10L);
     }
 
     @Test
@@ -520,13 +524,13 @@ class ScheduleServiceTest {
         int size = 100;
         long expectedOffset = 2_999_999_900L;
 
-        given(scheduleMapper.selectByCondition(condition, size, expectedOffset))
+        given(scheduleQueryRepository.selectByCondition(condition, size, expectedOffset))
                 .willReturn(List.of());
-        given(scheduleMapper.countByCondition(condition)).willReturn(0L);
+        given(scheduleQueryRepository.countByCondition(condition)).willReturn(0L);
 
         scheduleService.selectByCondition(condition, page, size);
 
-        verify(scheduleMapper).selectByCondition(condition, size, expectedOffset);
+        verify(scheduleQueryRepository).selectByCondition(condition, size, expectedOffset);
     }
 
     @Test
@@ -605,14 +609,14 @@ class ScheduleServiceTest {
                 .willReturn(gaPolicy);
 
         AtomicLong headerSequence = new AtomicLong(1000L);
-        given(scheduleMapper.insertScheduleHeader(any(ScheduleHeaderInsertDTO.class)))
+        given(scheduleWriteRepository.insertScheduleHeader(any(ScheduleHeaderInsertDTO.class)))
                 .willAnswer(invocation -> {
                     ScheduleHeaderInsertDTO header = invocation.getArgument(0);
                     ReflectionTestUtils.setField(
                             header, "scheduleHeaderId", headerSequence.getAndIncrement());
                     return 1;
                 });
-        given(scheduleMapper.insertAllScheduleLines(any()))
+        given(scheduleWriteRepository.insertAllScheduleLines(any()))
                 .willAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
 
         ScheduleGenerationResult generationResult = scheduleService.generateSchedules(contract);
@@ -624,7 +628,7 @@ class ScheduleServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ScheduleLineInsertDTO>> linesCaptor =
                 ArgumentCaptor.forClass(List.class);
-        verify(scheduleMapper, org.mockito.Mockito.times(2))
+        verify(scheduleWriteRepository, org.mockito.Mockito.times(2))
                 .insertAllScheduleLines(linesCaptor.capture());
 
         List<ScheduleLineInsertDTO> insurerLines = linesCaptor.getAllValues().get(0);
@@ -657,7 +661,7 @@ class ScheduleServiceTest {
         InsuranceContract contract = stubManagerSchedule(rank);
         given(agentRepository.findActiveAgentIdFromOrganizationHierarchy(
                 30L, rank, contract.getContractDate())).willReturn(40L);
-        given(scheduleMapper.insertAllScheduleLines(any()))
+        given(scheduleWriteRepository.insertAllScheduleLines(any()))
                 .willAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
 
         ScheduleGenerationResult result = scheduleService.generateSchedules(contract);
@@ -665,7 +669,7 @@ class ScheduleServiceTest {
         assertThat(result.createdLineCount()).isEqualTo(1);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ScheduleLineInsertDTO>> captor = ArgumentCaptor.forClass(List.class);
-        verify(scheduleMapper).insertAllScheduleLines(captor.capture());
+        verify(scheduleWriteRepository).insertAllScheduleLines(captor.capture());
         assertThat(captor.getValue()).singleElement().satisfies(line -> {
             assertThat(line.getBeneficiaryAgentId()).isEqualTo(40L);
             assertThat(line.getExpectedAmount()).isEqualByComparingTo("100000");
@@ -687,7 +691,7 @@ class ScheduleServiceTest {
                     assertThat(exception.getField()).isEqualTo("beneficiaryAgentId");
                     assertThat(exception.getParams()).containsEntry("agentRankCode", rank.name());
                 });
-        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+        verify(scheduleWriteRepository, never()).insertAllScheduleLines(any());
     }
 
     private InsuranceContract stubManagerSchedule(AgentRankCode rank) {
@@ -702,12 +706,12 @@ class ScheduleServiceTest {
                 .willReturn(policy(100L, PaymentStage.INSURER_TO_GA,
                         rule(1000L, null, 1, 1, "900.000000")));
         // 원수사 단계는 이미 생성되어 있고, 관리자 지급 단계만 새로 생성한다.
-        given(scheduleMapper.selectActiveOperationalPolicyVersionId(10L, PaymentStage.INSURER_TO_GA))
+        given(scheduleQueryRepository.selectActiveOperationalPolicyVersionId(10L, PaymentStage.INSURER_TO_GA))
                 .willReturn(100L);
         given(commissionPolicyService.resolveCurrentCommission(10L, PaymentStage.GA_TO_FC))
                 .willReturn(policy(200L, PaymentStage.GA_TO_FC,
                         rule(2000L, rank, 1, 1, "100.000000")));
-        given(scheduleMapper.insertScheduleHeader(any(ScheduleHeaderInsertDTO.class)))
+        given(scheduleWriteRepository.insertScheduleHeader(any(ScheduleHeaderInsertDTO.class)))
                 .willAnswer(invocation -> {
                     ScheduleHeaderInsertDTO header = invocation.getArgument(0);
                     ReflectionTestUtils.setField(header, "scheduleHeaderId", 1001L);
@@ -763,8 +767,8 @@ class ScheduleServiceTest {
                 .isInstanceOf(FgcBusinessException.class)
                 .hasMessage("FGC-COMMON-002");
 
-        verify(scheduleMapper, never()).insertScheduleHeader(any());
-        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+        verify(scheduleWriteRepository, never()).insertScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).insertAllScheduleLines(any());
     }
 
     @Test
@@ -788,7 +792,7 @@ class ScheduleServiceTest {
                         PaymentStage.GA_TO_FC,
                         "POLICY_DUPLICATE"
                 ));
-        given(scheduleMapper.upsertPolicyReviewCase(
+        given(scheduleWriteRepository.upsertPolicyReviewCase(
                 any(), any(), any(), any(), any()))
                 .willReturn(1);
 
@@ -796,10 +800,10 @@ class ScheduleServiceTest {
 
         assertThat(generationResult.createdLineCount()).isZero();
         assertThat(generationResult.scheduleHeaderIds()).isEmpty();
-        verify(scheduleMapper, times(2)).upsertPolicyReviewCase(
+        verify(scheduleWriteRepository, times(2)).upsertPolicyReviewCase(
                 any(), any(), any(), any(), any());
-        verify(scheduleMapper, never()).insertScheduleHeader(any());
-        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+        verify(scheduleWriteRepository, never()).insertScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).insertAllScheduleLines(any());
     }
 
     @Test
@@ -825,10 +829,10 @@ class ScheduleServiceTest {
         given(commissionPolicyService.resolveCurrentCommission(
                 contract.getContractId(), PaymentStage.GA_TO_FC))
                 .willReturn(gaPolicy);
-        given(scheduleMapper.selectActiveOperationalPolicyVersionId(
+        given(scheduleQueryRepository.selectActiveOperationalPolicyVersionId(
                 contract.getContractId(), PaymentStage.INSURER_TO_GA))
                 .willReturn(100L);
-        given(scheduleMapper.selectActiveOperationalPolicyVersionId(
+        given(scheduleQueryRepository.selectActiveOperationalPolicyVersionId(
                 contract.getContractId(), PaymentStage.GA_TO_FC))
                 .willReturn(200L);
 
@@ -836,8 +840,8 @@ class ScheduleServiceTest {
 
         assertThat(generationResult.createdLineCount()).isZero();
         assertThat(generationResult.scheduleHeaderIds()).isEmpty();
-        verify(scheduleMapper, never()).insertScheduleHeader(any());
-        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+        verify(scheduleWriteRepository, never()).insertScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).insertAllScheduleLines(any());
     }
 
     private FgcBusinessException policyResolutionException(
@@ -873,7 +877,7 @@ class ScheduleServiceTest {
                 .build();
         CapCalculationResult result = mock(CapCalculationResult.class);
         given(result.resultStatus()).willReturn(resultStatus);
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(plannedHeader);
         given(insuranceContractRepository.existsById(20L)).willReturn(true);
         given(capCheckService.calculateAndSave(any())).willReturn(new CapCheckSaveResult(1L, result));
 
@@ -883,27 +887,27 @@ class ScheduleServiceTest {
 
         verify(scheduleReviewService).registerCapReviewBeforeCommit(
                 20L, PaymentStage.GA_TO_FC, exceptionType, title, description);
-        verify(scheduleMapper, never()).confirmPlannedScheduleLines(any());
-        verify(scheduleMapper, never()).confirmScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).confirmPlannedScheduleLines(any());
+        verify(scheduleWriteRepository, never()).confirmScheduleHeader(any());
     }
 
     private void assertRegenerationRegistersReview(String reason) {
         ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).scheduleVersionNo(1).status(ScheduleHeaderStatus.CONFIRMED).activeYn(true).build();
         InsuranceContract contract = withContractId(20L, InsuranceContract.builder().build());
-        given(scheduleMapper.selectScheduleHeaderById(10L)).willReturn(oldHeader);
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(oldHeader);
         given(insuranceContractRepository.findById(20L)).willReturn(Optional.of(contract));
         given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willThrow(policyResolutionException(20L, PaymentStage.INSURER_TO_GA, reason));
-        given(scheduleMapper.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
+        given(scheduleWriteRepository.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
 
         ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "정책 변경 반영");
 
         assertThat(response.getScheduleHeaderId()).isEqualTo(10L);
         assertThat(response.getVersionNo()).isEqualTo(1L);
-        verify(scheduleMapper).upsertPolicyReviewCase(20L, PaymentStage.INSURER_TO_GA, reason, "수수료 정책 검토 필요 - INSURER_TO_GA", "예상 스케줄에 적용할 정책을 확정할 수 없습니다.");
-        verify(scheduleMapper, never()).updateScheduleHeaderStatus(
+        verify(scheduleWriteRepository).upsertPolicyReviewCase(20L, PaymentStage.INSURER_TO_GA, reason, "수수료 정책 검토 필요 - INSURER_TO_GA", "예상 스케줄에 적용할 정책을 확정할 수 없습니다.");
+        verify(scheduleWriteRepository, never()).updateScheduleHeaderStatus(
                 anyLong(), any(ScheduleHeaderStatus.class), anyBoolean());
-        verify(scheduleMapper, never()).insertScheduleHeader(any());
-        verify(scheduleMapper, never()).insertAllScheduleLines(any());
+        verify(scheduleWriteRepository, never()).insertScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).insertAllScheduleLines(any());
     }
 
     private InsuranceContract withContractId(Long id, InsuranceContract contract) {
