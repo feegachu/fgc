@@ -9,9 +9,9 @@ import com.susukkang.fgc.cap.dto.CapRuleSetView;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.dto.ScheduleAmountView;
-import com.susukkang.fgc.cap.mapper.CapContractMapper;
-import com.susukkang.fgc.cap.mapper.CapRuleMapper;
-import com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper;
+import com.susukkang.fgc.cap.repository.CapContractQueryRepository;
+import com.susukkang.fgc.cap.repository.CapRuleQueryRepository;
+import com.susukkang.fgc.cap.repository.CapScheduleAmountQueryRepository;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -43,22 +43,22 @@ public class CapCalculatorImpl implements CapCalculator {
     private static final String EXCLUDED = "EXCLUDED";
     private static final String REVIEW_REQUIRED = "REVIEW_REQUIRED";
 
-    private final CapContractMapper capContractMapper;
-    private final CapRuleMapper capRuleMapper;
-    private final CapScheduleAmountMapper capScheduleAmountMapper;
+    private final CapContractQueryRepository capContractQueryRepository;
+    private final CapRuleQueryRepository capRuleQueryRepository;
+    private final CapScheduleAmountQueryRepository capScheduleAmountQueryRepository;
     private final ProductRefundRateResolver refundRateResolver;
 
     @Override
     public CapCalculationResult calculate(CapCalculationCommand command) {
         // 계약 등록·수정 시(REALTIME) 또는 월 검증 배치(MONTHLY) 어느 쪽에서 호출돼도 아래 순서는 동일
-        CapContractView contract = capContractMapper.findById(command.contractId());
+        CapContractView contract = capContractQueryRepository.findCapViewByContractId(command.contractId());
         if (contract == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500,
                     null, Map.of(), "contractId=" + command.contractId() + " not found");
         }
 
         // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)
-        CapRuleSetView ruleSet = capRuleMapper.findApplicableRuleSet(
+        CapRuleSetView ruleSet = capRuleQueryRepository.findApplicableRuleSet(
                 command.paymentStage().name(), contract.getContractDate(),
                 contract.getInsurerId(), contract.getProductGroupCode(), contract.getChannelCode());
         if (ruleSet == null) {
@@ -102,10 +102,10 @@ public class CapCalculatorImpl implements CapCalculator {
         // 계약월차 1~firstYearMonths(기본 12) 안에 있는 예상 schedule_line 한 줄씩 훑으면서,
         // 그 수수료 항목이 이 룰셋에서 INCLUDED/EXCLUDED/REVIEW_REQUIRED 중 무엇인지 붙임
         Map<Long, CapRuleItemView> ruleItemsByCommissionItem = new HashMap<>();
-        for (CapRuleItemView item : capRuleMapper.findRuleItems(ruleSet.getCapRuleSetId())) {
+        for (CapRuleItemView item : capRuleQueryRepository.findRuleItems(ruleSet.getCapRuleSetId())) {
             ruleItemsByCommissionItem.put(item.getCommissionItemId(), item);
         }
-        List<ScheduleAmountView> scheduleAmounts = capScheduleAmountMapper.findFirstYearScheduleAmounts(
+        List<ScheduleAmountView> scheduleAmounts = capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(
                 command.contractId(), command.paymentStage().name(), ruleSet.getFirstYearMonths());
 
         List<CapCheckDetailLine> details = new ArrayList<>();
