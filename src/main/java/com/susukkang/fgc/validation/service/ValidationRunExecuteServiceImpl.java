@@ -49,7 +49,9 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
         // "오늘 생성된 아무 MANUAL_CONTRACT 행"이 아니라 지금 요청받은 이 행을 정확히 이어받는다
         // (코드리뷰 반영 — 빠뜨리면 이 행이 오늘 생성분이 아닐 때 조용히 실패하거나, 오늘 다른
         // MANUAL_CONTRACT 행이 있으면 그 행이 대신 진행될 수 있었다).
-        ValidationRunRow row = toRow(run);
+        // MonthlyValidationJobTrigger(validation/batch, #380 소유)는 ValidationRunRow 계약을
+        // 그대로 받는다 — 그쪽 호출부는 이번 전환 범위가 아니라 바꾸지 않는다.
+        ValidationRunRow row = ValidationRunRow.from(run);
         try {
             if (ValidationRunType.MANUAL_CONTRACT.name().equals(run.getRunType())) {
                 dailyChangedContractJobTrigger.runManual(run.getValidationRunId(), run.getTriggeredBy(), requestId);
@@ -61,26 +63,6 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
             // VRUN_005("다시 조회 후 시도하세요")가 기존 코드 중 재시도 의미에 가장 가깝다.
             throw new FgcBusinessException(FgcErrorCode.VRUN_005);
         }
-        return row;
-    }
-
-    // MonthlyValidationJobTrigger(validation/batch, #380 소유)는 ValidationRunRow 계약을
-    // 그대로 받는다 — 그쪽 호출부는 이번 전환 범위가 아니라 바꾸지 않는다.
-    private ValidationRunRow toRow(ValidationRun run) {
-        ValidationRunRow row = new ValidationRunRow();
-        row.setValidationRunId(run.getValidationRunId());
-        row.setValidationMonth(run.getValidationMonth());
-        row.setRunNo(run.getRunNo());
-        row.setRunType(run.getRunType());
-        row.setStatus(run.getStatus().name());
-        row.setCurrentStep(run.getCurrentStep());
-        row.setStartedAt(run.getStartedAt());
-        row.setCompletedAt(run.getCompletedAt());
-        row.setFinalizedAt(run.getFinalizedAt());
-        row.setTriggeredBy(run.getTriggeredBy());
-        row.setFinalizedBy(run.getFinalizedBy());
-        row.setFailureMessage(run.getFailureMessage());
-        row.setCreatedAt(run.getCreatedAt());
         return row;
     }
 }

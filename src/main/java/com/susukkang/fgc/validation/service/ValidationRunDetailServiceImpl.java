@@ -83,24 +83,6 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
     public ValidationRunProgressResponse progress(Long validationRunId) {
         ValidationRun run = validationRunRepository.findById(validationRunId)
                 .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
-        return ValidationRunProgressResponse.from(toRow(run));
-    }
-
-    private ValidationRunRow toRow(ValidationRun run) {
-        ValidationRunRow row = new ValidationRunRow();
-        row.setValidationRunId(run.getValidationRunId());
-        row.setValidationMonth(run.getValidationMonth());
-        row.setRunNo(run.getRunNo());
-        row.setRunType(run.getRunType());
-        row.setStatus(run.getStatus().name());
-        row.setCurrentStep(run.getCurrentStep());
-        row.setStartedAt(run.getStartedAt());
-        row.setCompletedAt(run.getCompletedAt());
-        row.setFinalizedAt(run.getFinalizedAt());
-        row.setTriggeredBy(run.getTriggeredBy());
-        row.setFinalizedBy(run.getFinalizedBy());
-        row.setFailureMessage(run.getFailureMessage());
-        row.setCreatedAt(run.getCreatedAt());
-        return row;
+        return ValidationRunProgressResponse.from(ValidationRunRow.from(run));
     }
 }
