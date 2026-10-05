@@ -95,7 +95,10 @@ validation
 audit
 dashboard
 batch
+frontend
 ```
+
+`frontend`는 2차 React 화면 작업(`frontend/`)에 씁니다. 예: `feature/{이슈번호}-frontend-contract-list`
 
 브랜치 이름의 이슈 번호는 GitHub Issue 번호를 사용합니다.
 

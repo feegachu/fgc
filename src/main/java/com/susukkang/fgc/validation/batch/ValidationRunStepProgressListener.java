@@ -38,8 +38,13 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
         try {
             return doAfterStep(stepExecution);
         } catch (RuntimeException e) {
-            log.error("Step {}({}) 진행상황 기록 중 예외가 발생해 Job을 FAILED로 전파합니다",
+            // ExitStatus만 FAILED로 돌려주면 SimpleJob(.start().next() 체인)은 BatchStatus가
+            // COMPLETED인 한 다음 Step으로 넘어간다. Step의 BatchStatus까지 FAILED로 올려야
+            // SimpleJob이 여기서 멈추고 Job도 FAILED가 된다.
+            log.error("Step {}({}) 진행상황 기록 중 예외가 발생해 Step·Job을 FAILED로 전파합니다",
                     stepNo, stepExecution.getStepName(), e);
+            stepExecution.upgradeStatus(BatchStatus.FAILED);
+            stepExecution.addFailureException(e);
             return ExitStatus.FAILED;
         }
     }

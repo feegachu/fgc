@@ -6,7 +6,6 @@ import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.exceptioncase.entity.ExceptionAction;
 import com.susukkang.fgc.exceptioncase.entity.ExceptionCase;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +43,7 @@ class ExceptionPersistenceRepositoryIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private ExceptionCaseQueryMapper queryMapper;
+    private ExceptionCaseQueryRepository queryRepository;
 
     @Test
     void caseSavePreservesNullableReferencesAndDatabaseDetectionDefaults() {
@@ -130,11 +129,11 @@ class ExceptionPersistenceRepositoryIntegrationTest {
     }
 
     @Test
-    void existingMyBatisHistoryQuerySeesJpaWritesInTheSameTransaction() {
+    void historyQuerySeesJpaWritesInTheSameTransaction() {
         ExceptionCase target = saveCase();
         ExceptionAction saved = actionRepository.saveAndFlush(action(target.getExceptionCaseId(), 1));
 
-        var rows = queryMapper.findActionsByCaseIds(List.of(target.getExceptionCaseId()));
+        var rows = queryRepository.findActionsByCaseIds(List.of(target.getExceptionCaseId()));
 
         assertThat(rows).singleElement().satisfies(row -> {
             assertThat(row.exceptionActionId()).isEqualTo(saved.getExceptionActionId());

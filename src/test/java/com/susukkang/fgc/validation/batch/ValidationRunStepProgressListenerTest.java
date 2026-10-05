@@ -101,9 +101,9 @@ class ValidationRunStepProgressListenerTest {
 
     @Test
     // lifecycleService.advance가 예외를 던지면(예: VRUN_005 상태 충돌) afterStep이 그걸 삼키지
-    // 않고 ExitStatus.FAILED로 바꿔 돌려줘야 Job이 그 자리에서 멈추고 다음 Step이 안 돈다
-    // (실제로 예외가 그냥 던져지면 Spring Batch가 로그만 남기고 다음 Step을 계속 실행한다는
-    // 것을 별도 스크래치 테스트로 재현 확인했다).
+    // 않고 Step의 BatchStatus를 FAILED로 올리고 ExitStatus.FAILED를 돌려줘야 한다.
+    // ExitStatus만 FAILED면 SimpleJob은 BatchStatus(COMPLETED)만 보고 다음 Step을 계속 돌린다
+    // (afterStep에서 예외를 그냥 던져도 AbstractStep이 로그만 남기고 삼킨다).
     void wrapsLifecycleServiceExceptionIntoFailedExitStatus() {
         ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(3, false, lifecycleService, auditService);
         StepExecution stepExecution = stepExecutionWithRunId(100L);
@@ -113,6 +113,8 @@ class ValidationRunStepProgressListenerTest {
         ExitStatus result = listener.afterStep(stepExecution);
 
         assertThat(result).isEqualTo(ExitStatus.FAILED);
+        assertThat(stepExecution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(stepExecution.getFailureExceptions()).hasSize(1);
     }
 
     @Test

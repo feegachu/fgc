@@ -6,7 +6,7 @@ import lombok.Setter;
 import java.math.BigDecimal;
 
 /**
- * 계약월차 1~12에 속하는 예상 스케줄(schedule_line) 한 줄. 1,200% 산입 후보 원자행
+ * 룰셋의 초년도 월수(firstYearMonths) 범위에 속하는 예상 스케줄 한 줄. 1,200% 산입 후보 원자행
  */
 @Getter
 @Setter
