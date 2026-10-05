@@ -3,7 +3,7 @@ package com.susukkang.fgc.schedule.service;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -14,14 +14,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class ScheduleReviewService {
 
-    private final ScheduleMapper scheduleMapper;
+    private final ScheduleWriteRepository scheduleWriteRepository;
     private final TransactionTemplate requiresNewTransaction;
 
     public ScheduleReviewService(
-            ScheduleMapper scheduleMapper,
+            ScheduleWriteRepository scheduleWriteRepository,
             PlatformTransactionManager transactionManager
     ) {
-        this.scheduleMapper = scheduleMapper;
+        this.scheduleWriteRepository = scheduleWriteRepository;
         this.requiresNewTransaction = new TransactionTemplate(transactionManager);
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -73,7 +73,7 @@ public class ScheduleReviewService {
             String title,
             String description
     ) {
-        int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+        int affectedRows = scheduleWriteRepository.upsertPolicyReviewCase(
                 contractId,
                 paymentStage,
                 exceptionType,
@@ -93,7 +93,7 @@ public class ScheduleReviewService {
             String description
     ) {
         requiresNewTransaction.executeWithoutResult(status -> {
-            int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+            int affectedRows = scheduleWriteRepository.upsertPolicyReviewCase(
                     contractId,
                     paymentStage,
                     exceptionType,
