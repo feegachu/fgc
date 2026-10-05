@@ -1,12 +1,10 @@
-package com.susukkang.fgc.cap.mapper;
+package com.susukkang.fgc.cap.performance.baseline;
 
 import com.susukkang.fgc.cap.dto.ScheduleAmountView;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-@Mapper
 public interface CapScheduleAmountMapper {
 
     /**
