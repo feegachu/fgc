@@ -8,9 +8,9 @@ import com.susukkang.fgc.cap.dto.CapRuleSetView;
 import com.susukkang.fgc.cap.dto.RefundRateQuery;
 import com.susukkang.fgc.cap.dto.RefundRateResolution;
 import com.susukkang.fgc.cap.dto.ScheduleAmountView;
-import com.susukkang.fgc.cap.mapper.CapContractMapper;
-import com.susukkang.fgc.cap.mapper.CapRuleMapper;
-import com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper;
+import com.susukkang.fgc.cap.repository.CapScheduleAmountQueryRepository;
+import com.susukkang.fgc.cap.repository.CapContractQueryRepository;
+import com.susukkang.fgc.cap.repository.CapRuleQueryRepository;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * 설명 : FGC-FUN-030 초년도 수수료 한도 계산 엔진 단위 테스트
- * DB 없이 매퍼를 mock 으로 대체해 계산식 자체(기본식·80% 가산·준법경영비 공제·산입 분류·판정)를 검증한다.
+ * DB 없이 조회 의존성을 mock 으로 대체해 계산식 자체(기본식·80% 가산·준법경영비 공제·산입 분류·판정)를 검증한다.
  *
  * @author yslee
  * @since 2026-08-10
@@ -57,11 +57,11 @@ class CapCalculatorImplTest {
     private static final String PRODUCT_GROUP = "HEALTH_PROTECTION";
 
     @Mock
-    private CapContractMapper capContractMapper;
+    private CapContractQueryRepository capContractQueryRepository;
     @Mock
-    private CapRuleMapper capRuleMapper;
+    private CapRuleQueryRepository capRuleQueryRepository;
     @Mock
-    private CapScheduleAmountMapper capScheduleAmountMapper;
+    private CapScheduleAmountQueryRepository capScheduleAmountQueryRepository;
     @Mock
     private ProductRefundRateResolver refundRateResolver;
 
@@ -69,7 +69,7 @@ class CapCalculatorImplTest {
 
     @BeforeEach
     void setUp() {
-        capCalculator = new CapCalculatorImpl(capContractMapper, capRuleMapper, capScheduleAmountMapper,
+        capCalculator = new CapCalculatorImpl(capContractQueryRepository, capRuleQueryRepository, capScheduleAmountQueryRepository,
                 refundRateResolver);
     }
 
@@ -137,12 +137,12 @@ class CapCalculatorImplTest {
     // 월납 100,000원 일반 샘플의 기본 한도는 1,200,000원이다
     @Test
     void basicLimitIsMonthlyPremiumTimesTwelveForGeneralSample() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
 
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
                 CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
@@ -158,12 +158,12 @@ class CapCalculatorImplTest {
     // 표준해약공제액 80% 이상 공제 대상은 12차월 예상해약환급률이 한도에 가산된다
     @Test
     void addsMonth12RefundRateToLimitForStandardDeduction80Product() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(refundRateResolver.resolve(any(RefundRateQuery.class)))
                 .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("24.000000"))));
 
@@ -225,12 +225,12 @@ class CapCalculatorImplTest {
 
     @Test
     void ignoresComplianceEvidenceForGaToFcStage() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "NONE"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
 
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
                 CONTRACT_ID,
@@ -244,12 +244,12 @@ class CapCalculatorImplTest {
     }
 
     private void stubComplianceCalculation(String stage, BigDecimal maximumPct) {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
-        when(capRuleMapper.findApplicableRuleSet(eq(stage), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq(stage), any(), any(), any(), any()))
                 .thenReturn(ruleSet(stage, maximumPct, "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(refundRateResolver.resolve(any(RefundRateQuery.class)))
                 .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("24.000000"))));
     }
@@ -264,12 +264,12 @@ class CapCalculatorImplTest {
         );
 
         for (LocalDate contractDate : contractDates) {
-            when(capContractMapper.findById(CONTRACT_ID))
+            when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                     .thenReturn(contract(contractDate, new BigDecimal("100000"), false));
-            when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), eq(contractDate), any(), any(), any()))
+            when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), eq(contractDate), any(), any(), any()))
                     .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
-            when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-            when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+            when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+            when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
                     .thenReturn(List.of());
 
             CapCalculationResult result = capCalculator.calculate(
@@ -284,9 +284,9 @@ class CapCalculatorImplTest {
     // 산입/제외 항목이 섞이면 INCLUDED만 합산되고 초과 시 VIOLATION이다
     @Test
     void sumsOnlyIncludedItemsAndFlagsViolationWhenExceeded() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
 
         CapRuleItemView included = includedItem(1L, "BASE_COMMISSION");
@@ -297,8 +297,8 @@ class CapCalculatorImplTest {
         excluded.setExclusionType("NEWCOMER_SUPPORT");
         excluded.setDecisionReason("신인활동지원비 제외");
 
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(included, excluded));
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(included, excluded));
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
                 scheduleLine(11L, 1L, 1, "1250000"),   // INCLUDED, 한도(1,200,000) 초과
                 scheduleLine(12L, 2L, 1, "500000")     // EXCLUDED, 합산 제외
         ));
@@ -314,13 +314,13 @@ class CapCalculatorImplTest {
 
     @Test
     void requiresReviewInsteadOfExcludingWhenEvidenceRequiredItemHasNoEvidence() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "NONE"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID))
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID))
                 .thenReturn(List.of(excludedEvidenceRequiredItem(2L, "NEWCOMER_SUPPORT")));
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
                 .thenReturn(List.of(scheduleLine(12L, 2L, 1, "500000")));
 
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
@@ -334,15 +334,15 @@ class CapCalculatorImplTest {
 
     @Test
     void keepsExcludedStatusAndSnapshotsEvidenceWhenEvidenceRequiredItemIsLinked() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "NONE"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID))
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID))
                 .thenReturn(List.of(excludedEvidenceRequiredItem(2L, "NEWCOMER_SUPPORT")));
         ScheduleAmountView line = scheduleLine(12L, 2L, 1, "500000");
         line.setEvidenceRef("EVD-2026-001");
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
                 .thenReturn(List.of(line));
 
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
@@ -356,12 +356,12 @@ class CapCalculatorImplTest {
     // 룰셋에 없는 항목이나 환급률표 미존재는 REVIEW_REQUIRED다
     @Test
     void flagsReviewRequiredWhenItemUnclassifiedOrRefundTableMissing() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), true));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
                 scheduleLine(11L, 99L, 1, "100000")   // 룰셋에 없는 항목
         ));
         when(refundRateResolver.resolve(any(RefundRateQuery.class))).thenReturn(Optional.empty());
@@ -376,13 +376,13 @@ class CapCalculatorImplTest {
     // 사용률이 경고기준 이상이면 WARNING이다
     @Test
     void flagsWarningWhenUsageAtOrAboveThreshold() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(includedItem(1L, "BASE_COMMISSION")));
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(includedItem(1L, "BASE_COMMISSION")));
         // 한도 1,200,000 의 91.666...% = 1,100,000
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
                 .thenReturn(List.of(scheduleLine(11L, 1L, 1, "1100000")));
 
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
@@ -398,12 +398,12 @@ class CapCalculatorImplTest {
         LocalDate contractDate = LocalDate.of(2026, 1, 15);
         LocalDate validationAsOfDate = LocalDate.of(2026, 9, 1);
 
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(contractDate, new BigDecimal("100000"), true));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
                 .thenReturn(List.of());
         when(refundRateResolver.resolve(any(RefundRateQuery.class)))
                 .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("24.000000"))));
@@ -421,12 +421,12 @@ class CapCalculatorImplTest {
     // 101 + 101 = 202여야 한다)
     @Test
     void roundsEachScheduleLineToWonBeforeSummingIncludedAmount() {
-        when(capContractMapper.findById(CONTRACT_ID))
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
-        when(capRuleMapper.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(includedItem(1L, "BASE_COMMISSION")));
-        when(capScheduleAmountMapper.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(includedItem(1L, "BASE_COMMISSION")));
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of(
                 scheduleLine(11L, 1L, 1, "100.5"),
                 scheduleLine(12L, 1L, 2, "100.5")
         ));
@@ -442,18 +442,19 @@ class CapCalculatorImplTest {
     // 존재하지 않는 계약이면 예외가 발생한다
     @Test
     void throwsExceptionWhenContractNotFound() {
-        when(capContractMapper.findById(CONTRACT_ID)).thenReturn(null);
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID)).thenReturn(null);
 
         assertThatThrownBy(() -> capCalculator.calculate(
                 CapCalculationCommand.realtime(CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.now())))
-                .isInstanceOf(FgcBusinessException.class);
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_500));
     }
 
     @Test
     void throwsCapRuleMissingWhenApplicableRuleSetDoesNotExist() {
-        when(capContractMapper.findById(CONTRACT_ID)).thenReturn(
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID)).thenReturn(
                 contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false));
-        when(capRuleMapper.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(null);
 
         assertThatThrownBy(() -> capCalculator.calculate(

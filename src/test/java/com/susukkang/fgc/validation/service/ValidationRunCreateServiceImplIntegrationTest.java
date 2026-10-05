@@ -14,7 +14,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,14 +45,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 class ValidationRunCreateServiceImplIntegrationTest {
 
-    // 이 클래스는 @Transactional 없이 실제 커밋하고, 아래 cleanUp()이 "월 통째로" 지운다.
-    // 그래서 센티넬 월은 이 클래스 전용이어야 한다 — 2099-01은 ReconciliationRunIntegrationTest도
-    // 쓰는 월이라, 남이 만든 실행(자식 exception_case가 달린)까지 지우려다 FK 위반으로 DELETE가
-    // 통째로 실패했다. 그러면 이 클래스가 만든 활성 MANUAL_CONTRACT 행이 남고,
-    // uq_validation_run_active_manual_contract는 월과 무관한 전역 1건 제약이라 뒤따르는 테스트가
-    // 줄줄이 무너진다(CI 2026-08-19 bee042b4에서 5건 실패). 아무도 안 쓰는 월로 옮긴다.
     private static final LocalDate MONTHLY_MONTH = LocalDate.of(2095, 1, 1);
     private static final LocalDate NON_MONTHLY_MONTH = LocalDate.of(2095, 2, 1);
+
+    // 배치 테스트가 무작위로 같은 월을 사용할 수 있으므로, 생성에 성공한 ID만 정리한다.
+    // 각 작업 스레드에서 커밋 직후 기록해 assertion 실패 시에도 정리할 수 있게 한다.
+    private final ConcurrentLinkedQueue<Long> createdValidationRunIds = new ConcurrentLinkedQueue<>();
 
     @Autowired
     private ValidationRunCreateService validationRunCreateService;
@@ -59,13 +59,56 @@ class ValidationRunCreateServiceImplIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_month IN (?, ?)",
-                MONTHLY_MONTH, NON_MONTHLY_MONTH);
+        createdValidationRunIds.forEach(id ->
+                jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", id));
+        createdValidationRunIds.clear();
     }
 
     private Callable<ValidationRunRow> createTask(LocalDate month, ValidationRunType runType) {
         CreateValidationRunCommand command = new CreateValidationRunCommand(month, runType, null);
-        return () -> validationRunCreateService.create(command);
+        return () -> {
+            ValidationRunRow row = validationRunCreateService.create(command);
+            createdValidationRunIds.add(row.getValidationRunId());
+            return row;
+        };
+    }
+
+    @Test
+    void cleanUpDeletesOnlyOwnedRunsWhenAnotherRunInTheSameMonthHasAnException() throws Exception {
+        // 일 배치가 같은 월을 무작위로 선택하고 예외 이력을 남기는 CI 상황을 재현한다.
+        Long otherRunId = validationRunCreateService.create(
+                new CreateValidationRunCommand(NON_MONTHLY_MONTH, ValidationRunType.PRE_CONFIRM, null))
+                .getValidationRunId();
+        try {
+            Long otherCaseId = jdbcTemplate.queryForObject("""
+                    INSERT INTO fgc.exception_case
+                        (exception_key, exception_type, severity, validation_run_id,
+                         source_entity_type, source_entity_id, title)
+                    VALUES (?, 'DATA_QUALITY', 'WARNING', ?, 'IT', ?, '테스트 데이터 정리 격리 검증')
+                    RETURNING exception_case_id
+                    """, Long.class, "IT-CLEANUP:" + UUID.randomUUID(), otherRunId, otherRunId.toString());
+            Long ownedRunId = createTask(NON_MONTHLY_MONTH, ValidationRunType.MANUAL_CONTRACT)
+                    .call().getValidationRunId();
+
+            cleanUp();
+
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                    Long.class, ownedRunId)).isZero();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                    Long.class, otherRunId)).isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM fgc.exception_case WHERE exception_case_id = ?",
+                    Long.class, otherCaseId)).isEqualTo(1);
+
+            // 활성 MANUAL_CONTRACT가 남아 후속 테스트의 생성을 막지 않아야 한다.
+            assertThat(createTask(NON_MONTHLY_MONTH, ValidationRunType.MANUAL_CONTRACT)
+                    .call().getValidationRunId()).isNotEqualTo(ownedRunId);
+        } finally {
+            jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE validation_run_id = ?", otherRunId);
+            jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", otherRunId);
+        }
     }
 
     @Test

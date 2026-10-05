@@ -7,10 +7,14 @@ on:
   push:
     branches: [develop, main]     # 머지 후 develop 검증 + README 뱃지 소스
 
-# 같은 브랜치에 새 푸시가 오면 진행 중 실행을 취소한다(러너 절약).
+# PR: 같은 PR에 새 푸시가 오면 진행 중 실행을 취소한다(러너 절약).
+# develop·main push: run마다 별도 그룹이라 서로 취소·대체하지 않는다 — 머지마다 검증 결과
+# (와 2차 이미지 publish)가 남아야 한다. 그룹을 ref로 두면 cancel-in-progress가 false여도
+# GitHub가 그룹당 "실행 1 + 대기 1"만 두어, 연속 머지 때 대기 중이던 run이 최신 run으로 대체(취소)된다.
+# 순서가 중요한 단계(publish 등)가 생기면 그 job에만 따로 concurrency(취소 없이)를 건다.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -108,3 +112,30 @@ jobs:
           name: test-report
           path: build/reports/tests/test
           retention-days: 7
+
+  # React 프론트(frontend/, #401). build와 다른 러너에서 병렬로 돈다.
+  # 브랜치 보호의 두 번째 필수 체크로 등록한다 — build와 같은 이유로 job id·name: 을 바꾸지 않는다.
+  # workflow 단위 paths 필터를 쓰지 않는다. 건너뛴 workflow는 필수 체크를 보고하지 않아 머지가 막힌다.
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node (frontend/.nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --run
+      # tsc -b(타입 검사) 후 vite build
+      - run: npm run build

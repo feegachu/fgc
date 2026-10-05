@@ -9,9 +9,9 @@
 #   - Gradle dependency graph    : dependency-submission.yml (develop push마다 제출)
 #   설정이 꺼지거나 그래프 제출이 실패하면 이 파일만으로는 Gradle CVE를 잡지 못한다.
 #
-# 컨테이너 이미지 스캔은 1차 범위에 없다. FGC는 Dockerfile이 없어 자체 빌드 이미지가
-# 없고, CI의 postgres:17은 테스트용 업스트림 공식 이미지다. 이미지 빌드·배포는
-# FGC-ECR-005(Docker 이미지, Stage/Prod 분리)로 2차이므로 스캐너도 그때 함께 넣는다.
+# 컨테이너 이미지: 저장소 루트의 Containerfile.db/api/web이 자체 빌드 이미지다.
+#   - 베이스 이미지 버전 갱신: 아래 docker 항목 (Dependabot은 Containerfile 이름도 인식한다)
+#   - 이미지 취약점 스캔: 2차 GHCR publish job의 Trivy (FGC-ECR-005, 런북 04 §10.1)
 # 아래 메이저 제외 규칙은 일반 버전 업데이트에만 적용되며 보안 업데이트는 막지 않는다.
 version: 2
 updates:
@@ -37,6 +37,33 @@ updates:
     # SHA 고정은 유지하면서 같은 메이저 안의 업데이트만 한 PR로 받는다.
     groups:
       github-actions-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  # React 프론트 (frontend/, #401). 메이저(React·Vite·Tailwind 등)는 ADR-01 검토 대상이라 제외한다.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  # Containerfile.db/api/web 베이스 이미지 (node:22·tomcat 10.1·postgres:17 메이저는 고정)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      container-images-minor-patch:
         patterns: ["*"]
         update-types: [minor, patch]
     ignore:
