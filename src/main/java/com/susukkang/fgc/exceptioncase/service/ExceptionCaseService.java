@@ -13,8 +13,10 @@ import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.exceptioncase.dto.*;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseActionMapper;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
+import com.susukkang.fgc.exceptioncase.entity.ExceptionAction;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionActionRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,8 +43,9 @@ public class ExceptionCaseService {
     private static final int MAX_SIZE = 100;
     private static final String SORT = "severity,asc,createdAt,desc";
 
-    private final ExceptionCaseQueryMapper exceptionCaseQueryMapper;
-    private final ExceptionCaseActionMapper exceptionCaseActionMapper;
+    private final ExceptionCaseQueryRepository exceptionCaseQueryRepository;
+    private final ExceptionCaseRepository exceptionCaseRepository;
+    private final ExceptionActionRepository exceptionActionRepository;
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
@@ -57,7 +60,7 @@ public class ExceptionCaseService {
 
         // 총 건수를 먼저 세어 범위 밖 page 를 마지막 페이지로 보정한다 — 큰 OFFSET 으로
         // 정렬·조인을 헛도는 행 조회를 아예 만들지 않는다. 응답의 page 가 보정된 값이다.
-        long total = exceptionCaseQueryMapper.count(criteria, statuses);
+        long total = exceptionCaseQueryRepository.count(criteria, statuses);
         long totalPages = (total + size - 1) / size;
         if (totalPages == 0) {
             page = MIN_PAGE; // 0건이면 화면이 "N / 1 페이지"로 어긋나지 않게 1로 되돌린다
@@ -73,7 +76,7 @@ public class ExceptionCaseService {
 
         List<ExceptionCaseSearchRow> rows = total == 0
                 ? List.of()
-                : exceptionCaseQueryMapper.search(criteria, statuses, offset, size);
+                : exceptionCaseQueryRepository.search(criteria, statuses, offset, size);
 
         Map<Long, List<ExceptionActionResponse>> actionsByCaseId = loadActions(rows);
         Map<Long, List<ExceptionOccurrenceResponse>> occurrencesByCaseId = loadOccurrences(rows);
@@ -84,7 +87,7 @@ public class ExceptionCaseService {
                         actionsByCaseId.getOrDefault(row.exceptionCaseId(), List.of())))
                 .toList();
 
-        List<ExceptionTypeSummaryResponse> summary = exceptionCaseQueryMapper.countOpenByType()
+        List<ExceptionTypeSummaryResponse> summary = exceptionCaseQueryRepository.countOpenByType()
                 .stream()
                 .map(ExceptionTypeSummaryResponse::from)
                 .toList();
@@ -105,7 +108,7 @@ public class ExceptionCaseService {
         List<Long> exceptionCaseIds = rows.stream()
                 .map(ExceptionCaseSearchRow::exceptionCaseId)
                 .toList();
-        return exceptionCaseQueryMapper.findOccurrencesByCaseIds(exceptionCaseIds)
+        return exceptionCaseQueryRepository.findOccurrencesByCaseIds(exceptionCaseIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                         ExceptionOccurrenceRow::exceptionCaseId,
@@ -115,19 +118,19 @@ public class ExceptionCaseService {
 
     @Transactional(readOnly = true)
     public List<String> reasonCodes() {
-        return exceptionCaseQueryMapper.findReasonCodes();
+        return exceptionCaseQueryRepository.findReasonCodes();
     }
 
     /** 담당자 필터 선택지 — 예외를 배정받은 적 있는 사용자만. */
     @Transactional(readOnly = true)
     public List<ExceptionAssigneeRow> assignees() {
-        return exceptionCaseQueryMapper.findAssignees();
+        return exceptionCaseQueryRepository.findAssignees();
     }
 
     /** 검증월 필터 선택지 — 예외가 검출된 검증월만, 최신순. */
     @Transactional(readOnly = true)
     public List<LocalDate> validationMonths() {
-        return exceptionCaseQueryMapper.findValidationMonths();
+        return exceptionCaseQueryRepository.findValidationMonths();
     }
 
     private Map<Long, List<ExceptionActionResponse>> loadActions(
@@ -140,7 +143,7 @@ public class ExceptionCaseService {
         List<Long> exceptionCaseIds = rows.stream()
                 .map(ExceptionCaseSearchRow::exceptionCaseId)
                 .toList();
-        return exceptionCaseQueryMapper.findActionsByCaseIds(exceptionCaseIds)
+        return exceptionCaseQueryRepository.findActionsByCaseIds(exceptionCaseIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                         ExceptionActionRow::exceptionCaseId,
@@ -214,7 +217,7 @@ public class ExceptionCaseService {
 
         // 1. 동시에 같은 예외를 처리하지 못하도록 행 잠금
         ExceptionCaseActionTarget target =
-                exceptionCaseActionMapper.findByIdForUpdate(exceptionCaseId);
+                exceptionCaseRepository.findByIdForUpdate(exceptionCaseId);
 
         if (target == null) {
             throw new FgcBusinessException(
@@ -255,14 +258,17 @@ public class ExceptionCaseService {
 
         // 3. 잠금을 획득한 상태에서 다음 이력 순번 계산
         int nextActionSeq =
-                exceptionCaseActionMapper.findNextActionSeq(exceptionCaseId);
+                exceptionActionRepository.findNextActionSeq(exceptionCaseId);
 
         // 응답이 즉시 화면에 표시되므로 GET 조회 경로(DateUtil.toSeoul)와 같은 기준으로 맞춘다 — SIR-008
         OffsetDateTime actionAt = DateUtil.nowSeoul();
 
-        // 4. 처리 이력 INSERT
-        int inserted = exceptionCaseActionMapper.insertAction(
-                ExceptionActionInsertCommand.builder()
+        // 2026-09-28 hjKang - 예외 조치 저장을 공용 JPA 엔티티로 전환한다.
+        // 기존 코드: Mapper가 처리 이력 INSERT와 상태 UPDATE를 실행했다.
+        // 문제: 공용 예외 저장 계약이 XML에 남아 있었다.
+        // 개선: 부모 행 잠금과 이력 → 상태 → 감사 순서를 유지하고 하나의 트랜잭션에 참여한다.
+        exceptionActionRepository.save(
+                ExceptionAction.builder()
                         .exceptionCaseId(exceptionCaseId)
                         .actionSeq(nextActionSeq)
                         .fromStatus(fromStatus)
@@ -273,16 +279,13 @@ public class ExceptionCaseService {
                         .actionBy(actionUserId)
                         .actionAt(actionAt)
                         .build());
-        if (inserted != 1) {
-            throw new IllegalStateException("예외 처리 이력 저장에 실패했습니다.");
-        }
 
         // 5. exception_case의 현재 상태 UPDATE
         Long assignedTo = actionType == ExceptionActionType.ASSIGN
                 ? actionUserId
                 : target.assignedTo();
         OffsetDateTime resolvedAt = isClosed(toStatus) ? actionAt : null;
-        int updated = exceptionCaseActionMapper.updateCaseAfterAction(
+        int updated = exceptionCaseRepository.updateCaseAfterAction(
                 exceptionCaseId,
                 toStatus,
                 assignedTo,
@@ -306,7 +309,7 @@ public class ExceptionCaseService {
         auditLogRepository.saveAndFlush(auditLog);
 
         return new ExceptionActionResponse(
-                null, // Mapper에서 generated key를 받으면 exceptionActionId 설정
+                null, // 기존 조치 응답의 null 계약을 유지하며 생성 ID는 이력 조회에서 제공한다.
                 nextActionSeq,
                 fromStatus,
                 toStatus,

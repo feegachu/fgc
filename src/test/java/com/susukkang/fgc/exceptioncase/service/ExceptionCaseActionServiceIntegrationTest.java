@@ -6,6 +6,7 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -315,6 +316,9 @@ class ExceptionCaseActionServiceIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void auditInsertFailureRollsBackStatusAndActionHistory() {
         Long exceptionCaseId = insertNewCase();
+        String reasonCode = "ROLLBACK-" + UUID.randomUUID();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET reason_code = ? WHERE exception_case_id = ?",
+                reasonCode, exceptionCaseId);
         Long userId = firstUserId();
         RequestIdContext.set("r".repeat(81));
         try {
@@ -325,6 +329,13 @@ class ExceptionCaseActionServiceIntegrationTest {
             assertThat(currentStatus(exceptionCaseId)).isEqualTo("NEW");
             assertThat(actionCount(exceptionCaseId)).isZero();
             assertThat(auditCount(exceptionCaseId)).isZero();
+            ExceptionCaseSearchDTO criteria = new ExceptionCaseSearchDTO();
+            criteria.setReasonCode(reasonCode);
+            var result = exceptionCaseService.search(criteria, 1, 20);
+            assertThat(result.content()).singleElement().satisfies(row -> {
+                assertThat(row.status()).isEqualTo(ExceptionStatus.NEW);
+                assertThat(row.actions()).isEmpty();
+            });
         } finally {
             jdbcTemplate.update("DELETE FROM fgc.exception_action WHERE exception_case_id = ?", exceptionCaseId);
             jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE exception_case_id = ?", exceptionCaseId);
