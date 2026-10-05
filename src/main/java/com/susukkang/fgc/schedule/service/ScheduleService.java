@@ -21,7 +21,8 @@ import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.schedule.dto.*;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleQueryRepository;
+import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,8 @@ import java.util.Objects;
 public class ScheduleService {
 
     private final CommissionPolicyService commissionPolicyService;
-    private final ScheduleMapper scheduleMapper;
+    private final ScheduleQueryRepository scheduleQueryRepository;
+    private final ScheduleWriteRepository scheduleWriteRepository;
     private final AgentRepository agentRepository;
     private final CapCheckService capCheckService;
     private final CapCheckQueryRepository capCheckQueryRepository;
@@ -90,10 +92,10 @@ public class ScheduleService {
         }
         // offset : DB가 앞에서 건널 뛸 행 개수 -> offset 번째 부터 조회함
         long offset = (long) (page - 1) * size;
-        List<ScheduleHeaderResponse> scheduleHeaderList = scheduleMapper.selectByCondition(condition,size,offset);
+        List<ScheduleHeaderResponse> scheduleHeaderList = scheduleQueryRepository.selectByCondition(condition,size,offset);
         // 검색 조건에 해당하는 전체 스케줄 건수 조회
         long totalSchedules =
-                scheduleMapper.countByCondition(condition);
+                scheduleQueryRepository.countByCondition(condition);
 
         return PageResponse.of(
                 scheduleHeaderList,
@@ -128,7 +130,7 @@ public class ScheduleService {
             );
         }
 
-        ScheduleDetailResponse detail  = scheduleMapper.selectScheduleDetailById(scheduleHeaderId);
+        ScheduleDetailResponse detail  = scheduleQueryRepository.selectScheduleDetailById(scheduleHeaderId);
 
         if (detail == null) {
             throw new FgcBusinessException(
@@ -149,7 +151,7 @@ public class ScheduleService {
         if (scheduleHeaderId == null) {
             throw validationException("scheduleHeaderId", "스케줄 헤더 ID는 필수입니다.");
         }
-        return scheduleMapper.selectVersionsByScheduleHeaderId(scheduleHeaderId);
+        return scheduleQueryRepository.selectVersionsByScheduleHeaderId(scheduleHeaderId);
     }
 
     /** 같은 계약에서 선택한 지급단계의 사용 중인 운영 스케줄 헤더를 찾는다. */
@@ -162,11 +164,11 @@ public class ScheduleService {
             throw validationException("paymentStage", "지급단계는 필수입니다.");
         }
 
-        ScheduleHeaderInsertDTO current = scheduleMapper.selectScheduleHeaderById(scheduleHeaderId);
+        ScheduleHeaderInsertDTO current = scheduleQueryRepository.selectScheduleHeaderById(scheduleHeaderId);
         if (current == null) {
             throw validationException("scheduleHeaderId", "존재하지 않는 스케줄입니다.");
         }
-        ScheduleDetailResponse target = scheduleMapper.selectByContractIdAndPaymentStage(
+        ScheduleDetailResponse target = scheduleQueryRepository.selectByContractIdAndPaymentStage(
                 current.getContractId(), paymentStage);
         if (target == null || target.getScheduleHeaderId() == null) {
             throw validationException("paymentStage", "선택한 지급단계의 사용 중인 운영 스케줄이 없습니다.");
@@ -224,7 +226,7 @@ public class ScheduleService {
         }
 
         Long lockedContractId =
-                scheduleMapper.lockContractForScheduleGeneration(contractId);
+                scheduleWriteRepository.lockContractForScheduleGeneration(contractId);
 
         if (!Objects.equals(lockedContractId, contractId)) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500);
@@ -272,7 +274,7 @@ public class ScheduleService {
         }
 
         List<Long> activeScheduleIds =
-                scheduleMapper.selectActiveOperationalScheduleIds(contractId);
+                scheduleQueryRepository.selectActiveOperationalScheduleIds(contractId);
         List<Long> regeneratedScheduleIds = new ArrayList<>();
 
         for (Long activeScheduleId : activeScheduleIds) {
@@ -329,7 +331,7 @@ public class ScheduleService {
                     ? "예상 스케줄에 적용할 수수료 정책을 확정할 수 없습니다."
                     : exception.getDetail();
 
-            int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+            int affectedRows = scheduleWriteRepository.upsertPolicyReviewCase(
                     contractId,
                     paymentStage,
                     reason,
@@ -357,7 +359,7 @@ public class ScheduleService {
             ResolvedCommissionPolicy policy
     ) {
         Long activePolicyVersionId =
-                scheduleMapper.selectActiveOperationalPolicyVersionId(
+                scheduleQueryRepository.selectActiveOperationalPolicyVersionId(
                         contract.getContractId(),
                         policy.getPaymentStage()
                 );
@@ -367,7 +369,7 @@ public class ScheduleService {
             return new CreatedSchedule(null, 0);
         }
 
-        int nextVersionNo = scheduleMapper.selectNextScheduleVersionNo(
+        int nextVersionNo = scheduleQueryRepository.selectNextScheduleVersionNo(
                 contract.getContractId(),
                 policy.getPaymentStage()
         );
@@ -377,7 +379,7 @@ public class ScheduleService {
 
         if (activePolicyVersionId != null) {
             int deactivatedRows =
-                    scheduleMapper.deactivateActiveOperationalSchedule(
+                    scheduleWriteRepository.deactivateActiveOperationalSchedule(
                             contract.getContractId(),
                             policy.getPaymentStage()
                     );
@@ -403,7 +405,7 @@ public class ScheduleService {
                                          ScheduleHeaderInsertDTO header,
                                          List<ScheduleLineInsertDTO> oldLines) {
         // 새로운 스케줄 헤더 저장 및 생성된 헤더 ID 검증
-        int headerRows = scheduleMapper.insertScheduleHeader(header);
+        int headerRows = scheduleWriteRepository.insertScheduleHeader(header);
         if (headerRows != 1 || header.getScheduleHeaderId() == null)
             throw new FgcBusinessException(FgcErrorCode.COMMON_500);
         // 현재 계약과 정책을 기준으로 새로운 회차별 스케줄 라인 생성
@@ -411,7 +413,7 @@ public class ScheduleService {
         // 확정·대사일치·조정된 기존 회차는 새 계산값 대신 기존 값과 상태를 유지
         if (!oldLines.isEmpty()) lines = mergeLockedScheduleLines(oldLines, lines, header.getScheduleHeaderId());
         // 새로운 스케줄 라인 일괄 저장 및 저장 건수 검증
-        int lineRows = scheduleMapper.insertAllScheduleLines(lines);
+        int lineRows = scheduleWriteRepository.insertAllScheduleLines(lines);
         if (lineRows != lines.size()) throw new FgcBusinessException(FgcErrorCode.COMMON_500);
         // 생성한 스케줄 헤더 ID와 라인 수 반환
         return new CreatedSchedule(header.getScheduleHeaderId(), lineRows);
@@ -508,7 +510,7 @@ public class ScheduleService {
             );
         }
 
-        ScheduleDetailResponse detail = scheduleMapper.selectByContractIdAndPaymentStage(
+        ScheduleDetailResponse detail = scheduleQueryRepository.selectByContractIdAndPaymentStage(
                 contractId,
                 paymentStage
         );
@@ -980,7 +982,7 @@ public class ScheduleService {
         if (condition.getPurpose() == null) {
             condition.setPurpose(SchedulePurpose.OPERATIONAL);
         }
-        return scheduleMapper.selectAllByCondition(condition);
+        return scheduleQueryRepository.selectAllByCondition(condition);
     }
 
     private String agentRankLabel(AgentRankCode agentRankCode) {
@@ -1069,14 +1071,14 @@ public class ScheduleService {
             throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
 
         // 기존 스케줄 헤더 조회 및 존재 여부 검증
-        ScheduleHeaderInsertDTO oldHeader = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        ScheduleHeaderInsertDTO oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (oldHeader == null)
             throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
         // 동일 계약의 스케줄 생성 및 재생성을 직렬화
-        scheduleMapper.lockContractForScheduleGeneration(oldHeader.getContractId());
+        scheduleWriteRepository.lockContractForScheduleGeneration(oldHeader.getContractId());
 
         // 락 대기 중 변경됐을 가능성이 있으므로 최신 헤더 재조회
-        oldHeader = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (oldHeader == null)
             throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
         if (!Boolean.TRUE.equals(oldHeader.getActiveYn()))
@@ -1106,10 +1108,10 @@ public class ScheduleService {
 
         // 확정된 과거 회차를 새 버전에서도 그대로 보존하기 위해 기존 라인을 조회
         List<ScheduleLineInsertDTO> oldLines =
-                scheduleMapper.selectScheduleLinesByScheduleId(oldHeader.getScheduleHeaderId());
+                scheduleQueryRepository.selectScheduleLinesByScheduleId(oldHeader.getScheduleHeaderId());
 
         // 기존 스케줄 헤더 상태를 조정으로 변경하고 비활성화
-        int updatedRows = scheduleMapper.updateScheduleHeaderStatus(
+        int updatedRows = scheduleWriteRepository.updateScheduleHeaderStatus(
                 oldHeader.getScheduleHeaderId(),
                 ScheduleHeaderStatus.ADJUSTED,
                 false
@@ -1119,7 +1121,7 @@ public class ScheduleService {
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
 
         // 계약과 지급단계에 해당하는 다음 스케줄 버전 번호 조회
-        int nextVersionNo = scheduleMapper.selectNextScheduleVersionNo(
+        int nextVersionNo = scheduleQueryRepository.selectNextScheduleVersionNo(
                 oldHeader.getContractId(),
                 oldHeader.getPaymentStage()
         );
@@ -1148,16 +1150,18 @@ public class ScheduleService {
 
     public boolean hasActiveOperationalSchedule(Long contractId, PaymentStage paymentStage) {
         ScheduleDetailResponse active =
-                scheduleMapper.selectByContractIdAndPaymentStage(contractId, paymentStage);
+                scheduleQueryRepository.selectByContractIdAndPaymentStage(contractId, paymentStage);
         return active != null && active.getScheduleHeaderId() != null;
     }
 
+    // 저장소는 호출자 트랜잭션 참여를 요구한다. 단독 호출도 기존 자동 커밋처럼 동작하도록 트랜잭션을 연다.
+    @Transactional
     public void registerCapRuleReview(
             Long contractId,
             PaymentStage paymentStage,
             String description
     ) {
-        int affectedRows = scheduleMapper.upsertPolicyReviewCase(
+        int affectedRows = scheduleWriteRepository.upsertPolicyReviewCase(
                 contractId,
                 paymentStage,
                 "POLICY_MISSING",
@@ -1184,13 +1188,13 @@ public class ScheduleService {
      */
     @Transactional(noRollbackFor = ScheduleConfirmationRejectedException.class)
     public ScheduleDetailResponse confirmSchedule(Long scheduleId) {
-        ScheduleHeaderInsertDTO header = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        ScheduleHeaderInsertDTO header = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (header == null) {
             throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
         }
 
-        scheduleMapper.lockContractForScheduleGeneration(header.getContractId());
-        header = scheduleMapper.selectScheduleHeaderById(scheduleId);
+        scheduleWriteRepository.lockContractForScheduleGeneration(header.getContractId());
+        header = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (header == null) {
             throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
         }
@@ -1259,18 +1263,18 @@ public class ScheduleService {
             throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_004);
         }
 
-        List<ScheduleLineInsertDTO> lines = scheduleMapper.selectScheduleLinesByScheduleId(scheduleId);
+        List<ScheduleLineInsertDTO> lines = scheduleQueryRepository.selectScheduleLinesByScheduleId(scheduleId);
         if (lines.isEmpty()) {
             throw validationException("scheduleId", "확정할 예정 회차가 없습니다.");
         }
         boolean hasPlannedLine = lines.stream()
                 .anyMatch(line -> line.getLineStatus() == ScheduleLineStatus.PLANNED);
         if (hasPlannedLine) {
-            scheduleMapper.confirmPlannedScheduleLines(scheduleId);
+            scheduleWriteRepository.confirmPlannedScheduleLines(scheduleId);
         } else if (lines.stream().anyMatch(line -> !isLockedLineStatus(line.getLineStatus()))) {
             throw validationException("scheduleId", "확정할 예정 회차가 없습니다.");
         }
-        if (scheduleMapper.confirmScheduleHeader(scheduleId) != 1) {
+        if (scheduleWriteRepository.confirmScheduleHeader(scheduleId) != 1) {
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
         }
         ScheduleDetailResponse confirmed = selectScheduleDetailById(scheduleId);

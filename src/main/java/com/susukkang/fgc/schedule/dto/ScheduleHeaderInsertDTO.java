@@ -19,6 +19,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleHeaderInsertDTO {
+    @Setter
     private Long scheduleHeaderId; // 생성된 스케줄 헤더 ID
     private Long contractId; // 계약 ID
     private PaymentStage paymentStage; // 지급 단계

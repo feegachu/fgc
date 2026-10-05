@@ -1,7 +1,7 @@
 package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,13 +28,13 @@ class ScheduleRegenerationBatchItemServiceTest {
     @Mock
     private ScheduleService scheduleService;
     @Mock
-    private ScheduleMapper scheduleMapper;
+    private ScheduleWriteRepository scheduleWriteRepository;
 
     private ScheduleRegenerationBatchItemService service;
 
     @BeforeEach
     void setUp() {
-        service = new ScheduleRegenerationBatchItemService(scheduleService, scheduleMapper);
+        service = new ScheduleRegenerationBatchItemService(scheduleService, scheduleWriteRepository);
     }
 
     @Test
@@ -44,7 +44,7 @@ class ScheduleRegenerationBatchItemServiceTest {
 
         service.process(10L, 118L);
 
-        verify(scheduleMapper).linkHeadersToValidationRun(List.of(200L, 201L), 118L);
+        verify(scheduleWriteRepository).linkHeadersToValidationRun(List.of(200L, 201L), 118L);
     }
 
     @Test
@@ -56,6 +56,6 @@ class ScheduleRegenerationBatchItemServiceTest {
 
         service.process(10L, 118L);
 
-        verify(scheduleMapper, never()).linkHeadersToValidationRun(any(), any());
+        verify(scheduleWriteRepository, never()).linkHeadersToValidationRun(any(), any());
     }
 }
