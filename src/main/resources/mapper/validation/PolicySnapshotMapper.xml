@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.susukkang.fgc.validation.mapper.PolicySnapshotMapper">
 
-    <!-- CapRuleMapper#findApplicableRuleSet과 같은 WHERE(활성 기간 + policy_version.status='ACTIVE')를
+    <!-- CapRuleQueryRepository#findApplicableRuleSet과 같은 WHERE(활성 기간 + policy_version.status='ACTIVE')를
          쓰되, 계약별 payment_stage/insurer_id 등으로 좁히지 않고 asOfDate 하나로만 전체를 나열한다. -->
     <select id="findActiveCapRuleSets" resultType="com.susukkang.fgc.cap.dto.CapRuleSetView">
         SELECT crs.cap_rule_set_id             AS capRuleSetId,

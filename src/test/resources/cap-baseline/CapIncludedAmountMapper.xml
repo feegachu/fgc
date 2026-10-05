@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.susukkang.fgc.cap.mapper.CapIncludedAmountMapper">
+<mapper namespace="com.susukkang.fgc.cap.performance.baseline.CapIncludedAmountMapper">
 
     <!-- 지급 확정 직전 기존 확정액과 현재 지급 건의 초년도 산입액을 계약·설계사별로 합산한다. -->
     <select id="sumIncludedAmountByContractAndAgent" resultType="com.susukkang.fgc.cap.dto.CapIncludedAmountSummary">

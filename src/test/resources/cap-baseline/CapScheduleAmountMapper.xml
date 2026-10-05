@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.susukkang.fgc.cap.mapper.CapScheduleAmountMapper">
+<mapper namespace="com.susukkang.fgc.cap.performance.baseline.CapScheduleAmountMapper">
 
     <!--
       OPERATIONAL·active_yn=true 인 스케줄만 봄 — COMPARISON/SIMULATION 용 가상 스케줄이나
