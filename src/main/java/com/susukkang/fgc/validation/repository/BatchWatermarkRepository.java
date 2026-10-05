@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -31,11 +32,14 @@ public interface BatchWatermarkRepository extends JpaRepository<BatchWatermark, 
      * Step이 성공했을 때만 부른다. lastProcessedAt/lastRunId/lastSuccessAt을 새 값으로
      * 덮어쓰고, processedCount는 이번에 처리한 건수만큼 더한다(누적).
      * trg_batch_watermark_touch(V2)가 updated_at을 자동으로 채워주므로 여기서는 건드리지 않는다.
+     * 호출처(WatermarkAdvanceStepListener#afterStep)는 청크 트랜잭션 밖이라, Repository 기본값인
+     * readOnly 트랜잭션/무트랜잭션으로 UPDATE가 실패하지 않도록 쓰기 트랜잭션을 직접 선언한다.
      *
      * @return 반영된 행 수. 정상 흐름에서는 항상 1(시드 행이 있으므로) — 0이면 (jobName,
      *         stepName) 오타 등 배선 문제를 의심해야 한다.
      */
-    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             UPDATE BatchWatermark w
                SET w.lastProcessedAt = :lastProcessedAt,
