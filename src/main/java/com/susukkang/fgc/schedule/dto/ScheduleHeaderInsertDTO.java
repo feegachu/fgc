@@ -1,7 +1,6 @@
 package com.susukkang.fgc.schedule.dto;
 
 import com.susukkang.fgc.common.code.PaymentStage;
-import com.susukkang.fgc.schedule.code.ScheduleGenReason;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
