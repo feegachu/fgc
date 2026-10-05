@@ -16,7 +16,7 @@ import com.susukkang.fgc.exceptioncase.dto.*;
 import com.susukkang.fgc.exceptioncase.entity.ExceptionAction;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionActionRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
-import com.susukkang.fgc.exceptioncase.mapper.ExceptionCaseQueryMapper;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +43,7 @@ public class ExceptionCaseService {
     private static final int MAX_SIZE = 100;
     private static final String SORT = "severity,asc,createdAt,desc";
 
-    private final ExceptionCaseQueryMapper exceptionCaseQueryMapper;
+    private final ExceptionCaseQueryRepository exceptionCaseQueryRepository;
     private final ExceptionCaseRepository exceptionCaseRepository;
     private final ExceptionActionRepository exceptionActionRepository;
     private final AuditLogRepository auditLogRepository;
@@ -60,7 +60,7 @@ public class ExceptionCaseService {
 
         // 총 건수를 먼저 세어 범위 밖 page 를 마지막 페이지로 보정한다 — 큰 OFFSET 으로
         // 정렬·조인을 헛도는 행 조회를 아예 만들지 않는다. 응답의 page 가 보정된 값이다.
-        long total = exceptionCaseQueryMapper.count(criteria, statuses);
+        long total = exceptionCaseQueryRepository.count(criteria, statuses);
         long totalPages = (total + size - 1) / size;
         if (totalPages == 0) {
             page = MIN_PAGE; // 0건이면 화면이 "N / 1 페이지"로 어긋나지 않게 1로 되돌린다
@@ -76,7 +76,7 @@ public class ExceptionCaseService {
 
         List<ExceptionCaseSearchRow> rows = total == 0
                 ? List.of()
-                : exceptionCaseQueryMapper.search(criteria, statuses, offset, size);
+                : exceptionCaseQueryRepository.search(criteria, statuses, offset, size);
 
         Map<Long, List<ExceptionActionResponse>> actionsByCaseId = loadActions(rows);
         Map<Long, List<ExceptionOccurrenceResponse>> occurrencesByCaseId = loadOccurrences(rows);
@@ -87,7 +87,7 @@ public class ExceptionCaseService {
                         actionsByCaseId.getOrDefault(row.exceptionCaseId(), List.of())))
                 .toList();
 
-        List<ExceptionTypeSummaryResponse> summary = exceptionCaseQueryMapper.countOpenByType()
+        List<ExceptionTypeSummaryResponse> summary = exceptionCaseQueryRepository.countOpenByType()
                 .stream()
                 .map(ExceptionTypeSummaryResponse::from)
                 .toList();
@@ -108,7 +108,7 @@ public class ExceptionCaseService {
         List<Long> exceptionCaseIds = rows.stream()
                 .map(ExceptionCaseSearchRow::exceptionCaseId)
                 .toList();
-        return exceptionCaseQueryMapper.findOccurrencesByCaseIds(exceptionCaseIds)
+        return exceptionCaseQueryRepository.findOccurrencesByCaseIds(exceptionCaseIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                         ExceptionOccurrenceRow::exceptionCaseId,
@@ -118,19 +118,19 @@ public class ExceptionCaseService {
 
     @Transactional(readOnly = true)
     public List<String> reasonCodes() {
-        return exceptionCaseQueryMapper.findReasonCodes();
+        return exceptionCaseQueryRepository.findReasonCodes();
     }
 
     /** 담당자 필터 선택지 — 예외를 배정받은 적 있는 사용자만. */
     @Transactional(readOnly = true)
     public List<ExceptionAssigneeRow> assignees() {
-        return exceptionCaseQueryMapper.findAssignees();
+        return exceptionCaseQueryRepository.findAssignees();
     }
 
     /** 검증월 필터 선택지 — 예외가 검출된 검증월만, 최신순. */
     @Transactional(readOnly = true)
     public List<LocalDate> validationMonths() {
-        return exceptionCaseQueryMapper.findValidationMonths();
+        return exceptionCaseQueryRepository.findValidationMonths();
     }
 
     private Map<Long, List<ExceptionActionResponse>> loadActions(
@@ -143,7 +143,7 @@ public class ExceptionCaseService {
         List<Long> exceptionCaseIds = rows.stream()
                 .map(ExceptionCaseSearchRow::exceptionCaseId)
                 .toList();
-        return exceptionCaseQueryMapper.findActionsByCaseIds(exceptionCaseIds)
+        return exceptionCaseQueryRepository.findActionsByCaseIds(exceptionCaseIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                         ExceptionActionRow::exceptionCaseId,
