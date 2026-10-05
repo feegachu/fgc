@@ -4,14 +4,27 @@
 #   (Pod 안)  podman run -d --pod fgc --name fgc-web localhost/fgc/web:v1
 #   (따로)    podman run -d --name fgc-web -p 8088:80 -e API_UPSTREAM=host.containers.internal:8082 localhost/fgc/web:v1
 #
-# 2차 React 전환 때는 1단계(node 빌드)를 앞에 붙이고 dist/ 를 html 로 복사하면 된다 — 이 파일의 자리는 그대로.
+# 1단계에서 frontend/(React)를 빌드하고, 2단계 nginx 이미지의 /app/ 아래에 결과만 담는다 (#401, 공존기 base /app/).
+
+# ---------- 1단계: React 빌드 ----------
+FROM docker.io/library/node:22-alpine AS frontend
+WORKDIR /src/frontend
+# lock 파일만 먼저 복사해 소스만 바뀐 빌드에서는 npm ci 레이어를 재사용한다
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# ---------- 2단계: 실행 ----------
 FROM docker.io/library/nginx:stable-alpine
 # base 패키지 CVE (2026-09-16 zot 스캔: libuuid HIGH 7건, 2.42.1-r0 → 2.42.3-r0) — 빌드 시점 패치 반영
 RUN apk upgrade --no-cache
 
 # templates/*.template 은 컨테이너 시작 시 ${VAR} 를 환경변수로 치환해 conf.d/ 로 복사된다
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+# Thymeleaf 화면이 쓰는 정적 파일은 웨이브 C(#419)까지 유지한다
 COPY src/main/resources/static/ /usr/share/nginx/html/
+COPY --from=frontend /src/frontend/dist/ /usr/share/nginx/html/app/
 
 ENV API_UPSTREAM=127.0.0.1:8080
 EXPOSE 80

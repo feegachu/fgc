@@ -6,6 +6,12 @@ docs
 qa-findings
 graphify-out
 skill-observations
+# 이미지 안에서 npm ci·build 를 다시 한다 (Containerfile.web 1단계)
+frontend/node_modules
+frontend/dist
+frontend/playwright-report
+frontend/test-results
+# 아래 *.png·*.jpg 는 컨텍스트 루트에만 걸린다(하위 폴더 이미지는 그대로 들어간다)
 *.png
 *.jpg
 *.log
