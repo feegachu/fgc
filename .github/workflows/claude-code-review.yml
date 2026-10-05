@@ -8,6 +8,7 @@ on:
     # ("Workflow validation failed"). 워크플로만 바뀐 PR은 어차피 스킵되므로 의미가 없다.
     paths:
       - "src/**"
+      - "frontend/**"           # 2차 React (#401)
       - "build.gradle"
       - "settings.gradle"
 
