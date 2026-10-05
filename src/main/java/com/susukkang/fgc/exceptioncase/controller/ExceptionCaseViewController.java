@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  *
  * 카드 링크가 같이 보내는 month 는 예외의 검색조건이 아니라 셸 기준월이다 —
  * {@link com.susukkang.fgc.common.web.ShellAdvice} 가 세션에 반영한다. KPI '미처리 예외'
- * 집계(DashboardMapper.countOpenException)에도 월 필터가 없으므로 카드 건수와
+ * 집계(DashboardQueryRepository.countOpenException)에도 월 필터가 없으므로 카드 건수와
  * 이 화면의 미처리 건수는 그대로 맞는다.
  *
  * 검증월 검색조건은 별도 파라미터 validationMonth 다 — 검증 실행 상세(VRUN-W02)의

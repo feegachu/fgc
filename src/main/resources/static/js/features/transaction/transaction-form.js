@@ -777,9 +777,9 @@
    * EXCP-W01 이 이미 지원하는 검색조건(type·contractNo)으로 그 건까지 좁혀 보낸다.
    *
    * CAP-W01(계산근거) 링크는 두지 않는다 — 확정 거절된 DRAFT 후보의 cap_check 는
-   * CapCheckMapper.latestScopedCapChecks 가 candidate_transaction_id 조건으로 목록에서
+   * CapCheckQueryRepository.LATEST_SCOPED_CAP_CHECKS 가 candidate_transaction_id 조건으로 목록에서
    * 제외하므로(계약의 현재 판정을 덮어쓰지 않게 하려는 의도) 링크를 걸면 빈 목록으로 보내게 된다.
-   * 같은 행을 DashboardMapper 는 세고 CAP-W01 은 세지 않아 위반 KPI 와 CAP-W01 건수가
+   * 같은 행을 대시보드 집계는 세고 CAP-W01 은 세지 않아 위반 KPI 와 CAP-W01 건수가
    * 어긋나는 문제(화면정의서 :402 "클릭하면 CAP-W01 위반 필터")가 별도로 있으며,
    * 그 판단이 정리된 뒤에 이 링크를 추가한다.
    */

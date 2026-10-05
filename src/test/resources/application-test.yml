@@ -3,6 +3,11 @@ spring:
     url: jdbc:tc:postgresql:17:///fgc?currentSchema=fgc
     username: fgc
     password: fgc_test_only
+    hikari:
+      # 캐시된 테스트 컨텍스트마다 풀이 생기므로 공유 PostgreSQL의 연결 한도를 넘지 않게 한다.
+      # 동시성 테스트와 REQUIRES_NEW 트랜잭션에 필요한 연결은 확보한다.
+      maximum-pool-size: 5
+      minimum-idle: 1
   flyway:
     locations:
       - classpath:db/migration

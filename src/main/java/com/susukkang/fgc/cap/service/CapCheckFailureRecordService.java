@@ -1,7 +1,7 @@
 package com.susukkang.fgc.cap.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CapCheckFailureRecordService {
 
-    private final ExceptionCaseMapper exceptionCaseMapper;
+    private final CapExceptionRepository capExceptionRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(
@@ -21,7 +21,7 @@ public class CapCheckFailureRecordService {
             PaymentStage paymentStage,
             String description
     ) {
-        exceptionCaseMapper.insertCapCheckFailure(
+        capExceptionRepository.recordCapCheckFailure(
                 validationRunId,
                 contractId,
                 paymentStage.name(),

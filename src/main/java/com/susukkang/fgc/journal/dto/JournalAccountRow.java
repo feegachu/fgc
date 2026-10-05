@@ -1,5 +1,6 @@
 package com.susukkang.fgc.journal.dto;
 
+import com.susukkang.fgc.journal.entity.JournalAccount;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,4 +15,14 @@ public class JournalAccountRow {
     private String accountName;
     private String normalBalance;
     private Boolean activeYn;
+
+    public static JournalAccountRow from(JournalAccount account) {
+        JournalAccountRow row = new JournalAccountRow();
+        row.setJournalAccountId(account.getJournalAccountId());
+        row.setAccountCode(account.getAccountCode());
+        row.setAccountName(account.getAccountName());
+        row.setNormalBalance(account.getNormalBalance().name());
+        row.setActiveYn(account.isActiveYn());
+        return row;
+    }
 }

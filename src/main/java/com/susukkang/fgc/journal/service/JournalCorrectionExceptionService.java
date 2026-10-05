@@ -10,8 +10,8 @@ import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRequest;
 import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionResponse;
 import com.susukkang.fgc.journal.dto.JournalCorrectionExceptionRow;
 import com.susukkang.fgc.journal.dto.JournalCorrectionHeaderRow;
-import com.susukkang.fgc.journal.mapper.JournalCorrectionExceptionMapper;
-import com.susukkang.fgc.journal.mapper.JournalCorrectionMapper;
+import com.susukkang.fgc.journal.repository.JournalCorrectionExceptionRepository;
+import com.susukkang.fgc.journal.repository.JournalCorrectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +31,8 @@ public class JournalCorrectionExceptionService {
 
     private static final String EXCEPTION_KEY_PREFIX = "JOURNAL_HEADER:";
 
-    private final JournalCorrectionMapper journalCorrectionMapper;
-    private final JournalCorrectionExceptionMapper correctionExceptionMapper;
+    private final JournalCorrectionRepository journalCorrectionRepository;
+    private final JournalCorrectionExceptionRepository correctionExceptionRepository;
     private final AuditLogService auditLogService;
 
     @Transactional
@@ -43,7 +43,7 @@ public class JournalCorrectionExceptionService {
     ) {
         validateRequest(journalHeaderId, request, requestedBy);
         JournalCorrectionHeaderRow original =
-                journalCorrectionMapper.findHeaderForUpdate(journalHeaderId);
+                journalCorrectionRepository.findHeaderForUpdate(journalHeaderId);
         validateOriginal(original, journalHeaderId);
 
         String reason = request.reason().trim();
@@ -53,12 +53,12 @@ public class JournalCorrectionExceptionService {
         // 기존 코드: 원분개 ID 하나를 영구 exception_key로 사용해 REJECTED 이후에도 종결 건을 반환
         // 문제: 종결 예외에는 재처리 폼이 없어 같은 원분개의 정정을 다시 요청할 수 없음
         // 개선: 원분개 잠금 안에서 활성 건을 먼저 조회하고 종결 이력 다음 요청은 새 순번 키로 생성
-        JournalCorrectionExceptionRow active = correctionExceptionMapper.findActiveBySource(
+        JournalCorrectionExceptionRow active = correctionExceptionRepository.findActiveBySource(
                 journalHeaderId, original.getPolicyVersionId());
         if (active != null) {
             return JournalCorrectionExceptionResponse.from(active, false);
         }
-        int requestNo = correctionExceptionMapper.countBySource(
+        int requestNo = correctionExceptionRepository.countBySource(
                 journalHeaderId, original.getPolicyVersionId()) + 1;
         String exceptionKey = buildExceptionKey(
                 journalHeaderId, original.getPolicyVersionId(), requestNo);
@@ -77,17 +77,15 @@ public class JournalCorrectionExceptionService {
                         .requestedBy(requestedBy)
                         .build();
 
-        boolean created = correctionExceptionMapper.insertCase(command) == 1;
+        boolean created = correctionExceptionRepository.insertCase(command) == 1;
         JournalCorrectionExceptionRow row =
-                correctionExceptionMapper.findByExceptionKey(exceptionKey);
+                correctionExceptionRepository.findByExceptionKey(exceptionKey);
         if (row == null) {
             throw new IllegalStateException("원장 정정 예외 조회에 실패했습니다.");
         }
 
         if (created) {
-            if (correctionExceptionMapper.insertInitialAction(command) != 1) {
-                throw new IllegalStateException("원장 정정 요청 이력 저장에 실패했습니다.");
-            }
+            correctionExceptionRepository.insertInitialAction(row.exceptionCaseId(), command);
             auditLogService.record(AuditLogService.AuditEvent.builder()
                     .actionCode("JOURNAL_CORRECTION_REQUESTED")
                     .entityType("EXCEPTION_CASE")

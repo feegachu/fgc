@@ -3,7 +3,7 @@ package com.susukkang.fgc.journal.service;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.journal.dto.JournalBalanceSummary;
-import com.susukkang.fgc.journal.mapper.JournalImbalanceMapper;
+import com.susukkang.fgc.journal.repository.JournalQueryRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -12,17 +12,17 @@ import java.util.Map;
 @Service
 public class JournalBalanceValidationServiceImpl implements JournalBalanceValidationService {
 
-    private final JournalImbalanceMapper journalImbalanceMapper;
+    private final JournalQueryRepository journalQueryRepository;
 
-    public JournalBalanceValidationServiceImpl(JournalImbalanceMapper journalImbalanceMapper) {
-        this.journalImbalanceMapper = journalImbalanceMapper;
+    public JournalBalanceValidationServiceImpl(JournalQueryRepository journalQueryRepository) {
+        this.journalQueryRepository = journalQueryRepository;
     }
 
     @Override
     public JournalBalanceSummary summarize(Long journalHeaderId) {
-        JournalBalanceSummary summary = journalImbalanceMapper.findBalanceSummary(journalHeaderId);
+        JournalBalanceSummary summary = journalQueryRepository.findBalanceSummary(journalHeaderId);
         if (summary == null) {
-            // journal_line이 하나도 없는 헤더는 GROUP BY 결과 자체가 없어 Mapper가 null을
+            // journal_line이 하나도 없는 헤더는 GROUP BY 결과 자체가 없어 Repository가 null을
             // 돌려준다(findBalanceSummary Javadoc 참고) — 0/0으로 채워서 돌려주면
             // isBalanced()가 자동으로 false가 되어(차변합계>0 조건 불만족) 호출부가 null
             // 체크를 따로 안 해도 된다.

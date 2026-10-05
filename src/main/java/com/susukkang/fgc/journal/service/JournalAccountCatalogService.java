@@ -1,7 +1,7 @@
 package com.susukkang.fgc.journal.service;
 
 import com.susukkang.fgc.journal.dto.JournalAccountRow;
-import com.susukkang.fgc.journal.mapper.JournalAccountMapper;
+import com.susukkang.fgc.journal.repository.JournalAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,10 +19,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JournalAccountCatalogService {
 
-    private final JournalAccountMapper journalAccountMapper;
+    private final JournalAccountRepository journalAccountRepository;
 
     @Transactional(readOnly = true)
     public List<JournalAccountRow> findAllActive() {
-        return List.copyOf(journalAccountMapper.findAllActive());
+        return journalAccountRepository.findAllByActiveYnTrueOrderByAccountCodeAsc().stream()
+                .map(JournalAccountRow::from)
+                .toList();
     }
 }

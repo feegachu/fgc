@@ -4,6 +4,9 @@ import com.susukkang.fgc.dashboard.dto.DashboardSummaryResult;
 import com.susukkang.fgc.dashboard.dto.RecentExceptionRow;
 import com.susukkang.fgc.dashboard.dto.RecentValidationRunRow;
 import com.susukkang.fgc.dashboard.service.DashboardService;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +31,8 @@ class DashboardServiceIntegrationTest {
     private DashboardService dashboardService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     private Long contractId(String contractNo) {
         return jdbcTemplate.queryForObject(
@@ -36,9 +41,14 @@ class DashboardServiceIntegrationTest {
     }
 
     private Long capRuleSetId(String paymentStage) {
-        return jdbcTemplate.queryForObject(
-                "SELECT cap_rule_set_id FROM fgc.cap_rule_set WHERE payment_stage = ?",
-                Long.class, paymentStage);
+        // 판정 결과 집계만 검증하므로 동일 지급단계의 외래키용 룰셋 한 건을 고정해서 선택한다.
+        return jdbcTemplate.queryForObject("""
+                SELECT cap_rule_set_id
+                  FROM fgc.cap_rule_set
+                 WHERE payment_stage = ?
+                 ORDER BY cap_rule_set_id
+                 LIMIT 1
+                """, Long.class, paymentStage);
     }
 
     // 화면·계약 검증 목적이라 base_premium_amount 등 금액은 임의값이면 충분
@@ -81,23 +91,34 @@ class DashboardServiceIntegrationTest {
     }
 
     private void insertArbitrageCheck(Long validationRunId, Long contractId, LocalDate asOfDate, String resultStatus) {
+        insertArbitrageCheck(validationRunId, contractId, "GA_TO_FC", asOfDate, resultStatus);
+    }
+
+    private void insertArbitrageCheck(Long validationRunId, Long contractId, String paymentStage,
+                                      LocalDate asOfDate, String resultStatus) {
         jdbcTemplate.update("""
                 INSERT INTO fgc.arbitrage_check
-                    (validation_run_id, contract_id, as_of_date, contract_month_no,
+                    (validation_run_id, contract_id, payment_stage, as_of_date, contract_month_no,
                      cumulative_paid_premium, net_difference_amount, standard_deduction_80_yn, result_status)
-                VALUES (?, ?, ?, 1, 100000, 0, false, ?)
-                """, validationRunId, contractId, asOfDate, resultStatus);
+                VALUES (?, ?, ?, ?, 1, 100000, 0, false, ?)
+                """, validationRunId, contractId, paymentStage, asOfDate, resultStatus);
     }
 
     // uq_reconciliation_run은 (settlement_month, payment_stage, insurer_id, validation_run_id)로
     // 유일해야 해서, 같은 정산월·지급단계로 "재실행"을 흉내내려면 매번 다른 validation_run_id가 필요
     private Long insertReconciliationRun(LocalDate settlementMonth, String paymentStage,
                                           Long validationRunId, OffsetDateTime createdAt) {
+        return insertReconciliationRun(settlementMonth, paymentStage, null, validationRunId, createdAt);
+    }
+
+    private Long insertReconciliationRun(LocalDate settlementMonth, String paymentStage, Long insurerId,
+                                          Long validationRunId, OffsetDateTime createdAt) {
         return jdbcTemplate.queryForObject("""
-                INSERT INTO fgc.reconciliation_run (settlement_month, payment_stage, validation_run_id, created_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO fgc.reconciliation_run
+                    (settlement_month, payment_stage, insurer_id, validation_run_id, created_at)
+                VALUES (?, ?, ?, ?, ?)
                 RETURNING reconciliation_run_id
-                """, Long.class, settlementMonth, paymentStage, validationRunId, createdAt);
+                """, Long.class, settlementMonth, paymentStage, insurerId, validationRunId, createdAt);
     }
 
     private void insertReconciliationResult(Long reconciliationRunId, String matchGroupKey, String resultType) {
@@ -260,6 +281,9 @@ class DashboardServiceIntegrationTest {
     // 5. 미처리 예외: 월 필터 없음, NEW+IN_REVIEW만
     @Test
     void summarizeCountsOpenExceptionsRegardlessOfMonth() {
+        long existingOpenCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.exception_case WHERE status IN ('NEW', 'IN_REVIEW')
+                """, Long.class);
         OffsetDateTime old = OffsetDateTime.parse("2026-01-01T09:00:00+09:00");
         insertExceptionCase("DASH-TEST-EXC-NEW", "NEW", old);
         insertExceptionCase("DASH-TEST-EXC-REVIEW", "IN_REVIEW", old);
@@ -268,19 +292,19 @@ class DashboardServiceIntegrationTest {
         // 예외 발생월(1월)과 무관하게 조회월(7월) 기준으로도 NEW/IN_REVIEW 2건이 그대로 잡혀야 한다
         DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
 
-        assertThat(result.kpis().openException()).isEqualTo(2);
+        assertThat(result.kpis().openException()).isEqualTo(existingOpenCount + 2);
     }
 
     // 6. 월 필터가 있는 KPI(1,200%·차익거래·대사불일치)는 미래월(2099-01)에 0이어야 한다.
     // journalImbalance/openException/recentExceptions/recentValidationRuns는
-    // 설계상 월 필터가 없어(각 Mapper 주석 참고 — "월 필터: 없음") 로컬 dev DB에 이미
+    // 설계상 월 필터가 없어 로컬 dev DB에 이미
     // 존재하는 시드 데이터를 그대로 반영한다 — 그래서
     // journalImbalance는 이 테스트에서 단언하지 않는다(월과 무관하게 vw_journal_imbalance
     // 전체를 세므로, "미래월이라 0"이라는 근거가 없다. 실제로 0건인지는 4번
     // summarizeCountsJournalImbalance()가 별도로 검증한다). 리스트도 "비어 있다"를
     // 단언하는 대신 "널이 아닌 리스트를 돌려준다"(예외 없이 항상 채워진 배열 필드다)는
     // 계약만 확인한다 — findRecentExceptions/findRecentValidationRuns가 실제로 빈
-    // 리스트를 돌려주는지는 DashboardServiceImplTest에서 Mapper를 빈 리스트로 스텁해
+    // 리스트를 돌려주는지는 DashboardServiceImplTest에서 Repository를 빈 리스트로 스텁해
     // 별도로 검증한다.
     @Test
     void summarizeReturnsZeroCountsForMonthFilteredKpisAndNeverReturnsNullLists() {
@@ -297,17 +321,25 @@ class DashboardServiceIntegrationTest {
     // 7. 최근 예외 5건: 최신순, 5건 제한
     @Test
     void summarizeReturnsAtMostFiveRecentExceptionsSortedByLatest() {
+        // 별도 트랜잭션을 커밋하는 다른 테스트의 예외보다 뒤에 fixture를 배치한다.
+        OffsetDateTime latest = jdbcTemplate.queryForObject(
+                "SELECT MAX(created_at) FROM fgc.exception_case",
+                (rs, rowNum) -> rs.getObject(1, OffsetDateTime.class));
+        OffsetDateTime firstCreatedAt = latest == null
+                ? OffsetDateTime.parse("2026-07-01T09:00:00+09:00") : latest.plusDays(1);
         for (int i = 1; i <= 6; i++) {
             insertExceptionCase("DASH-TEST-RECENT-EXC-" + i, "NEW",
-                    OffsetDateTime.parse("2026-07-0" + i + "T09:00:00+09:00"));
+                    firstCreatedAt.plusDays(i - 1));
         }
 
         DashboardSummaryResult result = dashboardService.summarize(LocalDate.of(2026, 7, 1));
         List<RecentExceptionRow> recent = result.recentExceptions();
 
         assertThat(recent).hasSize(5);
-        // 가장 최근(7월 6일)이 맨 앞
-        assertThat(recent.get(0).createdAt()).isEqualTo(OffsetDateTime.parse("2026-07-06T09:00:00+09:00"));
+        assertThat(recent).extracting(RecentExceptionRow::createdAt)
+                .usingElementComparator(OffsetDateTime.timeLineOrder())
+                .containsExactly(firstCreatedAt.plusDays(5), firstCreatedAt.plusDays(4),
+                        firstCreatedAt.plusDays(3), firstCreatedAt.plusDays(2), firstCreatedAt.plusDays(1));
     }
 
 
@@ -316,7 +348,11 @@ class DashboardServiceIntegrationTest {
     // 결정적으로 만든다 — 동일 시각 6건 중 최신 id 5개가 항상 같은 순서로 나와야 한다.
     @Test
     void summarizeBreaksRecentExceptionTiesByIdWhenCreatedAtIsIdentical() {
-        OffsetDateTime sameInstant = OffsetDateTime.parse("2026-07-10T09:00:00+09:00");
+        OffsetDateTime latest = jdbcTemplate.queryForObject(
+                "SELECT MAX(created_at) FROM fgc.exception_case",
+                (rs, rowNum) -> rs.getObject(1, OffsetDateTime.class));
+        OffsetDateTime sameInstant = latest == null
+                ? OffsetDateTime.parse("2026-07-10T09:00:00+09:00") : latest.plusDays(1);
         List<Long> ids = new java.util.ArrayList<>();
         for (int i = 1; i <= 6; i++) {
             ids.add(insertExceptionCase("DASH-TEST-TIE-EXC-" + i, "NEW", sameInstant));
@@ -391,5 +427,153 @@ class DashboardServiceIntegrationTest {
         assertThat(recent).allSatisfy(row -> assertThat(row.runType()).isEqualTo("MONTHLY"));
         assertThat(recent.stream().map(RecentValidationRunRow::validationRunId).toList())
                 .containsExactly(monthlyRun3, monthlyRun2, monthlyRun1);
+    }
+
+    @Test
+    void summarizeKeepsCapPaymentStagesSeparateAndBreaksCheckedAtTiesById() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        LocalDate month = LocalDate.of(2098, 7, 1);
+        OffsetDateTime checkedAt = OffsetDateTime.parse("2098-07-10T09:00:00+09:00");
+        insertCapCheck(id, "GA_TO_FC", month, "VIOLATION", checkedAt);
+        insertCapCheck(id, "GA_TO_FC", month, "WARNING", checkedAt);
+        insertCapCheck(id, "INSURER_TO_GA", month, "VIOLATION", checkedAt);
+
+        DashboardSummaryResult result = dashboardService.summarize(month);
+
+        assertThat(result.kpis().capViolation()).isEqualTo(1);
+        assertThat(result.kpis().capWarning()).isEqualTo(1);
+    }
+
+    @Test
+    void summarizeKeepsArbitragePaymentStagesSeparateAndFiltersMonthBeforeLatest() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        LocalDate month = LocalDate.of(2098, 7, 1);
+        Long run = insertValidationRun(month, 1, "COMPLETED",
+                OffsetDateTime.parse("2098-08-01T09:00:00+09:00"));
+        Long nextRun = insertValidationRun(month.plusMonths(1), 1, "COMPLETED",
+                OffsetDateTime.parse("2098-09-01T09:00:00+09:00"));
+        insertArbitrageCheck(run, id, "GA_TO_FC", month.plusDays(30), "CANDIDATE");
+        insertArbitrageCheck(run, id, "INSURER_TO_GA", month.plusDays(30), "CANDIDATE");
+        // 나중에 삽입한 과거 판정도 기준일이 최신인 7월 31일 판정을 덮으면 안 된다.
+        insertArbitrageCheck(run, id, "GA_TO_FC", month.plusDays(1), "CLEAR");
+        insertArbitrageCheck(nextRun, id, "GA_TO_FC", month.plusMonths(1), "CLEAR");
+
+        assertThat(dashboardService.summarize(month).kpis().arbitrageCandidate()).isEqualTo(2);
+        assertThat(dashboardService.summarize(month.plusMonths(1)).kpis().arbitrageCandidate()).isZero();
+    }
+
+    @Test
+    void summarizeKeepsReconciliationGroupsSeparateAndBreaksCreatedAtTiesById() {
+        LocalDate month = LocalDate.of(2098, 7, 1);
+        OffsetDateTime createdAt = OffsetDateTime.parse("2098-08-01T09:00:00+09:00");
+        Long insurerId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.insurer (insurer_code, insurer_name, insurer_type)
+                VALUES ('DASH-TEST-INSURER', '대시보드 테스트 보험사', 'LIFE')
+                RETURNING insurer_id
+                """, Long.class);
+        Long oldValidation = insertValidationRun(month, 1, "COMPLETED", createdAt);
+        Long newValidation = insertValidationRun(month, 2, "COMPLETED", createdAt);
+        Long oldRun = insertReconciliationRun(month, "GA_TO_FC", oldValidation, createdAt);
+        Long newRun = insertReconciliationRun(month, "GA_TO_FC", newValidation, createdAt);
+        Long insurerRun = insertReconciliationRun(month, "GA_TO_FC", insurerId, newValidation, createdAt);
+        Long otherStageRun = insertReconciliationRun(month, "INSURER_TO_GA", newValidation, createdAt);
+        Long otherMonthRun = insertReconciliationRun(month.plusMonths(1), "GA_TO_FC", null, createdAt);
+        insertReconciliationResult(oldRun, "DASH-OLD", "AMOUNT_DIFFERENCE");
+        insertReconciliationResult(newRun, "DASH-NEW", "MATCHED");
+        insertReconciliationResult(insurerRun, "DASH-INSURER", "AMOUNT_DIFFERENCE");
+        insertReconciliationResult(otherStageRun, "DASH-STAGE", "AMOUNT_DIFFERENCE");
+        insertReconciliationResult(otherMonthRun, "DASH-NEXT-MONTH", "AMOUNT_DIFFERENCE");
+
+        assertThat(dashboardService.summarize(month).kpis().reconciliationMismatch()).isEqualTo(2);
+    }
+
+    @Test
+    void summarizeBreaksRecentValidationRunTiesById() {
+        LocalDate month = LocalDate.of(2098, 7, 1);
+        OffsetDateTime createdAt = OffsetDateTime.parse("2098-08-01T09:00:00+09:00");
+        insertValidationRun(month, 1, "COMPLETED", createdAt);
+        Long second = insertValidationRun(month, 2, "COMPLETED", createdAt);
+        Long third = insertValidationRun(month, 3, "COMPLETED", createdAt);
+        Long fourth = insertValidationRun(month, 4, "COMPLETED", createdAt);
+
+        assertThat(dashboardService.summarize(month).recentValidationRuns())
+                .extracting(RecentValidationRunRow::validationRunId)
+                .containsExactly(fourth, third, second);
+    }
+
+    @Test
+    void summarizeMapsRecentExceptionFieldsWithAndWithoutContract() {
+        OffsetDateTime createdAt = OffsetDateTime.parse("2098-08-01T09:00:00+09:00");
+        Long withoutContract = insertExceptionCase("DASH-MAPPING-NO-CONTRACT", "NEW", createdAt);
+        Long withContract = insertExceptionCase("DASH-MAPPING-CONTRACT", "RESOLVED", createdAt);
+        jdbcTemplate.update("UPDATE fgc.exception_case SET contract_id = ? WHERE exception_case_id = ?",
+                contractId("FGC-FGL01-202607-0001"), withContract);
+
+        List<RecentExceptionRow> recent = dashboardService.summarize(LocalDate.of(2098, 7, 1))
+                .recentExceptions();
+
+        assertThat(recent.get(0)).usingRecursiveComparison()
+                .withComparatorForType(OffsetDateTime.timeLineOrder(), OffsetDateTime.class)
+                .isEqualTo(new RecentExceptionRow(withContract, "DATA_QUALITY", "INFO",
+                        "FGC-FGL01-202607-0001", "dashboard test", "RESOLVED", createdAt));
+        assertThat(recent.get(1)).usingRecursiveComparison()
+                .withComparatorForType(OffsetDateTime.timeLineOrder(), OffsetDateTime.class)
+                .isEqualTo(new RecentExceptionRow(withoutContract, "DATA_QUALITY", "INFO",
+                        null, "dashboard test", "NEW", createdAt));
+    }
+
+    @Test
+    void summarizeMapsRecentValidationRunFieldsAndNulls() {
+        LocalDate month = LocalDate.of(2098, 7, 1);
+        OffsetDateTime createdAt = OffsetDateTime.parse("2098-08-01T09:00:00+09:00");
+        OffsetDateTime startedAt = createdAt.plusMinutes(1);
+        OffsetDateTime completedAt = createdAt.plusMinutes(2);
+        OffsetDateTime finalizedAt = createdAt.plusMinutes(3);
+        Long finalized = insertValidationRun(month, 1, "COMPLETED", createdAt);
+        jdbcTemplate.update("""
+                UPDATE fgc.validation_run
+                   SET status = 'FINALIZED', current_step = 10,
+                       triggered_by = (SELECT user_id FROM fgc.app_user WHERE login_id = 'settle01'),
+                       finalized_by = (SELECT user_id FROM fgc.app_user WHERE login_id = 'audit01'),
+                       started_at = ?, completed_at = ?, finalized_at = ?
+                 WHERE validation_run_id = ?
+                """, startedAt, completedAt, finalizedAt, finalized);
+        Long failed = insertValidationRun(month, 2, "FAILED", createdAt);
+        jdbcTemplate.update("""
+                UPDATE fgc.validation_run SET current_step = 3, started_at = ?, failure_message = ?
+                 WHERE validation_run_id = ?
+                """, startedAt, "대사 데이터 누락", failed);
+        Long pending = insertValidationRun(month, 3, "CREATED", createdAt);
+
+        List<RecentValidationRunRow> recent = dashboardService.summarize(month).recentValidationRuns();
+
+        assertThat(recent).hasSize(3);
+        assertThat(recent.get(0)).isEqualTo(new RecentValidationRunRow(pending, month, 3,
+                "MONTHLY", "CREATED", 0, null, null, null, null, null, null));
+        assertThat(recent.get(1)).usingRecursiveComparison()
+                .withComparatorForType(OffsetDateTime.timeLineOrder(), OffsetDateTime.class)
+                .isEqualTo(new RecentValidationRunRow(failed, month, 2, "MONTHLY", "FAILED", 3,
+                        null, startedAt, null, null, null, "대사 데이터 누락"));
+        assertThat(recent.get(2)).usingRecursiveComparison()
+                .withComparatorForType(OffsetDateTime.timeLineOrder(), OffsetDateTime.class)
+                .isEqualTo(new RecentValidationRunRow(finalized, month, 1, "MONTHLY", "FINALIZED", 10,
+                        "settle01", startedAt, completedAt, finalizedAt, "audit01", null));
+    }
+
+    @Test
+    void summarizeExecutesEightSelectsWithoutAdditionalEntityQueries() {
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        boolean previouslyEnabled = statistics.isStatisticsEnabled();
+        try {
+            statistics.setStatisticsEnabled(true);
+            statistics.clear();
+
+            dashboardService.summarize(LocalDate.of(2099, 1, 1));
+
+            assertThat(statistics.getQueryExecutionCount()).isEqualTo(8);
+            assertThat(statistics.getPrepareStatementCount()).isEqualTo(8);
+        } finally {
+            statistics.setStatisticsEnabled(previouslyEnabled);
+        }
     }
 }

@@ -11,7 +11,7 @@ import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
-import com.susukkang.fgc.cap.mapper.CapCheckMapper;
+import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
@@ -44,7 +44,9 @@ import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
 import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
 import com.susukkang.fgc.transaction.dto.*;
-import com.susukkang.fgc.transaction.mapper.CommissionPaymentMapper;
+import com.susukkang.fgc.transaction.repository.CommissionPaymentQueryRepository;
+import com.susukkang.fgc.transaction.repository.CommissionPaymentWriteRepository;
+import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -77,7 +79,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     @Override
     @Transactional(readOnly = true)
     public CommissionPaymentResponse get(Long paymentId) {
-        return requirePayment(paymentId, mapper.findCapCheckIds(paymentId));
+        return requirePayment(paymentId, queryRepository.findCapCheckIds(paymentId));
     }
 
     // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
@@ -87,8 +89,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private static final String AUDIT_PAYMENT_UPDATED = "PAYMENT_UPDATED";
     private static final String AUDIT_PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
 
-    private final CommissionPaymentMapper mapper;
-    private final CapCheckMapper capCheckMapper;
+    private final CommissionPaymentQueryRepository queryRepository;
+    private final CommissionPaymentWriteRepository writeRepository;
+    private final CapExceptionRepository capExceptionRepository;
+    private final CapCheckWriteRepository capCheckWriteRepository;
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
@@ -102,11 +106,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     @Transactional
     public CommissionPaymentResponse create(CommissionPaymentCreateRequest request) {
         PreparedPayment prepared = commandFrom(request);
-        mapper.insertTransaction(prepared.payment());
+        writeRepository.insertTransaction(prepared.payment());
         Long paymentId = prepared.payment().getPaymentId();
         persistAttributions(paymentId, prepared.attributions());
         CommissionPaymentRow afterRow = requireRow(paymentId);
-        List<CommissionPaymentAttributionRow> afterAttributions = mapper.findAttributions(paymentId);
+        List<CommissionPaymentAttributionRow> afterAttributions = queryRepository.findAttributions(paymentId);
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_CREATED)
                 .entityType(AUDIT_ENTITY_TYPE)
@@ -128,17 +132,17 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // before 스냅샷 — FOR UPDATE 잠금 이후, 수정 전 본문·귀속행을 after 와 같은 조회
         // DTO(Row)로 확보한다. 두 스냅샷이 같은 스키마여야 diff 화면이 필드 단위로 비교된다.
         CommissionPaymentRow beforeRow = requireRow(paymentId);
-        List<CommissionPaymentAttributionRow> beforeAttributions = mapper.findAttributions(paymentId);
+        List<CommissionPaymentAttributionRow> beforeAttributions = queryRepository.findAttributions(paymentId);
 
         PreparedPayment prepared = commandFrom(paymentId, request);
-        if (mapper.updateTransaction(prepared.payment()) != 1) {
+        if (writeRepository.updateTransaction(prepared.payment()) != 1) {
             throw new FgcBusinessException(FgcErrorCode.TRAN_005);
         }
-        mapper.detachPreConfirmDetails(paymentId);
-        mapper.deleteAttributions(paymentId);
+        capCheckWriteRepository.detachPreConfirmDetails(paymentId);
+        writeRepository.deleteAttributions(paymentId);
         persistAttributions(paymentId, prepared.attributions());
         CommissionPaymentRow afterRow = requireRow(paymentId);
-        List<CommissionPaymentAttributionRow> afterAttributions = mapper.findAttributions(paymentId);
+        List<CommissionPaymentAttributionRow> afterAttributions = queryRepository.findAttributions(paymentId);
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_UPDATED)
                 .entityType(AUDIT_ENTITY_TYPE)
@@ -172,7 +176,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (first.status() == CommissionPaymentStatus.CONFIRMED
                 && normalizedIdempotencyKey != null
                 && normalizedIdempotencyKey.equals(first.confirmIdempotencyKey())) {
-            return requirePayment(paymentId, mapper.findCapCheckIds(paymentId));
+            return requirePayment(paymentId, queryRepository.findCapCheckIds(paymentId));
         }
 
         /**
@@ -189,7 +193,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
 
         requireDraft(attributions.get(0));
-        mapper.lockAttributedContracts(paymentId);
+        queryRepository.lockAttributedContracts(paymentId);
         failFirst(requiredValueFailures(attributions));
 
         List<Long> capCheckIds = new ArrayList<>();
@@ -205,11 +209,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
-            CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
+            CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
                     paymentId,
                     data.transactionAttributionId()
             );
-            boolean applicableCapRuleSetExists = mapper.existsApplicableCapRuleSet(
+            boolean applicableCapRuleSetExists = queryRepository.existsApplicableCapRuleSet(
                     paymentId,
                     data.transactionAttributionId()
             );
@@ -236,7 +240,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             );
 
             CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
-            mapper.insertCapCheck(check);
+            capCheckWriteRepository.insertCapCheck(check);
             insertCapCheckDetails(check, data, calculation);
             capCheckIds.add(check.getCapCheckId());
             capChecks.add(check);
@@ -258,7 +262,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         String capCheckIdsCsv = capCheckIds.stream()
                 .map(String::valueOf)
                 .collect(Collectors.joining(","));
-        if (mapper.confirm(paymentId, normalizedIdempotencyKey, capCheckIdsCsv) != 1) {
+        if (writeRepository.confirm(paymentId, normalizedIdempotencyKey, capCheckIdsCsv) != 1) {
             throw new FgcBusinessException(FgcErrorCode.TRAN_005);
         }
         // 확정 거절(CommissionPaymentConfirmationRejectedException)은 여기 도달 전에 던져지므로
@@ -303,7 +307,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         List<TransactionPrecheckResponse.CapPreviewItem> previews = new ArrayList<>();
         if (first.totalAttributedAmount() != null) {
-            Map<Long, String> contractNos = mapper.findAttributedContractNumbers(paymentId)
+            Map<Long, String> contractNos = queryRepository.findAttributedContractNumbers(paymentId)
                     .stream()
                     .collect(Collectors.toMap(
                             AttributedContractNo::contractId,
@@ -321,11 +325,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 if (data.contractId() == null || data.attributedAmount() == null) {
                     continue;
                 }
-                CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
+                CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
                         paymentId,
                         data.transactionAttributionId()
                 );
-                boolean applicableCapRuleSetExists = mapper.existsApplicableCapRuleSet(
+                boolean applicableCapRuleSetExists = queryRepository.existsApplicableCapRuleSet(
                         paymentId,
                         data.transactionAttributionId()
                 );
@@ -411,8 +415,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         }
 
         long offset = (long) (page - 1) * size;
-        List<CommissionPaymentListResponse> content = mapper.selectByCondition(condition, size, offset);
-        long totalElements = mapper.countByCondition(condition);
+        List<CommissionPaymentListResponse> content = queryRepository.selectByCondition(condition, size, offset);
+        long totalElements = queryRepository.countByCondition(condition);
 
         return PageResponse.of(content, page, size, totalElements, "commissionTransactionId,desc");
     }
@@ -801,7 +805,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             return null;
         }
         LocalDate attributionMonthStart = attributionDate.withDayOfMonth(1);
-        List<Long> ids = mapper.findOperationalScheduleLineIds(
+        List<Long> ids = queryRepository.findOperationalScheduleLineIds(
                 contractId, paymentStage, commissionItemId, recipientAgentId,
                 attributionMonthStart, attributionMonthStart.plusMonths(1));
         return ids != null && ids.size() == 1 ? ids.get(0) : null;
@@ -828,7 +832,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             return null;
         }
         LocalDate attributionMonthStart = attributionDate.withDayOfMonth(1);
-        List<Integer> installmentNos = mapper.findOperationalScheduleInstallmentNos(
+        List<Integer> installmentNos = queryRepository.findOperationalScheduleInstallmentNos(
                 contractId, paymentStage, commissionItemId, recipientAgentId,
                 attributionMonthStart, attributionMonthStart.plusMonths(1));
         if (installmentNos == null) {
@@ -920,10 +924,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             YearMonth attributionMonth = YearMonth.from(attributionDate);
             YearMonth settlementYearMonth = YearMonth.from(settlementMonth);
             YearMonth appointmentMonth = YearMonth.from(
-                    mapper.findAgentAppointmentDate(agentId)
+                    queryRepository.findAgentAppointmentDate(agentId)
             );
             boolean firstContract = YearMonth.from(target.contractDate()).equals(attributionMonth)
-                    && mapper.countContractsBeforeMonth(
+                    && queryRepository.countContractsBeforeMonth(
                     agentId,
                     attributionMonth.atDay(1)
             ) == 0;
@@ -959,7 +963,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (agentId != null || contractId == null) {
             return agentId;
         }
-        ContractReference contract = mapper.findContract(contractId);
+        ContractReference contract = queryRepository.findContract(contractId);
         return contract == null ? null : contract.agentId();
     }
 
@@ -978,7 +982,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             // 정책 미비 초안은 보존하고, confirm()의 정책 버전 게이트에서 확정을 막는다.
             return null;
         }
-        Long allocationPolicyId = mapper.findAllocationPolicyId(
+        Long allocationPolicyId = queryRepository.findAllocationPolicyId(
                 policyVersionId,
                 allocationBasis
         );
@@ -1040,7 +1044,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         for (CommissionPaymentAttributionCommand attribution : attributions) {
             attribution.setPaymentId(paymentId);
         }
-        mapper.insertAttributions(attributions);
+        writeRepository.insertAttributions(attributions);
     }
 
     /**
@@ -1250,7 +1254,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      * 제외 적격성(직전 3년 무경력·지원 가능 기간)을 확정 시점에 확인해야 한다.
      */
     private GateFailure newcomerSupportEligibilityFailure(ConfirmationData data) {
-        if (mapper.existsEligibleNewcomerSupportAgent(data.agentId(), data.attributionDate())) {
+        if (queryRepository.existsEligibleNewcomerSupportAgent(data.agentId(), data.attributionDate())) {
             return null;
         }
         return new GateFailure(
@@ -1310,7 +1314,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ConfirmationData data,
             CapCalculationResult calculation
     ) {
-        List<ExistingIncludedDetail> existing = mapper.findExistingIncludedDetails(
+        List<ExistingIncludedDetail> existing = queryRepository.findExistingIncludedDetails(
                 data.paymentId(),
                 data.transactionAttributionId()
         );
@@ -1361,7 +1365,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 rows.add(candidateDetailRow(check, 1));
             }
         }
-        capCheckMapper.insertCapCheckDetails(rows);
+        capCheckWriteRepository.insertCapCheckDetails(rows);
     }
 
     private CapCheckDetailInsertRow candidateDetailRow(CapCheckCommand check, int detailSeq) {
@@ -1608,7 +1612,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             String title,
             String description
     ) {
-        mapper.insertExceptionCase(exceptionCommand(
+        capExceptionRepository.insertExceptionCase(exceptionCommand(
                 data,
                 exceptionType,
                 reasonCode,
@@ -1630,8 +1634,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private List<ConfirmationData> requireConfirmationData(Long paymentId, boolean forUpdate) {
         List<ConfirmationData> data = forUpdate
-                ? mapper.findConfirmationDataForUpdate(paymentId)
-                : mapper.findConfirmationData(paymentId);
+                ? queryRepository.findConfirmationDataForUpdate(paymentId)
+                : queryRepository.findConfirmationData(paymentId);
         if (data == null || data.isEmpty()) {
             invalid("paymentId", "지급 건을 찾을 수 없습니다.");
         }
@@ -1643,11 +1647,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private CommissionPaymentResponse requirePayment(Long paymentId, List<Long> capCheckIds) {
-        return requireRow(paymentId).toResponse(mapper.findAttributions(paymentId), capCheckIds);
+        return requireRow(paymentId).toResponse(queryRepository.findAttributions(paymentId), capCheckIds);
     }
 
     private CommissionPaymentRow requireRow(Long paymentId) {
-        CommissionPaymentRow payment = mapper.findById(paymentId);
+        CommissionPaymentRow payment = queryRepository.findById(paymentId);
         if (payment == null) {
             invalid("paymentId", "지급 건을 찾을 수 없습니다.");
         }
@@ -1655,7 +1659,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private void requireAgent(Long agentId) {
-        if (!mapper.existsAgent(agentId)) {
+        if (!queryRepository.existsAgent(agentId)) {
             invalid("agentId", "설계사를 찾을 수 없습니다.");
         }
     }
@@ -1697,7 +1701,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      * 직급이 FC 이면 모집설계사 본인이어야 하므로 허용하지 않는다.
      */
     private void requireManagerOfContractOrganization(ContractReference target, Long agentId) {
-        AgentRankCode rankCode = mapper.findAgentRankCode(agentId);
+        AgentRankCode rankCode = queryRepository.findAgentRankCode(agentId);
         if (rankCode == null || rankCode == AgentRankCode.FC || target.organizationId() == null) {
             invalid("attributedContractId", "귀속계약의 설계사가 지급 대상 설계사와 다릅니다.");
             return;
@@ -1714,7 +1718,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private ContractReference requireContract(Long contractId, String field) {
-        ContractReference contract = mapper.findContract(contractId);
+        ContractReference contract = queryRepository.findContract(contractId);
         if (contract == null) {
             invalid(field, "계약을 찾을 수 없습니다.");
         }
@@ -1725,7 +1729,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long commissionItemId,
             LocalDate settlementMonth
     ) {
-        CommissionItemReference item = mapper.findCommissionItem(
+        CommissionItemReference item = queryRepository.findCommissionItem(
                 commissionItemId,
                 settlementMonth
         );
@@ -1791,7 +1795,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     }
 
     private void validatePolicyVersion(Long policyVersionId) {
-        if (policyVersionId != null && !mapper.existsPolicyVersion(policyVersionId)) {
+        if (policyVersionId != null && !queryRepository.existsPolicyVersion(policyVersionId)) {
             invalid("allocationPolicyVersion", "승인 또는 활성 상태의 정책 버전이 아닙니다.");
         }
     }

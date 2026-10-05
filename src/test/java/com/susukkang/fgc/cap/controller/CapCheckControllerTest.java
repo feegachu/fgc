@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * CapCheckController(IF-API-30, FUN-030) API 통합테스트. CapCheckService 는 mock 으로 대체해
  * 컨트롤러의 요청·응답 변환, 인증, SIR-008 표시형식만 검증한다 — 계산식 자체는 CapCalculatorImplTest,
- * 검색 SQL 은 CapCheckMapper 통합테스트가 담당한다.
+ * 검색 SQL은 CapCheckQueryRepository 통합테스트가 담당한다.
  */
 @WebMvcTest(CapCheckController.class)
 @Import({CapCheckController.class, GlobalExceptionHandler.class, FgcMessageResolver.class,

@@ -9,6 +9,8 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
@@ -290,6 +292,60 @@ class ExceptionCaseActionServiceIntegrationTest {
         assertThat(currentStatus(exceptionCaseId)).isEqualTo("NEW");
         assertThat(actionCount(exceptionCaseId)).isZero();
         assertThat(auditCount(exceptionCaseId)).isZero();
+    }
+
+    /** #376: IN_REVIEW의 허용 전이라도 실제 원장 정정 없이 일반 조치로 종결할 수 없다. */
+    @ParameterizedTest
+    @EnumSource(value = ExceptionActionType.class, names = {"CORRECT", "RESOLVE"})
+    void 원장정정예외는_일반조치로_우회종결할수없고_기존상태와이력을_보존한다(ExceptionActionType actionType) {
+        Long userId = firstUserId();
+        String loginId = loginIdOf(userId);
+        Long exceptionCaseId = insertNewCase();
+        jdbcTemplate.update("""
+                UPDATE fgc.exception_case
+                   SET exception_type = 'JOURNAL_CORRECTION_REQUIRED', source_entity_type = 'JOURNAL_HEADER'
+                 WHERE exception_case_id = ?
+                """, exceptionCaseId);
+        exceptionCaseService.action(exceptionCaseId,
+                new ExceptionActionRequest(ExceptionActionType.START_REVIEW, "원장 정정을 검토합니다.", "DOC-376"),
+                userId, loginId);
+        String beforeCase = jdbcTemplate.queryForObject("""
+                SELECT to_jsonb(e)::text FROM fgc.exception_case e WHERE exception_case_id = ?
+                """, String.class, exceptionCaseId);
+        var beforeActions = jdbcTemplate.queryForList("""
+                SELECT to_jsonb(a)::text FROM fgc.exception_action a
+                 WHERE exception_case_id = ? ORDER BY action_seq
+                """, String.class, exceptionCaseId);
+        var beforeAudits = jdbcTemplate.queryForList("""
+                SELECT to_jsonb(a)::text FROM fgc.audit_log a
+                 WHERE entity_type = 'EXCEPTION_CASE' AND entity_id = ? ORDER BY audit_log_id
+                """, String.class, exceptionCaseId.toString());
+        assertThat(currentStatus(exceptionCaseId)).isEqualTo("IN_REVIEW");
+        assertThat(beforeActions).hasSize(1);
+        assertThat(beforeAudits).hasSize(1);
+
+        assertThatThrownBy(() -> exceptionCaseService.action(exceptionCaseId,
+                new ExceptionActionRequest(actionType, "실제 역분개 없이 종결 시도", "DOC-BYPASS"), userId, loginId))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(failure -> {
+                    FgcBusinessException business = (FgcBusinessException) failure;
+                    assertThat(business.getErrorCode()).isEqualTo(FgcErrorCode.EXCP_003);
+                    assertThat(business.getParams())
+                            .containsEntry("status", "IN_REVIEW")
+                            .containsEntry("actionType", actionType.name());
+                });
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT to_jsonb(e)::text FROM fgc.exception_case e WHERE exception_case_id = ?
+                """, String.class, exceptionCaseId)).isEqualTo(beforeCase);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT to_jsonb(a)::text FROM fgc.exception_action a
+                 WHERE exception_case_id = ? ORDER BY action_seq
+                """, String.class, exceptionCaseId)).isEqualTo(beforeActions);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT to_jsonb(a)::text FROM fgc.audit_log a
+                 WHERE entity_type = 'EXCEPTION_CASE' AND entity_id = ? ORDER BY audit_log_id
+                """, String.class, exceptionCaseId.toString())).isEqualTo(beforeAudits);
     }
 
     @Test

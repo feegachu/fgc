@@ -1,0 +1,11 @@
+// 전용 폐기 DB에서만 실행하는 원장 저장·기표 비교. 일반 test 실행에서는 비활성이다.
+// SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:<port>/fgc_journal_write_perf_<suffix>?currentSchema=fgc
+// 실행: gradlew -I scripts/verification/journal-write-performance.init.gradle test --tests '*JournalWritePerformanceTest'
+// 실제 commit을 측정하므로 데이터가 남는다. 결과 확인 후 전용 DB 전체를 폐기한다.
+allprojects {
+    tasks.withType(Test).configureEach {
+        systemProperty 'fgc.journal.write.performance', 'true'
+        maxHeapSize = '1g'
+        testLogging.showStandardStreams = true
+    }
+}

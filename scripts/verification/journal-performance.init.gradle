@@ -1,0 +1,9 @@
+// 명시적으로 선택한 원장 조회 성능 비교만 활성화한다.
+// 사용: gradlew -I scripts/verification/journal-performance.init.gradle test --tests '*JournalReadPerformanceTest'
+allprojects {
+    tasks.withType(Test).configureEach {
+        systemProperty 'fgc.journal.performance', 'true'
+        maxHeapSize = '1g'
+        testLogging.showStandardStreams = true
+    }
+}

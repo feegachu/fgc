@@ -382,7 +382,7 @@ class ExceptionGenerationMapperIntegrationTest {
 
     private void insertJournalImbalance(Long validationRunId, Long contractId) {
         // 실제 기표처럼 원천(source_entity_id)은 실행이 바뀌어도 같고 revision_no 만
-        // 올라간다 (JournalMapper.existsPostedForSource / uq_journal_source_revision) —
+        // 올라간다 (JournalHeaderRepository의 POSTED 원천 조회 / uq_journal_source_revision) —
         // 안정 업무키가 재실행에서 같은 업무건으로 수렴하는 전제다.
         Long journalHeaderId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.journal_header (

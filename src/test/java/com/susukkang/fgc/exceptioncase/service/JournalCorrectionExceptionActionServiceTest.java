@@ -112,6 +112,33 @@ class JournalCorrectionExceptionActionServiceTest {
         verify(journalCorrectionService, never()).reverseAndRepost(any(JournalRepostCommand.class));
     }
 
+    @Test
+    void missingCorrectionExceptionDoesNotStartJournalCorrection() {
+        given(caseRepository.findJournalCorrectionTargetForUpdate(30L)).willReturn(null);
+
+        assertThatThrownBy(() -> service.correct(30L, request(), 1L, "settle01"))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(error -> assertThat(((FgcBusinessException) error).getErrorCode())
+                        .isEqualTo(FgcErrorCode.COMMON_004));
+
+        verify(journalCorrectionService, never()).reverseAndRepost(any(JournalRepostCommand.class));
+        verify(exceptionCaseService, never()).actionAfterJournalCorrection(any(), any(), any(), any());
+    }
+
+    @Test
+    void unresolvedReviewStatePreventsCorrectionAndResolution() {
+        given(caseRepository.findJournalCorrectionTargetForUpdate(30L))
+                .willReturn(target("JOURNAL_CORRECTION_REQUIRED", ExceptionStatus.NEW));
+
+        assertThatThrownBy(() -> service.correct(30L, request(), 1L, "settle01"))
+                .isInstanceOf(FgcBusinessException.class)
+                .satisfies(error -> assertThat(((FgcBusinessException) error).getErrorCode())
+                        .isEqualTo(FgcErrorCode.EXCP_003));
+
+        verify(journalCorrectionService, never()).reverseAndRepost(any(JournalRepostCommand.class));
+        verify(exceptionCaseService, never()).actionAfterJournalCorrection(any(), any(), any(), any());
+    }
+
     private JournalCorrectionExceptionTarget target(String type, ExceptionStatus status) {
         return new JournalCorrectionExceptionTarget(
                 30L, type, status, "JOURNAL_HEADER", "10");
