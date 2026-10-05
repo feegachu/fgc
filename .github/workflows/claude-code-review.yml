@@ -12,6 +12,11 @@ on:
       - "build.gradle"
       - "settings.gradle"
 
+# 같은 PR에서 리뷰가 겹쳐 돌면 같은 지적이 중복으로 달린다. 새 push가 오면 진행 중인 리뷰를 취소한다.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
     if: github.event.pull_request.user.login != 'dependabot[bot]'
@@ -26,10 +31,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0        # 이전 push와 base 브랜치를 비교하기 위해 전체 이력을 받는다
+
+      # push로 들어온 커밋 중 base 브랜치에 없는 "이 PR 자신의" 비병합 커밋이 없으면
+      # (develop 병합만 한 push) 리뷰를 건너뛴다. 판정할 수 없으면(강제 push 등) 리뷰한다.
+      - name: Skip review for base-branch-only pushes
+        id: gate
+        env:
+          ACTION: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$ACTION" != "synchronize" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          own=$(git rev-list --no-merges "${BEFORE}..${AFTER}" "^origin/${BASE}" | wc -l)
+          echo "이번 push의 PR 고유 커밋: ${own}건"
+          if [ "$own" -eq 0 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run Claude Code Review
         id: claude-review
+        if: steps.gate.outputs.run == 'true'
         uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -110,12 +138,25 @@ jobs:
             - 문제가 없으면 없다고 짧게 쓴다. 억지로 만들지 않는다.
             - 한국어로 작성한다.
 
+            ## 이전 리뷰와 중복 금지 (먼저 할 것)
+            이 PR은 push마다 다시 검토된다. 검토를 시작하기 전에 이미 달린 코멘트를 읽는다.
+            - 인라인: `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments --paginate`
+            - 종합 요약: `gh pr view ${{ github.event.pull_request.number }} --comments`
+            - `gh api`는 위 조회(GET)에만 쓴다. 코멘트 작성·수정·삭제에 쓰지 않는다.
+            규칙:
+            - 이전에 단 지적과 같은 내용은 인라인 코멘트를 다시 달지 않는다.
+            - 이전 지적이 현재 코드에서 해결됐으면 새 인라인 없이 요약에 "해결됨: <지적 요지> (<파일:줄>)"로만 적는다.
+            - 이전 지적이 아직 남아 있으면 요약에 "미해결: <지적 요지>" 한 줄로만 적는다.
+            - 인라인 코멘트는 이번에 처음 발견한 지적에만 단다.
+            - 새 지적이 없고 이전 지적의 상태도 바뀌지 않았으면 종합 요약도 남기지 않는다.
+
             ## 출력
             - 특정 코드 줄의 문제는 mcp__github_inline_comment__create_inline_comment
               (confirmed: true)로 인라인 코멘트를 단다.
             - 마지막에 `gh pr comment`로 종합 요약 1건을 남긴다.
+              단, 위 중복 금지 규칙의 생략 조건(새 지적 없음·상태 변화 없음)이면 남기지 않는다.
             - 반드시 GitHub 코멘트로 출력한다. 메시지로만 끝내지 마라.
 
           claude_args: |
             --model claude-sonnet-5-5
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments:*),Read,Glob,Grep"
