@@ -45,4 +45,16 @@ public interface AuthRefreshTokenRepository extends JpaRepository<AuthRefreshTok
     int revokeActiveByUserId(@Param("userId") Long userId,
                              @Param("reason") RevokedReason reason,
                              @Param("now") OffsetDateTime now);
+
+    /** 로그아웃은 토큰 한 행이 아니라 그 로그인(session_id) 전체를 끝낸다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE AuthRefreshToken t
+               SET t.revokedAt = :now, t.revokedReason = :reason
+             WHERE t.sessionId = :sessionId AND t.revokedAt IS NULL
+            """)
+    int revokeActiveBySessionId(@Param("sessionId") UUID sessionId,
+                                @Param("reason") RevokedReason reason,
+                                @Param("now") OffsetDateTime now);
 }

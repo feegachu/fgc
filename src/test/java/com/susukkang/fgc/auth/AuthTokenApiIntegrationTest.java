@@ -3,6 +3,7 @@ package com.susukkang.fgc.auth;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.auth.service.AuthTokenService;
 import com.susukkang.fgc.auth.service.FgcUserDetailsService;
@@ -25,6 +26,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -42,6 +44,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -78,6 +82,8 @@ class AuthTokenApiIntegrationTest {
     private FgcUserDetailsService userDetailsService;
     @MockitoBean
     private CommissionPaymentService commissionPaymentService;
+    @MockitoSpyBean
+    private AuditLogRepository auditLogRepository;
 
     private record Tokens(String access, String refresh) {
     }
@@ -401,6 +407,135 @@ class AuthTokenApiIntegrationTest {
                 .isEqualTo(threads - 1);
     }
 
+    // ── PR #440 리뷰: refresh 동시성 ──────────────────────────────────────────
+
+    /**
+     * 같은 Refresh 로 동시에 두 번 갱신하면 하나만 성공한다. 나중 요청은 이미 회전된 토큰을 들고 오므로
+     * 이슈 #400 규칙("회전 전 Refresh 재사용 → 전부 무효화")대로 탈취로 처리된다 — 500 이나 활성 2행은 없다.
+     */
+    @Test
+    void concurrentRefreshWithSameTokenSucceedsOnceAndNeverLeavesTwoActiveRows() throws Exception {
+        Tokens tokens = login("settle01");
+
+        List<Integer> statuses = runConcurrently(2, () -> mockMvc.perform(trusted(post("/api/v1/auth/refresh"))
+                .cookie(refreshCookie(tokens.refresh()))).andReturn().getResponse().getStatus());
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 401);
+        assertThat(count("SELECT count(*) FROM fgc.auth_refresh_token WHERE revoked_at IS NULL")).isLessThanOrEqualTo(1);
+    }
+
+    /**
+     * refresh 가 먼저 커밋된 뒤 회전 전 쿠키로 logout 이 와도 그 로그인은 끝나야 한다.
+     * 로그아웃은 토큰 한 행이 아니라 로그인(session_id) 단위로 무효화한다.
+     */
+    @Test
+    void logoutWithPreRotationCookieStillEndsTheLogin() throws Exception {
+        Tokens tokens = login("settle01");
+        Tokens rotated = refresh(tokens.refresh());
+
+        mockMvc.perform(trusted(post("/api/v1/auth/logout")).cookie(refreshCookie(tokens.refresh())))
+                .andExpect(status().isOk());
+
+        assertThat(count("SELECT count(*) FROM fgc.auth_refresh_token WHERE revoked_at IS NULL")).isZero();
+        mockMvc.perform(trusted(post("/api/v1/auth/refresh")).cookie(refreshCookie(rotated.refresh())))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/contracts").header(HttpHeaders.AUTHORIZATION, "Bearer " + rotated.access()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /** refresh 와 logout 이 동시에 와도 순서와 무관하게 그 로그인은 끝난다. */
+    @Test
+    void concurrentRefreshAndLogoutAlwaysEndTheLogin() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            Tokens tokens = login("settle01");
+            Cookie cookie = refreshCookie(tokens.refresh());
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                Future<Integer> refreshed = pool.submit(() -> {
+                    start.await();
+                    return mockMvc.perform(trusted(post("/api/v1/auth/refresh")).cookie(cookie))
+                            .andReturn().getResponse().getStatus();
+                });
+                Future<Integer> loggedOut = pool.submit(() -> {
+                    start.await();
+                    return mockMvc.perform(trusted(post("/api/v1/auth/logout")).cookie(cookie))
+                            .andReturn().getResponse().getStatus();
+                });
+                start.countDown();
+                assertThat(refreshed.get()).isIn(200, 401);
+                assertThat(loggedOut.get()).isEqualTo(200);
+            } finally {
+                pool.shutdownNow();
+            }
+            assertThat(count("SELECT count(*) FROM fgc.auth_refresh_token WHERE revoked_at IS NULL"))
+                    .as("round %d", round).isZero();
+        }
+    }
+
+    private static <T> List<T> runConcurrently(int threads, Callable<T> task) throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        try {
+            List<Future<T>> futures = new java.util.ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return task.call();
+                }));
+            }
+            start.countDown();
+            List<T> results = new java.util.ArrayList<>();
+            for (Future<T> future : futures) {
+                results.add(future.get());
+            }
+            return results;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    // ── PR #440 리뷰: 감사 INSERT 실패 ↔ 토큰 트랜잭션 ─────────────────────────
+
+    /**
+     * 감사 INSERT 가 DB 에서 실패해도(PostgreSQL 은 실패 뒤 같은 트랜잭션의 SQL 을 전부 거절한다)
+     * 재사용 탐지의 전부 무효화는 커밋돼야 한다. 감사는 토큰 트랜잭션이 커밋된 뒤 별도 트랜잭션에서 쓴다.
+     */
+    @Test
+    void reuseDetectionRevocationSurvivesAuditInsertFailure() throws Exception {
+        Tokens first = login("settle01");
+        refresh(first.refresh());
+        failAuditInserts();
+
+        mockMvc.perform(trusted(post("/api/v1/auth/refresh")).cookie(refreshCookie(first.refresh())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-002"));
+
+        assertThat(count("SELECT count(*) FROM fgc.auth_refresh_token WHERE revoked_at IS NULL")).isZero();
+        assertThat(count("SELECT count(*) FROM fgc.auth_refresh_token WHERE revoked_reason = 'REUSE_DETECTED'"))
+                .isOne();
+    }
+
+    /** 감사 실패가 로그인을 막지 않는다(1차 폼 로그인과 같은 정책 — AuthAuditListener ponytail 주석). */
+    @Test
+    void loginStillSucceedsWhenAuditInsertFails() throws Exception {
+        failAuditInserts();
+
+        Tokens tokens = login("settle01");
+
+        assertThat(count("SELECT count(*) FROM fgc.auth_refresh_token WHERE revoked_at IS NULL")).isOne();
+        mockMvc.perform(get("/api/v1/contracts").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.access()))
+                .andExpect(status().isOk());
+    }
+
+    /** 감사 저장을 진짜 SQL 오류로 실패시킨다 — 그 순간 열린 트랜잭션은 PostgreSQL 에서 aborted 상태가 된다. */
+    private void failAuditInserts() {
+        doAnswer(invocation -> {
+            jdbcTemplate.execute("SELECT 1/0");
+            return null;
+        }).when(auditLogRepository).saveAndFlush(any());
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private MockHttpServletRequestBuilder trusted(MockHttpServletRequestBuilder builder) {
@@ -439,7 +574,7 @@ class AuthTokenApiIntegrationTest {
         return objectMapper.writeValueAsString(Map.of("loginId", loginId, "password", PASSWORD));
     }
 
-    private String claim(String token, String name) throws Exception {
+    private static String claim(String token, String name) {
         String payload = new String(java.util.Base64.getUrlDecoder().decode(token.split("\\.")[1]),
                 StandardCharsets.UTF_8);
         return JsonPath.read(payload, "$." + name);

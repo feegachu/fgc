@@ -157,7 +157,14 @@ public class AuthTokenService {
         return RefreshResult.rejected(FgcErrorCode.AUTH_002);
     }
 
-    /** 쿠키의 Refresh 가 살아 있으면 그 로그인을 끝낸다. 없거나 이미 무효면 아무것도 하지 않는다(멱등). */
+    /**
+     * 쿠키의 Refresh 가 속한 로그인(session_id)을 끝낸다. 이미 끝난 로그인이거나 모르는 토큰이면 아무것도 하지 않는다(멱등).
+     *
+     * 2026-10-06 yslee - 토큰 한 행이 아니라 로그인 단위로 무효화(PR #440 리뷰)
+     * 문제: refresh 와 logout 이 동시에 오면, refresh 가 먼저 커밋됐을 때 logout 이 들고 온 회전 전 토큰은
+     *      이미 ROTATED 라 아무것도 하지 않았다 — 새로 발급된 Refresh 가 살아남아 로그아웃이 무시됐다.
+     * 개선: 같은 session_id 의 활성 행을 LOGOUT 으로 무효화한다. 어느 순서로 커밋돼도 로그인이 끝난다.
+     */
     @Transactional
     public void logout(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
@@ -170,11 +177,11 @@ public class AuthTokenService {
         }
         appUserRepository.lockById(userId.get());
         AuthRefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElseThrow();
-        if (!token.isActive()) {
-            return;
+        int revoked = refreshTokenRepository.revokeActiveBySessionId(
+                token.getSessionId(), RevokedReason.LOGOUT, OffsetDateTime.now());
+        if (revoked > 0) {
+            auditListener.recordTokenEvent("LOGOUT", token.getUserId(), loginIdOf(token.getUserId()), null);
         }
-        token.revoke(RevokedReason.LOGOUT, OffsetDateTime.now());
-        auditListener.recordTokenEvent("LOGOUT", token.getUserId(), loginIdOf(token.getUserId()), null);
     }
 
     private IssuedTokens issue(FgcUserDetails user, UUID sessionId, OffsetDateTime refreshExpiresAt,

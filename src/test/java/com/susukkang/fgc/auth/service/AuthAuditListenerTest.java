@@ -43,7 +43,8 @@ class AuthAuditListenerTest {
     @Test
     void auditFailureDoesNotEscapeLoginOrLogoutListeners() {
         given(repository.saveAndFlush(any())).willThrow(new DataIntegrityViolationException("audit unavailable"));
-        var listener = new AuthAuditListener(repository);
+        var listener = new AuthAuditListener(repository, org.mockito.Mockito.mock(
+                org.springframework.transaction.PlatformTransactionManager.class));
         var authentication = UsernamePasswordAuthenticationToken.unauthenticated("settle01", "unused");
 
         assertThatCode(() -> {
@@ -64,7 +65,8 @@ class AuthAuditListenerTest {
      */
     @Test
     void failureKeepsReasonAndClampsUntrustedLoginId() {
-        var listener = new AuthAuditListener(repository);
+        var listener = new AuthAuditListener(repository, org.mockito.Mockito.mock(
+                org.springframework.transaction.PlatformTransactionManager.class));
         listener.onLoginFailure(new AuthenticationFailureBadCredentialsEvent(
                 UsernamePasswordAuthenticationToken.unauthenticated("x".repeat(101), "unused"),
                 new BadCredentialsException("bad credentials")));

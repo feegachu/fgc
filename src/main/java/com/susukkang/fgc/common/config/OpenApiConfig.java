@@ -12,9 +12,7 @@ import org.springframework.context.annotation.Configuration;
  * 세션(폼 로그인)으로 연 Swagger UI 는 지금처럼 쿠키로도 동작한다.
  */
 @Configuration
-@SecurityScheme(name = OpenApiConfig.BEARER, type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
-@OpenAPIDefinition(security = @SecurityRequirement(name = OpenApiConfig.BEARER))
+@SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
+@OpenAPIDefinition(security = @SecurityRequirement(name = "bearerAuth"))
 public class OpenApiConfig {
-
-    static final String BEARER = "bearerAuth";
 }
