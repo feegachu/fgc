@@ -60,7 +60,9 @@ class ContractStatusEventProcessingRepositoryIntegrationTest {
         contractStatusEventProcessingRepository.insertProcessing(eventId, JOB_NAME, "SUCCEEDED", null, null);
 
         List<Long> after = contractStatusEventProcessingRepository.findPendingEventIds(contractId, JOB_NAME);
-        assertThat(after).doesNotContain(eventId);
+        // after가 비어 있으면 doesNotContain은 공허하게 통과하므로(S5841), before에서 이 이벤트만 빠졌는지 비교한다
+        List<Long> expected = before.stream().filter(id -> !id.equals(eventId)).toList();
+        assertThat(after).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     @Test
