@@ -34,6 +34,8 @@ dependencies {
     // 인증·인가
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
+    // 2차 JWT 공존 모드(#400) — NimbusJwtEncoder/Decoder(HS256)를 쓴다. jjwt 는 넣지 않는다.
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
     // 입력값 검증
     implementation 'org.springframework.boot:spring-boot-starter-validation'

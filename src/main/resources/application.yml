@@ -54,6 +54,11 @@ springdoc:
 # FGC 업무 설정 — 코드에 숫자를 박지 않기 위한 자리 (COR-004)
 fgc:
   demo-month: 2026-07
+  # 2차 JWT 공존 모드(#400, 인터페이스정의서 §2-1-1). 키는 커밋하지 않는다 — 비어 있으면 기동마다 임의 키(JwtConfig).
+  jwt:
+    secret: ${FGC_JWT_SECRET:}
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
   batch:
     daily-changed-contract:
       cron: "0 0 2 * * *"        # 매일 02:00. 프로젝트 운영 가정일 뿐 법정 기준 아님
