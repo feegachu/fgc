@@ -3,6 +3,7 @@ package com.susukkang.fgc.validation.service;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
 import com.susukkang.fgc.schedule.service.ScheduleService;
@@ -11,8 +12,7 @@ import com.susukkang.fgc.validation.batch.contract.ScheduleRegenerationPort;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
 import com.susukkang.fgc.validation.dto.ValidationScheduleState;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
-import com.susukkang.fgc.validation.mapper.ValidationScheduleMapper;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,10 +30,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ValidationRunScheduleService implements ScheduleRegenerationPort {
 
-    private final ValidationScheduleMapper validationScheduleMapper;
+    private final ValidationTargetRepository validationTargetRepository;
     private final CommissionPolicyService commissionPolicyService;
     private final ScheduleMapper scheduleMapper;
-    private final ExceptionCaseMapper exceptionCaseMapper;
+    private final ExceptionCaseRepository exceptionCaseRepository;
     private final ScheduleRegenerationBatchItemService itemService;
 
     @Override
@@ -52,7 +52,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
         }
 
         List<ValidationScheduleState> states =
-                validationScheduleMapper.selectScheduleStates(validationRunId);
+                validationTargetRepository.selectScheduleStates(validationRunId);
         Map<Long, List<ValidationScheduleState>> statesByContract = new LinkedHashMap<>();
         for (ValidationScheduleState state : states) {
             statesByContract.computeIfAbsent(state.getContractId(), ignored -> new ArrayList<>())
@@ -65,7 +65,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
             Long contractId = entry.getKey();
             String invalidReason = findStructuralError(entry.getValue());
             if (invalidReason != null) {
-                exceptionCaseMapper.insertDataQualityCase(
+                exceptionCaseRepository.insertDataQualityCase(
                         validationRunId,
                         contractId,
                         "예상 스케줄 정합성 오류",
@@ -98,7 +98,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                 //       담당자는 그 계약이 예상 스케줄 0행이라는 사실을 알 수 없었다.
                 //       그 상태로 대사가 돌면 실제 지급만 남아 엉뚱한 판정이 나온다.
                 // 개선: 구조 오류·정책 오류 분기와 동일하게 DATA_QUALITY 케이스를 남긴다.
-                exceptionCaseMapper.insertDataQualityCase(
+                exceptionCaseRepository.insertDataQualityCase(
                         validationRunId,
                         contractId,
                         "예상 스케줄 생성 실패",
@@ -135,7 +135,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                         "예상 스케줄 생성 검토 필요",
                         message
                 );
-                exceptionCaseMapper.insertDataQualityCase(
+                exceptionCaseRepository.insertDataQualityCase(
                         validationRunId,
                         contractId,
                         "예상 스케줄 정책 오류",

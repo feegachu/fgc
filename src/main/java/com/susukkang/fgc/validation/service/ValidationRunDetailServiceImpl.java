@@ -9,9 +9,11 @@ import com.susukkang.fgc.validation.dto.ValidationRunProgressResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunResultSummaryRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationTargetItemResponse;
-import com.susukkang.fgc.validation.mapper.ValidationRunDetailMapper;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,22 +27,21 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
     // ponytail: 페이징 없이 200행 캡 — 데모 계약 규모(수십 건)에 충분, 대상 폭증 시 페이징 추가
     private static final int TARGET_LIMIT = 200;
 
-    private final ValidationRunDetailMapper validationRunDetailMapper;
-    private final ValidationRunMapper validationRunMapper;
+    private final ValidationRunRepository validationRunRepository;
+    private final ValidationTargetRepository validationTargetRepository;
 
     @Override
     @Transactional(readOnly = true)
     public ValidationRunDetailResponse detail(Long validationRunId) {
-        ValidationRunListRow header = validationRunDetailMapper.findHeaderById(validationRunId);
-        if (header == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
-        }
+        ValidationRunListRow header = validationRunRepository.findHeaderById(validationRunId)
+                .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
 
         List<ValidationTargetItemResponse> targets =
-                validationRunDetailMapper.findTargets(validationRunId, TARGET_LIMIT).stream()
+                validationTargetRepository.findTargets(validationRunId, PageRequest.of(0, TARGET_LIMIT)).stream()
                         .map(ValidationTargetItemResponse::from)
                         .toList();
-        ValidationRunResultSummaryRow summary = validationRunDetailMapper.summarize(validationRunId);
+        ValidationRunResultSummaryRow summary = validationRunRepository.summarize(validationRunId)
+                .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
 
         return new ValidationRunDetailResponse(
                 ValidationRunItemResponse.from(header),
@@ -80,10 +81,8 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
     @Override
     @Transactional(readOnly = true)
     public ValidationRunProgressResponse progress(Long validationRunId) {
-        ValidationRunRow row = validationRunMapper.findById(validationRunId);
-        if (row == null) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId));
-        }
-        return ValidationRunProgressResponse.from(row);
+        ValidationRun run = validationRunRepository.findById(validationRunId)
+                .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
+        return ValidationRunProgressResponse.from(ValidationRunRow.from(run));
     }
 }

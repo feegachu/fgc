@@ -1,8 +1,9 @@
 package com.susukkang.fgc.validation.service;
 
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,27 +18,30 @@ import static org.mockito.Mockito.when;
 class ValidationRunBatchProgressServiceImplTest {
 
     @Mock
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
 
     private ValidationRunBatchProgressServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new ValidationRunBatchProgressServiceImpl(validationRunMapper);
+        service = new ValidationRunBatchProgressServiceImpl(validationRunRepository);
     }
 
     @Test
-    void startRunningDelegatesToMapper() {
-        when(validationRunMapper.transitionToRunning(1L)).thenReturn(1);
+    void startRunningDelegatesToRepository() {
+        when(validationRunRepository.transitionToRunning(1L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING))
+                .thenReturn(1);
 
         service.startRunning(1L);
 
-        verify(validationRunMapper).transitionToRunning(1L);
+        verify(validationRunRepository)
+                .transitionToRunning(1L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING);
     }
 
     @Test
     void startRunningThrowsWhenNoRowAffected() {
-        when(validationRunMapper.transitionToRunning(1L)).thenReturn(0);
+        when(validationRunRepository.transitionToRunning(1L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING))
+                .thenReturn(0);
 
         assertThatThrownBy(() -> service.startRunning(1L))
                 .isInstanceOf(FgcBusinessException.class)
@@ -46,17 +50,17 @@ class ValidationRunBatchProgressServiceImplTest {
     }
 
     @Test
-    void advanceStepDelegatesToMapperWithStepNumber() {
-        when(validationRunMapper.updateCurrentStep(1L, 3)).thenReturn(1);
+    void advanceStepDelegatesToRepositoryWithStepNumber() {
+        when(validationRunRepository.updateCurrentStep(1L, 3, ValidationRunStatus.RUNNING)).thenReturn(1);
 
         service.advanceStep(1L, 3);
 
-        verify(validationRunMapper).updateCurrentStep(1L, 3);
+        verify(validationRunRepository).updateCurrentStep(1L, 3, ValidationRunStatus.RUNNING);
     }
 
     @Test
     void advanceStepThrowsWhenNoRowAffected() {
-        when(validationRunMapper.updateCurrentStep(1L, 3)).thenReturn(0);
+        when(validationRunRepository.updateCurrentStep(1L, 3, ValidationRunStatus.RUNNING)).thenReturn(0);
 
         assertThatThrownBy(() -> service.advanceStep(1L, 3))
                 .isInstanceOf(FgcBusinessException.class)
@@ -65,7 +69,7 @@ class ValidationRunBatchProgressServiceImplTest {
     }
 
     @Test
-    // step=1은 startRunning 전담 — advanceStep(1)은 매퍼도 안 부르고 바로 거부
+    // step=1은 startRunning 전담 — advanceStep(1)은 Repository도 안 부르고 바로 거부
     void advanceStepRejectsStepOne() {
         assertThatThrownBy(() -> service.advanceStep(1L, 1))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -78,17 +82,20 @@ class ValidationRunBatchProgressServiceImplTest {
     }
 
     @Test
-    void completeRunDelegatesToMapper() {
-        when(validationRunMapper.transitionToCompleted(1L)).thenReturn(1);
+    void completeRunDelegatesToRepository() {
+        when(validationRunRepository.transitionToCompleted(1L, ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED))
+                .thenReturn(1);
 
         service.completeRun(1L);
 
-        verify(validationRunMapper).transitionToCompleted(1L);
+        verify(validationRunRepository)
+                .transitionToCompleted(1L, ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED);
     }
 
     @Test
     void completeRunThrowsWhenNoRowAffected() {
-        when(validationRunMapper.transitionToCompleted(1L)).thenReturn(0);
+        when(validationRunRepository.transitionToCompleted(1L, ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED))
+                .thenReturn(0);
 
         assertThatThrownBy(() -> service.completeRun(1L))
                 .isInstanceOf(FgcBusinessException.class)
@@ -97,17 +104,20 @@ class ValidationRunBatchProgressServiceImplTest {
     }
 
     @Test
-    void markFailedDelegatesToMapperWithStepAndMessage() {
-        when(validationRunMapper.transitionToFailed(1L, 5, "boom")).thenReturn(1);
+    void markFailedDelegatesToRepositoryWithStepAndMessage() {
+        when(validationRunRepository.transitionToFailed(
+                1L, 5, "boom", ValidationRunStatus.RUNNING, ValidationRunStatus.FAILED)).thenReturn(1);
 
         service.markFailed(1L, 5, "boom");
 
-        verify(validationRunMapper).transitionToFailed(1L, 5, "boom");
+        verify(validationRunRepository)
+                .transitionToFailed(1L, 5, "boom", ValidationRunStatus.RUNNING, ValidationRunStatus.FAILED);
     }
 
     @Test
     void markFailedThrowsWhenNoRowAffected() {
-        when(validationRunMapper.transitionToFailed(1L, 5, "boom")).thenReturn(0);
+        when(validationRunRepository.transitionToFailed(
+                1L, 5, "boom", ValidationRunStatus.RUNNING, ValidationRunStatus.FAILED)).thenReturn(0);
 
         assertThatThrownBy(() -> service.markFailed(1L, 5, "boom"))
                 .isInstanceOf(FgcBusinessException.class)

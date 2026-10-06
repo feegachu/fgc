@@ -1,11 +1,13 @@
 package com.susukkang.fgc.policy.repository;
 
+import com.susukkang.fgc.cap.dto.RefundRateTableView;
 import com.susukkang.fgc.policy.dto.RefundRateTableDetailRow;
 import com.susukkang.fgc.policy.entity.RefundRateTable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -42,4 +44,21 @@ public interface RefundRateTableRepository extends JpaRepository<RefundRateTable
                      rrt.refundRateTableId, rrl.contractMonthNo
             """)
     List<RefundRateTableDetailRow> selectRefundRateTables(@Param("policyVersionId") Long policyVersionId);
+
+    // #379 validation_run 생성 시 policy_snapshot 조립용. asOfDate 시점에 유효한 전체를 나열한다.
+    @Query("""
+            SELECT new com.susukkang.fgc.cap.dto.RefundRateTableView(
+                rrt.refundRateTableId,
+                rrt.policyVersionId,
+                pv.versionNo,
+                rrt.standardDeduction80Yn,
+                rrt.effectiveFrom)
+            FROM RefundRateTable rrt
+            JOIN PolicyVersion pv ON pv.policyVersionId = rrt.policyVersionId
+            WHERE pv.status = com.susukkang.fgc.common.code.PolicyStatus.ACTIVE
+              AND rrt.effectiveFrom <= :asOfDate
+              AND (rrt.effectiveTo IS NULL OR rrt.effectiveTo >= :asOfDate)
+            ORDER BY rrt.refundRateTableId
+            """)
+    List<RefundRateTableView> findActiveRefundRateTables(@Param("asOfDate") LocalDate asOfDate);
 }

@@ -5,8 +5,12 @@ import { RouterProvider } from 'react-router'
 import { queryClient } from './app/queryClient'
 import { router } from './app/router'
 import './index.css'
+import { apiClient } from './lib/api/client'
 
-createRoot(document.getElementById('root')!).render(
+// Restore before mounting queries; #404 owns the login page and route guards.
+const ready = apiClient.isLoginPage() || await apiClient.restoreSession().then(() => true, () => false)
+
+if (ready) createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
