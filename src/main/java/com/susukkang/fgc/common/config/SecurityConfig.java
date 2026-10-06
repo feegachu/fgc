@@ -1,23 +1,39 @@
 package com.susukkang.fgc.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter;
+import com.susukkang.fgc.auth.service.JwtSessionRevokedException;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.common.web.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+
+import java.io.IOException;
 
 // FUN-001 개발 순서 1
 
@@ -28,6 +44,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * 한 체인에 formLogin(loginPage)과 httpBasic을 같이 두면 인증 진입점이 하나로 합쳐진다.
  * 그러면 미인증 REST 호출까지 로그인 화면으로 302 되어 화면 스크립트가 401을 구분할 수 없다.
  * 인터페이스정의서 5-3의 "MPA = /login 302 / Ajax = 401 JSON" 규칙을 체인 분리로 강제한다.
+ * <p>
+ * 2차 JWT 공존 모드(#400, 인터페이스정의서 §2-1-1)
+ * API 체인(1·2)은 세션과 Bearer 토큰을 둘 다 받는다. Bearer 요청만 CSRF 토큰 검사에서 빼고,
+ * 세션 쿠키로 들어온 요청은 1차와 같이 CSRF 를 검사한다. STATELESS·csrf.disable() 은 웨이브 C(#419)에서 건다 —
+ * 지금 걸면 공존기 Thymeleaf Ajax 가 전부 401·403 이 되거나 위조 요청이 통한다.
  */
 @Configuration
 @EnableMethodSecurity
@@ -49,12 +70,71 @@ public class SecurityConfig {
                 response.setStatus(HttpStatus.UNAUTHORIZED.value());
                 return;
             }
-            var entity = globalExceptionHandler.handleAccessDenied(exception);
-            response.setStatus(entity.getStatusCode().value());
-            response.setCharacterEncoding("UTF-8");
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            objectMapper.writeValue(response.getWriter(), entity.getBody());
+            writeEnvelope(response, globalExceptionHandler.handleAccessDenied(exception), objectMapper);
         };
+    }
+
+    /**
+     * #400 — Bearer 토큰 인증 실패(만료·서명 위조·무효화된 로그인)를 401 + ApiResponse 봉투로 내보낸다.
+     * 중복 로그인으로 밀려난 로그인은 FGC-AUTH-004, 그 밖에는 FGC-AUTH-002(로그인 만료).
+     * WWW-Authenticate 헤더는 표준 진입점(RFC 6750)이 붙인다.
+     */
+    @Bean
+    public AuthenticationEntryPoint bearerAuthenticationEntryPoint(
+            GlobalExceptionHandler globalExceptionHandler, ObjectMapper objectMapper) {
+        BearerTokenAuthenticationEntryPoint standard = new BearerTokenAuthenticationEntryPoint();
+        return (request, response, exception) -> {
+            standard.commence(request, response, exception);
+            FgcErrorCode errorCode = exception instanceof JwtSessionRevokedException revoked
+                    ? revoked.getErrorCode()
+                    : FgcErrorCode.AUTH_002;
+            writeEnvelope(response,
+                    globalExceptionHandler.handleBusinessException(new FgcBusinessException(errorCode)),
+                    objectMapper);
+        };
+    }
+
+    private static void writeEnvelope(HttpServletResponse response, ResponseEntity<ApiResponse<Void>> entity,
+                                      ObjectMapper objectMapper) throws IOException {
+        response.setStatus(entity.getStatusCode().value());
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), entity.getBody());
+    }
+
+    /**
+     * Bearer 로 인증하려는 요청. DefaultBearerTokenResolver 가 읽는 헤더("bearer" 로 시작)의 부분집합이라,
+     * 여기 걸려 CSRF 를 면제받은 요청은 반드시 토큰 인증을 거친다 — 토큰이 틀리면 세션으로 넘어가지 않고 401.
+     */
+    private static final RequestMatcher BEARER_REQUEST = request -> {
+        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+        return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7);
+    };
+
+    /**
+     * Refresh 쿠키로 동작하는 토큰 API. Spring CSRF 토큰 대신 AuthTokenController 가
+     * Origin·X-FGC-Client 를 검사한다(인터페이스정의서 §2-1-1 "CSRF 판정").
+     */
+    private static final String[] AUTH_TOKEN_ENDPOINTS = {
+            "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout"};
+
+    /**
+     * 체인 1·2 공통 — 세션과 Bearer 공존.
+     * 디코더·Converter 를 요청 시점에 꺼내는 이유: SecurityConfig 를 import 하는 @WebMvcTest 슬라이스에는
+     * JwtConfig·FgcUserDetailsService 가 없다. 빈이 없는 채로 Bearer 요청이 오면 500 으로 실패한다(통과시키지 않는다).
+     */
+    private static void bearerAndSession(HttpSecurity http,
+                                         ObjectProvider<JwtDecoder> jwtDecoder,
+                                         ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
+                                         AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
+        http
+                .oauth2ResourceServer(resource -> resource
+                        .jwt(jwt -> jwt
+                                .decoder(token -> jwtDecoder.getObject().decode(token))
+                                .jwtAuthenticationConverter(token -> jwtConverter.getObject().convert(token)))
+                        .authenticationEntryPoint(bearerAuthenticationEntryPoint))
+                // NEVER: 새 세션을 만들지 않지만, 폼 로그인으로 생긴 세션이 있으면 읽는다(공존기 Thymeleaf Ajax).
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.NEVER));
     }
 
     /**
@@ -63,7 +143,11 @@ public class SecurityConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain protectedStateChangeApiSecurityFilterChain(
-            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler) throws Exception {
+            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
+            ObjectProvider<JwtDecoder> jwtDecoder,
+            ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
+            AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
+        bearerAndSession(http, jwtDecoder, jwtConverter, bearerAuthenticationEntryPoint);
         http
                 // 2026-08-12 yslee - 대사 실행 상태 변경 API에 CSRF 보호 적용
                 // 기존 코드: 지급 API 경로만 CSRF 보호 체인에 포함
@@ -76,7 +160,8 @@ public class SecurityConfig {
                 // 기존 코드: /api/** 전체에서 CSRF 검증을 비활성화
                 // 문제: 로그인 세션을 악용한 외부 사이트가 지급 등록·수정·확정 요청을 위조할 수 있음
                 // 개선: FUN-065 상태 변경 요청에 Spring Security 기본 CSRF 토큰 검증을 우선 적용
-                .csrf(Customizer.withDefaults())
+                // 2026-10-06 yslee - Bearer 요청만 CSRF 토큰 검사에서 면제(#400). 세션 요청은 그대로 검사한다.
+                .csrf(csrf -> csrf.ignoringRequestMatchers(BEARER_REQUEST))
                 .authorizeHttpRequests(auth -> auth
                         // FUN-002(#82) — COMPLIANCE는 역할 정의(§4-1)상 "조회만". 컨트롤러
                         // @PreAuthorize를 빠뜨려도 최소한 이 굵은 규칙이 COMPLIANCE의 상태 변경
@@ -109,10 +194,20 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain apiSecurityFilterChain(
-            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler) throws Exception {
+            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
+            ObjectProvider<JwtDecoder> jwtDecoder,
+            ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
+            AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
+        bearerAndSession(http, jwtDecoder, jwtConverter, bearerAuthenticationEntryPoint);
         http
                 .securityMatcher("/api/**")
+                // 2026-10-06 yslee - Bearer 요청과 토큰 API 3개만 CSRF 토큰 검사에서 면제(#400)
+                // 토큰 API 는 로그인 전에 부르므로 COMPLIANCE 도 막지 않는다(아래 permitAll).
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers(BEARER_REQUEST)
+                        .ignoringRequestMatchers(AUTH_TOKEN_ENDPOINTS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.POST, AUTH_TOKEN_ENDPOINTS).permitAll()
                         // 감사로그 API(IF-API-52)는 아직 미구현이지만 구현 시점에 바로
                         // 적용되도록 선제 등록한다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/audit-logs/**")
