@@ -135,6 +135,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
+      - run: npm run check:api
       - run: npm run lint
       - run: npm test -- --run
       # tsc -b(타입 검사) 후 vite build
