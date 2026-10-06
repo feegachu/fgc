@@ -78,6 +78,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
 
     // ── #380: 검증 배치가 소유하는 예외 탐지·생성 경로 ──────────────────────────
     // V23_1(SRC-032) 이후 전 메서드 공통 — fgc.record_exception_detection()을 호출한다.
+    // 쓰기 함수 호출이라 읽기 전용 기본값으로 실행되면 안 된다 — 호출자의 쓰기 트랜잭션을 필수로 강제한다.
     // 안정 업무키는 "{exception_type}:{YYYY-MM 검증월}:CONTRACT:..." 형태로, 실행 ID나
     // 실행별 결과 PK를 쓰지 않는다 — 같은 계약·같은 사유가 재실행에서도 같은 키가 돼
     // 새 업무건이 아니라 기존 건의 재검출(occurrence)로 잡힌다. 재검출 시 RESOLVED였던
@@ -93,6 +94,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
     // 그 두 메서드와 ExceptionCaseMapper 인터페이스 자체는 그 소비자들이 전환한 뒤에야 지운다.
 
     /** 일일 변경 계약 재검증 실패를 검증월 기준 안정 업무키로 기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
             SELECT recorded.recorded_case_id
               FROM fgc.validation_run vr
@@ -125,6 +127,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                                 @Param("description") String description);
 
     /** 월 검증의 계약별 1,200% 계산 실패를 지급 단계별로 검증월 기준 안정 업무키로 기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
             SELECT recorded.recorded_case_id
               FROM fgc.validation_run vr
@@ -145,6 +148,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                                 @Param("description") String description);
 
     /** 월 검증 8단계: 이번 실행의 1,200% 한도 위반·검토필요 전부를 한 번에 탐지·기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
             SELECT COUNT(*) FILTER (WHERE recorded.new_case)
               FROM fgc.cap_check cc
@@ -211,6 +215,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
      * ARBITRAGE_CANDIDATE는 이유가 하나뿐이라 키에 reason 세그먼트가 없고(V24 보정과
      * 일치), 그 외 유형은 V23_1 레거시 재계산(끝에 :reason_code)과 같은 형식을 쓴다.
      */
+    @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
             SELECT COUNT(*) FILTER (WHERE recorded.new_case)
               FROM (
@@ -290,6 +295,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
     long insertFromArbitrageChecks(@Param("validationRunId") Long validationRunId);
 
     /** 월 검증 8단계: 이번 실행의 대사 불일치(MATCHED 제외) 전부를 한 번에 탐지·기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
             SELECT COUNT(*) FILTER (WHERE recorded.new_case)
               FROM fgc.reconciliation_result rr
@@ -355,6 +361,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
      * 탐지·기록한다. 분개 원천 식별자(source_entity_id)까지 넣어야 같은 실행의 서로 다른
      * 불균형 분개가 별도 업무건으로 남는다 — 원천은 실행이 바뀌어도 안정적이다(V29).
      */
+    @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
             SELECT COUNT(*) FILTER (WHERE recorded.new_case)
               FROM fgc.vw_journal_imbalance imbalance

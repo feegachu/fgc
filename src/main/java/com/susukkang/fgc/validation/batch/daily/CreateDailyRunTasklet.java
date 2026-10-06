@@ -84,7 +84,7 @@ public class CreateDailyRunTasklet implements Tasklet {
         OffsetDateTime dayStart = now.toLocalDate().atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime();
         OffsetDateTime dayEnd = dayStart.plusDays(1);
         Optional<ValidationRun> existing = validationRunRepository
-                .findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+                .findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                         ValidationRunType.MANUAL_CONTRACT.name(), dayStart, dayEnd);
         return existing.isEmpty() ? createAndStart(params) : reuseOrRecreate(existing.get(), params);
     }

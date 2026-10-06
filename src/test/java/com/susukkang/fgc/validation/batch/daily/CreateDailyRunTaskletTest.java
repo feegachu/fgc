@@ -147,7 +147,7 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void noExistingRunTodayCreatesAndStartsNewRun() {
-        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                 eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any())).willReturn(noExistingRun());
         ValidationRunRow created = runRowWithStatus(ValidationRunStatus.CREATED);
         created.setValidationRunId(42L);
@@ -163,7 +163,7 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingCreatedRunIsStarted() {
-        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                 eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
                 .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.CREATED)));
 
@@ -175,7 +175,7 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingFailedRunIsRetriedViaTransition() {
-        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                 eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
                 .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.FAILED)));
 
@@ -190,7 +190,7 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingRunningRunIsReusedAsIs() {
-        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                 eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
                 .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.RUNNING)));
 
@@ -204,7 +204,7 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void existingCompletedRunCausesFreshRunToBeCreated() {
-        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                 eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
                 .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.COMPLETED)));
         ValidationRunRow freshRun = runRowWithStatus(ValidationRunStatus.CREATED);
@@ -224,7 +224,7 @@ class CreateDailyRunTaskletTest {
     // 나누면서 FINALIZED 케이스를 실수로 빠뜨리는 회귀를 잡기 위해 별도로 고정해 둔다.
     @Test
     void existingFinalizedRunCausesFreshRunToBeCreatedWithoutTouchingTheFinalizedRow() {
-        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                 eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
                 .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.FINALIZED)));
         ValidationRunRow freshRun = runRowWithStatus(ValidationRunStatus.CREATED);
@@ -253,7 +253,7 @@ class CreateDailyRunTaskletTest {
         assertThat(result).isEqualTo(RepeatStatus.FINISHED);
         verify(lifecycleService).start(eq(42L), any());
         verify(validationRunRepository, never())
-                .findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(any(), any(), any());
+                .findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(any(), any(), any());
         assertThat(ValidationRunBatchContext.getValidationRunId(chunkContext)).isEqualTo(42L);
     }
 
@@ -298,7 +298,7 @@ class CreateDailyRunTaskletTest {
 
     @Test
     void watermarkAndRunStartedAtAreStoredInJobExecutionContext() {
-        given(validationRunRepository.findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+        given(validationRunRepository.findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
                 eq(ValidationRunType.MANUAL_CONTRACT.name()), any(), any()))
                 .willReturn(Optional.of(entityWithStatus(42L, ValidationRunStatus.RUNNING)));
 
