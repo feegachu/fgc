@@ -1,5 +1,6 @@
 import { matchPath } from 'react-router'
-export type Permission = 'canProcess' | 'canViewAuditLog'
+import type { Permission } from '../features/auth/types'
+export type { Permission } from '../features/auth/types'
 export interface ScreenDefinition {
   id: string
   path: string
@@ -174,8 +175,8 @@ export const screens: ScreenDefinition[] = [
 export const screenFor = (pathname: string) =>
   screens.find((screen) => matchPath({ path: screen.path, end: true }, pathname))
 // 화면 권한 판정은 여기 한 곳에서 한다. 권한 종류가 늘어도 호출부는 그대로다.
-export const canOpen = (screen: ScreenDefinition, user: Record<Permission, boolean>) =>
-  !screen.permission || user[screen.permission]
+export const canOpen = (screen: ScreenDefinition, user: Partial<Record<Permission, boolean>>) =>
+  !screen.permission || user[screen.permission] === true
 export function legacyHref(screen: ScreenDefinition, pathname: string, search: string) {
   const params = matchPath(screen.path, pathname)?.params ?? {}
   return screen.legacy.replace(/:([a-z]+)/g, (_, key: string) => encodeURIComponent(params[key] ?? '')) + search

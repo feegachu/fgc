@@ -59,7 +59,7 @@ export function createApiClient(env: ClientEnvironment) {
       credentials: 'same-origin', signal: options.signal,
     })
   }
-  async function refresh() {
+  async function refresh(redirectOnFailure = true) {
     if (refreshPromise) return refreshPromise
     const currentGeneration = generation
     const pending = (async () => {
@@ -71,7 +71,10 @@ export function createApiClient(env: ClientEnvironment) {
         if (generation !== currentGeneration) throw new ApiError({ code: 'FGC-AUTH-002' }, null, 401)
         env.setToken(data.accessToken)
       } catch (error) {
-        if (generation === currentGeneration) expire(error instanceof ApiError && error.code === 'FGC-AUTH-004')
+        if (generation === currentGeneration) {
+          if (redirectOnFailure) expire(error instanceof ApiError && error.code === 'FGC-AUTH-004')
+          else env.setToken(null)
+        }
         throw error
       }
     })()
@@ -119,9 +122,9 @@ export function createApiClient(env: ClientEnvironment) {
     }
     return { blob: await response.blob(), disposition: response.headers.get('Content-Disposition') }
   }
-  function restoreSession(): Promise<void> {
+  function restoreSession({ redirectOnFailure = true }: { redirectOnFailure?: boolean } = {}): Promise<void> {
     // StrictMode and callers share one startup attempt; an existing login needn't be rotated.
-    startupPromise ??= env.getToken() ? Promise.resolve() : refresh()
+    startupPromise ??= env.getToken() ? Promise.resolve() : refresh(redirectOnFailure)
     return startupPromise
   }
   async function login(loginId: string, password: string) {

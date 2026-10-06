@@ -149,6 +149,23 @@ describe('401과 세션 복구', () => {
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(location.assign).not.toHaveBeenCalled()
   })
+  it('로그인 화면의 쿠키 복원이 실패해도 로그인 URL로 다시 이동하지 않는다', async () => {
+    const fetcher = vi.fn().mockResolvedValue(fail())
+    const { client, location, setToken, getToken } = setup(fetcher)
+    setToken(null)
+    await expect(client.restoreSession({ redirectOnFailure: false })).rejects.toBeInstanceOf(ApiError)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(getToken()).toBeNull()
+    expect(location.assign).not.toHaveBeenCalled()
+  })
+  it('로그인 화면의 유효한 쿠키는 토큰으로 복원한다', async () => {
+    const fetcher = vi.fn().mockResolvedValue(ok({ accessToken: 'restored' }))
+    const { client, location, setToken, getToken } = setup(fetcher)
+    setToken(null)
+    await client.restoreSession({ redirectOnFailure: false })
+    expect(getToken()).toBe('restored')
+    expect(location.assign).not.toHaveBeenCalled()
+  })
   it('/auth/me도 Bearer와 web 헤더를 사용하고 만료 시 갱신한다', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(fail()).mockResolvedValueOnce(ok({ accessToken: 'new' })).mockResolvedValueOnce(ok({ loginId: 'demo' }))
     const { client } = setup(fetcher)

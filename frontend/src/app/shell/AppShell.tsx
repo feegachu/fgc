@@ -1,21 +1,16 @@
-import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
-import { apiClient } from '../../lib/api/client'
-import { errorText } from '../../lib/format'
-import { loginUrl } from '../../lib/api/redirect'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
-import { toast } from '../../stores/toasts'
 import { MonthSelector } from '../../components/MonthSelector'
-import { Button } from '../../components/Button'
-import { queryClient } from '../queryClient'
 import { canOpen, screenFor } from '../screens'
 import { Sidebar } from './Sidebar'
 import { roleLabels } from './labels'
 import type { ShellUser } from './Sidebar'
 import { WorkspaceTabs } from './WorkspaceTabs'
-import type { MeResponse } from '../../lib/api/client'
+import { useAuth } from '../../features/auth/useAuth'
+import { useLogout } from '../../features/auth/useLogout'
+import { AuthStatus } from '../../features/auth/AuthStatus'
 export interface ShellContext {
   user: ShellUser
   month: string | null
@@ -27,7 +22,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const month = useWorkspaceStore((state) => state.month)
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
-  const [loggingOut, setLoggingOut] = useState(false)
+  const { loggingOut, logout } = useLogout()
   useEffect(() => {
     const workspace = useWorkspaceStore.getState()
     const requestedMonth = new URLSearchParams(location.search).get('month')
@@ -58,18 +53,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
     defaultMonth,
     navigate,
   ])
-  async function logout() {
-    setLoggingOut(true)
-    queryClient.clear()
-    try {
-      await apiClient.logout()
-      useWorkspaceStore.getState().clear()
-      window.location.assign(loginUrl(window.location, import.meta.env.BASE_URL))
-    } catch (error) {
-      toast(errorText(error instanceof Error ? error : null), 'error')
-      setLoggingOut(false)
-    }
-  }
   return (
     <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#main-content">
@@ -115,44 +98,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   )
 }
 export function AppShell() {
-  const me = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: async () => (await apiClient.request<MeResponse>('/api/v1/auth/me')).data,
-    staleTime: Infinity,
-    // 실패는 아래 셸 오류 화면이 보여 준다. 전역 Toast 까지 띄우면 같은 오류가 두 번 나온다.
-    meta: { errorToast: false },
-  })
-  if (me.isPending)
-    return (
-      <p className="shell-error" role="status">
-        업무 화면을 준비하고 있습니다.
-      </p>
-    )
-  if (me.isError)
-    return (
-      <div className="shell-error">
-        <p role="alert">{errorText(me.error)}</p>
-        <Button onClick={() => void me.refetch()}>다시 시도</Button>
-      </div>
-    )
-  const data = me.data
-  const defaultMonth = data.demoMonth
-  if (!data.loginId || !data.userName || !data.roleCode || !validMonth(defaultMonth))
-    return (
-      <p className="shell-error" role="alert">
-        사용자 정보와 서버 기준 정산월을 확인할 수 없습니다.
-      </p>
-    )
-  return (
-    <AppShellView
-      user={{
-        loginId: data.loginId,
-        userName: data.userName,
-        roleCode: data.roleCode,
-        canProcess: data.canProcess === true,
-        canViewAuditLog: data.canViewAuditLog === true,
-      }}
-      defaultMonth={defaultMonth}
-    />
-  )
+  const auth = useAuth()
+  if (!auth.user) return <AuthStatus error={auth.error} retry={() => { void auth.refetch() }} />
+  return <AppShellView user={auth.user} defaultMonth={auth.user.demoMonth} />
 }

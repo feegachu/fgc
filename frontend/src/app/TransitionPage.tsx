@@ -1,18 +1,8 @@
-import { Link, useLocation, useOutletContext } from 'react-router'
-import type { ShellContext } from './shell/AppShell'
-import { canOpen, legacyHref } from './screens'
+import { useLocation } from 'react-router'
+import { legacyHref } from './screens'
 import type { ScreenDefinition } from './screens'
 export function TransitionPage({ screen }: { screen: ScreenDefinition }) {
   const location = useLocation()
-  const { user } = useOutletContext<ShellContext>()
-  if (!canOpen(screen, user))
-    return (
-      <section className="react-transition">
-        <h1 className="page-title">접근 권한이 없습니다.</h1>
-        <p>현재 역할로 이 화면을 사용할 수 없습니다.</p>
-        <Link to="/">업무 대시보드로 이동</Link>
-      </section>
-    )
   return (
     <>
       <header className="page-header">
@@ -29,16 +19,5 @@ export function TransitionPage({ screen }: { screen: ScreenDefinition }) {
         </a>
       </section>
     </>
-  )
-}
-export function LoginPlaceholder() {
-  return (
-    <main className="page-content">
-      <h1 className="page-title">로그인 화면 전환 중</h1>
-      <p>새 로그인 화면을 준비하고 있습니다.</p>
-      <a className="button button-primary" href="/login">
-        기존 로그인 화면으로 이동
-      </a>
-    </main>
   )
 }
