@@ -5,7 +5,7 @@ import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaExpectedSourceRow;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaMatchCandidate;
-import com.susukkang.fgc.reconciliation.mapper.InsurerGaReconciliationMapper;
+import com.susukkang.fgc.reconciliation.repository.InsurerGaReconciliationRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class InsurerGaReconciliationMatcherImplTest {
     private static final LocalDate MONTH = LocalDate.of(2026, 8, 1);
 
     @Mock
-    private InsurerGaReconciliationMapper reconciliationMapper;
+    private InsurerGaReconciliationRepository reconciliationMapper;
 
     private InsurerGaReconciliationMatcherImpl matcher;
 
