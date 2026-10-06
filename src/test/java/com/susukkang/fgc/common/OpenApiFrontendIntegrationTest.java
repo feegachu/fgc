@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -46,6 +47,7 @@ class OpenApiFrontendIntegrationTest {
     @Autowired private FgcUserDetailsService userDetails;
     @Autowired private JwtEncoder encoder;
     @Autowired private JwtDecoder decoder;
+    @Value("${fgc.demo-month}") private String demoMonth;
 
     @Test
     void exportAuthenticatedSchemaAndVerifyFrontendAgainstServer() throws Exception {
@@ -75,6 +77,7 @@ class OpenApiFrontendIntegrationTest {
         builder.environment().put("FGC_INTEGRATION_URL", "http://localhost:" + port);
         builder.environment().put("FGC_EXPIRED_ACCESS", expired);
         builder.environment().put("FGC_EXPIRED_REFRESH", tokens.refreshToken());
+        builder.environment().put("FGC_EXPECTED_DEMO_MONTH", demoMonth);
         Process process = builder.start();
         boolean finished = process.waitFor(Duration.ofMinutes(2).toMillis(), TimeUnit.MILLISECONDS);
         if (!finished) process.destroyForcibly();

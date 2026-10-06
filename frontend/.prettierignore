@@ -1,0 +1,7 @@
+dist
+playwright-report
+test-results
+openapi
+src/lib/api/schema.d.ts
+src/styles/*.css
+!src/styles/react.css
