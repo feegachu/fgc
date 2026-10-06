@@ -1,7 +1,7 @@
 package com.susukkang.fgc.arbitrage.service;
 
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
-import com.susukkang.fgc.arbitrage.repository.ArbitrageExceptionRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseDetectionCommandsImpl;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class ArbitrageTransactionBoundaryIntegrationTest {
     @Autowired ArbitrageService service;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
-    @MockitoSpyBean ArbitrageExceptionRepository exceptionRepository;
+    @MockitoSpyBean ExceptionCaseDetectionCommandsImpl exceptionRepository;
 
     @Test
     void rollsBackPartialDetectionRetriesWithoutDuplicatesAndCommitsOtherContractIndependently() {
@@ -39,12 +39,14 @@ class ArbitrageTransactionBoundaryIntegrationTest {
                 VALUES (DATE '2094-01-01', 1, 'PRE_CONFIRM', 'CREATED') RETURNING validation_run_id
                 """, Long.class);
         Reference first = references.getFirst();
-        ArbitrageExceptionRepository spyTarget = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(exceptionRepository);
+        ExceptionCaseDetectionCommandsImpl spyTarget = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(exceptionRepository);
         doAnswer(invocation -> {
             invocation.callRealMethod(); // 계산 결과와 예외·occurrence까지 쓴 다음 실패시킨다.
             throw new FgcBusinessException(FgcErrorCode.COMMON_500, Map.of());
         }).when(spyTarget).insertArbitrageReviewCase(anyString(), eq(runId), eq(first.id()), anyLong(), anyString(), anyString(), anyString());
-        assertThatThrownBy(() -> itemService.process(runId, first.id(), first.date())).isInstanceOf(FgcBusinessException.class);
+        Long failedContractId = first.id();
+        LocalDate failedAsOfDate = first.date();
+        assertThatThrownBy(() -> itemService.process(runId, failedContractId, failedAsOfDate)).isInstanceOf(FgcBusinessException.class);
         assertThat(count("arbitrage_check", runId)).isZero();
         assertThat(count("exception_occurrence", runId)).isZero();
         assertThat(count("exception_case", runId)).isZero();

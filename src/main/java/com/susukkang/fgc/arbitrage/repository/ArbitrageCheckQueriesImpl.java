@@ -20,6 +20,10 @@ import java.util.List;
 public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
     private final EntityManager entityManager;
 
+    private static final String CONTRACT_ID = "contractId";
+    private static final String PAYMENT_STAGE = "paymentStage";
+    private static final String AS_OF_DATE = "asOfDate";
+
     private static final String SELECT_BY_CONDITION = """
             SELECT
             ac.arbitrage_check_id,
@@ -313,15 +317,15 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
 
     @Override
     public List<ArbitrageCheckView> selectByContractId(Long contractId, PaymentStage paymentStage) {
-        return query(SELECT_BY_CONTRACT_ID).setParameter("contractId", contractId, Long.class)
-                .setParameter("paymentStage", paymentStage.name(), String.class)
+        return query(SELECT_BY_CONTRACT_ID).setParameter(CONTRACT_ID, contractId, Long.class)
+                .setParameter(PAYMENT_STAGE, paymentStage.name(), String.class)
                 .setTupleTransformer((tuple, aliases) -> view(tuple)).getResultList();
     }
 
     @Override
     public ArbitrageCalculationSource selectCalculationSource(Long contractId, LocalDate asOfDate) {
         List<ArbitrageCalculationSource> rows = query(SELECT_CALCULATION_SOURCE)
-                .setParameter("contractId", contractId, Long.class).setParameter("asOfDate", asOfDate, LocalDate.class)
+                .setParameter(CONTRACT_ID, contractId, Long.class).setParameter(AS_OF_DATE, asOfDate, LocalDate.class)
                 .setTupleTransformer((tuple, aliases) -> source(tuple)).getResultList();
         return rows.isEmpty() ? null : rows.getFirst();
     }
@@ -329,8 +333,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
     @Override
     public ConfirmedCommissionSummary sumConfirmedCommissionAmount(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
         Object[] row = (Object[]) query(SUM_CONFIRMED_COMMISSION_AMOUNT)
-                .setParameter("contractId", contractId, Long.class).setParameter("paymentStage", paymentStage.name(), String.class)
-                .setParameter("asOfDate", asOfDate, LocalDate.class).getSingleResult();
+                .setParameter(CONTRACT_ID, contractId, Long.class).setParameter(PAYMENT_STAGE, paymentStage.name(), String.class)
+                .setParameter(AS_OF_DATE, asOfDate, LocalDate.class).getSingleResult();
         ConfirmedCommissionSummary result = new ConfirmedCommissionSummary();
         result.setConfirmedPaymentAmount((BigDecimal) row[0]);
         result.setConfirmedDeductionAmount((BigDecimal) row[1]);
@@ -340,8 +344,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
 
     @Override
     public BigDecimal sumPlannedCommissionAmount(Long contractId, PaymentStage paymentStage) {
-        return (BigDecimal) query(SUM_PLANNED_COMMISSION_AMOUNT).setParameter("contractId", contractId, Long.class)
-                .setParameter("paymentStage", paymentStage.name(), String.class).getSingleResult();
+        return (BigDecimal) query(SUM_PLANNED_COMMISSION_AMOUNT).setParameter(CONTRACT_ID, contractId, Long.class)
+                .setParameter(PAYMENT_STAGE, paymentStage.name(), String.class).getSingleResult();
     }
 
     @Override
@@ -368,9 +372,9 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         entityManager.flush();
         NativeQuery<?> q = query(INSERT_ARBITRAGE_CHECK);
         q.setParameter("validationRunId", row.getValidationRunId(), Long.class);
-        q.setParameter("contractId", row.getContractId(), Long.class);
-        q.setParameter("paymentStage", row.getPaymentStage() == null ? null : row.getPaymentStage().name(), String.class);
-        q.setParameter("asOfDate", row.getAsOfDate(), LocalDate.class);
+        q.setParameter(CONTRACT_ID, row.getContractId(), Long.class);
+        q.setParameter(PAYMENT_STAGE, row.getPaymentStage() == null ? null : row.getPaymentStage().name(), String.class);
+        q.setParameter(AS_OF_DATE, row.getAsOfDate(), LocalDate.class);
         q.setParameter("contractMonthNo", row.getContractMonthNo(), Integer.class);
         q.setParameter("cumulativePaidPremium", row.getCumulativePaidPremium(), BigDecimal.class);
         q.setParameter("paidCommissionAmount", row.getPaidCommissionAmount(), BigDecimal.class);

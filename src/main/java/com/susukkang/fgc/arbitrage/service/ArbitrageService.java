@@ -18,7 +18,7 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
-import com.susukkang.fgc.arbitrage.repository.ArbitrageExceptionRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -55,7 +55,7 @@ public class ArbitrageService {
     private final ArbitrageCheckRepository arbitrageCheckRepository;
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunRepository validationRunRepository;
-    private final ArbitrageExceptionRepository arbitrageExceptionRepository;
+    private final ExceptionCaseRepository exceptionCaseRepository;
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
 
@@ -276,7 +276,7 @@ public class ArbitrageService {
 
         // 차익거래 후보만 공통 예외 목록에 중복 없이 등록
         if (row.getResultStatus() == ArbitrageCheckStatus.CANDIDATE) {
-            arbitrageExceptionRepository.insertArbitrageCandidate(
+            exceptionCaseRepository.insertArbitrageCandidate(
                     validationRunId,
                     contractId,
                     row.getArbitrageCheckId(),
@@ -285,7 +285,7 @@ public class ArbitrageService {
             );
         } else if (row.getResultStatus() == ArbitrageCheckStatus.REVIEW_REQUIRED) {
             ExceptionType exceptionType = reviewExceptionType(decision.reason());
-            arbitrageExceptionRepository.insertArbitrageReviewCase(
+            exceptionCaseRepository.insertArbitrageReviewCase(
                     exceptionType.name(),
                     validationRunId,
                     contractId,

@@ -2,7 +2,6 @@ package com.susukkang.fgc.arbitrage.baseline;
 
 import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.common.code.PaymentStage;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.susukkang.fgc.arbitrage.repository;
+package com.susukkang.fgc.exceptioncase.repository;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -9,16 +9,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * C 소유 차익거래 호출부의 검출 어댑터. 공용 예외 엔티티를 중복 정의하지 않는다.
- * #380의 공유 JPA 검출 API가 병합되기 전까지 기존 DB 함수를 호출하며,
+ * 공용 ExceptionCaseRepository의 차익거래 단건 탐지 fragment.
+ * #378의 후보·검토 필요 등록을 기존 DB 함수로 처리하며,
  * 업무키·재검출·재개방·실행별 검출 이력 계약은 fgc.record_exception_detection이 관리한다.
  */
 @Repository
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
-public class ArbitrageExceptionRepository {
+public class ExceptionCaseDetectionCommandsImpl implements ExceptionCaseDetectionCommands {
     private final EntityManager entityManager;
 
+    @Override
     public Long insertArbitrageCandidate(Long validationRunId, Long contractId, Long arbitrageCheckId, String paymentStage, String description) {
         entityManager.flush();
         NativeQuery<?> q = entityManager.createNativeQuery("""
@@ -49,6 +50,7 @@ public class ArbitrageExceptionRepository {
         return ids.isEmpty() ? null : ((Number) ids.getFirst()).longValue();
     }
 
+    @Override
     public Long insertArbitrageReviewCase(String exceptionType, Long validationRunId, Long contractId, Long arbitrageCheckId, String paymentStage, String title, String description) {
         entityManager.flush();
         NativeQuery<?> q = entityManager.createNativeQuery("""

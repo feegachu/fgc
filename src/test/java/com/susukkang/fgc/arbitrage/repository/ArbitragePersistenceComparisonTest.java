@@ -3,6 +3,7 @@ package com.susukkang.fgc.arbitrage.repository;
 import com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.common.code.*;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.transaction.performance.PaymentJdbcObservation;
 import jakarta.persistence.EntityManager;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
@@ -37,7 +38,7 @@ class ArbitragePersistenceComparisonTest {
     @Autowired SqlSessionFactory sqlSessionFactory;
     @Autowired JdbcTemplate jdbc;
     @Autowired EntityManager entityManager;
-    @Autowired ArbitrageExceptionRepository exceptionRepository;
+    @Autowired ExceptionCaseRepository exceptionRepository;
     @Autowired com.susukkang.fgc.validation.mapper.ExceptionCaseMapper oldExceptionMapper;
     @Autowired com.susukkang.fgc.arbitrage.service.ArbitrageService service;
     @Autowired com.susukkang.fgc.validation.service.ValidationRunCreateService createService;

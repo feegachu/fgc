@@ -39,9 +39,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ArbitrageBaselineService {
     private static final PaymentStage REGULATORY_PAYMENT_STAGE = PaymentStage.GA_TO_FC;
-    // TODO 정책 파라미터 키와 적용 policy_version 선택 기준이 확정되면
-    // policy_parameter에서 차익거래 해약환급금 합산 기간을 조회하도록 변경한다.
-    // 현재 값은 REG-12의 계약 체결 후 3년(36개월) 기준을 따른다.
+    // 전환 전 비교 기준: REG-12의 계약 체결 후 3년(36개월) 고정값을 보존한다.
+    // 정책 조회로의 변경은 이 baseline과 #378의 계산 동등성 검증 범위 밖이다.
     private static final int REFUND_ADDITION_LAST_MONTH = 36;
 
     // FUN-061 — 수동 재검증은 사용자가 촉발하는 상태 변경이라 같은 트랜잭션에서 감사행을 남긴다.
@@ -319,7 +318,7 @@ public class ArbitrageBaselineService {
 
         int contractMonthNo = source.getContractMonthNo();
         BigDecimal cumulativePaidPremium = MoneyUtil.roundWon(source.getCumulativePaidPremium());
-        RefundDecision refund = resolveSurrenderValue(source, cumulativePaidPremium);
+        RefundDecision refund = resolveSurrenderValue(source);
         if (refund.reviewRequired())
             return reviewRequired(contractMonthNo, refund.reason(), cumulativePaidPremium);
 
@@ -360,9 +359,7 @@ public class ArbitrageBaselineService {
         );
     }
 
-    private RefundDecision resolveSurrenderValue(
-            ArbitrageCalculationSource source,
-            BigDecimal cumulativePaidPremium) {
+    private RefundDecision resolveSurrenderValue(ArbitrageCalculationSource source) {
         boolean applies = Boolean.TRUE.equals(source.getStandardDeduction80Yn())
                 && source.getContractMonthNo() >= 1
                 && source.getContractMonthNo() <= REFUND_ADDITION_LAST_MONTH;

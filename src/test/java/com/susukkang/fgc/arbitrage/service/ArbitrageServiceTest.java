@@ -14,7 +14,7 @@ import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
-import com.susukkang.fgc.arbitrage.repository.ArbitrageExceptionRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +48,7 @@ class ArbitrageServiceTest {
     @Mock
     private ValidationRunRepository validationRunRepository;
     @Mock
-    private ArbitrageExceptionRepository arbitrageExceptionRepository;
+    private ExceptionCaseRepository exceptionCaseRepository;
     @Mock
     private AuditLogService auditLogService;
 
@@ -60,7 +60,7 @@ class ArbitrageServiceTest {
                 arbitrageCheckRepository,
                 validationRunCreateService,
                 validationRunRepository,
-                arbitrageExceptionRepository,
+                exceptionCaseRepository,
                 new ObjectMapper().findAndRegisterModules(),
                 auditLogService
         );
@@ -102,7 +102,7 @@ class ArbitrageServiceTest {
         assertThat(response.getValidationRunId()).isEqualTo(100L);
         assertThat(response.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CANDIDATE);
         verify(arbitrageCheckRepository).insertArbitrageCheck(any());
-        verify(arbitrageExceptionRepository).insertArbitrageCandidate(
+        verify(exceptionCaseRepository).insertArbitrageCandidate(
                 100L, 10L, 200L, "GA_TO_FC",
                 "지급예정 수수료를 포함하면 누적 납입보험료를 초과합니다.");
     }
@@ -209,7 +209,7 @@ class ArbitrageServiceTest {
         );
 
         assertThat(response.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
-        verify(arbitrageExceptionRepository).insertArbitrageReviewCase(
+        verify(exceptionCaseRepository).insertArbitrageReviewCase(
                 "DATA_QUALITY", 101L, 10L, 201L, "GA_TO_FC",
                 "차익거래 검증 자료 확인 필요",
                 "기준일 이하 계약 금융 스냅샷이 없습니다.");
@@ -242,7 +242,7 @@ class ArbitrageServiceTest {
         given(arbitrageCheckRepository.selectRefundRateCandidates(source, source.getContractDate())).willReturn(List.of(candidate));
         var row = checkExisting(source, "0", "0");
         assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
-        verify(arbitrageExceptionRepository).insertArbitrageReviewCase("PRODUCT_CODE_MISMATCH", 100L, 10L, 200L,
+        verify(exceptionCaseRepository).insertArbitrageReviewCase("PRODUCT_CODE_MISMATCH", 100L, 10L, 200L,
                 "GA_TO_FC", "차익거래 검증 자료 확인 필요", "금융 스냅샷과 적용 환급률표가 일치하지 않습니다.");
     }
 
