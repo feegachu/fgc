@@ -339,7 +339,7 @@ class ValidationRunRepositoryIntegrationTest {
     }
 
     @Test
-    void findFirstByRunTypeAndCreatedAtBetweenReturnsLatestRunNoWithinWindow() {
+    void findFirstByRunTypeAndCreatedAtReturnsLatestRunNoWithinWindow() {
         OffsetDateTime dayStart = OffsetDateTime.of(2026, 9, 1, 0, 0, 0, 0, ZoneOffset.UTC);
         OffsetDateTime dayEnd = dayStart.plusDays(1);
         // uq_validation_run_active_manual_contract(V13)는 MANUAL_CONTRACT 활성 실행을
@@ -353,10 +353,30 @@ class ValidationRunRepositoryIntegrationTest {
                 dayStart.plusHours(5), id1, id2);
 
         Optional<ValidationRun> found = validationRunRepository
-                .findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc("MANUAL_CONTRACT", dayStart, dayEnd);
+                .findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc("MANUAL_CONTRACT", dayStart, dayEnd);
 
         assertThat(found).isPresent();
         assertThat(found.get().getRunNo()).isEqualTo(2);
+    }
+
+    @Test
+    void findFirstByRunTypeAndCreatedAtTreatsDayEndAsExclusiveAndDayStartAsInclusive() {
+        OffsetDateTime dayStart = OffsetDateTime.of(2026, 9, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        OffsetDateTime dayEnd = dayStart.plusDays(1);
+        Long atStart = insertCreatedRun(LocalDate.of(2026, 9, 1), 1, "MANUAL_CONTRACT");
+        validationRunRepository.transitionToRunning(atStart, CREATED, RUNNING);
+        validationRunRepository.transitionToCompleted(atStart, RUNNING, COMPLETED);
+        Long atEnd = insertCreatedRun(LocalDate.of(2026, 9, 1), 2, "MANUAL_CONTRACT");
+        jdbcTemplate.update("UPDATE fgc.validation_run SET created_at = ? WHERE validation_run_id = ?", dayStart, atStart);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET created_at = ? WHERE validation_run_id = ?", dayEnd, atEnd);
+
+        Optional<ValidationRun> found = validationRunRepository
+                .findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
+                        "MANUAL_CONTRACT", dayStart, dayEnd);
+
+        // 다음 날 00:00 정각 행(run_no 2)은 오늘 구간에 들어오지 않고, 오늘 00:00 정각 행(run_no 1)은 들어온다
+        assertThat(found).isPresent();
+        assertThat(found.get().getRunNo()).isEqualTo(1);
     }
 
     private Long insertAppUser(String loginId) {

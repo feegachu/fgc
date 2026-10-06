@@ -1,6 +1,6 @@
 package com.susukkang.fgc.validation.batch.daily;
 
-import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
+import com.susukkang.fgc.validation.repository.BatchWatermarkRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,13 +28,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class WatermarkAdvanceStepListenerTest {
 
     @Mock
-    private BatchWatermarkMapper batchWatermarkMapper;
+    private BatchWatermarkRepository batchWatermarkRepository;
 
     private WatermarkAdvanceStepListener listener;
 
     @BeforeEach
     void setUp() {
-        listener = new WatermarkAdvanceStepListener(batchWatermarkMapper);
+        listener = new WatermarkAdvanceStepListener(batchWatermarkRepository);
     }
 
     private StepExecution stepExecution(OffsetDateTime runStartedAt, Long validationRunId) {
@@ -59,7 +59,7 @@ class WatermarkAdvanceStepListenerTest {
 
         listener.afterStep(stepExecution);
 
-        verify(batchWatermarkMapper).advance(
+        verify(batchWatermarkRepository).advance(
                 eq(DailyChangedContractJobNames.JOB_NAME),
                 eq(DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME),
                 eq(runStartedAt), eq(777L), eq(5L));
@@ -72,7 +72,7 @@ class WatermarkAdvanceStepListenerTest {
 
         listener.afterStep(stepExecution);
 
-        verifyNoInteractions(batchWatermarkMapper);
+        verifyNoInteractions(batchWatermarkRepository);
     }
 
     @Test
@@ -82,6 +82,6 @@ class WatermarkAdvanceStepListenerTest {
 
         listener.afterStep(stepExecution);
 
-        verify(batchWatermarkMapper, never()).advance(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyLong());
+        verify(batchWatermarkRepository, never()).advance(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyLong());
     }
 }

@@ -9,7 +9,7 @@ import com.susukkang.fgc.contract.entity.InsuranceContract;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
-import com.susukkang.fgc.validation.mapper.ContractStatusEventProcessingMapper;
+import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.annotation.BeforeStep;
@@ -31,7 +31,7 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
     private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
-    private final ContractStatusEventProcessingMapper contractStatusEventProcessingMapper;
+    private final ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
 
     private Long validationRunId;
     private OffsetDateTime lastProcessedAt;
@@ -45,7 +45,7 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
 
     @Override
     public ChangedContractResult process(Long contractId) {
-        List<Long> pendingEventIds = contractStatusEventProcessingMapper.findPendingEventIds(
+        List<Long> pendingEventIds = contractStatusEventProcessingRepository.findPendingEventIds(
                 contractId, DailyChangedContractJobNames.JOB_NAME);
 
         try {
