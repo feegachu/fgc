@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
 import { useSidebarStore } from '../../stores/sidebar'
-import { screens } from '../screens'
+import { canOpen, screens } from '../screens'
 import type { ScreenDefinition } from '../screens'
 export interface ShellUser {
   loginId: string
@@ -57,7 +57,7 @@ export function Sidebar({
   }, [setCollapsed])
   function link(path: string, sub = false) {
     const definition = screens.find((screen) => screen.path === path)!
-    if (definition.permission === 'canViewAuditLog' && !user.canViewAuditLog) return null
+    if (!canOpen(definition, user)) return null
     return (
       <li key={path}>
         <Link

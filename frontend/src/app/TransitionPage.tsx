@@ -1,11 +1,11 @@
 import { Link, useLocation, useOutletContext } from 'react-router'
 import type { ShellContext } from './shell/AppShell'
-import { legacyHref, screenId } from './screens'
+import { canOpen, legacyHref } from './screens'
 import type { ScreenDefinition } from './screens'
 export function TransitionPage({ screen }: { screen: ScreenDefinition }) {
   const location = useLocation()
   const { user } = useOutletContext<ShellContext>()
-  if (screen.permission && !user[screen.permission])
+  if (!canOpen(screen, user))
     return (
       <section className="react-transition">
         <h1 className="page-title">접근 권한이 없습니다.</h1>
@@ -18,7 +18,7 @@ export function TransitionPage({ screen }: { screen: ScreenDefinition }) {
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">{screen.title}</h1>
-          <p className="page-description">{screenId(screen)}</p>
+          <p className="page-description">{screen.id}</p>
         </div>
       </header>
       <section className="react-transition">

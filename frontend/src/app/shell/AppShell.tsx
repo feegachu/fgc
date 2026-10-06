@@ -10,7 +10,7 @@ import { toast } from '../../stores/toasts'
 import { MonthSelector } from '../../components/MonthSelector'
 import { Button } from '../../components/Button'
 import { queryClient } from '../queryClient'
-import { screenFor } from '../screens'
+import { canOpen, screenFor } from '../screens'
 import { Sidebar } from './Sidebar'
 import { roleLabels } from './labels'
 import type { ShellUser } from './Sidebar'
@@ -44,10 +44,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       void navigate(normalized, { replace: true })
       return
     }
-    if (
-      current &&
-      (!current.permission || (current.permission === 'canProcess' ? user.canProcess : user.canViewAuditLog))
-    )
+    if (current && canOpen(current, { canProcess: user.canProcess, canViewAuditLog: user.canViewAuditLog }))
       workspace.openTab({ id: current.id, title: current.title, icon: current.icon, href: normalized })
     document.title = `${current?.title ?? '페이지를 찾을 수 없습니다'} (${current?.id ?? 'ERR-404'}) · FGC`
   }, [

@@ -1,13 +1,13 @@
 import type { RouteObject } from 'react-router'
 import { AppShell } from './shell/AppShell'
 import { ApplicationRoot } from './ApplicationRoot'
-import { screens, screenId } from './screens'
+import { screens } from './screens'
 import { TransitionPage, LoginPlaceholder } from './TransitionPage'
 import { NotFoundPage } from './NotFoundPage'
 export const screenRoutes: RouteObject[] = screens.map((screen) => ({
   path: screen.path,
   element: <TransitionPage screen={screen} />,
-  handle: { screenId: screenId(screen), title: screen.title, parentMenu: screen.menu, permission: screen.permission },
+  handle: { screenId: screen.id, title: screen.title, parentMenu: screen.menu, permission: screen.permission },
 }))
 export const routes: RouteObject[] = [
   {
