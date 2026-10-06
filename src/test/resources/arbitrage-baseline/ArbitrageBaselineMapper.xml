@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper">
+<mapper namespace="com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineMapper">
 
     <!-- 차익거래 검증 결과를 화면 조회 DTO에 매핑한다. -->
     <resultMap id="arbitrageCheckViewMap"

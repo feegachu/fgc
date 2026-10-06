@@ -1,6 +1,6 @@
 package com.susukkang.fgc.arbitrage.service;
 
-import com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
@@ -23,13 +23,13 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ArbitrageCheckBatchAdapter implements ArbitrageCheckBatchPort {
-    private final ArbitrageMapper arbitrageMapper;
+    private final ValidationTargetRepository validationTargetRepository;
     private final ArbitrageCheckBatchItemService arbitrageCheckBatchItemService;
 
     @Override
     public StepProcessingResult check(ValidationStepContext context) {
         List<Long> contractIds =
-                arbitrageMapper.selectSelectedContractIds(context.validationRunId());
+                validationTargetRepository.selectSelectedContractIds(context.validationRunId());
         LocalDate asOfDate = context.job().validationMonth().plusMonths(1).minusDays(1);
         long processedCount = 0;
         List<ContractSkip> skips = new ArrayList<>();
