@@ -23,6 +23,16 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
  && rm -rf /usr/local/tomcat/webapps/*
 COPY --from=build /src/build/libs/fgc-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
 
+# 앞단 nginx 가 TLS 를 끝내고 X-Forwarded-Proto/For 를 넘긴다(nginx/default.conf.template). 외장 Tomcat 은
+# application.yml 의 server.forward-headers-strategy(내장 Tomcat 전용)를 읽지 않으므로 같은 일을 RemoteIpValve 가 한다.
+# 없으면 HTTPS 뒤에서 앱이 자기 출처를 http:// 로 알아 #400 토큰 API 의 Origin 검사가 전부 403 이 되고,
+# 로그인 리다이렉트가 http:// 로 나가며, audit_log.client_ip 에 사용자 대신 nginx 주소가 남는다.
+# 신뢰 프록시는 Tomcat 기본값(10/8·172.16/12·192.168/16·127/8 등 사설 대역) — 운영 prd-web→prd-was, Pod 내부 모두 해당.
+# grep 은 Tomcat 이 server.xml 형식을 바꿔 sed 가 조용히 빗나가면 빌드를 실패시킨다.
+RUN sed -i 's|<Engine name="Catalina" defaultHost="localhost">|&\n        <Valve className="org.apache.catalina.valves.RemoteIpValve" protocolHeader="X-Forwarded-Proto" />|' \
+        /usr/local/tomcat/conf/server.xml \
+ && grep -q 'RemoteIpValve' /usr/local/tomcat/conf/server.xml
+
 # application-local.yml 은 .gitignore 라 이미지에 없다. 대신 환경변수로 같은 값을 준다.
 ENV SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/fgc?currentSchema=fgc" \
     SPRING_DATASOURCE_USERNAME=fgc \
