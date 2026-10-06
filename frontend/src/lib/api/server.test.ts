@@ -23,11 +23,34 @@ describe.skipIf(!origin)('실제 JWT 서버 연동', () => {
       return response
     }
     const client = createApiClient({
-      fetch: fetcher, base: '/app/',
-      location: { pathname: '/app/contracts', search: '?page=2', hash: '', assign: (url) => { redirects.push(String(url)) } },
-      getToken: () => token, setToken: (value) => { token = value },
+      fetch: fetcher,
+      base: '/app/',
+      location: {
+        pathname: '/app/contracts',
+        search: '?page=2',
+        hash: '',
+        assign: (url) => {
+          redirects.push(String(url))
+        },
+      },
+      getToken: () => token,
+      setToken: (value) => {
+        token = value
+      },
     })
-    return { client, calls, redirects, getToken: () => token, setToken: (value: string) => { token = value }, setCookie: (value: string) => { cookie = value }, raw: fetcher }
+    return {
+      client,
+      calls,
+      redirects,
+      getToken: () => token,
+      setToken: (value: string) => {
+        token = value
+      },
+      setCookie: (value: string) => {
+        cookie = value
+      },
+      raw: fetcher,
+    }
   }
   it('실제 access 만료 → 동시 3요청 refresh 1회 → 원 요청 성공', async () => {
     const env = environment()
@@ -65,6 +88,8 @@ describe.skipIf(!origin)('실제 JWT 서버 연동', () => {
       const response = await env.client.request<MeResponse>('/api/v1/auth/me?month=2040-12')
       expect(response.data.demoMonth).toBe(process.env.FGC_EXPECTED_DEMO_MONTH)
       expect(response.data.canViewAuditLog).toBe(true)
-    } finally { await env.client.logout() }
+    } finally {
+      await env.client.logout()
+    }
   })
 })

@@ -17,6 +17,7 @@
 | 의존성 설치 | `npm ci` |
 | 개발 서버 | `npm run dev` → `http://localhost:5173/app/` (`/api`는 8081로 프록시) |
 | 린트 | `npm run lint` |
+| 포맷 | `npx prettier --write <파일>` — 설정은 `.prettierrc.json`. 아직 CI 체크는 없고, #444 이전 파일은 일괄 포맷하지 않았다 |
 | 단위 테스트 | `npm test` (감시 모드) / `npm test -- --run` (CI와 동일) |
 | 빌드 | `npm run build` (`tsc -b` 타입 검사 + `vite build` → `dist/`) |
 | E2E | 처음 한 번 `npx playwright install chromium`, 이후 `npm run test:e2e` (시나리오는 #418) |

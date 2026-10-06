@@ -19,9 +19,20 @@ import { ApiError } from '../lib/api/errors'
 import { EvidenceLink } from './EvidenceLink'
 import { MonthSelector } from './MonthSelector'
 
-afterEach(() => { vi.useRealTimers(); useToastStore.setState({ messages: [] }); vi.restoreAllMocks() })
+afterEach(() => {
+  vi.useRealTimers()
+  useToastStore.setState({ messages: [] })
+  vi.restoreAllMocks()
+})
 it('Button loading과 Field 오류를 입력·라벨에 연결한다', () => {
-  render(<><Button loading>저장</Button><Field label="사유" required error="사유를 입력하세요"><input /></Field></>)
+  render(
+    <>
+      <Button loading>저장</Button>
+      <Field label="사유" required error="사유를 입력하세요">
+        <input />
+      </Field>
+    </>,
+  )
   expect(screen.getByRole('button', { name: /저장/ })).toBeDisabled()
   const input = screen.getByRole('textbox', { name: '사유' })
   expect(input).toBeRequired()
@@ -29,7 +40,12 @@ it('Button loading과 Field 오류를 입력·라벨에 연결한다', () => {
   expect(input).toHaveAccessibleDescription('사유를 입력하세요')
 })
 it('StatusBadge는 색상 의미와 서버 문구를 함께, KPI는 값·단위를 표시한다', () => {
-  render(<><StatusBadge tone="warning">주의</StatusBadge><KpiCard label="후보 계약" value="1,234" unit="건" footer="이번 월" /></>)
+  render(
+    <>
+      <StatusBadge tone="warning">주의</StatusBadge>
+      <KpiCard label="후보 계약" value="1,234" unit="건" footer="이번 월" />
+    </>,
+  )
   expect(screen.getByText('주의')).toHaveClass('status-badge-warning')
   expect(screen.getByRole('region', { name: '후보 계약' })).toHaveTextContent('1,234건')
 })
@@ -38,7 +54,24 @@ it('DataTable 정렬·행 선택·페이지 전체 선택·전체 보기/접기�
   const sort = vi.fn()
   function Table() {
     const [selected, setSelected] = useState<string[]>([])
-    return <DataTable caption="계약 목록" rows={[{ id: 'C1', reason: '검증 상세 근거' }, { id: 'C2', reason: '다른 근거' }]} rowKey={(row) => row.id} columns={[{ key: 'id', label: '계약', sortable: true, render: (row) => row.id }, { key: 'reason', label: '근거', expandable: true, render: (row) => row.reason }]} sort={{ key: 'id', direction: 'asc' }} onSort={sort} selectedKeys={selected} onSelectionChange={setSelected} />
+    return (
+      <DataTable
+        caption="계약 목록"
+        rows={[
+          { id: 'C1', reason: '검증 상세 근거' },
+          { id: 'C2', reason: '다른 근거' },
+        ]}
+        rowKey={(row) => row.id}
+        columns={[
+          { key: 'id', label: '계약', sortable: true, render: (row) => row.id },
+          { key: 'reason', label: '근거', expandable: true, render: (row) => row.reason },
+        ]}
+        sort={{ key: 'id', direction: 'asc' }}
+        onSort={sort}
+        selectedKeys={selected}
+        onSelectionChange={setSelected}
+      />
+    )
   }
   render(<Table />)
   await user.click(screen.getByRole('button', { name: '계약' }))
@@ -54,7 +87,14 @@ it('DataTable 정렬·행 선택·페이지 전체 선택·전체 보기/접기�
   expect(screen.getAllByRole('button', { name: '전체 보기' })).toHaveLength(2)
 })
 it('DataTable 빈 목록은 오류 대신 빈 상태 문구를 보여 준다', () => {
-  render(<DataTable caption="빈 목록" rows={[]} rowKey={() => ''} columns={[{ key: 'id', label: '계약', render: () => '' }]} />)
+  render(
+    <DataTable
+      caption="빈 목록"
+      rows={[]}
+      rowKey={() => ''}
+      columns={[{ key: 'id', label: '계약', render: () => '' }]}
+    />,
+  )
   expect(screen.getByRole('table', { name: '빈 목록' })).toHaveTextContent('조건에 맞는 자료가 없습니다.')
 })
 it('Pagination은 1-base 5페이지 그룹이며 끝에서 다음을 막는다', async () => {
@@ -73,9 +113,20 @@ it('Pagination은 1-base 5페이지 그룹이며 끝에서 다음을 막는다',
 it('FilterBar와 URL 훅은 다른 조건·기준월을 보존하고 조회 시 page만 초기화한다', async () => {
   function Filters() {
     const { values, update, reset, params } = useSearchParamsState({ status: '' })
-    return <><FilterBar onSubmit={() => update({ status: 'ACTIVE' })} onReset={reset}><span>{values.status}</span></FilterBar><output>{params.toString()}</output></>
+    return (
+      <>
+        <FilterBar onSubmit={() => update({ status: 'ACTIVE' })} onReset={reset}>
+          <span>{values.status}</span>
+        </FilterBar>
+        <output>{params.toString()}</output>
+      </>
+    )
   }
-  render(<MemoryRouter initialEntries={['/contracts?month=2026-07&status=OLD&page=4&insurerId=1']}><Filters /></MemoryRouter>)
+  render(
+    <MemoryRouter initialEntries={['/contracts?month=2026-07&status=OLD&page=4&insurerId=1']}>
+      <Filters />
+    </MemoryRouter>,
+  )
   await userEvent.click(screen.getByRole('button', { name: '조회' }))
   expect(screen.getByRole('status')).toHaveTextContent('month=2026-07&status=ACTIVE&insurerId=1')
   await userEvent.click(screen.getByRole('button', { name: '초기화' }))
@@ -84,7 +135,18 @@ it('FilterBar와 URL 훅은 다른 조건·기준월을 보존하고 조회 시 
 describe('Modal', () => {
   it('포커스 순환·Esc·닫힌 뒤 원래 포커스 복원', async () => {
     const user = userEvent.setup()
-    function Dialog() { const [open, setOpen] = useState(false); return <><button onClick={() => setOpen(true)}>열기</button><Modal title="재검증" open={open} onClose={() => setOpen(false)}><input aria-label="사유" /><button>실행</button></Modal></> }
+    function Dialog() {
+      const [open, setOpen] = useState(false)
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>열기</button>
+          <Modal title="재검증" open={open} onClose={() => setOpen(false)}>
+            <input aria-label="사유" />
+            <button>실행</button>
+          </Modal>
+        </>
+      )
+    }
     render(<Dialog />)
     await user.click(screen.getByRole('button', { name: '열기' }))
     const close = screen.getByRole('button', { name: '모달 닫기' })
@@ -99,10 +161,18 @@ describe('Modal', () => {
   })
   it('배경 클릭은 옵션에 따라서만 닫는다', () => {
     const close = vi.fn()
-    const { rerender } = render(<Modal title="검증" open onClose={close}><p>내용</p></Modal>)
+    const { rerender } = render(
+      <Modal title="검증" open onClose={close}>
+        <p>내용</p>
+      </Modal>,
+    )
     fireEvent.click(screen.getByRole('dialog').parentElement!)
     expect(close).not.toHaveBeenCalled()
-    rerender(<Modal title="검증" open closeOnBackdrop onClose={close}><p>내용</p></Modal>)
+    rerender(
+      <Modal title="검증" open closeOnBackdrop onClose={close}>
+        <p>내용</p>
+      </Modal>,
+    )
     fireEvent.click(screen.getByRole('dialog').parentElement!)
     expect(close).toHaveBeenCalledOnce()
   })
@@ -110,7 +180,11 @@ describe('Modal', () => {
 it('Toast 일반 알림은 5초 후 닫고 오류·로딩은 수동으로 닫는다', () => {
   vi.useFakeTimers()
   render(<ToastRegion />)
-  act(() => { toast('성공', 'success'); toast('오류', 'error'); toast('로딩', 'loading') })
+  act(() => {
+    toast('성공', 'success')
+    toast('오류', 'error')
+    toast('로딩', 'loading')
+  })
   act(() => vi.advanceTimersByTime(4999))
   expect(screen.getByText('성공')).toBeInTheDocument()
   act(() => vi.advanceTimersByTime(1))

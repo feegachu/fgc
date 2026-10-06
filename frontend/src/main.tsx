@@ -14,12 +14,18 @@ import './styles/react.css'
 import { apiClient } from './lib/api/client'
 
 // Restore before mounting queries; #404 owns the login page and route guards.
-const ready = apiClient.isLoginPage() || await apiClient.restoreSession().then(() => true, () => false)
+const ready =
+  apiClient.isLoginPage() ||
+  (await apiClient.restoreSession().then(
+    () => true,
+    () => false,
+  ))
 
-if (ready) createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </StrictMode>,
-)
+if (ready)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </StrictMode>,
+  )
