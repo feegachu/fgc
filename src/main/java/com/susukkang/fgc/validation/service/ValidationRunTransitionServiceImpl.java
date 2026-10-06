@@ -44,24 +44,6 @@ public class ValidationRunTransitionServiceImpl implements ValidationRunTransiti
         // updateStatusIfCurrent가 clearAutomatically=true라 이 조회는 1차 캐시가 아니라 DB를 다시 읽는다.
         ValidationRun updated = validationRunRepository.findById(validationRunId)
                 .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
-        return toRow(updated);
-    }
-
-    private ValidationRunRow toRow(ValidationRun run) {
-        ValidationRunRow row = new ValidationRunRow();
-        row.setValidationRunId(run.getValidationRunId());
-        row.setValidationMonth(run.getValidationMonth());
-        row.setRunNo(run.getRunNo());
-        row.setRunType(run.getRunType());
-        row.setStatus(run.getStatus().name());
-        row.setCurrentStep(run.getCurrentStep());
-        row.setStartedAt(run.getStartedAt());
-        row.setCompletedAt(run.getCompletedAt());
-        row.setFinalizedAt(run.getFinalizedAt());
-        row.setTriggeredBy(run.getTriggeredBy());
-        row.setFinalizedBy(run.getFinalizedBy());
-        row.setFailureMessage(run.getFailureMessage());
-        row.setCreatedAt(run.getCreatedAt());
-        return row;
+        return ValidationRunRow.from(updated);
     }
 }

@@ -3,7 +3,7 @@ package com.susukkang.fgc.reconciliation.service;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.RequestIdContext;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,24 +22,24 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class ReconciliationRunLifecycleServiceImpl implements ReconciliationRunLifecycleService {
 
-    private final ReconciliationRunMapper reconciliationRunMapper;
+    private final ReconciliationRunRepository reconciliationRunRepository;
 
     @Override
     @Transactional
     public void start(Long reconciliationRunId) {
-        requireAffected(reconciliationRunMapper.transitionToRunning(reconciliationRunId));
+        requireAffected(reconciliationRunRepository.transitionToRunning(reconciliationRunId));
     }
 
     @Override
     @Transactional
     public void complete(Long reconciliationRunId) {
-        requireAffected(reconciliationRunMapper.transitionToCompleted(reconciliationRunId));
+        requireAffected(reconciliationRunRepository.transitionToCompleted(reconciliationRunId));
     }
 
     @Override
     @Transactional
     public void fail(Long reconciliationRunId) {
-        requireAffected(reconciliationRunMapper.transitionToFailed(reconciliationRunId));
+        requireAffected(reconciliationRunRepository.transitionToFailed(reconciliationRunId));
     }
 
     private static void requireAffected(int affected) {

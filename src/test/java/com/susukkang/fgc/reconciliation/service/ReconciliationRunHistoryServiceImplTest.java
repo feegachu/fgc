@@ -5,7 +5,7 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunSearchCriteria;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunHistoryMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 /**
  * FGC-FUN-051 — 일치율 계산(대상 0건 처리 포함)과 라벨 변환, 페이징 파라미터 검증을
  * 순수 로직 단위로 검증한다. DB 없이 Mockito로 Mapper를 대체한다 — SQL 정합성은
- * ReconciliationRunHistoryMapperIntegrationTest가 맡는다.
+ * ReconciliationRunHistoryRepositoryIntegrationTest가 맡는다.
  */
 @ExtendWith(MockitoExtension.class)
 class ReconciliationRunHistoryServiceImplTest {
@@ -35,13 +35,13 @@ class ReconciliationRunHistoryServiceImplTest {
             new ReconciliationRunSearchCriteria(null, null, null);
 
     @Mock
-    private ReconciliationRunHistoryMapper reconciliationRunHistoryMapper;
+    private ReconciliationRunHistoryRepository reconciliationRunHistoryRepository;
 
     private ReconciliationRunHistoryServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new ReconciliationRunHistoryServiceImpl(reconciliationRunHistoryMapper);
+        service = new ReconciliationRunHistoryServiceImpl(reconciliationRunHistoryRepository);
     }
 
     private ReconciliationRunHistoryRow row(long targetCount, long matchedCount, long exceptionCount) {
@@ -64,7 +64,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void returnsNullMatchRateWhenTargetCountIsZero() {
-        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(0, 0, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -77,7 +77,7 @@ class ReconciliationRunHistoryServiceImplTest {
     @Test
     void calculatesMatchRatePctRoundedToOneDecimal() {
         // 3건 중 2건 일치 = 66.6666...% → 소수점 첫째 자리 반올림으로 66.7
-        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(3, 2, 1)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -93,7 +93,7 @@ class ReconciliationRunHistoryServiceImplTest {
         // 12.449%다. 소수 넷째 자리에서 먼저 반올림한 뒤 다시 소수 첫째 자리로
         // 반올림하면(두 번 반올림) 12.45 → 12.5로 틀어진다. 한 번에 반올림하면 12.4가
         // 맞는 값이다.
-        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(100000, 12449, 87551)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -105,7 +105,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void calculatesFullMatchRateAsHundred() {
-        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(5, 5, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -117,7 +117,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void mapsPaymentStageAndStatusLabels() {
-        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of(row(1, 1, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -133,9 +133,9 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void returnsEmptyPageWhenMapperFindsNothing() {
-        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
                 .willReturn(List.of());
-        given(reconciliationRunHistoryMapper.count(null, null, null)).willReturn(0L);
+        given(reconciliationRunHistoryRepository.count(null, null, null)).willReturn(0L);
 
         PageResponse<ReconciliationRunHistoryResponse> result =
                 service.findHistory(NO_FILTER, 1, 20, "createdAt,desc");
@@ -148,36 +148,36 @@ class ReconciliationRunHistoryServiceImplTest {
     void passesSettlementMonthAndPaymentStageFiltersThrough() {
         ReconciliationRunSearchCriteria criteria =
                 new ReconciliationRunSearchCriteria(LocalDate.of(2026, 7, 1), "GA_TO_FC", null);
-        given(reconciliationRunHistoryMapper.search(
+        given(reconciliationRunHistoryRepository.search(
                 LocalDate.of(2026, 7, 1), "GA_TO_FC", null, "desc", 0, 20))
                 .willReturn(List.of());
 
         service.findHistory(criteria, 1, 20, "createdAt,desc");
 
-        verify(reconciliationRunHistoryMapper)
+        verify(reconciliationRunHistoryRepository)
                 .search(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq((Long) null), eq("desc"), eq(0), eq(20));
-        verify(reconciliationRunHistoryMapper)
+        verify(reconciliationRunHistoryRepository)
                 .count(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq((Long) null));
     }
 
     @Test
     void ascendingSortIsPassedThroughAsDirection() {
-        given(reconciliationRunHistoryMapper.search(null, null, null, "asc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "asc", 0, 20))
                 .willReturn(List.of());
 
         service.findHistory(NO_FILTER, 1, 20, "createdAt,asc");
 
-        verify(reconciliationRunHistoryMapper).search(null, null, null, "asc", 0, 20);
+        verify(reconciliationRunHistoryRepository).search(null, null, null, "asc", 0, 20);
     }
 
     @Test
     void secondPageUsesOffsetOfSizeTimesPageMinusOne() {
-        given(reconciliationRunHistoryMapper.search(null, null, null, "desc", 40, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 40, 20))
                 .willReturn(List.of());
 
         service.findHistory(NO_FILTER, 3, 20, "createdAt,desc");
 
-        verify(reconciliationRunHistoryMapper).search(null, null, null, "desc", 40, 20);
+        verify(reconciliationRunHistoryRepository).search(null, null, null, "desc", 40, 20);
     }
 
     @Test
@@ -186,7 +186,7 @@ class ReconciliationRunHistoryServiceImplTest {
                 .isInstanceOf(FgcBusinessException.class)
                 .satisfies(exception ->
                         assertThat(((FgcBusinessException) exception).getField()).isEqualTo("page"));
-        verifyNoInteractions(reconciliationRunHistoryMapper);
+        verifyNoInteractions(reconciliationRunHistoryRepository);
     }
 
     @Test

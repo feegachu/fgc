@@ -5,7 +5,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 class ReconciliationExceptionServiceTest {
 
     @Mock
-    private ReconciliationRunMapper reconciliationRunMapper;
+    private ReconciliationRunRepository reconciliationRunRepository;
 
     @Mock
     private ExceptionCaseMapper exceptionCaseMapper;
@@ -32,12 +32,12 @@ class ReconciliationExceptionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ReconciliationExceptionService(reconciliationRunMapper, exceptionCaseMapper);
+        service = new ReconciliationExceptionService(reconciliationRunRepository, exceptionCaseMapper);
     }
 
     @Test
     void createdAndSkippedDuplicateAddUpToCandidateCount() {
-        given(reconciliationRunMapper.findById(41L)).willReturn(runLinkedToValidationRun(41L, 900L));
+        given(reconciliationRunRepository.findById(41L)).willReturn(runLinkedToValidationRun(41L, 900L));
         ReconciliationExceptionBulkCreateRow row = new ReconciliationExceptionBulkCreateRow();
         row.setCandidateCount(5L);
         row.setCreatedCount(2L);
@@ -51,7 +51,7 @@ class ReconciliationExceptionServiceTest {
 
     @Test
     void throwsCommon004WhenReconciliationRunDoesNotExist() {
-        given(reconciliationRunMapper.findById(99L)).willReturn(null);
+        given(reconciliationRunRepository.findById(99L)).willReturn(null);
 
         assertThatThrownBy(() -> service.bulkCreate(99L))
                 .isInstanceOf(FgcBusinessException.class)
@@ -69,7 +69,7 @@ class ReconciliationExceptionServiceTest {
         ReconciliationRunRow standaloneRun = new ReconciliationRunRow();
         standaloneRun.setReconciliationRunId(41L);
         standaloneRun.setValidationRunId(null);
-        given(reconciliationRunMapper.findById(41L)).willReturn(standaloneRun);
+        given(reconciliationRunRepository.findById(41L)).willReturn(standaloneRun);
 
         assertThatThrownBy(() -> service.bulkCreate(41L))
                 .isInstanceOf(FgcBusinessException.class)
@@ -85,7 +85,7 @@ class ReconciliationExceptionServiceTest {
     void throwsReco004WhenReconciliationRunIsNotCompleted() {
         ReconciliationRunRow runningRun = runLinkedToValidationRun(41L, 900L);
         runningRun.setStatus("RUNNING");
-        given(reconciliationRunMapper.findById(41L)).willReturn(runningRun);
+        given(reconciliationRunRepository.findById(41L)).willReturn(runningRun);
 
         assertThatThrownBy(() -> service.bulkCreate(41L))
                 .isInstanceOf(FgcBusinessException.class)

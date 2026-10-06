@@ -108,7 +108,7 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
                 validationRunRepository.findByValidationMonthAndRunNo(command.validationMonth(), command.runNo());
         if (existing.isPresent()) {
             if (matchesRequest(existing.get(), command)) {
-                return toRow(existing.get());
+                return ValidationRunRow.from(existing.get());
             }
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of(
                     "validationMonth", command.validationMonth(), "runNo", command.runNo()));
@@ -184,25 +184,7 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
         ValidationRun saved = validationRunRepository.save(run);
 
         // 5. 반환
-        return toRow(saved);
-    }
-
-    private ValidationRunRow toRow(ValidationRun run) {
-        ValidationRunRow row = new ValidationRunRow();
-        row.setValidationRunId(run.getValidationRunId());
-        row.setValidationMonth(run.getValidationMonth());
-        row.setRunNo(run.getRunNo());
-        row.setRunType(run.getRunType());
-        row.setStatus(run.getStatus().name());
-        row.setCurrentStep(run.getCurrentStep());
-        row.setStartedAt(run.getStartedAt());
-        row.setCompletedAt(run.getCompletedAt());
-        row.setFinalizedAt(run.getFinalizedAt());
-        row.setTriggeredBy(run.getTriggeredBy());
-        row.setFinalizedBy(run.getFinalizedBy());
-        row.setFailureMessage(run.getFailureMessage());
-        row.setCreatedAt(run.getCreatedAt());
-        return row;
+        return ValidationRunRow.from(saved);
     }
 
     // 정책 스냅샷 Map을 JSON 문자열로 직렬화

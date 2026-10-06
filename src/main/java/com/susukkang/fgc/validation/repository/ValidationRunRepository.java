@@ -102,10 +102,10 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
 
     /**
      * DailyChangedContractJob "하루 1건" 규칙 지원용 — [dayStart, dayEnd) 구간의 최근(run_no 최대) 1건.
-     * "First"+"OrderBy...Desc" 파생 쿼리로 LIMIT 1을 적용한다 — @Query로 직접 쓰면 JPQL이
+     * "First"+"OrderBy...Desc" 파생 쿼리로 LIMIT 1을 적용한다. Between은 양끝 포함이라 쓰지 않는다(다음 날 00:00 정각 행이 오늘 것으로 잡힘). @Query로 직접 쓰면 JPQL이
      * LIMIT을 지원하지 않아 구간에 행이 2건 이상일 때 NonUniqueResultException이 난다.
      */
-    Optional<ValidationRun> findFirstByRunTypeAndCreatedAtBetweenOrderByRunNoDesc(
+    Optional<ValidationRun> findFirstByRunTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByRunNoDesc(
             String runType, OffsetDateTime dayStart, OffsetDateTime dayEnd);
 
     /**

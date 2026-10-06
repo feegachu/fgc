@@ -1,10 +1,14 @@
 package com.susukkang.fgc.validation.entity;
 
+import com.susukkang.fgc.validation.dto.ValidationScheduleState;
 import jakarta.persistence.Column;
+import jakarta.persistence.ColumnResult;
+import jakarta.persistence.ConstructorResult;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SqlResultSetMapping;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -13,6 +17,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
@@ -22,6 +27,21 @@ import java.time.OffsetDateTime;
  * 유지한다(#379 이슈의 "DB 전용 기능은 네이티브 SQL" 방침).
  */
 @Entity
+@SqlResultSetMapping(name = "ValidationScheduleStateMapping", classes = @ConstructorResult(
+        targetClass = ValidationScheduleState.class,
+        columns = {
+                @ColumnResult(name = "contractId", type = Long.class),
+                @ColumnResult(name = "paymentStage", type = String.class),
+                @ColumnResult(name = "scheduleHeaderId", type = Long.class),
+                @ColumnResult(name = "policyVersionId", type = Long.class),
+                @ColumnResult(name = "scheduleVersion", type = Integer.class),
+                @ColumnResult(name = "scheduleStatus", type = String.class),
+                @ColumnResult(name = "activeHeaderCount", type = Long.class),
+                @ColumnResult(name = "lineCount", type = Long.class),
+                @ColumnResult(name = "distinctLineCount", type = Long.class),
+                @ColumnResult(name = "totalAmount", type = BigDecimal.class)
+        }
+))
 @Table(
         name = "validation_target",
         schema = "fgc",

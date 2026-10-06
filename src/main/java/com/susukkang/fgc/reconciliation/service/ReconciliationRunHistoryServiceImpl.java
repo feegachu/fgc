@@ -9,7 +9,7 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunSearchCriteria;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunHistoryMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +29,7 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
     private static final int MAX_SIZE = 100;
     private static final Set<String> SUPPORTED_SORTS = Set.of("createdAt,asc", "createdAt,desc");
 
-    private final ReconciliationRunHistoryMapper reconciliationRunHistoryMapper;
+    private final ReconciliationRunHistoryRepository reconciliationRunHistoryRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -53,12 +53,12 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
 
         String direction = sort.endsWith(",asc") ? "asc" : "desc";
 
-        List<ReconciliationRunHistoryResponse> content = reconciliationRunHistoryMapper
+        List<ReconciliationRunHistoryResponse> content = reconciliationRunHistoryRepository
                 .search(criteria.settlementMonth(), criteria.paymentStage(), criteria.insurerId(), direction, offset, size)
                 .stream()
                 .map(this::toResponse)
                 .toList();
-        long total = reconciliationRunHistoryMapper.count(
+        long total = reconciliationRunHistoryRepository.count(
                 criteria.settlementMonth(), criteria.paymentStage(), criteria.insurerId());
 
         return PageResponse.of(content, page, size, total, sort);

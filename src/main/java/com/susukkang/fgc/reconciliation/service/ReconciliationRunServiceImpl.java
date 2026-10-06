@@ -7,7 +7,7 @@ import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunCommand;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunInsertRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequestPort;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
@@ -31,7 +31,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ReconciliationRunServiceImpl implements ReconciliationRunService {
 
-    private final ReconciliationRunMapper reconciliationRunMapper;
+    private final ReconciliationRunRepository reconciliationRunRepository;
     private final ValidationRunMapper validationRunMapper;
     private final ReconciliationRunLifecycleService lifecycleService;
     private final Optional<ReconciliationExecutionRequestPort> executionRequestPort;
@@ -51,7 +51,7 @@ public class ReconciliationRunServiceImpl implements ReconciliationRunService {
                 ));
 
         ReconciliationRunInsertRow insertRow = ReconciliationRunInsertRow.from(command);
-        reconciliationRunMapper.insert(insertRow);
+        reconciliationRunRepository.insert(insertRow);
 
         // 2026-08-12 yslee - 실제 실행 요청이 등록된 실행만 RUNNING으로 커밋
         // 기존 코드: 실행기 연결 없이 reconciliation_run 상태만 즉시 RUNNING으로 변경
@@ -67,7 +67,7 @@ public class ReconciliationRunServiceImpl implements ReconciliationRunService {
                 command.createdBy()
         ));
 
-        ReconciliationRunRow created = reconciliationRunMapper.findById(insertRow.getReconciliationRunId());
+        ReconciliationRunRow created = reconciliationRunRepository.findById(insertRow.getReconciliationRunId());
         if (created == null) {
             throw new IllegalStateException("생성된 대사 실행을 조회하지 못했습니다.");
         }
@@ -75,7 +75,7 @@ public class ReconciliationRunServiceImpl implements ReconciliationRunService {
     }
 
     private void rejectDuplicateRun(CreateReconciliationRunCommand command) {
-        ReconciliationRunRow existing = reconciliationRunMapper.findByNaturalKey(
+        ReconciliationRunRow existing = reconciliationRunRepository.findByNaturalKey(
                 command.settlementMonth(),
                 command.paymentStage(),
                 command.insurerId(),
@@ -93,7 +93,7 @@ public class ReconciliationRunServiceImpl implements ReconciliationRunService {
     }
 
     private void validateReferences(CreateReconciliationRunCommand command) {
-        if (!reconciliationRunMapper.existsActiveInsurer(command.insurerId())) {
+        if (!reconciliationRunRepository.existsActiveInsurer(command.insurerId())) {
             notFound("insurerId", command.insurerId());
         }
 

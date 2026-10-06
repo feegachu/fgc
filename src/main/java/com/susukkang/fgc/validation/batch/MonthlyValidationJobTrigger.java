@@ -3,7 +3,8 @@ package com.susukkang.fgc.validation.batch;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -32,7 +34,7 @@ public class MonthlyValidationJobTrigger {
 
     private final Job monthlyValidationJob;
     private final JobLauncher jobLauncher;
-    private final ValidationRunMapper validationRunMapper;
+    private final ValidationRunRepository validationRunRepository;
 
     private static ThreadPoolTaskExecutor createExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -91,10 +93,10 @@ public class MonthlyValidationJobTrigger {
         // 끝나 호출자에게 별도 에러가 가지 않는다 — 202는 "수락"의 약속일 뿐이고 화면 진실은
         // IF-API-49 폴링이 보여주므로 사용자 관점의 결과는 동일하다(§3-2 VRUN-005 비고 참조).
         // 원자적 클레임(조건부 UPDATE)은 배치 리스너의 transitionToRunning이 최종 방어한다.
-        ValidationRunRow fresh = validationRunMapper.findById(validationRunId);
-        if (fresh == null || !ValidationRunStatus.CREATED.name().equals(fresh.getStatus())) {
+        Optional<ValidationRun> fresh = validationRunRepository.findById(validationRunId);
+        if (fresh.isEmpty() || fresh.get().getStatus() != ValidationRunStatus.CREATED) {
             throw new IllegalStateException("validation_run " + validationRunId + " 은 이미 기동됨(status="
-                    + (fresh == null ? "삭제됨" : fresh.getStatus()) + ") — 중복 실행 요청을 무시합니다.");
+                    + (fresh.isEmpty() ? "삭제됨" : fresh.get().getStatus()) + ") — 중복 실행 요청을 무시합니다.");
         }
         try {
             return jobLauncher.run(monthlyValidationJob, jobParameters);

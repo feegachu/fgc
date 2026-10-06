@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "generate:api": "openapi-typescript openapi/schema.json -o src/lib/api/schema.d.ts",
+    "check:api": "node scripts/check-api.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
@@ -34,6 +36,7 @@
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
     "jsdom": "^30.1.2",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.29",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.2",
@@ -43,5 +46,10 @@
   },
   "engines": {
     "node": ">=22.22.2 <23"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

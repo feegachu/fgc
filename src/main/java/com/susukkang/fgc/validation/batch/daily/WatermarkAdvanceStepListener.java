@@ -1,7 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
-import com.susukkang.fgc.validation.mapper.BatchWatermarkMapper;
+import com.susukkang.fgc.validation.repository.BatchWatermarkRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.BatchStatus;
@@ -23,7 +23,7 @@ import java.time.OffsetDateTime;
 @RequiredArgsConstructor
 public class WatermarkAdvanceStepListener implements StepExecutionListener {
 
-    private final BatchWatermarkMapper batchWatermarkMapper;
+    private final BatchWatermarkRepository batchWatermarkRepository;
 
     @Override
     public ExitStatus afterStep(StepExecution stepExecution) {
@@ -42,7 +42,7 @@ public class WatermarkAdvanceStepListener implements StepExecutionListener {
             return stepExecution.getExitStatus();
         }
 
-        int affected = batchWatermarkMapper.advance(
+        int affected = batchWatermarkRepository.advance(
                 DailyChangedContractJobNames.JOB_NAME,
                 DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME,
                 runStartedAt,

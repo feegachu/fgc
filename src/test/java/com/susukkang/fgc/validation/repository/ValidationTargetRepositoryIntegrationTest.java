@@ -1,11 +1,14 @@
 package com.susukkang.fgc.validation.repository;
 
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.validation.dto.ValidationScheduleState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -121,6 +124,86 @@ class ValidationTargetRepositoryIntegrationTest {
         List<Long> selected = validationTargetRepository.selectSelectedContractIds(requestedRunId);
 
         assertThat(selected).containsExactly(contractIds.get(0), contractIds.get(2));
+    }
+
+    /**
+     * #380 Phase 4 — ValidationTargetRepository.selectScheduleStates(unnest + ROW() 기반
+     * DISTINCT COUNT를 네이티브 쿼리로 옮긴 메서드)가 선별된 계약의 두 지급 단계를 모두
+     * 반환하는지 검증한다. 구 MyBatis ValidationScheduleMapper는 이 전환 완료 후 다른
+     * 패키지에서 참조가 없어 삭제되었다 — 이 테스트가 그 검증 책임을 이어받는다.
+     */
+    @Test
+    void selectScheduleStatesReturnsBothPaymentStagesForSelectedContract() {
+        LocalDate validationMonth = LocalDate.of(2098, 7, 1);
+        Long validationRunId = insertValidationRun(validationMonth);
+        Long contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1",
+                Long.class);
+        insertTarget(validationRunId, contractId, "SELECTED");
+
+        List<ValidationScheduleState> states = validationTargetRepository.selectScheduleStates(validationRunId);
+
+        assertThat(states).hasSize(2);
+        assertThat(states).extracting(ValidationScheduleState::getPaymentStage)
+                .containsExactlyInAnyOrder(PaymentStage.INSURER_TO_GA, PaymentStage.GA_TO_FC);
+        assertThat(states).allSatisfy(state -> {
+            assertThat(state.getContractId()).isEqualTo(contractId);
+            assertThat(state.getActiveHeaderCount()).isNotNull();
+            assertThat(state.getLineCount()).isNotNull();
+            assertThat(state.getDistinctLineCount()).isNotNull();
+        });
+    }
+
+    @Test
+    void selectScheduleStatesSumsScheduleAmountsAfterRoundingEachLineToWon() {
+        LocalDate validationMonth = LocalDate.of(2098, 8, 1);
+        Long validationRunId = insertValidationRun(validationMonth);
+        Long contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1",
+                Long.class);
+        LocalDate contractDate = jdbcTemplate.queryForObject(
+                "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?",
+                LocalDate.class, contractId);
+        Long policyVersionId = jdbcTemplate.queryForObject(
+                "SELECT policy_version_id FROM fgc.policy_version WHERE status = 'ACTIVE' ORDER BY policy_version_id LIMIT 1",
+                Long.class);
+        Long commissionItemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 1",
+                Long.class);
+        insertTarget(validationRunId, contractId, "SELECTED");
+        jdbcTemplate.update("""
+                UPDATE fgc.schedule_header
+                   SET active_yn = false
+                 WHERE contract_id = ?
+                   AND payment_stage = 'GA_TO_FC'
+                   AND schedule_purpose = 'OPERATIONAL'
+                   AND active_yn = true
+                """, contractId);
+        Long scheduleHeaderId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_header (
+                    contract_id, payment_stage, policy_version_id, schedule_version_no,
+                    schedule_regime, schedule_purpose, active_yn
+                )
+                VALUES (?, 'GA_TO_FC', ?, 999, 'CURRENT', 'OPERATIONAL', true)
+                RETURNING schedule_header_id
+                """, Long.class, contractId, policyVersionId);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.schedule_line (
+                    schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                    commission_item_id, basis_code, basis_amount, calculation_type,
+                    rate_pct, expected_amount
+                ) VALUES
+                    (?, 1, 1, 1, ?, ?, 'TEST_AMOUNT', 10.40, 'RATE', 100.000000, 10.40),
+                    (?, 2, 2, 1, ?, ?, 'TEST_AMOUNT', 10.40, 'RATE', 100.000000, 10.40)
+                """, scheduleHeaderId, contractDate, commissionItemId,
+                scheduleHeaderId, contractDate, commissionItemId);
+
+        ValidationScheduleState gaToFc = validationTargetRepository.selectScheduleStates(validationRunId).stream()
+                .filter(state -> state.getPaymentStage() == PaymentStage.GA_TO_FC)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(gaToFc.getTotalAmount()).isEqualByComparingTo(new BigDecimal("20"));
     }
 
     private Long insertSavContract() {

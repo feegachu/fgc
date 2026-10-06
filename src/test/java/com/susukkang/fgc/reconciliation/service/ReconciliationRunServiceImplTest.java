@@ -7,7 +7,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.reconciliation.dto.CreateReconciliationRunCommand;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunInsertRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
-import com.susukkang.fgc.reconciliation.mapper.ReconciliationRunMapper;
+import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequestPort;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
@@ -41,7 +41,7 @@ import static org.mockito.Mockito.verify;
 class ReconciliationRunServiceImplTest {
 
     @Mock
-    private ReconciliationRunMapper reconciliationRunMapper;
+    private ReconciliationRunRepository reconciliationRunRepository;
 
     @Mock
     private ValidationRunMapper validationRunMapper;
@@ -57,7 +57,7 @@ class ReconciliationRunServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ReconciliationRunServiceImpl(
-                reconciliationRunMapper,
+                reconciliationRunRepository,
                 validationRunMapper,
                 lifecycleService,
                 Optional.of(executionRequestPort)
@@ -67,14 +67,14 @@ class ReconciliationRunServiceImplTest {
     @Test
     void 참조를_검증하고_CREATED에서_RUNNING으로_전이한다() {
         CreateReconciliationRunCommand command = command();
-        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(true);
+        given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
         given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
         doAnswer(invocation -> {
             ReconciliationRunInsertRow row = invocation.getArgument(0);
             row.setReconciliationRunId(29L);
             return null;
-        }).when(reconciliationRunMapper).insert(any());
-        given(reconciliationRunMapper.findById(29L)).willReturn(reconciliationRun(29L));
+        }).when(reconciliationRunRepository).insert(any());
+        given(reconciliationRunRepository.findById(29L)).willReturn(reconciliationRun(29L));
 
         ReconciliationRunRow result = service.create(command);
 
@@ -86,9 +86,9 @@ class ReconciliationRunServiceImplTest {
 
     @Test
     void 동일_자연키_실행이_있으면_RECO_002로_거절한다() {
-        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(true);
+        given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
         given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
-        given(reconciliationRunMapper.findByNaturalKey(
+        given(reconciliationRunRepository.findByNaturalKey(
                 LocalDate.of(2026, 8, 1), PaymentStage.GA_TO_FC, 3L, 17L
         )).willReturn(reconciliationRun(29L));
 
@@ -98,37 +98,37 @@ class ReconciliationRunServiceImplTest {
                     assertThat(exception.getParams()).containsEntry("reconciliationRunId", 29L);
                 });
 
-        verify(reconciliationRunMapper, never()).insert(any());
+        verify(reconciliationRunRepository, never()).insert(any());
         verify(executionRequestPort, never()).requestExecution(any());
     }
 
     @Test
     void 실행기가_연결되지_않으면_행을_생성하지_않는다() {
         ReconciliationRunServiceImpl unavailableService = new ReconciliationRunServiceImpl(
-                reconciliationRunMapper,
+                reconciliationRunRepository,
                 validationRunMapper,
                 lifecycleService,
                 Optional.empty()
         );
-        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(true);
+        given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
         given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
 
         assertThatThrownBy(() -> unavailableService.create(command()))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_500));
 
-        verify(reconciliationRunMapper, never()).insert(any());
+        verify(reconciliationRunRepository, never()).insert(any());
     }
 
     @Test
     void 실행요청_등록이_실패하면_생성결과를_반환하지_않는다() {
-        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(true);
+        given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
         given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
         doAnswer(invocation -> {
             ReconciliationRunInsertRow row = invocation.getArgument(0);
             row.setReconciliationRunId(29L);
             return null;
-        }).when(reconciliationRunMapper).insert(any());
+        }).when(reconciliationRunRepository).insert(any());
         doThrow(new IllegalStateException("실행 요청 거절"))
                 .when(executionRequestPort).requestExecution(any());
 
@@ -137,12 +137,12 @@ class ReconciliationRunServiceImplTest {
                 .hasMessage("실행 요청 거절");
 
         verify(lifecycleService).start(29L);
-        verify(reconciliationRunMapper, never()).findById(29L);
+        verify(reconciliationRunRepository, never()).findById(29L);
     }
 
     @Test
     void 존재하지_않는_보험회사는_404로_거절한다() {
-        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(false);
+        given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(false);
 
         assertThatThrownBy(() -> service.create(command()))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
@@ -150,12 +150,12 @@ class ReconciliationRunServiceImplTest {
                     assertThat(exception.getField()).isEqualTo("insurerId");
                 });
 
-        verify(reconciliationRunMapper, never()).insert(any());
+        verify(reconciliationRunRepository, never()).insert(any());
     }
 
     @Test
     void 검증실행의_기준월이_다르면_400으로_거절한다() {
-        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(true);
+        given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
         given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 7, 1)));
 
         assertThatThrownBy(() -> service.create(command()))
@@ -164,12 +164,12 @@ class ReconciliationRunServiceImplTest {
                     assertThat(exception.getField()).isEqualTo("validationRunId");
                 });
 
-        verify(reconciliationRunMapper, never()).insert(any());
+        verify(reconciliationRunRepository, never()).insert(any());
     }
 
     @Test
     void fgcFun044_rejectsFinalizedValidationRunBeforeInsert() {
-        given(reconciliationRunMapper.existsActiveInsurer(3L)).willReturn(true);
+        given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
         ValidationRunRow finalizedRun = validationRun(LocalDate.of(2026, 8, 1));
         finalizedRun.setStatus(ValidationRunStatus.FINALIZED.name());
         given(validationRunMapper.findByIdForUpdate(17L)).willReturn(finalizedRun);
@@ -178,8 +178,8 @@ class ReconciliationRunServiceImplTest {
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_003));
 
-        verify(reconciliationRunMapper, never()).findByNaturalKey(any(), any(), any(), any());
-        verify(reconciliationRunMapper, never()).insert(any());
+        verify(reconciliationRunRepository, never()).findByNaturalKey(any(), any(), any(), any());
+        verify(reconciliationRunRepository, never()).insert(any());
         verify(executionRequestPort, never()).requestExecution(any());
     }
 

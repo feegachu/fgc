@@ -7,7 +7,7 @@ import com.susukkang.fgc.reconciliation.dto.InsurerGaActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaExpectedSourceRow;
 import com.susukkang.fgc.reconciliation.dto.InsurerGaMatchCandidate;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchSource;
-import com.susukkang.fgc.reconciliation.mapper.InsurerGaReconciliationMapper;
+import com.susukkang.fgc.reconciliation.repository.InsurerGaReconciliationRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,7 +39,7 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
 
-    private final InsurerGaReconciliationMapper reconciliationMapper;
+    private final InsurerGaReconciliationRepository sourceRepository;
     private final TolerancePolicy tolerancePolicy;
 
     @Override
@@ -47,9 +47,9 @@ public class InsurerGaReconciliationMatcherImpl implements InsurerGaReconciliati
     public List<InsurerGaMatchCandidate> match(ReconciliationExecutionRequest request) {
         validateRequest(request);
 
-        List<InsurerGaExpectedSourceRow> expectedSources = reconciliationMapper.findExpectedSources(
+        List<InsurerGaExpectedSourceRow> expectedSources = sourceRepository.findExpectedSources(
                 request.settlementMonth(), request.insurerId());
-        List<InsurerGaActualSourceRow> actualSources = reconciliationMapper.findActualSources(
+        List<InsurerGaActualSourceRow> actualSources = sourceRepository.findActualSources(
                 request.settlementMonth(), request.insurerId());
 
         Map<BaseMatchKey, List<InsurerGaExpectedSourceRow>> expectedByKey = groupExpected(expectedSources);
