@@ -7,6 +7,8 @@ import { apiClient } from '../lib/api/client'
 import { useWorkspaceStore } from '../stores/workspace'
 import { useSidebarStore } from '../stores/sidebar'
 import { screens } from './screens'
+import { queryClient } from './queryClient'
+import { subscribeApiErrors } from '../lib/api/errorNotifications'
 beforeEach(() => {
   useWorkspaceStore.getState().clear()
   useSidebarStore.setState({ collapsed: false, openSections: [] })
@@ -81,5 +83,29 @@ describe('AppShell·라우트', () => {
     expect(await screen.findByRole('heading', { name: '접근 권한이 없습니다.' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '기존 화면으로 이동' })).toBeNull()
     expect(screens.find((route) => route.path === '/contracts/:id/edit')?.permission).toBe('canProcess')
+  })
+})
+describe('AppShell /auth/me 실패', () => {
+  it('셸 오류 화면만 보여 주고 전역 Toast 를 띄우지 않는다', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(new Error('사용자 정보를 불러오지 못했습니다.'))
+    const notify = vi.fn()
+    const unsubscribe = subscribeApiErrors(notify)
+    // 전역 QueryCache onError 가 붙은 실제 queryClient 로 그려야 중복 알림을 잡는다.
+    const defaults = queryClient.getDefaultOptions()
+    queryClient.setDefaultOptions({ ...defaults, queries: { ...defaults.queries, retry: false } })
+    try {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/contracts'] })} />
+        </QueryClientProvider>,
+      )
+      expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+      expect(screen.getAllByRole('alert')).toHaveLength(1)
+      expect(notify).not.toHaveBeenCalled()
+    } finally {
+      unsubscribe()
+      queryClient.clear()
+      queryClient.setDefaultOptions(defaults)
+    }
   })
 })

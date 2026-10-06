@@ -122,6 +122,8 @@ export function AppShell() {
     queryKey: ['auth', 'me'],
     queryFn: async () => (await apiClient.request<MeResponse>('/api/v1/auth/me')).data,
     staleTime: Infinity,
+    // 실패는 아래 셸 오류 화면이 보여 준다. 전역 Toast 까지 띄우면 같은 오류가 두 번 나온다.
+    meta: { errorToast: false },
   })
   if (me.isPending)
     return (
