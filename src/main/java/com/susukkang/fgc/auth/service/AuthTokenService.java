@@ -91,8 +91,9 @@ public class AuthTokenService {
      */
     @Transactional
     public IssuedTokens login(FgcUserDetails user) {
-        OffsetDateTime now = OffsetDateTime.now();
         appUserRepository.lockById(user.getUserId());
+        // 시각은 잠금을 얻은 뒤에 잡는다 — 대기한 만큼 이른 시각으로 만료·무효화를 판정하지 않게.
+        OffsetDateTime now = OffsetDateTime.now();
         int superseded = refreshTokenRepository.revokeActiveByUserId(
                 user.getUserId(), RevokedReason.SUPERSEDED, now);
         if (superseded > 0) {
@@ -117,8 +118,8 @@ public class AuthTokenService {
         if (userId.isEmpty()) {
             return RefreshResult.rejected(FgcErrorCode.AUTH_002);
         }
-        OffsetDateTime now = OffsetDateTime.now();
         appUserRepository.lockById(userId.get());
+        OffsetDateTime now = OffsetDateTime.now();
         AuthRefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElseThrow();
         String loginId = loginIdOf(token.getUserId());
 
