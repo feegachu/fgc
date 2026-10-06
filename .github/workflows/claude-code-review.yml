@@ -130,6 +130,23 @@ jobs:
           sed -i "s|__REPO__|${REPO}|; s|__PR__|${PR_NUMBER}|" "$helper"
           chmod 0555 "$helper"
 
+      # 첫 리뷰인지는 모델이 코멘트를 읽고 짐작하게 두지 않고 여기서 확정한다(#444: 지적 0건이면 흔적이 남지 않았다).
+      # 종합 요약은 PR 대화 코멘트(issue comment)다. 실패하면 "첫 리뷰"로 본다 — 요약이 한 건 더 남는 쪽이 안전하다.
+      - name: Detect first review
+        id: first
+        if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # --paginate 는 페이지마다 숫자를 한 줄씩 내므로 awk 로 더한다.
+          count=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq '[.[] | select(.user.login == "claude[bot]")] | length' 2>/dev/null \
+            | awk '{s+=$1} END {print s+0}') || count=0
+          echo "이 PR 의 기존 Claude 종합 요약: ${count}건"
+          if [ "$count" -eq 0 ]; then echo "first=true" >> "$GITHUB_OUTPUT"; else echo "first=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: Run Claude Code Review
         id: claude-review
         if: steps.gate.outputs.run == 'true'
@@ -139,6 +156,7 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+            FIRST REVIEW: ${{ steps.first.outputs.first }}
 
             이 PR을 FGC 도메인 문서 기준으로 검토한다. PR 브랜치는 이미 체크아웃되어 있다.
 
@@ -229,16 +247,38 @@ jobs:
               그대로면 스레드를 닫지 않는다(사람이 판단해 닫는다).
             - 이전 지적이 아직 남아 있으면 스레드를 닫지 않고 요약에 "미해결: <지적 요지>" 한 줄로만 적는다.
             - 인라인 코멘트는 이번에 처음 발견한 지적에만 단다.
-            - 새 지적이 없고 열린 내 스레드도 없으면 종합 요약을 남기지 않는다.
+            - `FIRST REVIEW: true`(이 PR 에 내 종합 요약이 아직 없음)이면 지적이 없어도 종합 요약을 반드시 남긴다.
+              지적이 없으면 "검토 범위: <확인한 파일·관점> / 지적 없음"처럼 무엇을 봤는지 짧게 적는다.
+              요약이 없으면 리뷰가 실패한 것인지 문제가 없었던 것인지 구분할 수 없다.
+            - `FIRST REVIEW: false`이고 새 지적이 없고 열린 내 스레드도 없으면 종합 요약을 남기지 않는다.
               열린 내 스레드가 하나라도 있었으면 해결·미해결 판정을 담은 종합 요약을 반드시 남긴다.
 
             ## 출력
             - 특정 코드 줄의 문제는 mcp__github_inline_comment__create_inline_comment
               (confirmed: true)로 인라인 코멘트를 단다.
             - 마지막에 `gh pr comment`로 종합 요약 1건을 남긴다.
-              단, 위 중복 금지 규칙의 생략 조건(새 지적 없음·상태 변화 없음)이면 남기지 않는다.
+              단, 위 중복 금지 규칙의 생략 조건(첫 리뷰가 아니고 새 지적 없음·상태 변화 없음)이면 남기지 않는다.
             - 반드시 GitHub 코멘트로 출력한다. 메시지로만 끝내지 마라.
 
           claude_args: |
             --model claude-sonnet-5-5
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments:*),Bash(${{ runner.temp }}/claude-review-threads.sh:*),Read,Glob,Grep"
+
+      # 첫 리뷰인데 요약이 없으면 리뷰가 실제로 됐는지 알 수 없다(#444) — 초록색으로 두지 않고 실패로 드러낸다.
+      # 필수 체크(build·frontend)가 아니라 병합은 막지 않는다. 일시 오류면 이 run 을 Re-run 한다.
+      # 조회 자체가 실패해도 이 단계가 실패한다(pipefail) — 확인하지 못한 것을 성공으로 두지 않는다.
+      - name: Verify first-review summary
+        if: steps.first.outputs.first == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          count=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq '[.[] | select(.user.login == "claude[bot]")] | length' \
+            | awk '{s+=$1} END {print s+0}')
+          if [ "$count" -eq 0 ]; then
+            echo "::error::첫 리뷰인데 Claude 종합 요약이 남지 않았습니다. 리뷰가 실제로 되지 않았을 수 있으니 이 run 을 Re-run 하세요."
+            exit 1
+          fi
+          echo "Claude 종합 요약 확인: ${count}건"
