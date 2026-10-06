@@ -20,7 +20,7 @@ import java.time.OffsetDateTime;
  * @version 1.0
  * @since 2026-09-28
  */
-public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Long> {
+public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Long>, ExceptionCaseDetectionCommands {
 
     // 관리 중인 엔티티의 이전 상태를 재사용하지 않고 잠근 DB 행을 DTO로 읽는다.
     // 잠금은 후속 순번 조회·이력 저장·상태 갱신까지 유지돼야 하므로 호출자 트랜잭션이 필수다.
@@ -88,10 +88,10 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
     // 반환한다(재검출로 이력만 추가된 건 세지 않는다 — ValidationRunExceptionServiceImpl
     // 누적 카운트가 반복 호출로 커지지 않는다).
     //
-    // insertArbitrageCandidate/insertArbitrageReviewCase/bulkCreateFromReconciliationResultsByRun은
-    // ArbitrageService(#373)·ReconciliationExceptionService(#377/#378)가 구 MyBatis
-    // ExceptionCaseMapper를 아직 직접 주입해 쓰고 있어 이 Repository로 옮기지 않는다 —
-    // 그 두 메서드와 ExceptionCaseMapper 인터페이스 자체는 그 소비자들이 전환한 뒤에야 지운다.
+    // #378의 차익거래 단건 탐지 2종은 ExceptionCaseDetectionCommands fragment로 제공한다.
+    // ArbitrageService는 이 공용 Repository를 직접 소비하며 기존 flush/clear 계약을 유지한다.
+    // bulkCreateFromReconciliationResultsByRun 등 다른 소비자와 테스트 baseline의 Mapper
+    // 참조는 남아 있으므로 공유 ExceptionCaseMapper/XML 제거는 #366/#383에서 확인한다.
 
     /** 일일 변경 계약 재검증 실패를 검증월 기준 안정 업무키로 기록한다. */
     @Transactional(propagation = Propagation.MANDATORY)

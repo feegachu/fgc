@@ -1,24 +1,30 @@
 package com.susukkang.fgc.exceptioncase.repository;
 
 import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.common.code.ExceptionStatus;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * #380 Phase 1 — 아직 남아있는 구 MyBatis {@code ExceptionCaseMapper}와 새
+ * #380의 구 MyBatis {@code ExceptionCaseMapper}와 공용
  * {@code ExceptionCaseRepository}(네이티브 쿼리로 fgc.record_exception_detection을
  * 감싼 6개 메서드)가 같은 입력에 대해 완전히 동일한 exception_case 행을 만드는지
- * 직접 비교한다. 두 실행을 서로 다른 검증월로 나눠(안정 업무키 충돌 방지) 같은
- * 시드 데이터를 넣고, 생성된 예외의 종류·심각도·제목·본문이 정확히 같은지 확인한다.
+ * 직접 비교한다. 비교 실행을 서로 다른 검증월로 나눠 같은 시드의 종류·심각도·제목·본문을
+ * 확인한다. #378 단건 탐지의 미조회·호출자 트랜잭션·같은 월 재검출·일괄 탐지 수렴도 검증한다.
  */
 @SpringBootTest
 @Transactional
@@ -33,6 +39,79 @@ class ExceptionCaseRepositoryDetectionIntegrationTest {
     private ExceptionCaseRepository exceptionCaseRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private EntityManager entityManager;
+
+    @Test
+    void arbitrageDetectionReturnsNullWhenValidationRunDoesNotExist() {
+        assertThat(exceptionCaseRepository.insertArbitrageCandidate(
+                Long.MAX_VALUE, 1L, 1L, "GA_TO_FC", null)).isNull();
+        assertThat(exceptionCaseRepository.insertArbitrageReviewCase(
+                "DATA_QUALITY", Long.MAX_VALUE, 1L, 1L, "GA_TO_FC", "확인 필요", null)).isNull();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void arbitrageDetectionRequiresTheCallersTransaction() {
+        assertThatThrownBy(() -> exceptionCaseRepository.insertArbitrageCandidate(
+                1L, 1L, 1L, "GA_TO_FC", null)).isInstanceOf(IllegalTransactionStateException.class);
+        assertThatThrownBy(() -> exceptionCaseRepository.insertArbitrageReviewCase(
+                "DATA_QUALITY", 1L, 1L, 1L, "GA_TO_FC", "확인 필요", null))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    @Test
+    void arbitrageSingleAndBulkDetectionShareBusinessKeyEvidenceAndReopening() {
+        Long contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
+        Long firstRunId = insertArbitrageValidationRun();
+        Long firstResultId = insertArbitrageCandidateResult(firstRunId, contractId);
+        Long caseId = exceptionCaseRepository.insertArbitrageCandidate(
+                firstRunId, contractId, firstResultId, "GA_TO_FC", null);
+        assertThat(caseId).isNotNull();
+        assertThat(exceptionCaseRepository.insertFromArbitrageChecks(firstRunId)).isZero();
+        var loaded = exceptionCaseRepository.findById(caseId).orElseThrow();
+        assertThat(entityManager.contains(loaded)).isTrue();
+        assertThat(exceptionCaseRepository.updateCaseAfterAction(
+                caseId, ExceptionStatus.RESOLVED, null, OffsetDateTime.now())).isEqualTo(1);
+
+        Long secondRunId = insertArbitrageValidationRun();
+        Long secondResultId = insertArbitrageCandidateResult(secondRunId, contractId);
+        assertThat(exceptionCaseRepository.insertArbitrageCandidate(
+                secondRunId, contractId, secondResultId, "GA_TO_FC", null)).isEqualTo(caseId);
+        assertThat(entityManager.contains(loaded)).isFalse();
+        assertThat(exceptionCaseRepository.findById(caseId).orElseThrow().getStatus()).isEqualTo(ExceptionStatus.NEW);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT was_reopened FROM fgc.exception_occurrence
+                 WHERE exception_case_id=? AND validation_run_id=?
+                """, Boolean.class, caseId, secondRunId)).isTrue();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT evidence_snapshot -> 'description' = 'null'::jsonb FROM fgc.exception_occurrence
+                 WHERE exception_case_id=? AND validation_run_id=?
+                """, Boolean.class, caseId, secondRunId)).isTrue();
+        assertThat(exceptionCaseRepository.insertFromArbitrageChecks(secondRunId)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id=?", Long.class, caseId)).isEqualTo(2L);
+    }
+
+    private Long insertArbitrageValidationRun() {
+        // 재검출은 같은 검증월의 서로 다른 실행이다. 월당 활성 MONTHLY 실행 제약과 구분한다.
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status)
+                SELECT ?, COALESCE(MAX(run_no), 0) + 1, 'PRE_CONFIRM', 'CREATED'
+                  FROM fgc.validation_run WHERE validation_month = ? RETURNING validation_run_id
+                """, Long.class, NEW_MONTH, NEW_MONTH);
+    }
+
+    private Long insertArbitrageCandidateResult(Long runId, Long contractId) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.arbitrage_check
+                    (validation_run_id, contract_id, as_of_date, contract_month_no,
+                     cumulative_paid_premium, net_difference_amount, standard_deduction_80_yn, result_status)
+                VALUES (?, ?, ?, 12, 1000000, 100000, false, 'CANDIDATE')
+                RETURNING arbitrage_check_id
+                """, Long.class, runId, contractId, NEW_MONTH.plusMonths(1).minusDays(1));
+    }
 
     @Test
     void bulkDetectionMethodsProduceIdenticalExceptionsToLegacyMapper() {

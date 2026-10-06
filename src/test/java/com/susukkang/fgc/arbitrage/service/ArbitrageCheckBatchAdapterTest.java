@@ -1,6 +1,6 @@
 package com.susukkang.fgc.arbitrage.service;
 
-import com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -31,14 +31,14 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class ArbitrageCheckBatchAdapterTest {
     @Mock
-    private ArbitrageMapper arbitrageMapper;
+    private ValidationTargetRepository validationTargetRepository;
     @Mock
     private ArbitrageCheckBatchItemService arbitrageCheckBatchItemService;
 
     @Test
     void checksSelectedContractsAndReturnsRecoverableFailureAsSkip() {
         ArbitrageCheckBatchAdapter adapter =
-                new ArbitrageCheckBatchAdapter(arbitrageMapper, arbitrageCheckBatchItemService);
+                new ArbitrageCheckBatchAdapter(validationTargetRepository, arbitrageCheckBatchItemService);
         ValidationStepContext context = new ValidationStepContext(
                 100L,
                 new ValidationJobContext(
@@ -48,7 +48,7 @@ class ArbitrageCheckBatchAdapterTest {
                         1,
                         "request-1")
         );
-        given(arbitrageMapper.selectSelectedContractIds(100L)).willReturn(List.of(10L, 20L));
+        given(validationTargetRepository.selectSelectedContractIds(100L)).willReturn(List.of(10L, 20L));
         given(arbitrageCheckBatchItemService.process(
                 100L, 10L, LocalDate.of(2026, 7, 31)))
                 .willReturn(new ArbitrageCheckInsertDTO());

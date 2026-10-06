@@ -8,12 +8,13 @@ import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.arbitrage.dto.ConfirmedCommissionSummary;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
-import com.susukkang.fgc.arbitrage.mapper.ArbitrageMapper;
+import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,13 +42,13 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class ArbitrageServiceTest {
     @Mock
-    private ArbitrageMapper arbitrageMapper;
+    private ArbitrageCheckRepository arbitrageCheckRepository;
     @Mock
     private ValidationRunCreateService validationRunCreateService;
     @Mock
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
     @Mock
-    private ExceptionCaseMapper exceptionCaseMapper;
+    private ExceptionCaseRepository exceptionCaseRepository;
     @Mock
     private AuditLogService auditLogService;
 
@@ -56,10 +57,10 @@ class ArbitrageServiceTest {
     @BeforeEach
     void setUp() {
         arbitrageService = new ArbitrageService(
-                arbitrageMapper,
+                arbitrageCheckRepository,
                 validationRunCreateService,
-                validationRunMapper,
-                exceptionCaseMapper,
+                validationRunRepository,
+                exceptionCaseRepository,
                 new ObjectMapper().findAndRegisterModules(),
                 auditLogService
         );
@@ -76,20 +77,20 @@ class ArbitrageServiceTest {
         LocalDate asOfDate = LocalDate.of(2026, 7, 31);
         ArbitrageCalculationSource source = calculationSource(
                 new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
-        given(arbitrageMapper.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageMapper.sumConfirmedCommissionAmount(
+        given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
+        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
-        given(arbitrageMapper.sumPlannedCommissionAmount(
+        given(arbitrageCheckRepository.sumPlannedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC)).willReturn(new BigDecimal("400000"));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
-        given(validationRunMapper.transitionToRunning(100L)).willReturn(1);
-        given(validationRunMapper.updateCurrentStep(100L, 5)).willReturn(1);
-        given(arbitrageMapper.insertArbitrageCheck(any())).willAnswer(invocation -> {
+        given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
+        given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
+        given(arbitrageCheckRepository.insertArbitrageCheck(any())).willAnswer(invocation -> {
             invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0)
                     .setArbitrageCheckId(200L);
             return 1;
         });
-        given(validationRunMapper.transitionToCompleted(100L)).willReturn(1);
+        given(validationRunRepository.transitionToCompleted(100L, ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED)).willReturn(1);
 
         ReArbitrageCheckResponse response = arbitrageService.reArbitrageCheck(
                 10L,
@@ -100,8 +101,8 @@ class ArbitrageServiceTest {
         assertThat(response.getArbitrageCheckId()).isEqualTo(200L);
         assertThat(response.getValidationRunId()).isEqualTo(100L);
         assertThat(response.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CANDIDATE);
-        verify(arbitrageMapper).insertArbitrageCheck(any());
-        verify(exceptionCaseMapper).insertArbitrageCandidate(
+        verify(arbitrageCheckRepository).insertArbitrageCheck(any());
+        verify(exceptionCaseRepository).insertArbitrageCandidate(
                 100L, 10L, 200L, "GA_TO_FC",
                 "지급예정 수수료를 포함하면 누적 납입보험료를 초과합니다.");
     }
@@ -117,20 +118,20 @@ class ArbitrageServiceTest {
         LocalDate asOfDate = LocalDate.of(2026, 7, 31);
         ArbitrageCalculationSource source = calculationSource(
                 new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
-        given(arbitrageMapper.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageMapper.sumConfirmedCommissionAmount(
+        given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
+        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
-        given(arbitrageMapper.sumPlannedCommissionAmount(
+        given(arbitrageCheckRepository.sumPlannedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC)).willReturn(new BigDecimal("400000"));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
-        given(validationRunMapper.transitionToRunning(100L)).willReturn(1);
-        given(validationRunMapper.updateCurrentStep(100L, 5)).willReturn(1);
-        given(arbitrageMapper.insertArbitrageCheck(any())).willAnswer(invocation -> {
+        given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
+        given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
+        given(arbitrageCheckRepository.insertArbitrageCheck(any())).willAnswer(invocation -> {
             invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0)
                     .setArbitrageCheckId(200L);
             return 1;
         });
-        given(validationRunMapper.transitionToCompleted(100L)).willReturn(1);
+        given(validationRunRepository.transitionToCompleted(100L, ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED)).willReturn(1);
 
         arbitrageService.reArbitrageCheck(
                 10L,
@@ -161,9 +162,9 @@ class ArbitrageServiceTest {
         summary.setClearCount(3);
         summary.setCandidateCount(2);
         summary.setReviewRequiredCount(1);
-        given(arbitrageMapper.selectByCondition(condition, 0, 20)).willReturn(List.of());
-        given(arbitrageMapper.arbitrageCheckSummary(any())).willReturn(summary);
-        given(arbitrageMapper.countByCondition(condition)).willReturn(2L);
+        given(arbitrageCheckRepository.selectByCondition(condition, 0, 20)).willReturn(List.of());
+        given(arbitrageCheckRepository.arbitrageCheckSummary(any())).willReturn(summary);
+        given(arbitrageCheckRepository.countByCondition(condition)).willReturn(2L);
 
         var response = arbitrageService.selectByCondition(condition, 1, 20);
 
@@ -171,7 +172,7 @@ class ArbitrageServiceTest {
         assertThat(response.getItems().totalElements()).isEqualTo(2);
         org.mockito.ArgumentCaptor<ArbitrageCheckSearchCondition> summaryCondition =
                 org.mockito.ArgumentCaptor.forClass(ArbitrageCheckSearchCondition.class);
-        verify(arbitrageMapper).arbitrageCheckSummary(summaryCondition.capture());
+        verify(arbitrageCheckRepository).arbitrageCheckSummary(summaryCondition.capture());
         assertThat(summaryCondition.getValue().getStatus()).isNull();
         assertThat(summaryCondition.getValue().getMonth()).isEqualTo(condition.getMonth());
     }
@@ -186,20 +187,20 @@ class ArbitrageServiceTest {
     void marksMissingFinancialSnapshotAsReviewRequired() {
         LocalDate asOfDate = LocalDate.of(2026, 7, 31);
         ArbitrageCalculationSource source = calculationSource(null, null, false, null);
-        given(arbitrageMapper.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageMapper.sumConfirmedCommissionAmount(
+        given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
+        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("0", "0"));
-        given(arbitrageMapper.sumPlannedCommissionAmount(
+        given(arbitrageCheckRepository.sumPlannedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC)).willReturn(BigDecimal.ZERO);
         given(validationRunCreateService.create(any())).willReturn(validationRun(101L));
-        given(validationRunMapper.transitionToRunning(101L)).willReturn(1);
-        given(validationRunMapper.updateCurrentStep(101L, 5)).willReturn(1);
-        given(arbitrageMapper.insertArbitrageCheck(any())).willAnswer(invocation -> {
+        given(validationRunRepository.transitionToRunning(101L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
+        given(validationRunRepository.updateCurrentStep(101L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
+        given(arbitrageCheckRepository.insertArbitrageCheck(any())).willAnswer(invocation -> {
             invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0)
                     .setArbitrageCheckId(201L);
             return 1;
         });
-        given(validationRunMapper.transitionToCompleted(101L)).willReturn(1);
+        given(validationRunRepository.transitionToCompleted(101L, ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED)).willReturn(1);
 
         ReArbitrageCheckResponse response = arbitrageService.reArbitrageCheck(
                 10L,
@@ -208,10 +209,53 @@ class ArbitrageServiceTest {
         );
 
         assertThat(response.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
-        verify(exceptionCaseMapper).insertArbitrageReviewCase(
+        verify(exceptionCaseRepository).insertArbitrageReviewCase(
                 "DATA_QUALITY", 101L, 10L, 201L, "GA_TO_FC",
                 "차익거래 검증 자료 확인 필요",
                 "기준일 이하 계약 금융 스냅샷이 없습니다.");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"36, 100000, CANDIDATE", "37, 0, CLEAR"})
+    void preservesRefundAdditionBoundary(int month, String refundAmount, ArbitrageCheckStatus status) {
+        var source = calculationSource(new BigDecimal("1000000"), month, true, new BigDecimal("100000.49"));
+        var row = checkExisting(source, "1000000", "0");
+        assertThat(row.getIncludedSurrenderValueAmount()).isEqualByComparingTo(refundAmount);
+        assertThat(row.getResultStatus()).isEqualTo(status);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"999999.49, CLEAR", "1000000.49, CLEAR", "1000000.50, CANDIDATE"})
+    void preservesWonRoundingAndStrictPositiveCandidateBoundary(String paid, ArbitrageCheckStatus expected) {
+        var row = checkExisting(calculationSource(new BigDecimal("1000000"), 12, false, BigDecimal.ZERO), paid, "0");
+        assertThat(row.getResultStatus()).isEqualTo(expected);
+        assertThat(row.getNetDifferenceAmount()).isEqualByComparingTo(expected == ArbitrageCheckStatus.CLEAR ? "0" : "1");
+    }
+
+    @Test
+    void retainsExpectedRefundSourceAndRejectsMismatchedTable() {
+        var source = calculationSource(new BigDecimal("1000000"), 12, true, new BigDecimal("100000"));
+        source.setSurrenderValueType("EXPECTED_TABLE");
+        source.setSnapshotRefundRateTableId(11L);
+        var candidate = new com.susukkang.fgc.arbitrage.dto.ArbitrageRefundRateCandidate();
+        candidate.setRefundRateTableId(12L);
+        given(arbitrageCheckRepository.selectRefundRateCandidates(source, source.getContractDate())).willReturn(List.of(candidate));
+        var row = checkExisting(source, "0", "0");
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
+        verify(exceptionCaseRepository).insertArbitrageReviewCase("PRODUCT_CODE_MISMATCH", 100L, 10L, 200L,
+                "GA_TO_FC", "차익거래 검증 자료 확인 필요", "금융 스냅샷과 적용 환급률표가 일치하지 않습니다.");
+    }
+
+    private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(ArbitrageCalculationSource source, String paid, String planned) {
+        LocalDate date = LocalDate.of(2026, 7, 31);
+        given(arbitrageCheckRepository.selectCalculationSource(10L, date)).willReturn(source);
+        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(confirmed(paid, "0"));
+        given(arbitrageCheckRepository.sumPlannedCommissionAmount(10L, PaymentStage.GA_TO_FC)).willReturn(new BigDecimal(planned));
+        given(arbitrageCheckRepository.insertArbitrageCheck(any())).willAnswer(invocation -> {
+            invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0).setArbitrageCheckId(200L);
+            return 1;
+        });
+        return arbitrageService.checkInExistingRun(100L, 10L, date);
     }
 
     private ArbitrageCalculationSource calculationSource(

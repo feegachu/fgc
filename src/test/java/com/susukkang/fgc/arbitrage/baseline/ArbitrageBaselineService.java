@@ -1,12 +1,11 @@
-package com.susukkang.fgc.arbitrage.service;
+package com.susukkang.fgc.arbitrage.baseline;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
-import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
+import com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
-import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.SurrenderValueSourceType;
@@ -17,11 +16,10 @@ import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.repository.ValidationRunRepository;
-import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
+import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -38,13 +36,11 @@ import java.util.Map;
  * @version 1.1
  * @since 2026-08-12
  */
-@Service
 @RequiredArgsConstructor
-public class ArbitrageService {
+public class ArbitrageBaselineService {
     private static final PaymentStage REGULATORY_PAYMENT_STAGE = PaymentStage.GA_TO_FC;
-    // TODO 정책 파라미터 키와 적용 policy_version 선택 기준이 확정되면
-    // policy_parameter에서 차익거래 해약환급금 합산 기간을 조회하도록 변경한다.
-    // 현재 값은 REG-12의 계약 체결 후 3년(36개월) 기준을 따른다.
+    // 전환 전 비교 기준: REG-12의 계약 체결 후 3년(36개월) 고정값을 보존한다.
+    // 정책 조회로의 변경은 이 baseline과 #378의 계산 동등성 검증 범위 밖이다.
     private static final int REFUND_ADDITION_LAST_MONTH = 36;
 
     // FUN-061 — 수동 재검증은 사용자가 촉발하는 상태 변경이라 같은 트랜잭션에서 감사행을 남긴다.
@@ -52,10 +48,10 @@ public class ArbitrageService {
     private static final String AUDIT_ENTITY_TYPE = "ARBITRAGE_CHECK";
     private static final String AUDIT_ARBITRAGE_RECHECKED = "ARBITRAGE_RECHECKED";
 
-    private final ArbitrageCheckRepository arbitrageCheckRepository;
+    private final ArbitrageBaselineMapper arbitrageMapper;
     private final ValidationRunCreateService validationRunCreateService;
-    private final ValidationRunRepository validationRunRepository;
-    private final ExceptionCaseRepository exceptionCaseRepository;
+    private final ValidationRunMapper validationRunMapper;
+    private final ExceptionCaseMapper exceptionCaseMapper;
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
 
@@ -69,7 +65,6 @@ public class ArbitrageService {
      * @author hjKang
      * @since 2026-08-12
      */
-    @Transactional(readOnly = true)
     public ArbitrageSearchResponse selectByCondition(
             ArbitrageCheckSearchCondition condition, int page, int size) {
         // 페이지 번호 유효성 검증
@@ -87,14 +82,14 @@ public class ArbitrageService {
 
         // 검색 조건에 해당하는 차익거래 검증 결과 목록 조회
         List<ArbitrageCheckView> arbitrageCheckList =
-                arbitrageCheckRepository.selectByCondition(condition, offset, size);
+                arbitrageMapper.selectByCondition(condition, offset, size);
         // 상태 필터와 무관하게 현재 조회 범위의 판정 분포를 카드에 유지한다.
         ArbitrageCheckSearchCondition summaryCondition = new ArbitrageCheckSearchCondition(
                 condition.getMonth(), null, condition.getStage(),
                 condition.getInsurerId(), condition.getContractNo());
-        ArbitrageCheckSummary summary = arbitrageCheckRepository.arbitrageCheckSummary(summaryCondition);
+        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(summaryCondition);
         if (summary == null) summary = new ArbitrageCheckSummary();
-        long totalElements = arbitrageCheckRepository.countByCondition(condition);
+        long totalElements = arbitrageMapper.countByCondition(condition);
 
         // 조회 목록을 페이지 응답으로 변환
         PageResponse<ArbitrageCheckView> items = PageResponse.of(
@@ -118,7 +113,6 @@ public class ArbitrageService {
      * @author hjKang
      * @since 2026-08-12
      */
-    @Transactional(readOnly = true)
     public List<ArbitrageCheckView> selectByContractId(
             Long contractId,
             PaymentStage paymentStage) {
@@ -126,7 +120,7 @@ public class ArbitrageService {
             throw validationException("contractId", "contractId는 1 이상이어야 합니다.");
         if (paymentStage == null)
             throw validationException("paymentStage", "지급단계는 필수입니다.");
-        return arbitrageCheckRepository.selectByContractId(contractId, paymentStage);
+        return arbitrageMapper.selectByContractId(contractId, paymentStage);
     }
 
     /**
@@ -153,18 +147,16 @@ public class ArbitrageService {
                 ValidationRunType.MANUAL_CONTRACT,
                 triggeredBy
         ));
-        if (validationRunRepository.transitionToRunning(
-                run.getValidationRunId(), ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING) != 1)
+        if (validationRunMapper.transitionToRunning(run.getValidationRunId()) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
-        if (validationRunRepository.updateCurrentStep(run.getValidationRunId(), 5, ValidationRunStatus.RUNNING) != 1)
+        if (validationRunMapper.updateCurrentStep(run.getValidationRunId(), 5) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
 
         ArbitrageCheckInsertDTO row = executeArbitrageCheck(
                 run.getValidationRunId(), contractId, request);
 
         // 수동 검증 실행 완료 처리
-        if (validationRunRepository.transitionToCompleted(
-                run.getValidationRunId(), ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED) != 1)
+        if (validationRunMapper.transitionToCompleted(run.getValidationRunId()) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
 
         Map<String, Object> auditValue = new LinkedHashMap<>();
@@ -225,12 +217,12 @@ public class ArbitrageService {
             ReArbitrageCheckRequest request) {
         // 계약과 기준일 이하 최신 금융 스냅샷 조회
         ArbitrageCalculationSource source =
-                arbitrageCheckRepository.selectCalculationSource(contractId, request.getAsOfDate());
+                arbitrageMapper.selectCalculationSource(contractId, request.getAsOfDate());
         if (source == null)
             throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", contractId));
 
         // 확정 지급·차감 순액과 활성 스케줄의 남은 지급예정액 조회
-        ConfirmedCommissionSummary confirmedCommission = arbitrageCheckRepository.sumConfirmedCommissionAmount(
+        ConfirmedCommissionSummary confirmedCommission = arbitrageMapper.sumConfirmedCommissionAmount(
                 contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate());
         BigDecimal confirmedPaymentAmount = confirmedCommission == null
                 ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getConfirmedPaymentAmount());
@@ -238,7 +230,7 @@ public class ArbitrageService {
                 ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getConfirmedDeductionAmount());
         BigDecimal paidCommissionAmount = confirmedCommission == null
                 ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getPaidCommissionAmount());
-        BigDecimal plannedCommissionAmount = valueOrZero(arbitrageCheckRepository.sumPlannedCommissionAmount(
+        BigDecimal plannedCommissionAmount = valueOrZero(arbitrageMapper.sumPlannedCommissionAmount(
                 contractId, REGULATORY_PAYMENT_STAGE));
 
         // 금융자료 및 해약환급금 적용 조건 확인
@@ -270,13 +262,13 @@ public class ArbitrageService {
                         source, confirmedPaymentAmount, confirmedDeductionAmount,
                         paidCommissionAmount, plannedCommissionAmount, decision, request))
                 .build();
-        int insertedRows = arbitrageCheckRepository.insertArbitrageCheck(row);
+        int insertedRows = arbitrageMapper.insertArbitrageCheck(row);
         if (insertedRows != 1 || row.getArbitrageCheckId() == null)
             throw new FgcBusinessException(FgcErrorCode.COMMON_500, Map.of());
 
         // 차익거래 후보만 공통 예외 목록에 중복 없이 등록
         if (row.getResultStatus() == ArbitrageCheckStatus.CANDIDATE) {
-            exceptionCaseRepository.insertArbitrageCandidate(
+            exceptionCaseMapper.insertArbitrageCandidate(
                     validationRunId,
                     contractId,
                     row.getArbitrageCheckId(),
@@ -285,7 +277,7 @@ public class ArbitrageService {
             );
         } else if (row.getResultStatus() == ArbitrageCheckStatus.REVIEW_REQUIRED) {
             ExceptionType exceptionType = reviewExceptionType(decision.reason());
-            exceptionCaseRepository.insertArbitrageReviewCase(
+            exceptionCaseMapper.insertArbitrageReviewCase(
                     exceptionType.name(),
                     validationRunId,
                     contractId,
@@ -326,7 +318,7 @@ public class ArbitrageService {
 
         int contractMonthNo = source.getContractMonthNo();
         BigDecimal cumulativePaidPremium = MoneyUtil.roundWon(source.getCumulativePaidPremium());
-        RefundDecision refund = resolveSurrenderValue(source, cumulativePaidPremium);
+        RefundDecision refund = resolveSurrenderValue(source);
         if (refund.reviewRequired())
             return reviewRequired(contractMonthNo, refund.reason(), cumulativePaidPremium);
 
@@ -367,9 +359,7 @@ public class ArbitrageService {
         );
     }
 
-    private RefundDecision resolveSurrenderValue(
-            ArbitrageCalculationSource source,
-            BigDecimal cumulativePaidPremium) {
+    private RefundDecision resolveSurrenderValue(ArbitrageCalculationSource source) {
         boolean applies = Boolean.TRUE.equals(source.getStandardDeduction80Yn())
                 && source.getContractMonthNo() >= 1
                 && source.getContractMonthNo() <= REFUND_ADDITION_LAST_MONTH;
@@ -397,7 +387,7 @@ public class ArbitrageService {
             return RefundDecision.reviewRequired("예상 해약환급금의 환급률표 ID가 없습니다.");
 
         List<ArbitrageRefundRateCandidate> candidates =
-                arbitrageCheckRepository.selectRefundRateCandidates(source, source.getContractDate());
+                arbitrageMapper.selectRefundRateCandidates(source, source.getContractDate());
         if (candidates.size() != 1)
             return RefundDecision.reviewRequired(candidates.isEmpty()
                     ? "적용 가능한 예상 해약환급률표가 없습니다."
