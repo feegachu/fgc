@@ -1,4 +1,4 @@
-package com.susukkang.fgc.arbitrage.mapper;
+package com.susukkang.fgc.arbitrage.baseline;
 
 import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -16,8 +16,7 @@ import java.time.LocalDate;
  * @version 1.0
  * @since 2026-08-12
  */
-@Mapper
-public interface ArbitrageMapper {
+public interface ArbitrageBaselineMapper {
     //검색조건에 해당하는 차익거래 검증 결과 List를 select한다
     List<ArbitrageCheckView> selectByCondition(
             @Param("condition") ArbitrageCheckSearchCondition condition,

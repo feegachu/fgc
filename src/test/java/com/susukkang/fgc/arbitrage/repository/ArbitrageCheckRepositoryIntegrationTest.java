@@ -1,4 +1,4 @@
-package com.susukkang.fgc.arbitrage.mapper;
+package com.susukkang.fgc.arbitrage.repository;
 
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSearchCondition;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSummary;
@@ -19,7 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 설명 : 차익거래 검증 결과 조회 Mapper의 검색, 요약 및 페이징을 검증한다.
+ * 설명 : 차익거래 검증 결과 조회 Repository의 검색, 요약 및 페이징을 검증한다.
  *
  * @author hjKang
  * @version 1.0
@@ -27,11 +27,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @Transactional
-class ArbitrageMapperIntegrationTest {
+class ArbitrageCheckRepositoryIntegrationTest {
     private static final YearMonth TEST_MONTH = YearMonth.of(2098, 11);
 
     @Autowired
-    private ArbitrageMapper arbitrageMapper;
+    private ArbitrageCheckRepository arbitrageCheckRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -59,8 +59,8 @@ class ArbitrageMapperIntegrationTest {
                 TEST_MONTH, null, PaymentStage.GA_TO_FC, reference.insurerId());
         condition.setContractNo(reference.contractNo());
 
-        List<ArbitrageCheckView> items = arbitrageMapper.selectByCondition(condition, 0, 20);
-        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
+        List<ArbitrageCheckView> items = arbitrageCheckRepository.selectByCondition(condition, 0, 20);
+        ArbitrageCheckSummary summary = arbitrageCheckRepository.arbitrageCheckSummary(condition);
 
         assertThat(items).hasSize(3);
         assertThat(items).extracting(ArbitrageCheckView::getPaymentStage)
@@ -93,9 +93,9 @@ class ArbitrageMapperIntegrationTest {
                 TEST_MONTH, ArbitrageCheckStatus.CANDIDATE,
                 PaymentStage.GA_TO_FC, reference.insurerId());
 
-        List<ArbitrageCheckView> firstPage = arbitrageMapper.selectByCondition(condition, 0, 1);
-        List<ArbitrageCheckView> secondPage = arbitrageMapper.selectByCondition(condition, 1, 1);
-        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
+        List<ArbitrageCheckView> firstPage = arbitrageCheckRepository.selectByCondition(condition, 0, 1);
+        List<ArbitrageCheckView> secondPage = arbitrageCheckRepository.selectByCondition(condition, 1, 1);
+        ArbitrageCheckSummary summary = arbitrageCheckRepository.arbitrageCheckSummary(condition);
 
         assertThat(firstPage).singleElement()
                 .extracting(ArbitrageCheckView::getDecisionReason)
@@ -129,13 +129,13 @@ class ArbitrageMapperIntegrationTest {
                 TEST_MONTH, null, PaymentStage.GA_TO_FC, reference.insurerId());
         condition.setContractNo(reference.contractNo());
 
-        List<ArbitrageCheckView> items = arbitrageMapper.selectByCondition(condition, 0, 20);
-        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
+        List<ArbitrageCheckView> items = arbitrageCheckRepository.selectByCondition(condition, 0, 20);
+        ArbitrageCheckSummary summary = arbitrageCheckRepository.arbitrageCheckSummary(condition);
 
         assertThat(items).singleElement()
                 .extracting(ArbitrageCheckView::getDecisionReason)
                 .isEqualTo("2회차 판정");
-        assertThat(arbitrageMapper.countByCondition(condition)).isEqualTo(1);
+        assertThat(arbitrageCheckRepository.countByCondition(condition)).isEqualTo(1);
         assertThat(summary.getCandidateCount()).isEqualTo(1);
     }
 
@@ -158,7 +158,7 @@ class ArbitrageMapperIntegrationTest {
                 TEST_MONTH, null, PaymentStage.GA_TO_FC, reference.insurerId());
         condition.setContractNo(reference.contractNo());
 
-        ArbitrageCheckSummary summary = arbitrageMapper.arbitrageCheckSummary(condition);
+        ArbitrageCheckSummary summary = arbitrageCheckRepository.arbitrageCheckSummary(condition);
 
         assertThat(summary.getCandidateCount()).isZero();
         assertThat(summary.getClearCount()).isEqualTo(1);
