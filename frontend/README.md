@@ -38,7 +38,7 @@ src/
 ```
 
 - 테스트는 대상 파일 옆에 `*.test.tsx`로 둔다.
-- 화면 라우트는 인터페이스정의서 §5-2 "2차 React 경로" 열을 따라 `src/app/router.tsx`에 추가한다.
+- 화면 라우트는 인터페이스정의서 §5-2 "2차 React 경로" 열을 따라 `src/app/screens.ts`의 메타데이터와 `src/app/routes.tsx`에 추가한다.
 - 업무 규칙(금액 계산·반올림·한도 판정)은 프론트에서 새로 만들지 않는다. 서버 응답을 표시한다.
 
 ## 컨테이너
@@ -138,10 +138,88 @@ npm run build
 
 추출 테스트는 `test` 프로필의 임시 PostgreSQL과 실제 HTTP 서버를 사용한다.
 추출과 함께 프론트 클라이언트의 실제 JWT 만료·동시 refresh·refresh 실패·중복 로그인 처리를 검증한다.
-일반 프론트 실행에서 `server.test.ts`의 3개 실서버 검증은 건너뛰고 위 명령이 별도로 실행한다.
+일반 프론트 실행에서 `server.test.ts`의 4개 실서버 검증은 건너뛰고 위 명령이 별도로 실행한다.
 일반 백엔드 빌드에서도 추출 테스트는 opt-in이므로 스펙 파일을 자동으로 덮어쓰지 않는다.
 
 TS 6은 #401 결정을 유지한다. openapi-typescript 7.13.0의 TS 5 peer 요구는
 `overrides.openapi-typescript.typescript = "$typescript"`로 맞춘다.
 `--force`, `--legacy-peer-deps`는 쓰지 않는다. 생성 타입의 응답 필드는 springdoc가 optional로
 내보내므로 소비자는 null/undefined를 고려한다. 인증 응답의 토큰은 클라이언트가 필수로 검증한다.
+
+## AppShell와 공통 UI (#403)
+
+`app/screens.ts`가 화면 ID·제목·상위 메뉴·권한·기존 경로의 기준이다. 업무 화면이
+전환되기 전에는 `TransitionPage`가 query를 유지한 기존 화면 링크를 제공한다.
+`/contracts/:id/edit`도 인터페이스정의서에 추가했다. 로그인/ProtectedRoute는 #404,
+업무 화면 구현과 서버 권한 검사는 각 담당 이슈의 책임이다.
+
+사이드바 접힘은 `fgc.sidebar.collapsed.v1`(localStorage), 열린 섹션은
+`fgc.sidebar.open-sections.v1`(sessionStorage)을 사용한다. 탭·기준월·수정 표시는
+`fgc.react.workspace.v1`(sessionStorage)에만 보관하고 로그인 ID가 같을 때만 복원한다.
+복원 시 화면 메타데이터·권한을 다시 검사한다. Access Token이나 업무 응답은 저장하지 않는다.
+대시보드는 고정이며 총 10개를 넘으면 가장 오래 열린 업무 탭을 제거한다.
+계약 등록·수정은 기존 화면처럼 CONT-W03 탭 하나를 재사용한다.
+
+기준월 우선순위는 유효한 URL `month` → 동일 사용자의 저장 월 → 서버 기본 월이다.
+전체 탭에 월 변경을 적용할 때 `page`만 제거하고 나머지 query/hash는 보존한다.
+`useWorkspaceStore.getState().markModified(screenId, true/false)`로 폼 수정 표시를 변경한다.
+서버 기본 월은 `fgc.demo-month`여야 한다. `/auth/me`의 필수 문자열 `demoMonth`를
+사용하며, 이 필드는 요청/세션의 선택 월과 독립적인 서버 기본값이다(#403 담당자 승인).
+UI 테스트의 월은 fixture이고 실제 연결은 서버 통합 테스트로 별도 검증한다.
+운영 코드에 현재 월이나 고정 월 fallback을 두지 않았다.
+
+### 컴포넌트 계약
+
+모든 컴포넌트는 `src/components/{Name}.tsx`에서 직접 import한다.
+
+| 컴포넌트 | 주요 props/호출 | 동작 |
+|---|---|---|
+| DataTable<T> | caption, columns, rows, rowKey, sort/onSort, selectedKeys/onSelectionChange, onRowClick | 서버 조회용 정렬 콜백, 현재 페이지 선택, 빈 상태, column.expandable의 전체 보기/접기 |
+| Pagination | page, totalPages, onPageChange | 1-base, 5페이지 그룹, 처음/이전/다음/마지막 |
+| FilterBar | children, onSubmit, onReset | 조회/초기화; useSearchParamsState(defaults)의 update/reset과 연결 |
+| Modal | open, title, onClose, initialFocusRef, closeOnBackdrop, closeOnEscape, footer | 포커스 순환·복원, 기본 배경 클릭 금지, Esc 닫기 |
+| ToastRegion | 앱 루트에 한 번 마운트 | toast(message, tone) 또는 API 오류 구독; 일반 5초, 오류/로딩 수동 닫기 |
+| EvidenceLink | label, children | hover/focus, 클릭 고정, Esc/외부 클릭 해제 |
+| StatusBadge | tone, children | 서버 문구와 상태 색상 함께 표시 |
+| MonthSelector | value, onApply, disabledMonths, openTabCount | 12개월 4열, 초안/취소/적용, 방향키, 1~9999년 |
+| KpiCard | label, value, unit, footer, tone | 표시 값만 전달; 업무 계산 없음 |
+| Button | variant, loading, 일반 button props | primary/secondary/ghost; 처리 중 비활성 |
+| Field | label, children, required, error, helper, id | 입력 id·라벨·오류 aria 연결 |
+
+### 토큰과 자산
+
+1차 common의 variables/reset/layout/components/utilities CSS를 그대로 복사했다.
+`src/styles/tokens.js`는 CSS 값 대신 `var(--...)`를 Tailwind에 연결한다.
+`--color-*` → colors(접두어 제외), `--space-*` → spacing,
+`--radius-*` → borderRadius, `--z-*` → zIndex, `--font-*` → fontFamily.
+상태 24개·neutral 12개와 모든 spacing/radius/z 항목은 `tokens.test.ts`로 대조한다.
+Tailwind 사용 예: `text-status-warning-text bg-neutral-50 p-4 rounded-8 z-modal`.
+Noto Sans KR와 Material Symbols는 `public/fonts/`에서 제공한다. 브랜드 자산은
+`public/images/brand/`에 있다. 원본 변경 시 React 복사본과 매핑도 함께 갱신한다.
+
+### 검증과 1차 구조 테스트 대응
+
+| 유지하는 1차 테스트 | React 동작 검증 |
+|---|---|
+| AppShellWorkspaceStructureTest | workspace.test.ts, router.test.tsx, e2e/app-shell.spec.ts(10개 제한·복원·월 동기화) |
+| SidebarSectionStateStructureTest | Sidebar.test.tsx, 역할 4종 Playwright(메뉴·접힘·섹션 복원) |
+| GlobalMonthSelectorStructureTest | components.test.tsx, workspace.test.ts, Playwright(초안·비활성 월·방향키·취소) |
+| StatusBadgeDesignTokenTest | tokens.test.ts(원본 CSS 및 status 24개 값 대조), components.test.tsx(문구·상태 클래스) |
+| PublishingTemplateStructureTest | components.test.tsx(표·페이지·모달·알림·근거·필드), tokens.test.ts |
+
+기존 템플릿·JS·위 구조 테스트는 #419까지 유지한다. `npm run test:e2e`는 #403 UI API
+fixture 시나리오를 실행한다. 실제 JWT/refresh 검증은 #402의 별도 서버 통합 테스트다.
+설치된 Chrome을 쓰려면 `FGC_BROWSER_EXECUTABLE`에 실행 파일 경로를 전달한다.
+
+동일 1440×1000 viewport의 기존 Thymeleaf/React 캡처와 치수 비교는 개발 서버 실행 후:
+
+```bash
+FGC_VERIFY_SHELL=true FGC_NODE_BIN="$(command -v node)" \
+  ./gradlew test --tests '*AppShellScreenshotIntegrationTest'
+```
+
+이 테스트도 임시 PostgreSQL을 사용한다. 기존 화면은 실제 Thymeleaf 렌더러로 생성하고,
+조회 API에는 시각 검증용 빈 데이터, React 사용자/월 API에는 UI fixture를 제공한다.
+`build/screenshots/app-shell/`에 legacy.png, react.png, react-month.png를 저장한다.
+업무 본문은 아직 placeholder이므로 본문 픽셀 일치를 주장하지 않는다. 사이드바 256px,
+헤더 52px, 탭 220×40px 및 실제 화면을 비교한다.

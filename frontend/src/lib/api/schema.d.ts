@@ -2843,6 +2843,11 @@ export interface components {
             canProcess?: boolean;
             canReverseJournal?: boolean;
             canViewAuditLog?: boolean;
+            /**
+             * @description 서버 fgc.demo-month 설정의 기본 기준 정산월. URL·세션의 선택 월과 독립적이다.
+             * @example 2026-07
+             */
+            demoMonth: string;
             loginId?: string;
             roleCode?: string;
             userName?: string;

@@ -14,6 +14,7 @@ import com.susukkang.fgc.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+import java.time.YearMonth;
 
 /**
  * 설명 : 2차 JWT 토큰 API(#400, 인터페이스정의서 §2-1-1·§11-3).
@@ -58,11 +60,14 @@ public class AuthTokenController {
 
     private final AuthTokenService authTokenService;
     private final AuthenticationConfiguration authenticationConfiguration;
+    private final YearMonth demoMonth;
 
     public AuthTokenController(AuthTokenService authTokenService,
-                               AuthenticationConfiguration authenticationConfiguration) {
+                               AuthenticationConfiguration authenticationConfiguration,
+                               @Value("${fgc.demo-month}") String demoMonth) {
         this.authTokenService = authTokenService;
         this.authenticationConfiguration = authenticationConfiguration;
+        this.demoMonth = YearMonth.parse(demoMonth);
     }
 
     /**
@@ -127,7 +132,7 @@ public class AuthTokenController {
                 allowed(CAN_VIEW_AUDIT_LOG, context),
                 allowed(CAN_HANDLE_EXCEPTION, context),
                 allowed(CAN_REVERSE_JOURNAL, context),
-                allowed(CAN_FINALIZE_VALIDATION, context)));
+                allowed(CAN_FINALIZE_VALIDATION, context), demoMonth.toString()));
     }
 
     /** @PreAuthorize 에 쓰는 Roles 상수를 그대로 평가한다 — 역할 조합을 여기서 다시 적지 않는다. */

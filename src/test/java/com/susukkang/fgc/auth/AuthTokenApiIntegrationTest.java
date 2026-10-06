@@ -61,7 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * audit_log 는 INSERT 전용 트리거라 지울 수 없으므로 감사 검증은 전후 건수 차이로만 본다.
  * 지급 등록 서비스만 목으로 바꾼다 — 시나리오 2는 보안 계층(Bearer + CSRF 면제)이 컨트롤러까지 통과시키는지가 대상이다.
  */
-@SpringBootTest
+@SpringBootTest(properties = "fgc.demo-month=2032-11")
 @AutoConfigureMockMvc
 class AuthTokenApiIntegrationTest {
 
@@ -145,6 +145,7 @@ class AuthTokenApiIntegrationTest {
                 .andExpect(jsonPath("$.data.loginId").value("settle01"))
                 .andExpect(jsonPath("$.data.userName").value("정산담당자"))
                 .andExpect(jsonPath("$.data.roleCode").value("SETTLEMENT"))
+                .andExpect(jsonPath("$.data.demoMonth").value("2032-11"))
                 .andExpect(jsonPath("$.data.canProcess").value(true))
                 .andExpect(jsonPath("$.data.canViewAuditLog").value(false))
                 .andExpect(jsonPath("$.data.canHandleException").value(true))
@@ -159,9 +160,12 @@ class AuthTokenApiIntegrationTest {
 
     @Test
     void meReturnsAuditFlagsForComplianceAndWorksWithSession() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me").session(sessionLogin("audit01")))
+        MockHttpSession session = sessionLogin("audit01");
+        session.setAttribute("fgc.month", "2020-01");
+        mockMvc.perform(get("/api/v1/auth/me").param("month", "2040-12").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.roleCode").value("COMPLIANCE"))
+                .andExpect(jsonPath("$.data.demoMonth").value("2032-11"))
                 .andExpect(jsonPath("$.data.canProcess").value(false))
                 .andExpect(jsonPath("$.data.canViewAuditLog").value(true))
                 .andExpect(jsonPath("$.data.canFinalizeValidation").value(false));

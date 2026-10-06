@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { describe, expect, it } from 'vitest'
 import { createApiClient } from './client'
+import type { MeResponse } from './client'
 
 const origin = process.env.FGC_INTEGRATION_URL
 // The Java opt-in test starts a real HTTP server and an isolated Testcontainers database.
@@ -56,5 +57,14 @@ describe.skipIf(!origin)('실제 JWT 서버 연동', () => {
     expect(older.calls.filter((path) => path === '/api/v1/auth/refresh')).toHaveLength(0)
     expect(older.getToken()).toBeNull()
     expect(older.redirects).toEqual(['/app/login?reason=duplicate&redirect=%2Fcontracts%3Fpage%3D2'])
+  })
+  it('실제 /auth/me는 선택 월과 무관하게 서버 기본 기준월을 반환한다', async () => {
+    const env = environment()
+    await env.client.login('audit01', 'fgc1234!')
+    try {
+      const response = await env.client.request<MeResponse>('/api/v1/auth/me?month=2040-12')
+      expect(response.data.demoMonth).toBe(process.env.FGC_EXPECTED_DEMO_MONTH)
+      expect(response.data.canViewAuditLog).toBe(true)
+    } finally { await env.client.logout() }
   })
 })
