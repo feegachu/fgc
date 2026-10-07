@@ -8,7 +8,13 @@ export function severityTone(severity?: string): StatusTone {
 }
 
 const warningTypes = ['CAP_WARNING', 'ARBITRAGE_CANDIDATE', 'ALLOCATION_EVIDENCE_MISSING']
-const errorTypes = ['CAP_VIOLATION', 'RECONCILIATION_MISMATCH', 'JOURNAL_IMBALANCE', 'POLICY_MISSING', 'POLICY_DUPLICATE']
+const errorTypes = [
+  'CAP_VIOLATION',
+  'RECONCILIATION_MISMATCH',
+  'JOURNAL_IMBALANCE',
+  'POLICY_MISSING',
+  'POLICY_DUPLICATE',
+]
 const reviewTypes = ['CAP_REVIEW_REQUIRED', 'REFUND_TABLE_MISSING', 'PRODUCT_CODE_MISMATCH', 'DATA_QUALITY']
 
 export function exceptionTypeTone(type = ''): StatusTone {
