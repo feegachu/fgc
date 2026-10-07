@@ -1,5 +1,6 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -70,6 +71,7 @@ public record ExceptionOccurrenceResponse(
                 row.newCase(), row.reopened(), DateUtil.toSeoul(row.detectedAt()));
     }
 
+    @JsonProperty("detectionLabel")
     public String detectionLabel() {
         if (reopened) return "재발·재개";
         return newCase ? "신규" : "재검출";
@@ -83,6 +85,7 @@ public record ExceptionOccurrenceResponse(
      * 증거 스냅샷을 원시 JSON 대신 관리자가 읽는 항목 목록으로 푼다.
      * 파싱이 안 되거나 알려진 키가 없으면 빈 목록 — 검출 이력 자체는 그대로 보인다.
      */
+    @JsonProperty("evidenceItems")
     public List<EvidenceItem> evidenceItems() {
         if (evidenceJson == null || evidenceJson.isBlank()) {
             return List.of();

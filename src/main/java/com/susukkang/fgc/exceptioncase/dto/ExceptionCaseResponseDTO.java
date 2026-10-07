@@ -1,5 +1,6 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
@@ -64,6 +65,23 @@ public record ExceptionCaseResponseDTO(
         );
     }
 
+    /** API 응답에도 한글 라벨을 함께 내려준다(SIR-008). */
+    @JsonProperty("typeLabel")
+    public String typeLabel() {
+        return type.label();
+    }
+
+    @JsonProperty("severityLabel")
+    public String severityLabel() {
+        return severity.label();
+    }
+
+    @JsonProperty("statusLabel")
+    public String statusLabel() {
+        return status.label();
+    }
+
+    @JsonProperty("reasonLabel")
     public String reasonLabel() {
         return labelOf(reasonCode);
     }
@@ -107,6 +125,7 @@ public record ExceptionCaseResponseDTO(
     }
 
     /** 예외의 원천 업무 화면이 제공되는 경우 바로 이동할 링크를 반환한다. */
+    @JsonProperty("sourceLink")
     public String sourceLink() {
         if (sourceEntityType == null || sourceEntityId == null || sourceEntityId.isBlank()) {
             return null;
@@ -132,6 +151,7 @@ public record ExceptionCaseResponseDTO(
      *
      * 실시간 경로(FUN-034)는 cap_check_id 컬럼을, 배치 경로는 source_entity 를 쓴다.
      */
+    @JsonProperty("capBasisLink")
     public String capBasisLink() {
         if (capCheckId != null) {
             return "/cap-checks?capCheckId=" + capCheckId;

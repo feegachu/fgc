@@ -10,6 +10,7 @@ import { TransitionPage } from './TransitionPage'
 import { NotFoundPage } from './NotFoundPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
+import { ExceptionPage } from '../features/exception/ExceptionPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RequirePermission } from './RequirePermission'
 // React로 전환을 마친 화면. lazy()로 등록한 화면만 별도 청크로 나뉘어 그 경로에 들어갈 때 받는다
@@ -19,6 +20,7 @@ const pages: Record<string, ComponentType> = {
   '/': DashboardPage,
   '/base': BasePage,
   '/policies': PoliciesPage,
+  '/exceptions': ExceptionPage,
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
 }
 export const screenRoutes: RouteObject[] = screens.map((screen) => {
