@@ -71,7 +71,7 @@ export function DataTable<T>({
         <caption className="visually-hidden">{caption}</caption>
         {columns.some((column) => column.width) && (
           <colgroup>
-            {onSelectionChange && <col />}{' '}
+            {onSelectionChange && <col />}
             {columns.map((column) => (
               <col key={column.key} style={{ width: column.width }} />
             ))}

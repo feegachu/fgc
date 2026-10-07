@@ -8,7 +8,7 @@ const server = process.env.FGC_REFERENCE_SERVER
 const access = process.env.FGC_REFERENCE_ACCESS
 await mkdir(directory, { recursive: true })
 const browser = await chromium.launch({ executablePath: process.env.FGC_BROWSER_EXECUTABLE || undefined })
-const evidence = { base: [], policies: [], errors: [], apiStatuses: [], layout: [] }
+const evidence = { base: [], policies: [], errors: [], apiStatuses: [], layout: [], consoleErrors: [] }
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const api = async (path) => {
@@ -53,6 +53,10 @@ try {
   })
   const react = await context.newPage()
   react.on('pageerror', (error) => evidence.errors.push(error.message))
+  react.on('console', (message) => {
+    if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:'))
+      evidence.consoleErrors.push(message.text())
+  })
   legacy.on('pageerror', (error) => evidence.errors.push(error.message))
   await react.route('**/api/v1/**', (route) => {
     if (new URL(route.request().url()).pathname === '/api/v1/auth/refresh')
@@ -205,6 +209,7 @@ try {
   await react.goto('http://localhost:5173/app/policies?month=2026-07&asOf=broken')
   await expect(react.getByRole('alert')).toBeVisible()
   assert.deepEqual(evidence.errors, [])
+  assert.deepEqual(evidence.consoleErrors, [])
   await writeFile(resolve(directory, 'evidence.json'), JSON.stringify(evidence, null, 2))
   console.log(JSON.stringify({ directory, base: evidence.base, policies: evidence.policies, errors: evidence.errors }))
 } finally {

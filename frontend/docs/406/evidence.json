@@ -150,10 +150,6 @@
       "status": 200
     },
     {
-      "path": "/api/v1/auth/me",
-      "status": 200
-    },
-    {
       "path": "/api/v1/base/commission-items?asOf=2026-07-01",
       "status": 200
     },
@@ -1267,5 +1263,6 @@
         "height": 96.84375
       }
     }
-  ]
+  ],
+  "consoleErrors": []
 }
