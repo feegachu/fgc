@@ -35,9 +35,10 @@ class LoginViewRenderingTest {
     @Test
     void loginTemplateKeepsLegacyMessageAndPasswordToggle() throws Exception {
         String html = render("/login?error");
-        assertThat(html).contains("아이디 또는 비밀번호가 맞지 않습니다.", "auth-error is-visible",
-                "data-password-toggle", "action=\"/login\"");
-        assertThat(render("/login")).doesNotContain("auth-error is-visible");
+        assertThat(html).contains("아이디 또는 비밀번호가 맞지 않습니다.",
+                "data-password-toggle", "action=\"/login\"")
+                .containsPattern("class=\"auth-error\\s+is-visible\"");
+        assertThat(render("/login")).doesNotContainPattern("class=\"auth-error\\s+is-visible\"");
     }
 
     @Test
@@ -82,10 +83,12 @@ class LoginViewRenderingTest {
         }
 
         @Bean
-        SpringTemplateEngine templateEngine() {
+        SpringTemplateEngine templateEngine(SpringResourceTemplateResolver templateResolver,
+                                            ResourceBundleMessageSource messageSource) {
             SpringTemplateEngine engine = new SpringTemplateEngine();
-            engine.setTemplateResolver(templateResolver());
-            engine.setTemplateEngineMessageSource(messageSource());
+            // proxyBeanMethods=false이므로 직접 호출 대신 컨텍스트가 초기화한 Bean을 주입받는다.
+            engine.setTemplateResolver(templateResolver);
+            engine.setTemplateEngineMessageSource(messageSource);
             return engine;
         }
 
