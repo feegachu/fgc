@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { createMemoryRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { routes } from './routes'
@@ -9,11 +10,16 @@ import { useSidebarStore } from '../stores/sidebar'
 import { screens } from './screens'
 import { queryClient } from './queryClient'
 import { subscribeApiErrors } from '../lib/api/errorNotifications'
+import { useAuthStore } from '../stores/auth'
 beforeEach(() => {
+  useAuthStore.setState({ accessToken: 'shell-fixture', loggingOut: false })
   useWorkspaceStore.getState().clear()
   useSidebarStore.setState({ collapsed: false, openSections: [] })
 })
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  useAuthStore.setState({ accessToken: null, loggingOut: false })
+})
 function renderAt(path: string, roleCode = 'SETTLEMENT') {
   vi.spyOn(apiClient, 'request').mockResolvedValue({
     data: {
