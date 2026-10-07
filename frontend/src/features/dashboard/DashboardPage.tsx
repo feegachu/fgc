@@ -94,7 +94,7 @@ function DashboardContent({ month }: { month: string }) {
         <>
           <section className="kpi-grid" aria-label="주요 검증 지표">
             {kpis?.map((kpi) => (
-              <Link key={kpi.label} to={kpi.to} className="kpi-card-link" aria-label={kpi.label}>
+              <Link key={kpi.label} to={kpi.to} className="kpi-card-link" aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}>
                 <KpiCard
                   label={kpi.label}
                   value={int(kpi.value ?? 0)}

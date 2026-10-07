@@ -93,7 +93,7 @@ describe('DASH-W01 업무 대시보드', () => {
     renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
     expect(within(kpis).getAllByRole('link')).toHaveLength(6)
-    expect(within(kpis).getByRole('link', { name: '1,200% 위반' })).toHaveTextContent('1,234건')
+    expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
     expect(summaryCalls()).toEqual(['/api/v1/dashboard/summary?month=2026-07'])
     const table = screen.getByRole('table', { name: '최근 예외 목록' })
     expect(within(table).getByText('C-0001')).toBeInTheDocument()
@@ -114,11 +114,11 @@ describe('DASH-W01 업무 대시보드', () => {
   it('KPI 카드와 행 클릭은 필터·기준월을 유지한 채 업무 화면으로 이동한다', async () => {
     const { router, actions } = renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
-    expect(within(kpis).getByRole('link', { name: '대사 불일치' })).toHaveAttribute(
+    expect(within(kpis).getByRole('link', { name: '대사 불일치 4건' })).toHaveAttribute(
       'href',
       '/app/reconciliations?onlyMismatch=true&month=2026-07',
     )
-    await actions.click(within(kpis).getByRole('link', { name: '1,200% 위반' }))
+    await actions.click(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/app/cap-checks'))
     expect(new URLSearchParams(router.state.location.search).get('status')).toBe('VIOLATION')
     expect(new URLSearchParams(router.state.location.search).get('month')).toBe('2026-07')
@@ -142,7 +142,7 @@ describe('DASH-W01 업무 대시보드', () => {
       envelope({ ...summary, capViolation: 0, capWarning: 0, openException: 0, recentExceptions: [], recentRuns: [] })
     renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
-    expect(within(kpis).getByRole('link', { name: '1,200% 위반' })).toHaveTextContent('0건')
+    expect(within(kpis).getByRole('link', { name: '1,200% 위반 0건' })).toHaveTextContent('0건')
     expect(screen.getAllByText('조건에 맞는 자료가 없습니다.')).toHaveLength(2)
   })
 
