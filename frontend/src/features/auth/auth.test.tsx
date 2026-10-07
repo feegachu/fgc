@@ -198,7 +198,7 @@ describe('서버 권한 플래그', () => {
       envelope({ ...user, roleCode: 'COMPLIANCE', canProcess: false, canViewAuditLog: true }),
     )
     const { router } = renderAt('/app/audit-logs', true)
-    await screen.findByRole('heading', { name: '감사로그' })
+    await screen.findByRole('heading', { name: '감사로그 조회' })
     await act(() => router.navigate('/transactions/new'))
     expect(await screen.findByRole('alert')).toHaveTextContent(authMessages.forbidden)
     expect(screen.queryByRole('link', { name: '기존 화면으로 이동' })).toBeNull()

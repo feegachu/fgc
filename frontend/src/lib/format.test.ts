@@ -41,6 +41,8 @@ test("일시는 Asia/Seoul 로 고정해 표시한다 (인터페이스정의서 
   // UTC 기준으로는 전날이지만 KST 로는 당일이다.
   assert.strictEqual(format.dateTime("2026-08-02T15:30:00Z"), "2026-08-03 00:30");
   assert.strictEqual(format.date("2026-08-02T15:30:00Z"), "2026-08-03");
+  assert.strictEqual(format.dateTimeSeconds("2026-08-02T15:30:07Z"), "2026-08-03 00:30:07");
+  assert.strictEqual(format.dateTimeSeconds("not-a-date"), "-");
 });
 
 test("빈 값과 잘못된 값은 대시로 통일한다", () => {

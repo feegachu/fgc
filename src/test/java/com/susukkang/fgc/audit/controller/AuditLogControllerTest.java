@@ -1,6 +1,10 @@
 package com.susukkang.fgc.audit.controller;
 
+import com.susukkang.fgc.audit.dto.AuditDiffEntry;
+import com.susukkang.fgc.audit.dto.AuditLogDetailResponse;
+import com.susukkang.fgc.audit.dto.AuditLogOptionsResponse;
 import com.susukkang.fgc.audit.dto.AuditLogResponse;
+import com.susukkang.fgc.audit.dto.AuditUserRow;
 import com.susukkang.fgc.audit.service.AuditLogQueryService;
 import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
@@ -22,12 +26,14 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -148,5 +154,53 @@ class AuditLogControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
                 .andExpect(jsonPath("$.error.field").value("from"));
+    }
+
+    /** #407 AUDT-W01 React 필터 선택지 — 1차 모델의 actionCodes·entityTypes·auditUsers 와 같은 값. */
+    @Test
+    void returnsFilterOptions() throws Exception {
+        given(auditLogQueryService.options()).willReturn(new AuditLogOptionsResponse(
+                List.of("PAYMENT_CONFIRMED"), List.of("COMMISSION_PAYMENT"), List.of(new AuditUserRow(12L, "settle01"))));
+
+        mockMvc.perform(get("/api/v1/audit-logs/options").with(user("audit01").roles("COMPLIANCE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actionCodes[0]").value("PAYMENT_CONFIRMED"))
+                .andExpect(jsonPath("$.data.entityTypes[0]").value("COMMISSION_PAYMENT"))
+                .andExpect(jsonPath("$.data.users[0].userId").value(12))
+                .andExpect(jsonPath("$.data.users[0].loginId").value("settle01"));
+    }
+
+    /** #407 상세는 감사행과 서버가 계산한 diff 를 함께 돌려준다. */
+    @Test
+    void returnsDetailWithServerComputedDiff() throws Exception {
+        given(auditLogQueryService.detail(1L)).willReturn(Optional.of(new AuditLogDetailResponse(
+                sampleLog(), List.of(new AuditDiffEntry("status", "DRAFT", "CONFIRMED", true)))));
+
+        mockMvc.perform(get("/api/v1/audit-logs/1").with(user("audit01").roles("SYSTEM_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.log.auditLogId").value(1))
+                .andExpect(jsonPath("$.data.diff[0].field").value("status"))
+                .andExpect(jsonPath("$.data.diff[0].before").value("DRAFT"))
+                .andExpect(jsonPath("$.data.diff[0].after").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.diff[0].changed").value(true));
+    }
+
+    @Test
+    void returnsNotFoundForUnknownAuditLog() throws Exception {
+        given(auditLogQueryService.detail(999L)).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/audit-logs/999").with(user("audit01").roles("COMPLIANCE")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-004"));
+    }
+
+    /** 신설 API 도 FUN-002 권한 규칙을 그대로 따른다 — SecurityConfig URL 규칙 + @PreAuthorize. */
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/audit-logs/options", "/api/v1/audit-logs/1"})
+    void rejectsSettlementForNewEndpoints(String path) throws Exception {
+        mockMvc.perform(get(path).with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isForbidden());
+        verify(auditLogQueryService, never()).options();
+        verify(auditLogQueryService, never()).detail(any());
     }
 }

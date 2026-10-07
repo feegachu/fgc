@@ -299,6 +299,31 @@ class AuditLogQueryRepositoryIntegrationTest {
     }
 
     /**
+     * 설명 : 상세 조회(#407)가 목록과 같은 프로젝션으로 한 건을 돌려주고, 서비스가 diff 를 붙이는지 검증한다.
+     */
+    @Test
+    @DisplayName("단건 조회 — 처리자 LEFT JOIN 유지, 없는 ID 는 empty, 서비스 상세는 diff 포함")
+    void selectsSingleAuditLogWithDiff() {
+        Long id = jdbcTemplate.queryForObject(
+                "SELECT audit_log_id FROM fgc.audit_log WHERE action_code = ? AND entity_id = '9001'",
+                Long.class, actionA);
+
+        AuditLogRow row = queryRepository.selectAuditLog(id).orElseThrow();
+        assertThat(row.userLoginId()).isEqualTo(loginId);
+        assertThat(row.reason()).isEqualTo("첫 행");
+        assertThat(queryRepository.selectAuditLog(-1L)).isEmpty();
+
+        var detail = queryService.detail(id).orElseThrow();
+        assertThat(detail.log().auditLogId()).isEqualTo(id);
+        assertThat(detail.diff()).singleElement().satisfies(entry -> {
+            assertThat(entry.field()).isEqualTo("status");
+            assertThat(entry.before()).isEqualTo("DRAFT");
+            assertThat(entry.after()).isEqualTo("CONFIRMED");
+            assertThat(entry.changed()).isTrue();
+        });
+    }
+
+    /**
      * 설명 : 작업 유형과 대상 종류 및 감사 처리자 선택지 조회를 검증한다.
      *
      * @author hjKang

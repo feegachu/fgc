@@ -1,5 +1,7 @@
 package com.susukkang.fgc.audit.service;
 
+import com.susukkang.fgc.audit.dto.AuditLogDetailResponse;
+import com.susukkang.fgc.audit.dto.AuditLogOptionsResponse;
 import com.susukkang.fgc.audit.dto.AuditLogResponse;
 import com.susukkang.fgc.audit.dto.AuditLogSearchCriteria;
 import com.susukkang.fgc.audit.dto.AuditUserRow;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 설명 : FUN-061 IF-API-52 감사로그 조회 서비스.
@@ -33,6 +36,7 @@ public class AuditLogQueryServiceImpl implements AuditLogQueryService {
     private static final String SORT = "occurredAt,desc";
 
     private final AuditLogQueryRepository auditLogQueryRepository;
+    private final AuditDiffCalculator auditDiffCalculator;
 
     /**
      * 설명 : 검색 조건과 페이지를 검증하고 종료일 포함 규칙을 적용한 감사로그 페이지를 반환한다.
@@ -120,6 +124,27 @@ public class AuditLogQueryServiceImpl implements AuditLogQueryService {
     @Transactional(readOnly = true)
     public List<AuditUserRow> auditUsers() {
         return auditLogQueryRepository.selectAuditUsers();
+    }
+
+    /**
+     * 설명 : 감사로그 검색 화면의 필터 선택지 세 가지를 한 응답으로 반환한다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AuditLogOptionsResponse options() {
+        return new AuditLogOptionsResponse(actionCodes(), entityTypes(), auditUsers());
+    }
+
+    /**
+     * 설명 : 감사로그 한 건과 before/after 리프 경로 비교를 반환한다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AuditLogDetailResponse> detail(Long auditLogId) {
+        return auditLogQueryRepository.selectAuditLog(auditLogId)
+                .map(AuditLogResponse::from)
+                .map(log -> new AuditLogDetailResponse(
+                        log, auditDiffCalculator.diff(log.beforeValue(), log.afterValue())));
     }
 
     /**

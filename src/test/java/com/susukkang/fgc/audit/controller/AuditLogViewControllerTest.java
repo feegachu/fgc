@@ -2,6 +2,7 @@ package com.susukkang.fgc.audit.controller;
 
 import com.susukkang.fgc.audit.dto.AuditLogResponse;
 import com.susukkang.fgc.audit.dto.AuditUserRow;
+import com.susukkang.fgc.audit.service.AuditDiffCalculator;
 import com.susukkang.fgc.audit.service.AuditLogQueryService;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 역할 제한 스모크(ScreenViewControllerTest 에서 이관)와 서버 렌더링(목록·BATCH 표기·diff)을 본다.
  */
 @WebMvcTest(AuditLogViewController.class)
-@Import({ShellAdvice.class, SecurityConfig.class, MessageSourceAutoConfiguration.class,
+@Import({AuditDiffCalculator.class, ShellAdvice.class, SecurityConfig.class, MessageSourceAutoConfiguration.class,
         com.susukkang.fgc.common.exception.FgcMessageResolver.class,
         com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver.class})
 @TestPropertySource(properties = "fgc.demo-month=2026-07")

@@ -99,6 +99,7 @@
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
       hour12: false
     }).formatToParts(date);
 
@@ -133,6 +134,14 @@
     const parts = seoulParts(String(value).trim());
     if (!parts) return EMPTY;
     return parts.year + "-" + parts.month + "-" + parts.day + " " + parts.hour + ":" + parts.minute;
+  }
+
+  /* YYYY-MM-DD HH:mm:ss, Asia/Seoul 고정. 감사로그 발생시각처럼 초까지 구분해야 하는 값에 쓴다. */
+  export function dateTimeSeconds(value: unknown) {
+    if (isBlank(value)) return EMPTY;
+
+    const parts = seoulParts(String(value).trim());
+    return parts ? dateTime(value) + ":" + parts.second : EMPTY;
   }
 
   /* YYYY-MM. 정산월·귀속월은 서버가 항상 그 달 1일로 준다. */
