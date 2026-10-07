@@ -5,13 +5,14 @@ import { screens } from './screens'
 import { TransitionPage } from './TransitionPage'
 import { NotFoundPage } from './NotFoundPage'
 import { LoginPage } from '../features/auth/LoginPage'
+import { ExceptionPage } from '../features/exception/ExceptionPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RequirePermission } from './RequirePermission'
 export const screenRoutes: RouteObject[] = screens.map((screen) => ({
   path: screen.path,
   element: (
     <RequirePermission permission={screen.permission}>
-      <TransitionPage screen={screen} />
+      {screen.id === 'EXCP-W01' ? <ExceptionPage /> : <TransitionPage screen={screen} />}
     </RequirePermission>
   ),
   handle: { screenId: screen.id, title: screen.title, parentMenu: screen.menu, permission: screen.permission },

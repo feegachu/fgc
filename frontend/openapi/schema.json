@@ -332,6 +332,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseExceptionOptionsResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionOptionsResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseFinalizeChecklistResponse" : {
         "properties" : {
           "data" : {
@@ -503,6 +517,23 @@
           "data" : {
             "items" : {
               "$ref" : "#/components/schemas/ContractStatusEventResponse"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseListJournalAccountRow" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/JournalAccountRow"
             },
             "type" : "array"
           },
@@ -3053,6 +3084,17 @@
         },
         "type" : "object"
       },
+      "EvidenceItem" : {
+        "properties" : {
+          "label" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ExceptionActionRequest" : {
         "properties" : {
           "actionType" : {
@@ -3091,6 +3133,9 @@
           "actionType" : {
             "type" : "string"
           },
+          "actionTypeLabel" : {
+            "type" : "string"
+          },
           "evidenceRef" : {
             "type" : "string"
           },
@@ -3102,12 +3147,30 @@
             "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
           },
+          "fromStatusLabel" : {
+            "type" : "string"
+          },
           "reason" : {
             "type" : "string"
           },
           "toStatus" : {
             "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
             "type" : "string"
+          },
+          "toStatusLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionAssigneeRow" : {
+        "properties" : {
+          "loginId" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -3128,6 +3191,9 @@
             "type" : "integer"
           },
           "assigneeLoginId" : {
+            "type" : "string"
+          },
+          "capBasisLink" : {
             "type" : "string"
           },
           "capCheckId" : {
@@ -3184,11 +3250,17 @@
           "reasonCode" : {
             "type" : "string"
           },
+          "reasonLabel" : {
+            "type" : "string"
+          },
           "reconciliationResultType" : {
             "type" : "string"
           },
           "severity" : {
             "enum" : [ "INFO", "WARNING", "HIGH", "CRITICAL" ],
+            "type" : "string"
+          },
+          "severityLabel" : {
             "type" : "string"
           },
           "sourceEntityId" : {
@@ -3197,8 +3269,14 @@
           "sourceEntityType" : {
             "type" : "string"
           },
+          "sourceLink" : {
+            "type" : "string"
+          },
           "status" : {
             "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
+            "type" : "string"
+          },
+          "statusLabel" : {
             "type" : "string"
           },
           "title" : {
@@ -3206,6 +3284,9 @@
           },
           "type" : {
             "enum" : [ "CAP_WARNING", "CAP_VIOLATION", "CAP_REVIEW_REQUIRED", "RECONCILIATION_MISMATCH", "JOURNAL_IMBALANCE", "JOURNAL_CORRECTION_REQUIRED", "ARBITRAGE_CANDIDATE", "REFUND_TABLE_MISSING", "PRODUCT_CODE_MISMATCH", "POLICY_MISSING", "POLICY_DUPLICATE", "ALLOCATION_EVIDENCE_MISSING", "DATA_QUALITY", "OTHER" ],
+            "type" : "string"
+          },
+          "typeLabel" : {
             "type" : "string"
           },
           "validationMonth" : {
@@ -3301,6 +3382,15 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "detectionLabel" : {
+            "type" : "string"
+          },
+          "evidenceItems" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EvidenceItem"
+            },
+            "type" : "array"
+          },
           "evidenceJson" : {
             "type" : "string"
           },
@@ -3337,6 +3427,43 @@
           "validationRunId" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionOptionsResponse" : {
+        "description" : "IF-API-43A 예외함 필터 선택지",
+        "properties" : {
+          "assignees" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionAssigneeRow"
+            },
+            "type" : "array"
+          },
+          "reasons" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Option"
+            },
+            "type" : "array"
+          },
+          "severities" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Option"
+            },
+            "type" : "array"
+          },
+          "types" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Option"
+            },
+            "type" : "array"
+          },
+          "validationMonths" : {
+            "items" : {
+              "format" : "date",
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -3378,6 +3505,9 @@
           },
           "type" : {
             "enum" : [ "CAP_WARNING", "CAP_VIOLATION", "CAP_REVIEW_REQUIRED", "RECONCILIATION_MISMATCH", "JOURNAL_IMBALANCE", "JOURNAL_CORRECTION_REQUIRED", "ARBITRAGE_CANDIDATE", "REFUND_TABLE_MISSING", "PRODUCT_CODE_MISMATCH", "POLICY_MISSING", "POLICY_DUPLICATE", "ALLOCATION_EVIDENCE_MISSING", "DATA_QUALITY", "OTHER" ],
+            "type" : "string"
+          },
+          "typeLabel" : {
             "type" : "string"
           }
         },
@@ -3470,6 +3600,27 @@
           "insurerTypeLabel" : {
             "description" : "보험회사 유형 한글명",
             "example" : "생명보험",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "JournalAccountRow" : {
+        "properties" : {
+          "accountCode" : {
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "activeYn" : {
+            "type" : "boolean"
+          },
+          "journalAccountId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "normalBalance" : {
             "type" : "string"
           }
         },
@@ -4088,6 +4239,17 @@
           }
         },
         "required" : [ "demoMonth" ],
+        "type" : "object"
+      },
+      "Option" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "OrganizationResponse" : {
@@ -6868,6 +7030,13 @@
           }
         }, {
           "in" : "query",
+          "name" : "assigneeFilter",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
@@ -6891,6 +7060,24 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseExceptionCaseSearchResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-case-controller" ]
+      }
+    },
+    "/api/v1/exceptions/options" : {
+      "get" : {
+        "operationId" : "options",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionOptionsResponse"
                 }
               }
             },
@@ -7061,6 +7248,26 @@
           }
         },
         "summary" : "검증원장 목록 조회",
+        "tags" : [ "검증원장" ]
+      }
+    },
+    "/api/v1/journals/accounts" : {
+      "get" : {
+        "description" : "사용 중인 계정과목을 계정코드 오름차순으로 돌려준다.",
+        "operationId" : "accounts",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListJournalAccountRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "활성 분개 계정과목 목록 조회",
         "tags" : [ "검증원장" ]
       }
     },

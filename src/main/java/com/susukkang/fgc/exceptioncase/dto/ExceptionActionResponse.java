@@ -1,5 +1,6 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.util.DateUtil;
@@ -29,14 +30,17 @@ public record ExceptionActionResponse(
         );
     }
 
+    @JsonProperty("actionTypeLabel")
     public String actionTypeLabel() {
         return ExceptionActionType.valueOf(actionType).label();
     }
 
+    @JsonProperty("fromStatusLabel")
     public String fromStatusLabel() {
         return fromStatus == null ? "-" : fromStatus.label();
     }
 
+    @JsonProperty("toStatusLabel")
     public String toStatusLabel() {
         return toStatus.label();
     }

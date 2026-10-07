@@ -12,6 +12,7 @@ import './styles/components.css'
 import './styles/utilities.css'
 import './styles/react.css'
 import './features/auth/login.css'
+import './features/exception/exception.css'
 import { apiClient } from './lib/api/client'
 
 // 로그인 URL을 새로 열어도 유효한 쿠키가 있으면 기존 인증을 복원한다.
