@@ -1,3 +1,4 @@
+import { ReferenceText } from '../reference/ReferenceUI'
 import { present } from '../reference/utils'
 import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -7,46 +8,86 @@ const active = (value?: boolean) => (
   <StatusBadge tone={value ? 'success' : 'neutral'}>{value ? '사용' : '사용중지'}</StatusBadge>
 )
 export const organizationColumns: TableColumn<Organization>[] = [
-  { key: 'code', label: '조직코드', render: (r) => present(r.organizationCode) },
-  { key: 'name', label: '조직명', render: (r) => present(r.organizationName) },
+  {
+    key: 'code',
+    label: '조직코드',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.organizationCode} limit={20} singleLine />,
+  },
+  {
+    key: 'name',
+    label: '조직명',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.organizationName} limit={24} singleLine />,
+  },
   {
     key: 'type',
-    label: '조직유형',
+    label: '유형',
     render: (r) => (
       <>
-        {present(r.organizationTypeLabel)} <small>{r.organizationType}</small>
+        {present(r.organizationTypeLabel)} <span className="base-code-label">{r.organizationType}</span>
       </>
     ),
   },
-  { key: 'parent', label: '상위조직', render: (r) => present(r.parentName) },
-  { key: 'from', label: '적용시작일', render: (r) => date(r.effectiveFrom) },
-  { key: 'to', label: '적용종료일', render: (r) => date(r.effectiveTo) },
-  { key: 'active', label: '사용여부', render: (r) => active(r.activeYn) },
+  {
+    key: 'parent',
+    label: '상위 조직',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.parentName} limit={24} singleLine />,
+  },
+  { key: 'from', label: '적용 시작일', render: (r) => date(r.effectiveFrom) },
+  { key: 'to', label: '적용 종료일', render: (r) => date(r.effectiveTo) },
+  { key: 'active', label: '상태', render: (r) => active(r.activeYn) },
 ]
 export const insurerColumns: TableColumn<Insurer>[] = [
-  { key: 'code', label: '보험회사코드', render: (r) => present(r.insurerCode) },
-  { key: 'name', label: '보험회사명', render: (r) => present(r.insurerName) },
+  {
+    key: 'code',
+    label: '보험회사 코드',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.insurerCode} limit={20} singleLine />,
+  },
+  {
+    key: 'name',
+    label: '보험회사명',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.insurerName} limit={24} singleLine />,
+  },
   {
     key: 'type',
-    label: '보험유형',
+    label: '구분',
     render: (r) => (
       <>
-        {present(r.insurerTypeLabel)} <small>{r.insurerType}</small>
+        {present(r.insurerTypeLabel)} <span className="base-code-label">{r.insurerType}</span>
       </>
     ),
   },
-  { key: 'active', label: '사용여부', render: (r) => active(r.activeYn) },
+  { key: 'active', label: '상태', render: (r) => active(r.activeYn) },
 ]
 export const productColumns: TableColumn<Product>[] = [
-  { key: 'code', label: '보험회사 상품코드', render: (r) => present(r.insurerProductCode) },
-  { key: 'name', label: '상품명', render: (r) => present(r.productName) },
-  { key: 'standard', label: '표준상품코드', render: (r) => present(r.standardProductCode) },
+  {
+    key: 'code',
+    label: '상품코드',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.insurerProductCode} limit={20} singleLine />,
+  },
+  {
+    key: 'name',
+    label: '상품명',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.productName} limit={28} />,
+  },
+  {
+    key: 'standard',
+    label: '표준상품코드',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.standardProductCode} limit={20} singleLine />,
+  },
   { key: 'group', label: '상품군', render: (r) => present(r.productGroupCode) },
   { key: 'version', label: '판매버전', render: (r) => present(r.offeringVersion) },
   {
     key: 'period',
     label: '판매기간',
-    render: (r) => `${date(r.salesStartDate)} ~ ${r.salesEndDate ? date(r.salesEndDate) : '계속'}`,
+    render: (r) => `${date(r.salesStartDate)} ~ ${r.salesEndDate ? date(r.salesEndDate) : '현재'}`,
   },
   {
     key: 'document',
@@ -54,24 +95,23 @@ export const productColumns: TableColumn<Product>[] = [
     render: (r) => (
       <>
         {present(r.basicDocumentVersion)}
-        <br />
-        {date(r.basicDocumentDate)}
+        <span className="base-secondary-line">{date(r.basicDocumentDate)}</span>
       </>
     ),
   },
   {
     key: 'channel',
-    label: '판매채널',
+    label: '채널',
     render: (r) => (
       <>
-        {present(r.channelCode)} {r.channelSpecialRuleYn && <StatusBadge tone="warning">채널특례</StatusBadge>}
+        {present(r.channelCode)} {r.channelSpecialRuleYn && <span className="base-secondary-line">채널 특례</span>}
       </>
     ),
   },
   { key: 'fee', label: '수수료체계', render: (r) => present(r.feeRegimeCode) },
   {
     key: 'deduction',
-    label: '표준해약공제 80%',
+    label: '80% 공제',
     render: (r) => (
       <StatusBadge tone={r.standardDeduction80Yn ? 'warning' : 'neutral'}>
         {r.standardDeduction80Yn ? '예' : '아니오'}
@@ -80,25 +120,30 @@ export const productColumns: TableColumn<Product>[] = [
   },
 ]
 export const agentColumns: TableColumn<Agent>[] = [
-  { key: 'code', label: '설계사코드', render: (r) => present(r.agentCode) },
+  {
+    key: 'code',
+    label: '설계사 코드',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.agentCode} limit={20} singleLine />,
+  },
   { key: 'name', label: '설계사명', render: (r) => present(r.agentName) },
   {
     key: 'rank',
     label: '직급',
     render: (r) => (
       <>
-        {present(r.rankLabel)} <small>{r.rankCode}</small>
+        {present(r.rankLabel)} <span className="base-code-label">{r.rankCode}</span>
       </>
     ),
   },
   {
     key: 'org',
-    label: '소속조직',
+    label: '소속 조직',
+    cellClassName: 'base-disclosure-cell',
     render: (r) => (
       <>
-        {present(r.organizationName)}
-        <br />
-        <small>{r.organizationCode}</small>
+        <ReferenceText value={r.organizationName} limit={24} singleLine />
+        <span className="base-secondary-line">{r.organizationCode}</span>
       </>
     ),
   },
@@ -112,30 +157,25 @@ export const agentColumns: TableColumn<Agent>[] = [
         <StatusBadge tone={r.agentStatus === 'ACTIVE' ? 'success' : 'neutral'}>
           {present(r.agentStatusLabel)}
         </StatusBadge>
-        {!r.activeYn && <StatusBadge>사용중지</StatusBadge>}
+        {!r.activeYn && <span className="base-secondary-line">기준정보 사용중지</span>}
       </>
     ),
   },
   { key: 'registration', label: '최근 등록일', render: (r) => date(r.latestRegistrationDate) },
   {
     key: 'experience',
-    label: '최근 3년 경력',
+    label: '직전 3년 경력',
     render: (r) => (r.priorThreeYearExperienceYn == null ? '확인 전' : r.priorThreeYearExperienceYn ? '예' : '아니오'),
   },
   {
     key: 'support',
-    label: '신인 지원 대상',
+    label: '신인지원',
     render: (r) => (
       <>
         <StatusBadge tone={r.newcomerSupportEligibleYn ? 'warning' : 'neutral'}>
           {r.newcomerSupportEligibleYn ? '대상' : '비대상'}
         </StatusBadge>
-        {r.newcomerSupportEndDate && (
-          <>
-            <br />
-            {date(r.newcomerSupportEndDate)}까지
-          </>
-        )}
+        {r.newcomerSupportEndDate && <span className="base-secondary-line">{date(r.newcomerSupportEndDate)}까지</span>}
       </>
     ),
   },
@@ -153,8 +193,18 @@ const categories: Record<string, string> = {
   RECOVERY: '회수',
 }
 export const commissionColumns: TableColumn<CommissionItem>[] = [
-  { key: 'code', label: '항목코드', render: (r) => present(r.itemCode) },
-  { key: 'name', label: '항목명', render: (r) => present(r.itemName) },
+  {
+    key: 'code',
+    label: '항목코드',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.itemCode} limit={18} singleLine />,
+  },
+  {
+    key: 'name',
+    label: '항목명',
+    cellClassName: 'base-disclosure-cell',
+    render: (r) => <ReferenceText value={r.itemName} limit={28} />,
+  },
   {
     key: 'cashflow',
     label: '지급/차감',
@@ -174,6 +224,6 @@ export const commissionColumns: TableColumn<CommissionItem>[] = [
           ? '신인지원'
           : (categories[r.itemCategory ?? ''] ?? present(r.itemCategory)),
   },
-  { key: 'from', label: '사용시작일', render: (r) => date(r.effectiveFrom) },
-  { key: 'to', label: '사용종료일', render: (r) => date(r.effectiveTo) },
+  { key: 'from', label: '적용 시작일', render: (r) => date(r.effectiveFrom) },
+  { key: 'to', label: '적용 종료일', render: (r) => date(r.effectiveTo) },
 ]

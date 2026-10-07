@@ -94,15 +94,15 @@
       "status": 200
     },
     {
+      "path": "/api/v1/base/insurers?page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=100",
+      "status": 200
+    },
+    {
       "path": "/api/v1/base/products?page=1&size=20&insurerId=1&asOf=2026-07-01",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/base/insurers?page=1&size=100",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/base/insurers?page=1&size=100",
       "status": 200
     },
     {
@@ -118,26 +118,30 @@
       "status": 200
     },
     {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
       "path": "/api/v1/base/agents?page=1&size=20&asOf=2026-07-01",
       "status": 200
     },
     {
-      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
-      "status": 200
-    },
-    {
       "path": "/api/v1/base/commission-items?asOf=2026-07-01",
       "status": 200
     },
@@ -146,11 +150,11 @@
       "status": 200
     },
     {
-      "path": "/api/v1/base/commission-items?asOf=2026-07-01",
+      "path": "/api/v1/auth/me",
       "status": 200
     },
     {
-      "path": "/api/v1/auth/me",
+      "path": "/api/v1/base/commission-items?asOf=2026-07-01",
       "status": 200
     },
     {
@@ -167,10 +171,6 @@
     },
     {
       "path": "/api/v1/policies/6",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/auth/me",
       "status": 200
     },
     {
@@ -191,10 +191,6 @@
     },
     {
       "path": "/api/v1/policies/4",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/auth/me",
       "status": 200
     },
     {
@@ -247,10 +243,6 @@
     },
     {
       "path": "/api/v1/policies/12",
-      "status": 200
-    },
-    {
-      "path": "/api/v1/auth/me",
       "status": 200
     },
     {
@@ -280,6 +272,1000 @@
     {
       "path": "/api/v1/policies?asOf=broken",
       "status": 400
+    }
+  ],
+  "layout": [
+    {
+      "name": "base-organization",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-filter-form",
+      "before": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 100
+      },
+      "after": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 100
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-filter-form :is(input, select)",
+      "before": {
+        "x": 21,
+        "y": 146,
+        "width": 548,
+        "height": 32
+      },
+      "after": {
+        "x": 21,
+        "y": 146,
+        "width": 548,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-filter-form .filter-actions",
+      "before": {
+        "x": 915,
+        "y": 146,
+        "width": 200,
+        "height": 32
+      },
+      "after": {
+        "x": 915,
+        "y": 146,
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-result-header",
+      "before": {
+        "x": 1,
+        "y": 220,
+        "width": 1134,
+        "height": 70.84375
+      },
+      "after": {
+        "x": 1,
+        "y": 220,
+        "width": 1134,
+        "height": 70.84375
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-table-viewport",
+      "before": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 419
+      },
+      "after": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 419
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-table thead",
+      "before": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 40
+      },
+      "after": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 40
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-table tbody tr:first-child",
+      "before": {
+        "x": 25,
+        "y": 331.34375,
+        "width": 1086,
+        "height": 42
+      },
+      "after": {
+        "x": 25,
+        "y": 331.34375,
+        "width": 1086,
+        "height": 42
+      }
+    },
+    {
+      "name": "base-organization",
+      "selector": ".base-pagination-footer",
+      "before": {
+        "x": 25,
+        "y": 725.84375,
+        "width": 1086,
+        "height": 56
+      },
+      "after": {
+        "x": 25,
+        "y": 725.84375,
+        "width": 1086,
+        "height": 56
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-filter-form",
+      "before": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 100
+      },
+      "after": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 100
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-filter-form :is(input, select)",
+      "before": {
+        "x": 21,
+        "y": 146,
+        "width": 878,
+        "height": 32
+      },
+      "after": {
+        "x": 21,
+        "y": 146,
+        "width": 878,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-filter-form .filter-actions",
+      "before": {
+        "x": 915,
+        "y": 146,
+        "width": 200,
+        "height": 32
+      },
+      "after": {
+        "x": 915,
+        "y": 146,
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-result-header",
+      "before": {
+        "x": 1,
+        "y": 220,
+        "width": 1134,
+        "height": 70.84375
+      },
+      "after": {
+        "x": 1,
+        "y": 220,
+        "width": 1134,
+        "height": 70.84375
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-table-viewport",
+      "before": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 293
+      },
+      "after": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 293
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-table thead",
+      "before": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 40
+      },
+      "after": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 40
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-table tbody tr:first-child",
+      "before": {
+        "x": 25,
+        "y": 331.34375,
+        "width": 1086,
+        "height": 42
+      },
+      "after": {
+        "x": 25,
+        "y": 331.34375,
+        "width": 1086,
+        "height": 42
+      }
+    },
+    {
+      "name": "base-insurer",
+      "selector": ".base-pagination-footer",
+      "before": {
+        "x": 25,
+        "y": 599.84375,
+        "width": 1086,
+        "height": 56
+      },
+      "after": {
+        "x": 25,
+        "y": 599.84375,
+        "width": 1086,
+        "height": 56
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-filter-form",
+      "before": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 108.078125
+      },
+      "after": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 108.078125
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-filter-form :is(input, select)",
+      "before": {
+        "x": 21,
+        "y": 154.078125,
+        "width": 548,
+        "height": 32
+      },
+      "after": {
+        "x": 21,
+        "y": 154.078125,
+        "width": 548,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-filter-form .filter-actions",
+      "before": {
+        "x": 915,
+        "y": 154.078125,
+        "width": 200,
+        "height": 32
+      },
+      "after": {
+        "x": 915,
+        "y": 154.078125,
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-result-header",
+      "before": {
+        "x": 1,
+        "y": 228.078125,
+        "width": 1134,
+        "height": 73.53125
+      },
+      "after": {
+        "x": 1,
+        "y": 228.078125,
+        "width": 1134,
+        "height": 73.53125
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-table-viewport",
+      "before": {
+        "x": 25,
+        "y": 301.609375,
+        "width": 1086,
+        "height": 85.6875
+      },
+      "after": {
+        "x": 25,
+        "y": 301.609375,
+        "width": 1086,
+        "height": 85.6875
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-table thead",
+      "before": {
+        "x": 25,
+        "y": 301.609375,
+        "width": 1408,
+        "height": 40
+      },
+      "after": {
+        "x": 25,
+        "y": 301.609375,
+        "width": 1408,
+        "height": 40
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-table tbody tr:first-child",
+      "before": {
+        "x": 25,
+        "y": 342.109375,
+        "width": 1408,
+        "height": 42
+      },
+      "after": {
+        "x": 25,
+        "y": 342.109375,
+        "width": 1408,
+        "height": 42
+      }
+    },
+    {
+      "name": "base-product",
+      "selector": ".base-pagination-footer",
+      "before": {
+        "x": 25,
+        "y": 403.296875,
+        "width": 1086,
+        "height": 58.703125
+      },
+      "after": {
+        "x": 25,
+        "y": 403.296875,
+        "width": 1086,
+        "height": 58.703125
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-filter-form",
+      "before": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 148
+      },
+      "after": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 148
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-filter-form :is(input, select)",
+      "before": {
+        "x": 21,
+        "y": 146,
+        "width": 408.796875,
+        "height": 32
+      },
+      "after": {
+        "x": 21,
+        "y": 146,
+        "width": 408.796875,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-filter-form .filter-actions",
+      "before": {
+        "x": 915,
+        "y": 194,
+        "width": 200,
+        "height": 32
+      },
+      "after": {
+        "x": 915,
+        "y": 194,
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-result-header",
+      "before": {
+        "x": 1,
+        "y": 268,
+        "width": 1134,
+        "height": 70.84375
+      },
+      "after": {
+        "x": 1,
+        "y": 268,
+        "width": 1134,
+        "height": 70.84375
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-table-viewport",
+      "before": {
+        "x": 25,
+        "y": 338.84375,
+        "width": 1086,
+        "height": 425.5
+      },
+      "after": {
+        "x": 25,
+        "y": 338.84375,
+        "width": 1086,
+        "height": 425.5
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-table thead",
+      "before": {
+        "x": 25,
+        "y": 338.84375,
+        "width": 1408,
+        "height": 40
+      },
+      "after": {
+        "x": 25,
+        "y": 338.84375,
+        "width": 1408,
+        "height": 40
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-table tbody tr:first-child",
+      "before": {
+        "x": 25,
+        "y": 379.34375,
+        "width": 1408,
+        "height": 54.5
+      },
+      "after": {
+        "x": 25,
+        "y": 379.34375,
+        "width": 1408,
+        "height": 54.5
+      }
+    },
+    {
+      "name": "base-agent",
+      "selector": ".base-pagination-footer",
+      "before": {
+        "x": 25,
+        "y": 780.34375,
+        "width": 1086,
+        "height": 56
+      },
+      "after": {
+        "x": 25,
+        "y": 780.34375,
+        "width": 1086,
+        "height": 56
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 38,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".base-filter-form",
+      "before": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 100
+      },
+      "after": {
+        "x": 0,
+        "y": 99,
+        "width": 1136,
+        "height": 100
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".base-filter-form :is(input, select)",
+      "before": {
+        "x": 21,
+        "y": 146,
+        "width": 878,
+        "height": 32
+      },
+      "after": {
+        "x": 21,
+        "y": 146,
+        "width": 878,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".base-filter-form .filter-actions",
+      "before": {
+        "x": 915,
+        "y": 146,
+        "width": 200,
+        "height": 32
+      },
+      "after": {
+        "x": 915,
+        "y": 146,
+        "width": 200,
+        "height": 32
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".base-result-header",
+      "before": {
+        "x": 1,
+        "y": 220,
+        "width": 1134,
+        "height": 70.84375
+      },
+      "after": {
+        "x": 1,
+        "y": 220,
+        "width": 1134,
+        "height": 70.84375
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".base-table-viewport",
+      "before": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 507
+      },
+      "after": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 507
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".base-table thead",
+      "before": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 40
+      },
+      "after": {
+        "x": 25,
+        "y": 290.84375,
+        "width": 1086,
+        "height": 40
+      }
+    },
+    {
+      "name": "base-commission-item",
+      "selector": ".base-table tbody tr:first-child",
+      "before": {
+        "x": 25,
+        "y": 331.34375,
+        "width": 1086,
+        "height": 42
+      },
+      "after": {
+        "x": 25,
+        "y": 331.34375,
+        "width": 1086,
+        "height": 42
+      }
+    },
+    {
+      "name": "policies-versions",
+      "selector": ".policy-date-field",
+      "before": {
+        "x": 960,
+        "y": 0,
+        "width": 176,
+        "height": 54
+      },
+      "after": {
+        "x": 960,
+        "y": 0,
+        "width": 176,
+        "height": 54
+      }
+    },
+    {
+      "name": "policies-versions",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "policies-versions",
+      "selector": ".policy-panel-header",
+      "before": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      },
+      "after": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      }
+    },
+    {
+      "name": "policies-versions",
+      "selector": ".policy-version-table thead",
+      "before": {
+        "x": 1,
+        "y": 151,
+        "width": 1344,
+        "height": 40
+      },
+      "after": {
+        "x": 1,
+        "y": 151,
+        "width": 1344,
+        "height": 40
+      }
+    },
+    {
+      "name": "policies-versions",
+      "selector": ".policy-version-table tbody tr:first-child",
+      "before": {
+        "x": 1,
+        "y": 191.5,
+        "width": 1344,
+        "height": 42
+      },
+      "after": {
+        "x": 1,
+        "y": 191.5,
+        "width": 1344,
+        "height": 42
+      }
+    },
+    {
+      "name": "policies-versions",
+      "selector": ".policy-version-table th:first-child",
+      "before": {
+        "x": 1,
+        "y": 151,
+        "width": 48,
+        "height": 40
+      },
+      "after": {
+        "x": 1,
+        "y": 151,
+        "width": 48,
+        "height": 40
+      }
+    },
+    {
+      "name": "policies-versions",
+      "selector": ".policy-version-table th:nth-child(2)",
+      "before": {
+        "x": 49,
+        "y": 151,
+        "width": 200,
+        "height": 40
+      },
+      "after": {
+        "x": 49,
+        "y": 151,
+        "width": 200,
+        "height": 40
+      }
+    },
+    {
+      "name": "policies-commission",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "policies-commission",
+      "selector": ".policy-panel-header",
+      "before": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      },
+      "after": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      }
+    },
+    {
+      "name": "policies-commission",
+      "selector": ".policy-detail-table-viewport",
+      "before": {
+        "x": 1,
+        "y": 151,
+        "width": 1134,
+        "height": 430.5
+      },
+      "after": {
+        "x": 1,
+        "y": 151,
+        "width": 1134,
+        "height": 430.5
+      }
+    },
+    {
+      "name": "policies-cap",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "policies-cap",
+      "selector": ".policy-panel-header",
+      "before": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      },
+      "after": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      }
+    },
+    {
+      "name": "policies-cap",
+      "selector": ".policy-detail-table-viewport",
+      "before": {
+        "x": 1,
+        "y": 151,
+        "width": 1134,
+        "height": 83
+      },
+      "after": {
+        "x": 1,
+        "y": 151,
+        "width": 1134,
+        "height": 83
+      }
+    },
+    {
+      "name": "policies-refund",
+      "selector": ".tab-list",
+      "before": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      },
+      "after": {
+        "x": 0,
+        "y": 66,
+        "width": 1136,
+        "height": 41
+      }
+    },
+    {
+      "name": "policies-refund",
+      "selector": ".policy-panel-header",
+      "before": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      },
+      "after": {
+        "x": 1,
+        "y": 107,
+        "width": 1134,
+        "height": 44
+      }
+    },
+    {
+      "name": "policies-refund",
+      "selector": ".policy-detail-table-viewport",
+      "before": {
+        "x": 1,
+        "y": 299.84375,
+        "width": 1134,
+        "height": 1553
+      },
+      "after": {
+        "x": 1,
+        "y": 299.84375,
+        "width": 1134,
+        "height": 1553
+      }
+    },
+    {
+      "name": "policies-refund",
+      "selector": ".policy-detail-title",
+      "before": {
+        "x": 1,
+        "y": 151,
+        "width": 1134,
+        "height": 44
+      },
+      "after": {
+        "x": 1,
+        "y": 151,
+        "width": 1134,
+        "height": 44
+      }
+    },
+    {
+      "name": "policies-refund",
+      "selector": ".policy-refund-metadata",
+      "before": {
+        "x": 17,
+        "y": 195,
+        "width": 1102,
+        "height": 96.84375
+      },
+      "after": {
+        "x": 17,
+        "y": 195,
+        "width": 1102,
+        "height": 96.84375
+      }
     }
   ]
 }

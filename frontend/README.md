@@ -262,13 +262,18 @@ React Query를 사용하며 취소 signal을 전달한다. 응답 타입은 생�
 - 기준일이 없으면 현재 전역 기준월의 1일을 사용한다. `asOf=broken` 같은 잘못된 URL은 API에
   전달하여 서버 400 메시지를 표시한다. 인증 오류는 공용 client가 처리한다. 500은 요청 ID만 노출한다.
 - 금액/요율/날짜는 공용 format을 사용한다. 브라우저에서 산입·한도·요율을 계산하지 않는다.
-  `regulationRefs`와 상세 `sourceRefs`는 EvidenceLink로 확인한다.
+  `regulationRefs`와 환급률표 원천 문서는 EvidenceLink로 확인한다.
 
-의도적인 화면 차이: 공용 Field의 필수 표시, Pagination의 5페이지 그룹, 정액의 `원` 단위,
-탭·선택 정책의 URL 복원, 상세 근거 표시를 추가했다. 기존 수수료 항목의 분류 라벨은
-API에 라벨 필드가 없어 `base-list.js`의 표시용 매핑을 그대로 옮겼다. API 계약 확장은 하지 않았다.
-DataTable에 `rowClassName`(근거 미기재 행)과 `onRowActivate`(행 클릭 선택)를 추가했다.
-키보드 선택은 라디오 버튼을 사용하고 근거 버튼 클릭은 행 선택을 바꾸지 않는다.
+기존 Thymeleaf 화면의 배치·문구·표 너비를 유지한다. BASE 필터/결과 카드를 분리하고
+결과 제목·설명·우측 건수, 초기화→조회 순서, 중앙 이전/다음 및 5페이지 이동 창을 복원했다.
+POL 기준일은 제목 오른쪽에 두고, 표의 열 너비와 상세 제목·환급률 메타정보 2열 배치를 유지한다.
+필수 입력 검증은 유지하되 기존처럼 별표는 표시하지 않으며 정액은 단위를 열 제목에만 표시한다.
+화면 CSS는 공통 CSS 뒤에서 적용한다. DataTable의 선택·열 너비 옵션과 FilterBar/Pagination의
+선택적 배치 옵션을 쓰며 다른 화면의 기본 동작은 유지한다.
+
+탭·선택 정책의 URL 복원과 EvidenceLink, 음수 금액의 괄호/빨간색, 요율 4자리 절사는 유지한다.
+수수료 항목 분류는 API에 라벨 필드가 없어 `base-list.js`의 표시용 매핑을 그대로 옮겼다.
+키보드 선택은 라디오 버튼을 사용하고 근거 버튼·셀 전체 보기 클릭은 행 선택을 바꾸지 않는다.
 
 ### 검증·전후 캡처
 
@@ -281,16 +286,16 @@ PublishingTemplateStructureTest와 policy-list.test.cjs는 유지한다.
 
 ```bash
 FGC_VERIFY_REFERENCE=true FGC_NODE_BIN=node \
-  ./gradlew test --tests '*ReferenceScreensIntegrationTest'
+  ./gradlew test --tests '*ReferenceScreensIntegrationTest' --rerun
 ```
 
 설치된 Chrome 사용 시 `FGC_BROWSER_EXECUTABLE`도 지정한다. 테스트는 MockMvc로 실제 Thymeleaf
 HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 임시 서버에 전달한다. React 시작 세션은
 테스트 서버가 발급한 실제 JWT를 주입하고 `/auth/me`부터 실제 API를 사용한다. 운영·개발 DB를 쓰지 않는다.
 1440×1000에서 BASE 5탭·POL 4탭의 전후 PNG와 API 상태·행 비교 결과를
-`build/screenshots/reference/`에 저장한다. 두 화면의 동일 데이터 표시를 검증하며 본문 픽셀 동일성을
-주장하지 않는다. 캡처에는 시드 데이터만 들어간다.
+`build/screenshots/reference/`에 저장한다. 두 화면의 동일 데이터·표 제목·필터/버튼 순서와 주요 영역의 위치·너비·높이(허용오차 2px)를
+비교한다. 전체 이미지의 픽셀 동일성을 주장하지 않는다. #403 공통 셸 변경은 비교 범위 밖이다. 캡처에는 시드 데이터만 들어간다.
 
-긴 기준정보·정책 코드와 기간은 셀에서 줄바꿈해 전체 값을 읽을 수 있게 했다. 상품·설계사 표는
-기존과 같은 최소 너비 88rem을 유지하고 좁은 화면에서 가로 스크롤한다. 긴 판단 이유·귀속방법은
-공용 DataTable의 전체 보기/접기로 확인한다.
+긴 기준정보·정책 텍스트는 기존과 같은 1~2줄 미리보기와 전체 보기/접기를 사용한다.
+실제 잘림이 발생하는 경우에만 펼침 버튼을 표시하며, 너비 변경 시 ResizeObserver로 다시 확인한다.
+상품·설계사 표는 최소 너비 88rem, 정책 버전 표는 84rem을 유지하고 좁은 화면에서 가로 스크롤한다.

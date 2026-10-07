@@ -1,68 +1,439 @@
-.reference-tabs {
-  display: flex;
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--color-border-default);
-  margin-bottom: var(--space-4);
-  overflow-x: auto;
+.base-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
 }
-.reference-tabs button {
-  padding: var(--space-3) var(--space-2);
-  white-space: nowrap;
+
+.base-page-header {
+  align-items: flex-end;
+}
+
+.base-as-of-summary {
+  flex: 0 0 auto;
   color: var(--color-text-secondary);
-  border-bottom: 2px solid transparent;
+  font-size: 0.75rem;
 }
-.reference-tabs button[aria-selected='true'] {
-  color: var(--color-text-link);
-  border-color: var(--color-text-link);
-  font-weight: 600;
+
+.base-as-of-summary strong {
+  margin-left: var(--space-1);
+  color: var(--color-text-primary);
 }
-.reference-section {
-  margin-top: var(--space-4);
+
+.base-workspace {
+  min-width: 0;
 }
-.reference-section h2 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: var(--space-3);
+
+.base-panel {
+  display: grid;
+  min-height: 24rem;
+  gap: var(--space-5);
+  padding-top: var(--space-5);
+  overflow: visible;
+  border-radius: 0;
 }
-.reference-meta {
-  display: flex;
+
+.base-filter-form {
   flex-wrap: wrap;
-  gap: var(--space-4);
-  margin-bottom: var(--space-3);
-  color: var(--color-text-secondary);
+  padding: var(--space-5);
+  border-radius: var(--radius-12);
+  box-shadow: var(--shadow-xs);
 }
-.reference-missing-evidence {
+
+.base-filter-form .field {
+  width: auto;
+  flex: 1 1 13rem;
+}
+
+.base-filter-form .base-filter-keyword,
+.base-filter-form .base-filter-select {
+  width: auto;
+  flex: 2 1 21rem;
+}
+
+.base-filter-actions {
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.base-result-surface {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-12);
+}
+
+.base-result-header {
+  min-height: 4rem;
+  padding: var(--space-4) var(--space-6) var(--space-3);
+}
+
+.base-result-description {
+  margin-top: 0.125rem;
   color: var(--color-text-tertiary);
-  background: var(--color-bg-subtle);
+  font-size: 0.75rem;
 }
-.reference-count {
-  margin: var(--space-3) 0;
+
+.base-result-count {
+  flex: 0 0 auto;
   color: var(--color-text-secondary);
+  font-size: 0.8125rem;
 }
-.reference-panel {
-  padding: var(--space-4);
+
+.base-result-count strong {
+  color: var(--color-text-primary);
 }
-.data-table tbody tr.reference-missing-evidence {
-  color: var(--color-text-tertiary);
-  background: var(--color-bg-subtle);
+
+.base-result-message {
+  margin: 0 var(--space-6) var(--space-4);
+  border-radius: var(--radius-8);
+  font-size: 0.8125rem;
 }
-.reference-panel .data-table {
-  min-width: 60rem;
+
+.base-result-message.is-error {
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
 }
-.reference-panel .data-table th {
-  white-space: normal;
+
+.base-table {
+  min-width: 58rem;
 }
-.reference-panel .evidence + .evidence {
-  margin-left: var(--space-2);
-}
-.reference-base-product .data-table,
-.reference-base-agent .data-table {
+
+.base-product-table,
+.base-agent-table {
   min-width: 88rem;
 }
-.reference-policy-versions .data-table {
-  min-width: 100rem;
+
+.base-table-viewport {
+  width: auto;
+  margin-inline: var(--space-6);
 }
-.reference-panel .data-table td {
+
+.data-table td.base-disclosure-cell {
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: middle;
+  text-overflow: clip;
   white-space: normal;
+}
+
+.base-code-label,
+.base-secondary-line {
+  display: block;
+  margin-top: 0.125rem;
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+.base-code-label {
+  font-variant-numeric: tabular-nums;
+}
+
+.base-pagination-footer {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  margin: var(--space-4) var(--space-6) 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.base-state-row:hover {
+  background: var(--color-bg-surface);
+}
+
+.base-state-row td {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+}
+
+@media (max-width: 63.9375rem) {
+  .base-filter-form .field {
+    width: 100%;
+    flex: none;
+  }
+
+  .base-filter-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .base-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .base-filter-form,
+  .base-result-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .base-panel {
+    gap: var(--space-4);
+    padding-top: var(--space-4);
+  }
+
+  .base-filter-form {
+    padding: var(--space-4);
+  }
+
+  .base-result-header {
+    padding: var(--space-4);
+  }
+
+  .base-filter-form .field,
+  .base-filter-actions .button {
+    width: 100%;
+  }
+
+  .base-filter-form .field {
+    flex: none;
+  }
+
+  .base-filter-actions {
+    margin-left: 0;
+  }
+
+  .base-result-message,
+  .base-table-viewport {
+    margin-inline: var(--space-4);
+  }
+
+  .base-pagination-footer {
+    margin-inline: var(--space-4);
+  }
+}
+
+.policy-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.policy-page-header {
+  align-items: flex-end;
+}
+
+.policy-date-field {
+  width: 11rem;
+  flex: 0 0 auto;
+  gap: var(--space-1);
+}
+
+.policy-date-field .field-label {
+  color: var(--color-text-secondary);
+}
+
+.policy-tabs,
+.policy-tab-panel,
+.policy-detail-body {
+  min-width: 0;
+}
+
+.policy-panel-header {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.policy-panel-caption {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-align: right;
+}
+
+.policy-version-table {
+  min-width: 84rem;
+}
+
+.policy-col-select {
+  width: 3rem;
+}
+.policy-col-code {
+  width: 12.5rem;
+}
+.policy-col-name {
+  width: 15rem;
+}
+.policy-col-type {
+  width: 9rem;
+}
+.policy-col-source {
+  width: 7.5rem;
+}
+.policy-col-version {
+  width: 4.5rem;
+}
+.policy-col-date {
+  width: 7.5rem;
+}
+.policy-col-status {
+  width: 6rem;
+}
+.policy-col-reference {
+  width: 11.5rem;
+}
+
+.data-table td.policy-disclosure-cell {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: middle;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.policy-row {
+  cursor: pointer;
+}
+
+.policy-row-select:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.policy-select-cell {
+  text-align: center;
+}
+
+.policy-row-select {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--color-action-primary);
+}
+
+.policy-row-missing-reference td {
+  color: var(--color-text-tertiary);
+}
+
+.policy-state-row:hover {
+  background: var(--color-bg-surface);
+}
+
+.policy-state-row td {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+}
+
+.policy-empty-state {
+  min-height: 12rem;
+}
+
+.policy-empty-state.is-error {
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
+.policy-detail-table-viewport + .policy-detail-title,
+.policy-refund-metadata + .policy-detail-table-viewport {
+  margin-top: var(--space-2);
+}
+
+.policy-detail-title {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  color: var(--color-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-wrap: pretty;
+}
+
+.policy-rule-table {
+  min-width: 72rem;
+}
+
+.policy-cap-table {
+  min-width: 68rem;
+}
+
+.policy-cap-item-table {
+  min-width: 58rem;
+}
+
+.policy-refund-table {
+  min-width: 42rem;
+}
+
+.policy-refund-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0 var(--space-4);
+}
+
+.policy-refund-metadata > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-8);
+  background: var(--color-bg-subtle);
+}
+
+.policy-refund-metadata dt {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+}
+
+.policy-refund-metadata dd {
+  min-width: 0;
+  margin: 0;
   overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 63.9375rem) {
+  .policy-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: var(--space-2);
+  }
+
+  .policy-panel-caption {
+    text-align: left;
+  }
+
+  .policy-refund-metadata {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .policy-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .policy-date-field {
+    width: 100%;
+  }
+
+  .policy-refund-metadata > div {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}
+
+.base-filter-form .filter-actions {
+  gap: var(--space-2);
+  flex-wrap: nowrap;
+  margin-left: auto;
+}
+@media (max-width: 63.9375rem) {
+  .base-filter-form .filter-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+.policy-tab-panel .evidence + .evidence {
+  margin-left: var(--space-2);
 }

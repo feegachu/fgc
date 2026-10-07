@@ -8,7 +8,7 @@ const server = process.env.FGC_REFERENCE_SERVER
 const access = process.env.FGC_REFERENCE_ACCESS
 await mkdir(directory, { recursive: true })
 const browser = await chromium.launch({ executablePath: process.env.FGC_BROWSER_EXECUTABLE || undefined })
-const evidence = { base: [], policies: [], errors: [], apiStatuses: [] }
+const evidence = { base: [], policies: [], errors: [], apiStatuses: [], layout: [] }
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const api = async (path) => {
@@ -69,6 +69,39 @@ try {
     await page.evaluate(() => document.fonts.ready)
     await page.screenshot({ path: resolve(directory, `${name}.png`), fullPage: true })
   }
+  const compareLayout = async (name, selectors) => {
+    await Promise.all([legacy.evaluate(() => document.fonts.ready), react.evaluate(() => document.fonts.ready)])
+    const measure = (page, selector) =>
+      page
+        .locator(selector)
+        .filter({ visible: true })
+        .first()
+        .evaluate((element) => {
+          const anchor = element
+            .closest('.base-page, .policy-page')
+            .querySelector('.page-header')
+            .getBoundingClientRect()
+          const rect = element.getBoundingClientRect()
+          return { x: rect.x - anchor.x, y: rect.y - anchor.y, width: rect.width, height: rect.height }
+        })
+    for (const selector of selectors) {
+      const before = await measure(legacy, selector)
+      const after = await measure(react, selector)
+      evidence.layout.push({ name, selector, before, after })
+      for (const property of ['x', 'y', 'width', 'height'])
+        assert.ok(
+          Math.abs(before[property] - after[property]) <= 2,
+          `${name} ${selector} ${property}: legacy=${before[property]}, react=${after[property]}`,
+        )
+    }
+    const headers = (page) =>
+      page.getByRole('tabpanel').filter({ visible: true }).locator('thead:visible').allTextContents()
+    assert.deepEqual(
+      (await headers(react)).map((text) => text.replace(/\s/g, '')),
+      (await headers(legacy)).map((text) => text.replace(/\s/g, '')),
+      `${name} table labels`,
+    )
+  }
   const firstInsurer = (await api('/api/v1/base/insurers?page=1&size=20')).content[0]
   const bases = [
     ['organization', 'organizations', 'organizationCode'],
@@ -89,6 +122,24 @@ try {
     await expect(legacy.locator(`[data-base-body="${tab}"]`)).toContainText(rows[0][key])
     await expect(react.getByRole('tabpanel')).toContainText(rows[0][key])
     for (const row of rows) await expect(react.getByRole('tabpanel')).toContainText(row[key])
+    await compareLayout(`base-${tab}`, [
+      '.tab-list',
+      '.base-filter-form',
+      '.base-filter-form :is(input, select)',
+      '.base-filter-form .filter-actions',
+      '.base-result-header',
+      '.base-table-viewport',
+      '.base-table thead',
+      '.base-table tbody tr:first-child',
+      ...(tab === 'commission-item' ? [] : ['.base-pagination-footer']),
+    ])
+    const filterOrder = (page) =>
+      page
+        .getByRole('tabpanel')
+        .filter({ visible: true })
+        .locator('.field-label, .filter-actions button')
+        .allTextContents()
+    assert.deepEqual(await filterOrder(react), await filterOrder(legacy), `${tab} filter/button order`)
     await screenshot(legacy, `legacy-base-${tab}`)
     await screenshot(react, `react-base-${tab}`)
     evidence.base.push({ tab, count: rows.length, firstCode: rows[0][key] })
@@ -98,6 +149,15 @@ try {
   await react.goto('http://localhost:5173/app/policies?month=2026-07&asOf=2026-07-01')
   for (const policy of policies)
     await expect(react.getByRole('table', { name: '정책 버전' })).toContainText(policy.policyCode)
+  await compareLayout('policies-versions', [
+    '.policy-date-field',
+    '.tab-list',
+    '.policy-panel-header',
+    '.policy-version-table thead',
+    '.policy-version-table tbody tr:first-child',
+    '.policy-version-table th:first-child',
+    '.policy-version-table th:nth-child(2)',
+  ])
   await screenshot(legacy, 'legacy-policies-versions')
   await screenshot(react, 'react-policies-versions')
   const nonEmpty = { commission: null, cap: null, refund: null }
@@ -125,6 +185,12 @@ try {
     )
     await expect(react.getByRole('tabpanel')).toContainText(fixture.detail[property][0][key])
     await expect(legacy.locator(`#tab-${legacyTab}`)).toContainText(fixture.detail[property][0][key])
+    await compareLayout(`policies-${tab}`, [
+      '.tab-list',
+      '.policy-panel-header',
+      '.policy-detail-table-viewport',
+      ...(tab === 'refund' ? ['.policy-detail-title', '.policy-refund-metadata'] : []),
+    ])
     await screenshot(legacy, `legacy-policies-${tab}`)
     await screenshot(react, `react-policies-${tab}`)
     evidence.policies.push({ tab, policy: fixture.policy.policyCode, count: fixture.detail[property].length })

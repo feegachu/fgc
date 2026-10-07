@@ -163,7 +163,7 @@ it.each(['organization', 'insurer', 'product', 'agent', 'commission-item'])(
         ? envelope([])
         : envelope({ ...page, content: [], totalPages: 0, totalElements: 0 }),
     )
-    expect(await screen.findByText('조건에 맞는 자료가 없습니다.')).toBeVisible()
+    expect(await screen.findByText('조건에 맞는 기준정보가 없습니다.')).toBeVisible()
   },
 )
 it('POL uses month first day and fetches detail lazily; preserves selection across all four tabs', async () => {
@@ -172,17 +172,17 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   await screen.findByText('규제 정책')
   expect(screen.getByLabelText(/기준일/)).toHaveValue('2026-08-01')
   expect(request.mock.calls.some(([p]) => /policies\/\d/.test(p))).toBe(false)
-  expect(screen.getByText('근거 미기재').closest('tr')).toHaveClass('reference-missing-evidence')
+  expect(screen.getByText('근거 미기재').closest('tr')).toHaveClass('policy-row-missing-reference')
   expect(screen.getByText('프로젝트 가정')).toHaveClass('status-badge-warning')
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
   await screen.findByText('650.1234')
   expect(screen.getByText('1 ~ 12회차')).toBeVisible()
-  expect(screen.getByText('(1,234)원')).toHaveClass('is-negative-amount')
+  expect(screen.getByText('(1,234)')).toHaveClass('is-negative-amount')
   await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
   await screen.findByText('89.1234')
-  expect(screen.getByText('증빙필수')).toBeVisible()
+  expect(screen.getByText('증빙 확인')).toBeVisible()
   await user.click(screen.getByRole('tab', { name: '예상 해약환급률표' }))
-  await screen.findByText('34.5678')
+  await screen.findByText('34.5678%')
   expect(screen.getByText('1,200% 한도 가산에 쓰는 값')).toBeVisible()
   expect(router.state.location.search).toContain('policyVersionId=1')
   await user.click(screen.getByRole('tab', { name: '정책 버전' }))
@@ -194,7 +194,7 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
 })
 it('POL restores detail tab and selected id from a shared URL', async () => {
   const { request } = mount('/policies?asOf=2026-07-11&tab=refund&policyVersionId=2')
-  await screen.findByText('34.5678')
+  await screen.findByText('34.5678%')
   expect(screen.getByRole('tab', { name: '예상 해약환급률표' })).toHaveAttribute('aria-selected', 'true')
   expect(request.mock.calls.some(([p]) => p === '/api/v1/policies/2')).toBe(true)
 })
@@ -243,7 +243,7 @@ it.each(['commission', 'cap', 'refund'])('POL %s handles empty detail', async (t
 it('POL empty versions and keyboard tab switching', async () => {
   const user = userEvent.setup()
   mount('/policies', () => envelope([]))
-  await screen.findByText('조건에 맞는 자료가 없습니다.')
+  await screen.findByText('기준일에 적용되는 정책 버전이 없습니다. 기준일을 바꿔 보세요.')
   screen.getByRole('tab', { name: '정책 버전' }).focus()
   await user.keyboard('{End}')
   expect(screen.getByRole('tab', { name: '예상 해약환급률표' })).toHaveFocus()

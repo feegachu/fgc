@@ -6,10 +6,9 @@ import { EvidenceLink } from '../../components/EvidenceLink'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date, int } from '../../lib/format'
-import { QueryState, ReferenceHeader, ReferenceTabs } from '../reference/ReferenceUI'
+import { QueryState, ReferenceTabs, ReferenceText } from '../reference/ReferenceUI'
 import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
-import '../reference/reference.css'
 const tabs = [
   { id: 'versions', label: '정책 버전' },
   { id: 'commission', label: '수수료 규칙' },
@@ -47,116 +46,148 @@ export function PoliciesPage() {
     })
   }
   return (
-    <>
-      <ReferenceHeader title="정책·룰셋 조회" description="기준일에 적용되는 정책 버전과 계산 규칙을 조회합니다." />
-      <div className="filter-bar">
-        <Field label="기준일" required>
-          <input
-            type="date"
-            value={asOf}
-            required
-            onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })}
-          />
+    <div className="policy-page">
+      <header className="page-header policy-page-header">
+        <div className="page-header-copy">
+          <h1 className="page-title">정책 · 룰셋 조회</h1>
+        </div>
+        <Field className="policy-date-field" label="적용 기준일">
+          <input type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
         </Field>
-      </div>
-      <QueryState loading={policies.isLoading} error={policies.error} />
-      <p className="reference-count">
-        총 {int(policies.data?.length ?? 0)}건 · 선택 정책:{' '}
-        {selected ? `${selected.policyCode} v${selected.versionNo}` : '-'}
-      </p>
-      <ReferenceTabs
-        panelClassName={`reference-policy-${active}`}
-        tabs={tabs}
-        active={active}
-        onChange={(tab) => patch({ tab, ...(id !== undefined ? { policyVersionId: String(id) } : {}) })}
-      >
-        <div hidden={active !== 'versions'}>
-          <DataTable
-            caption="정책 버전"
-            rows={policies.data ?? []}
-            rowKey={(r) => String(r.policyVersionId)}
-            selectedKeys={id === undefined ? [] : [String(id)]}
-            rowClassName={(r) => (r.regulationRefs?.length ? '' : 'reference-missing-evidence')}
-            onRowActivate={(r) => patch({ policyVersionId: String(r.policyVersionId) })}
-            columns={[
-              {
-                key: 'select',
-                label: '선택',
-                render: (r) => (
-                  <input
-                    type="radio"
-                    name="policy-version"
-                    aria-label={`${r.policyCode} v${r.versionNo} 선택`}
-                    checked={id === r.policyVersionId}
-                    onChange={() => patch({ policyVersionId: String(r.policyVersionId) })}
-                  />
-                ),
-              },
-              { key: 'code', label: '정책코드', render: (r) => present(r.policyCode) },
-              { key: 'name', label: '정책명', render: (r) => present(r.policyName) },
-              { key: 'type', label: '정책유형', render: (r) => present(r.policyTypeLabel) },
-              {
-                key: 'source',
-                label: '출처분류',
-                render: (r) => (
-                  <StatusBadge tone={sourceTones[r.sourceClass ?? ''] ?? 'neutral'}>
-                    {present(r.sourceClassLabel)}
-                  </StatusBadge>
-                ),
-              },
-              { key: 'version', label: '버전', render: (r) => `v${r.versionNo}` },
-              { key: 'from', label: '적용시작일', render: (r) => date(r.effectiveFrom) },
-              { key: 'to', label: '적용종료일', render: (r) => (r.effectiveTo ? date(r.effectiveTo) : '계속') },
-              {
-                key: 'status',
-                label: '상태',
-                render: (r) => (
-                  <StatusBadge tone={r.status === 'ACTIVE' ? 'success' : r.status === 'DRAFT' ? 'warning' : 'neutral'}>
-                    {present(r.statusLabel)}
-                  </StatusBadge>
-                ),
-              },
-              {
-                key: 'refs',
-                label: '근거',
-                render: (r) =>
-                  r.regulationRefs?.length
-                    ? r.regulationRefs.map((ref) => (
+      </header>
+      <div className="policy-tabs">
+        <ReferenceTabs
+          panelClassName="surface policy-tab-panel"
+          label="정책 상세 구분"
+          tabs={tabs}
+          active={active}
+          onChange={(tab) => patch({ tab, ...(id !== undefined ? { policyVersionId: String(id) } : {}) })}
+        >
+          <header className="surface-header policy-panel-header">
+            <h2 className="surface-title">{tabs.find((tab) => tab.id === active)?.label}</h2>
+            <p className="policy-panel-caption">
+              {active === 'versions'
+                ? `기준일 ${asOf} · ${int(policies.data?.length ?? 0)}건 · 행을 선택하면 나머지 탭에서 상세를 확인할 수 있습니다`
+                : selected
+                  ? `선택 정책: ${selected.policyCode} v${selected.versionNo}`
+                  : ''}
+            </p>
+          </header>
+          <QueryState loading={policies.isLoading} error={policies.error} />
+          <div hidden={active !== 'versions'}>
+            <DataTable
+              className="policy-version-table"
+              viewportClassName="policy-version-table-viewport"
+              caption="정책 버전"
+              emptyMessage="기준일에 적용되는 정책 버전이 없습니다. 기준일을 바꿔 보세요."
+              rows={policies.data ?? []}
+              rowKey={(r) => String(r.policyVersionId)}
+              selectedKeys={id === undefined ? [] : [String(id)]}
+              rowClassName={(r) => `policy-row ${r.regulationRefs?.length ? '' : 'policy-row-missing-reference'}`}
+              onRowActivate={(r) => patch({ policyVersionId: String(r.policyVersionId) })}
+              columns={[
+                {
+                  key: 'select',
+                  label: <span className="visually-hidden">선택</span>,
+                  width: '3rem',
+                  cellClassName: 'policy-select-cell',
+                  render: (r) => (
+                    <input
+                      className="policy-row-select"
+                      type="radio"
+                      name="policy-version"
+                      aria-label={`${r.policyCode} v${r.versionNo} 선택`}
+                      checked={id === r.policyVersionId}
+                      onChange={() => patch({ policyVersionId: String(r.policyVersionId) })}
+                    />
+                  ),
+                },
+                {
+                  key: 'code',
+                  label: '정책코드',
+                  width: '12.5rem',
+                  cellClassName: 'tabular-nums policy-disclosure-cell',
+                  render: (r) => <ReferenceText value={r.policyCode} limit={22} singleLine />,
+                },
+                {
+                  key: 'name',
+                  label: '정책이름',
+                  width: '15rem',
+                  cellClassName: 'policy-disclosure-cell',
+                  render: (r) => <ReferenceText value={r.policyName} limit={28} />,
+                },
+                { key: 'type', label: '유형', width: '9rem', render: (r) => present(r.policyTypeLabel) },
+                {
+                  key: 'source',
+                  label: '출처분류',
+                  width: '7.5rem',
+                  render: (r) => (
+                    <StatusBadge tone={sourceTones[r.sourceClass ?? ''] ?? 'neutral'}>
+                      {present(r.sourceClassLabel)}
+                    </StatusBadge>
+                  ),
+                },
+                { key: 'version', label: '버전', width: '4.5rem', align: 'number', render: (r) => `v${r.versionNo}` },
+                { key: 'from', label: '적용 시작', width: '7.5rem', render: (r) => date(r.effectiveFrom) },
+                {
+                  key: 'to',
+                  label: '적용 종료',
+                  width: '7.5rem',
+                  render: (r) => (r.effectiveTo ? date(r.effectiveTo) : '계속'),
+                },
+                {
+                  key: 'status',
+                  label: '상태',
+                  width: '6rem',
+                  render: (r) => (
+                    <StatusBadge
+                      tone={r.status === 'ACTIVE' ? 'success' : r.status === 'DRAFT' ? 'warning' : 'neutral'}
+                    >
+                      {present(r.statusLabel)}
+                    </StatusBadge>
+                  ),
+                },
+                {
+                  key: 'refs',
+                  label: '근거',
+                  width: '11.5rem',
+                  cellClassName: 'policy-disclosure-cell',
+                  render: (r) =>
+                    r.regulationRefs?.length ? (
+                      r.regulationRefs.map((ref) => (
                         <EvidenceLink key={ref} label={ref}>
                           {r.policyName} · {ref}
                         </EvidenceLink>
                       ))
-                    : '근거 미기재',
-              },
-            ]}
-          />
-        </div>
-        {active !== 'versions' && policies.isSuccess && (
-          <>
-            {id === undefined ? (
-              <p>정책 버전 탭에서 정책을 선택하세요.</p>
-            ) : (
-              <>
-                <QueryState loading={detail.isLoading} error={detail.error} />
-                {detail.data && !detail.error && (
-                  <>
-                    <div className="reference-meta">
-                      {detail.data.sourceRefs?.map((ref) => (
-                        <EvidenceLink key={ref} label={ref}>
-                          {detail.data?.header?.policyName} · {ref}
-                        </EvidenceLink>
-                      ))}
-                    </div>
-                    {active === 'commission' && <CommissionRules rows={detail.data.commissionRules ?? []} />}
-                    {active === 'cap' && <CapRuleSets rows={detail.data.capRuleSets ?? []} />}
-                    {active === 'refund' && <RefundTables rows={detail.data.refundRateTables ?? []} />}
-                  </>
-                )}
-              </>
-            )}
-          </>
-        )}
-      </ReferenceTabs>
-    </>
+                    ) : (
+                      <StatusBadge>근거 미기재</StatusBadge>
+                    ),
+                },
+              ]}
+            />
+          </div>
+          {active !== 'versions' && policies.isSuccess && (
+            <>
+              {id === undefined ? (
+                <div className="empty-state policy-empty-state" role="status">
+                  정책 버전 탭에서 정책을 선택하세요.
+                </div>
+              ) : (
+                <>
+                  <QueryState loading={detail.isLoading} error={detail.error} />
+                  {detail.data && !detail.error && (
+                    <>
+                      {active === 'commission' && <CommissionRules rows={detail.data.commissionRules ?? []} />}
+                      {active === 'cap' && <CapRuleSets rows={detail.data.capRuleSets ?? []} />}
+                      {active === 'refund' && <RefundTables rows={detail.data.refundRateTables ?? []} />}
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </ReferenceTabs>
+      </div>
+    </div>
   )
 }
