@@ -80,31 +80,55 @@ export function ExceptionPage() {
   }
 
   const columns: TableColumn<ExceptionCase>[] = [
-    { key: 'id', label: '번호', align: 'number', render: (row) => row.exceptionCaseId },
+    { key: 'id', label: '번호', width: '4rem', align: 'number', render: (row) => row.exceptionCaseId },
     {
       key: 'type',
       label: '유형',
+      width: '8.5rem',
       render: (row) => <StatusBadge tone={typeTone(row.type)}>{row.typeLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'reason', label: '상세 원인', expandable: true, render: (row) => row.reasonLabel || '-' },
+    {
+      key: 'reason',
+      label: '상세 원인',
+      width: '8.5rem',
+      cellClassName: 'exception-disclosure-cell',
+      expandable: true,
+      render: (row) => row.reasonLabel || '-',
+    },
     {
       key: 'severity',
       label: '심각도',
+      width: '5rem',
       render: (row) => <StatusBadge tone={severityTone(row.severity)}>{row.severityLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'contract', label: '계약', align: 'number', render: (row) => row.contractNo ?? '-' },
-    { key: 'title', label: '내용', expandable: true, render: (row) => row.title ?? '-' },
+    { key: 'contract', label: '계약', width: '12rem', align: 'number', render: (row) => row.contractNo ?? '-' },
+    {
+      key: 'title',
+      label: '내용',
+      cellClassName: 'exception-title-cell exception-disclosure-cell',
+      expandable: true,
+      render: (row) => row.title ?? '-',
+    },
     {
       key: 'status',
       label: '상태',
+      width: '5.75rem',
       render: (row) => <StatusBadge tone={statusTone(row.status)}>{row.statusLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'assignee', label: '담당자', render: (row) => row.assigneeLoginId ?? '미배정' },
-    { key: 'detectedAt', label: '최근 검출', align: 'number', render: (row) => dateTime(row.lastDetectedAt) },
-    { key: 'count', label: '검출', align: 'number', render: (row) => `${row.detectionCount ?? 0}회` },
+    { key: 'assignee', label: '담당자', width: '6rem', render: (row) => row.assigneeLoginId ?? '미배정' },
+    {
+      key: 'detectedAt',
+      label: '최근 검출',
+      width: '8.5rem',
+      align: 'number',
+      render: (row) => dateTime(row.lastDetectedAt),
+    },
+    { key: 'count', label: '검출', width: '4rem', align: 'number', render: (row) => `${row.detectionCount ?? 0}회` },
     {
       key: 'reference',
       label: '참조',
+      width: '8rem',
+      cellClassName: 'tabular-nums exception-disclosure-cell',
       expandable: true,
       render: (row) => {
         const reference = `${row.sourceEntityType}:${row.sourceEntityId}`
@@ -183,6 +207,10 @@ export function ExceptionPage() {
               <>
                 <DataTable
                   caption="예외 목록"
+                  className="exception-table"
+                  viewportClassName="exception-table-viewport"
+                  rowClassName={() => 'exception-row'}
+                  onRowActivate={(row) => select(String(row.exceptionCaseId))}
                   columns={columns}
                   rows={rows}
                   rowKey={(row) => String(row.exceptionCaseId)}
@@ -346,6 +374,9 @@ function FilterForm({
   )
   return (
     <FilterBar
+      className="exception-filter-bar"
+      wrapFields={false}
+      resetFirst
       onSubmit={() =>
         onApply({
           type: draft.type,
@@ -359,7 +390,7 @@ function FilterForm({
       }
       onReset={onReset}
     >
-      <div className="exception-filter-fields">
+      <div className="filter-fields exception-filter-fields">
         {select(
           'f-type',
           '예외 유형',
