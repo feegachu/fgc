@@ -53,3 +53,16 @@
 .shell-error {
   padding: var(--space-6);
 }
+/* React callers provide a text label, whereas the legacy trigger contains an icon. */
+.react-evidence-trigger {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  min-height: 1.25rem;
+  padding: 0 var(--space-1);
+  white-space: nowrap;
+}
+.cell-preview {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
