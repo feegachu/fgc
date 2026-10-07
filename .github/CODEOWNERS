@@ -1,0 +1,12 @@
+/.github/                       @HyunJuneKang @C4t4ddict
+/infra/                         @HyunJuneKang @C4t4ddict
+/podman/                        @HyunJuneKang @C4t4ddict
+/nginx/                         @HyunJuneKang @C4t4ddict
+/Jenkinsfile.fgc                @HyunJuneKang @C4t4ddict
+/.trivyignore                   @HyunJuneKang @C4t4ddict
+/Containerfile.*                @HyunJuneKang @C4t4ddict
+/src/main/resources/db/migration/ @HyunJuneKang @C4t4ddict
+/src/main/resources/db/demo/     @HyunJuneKang @C4t4ddict
+/frontend/                      @ParkMinjun0721 @HyunJuneKang
+
+/.github/CODEOWNERS             @yslee4601 @HyunJuneKang
