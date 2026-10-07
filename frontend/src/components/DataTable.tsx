@@ -18,6 +18,8 @@ export interface DataTableProps<T> {
   selectedKeys?: string[]
   onSelectionChange?: (keys: string[]) => void
   onRowClick?: (row: T) => void
+  onRowActivate?: (row: T) => void
+  rowClassName?: (row: T) => string
   emptyMessage?: string
 }
 function ExpandableCell({ children }: { children: ReactNode }) {
@@ -46,6 +48,8 @@ export function DataTable<T>({
   selectedKeys = [],
   onSelectionChange,
   onRowClick,
+  onRowActivate,
+  rowClassName,
   emptyMessage = '조건에 맞는 자료가 없습니다.',
 }: DataTableProps<T>) {
   const keys = rows.map(rowKey)
@@ -118,7 +122,19 @@ export function DataTable<T>({
         <tbody>
           {rows.length ? (
             rows.map((row) => (
-              <tr key={rowKey(row)} className={selectedKeys.includes(rowKey(row)) ? 'is-selected' : undefined}>
+              <tr
+                key={rowKey(row)}
+                className={[selectedKeys.includes(rowKey(row)) ? 'is-selected' : '', rowClassName?.(row)]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={
+                  onRowActivate
+                    ? (event) => {
+                        if (!(event.target as Element).closest('button, a, input')) onRowActivate(row)
+                      }
+                    : undefined
+                }
+              >
                 {onSelectionChange && (
                   <td>
                     <input

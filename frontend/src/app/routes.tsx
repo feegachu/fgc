@@ -1,3 +1,5 @@
+import { BasePage } from '../features/base/BasePage'
+import { PoliciesPage } from '../features/policies/PoliciesPage'
 import type { RouteObject } from 'react-router'
 import { AppShell } from './shell/AppShell'
 import { ApplicationRoot } from './ApplicationRoot'
@@ -11,7 +13,13 @@ export const screenRoutes: RouteObject[] = screens.map((screen) => ({
   path: screen.path,
   element: (
     <RequirePermission permission={screen.permission}>
-      <TransitionPage screen={screen} />
+      {screen.id === 'BASE-W01' ? (
+        <BasePage />
+      ) : screen.id === 'POL-W01' ? (
+        <PoliciesPage />
+      ) : (
+        <TransitionPage screen={screen} />
+      )}
     </RequirePermission>
   ),
   handle: { screenId: screen.id, title: screen.title, parentMenu: screen.menu, permission: screen.permission },

@@ -1,0 +1,68 @@
+.reference-tabs {
+  display: flex;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border-default);
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+}
+.reference-tabs button {
+  padding: var(--space-3) var(--space-2);
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid transparent;
+}
+.reference-tabs button[aria-selected='true'] {
+  color: var(--color-text-link);
+  border-color: var(--color-text-link);
+  font-weight: 600;
+}
+.reference-section {
+  margin-top: var(--space-4);
+}
+.reference-section h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+.reference-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+}
+.reference-missing-evidence {
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-subtle);
+}
+.reference-count {
+  margin: var(--space-3) 0;
+  color: var(--color-text-secondary);
+}
+.reference-panel {
+  padding: var(--space-4);
+}
+.data-table tbody tr.reference-missing-evidence {
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-subtle);
+}
+.reference-panel .data-table {
+  min-width: 60rem;
+}
+.reference-panel .data-table th {
+  white-space: normal;
+}
+.reference-panel .evidence + .evidence {
+  margin-left: var(--space-2);
+}
+.reference-base-product .data-table,
+.reference-base-agent .data-table {
+  min-width: 88rem;
+}
+.reference-policy-versions .data-table {
+  min-width: 100rem;
+}
+.reference-panel .data-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

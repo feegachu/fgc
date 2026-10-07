@@ -224,3 +224,73 @@ FGC_VERIFY_SHELL=true FGC_NODE_BIN="$(command -v node)" \
 `build/screenshots/app-shell/`에 legacy.png, react.png, react-month.png를 저장한다.
 업무 본문은 아직 placeholder이므로 본문 픽셀 일치를 주장하지 않는다. 사이드바 256px,
 헤더 52px, 탭 220×40px 및 실제 화면을 비교한다.
+
+## #406 기준정보·정책/룰셋
+
+`/app/base`, `/app/policies`에 조회 화면을 연결했다. 기존 `/base`, `/policies`와 템플릿·JS·테스트는
+#419까지 유지한다. API/DB 계약 변경은 없다. #404 로그인/가드가 병합된 develop을 반영했으며 ProtectedRoute·RequirePermission 안에서
+화면을 렌더링한다.
+
+### 공용 기준정보 훅
+
+다른 도메인에서도 `src/features/base/api.ts`를 직접 import한다. 모든 요청은 #402 `apiClient`와
+React Query를 사용하며 취소 signal을 전달한다. 응답 타입은 생성된 OpenAPI 스키마에서 가져온다.
+
+| 훅 | 파라미터 | 응답 data |
+|---|---|---|
+| useOrganizations | `{asOf, keyword?, page?, size?}`, enabled? | PageResponseOrganizationResponse |
+| useInsurers | `{keyword?, page?, size?}`?, enabled? | PageResponseInsurerResponse |
+| useProducts | `{insurerId, asOf, page?, size?}`, enabled? | PageResponseProductResponse |
+| useAgents | `{asOf, organizationId?, keyword?, page?, size?}`, enabled? | PageResponseAgentResponse |
+| useCommissionItems | asOf, enabled? | CommissionItemResponse[] |
+| useInsurerOptions | enabled? | 보험회사 전체 페이지 목록 |
+| useOrganizationOptions | asOf, enabled? | 해당 기준일의 조직 전체 페이지 목록 |
+
+일반 페이지는 화면에서 1-base, size=20을 사용한다. 옵션 훅은 size=100으로 모든 페이지를 순회한다.
+필수 기준일/보험회사가 없으면 해당 훅은 요청하지 않는다. `activeYn`은 그대로 보존한다.
+등록·수정 화면에서는 `activeYn === false`인 option을 disable한다. 기준정보의 읽기 전용 조회 필터는
+기존 화면처럼 사용중지 데이터도 조회할 수 있으며 `· 사용중지`를 표시한다.
+
+### URL과 동작
+
+- BASE `tab=organization|insurer|product|agent|commission-item`, `keyword`, `asOf`, `insurerId`,
+  `organizationId`, `page`. 기존 tab 식별자를 유지한다. 탭마다 조회 조건과 미조회 초안을 보관한다.
+  조회/초기화는 page를 제거하고 월을 보존한다. 새로고침/공유는 현재 탭의 **조회한** 조건을 복원한다.
+- POL `tab=versions|commission|cap|refund`, `asOf`, `policyVersionId`. 목록 첫 행을 기본 선택하고
+  상세 탭을 열 때만 상세 API를 조회한다. 기준일 변경은 목록을 다시 조회하고 선택 ID를 지운다.
+  상세 404가 나도 목록을 유지하고 다른 정책을 선택할 수 있다.
+- 기준일이 없으면 현재 전역 기준월의 1일을 사용한다. `asOf=broken` 같은 잘못된 URL은 API에
+  전달하여 서버 400 메시지를 표시한다. 인증 오류는 공용 client가 처리한다. 500은 요청 ID만 노출한다.
+- 금액/요율/날짜는 공용 format을 사용한다. 브라우저에서 산입·한도·요율을 계산하지 않는다.
+  `regulationRefs`와 상세 `sourceRefs`는 EvidenceLink로 확인한다.
+
+의도적인 화면 차이: 공용 Field의 필수 표시, Pagination의 5페이지 그룹, 정액의 `원` 단위,
+탭·선택 정책의 URL 복원, 상세 근거 표시를 추가했다. 기존 수수료 항목의 분류 라벨은
+API에 라벨 필드가 없어 `base-list.js`의 표시용 매핑을 그대로 옮겼다. API 계약 확장은 하지 않았다.
+DataTable에 `rowClassName`(근거 미기재 행)과 `onRowActivate`(행 클릭 선택)를 추가했다.
+키보드 선택은 라디오 버튼을 사용하고 근거 버튼 클릭은 행 선택을 바꾸지 않는다.
+
+### 검증·전후 캡처
+
+`src/features/reference/reference.test.tsx`는 탭별 조회·필터·페이지·URL·지연 상세·빈 결과·400/404/500을
+검증한다. `e2e/reference.spec.ts`는 역할 4종의 읽기 전용 조회·새로고침·근거 표시를 검증한다.
+기존 BaseViewControllerTest, BaseViewIntegrationTest, PolicyViewControllerTest,
+PublishingTemplateStructureTest와 policy-list.test.cjs는 유지한다.
+
+개발 서버를 실행한 뒤 실제 HTTP/JWT와 임시 PostgreSQL로 검증하려면 프로젝트 루트에서:
+
+```bash
+FGC_VERIFY_REFERENCE=true FGC_NODE_BIN=node \
+  ./gradlew test --tests '*ReferenceScreensIntegrationTest'
+```
+
+설치된 Chrome 사용 시 `FGC_BROWSER_EXECUTABLE`도 지정한다. 테스트는 MockMvc로 실제 Thymeleaf
+HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 임시 서버에 전달한다. React 시작 세션은
+테스트 서버가 발급한 실제 JWT를 주입하고 `/auth/me`부터 실제 API를 사용한다. 운영·개발 DB를 쓰지 않는다.
+1440×1000에서 BASE 5탭·POL 4탭의 전후 PNG와 API 상태·행 비교 결과를
+`build/screenshots/reference/`에 저장한다. 두 화면의 동일 데이터 표시를 검증하며 본문 픽셀 동일성을
+주장하지 않는다. 캡처에는 시드 데이터만 들어간다.
+
+긴 기준정보·정책 코드와 기간은 셀에서 줄바꿈해 전체 값을 읽을 수 있게 했다. 상품·설계사 표는
+기존과 같은 최소 너비 88rem을 유지하고 좁은 화면에서 가로 스크롤한다. 긴 판단 이유·귀속방법은
+공용 DataTable의 전체 보기/접기로 확인한다.
