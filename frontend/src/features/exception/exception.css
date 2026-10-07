@@ -1,0 +1,568 @@
+.exception-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.25rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.exception-summary-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+.exception-summary-card.is-active {
+  background: var(--color-action-subtle);
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
+.exception-summary-card:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.exception-summary-card .kpi-comparison {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exception-summary-empty {
+  grid-column: 1 / -1;
+}
+
+.exception-work-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(20rem, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.exception-table {
+  width: 100%;
+  min-width: 75rem;
+  table-layout: fixed;
+}
+
+.exception-table th,
+.exception-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exception-table .exception-title-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exception-table td.exception-disclosure-cell {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow: visible;
+  vertical-align: top;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/*
+ * 펼친 내용은 반드시 칸 폭 안에서 줄바꿈한다.
+ *
+ * 이 칸은 세로로 늘어나야 해서 overflow: visible 이라 넘친 내용이 잘리지 않고 그대로 흘러나간다.
+ * 그런데 참조는 마지막 열이라 오른쪽으로 흘러나가면 표 바깥이고, 뷰포트의 가로 스크롤 범위는
+ * 표 너비로만 잡히므로 스크롤을 끝까지 밀어도 닿지 않는 영역에서 잘린다.
+ * (계약·상세 원인 칸도 같은 disclosure 를 쓰므로 함께 묶는다.)
+ */
+.exception-table .table-cell-full {
+  max-width: 100%;
+}
+
+/*
+ * 참조 링크는 버튼 모양인데 .button 의 min-width: 6rem 과 white-space: nowrap 때문에
+ * 8rem 짜리 참조 칸을 그대로 넘어선다. 여기서는 줄바꿈되는 링크로 쓴다.
+ */
+.exception-table .table-cell-full .button {
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  padding-block: var(--space-1);
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
+}
+
+.exception-col-number {
+  width: 4rem;
+}
+
+.exception-col-type,
+.exception-col-reason {
+  width: 8.5rem;
+}
+
+.exception-col-severity {
+  width: 5rem;
+}
+
+/* 차익거래 검증 화면(.arb-col-contract)과 동일한 폭으로 맞춰 토글 없이 항상 전체를 보여준다(이슈 326). */
+.exception-col-contract {
+  width: 12rem;
+}
+
+.exception-col-title {
+  width: auto;
+}
+
+.exception-col-status {
+  width: 5.75rem;
+}
+
+.exception-col-assignee {
+  width: 6rem;
+}
+
+.exception-col-detected-at {
+  width: 8.5rem;
+}
+
+.exception-col-detection-count {
+  width: 4rem;
+}
+
+.exception-col-reference {
+  width: 8rem;
+}
+
+.exception-row {
+  cursor: pointer;
+}
+
+.exception-row:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: -2px;
+}
+
+.exception-row.is-selected {
+  background: var(--color-action-subtle);
+}
+
+.exception-side-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.exception-action-form {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.exception-action-submit {
+  justify-self: end;
+}
+
+/* 2026-08-20 yslee - 원장 정정 화면을 RECO-W02 기반 비교 모달로 구성
+ * 기존 코드: 원분개와 신규 재기표 폼에 대한 본문 배치 스타일만 제공
+ * 문제: 정정 작업이 상세 본문에 섞이고 작은 화면의 비교·입력 흐름이 불명확
+ * 개선: 데스크톱 좌우 비교, 모바일 단일 열, 공통 모달 header/body/footer 구조 적용 */
+.journal-correction-modal {
+  width: min(65rem, calc(100vw - var(--layout-sidebar-current-width, 0rem) - 3rem));
+  height: min(53.75rem, calc(100dvh - 3rem));
+  border-radius: var(--radius-16);
+  transform: translateX(calc(var(--layout-sidebar-current-width, 0rem) / 2));
+}
+
+.journal-correction-open {
+  margin-top: var(--space-3);
+}
+
+.journal-correction-modal-header,
+.journal-correction-modal-footer {
+  display: flex;
+  align-items: center;
+}
+
+.journal-correction-modal-header {
+  min-height: 4.75rem;
+  min-width: 0;
+  padding-block: var(--space-3);
+}
+
+.journal-correction-heading {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  column-gap: var(--space-6);
+}
+
+.journal-correction-eyebrow {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-link);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+}
+
+.journal-correction-modal .modal-title {
+  font-size: 1.3125rem;
+  line-height: 1.6875rem;
+}
+
+.journal-correction-description {
+  min-width: 0;
+  margin: 0 0 0.125rem;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journal-correction-modal-content,
+.journal-correction-modal-form,
+.journal-correction-inputs,
+.journal-correction-action-panel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.journal-correction-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.journal-correction-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.journal-correction-panel-header {
+  min-height: 3rem;
+}
+
+.journal-correction-panel-body,
+.journal-correction-action-panel {
+  padding: var(--space-4);
+}
+
+.journal-correction-action-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.journal-correction-action-panel .exception-action-error,
+.journal-correction-action-panel .exception-action-submit {
+  grid-column: 1 / -1;
+}
+
+.journal-correction-modal-footer {
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.journal-correction-modal-footer p {
+  margin: 0;
+}
+
+.journal-correction-guidance {
+  padding: var(--space-3);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.journal-correction-lines {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.journal-correction-line {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1.5fr) repeat(2, minmax(7rem, 0.75fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.journal-correction-line__title {
+  grid-column: 1 / -2;
+}
+
+.journal-correction-line__remove {
+  grid-column: -2 / -1;
+  justify-self: end;
+}
+
+.journal-correction-line .field:last-child {
+  grid-column: 1 / -1;
+}
+
+.journal-correction-add-line {
+  justify-self: start;
+}
+
+.journal-correction-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.journal-correction-original,
+.journal-correction-result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.journal-correction-validation {
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+}
+
+.journal-correction-validation.is-valid {
+  color: var(--color-status-success-text);
+  background: var(--color-status-success-bg);
+}
+
+.journal-correction-validation.is-invalid {
+  color: var(--color-status-error-text);
+  background: var(--color-status-error-bg);
+}
+
+.journal-correction-original-lines {
+  display: grid;
+  grid-template-columns: minmax(3rem, 0.4fr) minmax(12rem, 1.5fr) repeat(2, minmax(7rem, 0.7fr)) minmax(9rem, 1fr);
+  margin-top: var(--space-3);
+  overflow-x: auto;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.journal-correction-original-line {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.journal-correction-original-line.is-heading {
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
+}
+
+.exception-action-error,
+.exception-action-notice {
+  min-height: 1.125rem;
+  margin: 0;
+}
+
+.exception-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.exception-detail-grid > div {
+  min-width: 0;
+}
+
+.exception-detail-grid dt {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+}
+
+.exception-detail-grid dd {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+}
+
+.exception-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.exception-history-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exception-history-item {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.exception-pagination {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+@media (max-width: 63.9375rem) {
+  .exception-work-grid,
+  .exception-side-panels,
+  .exception-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exception-detail-wide {
+    grid-column: auto;
+  }
+
+  .journal-correction-line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .journal-correction-line__title,
+  .journal-correction-line__remove,
+  .journal-correction-line .field:last-child {
+    grid-column: auto;
+  }
+
+  .journal-correction-compare-grid,
+  .journal-correction-action-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .journal-correction-action-panel .exception-action-error,
+  .journal-correction-action-panel .exception-action-submit {
+    grid-column: auto;
+  }
+
+  .exception-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .exception-pagination > span {
+    text-align: center;
+  }
+
+  .exception-pagination .pagination-controls {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .journal-correction-backdrop > div {
+    width: 100%;
+  }
+
+  .journal-correction-modal {
+    width: 100%;
+    height: 100dvh;
+    border-radius: 0;
+    transform: none;
+  }
+
+  .journal-correction-modal-header {
+    align-items: flex-start;
+  }
+
+  .journal-correction-heading {
+    display: block;
+  }
+
+  .journal-correction-description {
+    margin-top: var(--space-1);
+    white-space: normal;
+  }
+
+  .journal-correction-modal-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .journal-correction-modal-footer .button {
+    width: 100%;
+  }
+
+  .exception-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ───────── 페이지 셸 전환으로 새로 필요한 규칙 (#286 후속 #290) ───────── */
+
+.exception-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+/* 공통 filter-bar 위에 폭만 얹는다 — 예전에는 인라인 min-width 였다. */
+.exception-filter-fields {
+  flex: 1 1 auto;
+}
+
+.exception-filter-wide {
+  width: 11.875rem;
+}
+.exception-filter-mid {
+  width: 9.375rem;
+}
+.exception-filter-narrow {
+  width: 8.75rem;
+}
+
+.exception-filter-actions {
+  flex: 0 0 auto;
+}
+
+.exception-summary-empty {
+  grid-column: 1 / -1;
+}
+
+.exception-count-note {
+  font-size: 0.75rem;
+}
+
+.exception-card-note {
+  font-size: 0.6875rem;
+}
+
+.exception-placeholder {
+  font-size: 0.8125rem;
+}
+
+.exception-occurrence-meta {
+  margin-top: var(--space-1);
+}
+
+.exception-history-reason {
+  margin-top: var(--space-1);
+}
+
+.exception-evidence {
+  margin-top: var(--space-1);
+}
+
+.exception-evidence-list {
+  margin-top: var(--space-1);
+  font-size: 0.75rem;
+  list-style: none;
+}
+
+.exception-table-viewport:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}

@@ -12,6 +12,7 @@ export function Modal({
   closeOnBackdrop = false,
   closeOnEscape = true,
   initialFocusRef,
+  className = '',
 }: {
   open: boolean
   title: string
@@ -21,6 +22,7 @@ export function Modal({
   closeOnBackdrop?: boolean
   closeOnEscape?: boolean
   initialFocusRef?: RefObject<HTMLElement | null>
+  className?: string
 }) {
   const titleId = useId()
   const dialog = useRef<HTMLDivElement>(null)
@@ -82,7 +84,14 @@ export function Modal({
         if (closeOnBackdrop && event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} ref={dialog}>
+      <div
+        className={`modal ${className}`.trim()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        ref={dialog}
+      >
         <header className="modal-header">
           <h2 className="modal-title" id={titleId}>
             {title}

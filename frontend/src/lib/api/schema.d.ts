@@ -472,6 +472,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions/{id}/actions": {
         parameters: {
             query?: never;
@@ -516,6 +532,26 @@ export interface paths {
          * @description 기간(from/to)·분개유형·계정·계약·상태로 검색하고 페이징된 목록을 돌려준다.
          */
         get: operations["search_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journals/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 활성 분개 계정과목 목록 조회
+         * @description 사용 중인 계정과목을 계정코드 오름차순으로 돌려준다.
+         */
+        get: operations["accounts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1214,6 +1250,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseExceptionOptionsResponse: {
+            data?: components["schemas"]["ExceptionOptionsResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseFinalizeChecklistResponse: {
             data?: components["schemas"]["FinalizeChecklistResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1271,6 +1312,11 @@ export interface components {
         };
         ApiResponseListContractStatusEventResponse: {
             data?: components["schemas"]["ContractStatusEventResponse"][];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseListJournalAccountRow: {
+            data?: components["schemas"]["JournalAccountRow"][];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2419,6 +2465,10 @@ export interface components {
             /** Format: int64 */
             reconMismatch?: number;
         };
+        EvidenceItem: {
+            label?: string;
+            value?: string;
+        };
         ExceptionActionRequest: {
             /** @enum {string} */
             actionType: "ASSIGN" | "START_REVIEW" | "CORRECT" | "REDUCE" | "CANCEL" | "DEFER" | "RECONCILE_AGAIN" | "FALSE_POSITIVE" | "RESOLVE" | "REJECT" | "REOPEN" | "COMMENT";
@@ -2434,14 +2484,22 @@ export interface components {
             /** Format: int32 */
             actionSeq?: number;
             actionType?: string;
+            actionTypeLabel?: string;
             evidenceRef?: string;
             /** Format: int64 */
             exceptionActionId?: number;
             /** @enum {string} */
             fromStatus?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            fromStatusLabel?: string;
             reason?: string;
             /** @enum {string} */
             toStatus?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            toStatusLabel?: string;
+        };
+        ExceptionAssigneeRow: {
+            loginId?: string;
+            /** Format: int64 */
+            userId?: number;
         };
         ExceptionCaseResponseDTO: {
             actions?: components["schemas"]["ExceptionActionResponse"][];
@@ -2449,6 +2507,7 @@ export interface components {
             /** Format: int64 */
             assignedTo?: number;
             assigneeLoginId?: string;
+            capBasisLink?: string;
             /** Format: int64 */
             capCheckId?: number;
             /** Format: int64 */
@@ -2472,16 +2531,21 @@ export interface components {
             lastDetectedRunId?: number;
             occurrences?: components["schemas"]["ExceptionOccurrenceResponse"][];
             reasonCode?: string;
+            reasonLabel?: string;
             reconciliationResultType?: string;
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
+            severityLabel?: string;
             sourceEntityId?: string;
             sourceEntityType?: string;
+            sourceLink?: string;
             /** @enum {string} */
             status?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+            statusLabel?: string;
             title?: string;
             /** @enum {string} */
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
+            typeLabel?: string;
             /** Format: date */
             validationMonth?: string;
         };
@@ -2518,6 +2582,8 @@ export interface components {
         ExceptionOccurrenceResponse: {
             /** Format: date-time */
             detectedAt?: string;
+            detectionLabel?: string;
+            evidenceItems?: components["schemas"]["EvidenceItem"][];
             evidenceJson?: string;
             /** Format: int64 */
             exceptionOccurrenceId?: number;
@@ -2533,6 +2599,14 @@ export interface components {
             validationMonth?: string;
             /** Format: int64 */
             validationRunId?: number;
+        };
+        /** @description IF-API-43A 예외함 필터 선택지 */
+        ExceptionOptionsResponse: {
+            assignees?: components["schemas"]["ExceptionAssigneeRow"][];
+            reasons?: components["schemas"]["Option"][];
+            severities?: components["schemas"]["Option"][];
+            types?: components["schemas"]["Option"][];
+            validationMonths?: string[];
         };
         ExceptionSummary: {
             /** Format: int64 */
@@ -2553,6 +2627,7 @@ export interface components {
             count?: number;
             /** @enum {string} */
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
+            typeLabel?: string;
         };
         FinalizeChecklistConditionResponse: {
             /** Format: int64 */
@@ -2608,6 +2683,14 @@ export interface components {
              * @example 생명보험
              */
             insurerTypeLabel?: string;
+        };
+        JournalAccountRow: {
+            accountCode?: string;
+            accountName?: string;
+            activeYn?: boolean;
+            /** Format: int64 */
+            journalAccountId?: number;
+            normalBalance?: string;
         };
         JournalCorrectionActionLineRequest: {
             accountCode: string;
@@ -2851,6 +2934,10 @@ export interface components {
             loginId?: string;
             roleCode?: string;
             userName?: string;
+        };
+        Option: {
+            code?: string;
+            label?: string;
         };
         /** @description GA·조직 기준정보 */
         OrganizationResponse: {
@@ -4469,6 +4556,7 @@ export interface operations {
         parameters: {
             query: {
                 criteria: components["schemas"]["ExceptionCaseSearchDTO"];
+                assigneeFilter?: string;
                 page?: number;
                 size?: number;
             };
@@ -4485,6 +4573,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseExceptionCaseSearchResponse"];
+                };
+            };
+        };
+    };
+    options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionOptionsResponse"];
                 };
             };
         };
@@ -4574,6 +4682,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseJournalSearchResponse"];
+                };
+            };
+        };
+    };
+    accounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListJournalAccountRow"];
                 };
             };
         };

@@ -13,8 +13,10 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionOptionsResponse;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionResponse;
 import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
@@ -28,6 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -102,6 +105,127 @@ class ExceptionCaseControllerTest {
                                 && criteria.getTypes().equals(List.of(
                                 ExceptionType.POLICY_MISSING, ExceptionType.POLICY_DUPLICATE))),
                 eq(1), eq(20));
+    }
+
+    private ExceptionCaseSearchResponse emptySearchResponse() {
+        return new ExceptionCaseSearchResponse(
+                List.of(), List.of(), 1, 20, 0, 0, "severity,asc,createdAt,desc");
+    }
+
+    @Test
+    void defaultsStatusToOpenOnlyWhenParameterIsAbsent() throws Exception {
+        given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(1), eq(20)))
+                .willReturn(emptySearchResponse());
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE"))))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        ExceptionStatus.OPEN_FILTER.equals(criteria.getStatus())),
+                eq(1), eq(20));
+    }
+
+    @Test
+    void keepsEmptyStatusAsAllInsteadOfOpenDefault() throws Exception {
+        given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(1), eq(20)))
+                .willReturn(emptySearchResponse());
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("status", ""))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria -> "".equals(criteria.getStatus())),
+                eq(1), eq(20));
+    }
+
+    @Test
+    void convertsAssigneeFilterToExistingSearchConditions() throws Exception {
+        given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(1), eq(20)))
+                .willReturn(emptySearchResponse());
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("assigneeFilter", "unassigned"))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        criteria.isUnassignedOnly() && criteria.getAssignee() == null),
+                eq(1), eq(20));
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("assigneeFilter", "7"))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        !criteria.isUnassignedOnly() && Long.valueOf(7L).equals(criteria.getAssignee())),
+                eq(1), eq(20));
+    }
+
+    @Test
+    void assigneeFilterOverridesConflictingLegacyAssigneeConditions() throws Exception {
+        given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(1), eq(20)))
+                .willReturn(emptySearchResponse());
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("unassignedOnly", "true")
+                        .param("assigneeFilter", "7"))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        !criteria.isUnassignedOnly() && Long.valueOf(7L).equals(criteria.getAssignee())),
+                eq(1), eq(20));
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("assignee", "9")
+                        .param("assigneeFilter", "unassigned"))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        criteria.isUnassignedOnly() && criteria.getAssignee() == null),
+                eq(1), eq(20));
+    }
+
+    @Test
+    void rejectsNonNumericAssigneeFilterWithCommonErrorContract() throws Exception {
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("assigneeFilter", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("assigneeFilter"));
+
+        verify(exceptionCaseService, never()).search(any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void returnsFilterOptionsForAnyAuthenticatedRole() throws Exception {
+        given(exceptionCaseService.options()).willReturn(new ExceptionOptionsResponse(
+                List.of(new ExceptionOptionsResponse.Option("CAP_VIOLATION", "1,200% 위반")),
+                List.of(new ExceptionOptionsResponse.Option("AMOUNT_DIFFERENCE", "금액 불일치")),
+                List.of(new ExceptionOptionsResponse.Option("HIGH", "높음")),
+                List.of(new ExceptionAssigneeRow(7L, "settle01")),
+                List.of(LocalDate.of(2026, 7, 1))));
+
+        mockMvc.perform(get("/api/v1/exceptions/options")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.types[0].code").value("CAP_VIOLATION"))
+                .andExpect(jsonPath("$.data.types[0].label").value("1,200% 위반"))
+                .andExpect(jsonPath("$.data.reasons[0].label").value("금액 불일치"))
+                .andExpect(jsonPath("$.data.severities[0].code").value("HIGH"))
+                .andExpect(jsonPath("$.data.assignees[0].loginId").value("settle01"))
+                .andExpect(jsonPath("$.data.validationMonths[0]").value("2026-07-01"));
+    }
+
+    @Test
+    void rejectsUnauthenticatedOptionsRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/exceptions/options")).andExpect(status().isUnauthorized());
     }
 
     @Test
