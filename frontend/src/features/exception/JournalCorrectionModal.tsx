@@ -7,6 +7,7 @@ import { Field } from '../../components/Field'
 import { Modal } from '../../components/Modal'
 import { errorText, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
+import { validateCorrectionLines } from './correctionLines'
 import {
   applyActionToCache,
   journalAccountsQueryOptions,
@@ -196,8 +197,8 @@ function CorrectionBody({
         lines: lines.map((line) => ({
           originalLineNo: line.originalLineNo ?? undefined,
           accountCode: line.accountCode,
-          debitAmount: Number(line.debitAmount),
-          creditAmount: Number(line.creditAmount),
+          debitAmount: Number(line.debitAmount || 0),
+          creditAmount: Number(line.creditAmount || 0),
           lineDescription: line.lineDescription.trim() || undefined,
         })),
       }),
@@ -220,8 +221,9 @@ function CorrectionBody({
   }
   function submit(event: FormEvent) {
     event.preventDefault()
-    setError('')
-    mutation.mutate()
+    const invalid = validateCorrectionLines(lines)
+    setError(invalid ?? '')
+    if (!invalid) mutation.mutate()
   }
 
   const readOnly = !editable || result !== null

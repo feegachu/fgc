@@ -9,6 +9,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
 
 const user = {
@@ -357,4 +358,46 @@ describe('EXCP-W01 예외함', () => {
       '/app/journals?selected=72',
     )
   })
+})
+
+describe('원장 정정 입력 검증', () => {
+  const lines = (debit: string, credit: string) => [
+    { debitAmount: debit, creditAmount: '0' },
+    { debitAmount: '0', creditAmount: credit },
+  ]
+  it('균형 잡힌 한쪽씩 입력은 통과한다', () => {
+    expect(validateCorrectionLines(lines('1000', '1000'))).toBeNull()
+    // 쓰지 않는 쪽을 비워도 0 으로 본다.
+    expect(
+      validateCorrectionLines([
+        { debitAmount: '500', creditAmount: '' },
+        { debitAmount: '', creditAmount: '500' },
+      ]),
+    ).toBeNull()
+  })
+  it('양쪽이 모두 0 이거나 모두 양수인 라인을 거부한다', () => {
+    expect(validateCorrectionLines([{ debitAmount: '', creditAmount: '' }])).toContain('1번 라인')
+    expect(validateCorrectionLines([{ debitAmount: '10', creditAmount: '10' }])).toContain('한쪽에만')
+  })
+  it('음수·소수·차대 불균형·0원 합계를 거부한다', () => {
+    expect(validateCorrectionLines([{ debitAmount: '-1', creditAmount: '0' }])).toContain('정수')
+    expect(validateCorrectionLines([{ debitAmount: '1.5', creditAmount: '0' }])).toContain('정수')
+    expect(validateCorrectionLines(lines('1000', '900'))).toContain('같아야')
+  })
+})
+
+it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보내지 않고 안내한다', async () => {
+  searchResponse = () => search([correctionCase])
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
+  const dialog = await screen.findByRole('dialog')
+  await within(dialog).findByText(/J-0070/)
+  await actions.type(within(dialog).getByLabelText(/정정 사유/), '사유')
+  const debit = within(dialog).getAllByLabelText(/차변/)[0]
+  await actions.clear(debit)
+  await actions.type(debit, '0')
+  await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
+  expect(await within(dialog).findByText(/1번 라인은 차변 또는 대변 중 한쪽에만/)).toBeInTheDocument()
+  expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
 })
