@@ -13,6 +13,7 @@ import './styles/utilities.css'
 import './styles/react.css'
 import './features/auth/login.css'
 import './features/exception/exception.css'
+import './features/dashboard/dashboard.css'
 import './features/reference/reference.css'
 import { apiClient } from './lib/api/client'
 

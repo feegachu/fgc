@@ -7,7 +7,7 @@ import { screens } from './screens'
 import { TransitionPage } from './TransitionPage'
 import { NotFoundPage } from './NotFoundPage'
 import { LoginPage } from '../features/auth/LoginPage'
-import { ExceptionPage } from '../features/exception/ExceptionPage'
+import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RequirePermission } from './RequirePermission'
 export const screenRoutes: RouteObject[] = screens.map((screen) => ({
@@ -20,6 +20,8 @@ export const screenRoutes: RouteObject[] = screens.map((screen) => ({
         <PoliciesPage />
       ) : screen.id === 'EXCP-W01' ? (
         <ExceptionPage />
+      ) : screen.id === 'DASH-W01' ? (
+        <DashboardPage />
       ) : (
         <TransitionPage screen={screen} />
       )}
