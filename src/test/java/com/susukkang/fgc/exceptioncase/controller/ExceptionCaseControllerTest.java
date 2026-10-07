@@ -165,6 +165,32 @@ class ExceptionCaseControllerTest {
     }
 
     @Test
+    void assigneeFilterOverridesConflictingLegacyAssigneeConditions() throws Exception {
+        given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(1), eq(20)))
+                .willReturn(emptySearchResponse());
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("unassignedOnly", "true")
+                        .param("assigneeFilter", "7"))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        !criteria.isUnassignedOnly() && Long.valueOf(7L).equals(criteria.getAssignee())),
+                eq(1), eq(20));
+
+        mockMvc.perform(get("/api/v1/exceptions")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("assignee", "9")
+                        .param("assigneeFilter", "unassigned"))
+                .andExpect(status().isOk());
+        verify(exceptionCaseService).search(
+                org.mockito.ArgumentMatchers.argThat(criteria ->
+                        criteria.isUnassignedOnly() && criteria.getAssignee() == null),
+                eq(1), eq(20));
+    }
+
+    @Test
     void rejectsNonNumericAssigneeFilterWithCommonErrorContract() throws Exception {
         mockMvc.perform(get("/api/v1/exceptions")
                         .with(user(principal(3L, "audit01", "COMPLIANCE")))

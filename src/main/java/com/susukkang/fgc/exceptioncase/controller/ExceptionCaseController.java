@@ -44,7 +44,8 @@ public class ExceptionCaseController {
      *
      * <p>status 파라미터가 아예 없으면 워크큐 기본값 OPEN(미처리)으로 조회한다. 빈 값(status=)은 "전체"다.
      * assigneeFilter 는 "(미배정)"까지 한 컨트롤인 화면용 값으로, unassigned 또는 사용자 ID 를 받아
-     * 기존 검색조건(unassignedOnly·assignee)으로 변환한다. 기존 파라미터는 그대로 쓸 수 있다.
+     * 기존 검색조건(unassignedOnly·assignee)으로 변환한다. 기존 파라미터는 그대로 쓸 수 있고,
+     * 둘이 함께 오면 assigneeFilter 가 우선해 반대 조건을 해제한다.
      */
     @GetMapping
     public ApiResponse<ExceptionCaseSearchResponse> search(
@@ -72,10 +73,12 @@ public class ExceptionCaseController {
         }
         if ("unassigned".equals(assigneeFilter)) {
             criteria.setUnassignedOnly(true);
+            criteria.setAssignee(null);
             return;
         }
         try {
             criteria.setAssignee(Long.valueOf(assigneeFilter));
+            criteria.setUnassignedOnly(false);
         } catch (NumberFormatException e) {
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_002, "assigneeFilter", Map.of("field", "assigneeFilter"), null);
