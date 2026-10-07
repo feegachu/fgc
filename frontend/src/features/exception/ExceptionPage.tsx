@@ -10,6 +10,7 @@ import { dateTime, errorText, int } from '../../lib/format'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { withMonth } from '../../stores/workspace'
 import { ActionPanel } from './ActionPanel'
+import { Disclosure } from './Disclosure'
 import { ALL_STATUS, exceptionOptionsQueryOptions, exceptionSearchQueryOptions, OPEN_STATUS } from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
 import { severityTone, statusOptions, statusTone, typeTone } from './rules'
@@ -92,8 +93,7 @@ export function ExceptionPage() {
       label: '상세 원인',
       width: '8.5rem',
       cellClassName: 'exception-disclosure-cell',
-      expandable: true,
-      render: (row) => row.reasonLabel || '-',
+      render: (row) => <Disclosure preview={row.reasonLabel || '-'} singleLine />,
     },
     {
       key: 'severity',
@@ -106,8 +106,7 @@ export function ExceptionPage() {
       key: 'title',
       label: '내용',
       cellClassName: 'exception-title-cell exception-disclosure-cell',
-      expandable: true,
-      render: (row) => row.title ?? '-',
+      render: (row) => <Disclosure preview={row.title ?? '-'} />,
     },
     {
       key: 'status',
@@ -129,10 +128,21 @@ export function ExceptionPage() {
       label: '참조',
       width: '8rem',
       cellClassName: 'tabular-nums exception-disclosure-cell',
-      expandable: true,
       render: (row) => {
         const reference = `${row.sourceEntityType}:${row.sourceEntityId}`
-        return row.sourceLink ? <Link to={row.sourceLink}>{reference}</Link> : reference
+        return row.sourceLink ? (
+          <Disclosure
+            singleLine
+            preview={<Link to={row.sourceLink}>{reference}</Link>}
+            full={
+              <Link className="button button-secondary" to={row.sourceLink}>
+                {reference}
+              </Link>
+            }
+          />
+        ) : (
+          <Disclosure singleLine preview={reference} />
+        )
       },
     },
   ]
@@ -377,6 +387,7 @@ function FilterForm({
       className="exception-filter-bar"
       wrapFields={false}
       resetFirst
+      icons
       onSubmit={() =>
         onApply({
           type: draft.type,
