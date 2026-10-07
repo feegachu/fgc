@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
 import { Link, useOutletContext } from 'react-router'
+import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { KpiCard } from '../../components/KpiCard'
@@ -41,15 +42,17 @@ function DashboardContent({ month }: { month: string }) {
       label: '유형',
       render: (e) => <StatusBadge tone={exceptionTypeTone(e.exceptionType)}>{e.exceptionTypeLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'contractNo', label: '계약번호', align: 'number', render: (e) => e.contractNo ?? '-' },
+    { key: 'contractNo', label: '계약번호', cellClassName: 'tabular-nums', render: (e) => e.contractNo ?? '-' },
     {
       key: 'title',
       label: '예외 내용',
-      expandable: true,
+      cellClassName: 'dashboard-disclosure-cell',
       render: (e) => (
-        <Link to={href('/exceptions', { contractNo: e.contractNo ?? '' })} title={e.title}>
-          {e.title ?? '-'}
-        </Link>
+        <CellDisclosure
+          singleLine
+          preview={<Link to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{e.title ?? '-'}</Link>}
+          full={e.title ?? '-'}
+        />
       ),
     },
     {
@@ -57,19 +60,55 @@ function DashboardContent({ month }: { month: string }) {
       label: '상태',
       render: (e) => <StatusBadge tone={exceptionStatusTone(e.status)}>{e.statusLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'createdAt', label: '발생', align: 'number', render: (e) => dateTime(e.createdAt) },
+    { key: 'createdAt', label: '발생', cellClassName: 'tabular-nums', render: (e) => dateTime(e.createdAt) },
   ]
 
   const kpis =
     data &&
     ([
-      { label: '1,200% 위반', value: data.capViolation, footer: '확정 위반 판정', tone: 'error', to: href('/cap-checks', { status: 'VIOLATION' }) },
-      { label: '1,200% 주의', value: data.capWarning, footer: '사용률 경고 기준 이상', tone: 'warning', to: href('/cap-checks', { status: 'WARNING' }) },
-      { label: '차익거래 검토대상', value: data.arbitrageCandidate, footer: '위반 확정 아님', tone: 'warning', to: href('/arbitrage-checks', { status: 'CANDIDATE' }) },
-      { label: '대사 불일치', value: data.reconMismatch, footer: '허용오차 0원', tone: 'risk', to: href('/reconciliations', { onlyMismatch: 'true' }) },
-      { label: '원장 불균형', value: data.journalImbalance, footer: '기표 전 0건 필수', tone: data.journalImbalance === 0 ? 'success' : 'error', to: href('/journals', { imbalanceOnly: 'true' }) },
+      {
+        label: '1,200% 위반',
+        value: data.capViolation,
+        footer: '확정 위반 판정',
+        tone: 'error',
+        to: href('/cap-checks', { status: 'VIOLATION' }),
+      },
+      {
+        label: '1,200% 주의',
+        value: data.capWarning,
+        footer: '사용률 경고 기준 이상',
+        tone: 'warning',
+        to: href('/cap-checks', { status: 'WARNING' }),
+      },
+      {
+        label: '차익거래 검토대상',
+        value: data.arbitrageCandidate,
+        footer: '위반 확정 아님',
+        tone: 'warning',
+        to: href('/arbitrage-checks', { status: 'CANDIDATE' }),
+      },
+      {
+        label: '대사 불일치',
+        value: data.reconMismatch,
+        footer: '허용오차 0원',
+        tone: 'risk',
+        to: href('/reconciliations', { onlyMismatch: 'true' }),
+      },
+      {
+        label: '원장 불균형',
+        value: data.journalImbalance,
+        footer: '기표 전 0건 필수',
+        tone: data.journalImbalance === 0 ? 'success' : 'error',
+        to: href('/journals', { imbalanceOnly: 'true' }),
+      },
       // OPEN 은 DB 상태값이 아니라 EXCP-W01 과 공유하는 화면 묶음 필터(NEW + IN_REVIEW)다.
-      { label: '미처리 예외', value: data.openException, footer: '신규 + 검토중', tone: 'warning', to: href('/exceptions', { status: 'OPEN' }) },
+      {
+        label: '미처리 예외',
+        value: data.openException,
+        footer: '신규 + 검토중',
+        tone: 'warning',
+        to: href('/exceptions', { status: 'OPEN' }),
+      },
     ] as const)
 
   return (
@@ -94,7 +133,12 @@ function DashboardContent({ month }: { month: string }) {
         <>
           <section className="kpi-grid" aria-label="주요 검증 지표">
             {kpis?.map((kpi) => (
-              <Link key={kpi.label} to={kpi.to} className="kpi-card-link" aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}>
+              <Link
+                key={kpi.label}
+                to={kpi.to}
+                className="kpi-card-link"
+                aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}
+              >
                 <KpiCard
                   label={kpi.label}
                   value={int(kpi.value ?? 0)}
@@ -158,7 +202,7 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const progress = Math.max(0, Math.min(100, step * 10))
   return (
     <Link className="run-row" to={to}>
-      <strong className="run-title">{`${(run.validationMonth ?? '').slice(0, 7)} · ${run.runNo}회차`}</strong>
+      <strong className="run-title">{`${run.validationMonth ?? ''} · ${run.runNo}회차`}</strong>
       <span className="run-meta">{`${step}/10 단계 · 실행 ${run.triggeredBy ?? '-'}`}</span>
       <StatusBadge tone={runStatusTone(run.status)}>{run.statusLabel ?? '-'}</StatusBadge>
       <span

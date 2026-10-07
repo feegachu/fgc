@@ -86,7 +86,10 @@ function renderDashboard(path = '/app/') {
   return { router, actions: userEvent.setup() }
 }
 const summaryCalls = () =>
-  vi.mocked(apiClient.request).mock.calls.map(([path]) => path).filter((path) => path.includes('/dashboard/summary'))
+  vi
+    .mocked(apiClient.request)
+    .mock.calls.map(([path]) => path)
+    .filter((path) => path.includes('/dashboard/summary'))
 
 describe('DASH-W01 업무 대시보드', () => {
   it('KPI 6종과 최근 예외·실행을 형식 규칙에 맞게 보여 준다', async () => {
@@ -99,7 +102,7 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(within(table).getByText('C-0001')).toBeInTheDocument()
     // UTC 15:30 은 Asia/Seoul 로 다음 날 00:30 이다.
     expect(within(table).getByText('2026-07-11 00:30')).toBeInTheDocument()
-    const run = screen.getByRole('link', { name: /2026-07 · 2회차/ })
+    const run = screen.getByRole('link', { name: /2026-07-01 · 2회차/ })
     expect(within(run).getByRole('progressbar', { name: '검증 진행률' })).toHaveAttribute('aria-valuenow', '40')
     expect(run).toHaveTextContent('4/10 단계 · 실행 settle01')
   })
@@ -131,7 +134,7 @@ describe('DASH-W01 업무 대시보드', () => {
       'href',
       '/app/exceptions?contractNo=C-0001&month=2026-07',
     )
-    expect(screen.getByRole('link', { name: /2026-07 · 2회차/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /2026-07-01 · 2회차/ })).toHaveAttribute(
       'href',
       '/app/validation-runs/77?month=2026-07',
     )
