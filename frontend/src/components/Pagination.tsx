@@ -3,22 +3,32 @@ export function Pagination({
   page,
   totalPages,
   onPageChange,
+  compact = false,
 }: {
+  compact?: boolean
   page: number
   totalPages: number
   onPageChange: (page: number) => void
 }) {
   const last = Math.max(1, totalPages)
   const current = Math.max(1, Math.min(last, page))
-  const start = Math.floor((current - 1) / 5) * 5 + 1
+  const start = compact ? Math.max(1, Math.min(current - 2, last - 4)) : Math.floor((current - 1) / 5) * 5 + 1
   return (
     <nav className="pagination-controls" aria-label="페이지 선택">
-      <Button variant="ghost" disabled={current === 1} onClick={() => onPageChange(1)}>
-        처음
-      </Button>
-      <Button variant="ghost" disabled={start === 1} onClick={() => onPageChange(start - 1)}>
-        이전
-      </Button>
+      {!compact && (
+        <Button variant="ghost" disabled={current === 1} onClick={() => onPageChange(1)}>
+          처음
+        </Button>
+      )}
+      <button
+        type="button"
+        className={compact ? 'pagination-button' : 'button button-ghost'}
+        aria-label={compact ? '이전 페이지' : undefined}
+        disabled={compact ? current === 1 : start === 1}
+        onClick={() => onPageChange(compact ? current - 1 : start - 1)}
+      >
+        {compact ? '‹' : '이전'}
+      </button>
       {Array.from({ length: Math.min(5, last - start + 1) }, (_, index) => start + index).map((number) => (
         <button
           type="button"
@@ -30,12 +40,20 @@ export function Pagination({
           {number}
         </button>
       ))}
-      <Button variant="ghost" disabled={start + 4 >= last} onClick={() => onPageChange(start + 5)}>
-        다음
-      </Button>
-      <Button variant="ghost" disabled={current === last} onClick={() => onPageChange(last)}>
-        마지막
-      </Button>
+      <button
+        type="button"
+        className={compact ? 'pagination-button' : 'button button-ghost'}
+        aria-label={compact ? '다음 페이지' : undefined}
+        disabled={compact ? current === last : start + 4 >= last}
+        onClick={() => onPageChange(compact ? current + 1 : start + 5)}
+      >
+        {compact ? '›' : '다음'}
+      </button>
+      {!compact && (
+        <Button variant="ghost" disabled={current === last} onClick={() => onPageChange(last)}>
+          마지막
+        </Button>
+      )}
     </nav>
   )
 }

@@ -2,13 +2,17 @@ import { Fragment, useState } from 'react'
 import type { ReactNode } from 'react'
 export interface TableColumn<T> {
   key: string
-  label: string
+  label: ReactNode
   render: (row: T) => ReactNode
+  width?: string
+  cellClassName?: string
   sortable?: boolean
   expandable?: boolean
   align?: 'left' | 'center' | 'number'
 }
 export interface DataTableProps<T> {
+  className?: string
+  viewportClassName?: string
   caption: string
   columns: TableColumn<T>[]
   rows: T[]
@@ -18,6 +22,8 @@ export interface DataTableProps<T> {
   selectedKeys?: string[]
   onSelectionChange?: (keys: string[]) => void
   onRowClick?: (row: T) => void
+  onRowActivate?: (row: T) => void
+  rowClassName?: (row: T) => string
   emptyMessage?: string
 }
 function ExpandableCell({ children }: { children: ReactNode }) {
@@ -38,6 +44,8 @@ function ExpandableCell({ children }: { children: ReactNode }) {
 }
 export function DataTable<T>({
   caption,
+  className = '',
+  viewportClassName = '',
   columns,
   rows,
   rowKey,
@@ -46,6 +54,8 @@ export function DataTable<T>({
   selectedKeys = [],
   onSelectionChange,
   onRowClick,
+  onRowActivate,
+  rowClassName,
   emptyMessage = '조건에 맞는 자료가 없습니다.',
 }: DataTableProps<T>) {
   const keys = rows.map(rowKey)
@@ -56,9 +66,17 @@ export function DataTable<T>({
     )
   }
   return (
-    <div className="data-table-viewport">
-      <table className="data-table">
+    <div className={`data-table-viewport ${viewportClassName}`}>
+      <table className={`data-table ${className}`}>
         <caption className="visually-hidden">{caption}</caption>
+        {columns.some((column) => column.width) && (
+          <colgroup>
+            {onSelectionChange && <col />}
+            {columns.map((column) => (
+              <col key={column.key} style={{ width: column.width }} />
+            ))}
+          </colgroup>
+        )}
         <thead>
           <tr>
             {onSelectionChange && (
@@ -118,7 +136,19 @@ export function DataTable<T>({
         <tbody>
           {rows.length ? (
             rows.map((row) => (
-              <tr key={rowKey(row)} className={selectedKeys.includes(rowKey(row)) ? 'is-selected' : undefined}>
+              <tr
+                key={rowKey(row)}
+                className={[selectedKeys.includes(rowKey(row)) ? 'is-selected' : '', rowClassName?.(row)]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={
+                  onRowActivate
+                    ? (event) => {
+                        if (!(event.target as Element).closest('button, a, input, summary')) onRowActivate(row)
+                      }
+                    : undefined
+                }
+              >
                 {onSelectionChange && (
                   <td>
                     <input
@@ -130,7 +160,7 @@ export function DataTable<T>({
                   </td>
                 )}
                 {columns.map((column, index) => (
-                  <td key={column.key} className={`is-${column.align ?? 'left'}`}>
+                  <td key={column.key} className={`is-${column.align ?? 'left'} ${column.cellClassName ?? ''}`}>
                     <Fragment>
                       {index === 0 && onRowClick ? (
                         <button type="button" className="table-row-link" onClick={() => onRowClick(row)}>

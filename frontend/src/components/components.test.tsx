@@ -245,3 +245,14 @@ it('MonthSelector는 저장된 월이 비활성이면 가능한 월로 포커스
   expect(screen.getByRole('button', { name: '이전 연도' })).toBeDisabled()
   expect(screen.getByRole('button', { name: '적용' })).toBeDisabled()
 })
+
+it('compact pagination keeps a sliding five-page window and moves one page at a time', async () => {
+  const change = vi.fn()
+  render(<Pagination compact page={6} totalPages={12} onPageChange={change} />)
+  for (const page of ['4', '5', '6', '7', '8']) expect(screen.getByRole('button', { name: page })).toBeVisible()
+  expect(screen.queryByRole('button', { name: '처음' })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '이전 페이지' }))
+  expect(change).toHaveBeenLastCalledWith(5)
+  await userEvent.click(screen.getByRole('button', { name: '다음 페이지' }))
+  expect(change).toHaveBeenLastCalledWith(7)
+})
