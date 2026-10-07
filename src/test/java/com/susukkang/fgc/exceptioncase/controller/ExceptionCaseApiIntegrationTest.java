@@ -125,6 +125,38 @@ class ExceptionCaseApiIntegrationTest {
     }
 
     @Test
+    void omittedStatusListsOnlyOpenCasesWhileEmptyStatusListsAll() throws Exception {
+        String reason = "API-" + UUID.randomUUID();
+        Long open = insertCase(reason, "WARNING");
+        Long resolved = insertCase(reason, "WARNING");
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status = 'RESOLVED' WHERE exception_case_id = ?", resolved);
+
+        mockMvc.perform(get("/api/v1/exceptions").with(user(principal("COMPLIANCE"))).param("reasonCode", reason))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].exceptionCaseId").value(open));
+
+        mockMvc.perform(get("/api/v1/exceptions").with(user(principal("COMPLIANCE")))
+                        .param("reasonCode", reason).param("status", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2));
+    }
+
+    @Test
+    void optionsListsAllTypesAndSeveritiesWithLabelsAndUsedReasons() throws Exception {
+        String reason = "API-" + UUID.randomUUID();
+        insertCase(reason, "WARNING");
+
+        mockMvc.perform(get("/api/v1/exceptions/options").with(user(principal("COMPLIANCE"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.types[?(@.code == 'CAP_VIOLATION')].label").value("1,200% 위반"))
+                .andExpect(jsonPath("$.data.severities.length()").value(4))
+                .andExpect(jsonPath("$.data.reasons[?(@.code == '" + reason + "')].label").value(reason))
+                .andExpect(jsonPath("$.data.assignees").isArray())
+                .andExpect(jsonPath("$.data.validationMonths").isArray());
+    }
+
+    @Test
     void rejectsUnauthenticatedSearch() throws Exception {
         mockMvc.perform(get("/api/v1/exceptions")).andExpect(status().isUnauthorized());
     }

@@ -3,6 +3,7 @@ package com.susukkang.fgc.exceptioncase.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.ExceptionActionType;
+import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.audit.entity.AuditLog;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -131,6 +133,23 @@ public class ExceptionCaseService {
     @Transactional(readOnly = true)
     public List<LocalDate> validationMonths() {
         return exceptionCaseQueryRepository.findValidationMonths();
+    }
+
+    /** IF-API-43A 필터 선택지 — 유형·심각도는 enum 전체, 나머지는 실제 데이터에서 뽑는다. */
+    @Transactional(readOnly = true)
+    public ExceptionOptionsResponse options() {
+        return new ExceptionOptionsResponse(
+                Arrays.stream(ExceptionType.values())
+                        .map(type -> new ExceptionOptionsResponse.Option(type.name(), type.label()))
+                        .toList(),
+                reasonCodes().stream()
+                        .map(code -> new ExceptionOptionsResponse.Option(code, ExceptionCaseResponseDTO.labelOf(code)))
+                        .toList(),
+                Arrays.stream(ExceptionSeverity.values())
+                        .map(severity -> new ExceptionOptionsResponse.Option(severity.name(), severity.label()))
+                        .toList(),
+                assignees(),
+                validationMonths());
     }
 
     private Map<Long, List<ExceptionActionResponse>> loadActions(
