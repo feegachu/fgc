@@ -62,7 +62,7 @@ export function EvidenceLink({ label, children }: { label: string; children: Rea
     <span className="evidence">
       <button
         ref={trigger}
-        className="evidence-trigger"
+        className="evidence-trigger react-evidence-trigger"
         type="button"
         aria-describedby={open ? id : undefined}
         aria-expanded={open}

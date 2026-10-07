@@ -3,6 +3,10 @@ import type { Page } from '@playwright/test'
 
 async function session(page: Page, roleCode = 'SETTLEMENT') {
   const envelope = (data: unknown) => ({ data, error: null, requestId: 'shell-fixture' })
+  await page.route('**/api/v1/base/**', (route) =>
+    route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }),
+  )
+  await page.route('**/api/v1/policies**', (route) => route.fulfill({ json: envelope([]) }))
   await page.route('**/api/v1/auth/refresh', (route) =>
     route.fulfill({ json: envelope({ accessToken: 'shell-fixture', tokenType: 'Bearer', expiresIn: 1800 }) }),
   )
