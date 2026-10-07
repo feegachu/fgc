@@ -1,0 +1,285 @@
+{
+  "base": [
+    {
+      "tab": "organization",
+      "count": 9,
+      "firstCode": "FGC-B0101"
+    },
+    {
+      "tab": "insurer",
+      "count": 6,
+      "firstCode": "FGL01"
+    },
+    {
+      "tab": "product",
+      "count": 1,
+      "firstCode": "P-A-001"
+    },
+    {
+      "tab": "agent",
+      "count": 7,
+      "firstCode": "A-BM-001"
+    },
+    {
+      "tab": "commission-item",
+      "count": 10,
+      "firstCode": "ADJUSTMENT"
+    }
+  ],
+  "policies": [
+    {
+      "tab": "commission",
+      "policy": "GA-CUR-2026-V1",
+      "count": 6
+    },
+    {
+      "tab": "cap",
+      "policy": "REG-CAP-GA-2026-V1",
+      "count": 1
+    },
+    {
+      "tab": "refund",
+      "policy": "INS-REFUND-2026-SAV-V1",
+      "count": 1
+    }
+  ],
+  "errors": [],
+  "apiStatuses": [
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=20",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?page=1&size=20&asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=20",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=20",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/products?insurerId=1&asOf=2026-07-01&page=1&size=20",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/products?page=1&size=20&insurerId=1&asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/insurers?page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/agents?asOf=2026-07-01&page=1&size=20",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/agents?page=1&size=20&asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/organizations?asOf=2026-07-01&page=1&size=100",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/commission-items?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/base/commission-items?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/6",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/6",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/4",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/4",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/12",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/12",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/12",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=2026-07-01",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies/999999999",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/policies?asOf=broken",
+      "status": 400
+    },
+    {
+      "path": "/api/v1/policies?asOf=broken",
+      "status": 400
+    }
+  ]
+}
