@@ -1,7 +1,11 @@
 package com.susukkang.fgc.audit.controller;
 
+import com.susukkang.fgc.audit.dto.AuditLogDetailResponse;
+import com.susukkang.fgc.audit.dto.AuditLogOptionsResponse;
 import com.susukkang.fgc.audit.dto.AuditLogResponse;
 import com.susukkang.fgc.audit.service.AuditLogQueryService;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -12,11 +16,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 /**
  * FUN-061 IF-API-52 감사로그 조회 API.
@@ -68,5 +74,31 @@ public class AuditLogController {
     ) {
         return ApiResponse.success(
                 auditLogQueryService.search(entityType, entityId, userId, action, from, to, page, size));
+    }
+
+    @Operation(
+            summary = "감사로그 필터 선택지",
+            description = "AUDT-W01 필터의 행위 종류·대상 종류·행위자 선택지입니다. 감사행에 기록된 값만 나열합니다."
+    )
+    @GetMapping("/options")
+    @PreAuthorize(Roles.CAN_VIEW_AUDIT_LOG)
+    public ApiResponse<AuditLogOptionsResponse> options() {
+        return ApiResponse.success(auditLogQueryService.options());
+    }
+
+    @Operation(
+            summary = "감사로그 상세",
+            description = "감사로그 한 건과 before/after JSON 을 리프 경로로 비교한 diff 를 돌려줍니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404", description = "auditLogId에 해당하는 감사로그가 없음 (FGC-COMMON-004)")
+    @GetMapping("/{auditLogId}")
+    @PreAuthorize(Roles.CAN_VIEW_AUDIT_LOG)
+    public ApiResponse<AuditLogDetailResponse> detail(
+            @Parameter(description = "감사로그 ID", example = "1")
+            @PathVariable Long auditLogId
+    ) {
+        return ApiResponse.success(auditLogQueryService.detail(auditLogId)
+                .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", auditLogId))));
     }
 }

@@ -150,6 +150,34 @@
         },
         "type" : "object"
       },
+      "ApiResponseAuditLogDetailResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AuditLogDetailResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseAuditLogOptionsResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AuditLogOptionsResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseCapCheckBasisResponse" : {
         "properties" : {
           "data" : {
@@ -1107,6 +1135,76 @@
         },
         "type" : "object"
       },
+      "AuditDiffEntry" : {
+        "description" : "변경 내용 비교 행 — before/after JSON 의 리프 경로 하나",
+        "properties" : {
+          "after" : {
+            "description" : "변경 후 값(없으면 null)",
+            "example" : "700000",
+            "type" : "string"
+          },
+          "before" : {
+            "description" : "변경 전 값(없으면 null)",
+            "example" : "500000",
+            "type" : "string"
+          },
+          "changed" : {
+            "description" : "전·후 값이 다른지 여부",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "field" : {
+            "description" : "리프 경로. JSON 객체가 아니면 value",
+            "example" : "payment.amount",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AuditLogDetailResponse" : {
+        "description" : "감사로그 상세 응답",
+        "properties" : {
+          "diff" : {
+            "description" : "before/after 리프 경로 비교. 둘 다 없으면 빈 배열",
+            "items" : {
+              "$ref" : "#/components/schemas/AuditDiffEntry"
+            },
+            "type" : "array"
+          },
+          "log" : {
+            "$ref" : "#/components/schemas/AuditLogResponse",
+            "description" : "감사로그"
+          }
+        },
+        "type" : "object"
+      },
+      "AuditLogOptionsResponse" : {
+        "description" : "감사로그 필터 선택지",
+        "properties" : {
+          "actionCodes" : {
+            "description" : "행위 종류(감사행에 기록된 값, 정렬)",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "entityTypes" : {
+            "description" : "대상 종류(감사행에 기록된 값, 정렬)",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "users" : {
+            "description" : "행위자(감사행을 남긴 사용자, 로그인 ID 순)",
+            "items" : {
+              "$ref" : "#/components/schemas/AuditUserRow"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "AuditLogResponse" : {
         "description" : "감사로그 조회 응답",
         "properties" : {
@@ -1169,6 +1267,18 @@
             "description" : "행위자 로그인 ID (배치는 null)",
             "example" : "settle01",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AuditUserRow" : {
+        "properties" : {
+          "loginId" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -3432,7 +3542,6 @@
         "type" : "object"
       },
       "ExceptionOptionsResponse" : {
-        "description" : "IF-API-43A 예외함 필터 선택지",
         "properties" : {
           "assignees" : {
             "items" : {
@@ -6000,6 +6109,57 @@
           }
         },
         "summary" : "감사로그 조회",
+        "tags" : [ "감사로그" ]
+      }
+    },
+    "/api/v1/audit-logs/options" : {
+      "get" : {
+        "description" : "AUDT-W01 필터의 행위 종류·대상 종류·행위자 선택지입니다. 감사행에 기록된 값만 나열합니다.",
+        "operationId" : "options_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAuditLogOptionsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "감사로그 필터 선택지",
+        "tags" : [ "감사로그" ]
+      }
+    },
+    "/api/v1/audit-logs/{auditLogId}" : {
+      "get" : {
+        "description" : "감사로그 한 건과 before/after JSON 을 리프 경로로 비교한 diff 를 돌려줍니다.",
+        "operationId" : "detail_1",
+        "parameters" : [ {
+          "description" : "감사로그 ID",
+          "example" : 1,
+          "in" : "path",
+          "name" : "auditLogId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "404" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAuditLogDetailResponse"
+                }
+              }
+            },
+            "description" : "auditLogId에 해당하는 감사로그가 없음 (FGC-COMMON-004)"
+          }
+        },
+        "summary" : "감사로그 상세",
         "tags" : [ "감사로그" ]
       }
     },
@@ -8757,8 +8917,8 @@
     "description" : "FUN-061 핵심 업무 감사로그 조회 API",
     "name" : "감사로그"
   }, {
-    "description" : "FUN-065 수수료 지급 건 등록·수정·확정 API",
-    "name" : "수수료 지급 건"
+    "description" : "분개 계정과목 기준정보 API",
+    "name" : "검증원장"
   }, {
     "description" : "초년도 모집수수료 한도 계산 목록 조회 API",
     "name" : "1200% 한도"
@@ -8769,20 +8929,23 @@
     "description" : "예상 스케줄과 실제 지급 데이터의 대사 실행 API",
     "name" : "대사"
   }, {
-    "description" : "계약 상세 통합조회 및 재검증 API",
-    "name" : "계약"
-  }, {
     "description" : "월 통합검증·수동검증 실행 생성/조회 API",
     "name" : "검증 실행"
-  }, {
-    "description" : "FGC 기준정보 조회 API",
-    "name" : "기준정보"
   }, {
     "description" : "검증원장 목록 조회 API",
     "name" : "검증원장"
   }, {
     "description" : "검증원장 상세 조회 API",
     "name" : "검증원장"
+  }, {
+    "description" : "FUN-065 수수료 지급 건 등록·수정·확정 API",
+    "name" : "수수료 지급 건"
+  }, {
+    "description" : "계약 상세 통합조회 및 재검증 API",
+    "name" : "계약"
+  }, {
+    "description" : "FGC 기준정보 조회 API",
+    "name" : "기준정보"
   }, {
     "description" : "FGC 정책·룰셋 조회 API — 1차 조회 전용, 편집은 2차(POL-W02)",
     "name" : "정책·룰셋"

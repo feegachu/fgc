@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 설명 : 감사 조회 전용 인터페이스. JPQL DTO 프로젝션으로 검색하고 저장·삭제 메서드는 노출하지 않는다.
@@ -58,6 +59,20 @@ public interface AuditLogQueryRepository extends Repository<AuditLog, Long> {
             from AuditLog al left join al.user u
             """ + SEARCH_CONDITIONS + " order by al.occurredAt desc, al.auditLogId desc")
     List<AuditLogRow> selectAuditLogs(@Param("criteria") AuditLogSearchCriteria criteria, Pageable pageable);
+
+    /**
+     * 설명 : 감사로그 한 건을 목록과 같은 프로젝션(처리자 LEFT JOIN)으로 조회한다. AUDT-W01 상세·diff(#407).
+     */
+    @Query("""
+            select new com.susukkang.fgc.audit.dto.AuditLogRow(
+                al.auditLogId, al.occurredAt, al.userId, u.loginId,
+                al.actionCode, al.entityType, al.entityId,
+                cast(al.beforeValue as String), cast(al.afterValue as String),
+                al.reason, al.requestId, al.policyVersionId)
+            from AuditLog al left join al.user u
+            where al.auditLogId = :auditLogId
+            """)
+    Optional<AuditLogRow> selectAuditLog(@Param("auditLogId") Long auditLogId);
 
     /**
      * 설명 : 목록과 동일한 검색 조건을 적용한 전체 감사로그 건수를 반환한다.

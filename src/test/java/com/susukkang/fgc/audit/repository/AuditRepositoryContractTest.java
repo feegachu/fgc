@@ -48,7 +48,8 @@ class AuditRepositoryContractTest {
         assertThat(CrudRepository.class.isAssignableFrom(AuditLogQueryRepository.class)).isFalse();
         assertThat(AuditLogQueryRepository.class.getMethods())
                 .extracting(Method::getName)
-                .containsExactlyInAnyOrder("selectAuditLogs", "countAuditLogs", "selectDistinctActionCodes",
+                .containsExactlyInAnyOrder("selectAuditLogs", "selectAuditLog", "countAuditLogs",
+                        "selectDistinctActionCodes",
                         "selectDistinctEntityTypes", "selectAuditUsers");
     }
 }

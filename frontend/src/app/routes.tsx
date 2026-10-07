@@ -1,3 +1,5 @@
+import { lazy, Suspense } from 'react'
+import type { ComponentType } from 'react'
 import { BasePage } from '../features/base/BasePage'
 import { PoliciesPage } from '../features/policies/PoliciesPage'
 import type { RouteObject } from 'react-router'
@@ -11,25 +13,34 @@ import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { ExceptionPage } from '../features/exception/ExceptionPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RequirePermission } from './RequirePermission'
-export const screenRoutes: RouteObject[] = screens.map((screen) => ({
-  path: screen.path,
-  element: (
-    <RequirePermission permission={screen.permission}>
-      {screen.id === 'BASE-W01' ? (
-        <BasePage />
-      ) : screen.id === 'POL-W01' ? (
-        <PoliciesPage />
-      ) : screen.id === 'EXCP-W01' ? (
-        <ExceptionPage />
-      ) : screen.id === 'DASH-W01' ? (
-        <DashboardPage />
-      ) : (
-        <TransitionPage screen={screen} />
-      )}
-    </RequirePermission>
-  ),
-  handle: { screenId: screen.id, title: screen.title, parentMenu: screen.menu, permission: screen.permission },
-}))
+// React로 전환을 마친 화면. lazy()로 등록한 화면만 별도 청크로 나뉘어 그 경로에 들어갈 때 받는다
+// (현재 /audit-logs). 직접 import한 화면은 초기 번들에 들어간다.
+// 여기 없는 경로는 기존 Thymeleaf 화면으로 안내하는 TransitionPage를 그린다.
+const pages: Record<string, ComponentType> = {
+  '/': DashboardPage,
+  '/base': BasePage,
+  '/policies': PoliciesPage,
+  '/exceptions': ExceptionPage,
+  '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
+}
+export const screenRoutes: RouteObject[] = screens.map((screen) => {
+  const Page = pages[screen.path]
+  return {
+    path: screen.path,
+    element: (
+      <RequirePermission permission={screen.permission}>
+        {Page ? (
+          <Suspense fallback={null}>
+            <Page />
+          </Suspense>
+        ) : (
+          <TransitionPage screen={screen} />
+        )}
+      </RequirePermission>
+    ),
+    handle: { screenId: screen.id, title: screen.title, parentMenu: screen.menu, permission: screen.permission },
+  }
+})
 export const routes: RouteObject[] = [
   {
     element: <ApplicationRoot />,

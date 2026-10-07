@@ -40,6 +40,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-logs/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 감사로그 필터 선택지
+         * @description AUDT-W01 필터의 행위 종류·대상 종류·행위자 선택지입니다. 감사행에 기록된 값만 나열합니다.
+         */
+        get: operations["options_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit-logs/{auditLogId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 감사로그 상세
+         * @description 감사로그 한 건과 before/after JSON 을 리프 경로로 비교한 diff 를 돌려줍니다.
+         */
+        get: operations["detail_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -1185,6 +1225,16 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseAuditLogDetailResponse: {
+            data?: components["schemas"]["AuditLogDetailResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseAuditLogOptionsResponse: {
+            data?: components["schemas"]["AuditLogOptionsResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseCapCheckBasisResponse: {
             data?: components["schemas"]["CapCheckBasisResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1529,6 +1579,45 @@ export interface components {
             /** Format: int64 */
             reviewRequiredCount?: number;
         };
+        /** @description 변경 내용 비교 행 — before/after JSON 의 리프 경로 하나 */
+        AuditDiffEntry: {
+            /**
+             * @description 변경 후 값(없으면 null)
+             * @example 700000
+             */
+            after?: string;
+            /**
+             * @description 변경 전 값(없으면 null)
+             * @example 500000
+             */
+            before?: string;
+            /**
+             * @description 전·후 값이 다른지 여부
+             * @example true
+             */
+            changed?: boolean;
+            /**
+             * @description 리프 경로. JSON 객체가 아니면 value
+             * @example payment.amount
+             */
+            field?: string;
+        };
+        /** @description 감사로그 상세 응답 */
+        AuditLogDetailResponse: {
+            /** @description before/after 리프 경로 비교. 둘 다 없으면 빈 배열 */
+            diff?: components["schemas"]["AuditDiffEntry"][];
+            /** @description 감사로그 */
+            log?: components["schemas"]["AuditLogResponse"];
+        };
+        /** @description 감사로그 필터 선택지 */
+        AuditLogOptionsResponse: {
+            /** @description 행위 종류(감사행에 기록된 값, 정렬) */
+            actionCodes?: string[];
+            /** @description 대상 종류(감사행에 기록된 값, 정렬) */
+            entityTypes?: string[];
+            /** @description 행위자(감사행을 남긴 사용자, 로그인 ID 순) */
+            users?: components["schemas"]["AuditUserRow"][];
+        };
         /** @description 감사로그 조회 응답 */
         AuditLogResponse: {
             /**
@@ -1585,6 +1674,11 @@ export interface components {
              * @example settle01
              */
             userLoginId?: string;
+        };
+        AuditUserRow: {
+            loginId?: string;
+            /** Format: int64 */
+            userId?: number;
         };
         Blocker: {
             code?: string;
@@ -2600,7 +2694,6 @@ export interface components {
             /** Format: int64 */
             validationRunId?: number;
         };
-        /** @description IF-API-43A 예외함 필터 선택지 */
         ExceptionOptionsResponse: {
             assignees?: components["schemas"]["ExceptionAssigneeRow"][];
             reasons?: components["schemas"]["Option"][];
@@ -3815,6 +3908,52 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponsePageResponseAuditLogResponse"];
+                };
+            };
+        };
+    };
+    options_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAuditLogOptionsResponse"];
+                };
+            };
+        };
+    };
+    detail_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description 감사로그 ID
+                 * @example 1
+                 */
+                auditLogId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description auditLogId에 해당하는 감사로그가 없음 (FGC-COMMON-004) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAuditLogDetailResponse"];
                 };
             };
         };
