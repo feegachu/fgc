@@ -9,7 +9,6 @@ import { dateTimeSeconds, errorText, int } from '../../lib/format'
 import { auditLogDetailQuery, auditLogOptionsQuery, auditLogsQuery, normalizeCriteria } from './api'
 import type { AuditCriteria, AuditLog, AuditLogOptions } from './api'
 import './audit.css'
-import './audit-react.css'
 
 /*
  * FGC-UI-AUDT-W01 감사로그 조회 (FUN-061). 1차 audit/list.html 과 같은 문구·딥링크를 쓴다.
@@ -21,15 +20,16 @@ type Filters = Omit<AuditCriteria, 'page'>
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
+// 열 너비는 1차 audit.css 의 .audit-col-* 와 같은 값이다.
 const columns: TableColumn<AuditLog>[] = [
-  { key: 'occurredAt', label: '발생시각', render: (row) => dateTimeSeconds(row.occurredAt) },
-  { key: 'user', label: '행위자', render: (row) => row.userLoginId ?? 'BATCH' },
-  { key: 'action', label: '행위', render: (row) => dash(row.actionCode) },
-  { key: 'entityType', label: '대상 종류', render: (row) => dash(row.entityType) },
-  { key: 'entityId', label: '대상 ID', render: (row) => dash(row.entityId) },
-  { key: 'reason', label: '사유', render: (row) => dash(row.reason), expandable: true },
-  { key: 'policy', label: '정책버전', render: (row) => dash(row.policyVersionId) },
-  { key: 'requestId', label: '요청 ID', render: (row) => dash(row.requestId) },
+  { key: 'occurredAt', label: '발생시각', width: '10rem', render: (row) => dateTimeSeconds(row.occurredAt) },
+  { key: 'user', label: '행위자', width: '6.5rem', render: (row) => row.userLoginId ?? 'BATCH' },
+  { key: 'action', label: '행위', width: '11rem', render: (row) => dash(row.actionCode) },
+  { key: 'entityType', label: '대상 종류', width: '11rem', render: (row) => dash(row.entityType) },
+  { key: 'entityId', label: '대상 ID', width: '6rem', render: (row) => dash(row.entityId) },
+  { key: 'reason', label: '사유', width: '14rem', render: (row) => dash(row.reason), expandable: true },
+  { key: 'policy', label: '정책버전', width: '7rem', render: (row) => dash(row.policyVersionId) },
+  { key: 'requestId', label: '요청 ID', width: '10rem', render: (row) => dash(row.requestId) },
 ]
 
 export default function AuditLogPage() {
@@ -41,6 +41,7 @@ export default function AuditLogPage() {
   const selectedId = params.get('selected')
   const selected = rows.find((row) => String(row.auditLogId) === selectedId)
   const totalPages = logs.data?.totalPages ?? 0
+  const select = (row: AuditLog) => update({ selected: String(row.auditLogId) }, { resetPage: false })
 
   return (
     <div className="audit-page">
@@ -80,12 +81,16 @@ export default function AuditLogPage() {
             </p>
           )}
           <DataTable
+            className="audit-log-table"
             caption="검색조건에 해당하는 감사 기록 목록"
             columns={columns}
             rows={rows}
             rowKey={(row) => String(row.auditLogId)}
             selectedKeys={selected ? [String(selected.auditLogId)] : []}
-            onRowClick={(row) => update({ selected: String(row.auditLogId) }, { resetPage: false })}
+            // 1차처럼 행 어디를 눌러도 선택한다. 키보드는 첫 열 버튼으로 같은 동작을 한다.
+            rowClassName={() => 'audit-log-row'}
+            onRowActivate={select}
+            onRowClick={select}
             emptyMessage={logs.isPending ? '불러오는 중입니다.' : undefined}
           />
           {totalPages > 1 && (
@@ -94,6 +99,7 @@ export default function AuditLogPage() {
                 {criteria.page} / {totalPages} 페이지
               </span>
               <Pagination
+                compact
                 page={criteria.page}
                 totalPages={totalPages}
                 onPageChange={(page) => update({ page: String(page), selected: '' }, { resetPage: false })}
@@ -147,59 +153,61 @@ function AuditFilter({
     onChange: (event: { target: { value: string } }) => setFilters({ ...filters, [key]: event.target.value }),
   })
   return (
-    <FilterBar onSubmit={() => onSearch(filters)} onReset={onReset}>
-      <div className="filter-field audit-filter-date">
-        <label className="filter-field-label" htmlFor="f-from">
-          발생 시각 (시작)
-        </label>
-        <input className="field-control" type="date" {...bind('from')} />
-      </div>
-      <div className="filter-field audit-filter-date">
-        <label className="filter-field-label" htmlFor="f-to">
-          발생 시각 (끝)
-        </label>
-        <input className="field-control" type="date" {...bind('to')} />
-      </div>
-      <div className="filter-field audit-filter-user">
-        <label className="filter-field-label" htmlFor="f-userId">
-          행위자
-        </label>
-        <select className="select-control" {...bind('userId')}>
-          <option value="">전체</option>
-          {options?.users?.map((user) => (
-            <option key={user.userId} value={String(user.userId)}>
-              {user.loginId}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="filter-field audit-filter-code">
-        <label className="filter-field-label" htmlFor="f-action">
-          행위 종류
-        </label>
-        <select className="select-control" {...bind('action')}>
-          <option value="">전체</option>
-          {options?.actionCodes?.map((code) => (
-            <option key={code}>{code}</option>
-          ))}
-        </select>
-      </div>
-      <div className="filter-field audit-filter-code">
-        <label className="filter-field-label" htmlFor="f-entityType">
-          대상 종류
-        </label>
-        <select className="select-control" {...bind('entityType')}>
-          <option value="">전체</option>
-          {options?.entityTypes?.map((type) => (
-            <option key={type}>{type}</option>
-          ))}
-        </select>
-      </div>
-      <div className="filter-field audit-filter-entity-id">
-        <label className="filter-field-label" htmlFor="f-entityId">
-          대상 ID
-        </label>
-        <input className="field-control" type="text" placeholder="4104" {...bind('entityId')} />
+    <FilterBar className="audit-filter-bar" wrapFields={false} onSubmit={() => onSearch(filters)} onReset={onReset}>
+      <div className="filter-fields audit-filter-fields">
+        <div className="filter-field audit-filter-date">
+          <label className="filter-field-label" htmlFor="f-from">
+            발생 시각 (시작)
+          </label>
+          <input className="field-control" type="date" {...bind('from')} />
+        </div>
+        <div className="filter-field audit-filter-date">
+          <label className="filter-field-label" htmlFor="f-to">
+            발생 시각 (끝)
+          </label>
+          <input className="field-control" type="date" {...bind('to')} />
+        </div>
+        <div className="filter-field audit-filter-user">
+          <label className="filter-field-label" htmlFor="f-userId">
+            행위자
+          </label>
+          <select className="select-control" {...bind('userId')}>
+            <option value="">전체</option>
+            {options?.users?.map((user) => (
+              <option key={user.userId} value={String(user.userId)}>
+                {user.loginId}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="filter-field audit-filter-code">
+          <label className="filter-field-label" htmlFor="f-action">
+            행위 종류
+          </label>
+          <select className="select-control" {...bind('action')}>
+            <option value="">전체</option>
+            {options?.actionCodes?.map((code) => (
+              <option key={code}>{code}</option>
+            ))}
+          </select>
+        </div>
+        <div className="filter-field audit-filter-code">
+          <label className="filter-field-label" htmlFor="f-entityType">
+            대상 종류
+          </label>
+          <select className="select-control" {...bind('entityType')}>
+            <option value="">전체</option>
+            {options?.entityTypes?.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+        <div className="filter-field audit-filter-entity-id">
+          <label className="filter-field-label" htmlFor="f-entityId">
+            대상 ID
+          </label>
+          <input className="field-control" type="text" placeholder="4104" {...bind('entityId')} />
+        </div>
       </div>
     </FilterBar>
   )

@@ -134,6 +134,13 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(screen.getByText('COMMISSION_PAYMENT #42')).toBeInTheDocument()
   })
 
+  it('1차처럼 행의 다른 칸을 눌러도 그 행을 선택한다', async () => {
+    const { router, actions } = renderAt('/audit-logs?month=2026-07')
+    await actions.click(await screen.findByText('BATCH'))
+    await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&selected=2'))
+    expect(await screen.findByText('STARTED')).toBeInTheDocument()
+  })
+
   it('?selected= 로 새로 열어도 같은 로그의 선택 상태와 diff 를 복원한다', async () => {
     renderAt('/audit-logs?selected=1')
     expect(await screen.findByText('payment.amount')).toBeInTheDocument()
