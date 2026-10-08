@@ -10,6 +10,7 @@ import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
+import com.susukkang.fgc.validation.dto.ActiveMonthlyRunResponse;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.CreateValidationRunRequest;
 import com.susukkang.fgc.validation.dto.CreateValidationRunResponse;
@@ -168,6 +169,37 @@ public class ValidationRunController {
 
         // 4) 응답 변환
         return ApiResponse.success(ValidationRunSearchResponse.from(pageResponse));
+    }
+
+    @Operation(
+            summary = "진행 중인 월간 실행 존재 여부 (IF-API-46A)",
+            description = "검증월에 활성(CREATED/RUNNING) MONTHLY 실행이 있는지 돌려준다. "
+                    + "VRUN-W01 이 실행 생성 버튼을 끄는 판정이며, 최종 차단은 생성 API 의 409(FGC-VRUN-001)다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = ActiveMonthlyRunResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "month 누락 또는 형식(yyyy-MM) 오류 (FGC-COMMON-002)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "인증되지 않은 요청")
+    })
+    @GetMapping("/active-monthly")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<ActiveMonthlyRunResponse> activeMonthly(
+            @Parameter(description = "검증월(yyyy-MM)", example = "2026-08")
+            @RequestParam(required = false) String month
+    ) {
+        LocalDate validationMonth;
+        try {
+            validationMonth = DateUtil.parseSettlementMonth(month);
+        } catch (DateTimeException | NullPointerException e) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, "month",
+                    Map.of("field", "month"), null);
+        }
+        return ApiResponse.success(new ActiveMonthlyRunResponse(
+                validationRunSearchService.existsActiveMonthlyRun(validationMonth)));
     }
 
     @Operation(
