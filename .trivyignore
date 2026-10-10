@@ -1,0 +1,6 @@
+# 이미지 검사 예외. 사유·승인자·만료일 없이 추가하지 않는다.
+# CVE-2026-47884: spring-webmvc XsltView (Trivy CRITICAL / Spring MEDIUM).
+# 런북의 검사 결과에 따른 예외 제안. src/main에서 XsltView·xslt 사용 없음 확인.
+# 승인: PL 승인 대기 — 이 PR의 코드오너 승인 및 RFC 링크로 기록한다.
+# 만료: 2026-11-30. 수정 가능한 Spring 버전 공개 또는 만료 시 재검토한다.
+CVE-2026-47884 exp:2026-11-30
