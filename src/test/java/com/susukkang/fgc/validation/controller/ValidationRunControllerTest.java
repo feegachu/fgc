@@ -228,6 +228,37 @@ class ValidationRunControllerTest {
     }
 
     @Test
+    void activeMonthlyReportsWhetherAnActiveMonthlyRunExists() throws Exception {
+        given(validationRunSearchService.existsActiveMonthlyRun(java.time.LocalDate.of(2026, 8, 1)))
+                .willReturn(true);
+
+        mockMvc.perform(get("/api/v1/validation-runs/active-monthly")
+                        .with(user(principal(3L, "audit01", "COMPLIANCE")))
+                        .param("month", "2026-08"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.exists").value(true));
+    }
+
+    @Test
+    void activeMonthlyRejectsMissingOrMalformedMonth() throws Exception {
+        for (String month : new String[] {null, "2026-13", "abc"}) {
+            var request = get("/api/v1/validation-runs/active-monthly")
+                    .with(user(principal(3L, "audit01", "COMPLIANCE")));
+            if (month != null) request = request.param("month", month);
+            mockMvc.perform(request)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                    .andExpect(jsonPath("$.error.field").value("month"));
+        }
+    }
+
+    @Test
+    void activeMonthlyRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/validation-runs/active-monthly").param("month", "2026-08"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void checklistIsReadableBySettlementRole() throws Exception {
         given(validationRunFinalizationService.getChecklist(100L)).willReturn(
                 new FinalizeChecklistResponse(100L, true, List.of(

@@ -1,6 +1,14 @@
 {
   "components" : {
     "schemas" : {
+      "ActiveMonthlyRunResponse" : {
+        "properties" : {
+          "exists" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "Agent" : {
         "properties" : {
           "agentCode" : {
@@ -132,6 +140,20 @@
           "params" : {
             "additionalProperties" : { },
             "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseActiveMonthlyRunResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ActiveMonthlyRunResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -8598,6 +8620,36 @@
           }
         },
         "summary" : "검증 실행 생성 (IF-API-45)",
+        "tags" : [ "검증 실행" ]
+      }
+    },
+    "/api/v1/validation-runs/active-monthly" : {
+      "get" : {
+        "description" : "검증월에 활성(CREATED/RUNNING) MONTHLY 실행이 있는지 돌려준다. VRUN-W01 이 실행 생성 버튼을 끄는 판정이며, 최종 차단은 생성 API 의 409(FGC-VRUN-001)다.",
+        "operationId" : "activeMonthly",
+        "parameters" : [ {
+          "description" : "검증월(yyyy-MM)",
+          "example" : "2026-08",
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseActiveMonthlyRunResponse"
+                }
+              }
+            },
+            "description" : "조회 성공"
+          }
+        },
+        "summary" : "진행 중인 월간 실행 존재 여부 (IF-API-46A)",
         "tags" : [ "검증 실행" ]
       }
     },

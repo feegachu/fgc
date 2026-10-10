@@ -1013,6 +1013,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation-runs/active-monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 진행 중인 월간 실행 존재 여부 (IF-API-46A)
+         * @description 검증월에 활성(CREATED/RUNNING) MONTHLY 실행이 있는지 돌려준다. VRUN-W01 이 실행 생성 버튼을 끄는 판정이며, 최종 차단은 생성 API 의 409(FGC-VRUN-001)다.
+         */
+        get: operations["activeMonthly"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/validation-runs/{id}": {
         parameters: {
             query?: never;
@@ -1117,6 +1137,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActiveMonthlyRunResponse: {
+            exists?: boolean;
+        };
         Agent: {
             agentCode?: string;
             /** Format: int64 */
@@ -1219,6 +1242,11 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             };
+        };
+        ApiResponseActiveMonthlyRunResponse: {
+            data?: components["schemas"]["ActiveMonthlyRunResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
         };
         ApiResponseArbitrageSearchResponse: {
             data?: components["schemas"]["ArbitrageSearchResponse"];
@@ -5688,6 +5716,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                };
+            };
+        };
+    };
+    activeMonthly: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 검증월(yyyy-MM)
+                 * @example 2026-08
+                 */
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 조회 성공 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
                 };
             };
         };
