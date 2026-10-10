@@ -195,6 +195,19 @@ it('Toast 일반 알림은 5초 후 닫고 오류·로딩은 수동으로 닫는
   act(() => notifyApiError(new ApiError({ code: 'FGC-COMMON-500', message: '실패' }, 'trace', 500)))
   expect(screen.getByRole('alert')).toHaveTextContent('실패 (FGC-COMMON-500 · 요청 ID: trace)')
 })
+it('EvidenceLink icon 은 1차처럼 ⓘ 버튼에 접근 가능한 이름을 단다', async () => {
+  const user = userEvent.setup()
+  render(
+    <EvidenceLink icon label="적용 체계 판정 근거">
+      REG-19
+    </EvidenceLink>,
+  )
+  const trigger = screen.getByRole('button', { name: '적용 체계 판정 근거' })
+  expect(trigger).toHaveClass('evidence-trigger')
+  expect(trigger).not.toHaveClass('react-evidence-trigger')
+  await user.click(trigger)
+  expect(screen.getByRole('tooltip')).toHaveTextContent('REG-19')
+})
 it('EvidenceLink는 hover·focus로 열고 클릭 고정·Esc로 해제한다', async () => {
   const user = userEvent.setup()
   render(<EvidenceLink label="REG-08">제4-32조제11항</EvidenceLink>)
