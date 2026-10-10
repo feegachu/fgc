@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 // icon 이면 1차 evidence 마크업처럼 ⓘ 아이콘 버튼을 그리고 label 은 접근 가능한 이름으로만 쓴다.
+// 버튼이므로 정렬 가능한 DataTable 열 머리글(label 이 <button> 안에 들어감)에는 넣지 않는다 — 버튼 중첩·정렬 오작동.
 export function EvidenceLink({
   label,
   children,

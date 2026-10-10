@@ -180,7 +180,7 @@ UI 테스트의 월은 fixture이고 실제 연결은 서버 통합 테스트로
 | FilterBar | children, onSubmit, onReset | 조회/초기화; useSearchParamsState(defaults)의 update/reset과 연결 |
 | Modal | open, title, onClose, initialFocusRef, closeOnBackdrop, closeOnEscape, footer | 포커스 순환·복원, 기본 배경 클릭 금지, Esc 닫기 |
 | ToastRegion | 앱 루트에 한 번 마운트 | toast(message, tone) 또는 API 오류 구독; 일반 5초, 오류/로딩 수동 닫기 |
-| EvidenceLink | label, children | hover/focus, 클릭 고정, Esc/외부 클릭 해제 |
+| EvidenceLink | label, children, icon? | hover/focus, 클릭 고정, Esc/외부 클릭 해제; icon 이면 1차 ⓘ 버튼을 그리고 label 은 aria-label 로만 씀 |
 | StatusBadge | tone, children | 서버 문구와 상태 색상 함께 표시 |
 | MonthSelector | value, onApply, disabledMonths, openTabCount | 12개월 4열, 초안/취소/적용, 방향키, 1~9999년 |
 | KpiCard | label, value, unit, footer, tone | 표시 값만 전달; 업무 계산 없음 |
