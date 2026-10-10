@@ -237,7 +237,8 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/assets/**", "/css/**", "/js/**",
-                                "/images/**", "/fonts/**", "/favicon.ico", "/error").permitAll()
+                                "/images/**", "/fonts/**", "/favicon.ico", "/error",
+                                "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/audit-logs")
                         .hasAnyRole(Roles.COMPLIANCE, Roles.SYSTEM_ADMIN)
                         // FUN-002(#82) 굵은 규칙 — protectedStateChangeApiSecurityFilterChain 주석 참고.
