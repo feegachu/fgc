@@ -55,6 +55,9 @@ function renderAt(path: string, roleCode = 'SETTLEMENT') {
 async function apiErrorFrom(response: Response) {
   return readEnvelope(response).then(() => { throw new Error('ApiError expected') }, (error: unknown) => error)
 }
+// 셸은 기준월이 없는 주소를 ?month= 를 붙인 주소로 바꾼다. 위치가 바뀌면 바운더리가 의도대로 초기화되어
+// 오류 화면을 다시 그리므로, 그 사이에 찾은 요소가 문서에서 떨어진다. 오류 화면 검사는 기준월이 붙은 주소에서 연다.
+const HOME = '/?month=2026-07'
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
@@ -88,8 +91,7 @@ describe('오류 화면 (#417)', () => {
       error: { code: 'FGC-COMMON-500', message: 'SQLException: 내부 정보' },
       requestId: 'req-500',
     }))
-    // 기준월이 붙은 주소로 연다. 셸이 월을 붙이며 이동하면 바운더리는 의도대로 초기화되어 복사 상태도 사라진다.
-    renderAt('/?month=2026-07')
+    renderAt(HOME)
     expect(await screen.findByRole('heading', { name: '500 · 처리 오류' })).toBeInTheDocument()
     expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 req-500를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.getByText('FGC-COMMON-500')).toBeInTheDocument()
@@ -106,7 +108,7 @@ describe('오류 화면 (#417)', () => {
     const onError = (event: ErrorEvent) => { event.preventDefault(); reported.push(event.error) }
     window.addEventListener('error', onError)
     onTestFinished(() => window.removeEventListener('error', onError))
-    const router = renderAt('/')
+    const router = renderAt(HOME)
     expect(await screen.findByRole('heading', { name: '500 · 처리 오류' })).toBeInTheDocument()
     expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 -를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.queryByText(/secret\.stack/)).toBeNull()
@@ -122,7 +124,7 @@ describe('오류 화면 (#417)', () => {
       status: 502,
       headers: { 'Content-Type': 'text/html', 'X-Request-Id': 'req-502' },
     }))
-    renderAt('/')
+    renderAt(HOME)
     expect(await screen.findByRole('heading', { name: '500 · 처리 오류' })).toBeInTheDocument()
     expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 req-502를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.queryByText(/Bad Gateway/)).toBeNull()
@@ -134,7 +136,7 @@ describe('오류 화면 (#417)', () => {
       error: { code: 'FGC-COMMON-004', message: '요청한 데이터를 찾을 수 없습니다. (12)' },
       requestId: 'req-404',
     }))
-    renderAt('/')
+    renderAt(HOME)
     expect(await screen.findByRole('heading', { name: '404 · 찾을 수 없음' })).toBeInTheDocument()
     expect(screen.getByText('요청한 데이터를 찾을 수 없습니다. (12)')).toBeInTheDocument()
     expect(screen.getByText('FGC-COMMON-004 · 요청 ID: req-404')).toBeInTheDocument()
@@ -147,7 +149,7 @@ describe('오류 화면 (#417)', () => {
       error: { code: 'FGC-SCHE-001', message: '되돌릴 수 없습니다 — 확정된 스케줄은 새 버전으로만 바꿉니다.' },
       requestId: 'req-409',
     }))
-    renderAt('/')
+    renderAt(HOME)
     expect(await screen.findByRole('heading', { name: '409 · 처리 오류' })).toBeInTheDocument()
     expect(screen.getByText('FGC-SCHE-001 · 요청 ID: req-409')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '요청 ID 복사' })).toBeNull()
