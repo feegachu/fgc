@@ -1,0 +1,49 @@
+/* 1차 static/css/features/error.css 를 옮겼다. 색·간격은 variables.css 토큰만 쓴다. */
+.error-page {
+  display: grid;
+  justify-items: center;
+}
+
+.error-card {
+  width: 100%;
+  max-width: 35rem;
+  margin-top: var(--space-10);
+}
+
+.error-card-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.error-message {
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+/* 오류코드·요청 ID — 담당자에게 그대로 읽어 주는 값이라 본문보다 낮은 대비로 둔다. */
+.error-trace {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.error-help {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.error-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 47.9375rem) {
+  .error-card {
+    margin-top: var(--space-4);
+  }
+}

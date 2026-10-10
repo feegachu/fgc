@@ -83,7 +83,7 @@ test('eleventh tab is bounded and restored; month updates every tab and removes 
 test('unknown route and keyboard month cancellation', async ({ page }) => {
   await session(page)
   await page.goto('unknown')
-  await expect(page.getByRole('heading', { name: '페이지를 찾을 수 없습니다' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '404 · 찾을 수 없음' })).toBeVisible()
   const trigger = page.getByRole('button', { name: '기준 정산월 2026-07' })
   await trigger.click()
   await page.getByRole('gridcell', { name: '7월', exact: true }).focus()

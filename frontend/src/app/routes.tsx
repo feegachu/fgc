@@ -7,7 +7,8 @@ import { AppShell } from './shell/AppShell'
 import { ApplicationRoot } from './ApplicationRoot'
 import { screens } from './screens'
 import { TransitionPage } from './TransitionPage'
-import { NotFoundPage } from './NotFoundPage'
+import { NotFoundPage } from '../features/error/ErrorPages'
+import { RouteErrorBoundary } from './ErrorBoundary'
 import { LoginPage } from '../features/auth/LoginPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { ExceptionPage } from '../features/exception/ExceptionPage'
@@ -44,11 +45,24 @@ export const screenRoutes: RouteObject[] = screens.map((screen) => {
 export const routes: RouteObject[] = [
   {
     element: <ApplicationRoot />,
+    // 셸 밖(로그인·셸 자체)의 예외도 React Router 기본 화면(스택 노출) 대신 오류 화면으로 받는다.
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: '/login', element: <LoginPage />, handle: { screenId: 'AUTH-W01', title: '로그인' } },
       {
         element: <ProtectedRoute />,
-        children: [{ element: <AppShell />, children: [...screenRoutes, { path: '*', element: <NotFoundPage /> }] }],
+        children: [
+          {
+            element: <AppShell />,
+            // 업무 화면 예외는 셸 안에서 받는다. 셸·탭·사이드바는 그대로 동작한다.
+            children: [
+              {
+                errorElement: <RouteErrorBoundary />,
+                children: [...screenRoutes, { path: '*', element: <NotFoundPage /> }],
+              },
+            ],
+          },
+        ],
       },
     ],
   },

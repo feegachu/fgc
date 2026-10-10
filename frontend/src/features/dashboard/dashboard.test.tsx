@@ -176,6 +176,6 @@ describe('DASH-W01 업무 대시보드', () => {
           })) as typeof apiClient.request)
     renderDashboard()
     expect(await screen.findByRole('region', { name: '주요 검증 지표' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '접근 권한이 없습니다' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: '403 · 권한 없음' })).toBeNull()
   })
 })
