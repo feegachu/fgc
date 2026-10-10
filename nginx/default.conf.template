@@ -2,9 +2,16 @@
 # ${API_UPSTREAM} 은 컨테이너 시작 때 환경변수로 치환된다 (nginx 공식 이미지의 templates 기능).
 #   같은 Pod 안:      API_UPSTREAM=127.0.0.1:8080  (기본값)
 #   따로 띄웠을 때:   API_UPSTREAM=host.containers.internal:8082
+# 브라우저가 본 포트(Host 헤더의 :포트, 없으면 scheme 기본값)를 Tomcat에 넘긴다.
+# 컨테이너 안 $server_port(80)는 터널(18088)·발행 포트(8088)와 다르므로 쓰지 않는다.
+map $scheme $fgc_scheme_port { https 443; default 80; }
+map $http_host $fgc_forwarded_port { "~:(?<p>[0-9]+)$" $p; default $fgc_scheme_port; }
 server {
     listen 80;
     server_name _;
+
+    # 환경별 추가 설정(로그인 제한·actuator 차단·운영 TLS). deploy-host.sh가 넣는다. 없으면 아무 일도 없다(와일드카드 include).
+    include /etc/nginx/fgc.d/*.conf;
 
     root /usr/share/nginx/html;
 
@@ -50,6 +57,7 @@ server {
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host  $http_host;
+        proxy_set_header X-Forwarded-Port  $fgc_forwarded_port;
         proxy_read_timeout 60s;
     }
 }
