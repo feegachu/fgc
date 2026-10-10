@@ -180,7 +180,7 @@ UI 테스트의 월은 fixture이고 실제 연결은 서버 통합 테스트로
 | FilterBar | children, onSubmit, onReset | 조회/초기화; useSearchParamsState(defaults)의 update/reset과 연결 |
 | Modal | open, title, onClose, initialFocusRef, closeOnBackdrop, closeOnEscape, footer | 포커스 순환·복원, 기본 배경 클릭 금지, Esc 닫기 |
 | ToastRegion | 앱 루트에 한 번 마운트 | toast(message, tone) 또는 API 오류 구독; 일반 5초, 오류/로딩 수동 닫기 |
-| EvidenceLink | label, children | hover/focus, 클릭 고정, Esc/외부 클릭 해제 |
+| EvidenceLink | label, children, icon? | hover/focus, 클릭 고정, Esc/외부 클릭 해제; icon 이면 1차 ⓘ 버튼을 그리고 label 은 aria-label 로만 씀 |
 | StatusBadge | tone, children | 서버 문구와 상태 색상 함께 표시 |
 | MonthSelector | value, onApply, disabledMonths, openTabCount | 12개월 4열, 초안/취소/적용, 방향키, 1~9999년 |
 | KpiCard | label, value, unit, footer, tone | 표시 값만 전달; 업무 계산 없음 |
@@ -299,3 +299,18 @@ HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 �
 긴 기준정보·정책 텍스트는 기존과 같은 1~2줄 미리보기와 전체 보기/접기를 사용한다.
 실제 잘림이 발생하는 경우에만 펼침 버튼을 표시하며, 너비 변경 시 ResizeObserver로 다시 확인한다.
 상품·설계사 표는 최소 너비 88rem, 정책 버전 표는 84rem을 유지하고 좁은 화면에서 가로 스크롤한다.
+
+## #409 예상 스케줄 목록·상세
+
+`/app/schedules`, `/app/schedules/:id`를 `features/schedule/`로 옮겼다. 두 화면은 lazy 청크라 초기 번들에 들어가지 않는다.
+기존 `/schedules`, `/schedules/{id}`와 템플릿·JS·구조 테스트는 #419까지 유지한다. API·DB 계약 변경은 없다.
+
+- URL: 목록 `contractNo·stage·regime·purpose·status·page`(1차와 같은 이름). 목록에 없는 코드값은 1차처럼 전체(용도는 운영)로 보정하고,
+  범위를 넘은 `page`는 마지막 페이지로 바꿔(기록 대체) 다시 조회한다. 상세는 경로의 숫자 id만 받는다.
+- 라벨: 헤더는 서버 `*Label`을 쓰고, 응답에 라벨이 없는 회차 상태·계산방식과 필터 선택지는 `labels.ts`의 표를 쓴다.
+- 합계는 서버 `expectedTotal`을 그대로 표시한다(화면에서 다시 더하지 않는다).
+- 확정·재생성 버튼은 `canProcess`가 없거나 상태가 맞지 않으면 비활성화하고 사유를 텍스트로 보인다. 최종 판정은 서버 `@PreAuthorize`다.
+- 재생성 사유는 비어 있거나 40자를 넘으면 필드 오류를 보이고 저장하지 않는다. 서버가 `field=reason`으로 거절하면 그 문구를 필드 옆에 둔다.
+- `EvidenceLink`에 `icon` 옵션을 더했다. 1차처럼 ⓘ 버튼을 그리고 `label`은 접근 가능한 이름이 된다(기존 호출부는 그대로).
+
+검증: `src/features/schedule/schedule.test.tsx`(1차 `schedule-list.test.cjs` 3건 이전 + 이슈 시나리오 #1~#6).
