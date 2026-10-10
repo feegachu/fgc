@@ -1,12 +1,12 @@
-/.github/                       @HyunJuneKang 
-/infra/                         @HyunJuneKang 
-/podman/                        @HyunJuneKang 
-/nginx/                         @HyunJuneKang 
-/Jenkinsfile.fgc                @HyunJuneKang 
-/.trivyignore                   @HyunJuneKang 
-/Containerfile.*                @HyunJuneKang 
-/src/main/resources/db/migration/ @HyunJuneKang 
-/src/main/resources/db/demo/     @HyunJuneKang 
+/.github/                       @HyunJuneKang @yslee4601
+/infra/                         @HyunJuneKang @yslee4601
+/podman/                        @HyunJuneKang @yslee4601
+/nginx/                         @HyunJuneKang @yslee4601
+/Jenkinsfile.fgc                @HyunJuneKang @yslee4601
+/.trivyignore                   @HyunJuneKang @yslee4601
+/Containerfile.*                @HyunJuneKang @yslee4601
+/src/main/resources/db/migration/ @HyunJuneKang @yslee4601
+/src/main/resources/db/demo/     @HyunJuneKang @yslee4601
 /frontend/                      @ParkMinjun0721 @HyunJuneKang
 
 /.github/CODEOWNERS             @yslee4601 @HyunJuneKang
