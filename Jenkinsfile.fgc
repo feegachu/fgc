@@ -1,0 +1,145 @@
+def ship(String host, String credential) {
+    withEnv(["FGC_HOST=${host}", "FGC_ATTEMPT=${env.BUILD_TAG.replaceAll('[^A-Za-z0-9_-]', '_')}"]) {
+        withCredentials([
+            sshUserPrivateKey(credentialsId: credential, keyFileVariable: 'DEPLOY_KEY', usernameVariable: 'DEPLOY_USER'),
+            file(credentialsId: 'fgc-known-hosts', variable: 'KNOWN_HOSTS')
+        ]) {
+            sh '''#!/usr/bin/env bash
+set -euo pipefail
+set +x
+remote="fgc/incoming/$FGC_ATTEMPT"
+opts=(-i "$DEPLOY_KEY" -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$KNOWN_HOSTS")
+ssh "${opts[@]}" "$DEPLOY_USER@$FGC_HOST" "mkdir -p '$remote'"
+scp "${opts[@]}" bundle.tgz "$DEPLOY_USER@$FGC_HOST:$remote/bundle.tgz"
+ssh "${opts[@]}" "$DEPLOY_USER@$FGC_HOST" \
+  "cd '$remote' && tar -xzf bundle.tgz && bash infra/scripts/deploy-host.sh release.json"
+'''
+        }
+    }
+}
+
+pipeline {
+    agent any
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timestamps()
+        timeout(time: 90, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '20'))
+    }
+    parameters {
+        string(name: 'SOURCE_BUILD', defaultValue: '', description: 'stage: dev 빌드 번호 / prod: stage 빌드 번호 / prod 롤백: 이전 prod 성공 빌드 번호')
+        booleanParam(name: 'ROLLBACK', defaultValue: false, description: 'prod에서만: 호환성이 확인된 이전 운영 bundle을 선택')
+        string(name: 'RFC_URL', defaultValue: '', description: '운영 변경 요청 문서 URL. 롤백에도 필수')
+    }
+    environment {
+        REGISTRY = 'ghcr.io/feegachu/fgc'
+        PRD_URL = 'https://feegachu.cloud'
+        PL_APPROVER = 'hjkang'
+    }
+    stages {
+        stage('Identify target') {
+            steps {
+                deleteDir()
+                script {
+                    def targets = ['dev-fgc': 'dev', 'stage-fgc': 'stage', 'release-fgc': 'prod']
+                    env.TARGET_ENV = targets[env.JOB_BASE_NAME]
+                    if (!env.TARGET_ENV) { error('허용되지 않은 job 이름') }
+                    if (params.ROLLBACK && env.TARGET_ENV != 'prod') { error('ROLLBACK은 prod 전용') }
+                }
+            }
+        }
+        stage('Build immutable bundle from develop') {
+            when { expression { env.TARGET_ENV == 'dev' } }
+            steps {
+                checkout scm
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+export FGC_COMMIT=$(git rev-parse HEAD)
+[[ "$FGC_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+ready=0
+for n in $(seq 1 180); do
+  if skopeo inspect "docker://$REGISTRY/api:sha-$FGC_COMMIT" > api-inspect.json \
+     && skopeo inspect "docker://$REGISTRY/web:sha-$FGC_COMMIT" > web-inspect.json; then
+    ready=1; break
+  fi
+  sleep 15
+done
+[[ "$ready" == 1 ]] || { echo '45분 내 이미지 미완료: GitHub Actions의 build·frontend·publish 결과 확인. 이미지가 나중에 올라오면 dev-fgc를 Build Now로 다시 실행'; exit 1; }
+python3 infra/scripts/make-release.py
+tar -czf bundle.tgz release.json infra/scripts/deploy-host.sh podman/fgc-app-combined.yaml podman/fgc-app-was.yaml podman/fgc-app-web.yaml
+cat release.json
+'''
+            }
+        }
+        stage('Select previously verified bundle') {
+            when { expression { env.TARGET_ENV != 'dev' } }
+            steps {
+                script {
+                    if (!(params.SOURCE_BUILD ==~ /[1-9][0-9]*/)) { error('SOURCE_BUILD는 성공 빌드의 정수 번호') }
+                    def sourceJob = env.TARGET_ENV == 'stage' ? 'dev-fgc' : (params.ROLLBACK ? 'release-fgc' : 'stage-fgc')
+                    copyArtifacts(projectName: sourceJob,
+                        selector: specific(params.SOURCE_BUILD),
+                        filter: 'bundle.tgz', fingerprintArtifacts: true)
+                }
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+tar -tzf bundle.tgz
+tar -xzf bundle.tgz
+cat release.json
+sha256sum bundle.tgz
+'''
+            }
+        }
+        stage('Production approval') {
+            when { expression { env.TARGET_ENV == 'prod' } }
+            steps {
+                script {
+                    if (!params.RFC_URL.trim()) { error('RFC_URL이 필요합니다') }
+                    if (env.PL_APPROVER.startsWith('REPLACE_')) { error('PL_APPROVER를 실제 ID로 수정하세요') }
+                    timeout(time: 30, unit: 'MINUTES') {
+                        input message: "운영 ${params.ROLLBACK ? '롤백' : '배포'} 승인. 위 release.json, 검증 결과, DB 호환성을 확인하세요. RFC: ${params.RFC_URL}",
+                              ok: 'Approve', submitter: env.PL_APPROVER,
+                              submitterParameter: 'APPROVED_BY'
+                    }
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                script {
+                    if (env.TARGET_ENV == 'dev') {
+                        ship('10.250.1.10', 'fgc-dev-key')
+                    } else if (env.TARGET_ENV == 'stage') {
+                        ship('10.250.11.10', 'fgc-stage-key')
+                    } else {
+                        ship('10.250.11.20', 'fgc-prod-was-key')
+                        ship('10.250.2.10', 'fgc-prod-web-key')
+                    }
+                }
+            }
+        }
+        stage('Public production smoke test') {
+            when { expression { env.TARGET_ENV == 'prod' } }
+            steps {
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+code=$(curl --connect-timeout 5 --max-time 20 -sS -o /dev/null -w '%{http_code}' "$PRD_URL/login")
+[[ "$code" == 200 ]] || { echo "HTTPS login check failed: $code"; exit 1; }
+'''
+            }
+        }
+    }
+    post {
+        success {
+            archiveArtifacts artifacts: 'bundle.tgz,release.json', fingerprint: true
+            echo '배포 성공. QA 업무 시나리오와 환경 현황표까지 완료하세요.'
+        }
+        failure {
+            echo '배포 실패: 일부 서비스만 새 버전일 수 있습니다. 운영 상태와 DB migration을 먼저 확인하세요.'
+        }
+        aborted {
+            echo '중단되었습니다. 승인 이전인지 배포 도중인지 로그로 확인하세요.'
+        }
+    }
+}
