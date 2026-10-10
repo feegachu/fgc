@@ -82,11 +82,11 @@ describe('AppShell·라우트', () => {
   })
   it('미등록 경로를 404 연결 화면으로 보낸다', async () => {
     renderAt('/xyz')
-    expect(await screen.findByRole('heading', { name: '페이지를 찾을 수 없습니다' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '404 · 찾을 수 없음' })).toBeInTheDocument()
   })
   it('수정 라우트 메타데이터를 등록하고 쓰기 권한이 없으면 기존 링크도 숨긴다', async () => {
     renderAt('/contracts/12/edit', 'COMPLIANCE')
-    expect(await screen.findByRole('heading', { name: '접근 권한이 없습니다.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '기존 화면으로 이동' })).toBeNull()
     expect(screens.find((route) => route.path === '/contracts/:id/edit')?.permission).toBe('canProcess')
   })
