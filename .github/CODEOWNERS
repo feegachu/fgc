@@ -7,6 +7,6 @@
 /Containerfile.*                @HyunJuneKang @yslee4601
 /src/main/resources/db/migration/ @HyunJuneKang @yslee4601
 /src/main/resources/db/demo/     @HyunJuneKang @yslee4601
-/frontend/                      @ParkMinjun0721 @HyunJuneKang
+/frontend/                      @yslee4601 @HyunJuneKang
 
 /.github/CODEOWNERS             @yslee4601 @HyunJuneKang
