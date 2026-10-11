@@ -599,7 +599,8 @@ class ContractConsistencyIntegrationTest {
             confirmation.get(20, TimeUnit.SECONDS);
             CapCheckSaveResult saved = calculation.get(20, TimeUnit.SECONDS);
             assertThat(saved.result().complianceDeductionAmount()).isEqualByComparingTo("600");
-            assertThat(saved.result().limitAmount()).isEqualByComparingTo("1199400");
+            // #468: 준법경영비를 산입액에서 제외하므로 실질 한도는 월납×12 + 확정 증빙액이다.
+            assertThat(saved.result().limitAmount()).isEqualByComparingTo("1200600");
             assertThat(jdbc.queryForObject("SELECT (calculation_snapshot->>'complianceEvidenceAmount')::numeric FROM fgc.cap_check WHERE cap_check_id=?",
                     BigDecimal.class, saved.capCheckId())).isEqualByComparingTo("600");
             assertThat(jdbc.queryForObject("SELECT compliance_deduction_amount FROM fgc.cap_check WHERE cap_check_id=?",
