@@ -23,7 +23,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -391,7 +390,7 @@ class CorrectionActionPerformanceTest {
         return new SqlCounts(select, insert, update, other, statements.size());
     }
 
-    private JdbcBaseline baselineSession() throws Exception {
+    private JdbcBaseline baselineSession() {
         return new JdbcBaseline(dataSource);
     }
 

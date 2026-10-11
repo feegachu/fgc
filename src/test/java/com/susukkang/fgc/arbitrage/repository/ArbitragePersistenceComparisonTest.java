@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,7 +45,7 @@ class ArbitragePersistenceComparisonTest {
     private ArbitrageJdbcBaseline baseline;
 
     @BeforeEach
-    void loadTestOnlyBaseline() throws Exception {
+    void loadTestOnlyBaseline() {
         baseline = new ArbitrageJdbcBaseline(dataSource);
     }
 

@@ -90,8 +90,8 @@ class ValidationTargetSelectionRepositoryIntegrationTest {
                   FROM fgc.validation_target
                  WHERE validation_run_id = ? AND contract_id = ?
                 """, runId, contractId);
-        assertThat(target.get("selection_status")).isEqualTo("SELECTED");
-        assertThat(target.get("selection_reason")).isEqualTo("월 통합검증 대상");
+        assertThat(target).containsEntry("selection_status", "SELECTED")
+                .containsEntry("selection_reason", "월 통합검증 대상");
         assertThat(target.get("refund_rate_table_id")).isNotNull();
     }
 

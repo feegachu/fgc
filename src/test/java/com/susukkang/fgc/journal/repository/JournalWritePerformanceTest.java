@@ -23,7 +23,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
@@ -108,7 +107,7 @@ class JournalWritePerformanceTest {
     }
 
     @Test
-    void compareCommittedDraftAndPostingWrites() throws Exception {
+    void compareCommittedDraftAndPostingWrites() {
         assertThat(jdbc.queryForObject("SELECT current_database()", String.class))
                 .startsWith("fgc_journal_write_perf_");
         assertThat(AopUtils.isAopProxy(postingTransaction)).isTrue();
@@ -369,7 +368,7 @@ class JournalWritePerformanceTest {
 
     private long count(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }
 
-    private JdbcBaseline baselineSession() throws Exception {
+    private JdbcBaseline baselineSession() {
         return new JdbcBaseline(dataSource);
     }
 

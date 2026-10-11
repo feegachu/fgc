@@ -43,6 +43,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ContractQueryRepository {
 
+    private static final String CONTRACT_ID_PARAMETER = "contractId";
+
     private final EntityManager entityManager;
     private final JPAQueryFactory queryFactory;
 
@@ -68,7 +70,7 @@ public class ContractQueryRepository {
                   JOIN Organization o ON o.organizationId = c.organizationId
                  WHERE c.contractId = :contractId
                 """, ContractDetailResponse.class)
-                .setParameter("contractId", contractId).getResultList().stream().findFirst();
+                .setParameter(CONTRACT_ID_PARAMETER, contractId).getResultList().stream().findFirst();
     }
 
     /** 사건 원본이 아닌 Job별 처리 테이블에서 처리 이력을 조회한다. */
@@ -82,7 +84,7 @@ public class ContractQueryRepository {
                  WHERE e.contractId = :contractId
                  ORDER BY p.contractStatusEventId, p.processedAt, p.contractStatusEventProcessingId
                 """, ContractStatusEventProcessingRow.class)
-                .setParameter("contractId", contractId).getResultList();
+                .setParameter(CONTRACT_ID_PARAMETER, contractId).getResultList();
     }
 
     @Transactional(readOnly = true)
@@ -157,7 +159,7 @@ public class ContractQueryRepository {
                    AND ta.attribution_date >= c.contract_date
                    AND ta.attribution_date < c.contract_date + INTERVAL '12 months'
                 """);
-        query.setParameter("contractId", contractId);
+        query.setParameter(CONTRACT_ID_PARAMETER, contractId);
         query.setParameter("paymentStage", paymentStage.name());
         query.addScalar("evidence_amount", BigDecimal.class);
         return (BigDecimal) query.getSingleResult();

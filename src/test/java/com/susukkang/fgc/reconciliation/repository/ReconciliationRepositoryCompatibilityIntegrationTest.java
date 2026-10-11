@@ -54,7 +54,7 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
     private JdbcBaseline baseline;
 
     @BeforeEach
-    void isolatedBaseline() throws Exception {
+    void isolatedBaseline() {
         baseline = new JdbcBaseline(dataSource);
     }
 

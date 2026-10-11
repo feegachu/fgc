@@ -11,10 +11,8 @@ import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.io.ClassPathResource;
 
 import javax.sql.DataSource;
-import java.io.IOException;
 
 /**
  * 설명 : d1a603df 지급 서비스·Mapper 기준 구현의 명시적 테스트 등록.
@@ -28,7 +26,7 @@ import java.io.IOException;
 public class PaymentBaselineConfiguration {
 
     @Bean(defaultCandidate = false)
-    BaselineMappers paymentBaselineMappers(DataSource dataSource) throws IOException {
+    BaselineMappers paymentBaselineMappers(DataSource dataSource) {
         return new BaselineMappers(new CommissionPaymentJdbcBaseline(dataSource),
                 new PaymentCapCheckJdbcBaseline(dataSource), new PaymentCapExceptionJdbcBaseline(dataSource));
     }

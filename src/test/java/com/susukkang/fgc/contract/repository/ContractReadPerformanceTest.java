@@ -18,7 +18,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,7 +69,7 @@ class ContractReadPerformanceTest {
     @Autowired private EntityManagerFactory entityManagerFactory;
 
     @Test
-    void compareLegacyQueriesAndCurrentRepositories() throws Exception {
+    void compareLegacyQueriesAndCurrentRepositories() {
         Long contractId = jdbc.queryForObject("""
                 SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL01-202607-0001'
                 """, Long.class);
@@ -127,7 +126,7 @@ class ContractReadPerformanceTest {
         return PageResponse.of(content, page, 20, count, "contractId,desc");
     }
 
-    private JdbcBaseline baselineSession() throws Exception {
+    private JdbcBaseline baselineSession() {
         return new JdbcBaseline(dataSource);
     }
 

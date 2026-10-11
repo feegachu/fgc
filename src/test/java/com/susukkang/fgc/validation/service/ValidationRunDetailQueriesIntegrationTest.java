@@ -239,14 +239,12 @@ class ValidationRunDetailQueriesIntegrationTest {
         insertCapCheck(runId, c1, "GA_TO_FC", "NORMAL");
 
         List<AgentCapMonitoringRow> fromRepository = validationRunRepository.summarizeCapByAgent(runId);
-        assertThat(fromRepository).hasSize(2);
-        assertThat(fromRepository).allSatisfy(row -> {
+        assertThat(fromRepository).hasSize(2).allSatisfy(row -> {
             assertThat(row.getCheckedCount()).isEqualTo(1);
             assertThat(row.getWarningCount()).isZero();
             assertThat(row.getReviewRequiredCount()).isZero();
             assertThat(row.getViolationCount()).isEqualTo("INSURER_TO_GA".equals(row.getPaymentStage()) ? 1 : 0);
-        });
-        assertThat(fromRepository).extracting(AgentCapMonitoringRow::getPaymentStage)
+        }).extracting(AgentCapMonitoringRow::getPaymentStage)
                 .containsExactlyInAnyOrder("INSURER_TO_GA", "GA_TO_FC");
     }
 }

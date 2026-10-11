@@ -201,7 +201,7 @@ class ValidationRunDetailRepositoryIntegrationTest {
         assertThat(header.getCurrentStep()).isZero();
         assertThat(header.getTriggeredBy()).isNull(); // triggered_by 미지정 → login_id 도 null
 
-        assertThat(mapper.findHeaderById(-1L).orElse(null)).isNull();
+        assertThat(mapper.findHeaderById(-1L)).isEmpty();
     }
 
     @Test

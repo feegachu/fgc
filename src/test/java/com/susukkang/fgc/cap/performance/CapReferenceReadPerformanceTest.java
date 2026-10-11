@@ -21,7 +21,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootVersion;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.transaction.annotation.Transactional;
@@ -263,7 +262,7 @@ class CapReferenceReadPerformanceTest {
         return value;
     }
 
-    private Baseline baseline() throws IOException {
+    private Baseline baseline() {
         return new Baseline(new CapContractJdbcBaseline(dataSource), new CapRuleJdbcBaseline(dataSource),
                 new CapScheduleAmountJdbcBaseline(dataSource), new RefundRateJdbcBaseline(dataSource),
                 new CapIncludedAmountJdbcBaseline(dataSource));

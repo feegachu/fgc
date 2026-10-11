@@ -72,11 +72,10 @@ class ExceptionGenerationRepositoryIntegrationTest {
                         "RECONCILIATION_MISMATCH",
                         "RECONCILIATION_MISMATCH");
         assertThat(exceptions)
-                .anySatisfy(row -> {
-                    assertThat(row.get("exception_type")).isEqualTo("CAP_VIOLATION");
-                    assertThat(row.get("severity")).isEqualTo("CRITICAL");
-                    assertThat(row.get("source_entity_type")).isEqualTo("CAP_CHECK");
-                });
+                .anySatisfy(row -> assertThat(row)
+                        .containsEntry("exception_type", "CAP_VIOLATION")
+                        .containsEntry("severity", "CRITICAL")
+                        .containsEntry("source_entity_type", "CAP_CHECK"));
 
         assertThat(exceptionCaseRepository.insertFromCapChecks(validationRunId)).isZero();
         assertThat(exceptionCaseRepository.insertFromArbitrageChecks(validationRunId)).isZero();
@@ -124,6 +123,11 @@ class ExceptionGenerationRepositoryIntegrationTest {
         assertThat(exceptionCaseRepository.insertFromReconciliationResults(rerunId)).isZero();
         assertThat(exceptionCaseRepository.insertFromJournalImbalances(rerunId)).isZero();
 
+        assertRecurringDetections(resolvedCaseId, changedRejectedCaseId, unchangedRejectedCaseId);
+    }
+
+    private void assertRecurringDetections(Long resolvedCaseId, Long changedRejectedCaseId,
+                                          Long unchangedRejectedCaseId) {
         Map<String, Object> rerunSummary = jdbcTemplate.queryForMap("""
                 SELECT COUNT(DISTINCT ec.exception_case_id) AS work_items,
                        COUNT(eo.exception_occurrence_id) AS occurrences,
@@ -137,13 +141,13 @@ class ExceptionGenerationRepositoryIntegrationTest {
                     ON eo.exception_case_id = ec.exception_case_id
                  WHERE ec.validation_month = ?
                 """, TEST_MONTH);
-        assertThat(rerunSummary.get("work_items")).isEqualTo(8L);
-        assertThat(rerunSummary.get("occurrences")).isEqualTo(16L);
-        assertThat(rerunSummary.get("new_occurrences")).isEqualTo(8L);
-        assertThat(rerunSummary.get("recurring_occurrences")).isEqualTo(8L);
-        assertThat(rerunSummary.get("reopened_occurrences")).isEqualTo(2L);
-        assertThat(rerunSummary.get("min_detection_count")).isEqualTo(2);
-        assertThat(rerunSummary.get("max_detection_count")).isEqualTo(2);
+        assertThat(rerunSummary).containsEntry("work_items", 8L)
+                .containsEntry("occurrences", 16L)
+                .containsEntry("new_occurrences", 8L)
+                .containsEntry("recurring_occurrences", 8L)
+                .containsEntry("reopened_occurrences", 2L)
+                .containsEntry("min_detection_count", 2)
+                .containsEntry("max_detection_count", 2);
         assertThat(status(resolvedCaseId)).isEqualTo("NEW");
         assertThat(status(changedRejectedCaseId)).isEqualTo("NEW");
         assertThat(status(unchangedRejectedCaseId)).isEqualTo("REJECTED");

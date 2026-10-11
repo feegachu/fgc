@@ -29,7 +29,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.test.context.transaction.AfterTransaction;
@@ -100,7 +99,7 @@ class JournalReadPerformanceTest {
     private final List<Long> runIds = new ArrayList<>();
 
     @Test
-    void compareLegacyQueriesAndCurrentServices() throws Exception {
+    void compareLegacyQueriesAndCurrentServices() {
         assertThat(AopUtils.isAopProxy(legacyReadFacade)).as("Legacy read transaction proxy").isTrue();
         Fixture fixture = createFixture();
         JdbcBaseline baseline = baselineSession();
@@ -199,7 +198,7 @@ class JournalReadPerformanceTest {
         return JournalImbalanceSearchResponse.of(rows, rows.size());
     }
 
-    private JdbcBaseline baselineSession() throws Exception {
+    private JdbcBaseline baselineSession() {
         return new JdbcBaseline(dataSource);
     }
 

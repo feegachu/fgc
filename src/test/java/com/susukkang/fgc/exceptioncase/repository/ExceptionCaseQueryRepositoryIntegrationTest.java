@@ -24,7 +24,6 @@ import com.susukkang.fgc.common.code.ExceptionType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
-import org.springframework.core.io.ClassPathResource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -278,9 +277,9 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         assertThat(repository.findActionsByCaseIds(caseIds)).isEmpty();
     }
 
-    /** 전환 전 XML을 테스트 전용으로 실행하여 필터·순서·null·JSON·연결 값을 비교한다. */
+    /** 전환 전 SQL을 독립 JDBC 기준선으로 실행하여 필터·순서·null·JSON·연결 값을 비교한다. */
     @Test
-    void matchesLegacySearchSummaryOptionsAndHistories() throws Exception {
+    void matchesLegacySearchSummaryOptionsAndHistories() {
         Long userId = anyUserId();
         Long runId = insertRun();
         Long caseId = firstCaseId();
@@ -344,7 +343,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
 
     /** 테스트 전용 DB에서 빈 선택지·미처리 0건의 반환 계약을 확인하고 전부 롤백한다. */
     @Test
-    void returnsEmptySummaryAndOptionsWhenNoEligibleRowsExist() throws Exception {
+    void returnsEmptySummaryAndOptionsWhenNoEligibleRowsExist() {
         jdbcTemplate.update("""
                 UPDATE fgc.exception_case
                    SET reason_code = NULL, assigned_to = NULL, validation_month = NULL,
@@ -382,7 +381,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
     }
 
     @Test
-    void historyQueryCountStaysConstantAsPageAndHistorySizesGrow() throws Exception {
+    void historyQueryCountStaysConstantAsPageAndHistorySizesGrow() {
         Long runId = insertRun();
         jdbcTemplate.update("""
                 INSERT INTO fgc.exception_case
@@ -547,11 +546,11 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         }
     }
 
-    private JdbcBaseline baselineSession() throws Exception {
+    private JdbcBaseline baselineSession() {
         return baselineSession(new AtomicInteger());
     }
 
-    private JdbcBaseline baselineSession(AtomicInteger statements) throws Exception {
+    private JdbcBaseline baselineSession(AtomicInteger statements) {
         return new JdbcBaseline(dataSource, statements);
     }
 

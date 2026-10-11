@@ -41,6 +41,9 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class JournalQueryRepository {
 
+    private static final String STATUS_ALIAS = "status";
+    private static final String VALIDATION_RUN_ID_PARAMETER = "validationRunId";
+
     private static final String IMBALANCE_FROM = """
               FROM fgc.vw_journal_imbalance vw
               JOIN fgc.journal_header h ON h.journal_header_id = vw.journal_header_id
@@ -68,7 +71,7 @@ public class JournalQueryRepository {
         return queryFactory.select(Projections.bean(JournalListRow.class,
                         h.journalHeaderId, h.journalNo, h.journalDate, h.journalType.stringValue().as("journalType"),
                         h.sourceEntityType, h.sourceEntityId, h.contractId, c.contractNo,
-                        h.status.stringValue().as("status"),
+                        h.status.stringValue().as(STATUS_ALIAS),
                         ExpressionUtils.as(JPAExpressions.select(l.debitAmount.sumAggregate().coalesce(BigDecimal.ZERO))
                                 .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), "debitTotal"),
                         ExpressionUtils.as(JPAExpressions.select(l.creditAmount.sumAggregate().coalesce(BigDecimal.ZERO))
@@ -135,7 +138,7 @@ public class JournalQueryRepository {
         query.addScalar("validation_run_id", Long.class);
         query.addScalar("policy_version_id", Long.class);
         query.addScalar("correction_group_key", String.class);
-        query.addScalar("status", String.class);
+        query.addScalar(STATUS_ALIAS, String.class);
         query.addScalar("description", String.class);
         query.addScalar("created_by", String.class);
         query.addScalar("created_at", OffsetDateTime.class);
@@ -200,11 +203,11 @@ public class JournalQueryRepository {
                 SELECT vw.journal_header_id, vw.journal_no, h.journal_type, vw.status,
                        vw.debit_total, vw.credit_total, vw.difference_amount
                 """ + IMBALANCE_FROM + " ORDER BY vw.journal_header_id").unwrap(NativeQuery.class);
-        query.setParameter("validationRunId", validationRunId);
+        query.setParameter(VALIDATION_RUN_ID_PARAMETER, validationRunId);
         query.addScalar("journal_header_id", Long.class);
         query.addScalar("journal_no", String.class);
         query.addScalar("journal_type", String.class);
-        query.addScalar("status", String.class);
+        query.addScalar(STATUS_ALIAS, String.class);
         query.addScalar("debit_total", BigDecimal.class);
         query.addScalar("credit_total", BigDecimal.class);
         query.addScalar("difference_amount", BigDecimal.class);
@@ -223,7 +226,7 @@ public class JournalQueryRepository {
 
     public long countImbalances(Long validationRunId) {
         return ((Number) entityManager.createNativeQuery("SELECT COUNT(*) " + IMBALANCE_FROM)
-                .setParameter("validationRunId", validationRunId)
+                .setParameter(VALIDATION_RUN_ID_PARAMETER, validationRunId)
                 .getSingleResult()).longValue();
     }
 
@@ -233,7 +236,7 @@ public class JournalQueryRepository {
                 SELECT COUNT(h) FROM JournalHeader h
                  WHERE h.validationRunId = :validationRunId
                 """, Long.class)
-                .setParameter("validationRunId", validationRunId)
+                .setParameter(VALIDATION_RUN_ID_PARAMETER, validationRunId)
                 .getSingleResult();
     }
 
