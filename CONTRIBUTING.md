@@ -418,7 +418,7 @@ PR 제목은 아래 형식으로 작성합니다.
 ### 백엔드 확인사항
 
 * Controller에 업무 로직이 들어가 있지 않은가
-* Service와 Mapper의 책임이 분리되어 있는가
+* Service와 Repository의 책임이 분리되어 있는가
 * DTO와 Entity 또는 DB 모델을 구분했는가
 * 입력값 검증이 적용되어 있는가
 * 트랜잭션 범위가 적절한가
@@ -933,3 +933,26 @@ PR을 생성하기 전에 다음을 확인합니다.
 현재 막힌 문제
 다른 팀원과 충돌할 가능성이 있는 파일
 ```
+
+---
+
+## 20. 데이터 접근과 통합 검증
+
+운영과 테스트의 MyBatis 의존성·Mapper·XML은 #383에서 제거했습니다. 새 저장소는 기존 도메인의 공유 엔티티와 Repository를 재사용하고, 호출자가 사용하는 메서드·DTO 계약을 유지합니다.
+
+| 조회·저장 특성 | 구현 기준 | 예시 |
+| --- | --- | --- |
+| 단순 CRUD·식별자 조회 | Spring Data JPA, 파생 쿼리 | `InsuranceContractRepository`, `ValidationRunRepository` |
+| 고정 조인·DTO 투영 | JPQL | 계약 상세·기준정보 검증, 감사 상세·선택지 |
+| 선택 조건 조합·동적 검색 | QueryDSL, 목록과 count가 같은 predicate 공유 | 계약·감사로그·스케줄·원장 검색 |
+| PostgreSQL 기능 또는 DB의 집합 처리 계약 | JPA 네이티브 SQL | CTE/LATERAL, ILIKE, JSONB·배열, UPSERT/RETURNING, advisory lock, 월 집계·행별 ROUND |
+
+QueryDSL은 Jakarta JPA용 `io.github.openfeign.querydsl`을 사용합니다. Q 타입은 `compileJava`의 annotation processor가 `build/generated/sources/annotationProcessor/java/main`에 생성하므로 직접 수정하거나 커밋하지 않습니다. `QuerydslConfig`의 `JPAQueryFactory`는 Spring이 제공하는 현재 트랜잭션의 EntityManager를 사용합니다. 원본 프로젝트의 유지보수 상황과 포크 지원 범위는 [Spring Data 공식 문서](https://docs.spring.io/spring-data/jpa/reference/repositories/core-extensions.html)를 참고합니다.
+
+검색 조건을 전환할 때 빈 값·LIKE 와일드카드·이스케이프·기간 양끝·NULL·정렬·페이징·건수 의미를 바꾸지 않습니다. 금액 계산의 행별 HALF_UP, 최신 판정 뷰의 선택 순서, 네이티브 변경 전 flush/변경 후 clear, 잠금·멱등키·트랜잭션 전파도 기존 계약을 따릅니다. DB 뷰의 QueryDSL 조인이 필요하면 읽기 전용 `@Immutable` 매핑을 사용하고, 기존 테이블 엔티티를 다시 만들지 않습니다.
+
+Java 21과 Docker에서 `./gradlew clean build`로 전체 PostgreSQL 테스트와 `verifyPersistenceDependencies`를 실행합니다. 후자는 운영·테스트 런타임 의존성에 MyBatis가 다시 들어오면 실패합니다. 테스트는 `test` 프로필의 일회성 PostgreSQL을 사용하며 개발 DB를 공유하지 않습니다.
+
+선택 실행하는 성능 테스트는 `scripts/verification/*-performance.init.gradle`을 사용합니다. 예: `./gradlew -I scripts/verification/contract-performance.init.gradle test --tests '*ContractReadPerformanceTest'`. 정정·전표 쓰기 성능 테스트도 각각 별도 Testcontainers DB를 생성합니다. 전환 전 SQL은 `src/test/java/.../common/persistence/baseline`의 JDBC 비교 기준으로만 남습니다. 운영 SQL과 공유하지 않으며, 응답·DB 결과·SQL 수를 비교합니다. JDBC와 JPA의 측정 시간은 드라이버·매핑 비용이 포함된 참고값이며 MyBatis 런타임의 성능으로 해석하지 않습니다.
+
+성능 6종까지 포함한 전체 검증은 `./gradlew clean build -I scripts/verification/persistence-integration.init.gradle`로 실행합니다. Node와 프런트 의존성이 준비된 환경에서 `FGC_EXPORT_OPENAPI=true`도 설정하면 실제 서버와 프런트의 HTTP 연동 테스트가 추가됩니다.

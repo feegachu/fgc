@@ -79,6 +79,19 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
     @Query("SELECT v FROM ValidationRun v WHERE v.validationRunId = :validationRunId")
     Optional<ValidationRun> findByIdForUpdate(@Param("validationRunId") Long validationRunId);
 
+    /** 대사 생성은 영속성 컨텍스트의 캐시 대신 잠근 DB 행의 현재 상태·월을 검증한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query(value = """
+            SELECT validation_month AS "validationMonth", status
+              FROM fgc.validation_run WHERE validation_run_id = :validationRunId FOR UPDATE
+            """, nativeQuery = true)
+    Optional<LockedReference> findReferenceForUpdate(@Param("validationRunId") Long validationRunId);
+
+    interface LockedReference {
+        LocalDate getValidationMonth();
+        String getStatus();
+    }
+
     /** (validationMonth, runNo) 복합 유니크 키 조회 — 명시적 runNo 재시작의 멱등성 판단용. */
     Optional<ValidationRun> findByValidationMonthAndRunNo(LocalDate validationMonth, Integer runNo);
 

@@ -90,8 +90,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
     //
     // #378의 차익거래 단건 탐지 2종은 ExceptionCaseDetectionCommands fragment로 제공한다.
     // ArbitrageService는 이 공용 Repository를 직접 소비하며 기존 flush/clear 계약을 유지한다.
-    // bulkCreateFromReconciliationResultsByRun 등 다른 소비자와 테스트 baseline의 Mapper
-    // 참조는 남아 있으므로 공유 ExceptionCaseMapper/XML 제거는 #366/#383에서 확인한다.
+    // IF-API-42의 대사 실행별 일괄 생성도 동일 fragment에서 DB 함수로 처리한다.
 
     /** 일일 변경 계약 재검증 실패를 검증월 기준 안정 업무키로 기록한다. */
     @Transactional(propagation = Propagation.MANDATORY)

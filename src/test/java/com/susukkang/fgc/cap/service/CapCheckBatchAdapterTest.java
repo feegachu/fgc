@@ -10,7 +10,7 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
-import com.susukkang.fgc.validation.mapper.ValidationTargetSelectionMapper;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,7 +34,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class CapCheckBatchAdapterTest {
 
-    @Mock ValidationTargetSelectionMapper validationMapper;
+    @Mock ValidationTargetRepository validationMapper;
     @Mock CapCheckQueryRepository capCheckQueryRepository;
     @Mock CapCheckBatchItemService itemService;
     @Mock CapCheckFailureRecordService failureRecordService;

@@ -1,5 +1,7 @@
 package com.susukkang.fgc.journal.repository;
 
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
 import com.susukkang.fgc.audit.entity.AuditLog;
 import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
@@ -12,15 +14,8 @@ import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
 import com.susukkang.fgc.journal.dto.JournalHeaderRow;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
 import com.susukkang.fgc.journal.service.JournalPersistenceService;
-import org.apache.ibatis.builder.xml.XMLMapperBuilder;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -77,8 +72,8 @@ class JournalWritePerformanceTest {
     private static final int WARMUPS = 10;
     private static final int SAMPLES = 40;
     private static final LocalDate DATE = LocalDate.of(2094, 6, 15);
-    private static final String MAPPER = "com.susukkang.fgc.journal.mapper.JournalMapper.";
-    private static final String ACCOUNT = "com.susukkang.fgc.journal.mapper.JournalAccountMapper.";
+    private static final String MAPPER = "journalBaseline.Journal.";
+    private static final String ACCOUNT = "journalBaseline.JournalAccount.";
     private static final ThreadLocal<Observation> OBSERVATION = new ThreadLocal<>();
 
     @Autowired private DataSource dataSource;
@@ -99,13 +94,16 @@ class JournalWritePerformanceTest {
     private long expectedLines;
 
     // Flyway를 포함한 Spring 컨텍스트 초기화 전에 운영/개발 DB 주소를 거부한다.
+    private static final org.testcontainers.containers.PostgreSQLContainer<?> database =
+            new org.testcontainers.containers.PostgreSQLContainer<>("postgres:17")
+                    .withDatabaseName("fgc_journal_write_perf_test").withUsername("fgc").withPassword("fgc_test_only");
+
     @DynamicPropertySource
     static void requireDisposableDatabase(DynamicPropertyRegistry registry) {
-        String url = System.getenv("SPRING_DATASOURCE_URL");
-        if (url == null || !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/fgc_journal_write_perf_[a-z0-9_]+\\?currentSchema=fgc")) {
-            throw new IllegalStateException("쓰기 성능 비교에는 loopback의 fgc_journal_write_perf_* 전용 DB가 필요합니다.");
-        }
-        registry.add("spring.datasource.url", () -> url);
+        database.start();
+        registry.add("spring.datasource.url", () -> database.getJdbcUrl() + "?currentSchema=fgc");
+        registry.add("spring.datasource.username", database::getUsername);
+        registry.add("spring.datasource.password", database::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
@@ -371,19 +369,8 @@ class JournalWritePerformanceTest {
 
     private long count(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }
 
-    private SqlSessionTemplate baselineSession() throws Exception {
-        Configuration configuration = new Configuration(new Environment("journal-write-baseline",
-                new SpringManagedTransactionFactory(), dataSource));
-        configuration.setMapUnderscoreToCamelCase(true);
-        configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        configuration.setCacheEnabled(false);
-        for (String name : List.of("JournalMapper.xml", "JournalAccountMapper.xml")) {
-            String path = "journal-write-baseline/" + name;
-            try (var input = new ClassPathResource(path).getInputStream()) {
-                new XMLMapperBuilder(input, configuration, path, configuration.getSqlFragments()).parse();
-            }
-        }
-        return new SqlSessionTemplate(new SqlSessionFactoryBuilder().build(configuration));
+    private JdbcBaseline baselineSession() throws Exception {
+        return new JdbcBaseline(dataSource);
     }
 
     private static Map<String, Object> params(Object... pairs) {
@@ -402,12 +389,12 @@ class JournalWritePerformanceTest {
      * XML SQL/GeneratedKeys, 선행 검증, 재시도/원천 경합 처리, 감사 JPA와 최종 재조회는 그대로다.
      */
     private static class LegacyPersistence {
-        private final SqlSessionTemplate session;
+        private final JdbcBaseline session;
         private final TransactionTemplate requiresNew;
         private final AuditLogRepository audits;
         private final ConstraintErrorCodeResolver resolver;
 
-        LegacyPersistence(SqlSessionTemplate session, PlatformTransactionManager manager,
+        LegacyPersistence(JdbcBaseline session, PlatformTransactionManager manager,
                           AuditLogRepository audits, ConstraintErrorCodeResolver resolver) {
             this.session = session;
             this.audits = audits;

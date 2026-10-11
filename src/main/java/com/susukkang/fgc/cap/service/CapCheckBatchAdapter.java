@@ -9,7 +9,7 @@ import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
-import com.susukkang.fgc.validation.mapper.ValidationTargetSelectionMapper;
+import com.susukkang.fgc.validation.repository.ValidationTargetRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Service
 public class CapCheckBatchAdapter implements CapCheckBatchPort {
-    private final ValidationTargetSelectionMapper validationMapper;
+    private final ValidationTargetRepository validationTargetRepository;
     private final CapCheckQueryRepository capCheckQueryRepository;
     private final CapCheckBatchItemService itemService;
     private final CapCheckFailureRecordService failureRecordService;
@@ -43,12 +43,12 @@ public class CapCheckBatchAdapter implements CapCheckBatchPort {
     @Override
     public StepProcessingResult check(ValidationStepContext context, PaymentStage paymentStage) {
         /*
-        → Mapper로 검증 대상 계약 목록 조회
+        → Repository로 검증 대상 계약 목록 조회
         → 계약을 하나씩 1,200% 검증
         → 각 계약 결과를 DB에 저장v
         → 전체 처리 건수/실패 건수를 Tasklet에 반환
          */
-        //Mapper로 검증 대상 계약 목록 조회
+        // Repository로 검증 대상 계약 목록 조회
         Long validationRunId = context.validationRunId();
 
         LocalDate asOfDate = context.job()
@@ -57,7 +57,7 @@ public class CapCheckBatchAdapter implements CapCheckBatchPort {
                 .minusDays(1);
 
         List<Long> contractIds =
-                validationMapper.selectSelectedContractIds(validationRunId);
+                validationTargetRepository.selectSelectedContractIds(validationRunId);
 
         long processedCount = 0;
         List<ContractSkip> skips = new ArrayList<>();

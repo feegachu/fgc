@@ -6,7 +6,7 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRes
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +26,7 @@ class ReconciliationExceptionServiceTest {
     private ReconciliationRunRepository reconciliationRunRepository;
 
     @Mock
-    private ExceptionCaseMapper exceptionCaseMapper;
+    private ExceptionCaseRepository exceptionCaseMapper;
 
     private ReconciliationExceptionService service;
 

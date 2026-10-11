@@ -19,7 +19,7 @@ import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleJdbcBaseline;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.service.ScheduleRegenerationBatchItemService;
 import jakarta.persistence.EntityManagerFactory;
@@ -51,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 설명 : 예상 스케줄 저장소의 JPA 전환(#371)을 실제 PostgreSQL에서 검증한다.
- * 조회 결과는 아직 운영에 남아 있는 기존 ScheduleMapper(E 담당 ValidationRunScheduleService가 사용)와
+ * 조회 결과는 아직 운영에 남아 있는 기존 ScheduleJdbcBaseline(E 담당 ValidationRunScheduleService가 사용)와
  * 같은 데이터로 비교한다. ScheduleMapper를 삭제할 때 이 비교 테스트의 기준선도 함께 정리한다.
  * 커밋이 필요한 시나리오(동시성·REQUIRES_NEW)는 월 검증 대상(ACTIVE)에서 빠지는 청약(APPLIED) 계약을 쓰고,
  * 끝나면 그 계약의 스케줄을 비활성화해 대사 대상에서도 뺀다(확정·조정 이력 행은 DB 가드로 삭제할 수 없다).
@@ -72,7 +72,10 @@ class ScheduleRepositoryIntegrationTest {
     @Autowired private InsuranceContractRepository contractRepository;
     @Autowired private ScheduleService scheduleService;
     @Autowired private ScheduleQueryRepository queryRepository;
-    @Autowired private ScheduleMapper baseline;
+    private ScheduleJdbcBaseline baseline;
+    @Autowired void initializeBaseline(javax.sql.DataSource dataSource) {
+        baseline = new ScheduleJdbcBaseline(dataSource);
+    }
     @Autowired private ScheduleRegenerationBatchItemService batchItemService;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -81,7 +84,7 @@ class ScheduleRepositoryIntegrationTest {
     private Long committedContractId;
 
     @Test
-    void readsMatchMyBatisBaselineIncludingSearchPagingAndEmptyResults() {
+    void readsMatchJdbcBaselineIncludingSearchPagingAndEmptyResults() {
         inRolledBackTransaction(() -> {
             Long contractId = createContract(ContractStatus.ACTIVE);
             String contractNo = contractNo(contractId);
