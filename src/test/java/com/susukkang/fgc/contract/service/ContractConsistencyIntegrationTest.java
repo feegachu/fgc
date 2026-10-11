@@ -66,6 +66,7 @@ class ContractConsistencyIntegrationTest {
     @Autowired private CapCheckBatchItemService batchItem;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired private jakarta.persistence.EntityManager entityManager;
     @MockitoSpyBean private ScheduleWriteRepository scheduleWrites;
     @MockitoSpyBean private CommissionPaymentQueryRepository paymentQueries;
     @MockitoSpyBean private CapScheduleAmountQueryRepository capSchedules;
@@ -91,7 +92,7 @@ class ContractConsistencyIntegrationTest {
 
         TransactionPrecheckResponse preview = payments.precheck(payment);
         assertThat(preview.confirmable()).isFalse();
-        assertThat(preview.capPreview()).allSatisfy(row -> {
+        assertThat(preview.capPreview()).hasSize(1).allSatisfy(row -> {
             assertThat(row.includedAmount()).isEqualTo(total.longValueExact());
             assertThat(row.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
         });
@@ -101,6 +102,8 @@ class ContractConsistencyIntegrationTest {
                                 com.susukkang.fgc.common.exception.FgcErrorCode.CAP_001));
         assertThat(jdbc.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
                 String.class, payment)).isEqualTo("DRAFT");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, payment)).isEqualTo(1);
     }
 
     @Test
@@ -121,6 +124,7 @@ class ContractConsistencyIntegrationTest {
 
         CommissionPaymentResponse confirmed = payments.confirm(payment, "CONSISTENCY-" + payment);
         assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).hasSize(1);
         for (Long check : confirmed.capCheckIds()) {
             assertThat(jdbc.queryForObject("SELECT included_amount FROM fgc.cap_check WHERE cap_check_id=?",
                     BigDecimal.class, check)).isEqualByComparingTo(limit);
@@ -131,6 +135,58 @@ class ContractConsistencyIntegrationTest {
         }
         assertThat(payments.confirm(payment, "CONSISTENCY-" + payment).capCheckIds())
                 .containsExactlyElementsOf(confirmed.capCheckIds());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {2, 3, 7})
+    @Transactional
+    void splitAttributionsSaveOneContractCheckAndEachDetailOnce(int splits) {
+        Long id = newContract();
+        deactivateSchedules(id);
+        BigDecimal part = new BigDecimal("100000");
+        List<CommissionPaymentAttributionRequest> rows = new java.util.ArrayList<>();
+        for (int index = 0; index < splits; index++) rows.add(attribution(id, part));
+        java.util.Collections.reverse(rows);
+        Long payment = payment(id, part.multiply(BigDecimal.valueOf(splits)), rows);
+
+        assertThat(payments.precheck(payment).capPreview()).hasSize(1);
+        CommissionPaymentResponse confirmed = payments.confirm(payment, "SPLIT-" + payment);
+        assertThat(confirmed.capCheckIds()).hasSize(1);
+        Long check = confirmed.capCheckIds().getFirst();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, payment)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check_detail WHERE cap_check_id=?",
+                Integer.class, check)).isEqualTo(splits);
+        assertThat(jdbc.queryForObject("SELECT count(DISTINCT transaction_attribution_id) FROM fgc.cap_check_detail WHERE cap_check_id=?",
+                Integer.class, check)).isEqualTo(splits);
+        assertThat(payments.confirm(payment, "SPLIT-" + payment).capCheckIds()).containsExactly(check);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, payment)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Transactional
+    void groupingDoesNotSkipAReviewRequiredAttribution(boolean reviewFirst) {
+        Long id = newContract();
+        deactivateSchedules(id);
+        CommissionPaymentAttributionRequest review = new CommissionPaymentAttributionRequest(id,
+                LocalDate.of(2026, 7, 31), new BigDecimal("100000"), InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, "검토필요 귀속", "DIRECT", "REVIEW-EVIDENCE", AttributionMethod.DIRECT);
+        CommissionPaymentAttributionRequest included = attribution(id, new BigDecimal("600000"));
+        Long payment = payment(id, new BigDecimal("700000"),
+                reviewFirst ? List.of(review, included) : List.of(included, review));
+        TransactionPrecheckResponse preview = payments.precheck(payment);
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.capPreview()).hasSize(1).allSatisfy(row -> {
+            assertThat(row.resultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
+            assertThat(row.candidateAmount()).isEqualTo(600000);
+        });
+        assertThatThrownBy(() -> payments.confirm(payment, null)).isInstanceOfSatisfying(FgcBusinessException.class,
+                failure -> assertThat(failure.getErrorCode()).isEqualTo(
+                        com.susukkang.fgc.common.exception.FgcErrorCode.CAP_002));
+        assertThat(jdbc.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, payment)).isEqualTo("DRAFT");
     }
 
     @Test
@@ -144,16 +200,24 @@ class ContractConsistencyIntegrationTest {
                 first, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 31))).limitAmount();
         Long payment = payment(first, limit.multiply(BigDecimal.TWO),
                 List.of(attribution(first, limit), attribution(second, limit)));
-        assertThat(payments.precheck(payment).confirmable()).isTrue();
-        assertThat(payments.confirm(payment, null).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        TransactionPrecheckResponse preview = payments.precheck(payment);
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).hasSize(2);
+        CommissionPaymentResponse confirmed = payments.confirm(payment, null);
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).hasSize(2);
     }
 
-    @Test
+    @ParameterizedTest
+    @CsvSource({"2026-07-10,2027-07-10", "2032-02-29,2033-02-28"})
     @Transactional
-    void firstYearBoundaryExcludesOnlyTheRowsOnOrAfterMonthThirteen() {
+    void firstYearBoundaryExcludesOnlyTheRowsOnOrAfterMonthThirteen(LocalDate start, LocalDate anniversary) {
         Long id = newContract();
         deactivateSchedules(id);
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date=? WHERE contract_id=?", start, id);
+        entityManager.refresh(contractRepository.findById(id).orElseThrow());
         LocalDate end = contractRepository.findById(id).orElseThrow().getContractDate().plusMonths(12);
+        assertThat(end).isEqualTo(anniversary);
         BigDecimal limit = calculator.calculate(CapCalculationCommand.realtime(id, PaymentStage.GA_TO_FC, end)).limitAmount();
         CommissionPaymentAttributionRequest lastDay = new CommissionPaymentAttributionRequest(id, end.minusDays(1), limit,
                 InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, "초년도 마지막 날", "DIRECT", "BOUNDARY", AttributionMethod.DIRECT);
@@ -163,9 +227,71 @@ class ContractConsistencyIntegrationTest {
         assertThat(payments.precheck(payment).capPreview()).allSatisfy(row ->
                 assertThat(row.includedAmount()).isEqualTo(limit.longValueExact()));
         CommissionPaymentResponse confirmed = payments.confirm(payment, null);
+        assertThat(confirmed.capCheckIds()).hasSize(1);
         for (Long check : confirmed.capCheckIds()) {
             assertThat(jdbc.queryForObject("SELECT sum(amount) FROM fgc.cap_check_detail WHERE cap_check_id=? AND classification_snapshot='INCLUDED'",
                     BigDecimal.class, check)).isEqualByComparingTo(limit);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void missingCapRuleKeepsTheContractLockedUntilTheOuterTransactionEnds(boolean rollback) throws Exception {
+        Long id = newContract();
+        // 운영 룰셋 시행 전 계약을 만들어 실제 계산기에서 CAP_004를 발생시킨다.
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date='1900-01-01' WHERE contract_id=?", id);
+        int checksBefore = jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE contract_id=?", Integer.class, id);
+        CountDownLatch reviewWritten = new CountDownLatch(1);
+        CountDownLatch finishTransaction = new CountDownLatch(1);
+        CountDownLatch writerStarted = new CountDownLatch(1);
+        AtomicInteger holderPid = new AtomicInteger();
+        AtomicInteger writerPid = new AtomicInteger();
+        ExecutorService workers = workers();
+        try {
+            Future<?> holder = workers.submit(() -> transaction().executeWithoutResult(status -> {
+                holderPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                assertThatThrownBy(() -> capChecks.calculateAndSave(CapCalculationCommand.realtime(
+                        id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 31))))
+                        .isInstanceOfSatisfying(FgcBusinessException.class,
+                                failure -> assertThat(failure.getErrorCode()).isEqualTo(
+                                        com.susukkang.fgc.common.exception.FgcErrorCode.CAP_004));
+                assertThat(status.isRollbackOnly()).isFalse();
+                schedules.registerCapRuleReview(id, PaymentStage.GA_TO_FC, "CAP_004 lock regression");
+                reviewWritten.countDown();
+                await(finishTransaction);
+                if (rollback) status.setRollbackOnly();
+            }));
+            await(reviewWritten);
+            Future<?> writer = workers.submit(() -> transaction().executeWithoutResult(status -> {
+                writerPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                writerStarted.countDown();
+                jdbc.update("UPDATE fgc.insurance_contract SET contract_no=contract_no || '-LOCKED' WHERE contract_id=?", id);
+            }));
+            await(writerStarted);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            boolean blockedByHolder = false;
+            while (System.nanoTime() < deadline && !writer.isDone()) {
+                if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT ? = ANY(pg_blocking_pids(?))",
+                        Boolean.class, holderPid.get(), writerPid.get()))) {
+                    blockedByHolder = true;
+                    break;
+                }
+                Thread.sleep(20);
+            }
+            assertThat(blockedByHolder).as("CAP_004 이후에도 상위 트랜잭션이 경쟁 수정을 막아야 한다").isTrue();
+            assertThat(writer.isDone()).isFalse();
+            finishTransaction.countDown();
+            holder.get(20, TimeUnit.SECONDS);
+            writer.get(20, TimeUnit.SECONDS);
+            assertThat(jdbc.queryForObject("SELECT contract_no FROM fgc.insurance_contract WHERE contract_id=?", String.class, id))
+                    .endsWith("-LOCKED");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE contract_id=? AND description='CAP_004 lock regression'",
+                    Integer.class, id)).isEqualTo(rollback ? 0 : 1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE contract_id=?", Integer.class, id))
+                    .isEqualTo(checksBefore);
+        } finally {
+            finishTransaction.countDown();
+            workers.shutdownNow();
         }
     }
 

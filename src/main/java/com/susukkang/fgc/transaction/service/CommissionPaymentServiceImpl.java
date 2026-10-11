@@ -201,6 +201,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         List<Long> capCheckIds = new ArrayList<>();
         List<CapCheckCommand> capChecks = new ArrayList<>();
+        Map<CapGroupKey, CapEvaluation> evaluations = new LinkedHashMap<>();
 
         // 2026-08-10 yslee - 지급 건의 모든 계약별 귀속행을 독립 검증
         // 기존 코드: attribution_seq=1인 단일 귀속행만 FUN-033 검증
@@ -243,24 +244,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             );
 
             CapCheckCommand check = buildCapCheck(data, rule, calculation, validation, attributions);
-            capCheckWriteRepository.insertCapCheck(check);
-            insertCapCheckDetails(check, data, calculation, attributions);
-            capCheckIds.add(check.getCapCheckId());
-            capChecks.add(check);
-
-            /**
-             * @author hjKang
-             * @since 2026-08-12
-             *
-             * 2026-08-12 - FUN-034 한도 예외 생성 서비스 연결
-             * 기존 코드: 지급확정 서비스가 WARNING·VIOLATION 예외를 직접 저장
-             * 문제: 실시간과 배치가 서로 다른 자연키와 저장 로직을 사용할 수 있음
-             * 개선: 최종 한도 판정 결과를 공통 CapExceptionService에 전달하여 멱등 저장
-             */
-            capExceptionService.createIfNecessary(capExceptionCommand(data, check));
-
-            failFirst(capResultFailure(data, check));
+            evaluations.merge(new CapGroupKey(data.contractId(), data.paymentStage()),
+                    new CapEvaluation(data, rule, calculation, check), this::stricterCapEvaluation);
+            GateFailure resultFailure = capResultFailure(data, check);
+            if (resultFailure != null) {
+                saveCapEvaluations(evaluations, attributions, capCheckIds, capChecks);
+                failFirst(resultFailure);
+            }
         }
+
+        saveCapEvaluations(evaluations, attributions, capCheckIds, capChecks);
 
         String capCheckIdsCsv = capCheckIds.stream()
                 .map(String::valueOf)
@@ -309,6 +302,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         failures.addAll(requiredValueFailures(attributions));
 
         List<TransactionPrecheckResponse.CapPreviewItem> previews = new ArrayList<>();
+        Map<CapGroupKey, CapEvaluation> evaluations = new LinkedHashMap<>();
         if (first.totalAttributedAmount() != null) {
             Map<Long, String> contractNos = queryRepository.findAttributedContractNumbers(paymentId)
                     .stream()
@@ -380,15 +374,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     );
                 }
                 CapCheckCommand check = buildCapCheck(data, rule, calculation, validation, attributions);
-                previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
-                        check,
-                        rule,
-                        contractNos.get(data.contractId())
-                ));
+                evaluations.merge(new CapGroupKey(data.contractId(), data.paymentStage()),
+                        new CapEvaluation(data, rule, calculation, check), this::stricterCapEvaluation);
                 GateFailure resultFailure = capResultFailure(data, check);
                 if (resultFailure != null) {
                     failures.add(resultFailure);
                 }
+            }
+            for (CapEvaluation evaluation : evaluations.values()) {
+                previews.add(TransactionPrecheckResponse.CapPreviewItem.from(evaluation.check(), evaluation.rule(),
+                        contractNos.get(evaluation.data().contractId())));
             }
         }
         return new TransactionPrecheckResponse(
@@ -1306,12 +1301,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      * 종전에는 후보 1행만 저장해 CAP-W02 가 "저장 산입금액과 항목별 산입 합계 불일치"
      * 경고를 띄웠다(#255 F-11). 헤더가 어느 쪽 값으로 정해졌는지에 맞춰 같은 쪽의
      * 행 단위 내역을 저장해 상세 합계 = included_amount 를 만든다:
-     *  - 실제(기존 확정 귀속행 + 후보) 합계가 헤더와 같으면 → 실제 귀속행 항목화 + 후보 행
+     *  - 실제(기존 확정 귀속행 + 후보) 합계가 헤더와 같으면 → 기존 확정행 + 계약별 후보 귀속 전체
      *  - 그 외(스케줄 우세 등)          → REALTIME 경로와 동일하게 calculation.details() 저장
      *
-     * ponytail: cap_check_detail.amount 는 CHECK(>=0) 라 DEDUCTION(환수) 음수 기여가 섞이면
-     * 실제 쪽 항목화를 표현할 수 없어 스케줄 내역으로 폴백한다(헤더가 실제 우세면 경고는 남는다).
-     * 업그레이드 경로: amount 부호 허용 또는 부호 컬럼 추가 마이그레이션.
+     * cap_check_detail.amount는 CHECK(>=0)이므로 차감이 있는 실제 판정은 순산입액 요약으로
+     * 저장한다. 귀속별 부호와 원본 ID는 calculation_snapshot에 보존한다.
      */
     private void insertCapCheckDetails(
             CapCheckCommand check,
@@ -1456,6 +1450,42 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .decisionReason(rule.decisionReason())
                 .evidenceRef(data.evidenceRef())
                 .build();
+    }
+
+    private record CapGroupKey(Long contractId, PaymentStage paymentStage) { }
+
+    private record CapEvaluation(ConfirmationData data, CapRuleSnapshot rule,
+                                 CapCalculationResult calculation, CapCheckCommand check) { }
+
+    // 각 귀속의 검증은 모두 수행하고, 계약·단계별 가장 엄격한 결과만 저장·표시한다.
+    private CapEvaluation stricterCapEvaluation(CapEvaluation left, CapEvaluation right) {
+        int comparison = Integer.compare(capResultPriority(right.check().getResultStatus()),
+                capResultPriority(left.check().getResultStatus()));
+        if (comparison == 0) comparison = right.check().getUsagePct().compareTo(left.check().getUsagePct());
+        if (comparison == 0) comparison = right.check().getAsOfDate().compareTo(left.check().getAsOfDate());
+        if (comparison == 0) comparison = Long.compare(left.data().transactionAttributionId(), right.data().transactionAttributionId());
+        return comparison > 0 ? right : left;
+    }
+
+    private int capResultPriority(CapResultStatus status) {
+        return switch (status) {
+            case NORMAL -> 0;
+            case WARNING -> 1;
+            case VIOLATION -> 2;
+            case REVIEW_REQUIRED -> 3;
+        };
+    }
+
+    private void saveCapEvaluations(Map<CapGroupKey, CapEvaluation> evaluations, List<ConfirmationData> attributions,
+                                    List<Long> capCheckIds, List<CapCheckCommand> capChecks) {
+        for (CapEvaluation evaluation : evaluations.values()) {
+            CapCheckCommand check = evaluation.check();
+            capCheckWriteRepository.insertCapCheck(check);
+            insertCapCheckDetails(check, evaluation.data(), evaluation.calculation(), attributions);
+            capCheckIds.add(check.getCapCheckId());
+            capChecks.add(check);
+            capExceptionService.createIfNecessary(capExceptionCommand(evaluation.data(), check));
+        }
     }
 
     // #436: 동일 계약·지급단계·초년도 기간의 현재 지급 귀속을 순서와 분할 개수에 무관하게 합산한다.

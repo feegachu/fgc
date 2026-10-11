@@ -2117,9 +2117,11 @@ class CommissionPaymentServiceImplTest {
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
 
         TransactionPrecheckResponse preview = service.precheck(101L);
-        assertThat(preview.capPreview()).hasSize(2).allSatisfy(row -> {
+        assertThat(preview.capPreview()).hasSize(1).allSatisfy(row -> {
             assertThat(row.candidateAmount()).isEqualTo(600000);
             assertThat(row.includedAmount()).isEqualTo(600000);
+            assertThat(row.resultStatus()).isEqualTo(otherStatus == InclusionDecisionStatus.REVIEW_REQUIRED
+                    ? CapResultStatus.REVIEW_REQUIRED : CapResultStatus.NORMAL);
         });
         assertThat(preview.confirmable()).isEqualTo(otherStatus == InclusionDecisionStatus.EXCLUDED);
     }
