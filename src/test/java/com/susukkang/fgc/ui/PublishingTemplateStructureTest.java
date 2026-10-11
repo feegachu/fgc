@@ -171,6 +171,8 @@ class PublishingTemplateStructureTest {
                 .contains("id=\"cond-body\" aria-live=\"polite\"")
                 .contains("data-checklist-passed=\"false\"")
                 .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                // #494 확정 가능 유형은 서버(ValidationRunType#isFinalizable)가 정해 내려준다
+                .contains("data-run-finalizable=${detail.header().runType().isFinalizable()}")
                 .contains("검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.")
                 .containsOnlyOnce("id=\"finalize-action-guide\"")
                 .containsOnlyOnce("id=\"btn-finalize\"")
@@ -181,7 +183,10 @@ class PublishingTemplateStructureTest {
                 .contains("/finalize-checklist")
                 .contains("/finalize\"")
                 .contains("safeInternalLink")
-                .contains("var CHECKLIST_CONDITION_COUNT = 7;")
+                .contains("var CHECKLIST_CONDITION_COUNT = 8;")
+                // #494 리뷰: 이미 확정된 실행 사유가 계약수동 사유보다 먼저, 조건 8 단독 미충족은 비교용 안내
+                .containsPattern("(?s)if \\(runStatus === \"FINALIZED\"\\) \\{\\s*reason = .*?\\} else if \\(!runFinalizable\\)")
+                .contains("failing.length === 1 && failing[0].no === 8")
                 .contains("checklist.conditions.length !== CHECKLIST_CONDITION_COUNT")
                 .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
                 .contains("idempotencyKey: finalizeIdempotencyKey")

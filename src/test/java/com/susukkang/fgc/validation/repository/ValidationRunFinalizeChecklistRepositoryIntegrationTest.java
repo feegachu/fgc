@@ -136,6 +136,34 @@ class ValidationRunFinalizeChecklistRepositoryIntegrationTest {
         assertThat(latestCounts.getLatestRunId()).isNull();
     }
 
+    // 2026-10-12 yslee - #494 조건 8: 같은 검증월에 이미 FINALIZED 인 다른 실행 수
+    // 유형은 가리지 않고, 자기 자신과 다른 달은 세지 않는다
+    @Test
+    void countsOtherFinalizedRunsInTheSameMonthOnly() {
+        LocalDate month = TEST_MONTH.plusMonths(6);
+        Long finalized = createCompletedRun(month);
+        jdbcTemplate.update("""
+                UPDATE fgc.validation_run
+                   SET status = 'FINALIZED', current_step = 10, finalized_at = clock_timestamp()
+                 WHERE validation_run_id = ?
+                """, finalized);
+        Long revalidation = createCompletedRun(month);
+        Long otherMonth = createCompletedRun(month.plusMonths(1));
+
+        FinalizeChecklistCounts revalidationCounts = validationRunRepository
+                .findFinalizeChecklistCounts(revalidation).orElseThrow();
+        FinalizeChecklistCounts finalizedCounts = validationRunRepository
+                .findFinalizeChecklistCounts(finalized).orElseThrow();
+        FinalizeChecklistCounts otherMonthCounts = validationRunRepository
+                .findFinalizeChecklistCounts(otherMonth).orElseThrow();
+
+        assertThat(revalidationCounts.getFinalizedRunCount()).isEqualTo(1);
+        assertThat(revalidationCounts.getFinalizedRunId()).isEqualTo(finalized);
+        assertThat(finalizedCounts.getFinalizedRunCount()).isZero();
+        assertThat(otherMonthCounts.getFinalizedRunCount()).isZero();
+        assertThat(otherMonthCounts.getFinalizedRunId()).isNull();
+    }
+
     private Long insertRun(LocalDate month, String runType) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
