@@ -23,9 +23,9 @@ const pages: Record<string, ComponentType> = {
   '/policies': PoliciesPage,
   '/exceptions': ExceptionPage,
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
-  '/reconciliations': lazy(() => import('../features/reconciliation/ReconciliationPage')),
   '/schedules': lazy(() => import('../features/schedule/ScheduleListPage')),
   '/schedules/:id': lazy(() => import('../features/schedule/ScheduleDetailPage')),
+  '/reconciliations': lazy(() => import('../features/reconciliation/ReconciliationPage')),
 }
 export const screenRoutes: RouteObject[] = screens.map((screen) => {
   const Page = pages[screen.path]

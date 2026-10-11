@@ -66,7 +66,8 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         <div>
           <dt>계약 · 항목 · 회차</dt>
           <dd>
-            {text(detail.contractNo)} · {text(detail.commissionItemName)} · {int(detail.installmentNo)}회차
+            {text(detail.contractNo)} · {text(detail.commissionItemName)} ·{' '}
+            {detail.installmentNo == null ? EMPTY : `${int(detail.installmentNo)}회차`}
           </dd>
         </div>
         <div>
@@ -161,7 +162,7 @@ function SourceSide({
             <dl>
               <div>
                 <dt>회차</dt>
-                <dd>{int(match.installmentNo)}회차</dd>
+                <dd>{match.installmentNo == null ? EMPTY : `${int(match.installmentNo)}회차`}</dd>
               </div>
               <div>
                 <dt>{expected ? '지급예정일' : '정산월'}</dt>

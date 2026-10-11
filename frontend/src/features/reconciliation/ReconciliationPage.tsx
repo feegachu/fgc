@@ -440,7 +440,7 @@ function RunFilters({
           >
             <option value="">전체 (실행 이력 조회만)</option>
             {(insurers.data ?? []).map((row) => (
-              <option key={row.insurerId} value={row.insurerId} disabled={row.activeYn === false}>
+              <option key={row.insurerId} value={row.insurerId}>
                 {row.insurerCode} · {row.insurerName}
               </option>
             ))}

@@ -16,6 +16,54 @@ const result = {
   detailSnapshot: { paymentStage: 'GA_TO_FC' },
 }
 
+async function historyFixture(page: import('@playwright/test').Page) {
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    const data = path.endsWith('/auth/refresh')
+      ? { accessToken: 'reco-fixture' }
+      : path.endsWith('/auth/me')
+        ? { loginId: 'fixture', userName: '담당자', roleCode: 'SETTLEMENT', canProcess: true, demoMonth: '2026-07' }
+        : path.endsWith('/base/insurers')
+          ? { content: [{ insurerId: 9, insurerCode: 'OLD', insurerName: '과거회사', activeYn: false }], totalPages: 1 }
+          : path.endsWith('/results/7')
+            ? {
+                ...result,
+                installmentNo: null,
+                matches: [
+                  {
+                    matchSeq: 1,
+                    matchRole: 'ACTUAL',
+                    commissionTransactionId: 12,
+                    matchedAmount: 11000,
+                    installmentNo: null,
+                  },
+                ],
+              }
+            : { content: [], page: 1, totalPages: 0 }
+    await route.fulfill({ json: envelope(data) })
+  })
+}
+
+test('비활성 보험회사 과거 이력 조회는 가능하고 신규 대사는 차단한다', async ({ page }) => {
+  await historyFixture(page)
+  await page.goto('reconciliations?month=2026-07&stage=GA_TO_FC')
+  await expect(page.getByRole('option', { name: 'OLD · 과거회사' })).toBeEnabled()
+  await page.getByLabel('보험회사').selectOption('9')
+  await expect(page.getByRole('button', { name: '대사 실행', exact: true })).toBeDisabled()
+  const response = page.waitForResponse((res) => new URL(res.url()).searchParams.get('insurerId') === '9')
+  await page.getByRole('button', { name: '조회', exact: true }).click()
+  expect((await response).ok()).toBe(true)
+  await expect(page).toHaveURL(/insurer=9/)
+})
+
+test('비교 모달의 null 회차는 대시로 표시한다', async ({ page }) => {
+  await historyFixture(page)
+  await page.goto('reconciliations?month=2026-07&resultId=7')
+  await expect(page.getByRole('dialog').getByText('C-001 · 초회 수수료 · —')).toBeVisible()
+  await expect(page.getByRole('dialog')).not.toContainText('-회차')
+  await expect(page.getByRole('dialog')).not.toContainText('—회차')
+})
+
 test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외', async ({ page }) => {
   let created = false
   await page.route('**/api/v1/**', async (route) => {

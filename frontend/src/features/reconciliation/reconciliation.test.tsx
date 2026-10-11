@@ -147,6 +147,39 @@ afterEach(() => {
 const bodyPosts = () =>
   calls.filter((call) => call.url === '/api/v1/reconciliations' && call.options?.method === 'POST')
 describe('RECO-W01·W02 React 전환', () => {
+  it('비활성 보험회사도 과거 이력을 조회할 수 있지만 새 실행은 차단한다', async () => {
+    const { router, user } = renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC', (url) =>
+      url.startsWith('/api/v1/base/insurers')
+        ? { content: [{ insurerId: 9, insurerCode: 'OLD', insurerName: '과거회사', activeYn: false }], totalPages: 1 }
+        : undefined,
+    )
+    expect(await screen.findByRole('option', { name: 'OLD · 과거회사' })).toBeEnabled()
+    await user.selectOptions(screen.getByLabelText('보험회사'), '9')
+    expect(screen.getByRole('button', { name: '대사 실행' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '조회' }))
+    expect(router.state.location.search).toContain('insurer=9')
+    await waitFor(() => expect(calls.some((call) => call.url.includes('insurerId=9'))).toBe(true))
+    expect(bodyPosts()).toHaveLength(0)
+  })
+  it('회차 없는 비교 항목과 원천은 대시만 표시하며 0 회차는 보존한다', async () => {
+    renderAt('/reconciliations?month=2026-07&resultId=7', (url) =>
+      url === '/api/v1/reconciliations/results/7'
+        ? {
+            ...result,
+            installmentNo: null,
+            matches: [
+              { ...result.matches![0], installmentNo: null },
+              { ...result.matches![1], installmentNo: 0 },
+            ],
+          }
+        : undefined,
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('0회차')).toBeVisible()
+    expect(dialog).not.toHaveTextContent('-회차')
+    expect(dialog).not.toHaveTextContent('—회차')
+    expect(within(dialog).getByText('C-001 · 초회 수수료 · —')).toBeVisible()
+  })
   it('이력의 단계·보험회사·정산월·page/size/sort 조건 및 표시 규칙을 유지한다', async () => {
     const { router, user } = renderAt('/reconciliations?stage=GA_TO_FC&insurer=1')
     expect(await screen.findByRole('button', { name: '41' })).toBeVisible()
