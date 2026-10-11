@@ -43,6 +43,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 테스트 전용 검증월(2086년)의 실행 행을 직접 지운다. 확정에 성공한 행은 트리거상 지울 수 없으므로
  * 이 테스트는 확정이 거부되는 경로와 생성 경로만 다룬다.
  *
+ * 격리 수준 전제: 확정 트랜잭션이 READ COMMITTED(PostgreSQL 기본)라 월 잠금을 얻은 뒤의 체크리스트 조회가
+ * 방금 커밋된 새 실행을 본다. REPEATABLE READ 이상으로 바꾸면 스냅샷이 잠금 전에 고정되어 첫 번째 테스트가
+ * 실패한다 — 격리 수준을 바꾸는 변경은 이 테스트 통과를 조건으로 한다.
+ *
  * @author yslee
  * @since 2026-10-11
  */
