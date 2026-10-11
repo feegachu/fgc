@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createApiClient, ApiError } from './client'
 import { loginUrl, safeRedirect } from './redirect'
+import { errorText } from '../format'
 
 const ok = (data: unknown = { id: 1 }) => Response.json({ data, error: null, requestId: 'req-1' })
 const fail = (status = 401, code = 'FGC-AUTH-002') => Response.json({ data: null, error: { code, message: '서버 문구', field: 'name', params: { value: 1 }, detail: 'detail' }, requestId: 'error-1' }, { status })
@@ -33,7 +34,7 @@ describe('API 계약', () => {
     const { client } = setup(vi.fn().mockResolvedValue(new Response(null, { status: 204, headers: { 'X-Request-Id': 'empty' } })))
     expect(await client.request('/api/v1/contracts')).toEqual({ data: null, error: null, requestId: 'empty' })
   })
-  it.each([400, 403, 409, 500])('%i 오류 필드를 보존하고 refresh하지 않는다', async (status) => {
+  it.each([400, 403, 404, 409, 500])('%i 오류 필드를 보존하고 refresh하지 않는다', async (status) => {
     const fetcher = vi.fn().mockResolvedValue(fail(status, 'FGC-CONT-001'))
     const { client } = setup(fetcher)
     await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({ name: 'ApiError', code: 'FGC-CONT-001', message: '서버 문구', field: 'name', params: { value: 1 }, detail: 'detail', requestId: 'error-1', status })
@@ -43,9 +44,17 @@ describe('API 계약', () => {
     const { client } = setup(vi.fn().mockResolvedValue(new Response('Bad Gateway', { status: 502, headers: { 'X-Request-Id': 'proxy' } })))
     await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({ code: 'FGC-COMMON-500', requestId: 'proxy', status: 502 })
   })
+  it.each([404, 405, 413])('비JSON %i는 서버 장애 코드로 분류하지 않는다 (#466)', async (status) => {
+    const { client } = setup(vi.fn().mockResolvedValue(new Response('<html>Not Found</html>', { status, headers: { 'X-Request-Id': 'proxy' } })))
+    const error = await client.request('/api/v1/contracts').catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: '', requestId: 'proxy', status })
+    expect(errorText(error as ApiError)).toBe('요청을 처리하지 못했습니다. (요청 ID: proxy)')
+  })
   it('성공 상태라도 잘못된 봉투는 오류다', async () => {
     const { client } = setup(vi.fn().mockResolvedValue(Response.json({ foo: 1 })))
     await expect(client.request('/api/v1/contracts')).rejects.toBeInstanceOf(ApiError)
+    // 깨진 2xx 봉투는 4xx가 아니므로 서버 장애로 남는다(#466).
+    await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({ code: 'FGC-COMMON-500', status: 200 })
   })
   it('FormData에 JSON Content-Type을 설정하지 않는다', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(ok())

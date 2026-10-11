@@ -234,6 +234,13 @@ it('500 only reveals request id, not exception detail or server text', async () 
   expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
   expect(screen.queryByText(/SQL private detail/)).not.toBeInTheDocument()
 })
+it('non-JSON 404 is not shown as a 500 request-id-only error (#466)', async () => {
+  mount('/base', () => {
+    throw new ApiError(null, 'trace-404', 404)
+  })
+  expect(await screen.findByRole('alert')).toHaveTextContent('요청을 처리하지 못했습니다. (요청 ID: trace-404)')
+  expect(screen.queryByText(/FGC-COMMON-500/)).not.toBeInTheDocument()
+})
 it.each(['commission', 'cap', 'refund'])('POL %s handles empty detail', async (tab) => {
   mount(`/policies?tab=${tab}`, (p) =>
     p.includes('/policies/') ? envelope({ commissionRules: [], capRuleSets: [], refundRateTables: [] }) : fixtures(p),

@@ -21,9 +21,11 @@ import java.util.Map;
  * limitAmount 계산 순서:
  *   annualizedLimitBase = basePremiumAmount × premium_multiplier(기본 12)
  *   refund12mAmount = 80% 이상 공제 대상일 때만, annualizedLimitBase × 12차월 예상 해약환급률
- *   grossLimit = annualizedLimitBase + refund12mAmount
  *   complianceDeductionAmount = min(증빙된 실제 준법경영비, basePremiumAmount × 최대 허용률)
- *   limitAmount = grossLimit - complianceDeductionAmount
+ *   limitAmount = max(0, annualizedLimitBase - refund12mAmount + complianceDeductionAmount)
+ *
+ * 규정 판정식은 "산입액 + refund12mAmount - complianceDeductionAmount ≤ annualizedLimitBase"다
+ * (감독규정 제4-32조⑤·⑭, FAQ 2차 Q1-1). 이를 한도 쪽으로 이항해 includedAmount는 상세 INCLUDED 합계 그대로 둔다.
  *
  * @author yslee
  * @since 2026-08-10

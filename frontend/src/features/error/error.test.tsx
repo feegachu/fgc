@@ -96,6 +96,7 @@ describe('오류 화면 (#417)', () => {
     expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 req-500를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.getByText('FGC-COMMON-500')).toBeInTheDocument()
     expect(screen.queryByText(/SQLException/)).toBeNull()
+    await waitFor(() => expect(document.title).toBe('처리 오류 (FGC-UI-ERR-500) · FGC'))
     await userEvent.click(screen.getByRole('button', { name: '요청 ID 복사' }))
     expect(writeText).toHaveBeenCalledWith('req-500')
     expect(await screen.findByRole('button', { name: '복사했습니다' })).toBeInTheDocument()
@@ -112,10 +113,13 @@ describe('오류 화면 (#417)', () => {
     expect(await screen.findByRole('heading', { name: '500 · 처리 오류' })).toBeInTheDocument()
     expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 -를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.queryByText(/secret\.stack/)).toBeNull()
+    await waitFor(() => expect(document.title).toBe('처리 오류 (FGC-UI-ERR-500) · FGC'))
     await userEvent.click(screen.getByRole('link', { name: '보험계약' }))
     expect(await screen.findByRole('heading', { name: '보험계약' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/contracts')
     expect(screen.queryByRole('heading', { name: '500 · 처리 오류' })).toBeNull()
+    // 바운더리가 초기화되면 등록한 제목도 지워져 이동한 화면의 제목으로 돌아온다(#467).
+    await waitFor(() => expect(document.title).toBe('보험계약 (CONT-W01) · FGC'))
     expect(reported.every((error) => (error as Error).cause === page.thrown)).toBe(true)
   })
 
@@ -128,6 +132,7 @@ describe('오류 화면 (#417)', () => {
     expect(await screen.findByRole('heading', { name: '500 · 처리 오류' })).toBeInTheDocument()
     expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 req-502를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.queryByText(/Bad Gateway/)).toBeNull()
+    await waitFor(() => expect(document.title).toBe('처리 오류 (FGC-UI-ERR-500) · FGC'))
   })
 
   it('6. 상세 API 404는 서버 문구로 404를 보이며 경로 없음·빈 목록과 구분한다', async () => {
@@ -141,6 +146,19 @@ describe('오류 화면 (#417)', () => {
     expect(screen.getByText('요청한 데이터를 찾을 수 없습니다. (12)')).toBeInTheDocument()
     expect(screen.getByText('FGC-COMMON-004 · 요청 ID: req-404')).toBeInTheDocument()
     expect(screen.queryByText('요청한 화면이 없습니다.')).toBeNull()
+    await waitFor(() => expect(document.title).toBe('찾을 수 없음 (FGC-UI-ERR-404) · FGC'))
+  })
+
+  it('비JSON 404는 서버 장애 코드 없이 404 · 처리 오류로 보인다 (#466)', async () => {
+    page.thrown = await apiErrorFrom(new Response('<html>Not Found</html>', {
+      status: 404,
+      headers: { 'Content-Type': 'text/html', 'X-Request-Id': 'req-404' },
+    }))
+    renderAt(HOME)
+    expect(await screen.findByRole('heading', { name: '404 · 처리 오류' })).toBeInTheDocument()
+    expect(screen.getByText('요청 ID: req-404')).toBeInTheDocument()
+    expect(screen.queryByText(/FGC-COMMON-500/)).toBeNull()
+    await waitFor(() => expect(document.title).toBe('처리 오류 (FGC-UI-ERR-404) · FGC'))
   })
 
   it('업무 오류(409)는 1차 business 화면처럼 상태 · 처리 오류로 문구를 그대로 보인다', async () => {
@@ -153,5 +171,6 @@ describe('오류 화면 (#417)', () => {
     expect(await screen.findByRole('heading', { name: '409 · 처리 오류' })).toBeInTheDocument()
     expect(screen.getByText('FGC-SCHE-001 · 요청 ID: req-409')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '요청 ID 복사' })).toBeNull()
+    await waitFor(() => expect(document.title).toBe('처리 오류 (FGC-UI-ERR-409) · FGC'))
   })
 })

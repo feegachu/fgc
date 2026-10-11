@@ -42,6 +42,7 @@ public class CapCalculatorImpl implements CapCalculator {
     private static final String INCLUDED = "INCLUDED";
     private static final String EXCLUDED = "EXCLUDED";
     private static final String REVIEW_REQUIRED = "REVIEW_REQUIRED";
+    private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
     private final CapContractQueryRepository capContractQueryRepository;
     private final CapRuleQueryRepository capRuleQueryRepository;
@@ -82,21 +83,32 @@ public class CapCalculatorImpl implements CapCalculator {
         BigDecimal annualizedLimitBase = MoneyUtil.multiplyAndRound(
                 basePremiumAmount, ruleSet.getPremiumMultiplier());
 
-        // 2) 저해지·표준미달형 등 80% 이상 공제 대상이면 한도를 가산
-        // 표준해약공제액의 80% 이상을 공제하는 상품은 12차월 예상 해약환급금만큼 한도가 더 큼 (REG-08)
+        // 2) 저해지·표준미달형 등 80% 이상 공제 대상이면 12차월 예상 해약환급금을 구함 (REG-08)
         RefundAddition refundAddition = resolveRefundAddition(contract, ruleSet, annualizedLimitBase, command);
 
         // 2026-08-10 yslee - 준법경영비를 증빙 실제액 기준으로 제한
         // 기존 코드: 정책 공제율이 0보다 크면 월납 초회보험료의 3%를 일괄 공제
         // 문제: 실제 지급·증빙 금액이 없거나 상한보다 적어도 최대액을 자동 공제하여 REG-10 위반
         // 개선: 증빙 실제액과 정책상 최대 허용액 중 작은 금액만 공제하고 증빙 누락은 검토필요 처리
-        BigDecimal grossLimit = annualizedLimitBase.add(refundAddition.amount());
         ComplianceDeduction complianceDeduction = resolveComplianceDeduction(
                 basePremiumAmount,
                 ruleSet.getComplianceDeductionPct(),
                 command.complianceEvidenceAmount()
         );
-        BigDecimal limitAmount = grossLimit.subtract(complianceDeduction.appliedAmount());
+
+        // 2026-10-11 yslee - 해약환급금·준법경영비 반영 방향을 규정대로 교정 (#468)
+        // 기존 코드: 한도 = 월납×12 + 해약환급금 − 준법경영비
+        // 문제: 감독규정 제4-32조⑤·FAQ Q1-1은 해약환급금을 수수료등에 "합산"하고(산입 + 환급금 ≤ 1,200%),
+        //       ⑭는 준법경영비를 수수료등 계산에서 "제외"한다 — 부호가 둘 다 반대라 환급금 계약은 위반을 놓치고
+        //       준법경영비 증빙 계약은 정상을 위반으로 판정했다
+        // 개선: 산입 + 환급금 − 준법경영비 ≤ 월납×12 를 한도 쪽으로 이항한다.
+        //       판정은 FAQ 식과 같고, 지급확정(CapValidator)·정합성 검사(산입액 = 상세 합계)는 이 한도를 그대로 쓴다.
+        //       환급률 100% 초과 환급률표는 resolveRefundAddition이 REVIEW_REQUIRED로 올리고,
+        //       max(0)은 cap_check.limit_amount >= 0 제약을 지키는 마지막 방어선이다.
+        BigDecimal limitAmount = annualizedLimitBase
+                .subtract(refundAddition.amount())
+                .add(complianceDeduction.appliedAmount())
+                .max(BigDecimal.ZERO);
 
         // 4) 실제 산입액 집계
         // 계약월차 1~firstYearMonths(기본 12) 안에 있는 예상 schedule_line 한 줄씩 훑으면서,
@@ -153,7 +165,10 @@ public class CapCalculatorImpl implements CapCalculator {
 
         // 5) 잔여 한도·사용률·최종 판정
         BigDecimal remainingAmount = limitAmount.subtract(includedAmount);
-        BigDecimal usagePct = MoneyUtil.usagePercent(includedAmount, limitAmount);
+        // 한도 0에 산입액이 있으면 100% — CapValidatorImpl·지급확정 경로와 같은 규칙
+        BigDecimal usagePct = limitAmount.signum() == 0 && includedAmount.signum() > 0
+                ? ONE_HUNDRED
+                : MoneyUtil.usagePercent(includedAmount, limitAmount);
 
         CapResultStatus resultStatus = determineResultStatus(
                 anyReviewRequired, includedAmount, limitAmount, usagePct, ruleSet.getWarningUsagePct());
@@ -168,14 +183,14 @@ public class CapCalculatorImpl implements CapCalculator {
                 includedAmount, remainingAmount, usagePct, resultStatus, details, snapshot);
     }
 
-    // 80% 이상 공제 대상 상품이면 12차월 예상 해약환급금을 한도에 가산할 금액과, 그 판정에 쓴
+    // 80% 이상 공제 대상 상품이면 수수료등에 합산할(= 한도에서 뺄) 12차월 예상 해약환급금과, 그 판정에 쓴
     // 환급률표(refund_rate_table_id·policy_version_id·version_no)를 계산해서 돌려줌
     private RefundAddition resolveRefundAddition(CapContractView contract, CapRuleSetView ruleSet,
                                                    BigDecimal annualizedLimitBase, CapCalculationCommand command) {
         boolean applies = REFUND_ADDITION_STANDARD_DEDUCTION_80.equals(ruleSet.getRefundAdditionCondition())
                 && Boolean.TRUE.equals(contract.getStandardDeduction80Yn());
         if (!applies) {
-            return new RefundAddition(BigDecimal.ZERO, null, null, null, false);
+            return new RefundAddition(BigDecimal.ZERO, null, null, null, false, false);
         }
 
         // 반드시 계약 체결일(contract.getContractDate())로 조회
@@ -183,12 +198,16 @@ public class CapCalculatorImpl implements CapCalculator {
                 contract.getPaymentTermMonths(), contract.getChannelCode(), contract.getContractDate());
         Optional<RefundRateResolution> resolution = refundRateResolver.resolve(query);
         if (resolution.isEmpty()) {
-            return new RefundAddition(BigDecimal.ZERO, null, null, null, true);
+            return new RefundAddition(BigDecimal.ZERO, null, null, null, true, false);
         }
 
         RefundRateResolution r = resolution.get();
         BigDecimal amount = MoneyUtil.applyPercent(annualizedLimitBase, r.month12RatePct());
-        return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(), false);
+        // 1년 경과 예상 해약환급금이 1년 납입보험료를 넘는 환급률표는 데이터 오류다.
+        // 숫자를 조용히 자르지 않고 표가 없을 때와 같이 사람 판단으로 넘긴다.
+        boolean abnormalRate = r.month12RatePct().compareTo(ONE_HUNDRED) > 0;
+        return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(),
+                abnormalRate, abnormalRate);
     }
 
     private ComplianceDeduction resolveComplianceDeduction(
@@ -244,7 +263,8 @@ public class CapCalculatorImpl implements CapCalculator {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("premiumMultiplier", ruleSet.getPremiumMultiplier());
         snapshot.put("refundAdditionCondition", ruleSet.getRefundAdditionCondition());
-        snapshot.put("refundTableMissing", refundAddition.reviewRequired());
+        snapshot.put("refundTableMissing", refundAddition.reviewRequired() && !refundAddition.abnormalRate());
+        snapshot.put("refundRateAbnormal", refundAddition.abnormalRate());
         snapshot.put("refundRateTablePolicyVersionId", refundAddition.policyVersionId());
         snapshot.put("refundRateTableVersionNo", refundAddition.versionNo());
         snapshot.put("complianceDeductionPct", ruleSet.getComplianceDeductionPct());
@@ -256,7 +276,7 @@ public class CapCalculatorImpl implements CapCalculator {
     }
 
     private record RefundAddition(BigDecimal amount, Long refundRateTableId, Long policyVersionId,
-                                   Integer versionNo, boolean reviewRequired) {
+                                   Integer versionNo, boolean reviewRequired, boolean abnormalRate) {
     }
 
     private record ComplianceDeduction(
