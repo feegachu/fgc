@@ -25,6 +25,7 @@ public class CapScheduleAmountQueryRepository {
     private final EntityManager entityManager;
 
     // 해당 귀속행이 있고 모두 증빙을 갖춘 경우에만 증빙을 반환한다. 증빙이 없어도 스케줄 행은 조회한다.
+    // CapCalculatorImpl이 반환 순서대로 detail_seq를 매기므로 결정적 정렬이 필요하다(#501).
     private static final String BASE_SQL = """
         SELECT sl.schedule_line_id      AS scheduleLineId,
                sl.commission_item_id     AS commissionItemId,
@@ -82,6 +83,7 @@ public class CapScheduleAmountQueryRepository {
            AND sh.active_yn = true
            AND sl.line_status <> 'CANCELLED'
            AND sl.contract_month_no BETWEEN 1 AND :firstYearMonths
+         ORDER BY sl.contract_month_no, sl.schedule_line_id
         """;
 
     /** 분급 체계와 관계없이 계약월차 1~firstYearMonths의 현재 운영 스케줄을 조회한다. */

@@ -385,6 +385,25 @@ class CapCalculatorIntegrationTest {
                 .singleElement().extracting(ScheduleAmountView::getEvidenceRef).isNull();
     }
 
+    // #501: 상세 순번(detail_seq)이 조회 순서를 따르므로 실행 계획과 무관하게 계약월차·행 ID 순이어야 한다.
+    // 평소엔 ix_schedule_line_contract_month 인덱스 스캔이 우연히 월차 순서를 내지만, 부하·통계에 따라
+    // 순차 스캔으로 바뀌면 힙 순서가 나온다. 인덱스 스캔을 끄고 행 ID와 월차 순서를 거꾸로 만들어 그 상황을 재현한다.
+    @Test
+    void returnsScheduleLinesInContractMonthThenLineIdOrderRegardlessOfQueryPlan() {
+        jdbcTemplate.execute("SET LOCAL enable_indexscan = off");
+        jdbcTemplate.execute("SET LOCAL enable_bitmapscan = off");
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(contractId, LocalDate.of(2026, 7, 10),
+                new BigDecimal("100"), new BigDecimal("200"), new BigDecimal("300"));
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET contract_month_no = 4 - line_no WHERE schedule_header_id = ?",
+                headerId);
+        List<Long> lineIds = scheduleLineIds(headerId);
+
+        assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12))
+                .extracting(ScheduleAmountView::getScheduleLineId)
+                .containsExactly(lineIds.get(2), lineIds.get(1), lineIds.get(0));
+    }
+
     @ParameterizedTest
     @CsvSource({
             "OPERATIONAL, true, PLANNED, 6, 6, true",
