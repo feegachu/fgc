@@ -1301,7 +1301,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      * 종전에는 후보 1행만 저장해 CAP-W02 가 "저장 산입금액과 항목별 산입 합계 불일치"
      * 경고를 띄웠다(#255 F-11). 헤더가 어느 쪽 값으로 정해졌는지에 맞춰 같은 쪽의
      * 행 단위 내역을 저장해 상세 합계 = included_amount 를 만든다:
-     *  - 실제(기존 확정 귀속행 + 후보) 합계가 헤더와 같으면 → 기존 확정행 + 계약별 후보 귀속 전체
+     *  - 실제(기존 확정 귀속행 + 후보) 합계가 헤더와 같으면 → 기존 확정행 + 현재 기간의 산입 후보 귀속
      *  - 그 외(스케줄 우세 등)          → REALTIME 경로와 동일하게 calculation.details() 저장
      *
      * cap_check_detail.amount는 CHECK(>=0)이므로 차감이 있는 실제 판정은 순산입액 요약으로
@@ -1342,13 +1342,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         .evidenceRef(d.getEvidenceRef())
                         .build());
             }
-            for (ConfirmationData candidate : currentPeriodAttributions(attributions, data)) {
+            for (ConfirmationData candidate : currentIncludedAttributions(attributions, data)) {
                 rows.add(CapCheckDetailInsertRow.builder()
                         .capCheckId(check.getCapCheckId()).detailSeq(seq++)
                         .commissionItemId(candidate.commissionItemId()).itemCode(candidate.itemCode())
                         .itemName(candidate.itemName()).transactionAttributionId(candidate.transactionAttributionId())
                         .classificationSnapshot(candidate.inclusionDecisionStatus().name())
-                        .amount(MoneyUtil.roundWon(candidate.attributedAmount()))
+                        .amount(signedAttributedAmount(candidate))
                         .decisionReason(candidate.inclusionDecisionReason()).evidenceRef(candidate.evidenceRef())
                         .build());
             }
@@ -1498,9 +1498,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .toList();
     }
 
-    private BigDecimal currentIncludedAmount(List<ConfirmationData> attributions, ConfirmationData data) {
+    private List<ConfirmationData> currentIncludedAttributions(List<ConfirmationData> attributions, ConfirmationData data) {
         return currentPeriodAttributions(attributions, data).stream()
                 .filter(row -> row.inclusionDecisionStatus() == InclusionDecisionStatus.INCLUDED)
+                .toList();
+    }
+
+    private BigDecimal currentIncludedAmount(List<ConfirmationData> attributions, ConfirmationData data) {
+        return currentIncludedAttributions(attributions, data).stream()
                 .map(this::signedAttributedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
