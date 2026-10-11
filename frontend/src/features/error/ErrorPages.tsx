@@ -1,20 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../../lib/api/errors'
+import { useErrorTitleStore } from '../../stores/errorTitle'
 import { authMessages } from '../auth/messages'
 import { errorMessages } from './messages'
 
 // 1차 templates/error/{403,404,500,business}.html의 카드 구조·문구·"코드 · 요청 ID: 값" 형식을 따른다.
 interface ErrorCardProps {
-  heading: string
+  status: number
+  title: string
   message: string
   help?: ReactNode
   code?: string | null
   requestId?: string | null
   copyRequestId?: boolean
 }
-function ErrorCard({ heading, message, help, code, requestId, copyRequestId }: ErrorCardProps) {
+function ErrorCard({ status, title, message, help, code, requestId, copyRequestId }: ErrorCardProps) {
+  // 문서 제목은 1차 layout/default의 "제목 (FGC-UI-ERR-상태) · FGC". 셸 밖(최상위 바운더리)에서는 직접 바꾼 값이 남는다.
+  const documentTitle = `${title} (FGC-UI-ERR-${status}) · FGC`
+  useEffect(() => {
+    document.title = documentTitle
+    useErrorTitleStore.setState({ title: documentTitle })
+    return () => useErrorTitleStore.setState({ title: null })
+  }, [documentTitle])
   // 문구에 이미 요청 ID가 들어 있으면 다시 붙이지 않는다(format.ts errorText와 같은 규칙).
   const trace = [code, requestId && !message.includes(requestId) ? `요청 ID: ${requestId}` : null]
     .filter(Boolean)
@@ -23,7 +32,7 @@ function ErrorCard({ heading, message, help, code, requestId, copyRequestId }: E
     <div className="error-page">
       <section className="surface error-card" aria-labelledby="error-title">
         <header className="surface-header">
-          <h1 id="error-title" className="surface-title">{heading}</h1>
+          <h1 id="error-title" className="surface-title">{status} · {title}</h1>
         </header>
         <div className="surface-body error-card-body">
           <p className="error-message" role="alert">{message}</p>
@@ -65,7 +74,8 @@ function CopyButton({ value }: { value: string }) {
 export function ForbiddenPage({ error }: { error?: ApiError }) {
   return (
     <ErrorCard
-      heading="403 · 권한 없음"
+      status={403}
+      title="권한 없음"
       message={authMessages.forbidden}
       help={authMessages.forbiddenHelp}
       code={error?.code ?? 'FGC-AUTH-003'}
@@ -76,7 +86,7 @@ export function ForbiddenPage({ error }: { error?: ApiError }) {
 
 // 경로 없음. 데이터 없음(상세 API 404)은 서버 문구를 그대로 쓰는 ApiErrorPage가 그린다.
 export function NotFoundPage() {
-  return <ErrorCard heading="404 · 찾을 수 없음" message={errorMessages.pageNotFound} help={errorMessages.pageNotFoundHelp} />
+  return <ErrorCard status={404} title="찾을 수 없음" message={errorMessages.pageNotFound} help={errorMessages.pageNotFoundHelp} />
 }
 
 // 500 계열은 서버 문구 대신 요청번호만 보여 준다(인터페이스정의서 §3-1). 렌더링 예외는 요청번호가 없다.
@@ -84,7 +94,8 @@ export function ServerErrorPage({ error }: { error?: ApiError }) {
   const requestId = error?.requestId ?? null
   return (
     <ErrorCard
-      heading="500 · 처리 오류"
+      status={500}
+      title="처리 오류"
       message={errorMessages.internal(requestId)}
       code={error?.code}
       requestId={requestId}
@@ -97,10 +108,11 @@ export function ServerErrorPage({ error }: { error?: ApiError }) {
 export function ApiErrorPage({ error }: { error: ApiError }) {
   if (error.code === 'FGC-AUTH-003') return <ForbiddenPage error={error} />
   if (error.status >= 500) return <ServerErrorPage error={error} />
-  const title = error.status === 400 ? '입력 오류' : '처리 오류'
+  const title = error.code === 'FGC-COMMON-004' ? '찾을 수 없음' : error.status === 400 ? '입력 오류' : '처리 오류'
   return (
     <ErrorCard
-      heading={error.code === 'FGC-COMMON-004' ? '404 · 찾을 수 없음' : `${error.status} · ${title}`}
+      status={error.status}
+      title={title}
       message={error.message}
       help={typeof error.detail === 'string' ? error.detail : undefined}
       code={error.code}
