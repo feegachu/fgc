@@ -463,14 +463,15 @@
     document.getElementById("input-body").innerHTML =
       detailPair("월납환산 초회보험료", won(item.basePremiumAmount)) +
       detailPair("한도 배수", multiplier == null ? "—" : multiplier + "배") +
-      detailPair("환급금 가산", won(item.refund12mAmount)) +
+      detailPair("해약환급금 합산", won(item.refund12mAmount)) +
       detailPair("준법경영비 공제", insurerStage ? won(item.complianceDeductionAmount) : "적용하지 않음") +
       detailPair("적용 룰셋", ruleSetLabel);
 
+    // 산입 + 해약환급금 − 준법경영비 ≤ 월납×12 를 한도 쪽으로 옮긴 식이다 (#468, 감독규정 제4-32조⑤·⑭)
     var limitParts = [number(item.basePremiumAmount), "×", multiplier == null ? "—" : multiplier];
-    if (Number(item.refund12mAmount) !== 0) limitParts.push("+", number(item.refund12mAmount));
+    if (Number(item.refund12mAmount) !== 0) limitParts.push("−", number(item.refund12mAmount));
     if (insurerStage && Number(item.complianceDeductionAmount) !== 0) {
-      limitParts.push("−", number(item.complianceDeductionAmount));
+      limitParts.push("+", number(item.complianceDeductionAmount));
     }
     document.getElementById("formula-limit").textContent =
       "한도 = " + limitParts.join(" ") + " = " + won(item.limitAmount);
