@@ -21,7 +21,8 @@ export class ApiError extends Error {
   constructor(error: ErrorBody | null, requestId: string | null, status: number) {
     super(error?.message || '요청을 처리하지 못했습니다.')
     this.name = 'ApiError'
-    this.code = error?.code || 'FGC-COMMON-500'
+    // 서버 코드가 없을 때 4xx(프록시의 HTML 404·413 등)는 코드 없음, 5xx와 깨진 2xx 봉투는 서버 장애로 본다.
+    this.code = error?.code || (status >= 400 && status < 500 ? '' : 'FGC-COMMON-500')
     this.field = error?.field || null
     this.params = error?.params || {}
     this.detail = error?.detail ?? null

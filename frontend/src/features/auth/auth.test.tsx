@@ -98,6 +98,14 @@ describe('AUTH-W01 로그인', () => {
     expect(screen.queryByText(/internal details|FGC-COMMON-500/)).toBeNull()
   })
 
+  it('비JSON 4xx는 요청 ID만 보이지 않고 일반 문구를 보인다 (#466)', async () => {
+    vi.mocked(apiClient.login).mockRejectedValue(new ApiError(null, 'trace-413', 413))
+    const { actions } = renderAt()
+    await enterCredentials(actions)
+    expect(await screen.findByRole('alert')).toHaveTextContent('요청을 처리하지 못했습니다.')
+    expect(screen.queryByText(/요청 ID|FGC-COMMON-500/)).toBeNull()
+  })
+
   it.each(['/app', ''])('base=%s: 보호 경로와 query/hash를 보존하여 로그인 후 복귀한다', async (base) => {
     const target = '/transactions/new?month=2026-08&status=ACTIVE#form'
     const { router, actions, client } = renderAt(`${base}${target}`, false, base || '/')
