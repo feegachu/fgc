@@ -1,7 +1,17 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
-export function EvidenceLink({ label, children }: { label: string; children: ReactNode }) {
+// icon 이면 1차 evidence 마크업처럼 ⓘ 아이콘 버튼을 그리고 label 은 접근 가능한 이름으로만 쓴다.
+// 버튼이므로 정렬 가능한 DataTable 열 머리글(label 이 <button> 안에 들어감)에는 넣지 않는다 — 버튼 중첩·정렬 오작동.
+export function EvidenceLink({
+  label,
+  children,
+  icon = false,
+}: {
+  label: string
+  children: ReactNode
+  icon?: boolean
+}) {
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   const popover = useRef<HTMLDivElement>(null)
@@ -62,8 +72,9 @@ export function EvidenceLink({ label, children }: { label: string; children: Rea
     <span className="evidence">
       <button
         ref={trigger}
-        className="evidence-trigger react-evidence-trigger"
+        className={icon ? 'evidence-trigger' : 'evidence-trigger react-evidence-trigger'}
         type="button"
+        aria-label={icon ? label : undefined}
         aria-describedby={open ? id : undefined}
         aria-expanded={open}
         onMouseEnter={show}
@@ -78,7 +89,13 @@ export function EvidenceLink({ label, children }: { label: string; children: Rea
           setOpen(!pinned)
         }}
       >
-        {label}
+        {icon ? (
+          <span className="material-symbols-rounded" aria-hidden="true">
+            info
+          </span>
+        ) : (
+          label
+        )}
       </button>
       {open &&
         createPortal(
