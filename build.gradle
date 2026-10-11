@@ -97,8 +97,4 @@ tasks.named('test') {
     // 통합 테스트가 개발자가 localhost:8081에서 쓰는 fgc DB를 공유하면 @AfterEach 정리가
     // 실제 실행 이력까지 훼손할 수 있다. 모든 테스트를 Docker 임시 PostgreSQL로 격리한다.
     systemProperty 'spring.profiles.active', 'test'
-    // CI(GitHub Actions가 CI=true를 준다)에서만 fork 2개로 나눠 돌린다. fork마다 JVM이 따로 떠서
-    // jdbc:tc: 컨테이너(DB)도 fork마다 따로 생기므로 서로의 @AfterEach 정리가 섞이지 않는다.
-    // 로컬은 순차 그대로 둔다 — Docker Desktop에서는 이득이 없었고(6분18초→6분3초), 8 fork는 11분으로 더 느렸다.
-    maxParallelForks = System.getenv('CI') ? 2 : 1
 }

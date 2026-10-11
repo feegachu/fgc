@@ -29,9 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    # DB는 서비스 컨테이너가 아니라 test 프로필의 Testcontainers(jdbc:tc:)가 띄운다.
-    # 테스트가 fork 단위로 병렬 실행되므로(build.gradle maxParallelForks) fork마다 DB가 따로 있어야
-    # 서로의 @AfterEach 정리가 섞이지 않는다. 시드 위치(db/demo 포함)도 application-test.yml에 있다.
+    # DB는 서비스 컨테이너가 아니라 test 프로필의 Testcontainers(jdbc:tc:postgresql:17)가 띄운다.
+    # 로컬과 같은 설정 하나(application-test.yml)만 쓰며, 시드 위치(db/migration+db/demo)도 거기 있다.
+    # 테스트 fork 병렬(maxParallelForks=2)은 PR #502에서 측정했으나 4코어 러너에서 :test 시간이 줄지 않아 넣지 않았다.
 
     steps:
       - name: Checkout
