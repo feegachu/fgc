@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
+import { useErrorTitleStore } from '../../stores/errorTitle'
 import { MonthSelector } from '../../components/MonthSelector'
 import { canOpen, screenFor } from '../screens'
 import { Sidebar } from './Sidebar'
@@ -22,7 +23,9 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const month = useWorkspaceStore((state) => state.month)
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
+  const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
+  const allowed = current && canOpen(current, { canProcess: user.canProcess, canViewAuditLog: user.canViewAuditLog })
   useEffect(() => {
     const workspace = useWorkspaceStore.getState()
     const requestedMonth = new URLSearchParams(location.search).get('month')
@@ -39,25 +42,27 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       void navigate(normalized, { replace: true })
       return
     }
-    const allowed = current && canOpen(current, { canProcess: user.canProcess, canViewAuditLog: user.canViewAuditLog })
     if (allowed) workspace.openTab({ id: current.id, title: current.title, icon: current.icon, href: normalized })
-    // 1차 오류 화면 제목(layout/default의 "제목 (화면ID) · FGC")과 맞춘다.
-    document.title = !current
-      ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
-      : allowed
-        ? `${current.title} (${current.id}) · FGC`
-        : '권한 없음 (FGC-UI-ERR-403) · FGC'
   }, [
     location.pathname,
     location.search,
     location.hash,
     current,
+    allowed,
     user.loginId,
     user.canProcess,
     user.canViewAuditLog,
     defaultMonth,
     navigate,
   ])
+  // 1차 화면 제목(layout/default의 "제목 (화면ID) · FGC")과 맞춘다. 에러 바운더리가 그린 오류 화면이 있으면 그 제목이 먼저다.
+  useEffect(() => {
+    document.title = errorTitle ?? (!current
+      ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
+      : allowed
+        ? `${current.title} (${current.id}) · FGC`
+        : '권한 없음 (FGC-UI-ERR-403) · FGC')
+  }, [errorTitle, current, allowed])
   return (
     <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''}`}>
       <a className="skip-link" href="#main-content">
