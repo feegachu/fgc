@@ -161,7 +161,12 @@
   // 2026-08-19 yslee - FUN-044 확정 조건을 IF-API-50 응답으로 표시
   // 기존 코드: 체크리스트 영역이 정적 "연동 대기" 문구와 비활성 버튼만 표시
   // 문제: 사용자가 어떤 조건 때문에 확정할 수 없는지 화면에서 확인할 수 없음
-  // 개선: 서버가 판정한 6개 조건을 그대로 표시하고 통과 여부를 후속 확정 게이트에 전달
+  // 개선: 서버가 판정한 조건을 그대로 표시하고 통과 여부를 후속 확정 게이트에 전달
+  // 2026-10-11 yslee - #491 조건 7(같은 검증월의 가장 최근 실행인가) 추가로 6 → 7
+  // 서버(ValidationRunFinalizationServiceImpl#buildChecklist)와 개수가 다르면 응답 오류로 처리한다.
+  // 일부만 그려 "모두 통과"로 보이는 것보다 조회 실패로 멈추는 편이 안전하다.
+  var CHECKLIST_CONDITION_COUNT = 7;
+
   function safeInternalLink(linkUrl) {
     if (!linkUrl || typeof linkUrl !== "string" || !linkUrl.startsWith("/") || linkUrl.startsWith("//")) {
       return null;
@@ -222,7 +227,7 @@
     } else if (runStatus !== "COMPLETED") {
       reason = "검증 계산이 끝난 실행만 확정할 수 있습니다.";
     } else if (!checklistPassed) {
-      reason = "확정 조건 6개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.";
+      reason = "확정 조건 " + CHECKLIST_CONDITION_COUNT + "개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.";
     }
     if (finalizeNote) {
       finalizeNote.textContent = reason;
@@ -277,7 +282,7 @@
     });
 
     checklistBody.appendChild(list);
-    setSummaryBadge(checklist.passed ? "6개 조건 모두 통과" : "미충족 조건 있음",
+    setSummaryBadge(checklist.passed ? CHECKLIST_CONDITION_COUNT + "개 조건 모두 통과" : "미충족 조건 있음",
       checklist.passed ? "status-badge-success" : "status-badge-error");
     finalizeButton.dataset.checklistPassed = String(checklist.passed);
     updateFinalizeButtonState();
@@ -303,7 +308,7 @@
     apiClient.request("/api/v1/validation-runs/" + runId + "/finalize-checklist")
       .then(function (envelope) {
         var checklist = envelope.data;
-        if (!checklist || !Array.isArray(checklist.conditions) || checklist.conditions.length !== 6) {
+        if (!checklist || !Array.isArray(checklist.conditions) || checklist.conditions.length !== CHECKLIST_CONDITION_COUNT) {
           throw new apiClient.ApiError({ message: "확정 조건 응답 형식이 올바르지 않습니다." }, envelope.requestId, 200);
         }
         renderChecklist(checklist);

@@ -200,13 +200,18 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                              @Param("finalized") ValidationRunStatus finalized);
 
     /**
-     * IF-API-50 / FUN-044-01. 한 네이티브 쿼리의 MVCC 스냅샷에서 여섯 확정 조건의 실패
+     * IF-API-50 / FUN-044-01. 한 네이티브 쿼리의 MVCC 스냅샷에서 일곱 확정 조건의 실패
      * 건수를 함께 읽어 조건별 조회 시점 차이를 없앤다. 전표·한도는 validation_run_id 범위,
      * 예외·귀속합계는 문서 정의대로 validation_month 범위다(#330 — 예외를 실행 범위로
      * 좁히면 실시간 경로의 CRITICAL·POLICY_*가 빠진 채 확정됨). 집계가 여러 이미 JPA로
      * 전환된 테이블(journal_header, exception_case, cap_check 등)을 넘나드는 다중
      * 서브쿼리라 JPQL 대신 네이티브 SQL + {@code @SqlResultSetMapping}(ValidationRun
      * 엔티티에 선언)으로 유지한다.
+     *
+     * <p>조건 7(#491): 같은 검증월에 이 실행보다 뒤에 만든 MONTHLY·PRE_CONFIRM 실행이 있으면 확정하지 않는다.
+     * 순서는 IDENTITY인 validation_run_id로 정하고(run_no는 명시 채번 가능), 뒤 실행의 상태는 가리지 않는다
+     * (CREATED·RUNNING·FAILED여도 다시 돌리려 했다는 뜻). MANUAL_CONTRACT는 매일 생기는 일일 배치라 제외한다.
+     * 같은 SQL이 {@code ValidationRunMapper.xml#findFinalizeChecklistCounts}에도 있으니 함께 고친다.
      */
     @NativeQuery(value = """
             SELECT vr.validation_run_id AS validationRunId,
@@ -248,7 +253,19 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                             GROUP BY cc.cap_check_id, cc.included_amount
                            HAVING cc.included_amount <> COALESCE(SUM(ROUND(detail.amount, 0)), 0)
                       ) mismatch)
-                       AS capDetailMismatchCount
+                       AS capDetailMismatchCount,
+                   (SELECT COUNT(*)
+                      FROM fgc.validation_run newer
+                     WHERE newer.validation_month = vr.validation_month
+                       AND newer.run_type IN ('MONTHLY', 'PRE_CONFIRM')
+                       AND newer.validation_run_id > vr.validation_run_id)
+                       AS supersededRunCount,
+                   (SELECT MAX(newer.validation_run_id)
+                      FROM fgc.validation_run newer
+                     WHERE newer.validation_month = vr.validation_month
+                       AND newer.run_type IN ('MONTHLY', 'PRE_CONFIRM')
+                       AND newer.validation_run_id > vr.validation_run_id)
+                       AS latestRunId
               FROM fgc.validation_run vr
              WHERE vr.validation_run_id = :validationRunId
             """, sqlResultSetMapping = "FinalizeChecklistCountsMapping")

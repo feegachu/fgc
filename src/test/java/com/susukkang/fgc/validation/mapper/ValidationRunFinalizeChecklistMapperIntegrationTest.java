@@ -108,6 +108,37 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
                 .getCapDetailMismatchCount()).isZero();
     }
 
+    // 2026-10-11 yslee - #491 조건 7: 같은 검증월의 더 최근 월 전체 실행 수
+    // 뒤 실행은 상태를 가리지 않고(FAILED 포함) 세고, 일일 배치(MANUAL_CONTRACT)와 다른 달은 세지 않는다
+    @Test
+    void countsNewerWholeMonthRunsOfAnyStatusButNotDailyRunsOrOtherMonths() {
+        LocalDate month = TEST_MONTH.plusMonths(5);
+        Long oldest = createCompletedRun(month);
+        // DB 상태전이 가드상 FAILED 는 RUNNING 에서만 갈 수 있다
+        Long failedNewer = createRunningRun(month);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status = 'FAILED' WHERE validation_run_id = ?",
+                failedNewer);
+        Long latest = createCompletedRun(month);
+        insertRun(month, "MANUAL_CONTRACT");
+        insertRun(month.plusMonths(1), "MONTHLY");
+
+        FinalizeChecklistCounts oldestCounts = validationRunMapper.findFinalizeChecklistCounts(oldest);
+        FinalizeChecklistCounts latestCounts = validationRunMapper.findFinalizeChecklistCounts(latest);
+
+        assertThat(oldestCounts.getSupersededRunCount()).isEqualTo(2);
+        assertThat(oldestCounts.getLatestRunId()).isEqualTo(latest);
+        assertThat(latestCounts.getSupersededRunCount()).isZero();
+        assertThat(latestCounts.getLatestRunId()).isNull();
+    }
+
+    private Long insertRun(LocalDate month, String runType) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
+                VALUES (?, ?, ?)
+                RETURNING validation_run_id
+                """, Long.class, month, ThreadLocalRandom.current().nextInt(1, 1_000_000), runType);
+    }
+
     private Long createCompletedRun(LocalDate month) {
         Long id = createRunningRun(month);
         jdbcTemplate.update("""
