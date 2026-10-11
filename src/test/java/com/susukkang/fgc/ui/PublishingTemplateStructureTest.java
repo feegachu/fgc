@@ -184,6 +184,9 @@ class PublishingTemplateStructureTest {
                 .contains("/finalize\"")
                 .contains("safeInternalLink")
                 .contains("var CHECKLIST_CONDITION_COUNT = 8;")
+                // #494 리뷰: 이미 확정된 실행 사유가 계약수동 사유보다 먼저, 조건 8 단독 미충족은 비교용 안내
+                .containsPattern("(?s)if \\(runStatus === \"FINALIZED\"\\) \\{\\s*reason = .*?\\} else if \\(!runFinalizable\\)")
+                .contains("failing.length === 1 && failing[0].no === 8")
                 .contains("checklist.conditions.length !== CHECKLIST_CONDITION_COUNT")
                 .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
                 .contains("idempotencyKey: finalizeIdempotencyKey")

@@ -224,15 +224,20 @@
       || !canFinalize || !checklistPassed;
     finalizeButton.removeAttribute("title");
 
+    // 사유는 사실 판정 → 권한 → 진행 상태 → 체크리스트 순으로 고른다. 이미 확정된 실행을 맨 앞에 둬야
+    // #494 이전에 확정된 계약수동 실행에 "확정할 수 없습니다"가 잘못 뜨지 않는다(loadFinalizeChecklist 와 같은 순서).
     var reason = "";
-    if (!runFinalizable) {
-      reason = "계약수동 실행은 변경된 계약만 다시 계산하므로 확정할 수 없습니다. 같은 달 월간 실행을 확정하세요.";
+    if (runStatus === "FINALIZED") {
+      reason = "이미 확정된 실행입니다. 같은 달을 다시 검증하면 새 실행은 이 결과와 비교하는 용도로 남습니다.";
+    } else if (!runFinalizable) {
+      reason = "계약수동 실행은 변경된 계약만 다시 계산하므로 확정할 수 없습니다. 같은 달 월 전체 실행(월간·확정전)을 확정하세요.";
     } else if (!canFinalize) {
       reason = "확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.";
-    } else if (runStatus === "FINALIZED") {
-      reason = "이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.";
     } else if (runStatus !== "COMPLETED") {
       reason = "검증 계산이 끝난 실행만 확정할 수 있습니다.";
+    } else if (!checklistPassed && finalizeButton.dataset.monthFinalized === "true") {
+      // 조건 8(이미 확정된 달)만 남은 재검증 실행은 고칠 수 있는 문제가 아니다 — 비교용임을 바로 알린다
+      reason = "이 달은 이미 확정되었습니다. 이 실행은 확정 결과와 비교하는 용도입니다.";
     } else if (!checklistPassed) {
       reason = "확정 조건 " + CHECKLIST_CONDITION_COUNT + "개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.";
     }
@@ -292,6 +297,9 @@
     setSummaryBadge(checklist.passed ? CHECKLIST_CONDITION_COUNT + "개 조건 모두 통과" : "미충족 조건 있음",
       checklist.passed ? "status-badge-success" : "status-badge-error");
     finalizeButton.dataset.checklistPassed = String(checklist.passed);
+    // 조건 8(같은 검증월에 이미 확정된 실행이 없는가)만 미충족인지 — 비활성 사유 문구 선택용
+    var failing = checklist.conditions.filter(function (condition) { return !condition.passed; });
+    finalizeButton.dataset.monthFinalized = String(failing.length === 1 && failing[0].no === 8);
     updateFinalizeButtonState();
     syncDisclosures();
   }
@@ -305,7 +313,7 @@
       return;
     }
     if (finalizeButton.dataset.runFinalizable !== "true") {
-      setChecklistState("확정 대상 아님", "계약수동 실행은 확정할 수 없습니다. 같은 달 월간 실행에서 확정하세요.",
+      setChecklistState("확정 대상 아님", "계약수동 실행은 확정할 수 없습니다. 같은 달 월 전체 실행(월간·확정전)에서 확정하세요.",
         null, "is-empty");
       setBusy(false);
       return;
