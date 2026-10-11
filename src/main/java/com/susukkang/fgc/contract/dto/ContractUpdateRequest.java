@@ -14,6 +14,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 /**
  * 설명 : ContractUpdateRequest
@@ -60,5 +61,8 @@ public class ContractUpdateRequest implements ContractInput {
     private Integer paymentTermMonths; // 보험료 납입 기간(개월)
     @PositiveOrZero
     private BigDecimal standardSurrenderDeductionAmount; // 표준 해약 공제액
+
+    @NotNull
+    private OffsetDateTime expectedUpdatedAt; // 상세 조회 당시 수정 시각. 오래된 편집 요청 검출
 
 }
