@@ -237,7 +237,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                              @Param("finalized") ValidationRunStatus finalized);
 
     /**
-     * IF-API-50 / FUN-044-01. 한 네이티브 쿼리의 MVCC 스냅샷에서 일곱 확정 조건의 실패
+     * IF-API-50 / FUN-044-01. 한 네이티브 쿼리의 MVCC 스냅샷에서 여덟 확정 조건의 실패
      * 건수를 함께 읽어 조건별 조회 시점 차이를 없앤다. 전표·한도는 validation_run_id 범위,
      * 예외·귀속합계는 문서 정의대로 validation_month 범위다(#330 — 예외를 실행 범위로
      * 좁히면 실시간 경로의 CRITICAL·POLICY_*가 빠진 채 확정됨). 집계가 여러 이미 JPA로
@@ -248,6 +248,12 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
      * <p>조건 7(#491): 같은 검증월에 이 실행보다 뒤에 만든 MONTHLY·PRE_CONFIRM 실행이 있으면 확정하지 않는다.
      * 순서는 IDENTITY인 validation_run_id로 정하고(run_no는 명시 채번 가능), 뒤 실행의 상태는 가리지 않는다
      * (CREATED·RUNNING·FAILED여도 다시 돌리려 했다는 뜻). MANUAL_CONTRACT는 매일 생기는 일일 배치라 제외한다.
+     * {@code run_type IN ('MONTHLY','PRE_CONFIRM')}은 {@code ValidationRunType#isFinalizable}과 같은 집합이다(#494).
+     *
+     * <p>조건 8(#494): 같은 검증월에 이미 FINALIZED 실행이 있으면 확정하지 않는다 — 확정은 그 달을 대표하는 한 건이다.
+     * 실행 생성은 막지 않는다: FUN-044 인수조건 "동일 월 재검증은 새 실행번호로 생성되어 이전 결과와 비교할 수 있다".
+     * 유형은 가리지 않는다(#494 이전에 확정된 MANUAL_CONTRACT 도 그 달의 확정으로 본다). 확정 경로는 검증월 잠금을
+     * 잡은 뒤 이 값을 세므로, 같은 달 두 실행을 동시에 확정해도 두 번째는 첫 번째의 FINALIZED 를 보고 멈춘다.
      */
     @NativeQuery(value = """
             SELECT vr.validation_run_id AS validationRunId,
@@ -301,7 +307,19 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                      WHERE newer.validation_month = vr.validation_month
                        AND newer.run_type IN ('MONTHLY', 'PRE_CONFIRM')
                        AND newer.validation_run_id > vr.validation_run_id)
-                       AS latestRunId
+                       AS latestRunId,
+                   (SELECT COUNT(*)
+                      FROM fgc.validation_run finalized
+                     WHERE finalized.validation_month = vr.validation_month
+                       AND finalized.status = 'FINALIZED'
+                       AND finalized.validation_run_id <> vr.validation_run_id)
+                       AS finalizedRunCount,
+                   (SELECT MAX(finalized.validation_run_id)
+                      FROM fgc.validation_run finalized
+                     WHERE finalized.validation_month = vr.validation_month
+                       AND finalized.status = 'FINALIZED'
+                       AND finalized.validation_run_id <> vr.validation_run_id)
+                       AS finalizedRunId
               FROM fgc.validation_run vr
              WHERE vr.validation_run_id = :validationRunId
             """, sqlResultSetMapping = "FinalizeChecklistCountsMapping")

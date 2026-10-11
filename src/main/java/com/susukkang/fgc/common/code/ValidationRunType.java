@@ -23,4 +23,16 @@ public enum ValidationRunType {
             case PRE_CONFIRM -> "확정전";
         };
     }
+
+    /**
+     * 그 달을 대표해 확정(FINALIZED)할 수 있는 유형인가 (#494, 운영정책서 제44조).
+     *
+     * <p>MONTHLY·PRE_CONFIRM 은 MonthlyValidationJob 으로 월 전체를 다시 계산한다. MANUAL_CONTRACT 는
+     * 일일 변경계약 배치·차익 재검증이 만드는 실행으로 변경된 계약만 계산하므로, 확정하면 일부 계약의 결과가
+     * 그 달의 확정 결과로 잠긴다. 확정 조건 7("같은 검증월의 가장 최근 실행인가")이 세는 유형과 같은 집합이다
+     * — {@code ValidationRunRepository#findFinalizeChecklistCounts} SQL 의 {@code run_type IN (...)} 과 함께 고친다.
+     */
+    public boolean isFinalizable() {
+        return this == MONTHLY || this == PRE_CONFIRM;
+    }
 }
