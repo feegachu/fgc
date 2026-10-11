@@ -21,6 +21,7 @@ import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.contract.repository.ContractLockRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -49,6 +50,7 @@ public class CapCheckServiceImpl implements CapCheckService {
     private final CapCheckQueryRepository capCheckQueryRepository;
     private final CapCheckWriteRepository capCheckWriteRepository;
     private final ObjectMapper objectMapper;
+    private final ContractLockRepository contractLockRepository;
 
     @Override
     // 계약 생성·수정 흐름은 CAP_004를 잡아 계약은 보존하고 검토 케이스만 남긴다.
@@ -57,6 +59,14 @@ public class CapCheckServiceImpl implements CapCheckService {
     // 호출한 상위 서비스까지 전파되어 그 상위 트랜잭션의 기본 롤백 규칙을 그대로 따른다.
     @Transactional(noRollbackFor = FgcBusinessException.class)
     public CapCheckSaveResult calculateAndSave(CapCalculationCommand command) {
+        // #434: 계약·정책·활성 스케줄·증빙 조회에서 결과 저장까지 같은 계약 잠금을 유지한다.
+        contractLockRepository.lock(command.contractId());
+        if (command.paymentStage() == PaymentStage.INSURER_TO_GA
+                && (command.checkKind() == CapCheckKind.MANUAL || command.checkKind() == CapCheckKind.MONTHLY)) {
+            command = new CapCalculationCommand(command.contractId(), command.paymentStage(), command.asOfDate(),
+                    command.checkKind(), command.validationRunId(),
+                    capCheckQueryRepository.selectComplianceEvidenceAmount(command.contractId(), command.paymentStage()));
+        }
         // 계산(CapCalculator)과 저장(capCheckWriteRepository)을 하나의 트랜잭션으로 묶는다.
         // 계산 중 예외가 나면 당연히 저장도 안 되고, 저장이 실패해도 계산 결과가 반쪽만 남지 않는다.
         CapCalculationResult result = capCalculator.calculate(command);

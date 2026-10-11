@@ -2567,6 +2567,10 @@
             "enum" : [ "SEED", "NORMALIZED_DB", "MANUAL" ],
             "type" : "string"
           },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "firstPremiumAmount" : {
             "type" : "number"
           },
@@ -2982,6 +2986,10 @@
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
           },
+          "expectedUpdatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "firstPremiumAmount" : {
             "minimum" : 0,
             "type" : "number"
@@ -3020,7 +3028,7 @@
             "type" : "number"
           }
         },
-        "required" : [ "agentId", "contractDate", "contractNo", "contractStatus", "firstPremiumAmount", "insurerId", "monthlyEquivalentFirstPremium", "organizationId", "paymentCycleCode", "paymentTermMonths", "premiumPerCycleAmount", "productOfferingId" ],
+        "required" : [ "agentId", "contractDate", "contractNo", "contractStatus", "expectedUpdatedAt", "firstPremiumAmount", "insurerId", "monthlyEquivalentFirstPremium", "organizationId", "paymentCycleCode", "paymentTermMonths", "premiumPerCycleAmount", "productOfferingId" ],
         "type" : "object"
       },
       "ContractUpdateResponse" : {

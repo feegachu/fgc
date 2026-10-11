@@ -292,6 +292,7 @@ public class CommissionPaymentQueryRepository {
         query.addScalar("evidence_ref", String.class);
         query.addScalar("attribution_method", String.class);
         query.addScalar("contract_date", LocalDate.class);
+        query.addScalar("cashflow_type", String.class);
         return query.setTupleTransformer((row, aliases) -> new ConfirmationData(
                 (Long) row[0],
                 enumValue(CommissionPaymentStatus.class, row[1]),
@@ -315,7 +316,8 @@ public class CommissionPaymentQueryRepository {
                 (String) row[19],
                 (String) row[20],
                 enumValue(AttributionMethod.class, row[21]),
-                (LocalDate) row[22]
+                (LocalDate) row[22],
+                (String) row[23]
         )).getResultList();
     }
 

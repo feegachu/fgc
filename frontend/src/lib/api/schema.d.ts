@@ -2318,6 +2318,8 @@ export interface components {
             contractStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             /** @enum {string} */
             dataOrigin?: "SEED" | "NORMALIZED_DB" | "MANUAL";
+            /** Format: date-time */
+            updatedAt?: string;
             firstPremiumAmount?: number;
             /** Format: int64 */
             insurerId?: number;
@@ -2479,6 +2481,8 @@ export interface components {
             contractNo: string;
             /** @enum {string} */
             contractStatus: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            /** Format: date-time */
+            expectedUpdatedAt: string;
             firstPremiumAmount: number;
             /** Format: int64 */
             insurerId: number;
