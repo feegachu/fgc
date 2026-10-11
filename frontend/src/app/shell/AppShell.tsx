@@ -39,9 +39,14 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       void navigate(normalized, { replace: true })
       return
     }
-    if (current && canOpen(current, { canProcess: user.canProcess, canViewAuditLog: user.canViewAuditLog }))
-      workspace.openTab({ id: current.id, title: current.title, icon: current.icon, href: normalized })
-    document.title = `${current?.title ?? '페이지를 찾을 수 없습니다'} (${current?.id ?? 'ERR-404'}) · FGC`
+    const allowed = current && canOpen(current, { canProcess: user.canProcess, canViewAuditLog: user.canViewAuditLog })
+    if (allowed) workspace.openTab({ id: current.id, title: current.title, icon: current.icon, href: normalized })
+    // 1차 오류 화면 제목(layout/default의 "제목 (화면ID) · FGC")과 맞춘다.
+    document.title = !current
+      ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
+      : allowed
+        ? `${current.title} (${current.id}) · FGC`
+        : '권한 없음 (FGC-UI-ERR-403) · FGC'
   }, [
     location.pathname,
     location.search,

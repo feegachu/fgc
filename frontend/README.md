@@ -314,3 +314,26 @@ HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 �
 - `EvidenceLink`에 `icon` 옵션을 더했다. 1차처럼 ⓘ 버튼을 그리고 `label`은 접근 가능한 이름이 된다(기존 호출부는 그대로).
 
 검증: `src/features/schedule/schedule.test.tsx`(1차 `schedule-list.test.cjs` 3건 이전 + 이슈 시나리오 #1~#6).
+
+## #417 오류 화면 (403·404·500·업무 오류)
+
+`src/features/error/ErrorPages.tsx`가 1차 `templates/error/*.html`의 카드·문구·"코드 · 요청 ID: 값" 형식을 옮긴다.
+문구는 `features/error/messages.ts`(error.common.*)와 `features/auth/messages.ts`(error.auth.*)에 둔다.
+
+| 상황 | 화면 | 연결 |
+|---|---|---|
+| 없는 경로 | `NotFoundPage` (404 · 찾을 수 없음) | `routes.tsx`의 `*` |
+| 권한 없는 라우트 | `ForbiddenPage` (403 · 권한 없음) | `RequirePermission` |
+| 렌더링 예외·청크 로드 실패 | `ServerErrorPage` (요청번호 `-`) | `app/ErrorBoundary.tsx`의 `RouteErrorBoundary` |
+| 화면이 던진 `ApiError` | `ApiErrorPage`가 코드로 분기 | 같은 바운더리 |
+
+`ApiErrorPage`는 `FGC-AUTH-003`이면 403, 5xx면 서버 문구 대신 요청번호와 복사 버튼, 그 밖에는 서버 `message`를
+그대로 보이고 제목을 1차 `MpaExceptionHandler`처럼 `{status} · 입력 오류(400)/처리 오류`로 둔다(`FGC-COMMON-004`는 `404 · 찾을 수 없음`).
+바운더리는 셸 안(업무 화면)과 최상위(로그인·셸 자체) 두 곳에 있다. 예외 메시지·스택은 화면에 내지 않는다.
+
+조회 실패는 지금처럼 화면 안 오류 문구·Toast로 보인다. 상세 화면 전체를 오류 화면으로 바꾸려면
+그 화면에서 `ApiError`를 던지면 된다(예: `useQuery({ ..., throwOnError: (e) => e instanceof ApiError && e.status === 404 })`).
+업무 오류(1차 `error/business.html`)는 SPA에서 폼 안 오류·Toast로 대체되어 별도 라우트를 두지 않는다.
+
+검증은 `src/features/error/error.test.tsx`(이슈 시나리오 1~6과 업무 오류 1건). 1차 대응 테스트
+`MpaErrorPageIntegrationTest`, `FgcErrorAttributesTest`, `PublishingTemplateStructureTest` 오류 화면 부분은 #419까지 유지한다.
