@@ -2098,6 +2098,32 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = InclusionDecisionStatus.class,
+            names = {"EXCLUDED", "REVIEW_REQUIRED"})
+    void splitIncludedTotalDoesNotCountExcludedOrReviewRequiredRows(InclusionDecisionStatus otherStatus) {
+        ConfirmationData included = confirmation(201L, 3L, "600000", "1300000",
+                InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, AttributionMethod.DIRECT, "INCLUDED-EVD");
+        ConfirmationData other = confirmation(202L, 3L, "700000", "1300000",
+                otherStatus, otherStatus == InclusionDecisionStatus.EXCLUDED ? ExclusionType.VOICE_RECORDING : ExclusionType.NONE,
+                AttributionMethod.DIRECT, "OTHER-EVD");
+        CapRuleSnapshot rule = capRule("0", null);
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(other, included));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(rule);
+        given(queryRepository.findCapRuleSnapshot(101L, 202L)).willReturn(new CapRuleSnapshot(
+                rule.capRuleSetId(), rule.capRuleItemId(), otherStatus, rule.decisionReason(),
+                rule.basePremiumAmount(), rule.premiumMultiplier(), rule.warningUsagePct(),
+                rule.existingIncludedAmount(), rule.complianceEvidenceAmount()));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        TransactionPrecheckResponse preview = service.precheck(101L);
+        assertThat(preview.capPreview()).hasSize(2).allSatisfy(row -> {
+            assertThat(row.candidateAmount()).isEqualTo(600000);
+            assertThat(row.includedAmount()).isEqualTo(600000);
+        });
+        assertThat(preview.confirmable()).isEqualTo(otherStatus == InclusionDecisionStatus.EXCLUDED);
+    }
+
     /** precheck의 무저장·무잠금 계약 — 확정 경로 전용 부작용이 하나도 호출되지 않아야 한다. */
     private void assertPrecheckSavesNothing() {
         verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
