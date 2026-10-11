@@ -178,6 +178,47 @@ class ContractConsistencyIntegrationTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @Transactional
+    void FGC_FUN_035_excludedCandidateDoesNotInflateSavedIncludedBreakdown(boolean existingPayment) {
+        Long id = newContract();
+        deactivateSchedules(id);
+        BigDecimal existing = existingPayment ? new BigDecimal("600000") : BigDecimal.ZERO;
+        if (existingPayment) payments.confirm(payment(id, existing, List.of(attribution(id, existing))), null);
+        registerExcludedItemPolicy(id);
+        List<CommissionPaymentAttributionRequest> excluded = List.of("300000", "400000").stream()
+                .map(amount -> new CommissionPaymentAttributionRequest(id, LocalDate.of(2026, 7, 31),
+                        new BigDecimal(amount), InclusionDecisionStatus.EXCLUDED, ExclusionType.VOICE_RECORDING,
+                        "녹취 지원 제외 증빙", "DIRECT", "VOICE-EVIDENCE", AttributionMethod.DIRECT))
+                .toList();
+        Long payment = payment(id, new BigDecimal("700000"), excluded, "CONS_EXCLUDED");
+        TransactionPrecheckResponse preview = payments.precheck(payment);
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).hasSize(1).allSatisfy(row -> {
+            assertThat(row.candidateAmount()).isZero();
+            assertThat(row.includedAmount()).isEqualTo(existing.longValueExact());
+        });
+
+        CommissionPaymentResponse confirmed = payments.confirm(payment, "EXCLUDED-" + payment);
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).hasSize(1);
+        Long check = confirmed.capCheckIds().getFirst();
+        BigDecimal included = jdbc.queryForObject("SELECT included_amount FROM fgc.cap_check WHERE cap_check_id=?",
+                BigDecimal.class, check);
+        assertThat(included).isEqualByComparingTo(existing);
+        assertThat(jdbc.queryForObject("SELECT COALESCE(sum(amount),0) FROM fgc.cap_check_detail WHERE cap_check_id=?",
+                BigDecimal.class, check)).isEqualByComparingTo(included);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check_detail WHERE cap_check_id=?",
+                Integer.class, check)).isEqualTo(existingPayment ? 1 : 0);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check_detail WHERE cap_check_id=? AND classification_snapshot<>'INCLUDED'",
+                Integer.class, check)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check_detail WHERE cap_check_id=? AND transaction_attribution_id IN (SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id=?)",
+                Integer.class, check, payment)).isZero();
+        assertThat(jdbc.queryForObject("SELECT jsonb_array_length(calculation_snapshot->'candidateAttributions') FROM fgc.cap_check WHERE cap_check_id=?",
+                Integer.class, check)).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Transactional
     void groupingDoesNotSkipAReviewRequiredAttribution(boolean reviewFirst) {
         Long id = newContract();
         deactivateSchedules(id);
@@ -322,8 +363,14 @@ class ContractConsistencyIntegrationTest {
         for (Long check : confirmed.capCheckIds()) {
             assertThat(jdbc.queryForObject("SELECT sum(amount) FROM fgc.cap_check_detail WHERE cap_check_id=? AND classification_snapshot='INCLUDED'",
                     BigDecimal.class, check)).isEqualByComparingTo("40000");
+            assertThat(jdbc.queryForObject("SELECT sum(amount) FROM fgc.cap_check_detail WHERE cap_check_id=?",
+                    BigDecimal.class, check)).isEqualByComparingTo("40000");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check_detail WHERE cap_check_id=? AND amount<0",
+                    Integer.class, check)).isZero();
             assertThat(jdbc.queryForObject("SELECT jsonb_array_length(calculation_snapshot->'candidateAttributions') FROM fgc.cap_check WHERE cap_check_id=?",
                     Integer.class, check)).isEqualTo(2);
+            assertThat(jdbc.queryForObject("SELECT sum((candidate->>'signedAmount')::numeric) FROM fgc.cap_check cc CROSS JOIN LATERAL jsonb_array_elements(cc.calculation_snapshot->'candidateAttributions') candidate WHERE cc.cap_check_id=?",
+                    BigDecimal.class, check)).isEqualByComparingTo("-60000");
         }
     }
 
@@ -639,6 +686,43 @@ class ContractConsistencyIntegrationTest {
                 seed.getAgentId(), seed.getOrganizationId(), PaymentCycleCode.MONTHLY,
                 new BigDecimal("100000"), new BigDecimal("100000"), new BigDecimal("100000"),
                 120, BigDecimal.ZERO)).contractId();
+    }
+
+    private void registerExcludedItemPolicy(Long id) {
+        Long originalRule = calculator.calculate(CapCalculationCommand.realtime(
+                id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 31))).capRuleSetId();
+        Long item = jdbc.queryForObject("""
+                INSERT INTO fgc.commission_item(item_code,item_name,cashflow_type,item_category,effective_from)
+                VALUES ('CONS_EXCLUDED','녹취 지원 검증 항목','PAYMENT','COST',DATE '2026-01-01')
+                RETURNING commission_item_id
+                """, Long.class);
+        Long policy = jdbc.queryForObject("""
+                INSERT INTO fgc.policy_version(policy_code,policy_name,policy_type,source_class,version_no,
+                    effective_from,status,approval_evidence_ref)
+                VALUES (?, '제외 귀속 상세 검증','CAP_1200','PROJECT_ASSUMPTION',1,
+                    DATE '2026-01-01','DRAFT','CONS-EXCLUDED-POLICY') RETURNING policy_version_id
+                """, Long.class, "CONS-EXCLUDED-" + UUID.randomUUID());
+        Long rule = jdbc.queryForObject("""
+                INSERT INTO fgc.cap_rule_set(policy_version_id,payment_stage,contract_date_from,contract_date_to,
+                    insurer_id,product_group_code,channel_code,first_year_months,premium_multiplier,
+                    compliance_deduction_pct,refund_addition_condition,warning_usage_pct)
+                SELECT ?,payment_stage,contract_date_from,contract_date_to,insurer_id,product_group_code,
+                    channel_code,first_year_months,premium_multiplier,compliance_deduction_pct,
+                    refund_addition_condition,warning_usage_pct FROM fgc.cap_rule_set WHERE cap_rule_set_id=?
+                RETURNING cap_rule_set_id
+                """, Long.class, policy, originalRule);
+        jdbc.update("""
+                INSERT INTO fgc.cap_rule_item(cap_rule_set_id,commission_item_id,inclusion_status,
+                    exclusion_type,evidence_required_yn,attribution_method,decision_reason)
+                VALUES (?,?,'EXCLUDED','VOICE_RECORDING',true,'DIRECT','증빙 있는 녹취 지원 항목 제외')
+                """, rule, item);
+        jdbc.update("""
+                UPDATE fgc.policy_version target SET status='APPROVED',approved_at=clock_timestamp(),
+                    created_by=original.created_by,approved_by=original.approved_by
+                FROM fgc.cap_rule_set crs JOIN fgc.policy_version original USING(policy_version_id)
+                WHERE crs.cap_rule_set_id=? AND target.policy_version_id=?
+                """, originalRule, policy);
+        jdbc.update("UPDATE fgc.policy_version SET status='ACTIVE' WHERE policy_version_id=?", policy);
     }
 
     private ContractUpdateRequest update(InsuranceContract source, String premiumText) {

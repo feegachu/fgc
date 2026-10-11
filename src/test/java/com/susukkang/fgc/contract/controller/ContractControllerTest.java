@@ -265,7 +265,7 @@ class ContractControllerTest {
                         .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("FGC-CONT-003"))
-                .andExpect(jsonPath("$.error.message").value("다른 요청에서 계약을 수정했습니다. 최신 계약을 다시 불러온 뒤 변경 내용을 확인하고 저장하세요."));
+                .andExpect(jsonPath("$.error.message").value("다른 요청에서 계약을 수정했습니다. 현재 입력은 유지됩니다. 변경 내용을 확인한 뒤 ‘최신 계약 다시 불러오기’를 눌러 다시 수정하세요."));
     }
 
     private ContractCreateRequest createRequest() {

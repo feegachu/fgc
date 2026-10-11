@@ -90,7 +90,8 @@ class ContractTransactionIntegrationTest {
     @ParameterizedTest(name = "수정 후 {0}: 기존 계약·스케줄·한도·이력 복원")
     @EnumSource(FailurePoint.class)
     void updateFailureRestoresCommittedContractAndDependentRows(FailurePoint point) {
-        InsuranceContract original = seedContract();
+        Long createdId = contractService.createContract(createRequest()).contractId();
+        InsuranceContract original = contractRepository.findById(createdId).orElseThrow();
         Long contractId = original.getContractId();
         Map<String, List<String>> before = snapshot(contractId);
         ContractUpdateRequest request = updateRequest(original);
@@ -110,6 +111,8 @@ class ContractTransactionIntegrationTest {
                 .isGreaterThan(before.get("schedule_header").size());
         assertThat(stateBeforeFailure.get("contract_financial_snapshot").size())
                 .isGreaterThan(before.get("contract_financial_snapshot").size());
+        assertThat(stateBeforeFailure.get("contract_financial_snapshot"))
+                .anySatisfy(row -> assertThat(row).contains("\"snapshot_version\": 2"));
         if (point != FailurePoint.SCHEDULE_BUSINESS) {
             assertThat(stateBeforeFailure.get("cap_check").size()).isGreaterThan(before.get("cap_check").size());
         }
@@ -117,6 +120,24 @@ class ContractTransactionIntegrationTest {
             assertThat(stateBeforeFailure.get("audit_log").size()).isGreaterThan(before.get("audit_log").size());
         }
         assertThat(snapshot(contractId)).isEqualTo(before);
+    }
+
+    @Test
+    void correctionInsertFailureRollsBackContractBeforeSchedulesAndAuditAreChanged() {
+        Long id = contractService.createContract(createRequest()).contractId();
+        InsuranceContract original = contractRepository.findById(id).orElseThrow();
+        Map<String, List<String>> before = snapshot(id);
+        String constraint = "ck_snapshot_insert_failure_" + id;
+        // 특정 테스트 계약의 버전 2 INSERT만 실제 PostgreSQL CHECK로 실패시킨다.
+        jdbc.execute("ALTER TABLE fgc.contract_financial_snapshot ADD CONSTRAINT " + constraint
+                + " CHECK (contract_id <> " + id + " OR snapshot_version = 1)");
+        try {
+            assertThatThrownBy(() -> contractService.updateContract(id, updateRequest(original)))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+            assertThat(snapshot(id)).isEqualTo(before);
+        } finally {
+            jdbc.execute("ALTER TABLE fgc.contract_financial_snapshot DROP CONSTRAINT " + constraint);
+        }
     }
 
     @Test
@@ -365,8 +386,8 @@ class ContractTransactionIntegrationTest {
 
     private ContractUpdateRequest updateRequest(InsuranceContract seed) {
         BigDecimal premium = seed.getFirstPremiumAmount().add(new BigDecimal("1000"));
-        // 날짜도 바꿔 수정 트랜잭션이 추가한 재무 스냅샷의 롤백을 검증한다.
-        LocalDate date = seed.getContractDate().plusDays(1);
+        // #389: 같은 기준일의 정정 버전과 계약·스케줄·한도·감사가 함께 롤백되는지 검증한다.
+        LocalDate date = seed.getContractDate();
         return new ContractUpdateRequest(seed.getContractNo(), seed.getInsurerId(), seed.getProductOfferingId(),
                 date, seed.getCurrentStatus(), seed.getAgentId(), seed.getOrganizationId(),
                 seed.getPaymentCycleCode(), premium, premium, premium, seed.getPaymentTermMonths(),

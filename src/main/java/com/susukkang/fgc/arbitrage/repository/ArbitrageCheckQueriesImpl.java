@@ -94,7 +94,11 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             fs.cumulative_paid_premium,
             fs.surrender_value,
             fs.surrender_value_type,
-            fs.refund_rate_table_id AS snapshot_refund_rate_table_id
+            fs.refund_rate_table_id AS snapshot_refund_rate_table_id,
+            fs.contract_financial_snapshot_id,
+            fs.snapshot_version,
+            fs.previous_snapshot_id,
+            fs.source_ref
             FROM fgc.insurance_contract c
             JOIN fgc.product_offering po
             ON
@@ -109,15 +113,23 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             cfs.cumulative_paid_premium,
             cfs.surrender_value,
             cfs.surrender_value_type,
-            cfs.refund_rate_table_id
-            FROM fgc.contract_financial_snapshot cfs
-            WHERE
-            cfs.contract_id = c.contract_id
-            AND
-            cfs.as_of_date  <=  :asOfDate
+            cfs.refund_rate_table_id,
+            cfs.contract_financial_snapshot_id,
+            cfs.snapshot_version,
+            cfs.previous_snapshot_id,
+            cfs.source_ref
+            FROM (
+                SELECT DISTINCT ON (as_of_date, surrender_value_type) *
+                FROM fgc.contract_financial_snapshot
+                WHERE contract_id = c.contract_id AND as_of_date <= :asOfDate
+                  AND (source_ref IS DISTINCT FROM 'MANUAL_CONTRACT_INITIAL' OR as_of_date = c.contract_date)
+                ORDER BY as_of_date, surrender_value_type, snapshot_version DESC,
+                         contract_financial_snapshot_id DESC
+            ) cfs
             ORDER BY
             cfs.as_of_date DESC,
             CASE WHEN cfs.surrender_value_type = 'ACTUAL' THEN 0 ELSE 1 END,
+            CASE WHEN cfs.source_ref = 'MANUAL_CONTRACT_INITIAL' THEN 1 ELSE 0 END,
             cfs.contract_financial_snapshot_id DESC
             LIMIT 1
             ) fs ON true
@@ -429,6 +441,10 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         result.setSurrenderValue((BigDecimal) row[12]);
         result.setSurrenderValueType((String) row[13]);
         result.setSnapshotRefundRateTableId((Long) row[14]);
+        result.setFinancialSnapshotId((Long) row[15]);
+        result.setFinancialSnapshotVersion((Integer) row[16]);
+        result.setPreviousFinancialSnapshotId((Long) row[17]);
+        result.setFinancialSnapshotSourceRef((String) row[18]);
         return result;
     }
 }
