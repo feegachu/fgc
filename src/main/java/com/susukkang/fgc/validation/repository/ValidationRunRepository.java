@@ -16,6 +16,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.NativeQuery;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -36,6 +38,37 @@ import java.util.Optional;
  * @since 2026-10-03
  */
 public interface ValidationRunRepository extends JpaRepository<ValidationRun, Long> {
+
+    /**
+     * 검증월 단위 트랜잭션 advisory lock(#491). 커밋·롤백 때 자동으로 풀린다.
+     *
+     * <p>확정 조건 7("같은 검증월의 가장 최근 실행인가")은 check-then-act라, 실행 행 잠금만으로는
+     * 조회 직후 같은 달 새 실행이 INSERT·커밋되는 경합을 막지 못한다(새 행 INSERT는 기존 행을 잠그지 않음).
+     * 그래서 실행 생성({@code ValidationRunCreateServiceImpl#attemptCreate})과 확정
+     * ({@code ValidationRunFinalizationServiceImpl#finalizeRun})이 같은 키를 이 메서드로 잡는다.
+     * 키를 만드는 곳을 여기 하나로 둔 이유다 — 두 쪽 키가 어긋나면 잠금이 조용히 무력화된다.
+     *
+     * <p>잠금 순서: 확정은 실행 행 → 검증월, 생성은 검증월만 잡는다. 생성 쪽이 기존 실행 행을 잠그지
+     * 않으므로 순환 대기(교착)가 생기지 않는다. 키는 {@code hashtextextended}(64비트) 해시라 다른 기능의
+     * 키(예: 전표 채번)와 충돌할 확률은 무시할 수 있고, 충돌해도 잠깐 기다릴 뿐 결과는 틀리지 않는다.
+     *
+     * <p>키 문자열은 Java에서 만든다({@link LocalDate#toString()} = ISO {@code 2026-07-01}). SQL에서
+     * {@code CAST(:date AS text)}로 만들면 드라이버가 date·timestamp 중 무엇으로 바인딩하느냐에 따라
+     * 문자열이 달라져, 같은 달인데 다른 키가 될 수 있다.
+     */
+    default void lockValidationMonth(LocalDate validationMonth) {
+        lockAdvisoryKey(VALIDATION_MONTH_LOCK_PREFIX + validationMonth);
+    }
+
+    /** {@link #lockValidationMonth} 키 접두사. 다른 기능의 advisory 키와 섞이지 않게 네임스페이스를 둔다. */
+    String VALIDATION_MONTH_LOCK_PREFIX = "fgc.validation_run.month:";
+
+    /** 문자열 키의 트랜잭션 advisory lock. 직접 쓰지 말고 {@link #lockValidationMonth}를 쓴다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @NativeQuery("""
+            SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:lockKey, 0))
+            """)
+    Integer lockAdvisoryKey(@Param("lockKey") String lockKey);
 
     /** IF-API-51 확정 트랜잭션 직렬화용 행 잠금 조회. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

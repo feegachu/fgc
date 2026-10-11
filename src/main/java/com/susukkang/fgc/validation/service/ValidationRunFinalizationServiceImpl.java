@@ -86,6 +86,13 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                     Map.of("from", lockedRun.getStatus(), "to", "FINALIZED"));
         }
 
+        // 2026-10-11 yslee - #491 PR 리뷰 반영: 조건 7의 check-then-act 경합 차단
+        // 기존 코드: 실행 행 잠금(findByIdForUpdate)만 잡은 채 "더 최근 실행 없음"을 확인
+        // 문제: 확인 직후 같은 달 새 실행이 INSERT·커밋되면 이전 실행이 그대로 FINALIZED 로 잠김
+        // 개선: 체크리스트 계산 전에 검증월 잠금을 잡는다. 실행 생성도 같은 잠금을 잡으므로
+        //       생성 중이면 그 커밋을 기다린 뒤 새 스냅샷(READ COMMITTED, 문장 단위)으로 다시 센다.
+        validationRunRepository.lockValidationMonth(lockedRun.getValidationMonth());
+
         // 조회 API 결과를 신뢰하지 않고 확정 트랜잭션에서 7개 조건을 다시 계산한다.
         FinalizeChecklistResponse checklist = buildChecklist(requireChecklistCounts(validationRunId));
         long remaining = checklist.remainingConditionCount();
@@ -156,10 +163,8 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                         "/validation-runs/" + id),
                 // #491: 같은 달을 다시 검증했다면 이전 실행의 결과를 잠그지 않는다.
                 // 바로가기는 가장 최근 실행으로 보낸다 — 사용자가 확정해야 할 대상이 그쪽이다.
-                // ponytail: 조회와 확정 사이에 새 실행이 생기는 경합은 이 행 잠금(findByIdForUpdate)으로
-                // 막지 못한다(새 행 INSERT 는 이 행을 잠그지 않음). 그 경우에도 새 실행이 최신이 되어
-                // 그쪽을 다시 확정할 수 있고 기존 결과가 바뀌지는 않는다. 완전히 막으려면 검증월 단위
-                // advisory lock 을 생성·확정 양쪽에 걸어야 한다.
+                // 확정 경로에서는 finalizeRun 이 검증월 잠금을 잡은 뒤 이 값을 세므로 경합이 없다.
+                // getChecklist(조회 전용)는 잠그지 않는다 — 화면 표시용이고 확정 때 다시 센다.
                 condition(7, "같은 검증월의 가장 최근 실행인가",
                         counts.getSupersededRunCount(),
                         "/validation-runs/" + (counts.getLatestRunId() != null ? counts.getLatestRunId() : id))
