@@ -29,7 +29,7 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
         ValidationRun run = validationRunRepository.findById(validationRunId)
                 .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
         if (run.getStatus() == ValidationRunStatus.FINALIZED) {
-            // "수정 불가 — 확정된 검증 결과입니다. 확정된 달의 결과는 바꾸지 않습니다." (§3-2)
+            // "수정 불가 — 확정된 검증 결과입니다. 새 실행을 만드세요." (§3-2)
             throw new FgcBusinessException(FgcErrorCode.VRUN_003);
         }
         if (run.getStatus() != ValidationRunStatus.CREATED) {

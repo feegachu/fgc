@@ -25,7 +25,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -145,18 +144,6 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
         //    runType 을 가리지 않고 잡는다: 확정 조건 7이 세지 않는 MANUAL_CONTRACT 도 잠깐 기다릴 뿐이고,
         //    유형별로 나누면 "어느 유형이 잠그는가"라는 규칙이 하나 더 생긴다.
         validationRunRepository.lockValidationMonth(command.validationMonth());
-
-        // 0-1. 확정된 달 (#494, 운영정책서 제44조) — 확정은 그 달의 검증 결과를 대표하므로, 확정 뒤에 월 전체를
-        //      다시 계산하는 실행을 만들어 두 번째 FINALIZED 가 생기지 않게 한다. 위 월 잠금 안에서 검사하므로
-        //      진행 중인 확정과 경합하지 않는다(확정이 끝나기를 기다린 뒤 FINALIZED 를 본다).
-        //      MANUAL_CONTRACT 는 막지 않는다: 확정할 수 없는 유형이라 두 번째 확정이 생기지 않고, 일일 변경계약
-        //      배치·차익 재검증(ArbitrageService)은 확정된 달에도 계속 돌아야 한다.
-        if (command.runType().isFinalizable()
-                && validationRunRepository.existsByValidationMonthAndStatus(
-                        command.validationMonth(), ValidationRunStatus.FINALIZED)) {
-            throw new FgcBusinessException(FgcErrorCode.VRUN_007,
-                    Map.of("month", YearMonth.from(command.validationMonth()).toString()));
-        }
 
         // 1. MONTHLY 중복 체크
         if (command.runType() == ValidationRunType.MONTHLY

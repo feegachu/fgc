@@ -18,7 +18,7 @@
   [막을 것]
    · 조건 미충족 상태에서 확정 — 버튼 비활성 + 서버도 거부
    · 확정된 실행 결과 수정 — DB 트리거가 거부
-   · 확정 취소·되돌리기 — 그런 기능을 만들지 않습니다. 확정된 달은 다시 검증하지 않습니다(#494)
+   · 확정 취소·되돌리기 — 그런 기능을 만들지 않습니다. 새 실행을 만드세요
    · "확정 = 송금 마감"으로 읽히는 표현
 
   헤더·스텝퍼·③대상 선별·④결과 요약은 서버 렌더링(IF-API-47 과 같은 조회를 서비스 직주입으로).
@@ -58,8 +58,8 @@
     <span class="material-symbols-rounded guidance-icon" aria-hidden="true">gavel</span>
     <div>
       <p>
-        <strong id="notice-finalize">확정하면 이 실행의 결과가 이 달의 검증 결과로 잠깁니다.</strong>
-        확정한 달은 다시 검증할 수 없으니, 바로잡을 것이 있으면 확정 전에 새 실행을 만드세요. (운영정책서 제43·44조)
+        <strong id="notice-finalize">확정하면 이 실행의 결과는 고칠 수 없습니다.</strong>
+        바로잡으려면 새 실행을 만들어야 합니다. 확정은 한 달에 한 건이라, 확정 뒤 새 실행은 이전 결과와 비교하는 용도로 남습니다. (운영정책서 제43·44조)
       </p>
     </div>
   </div>
@@ -176,7 +176,7 @@
       <p class="vrun-action-note" id="execute-action-note" role="status"
          th:hidden="${canProcess and st == 'CREATED'}"
          th:text="${st == 'FINALIZED'}
-                  ? '확정된 실행은 다시 돌리지 않습니다. 확정된 달은 다시 검증하지 않습니다.'
+                  ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.'
                   : (${!canProcess}
                      ? '실행 기동은 정산 담당자만 할 수 있습니다.'
                      : '생성됨 상태의 실행만 기동할 수 있습니다.')"></p>
@@ -363,7 +363,7 @@
   <!-- ⑤ 확정 조건 체크리스트 — IF-API-50 응답의 문서 순서·문구를 그대로 표시한다. -->
   <section class="surface" aria-labelledby="vrun-checklist-title">
     <header class="surface-header">
-      <h2 class="surface-title" id="vrun-checklist-title">⑤ 확정 조건 (운영정책서 제44조 · 7개 전부 통과해야 함)</h2>
+      <h2 class="surface-title" id="vrun-checklist-title">⑤ 확정 조건 (운영정책서 제44조 · 8개 전부 통과해야 함)</h2>
       <span id="cond-summary" class="vrun-card-note">확인 중</span>
     </header>
     <div class="surface-body" id="cond-body" aria-live="polite" aria-busy="true">
@@ -381,10 +381,10 @@
         <!-- 문제: aria-describedby가 빈 p를 가리켜 접근성 안내가 제공되지 않고 확정을 송금 마감으로 오인할 수 있음 -->
         <!-- 개선: 단일 안내 요소에 검증 결과 잠금이며 실제 송금·회계 마감이 아니라는 고정 문구를 표시 -->
         <p class="field-helper vrun-finalize-guide" id="finalize-action-guide">
-          위 7개 조건이 모두 통과한 실행만 확정할 수 있습니다. 같은 달을 다시 검증했다면 가장 최근 실행만 확정됩니다.<br>
+          위 8개 조건이 모두 통과한 실행만 확정할 수 있습니다. 같은 달을 다시 검증했다면 가장 최근 실행만, 한 달에 한 건만 확정됩니다.<br>
           확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 <strong>잠깁니다</strong>.
           <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong><br>
-          <strong>되돌릴 수 없습니다.</strong> 확정한 달은 다시 검증할 수 없으니, 바로잡을 것이 있으면 확정 전에 새 실행을 만드세요.
+          <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요. 확정 뒤의 새 실행은 비교용이며 다시 확정하지 않습니다.
           확정 권한은 <span class="tabular-nums">GA_ADMIN</span> · <span class="tabular-nums">SYSTEM_ADMIN</span> 에게만 있습니다.
         </p>
         <!-- 비활성 사유를 가시 텍스트로 둔다 — disabled 버튼은 포커스가 가지 않아 title 로는 닿지 않는다. -->

@@ -163,9 +163,10 @@
   // 문제: 사용자가 어떤 조건 때문에 확정할 수 없는지 화면에서 확인할 수 없음
   // 개선: 서버가 판정한 조건을 그대로 표시하고 통과 여부를 후속 확정 게이트에 전달
   // 2026-10-11 yslee - #491 조건 7(같은 검증월의 가장 최근 실행인가) 추가로 6 → 7
+  // 2026-10-12 yslee - #494 조건 8(같은 검증월에 이미 확정된 실행이 없는가) 추가로 7 → 8
   // 서버(ValidationRunFinalizationServiceImpl#buildChecklist)와 개수가 다르면 응답 오류로 처리한다.
   // 일부만 그려 "모두 통과"로 보이는 것보다 조회 실패로 멈추는 편이 안전하다.
-  var CHECKLIST_CONDITION_COUNT = 7;
+  var CHECKLIST_CONDITION_COUNT = 8;
 
   function safeInternalLink(linkUrl) {
     if (!linkUrl || typeof linkUrl !== "string" || !linkUrl.startsWith("/") || linkUrl.startsWith("//")) {
@@ -229,7 +230,7 @@
     } else if (!canFinalize) {
       reason = "확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.";
     } else if (runStatus === "FINALIZED") {
-      reason = "이미 확정된 실행입니다. 확정된 달은 다시 검증하지 않습니다.";
+      reason = "이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.";
     } else if (runStatus !== "COMPLETED") {
       reason = "검증 계산이 끝난 실행만 확정할 수 있습니다.";
     } else if (!checklistPassed) {
@@ -460,7 +461,7 @@
     });
   }
 
-  /* 오류 문구에 오류코드(FGC-VRUN-001~007)와 요청 ID 를 함께 붙인다. */
+  /* 오류 문구에 오류코드(FGC-VRUN-001~006)와 요청 ID 를 함께 붙인다. */
   function errorText(error, fallback) {
     if (format && typeof format.errorText === "function") return format.errorText(error, fallback);
     return (error && error.message) || fallback;

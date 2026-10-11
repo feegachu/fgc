@@ -183,7 +183,7 @@ class PublishingTemplateStructureTest {
                 .contains("/finalize-checklist")
                 .contains("/finalize\"")
                 .contains("safeInternalLink")
-                .contains("var CHECKLIST_CONDITION_COUNT = 7;")
+                .contains("var CHECKLIST_CONDITION_COUNT = 8;")
                 .contains("checklist.conditions.length !== CHECKLIST_CONDITION_COUNT")
                 .contains("finalizeButton.dataset.checklistPassed = String(checklist.passed)")
                 .contains("idempotencyKey: finalizeIdempotencyKey")

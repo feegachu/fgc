@@ -82,8 +82,7 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001), "
-                            + "이미 확정된 달의 MONTHLY·PRE_CONFIRM 생성 (FGC-VRUN-007)")
+                    responseCode = "409", description = "동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001)")
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -249,7 +248,7 @@ public class ValidationRunController {
 
     @Operation(
             summary = "검증 실행 확정 체크리스트 조회 (IF-API-50)",
-            description = "운영정책서 제44조의 확정 전 필수조건 7개를 문서 순서와 문구 그대로 반환한다."
+            description = "운영정책서 제44조의 확정 전 필수조건 8개를 문서 순서와 문구 그대로 반환한다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -270,7 +269,7 @@ public class ValidationRunController {
 
     @Operation(
             summary = "검증 실행 확정 (IF-API-51)",
-            description = "7개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. "
+            description = "8개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. "
                     + "이는 검증 결과 잠금이며 실제 송금·법정 회계마감이 아니다."
     )
     @ApiResponses({
