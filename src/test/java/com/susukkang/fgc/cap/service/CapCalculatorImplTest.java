@@ -251,9 +251,9 @@ class CapCalculatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
     }
 
-    // 환급률이 100%를 넘는 비정상 환급률표여도 한도는 음수가 되지 않는다
+    // 환급률이 100%를 넘는 비정상 환급률표는 검토필요로 올리고, 한도는 음수가 되지 않는다(DB CHECK)
     @Test
-    void neverReturnsNegativeLimit() {
+    void flagsReviewRequiredAndNeverReturnsNegativeLimitForAbnormalRefundRate() {
         stubIncludedAmount(true, BigDecimal.ZERO, "1");
         when(refundRateResolver.resolve(any(RefundRateQuery.class)))
                 .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("150.000000"))));
@@ -262,6 +262,23 @@ class CapCalculatorImplTest {
                 CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 7, 10), BigDecimal.ZERO));
 
         assertThat(result.limitAmount()).isEqualByComparingTo("0");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
+        assertThat(result.calculationSnapshot()).containsEntry("refundRateAbnormal", true)
+                .containsEntry("refundTableMissing", false);
+    }
+
+    // 한도 0에 산입액이 있으면 사용률은 100% — 지급확정 경로(CapValidatorImpl)와 같은 값
+    @Test
+    void usageIsHundredPercentWhenLimitIsZeroAndIncludedIsPositive() {
+        stubIncludedAmount(true, BigDecimal.ZERO, "1");
+        when(refundRateResolver.resolve(any(RefundRateQuery.class)))
+                .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("100.000000"))));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 7, 10), BigDecimal.ZERO));
+
+        assertThat(result.limitAmount()).isEqualByComparingTo("0");
+        assertThat(result.usagePct()).isEqualByComparingTo("100");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
     }
 

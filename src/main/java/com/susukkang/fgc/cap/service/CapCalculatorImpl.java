@@ -42,6 +42,7 @@ public class CapCalculatorImpl implements CapCalculator {
     private static final String INCLUDED = "INCLUDED";
     private static final String EXCLUDED = "EXCLUDED";
     private static final String REVIEW_REQUIRED = "REVIEW_REQUIRED";
+    private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
     private final CapContractQueryRepository capContractQueryRepository;
     private final CapRuleQueryRepository capRuleQueryRepository;
@@ -102,7 +103,8 @@ public class CapCalculatorImpl implements CapCalculator {
         //       준법경영비 증빙 계약은 정상을 위반으로 판정했다
         // 개선: 산입 + 환급금 − 준법경영비 ≤ 월납×12 를 한도 쪽으로 이항한다.
         //       판정은 FAQ 식과 같고, 지급확정(CapValidator)·정합성 검사(산입액 = 상세 합계)는 이 한도를 그대로 쓴다.
-        //       환급률이 100%를 넘는 비정상 환급률표가 들어와도 한도가 음수가 되지 않게 0에서 막는다.
+        //       환급률 100% 초과 환급률표는 resolveRefundAddition이 REVIEW_REQUIRED로 올리고,
+        //       max(0)은 cap_check.limit_amount >= 0 제약을 지키는 마지막 방어선이다.
         BigDecimal limitAmount = annualizedLimitBase
                 .subtract(refundAddition.amount())
                 .add(complianceDeduction.appliedAmount())
@@ -163,7 +165,10 @@ public class CapCalculatorImpl implements CapCalculator {
 
         // 5) 잔여 한도·사용률·최종 판정
         BigDecimal remainingAmount = limitAmount.subtract(includedAmount);
-        BigDecimal usagePct = MoneyUtil.usagePercent(includedAmount, limitAmount);
+        // 한도 0에 산입액이 있으면 100% — CapValidatorImpl·지급확정 경로와 같은 규칙
+        BigDecimal usagePct = limitAmount.signum() == 0 && includedAmount.signum() > 0
+                ? ONE_HUNDRED
+                : MoneyUtil.usagePercent(includedAmount, limitAmount);
 
         CapResultStatus resultStatus = determineResultStatus(
                 anyReviewRequired, includedAmount, limitAmount, usagePct, ruleSet.getWarningUsagePct());
@@ -185,7 +190,7 @@ public class CapCalculatorImpl implements CapCalculator {
         boolean applies = REFUND_ADDITION_STANDARD_DEDUCTION_80.equals(ruleSet.getRefundAdditionCondition())
                 && Boolean.TRUE.equals(contract.getStandardDeduction80Yn());
         if (!applies) {
-            return new RefundAddition(BigDecimal.ZERO, null, null, null, false);
+            return new RefundAddition(BigDecimal.ZERO, null, null, null, false, false);
         }
 
         // 반드시 계약 체결일(contract.getContractDate())로 조회
@@ -193,12 +198,16 @@ public class CapCalculatorImpl implements CapCalculator {
                 contract.getPaymentTermMonths(), contract.getChannelCode(), contract.getContractDate());
         Optional<RefundRateResolution> resolution = refundRateResolver.resolve(query);
         if (resolution.isEmpty()) {
-            return new RefundAddition(BigDecimal.ZERO, null, null, null, true);
+            return new RefundAddition(BigDecimal.ZERO, null, null, null, true, false);
         }
 
         RefundRateResolution r = resolution.get();
         BigDecimal amount = MoneyUtil.applyPercent(annualizedLimitBase, r.month12RatePct());
-        return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(), false);
+        // 1년 경과 예상 해약환급금이 1년 납입보험료를 넘는 환급률표는 데이터 오류다.
+        // 숫자를 조용히 자르지 않고 표가 없을 때와 같이 사람 판단으로 넘긴다.
+        boolean abnormalRate = r.month12RatePct().compareTo(ONE_HUNDRED) > 0;
+        return new RefundAddition(amount, r.refundRateTableId(), r.policyVersionId(), r.versionNo(),
+                abnormalRate, abnormalRate);
     }
 
     private ComplianceDeduction resolveComplianceDeduction(
@@ -254,7 +263,8 @@ public class CapCalculatorImpl implements CapCalculator {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("premiumMultiplier", ruleSet.getPremiumMultiplier());
         snapshot.put("refundAdditionCondition", ruleSet.getRefundAdditionCondition());
-        snapshot.put("refundTableMissing", refundAddition.reviewRequired());
+        snapshot.put("refundTableMissing", refundAddition.reviewRequired() && !refundAddition.abnormalRate());
+        snapshot.put("refundRateAbnormal", refundAddition.abnormalRate());
         snapshot.put("refundRateTablePolicyVersionId", refundAddition.policyVersionId());
         snapshot.put("refundRateTableVersionNo", refundAddition.versionNo());
         snapshot.put("complianceDeductionPct", ruleSet.getComplianceDeductionPct());
@@ -266,7 +276,7 @@ public class CapCalculatorImpl implements CapCalculator {
     }
 
     private record RefundAddition(BigDecimal amount, Long refundRateTableId, Long policyVersionId,
-                                   Integer versionNo, boolean reviewRequired) {
+                                   Integer versionNo, boolean reviewRequired, boolean abnormalRate) {
     }
 
     private record ComplianceDeduction(
