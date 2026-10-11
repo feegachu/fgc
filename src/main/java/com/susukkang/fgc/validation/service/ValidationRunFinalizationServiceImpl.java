@@ -2,6 +2,7 @@ package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
@@ -81,6 +82,17 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
             throw new FgcBusinessException(FgcErrorCode.VRUN_003, Map.of("id", validationRunId));
         }
 
+        // 2026-10-12 yslee - #494 확정할 수 있는 실행 유형 제한 (운영정책서 제44조)
+        // 기존 코드: 상태(COMPLETED/8)만 보고 실행 유형은 보지 않음
+        // 문제: 변경된 계약만 계산하는 MANUAL_CONTRACT 실행도 COMPLETED/8 이 되어, 일부 계약의 결과가
+        //       그 달의 확정 결과로 잠길 수 있었음
+        // 개선: 월 전체를 계산한 유형만 확정한다. 이미 FINALIZED 인 실행의 멱등 재요청(위)은 그대로 응답한다.
+        ValidationRunType runType = ValidationRunType.valueOf(lockedRun.getRunType());
+        if (!runType.isFinalizable()) {
+            throw new FgcBusinessException(FgcErrorCode.VRUN_004,
+                    Map.of("from", runType.label() + " 실행", "to", "FINALIZED"));
+        }
+
         if (lockedRun.getStatus() != ValidationRunStatus.COMPLETED || lockedRun.getCurrentStep() != 8) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
                     Map.of("from", lockedRun.getStatus(), "to", "FINALIZED"));
@@ -93,7 +105,8 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         //       생성 중이면 그 커밋을 기다린 뒤 새 스냅샷(READ COMMITTED, 문장 단위)으로 다시 센다.
         validationRunRepository.lockValidationMonth(lockedRun.getValidationMonth());
 
-        // 조회 API 결과를 신뢰하지 않고 확정 트랜잭션에서 7개 조건을 다시 계산한다.
+        // 조회 API 결과를 신뢰하지 않고 확정 트랜잭션에서 8개 조건을 다시 계산한다.
+        // 조건 7(더 최근 실행)·8(이미 확정된 실행)은 위 검증월 잠금을 잡은 뒤 세야 경합이 없다.
         FinalizeChecklistResponse checklist = buildChecklist(requireChecklistCounts(validationRunId));
         long remaining = checklist.remainingConditionCount();
         if (remaining > 0) {
@@ -167,7 +180,13 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                 // getChecklist(조회 전용)는 잠그지 않는다 — 화면 표시용이고 확정 때 다시 센다.
                 condition(7, "같은 검증월의 가장 최근 실행인가",
                         counts.getSupersededRunCount(),
-                        "/validation-runs/" + (counts.getLatestRunId() != null ? counts.getLatestRunId() : id))
+                        "/validation-runs/" + (counts.getLatestRunId() != null ? counts.getLatestRunId() : id)),
+                // #494: 확정은 그 달을 대표하는 한 건이다. 확정된 달에도 재검증 실행은 만들 수 있지만
+                // (FUN-044 "새 실행번호로 생성되어 이전 결과와 비교") 그 실행은 확정하지 않는다.
+                // 바로가기는 이미 확정된 실행 — 비교 기준이 그쪽이다.
+                condition(8, "같은 검증월에 이미 확정된 실행이 없는가",
+                        counts.getFinalizedRunCount(),
+                        "/validation-runs/" + (counts.getFinalizedRunId() != null ? counts.getFinalizedRunId() : id))
         );
         return new FinalizeChecklistResponse(id,
                 conditions.stream().allMatch(FinalizeChecklistConditionResponse::passed), conditions);
