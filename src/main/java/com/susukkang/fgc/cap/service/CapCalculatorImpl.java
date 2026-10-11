@@ -82,21 +82,31 @@ public class CapCalculatorImpl implements CapCalculator {
         BigDecimal annualizedLimitBase = MoneyUtil.multiplyAndRound(
                 basePremiumAmount, ruleSet.getPremiumMultiplier());
 
-        // 2) 저해지·표준미달형 등 80% 이상 공제 대상이면 한도를 가산
-        // 표준해약공제액의 80% 이상을 공제하는 상품은 12차월 예상 해약환급금만큼 한도가 더 큼 (REG-08)
+        // 2) 저해지·표준미달형 등 80% 이상 공제 대상이면 12차월 예상 해약환급금을 구함 (REG-08)
         RefundAddition refundAddition = resolveRefundAddition(contract, ruleSet, annualizedLimitBase, command);
 
         // 2026-08-10 yslee - 준법경영비를 증빙 실제액 기준으로 제한
         // 기존 코드: 정책 공제율이 0보다 크면 월납 초회보험료의 3%를 일괄 공제
         // 문제: 실제 지급·증빙 금액이 없거나 상한보다 적어도 최대액을 자동 공제하여 REG-10 위반
         // 개선: 증빙 실제액과 정책상 최대 허용액 중 작은 금액만 공제하고 증빙 누락은 검토필요 처리
-        BigDecimal grossLimit = annualizedLimitBase.add(refundAddition.amount());
         ComplianceDeduction complianceDeduction = resolveComplianceDeduction(
                 basePremiumAmount,
                 ruleSet.getComplianceDeductionPct(),
                 command.complianceEvidenceAmount()
         );
-        BigDecimal limitAmount = grossLimit.subtract(complianceDeduction.appliedAmount());
+
+        // 2026-10-11 yslee - 해약환급금·준법경영비 반영 방향을 규정대로 교정 (#468)
+        // 기존 코드: 한도 = 월납×12 + 해약환급금 − 준법경영비
+        // 문제: 감독규정 제4-32조⑤·FAQ Q1-1은 해약환급금을 수수료등에 "합산"하고(산입 + 환급금 ≤ 1,200%),
+        //       ⑭는 준법경영비를 수수료등 계산에서 "제외"한다 — 부호가 둘 다 반대라 환급금 계약은 위반을 놓치고
+        //       준법경영비 증빙 계약은 정상을 위반으로 판정했다
+        // 개선: 산입 + 환급금 − 준법경영비 ≤ 월납×12 를 한도 쪽으로 이항한다.
+        //       판정은 FAQ 식과 같고, 지급확정(CapValidator)·정합성 검사(산입액 = 상세 합계)는 이 한도를 그대로 쓴다.
+        //       환급률이 100%를 넘는 비정상 환급률표가 들어와도 한도가 음수가 되지 않게 0에서 막는다.
+        BigDecimal limitAmount = annualizedLimitBase
+                .subtract(refundAddition.amount())
+                .add(complianceDeduction.appliedAmount())
+                .max(BigDecimal.ZERO);
 
         // 4) 실제 산입액 집계
         // 계약월차 1~firstYearMonths(기본 12) 안에 있는 예상 schedule_line 한 줄씩 훑으면서,
@@ -168,7 +178,7 @@ public class CapCalculatorImpl implements CapCalculator {
                 includedAmount, remainingAmount, usagePct, resultStatus, details, snapshot);
     }
 
-    // 80% 이상 공제 대상 상품이면 12차월 예상 해약환급금을 한도에 가산할 금액과, 그 판정에 쓴
+    // 80% 이상 공제 대상 상품이면 수수료등에 합산할(= 한도에서 뺄) 12차월 예상 해약환급금과, 그 판정에 쓴
     // 환급률표(refund_rate_table_id·policy_version_id·version_no)를 계산해서 돌려줌
     private RefundAddition resolveRefundAddition(CapContractView contract, CapRuleSetView ruleSet,
                                                    BigDecimal annualizedLimitBase, CapCalculationCommand command) {

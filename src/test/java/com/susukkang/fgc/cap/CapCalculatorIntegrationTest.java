@@ -495,14 +495,14 @@ class CapCalculatorIntegrationTest {
         assertThat(capCheckService.findDetail(-1L)).isEmpty();
     }
 
-    // A1(80% 공제대상 상품)은 12차월 예상해약환급률표가 한도에 가산된다
+    // A1(80% 공제대상 상품)은 12차월 예상 해약환급금을 수수료등에 합산한다(= 한도에서 뺀다, #468)
     // FGC-FGL02-202601-0001 : STD-LIFE-B(80% 공제 대상), 월납 100,000원, 240개월납, 계약일 2026-01-15
     // GA_TO_FC 1,200% 룰셋은 2026-07-01부터 적용되므로(REG-CAP-GA-2026-V1), 이 계약은
     // INSURER_TO_GA 단계로 검증한다. 준법경영비 3% 공제(REG-10, 제4-32조제14항)는 2027.1.1부터
 
     // 시행이라 2026-01-15 계약에는 아직 적용되지 않는다(REG-CAP-INS-2021-V2, 공제 0%, V6_1).
     @Test
-    void standardDeduction80ProductA1AddsMonth12RefundRateToLimit() {
+    void standardDeduction80ProductA1SubtractsMonth12RefundFromLimit() {
         Long id = contractId("FGC-FGL02-202601-0001");
 
         CapCalculationResult result = capCalculator.calculate(
@@ -510,16 +510,17 @@ class CapCalculatorIntegrationTest {
 
         // seed 공식: GREATEST(0,(12-2)*2.4) = 24.0% → 1,200,000 × 24% = 288,000
         assertThat(result.refund12mAmount()).isEqualByComparingTo("288000");
-        // 준법경영비 3% 공제는 2027.1.1부터 시행이라 2026년 계약에는 적용되지 않는다 → gross 그대로 한도
+        // 준법경영비 3% 공제는 2027.1.1부터 시행이라 2026년 계약에는 적용되지 않는다
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("0");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1488000");
+        // 산입 + 288,000 ≤ 1,200,000 → 한도 912,000
+        assertThat(result.limitAmount()).isEqualByComparingTo("912000");
         assertThat(result.refundRateTableId()).isNotNull();
     }
 
 
     // REG-10(준법경영비 3% 공제)은 2027.1.1 이후 체결된 원수사→GA 계약부터 적용된다(REG-CAP-INS-2027-V1).
     // FGC-FGL01-202703-0001 : STD-LIFE-A(80% 공제 아님), 월납 100,000원, 계약일 2027-03-02
-    // 공제 기준액은 grossLimit이 아니라 월납 원액이다(feature/18 반영) — 3% × 100,000 = 3,000.
+    // 공제 기준액은 한도가 아니라 월납 원액이다(feature/18 반영) — 3% × 100,000 = 3,000.
     @Test
     void complianceDeductionAppliesFromContractsDatedOnOrAfter20270101() {
         Long id = contractId("FGC-FGL01-202703-0001");
@@ -534,7 +535,8 @@ class CapCalculatorIntegrationTest {
 
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1197000");
+        // 준법경영비는 수수료등 계산에서 제외(⑭) → 산입 − 3,000 ≤ 1,200,000 → 한도 1,203,000
+        assertThat(result.limitAmount()).isEqualByComparingTo("1203000");
     }
 
     // ProductRefundRateResolver는 STD-LIFE-B의 12차월 환급률과 표버전을 돌려준다
