@@ -100,7 +100,7 @@ class CapCalculatorIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"AMOUNT", "RECIPIENT", "ITEM", "INSTALLMENT", "DATE", "FUTURE"})
+    @ValueSource(strings = {"AMOUNT", "RECIPIENT", "ITEM", "INSTALLMENT", "DATE", "FUTURE", "PREVIOUS_HOLD", "PREVIOUS_CANCELLED", "CURRENT_HOLD", "CURRENT_CANCELLED"})
     void doesNotInheritEvidenceWhenTheCopiedOccurrenceScopeChanges(String change) {
         Long contractId = contractId("FGC-FGL01-202607-0001");
         Long header = insertOperationalScheduleWithBaseCommissionLines(
@@ -138,6 +138,18 @@ class CapCalculatorIntegrationTest {
                   FROM fgc.schedule_line WHERE schedule_line_id=? RETURNING schedule_line_id
                 """.formatted(installment, dueDate, changedItem, recipient, amount, status),
                 Long.class, copiedHeader, originalLine);
+        if (change.startsWith("PREVIOUS_")) {
+            jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status=? WHERE schedule_line_id=?",
+                    change.substring("PREVIOUS_".length()), originalLine);
+        }
+        if (change.startsWith("CURRENT_")) {
+            jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status=? WHERE schedule_line_id=?",
+                    change.substring("CURRENT_".length()), copiedLine);
+        }
+        if (change.equals("CURRENT_CANCELLED")) {
+            assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12)).isEmpty();
+            return;
+        }
         assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12))
                 .singleElement().satisfies(line -> {
                     assertThat(line.getScheduleLineId()).isEqualTo(copiedLine);

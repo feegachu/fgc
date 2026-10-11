@@ -76,6 +76,11 @@ public enum FgcErrorCode {
             HttpStatus.BAD_REQUEST,
             "error.contract.futureDate"
     ),
+    CONT_003(
+            "FGC-CONT-003",
+            HttpStatus.CONFLICT,
+            "error.contract.concurrentUpdate"
+    ),
 
     SCHE_001(
             "FGC-SCHE-001",

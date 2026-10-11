@@ -58,6 +58,26 @@ class CapCheckServiceImplTest {
 
     private CapCheckServiceImpl capCheckService;
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = CapCheckKind.class, names = {"MANUAL", "MONTHLY"})
+    void insurerChecksReplaceStaleEvidenceOnlyAfterLocking(CapCheckKind kind) {
+        CapCalculationCommand stale = new CapCalculationCommand(1L, PaymentStage.INSURER_TO_GA,
+                LocalDate.of(2027, 3, 31), kind, 42L, new BigDecimal("100"));
+        CapCalculationCommand refreshed = new CapCalculationCommand(1L, PaymentStage.INSURER_TO_GA,
+                stale.asOfDate(), kind, 42L, new BigDecimal("600"));
+        when(capCheckQueryRepository.selectComplianceEvidenceAmount(1L, PaymentStage.INSURER_TO_GA))
+                .thenReturn(new BigDecimal("600"));
+        CapCalculationResult result = sampleResult(List.of());
+        when(capCalculator.calculate(refreshed)).thenReturn(result);
+        capCheckService.calculateAndSave(stale);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(contractLockRepository, capCheckQueryRepository,
+                capCalculator, capCheckWriteRepository);
+        order.verify(contractLockRepository).lock(1L);
+        order.verify(capCheckQueryRepository).selectComplianceEvidenceAmount(1L, PaymentStage.INSURER_TO_GA);
+        order.verify(capCalculator).calculate(refreshed);
+        order.verify(capCheckWriteRepository).insertCapCheck(any(CapCheckInsertRow.class));
+    }
+
     private CapCalculationResult sampleResult(List<CapCheckDetailLine> details) {
         return new CapCalculationResult(
                 1L, PaymentStage.GA_TO_FC, CapCheckKind.REALTIME, LocalDate.of(2026, 7, 10),

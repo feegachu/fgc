@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static com.susukkang.fgc.common.code.ContractStatus.ACTIVE;
@@ -245,6 +246,28 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.data.contractId").value(21));
     }
 
+    @Test
+    void updateContractRequiresTheDetailReadTimestamp() throws Exception {
+        ContractUpdateRequest request = updateRequest();
+        request.setExpectedUpdatedAt(null);
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L).with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("expectedUpdatedAt"));
+        org.mockito.Mockito.verify(contractService, org.mockito.Mockito.never()).updateContract(any(), any());
+    }
+
+    @Test
+    void updateContractReturns409AndAnActionableConflictMessage() throws Exception {
+        when(contractService.updateContract(eq(21L), any())).thenThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(
+                com.susukkang.fgc.common.exception.FgcErrorCode.CONT_003));
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L).with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(updateRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("FGC-CONT-003"))
+                .andExpect(jsonPath("$.error.message").value("다른 요청에서 계약을 수정했습니다. 최신 계약을 다시 불러온 뒤 변경 내용을 확인하고 저장하세요."));
+    }
+
     private ContractCreateRequest createRequest() {
         return new ContractCreateRequest(
                 1L,
@@ -277,7 +300,8 @@ class ContractControllerTest {
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 120,
-                new BigDecimal("50000")
+                new BigDecimal("50000"),
+                OffsetDateTime.parse("2026-10-11T01:00:00.123456Z")
         );
     }
 

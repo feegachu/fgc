@@ -2,6 +2,7 @@ package com.susukkang.fgc.contract.service;
 
 import com.susukkang.fgc.cap.dto.*;
 import com.susukkang.fgc.cap.repository.CapScheduleAmountQueryRepository;
+import com.susukkang.fgc.cap.repository.CapCheckQueryRepository;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapCheckBatchItemService;
 import com.susukkang.fgc.cap.service.CapCheckService;
@@ -11,6 +12,7 @@ import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
+import com.susukkang.fgc.contract.repository.ContractQueryRepository;
 import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.transaction.dto.*;
@@ -24,6 +26,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -54,11 +59,16 @@ import static org.mockito.Mockito.doAnswer;
         "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_consistency?currentSchema=fgc"
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@AutoConfigureMockMvc
 @WithMockUser(roles = "SETTLEMENT")
 @Timeout(45)
 class ContractConsistencyIntegrationTest {
     @Autowired private ContractService contracts;
     @Autowired private InsuranceContractRepository contractRepository;
+    @Autowired private ContractQueryRepository contractQueries;
+    @Autowired private CapCheckQueryRepository capQueries;
+    @Autowired private MockMvc mvc;
+    @Autowired private ObjectMapper objectMapper;
     @Autowired private ScheduleService schedules;
     @Autowired private CommissionPaymentService payments;
     @Autowired private CapCalculator calculator;
@@ -70,6 +80,7 @@ class ContractConsistencyIntegrationTest {
     @MockitoSpyBean private ScheduleWriteRepository scheduleWrites;
     @MockitoSpyBean private CommissionPaymentQueryRepository paymentQueries;
     @MockitoSpyBean private CapScheduleAmountQueryRepository capSchedules;
+    @MockitoSpyBean private com.susukkang.fgc.contract.repository.ContractLockRepository contractLocks;
 
     @ParameterizedTest
     @CsvSource({"2,false,200000", "3,true,1", "7,true,1"})
@@ -316,31 +327,59 @@ class ContractConsistencyIntegrationTest {
         }
     }
 
-    @Test
-    void cachedConcurrentUpdateReevaluatesScheduleChangesFromCommittedState() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void staleConcurrentUpdateIsRejectedForSameAndDifferentFields(boolean sameField) throws Exception {
         Long id = newContract();
+        String originalNo = contractRepository.findById(id).orElseThrow().getContractNo();
         CountDownLatch read = new CountDownLatch(1);
         CountDownLatch committed = new CountDownLatch(1);
         ExecutorService workers = workers();
         try {
             Future<?> later = workers.submit(() -> transaction().executeWithoutResult(status -> {
                 InsuranceContract stale = contractRepository.findById(id).orElseThrow();
-                ContractUpdateRequest request = update(stale, "100000");
-                request.setContractNo(stale.getContractNo() + "-EDIT");
+                ContractUpdateRequest request = update(stale, sameField ? "300000" : "100000");
+                if (!sameField) request.setContractNo(stale.getContractNo() + "-EDIT");
                 read.countDown();
                 await(committed);
-                contracts.updateContract(id, request);
+                assertThatThrownBy(() -> contracts.updateContract(id, request))
+                        .isInstanceOfSatisfying(FgcBusinessException.class, failure ->
+                                assertThat(failure.getErrorCode()).isEqualTo(
+                                        com.susukkang.fgc.common.exception.FgcErrorCode.CONT_003));
+                status.setRollbackOnly();
             }));
             await(read);
             InsuranceContract before = contractRepository.findById(id).orElseThrow();
             contracts.updateContract(id, update(before, "200000"));
+            int headers = jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=?", Integer.class, id);
+            int checks = jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE contract_id=?", Integer.class, id);
             committed.countDown();
             later.get(20, TimeUnit.SECONDS);
             assertThat(contractRepository.findById(id).orElseThrow().getMonthlyEquivalentFirstPremium())
-                    .isEqualByComparingTo("100000");
-            assertActiveScheduleBasis(id, "100000");
+                    .isEqualByComparingTo("200000");
+            assertThat(contractRepository.findById(id).orElseThrow().getContractNo()).isEqualTo(originalNo);
+            assertActiveScheduleBasis(id, "200000");
+            assertThat(capChecks.findLatest(id, PaymentStage.GA_TO_FC).orElseThrow().result().basePremiumAmount())
+                    .isEqualByComparingTo("200000");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=?", Integer.class, id)).isEqualTo(headers);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE contract_id=?", Integer.class, id)).isEqualTo(checks);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE entity_type='CONTRACT' AND entity_id=? AND action_code='CONTRACT_UPDATED'", Integer.class, String.valueOf(id))).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT (before_value->>'firstPremiumAmount')::numeric FROM fgc.audit_log WHERE entity_type='CONTRACT' AND entity_id=? AND action_code='CONTRACT_UPDATED' ORDER BY audit_log_id DESC LIMIT 1",
+                    BigDecimal.class, String.valueOf(id))).isEqualByComparingTo("100000");
+            assertThat(jdbc.queryForObject("SELECT before_value->>'contractNo' FROM fgc.audit_log WHERE entity_type='CONTRACT' AND entity_id=? AND action_code='CONTRACT_UPDATED' ORDER BY audit_log_id DESC LIMIT 1",
+                    String.class, String.valueOf(id))).isEqualTo(originalNo);
+            // 상세 재조회 토큰으로 다시 요청하면 정상 저장되고 감사 before는 직전 커밋을 가리킨다.
+            ContractUpdateRequest fresh = update(contractRepository.findById(id).orElseThrow(), "200000");
+            fresh.setExpectedUpdatedAt(contractQueries.findDetailById(id).orElseThrow().getUpdatedAt());
+            fresh.setContractNo(originalNo + "-FRESH");
+            contracts.updateContract(id, fresh);
             assertThat(jdbc.queryForObject("SELECT (before_value->>'firstPremiumAmount')::numeric FROM fgc.audit_log WHERE entity_type='CONTRACT' AND entity_id=? AND action_code='CONTRACT_UPDATED' ORDER BY audit_log_id DESC LIMIT 1",
                     BigDecimal.class, String.valueOf(id))).isEqualByComparingTo("200000");
+            assertThat(jdbc.queryForObject("SELECT before_value->>'contractNo' FROM fgc.audit_log WHERE entity_type='CONTRACT' AND entity_id=? AND action_code='CONTRACT_UPDATED' ORDER BY audit_log_id DESC LIMIT 1",
+                    String.class, String.valueOf(id))).isEqualTo(originalNo);
+            assertActiveScheduleBasis(id, "200000");
+            assertThat(capChecks.findLatest(id, PaymentStage.GA_TO_FC).orElseThrow().result().basePremiumAmount())
+                    .isEqualByComparingTo("200000");
         } finally {
             committed.countDown();
             workers.shutdownNow();
@@ -474,6 +513,123 @@ class ContractConsistencyIntegrationTest {
         }
     }
 
+    @Test
+    void staleApiPutReturns409AndFreshDetailTokenCanBeSaved() throws Exception {
+        Long id = newContract();
+        String detail = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/contracts/{id}", id))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        ContractUpdateRequest stale = update(contractRepository.findById(id).orElseThrow(), "100000");
+        stale.setExpectedUpdatedAt(java.time.OffsetDateTime.parse(objectMapper.readTree(detail).path("data").path("updatedAt").asText()));
+        stale.setContractNo(stale.getContractNo() + "-STALE");
+        contracts.updateContract(id, update(contractRepository.findById(id).orElseThrow(), "200000"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/contracts/{id}", id)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(stale)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.error.code").value("FGC-CONT-003"));
+        ContractUpdateRequest fresh = update(contractRepository.findById(id).orElseThrow(), "200000");
+        fresh.setExpectedUpdatedAt(contractQueries.findDetailById(id).orElseThrow().getUpdatedAt()
+                .withOffsetSameInstant(java.time.ZoneOffset.ofHours(9)));
+        fresh.setContractNo(fresh.getContractNo() + "-FRESH");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/contracts/{id}", id)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(fresh)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        assertActiveScheduleBasis(id, "200000");
+        assertThat(capChecks.findLatest(id, PaymentStage.GA_TO_FC).orElseThrow().result().basePremiumAmount())
+                .isEqualByComparingTo("200000");
+        assertThat(contractRepository.findById(id).orElseThrow().getContractNo()).isEqualTo(fresh.getContractNo());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CapCheckKind.class, names = {"MANUAL", "MONTHLY"})
+    void insurerEvidenceIsRereadAfterWaitingForARealConfirmationCommit(CapCheckKind kind) throws Exception {
+        Long id = newContract();
+        // 3% 공제가 시행되는 계약을 고립된 fixture로 구성한다. 화면의 미래 계약일 제한과는 별개다.
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2027-03-02' WHERE contract_id=?", id);
+        deactivateSchedules(id);
+        insertComplianceEvidence(id, "100", true);
+        Long draft = insertComplianceEvidence(id, "500", false);
+        BigDecimal staleAmount = capQueries.selectComplianceEvidenceAmount(id, PaymentStage.INSURER_TO_GA);
+        assertThat(staleAmount).isEqualByComparingTo("100");
+        CapCalculationCommand stale = new CapCalculationCommand(id, PaymentStage.INSURER_TO_GA,
+                LocalDate.of(2027, 3, 31), kind, null, staleAmount);
+        CountDownLatch updated = new CountDownLatch(1);
+        CountDownLatch commit = new CountDownLatch(1);
+        AtomicInteger holderPid = new AtomicInteger();
+        AtomicInteger calculatorPid = new AtomicInteger();
+        transaction().executeWithoutResult(status -> doAnswer(call -> {
+            if (Thread.currentThread().getName().equals("consistency-evidence-cap")) {
+                calculatorPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+            }
+            return call.callRealMethod();
+        }).when(contractLocks).lock(id));
+        ExecutorService workers = workers();
+        try {
+            Future<?> confirmation = workers.submit(() -> transaction().executeWithoutResult(status -> {
+                holderPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                // 지급 확정과 동일한 지급 → 계약 잠금 순서. 값은 mock 없이 DB guard로 확정한다.
+                paymentQueries.findConfirmationDataForUpdate(draft);
+                paymentQueries.lockAttributedContracts(draft);
+                jdbc.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", draft);
+                updated.countDown();
+                await(commit);
+            }));
+            await(updated);
+            Future<CapCheckSaveResult> calculation = workers.submit(() -> {
+                Thread.currentThread().setName("consistency-evidence-cap");
+                return kind == CapCheckKind.MONTHLY ? batchItem.process(stale) : capChecks.calculateAndSave(stale);
+            });
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            boolean blocked = false;
+            while (System.nanoTime() < deadline) {
+                if (calculatorPid.get() != 0 && Boolean.TRUE.equals(jdbc.queryForObject(
+                        "SELECT ? = ANY(pg_blocking_pids(?))", Boolean.class, holderPid.get(), calculatorPid.get()))) {
+                    blocked = true;
+                    break;
+                }
+                if (calculation.isDone()) break;
+                Thread.sleep(20);
+            }
+            assertThat(blocked).as("증빙 확정이 커밋할 때까지 실제 PostgreSQL 계약 잠금에서 기다려야 한다").isTrue();
+            commit.countDown();
+            confirmation.get(20, TimeUnit.SECONDS);
+            CapCheckSaveResult saved = calculation.get(20, TimeUnit.SECONDS);
+            assertThat(saved.result().complianceDeductionAmount()).isEqualByComparingTo("600");
+            assertThat(saved.result().limitAmount()).isEqualByComparingTo("1199400");
+            assertThat(jdbc.queryForObject("SELECT (calculation_snapshot->>'complianceEvidenceAmount')::numeric FROM fgc.cap_check WHERE cap_check_id=?",
+                    BigDecimal.class, saved.capCheckId())).isEqualByComparingTo("600");
+            assertThat(jdbc.queryForObject("SELECT compliance_deduction_amount FROM fgc.cap_check WHERE cap_check_id=?",
+                    BigDecimal.class, saved.capCheckId())).isEqualByComparingTo("600");
+        } finally {
+            commit.countDown();
+            workers.shutdownNow();
+        }
+    }
+
+    private Long insertComplianceEvidence(Long id, String amount, boolean confirmed) {
+        Long payment = jdbc.queryForObject("""
+                INSERT INTO fgc.commission_transaction(payment_stage, source_type, source_business_key,
+                    commission_item_id, policy_version_id, settlement_month, due_date, amount, cashflow_type, status)
+                SELECT 'INSURER_TO_GA', 'GA_MANUAL_PAYMENT', ?, ci.commission_item_id, pv.policy_version_id,
+                    DATE '2027-03-01', DATE '2027-03-31', ?, 'PAYMENT', 'DRAFT'
+                  FROM fgc.commission_item ci CROSS JOIN fgc.policy_version pv
+                 WHERE ci.item_code='BASE_COMMISSION' AND pv.policy_code='INS-CUR-2026-V1'
+                RETURNING commission_transaction_id
+                """, Long.class, "CONS-EVIDENCE-" + UUID.randomUUID(), new BigDecimal(amount));
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id, contract_id, attribution_date,
+                    attribution_month, attributed_amount, inclusion_status_snapshot, exclusion_type_snapshot,
+                    attribution_method, evidence_ref)
+                VALUES (?, ?, DATE '2027-03-31', DATE '2027-03-01', ?, 'EXCLUDED', 'COMPLIANCE_3PCT', 'DIRECT', 'CONS-EVIDENCE')
+                """, payment, id, new BigDecimal(amount));
+        if (confirmed) jdbc.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", payment);
+        return payment;
+    }
+
     private Long newContract() {
         InsuranceContract seed = contractRepository.findById(jdbc.queryForObject(
                 "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no='FGC-FGL01-202607-0001'", Long.class)).orElseThrow();
@@ -489,7 +645,7 @@ class ContractConsistencyIntegrationTest {
         return new ContractUpdateRequest(source.getContractNo(), source.getInsurerId(), source.getProductOfferingId(),
                 source.getContractDate(), source.getCurrentStatus(), source.getAgentId(), source.getOrganizationId(),
                 source.getPaymentCycleCode(), premium, premium, premium, source.getPaymentTermMonths(),
-                source.getStandardSurrenderDeductionAmount());
+                source.getStandardSurrenderDeductionAmount(), source.getUpdatedAt());
     }
 
     private CommissionPaymentAttributionRequest attribution(Long id, BigDecimal amount) {

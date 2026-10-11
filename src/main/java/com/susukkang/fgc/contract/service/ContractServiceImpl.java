@@ -236,6 +236,13 @@ public class ContractServiceImpl implements ContractService {
         contractLockRepository.lockAndRefresh(id);
         InsuranceContract currentContract = insuranceContractRepository.findById(id)
                 .orElseThrow(() -> validationException("contractId", "존재하지 않는 보험계약입니다."));
+        // #431: 전체 교체 PUT의 옛 입력값은 refresh만으로 식별할 수 없다. 변경 전에 조회 토큰을 비교한다.
+        if (request.getExpectedUpdatedAt() == null) {
+            throw validationException("expectedUpdatedAt", "계약을 다시 조회한 뒤 수정해 주세요.");
+        }
+        if (!request.getExpectedUpdatedAt().toInstant().equals(currentContract.getUpdatedAt().toInstant())) {
+            throw new FgcBusinessException(FgcErrorCode.CONT_003);
+        }
         // 2. 수정 요청의 계약일·기준정보·소속 관계와 계약번호 중복 여부 검증
         validateInputForUpdate(currentContract, request);
 

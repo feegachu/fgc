@@ -11,6 +11,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 /**
  * 설명 : ResponseContractDetail
@@ -46,6 +47,7 @@ public class ContractDetailResponse {
     private BigDecimal standardSurrenderDeductionAmount; //표준해약공제액
     private ContractStatus contractStatus; //계약상태
     private DataOrigin dataOrigin; //계약 출처
+    private OffsetDateTime updatedAt; // 수정 요청의 expectedUpdatedAt으로 원문 그대로 전달
 
     //계약상태 사건 이력 List 2차
     //private List<ContractStatusEventResponse> contractStatusEventResponses;

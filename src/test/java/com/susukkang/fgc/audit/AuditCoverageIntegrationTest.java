@@ -90,7 +90,9 @@ class AuditCoverageIntegrationTest {
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 120,
-                BigDecimal.ZERO
+                BigDecimal.ZERO,
+                jdbcTemplate.queryForObject("SELECT updated_at FROM fgc.insurance_contract WHERE contract_id=?",
+                        java.time.OffsetDateTime.class, created.contractId())
         );
 
         contractService.updateContract(created.contractId(), updateRequest);

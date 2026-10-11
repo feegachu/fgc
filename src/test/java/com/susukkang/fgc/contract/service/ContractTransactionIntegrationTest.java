@@ -31,6 +31,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,6 +63,8 @@ class ContractTransactionIntegrationTest {
     private Map<String, List<String>> stateBeforeFailure;
     private BigDecimal premiumBeforeFailure;
     private List<BigDecimal> scheduleBasisBeforeFailure;
+    private String failureThreadName;
+    private Runnable beforeFailure = () -> { };
 
     enum FailurePoint { SCHEDULE_BUSINESS, CAP_BUSINESS, CAP_SQL, AUDIT_SQL }
 
@@ -161,6 +165,89 @@ class ContractTransactionIntegrationTest {
         assertThat(snapshot(id)).isEqualTo(before);
     }
 
+    @ParameterizedTest
+    @EnumSource(FailurePoint.class)
+    @org.junit.jupiter.api.Timeout(45)
+    void rollbackReleasesTheLockAndPreservesTheWaitingRequestsReadToken(FailurePoint point) throws Exception {
+        Long id = contractService.createContract(createRequest()).contractId();
+        InsuranceContract original = contractRepository.findById(id).orElseThrow();
+        Map<String, List<String>> before = snapshot(id);
+        ContractUpdateRequest failing = updateRequest(original);
+        ContractUpdateRequest waiting = updateRequest(original);
+        BigDecimal expected = original.getFirstPremiumAmount().add(new BigDecimal("2000"));
+        waiting.setFirstPremiumAmount(expected);
+        waiting.setPremiumPerCycleAmount(expected);
+        waiting.setMonthlyEquivalentFirstPremium(expected);
+        CountDownLatch writesReached = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger holderPid = new AtomicInteger();
+        AtomicInteger waiterPid = new AtomicInteger();
+        failureThreadName = "contract-failing-update";
+        beforeFailure = () -> {
+            holderPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+            writesReached.countDown();
+            await(release);
+        };
+        injectFailure(point, false);
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = workers.submit(() -> {
+                Thread.currentThread().setName(failureThreadName);
+                assertThatThrownBy(() -> contractService.updateContract(id, failing)).isInstanceOf(expectedFailure(point));
+            });
+            await(writesReached);
+            Future<?> second = workers.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                waiterPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                contractService.updateContract(id, waiting);
+            }));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            boolean blocked = false;
+            while (System.nanoTime() < deadline) {
+                if (waiterPid.get() != 0 && Boolean.TRUE.equals(jdbc.queryForObject(
+                        "SELECT ? = ANY(pg_blocking_pids(?))", Boolean.class, holderPid.get(), waiterPid.get()))) {
+                    blocked = true;
+                    break;
+                }
+                if (second.isDone()) break;
+                Thread.sleep(20);
+            }
+            assertThat(blocked).as("선행 수정의 실제 DB 잠금에서 대기해야 한다").isTrue();
+            release.countDown();
+            first.get(20, TimeUnit.SECONDS);
+            second.get(20, TimeUnit.SECONDS);
+            assertThat(readPremium(id)).isEqualByComparingTo(expected);
+            assertThat(jdbc.queryForList("""
+                    SELECT l.basis_amount FROM fgc.schedule_line l JOIN fgc.schedule_header h USING(schedule_header_id)
+                     WHERE h.contract_id=? AND h.active_yn AND l.basis_code='MONTHLY_EQUIVALENT_FIRST_PREMIUM'
+                    """, BigDecimal.class, id)).isNotEmpty().allSatisfy(value -> assertThat(value).isEqualByComparingTo(expected));
+            assertThat(jdbc.queryForObject("""
+                    SELECT base_premium_amount FROM fgc.cap_check WHERE contract_id=? AND payment_stage='GA_TO_FC'
+                     ORDER BY cap_check_id DESC LIMIT 1
+                    """, BigDecimal.class, id)).isEqualByComparingTo(expected);
+            assertThat(jdbc.queryForObject("""
+                    SELECT (before_value->>'firstPremiumAmount')::numeric FROM fgc.audit_log
+                     WHERE entity_type='CONTRACT' AND entity_id=? AND action_code='CONTRACT_UPDATED'
+                     ORDER BY audit_log_id DESC LIMIT 1
+                    """, BigDecimal.class, String.valueOf(id))).isEqualByComparingTo(original.getFirstPremiumAmount());
+            Map<String, List<String>> after = snapshot(id);
+            assertThat(after.get("schedule_header")).hasSize(before.get("schedule_header").size() + 2);
+            assertThat(after.get("cap_check")).hasSize(before.get("cap_check").size() + 2);
+            assertThat(after.get("audit_log")).hasSize(before.get("audit_log").size() + 1);
+        } finally {
+            release.countDown();
+            workers.shutdownNow();
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(15, TimeUnit.SECONDS)) throw new AssertionError("concurrency boundary timed out");
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(failure);
+        }
+    }
+
     private void injectMissingCapRule() {
         // 계산기에서 발생한 업무 예외가 실제 CapCheckService 트랜잭션 경계를 통과한다.
         doThrow(new FgcBusinessException(FgcErrorCode.CAP_004, "contractId", Map.of(),
@@ -170,7 +257,8 @@ class ContractTransactionIntegrationTest {
 
     private void injectFailure(FailurePoint point, boolean creation) {
         Answer<Object> afterRealWrite = invocation -> {
-            invocation.callRealMethod();
+            Object result = invocation.callRealMethod();
+            if (failureThreadName != null && !failureThreadName.equals(Thread.currentThread().getName())) return result;
             Long contractId = switch (point) {
                 case SCHEDULE_BUSINESS -> invocation.getArgument(0);
                 case CAP_BUSINESS, CAP_SQL ->
@@ -186,6 +274,7 @@ class ContractTransactionIntegrationTest {
                      WHERE h.contract_id = ? AND h.active_yn
                        AND l.basis_code = 'MONTHLY_EQUIVALENT_FIRST_PREMIUM'
                     """, BigDecimal.class, contractId);
+            beforeFailure.run();
             if (point == FailurePoint.CAP_SQL || point == FailurePoint.AUDIT_SQL) {
                 // 실제 DB 유일키 위반: 앞서 저장한 스냅샷을 중복 삽입하여 저장 오류를 만든다.
                 jdbc.update("""
@@ -281,6 +370,6 @@ class ContractTransactionIntegrationTest {
         return new ContractUpdateRequest(seed.getContractNo(), seed.getInsurerId(), seed.getProductOfferingId(),
                 date, seed.getCurrentStatus(), seed.getAgentId(), seed.getOrganizationId(),
                 seed.getPaymentCycleCode(), premium, premium, premium, seed.getPaymentTermMonths(),
-                seed.getStandardSurrenderDeductionAmount());
+                seed.getStandardSurrenderDeductionAmount(), seed.getUpdatedAt());
     }
 }

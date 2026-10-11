@@ -215,6 +215,7 @@
       <!-- 필수 입력 안내는 Guidance 가 아니다 (가이드 §7.2). 저장 버튼의 aria-describedby 로 연결해 유지한다. -->
       <p id="contract-save-hint" class="contract-save-hint" role="status">기준정보를 불러오는 중입니다.</p>
       <div class="contract-action-buttons">
+        <button id="contract-reload-button" class="button button-secondary" type="button" hidden>최신 계약 다시 불러오기</button>
         <a class="button button-secondary" th:href="@{/contracts}">취소</a>
         <button id="contract-save-button" class="button button-primary contract-save-button" type="submit"
                 aria-describedby="contract-save-hint" disabled>
