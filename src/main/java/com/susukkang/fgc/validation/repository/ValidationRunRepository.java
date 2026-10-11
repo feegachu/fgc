@@ -52,6 +52,10 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
      * 않으므로 순환 대기(교착)가 생기지 않는다. 키는 {@code hashtextextended}(64비트) 해시라 다른 기능의
      * 키(예: 전표 채번)와 충돌할 확률은 무시할 수 있고, 충돌해도 잠깐 기다릴 뿐 결과는 틀리지 않는다.
      *
+     * <p>이 잠금을 잡은 트랜잭션 안에서 {@code ValidationRunCreateService#create}를 부르지 않는다.
+     * create는 REQUIRES_NEW 새 트랜잭션에서 같은 키를 다시 잡으므로, 바깥 트랜잭션이 끝나기를 영원히
+     * 기다린다(PostgreSQL이 감지하지 못하는 앱 수준 자기 교착). 2026-10-11 기준 그런 호출 경로는 없다.
+     *
      * <p>키 문자열은 Java에서 만든다({@link LocalDate#toString()} = ISO {@code 2026-07-01}). SQL에서
      * {@code CAST(:date AS text)}로 만들면 드라이버가 date·timestamp 중 무엇으로 바인딩하느냐에 따라
      * 문자열이 달라져, 같은 달인데 다른 키가 될 수 있다.
