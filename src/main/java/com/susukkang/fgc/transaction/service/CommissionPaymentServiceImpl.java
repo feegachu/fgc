@@ -61,6 +61,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 
@@ -194,6 +195,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         requireDraft(attributions.get(0));
         queryRepository.lockAttributedContracts(paymentId);
+        // #433: 최초 지급 조회의 계약일은 잠금 대기 중 변경될 수 있다.
+        attributions = requireConfirmationData(paymentId);
         failFirst(requiredValueFailures(attributions));
 
         List<Long> capCheckIds = new ArrayList<>();
@@ -230,8 +233,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     calculation.limitAmount(),
                     rule.warningUsagePct(),
                     rule.existingIncludedAmount(),
-                    data.attributedAmount(),
-                    data.inclusionDecisionStatus()
+                    currentIncludedAmount(attributions, data),
+                    InclusionDecisionStatus.INCLUDED
             ));
             CapValidationResult validation = mergeScheduleAndActualValidation(
                     calculation,
@@ -239,9 +242,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     rule.warningUsagePct()
             );
 
-            CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
+            CapCheckCommand check = buildCapCheck(data, rule, calculation, validation, attributions);
             capCheckWriteRepository.insertCapCheck(check);
-            insertCapCheckDetails(check, data, calculation);
+            insertCapCheckDetails(check, data, calculation, attributions);
             capCheckIds.add(check.getCapCheckId());
             capChecks.add(check);
 
@@ -354,8 +357,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         calculation.limitAmount(),
                         rule.warningUsagePct(),
                         rule.existingIncludedAmount(),
-                        data.attributedAmount(),
-                        data.inclusionDecisionStatus()
+                        currentIncludedAmount(attributions, data),
+                        InclusionDecisionStatus.INCLUDED
                 ));
                 CapValidationResult validation = mergeScheduleAndActualValidation(
                         calculation,
@@ -365,7 +368,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 // 룰 판정 불일치·룰셋 불일치(CAP_002) 행은 confirm이 계산에 도달하지 못하는 행이다.
                 // CapValidator는 귀속 스냅샷만 보므로 정책 드리프트 시 NORMAL로 계산될 수 있는데,
                 // 게이지 수치는 참고용으로 남기되 판정만은 검토필요로 강제해 "정상" 오인을 막는다.
-                if (ruleFailure != null || consistencyFailure != null) {
+                if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
+                        || ruleFailure != null || consistencyFailure != null) {
                     validation = new CapValidationResult(
                             validation.limitAmount(),
                             validation.candidateIncludedAmount(),
@@ -375,7 +379,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                             CapResultStatus.REVIEW_REQUIRED
                     );
                 }
-                CapCheckCommand check = buildCapCheck(data, rule, calculation, validation);
+                CapCheckCommand check = buildCapCheck(data, rule, calculation, validation, attributions);
                 previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
                         check,
                         rule,
@@ -1312,7 +1316,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private void insertCapCheckDetails(
             CapCheckCommand check,
             ConfirmationData data,
-            CapCalculationResult calculation
+            CapCalculationResult calculation,
+            List<ConfirmationData> attributions
     ) {
         List<ExistingIncludedDetail> existing = queryRepository.findExistingIncludedDetails(
                 data.paymentId(),
@@ -1343,7 +1348,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         .evidenceRef(d.getEvidenceRef())
                         .build());
             }
-            rows.add(candidateDetailRow(check, seq));
+            for (ConfirmationData candidate : currentPeriodAttributions(attributions, data)) {
+                rows.add(CapCheckDetailInsertRow.builder()
+                        .capCheckId(check.getCapCheckId()).detailSeq(seq++)
+                        .commissionItemId(candidate.commissionItemId()).itemCode(candidate.itemCode())
+                        .itemName(candidate.itemName()).transactionAttributionId(candidate.transactionAttributionId())
+                        .classificationSnapshot(candidate.inclusionDecisionStatus().name())
+                        .amount(MoneyUtil.roundWon(candidate.attributedAmount()))
+                        .decisionReason(candidate.inclusionDecisionReason()).evidenceRef(candidate.evidenceRef())
+                        .build());
+            }
+        } else if (actualSum.compareTo(check.getIncludedAmount()) == 0) {
+            // 상세 금액은 음수를 허용하지 않으므로 차감이 있는 실제 판정은 순산입액으로 설명한다.
+            rows.add(netActualDetailRow(check));
         } else {
             for (CapCheckDetailLine d : calculation.details()) {
                 rows.add(CapCheckDetailInsertRow.builder()
@@ -1362,7 +1379,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             }
             if (rows.isEmpty()) {
                 // 스케줄 내역조차 없으면 종전 동작(후보 1행)으로 최소한의 근거를 남긴다.
-                rows.add(candidateDetailRow(check, 1));
+                rows.add(check.getCandidateAmount() != null && check.getCandidateAmount().signum() < 0
+                        ? netActualDetailRow(check) : candidateDetailRow(check, 1));
             }
         }
         capCheckWriteRepository.insertCapCheckDetails(rows);
@@ -1383,16 +1401,30 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .build();
     }
 
+    private CapCheckDetailInsertRow netActualDetailRow(CapCheckCommand check) {
+        return CapCheckDetailInsertRow.builder()
+                .capCheckId(check.getCapCheckId()).detailSeq(1)
+                .commissionItemId(check.getCommissionItemId()).itemCode(check.getItemCode()).itemName(check.getItemName())
+                .classificationSnapshot("INCLUDED").amount(check.getIncludedAmount())
+                .decisionReason("기존 확정액과 계약별 지급·차감 합계의 순산입액. 부호와 귀속행은 계산 스냅샷 참조")
+                .build();
+    }
+
     private CapCheckCommand buildCapCheck(
             ConfirmationData data,
             CapRuleSnapshot rule,
             CapCalculationResult calculation,
-            CapValidationResult result
+            CapValidationResult result,
+            List<ConfirmationData> attributions
     ) {
         Map<String, Object> snapshot = new LinkedHashMap<>(calculation.calculationSnapshot());
         snapshot.put("scheduledIncludedAmount", calculation.includedAmount());
         snapshot.put("existingIncludedAmount", rule.existingIncludedAmount());
         snapshot.put("candidateAmount", result.candidateIncludedAmount());
+        snapshot.put("candidateAttributions", currentPeriodAttributions(attributions, data).stream()
+                .map(row -> Map.of("transactionAttributionId", row.transactionAttributionId(),
+                        "classification", row.inclusionDecisionStatus().name(),
+                        "signedAmount", signedAttributedAmount(row))).toList());
         snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
                 .add(result.candidateIncludedAmount()));
         snapshot.put("effectiveIncludedAmount", result.includedAmount());
@@ -1420,10 +1452,31 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .itemName(data.itemName())
                 .transactionAttributionId(data.transactionAttributionId())
                 .classificationSnapshot(data.inclusionDecisionStatus().name())
-                .candidateAmount(data.attributedAmount())
+                .candidateAmount(result.candidateIncludedAmount())
                 .decisionReason(rule.decisionReason())
                 .evidenceRef(data.evidenceRef())
                 .build();
+    }
+
+    // #436: 동일 계약·지급단계·초년도 기간의 현재 지급 귀속을 순서와 분할 개수에 무관하게 합산한다.
+    private List<ConfirmationData> currentPeriodAttributions(List<ConfirmationData> attributions, ConfirmationData data) {
+        return attributions.stream()
+                .filter(row -> Objects.equals(row.contractId(), data.contractId()) && row.paymentStage() == data.paymentStage())
+                .filter(row -> row.attributedAmount() != null && row.attributionDate() != null)
+                .filter(row -> data.contractDate() == null || !row.attributionDate().isBefore(data.contractDate())
+                        && row.attributionDate().isBefore(data.contractDate().plusMonths(12)))
+                .toList();
+    }
+
+    private BigDecimal currentIncludedAmount(List<ConfirmationData> attributions, ConfirmationData data) {
+        return currentPeriodAttributions(attributions, data).stream()
+                .filter(row -> row.inclusionDecisionStatus() == InclusionDecisionStatus.INCLUDED)
+                .map(this::signedAttributedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal signedAttributedAmount(ConfirmationData data) {
+        BigDecimal amount = MoneyUtil.roundWon(data.attributedAmount());
+        return "DEDUCTION".equals(data.cashflowType()) ? amount.negate() : amount;
     }
 
     /**

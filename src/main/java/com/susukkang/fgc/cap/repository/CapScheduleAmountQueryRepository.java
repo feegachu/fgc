@@ -31,6 +31,34 @@ public class CapScheduleAmountQueryRepository {
                sl.contract_month_no      AS contractMonthNo,
                sl.expected_amount        AS amount,
                (
+                   WITH RECURSIVE preserved_lines AS (
+                       SELECT sl.schedule_line_id, sl.schedule_header_id
+                       UNION
+                       SELECT previous.schedule_line_id, previous.schedule_header_id
+                         FROM preserved_lines lineage
+                         JOIN fgc.schedule_line copied ON copied.schedule_line_id = lineage.schedule_line_id
+                         JOIN fgc.schedule_header copied_header ON copied_header.schedule_header_id = copied.schedule_header_id
+                         JOIN fgc.schedule_header previous_header ON previous_header.schedule_header_id = copied_header.regenerated_from_id
+                         JOIN fgc.schedule_line previous ON previous.schedule_header_id = previous_header.schedule_header_id
+                        WHERE copied.line_status IN ('CONFIRMED', 'MATCHED', 'ADJUSTED')
+                          AND previous.line_status IN ('CONFIRMED', 'MATCHED', 'ADJUSTED')
+                          AND previous_header.contract_id = sh.contract_id
+                          AND previous_header.payment_stage = sh.payment_stage
+                          AND previous_header.schedule_purpose = 'OPERATIONAL'
+                          AND ROW(previous.installment_no, previous.contract_month_no, previous.due_date,
+                                  previous.commission_item_id, previous.beneficiary_agent_id,
+                                  previous.basis_code, previous.basis_amount, previous.calculation_type,
+                                  previous.rate_pct, previous.fixed_amount, previous.expected_amount,
+                                  previous.rounding_scale, previous.rounding_mode, previous.payment_condition_code,
+                                  previous.source_commission_rule_id)
+                              IS NOT DISTINCT FROM
+                              ROW(copied.installment_no, copied.contract_month_no, copied.due_date,
+                                  copied.commission_item_id, copied.beneficiary_agent_id,
+                                  copied.basis_code, copied.basis_amount, copied.calculation_type,
+                                  copied.rate_pct, copied.fixed_amount, copied.expected_amount,
+                                  copied.rounding_scale, copied.rounding_mode, copied.payment_condition_code,
+                                  copied.source_commission_rule_id)
+                   )
                    SELECT CASE
                               WHEN COUNT(ta.transaction_attribution_id) > 0
                                AND BOOL_AND(NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL)
@@ -39,7 +67,8 @@ public class CapScheduleAmountQueryRepository {
                      FROM fgc.transaction_attribution ta
                      JOIN fgc.commission_transaction ct
                        ON ct.commission_transaction_id = ta.commission_transaction_id
-                    WHERE ta.schedule_line_id = sl.schedule_line_id
+                    WHERE ta.schedule_line_id IN (SELECT schedule_line_id FROM preserved_lines)
+                      AND ta.contract_id = sh.contract_id
                       AND ct.status = 'CONFIRMED'
                       AND ct.payment_stage = sh.payment_stage
                       AND ct.commission_item_id = sl.commission_item_id
