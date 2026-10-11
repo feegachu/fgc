@@ -23,6 +23,7 @@ const pages: Record<string, ComponentType> = {
   '/policies': PoliciesPage,
   '/exceptions': ExceptionPage,
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
+  '/journals': lazy(() => import('../features/ledger/LedgerPage')),
   '/schedules': lazy(() => import('../features/schedule/ScheduleListPage')),
   '/schedules/:id': lazy(() => import('../features/schedule/ScheduleDetailPage')),
 }
