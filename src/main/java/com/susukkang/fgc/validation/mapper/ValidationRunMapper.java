@@ -20,7 +20,7 @@ public interface ValidationRunMapper {
     /** 확정 트랜잭션 동안 결과 writer와 직렬화하기 위한 validation_run 행 잠금 조회. */
     ValidationRunRow findByIdForUpdate(@Param("validationRunId") Long validationRunId);
 
-    /** 운영정책서 제44조 여섯 확정 조건의 실패 건수를 한 스냅샷에서 조회한다. */
+    /** 운영정책서 제44조 일곱 확정 조건의 실패 건수를 한 스냅샷에서 조회한다. ValidationRunRepository 네이티브 쿼리와 같은 SQL이다. */
     FinalizeChecklistCounts findFinalizeChecklistCounts(@Param("validationRunId") Long validationRunId);
 
     /** 성공한 확정 응답 또는 동일 멱등키 재요청 응답을 위한 결과 조회. */

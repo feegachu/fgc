@@ -1064,7 +1064,7 @@ export interface paths {
         put?: never;
         /**
          * 검증 실행 확정 (IF-API-51)
-         * @description 6개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. 이는 검증 결과 잠금이며 실제 송금·법정 회계마감이 아니다.
+         * @description 7개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. 이는 검증 결과 잠금이며 실제 송금·법정 회계마감이 아니다.
          */
         post: operations["finalizeRun"];
         delete?: never;
@@ -1082,7 +1082,7 @@ export interface paths {
         };
         /**
          * 검증 실행 확정 체크리스트 조회 (IF-API-50)
-         * @description 운영정책서 제44조의 확정 전 필수조건 6개를 문서 순서와 문구 그대로 반환한다.
+         * @description 운영정책서 제44조의 확정 전 필수조건 7개를 문서 순서와 문구 그대로 반환한다.
          */
         get: operations["getFinalizeChecklist"];
         put?: never;

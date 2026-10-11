@@ -16,6 +16,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.NativeQuery;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -36,6 +38,41 @@ import java.util.Optional;
  * @since 2026-10-03
  */
 public interface ValidationRunRepository extends JpaRepository<ValidationRun, Long> {
+
+    /**
+     * 검증월 단위 트랜잭션 advisory lock(#491). 커밋·롤백 때 자동으로 풀린다.
+     *
+     * <p>확정 조건 7("같은 검증월의 가장 최근 실행인가")은 check-then-act라, 실행 행 잠금만으로는
+     * 조회 직후 같은 달 새 실행이 INSERT·커밋되는 경합을 막지 못한다(새 행 INSERT는 기존 행을 잠그지 않음).
+     * 그래서 실행 생성({@code ValidationRunCreateServiceImpl#attemptCreate})과 확정
+     * ({@code ValidationRunFinalizationServiceImpl#finalizeRun})이 같은 키를 이 메서드로 잡는다.
+     * 키를 만드는 곳을 여기 하나로 둔 이유다 — 두 쪽 키가 어긋나면 잠금이 조용히 무력화된다.
+     *
+     * <p>잠금 순서: 확정은 실행 행 → 검증월, 생성은 검증월만 잡는다. 생성 쪽이 기존 실행 행을 잠그지
+     * 않으므로 순환 대기(교착)가 생기지 않는다. 키는 {@code hashtextextended}(64비트) 해시라 다른 기능의
+     * 키(예: 전표 채번)와 충돌할 확률은 무시할 수 있고, 충돌해도 잠깐 기다릴 뿐 결과는 틀리지 않는다.
+     *
+     * <p>이 잠금을 잡은 트랜잭션 안에서 {@code ValidationRunCreateService#create}를 부르지 않는다.
+     * create는 REQUIRES_NEW 새 트랜잭션에서 같은 키를 다시 잡으므로, 바깥 트랜잭션이 끝나기를 영원히
+     * 기다린다(PostgreSQL이 감지하지 못하는 앱 수준 자기 교착). 2026-10-11 기준 그런 호출 경로는 없다.
+     *
+     * <p>키 문자열은 Java에서 만든다({@link LocalDate#toString()} = ISO {@code 2026-07-01}). SQL에서
+     * {@code CAST(:date AS text)}로 만들면 드라이버가 date·timestamp 중 무엇으로 바인딩하느냐에 따라
+     * 문자열이 달라져, 같은 달인데 다른 키가 될 수 있다.
+     */
+    default void lockValidationMonth(LocalDate validationMonth) {
+        lockAdvisoryKey(VALIDATION_MONTH_LOCK_PREFIX + validationMonth);
+    }
+
+    /** {@link #lockValidationMonth} 키 접두사. 다른 기능의 advisory 키와 섞이지 않게 네임스페이스를 둔다. */
+    String VALIDATION_MONTH_LOCK_PREFIX = "fgc.validation_run.month:";
+
+    /** 문자열 키의 트랜잭션 advisory lock. 직접 쓰지 말고 {@link #lockValidationMonth}를 쓴다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @NativeQuery("""
+            SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:lockKey, 0))
+            """)
+    Integer lockAdvisoryKey(@Param("lockKey") String lockKey);
 
     /** IF-API-51 확정 트랜잭션 직렬화용 행 잠금 조회. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -200,13 +237,18 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                              @Param("finalized") ValidationRunStatus finalized);
 
     /**
-     * IF-API-50 / FUN-044-01. 한 네이티브 쿼리의 MVCC 스냅샷에서 여섯 확정 조건의 실패
+     * IF-API-50 / FUN-044-01. 한 네이티브 쿼리의 MVCC 스냅샷에서 일곱 확정 조건의 실패
      * 건수를 함께 읽어 조건별 조회 시점 차이를 없앤다. 전표·한도는 validation_run_id 범위,
      * 예외·귀속합계는 문서 정의대로 validation_month 범위다(#330 — 예외를 실행 범위로
      * 좁히면 실시간 경로의 CRITICAL·POLICY_*가 빠진 채 확정됨). 집계가 여러 이미 JPA로
      * 전환된 테이블(journal_header, exception_case, cap_check 등)을 넘나드는 다중
      * 서브쿼리라 JPQL 대신 네이티브 SQL + {@code @SqlResultSetMapping}(ValidationRun
      * 엔티티에 선언)으로 유지한다.
+     *
+     * <p>조건 7(#491): 같은 검증월에 이 실행보다 뒤에 만든 MONTHLY·PRE_CONFIRM 실행이 있으면 확정하지 않는다.
+     * 순서는 IDENTITY인 validation_run_id로 정하고(run_no는 명시 채번 가능), 뒤 실행의 상태는 가리지 않는다
+     * (CREATED·RUNNING·FAILED여도 다시 돌리려 했다는 뜻). MANUAL_CONTRACT는 매일 생기는 일일 배치라 제외한다.
+     * 같은 SQL이 {@code ValidationRunMapper.xml#findFinalizeChecklistCounts}에도 있으니 함께 고친다.
      */
     @NativeQuery(value = """
             SELECT vr.validation_run_id AS validationRunId,
@@ -248,7 +290,19 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                             GROUP BY cc.cap_check_id, cc.included_amount
                            HAVING cc.included_amount <> COALESCE(SUM(ROUND(detail.amount, 0)), 0)
                       ) mismatch)
-                       AS capDetailMismatchCount
+                       AS capDetailMismatchCount,
+                   (SELECT COUNT(*)
+                      FROM fgc.validation_run newer
+                     WHERE newer.validation_month = vr.validation_month
+                       AND newer.run_type IN ('MONTHLY', 'PRE_CONFIRM')
+                       AND newer.validation_run_id > vr.validation_run_id)
+                       AS supersededRunCount,
+                   (SELECT MAX(newer.validation_run_id)
+                      FROM fgc.validation_run newer
+                     WHERE newer.validation_month = vr.validation_month
+                       AND newer.run_type IN ('MONTHLY', 'PRE_CONFIRM')
+                       AND newer.validation_run_id > vr.validation_run_id)
+                       AS latestRunId
               FROM fgc.validation_run vr
              WHERE vr.validation_run_id = :validationRunId
             """, sqlResultSetMapping = "FinalizeChecklistCountsMapping")

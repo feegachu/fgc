@@ -1505,10 +1505,10 @@ FGC — GA 수수료 정산·검증 플랫폼
 > 9·10단계는 Spring Batch 에 Step 자체가 없습니다. `validation_run` 에 `job_execution_id`
 > 도 없어 조인할 키가 없습니다. 각 Step 이 `current_step` 을 갱신하고 화면은 그것만 읽습니다.
 
-**⑤ 확정 조건 체크리스트 (운영정책서 제44조 — 6개 전부 초록이어야 확정 가능)**
+**⑤ 확정 조건 체크리스트 (운영정책서 제44조 — 7개 전부 초록이어야 확정 가능)**
 
-> 제44조에는 항목이 7개 적혀 있지만 마지막 `확정 사용자와 시각 기록` 은 **사전조건이 아니라
-> 확정의 사후효과**입니다(`finalized_by`·`finalized_at` 에 자동 기록). 게이트는 앞의 6개입니다.
+> 제44조에는 항목이 8개 적혀 있지만 마지막 `확정 사용자와 시각 기록` 은 **사전조건이 아니라
+> 확정의 사후효과**입니다(`finalized_by`·`finalized_at` 에 자동 기록). 게이트는 앞의 7개입니다.
 > **이 목록·순서를 바꾸지 마세요** — 예전에 정책서·쿡북·이 문서가 서로 다른 6개를 갖고
 > 있었습니다(SRC-027 감사). SQL 정본은 `08_화면별_SQL_쿡북_v1_0.md` IF-API-50 입니다.
 
@@ -1522,6 +1522,9 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 4 | 정책 없음 · 정책 중복이 0건인가 | `exception_case.exception_type IN ('POLICY_MISSING','POLICY_DUPLICATE')` |
 | 5 | 귀속합계 오류가 0건인가 | `vw_transaction_attribution_balance` ⋈ `commission_transaction` **WHERE `settlement_month` = 검증월** |
 | 6 | 계약별 상세 합계 = 실행 요약 합계인가 | `cap_check.included_amount` vs `SUM(cap_check_detail.amount WHERE INCLUDED)` |
+| 7 | 같은 검증월의 가장 최근 실행인가 | 같은 `validation_month`·`run_type IN ('MONTHLY','PRE_CONFIRM')`에 `validation_run_id`가 더 큰 실행 수(상태 무관). 바로가기는 가장 최근 실행 |
+
+> 7번은 2026-10-11 추가(#491, SRC-027 D-02 · FUN-044). 다시 검증한 달의 이전 실행을 확정하면 틀린 판정이 잠기기 때문입니다. 1~6번의 문구·순서는 그대로입니다.
 
 > **2·5번은 반드시 실행 범위로 좁혀야 합니다.** 뷰를 그냥 세면 다른 실행의 불균형까지
 > 세어 확정이 영영 막힙니다. 뷰에 `validation_run_id` 가 없어 부모 테이블로 되짚어야 하고,
@@ -1535,7 +1538,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 |---|---|
 | 실행 | 10단계를 순서대로 진행 |
 | 새로고침 | 진행률 갱신 |
-| 확정 | 6개 조건 전부 통과 시에만 활성. 결과를 잠급니다 |
+| 확정 | 7개 조건 전부 통과 시에만 활성. 결과를 잠급니다 |
 
 **막아야 할 것**
 

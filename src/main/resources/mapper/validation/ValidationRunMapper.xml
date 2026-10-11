@@ -98,7 +98,30 @@
                        -->
                        HAVING cc.included_amount &lt;&gt; COALESCE(SUM(ROUND(detail.amount, 0)), 0)
                   ) mismatch)
-                   AS capDetailMismatchCount
+                   AS capDetailMismatchCount,
+               <!--
+                 2026-10-11 yslee - #491 같은 검증월의 더 최근 월 전체 실행이 있으면 확정 차단
+                 기존 코드: 6개 조건이 모두 이 실행 안에서만 계산돼 오래된 실행도 확정할 수 있었음
+                 문제: #468 처럼 계산식이 바뀐 뒤 재검증해도, 이전 실행을 확정하면 틀린 판정이 영구히 잠김
+                 개선: 이 실행보다 뒤에 만든 MONTHLY·PRE_CONFIRM 실행 수를 센다.
+                   · 순서는 validation_run_id(IDENTITY, 단조 증가)로 정한다. run_no 는 명시 채번이 가능해 쓰지 않는다.
+                   · 상태는 가리지 않는다. 뒤 실행이 CREATED·RUNNING·FAILED 여도 누군가 다시 돌리려 했다는 뜻이므로
+                     이전 결과를 잠그지 않는다. 막힌 쪽은 새 실행을 완료해 확정하면 되므로 교착은 없다.
+                   · MANUAL_CONTRACT(일일 변경계약 배치)는 월 전체를 다시 계산하지 않고 매일 생기므로 세지 않는다.
+                     세면 일일 배치가 한 번이라도 돈 달은 영영 확정할 수 없다.
+               -->
+               (SELECT COUNT(*)
+                  FROM fgc.validation_run newer
+                 WHERE newer.validation_month = vr.validation_month
+                   AND newer.run_type IN ('MONTHLY', 'PRE_CONFIRM')
+                   AND newer.validation_run_id &gt; vr.validation_run_id)
+                   AS supersededRunCount,
+               (SELECT MAX(newer.validation_run_id)
+                  FROM fgc.validation_run newer
+                 WHERE newer.validation_month = vr.validation_month
+                   AND newer.run_type IN ('MONTHLY', 'PRE_CONFIRM')
+                   AND newer.validation_run_id &gt; vr.validation_run_id)
+                   AS latestRunId
           FROM fgc.validation_run vr
          WHERE vr.validation_run_id = #{validationRunId}
     </select>

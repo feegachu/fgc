@@ -8731,7 +8731,7 @@
     },
     "/api/v1/validation-runs/{id}/finalize" : {
       "post" : {
-        "description" : "6개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. 이는 검증 결과 잠금이며 실제 송금·법정 회계마감이 아니다.",
+        "description" : "7개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. 이는 검증 결과 잠금이며 실제 송금·법정 회계마감이 아니다.",
         "operationId" : "finalizeRun",
         "parameters" : [ {
           "in" : "path",
@@ -8817,7 +8817,7 @@
     },
     "/api/v1/validation-runs/{id}/finalize-checklist" : {
       "get" : {
-        "description" : "운영정책서 제44조의 확정 전 필수조건 6개를 문서 순서와 문구 그대로 반환한다.",
+        "description" : "운영정책서 제44조의 확정 전 필수조건 7개를 문서 순서와 문구 그대로 반환한다.",
         "operationId" : "getFinalizeChecklist",
         "parameters" : [ {
           "in" : "path",

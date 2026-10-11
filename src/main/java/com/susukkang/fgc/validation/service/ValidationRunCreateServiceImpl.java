@@ -139,6 +139,12 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     }
 
     private ValidationRunRow attemptCreate(CreateValidationRunCommand command) {
+        // 0. 검증월 잠금 (#491) — 같은 달 실행 확정과 직렬화한다. 확정이 "더 최근 실행 없음"을
+        //    확인한 뒤 커밋하기 전에 이 INSERT 가 끼어들면, 이미 재검증된 달의 이전 실행이 확정된다.
+        //    runType 을 가리지 않고 잡는다: 확정 조건 7이 세지 않는 MANUAL_CONTRACT 도 잠깐 기다릴 뿐이고,
+        //    유형별로 나누면 "어느 유형이 잠그는가"라는 규칙이 하나 더 생긴다.
+        validationRunRepository.lockValidationMonth(command.validationMonth());
+
         // 1. MONTHLY 중복 체크
         if (command.runType() == ValidationRunType.MONTHLY
                 && validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(
