@@ -1,4 +1,4 @@
-package com.susukkang.fgc.validation.mapper;
+package com.susukkang.fgc.validation.repository;
 
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 요구사항 : FGC-FUN-044 검증 결과 확정·잠금
  *
- * 설명 : IF-API-50 확정 체크리스트 PostgreSQL 통합 테스트
+ * 설명 : IF-API-50 확정 체크리스트 Repository PostgreSQL 통합 테스트
+ * 실제 확정 경로의 네이티브 SQL과 SqlResultSetMapping을 직접 검증한다(#493).
  *
  * @author yslee
  * @since 2026-08-19
@@ -25,12 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @Transactional
-class ValidationRunFinalizeChecklistMapperIntegrationTest {
+class ValidationRunFinalizeChecklistRepositoryIntegrationTest {
 
     private static final LocalDate TEST_MONTH = LocalDate.of(2088, 1, 1);
 
     @Autowired
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -66,7 +67,8 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
         insertCapMismatch(currentRunId, contractId);
         insertCapMismatch(otherRunId, contractId);
 
-        FinalizeChecklistCounts counts = validationRunMapper.findFinalizeChecklistCounts(currentRunId);
+        FinalizeChecklistCounts counts = validationRunRepository.findFinalizeChecklistCounts(currentRunId)
+                .orElseThrow();
 
         assertThat(counts.getIncompleteRunCount()).isZero();
         assertThat(counts.getJournalImbalanceCount()).isEqualTo(1);
@@ -83,7 +85,8 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
     void reportsStateConditionAsOneFailureForNonCompletedRun() {
         Long runId = createRunningRun(TEST_MONTH.plusMonths(2));
 
-        FinalizeChecklistCounts counts = validationRunMapper.findFinalizeChecklistCounts(runId);
+        FinalizeChecklistCounts counts = validationRunRepository.findFinalizeChecklistCounts(runId)
+                .orElseThrow();
 
         assertThat(counts.getIncompleteRunCount()).isEqualTo(1);
     }
@@ -102,9 +105,9 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
         insertCapDetails(insertCapCheck(mismatchRunId, contractId, "1.00"), "0.50", "0.50");
         insertCapDetails(insertCapCheck(matchedRunId, contractId, "2.00"), "0.50", "0.50");
 
-        assertThat(validationRunMapper.findFinalizeChecklistCounts(mismatchRunId)
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(mismatchRunId).orElseThrow()
                 .getCapDetailMismatchCount()).isEqualTo(1);
-        assertThat(validationRunMapper.findFinalizeChecklistCounts(matchedRunId)
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(matchedRunId).orElseThrow()
                 .getCapDetailMismatchCount()).isZero();
     }
 
@@ -122,8 +125,10 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
         insertRun(month, "MANUAL_CONTRACT");
         insertRun(month.plusMonths(1), "MONTHLY");
 
-        FinalizeChecklistCounts oldestCounts = validationRunMapper.findFinalizeChecklistCounts(oldest);
-        FinalizeChecklistCounts latestCounts = validationRunMapper.findFinalizeChecklistCounts(latest);
+        FinalizeChecklistCounts oldestCounts = validationRunRepository.findFinalizeChecklistCounts(oldest)
+                .orElseThrow();
+        FinalizeChecklistCounts latestCounts = validationRunRepository.findFinalizeChecklistCounts(latest)
+                .orElseThrow();
 
         assertThat(oldestCounts.getSupersededRunCount()).isEqualTo(2);
         assertThat(oldestCounts.getLatestRunId()).isEqualTo(latest);
