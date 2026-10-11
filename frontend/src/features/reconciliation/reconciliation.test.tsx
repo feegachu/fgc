@@ -183,6 +183,8 @@ describe('RECO-W01·W02 React 전환', () => {
   it('이력의 단계·보험회사·정산월·page/size/sort 조건 및 표시 규칙을 유지한다', async () => {
     const { router, user } = renderAt('/reconciliations?stage=GA_TO_FC&insurer=1')
     expect(await screen.findByRole('button', { name: '41' })).toBeVisible()
+    // AppShell의 최초 정산월 URL 정규화가 끝난 다음 사용자의 페이지 이동을 시작한다.
+    await waitFor(() => expect(new URLSearchParams(router.state.location.search).get('month')).toBe('2026-07'))
     const list = calls.find((call) => call.url.startsWith('/api/v1/reconciliations?'))!
     expect(Object.fromEntries(new URLSearchParams(list.url.split('?')[1]))).toEqual({
       month: '2026-07',
@@ -197,7 +199,7 @@ describe('RECO-W01·W02 React 전환', () => {
     const pagination = within(screen.getByRole('region', { name: '실행 이력' }))
     await user.click(pagination.getByRole('button', { name: '다음 페이지' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
-    expect(calls.some((call) => call.url.includes('page=2'))).toBe(true)
+    await waitFor(() => expect(calls.some((call) => call.url.includes('page=2'))).toBe(true))
   })
   it('조회 버튼은 초안 조건을 URL로 반영하고 이전 실행 선택을 지운다', async () => {
     const { router, user } = renderAt('/reconciliations?runId=41')
