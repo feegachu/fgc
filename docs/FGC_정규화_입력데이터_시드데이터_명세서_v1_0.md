@@ -686,7 +686,7 @@ refund_rate_table_id    = NULL
 source_ref              = MANUAL_CONTRACT_INITIAL
 ```
 
-`source_ref`로 시드 합성분과 수기 등록분을 구분한다. 업무키 `(contract_id, as_of_date, surrender_value_type)` 안에서 `snapshot_version`을 관리하며 UNIQUE는 업무키+버전이다. 기존·최초 행은 기본 버전 1이므로 기존 INSERT 재시도의 중복 방지는 유지된다. 수기 합성 초회보험료 정정은 직전 행을 `previous_snapshot_id`로 연결해 새 버전을 추가하고, 동일 내용 재요청에는 추가하지 않는다. 시드·정규화 적재·ACTUAL·후속 월별 자료는 정정 대상에서 제외한다. 상세 저장·조회 계약은 [초회 재무 스냅샷 정정 정책](contract-financial-snapshot-correction-policy.md)을 따른다. 근거분류는 운영정책서 제7조 예외조항의 `PROJECT_ASSUMPTION`이다.
+`source_ref`로 시드 합성분과 수기 등록분을 구분한다. 업무키 `(contract_id, as_of_date, surrender_value_type)` 안에서 `snapshot_version`을 관리하며 UNIQUE는 업무키+버전이다. 기존·최초 행은 기본 버전 1이므로 기존 INSERT 재시도의 중복 방지는 유지된다. 수기 합성 초회보험료 정정은 직전 행을 `previous_snapshot_id`로 연결해 새 버전을 추가하고, 동일 내용 재요청에는 추가하지 않는다. 시드·정규화 적재·ACTUAL·후속 월별 자료는 정정 대상에서 제외한다. 근거분류는 운영정책서 제7조 예외조항의 `PROJECT_ASSUMPTION`이다.
 
 ---
 
