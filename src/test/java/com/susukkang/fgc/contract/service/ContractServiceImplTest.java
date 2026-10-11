@@ -78,6 +78,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
  */
 @ExtendWith(MockitoExtension.class)
 class ContractServiceImplTest {
+    @Mock
+    private com.susukkang.fgc.contract.repository.ContractLockRepository contractLockRepository;
 
     @Mock
     private InsuranceContractRepository insuranceContractRepository;
@@ -344,7 +346,7 @@ class ContractServiceImplTest {
         InOrder updateOrder = inOrder(
                 insuranceContractRepository, contractFinancialSnapshotRepository, scheduleService);
         updateOrder.verify(insuranceContractRepository).flush();
-        updateOrder.verify(contractFinancialSnapshotRepository).insertInitialIfAbsent(21L);
+        updateOrder.verify(contractFinancialSnapshotRepository).appendManualInitialIfChanged(21L);
         updateOrder.verify(scheduleService).regenerateContractSchedules(21L, "CONTRACT_UPDATED");
         assertThat(current.getContractNo()).isEqualTo("TEST-001");
         assertThat(current.getDataOrigin()).isEqualTo(DataOrigin.SEED);
@@ -528,7 +530,7 @@ class ContractServiceImplTest {
         assertThat(response.scheduleHeaderIds()).isEmpty();
         assertThat(response.regeneratedScheduleIds()).isEmpty();
         verify(insuranceContractRepository).flush();
-        verify(contractFinancialSnapshotRepository).insertInitialIfAbsent(21L);
+        verify(contractFinancialSnapshotRepository).appendManualInitialIfChanged(21L);
         verifyNoInteractions(scheduleService, capCheckService);
     }
 
@@ -650,6 +652,7 @@ class ContractServiceImplTest {
 
     private InsuranceContract withContractId(Long id, InsuranceContract contract) {
         ReflectionTestUtils.setField(contract, "contractId", id);
+        ReflectionTestUtils.setField(contract, "updatedAt", OffsetDateTime.parse("2026-10-11T01:00:00.123456Z"));
         return contract;
     }
 
@@ -717,6 +720,24 @@ class ContractServiceImplTest {
         );
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void rejectsStaleOrMissingTokenBeforeAnyContractSideEffects(boolean missing) {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = contractMatching(request, 1L, 4L);
+        request.setExpectedUpdatedAt(missing ? null : request.getExpectedUpdatedAt().minusNanos(1000));
+        given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
+        assertThatThrownBy(() -> contractService.updateContract(21L, request))
+                .isInstanceOfSatisfying(FgcBusinessException.class, failure -> assertThat(failure.getErrorCode())
+                        .isEqualTo(missing ? FgcErrorCode.COMMON_002 : FgcErrorCode.CONT_003));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(contractLockRepository, insuranceContractRepository);
+        order.verify(contractLockRepository).lockAndRefresh(21L);
+        order.verify(insuranceContractRepository).findById(21L);
+        org.mockito.Mockito.verify(insuranceContractRepository, org.mockito.Mockito.never()).flush();
+        org.mockito.Mockito.verifyNoInteractions(scheduleService, capCheckService, auditLogService,
+                contractFinancialSnapshotRepository, contractQueryRepository);
+    }
+
     private ContractUpdateRequest updateRequest() {
         return new ContractUpdateRequest(
                 "TEST-001",
@@ -731,7 +752,8 @@ class ContractServiceImplTest {
                 new BigDecimal("100000"),
                 new BigDecimal("100000"),
                 120,
-                new BigDecimal("50000")
+                new BigDecimal("50000"),
+                OffsetDateTime.parse("2026-10-11T01:00:00.123456Z")
         );
     }
 }

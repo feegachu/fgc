@@ -39,7 +39,8 @@ public record ConfirmationData(
         String allocationBasis,
         String evidenceRef,
         AttributionMethod attributionMethod,
-        LocalDate contractDate
+        LocalDate contractDate,
+        String cashflowType
 ) {
 
     /**
@@ -58,6 +59,21 @@ public record ConfirmationData(
         this(paymentId, status, amount, attributedAmount, totalAttributedAmount, confirmIdempotencyKey,
                 attributionDate, attributionMonth, transactionAttributionId, contractId, agentId, paymentStage,
                 commissionItemId, itemCode, itemName, policyVersionId, inclusionDecisionStatus, exclusionType,
-                inclusionDecisionReason, allocationBasis, evidenceRef, attributionMethod, null);
+                inclusionDecisionReason, allocationBasis, evidenceRef, attributionMethod, null, "PAYMENT");
+    }
+
+    public ConfirmationData(
+            Long paymentId, CommissionPaymentStatus status, BigDecimal amount, BigDecimal attributedAmount,
+            BigDecimal totalAttributedAmount, String confirmIdempotencyKey, LocalDate attributionDate,
+            LocalDate attributionMonth, Long transactionAttributionId, Long contractId, Long agentId,
+            PaymentStage paymentStage, Long commissionItemId, String itemCode, String itemName,
+            Long policyVersionId, InclusionDecisionStatus inclusionDecisionStatus, ExclusionType exclusionType,
+            String inclusionDecisionReason, String allocationBasis, String evidenceRef,
+            AttributionMethod attributionMethod, LocalDate contractDate
+    ) {
+        this(paymentId, status, amount, attributedAmount, totalAttributedAmount, confirmIdempotencyKey,
+                attributionDate, attributionMonth, transactionAttributionId, contractId, agentId, paymentStage,
+                commissionItemId, itemCode, itemName, policyVersionId, inclusionDecisionStatus, exclusionType,
+                inclusionDecisionReason, allocationBasis, evidenceRef, attributionMethod, contractDate, "PAYMENT");
     }
 }

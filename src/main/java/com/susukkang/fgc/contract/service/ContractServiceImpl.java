@@ -31,6 +31,7 @@ import com.susukkang.fgc.contract.repository.ContractFinancialSnapshotRepository
 import com.susukkang.fgc.contract.repository.ContractQueryRepository;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
+import com.susukkang.fgc.contract.repository.ContractLockRepository;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
@@ -82,6 +83,7 @@ public class ContractServiceImpl implements ContractService {
     private final AuditLogService auditLogService;
     private final ContractQueryRepository contractQueryRepository;
     private final InsuranceContractRepository insuranceContractRepository;
+    private final ContractLockRepository contractLockRepository;
     private final ContractFinancialSnapshotRepository contractFinancialSnapshotRepository;
     private final ContractStatusEventRepository contractStatusEventRepository;
 
@@ -230,8 +232,17 @@ public class ContractServiceImpl implements ContractService {
         if (id == null) {
             throw validationException("contractId", "존재하지 않는 보험계약입니다.");
         }
+        // #431: 비교·감사 before·수정·재생성은 잠금 후 최신 계약으로 판단한다.
+        contractLockRepository.lockAndRefresh(id);
         InsuranceContract currentContract = insuranceContractRepository.findById(id)
                 .orElseThrow(() -> validationException("contractId", "존재하지 않는 보험계약입니다."));
+        // #431: 전체 교체 PUT의 옛 입력값은 refresh만으로 식별할 수 없다. 변경 전에 조회 토큰을 비교한다.
+        if (request.getExpectedUpdatedAt() == null) {
+            throw validationException("expectedUpdatedAt", "계약을 다시 조회한 뒤 수정해 주세요.");
+        }
+        if (!request.getExpectedUpdatedAt().toInstant().equals(currentContract.getUpdatedAt().toInstant())) {
+            throw new FgcBusinessException(FgcErrorCode.CONT_003);
+        }
         // 2. 수정 요청의 계약일·기준정보·소속 관계와 계약번호 중복 여부 검증
         validateInputForUpdate(currentContract, request);
 
@@ -263,10 +274,9 @@ public class ContractServiceImpl implements ContractService {
         // 6. 변경 감지를 DB에 반영하여 후속 네이티브 SQL·MyBatis 조회에 수정값 전달
         insuranceContractRepository.flush();
 
-        // 7. 수정된 계약일 기준 최초 재무 스냅샷이 없으면 생성
-        // 같은 계약·기준일·환급금 유형은 중복 생성하지 않는다.
-        // 계약일이 바뀌면 새 날짜의 스냅샷을 추가하고 기존 스냅샷은 이력으로 보존한다.
-        contractFinancialSnapshotRepository.insertInitialIfAbsent(id);
+        // #389: 최신 수기 합성 초회값이 변경된 경우 직전 버전에 연결한 새 행을 추가한다.
+        // 최초 행 누락은 보정하고, 실제/적재 자료와 과거 버전은 보존한다.
+        contractFinancialSnapshotRepository.appendManualInitialIfChanged(id);
         // 8. 보험료·상품·설계사 등 스케줄 산정 정보가 바뀐 경우에만 재생성과 한도 검증 수행
         List<Long> scheduleHeaderIds = List.of();
         if (scheduleImpactingChanges) {
@@ -308,6 +318,7 @@ public class ContractServiceImpl implements ContractService {
     public List<CapCheckSaveResult> recheckCap(Long contractId) {
         // 1. 계약 존재 확인
         validateContractExists(contractId);
+        contractLockRepository.lock(contractId);
 
         // 2. 지급단계별 활성 운영 스케줄을 기준으로 한도 재검증
         checkCapsForActiveSchedules(contractId, CapCheckKind.MANUAL);
@@ -333,6 +344,7 @@ public class ContractServiceImpl implements ContractService {
     public List<Long> regenerateSchedules(Long contractId, String reason) {
         // 1. 계약 존재 확인
         validateContractExists(contractId);
+        contractLockRepository.lockAndRefresh(contractId);
         // 2. 사유와 현재 계약·정책을 기준으로 운영 스케줄 재생성
         List<Long> scheduleIds = scheduleService.regenerateContractSchedules(contractId, reason);
         // 3. 재생성한 스케줄 ID와 요청 사유를 감사 로그에 기록

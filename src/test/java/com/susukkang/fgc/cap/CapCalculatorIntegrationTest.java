@@ -16,11 +16,14 @@ import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.cap.service.ProductRefundRateResolver;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ScheduleLineStatus;
+import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -59,6 +62,100 @@ class CapCalculatorIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private CapScheduleAmountQueryRepository capScheduleAmountQueryRepository;
+    @Autowired
+    private ScheduleService scheduleService;
+
+    @ParameterizedTest
+    @EnumSource(value = ScheduleLineStatus.class, names = {"CONFIRMED", "MATCHED", "ADJUSTED"})
+    void tracksConfirmedExclusionEvidenceAcrossRepeatedRegeneration(ScheduleLineStatus status) {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("100"));
+        Long originalLine = scheduleLineIds(headerId).getFirst();
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code='NEWCOMER_SUPPORT'", Long.class);
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET commission_item_id=?, line_status=? WHERE schedule_line_id=?",
+                itemId, status.name(), originalLine);
+        insertScheduleEvidence(contractId, originalLine, itemId, "GA_TO_FC", "EXCLUDED", "EVD-PRESERVED", true);
+
+        for (int version = 0; version < 3; version++) {
+            headerId = scheduleService.regenerateSchedules(headerId, "CONTRACT_UPDATED").getScheduleHeaderId();
+            List<ScheduleAmountView> current = capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(
+                    contractId, "GA_TO_FC", 12);
+            assertThat(current).filteredOn(line -> line.getCommissionItemId().equals(itemId))
+                    .singleElement().satisfies(line -> {
+                        assertThat(line.getScheduleLineId()).isNotEqualTo(originalLine);
+                        assertThat(line.getEvidenceRef()).isEqualTo("EVD-PRESERVED");
+                    });
+            assertThat(calculatorClassification(contractId, itemId)).isEqualTo("EXCLUDED");
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT schedule_line_id FROM fgc.transaction_attribution WHERE evidence_ref='EVD-PRESERVED' AND contract_id=?",
+                Long.class, contractId)).isEqualTo(originalLine);
+    }
+
+    private String calculatorClassification(Long contractId, Long itemId) {
+        return capCalculator.calculate(CapCalculationCommand.realtime(contractId, PaymentStage.GA_TO_FC,
+                        LocalDate.of(2026, 7, 31))).details().stream()
+                .filter(line -> line.commissionItemId().equals(itemId)).findFirst().orElseThrow().classification();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"AMOUNT", "RECIPIENT", "ITEM", "INSTALLMENT", "DATE", "FUTURE", "PREVIOUS_HOLD", "PREVIOUS_CANCELLED", "CURRENT_HOLD", "CURRENT_CANCELLED"})
+    void doesNotInheritEvidenceWhenTheCopiedOccurrenceScopeChanges(String change) {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long header = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("100"));
+        Long originalLine = scheduleLineIds(header).getFirst();
+        Long item = jdbcTemplate.queryForObject("SELECT commission_item_id FROM fgc.schedule_line WHERE schedule_line_id=?",
+                Long.class, originalLine);
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status='CONFIRMED' WHERE schedule_line_id=?", originalLine);
+        insertScheduleEvidence(contractId, originalLine, item, "GA_TO_FC", "EXCLUDED", "EVD-ORIGINAL", true);
+        jdbcTemplate.update("UPDATE fgc.schedule_header SET active_yn=false WHERE schedule_header_id=?", header);
+        Long copiedHeader = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_header(contract_id, payment_stage, policy_version_id, schedule_version_no,
+                    schedule_regime, schedule_purpose, active_yn, regenerated_from_id)
+                SELECT contract_id, payment_stage, policy_version_id, 2, schedule_regime, schedule_purpose, true,
+                       schedule_header_id FROM fgc.schedule_header WHERE schedule_header_id=?
+                RETURNING schedule_header_id
+                """, Long.class, header);
+        String amount = change.equals("AMOUNT") ? "expected_amount+1" : "expected_amount";
+        String recipient = change.equals("RECIPIENT")
+                ? "(SELECT min(agent_id) FROM fgc.agent WHERE agent_id IS DISTINCT FROM beneficiary_agent_id)" : "beneficiary_agent_id";
+        String changedItem = change.equals("ITEM")
+                ? "(SELECT commission_item_id FROM fgc.commission_item WHERE item_code='INCENTIVE')" : "commission_item_id";
+        String installment = change.equals("INSTALLMENT") ? "installment_no+1" : "installment_no";
+        String dueDate = change.equals("DATE") ? "due_date+1" : "due_date";
+        String status = change.equals("FUTURE") ? "'PLANNED'" : "line_status";
+        // 변경하는 SQL 조각은 위의 고정 테스트 케이스만 사용한다.
+        Long copiedLine = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_line(schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                    commission_item_id, beneficiary_agent_id, basis_code, basis_amount, calculation_type,
+                    rate_pct, fixed_amount, expected_amount, rounding_scale, rounding_mode, payment_condition_code,
+                    line_status, source_commission_rule_id)
+                SELECT ?, line_no, %s, contract_month_no, %s, %s, %s, basis_code, basis_amount, calculation_type,
+                       rate_pct, fixed_amount, %s, rounding_scale, rounding_mode, payment_condition_code, %s,
+                       source_commission_rule_id
+                  FROM fgc.schedule_line WHERE schedule_line_id=? RETURNING schedule_line_id
+                """.formatted(installment, dueDate, changedItem, recipient, amount, status),
+                Long.class, copiedHeader, originalLine);
+        if (change.startsWith("PREVIOUS_")) {
+            jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status=? WHERE schedule_line_id=?",
+                    change.substring("PREVIOUS_".length()), originalLine);
+        }
+        if (change.startsWith("CURRENT_")) {
+            jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status=? WHERE schedule_line_id=?",
+                    change.substring("CURRENT_".length()), copiedLine);
+        }
+        if (change.equals("CURRENT_CANCELLED")) {
+            assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12)).isEmpty();
+            return;
+        }
+        assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12))
+                .singleElement().satisfies(line -> {
+                    assertThat(line.getScheduleLineId()).isEqualTo(copiedLine);
+                    assertThat(line.getEvidenceRef()).isNull();
+                });
+    }
 
     private Long contractId(String contractNo) {
         return jdbcTemplate.queryForObject(

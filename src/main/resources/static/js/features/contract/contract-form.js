@@ -45,6 +45,9 @@
   var isLoadingProducts = false;
   var isLoadingAgents = false;
   var isSubmitting = false;
+  var expectedUpdatedAt = null;
+  var hasUpdateConflict = false;
+  var reloadButton = document.querySelector("#contract-reload-button");
   var productOfferings = [];
   /* 주기 보험료에 사용자 입력 또는 서버 저장값이 들어와 있으면 파생값으로 덮어쓰지 않는다. */
   var isPremiumPerCycleUserValue = false;
@@ -125,6 +128,11 @@
     // "입력값을 확인하세요. ({field})"만으로는 사용자가 조치할 수 없다.
     var message = error && error.detail ? error.detail : (error && error.message ? error.message : fallbackMessage);
     if (error && error.code === "FGC-CONT-001") message = "저장 불가 — 이미 등록된 계약번호입니다.";
+    if (error && error.code === "FGC-CONT-003") {
+      hasUpdateConflict = true;
+      reloadButton.hidden = false;
+      message = "다른 요청에서 계약을 수정했습니다. 현재 입력은 유지됩니다. 변경 내용을 확인한 뒤 ‘최신 계약 다시 불러오기’를 눌러 다시 수정하세요.";
+    }
     if (error && error.field && Object.prototype.hasOwnProperty.call(elements, error.field)) {
       setFieldError(error.field, message);
       var target = elements[error.field];
@@ -214,10 +222,12 @@
       return element && element.value !== "" && element.checkValidity();
     }) && elements.organizationId.value !== "" && form.checkValidity();
     var isBusy = isInitializing || isLoadingProducts || isLoadingAgents || isSubmitting;
-    saveButton.disabled = !hasRequiredValues || isBusy;
+    saveButton.disabled = !hasRequiredValues || isBusy || hasUpdateConflict || (isEditMode && !expectedUpdatedAt);
 
     if (isSubmitting) saveHint.textContent = "계약과 스케줄을 저장하고 있습니다.";
     else if (isInitializing || isLoadingProducts || isLoadingAgents) saveHint.textContent = "기준정보를 불러오는 중입니다.";
+    else if (hasUpdateConflict) saveHint.textContent = "최신 계약을 다시 불러온 뒤 수정해 주세요.";
+    else if (isEditMode && !expectedUpdatedAt) saveHint.textContent = "계약 정보를 다시 불러와 주세요.";
     else if (hasRequiredValues) saveHint.textContent = "저장할 준비가 되었습니다.";
     else saveHint.textContent = "필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.";
   }
@@ -357,6 +367,8 @@
     if (!contractId) return Promise.reject(new Error("수정할 계약 ID가 없습니다."));
     return contractApi.getContract(contractId).then(function (envelope) {
       var contract = envelope.data;
+      // Date로 변환하면 PostgreSQL의 소수 초 정밀도가 유실된다. 받은 문자열을 그대로 보관한다.
+      expectedUpdatedAt = contract.updatedAt || null;
       fillContract(contract);
       return loadInsurers(contract.insurerId, contract.insurerName).then(function () {
         return Promise.all([
@@ -381,7 +393,7 @@
   }
 
   function requestBody() {
-    return {
+    var body = {
       insurerId: Number(elements.insurerId.value),
       productOfferingId: Number(elements.productOfferingId.value),
       contractNo: elements.contractNo.value.trim(),
@@ -396,6 +408,8 @@
       paymentTermMonths: numberValue(elements.paymentTermMonths),
       standardSurrenderDeductionAmount: numberValue(elements.standardSurrenderDeductionAmount)
     };
+    if (isEditMode) body.expectedUpdatedAt = expectedUpdatedAt;
+    return body;
   }
 
   function handleReferenceChange(event) {
@@ -482,6 +496,7 @@
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (hasUpdateConflict || (isEditMode && !expectedUpdatedAt)) return;
     clearErrors();
     updateSaveState();
     if (saveButton.disabled) {
@@ -544,6 +559,10 @@
   form.addEventListener("input", handleInput);
   form.addEventListener("change", handleReferenceChange);
   form.addEventListener("submit", handleSubmit);
+  reloadButton.addEventListener("click", function () {
+    if (!window.confirm("현재 입력 내용을 최신 계약 정보로 바꿉니다. 다시 불러올까요?")) return;
+    window.location.reload();
+  });
 
   var initialization = isEditMode ? initializeEditForm() : initializeCreateForm();
   initialization.catch(function (error) {
