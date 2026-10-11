@@ -155,9 +155,9 @@ class CapCalculatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
     }
 
-    // 표준해약공제액 80% 이상 공제 대상은 12차월 예상해약환급률이 한도에 가산된다
+    // 표준해약공제액 80% 이상 공제 대상은 12차월 예상 해약환급금을 수수료등에 합산한다(= 한도에서 뺀다, #468)
     @Test
-    void addsMonth12RefundRateToLimitForStandardDeduction80Product() {
+    void subtractsMonth12RefundFromLimitForStandardDeduction80Product() {
         when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
                 .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
         when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
@@ -170,9 +170,9 @@ class CapCalculatorImplTest {
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
                 CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 1, 15)));
 
-        // base 1,200,000 × 24% = 288,000 → limit 1,488,000
+        // base 1,200,000 × 24% = 288,000 → 산입 + 288,000 ≤ 1,200,000 → limit 912,000
         assertThat(result.refund12mAmount()).isEqualByComparingTo("288000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1488000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("912000");
         assertThat(result.refundRateTableId()).isEqualTo(777L);
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
     }
@@ -193,7 +193,8 @@ class CapCalculatorImplTest {
         ));
 
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("2000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1486000");
+        // 1,200,000 − 해약환급금 288,000 + 준법경영비 2,000
+        assertThat(result.limitAmount()).isEqualByComparingTo("914000");
         assertThat(result.calculationSnapshot().get("complianceMaximumAmount").toString()).isEqualTo("3000");
     }
 
@@ -209,7 +210,86 @@ class CapCalculatorImplTest {
         ));
 
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1485000");
+        assertThat(result.limitAmount()).isEqualByComparingTo("915000");
+    }
+
+    // 2026-10-11 yslee - #468 규정 판정식(산입 + 해약환급금 − 준법경영비 ≤ 월납×12)의 경계값
+    // 기존 코드: 한도 = 월납×12 + 환급금 − 준법경영비 라서 아래 두 경계가 각각 반대로 판정됨
+    @Test
+    void flagsViolationWhenIncludedPlusRefundExceedsTwelveMonthPremium() {
+        stubIncludedAmount(true, BigDecimal.ZERO, "912001");
+        when(refundRateResolver.resolve(any(RefundRateQuery.class)))
+                .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("24.000000"))));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 7, 10), BigDecimal.ZERO));
+
+        // 912,001 + 288,000 = 1,200,001 > 1,200,000
+        assertThat(result.limitAmount()).isEqualByComparingTo("912000");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+    }
+
+    @Test
+    void allowsIncludedUpToTwelveMonthPremiumPlusVerifiedComplianceAmount() {
+        stubIncludedAmount(false, new BigDecimal("3.0000"), "1203000");
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2027, 1, 10), new BigDecimal("3000")));
+
+        // 1,203,000 − 3,000 = 1,200,000 ≤ 1,200,000 → 위반 아님(사용률 100%라 경고)
+        assertThat(result.limitAmount()).isEqualByComparingTo("1203000");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.WARNING);
+    }
+
+    @Test
+    void flagsViolationOneWonAboveComplianceAdjustedLimit() {
+        stubIncludedAmount(false, new BigDecimal("3.0000"), "1203001");
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2027, 1, 10), new BigDecimal("3000")));
+
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+    }
+
+    // 환급률이 100%를 넘는 비정상 환급률표는 검토필요로 올리고, 한도는 음수가 되지 않는다(DB CHECK)
+    @Test
+    void flagsReviewRequiredAndNeverReturnsNegativeLimitForAbnormalRefundRate() {
+        stubIncludedAmount(true, BigDecimal.ZERO, "1");
+        when(refundRateResolver.resolve(any(RefundRateQuery.class)))
+                .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("150.000000"))));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 7, 10), BigDecimal.ZERO));
+
+        assertThat(result.limitAmount()).isEqualByComparingTo("0");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
+        assertThat(result.calculationSnapshot()).containsEntry("refundRateAbnormal", true)
+                .containsEntry("refundTableMissing", false);
+    }
+
+    // 한도 0에 산입액이 있으면 사용률은 100% — 지급확정 경로(CapValidatorImpl)와 같은 값
+    @Test
+    void usageIsHundredPercentWhenLimitIsZeroAndIncludedIsPositive() {
+        stubIncludedAmount(true, BigDecimal.ZERO, "1");
+        when(refundRateResolver.resolve(any(RefundRateQuery.class)))
+                .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("100.000000"))));
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 7, 10), BigDecimal.ZERO));
+
+        assertThat(result.limitAmount()).isEqualByComparingTo("0");
+        assertThat(result.usagePct()).isEqualByComparingTo("100");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+    }
+
+    private void stubIncludedAmount(boolean standardDeduction80Yn, BigDecimal complianceDeductionPct, String amount) {
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), standardDeduction80Yn));
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("INSURER_TO_GA"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("INSURER_TO_GA", complianceDeductionPct, "STANDARD_DEDUCTION_80"));
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of(includedItem(1L, "BASE_COMMISSION")));
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+                .thenReturn(List.of(scheduleLine(11L, 1L, 1, amount)));
     }
 
     @Test

@@ -355,16 +355,17 @@
     capTableRows("input-body", [
       ["월납환산 초회보험료", money(item.basePremiumAmount)],
       ["한도 배수", multiplier == null ? "—" : multiplier + "배"],
-      ["환급금 가산", money(item.refund12mAmount)],
+      ["해약환급금 합산", money(item.refund12mAmount)],
       ["준법경영비 공제", insurerStage ? money(item.complianceDeductionAmount) : "적용하지 않음"],
       ["적용 룰셋", ruleSetLabel]
     ]);
+    // 산입 + 해약환급금 − 준법경영비 ≤ 월납×12 를 한도 쪽으로 옮긴 식이다 (#468, 감독규정 제4-32조⑤·⑭)
     var limitParts = [int(item.basePremiumAmount), "×", multiplier == null ? "—" : multiplier];
     if (number(item.refund12mAmount) !== 0) {
-      limitParts.push("+", int(item.refund12mAmount));
+      limitParts.push("−", int(item.refund12mAmount));
     }
     if (insurerStage && number(item.complianceDeductionAmount) !== 0) {
-      limitParts.push("−", int(item.complianceDeductionAmount));
+      limitParts.push("+", int(item.complianceDeductionAmount));
     }
     capText("formula-limit", "한도 = " + limitParts.join(" ") + " = " + money(item.limitAmount));
     capText("formula-usage", "사용률 = " + int(item.includedAmount) + " ÷ "
