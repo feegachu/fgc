@@ -143,6 +143,17 @@ describe('오류 화면 (#417)', () => {
     expect(screen.queryByText('요청한 화면이 없습니다.')).toBeNull()
   })
 
+  it('비JSON 404는 서버 장애 코드 없이 404 · 처리 오류로 보인다 (#466)', async () => {
+    page.thrown = await apiErrorFrom(new Response('<html>Not Found</html>', {
+      status: 404,
+      headers: { 'Content-Type': 'text/html', 'X-Request-Id': 'req-404' },
+    }))
+    renderAt(HOME)
+    expect(await screen.findByRole('heading', { name: '404 · 처리 오류' })).toBeInTheDocument()
+    expect(screen.getByText('요청 ID: req-404')).toBeInTheDocument()
+    expect(screen.queryByText(/FGC-COMMON-500/)).toBeNull()
+  })
+
   it('업무 오류(409)는 1차 business 화면처럼 상태 · 처리 오류로 문구를 그대로 보인다', async () => {
     page.thrown = await apiErrorFrom(json(409, {
       data: null,
