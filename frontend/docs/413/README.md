@@ -14,7 +14,7 @@
 | 항목 | 처리 |
 | --- | --- |
 | 검색 | `searched=true` 때만 목록 API 호출. `selected` 상세는 검색 여부와 독립적으로 조회. 조건·page·selected를 URL에 유지 |
-| 계정과목 | #414의 `/api/v1/journals/accounts`와 Query 옵션을 재사용. 신규 API 없음 |
+| 계정과목 | #414의 `/api/v1/journals/accounts`와 Query 옵션을 재사용하되, 입력용 활성 계정 API에 없는 기존 `JournalAccountCode` 8종을 조회 선택지에 보완한다. 서버 명칭은 우선 사용하며 비활성 계정도 과거 검색에서 숨기지 않는다. 정정 입력과 API 계약은 변경 없음 |
 | `imbalanceOnly=true` | 목록 API는 지원하지 않고 불균형 API는 validationRunId 필수다. 월 전체 불균형을 임의 계산하지 않으며 미지원 안내를 표시. 상세 선택 후 검증 실행별 기존 배너를 제공 |
 | 정정 요청 이동 | 응답 `/exceptions?selected=ID`를 검증 후 React Router로 이동하며 공통 정산월 유지. 실제 역분개+재기표 입력은 #414 예외함에서 처리 |
 | 역분개 후 | 전체 새로고침 대신 journals 캐시 무효화로 목록·상세·불균형을 갱신. 원분개 선택 유지 |
@@ -30,6 +30,8 @@
 ![React 상세](react-detail.png)
 
 ## 테스트 이관
+
+- 후속 경계 조건 수정: 도메인 Vitest 14건, 전체 Vitest 217건 통과/4건 opt-in 제외. 기존 계정 누락·서버 명칭 우선/비활성 검색 회귀 2건 및 브라우저 과거 계정 검색 1건을 추가했다.
 
 - `JournalViewControllerTest`: 초기 조회 대기·검색·selected → `ledger.test.tsx`.
 - `PublishingTemplateStructureTest` 원장 부분 → `ledger.test.tsx`와 공통 컴포넌트 테스트, Playwright 전후 스크린샷.

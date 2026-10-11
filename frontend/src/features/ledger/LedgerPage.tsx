@@ -28,7 +28,7 @@ import {
   reverseJournal,
 } from './api'
 import type { Journal, JournalCriteria, JournalDetail, JournalLine } from './api'
-import { JOURNAL_STATUS, JOURNAL_TYPE } from './labels'
+import { JOURNAL_ACCOUNT, JOURNAL_STATUS, JOURNAL_TYPE } from './labels'
 import './ledger.css'
 
 const EMPTY = '—'
@@ -314,11 +314,12 @@ function LedgerFilters({
         {field(
           'account',
           '계정과목',
-          Object.fromEntries(
-            (accounts.data ?? [])
-              .filter((a) => a.activeYn !== false && a.accountCode)
+          Object.fromEntries([
+            ...Object.entries(JOURNAL_ACCOUNT),
+            ...(accounts.data ?? [])
+              .filter((a) => a.accountCode)
               .map((a) => [a.accountCode!, a.accountName || a.accountCode!]),
-          ),
+          ]),
         )}
         {field('contract', '계약 ID', undefined, 'number')}
         {field('status', '상태', JOURNAL_STATUS)}

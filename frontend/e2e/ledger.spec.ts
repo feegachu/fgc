@@ -1,5 +1,34 @@
 import { expect, test } from '@playwright/test'
 
+test('활성 계정 API에 없는 기존 계정으로 과거 원장을 조회할 수 있다', async ({ page }) => {
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    const data = path.endsWith('/auth/refresh')
+      ? { accessToken: 'ledger-fixture' }
+      : path.endsWith('/auth/me')
+        ? {
+            loginId: 'fixture',
+            userName: '담당자',
+            roleCode: 'SETTLEMENT',
+            canReverseJournal: true,
+            demoMonth: '2026-07',
+          }
+        : path.endsWith('/journals/accounts')
+          ? [{ accountCode: 'EXPECTED_INCOME', accountName: '예상 수수료수익 대응', activeYn: true }]
+          : { content: [], page: 1, totalPages: 0 }
+    await route.fulfill({ json: { data, error: null, requestId: 'ledger-history-fixture' } })
+  })
+  await page.goto('journals?month=2026-07')
+  await expect(page.getByRole('option', { name: '예상 수수료미수금' })).toBeEnabled()
+  await page.getByLabel('계정과목').selectOption('EXPECTED_RECEIVABLE')
+  const response = page.waitForResponse(
+    (res) => new URL(res.url()).searchParams.get('account') === 'EXPECTED_RECEIVABLE',
+  )
+  await page.getByRole('button', { name: '조회', exact: true }).click()
+  expect((await response).ok()).toBe(true)
+  await expect(page).toHaveURL(/account=EXPECTED_RECEIVABLE/)
+})
+
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'ledger-fixture' })
 const original = {
   journalHeaderId: 11,

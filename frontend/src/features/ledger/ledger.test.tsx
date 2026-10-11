@@ -93,6 +93,31 @@ afterEach(() => {
   useAuthStore.setState({ accessToken: null })
 })
 describe('LEDG-W01 검증원장 React 전환', () => {
+  it('활성 계정 API에서 빠진 기존 계정도 과거 원장 검색 조건으로 제공한다', async () => {
+    const { user } = renderAt('/journals?month=2026-07', (url) =>
+      url === '/api/v1/journals/accounts'
+        ? [{ accountCode: 'EXPECTED_INCOME', accountName: '예상 수수료수익 대응', activeYn: true }]
+        : undefined,
+    )
+    await screen.findByRole('option', { name: '예상 수수료수익 대응' })
+    expect(screen.getByRole('option', { name: '예상 수수료미수금' })).toBeEnabled()
+    await user.selectOptions(screen.getByLabelText('계정과목'), 'EXPECTED_RECEIVABLE')
+    await user.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(calls.some((call) => call.url.includes('account=EXPECTED_RECEIVABLE'))).toBe(true))
+    expect(calls.some((call) => call.options?.method === 'POST')).toBe(false)
+  })
+  it('서버 계정명을 우선 표시하고 비활성 계정도 검색에서 숨기지 않는다', async () => {
+    const { user } = renderAt('/journals?month=2026-07', (url) =>
+      url === '/api/v1/journals/accounts'
+        ? [{ accountCode: 'EXPECTED_RECEIVABLE', accountName: '과거 미수금', activeYn: false }]
+        : undefined,
+    )
+    expect(await screen.findByRole('option', { name: '과거 미수금' })).toBeEnabled()
+    expect(screen.queryByRole('option', { name: '예상 수수료미수금' })).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('계정과목'), 'EXPECTED_RECEIVABLE')
+    await user.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(calls.some((call) => call.url.includes('account=EXPECTED_RECEIVABLE'))).toBe(true))
+  })
   it('명시적인 조회 전에는 목록 API를 호출하지 않는다', async () => {
     renderAt()
     expect(await screen.findByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).toBeVisible()
