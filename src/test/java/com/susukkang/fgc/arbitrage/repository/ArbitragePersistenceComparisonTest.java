@@ -229,7 +229,24 @@ class ArbitragePersistenceComparisonTest {
     }
 
     private void same(Object actual, Object expected) {
-        assertThat(actual).usingRecursiveComparison().withComparatorForType(BigDecimal::compareTo, BigDecimal.class).isEqualTo(expected);
+        if (actual instanceof ArbitrageCheckInsertDTO current && expected instanceof ArbitrageCheckInsertDTO previous) {
+            // #389는 원천 ID·버전 추적만 추가한다. 기존 산식·판정 JSON은 그대로 비교한다.
+            try {
+                var currentSnapshot = (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(current.getCalculationSnapshot());
+                currentSnapshot.remove(List.of("financialSnapshotId", "financialSnapshotVersion",
+                        "previousFinancialSnapshotId", "financialSnapshotSourceRef"));
+                assertThat(currentSnapshot).isEqualTo(objectMapper.readTree(previous.getCalculationSnapshot()));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+                throw new AssertionError("계산 스냅샷 JSON 비교 실패", failure);
+            }
+            assertThat(current).usingRecursiveComparison().ignoringFields("calculationSnapshot")
+                    .withComparatorForType(BigDecimal::compareTo, BigDecimal.class).isEqualTo(previous);
+            return;
+        }
+        assertThat(actual).usingRecursiveComparison()
+                .ignoringFieldsMatchingRegexes(".*financialSnapshotId", ".*financialSnapshotVersion",
+                        ".*previousFinancialSnapshotId", ".*financialSnapshotSourceRef")
+                .withComparatorForType(BigDecimal::compareTo, BigDecimal.class).isEqualTo(expected);
     }
 
     private Long firstContract() {

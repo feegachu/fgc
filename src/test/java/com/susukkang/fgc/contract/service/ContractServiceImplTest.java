@@ -346,7 +346,7 @@ class ContractServiceImplTest {
         InOrder updateOrder = inOrder(
                 insuranceContractRepository, contractFinancialSnapshotRepository, scheduleService);
         updateOrder.verify(insuranceContractRepository).flush();
-        updateOrder.verify(contractFinancialSnapshotRepository).insertInitialIfAbsent(21L);
+        updateOrder.verify(contractFinancialSnapshotRepository).appendManualInitialIfChanged(21L);
         updateOrder.verify(scheduleService).regenerateContractSchedules(21L, "CONTRACT_UPDATED");
         assertThat(current.getContractNo()).isEqualTo("TEST-001");
         assertThat(current.getDataOrigin()).isEqualTo(DataOrigin.SEED);
@@ -530,7 +530,7 @@ class ContractServiceImplTest {
         assertThat(response.scheduleHeaderIds()).isEmpty();
         assertThat(response.regeneratedScheduleIds()).isEmpty();
         verify(insuranceContractRepository).flush();
-        verify(contractFinancialSnapshotRepository).insertInitialIfAbsent(21L);
+        verify(contractFinancialSnapshotRepository).appendManualInitialIfChanged(21L);
         verifyNoInteractions(scheduleService, capCheckService);
     }
 

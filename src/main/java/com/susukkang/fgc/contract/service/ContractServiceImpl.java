@@ -274,10 +274,9 @@ public class ContractServiceImpl implements ContractService {
         // 6. 변경 감지를 DB에 반영하여 후속 네이티브 SQL·MyBatis 조회에 수정값 전달
         insuranceContractRepository.flush();
 
-        // 7. 수정된 계약일 기준 최초 재무 스냅샷이 없으면 생성
-        // 같은 계약·기준일·환급금 유형은 중복 생성하지 않는다.
-        // 계약일이 바뀌면 새 날짜의 스냅샷을 추가하고 기존 스냅샷은 이력으로 보존한다.
-        contractFinancialSnapshotRepository.insertInitialIfAbsent(id);
+        // #389: 최신 수기 합성 초회값이 변경된 경우 직전 버전에 연결한 새 행을 추가한다.
+        // 최초 행 누락은 보정하고, 실제/적재 자료와 과거 버전은 보존한다.
+        contractFinancialSnapshotRepository.appendManualInitialIfChanged(id);
         // 8. 보험료·상품·설계사 등 스케줄 산정 정보가 바뀐 경우에만 재생성과 한도 검증 수행
         List<Long> scheduleHeaderIds = List.of();
         if (scheduleImpactingChanges) {

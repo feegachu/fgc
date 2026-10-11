@@ -27,7 +27,8 @@ import java.time.OffsetDateTime;
                         columnNames = {
                                 "contract_id",
                                 "as_of_date",
-                                "surrender_value_type"
+                                "surrender_value_type",
+                                "snapshot_version"
                         }
                 )
         }
@@ -74,6 +75,12 @@ public class ContractFinancialSnapshot {
 
     @Column(name = "source_ref", length = 500)
     private String sourceRef;
+
+    @Column(name = "snapshot_version", nullable = false)
+    private Integer snapshotVersion;
+
+    @Column(name = "previous_snapshot_id")
+    private Long previousSnapshotId;
 
     // DB 기본값으로 생성
     @Column(

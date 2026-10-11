@@ -15,7 +15,7 @@ import org.springframework.data.repository.query.Param;
 
 
 public interface ContractFinancialSnapshotRepository
-        extends JpaRepository<ContractFinancialSnapshot, Long> {
+        extends JpaRepository<ContractFinancialSnapshot, Long>, ContractFinancialSnapshotWrites {
 
     /**
      * 계약일 기준 최초 재무 스냅샷을 생성한다.
