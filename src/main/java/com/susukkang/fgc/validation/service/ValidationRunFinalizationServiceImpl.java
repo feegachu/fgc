@@ -2,6 +2,7 @@ package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
@@ -79,6 +80,17 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                 return response(finalized);
             }
             throw new FgcBusinessException(FgcErrorCode.VRUN_003, Map.of("id", validationRunId));
+        }
+
+        // 2026-10-12 yslee - #494 확정할 수 있는 실행 유형 제한 (운영정책서 제44조)
+        // 기존 코드: 상태(COMPLETED/8)만 보고 실행 유형은 보지 않음
+        // 문제: 변경된 계약만 계산하는 MANUAL_CONTRACT 실행도 COMPLETED/8 이 되어, 일부 계약의 결과가
+        //       그 달의 확정 결과로 잠길 수 있었음
+        // 개선: 월 전체를 계산한 유형만 확정한다. 이미 FINALIZED 인 실행의 멱등 재요청(위)은 그대로 응답한다.
+        ValidationRunType runType = ValidationRunType.valueOf(lockedRun.getRunType());
+        if (!runType.isFinalizable()) {
+            throw new FgcBusinessException(FgcErrorCode.VRUN_004,
+                    Map.of("from", runType.label() + " 실행", "to", "FINALIZED"));
         }
 
         if (lockedRun.getStatus() != ValidationRunStatus.COMPLETED || lockedRun.getCurrentStep() != 8) {

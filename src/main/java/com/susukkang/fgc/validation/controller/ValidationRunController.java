@@ -82,7 +82,8 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001)")
+                    responseCode = "409", description = "동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001), "
+                            + "이미 확정된 달의 MONTHLY·PRE_CONFIRM 생성 (FGC-VRUN-007)")
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -283,7 +284,8 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005)"),
+                    responseCode = "409", description = "확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005), "
+                            + "확정할 수 없는 실행 유형(계약수동) (FGC-VRUN-004)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "422", description = "확정 조건 미충족 (FGC-VRUN-002)")
     })

@@ -171,6 +171,8 @@ class PublishingTemplateStructureTest {
                 .contains("id=\"cond-body\" aria-live=\"polite\"")
                 .contains("data-checklist-passed=\"false\"")
                 .contains("data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}")
+                // #494 확정 가능 유형은 서버(ValidationRunType#isFinalizable)가 정해 내려준다
+                .contains("data-run-finalizable=${detail.header().runType().isFinalizable()}")
                 .contains("검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.")
                 .containsOnlyOnce("id=\"finalize-action-guide\"")
                 .containsOnlyOnce("id=\"btn-finalize\"")

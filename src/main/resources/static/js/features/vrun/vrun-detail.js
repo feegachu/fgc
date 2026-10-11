@@ -214,16 +214,22 @@
    */
   function updateFinalizeButtonState() {
     if (!finalizeButton) return;
+    // #494 확정 가능한 실행 유형(월간·확정전)은 서버가 ValidationRunType#isFinalizable 로 정해 내려준다.
+    // 화면은 그 값을 쓸 뿐 유형 목록을 따로 갖지 않는다. 서버도 같은 기준으로 확정을 거부한다(VRUN-004).
+    var runFinalizable = finalizeButton.dataset.runFinalizable === "true";
     var canFinalize = finalizeButton.dataset.canFinalize === "true";
     var checklistPassed = finalizeButton.dataset.checklistPassed === "true";
-    finalizeButton.disabled = finalizeRequestPending || runStatus !== "COMPLETED" || !canFinalize || !checklistPassed;
+    finalizeButton.disabled = finalizeRequestPending || runStatus !== "COMPLETED" || !runFinalizable
+      || !canFinalize || !checklistPassed;
     finalizeButton.removeAttribute("title");
 
     var reason = "";
-    if (!canFinalize) {
+    if (!runFinalizable) {
+      reason = "계약수동 실행은 변경된 계약만 다시 계산하므로 확정할 수 없습니다. 같은 달 월간 실행을 확정하세요.";
+    } else if (!canFinalize) {
       reason = "확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.";
     } else if (runStatus === "FINALIZED") {
-      reason = "이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.";
+      reason = "이미 확정된 실행입니다. 확정된 달은 다시 검증하지 않습니다.";
     } else if (runStatus !== "COMPLETED") {
       reason = "검증 계산이 끝난 실행만 확정할 수 있습니다.";
     } else if (!checklistPassed) {
@@ -294,6 +300,12 @@
     if (runStatus === "FINALIZED") {
       setChecklistState("확정 완료", "확정된 실행의 결과와 계산 근거가 잠겼습니다.",
         "status-badge-review", "is-empty");
+      setBusy(false);
+      return;
+    }
+    if (finalizeButton.dataset.runFinalizable !== "true") {
+      setChecklistState("확정 대상 아님", "계약수동 실행은 확정할 수 없습니다. 같은 달 월간 실행에서 확정하세요.",
+        null, "is-empty");
       setBusy(false);
       return;
     }
@@ -448,7 +460,7 @@
     });
   }
 
-  /* 오류 문구에 오류코드(FGC-VRUN-001~006)와 요청 ID 를 함께 붙인다. */
+  /* 오류 문구에 오류코드(FGC-VRUN-001~007)와 요청 ID 를 함께 붙인다. */
   function errorText(error, fallback) {
     if (format && typeof format.errorText === "function") return format.errorText(error, fallback);
     return (error && error.message) || fallback;

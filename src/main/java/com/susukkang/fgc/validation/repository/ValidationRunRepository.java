@@ -90,6 +90,9 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
     boolean existsByValidationMonthAndRunTypeAndStatusIn(
             LocalDate validationMonth, String runType, Collection<ValidationRunStatus> statuses);
 
+    /** validationMonth 에 해당 상태의 실행이 있는지 — 확정된 달의 월 전체 실행 생성 차단용(#494). */
+    boolean existsByValidationMonthAndStatus(LocalDate validationMonth, ValidationRunStatus status);
+
     /**
      * runType='MANUAL_CONTRACT'이고 status가 활성인 실행이 있는지.
      * uq_validation_run_active_manual_contract(V13)의 애플리케이션측 사전 확인용 — month로 좁히지 않는다.
@@ -248,6 +251,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
      * <p>조건 7(#491): 같은 검증월에 이 실행보다 뒤에 만든 MONTHLY·PRE_CONFIRM 실행이 있으면 확정하지 않는다.
      * 순서는 IDENTITY인 validation_run_id로 정하고(run_no는 명시 채번 가능), 뒤 실행의 상태는 가리지 않는다
      * (CREATED·RUNNING·FAILED여도 다시 돌리려 했다는 뜻). MANUAL_CONTRACT는 매일 생기는 일일 배치라 제외한다.
+     * {@code run_type IN ('MONTHLY','PRE_CONFIRM')}은 {@code ValidationRunType#isFinalizable}과 같은 집합이다(#494).
      * 같은 SQL이 {@code ValidationRunMapper.xml#findFinalizeChecklistCounts}에도 있으니 함께 고친다.
      */
     @NativeQuery(value = """

@@ -5685,7 +5685,7 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
                 };
             };
-            /** @description 동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001) */
+            /** @description 동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001), 이미 확정된 달의 MONTHLY·PRE_CONFIRM 생성 (FGC-VRUN-007) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5845,7 +5845,7 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
                 };
             };
-            /** @description 확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005) */
+            /** @description 확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005), 확정할 수 없는 실행 유형(계약수동) (FGC-VRUN-004) */
             409: {
                 headers: {
                     [name: string]: unknown;

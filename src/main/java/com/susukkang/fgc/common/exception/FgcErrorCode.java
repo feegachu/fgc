@@ -133,6 +133,13 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.validationRun.idempotencyKeyConflict"
     ),
+    // 2026-10-12 yslee - #494 확정된 달에는 월 전체 실행을 새로 만들지 않는다(운영정책서 제44조).
+    // VRUN-003 은 확정된 결과의 "수정" 거부라 실행 "생성" 거부와 화면 안내·대응이 다르므로 코드를 나눈다.
+    VRUN_007(
+            "FGC-VRUN-007",
+            HttpStatus.CONFLICT,
+            "error.validationRun.monthFinalized"
+    ),
 
     LEDG_001(
             "FGC-LEDG-001",

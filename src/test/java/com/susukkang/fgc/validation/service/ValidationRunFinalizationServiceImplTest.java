@@ -249,10 +249,14 @@ class ValidationRunFinalizationServiceImplTest {
     }
 
     private ValidationRun run(ValidationRunStatus status, int currentStep) {
+        return run(status, currentStep, "MONTHLY");
+    }
+
+    private ValidationRun run(ValidationRunStatus status, int currentStep, String runType) {
         ValidationRun run = ValidationRun.builder()
                 .validationMonth(LocalDate.of(2026, 8, 1))
                 .runNo(1)
-                .runType("MONTHLY")
+                .runType(runType)
                 .build();
         ReflectionTestUtils.setField(run, "validationRunId", 44L);
         ReflectionTestUtils.setField(run, "status", status);
@@ -268,5 +272,35 @@ class ValidationRunFinalizationServiceImplTest {
         row.setFinalizedBy("gaadmin");
         row.setFinalizeIdempotencyKey(idempotencyKey);
         return row;
+    }
+
+    // 2026-10-12 yslee - #494 계약수동(MANUAL_CONTRACT) 실행은 COMPLETED/8 이어도 확정하지 않는다
+    // 체크리스트·월 잠금에 닿기 전에 거부한다
+    @Test
+    void rejectsManualContractRunBeforeChecklistAndMonthLock() {
+        when(validationRunRepository.findByIdForUpdate(44L))
+                .thenReturn(Optional.of(run(ValidationRunStatus.COMPLETED, 8, "MANUAL_CONTRACT")));
+
+        assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "finalize-44"))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_004);
+                    assertThat(exception.getParams()).containsEntry("from", "계약수동 실행");
+                });
+        verify(validationRunRepository, never()).lockValidationMonth(any());
+        verify(validationRunRepository, never()).findFinalizeChecklistCounts(any());
+        verify(validationRunRepository, never()).finalizeIfCompleted(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void finalizesPreConfirmRunLikeMonthly() {
+        when(validationRunRepository.findByIdForUpdate(44L))
+                .thenReturn(Optional.of(run(ValidationRunStatus.COMPLETED, 8, "PRE_CONFIRM")));
+        when(validationRunRepository.findFinalizeChecklistCounts(44L)).thenReturn(Optional.of(passingCounts()));
+        when(validationRunRepository.finalizeIfCompleted(
+                44L, 7L, null, ValidationRunStatus.COMPLETED, ValidationRunStatus.FINALIZED))
+                .thenReturn(1);
+        when(validationRunRepository.findFinalizationById(44L)).thenReturn(Optional.of(finalized(null)));
+
+        assertThat(service.finalizeRun(44L, 7L, null).status()).isEqualTo("FINALIZED");
     }
 }
