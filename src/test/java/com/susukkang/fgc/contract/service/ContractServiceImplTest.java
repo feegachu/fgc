@@ -78,6 +78,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
  */
 @ExtendWith(MockitoExtension.class)
 class ContractServiceImplTest {
+    @Mock
+    private com.susukkang.fgc.contract.repository.ContractLockRepository contractLockRepository;
 
     @Mock
     private InsuranceContractRepository insuranceContractRepository;

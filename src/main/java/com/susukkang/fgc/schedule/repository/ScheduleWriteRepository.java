@@ -3,6 +3,7 @@ package com.susukkang.fgc.schedule.repository;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.code.ScheduleLineStatus;
+import com.susukkang.fgc.contract.repository.ContractLockRepository;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
@@ -37,6 +38,7 @@ public class ScheduleWriteRepository {
 
     private final EntityManager entityManager;
     private final ScheduleHeaderRepository scheduleHeaderRepository;
+    private final ContractLockRepository contractLockRepository;
 
     private static final String LINE_INSERT = """
             INSERT INTO fgc.schedule_line (
@@ -161,15 +163,7 @@ public class ScheduleWriteRepository {
 
     /** 계약 단위 스케줄 생성·재생성·확정을 직렬화하기 위해 계약 행을 잠근다. 없으면 null. */
     public Long lockContractForScheduleGeneration(Long contractId) {
-        List<?> rows = entityManager.createNativeQuery("""
-                SELECT contract_id
-                  FROM fgc.insurance_contract
-                 WHERE contract_id = :contractId
-                 FOR UPDATE
-                """, Long.class)
-                .setParameter("contractId", contractId)
-                .getResultList();
-        return rows.isEmpty() ? null : ((Number) rows.getFirst()).longValue();
+        return contractLockRepository.lockAndRefresh(contractId);
     }
 
     /** 기존 활성 운영 스케줄을 비활성화한다. */

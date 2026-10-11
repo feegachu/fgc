@@ -45,6 +45,8 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class CapCheckServiceImplTest {
+    @Mock
+    private com.susukkang.fgc.contract.repository.ContractLockRepository contractLockRepository;
 
     @Mock
     private CapCalculator capCalculator;
@@ -67,7 +69,7 @@ class CapCheckServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        capCheckService = new CapCheckServiceImpl(capCalculator, capCheckQueryRepository, capCheckWriteRepository, new ObjectMapper());
+        capCheckService = new CapCheckServiceImpl(capCalculator, capCheckQueryRepository, capCheckWriteRepository, new ObjectMapper(), contractLockRepository);
     }
 
     @Test

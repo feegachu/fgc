@@ -31,6 +31,7 @@ import com.susukkang.fgc.contract.repository.ContractFinancialSnapshotRepository
 import com.susukkang.fgc.contract.repository.ContractQueryRepository;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
+import com.susukkang.fgc.contract.repository.ContractLockRepository;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
@@ -82,6 +83,7 @@ public class ContractServiceImpl implements ContractService {
     private final AuditLogService auditLogService;
     private final ContractQueryRepository contractQueryRepository;
     private final InsuranceContractRepository insuranceContractRepository;
+    private final ContractLockRepository contractLockRepository;
     private final ContractFinancialSnapshotRepository contractFinancialSnapshotRepository;
     private final ContractStatusEventRepository contractStatusEventRepository;
 
@@ -230,6 +232,8 @@ public class ContractServiceImpl implements ContractService {
         if (id == null) {
             throw validationException("contractId", "존재하지 않는 보험계약입니다.");
         }
+        // #431: 비교·감사 before·수정·재생성은 잠금 후 최신 계약으로 판단한다.
+        contractLockRepository.lockAndRefresh(id);
         InsuranceContract currentContract = insuranceContractRepository.findById(id)
                 .orElseThrow(() -> validationException("contractId", "존재하지 않는 보험계약입니다."));
         // 2. 수정 요청의 계약일·기준정보·소속 관계와 계약번호 중복 여부 검증
@@ -308,6 +312,7 @@ public class ContractServiceImpl implements ContractService {
     public List<CapCheckSaveResult> recheckCap(Long contractId) {
         // 1. 계약 존재 확인
         validateContractExists(contractId);
+        contractLockRepository.lock(contractId);
 
         // 2. 지급단계별 활성 운영 스케줄을 기준으로 한도 재검증
         checkCapsForActiveSchedules(contractId, CapCheckKind.MANUAL);
@@ -333,6 +338,7 @@ public class ContractServiceImpl implements ContractService {
     public List<Long> regenerateSchedules(Long contractId, String reason) {
         // 1. 계약 존재 확인
         validateContractExists(contractId);
+        contractLockRepository.lockAndRefresh(contractId);
         // 2. 사유와 현재 계약·정책을 기준으로 운영 스케줄 재생성
         List<Long> scheduleIds = scheduleService.regenerateContractSchedules(contractId, reason);
         // 3. 재생성한 스케줄 ID와 요청 사유를 감사 로그에 기록
