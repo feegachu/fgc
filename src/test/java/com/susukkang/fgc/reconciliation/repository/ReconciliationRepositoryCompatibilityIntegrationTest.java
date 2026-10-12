@@ -251,7 +251,7 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
             Map<String, Object> p = params("contractId", null, "expectedAgentId", null,
                     "actualAgentId", null, "journalHeaderIds", journalIds);
             compare("classification_context", () -> baseline.selectOne(NS + "ReconciliationResultMapper.findClassificationContext", p),
-                    () -> results.findClassificationContext(null, null, null, journalIds));
+                    () -> results.findClassificationContext(null, null, null, journalIds, null));
         }
         assertThat(results.findDetail(Long.MAX_VALUE)).isNull();
         assertThat(runs.findById(Long.MAX_VALUE)).isNull();
