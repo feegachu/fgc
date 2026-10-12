@@ -116,6 +116,8 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
      * 실제로 납입한 보험료"(감독규정 제4-32조⑥), 실효는 "실효계약 사유 발생 시를 계약해지 시기로 판단"(FAQ 2차 Q12).
      * 효력일이 고정이라 같은 해지 사건을 며칠 뒤 다시 읽어도 같은 기준일 행이 된다.
      * 최근 사건의 상태가 현재 상태와 다르면(사건 없는 수기 상태 변경) 효력일을 알 수 없으므로 오늘을 쓴다.
+     * "현재 상태와 같은 사건 중 최근 것"을 쓰지 않는 이유: 실효 → 부활(사건) → 수기로 다시 실효처럼 더 늦은 사건이
+     * 그 상태를 끝낸 경우, 부활로 효력을 잃은 예전 실효일을 고르게 된다(#515 조건 ③과 같은 판단).
      */
     private LocalDate arbitrageAsOfDate(InsuranceContract contract, LocalDate today) {
         ContractStatus status = contract.getCurrentStatus();
