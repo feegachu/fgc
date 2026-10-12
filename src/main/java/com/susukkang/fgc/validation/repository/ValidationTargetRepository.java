@@ -35,6 +35,11 @@ public interface ValidationTargetRepository extends JpaRepository<ValidationTarg
      * Asia/Seoul 자정으로 고정한다. 검증월 이전에 해지·실효된 계약은 그 달 실행에서 이미 점검했으므로 넣지 않는다.
      * 효력일에 상한(검증월 말일)을 두지 않는다 — 검증월을 나중에 다시 돌려도, 그 사이 해지된 계약이
      * 현재 상태 때문에 빠지지 않고 검증월에 살아 있던 계약이 그대로 대상이 된다(재실행 결과 재현성).
+     * <p>
+     * UNPAID·REVIVED도 유지 계약이다. 표준약관(보험업감독업무시행세칙 별표15, 생명보험 제26조)상 보험료가
+     * 연체돼도 납입최고(독촉)기간이 끝난 다음 날에야 해지되고 그 전 보험금 지급사유는 보상하며, 부활은
+     * 해지계약의 "효력회복"이다. V2 SCHEDULE_ELIGIBILITY도 두 상태를 지급(REVIVED)·보류(UNPAID) 대상으로 둔다.
+     * CANCELLED(청약철회)·MATURED(만기)는 차익거래 조문(제4-32조⑥)의 "해지"가 아니라 넣지 않는다.
      *
      * @return 실제로 삽입된 행 수(충돌로 스킵된 행은 제외)
      */
