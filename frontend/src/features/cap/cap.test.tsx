@@ -9,7 +9,7 @@ import { apiClient } from '../../lib/api/client'
 import { ApiError } from '../../lib/api/errors'
 import { useAuthStore } from '../../stores/auth'
 import { useWorkspaceStore } from '../../stores/workspace'
-import { criteriaFromParams } from './api'
+import { capDetailQuery, criteriaFromParams } from './api'
 import type { CapBasis, CapItem, CapSearch } from './api'
 import { CapDetailModal } from './CapDetailModal'
 
@@ -34,6 +34,7 @@ const item: CapItem = {
 const basis: CapBasis = {
   capCheck: item,
   calculationSnapshot: { premiumMultiplier: 12, warningUsagePct: '90.0000' },
+  warningStartUsagePct: '82.857142',
   details: [
     {
       detailSeq: 2,
@@ -278,47 +279,80 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
     expect(screen.queryByText(/internal database secret/)).not.toBeInTheDocument()
   })
-  it('공통 모달은 계약 상세 소비자에서도 동일 props로 사용하며 null은 조회하지 않는다', async () => {
-    const close = vi.fn()
-    const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope(basis))
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    function Consumer({ id }: { id: number | null }) {
-      return (
-        <QueryClientProvider client={client}>
-          <CapDetailModal capCheckId={id} onClose={close} />
-        </QueryClientProvider>
+  it.each([null, undefined, ''])(
+    '공통 모달은 계약 상세 소비자의 빈 ID(%s)를 열거나 조회하지 않는다',
+    async (emptyId) => {
+      const close = vi.fn()
+      const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope(basis))
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      function Consumer({ id }: { id: string | number | null | undefined }) {
+        return (
+          <QueryClientProvider client={client}>
+            <CapDetailModal capCheckId={id} onClose={close} />
+          </QueryClientProvider>
+        )
+      }
+      const router = createMemoryRouter([{ path: '/contracts/:id', element: <Consumer id={emptyId} /> }], {
+        initialEntries: ['/contracts/3?tab=cap'],
+      })
+      const view = render(<RouterProvider router={router} />)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(request).not.toHaveBeenCalled()
+      expect(capDetailQuery(emptyId).enabled).toBe(false)
+      expect(capDetailQuery(emptyId).queryKey).toEqual(['cap-checks', 'detail', null])
+      await expect(client.fetchQuery(capDetailQuery(emptyId))).rejects.toThrow('계산근거 ID가 없습니다.')
+      expect(request).not.toHaveBeenCalled()
+      view.unmount()
+      const opened = createMemoryRouter([{ path: '/contracts/:id', element: <Consumer id={11} /> }], {
+        initialEntries: ['/contracts/3?tab=cap'],
+      })
+      render(<RouterProvider router={opened} />)
+      const dialog = await screen.findByRole('dialog')
+      await within(dialog).findByText('저장 당시 산입', { selector: '.table-cell-preview' })
+      expect(request).toHaveBeenCalledWith(
+        '/api/v1/cap-checks/11/details',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       )
-    }
-    const router = createMemoryRouter([{ path: '/contracts/:id', element: <Consumer id={null} /> }], {
-      initialEntries: ['/contracts/3?tab=cap'],
-    })
-    const view = render(<RouterProvider router={router} />)
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(request).not.toHaveBeenCalled()
-    view.unmount()
-    const opened = createMemoryRouter([{ path: '/contracts/:id', element: <Consumer id={11} /> }], {
-      initialEntries: ['/contracts/3?tab=cap'],
-    })
-    render(<RouterProvider router={opened} />)
+      fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }))
+      expect(close).toHaveBeenCalledOnce()
+    },
+  )
+  it('주의선은 저장 정책 90이 아닌 서버의 사용률 위치를 쓰고 저장 판정을 유지한다', async () => {
+    renderAt('/cap-checks?capCheckId=11')
+    const dialog = await screen.findByRole('dialog')
+    const marker = await within(dialog).findByTitle('주의 기준 82.857142%')
+    expect(marker).toHaveStyle({ left: '82.857142%' })
+    expect(within(dialog).getByText('주의 기준 (1,200% 예산) 90.0000%')).toBeVisible()
+    expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
+  })
+  it('서버 주의선 위치가 없으면 90% 선을 추정하지 않는다', async () => {
+    renderAt('/cap-checks?capCheckId=11', (url) =>
+      url.endsWith('/details') ? { ...basis, warningStartUsagePct: undefined } : undefined,
+    )
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('저장 당시 산입', { selector: '.table-cell-preview' })
-    expect(request).toHaveBeenCalledWith(
-      '/api/v1/cap-checks/11/details',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    )
-    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }))
-    expect(close).toHaveBeenCalledOnce()
+    expect(dialog.querySelector('.cap-react-warning')).not.toBeInTheDocument()
   })
   it('GA→설계사는 공제 미적용, 상세 합계 불일치 안내만 하고 저장 판정은 유지한다', async () => {
     renderAt('/cap-checks?capCheckId=11', (url) =>
       url.endsWith('/details')
-        ? { ...basis, capCheck: { ...item, paymentStage: 'GA_TO_FC', includedAmount: 999999 } }
+        ? {
+            ...basis,
+            capCheck: {
+              ...item,
+              paymentStage: 'GA_TO_FC',
+              complianceDeductionAmount: 0,
+              limitAmount: 912000,
+              includedAmount: 999999,
+              remainingAmount: -87999,
+            },
+          }
         : undefined,
     )
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.')
     expect(within(dialog).getByText('적용하지 않음')).toBeVisible()
-    expect(within(dialog).getByText('한도 = 100,000 × 12 − 288,000 = 915,000원')).toBeVisible()
+    expect(within(dialog).getByText('한도 = 100,000 × 12 − 288,000 = 912,000원')).toBeVisible()
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
 })

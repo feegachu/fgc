@@ -1746,6 +1746,7 @@ export interface components {
             };
             capCheck?: components["schemas"]["CapCheckItemResponse"];
             details?: components["schemas"]["CapCheckDetailResponse"][];
+            warningStartUsagePct?: string;
         };
         CapCheckDetailLine: {
             amount?: number;

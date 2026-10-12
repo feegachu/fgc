@@ -5,14 +5,14 @@
 ## 공유 모달 계약
 
 `features/cap/CapDetailModal.tsx`의 named export `CapDetailModal`을 사용한다.
-props는 `capCheckId: string | number | null`, `onClose: () => void`이다. null은 닫힘/조회 안 함을 의미한다.
+props는 `capCheckId: string | number | null | undefined`, `onClose: () => void`이다. null·undefined·빈 문자열은 닫힘/조회 안 함을 의미한다. 빈 ID 쿼리를 수동으로 실행해도 API 요청 전에 차단한다.
 QueryClientProvider와 Router 안에서 렌더링하며, URL/선택 상태는 호출자가 관리한다.
 #408 담당자에게 이슈 댓글로 제안했으며, 합의·리뷰 완료로 간주하지 않는다.
 
 ## 검증
 
 - Node 22.22.2, Java 21 사용
-- Vitest: `npm test -- --run` — 218 passed / 4 skipped (CAP 15개 포함)
+- 리뷰 반영 후 Vitest: `npm test -- --run` — 222 passed / 4 skipped (CAP 19개 포함). 빈 ID 3종·서버 주의선 위치·위치 부재 회귀를 검증한다.
 - API 타입: `npm run check:api`, 린트: `npm run lint`, 프로덕션 빌드: `npm run build`
 - 기존 화면: `./gradlew test --tests '*CapPublishingTemplateStructureTest' --tests '*PublishingTemplateStructureTest' --tests '*ScreenViewControllerTest'` — 47 passed
 - 브라우저 UI 회귀: `npx playwright test e2e/cap.spec.ts` (API fixture, 실제 업무 서버 검증과 구분)
@@ -22,6 +22,8 @@ QueryClientProvider와 Router 안에서 렌더링하며, URL/선택 상태는 �
 - 계정은 `FGC_CAP_QA_LOGIN_ID`, `FGC_CAP_QA_PASSWORD` 환경변수로만 전달한다. 코드/캡처/PR에는 비밀번호·토큰·쿠키를 저장하지 않는다.
 
 ## 전후 화면
+
+후속 리뷰 반영: GA→설계사 수식 fixture를 준법경영비 0·한도 912,000원으로 맞췄다. 최신 develop `308e3973`의 #508을 따라 주의선은 서버 `warningStartUsagePct`로 표시하며, 정책 90%와 사용률 표시선 위치를 구분한다. OpenAPI 스펙과 생성 타입에 기존 서버 필드 1개만 동기화했다. API 경로·백엔드 판정 계산을 새로 변경한 것은 아니다. 아래 캡처는 최초 전환 당시 기록이다.
 
 2026-10-12 로컬 격리 PostgreSQL 17.11 + Java 21 실서버에서 확보했다. 토큰·쿠키·운영 데이터는 포함하지 않는다.
 기존 Flyway 시연 데이터를 사용하고 기존 API로 시연 계약 1~5의 운영 스케줄과 판정을 생성했다.

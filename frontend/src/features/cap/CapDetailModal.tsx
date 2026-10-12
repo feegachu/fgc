@@ -15,8 +15,8 @@ import { Amount, CapError, CapEvidence, CapStatus, CapUsage } from './badges'
 import './cap.css'
 
 export interface CapDetailModalProps {
-  /** #408 CONT-W02도 사용. null이면 닫힘, URL/선택 상태는 호출자가 소유한다. */
-  capCheckId: string | number | null
+  /** #408 CONT-W02도 사용. null/undefined/빈 문자열이면 닫힘, URL/선택 상태는 호출자가 소유한다. */
+  capCheckId: string | number | null | undefined
   onClose: () => void
 }
 type Detail = NonNullable<CapBasis['details']>[number]
@@ -72,7 +72,7 @@ export function CapDetailModal({ capCheckId, onClose }: CapDetailModalProps) {
   const detail = useQuery(capDetailQuery(capCheckId))
   return (
     <Modal
-      open={capCheckId !== null}
+      open={capCheckId != null && capCheckId !== ''}
       title="계산근거"
       className="cap-react-modal"
       onClose={onClose}
@@ -164,8 +164,8 @@ function BasisContent({ data }: { data: CapBasis }) {
           </section>
           <section className="surface">
             <h3>④ 합계와 판정</h3>
-            <CapUsage value={item.usagePct} status={item.resultStatus} warning={snapshot.warningUsagePct} />
-            {snapshot.warningUsagePct != null && <p>주의 기준 {rate(snapshot.warningUsagePct)}%</p>}
+            <CapUsage value={item.usagePct} status={item.resultStatus} warning={data.warningStartUsagePct} />
+            {snapshot.warningUsagePct != null && <p>주의 기준 (1,200% 예산) {rate(snapshot.warningUsagePct)}%</p>}
             <dl>
               <div>
                 <dt>산입 합계</dt>

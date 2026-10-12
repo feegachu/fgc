@@ -74,17 +74,20 @@ export const capListQuery = (criteria: CapCriteria) =>
     placeholderData: keepPreviousData,
     meta: { errorToast: false },
   })
-export const capDetailQuery = (id: string | number | null) =>
-  queryOptions({
-    queryKey: ['cap-checks', 'detail', id == null ? null : String(id)],
+export const capDetailQuery = (id: string | number | null | undefined) => {
+  const detailId = id == null || id === '' ? null : String(id)
+  return queryOptions({
+    queryKey: ['cap-checks', 'detail', detailId],
     queryFn: async ({ signal }) => {
-      const data = await get<CapBasis>(`/api/v1/cap-checks/${encodeURIComponent(String(id))}/details`, signal)
+      if (detailId === null) throw new Error('계산근거 ID가 없습니다.')
+      const data = await get<CapBasis>(`/api/v1/cap-checks/${encodeURIComponent(detailId)}/details`, signal)
       if (!data.capCheck) throw new Error('응답 데이터를 확인할 수 없습니다.')
       return data
     },
-    enabled: id !== null,
+    enabled: detailId !== null,
     meta: { errorToast: false },
   })
+}
 export const capInsurersQuery = () =>
   queryOptions({
     queryKey: ['cap-checks', 'insurers'],
