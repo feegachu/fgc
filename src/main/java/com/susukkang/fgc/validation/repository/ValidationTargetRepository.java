@@ -24,15 +24,17 @@ import java.util.List;
 public interface ValidationTargetRepository extends JpaRepository<ValidationTarget, Long> {
 
     /**
-     * asOfDate 기준 유지 계약(ACTIVE·UNPAID·REVIVED)과 검증월 안에 해지·실효 효력이 생긴 계약(#474) 중 환급률표 매칭 결과로 선정 상태(SELECTED/EXCLUDED/REVIEW_REQUIRED)를
+     * asOfDate 기준 유지 계약(ACTIVE·UNPAID·REVIVED)과 검증월 시작 이후 해지·실효 효력이 생긴 계약(#474) 중 환급률표 매칭 결과로 선정 상태(SELECTED/EXCLUDED/REVIEW_REQUIRED)를
      * 판정해 벌크 INSERT한다. 상품코드 비교·집합 연산(FILTER, GROUP BY)이 DB 전용 로직이라
      * 엔티티 조작 대신 네이티브 SQL을 그대로 유지한다(기존 MyBatis SQL과 동일).
      * {@code ON CONFLICT (validation_run_id, contract_id) DO NOTHING}으로 재시도 멱등성을 보장한다.
      * <p>
-     * #474 — 차익거래 규제(감독규정 제4-32조⑥, REG-12)는 해지·실효 계약을 겨냥하므로, 검증월 안에
+     * #474 — 차익거래 규제(감독규정 제4-32조⑥, REG-12)는 해지·실효 계약을 겨냥하므로, 검증월 1일 이후
      * 해지·실효 효력이 생긴 계약을 그 달 대상에 넣는다. 기준은 수신일이 아니라
      * {@code contract_status_event.effective_at}(효력일)이고, 날짜 경계는 세션 타임존과 무관하게
      * Asia/Seoul 자정으로 고정한다. 검증월 이전에 해지·실효된 계약은 그 달 실행에서 이미 점검했으므로 넣지 않는다.
+     * 효력일에 상한(검증월 말일)을 두지 않는다 — 검증월을 나중에 다시 돌려도, 그 사이 해지된 계약이
+     * 현재 상태 때문에 빠지지 않고 검증월에 살아 있던 계약이 그대로 대상이 된다(재실행 결과 재현성).
      *
      * @return 실제로 삽입된 행 수(충돌로 스킵된 행은 제외)
      */
@@ -66,7 +68,6 @@ public interface ValidationTargetRepository extends JpaRepository<ValidationTarg
                              WHERE e.contract_id = ic.contract_id
                                AND e.new_status IN ('TERMINATED', 'LAPSED')
                                AND e.effective_at >= CAST(:validationMonth AS timestamp) AT TIME ZONE 'Asia/Seoul'
-                               AND e.effective_at < (CAST(:asOfDate AS timestamp) + INTERVAL '1 day') AT TIME ZONE 'Asia/Seoul'
                         )
                    )
             ),

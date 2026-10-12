@@ -24,7 +24,7 @@ import java.util.List;
  * 스케줄 재생성은 무조건 호출X - "예상 지급 스케줄은 계약·정책·상태 변경으로 재생성이 필요한 경우에만 영향 범위에서 호출합니다" (IF-BAT-02)
  *
  * 차익거래 검증 및 원장 불균형 재검증은 로직 구현 후 추가 예정
- * (해지·실효 계약의 차익거래는 현재 월 통합검증에서 효력월에 점검한다 — #474. 일 배치 연결은 #512 후속 이슈)
+ * (해지·실효 계약의 차익거래는 현재 월 통합검증에서 효력월까지 점검한다 — #474. 일 배치 연결은 #512 후속 이슈)
  */
 @RequiredArgsConstructor
 public class ChangedContractItemProcessor implements ItemProcessor<Long, ChangedContractResult> {

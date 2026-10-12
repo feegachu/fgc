@@ -60,7 +60,8 @@ class ValidationTargetSelectionMapperIntegrationTest {
                         OR snapshot ->> 'insurerProductCode' IS NOT NULL)
                 """, Long.class, runId);
 
-        // C005(FGC-FGN01-202605-0001)는 7/02 실효 — 7월 해지·실효 계약도 차익거래 대상이다(#474).
+        // #474 — 7월에 살아 있던 계약은 지금 상태와 무관하게 7월 대상이다.
+        // C005(FGC-FGN01-202605-0001) 7/02 실효, A1(FGC-FGL02-202601-0001) 8/20·A2(FGC-FGL01-202601-0001) 8/22 해지.
         assertThat(selectedContractNos).containsExactlyInAnyOrder(
                 "FGC-FGL01-202607-0001",
                 "FGC-FGL01-202607-0002",
@@ -68,7 +69,9 @@ class ValidationTargetSelectionMapperIntegrationTest {
                 "FGC-FGL01-202607-0004",
                 "FGC-FGL01-202607-0005",
                 "FGC-FGL02-202605-0001",
-                "FGC-FGN01-202605-0001");
+                "FGC-FGN01-202605-0001",
+                "FGC-FGL02-202601-0001",
+                "FGC-FGL01-202601-0001");
         assertThat(selected).isPositive();          // 시드의 정상 시나리오 계약이 선정돼야 한다
         assertThat(productCodeMismatch).isZero();   // 시드 정본 코드 체계에서 불일치는 없어야 한다
         assertThat(selectedWithoutTable).isZero();  // 선정 건은 환급률표가 반드시 배정된다
@@ -99,10 +102,10 @@ class ValidationTargetSelectionMapperIntegrationTest {
 
     /**
      * #474 — ValidationTargetRepository.insertTargets 와 같은 조건인지 시드로 고정한다.
-     * 해지·실효 계약은 효력일이 속한 달에만 대상이다(A1 8/20·A2 8/22 해지는 8월, C005 7/02 실효는 7월).
+     * 해지·실효 계약은 효력일이 속한 달까지 대상이다(A1 8/20·A2 8/22 해지는 7·8월, C005 7/02 실효는 7월).
      */
     @Test
-    void fgc474TerminatedAndLapsedContractsEnterOnlyTheirEffectiveMonth() {
+    void fgc474TerminatedAndLapsedContractsStayTargetsThroughTheirEffectiveMonth() {
         Long julyRunId = insertValidationRun(LocalDate.of(2026, 7, 1));
         Long augustRunId = insertValidationRun(LocalDate.of(2026, 8, 1));
 
@@ -110,8 +113,8 @@ class ValidationTargetSelectionMapperIntegrationTest {
         mapper.insertTargets(augustRunId, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
 
         assertThat(contractNos(julyRunId))
-                .contains("FGC-FGN01-202605-0001", "FGC-FGN01-202603-0001")
-                .doesNotContain("FGC-FGL02-202601-0001", "FGC-FGL01-202601-0001");
+                .contains("FGC-FGN01-202605-0001", "FGC-FGN01-202603-0001",
+                        "FGC-FGL02-202601-0001", "FGC-FGL01-202601-0001");
         assertThat(contractNos(augustRunId))
                 .contains("FGC-FGL02-202601-0001", "FGC-FGL01-202601-0001")
                 .doesNotContain("FGC-FGN01-202605-0001", "FGC-FGN01-202603-0001");

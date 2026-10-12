@@ -26,8 +26,9 @@
                 ON p.product_id = po.product_id
                AND p.active_yn = true
              WHERE ic.contract_date <![CDATA[ <= ]]> #{asOfDate}
-               <!-- #474 검증월 안에 해지·실효 효력(effective_at, Asia/Seoul 날짜 경계)이 생긴 계약도
-                    차익거래 대상(REG-12). ValidationTargetRepository.insertTargets 와 같은 조건. -->
+               <!-- #474 검증월 1일 이후 해지·실효 효력(effective_at, Asia/Seoul 날짜 경계)이 생긴 계약도
+                    차익거래 대상(REG-12). 상한이 없어 과거 월 재실행 결과가 실행 시점에 따라 바뀌지 않는다.
+                    ValidationTargetRepository.insertTargets 와 같은 조건. -->
                AND (
                     ic.current_status IN ('ACTIVE', 'UNPAID', 'REVIVED')
                     OR EXISTS (
@@ -36,7 +37,6 @@
                          WHERE e.contract_id = ic.contract_id
                            AND e.new_status IN ('TERMINATED', 'LAPSED')
                            AND e.effective_at <![CDATA[ >= ]]> CAST(#{validationMonth} AS timestamp) AT TIME ZONE 'Asia/Seoul'
-                           AND e.effective_at <![CDATA[ < ]]> (CAST(#{asOfDate} AS timestamp) + INTERVAL '1 day') AT TIME ZONE 'Asia/Seoul'
                     )
                )
         ),

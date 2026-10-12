@@ -64,7 +64,8 @@ class ValidationTargetRepositoryIntegrationTest {
                         OR snapshot ->> 'insurerProductCode' IS NOT NULL)
                 """, Long.class, runId);
 
-        // C005(FGC-FGN01-202605-0001)는 7/02 실효 — 7월 해지·실효 계약도 차익거래 대상이다(#474).
+        // #474 — 7월에 살아 있던 계약은 지금 상태와 무관하게 7월 대상이다.
+        // C005(FGC-FGN01-202605-0001) 7/02 실효, A1(FGC-FGL02-202601-0001) 8/20·A2(FGC-FGL01-202601-0001) 8/22 해지.
         assertThat(selectedContractNos).containsExactlyInAnyOrder(
                 "FGC-FGL01-202607-0001",
                 "FGC-FGL01-202607-0002",
@@ -72,7 +73,9 @@ class ValidationTargetRepositoryIntegrationTest {
                 "FGC-FGL01-202607-0004",
                 "FGC-FGL01-202607-0005",
                 "FGC-FGL02-202605-0001",
-                "FGC-FGN01-202605-0001");
+                "FGC-FGN01-202605-0001",
+                "FGC-FGL02-202601-0001",
+                "FGC-FGL01-202601-0001");
         assertThat(selected).isPositive();
         assertThat(productCodeMismatch).isZero();
         assertThat(selectedWithoutTable).isZero();
@@ -97,11 +100,12 @@ class ValidationTargetRepositoryIntegrationTest {
     }
 
     /**
-     * #474 — 시드의 해지·실효 계약은 효력일(effective_at)이 속한 달의 실행에만 대상으로 들어간다.
+     * #474 — 시드의 해지·실효 계약은 효력일(effective_at)이 속한 달까지 대상이고 그 다음 달부터 빠진다.
      * C005 7/02 실효, R7 7/15 해지(납입기간 120개월 환급률표가 없어 검토필요), A1 8/20·A2 8/22 해지.
+     * A1·A2는 7월에 살아 있었으므로 지금 해지 상태여도 7월 재실행 대상이다(재실행 재현성).
      */
     @Test
-    void fgc474SeedTerminatedAndLapsedContractsEnterOnlyTheirEffectiveMonth() {
+    void fgc474SeedTerminatedAndLapsedContractsStayTargetsThroughTheirEffectiveMonth() {
         LocalDate july = LocalDate.of(2026, 7, 1);
         LocalDate august = LocalDate.of(2026, 8, 1);
         Long julyRunId = insertValidationRun(july);
@@ -113,7 +117,8 @@ class ValidationTargetRepositoryIntegrationTest {
         assertThat(targetStatuses(julyRunId))
                 .containsEntry("FGC-FGN01-202605-0001", "SELECTED")
                 .containsEntry("FGC-FGN01-202603-0001", "REVIEW_REQUIRED")
-                .doesNotContainKeys("FGC-FGL02-202601-0001", "FGC-FGL01-202601-0001");
+                .containsEntry("FGC-FGL02-202601-0001", "SELECTED")
+                .containsEntry("FGC-FGL01-202601-0001", "SELECTED");
         assertThat(targetStatuses(augustRunId))
                 .containsEntry("FGC-FGL02-202601-0001", "SELECTED")
                 .containsEntry("FGC-FGL01-202601-0001", "SELECTED")
@@ -122,8 +127,9 @@ class ValidationTargetRepositoryIntegrationTest {
 
     /**
      * #474 — 효력일 경계는 Asia/Seoul 자정이다. 세션 타임존을 UTC로 바꿔도
-     * 4/01 00:00(KST)=3/31 15:00(UTC) 해지는 3월이 아니라 4월 사건으로 본다.
-     * 검증월 이전 해지는 넣지 않고, 살아 있는 UNPAID·REVIVED는 사건 없이도 넣는다.
+     * 3/01 00:00(KST)=2/28 15:00(UTC) 해지는 2월이 아니라 3월 사건으로 보고 3월 대상에 넣는다.
+     * 2/28 23:59(KST) 해지처럼 검증월 이전 해지는 넣지 않는다. 검증월 이후(4/01·5/10) 해지는
+     * 3월에 살아 있었으므로 넣는다. 살아 있는 UNPAID·REVIVED는 사건 없이도 넣는다.
      */
     @Test
     void fgc474SelectsByEffectiveDateInSeoulRegardlessOfSessionTimeZone() {
@@ -132,6 +138,7 @@ class ValidationTargetRepositoryIntegrationTest {
         Long monthEnd = insertSavContract("IT-474-END", "LAPSED", "2098-03-31 23:59+09");
         Long nextMonth = insertSavContract("IT-474-NEXT", "TERMINATED", "2098-04-01 00:00+09");
         Long previousMonth = insertSavContract("IT-474-PREV", "TERMINATED", "2098-02-28 23:59+09");
+        Long later = insertSavContract("IT-474-LATER", "TERMINATED", "2098-05-10 00:00+09");
         Long unpaid = insertSavContract("IT-474-UNPAID", "UNPAID", null);
         Long revived = insertSavContract("IT-474-REVIVED", "REVIVED", null);
         Long runId = insertValidationRun(LocalDate.of(2098, 3, 1));
@@ -140,8 +147,8 @@ class ValidationTargetRepositoryIntegrationTest {
 
         List<Long> targetIds = jdbcTemplate.queryForList(
                 "SELECT contract_id FROM fgc.validation_target WHERE validation_run_id = ?", Long.class, runId);
-        assertThat(targetIds).contains(monthStart, monthEnd, unpaid, revived)
-                .doesNotContain(nextMonth, previousMonth);
+        assertThat(targetIds).contains(monthStart, monthEnd, nextMonth, later, unpaid, revived)
+                .doesNotContain(previousMonth);
     }
 
     @Test
