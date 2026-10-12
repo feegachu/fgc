@@ -314,6 +314,9 @@ class CapCalculatorImplTest {
         assertThat(result.limitAmount()).isEqualByComparingTo("0");
         assertThat(result.usagePct()).isEqualByComparingTo("100");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        // #490: 환급률 100% 이하면 환급금 ≤ L이라 한도가 0으로 잘리지 않는다 — 한도 0에서도 L을 그대로 되돌린다.
+        // 잘리는 경우(환급률 100% 초과)는 flagsReviewRequiredAndNeverReturnsNegativeLimitForAbnormalRefundRate처럼 REVIEW_REQUIRED가 먼저다.
+        assertThat(result.annualizedLimitBase()).isEqualByComparingTo("1200000");
     }
 
     private void stubIncludedAmount(boolean standardDeduction80Yn, BigDecimal complianceDeductionPct, String amount) {
