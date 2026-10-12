@@ -28,11 +28,13 @@ public class ReconciliationRunRepository {
     private static final String INSURER_ID_PARAM = "insurerId";
     private static final String RECONCILIATION_RUN_ID_PARAM = "reconciliationRunId";
     private static final String VALIDATION_RUN_ID_PARAM = "validationRunId";
+    private static final String SETTLEMENT_MONTH_PARAM = "settlementMonth";
+    private static final String PAYMENT_STAGE_PARAM = "paymentStage";
     private static final List<ReconciliationNativeProjection.Column> RUN_COLUMNS = List.of(
             new ReconciliationNativeProjection.Column(RECONCILIATION_RUN_ID_PARAM, Long.class),
             new ReconciliationNativeProjection.Column(VALIDATION_RUN_ID_PARAM, Long.class),
-            new ReconciliationNativeProjection.Column("settlementMonth", LocalDate.class),
-            new ReconciliationNativeProjection.Column("paymentStage", String.class),
+            new ReconciliationNativeProjection.Column(SETTLEMENT_MONTH_PARAM, LocalDate.class),
+            new ReconciliationNativeProjection.Column(PAYMENT_STAGE_PARAM, String.class),
             new ReconciliationNativeProjection.Column(INSURER_ID_PARAM, Long.class),
             new ReconciliationNativeProjection.Column("status", String.class),
             new ReconciliationNativeProjection.Column("startedAt", OffsetDateTime.class),
@@ -129,8 +131,8 @@ public class ReconciliationRunRepository {
                 AND insurer_id = :insurerId
                 AND validation_run_id = :validationRunId
                 """).unwrap(NativeQuery.class);
-        query.setParameter("settlementMonth", settlementMonth);
-        query.setParameter("paymentStage", paymentStage == null ? null : paymentStage.name());
+        query.setParameter(SETTLEMENT_MONTH_PARAM, settlementMonth);
+        query.setParameter(PAYMENT_STAGE_PARAM, paymentStage == null ? null : paymentStage.name());
         query.setParameter(INSURER_ID_PARAM, insurerId);
         query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId);
         return ReconciliationNativeProjection.map(query, ReconciliationRunRow::new, RUN_COLUMNS).uniqueResult();
@@ -175,8 +177,8 @@ public class ReconciliationRunRepository {
                 ORDER BY scope.insurer_id
                 """).unwrap(NativeQuery.class);
         query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId);
-        query.setParameter("settlementMonth", settlementMonth);
-        query.setParameter("paymentStage", paymentStage.name());
+        query.setParameter(SETTLEMENT_MONTH_PARAM, settlementMonth);
+        query.setParameter(PAYMENT_STAGE_PARAM, paymentStage.name());
         query.addScalar("insurer_id", Long.class);
         return query.setTupleTransformer((values, aliases) -> (Long) values[0]).getResultList();
     }

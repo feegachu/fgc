@@ -193,7 +193,7 @@ class ReconciliationBatchRunIntegrationTest {
                  WHERE run.validation_run_id = ?
                    AND contract.contract_no = 'FGC-FGN01-202603-0001'
                 """, validationRunId);
-        assertThat(r7.get("primary_reason_code")).isEqualTo("INVALID_CONTRACT_PAYMENT");
+        assertThat(r7).containsEntry("primary_reason_code", "INVALID_CONTRACT_PAYMENT");
         assertThat((BigDecimal) r7.get("expected_total_amount")).isEqualByComparingTo("0");
         assertThat((BigDecimal) r7.get("actual_total_amount")).isEqualByComparingTo("650000");
     }
