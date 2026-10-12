@@ -136,20 +136,47 @@ public class ReconciliationRunRepository {
         return ReconciliationNativeProjection.map(query, ReconciliationRunRow::new, RUN_COLUMNS).uniqueResult();
     }
 
-    public List<Long> findSelectedInsurerIds(Long validationRunId) {
+    // 2026-10-12 yslee - #516 대사할 보험사에 그 달 확정 지급이 있는 보험사를 합친다.
+    // 기존 코드: SELECTED 계약의 보험사만 골랐다.
+    // 문제: 선정 계약이 하나도 없는 보험사(시드 FGN01 8월)는 대사가 돌지 않아,
+    //       해지 뒤 지급 같은 비유효 계약 지급(FUN-049)이 결과 없이 빠졌다.
+    // 개선: SELECTED 계약의 보험사 ∪ 그 정산월·지급단계에 계약 귀속 확정 지급이 있는 보험사.
+    //       보험사 열은 단계별 실제 원천 쿼리와 같게 고른다(INSURER_TO_GA는 ct.insurer_id,
+    //       GA_TO_FC는 귀속 계약의 insurer_id). 원천 쿼리의 나머지 조건보다 넓은 상위집합이라
+    //       후보가 없으면 결과 0건으로 완료될 뿐 빠뜨리지는 않는다.
+    public List<Long> findReconciliationInsurerIds(
+            Long validationRunId, LocalDate settlementMonth, PaymentStage paymentStage) {
         NativeQuery<?> query = entityManager.createNativeQuery("""
-                SELECT DISTINCT contract.insurer_id
+                SELECT scope.insurer_id
+                FROM (
+                SELECT contract.insurer_id
                 FROM fgc.validation_target target
                 JOIN fgc.insurance_contract contract
                 ON contract.contract_id = target.contract_id
-                JOIN fgc.insurer insurer
-                ON insurer.insurer_id = contract.insurer_id
                 WHERE target.validation_run_id = :validationRunId
                 AND target.selection_status = 'SELECTED'
-                AND insurer.active_yn = TRUE
-                ORDER BY contract.insurer_id
+                UNION
+                SELECT CASE WHEN ct.payment_stage = 'GA_TO_FC' THEN contract.insurer_id
+                ELSE ct.insurer_id END
+                FROM fgc.commission_transaction ct
+                JOIN fgc.transaction_attribution ta
+                ON ta.commission_transaction_id = ct.commission_transaction_id
+                JOIN fgc.insurance_contract contract
+                ON contract.contract_id = ta.contract_id
+                WHERE ct.payment_stage = :paymentStage
+                AND ct.settlement_month = :settlementMonth
+                AND ct.cashflow_type = 'PAYMENT'
+                AND ct.status = 'CONFIRMED'
+                AND ta.attribution_scope = 'CONTRACT'
+                ) scope
+                JOIN fgc.insurer insurer
+                ON insurer.insurer_id = scope.insurer_id
+                WHERE insurer.active_yn = TRUE
+                ORDER BY scope.insurer_id
                 """).unwrap(NativeQuery.class);
         query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId);
+        query.setParameter("settlementMonth", settlementMonth);
+        query.setParameter("paymentStage", paymentStage.name());
         query.addScalar("insurer_id", Long.class);
         return query.setTupleTransformer((values, aliases) -> (Long) values[0]).getResultList();
     }
