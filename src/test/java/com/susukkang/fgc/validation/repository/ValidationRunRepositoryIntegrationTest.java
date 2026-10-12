@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * ValidationRunMapperIntegrationTest(MyBatis)와 같은 시나리오를 JPA Repository로 검증한다.
+ * 검증 실행의 생성·조회·상태 전이 계약을 JPA Repository로 검증한다.
  * 특히 각 조건부 @Modifying UPDATE가 실제 DB에서 "조건 불일치 시 0건"으로 동작하는지,
  * clearAutomatically=true 덕분에 같은 트랜잭션에서 뒤이은 findById가 1차 캐시가 아니라
  * DB의 최신 값을 돌려주는지는 Mock으로는 증명되지 않는다.

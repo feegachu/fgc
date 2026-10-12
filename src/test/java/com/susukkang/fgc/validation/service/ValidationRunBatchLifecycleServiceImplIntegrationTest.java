@@ -3,7 +3,7 @@ package com.susukkang.fgc.validation.service;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +52,7 @@ class ValidationRunBatchLifecycleServiceImplIntegrationTest {
     private ValidationRunBatchLifecycleService lifecycleService;
 
     @Autowired
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -85,7 +85,7 @@ class ValidationRunBatchLifecycleServiceImplIntegrationTest {
         // start()가 열었던 트랜잭션은 이미 롤백되고 끝난 뒤라, 이 조회는 완전히 새 트랜잭션에서
         // 실행된다 — 클래스 주석 참고. 여기서 CREATED가 보인다는 것 자체가 "progressService의
         // UPDATE까지 같이 롤백됐다"는 증거다(안 그랬다면 RUNNING으로 보여야 한다).
-        ValidationRunRow row = validationRunMapper.findById(id);
+        ValidationRunRow row = validationRunRepository.findById(id).map(ValidationRunRow::from).orElse(null);
         assertThat(row.getStatus()).isEqualTo("CREATED");
         assertThat(row.getCurrentStep()).isZero();
         assertThat(row.getStartedAt()).isNull();

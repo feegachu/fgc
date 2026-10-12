@@ -49,4 +49,11 @@ public record CapCalculationResult(
         List<CapCheckDetailLine> details,
         Map<String, Object> calculationSnapshot
 ) {
+    /**
+     * 연간 기준액 L(월납 × 배수). limit = L − 해약환급금 + 준법경영비 이므로 저장된 세 값에서 되돌린다 (#490).
+     * limit이 max(0)으로 잘린 경우(환급률 100% 초과)만 실제 L과 다른데, 그 판정은 REVIEW_REQUIRED가 우선한다.
+     */
+    public BigDecimal annualizedLimitBase() {
+        return limitAmount.add(refund12mAmount).subtract(complianceDeductionAmount);
+    }
 }

@@ -110,7 +110,7 @@ class ValidationRunDetailControllerTest {
                 new ValidationRunDetailResponse.ArbitrageSummary(3, 1, 0),
                 new ValidationRunDetailResponse.LedgerSummary(4, 0),
                 new ValidationRunDetailResponse.ReconciliationSummary(8, 2, 6, 2, 0, java.math.BigDecimal.valueOf(15000)),
-                new ValidationRunDetailResponse.ExceptionSummary(49, 0, 49, 0, 0, 49));
+                new ValidationRunDetailResponse.ExceptionSummary(49, 0, 49, 0, 0, 49, 0, null));
     }
 
     private ValidationRunRow createdRow() {

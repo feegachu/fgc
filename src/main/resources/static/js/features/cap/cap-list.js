@@ -486,9 +486,10 @@
     finalBar.setAttribute("aria-valuetext", "사용률 " + percent(item.usagePct));
     document.getElementById("final-usage").textContent = "사용률 " + percent(item.usagePct);
     var warningMark = document.getElementById("final-warning-mark");
-    var warningUsagePct = Number(snapshot.warningUsagePct);
-    warningMark.hidden = !Number.isFinite(warningUsagePct);
-    if (!warningMark.hidden) warningMark.style.left = visualWidth(warningUsagePct);
+    // 주의는 1,200% 예산의 90%라 해약환급금 계약은 사용률 90%보다 앞에서 켜진다 — 서버가 준 위치에 그린다 (#490)
+    var warningStartUsagePct = data.warningStartUsagePct == null ? NaN : Number(data.warningStartUsagePct);
+    warningMark.hidden = !Number.isFinite(warningStartUsagePct);
+    if (!warningMark.hidden) warningMark.style.left = visualWidth(warningStartUsagePct);
     document.getElementById("final-body").innerHTML =
       '<div><dt>산입 합계</dt><dd class="tabular-nums">' + won(item.includedAmount) + "</dd></div>" +
       '<div><dt>한도</dt><dd class="tabular-nums">' + won(item.limitAmount) + "</dd></div>" +

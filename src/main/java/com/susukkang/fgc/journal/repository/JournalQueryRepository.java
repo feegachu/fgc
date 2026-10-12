@@ -5,9 +5,19 @@ import com.susukkang.fgc.journal.dto.JournalDetailHeaderRow;
 import com.susukkang.fgc.journal.dto.JournalDetailLineRow;
 import com.susukkang.fgc.journal.dto.JournalListRow;
 import com.susukkang.fgc.journal.dto.LedgerImbalanceRow;
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.Projections;
+import com.querydsl.jpa.JPAExpressions;
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.susukkang.fgc.journal.entity.QJournalHeader;
+import com.susukkang.fgc.auth.entity.QAppUser;
+import static com.susukkang.fgc.journal.entity.QJournalHeader.journalHeader;
+import static com.susukkang.fgc.journal.entity.QJournalLine.journalLine;
+import static com.susukkang.fgc.journal.entity.QJournalAccount.journalAccount;
+import static com.susukkang.fgc.contract.entity.QInsuranceContract.insuranceContract;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
-import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Repository;
@@ -16,13 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 설명 : 원장 목록·상세·차대변 합계를 조회한다.
- * 공용 엔티티 조회는 JPQL, 정정그룹 조인과 불균형 뷰 조회는 네이티브 SQL을 사용한다.
+ * 동적 검색은 QueryDSL, 고정 조회는 JPQL, 정정그룹 조인과 불균형 뷰는 네이티브 SQL을 사용한다.
  *
  * @author hjKang
  * @version 1.0
@@ -33,25 +41,8 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class JournalQueryRepository {
 
-    private static final String LIST_SELECT = """
-            SELECT h.journalHeaderId AS journalHeaderId, h.journalNo AS journalNo,
-                   h.journalDate AS journalDate, cast(h.journalType as string) AS journalType,
-                   h.sourceEntityType AS sourceEntityType, h.sourceEntityId AS sourceEntityId,
-                   h.contractId AS contractId, c.contractNo AS contractNo,
-                   cast(h.status as string) AS status,
-                   (SELECT COALESCE(SUM(l.debitAmount), 0) FROM JournalLine l
-                     WHERE l.journalHeaderId = h.journalHeaderId) AS debitTotal,
-                   (SELECT COALESCE(SUM(l.creditAmount), 0) FROM JournalLine l
-                     WHERE l.journalHeaderId = h.journalHeaderId) AS creditTotal,
-                   h.reversalOfId AS reversalOfId, rev.journalNo AS reversalOfJournalNo,
-                   creator.loginId AS createdBy, poster.loginId AS postedBy,
-                   h.postedAt AS postedAt, h.createdAt AS createdAt
-              FROM JournalHeader h
-              LEFT JOIN InsuranceContract c ON c.contractId = h.contractId
-              LEFT JOIN JournalHeader rev ON rev.journalHeaderId = h.reversalOfId
-              LEFT JOIN AppUser creator ON creator.userId = h.createdBy
-              LEFT JOIN AppUser poster ON poster.userId = h.postedBy
-            """;
+    private static final String STATUS_ALIAS = "status";
+    private static final String VALIDATION_RUN_ID_PARAMETER = "validationRunId";
 
     private static final String IMBALANCE_FROM = """
               FROM fgc.vw_journal_imbalance vw
@@ -60,52 +51,49 @@ public class JournalQueryRepository {
             """;
 
     private final EntityManager entityManager;
+    private final JPAQueryFactory queryFactory;
 
-    /** 검증 실행 엔티티가 제공되기 전까지 불균형 조회 대상 실행의 존재 여부만 확인한다. */
     public boolean existsValidationRun(Long validationRunId) {
-        return (Boolean) entityManager.createNativeQuery("""
-                SELECT EXISTS (
-                    SELECT 1 FROM fgc.validation_run WHERE validation_run_id = :validationRunId
-                )
-                """)
-                .setParameter("validationRunId", validationRunId)
-                .getSingleResult();
+        return entityManager.createQuery("SELECT count(v) FROM ValidationRun v WHERE v.validationRunId = :id", Long.class)
+                .setParameter("id", validationRunId).getSingleResult() > 0;
     }
 
-    /** 계정과목 조건은 EXISTS로 검사하고 합계는 해당 헤더의 모든 라인으로 계산한다. */
-    // S2077 검토: searchWhere는 코드에 고정된 조건식만 조합하며 검색값은 모두 setParameter로 바인딩한다.
-    // ORDER BY는 고정이고 페이징은 JPA API를 사용한다. 사용자 입력을 JPQL 문자열에 연결하지 않는다.
-    // 회귀 검증: JournalSearchQueryRepositoryIntegrationTest의 bindsSqlLikeSearchValuesAsData/bindsSqlLikeAccountCodeAsData.
-    @SuppressWarnings("java:S2077")
+    /** 계정과목 필터는 EXISTS, 합계는 헤더의 모든 라인을 대상으로 유지한다. */
     public List<JournalListRow> search(LocalDate from, LocalDate to, String journalType,
                                        String accountCode, Long contractId, String status,
                                        int offset, int limit) {
-        Map<String, Object> parameters = new LinkedHashMap<>();
-        String where = searchWhere(from, to, journalType, accountCode, contractId, status, parameters);
-        TypedQuery<Tuple> query = entityManager.createQuery(
-                LIST_SELECT + where + " ORDER BY h.journalDate DESC, h.journalHeaderId DESC", Tuple.class);
-        parameters.forEach(query::setParameter);
-        return query.setFirstResult(offset).setMaxResults(limit).getResultList().stream()
-                .map(this::toListRow)
-                .toList();
+        var h = journalHeader;
+        var l = journalLine;
+        var c = insuranceContract;
+        var rev = new QJournalHeader("reversal");
+        var creator = new QAppUser("creator");
+        var poster = new QAppUser("poster");
+        return queryFactory.select(Projections.bean(JournalListRow.class,
+                        h.journalHeaderId, h.journalNo, h.journalDate, h.journalType.stringValue().as("journalType"),
+                        h.sourceEntityType, h.sourceEntityId, h.contractId, c.contractNo,
+                        h.status.stringValue().as(STATUS_ALIAS),
+                        ExpressionUtils.as(JPAExpressions.select(l.debitAmount.sumAggregate().coalesce(BigDecimal.ZERO))
+                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), "debitTotal"),
+                        ExpressionUtils.as(JPAExpressions.select(l.creditAmount.sumAggregate().coalesce(BigDecimal.ZERO))
+                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), "creditTotal"),
+                        h.reversalOfId, rev.journalNo.as("reversalOfJournalNo"),
+                        creator.loginId.as("createdBy"), poster.loginId.as("postedBy"), h.postedAt, h.createdAt))
+                .from(h).leftJoin(c).on(c.contractId.eq(h.contractId))
+                .leftJoin(rev).on(rev.journalHeaderId.eq(h.reversalOfId))
+                .leftJoin(creator).on(creator.userId.eq(h.createdBy))
+                .leftJoin(poster).on(poster.userId.eq(h.postedBy))
+                .where(searchFilters(from, to, journalType, accountCode, contractId, status))
+                .orderBy(h.journalDate.desc(), h.journalHeaderId.desc()).offset(offset).limit(limit).fetch();
     }
 
-    /** 목록과 같은 조건을 사용해 페이징 전 전체 헤더 수를 조회한다. */
-    // S2077 검토: search와 동일한 고정 조건식만 사용하며 모든 검색값은 setParameter로 바인딩한다.
-    // 회귀 검증: JournalSearchQueryRepositoryIntegrationTest에서 SQL 형태 입력의 목록과 count를 함께 확인한다.
-    @SuppressWarnings("java:S2077")
     public long count(LocalDate from, LocalDate to, String journalType,
                       String accountCode, Long contractId, String status) {
-        Map<String, Object> parameters = new LinkedHashMap<>();
-        String where = searchWhere(from, to, journalType, accountCode, contractId, status, parameters);
-        TypedQuery<Long> query = entityManager.createQuery(
-                "SELECT COUNT(h) FROM JournalHeader h " + where, Long.class);
-        parameters.forEach(query::setParameter);
-        return query.getSingleResult();
+        return queryFactory.select(journalHeader.count()).from(journalHeader)
+                .where(searchFilters(from, to, journalType, accountCode, contractId, status)).fetchOne();
     }
 
     /**
-     * 미조회 시 기존 상세 Mapper와 동일하게 null을 반환한다.
+     * 미조회 시 기존 상세 조회 계약대로 null을 반환한다.
      * 재기표를 다시 정정해도 자신의 정정그룹을 우선하여 헤더 한 건만 반환한다.
      */
     public JournalDetailHeaderRow findHeaderById(Long journalHeaderId) {
@@ -150,7 +138,7 @@ public class JournalQueryRepository {
         query.addScalar("validation_run_id", Long.class);
         query.addScalar("policy_version_id", Long.class);
         query.addScalar("correction_group_key", String.class);
-        query.addScalar("status", String.class);
+        query.addScalar(STATUS_ALIAS, String.class);
         query.addScalar("description", String.class);
         query.addScalar("created_by", String.class);
         query.addScalar("created_at", OffsetDateTime.class);
@@ -215,11 +203,11 @@ public class JournalQueryRepository {
                 SELECT vw.journal_header_id, vw.journal_no, h.journal_type, vw.status,
                        vw.debit_total, vw.credit_total, vw.difference_amount
                 """ + IMBALANCE_FROM + " ORDER BY vw.journal_header_id").unwrap(NativeQuery.class);
-        query.setParameter("validationRunId", validationRunId);
+        query.setParameter(VALIDATION_RUN_ID_PARAMETER, validationRunId);
         query.addScalar("journal_header_id", Long.class);
         query.addScalar("journal_no", String.class);
         query.addScalar("journal_type", String.class);
-        query.addScalar("status", String.class);
+        query.addScalar(STATUS_ALIAS, String.class);
         query.addScalar("debit_total", BigDecimal.class);
         query.addScalar("credit_total", BigDecimal.class);
         query.addScalar("difference_amount", BigDecimal.class);
@@ -238,7 +226,7 @@ public class JournalQueryRepository {
 
     public long countImbalances(Long validationRunId) {
         return ((Number) entityManager.createNativeQuery("SELECT COUNT(*) " + IMBALANCE_FROM)
-                .setParameter("validationRunId", validationRunId)
+                .setParameter(VALIDATION_RUN_ID_PARAMETER, validationRunId)
                 .getSingleResult()).longValue();
     }
 
@@ -248,58 +236,24 @@ public class JournalQueryRepository {
                 SELECT COUNT(h) FROM JournalHeader h
                  WHERE h.validationRunId = :validationRunId
                 """, Long.class)
-                .setParameter("validationRunId", validationRunId)
+                .setParameter(VALIDATION_RUN_ID_PARAMETER, validationRunId)
                 .getSingleResult();
     }
 
-    private String searchWhere(LocalDate from, LocalDate to, String journalType,
-                               String accountCode, Long contractId, String status,
-                               Map<String, Object> parameters) {
-        StringBuilder where = new StringBuilder(" WHERE 1 = 1");
-        appendCondition(where, parameters, "h.journalDate >= :fromDate", "fromDate", from);
-        appendCondition(where, parameters, "h.journalDate <= :toDate", "toDate", to);
-        // 문자열 조건을 유지해 미정의 코드·빈 문자열도 기존 SQL처럼 빈 결과가 되도록 한다.
-        appendCondition(where, parameters, "cast(h.journalType as string) = :journalType", "journalType", journalType);
-        appendCondition(where, parameters, "h.contractId = :contractId", "contractId", contractId);
-        appendCondition(where, parameters, "cast(h.status as string) = :status", "status", status);
-        appendCondition(where, parameters, """
-                EXISTS (
-                    SELECT 1 FROM JournalLine l2
-                    JOIN JournalAccount a2 ON a2.journalAccountId = l2.journalAccountId
-                    WHERE l2.journalHeaderId = h.journalHeaderId AND a2.accountCode = :accountCode
-                )
-                """, "accountCode", accountCode);
-        return where.toString();
-    }
-
-    private void appendCondition(StringBuilder where, Map<String, Object> parameters,
-                                 String expression, String parameterName, Object value) {
-        if (value != null) {
-            where.append(" AND ").append(expression);
-            parameters.put(parameterName, value);
-        }
-    }
-
-    private JournalListRow toListRow(Tuple row) {
-        JournalListRow result = new JournalListRow();
-        result.setJournalHeaderId(row.get("journalHeaderId", Long.class));
-        result.setJournalNo(row.get("journalNo", String.class));
-        result.setJournalDate(row.get("journalDate", LocalDate.class));
-        result.setJournalType(row.get("journalType", String.class));
-        result.setSourceEntityType(row.get("sourceEntityType", String.class));
-        result.setSourceEntityId(row.get("sourceEntityId", String.class));
-        result.setContractId(row.get("contractId", Long.class));
-        result.setContractNo(row.get("contractNo", String.class));
-        result.setStatus(row.get("status", String.class));
-        result.setDebitTotal(row.get("debitTotal", BigDecimal.class));
-        result.setCreditTotal(row.get("creditTotal", BigDecimal.class));
-        result.setReversalOfId(row.get("reversalOfId", Long.class));
-        result.setReversalOfJournalNo(row.get("reversalOfJournalNo", String.class));
-        result.setCreatedBy(row.get("createdBy", String.class));
-        result.setPostedBy(row.get("postedBy", String.class));
-        result.setPostedAt(row.get("postedAt", OffsetDateTime.class));
-        result.setCreatedAt(row.get("createdAt", OffsetDateTime.class));
-        return result;
+    private BooleanBuilder searchFilters(LocalDate from, LocalDate to, String journalType,
+                                          String accountCode, Long contractId, String status) {
+        var h = journalHeader;
+        BooleanBuilder where = new BooleanBuilder();
+        if (from != null) where.and(h.journalDate.goe(from));
+        if (to != null) where.and(h.journalDate.loe(to));
+        // 문자열 조건은 미정의 코드·빈 문자열도 예외 없이 빈 결과를 반환한다.
+        if (journalType != null) where.and(h.journalType.stringValue().eq(journalType));
+        if (contractId != null) where.and(h.contractId.eq(contractId));
+        if (status != null) where.and(h.status.stringValue().eq(status));
+        if (accountCode != null) where.and(JPAExpressions.selectOne().from(journalLine)
+                .join(journalAccount).on(journalAccount.journalAccountId.eq(journalLine.journalAccountId))
+                .where(journalLine.journalHeaderId.eq(h.journalHeaderId), journalAccount.accountCode.eq(accountCode)).exists());
+        return where;
     }
 
     private JournalDetailHeaderRow toDetailHeaderRow(Object[] row) {

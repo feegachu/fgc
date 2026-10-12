@@ -16,6 +16,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.DataClassRowMapper;
 import org.slf4j.LoggerFactory;
@@ -148,6 +150,41 @@ class AuditLogQueryRepositoryIntegrationTest {
         assertThat(queryRepository.countAuditLogs(search)).isEqualTo(1);
         assertThat(queryRepository.selectAuditLogs(search, PageRequest.of(0, 20)))
                 .singleElement().extracting(AuditLogRow::entityId).isEqualTo(quotedId);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    void repositoryTreatsEmptyAndWhitespaceFiltersAsExactValues(String value) {
+        insertRow(BASE, userId, actionA, entityTypeA, value, "exact id");
+        insertRow(BASE, userId, actionA, value, marker, "exact type");
+        insertRow(BASE, userId, value, entityTypeA, marker, "exact action");
+
+        var searches = Map.of(
+                "exact id", criteria(entityTypeA, value, null, null, null, null),
+                "exact type", criteria(value, null, null, actionA, null, null),
+                "exact action", criteria(entityTypeA, null, null, value, null, null));
+        searches.forEach((reason, search) -> {
+            assertThat(queryRepository.countAuditLogs(search)).isEqualTo(1);
+            assertThat(queryRepository.selectAuditLogs(search, PageRequest.of(0, 20)))
+                    .singleElement().extracting(AuditLogRow::reason).isEqualTo(reason);
+        });
+    }
+
+    @Test
+    void supportsUnpagedAndKeepsFixedOrderingRegardlessOfRequestedSort() {
+        insertRow(BASE, userId, actionA, entityTypeA, "paging-order", "oldest");
+        insertRow(BASE.plusHours(1), userId, actionA, entityTypeA, "paging-order", "older id");
+        insertRow(BASE.plusHours(1), userId, actionA, entityTypeA, "paging-order", "newer id");
+        var search = criteria(entityTypeA, "paging-order", null, null, null, null);
+        var ascending = Sort.by("occurredAt", "auditLogId");
+
+        assertThat(queryRepository.selectAuditLogs(search, Pageable.unpaged(ascending)))
+                .extracting(AuditLogRow::reason).containsExactly("newer id", "older id", "oldest");
+        assertThat(queryRepository.selectAuditLogs(search, PageRequest.of(0, 2, ascending)))
+                .extracting(AuditLogRow::reason).containsExactly("newer id", "older id");
+        assertThat(queryRepository.selectAuditLogs(search, PageRequest.of(1, 2, ascending)))
+                .extracting(AuditLogRow::reason).containsExactly("oldest");
+        assertThat(queryRepository.countAuditLogs(search)).isEqualTo(3);
     }
 
     /**

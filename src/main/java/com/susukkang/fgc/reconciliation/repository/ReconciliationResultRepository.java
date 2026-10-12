@@ -121,14 +121,38 @@ public class ReconciliationResultRepository {
                 .executeUpdate();
     }
 
-    /** 빈 ID 목록과 null 참조에서도 SQL 신호가 항상 boolean으로 반환된다. */
+    /**
+     * 빈 ID 목록과 null 참조에서도 SQL 신호가 항상 boolean으로 반환된다.
+     * <p>
+     * 비유효 계약 지급은 계약의 현재 상태가 아니라 <b>지급예정일 시점</b> 상태로 판정한다
+     * (SCHEDULE_ELIGIBILITY {@code STATUS_MONTH_RULE = PAY_IF_ACTIVE_ON_DUE_DATE}, V2). 현재 해지·실효·만기
+     * 계약이라도 지급예정일(Asia/Seoul 날짜)까지 효력이 생긴 상태 사건이 비유효 상태가 아니면 정상 지급이다.
+     * 다음은 예전처럼 현재 상태만으로 비유효로 본다 — 청약철회(CANCELLED, 처음부터 무효),
+     * 지급예정일이 없는 후보, 효력일 기준 최신 상태 사건이 현재 상태와 다른(또는 사건이 없는) 계약 —
+     * 계약 수정 화면의 상태 변경은 아직 사건을 남기지 않아(FUN-026 2차) 이력을 믿을 수 없다.
+     * "같은 상태 사건이 한 번이라도 있었는가"로 보면 LAPSED→REVIVED 이력 뒤 화면에서 다시 LAPSED로 바꾼
+     * 계약이 옛 사건으로 판정돼 비유효 신호가 사라진다(PR #515 리뷰).
+     */
     public ReconciliationClassificationContext findClassificationContext(
-            Long contractId, Long expectedAgentId, Long actualAgentId, List<Long> journalHeaderIds) {
+            Long contractId, Long expectedAgentId, Long actualAgentId, List<Long> journalHeaderIds,
+            LocalDate dueDate) {
         boolean hasJournals = journalHeaderIds != null && !journalHeaderIds.isEmpty();
         NativeQuery<?> query = entityManager.createNativeQuery("""
-                SELECT EXISTS (SELECT 1 FROM fgc.insurance_contract
-                                WHERE contract_id = :contractId
-                                  AND current_status IN ('CANCELLED','TERMINATED','MATURED','LAPSED'))
+                SELECT EXISTS (SELECT 1 FROM fgc.insurance_contract c
+                                WHERE c.contract_id = :contractId
+                                  AND c.current_status IN ('CANCELLED','TERMINATED','MATURED','LAPSED')
+                                  AND (c.current_status = 'CANCELLED'
+                                       OR CAST(:dueDate AS date) IS NULL
+                                       OR (SELECT l.new_status FROM fgc.contract_status_event l
+                                            WHERE l.contract_id = c.contract_id
+                                            ORDER BY l.effective_at DESC, l.event_seq DESC
+                                            LIMIT 1) IS DISTINCT FROM c.current_status
+                                       OR (SELECT e.new_status FROM fgc.contract_status_event e
+                                            WHERE e.contract_id = c.contract_id
+                                              AND e.effective_at < (CAST(:dueDate AS timestamp) + INTERVAL '1 day')
+                                                                   AT TIME ZONE 'Asia/Seoul'
+                                            ORDER BY e.effective_at DESC, e.event_seq DESC
+                                            LIMIT 1) IN ('CANCELLED','TERMINATED','MATURED','LAPSED')))
                     AS invalidContractPayment,
                 CASE WHEN CAST(:expectedAgentId AS bigint) IS NULL
                        OR CAST(:actualAgentId AS bigint) IS NULL THEN FALSE
@@ -147,6 +171,7 @@ public class ReconciliationResultRepository {
         query.setParameter(CONTRACT_ID_PARAM, contractId);
         query.setParameter(EXPECTED_AGENT_ID_PARAM, expectedAgentId);
         query.setParameter(ACTUAL_AGENT_ID_PARAM, actualAgentId);
+        query.setParameter("dueDate", dueDate, LocalDate.class);
         query.setParameter("hasJournals", hasJournals);
         // 빈 IN 목록을 만들지 않으며 hasJournals=false가 두 신호를 항상 FALSE로 고정한다.
         query.setParameterList("journalHeaderIds", hasJournals ? journalHeaderIds : List.of(0L));

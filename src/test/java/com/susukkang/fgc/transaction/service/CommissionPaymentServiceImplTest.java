@@ -48,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -1240,6 +1241,74 @@ class CommissionPaymentServiceImplTest {
         assertThat(captor.getValue().getUsagePct()).isEqualByComparingTo("90");
         assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.WARNING);
         verify(capExceptionService).createIfNecessary(any());
+    }
+
+    // #490: 해약환급금 288,000원 계약(한도 912,000)의 주의는 1,200% 예산 90%인 산입 792,000원부터다.
+    // 사용률(792,000 ÷ 912,000 = 86.8%)은 90% 미만이어도 계산기와 같은 판정을 내야 한다.
+    @ParameterizedTest(name = "실제 지급 {0} → {1}")
+    @CsvSource({"791999, NORMAL", "792000, WARNING"})
+    void judgesActualPaymentByRegulatoryBudgetForRefundContract(String amount, CapResultStatus expected) {
+        ConfirmationData data = confirmation(
+                201L, 3L, amount, amount, InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(refundCapCalculation("0", CapResultStatus.NORMAL));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(66L);
+            return null;
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "refund-budget", "66")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, amount)));
+
+        service.confirm(101L, "refund-budget");
+
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
+        assertThat(captor.getValue().getLimitAmount()).isEqualByComparingTo("912000");
+        assertThat(captor.getValue().getResultStatus()).isEqualTo(expected);
+    }
+
+    // #490: 결합 판정(mergeScheduleAndActualValidation)도 같은 규칙이다. 스케줄 산입 792,000이 실제 지급보다 크면
+    // 결합 산입액 기준으로 주의를 다시 판정한다 — 계산 결과가 NORMAL로 넘어와도(사용률 기준으로 낸 옛 판정) 주의가 된다.
+    @Test
+    void mergedScheduleIncludedUsesRegulatoryBudgetWarning() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "10000", "10000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(refundCapCalculation("792000", CapResultStatus.NORMAL));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(67L);
+            return null;
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "merge-budget", "67")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "10000")));
+
+        service.confirm(101L, "merge-budget");
+
+        ArgumentCaptor<CapCheckCommand> captor = ArgumentCaptor.forClass(CapCheckCommand.class);
+        verify(capCheckWriteRepository).insertCapCheck(captor.capture());
+        assertThat(captor.getValue().getIncludedAmount()).isEqualByComparingTo("792000");
+        assertThat(captor.getValue().getResultStatus()).isEqualTo(CapResultStatus.WARNING);
+    }
+
+    // 월납 100,000원, 해약환급금 288,000원(환급률 24%) → 한도 912,000원
+    private CapCalculationResult refundCapCalculation(String included, CapResultStatus status) {
+        BigDecimal limitAmount = new BigDecimal("912000");
+        BigDecimal includedAmount = new BigDecimal(included);
+        return new CapCalculationResult(
+                3L, PaymentStage.GA_TO_FC, CapCheckKind.REALTIME, LocalDate.of(2026, 7, 1), 31L, 777L,
+                new BigDecimal("100000"), new BigDecimal("288000"), BigDecimal.ZERO, limitAmount,
+                includedAmount, limitAmount.subtract(includedAmount),
+                includedAmount.multiply(BigDecimal.valueOf(100)).divide(limitAmount, 6, RoundingMode.HALF_UP),
+                status, List.of(), Map.of()
+        );
     }
 
     // 2026-08-11 yslee - 지급 정책과 계산 정책 불일치의 업무 예외 변환 검증

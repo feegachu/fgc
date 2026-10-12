@@ -204,7 +204,7 @@ class CapCheckControllerTest {
                 100000L, 0L, 0L, 1200000L, 650000L, 550000L, "54.166667",
                 CapResultStatus.NORMAL, CapResultStatus.NORMAL.label(), 500L);
 
-        return new CapCheckBasisResponse(capCheck, details, Map.of("premiumMultiplier", "12.0000"));
+        return new CapCheckBasisResponse(capCheck, details, Map.of("premiumMultiplier", "12.0000"), "90.000000");
     }
 
     @Test

@@ -19,7 +19,7 @@ import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleLineInsertDTO;
 import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleSearchCondition;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleJdbcBaseline;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.service.ScheduleRegenerationBatchItemService;
 import jakarta.persistence.EntityManagerFactory;
@@ -51,8 +51,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 설명 : 예상 스케줄 저장소의 JPA 전환(#371)을 실제 PostgreSQL에서 검증한다.
- * 조회 결과는 아직 운영에 남아 있는 기존 ScheduleMapper(E 담당 ValidationRunScheduleService가 사용)와
- * 같은 데이터로 비교한다. ScheduleMapper를 삭제할 때 이 비교 테스트의 기준선도 함께 정리한다.
+ * 조회 결과는 전환 전 SQL을 보존한 테스트 전용 ScheduleJdbcBaseline과 같은 데이터로 비교한다.
  * 커밋이 필요한 시나리오(동시성·REQUIRES_NEW)는 월 검증 대상(ACTIVE)에서 빠지는 청약(APPLIED) 계약을 쓰고,
  * 끝나면 그 계약의 스케줄을 비활성화해 대사 대상에서도 뺀다(확정·조정 이력 행은 DB 가드로 삭제할 수 없다).
  *
@@ -72,7 +71,10 @@ class ScheduleRepositoryIntegrationTest {
     @Autowired private InsuranceContractRepository contractRepository;
     @Autowired private ScheduleService scheduleService;
     @Autowired private ScheduleQueryRepository queryRepository;
-    @Autowired private ScheduleMapper baseline;
+    private ScheduleJdbcBaseline baseline;
+    @Autowired void initializeBaseline(javax.sql.DataSource dataSource) {
+        baseline = new ScheduleJdbcBaseline(dataSource);
+    }
     @Autowired private ScheduleRegenerationBatchItemService batchItemService;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -81,7 +83,7 @@ class ScheduleRepositoryIntegrationTest {
     private Long committedContractId;
 
     @Test
-    void readsMatchMyBatisBaselineIncludingSearchPagingAndEmptyResults() {
+    void readsMatchJdbcBaselineIncludingSearchPagingAndEmptyResults() {
         inRolledBackTransaction(() -> {
             Long contractId = createContract(ContractStatus.ACTIVE);
             String contractNo = contractNo(contractId);
@@ -140,6 +142,32 @@ class ScheduleRepositoryIntegrationTest {
             assertThat(queryRepository.selectByContractIdAndPaymentStage(-1L, PaymentStage.GA_TO_FC)).isNull();
             assertThat(queryRepository.selectNextScheduleVersionNo(-1L, PaymentStage.GA_TO_FC)).isEqualTo(1);
             assertThat(queryRepository.selectActiveOperationalPolicyVersionId(-1L, PaymentStage.GA_TO_FC)).isNull();
+        });
+    }
+
+    @Test
+    void searchPreservesEmptyValuesPostgresLikeWildcardsAndEscapes() {
+        inRolledBackTransaction(() -> {
+            String prefix = "SCH-" + UUID.randomUUID();
+            String specialContractNo = prefix + "_ %\\TAIL";
+            createContract(ContractStatus.ACTIVE, specialContractNo);
+
+            // null·빈 문자열은 조건을 생략하고 공백·와일드카드·역슬래시는 기존 LIKE 의미를 유지한다.
+            for (String keyword : java.util.Arrays.asList(null, "", " ", "%", "_", "\\",
+                    prefix + "%", prefix + "_", prefix + "\\_", "\\%", "\\\\",
+                    prefix + "\\_ \\%\\\\TAIL")) {
+                ScheduleSearchCondition search = condition(c -> c.setContractNo(keyword));
+                assertSame(baseline.selectAllByCondition(search), queryRepository.selectAllByCondition(search));
+                assertThat(queryRepository.countByCondition(search))
+                        .as("count for contractNo=%s", keyword).isEqualTo(baseline.countByCondition(search));
+                for (long offset : List.of(0L, 1L, 100_000L)) {
+                    assertSame(baseline.selectByCondition(search, 3, offset),
+                            queryRepository.selectByCondition(search, 3, offset));
+                }
+            }
+            ScheduleSearchCondition escaped = condition(c -> c.setContractNo(prefix + "\\_ \\%\\\\TAIL"));
+            assertThat(queryRepository.selectAllByCondition(escaped))
+                    .hasSize(2).extracting(ScheduleHeaderResponse::getContractNo).containsOnly(specialContractNo);
         });
     }
 
@@ -324,11 +352,15 @@ class ScheduleRepositoryIntegrationTest {
     }
 
     private Long createContract(ContractStatus status) {
+        return createContract(status, "SCH-" + UUID.randomUUID());
+    }
+
+    private Long createContract(ContractStatus status, String contractNo) {
         Long seedId = jdbc.queryForObject("SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = ?",
                 Long.class, "FGC-FGL01-202607-0001");
         InsuranceContract seed = contractRepository.findById(seedId).orElseThrow();
         return contractService.createContract(new ContractCreateRequest(seed.getInsurerId(),
-                "SCH-" + UUID.randomUUID(), seed.getProductOfferingId(),
+                contractNo, seed.getProductOfferingId(),
                 seed.getContractDate(), status,
                 seed.getAgentId(), seed.getOrganizationId(), PaymentCycleCode.MONTHLY,
                 new BigDecimal("123457"), new BigDecimal("123457"), new BigDecimal("123457"),

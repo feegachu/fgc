@@ -5,6 +5,8 @@ import com.susukkang.fgc.cap.dto.CapValidationResult;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.math.BigDecimal;
 
@@ -70,12 +72,39 @@ class CapValidatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.REVIEW_REQUIRED);
     }
 
+    // #490: 지급확정 판정도 CapCalculatorImplTest와 같은 경계(1,200% 예산의 90%)를 낸다.
+    // 월납 100,000원(L = 1,200,000), 한도 = L − 해약환급금 + 준법경영비
+    @ParameterizedTest(name = "한도 {0}, 산입 {1} → {2}")
+    @CsvSource({
+            "912000, 791999, NORMAL",
+            "912000, 792000, WARNING",
+            "912000, 912000, WARNING",
+            "912000, 912001, VIOLATION",
+            "1200000, 1079999, NORMAL",
+            "1200000, 1080000, WARNING",
+            "1203000, 1082999, NORMAL",
+            "1203000, 1083000, WARNING"
+    })
+    void judgesWarningByRegulatoryBudgetLikeCalculator(String limit, String included, CapResultStatus expected) {
+        CapValidationResult result = validator.validate(new CapValidationRequest(
+                new BigDecimal(limit),
+                new BigDecimal("1200000"),
+                new BigDecimal("90"),
+                BigDecimal.ZERO,
+                new BigDecimal(included),
+                InclusionDecisionStatus.INCLUDED
+        ));
+
+        assertThat(result.resultStatus()).isEqualTo(expected);
+    }
+
     private CapValidationRequest request(
             String existing,
             String candidate,
             InclusionDecisionStatus status
     ) {
         return new CapValidationRequest(
+                new BigDecimal("1200000"),
                 new BigDecimal("1200000"),
                 new BigDecimal("90"),
                 new BigDecimal(existing),
