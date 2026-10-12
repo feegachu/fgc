@@ -9,6 +9,9 @@ export function FilterBar({
   wrapFields = true,
   resetFirst = false,
   icons = false,
+  showSubmit = true,
+  fieldsClassName = '',
+  actionsClassName = '',
 }: {
   children: ReactNode
   onSubmit: () => void
@@ -18,6 +21,9 @@ export function FilterBar({
   wrapFields?: boolean
   resetFirst?: boolean
   icons?: boolean
+  showSubmit?: boolean
+  fieldsClassName?: string
+  actionsClassName?: string
 }) {
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -32,15 +38,15 @@ export function FilterBar({
   const submitButton = <Button type="submit">{icon('search')}조회</Button>
   return (
     <form className={`filter-bar ${className}`} aria-label="조회 조건" onSubmit={submit}>
-      {wrapFields ? <div className="filter-fields">{children}</div> : children}
-      <div className="filter-actions">
-        {!resetFirst && submitButton}
+      {wrapFields ? <div className={`filter-fields ${fieldsClassName}`}>{children}</div> : children}
+      <div className={`filter-actions ${actionsClassName}`}>
+        {showSubmit && !resetFirst && submitButton}
         {onReset && (
           <Button variant="secondary" onClick={onReset}>
             {icon('restart_alt')}초기화
           </Button>
         )}
-        {resetFirst && submitButton}
+        {showSubmit && resetFirst && submitButton}
         {actions}
       </div>
     </form>
