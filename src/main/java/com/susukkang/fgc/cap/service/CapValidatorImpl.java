@@ -46,12 +46,10 @@ public class CapValidatorImpl implements CapValidator {
         // 개선: 검토필요 상태를 최우선 결과로 반환하여 확정 서비스가 FGC-CAP-002로 차단
         if (request.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED) {
             resultStatus = CapResultStatus.REVIEW_REQUIRED;
-        } else if (remaining.signum() < 0) {
-            resultStatus = CapResultStatus.VIOLATION;
-        } else if (usagePct.compareTo(request.warningUsagePct()) >= 0) {
-            resultStatus = CapResultStatus.WARNING;
         } else {
-            resultStatus = CapResultStatus.NORMAL;
+            // #490: 계산기·결합 판정과 같은 1,200% 예산 기준
+            resultStatus = CapResultStatus.judge(
+                    remaining, request.annualizedLimitBase(), request.warningUsagePct());
         }
 
         return new CapValidationResult(
