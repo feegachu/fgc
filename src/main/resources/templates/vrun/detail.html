@@ -358,6 +358,19 @@
       <div class="kpi-card"><p class="kpi-label">이번 실행 미검출</p><p class="kpi-value-row"><span class="kpi-value tabular-nums" th:text="${detail.exceptionSummary().notDetectedCount()}">0</span><span class="kpi-unit">건</span></p></div>
       <div class="kpi-card"><p class="kpi-label">미처리 업무건</p><p class="kpi-value-row"><span class="kpi-value tabular-nums" th:text="${detail.exceptionSummary().openWorkItemCount()}">0</span><span class="kpi-unit">건</span></p></div>
     </div>
+    <!-- #498 확정된 달의 재검증 실행만: 확정 결과와 1,200% 판정·한도액이 다른 건(운영정책서 제44조 사후 점검 기록).
+         비교 기준이 없는 실행에서 0건을 "차이 없음"으로 읽지 않도록 기준이 있을 때만 보인다. -->
+    <p class="field-helper" id="finalized-result-diff"
+       th:if="${detail.exceptionSummary().comparedFinalizedRunId() != null}">
+      확정 실행
+      <a th:href="@{/validation-runs/{id}(id=${detail.exceptionSummary().comparedFinalizedRunId()})}"
+         th:text="'#' + ${detail.exceptionSummary().comparedFinalizedRunId()}">#1</a>
+      과 1,200% 판정·한도액이 다른 건
+      <strong class="tabular-nums" th:text="${detail.exceptionSummary().finalizedResultDiffCount()}">0</strong>건.
+      확정 결과는 바뀌지 않으며, 차이는 예외함에 사후 점검 건으로 남습니다.
+      <a th:if="${detail.exceptionSummary().finalizedResultDiffCount() > 0}"
+         th:href="@{/exceptions(status='',type='CAP_REVIEW_REQUIRED',reasonCode='FINALIZED_RESULT_DIFF',validationMonth=${detail.header().validationMonth()})}">예외함에서 보기</a>
+    </p>
   </section>
 
   <!-- ⑤ 확정 조건 체크리스트 — IF-API-50 응답의 문서 순서·문구를 그대로 표시한다. -->

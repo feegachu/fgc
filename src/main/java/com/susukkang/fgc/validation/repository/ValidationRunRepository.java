@@ -79,6 +79,19 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
     @Query("SELECT v FROM ValidationRun v WHERE v.validationRunId = :validationRunId")
     Optional<ValidationRun> findByIdForUpdate(@Param("validationRunId") Long validationRunId);
 
+    /** 대사 생성은 영속성 컨텍스트의 캐시 대신 잠근 DB 행의 현재 상태·월을 검증한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query(value = """
+            SELECT validation_month AS "validationMonth", status
+              FROM fgc.validation_run WHERE validation_run_id = :validationRunId FOR UPDATE
+            """, nativeQuery = true)
+    Optional<LockedReference> findReferenceForUpdate(@Param("validationRunId") Long validationRunId);
+
+    interface LockedReference {
+        LocalDate getValidationMonth();
+        String getStatus();
+    }
+
     /** (validationMonth, runNo) 복합 유니크 키 조회 — 명시적 runNo 재시작의 멱등성 판단용. */
     Optional<ValidationRun> findByValidationMonthAndRunNo(LocalDate validationMonth, Integer runNo);
 
@@ -355,7 +368,16 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                    rr.reconciliationUnmatchedCount, rr.reconciliationDifferenceAmountTotal,
                    ex.exceptionDetectedCount, ex.exceptionNewCount, ex.exceptionRecurringCount,
                    ex.exceptionReopenedCount, ex.exceptionNotDetectedCount,
-                   ex.exceptionOpenWorkItemCount
+                   ex.exceptionOpenWorkItemCount, ex.finalizedResultDiffCount,
+                   -- #498 비교 기준: ExceptionCaseRepository#insertFromFinalizedCapResultDiffs 와 같은 조건을 유지한다
+                   (SELECT MAX(finalized.validation_run_id)
+                      FROM fgc.validation_run finalized
+                      JOIN fgc.validation_run target_run
+                        ON target_run.validation_run_id = :validationRunId
+                     WHERE finalized.validation_month = target_run.validation_month
+                       AND finalized.status = 'FINALIZED'
+                       AND finalized.validation_run_id < target_run.validation_run_id)
+                       AS comparedFinalizedRunId
               FROM (SELECT COUNT(*) FILTER (WHERE selection_status = 'SELECTED')        AS targetSelectedCount,
                            COUNT(*) FILTER (WHERE selection_status = 'EXCLUDED')        AS targetExcludedCount,
                            COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
@@ -397,6 +419,8 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                         COUNT(*) FILTER (WHERE occurrence.is_new_case) AS exceptionNewCount,
                         COUNT(*) FILTER (WHERE NOT occurrence.is_new_case) AS exceptionRecurringCount,
                         COUNT(*) FILTER (WHERE occurrence.was_reopened) AS exceptionReopenedCount,
+                        COUNT(*) FILTER (WHERE occurrence.reason_code = 'FINALIZED_RESULT_DIFF')
+                            AS finalizedResultDiffCount,
                         (SELECT COUNT(*)
                            FROM fgc.exception_case ec
                            JOIN fgc.validation_run target_run

@@ -1,5 +1,7 @@
 package com.susukkang.fgc.journal.repository;
 
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.JournalHeaderStatus;
@@ -17,16 +19,9 @@ import com.susukkang.fgc.journal.service.JournalDetailService;
 import com.susukkang.fgc.journal.service.JournalImbalanceService;
 import com.susukkang.fgc.journal.service.JournalSearchService;
 import jakarta.persistence.EntityManagerFactory;
-import org.apache.ibatis.builder.xml.XMLMapperBuilder;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -34,7 +29,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.test.context.transaction.AfterTransaction;
@@ -62,10 +56,10 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * f7a82c78의 MyBatis SQL과 현재 JPA 서비스를 동일 DB·입력에서 비교한다.
+ * f7a82c78의 JDBC SQL과 현재 JPA 서비스를 동일 DB·입력에서 비교한다.
  * 30회 워밍업 후 100회 교차 실행하며 시간은 합격 기준으로 사용하지 않는다.
  * JDBC 실제 실행을 양쪽 모두 관찰하며 JSON 변환·검증·픽스처 생성 시간은 제외한다.
- * 테스트 전용 XML은 운영 mapper 경로 밖에 두고 로컬 SqlSessionFactory에서만 읽는다.
+ * 비교 SQL은 테스트 전용 JDBC 구현에 동결해 운영 Repository와 독립적으로 실행한다.
  *
  * @author hjKang
  * @since 2026-09-28
@@ -87,9 +81,9 @@ class JournalReadPerformanceTest {
     private static final int HEADER_COUNT = 5000;
     private static final LocalDate FROM = LocalDate.of(2091, 7, 1);
     private static final LocalDate TO = FROM.plusDays(27);
-    private static final String SEARCH = "com.susukkang.fgc.journal.mapper.JournalSearchMapper.";
-    private static final String DETAIL = "com.susukkang.fgc.journal.mapper.JournalDetailMapper.";
-    private static final String IMBALANCE = "com.susukkang.fgc.journal.mapper.JournalImbalanceMapper.";
+    private static final String SEARCH = "journalBaseline.JournalSearch.";
+    private static final String DETAIL = "journalBaseline.JournalDetail.";
+    private static final String IMBALANCE = "journalBaseline.JournalImbalance.";
     private static final ThreadLocal<List<String>> EXECUTED_SQL = new ThreadLocal<>();
 
     @Autowired private DataSource dataSource;
@@ -105,10 +99,10 @@ class JournalReadPerformanceTest {
     private final List<Long> runIds = new ArrayList<>();
 
     @Test
-    void compareLegacyQueriesAndCurrentServices() throws Exception {
+    void compareLegacyQueriesAndCurrentServices() {
         assertThat(AopUtils.isAopProxy(legacyReadFacade)).as("Legacy read transaction proxy").isTrue();
         Fixture fixture = createFixture();
-        SqlSessionTemplate baseline = baselineSession();
+        JdbcBaseline baseline = baselineSession();
         JournalSearchCriteria all = new JournalSearchCriteria(FROM, TO, null, null, null, null);
         JournalSearchCriteria account = new JournalSearchCriteria(FROM, TO, null, marker, null, null);
         assertThat(searchService.search(all, 1, 20).totalElements()).isEqualTo(HEADER_COUNT);
@@ -152,7 +146,7 @@ class JournalReadPerformanceTest {
                 () -> imbalanceService.findImbalances(runIds.getFirst()));
     }
 
-    private PageResponse<JournalListRow> legacyPage(SqlSessionTemplate session, JournalSearchCriteria condition, int page) {
+    private PageResponse<JournalListRow> legacyPage(JdbcBaseline session, JournalSearchCriteria condition, int page) {
         Map<String, Object> params = new HashMap<>();
         params.put("from", condition.from());
         params.put("to", condition.to());
@@ -168,7 +162,7 @@ class JournalReadPerformanceTest {
     }
 
     // f7a82c78의 서비스 조립 순서와 계산을 보존하여 양쪽 모두 같은 응답까지 생성한다.
-    private JournalDetailResponse legacyDetail(SqlSessionTemplate session, Long id) {
+    private JournalDetailResponse legacyDetail(JdbcBaseline session, Long id) {
         Map<String, Object> params = Map.of("journalHeaderId", id);
         JournalDetailHeaderRow row = session.selectOne(DETAIL + "findHeaderById", params);
         List<JournalDetailLineRow> lineRows = session.selectList(DETAIL + "findLinesByHeaderId", params);
@@ -195,7 +189,7 @@ class JournalReadPerformanceTest {
                 debit, credit, difference, balanced, lines);
     }
 
-    private JournalImbalanceSearchResponse legacyImbalances(SqlSessionTemplate session, Long runId) {
+    private JournalImbalanceSearchResponse legacyImbalances(JdbcBaseline session, Long runId) {
         Map<String, Object> params = Map.of("validationRunId", runId);
         // 기존 서비스도 ValidationRunMapper.findById를 먼저 호출했으므로 이 SQL을 함께 센다.
         Object run = session.selectOne("journalValidationBaseline.findById", params);
@@ -204,20 +198,8 @@ class JournalReadPerformanceTest {
         return JournalImbalanceSearchResponse.of(rows, rows.size());
     }
 
-    private SqlSessionTemplate baselineSession() throws Exception {
-        Configuration configuration = new Configuration(new Environment("journal-baseline",
-                new SpringManagedTransactionFactory(), dataSource));
-        configuration.setMapUnderscoreToCamelCase(true);
-        configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        configuration.setCacheEnabled(false);
-        for (String name : List.of("JournalSearchMapper.xml", "JournalDetailMapper.xml",
-                "JournalImbalanceMapper.xml", "ValidationRunRead.xml")) {
-            String path = "journal-baseline/" + name;
-            try (var input = new ClassPathResource(path).getInputStream()) {
-                new XMLMapperBuilder(input, configuration, path, configuration.getSqlFragments()).parse();
-            }
-        }
-        return new SqlSessionTemplate(new SqlSessionFactoryBuilder().build(configuration));
+    private JdbcBaseline baselineSession() {
+        return new JdbcBaseline(dataSource);
     }
 
     private void compare(String name, int expectedSqlCount, Supplier<?> oldRead, Supplier<?> newRead) {

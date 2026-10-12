@@ -17,7 +17,7 @@ import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
 import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
-import com.susukkang.fgc.transaction.performance.baseline.BaselineCapCheckMapper;
+import com.susukkang.fgc.transaction.performance.baseline.PaymentCapCheckJdbcBaseline;
 import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
@@ -50,7 +50,7 @@ import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
 import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
 import com.susukkang.fgc.transaction.dto.*;
-import com.susukkang.fgc.transaction.performance.baseline.BaselineCommissionPaymentMapper;
+import com.susukkang.fgc.transaction.performance.baseline.CommissionPaymentJdbcBaseline;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -91,8 +91,8 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
     private static final String AUDIT_PAYMENT_UPDATED = "PAYMENT_UPDATED";
     private static final String AUDIT_PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
 
-    private final BaselineCommissionPaymentMapper mapper;
-    private final BaselineCapCheckMapper capCheckMapper;
+    private final CommissionPaymentJdbcBaseline mapper;
+    private final PaymentCapCheckJdbcBaseline capCheckMapper;
     private final AgentRepository agentRepository;
     private final ObjectMapper objectMapper;
     private final CapValidator capValidator;
@@ -228,6 +228,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
 
             CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                     calculation.limitAmount(),
+                    calculation.annualizedLimitBase(),
                     rule.warningUsagePct(),
                     rule.existingIncludedAmount(),
                     data.attributedAmount(),
@@ -352,6 +353,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 }
                 CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                         calculation.limitAmount(),
+                        calculation.annualizedLimitBase(),
                         rule.warningUsagePct(),
                         rule.existingIncludedAmount(),
                         data.attributedAmount(),
@@ -1343,7 +1345,12 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                         .evidenceRef(d.getEvidenceRef())
                         .build());
             }
-            rows.add(candidateDetailRow(check, seq));
+            rows.add(CapCheckDetailInsertRow.builder()
+                    .capCheckId(check.getCapCheckId()).detailSeq(seq)
+                    .commissionItemId(data.commissionItemId()).itemCode(data.itemCode()).itemName(data.itemName())
+                    .transactionAttributionId(data.transactionAttributionId())
+                    .classificationSnapshot(data.inclusionDecisionStatus().name()).amount(check.getCandidateAmount())
+                    .decisionReason(data.inclusionDecisionReason()).evidenceRef(data.evidenceRef()).build());
         } else {
             for (CapCheckDetailLine d : calculation.details()) {
                 rows.add(CapCheckDetailInsertRow.builder()
@@ -1393,6 +1400,11 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         snapshot.put("scheduledIncludedAmount", calculation.includedAmount());
         snapshot.put("existingIncludedAmount", rule.existingIncludedAmount());
         snapshot.put("candidateAmount", result.candidateIncludedAmount());
+        // #383 측정 픽스처는 계약별 귀속 1건. 기존 병합분의 증거 필드까지 비교한다.
+        snapshot.put("candidateAttributions", List.of(Map.of(
+                "transactionAttributionId", data.transactionAttributionId(),
+                "classification", data.inclusionDecisionStatus().name(),
+                "signedAmount", result.candidateIncludedAmount())));
         snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
                 .add(result.candidateIncludedAmount()));
         snapshot.put("effectiveIncludedAmount", result.includedAmount());

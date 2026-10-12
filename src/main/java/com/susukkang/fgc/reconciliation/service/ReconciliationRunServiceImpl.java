@@ -10,8 +10,7 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequestPort;
-import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +31,7 @@ import java.util.Optional;
 public class ReconciliationRunServiceImpl implements ReconciliationRunService {
 
     private final ReconciliationRunRepository reconciliationRunRepository;
-    private final ValidationRunMapper validationRunMapper;
+    private final ValidationRunRepository validationRunRepository;
     private final ReconciliationRunLifecycleService lifecycleService;
     private final Optional<ReconciliationExecutionRequestPort> executionRequestPort;
 
@@ -97,7 +96,7 @@ public class ReconciliationRunServiceImpl implements ReconciliationRunService {
             notFound("insurerId", command.insurerId());
         }
 
-        ValidationRunRow validationRun = validationRunMapper.findByIdForUpdate(command.validationRunId());
+        var validationRun = validationRunRepository.findReferenceForUpdate(command.validationRunId()).orElse(null);
         if (validationRun == null) {
             notFound("validationRunId", command.validationRunId());
         }

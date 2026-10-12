@@ -1,5 +1,7 @@
 package com.susukkang.fgc.exceptioncase.repository;
 
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.dashboard.service.DashboardService;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow;
@@ -22,19 +24,6 @@ import com.susukkang.fgc.common.code.ExceptionType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
-import org.apache.ibatis.builder.xml.XMLMapperBuilder;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.executor.statement.StatementHandler;
-import org.apache.ibatis.plugin.Interceptor;
-import org.apache.ibatis.plugin.Intercepts;
-import org.apache.ibatis.plugin.Invocation;
-import org.apache.ibatis.plugin.Signature;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
-import org.springframework.core.io.ClassPathResource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -288,9 +277,9 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         assertThat(repository.findActionsByCaseIds(caseIds)).isEmpty();
     }
 
-    /** 전환 전 XML을 테스트 전용으로 실행하여 필터·순서·null·JSON·연결 값을 비교한다. */
+    /** 전환 전 SQL을 독립 JDBC 기준선으로 실행하여 필터·순서·null·JSON·연결 값을 비교한다. */
     @Test
-    void matchesLegacySearchSummaryOptionsAndHistories() throws Exception {
+    void matchesLegacySearchSummaryOptionsAndHistories() {
         Long userId = anyUserId();
         Long runId = insertRun();
         Long caseId = firstCaseId();
@@ -301,7 +290,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
                  WHERE exception_case_id = ?
                 """, suffix, runId, userId, contractId, caseId);
         insertHistories(List.of(caseId), runId, 3);
-        SqlSessionTemplate baseline = baselineSession();
+        JdbcBaseline baseline = baselineSession();
 
         var all = ExceptionCaseSearchDTO.builder().contractNo(contractNo.toLowerCase(java.util.Locale.ROOT)).build();
         var combined = ExceptionCaseSearchDTO.builder().contractNo(contractNo)
@@ -354,13 +343,13 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
 
     /** 테스트 전용 DB에서 빈 선택지·미처리 0건의 반환 계약을 확인하고 전부 롤백한다. */
     @Test
-    void returnsEmptySummaryAndOptionsWhenNoEligibleRowsExist() throws Exception {
+    void returnsEmptySummaryAndOptionsWhenNoEligibleRowsExist() {
         jdbcTemplate.update("""
                 UPDATE fgc.exception_case
                    SET reason_code = NULL, assigned_to = NULL, validation_month = NULL,
                        status = 'RESOLVED', resolved_at = CURRENT_TIMESTAMP
                 """);
-        SqlSessionTemplate baseline = baselineSession();
+        JdbcBaseline baseline = baselineSession();
         assertThat(repository.countOpenByType()).isEmpty();
         assertThat(repository.findReasonCodes()).isEmpty();
         assertThat(repository.findAssignees()).isEmpty();
@@ -392,7 +381,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
     }
 
     @Test
-    void historyQueryCountStaysConstantAsPageAndHistorySizesGrow() throws Exception {
+    void historyQueryCountStaysConstantAsPageAndHistorySizesGrow() {
         Long runId = insertRun();
         jdbcTemplate.update("""
                 INSERT INTO fgc.exception_case
@@ -430,7 +419,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
 
         // 동일한 30건·각 4개 이력을 전환 전후 교차 실행한다. 시간은 합격 기준으로 사용하지 않는다.
         AtomicInteger legacySqlCount = new AtomicInteger();
-        SqlSessionTemplate baseline = baselineSession(legacySqlCount);
+        JdbcBaseline baseline = baselineSession(legacySqlCount);
         assertEquivalent(service.search(criteria, 1, 30), readLegacyPage(baseline, criteria, 30));
         List<Long> oldSamples = new java.util.ArrayList<>();
         List<Long> newSamples = new java.util.ArrayList<>();
@@ -459,7 +448,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
                 oldSamples.get(4) / 1_000_000.0, newSamples.get(4) / 1_000_000.0);
     }
 
-    private ExceptionCaseSearchResponse readLegacyPage(SqlSessionTemplate baseline, ExceptionCaseSearchDTO criteria, int size) {
+    private ExceptionCaseSearchResponse readLegacyPage(JdbcBaseline baseline, ExceptionCaseSearchDTO criteria, int size) {
         Map<String, Object> params = Map.of("criteria", criteria, "statuses", List.of(), "offset", 0, "limit", size);
         long total = baseline.selectOne("exceptionCaseBaseline.count", params);
         List<ExceptionCaseSearchRow> rows = baseline.selectList("exceptionCaseBaseline.search", params);
@@ -557,37 +546,12 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
         }
     }
 
-    private SqlSessionTemplate baselineSession() throws Exception {
+    private JdbcBaseline baselineSession() {
         return baselineSession(new AtomicInteger());
     }
 
-    private SqlSessionTemplate baselineSession(AtomicInteger statements) throws Exception {
-        Configuration config = new Configuration(new Environment("exception-baseline",
-                new SpringManagedTransactionFactory(), dataSource));
-        config.setMapUnderscoreToCamelCase(true);
-        config.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        config.setCacheEnabled(false);
-        config.addInterceptor(new LegacySqlCounter(statements));
-        String resource = "baseline/exception-case-query.xml";
-        try (var input = new ClassPathResource(resource).getInputStream()) {
-            new XMLMapperBuilder(input, config, resource, config.getSqlFragments()).parse();
-        }
-        return new SqlSessionTemplate(new SqlSessionFactoryBuilder().build(config));
-    }
-
-    @Intercepts(@Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class}))
-    private static class LegacySqlCounter implements Interceptor {
-        private final AtomicInteger statements;
-
-        private LegacySqlCounter(AtomicInteger statements) {
-            this.statements = statements;
-        }
-
-        @Override
-        public Object intercept(Invocation invocation) throws Throwable {
-            statements.incrementAndGet();
-            return invocation.proceed();
-        }
+    private JdbcBaseline baselineSession(AtomicInteger statements) {
+        return new JdbcBaseline(dataSource, statements);
     }
 
     private void assertEquivalent(Object actual, Object expected) {

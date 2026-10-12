@@ -6,7 +6,7 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRes
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +26,7 @@ public class ReconciliationExceptionService {
     private static final Set<String> ELIGIBLE_STATUSES = Set.of("COMPLETED", "FINALIZED");
 
     private final ReconciliationRunRepository reconciliationRunRepository;
-    private final ExceptionCaseMapper exceptionCaseMapper;
+    private final ExceptionCaseRepository exceptionCaseRepository;
 
     @Transactional
     public ReconciliationExceptionBulkCreateResponse bulkCreate(Long reconciliationRunId) {
@@ -49,7 +49,7 @@ public class ReconciliationExceptionService {
         // 별도 왕복으로 나누면 그 사이에 결과가 더 들어와 생성 건수가 후보 건수를
         // 넘어서는(skippedDuplicate 음수) 경쟁 상태가 생길 수 있었다.
         ReconciliationExceptionBulkCreateRow row =
-                exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
+                exceptionCaseRepository.bulkCreateFromReconciliationResultsByRun(reconciliationRunId);
 
         return new ReconciliationExceptionBulkCreateResponse(
                 row.getCreatedCount(), row.getCandidateCount() - row.getCreatedCount());

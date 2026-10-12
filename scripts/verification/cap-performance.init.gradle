@@ -1,4 +1,4 @@
-// 동일 JVM·격리 PostgreSQL에서 원본 MyBatis와 현재 조회 저장소를 AB/BA 교대로 측정한다.
+// 동일 JVM·격리 PostgreSQL에서 전환 전 SQL의 JDBC 기준과 현재 조회 저장소를 AB/BA 교대로 측정한다.
 // gradlew -I scripts/verification/cap-performance.init.gradle test --tests '*CapReferenceReadPerformanceTest' -PcapRound=ab
 // 반대 시작 순서: -PcapRound=ba -PcapCurrentFirst=true
 allprojects {

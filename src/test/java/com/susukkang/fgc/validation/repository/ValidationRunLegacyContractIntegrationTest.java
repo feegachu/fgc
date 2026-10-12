@@ -1,0 +1,418 @@
+package com.susukkang.fgc.validation.repository;
+import com.susukkang.fgc.validation.entity.ValidationRun;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
+import org.springframework.data.domain.PageRequest;
+import static com.susukkang.fgc.common.code.ValidationRunStatus.*;
+
+
+import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
+import com.susukkang.fgc.validation.dto.ValidationRunListRow;
+import com.susukkang.fgc.validation.dto.ValidationRunRow;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.junit.jupiter.api.Disabled;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDate;
+import java.util.List;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+
+/**
+ * 기존 검증 실행 저장 계약을 격리된 PostgreSQL의 Repository로 검증
+ * 특히 updateStatusIfCurrent의 "조건부" 동작(이미 상태가 바뀐 뒤에는 0건이어야 함)은
+ * mock으로는 증명이 안 되고 실제 UPDATE ... WHERE status = ? 가 정말 그렇게 동작하는지 확인해야함
+ */
+@SpringBootTest
+@Transactional
+class ValidationRunLegacyContractIntegrationTest {
+
+    @Autowired
+    private ValidationRunRepository validationRunRepository;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+
+    // guard_run_lifecycle(V7)이 INSERT 시 status='CREATED'만 허용. run_type은 안 넣으면
+    // DB 기본값(MONTHLY)이 채워진다.
+
+    private Long insertCreatedRun(LocalDate month, int runNo) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, status)
+                VALUES (?, ?, 'CREATED')
+                RETURNING validation_run_id
+                """, Long.class, month, runNo);
+    }
+
+
+    private Long insertCreatedRun(LocalDate month, int runNo, String runType) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status)
+                VALUES (?, ?, ?, 'CREATED')
+                RETURNING validation_run_id
+                """, Long.class, month, runNo, runType);
+    }
+
+    @Test
+    // findById로 방금 넣은 CREATED 행이 그대로 읽히는지
+    void findByIdReturnsInsertedRow() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 8, 1), 1);
+
+        ValidationRunRow row = validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow();
+
+        assertThat(row).isNotNull();
+        assertThat(row.getValidationRunId()).isEqualTo(id);
+        assertThat(row.getStatus()).isEqualTo("CREATED");
+        assertThat(row.getValidationMonth()).isEqualTo(LocalDate.of(2026, 8, 1));
+        assertThat(row.getRunNo()).isEqualTo(1);
+    }
+
+    @Test
+    // updateStatusIfCurrent(id, \"CREATED\", \"RUNNING\")가 1을 반환하고 실제 status도 바뀌는지"
+    void updateStatusIfCurrentSucceedsWhenExpectedStatusMatches() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 8, 1), 2);
+
+        int affected = validationRunRepository.updateStatusIfCurrent(id, CREATED, RUNNING);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow().getStatus()).isEqualTo("RUNNING");
+    }
+
+    @Test
+    // 실제 status는 CREATED인데 expectedStatus를 RUNNING으로 주면 0을 반환하고 status가 그대로인지
+    void updateStatusIfCurrentReturnsZeroWhenExpectedStatusIsStale() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 8, 1), 3);
+
+        int affected = validationRunRepository.updateStatusIfCurrent(id, RUNNING, COMPLETED);
+
+        assertThat(affected).isZero();
+        assertThat(validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow().getStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
+    // 존재하지 않는 validationRunId로 updateStatusIfCurrent를 호출하면 역시 0을 반환하는지
+    void updateStatusIfCurrentReturnsZeroWhenRunDoesNotExist() {
+        int affected = validationRunRepository.updateStatusIfCurrent(999_999_999L, CREATED, RUNNING);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    // 해당 월에 행이 하나도 없으면 findNextRunNo가 1을 반환하는지
+    void findNextRunNoReturnsOneWhenNoRunsExistForMonth() {
+        Integer nextRunNo = validationRunRepository.findNextRunNo(LocalDate.of(2026, 9, 1));
+
+        assertThat(nextRunNo).isEqualTo(1);
+    }
+
+    @Test
+    // run_no 1,2가 이미 있으면 findNextRunNo가 3을 반환하는지 둘 다 MANUAL_CONTRACT로 넣음
+    void findNextRunNoReturnsMaxPlusOne() {
+        // uq_validation_run_active_manual_contract(V9) 때문에 MANUAL_CONTRACT 활성 실행은
+        // 동시에 1건만 가능하다 — 두 번째 행은 활성-1건 제약이 없는 PRE_CONFIRM으로 넣는다.
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        insertCreatedRun(month, 1, "MANUAL_CONTRACT");
+        insertCreatedRun(month, 2, "PRE_CONFIRM");
+
+        Integer nextRunNo = validationRunRepository.findNextRunNo(month);
+
+        assertThat(nextRunNo).isEqualTo(3);
+    }
+
+    @Test
+    // MONTHLY + CREATED/RUNNING 실행이 있으면 existsActiveMonthlyRun이 true인지
+    void existsActiveMonthlyRunReturnsTrueForActiveMonthlyRun() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        insertCreatedRun(month, 1);
+
+        boolean exists = validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(month, "MONTHLY", List.of(CREATED, RUNNING));
+
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    // 같은 달에 COMPLETED MONTHLY 실행만 있으면 false인지
+    void existsActiveMonthlyRunReturnsFalseWhenNoActiveRun() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        Long id = insertCreatedRun(month, 1);
+        validationRunRepository.updateStatusIfCurrent(id, CREATED, RUNNING);
+        jdbcTemplate.update(
+                "UPDATE fgc.validation_run SET status = 'COMPLETED', current_step = 8 WHERE validation_run_id = ?",
+                id);
+
+        boolean exists = validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(month, "MONTHLY", List.of(CREATED, RUNNING));
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    // MANUAL_CONTRACT 실행은 활성(CREATED)이어도 existsActiveMonthlyRun에 안 잡히는지
+    void existsActiveMonthlyRunIgnoresNonMonthlyRunType() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        insertCreatedRun(month, 1, "MANUAL_CONTRACT");
+
+        boolean exists = validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(month, "MONTHLY", List.of(CREATED, RUNNING));
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    // insert 후 row.validationRunId가 채워지고, status/current_step은 DB 기본값(CREATED/0)인지
+    void insertGeneratesIdAndAppliesDefaults() {
+        ValidationRunInsertRow row = ValidationRunInsertRow.builder()
+                .validationMonth(LocalDate.of(2026, 9, 1))
+                .runNo(1)
+                .runType("MONTHLY")
+                .build();
+
+        insert(row);
+
+        assertThat(row.getValidationRunId()).isNotNull();
+
+        ValidationRunRow found = validationRunRepository.findById(row.getValidationRunId()).map(ValidationRunRow::from).orElseThrow();
+        assertThat(found.getStatus()).isEqualTo("CREATED");
+
+        Integer currentStep = jdbcTemplate.queryForObject(
+                "SELECT current_step FROM fgc.validation_run WHERE validation_run_id = ?",
+                Integer.class, row.getValidationRunId());
+        assertThat(currentStep).isZero();
+    }
+
+    @Test
+    // 같은 달·같은 run_no로 두 번 insert하면 uq_validation_run 위반(DataIntegrityViolationException)인지
+    void insertFailsOnDuplicateRunNoInSameMonth() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        insertCreatedRun(month, 1);
+
+        ValidationRunInsertRow duplicate = ValidationRunInsertRow.builder()
+                .validationMonth(month)
+                .runNo(1)
+                .runType("MANUAL_CONTRACT")
+                .build();
+
+        assertThatThrownBy(() -> insert(duplicate))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    // ── #41 목록 조회(search/count) ──────────────────────────────────────────
+    // BindingException(Invalid bound statement)으로 실패한다 — 정상이다.
+
+    @Test
+    // month로 걸면 그 달 실행만 나오는지
+    void searchFiltersByMonth() {
+        insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        insertCreatedRun(LocalDate.of(2026, 10, 1), 1);
+
+        List<ValidationRunListRow> rows =
+                validationRunRepository.search(LocalDate.of(2026, 9, 1), null, PageRequest.of(0, 20)).getContent();
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getValidationMonth()).isEqualTo(LocalDate.of(2026, 9, 1));
+    }
+
+    @Test
+    // status로 걸면 그 상태 실행만 나오는지
+    void searchFiltersByStatus() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        Long runningId = insertCreatedRun(month, 1);
+        validationRunRepository.updateStatusIfCurrent(runningId, CREATED, RUNNING);
+        // uq_validation_run_active_month는 월당 활성(CREATED/RUNNING) MONTHLY 실행을 1건만
+        // 허용한다 — 위에서 이미 RUNNING 하나를 썼으니 두 번째는 MANUAL_CONTRACT로 넣는다.
+        insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+
+        List<ValidationRunListRow> rows = validationRunRepository.search(month, RUNNING, PageRequest.of(0, 20)).getContent();
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getValidationRunId()).isEqualTo(runningId);
+        assertThat(rows.get(0).getStatus()).isEqualTo("RUNNING");
+    }
+
+    @Test
+    // 조건에 맞는 실행이 없으면 빈 리스트(에러 아님).
+    // "아무도 안 쓰는 월" 상수는 다른 테스트가 그 월을 쓰기 시작하면 또 깨진다 —
+    // 2099-01(ReconciliationRunIntegrationTest 커밋 월)에서 한 번(CI 2026-08-19 bee042b4),
+    // 2094-01로 옮긴 뒤에도 재발했다(#333 CI, 문서만 바뀐 커밋에서 실패). 공유 DB에
+    // 트랜잭션 없이 커밋하는 테스트가 존재하는 한 상수는 전부 시한부다.
+    // 상수 대신 실행 시점의 DB 최댓값에서 100년 뒤 월을 쓴다 — 무엇이 커밋돼 있어도 항상 빈 월이다.
+    void searchReturnsEmptyListWhenNoMatch() {
+        LocalDate maxMonth = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(validation_month), DATE '2026-01-01') FROM fgc.validation_run",
+                LocalDate.class);
+        LocalDate unusedMonth = maxMonth.plusYears(100).withDayOfMonth(1);
+
+        List<ValidationRunListRow> rows = validationRunRepository.search(unusedMonth, null, PageRequest.of(0, 20)).getContent();
+
+        assertThat(rows).isEmpty();
+    }
+
+    @Test
+    // month/status 둘 다 null이면(조건 없음) 특정 월로 좁혀지지 않고 나오는지, count도
+    // search 건수 이상인지(정확히 일치하는 걸 기대하지 않는다 — 이 클래스는 @Transactional로
+    // 자기 데이터는 롤백되지만, FINALIZED 불변성 테스트처럼 트랜잭션 없이 커밋하고 지울 수
+    // 없는 다른 테스트의 행이 같은 DB에 영구히 남을 수 있어 "전체 건수"를 정확한 값으로
+    // 단정하면 실행 순서에 따라 흔들린다 — 코드리뷰로 발견, 2026-08-11).
+    void searchAndCountReturnAllRowsWhenNoFilterGiven() {
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        Long firstId = insertCreatedRun(month, 1);
+        // uq_validation_run_active_month 때문에 같은 달 두 번째 MONTHLY 활성 실행은 못 넣는다.
+        Long secondId = insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+
+        List<ValidationRunListRow> rows = validationRunRepository.search(null, null, PageRequest.of(0, 1000)).getContent();
+        long total = validationRunRepository.search(null, null, PageRequest.of(0, 1)).getTotalElements();
+
+        assertThat(rows).extracting(ValidationRunListRow::getValidationRunId)
+                .contains(firstId, secondId);
+        assertThat(total).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    // limit/offset이 실제로 페이징되는지 — run_no 1,2,3 중 offset=1, limit=1이면 1건만
+    void searchRespectsOffsetAndLimit() {
+        // uq_validation_run_active_month 때문에 같은 달 두 번째부터는 MONTHLY가 아닌 다른
+        // runType으로 넣어야 하고, uq_validation_run_active_manual_contract(V9) 때문에
+        // MANUAL_CONTRACT 활성 실행도 동시에 1건만 가능하다 — 그래서 두 번째는
+        // MANUAL_CONTRACT, 세 번째는 활성-1건 제약이 없는 PRE_CONFIRM으로 넣는다.
+        LocalDate month = LocalDate.of(2026, 9, 1);
+        insertCreatedRun(month, 1);
+        insertCreatedRun(month, 2, "MANUAL_CONTRACT");
+        insertCreatedRun(month, 3, "PRE_CONFIRM");
+
+        List<ValidationRunListRow> rows = validationRunRepository.search(month, null, PageRequest.of(1, 1)).getContent();
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getRunNo()).isEqualTo(2);
+    }
+
+    // ── #57 MonthlyValidationJob 진행 기록(transitionToRunning/updateCurrentStep/
+    //    transitionToCompleted/transitionToFailed) ────────────────────────────────
+
+    @Test
+    // CREATED → RUNNING 전이 시 current_step=1, started_at도 같이 채워지는지
+    void transitionToRunningSetsStatusStepAndStartedAt() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+
+        int affected = validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow();
+        assertThat(row.getStatus()).isEqualTo("RUNNING");
+        assertThat(row.getCurrentStep()).isEqualTo(1);
+        assertThat(row.getStartedAt()).isNotNull();
+    }
+
+    @Test
+    // 이미 CREATED가 아니면(RUNNING 등) 0건 — 중복 호출로 진행상황이 두 번 시작되지 않게
+    void transitionToRunningReturnsZeroWhenNotCreated() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+
+        int affected = validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    // RUNNING 상태에서 current_step만 전진하고 status는 그대로인지
+    void updateCurrentStepAdvancesStepWhileStayingRunning() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+
+        int affected = validationRunRepository.updateCurrentStep(id, 4, RUNNING);
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow();
+        assertThat(row.getStatus()).isEqualTo("RUNNING");
+        assertThat(row.getCurrentStep()).isEqualTo(4);
+    }
+
+    @Test
+    // CREATED 상태(RUNNING 아님)에서는 updateCurrentStep이 0건 — ck_validation_run_step이
+    // CREATED에서 current_step=0만 허용하므로, 조건절이 그 위반을 미리 막아야 한다
+    void updateCurrentStepReturnsZeroWhenNotRunning() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+
+        int affected = validationRunRepository.updateCurrentStep(id, 2, RUNNING);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    // current_step을 이미 지나온 단계 번호로 되돌릴 수 없다(0건) — 역행 방지
+    void updateCurrentStepReturnsZeroWhenGoingBackward() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+        validationRunRepository.updateCurrentStep(id, 5, RUNNING);
+
+        int affected = validationRunRepository.updateCurrentStep(id, 3, RUNNING);
+
+        assertThat(affected).isZero();
+        assertThat(validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow().getCurrentStep()).isEqualTo(5);
+    }
+
+    @Test
+    // journalPostingStep·imbalanceCheckStep이 같은 stepNo=6을 공유 — 같은 값으로 다시
+    // 호출해도(역행이 아니라 제자리) 성공해야 한다
+    void updateCurrentStepAllowsSettingTheSameStepAgain() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+        validationRunRepository.updateCurrentStep(id, 6, RUNNING);
+
+        int affected = validationRunRepository.updateCurrentStep(id, 6, RUNNING);
+
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    // RUNNING → COMPLETED 전이 시 current_step=8, completed_at도 같이 채워지는지
+    void transitionToCompletedSetsStatusStepAndCompletedAt() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+
+        int affected = validationRunRepository.transitionToCompleted(id, RUNNING, COMPLETED);
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow();
+        assertThat(row.getStatus()).isEqualTo("COMPLETED");
+        assertThat(row.getCurrentStep()).isEqualTo(8);
+        assertThat(row.getCompletedAt()).isNotNull();
+    }
+
+    @Test
+    // RUNNING → FAILED 전이 시 실패한 단계 번호와 사유가 같이 남는지
+    void transitionToFailedRecordsFailedStepAndMessage() {
+        Long id = insertCreatedRun(LocalDate.of(2026, 9, 1), 1);
+        validationRunRepository.transitionToRunning(id, CREATED, RUNNING);
+        validationRunRepository.updateCurrentStep(id, 3, RUNNING);
+
+        int affected = validationRunRepository.transitionToFailed(id, 5, "차익거래 검증 중 예외 발생", RUNNING, FAILED);
+
+        assertThat(affected).isEqualTo(1);
+        ValidationRunRow row = validationRunRepository.findById(id).map(ValidationRunRow::from).orElseThrow();
+        assertThat(row.getStatus()).isEqualTo("FAILED");
+        assertThat(row.getCurrentStep()).isEqualTo(5);
+        assertThat(row.getFailureMessage()).isEqualTo("차익거래 검증 중 예외 발생");
+    }
+
+    @Test
+    void lockedReferenceReadsCurrentDatabaseStatusEvenWhenEntityIsAlreadyManaged() {
+        Long id = insertCreatedRun(LocalDate.of(2091, 8, 1), 1);
+        ValidationRun cached = validationRunRepository.findById(id).orElseThrow();
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status = 'RUNNING' WHERE validation_run_id = ?", id);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status = 'COMPLETED', current_step = 8 WHERE validation_run_id = ?", id);
+
+        var reference = validationRunRepository.findReferenceForUpdate(id).orElseThrow();
+        assertThat(reference.getStatus()).isEqualTo("COMPLETED");
+        assertThat(reference.getValidationMonth()).isEqualTo(LocalDate.of(2091, 8, 1));
+        assertThat(cached.getStatus()).isEqualTo(CREATED);
+    }
+
+    private void insert(ValidationRunInsertRow row) {
+        ValidationRun saved = validationRunRepository.saveAndFlush(ValidationRun.builder()
+                .validationMonth(row.getValidationMonth()).runNo(row.getRunNo()).runType(row.getRunType())
+                .triggeredBy(row.getTriggeredBy()).policySnapshotJson(row.getPolicySnapshotJson()).build());
+        row.setValidationRunId(saved.getValidationRunId());
+    }
+}
