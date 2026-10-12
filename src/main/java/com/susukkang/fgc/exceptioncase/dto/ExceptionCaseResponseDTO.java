@@ -94,6 +94,7 @@ public record ExceptionCaseResponseDTO(
             case "CAP_LIMIT_WARNING" -> "1,200% 한도 주의";
             case "CAP_LIMIT_VIOLATION" -> "1,200% 한도 초과";
             case "CAP_CALCULATION_REVIEW_REQUIRED" -> "한도 계산 검토 필요";
+            case "FINALIZED_RESULT_DIFF" -> "확정 결과와 다름";
             case "ARBITRAGE_LIMIT_EXCEEDED" -> "차익거래 검토대상";
             case "FINANCIAL_SNAPSHOT_MISSING" -> "계약 금융 스냅샷 없음";
             case "REFUND_TABLE_MISSING" -> "환급률표 없음";

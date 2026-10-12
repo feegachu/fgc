@@ -27,6 +27,8 @@ public class ValidationRunExceptionServiceImpl implements ExceptionGenerationPor
 
         long createdCount = 0;
         createdCount += exceptionCaseRepository.insertFromCapChecks(validationRunId);
+        // #498 확정된 달의 재검증이면 확정 결과와 다른 1,200% 판정을 사후 점검 건으로 남긴다(확정 달이 아니면 0건)
+        createdCount += exceptionCaseRepository.insertFromFinalizedCapResultDiffs(validationRunId);
         createdCount += exceptionCaseRepository.insertFromArbitrageChecks(validationRunId);
         createdCount += exceptionCaseRepository.insertFromReconciliationResults(validationRunId);
         createdCount += exceptionCaseRepository.insertFromJournalImbalances(validationRunId);
