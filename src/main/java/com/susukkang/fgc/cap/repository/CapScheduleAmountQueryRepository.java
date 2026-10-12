@@ -27,7 +27,7 @@ public class CapScheduleAmountQueryRepository {
     // 해당 귀속행이 있고 모두 증빙을 갖춘 경우에만 증빙을 반환한다. 증빙이 없어도 스케줄 행은 조회한다.
     // CapCalculatorImpl이 반환 순서대로 detail_seq를 매기므로 결정적 정렬이 필요하다(#501).
     // CAP-W02 ③ "항목별 산입 내역"은 같은 항목을 모아 월차 순으로 둔다(FUN-035, 화면정의서 CAP-W02 "③ 표 정렬").
-    // 항목 사이 순서는 commission_item_id(등록 순)라 업무 규칙이 아니다 — 잠정 기준, 현업 확인 필요.
+    // 항목 사이 순서는 commission_item_id(등록 순)일 뿐 업무 규칙이 아니다 — 규정·협회 자료에 표시 순서가 없다(#507).
     private static final String BASE_SQL = """
         SELECT sl.schedule_line_id      AS scheduleLineId,
                sl.commission_item_id     AS commissionItemId,
