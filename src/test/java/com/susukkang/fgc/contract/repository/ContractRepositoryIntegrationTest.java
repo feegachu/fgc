@@ -57,6 +57,23 @@ class ContractRepositoryIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
+    void querydslSearchPreservesPostgresLikeWildcardsAndEscapes() {
+        for (String keyword : List.of("", "%", "_", "FGC-FGL01", "FGC%0001", "FGC_FGL01", "FGC" + (char) 92 + "_")) {
+            ContractSearchCondition condition = new ContractSearchCondition();
+            condition.setContractNo(keyword);
+            List<Long> expected = jdbcTemplate.queryForList(
+                    "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no LIKE ? ORDER BY contract_id DESC",
+                    Long.class, "%" + keyword + "%");
+            assertThat(contractQueryRepository.searchAll(condition)).extracting(ContractView::getContractId)
+                    .as("LIKE %s", keyword).containsExactlyElementsOf(expected);
+            var page = contractQueryRepository.search(condition, PageRequest.of(0, 3));
+            assertThat(page.getTotalElements()).isEqualTo(expected.size());
+            assertThat(page.getContent()).extracting(ContractView::getContractId)
+                    .containsExactlyElementsOf(expected.stream().limit(3).toList());
+        }
+    }
+
+    @Test
     @DisplayName("보험사·상품판매버전·설계사·조직의 연관관계를 확인한다")
     void checksReferenceExistence() {
         References refs = references();

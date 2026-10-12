@@ -37,7 +37,8 @@ public class ReconciliationBatchRunService {
             throw new IllegalStateException("FGC-FUN-041 검증 실행을 찾을 수 없습니다.");
         }
         List<ReconciliationExecutionRequest> requests = new ArrayList<>();
-        for (Long insurerId : reconciliationRunRepository.findSelectedInsurerIds(context.validationRunId())) {
+        for (Long insurerId : reconciliationRunRepository.findReconciliationInsurerIds(
+                context.validationRunId(), context.job().validationMonth(), paymentStage)) {
             ReconciliationRunRow run = reconciliationRunRepository.findByNaturalKey(
                     context.job().validationMonth(), paymentStage, insurerId, context.validationRunId());
             if (run == null) {

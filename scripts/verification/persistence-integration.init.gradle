@@ -1,0 +1,5 @@
+allprojects {
+    tasks.withType(Test).configureEach {
+        ['fgc.cap.performance','fgc.contract.performance','fgc.journal.performance','fgc.journal.write.performance','fgc.payment.performance','fgc.correction.action.performance'].each { systemProperty it, 'true' }
+    }
+}

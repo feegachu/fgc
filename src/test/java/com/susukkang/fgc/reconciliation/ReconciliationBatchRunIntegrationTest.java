@@ -2,6 +2,7 @@ package com.susukkang.fgc.reconciliation;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.reconciliation.adapter.ReconciliationBatchAdapter;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.service.ReconciliationBatchRunService;
 import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
@@ -12,8 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -39,6 +42,9 @@ class ReconciliationBatchRunIntegrationTest {
     private ReconciliationBatchRunService batchRunService;
 
     @Autowired
+    private ReconciliationBatchAdapter batchAdapter;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Long validationRunId;
@@ -48,6 +54,20 @@ class ReconciliationBatchRunIntegrationTest {
         if (validationRunId == null) {
             return;
         }
+        jdbcTemplate.update("""
+                DELETE FROM fgc.reconciliation_match
+                 WHERE reconciliation_result_id IN (
+                     SELECT result.reconciliation_result_id
+                       FROM fgc.reconciliation_result result
+                       JOIN fgc.reconciliation_run run
+                         ON run.reconciliation_run_id = result.reconciliation_run_id
+                      WHERE run.validation_run_id = ?)
+                """, validationRunId);
+        jdbcTemplate.update("""
+                DELETE FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id IN (
+                     SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE validation_run_id = ?)
+                """, validationRunId);
         jdbcTemplate.update(
                 "DELETE FROM fgc.reconciliation_run WHERE validation_run_id = ?", validationRunId);
         jdbcTemplate.update(
@@ -122,6 +142,60 @@ class ReconciliationBatchRunIntegrationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    /**
+     * #516 선정 계약이 없는 보험사도 그 달 확정 지급이 있으면 대사한다.
+     * 시드 R7(FGC-FGN01-202603-0001)은 7/15 해지 뒤 8/25 GA→FC 650,000원이 지급됐다(V4 정답표 :442).
+     * 검증 대상 0건인 실행에서도 FGN01 대사가 돌아 INVALID_CONTRACT_PAYMENT로 나와야 한다.
+     */
+    @Test
+    void 선정_계약이_없는_보험사의_해지_후_지급도_비유효_계약_지급으로_대사한다() {
+        LocalDate august = LocalDate.of(2026, 8, 1);
+        Long userId = jdbcTemplate.queryForObject(
+                "SELECT user_id FROM fgc.app_user WHERE login_id = 'settle01'", Long.class);
+        int runNo = Math.abs(UUID.randomUUID().hashCode() % 1_000_000) + 100_000;
+        validationRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (
+                    validation_month, run_no, run_type, triggered_by
+                ) VALUES (?, ?, 'PRE_CONFIRM', ?)
+                RETURNING validation_run_id
+                """, Long.class, august, runNo, userId);
+        jdbcTemplate.update("""
+                UPDATE fgc.validation_run
+                   SET status = 'RUNNING',
+                       started_at = clock_timestamp()
+                 WHERE validation_run_id = ?
+                   AND status = 'CREATED'
+                """, validationRunId);
+        Long fgn01 = jdbcTemplate.queryForObject(
+                "SELECT insurer_id FROM fgc.insurer WHERE insurer_code = 'FGN01'", Long.class);
+
+        batchAdapter.reconcile(new ValidationStepContext(
+                validationRunId,
+                new ValidationJobContext(
+                        august, runNo, ValidationRunType.PRE_CONFIRM,
+                        userId, "IT-516-" + validationRunId)), PaymentStage.GA_TO_FC);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.validation_target WHERE validation_run_id = ?",
+                Integer.class, validationRunId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT status FROM fgc.reconciliation_run
+                 WHERE validation_run_id = ? AND insurer_id = ? AND payment_stage = 'GA_TO_FC'
+                """, String.class, validationRunId, fgn01)).isEqualTo("COMPLETED");
+        Map<String, Object> r7 = jdbcTemplate.queryForMap("""
+                SELECT result.primary_reason_code, result.expected_total_amount, result.actual_total_amount
+                  FROM fgc.reconciliation_result result
+                  JOIN fgc.reconciliation_run run
+                    ON run.reconciliation_run_id = result.reconciliation_run_id
+                  JOIN fgc.insurance_contract contract ON contract.contract_id = result.contract_id
+                 WHERE run.validation_run_id = ?
+                   AND contract.contract_no = 'FGC-FGN01-202603-0001'
+                """, validationRunId);
+        assertThat(r7).containsEntry("primary_reason_code", "INVALID_CONTRACT_PAYMENT");
+        assertThat((BigDecimal) r7.get("expected_total_amount")).isEqualByComparingTo("0");
+        assertThat((BigDecimal) r7.get("actual_total_amount")).isEqualByComparingTo("650000");
     }
 
     private CompletableFuture<List<ReconciliationExecutionRequest>> prepareAsync(

@@ -5,7 +5,7 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
 import com.susukkang.fgc.validation.batch.contract.ScheduleRegenerationPort;
@@ -32,7 +32,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
 
     private final ValidationTargetRepository validationTargetRepository;
     private final CommissionPolicyService commissionPolicyService;
-    private final ScheduleMapper scheduleMapper;
+    private final ScheduleWriteRepository scheduleWriteRepository;
     private final ExceptionCaseRepository exceptionCaseRepository;
     private final ScheduleRegenerationBatchItemService itemService;
 
@@ -128,7 +128,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                 String message = "POLICY_DUPLICATE".equals(reasonCode)
                         ? "적용 가능한 현행 수수료 정책이 중복되었습니다."
                         : "적용 가능한 현행 수수료 정책이 없습니다.";
-                scheduleMapper.upsertPolicyReviewCase(
+                scheduleWriteRepository.upsertPolicyReviewCase(
                         contractId,
                         paymentStage,
                         reasonCode,

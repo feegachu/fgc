@@ -11,24 +11,16 @@ import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.transaction.performance.PaymentJdbcObservation;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
-import org.apache.ibatis.builder.xml.XMLMapperBuilder;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootVersion;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +41,7 @@ import java.util.function.ToLongFunction;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 설명 : #372 조회 전환 전 Mapper와 현재 저장소를 동일 데이터·트랜잭션에서 교대 측정한다.
+ * 설명 : #372 조회 전환 전 SQL의 JDBC 구현과 현재 저장소를 동일 데이터·트랜잭션에서 교대 측정한다.
  * 검증·정렬·보고서 생성은 타이밍 밖에 두며 시간 자체는 합격 기준으로 사용하지 않는다.
  * JDBC 관측 시간에는 드라이버와 래퍼 전달 비용이 포함되므로 DB 서버 실행 시간으로 해석하지 않는다.
  *
@@ -62,8 +54,6 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.properties.hibernate.generate_statistics=true",
         "spring.jpa.properties.hibernate.cache.use_query_cache=false",
         "spring.jpa.properties.hibernate.cache.use_second_level_cache=false",
-        "mybatis.configuration.local-cache-scope=STATEMENT",
-        "mybatis.configuration.cache-enabled=false",
         "logging.level.org.hibernate.SQL=OFF",
         "logging.level.org.hibernate.stat=OFF",
         "logging.level.org.hibernate.engine.internal.StatisticalLoggingSessionEventListener=OFF"
@@ -272,23 +262,10 @@ class CapReferenceReadPerformanceTest {
         return value;
     }
 
-    private Baseline baseline() throws IOException {
-        Configuration config = new Configuration(new Environment("cap-baseline-" + BASELINE_SHA,
-                new SpringManagedTransactionFactory(), dataSource));
-        config.setMapUnderscoreToCamelCase(true);
-        config.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        config.setCacheEnabled(false);
-        // 기준 application.yml에는 사용자 정의 type handler가 없으며 PaymentStage는 기본 EnumTypeHandler를 쓴다.
-        for (String name : List.of("CapContractMapper", "CapRuleMapper", "CapScheduleAmountMapper", "RefundRateMapper", "CapIncludedAmountMapper")) {
-            String resource = "cap-baseline/" + name + ".xml";
-            try (var input = new ClassPathResource(resource).getInputStream()) {
-                new XMLMapperBuilder(input, config, resource, config.getSqlFragments()).parse();
-            }
-        }
-        SqlSessionTemplate session = new SqlSessionTemplate(new SqlSessionFactoryBuilder().build(config));
-        return new Baseline(session.getMapper(CapContractMapper.class), session.getMapper(CapRuleMapper.class),
-                session.getMapper(CapScheduleAmountMapper.class), session.getMapper(RefundRateMapper.class),
-                session.getMapper(CapIncludedAmountMapper.class));
+    private Baseline baseline() {
+        return new Baseline(new CapContractJdbcBaseline(dataSource), new CapRuleJdbcBaseline(dataSource),
+                new CapScheduleAmountJdbcBaseline(dataSource), new RefundRateJdbcBaseline(dataSource),
+                new CapIncludedAmountJdbcBaseline(dataSource));
     }
 
     private Fixture insertFixture() {
@@ -376,7 +353,7 @@ class CapReferenceReadPerformanceTest {
         metadata.put("scope", "eight repository reads, six-query calculation input bundle, 20/50-contract confirmed-amount loops; not full calculator, HTTP or commit latency");
         metadata.put("timingCaveat", "JDBC wall time includes driver/reflection work, not server-only time. elapsed minus JDBC includes ORM, dispatch and observation overhead; not pure ORM CPU.");
         metadata.put("transaction", "clean outer writable test transaction; all fixture writes flushed before measurement; rollback after test");
-        metadata.put("caches", "MyBatis STATEMENT local cache, both second-level and query caches disabled; PostgreSQL warmed; no cold-cache claim");
+        metadata.put("caches", "JDBC rows are not cached; Hibernate second-level and query caches disabled; PostgreSQL warmed; no cold-cache claim");
         metadata.put("fixture", Map.of("sourceContract", "FGC-FGL02-202601-0001", "generatedContracts", CONTRACTS,
                 "scheduleLinesPerContract", 13, "cancelledScheduleMonth", 5, "transactionsPerContract", TRANSACTIONS_PER_CONTRACT,
                 "confirmedPerContract", TRANSACTIONS_PER_CONTRACT - 1, "draftPerContract", 1,
@@ -392,7 +369,7 @@ class CapReferenceReadPerformanceTest {
         metadata.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
         metadata.put("springBootVersion", SpringBootVersion.getVersion());
         metadata.put("hibernateVersion", org.hibernate.Version.getVersionString());
-        metadata.put("mybatisVersion", Configuration.class.getPackage().getImplementationVersion());
+        metadata.put("jdbcVersion", JdbcTemplate.class.getPackage().getImplementationVersion());
         metadata.put("postgresqlVersion", jdbc.queryForObject("SELECT version()", String.class));
         metadata.put("searchPath", jdbc.queryForObject("SHOW search_path", String.class));
         try (var connection = dataSource.getConnection()) {
@@ -491,8 +468,8 @@ class CapReferenceReadPerformanceTest {
         return values[(int) Math.ceil(values.length * fraction) - 1] / 1_000_000.0;
     }
 
-    private record Baseline(CapContractMapper contracts, CapRuleMapper rules, CapScheduleAmountMapper schedules,
-                            RefundRateMapper refunds, CapIncludedAmountMapper included) { }
+    private record Baseline(CapContractJdbcBaseline contracts, CapRuleJdbcBaseline rules, CapScheduleAmountJdbcBaseline schedules,
+                            RefundRateJdbcBaseline refunds, CapIncludedAmountJdbcBaseline included) { }
     private record Fixture(List<Long> contractIds, CapContractView contract, Long currentPaymentId,
                            Long ruleId, Long refundTableId) { }
     private record Benchmark(String name, int expectedSqlCount, Supplier<?> baseline, Supplier<?> current) { }
