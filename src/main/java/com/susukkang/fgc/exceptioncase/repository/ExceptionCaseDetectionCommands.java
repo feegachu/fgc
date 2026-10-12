@@ -1,5 +1,7 @@
 package com.susukkang.fgc.exceptioncase.repository;
 
+import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
+
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,4 +27,6 @@ public interface ExceptionCaseDetectionCommands {
      */
     Long insertArbitrageReviewCase(String exceptionType, Long validationRunId, Long contractId,
                                    Long arbitrageCheckId, String paymentStage, String title, String description);
+    /** IF-API-42: 같은 후보 스냅샷의 대상 수와 신규 예외 수를 반환한다. */
+    ReconciliationExceptionBulkCreateRow bulkCreateFromReconciliationResultsByRun(Long reconciliationRunId);
 }

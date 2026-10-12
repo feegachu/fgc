@@ -10,8 +10,8 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequestPort;
-import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository.LockedReference;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +44,7 @@ class ReconciliationRunServiceImplTest {
     private ReconciliationRunRepository reconciliationRunRepository;
 
     @Mock
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
 
     @Mock
     private ReconciliationRunLifecycleService lifecycleService;
@@ -58,7 +58,7 @@ class ReconciliationRunServiceImplTest {
     void setUp() {
         service = new ReconciliationRunServiceImpl(
                 reconciliationRunRepository,
-                validationRunMapper,
+                validationRunRepository,
                 lifecycleService,
                 Optional.of(executionRequestPort)
         );
@@ -68,7 +68,7 @@ class ReconciliationRunServiceImplTest {
     void 참조를_검증하고_CREATED에서_RUNNING으로_전이한다() {
         CreateReconciliationRunCommand command = command();
         given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
-        given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
+        given(validationRunRepository.findReferenceForUpdate(17L)).willReturn(Optional.of(validationRun(LocalDate.of(2026, 8, 1))));
         doAnswer(invocation -> {
             ReconciliationRunInsertRow row = invocation.getArgument(0);
             row.setReconciliationRunId(29L);
@@ -87,7 +87,7 @@ class ReconciliationRunServiceImplTest {
     @Test
     void 동일_자연키_실행이_있으면_RECO_002로_거절한다() {
         given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
-        given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
+        given(validationRunRepository.findReferenceForUpdate(17L)).willReturn(Optional.of(validationRun(LocalDate.of(2026, 8, 1))));
         given(reconciliationRunRepository.findByNaturalKey(
                 LocalDate.of(2026, 8, 1), PaymentStage.GA_TO_FC, 3L, 17L
         )).willReturn(reconciliationRun(29L));
@@ -106,12 +106,12 @@ class ReconciliationRunServiceImplTest {
     void 실행기가_연결되지_않으면_행을_생성하지_않는다() {
         ReconciliationRunServiceImpl unavailableService = new ReconciliationRunServiceImpl(
                 reconciliationRunRepository,
-                validationRunMapper,
+                validationRunRepository,
                 lifecycleService,
                 Optional.empty()
         );
         given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
-        given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
+        given(validationRunRepository.findReferenceForUpdate(17L)).willReturn(Optional.of(validationRun(LocalDate.of(2026, 8, 1))));
 
         assertThatThrownBy(() -> unavailableService.create(command()))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception ->
@@ -123,7 +123,7 @@ class ReconciliationRunServiceImplTest {
     @Test
     void 실행요청_등록이_실패하면_생성결과를_반환하지_않는다() {
         given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
-        given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 8, 1)));
+        given(validationRunRepository.findReferenceForUpdate(17L)).willReturn(Optional.of(validationRun(LocalDate.of(2026, 8, 1))));
         doAnswer(invocation -> {
             ReconciliationRunInsertRow row = invocation.getArgument(0);
             row.setReconciliationRunId(29L);
@@ -156,7 +156,7 @@ class ReconciliationRunServiceImplTest {
     @Test
     void 검증실행의_기준월이_다르면_400으로_거절한다() {
         given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
-        given(validationRunMapper.findByIdForUpdate(17L)).willReturn(validationRun(LocalDate.of(2026, 7, 1)));
+        given(validationRunRepository.findReferenceForUpdate(17L)).willReturn(Optional.of(validationRun(LocalDate.of(2026, 7, 1))));
 
         assertThatThrownBy(() -> service.create(command()))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
@@ -170,9 +170,8 @@ class ReconciliationRunServiceImplTest {
     @Test
     void fgcFun044_rejectsFinalizedValidationRunBeforeInsert() {
         given(reconciliationRunRepository.existsActiveInsurer(3L)).willReturn(true);
-        ValidationRunRow finalizedRun = validationRun(LocalDate.of(2026, 8, 1));
-        finalizedRun.setStatus(ValidationRunStatus.FINALIZED.name());
-        given(validationRunMapper.findByIdForUpdate(17L)).willReturn(finalizedRun);
+        LockedReference finalizedRun = reference(LocalDate.of(2026, 8, 1), "FINALIZED");
+        given(validationRunRepository.findReferenceForUpdate(17L)).willReturn(Optional.of(finalizedRun));
 
         assertThatThrownBy(() -> service.create(command()))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception ->
@@ -193,11 +192,15 @@ class ReconciliationRunServiceImplTest {
         );
     }
 
-    private static ValidationRunRow validationRun(LocalDate month) {
-        ValidationRunRow row = new ValidationRunRow();
-        row.setValidationRunId(17L);
-        row.setValidationMonth(month);
-        return row;
+    private static LockedReference validationRun(LocalDate month) {
+        return reference(month, "CREATED");
+    }
+
+    private static LockedReference reference(LocalDate month, String status) {
+        return new LockedReference() {
+            public LocalDate getValidationMonth() { return month; }
+            public String getStatus() { return status; }
+        };
     }
 
     private static ReconciliationRunRow reconciliationRun(Long id) {

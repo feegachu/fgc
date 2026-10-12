@@ -1,20 +1,16 @@
 package com.susukkang.fgc.reconciliation.repository;
 
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.reconciliation.dto.*;
 import com.susukkang.fgc.transaction.performance.PaymentJdbcObservation;
 import jakarta.persistence.EntityManager;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mybatis.spring.SqlSessionFactoryBean;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +26,10 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 설명 : b5b4692의 격리된 MyBatis SQL과 같은 DB·트랜잭션에서 원천·결과 projection을 비교한다.
+ * 설명 : b5b4692의 격리된 JDBC SQL과 같은 DB·트랜잭션에서 원천·결과 projection을 비교한다.
  * JDBC 계측은 기존 테스트 도구를 재사용하며 호출 시간은 DB 서버 실행시간과 다르다.
+ * #515의 예정일 시점 판정은 원본 SQL과 의도적으로 다르므로 분류 문맥 비교는 예정일 없는 fallback에 한정한다.
+ * 예정일·효력일 경계·수동 상태 변경은 ReconciliationClassificationContextIntegrationTest에서 검증한다.
  *
  * @author C4t4ddict
  * @since 2026-10-05
@@ -41,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 @Import(PaymentJdbcObservation.Config.class)
 class ReconciliationRepositoryCompatibilityIntegrationTest {
-    private static final String NS = "com.susukkang.fgc.reconciliation.mapper.";
+    private static final String NS = "reconciliationBaseline.";
     private static final LocalDate TEST_MONTH = LocalDate.of(2093, 5, 1);
     @Autowired private DataSource dataSource;
     @Autowired private JdbcTemplate jdbc;
@@ -54,21 +52,11 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
     @Autowired private ReconciliationResultJpaRepository resultEntities;
     @Autowired private ReconciliationMatchJpaRepository matchEntities;
     @Autowired private ReconciliationRunHistoryRepository history;
-    private SqlSessionTemplate baseline;
+    private JdbcBaseline baseline;
 
     @BeforeEach
-    void isolatedBaseline() throws Exception {
-        Configuration configuration = new Configuration();
-        configuration.setMapUnderscoreToCamelCase(true);
-        configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        configuration.setCacheEnabled(false);
-        SqlSessionFactoryBean factory = new SqlSessionFactoryBean();
-        factory.setDataSource(dataSource);
-        factory.setConfiguration(configuration);
-        factory.setTransactionFactory(new SpringManagedTransactionFactory());
-        factory.setMapperLocations(new PathMatchingResourcePatternResolver()
-                .getResources("classpath:reconciliation-baseline/*.xml"));
-        baseline = new SqlSessionTemplate(factory.getObject());
+    void isolatedBaseline() {
+        baseline = new JdbcBaseline(dataSource);
     }
 
     @Test
@@ -81,19 +69,19 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
         Long insurerId = jdbc.queryForObject("SELECT insurer_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
         LocalDate month = TEST_MONTH;
         Map<String, Object> parameters = params("settlementMonth", month, "insurerId", insurerId);
-        compare("insurer_expected", () -> baseline.selectList(NS + "InsurerGaReconciliationMapper.findExpectedSources", parameters),
+        compare("insurer_expected", () -> baseline.selectList(NS + "InsurerGaReconciliation.findExpectedSources", parameters),
                 () -> insurerSources.findExpectedSources(month, insurerId));
-        compare("insurer_actual", () -> baseline.selectList(NS + "InsurerGaReconciliationMapper.findActualSources", parameters),
+        compare("insurer_actual", () -> baseline.selectList(NS + "InsurerGaReconciliation.findActualSources", parameters),
                 () -> insurerSources.findActualSources(month, insurerId));
-        compare("fc_expected", () -> baseline.selectList(NS + "GaFcReconciliationMapper.findExpectedSources", parameters),
+        compare("fc_expected", () -> baseline.selectList(NS + "GaFcReconciliation.findExpectedSources", parameters),
                 () -> fcSources.findExpectedSources(month, insurerId));
-        compare("fc_actual", () -> baseline.selectList(NS + "GaFcReconciliationMapper.findActualSources", parameters),
+        compare("fc_actual", () -> baseline.selectList(NS + "GaFcReconciliation.findActualSources", parameters),
                 () -> fcSources.findActualSources(month, insurerId));
         assertThat(insurerSources.findExpectedSources(month, insurerId)).isNotEmpty();
         assertThat(fcSources.findExpectedSources(month, insurerId)).isNotEmpty();
         assertThat(insurerSources.findActualSources(month, insurerId)).isNotEmpty();
         assertThat(fcSources.findActualSources(month, insurerId)).isNotEmpty();
-        compare("empty_source", () -> baseline.selectList(NS + "GaFcReconciliationMapper.findActualSources",
+        compare("empty_source", () -> baseline.selectList(NS + "GaFcReconciliation.findActualSources",
                         params("settlementMonth", month, "insurerId", Long.MAX_VALUE)),
                 () -> fcSources.findActualSources(month, Long.MAX_VALUE));
     }
@@ -107,7 +95,7 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
         assertThat(runs.transitionToRunning(id)).isOne();
         assertThat(runs.transitionToRunning(id)).isZero();
         assertThat(runs.findById(id).getStatus()).isEqualTo("RUNNING");
-        compare("run_projection", () -> baseline.selectOne(NS + "ReconciliationRunMapper.findById",
+        compare("run_projection", () -> baseline.selectOne(NS + "ReconciliationRun.findById",
                 params("reconciliationRunId", id)), () -> runs.findById(id));
 
         ReconciliationResultInsertRow row = result(id);
@@ -150,11 +138,11 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
         Long matchId = jdbc.queryForObject("SELECT reconciliation_match_id FROM fgc.reconciliation_match WHERE reconciliation_result_id = ?",
                 Long.class, resultId);
         assertThat(matchEntities.findById(matchId).orElseThrow().getMatchedAmount()).isEqualByComparingTo("101.50");
-        compare("result_detail", () -> baseline.selectOne(NS + "ReconciliationResultMapper.findDetail",
+        compare("result_detail", () -> baseline.selectOne(NS + "ReconciliationResult.findDetail",
                 params("reconciliationResultId", resultId)), () -> results.findDetail(resultId));
-        compare("match_detail", () -> baseline.selectList(NS + "ReconciliationResultMapper.findMatches",
+        compare("match_detail", () -> baseline.selectList(NS + "ReconciliationResult.findMatches",
                 params("reconciliationResultId", resultId)), () -> results.findMatches(resultId));
-        compare("summary", () -> baseline.selectOne(NS + "ReconciliationResultMapper.findSummary",
+        compare("summary", () -> baseline.selectOne(NS + "ReconciliationResult.findSummary",
                 params("reconciliationRunId", runId)), () -> results.findSummary(runId));
     }
 
@@ -230,10 +218,10 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
             for (String direction : List.of("asc", "desc")) {
                 Map<String, Object> parameters = params("reconciliationRunId", id, "resultType", filter,
                         "sortDirection", direction, "offset", 0, "limit", 20);
-                compare("result_filter", () -> baseline.selectList(NS + "ReconciliationResultMapper.findResults", parameters),
+                compare("result_filter", () -> baseline.selectList(NS + "ReconciliationResult.findResults", parameters),
                         () -> results.findResults(id, filter, direction, 0, 20));
                 assertThat(results.countResults(id, filter)).isEqualTo(
-                        ((Number) baseline.selectOne(NS + "ReconciliationResultMapper.countResults", parameters)).longValue());
+                        ((Number) baseline.selectOne(NS + "ReconciliationResult.countResults", parameters)).longValue());
             }
         }
         createRun(TEST_MONTH.plusMonths(1));
@@ -241,21 +229,40 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
             for (String direction : List.of("asc", "desc")) {
                 Map<String, Object> p = params("settlementMonth", null, "paymentStage", stage, "insurerId", null,
                         "sortDirection", direction, "offset", 0, "limit", 20);
-                compare("history_filter", () -> baseline.selectList(NS + "ReconciliationRunHistoryMapper.search", p),
+                compare("history_filter", () -> baseline.selectList(NS + "ReconciliationRunHistory.search", p),
                         () -> history.search(null, stage, null, direction, 0, 20));
                 assertThat(history.count(null, stage, null)).isEqualTo(
-                        ((Number) baseline.selectOne(NS + "ReconciliationRunHistoryMapper.count", p)).longValue());
+                        ((Number) baseline.selectOne(NS + "ReconciliationRunHistory.count", p)).longValue());
             }
         }
         for (List<Long> journalIds : List.of(List.<Long>of(), List.of(Long.MAX_VALUE))) {
             Map<String, Object> p = params("contractId", null, "expectedAgentId", null,
                     "actualAgentId", null, "journalHeaderIds", journalIds);
-            compare("classification_context", () -> baseline.selectOne(NS + "ReconciliationResultMapper.findClassificationContext", p),
+            compare("classification_context", () -> baseline.selectOne(NS + "ReconciliationResult.findClassificationContext", p),
                     () -> results.findClassificationContext(null, null, null, journalIds, null));
         }
         assertThat(results.findDetail(Long.MAX_VALUE)).isNull();
         assertThat(runs.findById(Long.MAX_VALUE)).isNull();
         assertThat(results.findResults(id, null, "asc", 100, 20)).isEmpty();
+    }
+
+    @Test
+    void comparesOriginalClassificationSqlWhenDueDateIsUnavailable() {
+        Map<String, Boolean> expectedInvalidPayments = Map.of(
+                "FGC-FGN01-202605-0001", true,
+                "FGC-FGN01-202603-0001", true,
+                "FGC-FGL01-202607-0001", false);
+        expectedInvalidPayments.forEach((contractNo, expectedInvalid) -> {
+            Long contractId = jdbc.queryForObject(
+                    "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = ?", Long.class, contractNo);
+            Map<String, Object> parameters = params("contractId", contractId, "expectedAgentId", null,
+                    "actualAgentId", null, "journalHeaderIds", List.of());
+            compare("classification_without_due_date", () -> baseline.selectOne(
+                            NS + "ReconciliationResult.findClassificationContext", parameters),
+                    () -> results.findClassificationContext(contractId, null, null, List.of(), null));
+            assertThat(results.findClassificationContext(contractId, null, null, List.of(), null)
+                    .isInvalidContractPayment()).as(contractNo).isEqualTo(expectedInvalid);
+        });
     }
 
     private Long createRun() {
@@ -271,21 +278,21 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
     }
 
     @Test
-    void readsMyBatisWritesAndJpaWritesInTheSameTransactionWithoutEntityStateOverwrites() {
+    void readsJDBCWritesAndJpaWritesInTheSameTransactionWithoutEntityStateOverwrites() {
         Long id = createRun();
         ReconciliationResultInsertRow original = result(id);
         original.setSecondaryReasonCodes(List.of("AMOUNT_DIFFERENCE"));
-        baseline.insert(NS + "ReconciliationResultMapper.insertResult", original);
+        baseline.insert(NS + "ReconciliationResult.insertResult", original);
         assertThat(original.getReconciliationResultId()).isNotNull();
         assertThat(resultEntities.findById(original.getReconciliationResultId()).orElseThrow()
                 .getSecondaryReasonCodes()).containsExactly("AMOUNT_DIFFERENCE");
         assertThat(results.countByRunId(id)).isOne();
         assertThat(results.insertResult(original)).isZero();
         assertThat(results.countByRunId(id)).isOne();
-        baseline.update(NS + "ReconciliationRunMapper.transitionToRunning", params("reconciliationRunId", id));
+        baseline.update(NS + "ReconciliationRun.transitionToRunning", params("reconciliationRunId", id));
         assertThat(runs.findById(id).getStatus()).isEqualTo("RUNNING");
         assertThat(runs.transitionToCompleted(id)).isOne();
-        ReconciliationRunRow after = baseline.selectOne(NS + "ReconciliationRunMapper.findById",
+        ReconciliationRunRow after = baseline.selectOne(NS + "ReconciliationRun.findById",
                 params("reconciliationRunId", id));
         assertThat(after.getStatus()).isEqualTo("COMPLETED");
         assertThat(after.getCompletedAt()).isNotNull();
@@ -319,7 +326,7 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
         assertThat(oldStats.executions()).as(operation + " baseline SQL count").hasSize(1);
         assertThat(newStats.executions()).as(operation + " JPA SQL count").hasSize(1);
         org.slf4j.LoggerFactory.getLogger(getClass()).info(
-                "RECONCILIATION_AB operation={} mybatis_jdbc_ns={} jpa_jdbc_ns={} mybatis_sql={} jpa_sql={}",
+                "RECONCILIATION_AB operation={} jdbc_jdbc_ns={} jpa_jdbc_ns={} jdbc_sql={} jpa_sql={}",
                 operation, oldStats.jdbcNanos(), newStats.jdbcNanos(),
                 oldStats.executions().size(), newStats.executions().size());
     }

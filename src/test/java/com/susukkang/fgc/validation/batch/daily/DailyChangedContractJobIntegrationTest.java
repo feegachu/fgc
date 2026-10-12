@@ -3,7 +3,7 @@ package com.susukkang.fgc.validation.batch.daily;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
@@ -50,7 +50,7 @@ class DailyChangedContractJobIntegrationTest {
     private Job dailyChangedContractJob;
 
     @Autowired
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -143,7 +143,7 @@ class DailyChangedContractJobIntegrationTest {
         assertThat(validationRunId).isNotNull();
         createdValidationRunIds.add(validationRunId);
 
-        ValidationRunRow row = validationRunMapper.findById(validationRunId);
+        ValidationRunRow row = validationRunRepository.findById(validationRunId).map(ValidationRunRow::from).orElse(null);
         assertThat(row.getStatus()).isIn(
                 ValidationRunStatus.RUNNING.name(),
                 ValidationRunStatus.COMPLETED.name(),

@@ -12,3 +12,9 @@ spring:
     locations:
       - classpath:db/migration
       - classpath:db/demo
+
+fgc:
+  batch:
+    daily-changed-contract:
+      # 테스트 픽스처와 02시 예약 실행이 경합하지 않게 한다. 배치 테스트는 Job을 직접 실행한다.
+      enabled: false

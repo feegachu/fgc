@@ -1,22 +1,20 @@
 package com.susukkang.fgc.arbitrage.repository;
 
-import com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineMapper;
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
+import com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline;
 import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.common.code.*;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.transaction.performance.PaymentJdbcObservation;
 import jakarta.persistence.EntityManager;
-import org.apache.ibatis.builder.xml.XMLMapperBuilder;
-import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mybatis.spring.SqlSessionTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,37 +26,27 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 같은 PostgreSQL 데이터에서 기존 MyBatis와 JPA 결과·SQL 실행 수를 비교한다. */
+/** 같은 PostgreSQL 데이터에서 기존 JDBC와 JPA 결과·SQL 실행 수를 비교한다. */
 @SpringBootTest
 @Transactional
 @Import(PaymentJdbcObservation.Config.class)
 class ArbitragePersistenceComparisonTest {
     private static final Logger log = LoggerFactory.getLogger(ArbitragePersistenceComparisonTest.class);
     @Autowired ArbitrageCheckRepository repository;
-    @Autowired SqlSessionFactory sqlSessionFactory;
+    @Autowired javax.sql.DataSource dataSource;
     @Autowired JdbcTemplate jdbc;
     @Autowired EntityManager entityManager;
     @Autowired ExceptionCaseRepository exceptionRepository;
-    @Autowired com.susukkang.fgc.validation.mapper.ExceptionCaseMapper oldExceptionMapper;
     @Autowired com.susukkang.fgc.arbitrage.service.ArbitrageService service;
     @Autowired com.susukkang.fgc.validation.service.ValidationRunCreateService createService;
-    @Autowired com.susukkang.fgc.validation.mapper.ValidationRunMapper oldRunMapper;
+    @Autowired com.susukkang.fgc.validation.repository.ValidationRunRepository oldRunMapper;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     @Autowired com.susukkang.fgc.audit.service.AuditLogService auditLogService;
-    private ArbitrageBaselineMapper baseline;
+    private ArbitrageJdbcBaseline baseline;
 
     @BeforeEach
-    void loadTestOnlyBaseline() throws Exception {
-        var configuration = sqlSessionFactory.getConfiguration();
-        synchronized (configuration) {
-            if (!configuration.hasMapper(ArbitrageBaselineMapper.class)) {
-                var resource = new ClassPathResource("arbitrage-baseline/ArbitrageBaselineMapper.xml");
-                try (var stream = resource.getInputStream()) {
-                    new XMLMapperBuilder(stream, configuration, resource.toString(), configuration.getSqlFragments()).parse();
-                }
-            }
-        }
-        baseline = new SqlSessionTemplate(sqlSessionFactory).getMapper(ArbitrageBaselineMapper.class);
+    void loadTestOnlyBaseline() {
+        baseline = new ArbitrageJdbcBaseline(dataSource);
     }
 
     @Test
@@ -150,7 +138,7 @@ class ArbitragePersistenceComparisonTest {
         var row = row(insertRun(), firstContract(), LocalDate.of(2095, 7, 31));
         repository.insertArbitrageCheck(row);
         Long id = exceptionRepository.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "검토 근거");
-        Long oldId = oldExceptionMapper.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "검토 근거");
+        Long oldId = exceptionRepository.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "검토 근거");
         assertThat(id).isEqualTo(oldId);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id = ?", Long.class, id)).isEqualTo(1);
         String key = jdbc.queryForObject("SELECT exception_key FROM fgc.exception_case WHERE exception_case_id = ?", String.class, id);
@@ -164,7 +152,7 @@ class ArbitragePersistenceComparisonTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id = ?", Long.class, id)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT was_reopened FROM fgc.exception_occurrence WHERE exception_case_id = ? AND validation_run_id = ?", Boolean.class, id, row.getValidationRunId())).isTrue();
         Long reviewId = exceptionRepository.insertArbitrageReviewCase("DATA_QUALITY", row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "확인 필요", "기준일 이하 계약 금융 스냅샷이 없습니다.");
-        assertThat(reviewId).isEqualTo(oldExceptionMapper.insertArbitrageReviewCase("DATA_QUALITY", row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "확인 필요", "기준일 이하 계약 금융 스냅샷이 없습니다."));
+        assertThat(reviewId).isEqualTo(exceptionRepository.insertArbitrageReviewCase("DATA_QUALITY", row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "확인 필요", "기준일 이하 계약 금융 스냅샷이 없습니다."));
         assertThat(jdbc.queryForObject("SELECT reason_code FROM fgc.exception_case WHERE exception_case_id = ?", String.class, reviewId)).isEqualTo("FINANCIAL_SNAPSHOT_MISSING");
     }
 
@@ -180,7 +168,7 @@ class ArbitragePersistenceComparisonTest {
         var row = row(insertRun(), contractId, date);
         compare("upsert", () -> baseline.insertArbitrageCheck(row), () -> repository.insertArbitrageCheck(row), 1);
         var oldService = new com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineService(
-                baseline, createService, oldRunMapper, oldExceptionMapper, objectMapper, auditLogService);
+                baseline, createService, oldRunMapper, exceptionRepository, objectMapper, auditLogService);
         Long batchRunId = insertRun();
         Supplier<?> oldBatch = () -> oldService.checkInExistingRun(batchRunId, contractId, date);
         Supplier<?> newBatch = () -> service.checkInExistingRun(batchRunId, contractId, date);
@@ -212,13 +200,12 @@ class ArbitragePersistenceComparisonTest {
             assertThat(newMeasurement.sqlCount()).isEqualTo(expectedSql);
             oldNanos += oldMeasurement.nanos(); newNanos += newMeasurement.nanos();
         }
-        log.info("ARBITRAGE_COMPARISON {} samples=10 sql={}/{} avgMs(MyBatis/JPA)={}/{}", name, expectedSql, expectedSql,
+        log.info("ARBITRAGE_COMPARISON {} samples=10 sql={}/{} avgMs(JDBC/JPA)={}/{}", name, expectedSql, expectedSql,
                 oldNanos / 10.0 / 1_000_000, newNanos / 10.0 / 1_000_000);
     }
 
     private Measurement measure(Supplier<?> operation) {
-        // MyBatis 세션 캐시를 비우고 양쪽 모두 실제 DB 호출을 측정한다.
-        new SqlSessionTemplate(sqlSessionFactory).clearCache();
+        // JDBC 기준과 JPA 양쪽 모두 실제 DB 호출을 측정한다.
         PaymentJdbcObservation.start();
         long started = System.nanoTime();
         Object result;
