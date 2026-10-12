@@ -19,6 +19,8 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -251,6 +253,38 @@ class CapCalculatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
     }
 
+    // #490 주의 = 1,200% 예산 (산입 + 해약환급금 − 준법경영비) ÷ 월납×12 ≥ 90%
+    //  ⇔ 잔여 ≤ 10% × 1,200,000 = 120,000. 월납 100,000원, 환급률 24%면 해약환급금 288,000원.
+    @ParameterizedTest(name = "환급률 {0}%, 준법경영비 {1}, 산입 {2} → {3}")
+    @CsvSource({
+            // 해약환급금 288,000 (한도 912,000) — 기존 사용률 기준은 820,800원부터 주의였다
+            "24, 0, 791999, NORMAL",
+            "24, 0, 792000, WARNING",
+            "24, 0, 912000, WARNING",
+            "24, 0, 912001, VIOLATION",
+            // 일반 계약(해약환급금 0)은 기존과 같다
+            ", 0, 1079999, NORMAL",
+            ", 0, 1080000, WARNING",
+            // 준법경영비 3,000 (한도 1,203,000) — 기존 사용률 기준은 1,082,700원부터 주의였다
+            ", 3000, 1082999, NORMAL",
+            ", 3000, 1083000, WARNING"
+    })
+    void flagsWarningAtNinetyPercentOfRegulatoryBudget(String refundRatePct, String complianceEvidence,
+                                                       String included, CapResultStatus expected) {
+        boolean refund = refundRatePct != null;
+        stubIncludedAmount(refund, new BigDecimal("3.0000"), included);
+        if (refund) {
+            when(refundRateResolver.resolve(any(RefundRateQuery.class)))
+                    .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal(refundRatePct))));
+        }
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.INSURER_TO_GA, LocalDate.of(2026, 7, 10), new BigDecimal(complianceEvidence)));
+
+        assertThat(result.annualizedLimitBase()).isEqualByComparingTo("1200000");
+        assertThat(result.resultStatus()).isEqualTo(expected);
+    }
+
     // 환급률이 100%를 넘는 비정상 환급률표는 검토필요로 올리고, 한도는 음수가 되지 않는다(DB CHECK)
     @Test
     void flagsReviewRequiredAndNeverReturnsNegativeLimitForAbnormalRefundRate() {
@@ -280,6 +314,9 @@ class CapCalculatorImplTest {
         assertThat(result.limitAmount()).isEqualByComparingTo("0");
         assertThat(result.usagePct()).isEqualByComparingTo("100");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        // #490: 환급률 100% 이하면 환급금 ≤ L이라 한도가 0으로 잘리지 않는다 — 한도 0에서도 L을 그대로 되돌린다.
+        // 잘리는 경우(환급률 100% 초과)는 flagsReviewRequiredAndNeverReturnsNegativeLimitForAbnormalRefundRate처럼 REVIEW_REQUIRED가 먼저다.
+        assertThat(result.annualizedLimitBase()).isEqualByComparingTo("1200000");
     }
 
     private void stubIncludedAmount(boolean standardDeduction80Yn, BigDecimal complianceDeductionPct, String amount) {
