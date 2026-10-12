@@ -1,5 +1,7 @@
 package com.susukkang.fgc.contract.repository;
 
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -7,23 +9,15 @@ import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.service.ContractService;
 import jakarta.persistence.EntityManagerFactory;
-import org.apache.ibatis.builder.xml.XMLMapperBuilder;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +41,7 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 동일 DB·입력에서 기존 MyBatis SQL과 현재 조회 저장소를 비교하는 명시적 실행용 측정.
+ * 동일 DB·입력에서 기존 JDBC SQL과 현재 조회 저장소를 비교하는 명시적 실행용 측정.
  * 워밍업 후 교차 실행하며 시간은 합격 기준으로 사용하지 않는다.
  * 픽스처는 테스트 트랜잭션 종료 시 모두 롤백한다.
  */
@@ -75,12 +69,12 @@ class ContractReadPerformanceTest {
     @Autowired private EntityManagerFactory entityManagerFactory;
 
     @Test
-    void compareLegacyQueriesAndCurrentRepositories() throws Exception {
+    void compareLegacyQueriesAndCurrentRepositories() {
         Long contractId = jdbc.queryForObject("""
                 SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL01-202607-0001'
                 """, Long.class);
         addRepresentativeRows(contractId);
-        SqlSessionTemplate baseline = baselineSession();
+        JdbcBaseline baseline = baselineSession();
         ContractSearchCondition all = new ContractSearchCondition();
         ContractSearchCondition filtered = new ContractSearchCondition();
         filtered.setContractNo("FGC-FGL01");
@@ -125,24 +119,15 @@ class ContractReadPerformanceTest {
                 () -> contractService.selectAllByCondition(all));
     }
 
-    private PageResponse<ContractView> legacyPage(SqlSessionTemplate session, ContractSearchCondition condition, int page) {
+    private PageResponse<ContractView> legacyPage(JdbcBaseline session, ContractSearchCondition condition, int page) {
         List<ContractView> content = session.selectList("contractBaseline.selectByCondition",
                 Map.of("condition", condition, "size", 20, "offset", (page - 1) * 20));
         long count = session.selectOne("contractBaseline.countByCondition", condition);
         return PageResponse.of(content, page, 20, count, "contractId,desc");
     }
 
-    private SqlSessionTemplate baselineSession() throws Exception {
-        Configuration configuration = new Configuration(new Environment("contract-baseline",
-                new SpringManagedTransactionFactory(), dataSource));
-        configuration.setMapUnderscoreToCamelCase(true);
-        configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        configuration.setCacheEnabled(false);
-        try (var input = new ClassPathResource("contract-baseline/reads.xml").getInputStream()) {
-            new XMLMapperBuilder(input, configuration, "contract-baseline/reads.xml",
-                    configuration.getSqlFragments()).parse();
-        }
-        return new SqlSessionTemplate(new SqlSessionFactoryBuilder().build(configuration));
+    private JdbcBaseline baselineSession() {
+        return new JdbcBaseline(dataSource);
     }
 
     private void compare(String name, int expectedSqlCount, Supplier<?> oldRead, Supplier<?> newRead) {

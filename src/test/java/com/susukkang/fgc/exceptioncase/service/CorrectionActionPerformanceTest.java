@@ -1,5 +1,7 @@
 package com.susukkang.fgc.exceptioncase.service;
 
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.code.ExceptionActionType;
@@ -11,15 +13,8 @@ import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionResponse;
 import com.susukkang.fgc.journal.service.JournalCorrectionService;
 import jakarta.persistence.EntityManager;
-import org.apache.ibatis.builder.xml.XMLMapperBuilder;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +23,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -101,13 +95,16 @@ class CorrectionActionPerformanceTest {
     private Long debitAccount;
     private Long creditAccount;
 
+    private static final org.testcontainers.containers.PostgreSQLContainer<?> database =
+            new org.testcontainers.containers.PostgreSQLContainer<>("postgres:17")
+                    .withDatabaseName("fgc_correction_perf_test").withUsername("fgc").withPassword("fgc_test_only");
+
     @DynamicPropertySource
     static void requireDisposableDatabase(DynamicPropertyRegistry registry) {
-        String url = System.getenv("SPRING_DATASOURCE_URL");
-        if (url == null || !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/fgc_correction_perf_[a-z0-9_]+\\?currentSchema=fgc")) {
-            throw new IllegalStateException("정정 조치 성능 비교에는 loopback의 fgc_correction_perf_* 전용 DB가 필요합니다.");
-        }
-        registry.add("spring.datasource.url", () -> url);
+        database.start();
+        registry.add("spring.datasource.url", () -> database.getJdbcUrl() + "?currentSchema=fgc");
+        registry.add("spring.datasource.username", database::getUsername);
+        registry.add("spring.datasource.password", database::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
@@ -393,17 +390,8 @@ class CorrectionActionPerformanceTest {
         return new SqlCounts(select, insert, update, other, statements.size());
     }
 
-    private SqlSessionTemplate baselineSession() throws Exception {
-        Configuration configuration = new Configuration(new Environment("correction-action-baseline",
-                new SpringManagedTransactionFactory(), dataSource));
-        configuration.setMapUnderscoreToCamelCase(true);
-        configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        configuration.setCacheEnabled(false);
-        String path = "correction-action-baseline/ExceptionCaseActionMapper.xml";
-        try (var input = new ClassPathResource(path).getInputStream()) {
-            new XMLMapperBuilder(input, configuration, path, configuration.getSqlFragments()).parse();
-        }
-        return new SqlSessionTemplate(new SqlSessionFactoryBuilder().build(configuration));
+    private JdbcBaseline baselineSession() {
+        return new JdbcBaseline(dataSource);
     }
 
     private long count(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }

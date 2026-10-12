@@ -34,7 +34,7 @@ import java.util.function.ToLongFunction;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 설명 : 동일 JVM·DB에서 d1a603df 서비스/Mapper 복원본과 현재 JPA 서비스를 교대 비교한다.
+ * 설명 : 동일 JVM·DB에서 d1a603df의 서비스·SQL을 JDBC로 실행하고 현재 JPA 서비스와 교대 비교한다.
  * 각 lifecycle은 별도 롤백 트랜잭션이며 커밋·HTTP·검증 시간은 제외한다.
  * JDBC 시간은 드라이버 호출의 경과시간이며 DB 서버 실행시간이나 순수 ORM 비용이 아니다.
  *
@@ -46,8 +46,6 @@ import static org.assertj.core.api.Assertions.assertThat;
         "fgc.batch.daily-changed-contract.enabled=false",
         "spring.jpa.properties.hibernate.cache.use_query_cache=false",
         "spring.jpa.properties.hibernate.cache.use_second_level_cache=false",
-        "mybatis.configuration.local-cache-scope=STATEMENT",
-        "mybatis.configuration.cache-enabled=false",
         "logging.level.org.hibernate.SQL=OFF"
 })
 @Import({PaymentJdbcObservation.Config.class, PaymentBaselineConfiguration.class})
@@ -103,9 +101,9 @@ class CommissionPaymentPersistencePerformanceTest {
                     JsonNode newResult;
                     if (firstJpa) {
                         newResult = lifecycle(payments, "jpa", contracts, itemId, key, index, 0, record);
-                        oldResult = lifecycle(baseline, "mybatis", contracts, itemId, key, index, 1, record);
+                        oldResult = lifecycle(baseline, "jdbc", contracts, itemId, key, index, 1, record);
                     } else {
-                        oldResult = lifecycle(baseline, "mybatis", contracts, itemId, key, index, 0, record);
+                        oldResult = lifecycle(baseline, "jdbc", contracts, itemId, key, index, 0, record);
                         newResult = lifecycle(payments, "jpa", contracts, itemId, key, index, 1, record);
                     }
                     assertThat(newResult).as("normalized response and DB equivalence, contracts=%s pair=%s",
@@ -288,7 +286,7 @@ class CommissionPaymentPersistencePerformanceTest {
     private void report() {
         for (int contracts : List.of(1, 2)) {
             for (String operation : OPERATIONS) {
-                for (String implementation : List.of("mybatis", "jpa")) {
+                for (String implementation : List.of("jdbc", "jpa")) {
                     List<Sample> group = group(contracts, operation, implementation);
                     assertThat(group).hasSize(SAMPLES);
                     assertThat(group.stream().map(s -> s.jdbc.executions().size()).distinct()).hasSize(1);
@@ -324,7 +322,7 @@ class CommissionPaymentPersistencePerformanceTest {
                                 ms(slowest.nanos()), slowest.sql().replaceAll("\\s+", " ").trim());
                     });
                 }
-                List<Sample> old = group(contracts, operation, "mybatis");
+                List<Sample> old = group(contracts, operation, "jdbc");
                 List<Sample> current = group(contracts, operation, "jpa");
                 long[] differences = new long[SAMPLES];
                 for (int i = 0; i < SAMPLES; i++) {
@@ -333,7 +331,7 @@ class CommissionPaymentPersistencePerformanceTest {
                 }
                 Arrays.sort(differences);
                 System.out.printf(Locale.ROOT,
-                        "PAYMENT_AB_PAIRED run=%s contracts=%d operation=%s median_jpa_minus_mybatis_ms=%.3f%n",
+                        "PAYMENT_AB_PAIRED run=%s contracts=%d operation=%s median_jpa_minus_jdbc_ms=%.3f%n",
                         RUN, contracts, operation, ms(differences[(SAMPLES - 1) / 2]));
             }
         }

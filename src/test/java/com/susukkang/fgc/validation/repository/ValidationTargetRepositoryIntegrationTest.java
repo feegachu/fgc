@@ -18,8 +18,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * ValidationTargetSelectionMapperIntegrationTest(MyBatis)와 같은 시나리오를
- * ValidationTargetRepository(JPA, 네이티브 벌크 insert)로 검증한다.
+ * 검증 대상 선별과 스케줄 상태 조회 계약을 JPA Repository로 검증한다.
  */
 @SpringBootTest
 @Transactional
@@ -189,8 +188,7 @@ class ValidationTargetRepositoryIntegrationTest {
     /**
      * #380 Phase 4 — ValidationTargetRepository.selectScheduleStates(unnest + ROW() 기반
      * DISTINCT COUNT를 네이티브 쿼리로 옮긴 메서드)가 선별된 계약의 두 지급 단계를 모두
-     * 반환하는지 검증한다. 구 MyBatis ValidationScheduleMapper는 이 전환 완료 후 다른
-     * 패키지에서 참조가 없어 삭제되었다 — 이 테스트가 그 검증 책임을 이어받는다.
+     * 반환하는지 검증한다.
      */
     @Test
     void selectScheduleStatesReturnsBothPaymentStagesForSelectedContract() {
