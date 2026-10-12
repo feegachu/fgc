@@ -103,7 +103,7 @@ class ContractTransactionIntegrationTest {
         assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
         assertThat(observedContractId).isEqualTo(contractId);
         assertWritesReachedFailurePoint(point);
-        // JPA flush 후 MyBatis가 새 보험료로 스케줄을 재생성한 상태에서 실패해야 한다.
+        // JPA flush 후 새 보험료로 스케줄을 재생성한 상태에서 실패해야 한다.
         assertThat(premiumBeforeFailure).isEqualByComparingTo(request.getFirstPremiumAmount());
         assertThat(scheduleBasisBeforeFailure).isNotEmpty().allSatisfy(
                 amount -> assertThat(amount).isEqualByComparingTo(request.getMonthlyEquivalentFirstPremium()));
