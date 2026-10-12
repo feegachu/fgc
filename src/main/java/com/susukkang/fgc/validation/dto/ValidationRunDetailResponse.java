@@ -48,13 +48,19 @@ public record ValidationRunDetailResponse(
             BigDecimal differenceAmountTotal) {
     }
 
-    /** SRC-032 실행별 검출과 중복 없는 관리자 업무건 집계. */
+    /**
+     * SRC-032 실행별 검출과 중복 없는 관리자 업무건 집계.
+     * comparedFinalizedRunId는 이 실행보다 먼저 확정된 같은 달 실행(#498 비교 기준)이며 없으면 null —
+     * 그때 finalizedResultDiffCount 0은 "차이 없음"이 아니라 "비교 대상 아님"이다.
+     */
     public record ExceptionSummary(
             long detectedCount,
             long newCount,
             long recurringCount,
             long reopenedCount,
             long notDetectedCount,
-            long openWorkItemCount) {
+            long openWorkItemCount,
+            long finalizedResultDiffCount,
+            Long comparedFinalizedRunId) {
     }
 }
