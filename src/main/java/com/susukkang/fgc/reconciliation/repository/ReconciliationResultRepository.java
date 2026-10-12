@@ -128,8 +128,10 @@ public class ReconciliationResultRepository {
      * (SCHEDULE_ELIGIBILITY {@code STATUS_MONTH_RULE = PAY_IF_ACTIVE_ON_DUE_DATE}, V2). 현재 해지·실효·만기
      * 계약이라도 지급예정일(Asia/Seoul 날짜)까지 효력이 생긴 상태 사건이 비유효 상태가 아니면 정상 지급이다.
      * 다음은 예전처럼 현재 상태만으로 비유효로 본다 — 청약철회(CANCELLED, 처음부터 무효),
-     * 지급예정일이 없는 후보, 현재 상태로 바뀐 상태 사건이 없는 계약(계약 수정 화면의 상태 변경은 아직
-     * 사건을 남기지 않는다, FUN-026 2차).
+     * 지급예정일이 없는 후보, 효력일 기준 최신 상태 사건이 현재 상태와 다른(또는 사건이 없는) 계약 —
+     * 계약 수정 화면의 상태 변경은 아직 사건을 남기지 않아(FUN-026 2차) 이력을 믿을 수 없다.
+     * "같은 상태 사건이 한 번이라도 있었는가"로 보면 LAPSED→REVIVED 이력 뒤 화면에서 다시 LAPSED로 바꾼
+     * 계약이 옛 사건으로 판정돼 비유효 신호가 사라진다(PR #515 리뷰).
      */
     public ReconciliationClassificationContext findClassificationContext(
             Long contractId, Long expectedAgentId, Long actualAgentId, List<Long> journalHeaderIds,
@@ -141,9 +143,10 @@ public class ReconciliationResultRepository {
                                   AND c.current_status IN ('CANCELLED','TERMINATED','MATURED','LAPSED')
                                   AND (c.current_status = 'CANCELLED'
                                        OR CAST(:dueDate AS date) IS NULL
-                                       OR NOT EXISTS (SELECT 1 FROM fgc.contract_status_event t
-                                                       WHERE t.contract_id = c.contract_id
-                                                         AND t.new_status = c.current_status)
+                                       OR (SELECT l.new_status FROM fgc.contract_status_event l
+                                            WHERE l.contract_id = c.contract_id
+                                            ORDER BY l.effective_at DESC, l.event_seq DESC
+                                            LIMIT 1) IS DISTINCT FROM c.current_status
                                        OR (SELECT e.new_status FROM fgc.contract_status_event e
                                             WHERE e.contract_id = c.contract_id
                                               AND e.effective_at < (CAST(:dueDate AS timestamp) + INTERVAL '1 day')

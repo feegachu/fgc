@@ -72,6 +72,46 @@ class ReconciliationClassificationContextIntegrationTest {
         assertThat(invalid(active, LocalDate.of(2026, 8, 25))).isFalse();
     }
 
+    /**
+     * PR #515 리뷰 회귀 — 사건 LAPSED(3/01)→REVIVED(5/01) 뒤 화면에서 LAPSED로 바꾼 계약(사건 없음, FUN-026).
+     * 최신 사건(REVIVED)이 현재 상태(LAPSED)와 다르면 이력을 믿지 않고 현재 상태로 판정한다.
+     * "LAPSED 사건이 한 번이라도 있었는가"로 보면 부활 뒤 예정일이 옛 사건(REVIVED) 기준 정상으로 잘못 나온다.
+     */
+    @Test
+    void manualStatusChangeAfterEventHistoryFallsBackToCurrentStatus() {
+        Long contractId = insertContract("IT-RECON-RELAPSE", "LAPSED", "ACTIVE", "2098-01-15 00:00+09");
+        insertEvent(contractId, 2, "ACTIVE", "LAPSED", "2098-03-01 00:00+09");
+        insertEvent(contractId, 3, "LAPSED", "REVIVED", "2098-05-01 00:00+09");
+
+        assertThat(invalid(contractId, LocalDate.of(2098, 9, 25))).isTrue();
+    }
+
+    /**
+     * 같은 효력 시각의 사건은 event_seq가 큰 쪽이 그 시점 상태다. 3/01 00:00에 LAPSED(2)·REVIVED(3)가 함께
+     * 들어오고 6/01 해지된 계약은, 4/01 예정일 시점에 REVIVED라 비유효가 아니다.
+     */
+    @Test
+    void sameEffectiveTimeUsesLatestEventSeq() {
+        Long contractId = insertContract("IT-RECON-TIE", "TERMINATED", "ACTIVE", "2098-01-15 00:00+09");
+        insertEvent(contractId, 2, "ACTIVE", "LAPSED", "2098-03-01 00:00+09");
+        insertEvent(contractId, 3, "LAPSED", "REVIVED", "2098-03-01 00:00+09");
+        insertEvent(contractId, 4, "REVIVED", "TERMINATED", "2098-06-01 00:00+09");
+
+        assertThat(invalid(contractId, LocalDate.of(2098, 4, 1))).isFalse();
+        assertThat(invalid(contractId, LocalDate.of(2098, 6, 1))).isTrue();
+    }
+
+    private void insertEvent(Long contractId, int seq, String previousStatus, String newStatus, String effectiveAt) {
+        jdbcTemplate.update("""
+                INSERT INTO fgc.contract_status_event (
+                    contract_id, event_seq, previous_status, new_status,
+                    effective_at, received_at, source_system, source_event_key, data_origin
+                )
+                VALUES (?, ?, ?, ?, CAST(? AS timestamptz), CAST(? AS timestamptz), 'IT', ?, 'MANUAL')
+                """, contractId, seq, previousStatus, newStatus, effectiveAt, effectiveAt,
+                "IT-" + contractId + "-" + seq);
+    }
+
     private boolean invalid(Long contractId, LocalDate dueDate) {
         return repository.findClassificationContext(contractId, null, null, List.of(), dueDate)
                 .isInvalidContractPayment();
