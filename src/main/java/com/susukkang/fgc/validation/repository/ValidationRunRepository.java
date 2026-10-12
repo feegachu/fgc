@@ -355,7 +355,16 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                    rr.reconciliationUnmatchedCount, rr.reconciliationDifferenceAmountTotal,
                    ex.exceptionDetectedCount, ex.exceptionNewCount, ex.exceptionRecurringCount,
                    ex.exceptionReopenedCount, ex.exceptionNotDetectedCount,
-                   ex.exceptionOpenWorkItemCount
+                   ex.exceptionOpenWorkItemCount, ex.finalizedResultDiffCount,
+                   -- #498 비교 기준: ExceptionCaseRepository#insertFromFinalizedCapResultDiffs 와 같은 조건을 유지한다
+                   (SELECT MAX(finalized.validation_run_id)
+                      FROM fgc.validation_run finalized
+                      JOIN fgc.validation_run target_run
+                        ON target_run.validation_run_id = :validationRunId
+                     WHERE finalized.validation_month = target_run.validation_month
+                       AND finalized.status = 'FINALIZED'
+                       AND finalized.validation_run_id < target_run.validation_run_id)
+                       AS comparedFinalizedRunId
               FROM (SELECT COUNT(*) FILTER (WHERE selection_status = 'SELECTED')        AS targetSelectedCount,
                            COUNT(*) FILTER (WHERE selection_status = 'EXCLUDED')        AS targetExcludedCount,
                            COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
@@ -397,6 +406,8 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                         COUNT(*) FILTER (WHERE occurrence.is_new_case) AS exceptionNewCount,
                         COUNT(*) FILTER (WHERE NOT occurrence.is_new_case) AS exceptionRecurringCount,
                         COUNT(*) FILTER (WHERE occurrence.was_reopened) AS exceptionReopenedCount,
+                        COUNT(*) FILTER (WHERE occurrence.reason_code = 'FINALIZED_RESULT_DIFF')
+                            AS finalizedResultDiffCount,
                         (SELECT COUNT(*)
                            FROM fgc.exception_case ec
                            JOIN fgc.validation_run target_run
