@@ -60,13 +60,15 @@ class ValidationTargetSelectionMapperIntegrationTest {
                         OR snapshot ->> 'insurerProductCode' IS NOT NULL)
                 """, Long.class, runId);
 
+        // C005(FGC-FGN01-202605-0001)는 7/02 실효 — 7월 해지·실효 계약도 차익거래 대상이다(#474).
         assertThat(selectedContractNos).containsExactlyInAnyOrder(
                 "FGC-FGL01-202607-0001",
                 "FGC-FGL01-202607-0002",
                 "FGC-FGL01-202607-0003",
                 "FGC-FGL01-202607-0004",
                 "FGC-FGL01-202607-0005",
-                "FGC-FGL02-202605-0001");
+                "FGC-FGL02-202605-0001",
+                "FGC-FGN01-202605-0001");
         assertThat(selected).isPositive();          // 시드의 정상 시나리오 계약이 선정돼야 한다
         assertThat(productCodeMismatch).isZero();   // 시드 정본 코드 체계에서 불일치는 없어야 한다
         assertThat(selectedWithoutTable).isZero();  // 선정 건은 환급률표가 반드시 배정된다
@@ -93,6 +95,35 @@ class ValidationTargetSelectionMapperIntegrationTest {
         assertThat(target.get("selection_status")).isEqualTo("SELECTED");
         assertThat(target.get("selection_reason")).isEqualTo("월 통합검증 대상");
         assertThat(target.get("refund_rate_table_id")).isNotNull();
+    }
+
+    /**
+     * #474 — ValidationTargetRepository.insertTargets 와 같은 조건인지 시드로 고정한다.
+     * 해지·실효 계약은 효력일이 속한 달에만 대상이다(A1 8/20·A2 8/22 해지는 8월, C005 7/02 실효는 7월).
+     */
+    @Test
+    void fgc474TerminatedAndLapsedContractsEnterOnlyTheirEffectiveMonth() {
+        Long julyRunId = insertValidationRun(LocalDate.of(2026, 7, 1));
+        Long augustRunId = insertValidationRun(LocalDate.of(2026, 8, 1));
+
+        mapper.insertTargets(julyRunId, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
+        mapper.insertTargets(augustRunId, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertThat(contractNos(julyRunId))
+                .contains("FGC-FGN01-202605-0001", "FGC-FGN01-202603-0001")
+                .doesNotContain("FGC-FGL02-202601-0001", "FGC-FGL01-202601-0001");
+        assertThat(contractNos(augustRunId))
+                .contains("FGC-FGL02-202601-0001", "FGC-FGL01-202601-0001")
+                .doesNotContain("FGC-FGN01-202605-0001", "FGC-FGN01-202603-0001");
+    }
+
+    private List<String> contractNos(Long runId) {
+        return jdbcTemplate.queryForList("""
+                SELECT ic.contract_no
+                  FROM fgc.validation_target vt
+                  JOIN fgc.insurance_contract ic ON ic.contract_id = vt.contract_id
+                 WHERE vt.validation_run_id = ?
+                """, String.class, runId);
     }
 
     private Long insertSavContract() {
