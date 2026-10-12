@@ -192,6 +192,32 @@ describe('RECO-W01·W02 React 전환', () => {
     await waitFor(() => expect(calls.filter((call) => call.url.includes('/41/results'))).toHaveLength(2))
     expect(invalidate).not.toHaveBeenCalled()
   })
+  it('신규 실행이 첫 이력 조회 전에 완료돼도 진행 중 결과 응답 뒤 최종 결과를 받는다', async () => {
+    let created = false
+    let reads = 0
+    let finishInitial: ((value: unknown) => void) | undefined
+    const { user } = renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=1', (url, options) => {
+      if (url === '/api/v1/reconciliations' && options?.method === 'POST') {
+        created = true
+        return { reconciliationRunId: 42, status: 'RUNNING' }
+      }
+      if (url.startsWith('/api/v1/reconciliations?'))
+        return { ...history, content: created ? [{ ...run, reconciliationRunId: 42 }] : [] }
+      if (url.includes('/42/results')) {
+        if (++reads === 1)
+          return new Promise((resolve) => {
+            finishInitial = resolve
+          })
+        return results
+      }
+    })
+    await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+    await user.click(screen.getByRole('button', { name: '대사 실행' }))
+    await waitFor(() => expect(finishInitial).toBeDefined())
+    finishInitial!({ ...results, items: { ...results.items, content: [] } })
+    await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
+    expect(reads).toBe(2)
+  })
   it('현재 페이지가 전부 일치여도 전체 합계·다음 페이지를 유지하며 구체적으로 안내한다', async () => {
     renderAt('/reconciliations?month=2026-07&runId=41&onlyMismatch=true', (url) =>
       url.includes('/41/results')
@@ -204,6 +230,15 @@ describe('RECO-W01·W02 React 전환', () => {
     ).toBeEnabled()
     expect(screen.getByText(/실행 전체 합계/)).toHaveTextContent('24,000원')
     expect(screen.getByRole('region', { name: '일치율 (건수 기준)' })).toHaveTextContent('이력은 서버 반올림 값')
+  })
+  it('단일 페이지가 전부 일치이면 존재하지 않는 다른 페이지를 안내하지 않는다', async () => {
+    renderAt('/reconciliations?month=2026-07&runId=41&onlyMismatch=true', (url) =>
+      url.includes('/41/results')
+        ? { ...results, items: { ...results.items, content: [matched], totalPages: 1 } }
+        : undefined,
+    )
+    expect(await screen.findByText('이 페이지에는 불일치가 없습니다.')).toBeVisible()
+    expect(screen.queryByText('이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.')).not.toBeInTheDocument()
   })
   for (const action of ['조회', '대사 실행'])
     it(`다른 월 ${action}은 전역 탭 영향 확인 후 취소하면 URL·기준월·POST를 변경하지 않는다`, async () => {

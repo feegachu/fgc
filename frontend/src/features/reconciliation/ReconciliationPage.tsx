@@ -165,24 +165,31 @@ export default function ReconciliationPage() {
   const client = useQueryClient()
   const canProcess = usePermission('canProcess')
   const [bulkMessage, setBulkMessage] = useState<{ runId: string; message: string } | null>(null)
-  const previousRun = useRef<{ id: string; status: string } | null>(null)
+  const pendingRunIds = useRef(new Set<string>())
   useEffect(() => {
-    const previous = previousRun.current
-    // 같은 실행의 진행 → 완료 전이에만 최종 결과를 갱신한다. 완료 실행 재선택은 일반 Query 조회에 맡긴다.
-    if (
-      runId &&
-      previous?.id === runId &&
-      (previous.status === 'RUNNING' || previous.status === 'CREATED') &&
-      (status === 'COMPLETED' || status === 'FINALIZED')
-    )
-      void client.invalidateQueries({ queryKey: ['reconciliations', 'results', runId] })
-    if (runId && status) previousRun.current = { id: runId, status }
-    else if (!runId || previous?.id !== runId) previousRun.current = null
+    if (!runId || !status) return
+    if (status === 'RUNNING' || status === 'CREATED') {
+      pendingRunIds.current.add(runId)
+      return
+    }
+    // POST 또는 이력에서 관측한 진행 → 완료 전이에만 갱신한다. 조회 중 첫 응답도 끝난 뒤 최종 값을 받는다.
+    const wasPending = pendingRunIds.current.delete(runId)
+    if (wasPending && (status === 'COMPLETED' || status === 'FINALIZED')) {
+      const queryKey = ['reconciliations', 'results', runId]
+      const inFlight = client
+        .getQueryCache()
+        .findAll({ queryKey })
+        .filter((query) => query.state.fetchStatus !== 'idle')
+        .map((query) => query.promise)
+      void Promise.allSettled(inFlight).then(() => client.invalidateQueries({ queryKey }))
+    }
   }, [client, runId, status])
   const execution = useMutation({
     mutationFn: createRun,
     meta: { errorToast: false },
     onSuccess: (data, input) => {
+      if (data.status === 'RUNNING' || data.status === 'CREATED')
+        pendingRunIds.current.add(String(data.reconciliationRunId))
       void client.invalidateQueries({ queryKey: ['reconciliations', 'history'] })
       update({ ...input, runId: String(data.reconciliationRunId), runMonth: input.month, resultPage: '', resultId: '' })
       toast('대사 실행이 생성됐습니다. 이력에서 결과를 불러옵니다.', 'success')
@@ -328,7 +335,9 @@ export default function ReconciliationPage() {
                 : results.isPending
                   ? '대사 결과를 불러오는 중입니다.'
                   : onlyMismatch && (results.data?.items?.content?.length ?? 0) > 0 && filteredRows.length === 0
-                    ? '이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.'
+                    ? (results.data?.items?.totalPages ?? 0) > 1
+                      ? '이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.'
+                      : '이 페이지에는 불일치가 없습니다.'
                     : '조건에 맞는 자료가 없습니다.'
             }
           />
