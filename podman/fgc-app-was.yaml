@@ -1,0 +1,28 @@
+# 운영 WAS 앱 Pod. DB는 같은 서버의 별도 Pod(fgc-db).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fgc-app
+spec:
+  restartPolicy: Always
+  containers:
+    - name: api
+      image: __API_IMAGE__
+      # DB Pod가 5432를 열 때까지 최대 5분 기다린다. 넘으면 실패로 끝내 restartPolicy가 다시 시도하게 한다
+      command: ["bash", "-c", "for i in $(seq 1 150); do (echo > /dev/tcp/fgc-db/5432) 2>/dev/null && exec catalina.sh run; sleep 2; done; echo 'fgc-db 5432 대기 5분 초과' >&2; exit 1"]
+      ports:
+        - {containerPort: 8080, hostIP: __API_BIND_IP__, hostPort: __API_BIND_PORT__}
+      env:
+        - {name: SPRING_PROFILES_ACTIVE, value: "__ENV_NAME__"}
+        - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://fgc-db:5432/fgc"}
+        - {name: SPRING_DATASOURCE_USERNAME, value: fgc}
+        - {name: SPRING_FLYWAY_LOCATIONS, value: "classpath:db/migration,classpath:db/demo"}
+        - {name: JAVA_TOOL_OPTIONS, value: "-Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m"}
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom: {secretKeyRef: {name: fgc-app, key: SPRING_DATASOURCE_PASSWORD}}
+        - name: FGC_JWT_SECRET
+          valueFrom: {secretKeyRef: {name: fgc-app, key: FGC_JWT_SECRET}}
+        - name: SPRING_AI_OPENAI_API_KEY
+          valueFrom: {secretKeyRef: {name: fgc-app, key: SPRING_AI_OPENAI_API_KEY, optional: true}}
+      resources:
+        limits: {memory: __API_MEMORY__}

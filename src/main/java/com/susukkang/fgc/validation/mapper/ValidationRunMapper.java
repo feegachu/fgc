@@ -1,7 +1,6 @@
 package com.susukkang.fgc.validation.mapper;
 
 import com.susukkang.fgc.validation.dto.ValidationRunInsertRow;
-import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import com.susukkang.fgc.validation.dto.FinalizedValidationRunRow;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
@@ -19,9 +18,6 @@ public interface ValidationRunMapper {
 
     /** 확정 트랜잭션 동안 결과 writer와 직렬화하기 위한 validation_run 행 잠금 조회. */
     ValidationRunRow findByIdForUpdate(@Param("validationRunId") Long validationRunId);
-
-    /** 운영정책서 제44조 여섯 확정 조건의 실패 건수를 한 스냅샷에서 조회한다. */
-    FinalizeChecklistCounts findFinalizeChecklistCounts(@Param("validationRunId") Long validationRunId);
 
     /** 성공한 확정 응답 또는 동일 멱등키 재요청 응답을 위한 결과 조회. */
     FinalizedValidationRunRow findFinalizationById(@Param("validationRunId") Long validationRunId);

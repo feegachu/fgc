@@ -31,6 +31,8 @@ repositories {
 }
 
 dependencies {
+    // Actuator 추가
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     // Web / 화면
     implementation 'org.springframework.boot:spring-boot-starter-web'
     // WAR 로 외장 Tomcat 에 올릴 때 내장 Tomcat 은 WEB-INF/lib 에서 뺀다 (jar 실행에는 영향 없음)

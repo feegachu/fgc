@@ -16,11 +16,14 @@ import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.cap.service.ProductRefundRateResolver;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ScheduleLineStatus;
+import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -59,6 +62,100 @@ class CapCalculatorIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private CapScheduleAmountQueryRepository capScheduleAmountQueryRepository;
+    @Autowired
+    private ScheduleService scheduleService;
+
+    @ParameterizedTest
+    @EnumSource(value = ScheduleLineStatus.class, names = {"CONFIRMED", "MATCHED", "ADJUSTED"})
+    void tracksConfirmedExclusionEvidenceAcrossRepeatedRegeneration(ScheduleLineStatus status) {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("100"));
+        Long originalLine = scheduleLineIds(headerId).getFirst();
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code='NEWCOMER_SUPPORT'", Long.class);
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET commission_item_id=?, line_status=? WHERE schedule_line_id=?",
+                itemId, status.name(), originalLine);
+        insertScheduleEvidence(contractId, originalLine, itemId, "GA_TO_FC", "EXCLUDED", "EVD-PRESERVED", true);
+
+        for (int version = 0; version < 3; version++) {
+            headerId = scheduleService.regenerateSchedules(headerId, "CONTRACT_UPDATED").getScheduleHeaderId();
+            List<ScheduleAmountView> current = capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(
+                    contractId, "GA_TO_FC", 12);
+            assertThat(current).filteredOn(line -> line.getCommissionItemId().equals(itemId))
+                    .singleElement().satisfies(line -> {
+                        assertThat(line.getScheduleLineId()).isNotEqualTo(originalLine);
+                        assertThat(line.getEvidenceRef()).isEqualTo("EVD-PRESERVED");
+                    });
+            assertThat(calculatorClassification(contractId, itemId)).isEqualTo("EXCLUDED");
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT schedule_line_id FROM fgc.transaction_attribution WHERE evidence_ref='EVD-PRESERVED' AND contract_id=?",
+                Long.class, contractId)).isEqualTo(originalLine);
+    }
+
+    private String calculatorClassification(Long contractId, Long itemId) {
+        return capCalculator.calculate(CapCalculationCommand.realtime(contractId, PaymentStage.GA_TO_FC,
+                        LocalDate.of(2026, 7, 31))).details().stream()
+                .filter(line -> line.commissionItemId().equals(itemId)).findFirst().orElseThrow().classification();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"AMOUNT", "RECIPIENT", "ITEM", "INSTALLMENT", "DATE", "FUTURE", "PREVIOUS_HOLD", "PREVIOUS_CANCELLED", "CURRENT_HOLD", "CURRENT_CANCELLED"})
+    void doesNotInheritEvidenceWhenTheCopiedOccurrenceScopeChanges(String change) {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long header = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("100"));
+        Long originalLine = scheduleLineIds(header).getFirst();
+        Long item = jdbcTemplate.queryForObject("SELECT commission_item_id FROM fgc.schedule_line WHERE schedule_line_id=?",
+                Long.class, originalLine);
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status='CONFIRMED' WHERE schedule_line_id=?", originalLine);
+        insertScheduleEvidence(contractId, originalLine, item, "GA_TO_FC", "EXCLUDED", "EVD-ORIGINAL", true);
+        jdbcTemplate.update("UPDATE fgc.schedule_header SET active_yn=false WHERE schedule_header_id=?", header);
+        Long copiedHeader = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_header(contract_id, payment_stage, policy_version_id, schedule_version_no,
+                    schedule_regime, schedule_purpose, active_yn, regenerated_from_id)
+                SELECT contract_id, payment_stage, policy_version_id, 2, schedule_regime, schedule_purpose, true,
+                       schedule_header_id FROM fgc.schedule_header WHERE schedule_header_id=?
+                RETURNING schedule_header_id
+                """, Long.class, header);
+        String amount = change.equals("AMOUNT") ? "expected_amount+1" : "expected_amount";
+        String recipient = change.equals("RECIPIENT")
+                ? "(SELECT min(agent_id) FROM fgc.agent WHERE agent_id IS DISTINCT FROM beneficiary_agent_id)" : "beneficiary_agent_id";
+        String changedItem = change.equals("ITEM")
+                ? "(SELECT commission_item_id FROM fgc.commission_item WHERE item_code='INCENTIVE')" : "commission_item_id";
+        String installment = change.equals("INSTALLMENT") ? "installment_no+1" : "installment_no";
+        String dueDate = change.equals("DATE") ? "due_date+1" : "due_date";
+        String status = change.equals("FUTURE") ? "'PLANNED'" : "line_status";
+        // 변경하는 SQL 조각은 위의 고정 테스트 케이스만 사용한다.
+        Long copiedLine = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_line(schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                    commission_item_id, beneficiary_agent_id, basis_code, basis_amount, calculation_type,
+                    rate_pct, fixed_amount, expected_amount, rounding_scale, rounding_mode, payment_condition_code,
+                    line_status, source_commission_rule_id)
+                SELECT ?, line_no, %s, contract_month_no, %s, %s, %s, basis_code, basis_amount, calculation_type,
+                       rate_pct, fixed_amount, %s, rounding_scale, rounding_mode, payment_condition_code, %s,
+                       source_commission_rule_id
+                  FROM fgc.schedule_line WHERE schedule_line_id=? RETURNING schedule_line_id
+                """.formatted(installment, dueDate, changedItem, recipient, amount, status),
+                Long.class, copiedHeader, originalLine);
+        if (change.startsWith("PREVIOUS_")) {
+            jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status=? WHERE schedule_line_id=?",
+                    change.substring("PREVIOUS_".length()), originalLine);
+        }
+        if (change.startsWith("CURRENT_")) {
+            jdbcTemplate.update("UPDATE fgc.schedule_line SET line_status=? WHERE schedule_line_id=?",
+                    change.substring("CURRENT_".length()), copiedLine);
+        }
+        if (change.equals("CURRENT_CANCELLED")) {
+            assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12)).isEmpty();
+            return;
+        }
+        assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12))
+                .singleElement().satisfies(line -> {
+                    assertThat(line.getScheduleLineId()).isEqualTo(copiedLine);
+                    assertThat(line.getEvidenceRef()).isNull();
+                });
+    }
 
     private Long contractId(String contractNo) {
         return jdbcTemplate.queryForObject(
@@ -495,14 +592,14 @@ class CapCalculatorIntegrationTest {
         assertThat(capCheckService.findDetail(-1L)).isEmpty();
     }
 
-    // A1(80% 공제대상 상품)은 12차월 예상해약환급률표가 한도에 가산된다
+    // A1(80% 공제대상 상품)은 12차월 예상 해약환급금을 수수료등에 합산한다(= 한도에서 뺀다, #468)
     // FGC-FGL02-202601-0001 : STD-LIFE-B(80% 공제 대상), 월납 100,000원, 240개월납, 계약일 2026-01-15
     // GA_TO_FC 1,200% 룰셋은 2026-07-01부터 적용되므로(REG-CAP-GA-2026-V1), 이 계약은
     // INSURER_TO_GA 단계로 검증한다. 준법경영비 3% 공제(REG-10, 제4-32조제14항)는 2027.1.1부터
 
     // 시행이라 2026-01-15 계약에는 아직 적용되지 않는다(REG-CAP-INS-2021-V2, 공제 0%, V6_1).
     @Test
-    void standardDeduction80ProductA1AddsMonth12RefundRateToLimit() {
+    void standardDeduction80ProductA1SubtractsMonth12RefundFromLimit() {
         Long id = contractId("FGC-FGL02-202601-0001");
 
         CapCalculationResult result = capCalculator.calculate(
@@ -510,16 +607,17 @@ class CapCalculatorIntegrationTest {
 
         // seed 공식: GREATEST(0,(12-2)*2.4) = 24.0% → 1,200,000 × 24% = 288,000
         assertThat(result.refund12mAmount()).isEqualByComparingTo("288000");
-        // 준법경영비 3% 공제는 2027.1.1부터 시행이라 2026년 계약에는 적용되지 않는다 → gross 그대로 한도
+        // 준법경영비 3% 공제는 2027.1.1부터 시행이라 2026년 계약에는 적용되지 않는다
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("0");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1488000");
+        // 산입 + 288,000 ≤ 1,200,000 → 한도 912,000
+        assertThat(result.limitAmount()).isEqualByComparingTo("912000");
         assertThat(result.refundRateTableId()).isNotNull();
     }
 
 
     // REG-10(준법경영비 3% 공제)은 2027.1.1 이후 체결된 원수사→GA 계약부터 적용된다(REG-CAP-INS-2027-V1).
     // FGC-FGL01-202703-0001 : STD-LIFE-A(80% 공제 아님), 월납 100,000원, 계약일 2027-03-02
-    // 공제 기준액은 grossLimit이 아니라 월납 원액이다(feature/18 반영) — 3% × 100,000 = 3,000.
+    // 공제 기준액은 한도가 아니라 월납 원액이다(feature/18 반영) — 3% × 100,000 = 3,000.
     @Test
     void complianceDeductionAppliesFromContractsDatedOnOrAfter20270101() {
         Long id = contractId("FGC-FGL01-202703-0001");
@@ -534,7 +632,8 @@ class CapCalculatorIntegrationTest {
 
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.complianceDeductionAmount()).isEqualByComparingTo("3000");
-        assertThat(result.limitAmount()).isEqualByComparingTo("1197000");
+        // 준법경영비는 수수료등 계산에서 제외(⑭) → 산입 − 3,000 ≤ 1,200,000 → 한도 1,203,000
+        assertThat(result.limitAmount()).isEqualByComparingTo("1203000");
     }
 
     // ProductRefundRateResolver는 STD-LIFE-B의 12차월 환급률과 표버전을 돌려준다

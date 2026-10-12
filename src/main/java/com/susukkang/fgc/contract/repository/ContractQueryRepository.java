@@ -55,7 +55,7 @@ public class ContractQueryRepository {
                        ic.payment_cycle_code, ic.first_premium_amount,
                        ic.monthly_equivalent_first_premium, ic.payment_term_months,
                        ic.standard_surrender_deduction_amount,
-                       ic.current_status AS contract_status, ic.data_origin
+                       ic.current_status AS contract_status, ic.data_origin, ic.updated_at
                   FROM fgc.insurance_contract ic
                   JOIN fgc.insurer i ON i.insurer_id = ic.insurer_id
                   JOIN fgc.product_offering po ON po.product_offering_id = ic.product_offering_id
@@ -86,6 +86,8 @@ public class ContractQueryRepository {
         query.addScalar("contract_status", String.class);
         query.addScalar("data_origin", String.class);
 
+        query.addScalar("updated_at", OffsetDateTime.class);
+
         return query.setTupleTransformer((row, aliases) -> ContractDetailResponse.builder()
                         .contractId((Long) row[0])
                         .insurerId((Long) row[1])
@@ -107,6 +109,7 @@ public class ContractQueryRepository {
                         .standardSurrenderDeductionAmount((BigDecimal) row[17])
                         .contractStatus(ContractStatus.valueOf((String) row[18]))
                         .dataOrigin(DataOrigin.valueOf((String) row[19]))
+                        .updatedAt((OffsetDateTime) row[20])
                         .build())
                 .getResultList().stream().findFirst();
     }

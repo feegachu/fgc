@@ -450,6 +450,10 @@ public class ArbitrageService {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("manualReason", request.getReason());
         snapshot.put("snapshotAsOfDate", source.getSnapshotAsOfDate());
+        snapshot.put("financialSnapshotId", source.getFinancialSnapshotId());
+        snapshot.put("financialSnapshotVersion", source.getFinancialSnapshotVersion());
+        snapshot.put("previousFinancialSnapshotId", source.getPreviousFinancialSnapshotId());
+        snapshot.put("financialSnapshotSourceRef", source.getFinancialSnapshotSourceRef());
         snapshot.put("cumulativePaidPremium", decision.cumulativePaidPremium());
         snapshot.put("confirmedPaymentAmount", confirmedPaymentAmount);
         snapshot.put("confirmedDeductionAmount", confirmedDeductionAmount);

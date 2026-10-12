@@ -161,7 +161,13 @@
   // 2026-08-19 yslee - FUN-044 확정 조건을 IF-API-50 응답으로 표시
   // 기존 코드: 체크리스트 영역이 정적 "연동 대기" 문구와 비활성 버튼만 표시
   // 문제: 사용자가 어떤 조건 때문에 확정할 수 없는지 화면에서 확인할 수 없음
-  // 개선: 서버가 판정한 6개 조건을 그대로 표시하고 통과 여부를 후속 확정 게이트에 전달
+  // 개선: 서버가 판정한 조건을 그대로 표시하고 통과 여부를 후속 확정 게이트에 전달
+  // 2026-10-11 yslee - #491 조건 7(같은 검증월의 가장 최근 실행인가) 추가로 6 → 7
+  // 2026-10-12 yslee - #494 조건 8(같은 검증월에 이미 확정된 실행이 없는가) 추가로 7 → 8
+  // 서버(ValidationRunFinalizationServiceImpl#buildChecklist)와 개수가 다르면 응답 오류로 처리한다.
+  // 일부만 그려 "모두 통과"로 보이는 것보다 조회 실패로 멈추는 편이 안전하다.
+  var CHECKLIST_CONDITION_COUNT = 8;
+
   function safeInternalLink(linkUrl) {
     if (!linkUrl || typeof linkUrl !== "string" || !linkUrl.startsWith("/") || linkUrl.startsWith("//")) {
       return null;
@@ -209,20 +215,31 @@
    */
   function updateFinalizeButtonState() {
     if (!finalizeButton) return;
+    // #494 확정 가능한 실행 유형(월간·확정전)은 서버가 ValidationRunType#isFinalizable 로 정해 내려준다.
+    // 화면은 그 값을 쓸 뿐 유형 목록을 따로 갖지 않는다. 서버도 같은 기준으로 확정을 거부한다(VRUN-004).
+    var runFinalizable = finalizeButton.dataset.runFinalizable === "true";
     var canFinalize = finalizeButton.dataset.canFinalize === "true";
     var checklistPassed = finalizeButton.dataset.checklistPassed === "true";
-    finalizeButton.disabled = finalizeRequestPending || runStatus !== "COMPLETED" || !canFinalize || !checklistPassed;
+    finalizeButton.disabled = finalizeRequestPending || runStatus !== "COMPLETED" || !runFinalizable
+      || !canFinalize || !checklistPassed;
     finalizeButton.removeAttribute("title");
 
+    // 사유는 사실 판정 → 권한 → 진행 상태 → 체크리스트 순으로 고른다. 이미 확정된 실행을 맨 앞에 둬야
+    // #494 이전에 확정된 계약수동 실행에 "확정할 수 없습니다"가 잘못 뜨지 않는다(loadFinalizeChecklist 와 같은 순서).
     var reason = "";
-    if (!canFinalize) {
+    if (runStatus === "FINALIZED") {
+      reason = "이미 확정된 실행입니다. 같은 달을 다시 검증하면 새 실행은 이 결과와 비교하는 용도로 남습니다.";
+    } else if (!runFinalizable) {
+      reason = "계약수동 실행은 변경된 계약만 다시 계산하므로 확정할 수 없습니다. 같은 달 월 전체 실행(월간·확정전)을 확정하세요.";
+    } else if (!canFinalize) {
       reason = "확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.";
-    } else if (runStatus === "FINALIZED") {
-      reason = "이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.";
     } else if (runStatus !== "COMPLETED") {
       reason = "검증 계산이 끝난 실행만 확정할 수 있습니다.";
+    } else if (!checklistPassed && finalizeButton.dataset.monthFinalized === "true") {
+      // 조건 8(이미 확정된 달)만 남은 재검증 실행은 고칠 수 있는 문제가 아니다 — 비교용임을 바로 알린다
+      reason = "이 달은 이미 확정되었습니다. 이 실행은 확정 결과와 비교하는 용도입니다.";
     } else if (!checklistPassed) {
-      reason = "확정 조건 6개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.";
+      reason = "확정 조건 " + CHECKLIST_CONDITION_COUNT + "개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.";
     }
     if (finalizeNote) {
       finalizeNote.textContent = reason;
@@ -277,9 +294,12 @@
     });
 
     checklistBody.appendChild(list);
-    setSummaryBadge(checklist.passed ? "6개 조건 모두 통과" : "미충족 조건 있음",
+    setSummaryBadge(checklist.passed ? CHECKLIST_CONDITION_COUNT + "개 조건 모두 통과" : "미충족 조건 있음",
       checklist.passed ? "status-badge-success" : "status-badge-error");
     finalizeButton.dataset.checklistPassed = String(checklist.passed);
+    // 조건 8(같은 검증월에 이미 확정된 실행이 없는가)만 미충족인지 — 비활성 사유 문구 선택용
+    var failing = checklist.conditions.filter(function (condition) { return !condition.passed; });
+    finalizeButton.dataset.monthFinalized = String(failing.length === 1 && failing[0].no === 8);
     updateFinalizeButtonState();
     syncDisclosures();
   }
@@ -289,6 +309,12 @@
     if (runStatus === "FINALIZED") {
       setChecklistState("확정 완료", "확정된 실행의 결과와 계산 근거가 잠겼습니다.",
         "status-badge-review", "is-empty");
+      setBusy(false);
+      return;
+    }
+    if (finalizeButton.dataset.runFinalizable !== "true") {
+      setChecklistState("확정 대상 아님", "계약수동 실행은 확정할 수 없습니다. 같은 달 월 전체 실행(월간·확정전)에서 확정하세요.",
+        null, "is-empty");
       setBusy(false);
       return;
     }
@@ -303,7 +329,7 @@
     apiClient.request("/api/v1/validation-runs/" + runId + "/finalize-checklist")
       .then(function (envelope) {
         var checklist = envelope.data;
-        if (!checklist || !Array.isArray(checklist.conditions) || checklist.conditions.length !== 6) {
+        if (!checklist || !Array.isArray(checklist.conditions) || checklist.conditions.length !== CHECKLIST_CONDITION_COUNT) {
           throw new apiClient.ApiError({ message: "확정 조건 응답 형식이 올바르지 않습니다." }, envelope.requestId, 200);
         }
         renderChecklist(checklist);

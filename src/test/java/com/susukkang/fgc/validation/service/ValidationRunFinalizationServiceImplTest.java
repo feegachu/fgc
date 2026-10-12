@@ -53,7 +53,7 @@ class ValidationRunFinalizationServiceImplTest {
     }
 
     @Test
-    void returnsSixConditionsInCanonicalOrderAndLabels() {
+    void returnsEightConditionsInCanonicalOrderAndLabels() {
         FinalizeChecklistCounts counts = passingCounts();
         counts.setJournalImbalanceCount(2);
         when(validationRunRepository.findFinalizeChecklistCounts(44L)).thenReturn(Optional.of(counts));
@@ -61,14 +61,16 @@ class ValidationRunFinalizationServiceImplTest {
         FinalizeChecklistResponse response = service.getChecklist(44L);
 
         assertThat(response.passed()).isFalse();
-        assertThat(response.conditions()).extracting("no").containsExactly(1, 2, 3, 4, 5, 6);
+        assertThat(response.conditions()).extracting("no").containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
         assertThat(response.conditions()).extracting("label").containsExactly(
                 "검증 실행 상태가 계산완료(COMPLETED)인가",
                 "원장 불균형(차변≠대변)이 0건인가",
                 "심각도 긴급(CRITICAL) 미처리 예외가 0건인가",
                 "정책 없음 · 정책 중복이 0건인가",
                 "귀속합계 오류가 0건인가",
-                "계약별 상세 합계 = 실행 요약 합계인가");
+                "계약별 상세 합계 = 실행 요약 합계인가",
+                "같은 검증월의 가장 최근 실행인가",
+                "같은 검증월에 이미 확정된 실행이 없는가");
         assertThat(response.conditions().get(1).passed()).isFalse();
         assertThat(response.conditions().get(1).count()).isEqualTo(2);
         assertThat(response.conditions()).extracting("linkUrl").containsExactly(
@@ -78,7 +80,57 @@ class ValidationRunFinalizationServiceImplTest {
                 "/exceptions?validationMonth=2026-08-01&severity=CRITICAL&status=OPEN",
                 "/exceptions?validationMonth=2026-08-01&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN",
                 "/transactions?settlementMonth=2026-08&attributionImbalanceOnly=true",
+                "/validation-runs/44",
+                // 더 최근 실행이 없으면 자기 자신
+                "/validation-runs/44",
+                // 이미 확정된 실행이 없으면 자기 자신
                 "/validation-runs/44");
+    }
+
+    // 2026-10-12 yslee - #494 확정은 그 달을 대표하는 한 건 — 이미 확정된 달의 재검증 실행은 확정하지 않는다
+    // 바로가기는 비교 기준인 이미 확정된 실행으로 보낸다
+    @Test
+    void rejectsRunWhenTheMonthIsAlreadyFinalizedAndLinksToFinalizedRun() {
+        FinalizeChecklistCounts counts = passingCounts();
+        counts.setFinalizedRunCount(1);
+        counts.setFinalizedRunId(40L);
+        when(validationRunRepository.findFinalizeChecklistCounts(44L)).thenReturn(Optional.of(counts));
+        when(validationRunRepository.findByIdForUpdate(44L)).thenReturn(Optional.of(run(ValidationRunStatus.COMPLETED, 8)));
+
+        FinalizeChecklistResponse checklist = service.getChecklist(44L);
+
+        assertThat(checklist.conditions().get(7).passed()).isFalse();
+        assertThat(checklist.conditions().get(7).linkUrl()).isEqualTo("/validation-runs/40");
+        assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "finalize-44"))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_002);
+                    assertThat(exception.getParams()).containsEntry("n", 1L);
+                });
+        verify(validationRunRepository, never()).finalizeIfCompleted(any(), any(), any(), any(), any());
+    }
+
+    // 2026-10-11 yslee - #491 같은 검증월의 더 최근 실행이 있으면 이전 실행 확정 차단
+    // 바로가기는 확정해야 할 가장 최근 실행으로 보낸다
+    @Test
+    void rejectsSupersededRunAndLinksToLatestRun() {
+        FinalizeChecklistCounts counts = passingCounts();
+        counts.setSupersededRunCount(2);
+        counts.setLatestRunId(46L);
+        when(validationRunRepository.findFinalizeChecklistCounts(44L)).thenReturn(Optional.of(counts));
+        when(validationRunRepository.findByIdForUpdate(44L)).thenReturn(Optional.of(run(ValidationRunStatus.COMPLETED, 8)));
+
+        FinalizeChecklistResponse checklist = service.getChecklist(44L);
+
+        assertThat(checklist.passed()).isFalse();
+        assertThat(checklist.conditions().get(6).passed()).isFalse();
+        assertThat(checklist.conditions().get(6).count()).isEqualTo(2);
+        assertThat(checklist.conditions().get(6).linkUrl()).isEqualTo("/validation-runs/46");
+        assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "finalize-44"))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_002);
+                    assertThat(exception.getParams()).containsEntry("n", 1L);
+                });
+        verify(validationRunRepository, never()).finalizeIfCompleted(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -222,10 +274,14 @@ class ValidationRunFinalizationServiceImplTest {
     }
 
     private ValidationRun run(ValidationRunStatus status, int currentStep) {
+        return run(status, currentStep, "MONTHLY");
+    }
+
+    private ValidationRun run(ValidationRunStatus status, int currentStep, String runType) {
         ValidationRun run = ValidationRun.builder()
                 .validationMonth(LocalDate.of(2026, 8, 1))
                 .runNo(1)
-                .runType("MONTHLY")
+                .runType(runType)
                 .build();
         ReflectionTestUtils.setField(run, "validationRunId", 44L);
         ReflectionTestUtils.setField(run, "status", status);
@@ -241,5 +297,35 @@ class ValidationRunFinalizationServiceImplTest {
         row.setFinalizedBy("gaadmin");
         row.setFinalizeIdempotencyKey(idempotencyKey);
         return row;
+    }
+
+    // 2026-10-12 yslee - #494 계약수동(MANUAL_CONTRACT) 실행은 COMPLETED/8 이어도 확정하지 않는다
+    // 체크리스트·월 잠금에 닿기 전에 거부한다
+    @Test
+    void rejectsManualContractRunBeforeChecklistAndMonthLock() {
+        when(validationRunRepository.findByIdForUpdate(44L))
+                .thenReturn(Optional.of(run(ValidationRunStatus.COMPLETED, 8, "MANUAL_CONTRACT")));
+
+        assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "finalize-44"))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_004);
+                    assertThat(exception.getParams()).containsEntry("from", "계약수동 실행");
+                });
+        verify(validationRunRepository, never()).lockValidationMonth(any());
+        verify(validationRunRepository, never()).findFinalizeChecklistCounts(any());
+        verify(validationRunRepository, never()).finalizeIfCompleted(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void finalizesPreConfirmRunLikeMonthly() {
+        when(validationRunRepository.findByIdForUpdate(44L))
+                .thenReturn(Optional.of(run(ValidationRunStatus.COMPLETED, 8, "PRE_CONFIRM")));
+        when(validationRunRepository.findFinalizeChecklistCounts(44L)).thenReturn(Optional.of(passingCounts()));
+        when(validationRunRepository.finalizeIfCompleted(
+                44L, 7L, null, ValidationRunStatus.COMPLETED, ValidationRunStatus.FINALIZED))
+                .thenReturn(1);
+        when(validationRunRepository.findFinalizationById(44L)).thenReturn(Optional.of(finalized(null)));
+
+        assertThat(service.finalizeRun(44L, 7L, null).status()).isEqualTo("FINALIZED");
     }
 }

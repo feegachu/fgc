@@ -200,6 +200,9 @@ public class ScheduleService {
             );
         }
 
+        // #432: 계약과 두 지급단계의 정책은 계약 잠금을 획득한 뒤 조회한다.
+        Long lockedContractId = scheduleWriteRepository.lockContractForScheduleGeneration(contractId);
+
         // 계약 존재 여부 확인
         InsuranceContract savedContract = insuranceContractRepository
                 .findById(contractId)
@@ -224,9 +227,6 @@ public class ScheduleService {
                     resolvePolicyOrRegisterReview(contractId, paymentStage)
             );
         }
-
-        Long lockedContractId =
-                scheduleWriteRepository.lockContractForScheduleGeneration(contractId);
 
         if (!Objects.equals(lockedContractId, contractId)) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500);
@@ -272,6 +272,8 @@ public class ScheduleService {
         if (contractId == null) {
             throw validationException("contractId", "계약 ID가 존재하지 않습니다.");
         }
+
+        scheduleWriteRepository.lockContractForScheduleGeneration(contractId);
 
         List<Long> activeScheduleIds =
                 scheduleQueryRepository.selectActiveOperationalScheduleIds(contractId);

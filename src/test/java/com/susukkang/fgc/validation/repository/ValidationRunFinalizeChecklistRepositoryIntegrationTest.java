@@ -1,4 +1,4 @@
-package com.susukkang.fgc.validation.mapper;
+package com.susukkang.fgc.validation.repository;
 
 import com.susukkang.fgc.validation.dto.FinalizeChecklistCounts;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 요구사항 : FGC-FUN-044 검증 결과 확정·잠금
  *
- * 설명 : IF-API-50 확정 체크리스트 PostgreSQL 통합 테스트
+ * 설명 : IF-API-50 확정 체크리스트 Repository PostgreSQL 통합 테스트
+ * 실제 확정 경로의 네이티브 SQL과 SqlResultSetMapping을 직접 검증한다(#493).
  *
  * @author yslee
  * @since 2026-08-19
@@ -25,12 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @Transactional
-class ValidationRunFinalizeChecklistMapperIntegrationTest {
+class ValidationRunFinalizeChecklistRepositoryIntegrationTest {
 
     private static final LocalDate TEST_MONTH = LocalDate.of(2088, 1, 1);
 
     @Autowired
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -66,7 +67,8 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
         insertCapMismatch(currentRunId, contractId);
         insertCapMismatch(otherRunId, contractId);
 
-        FinalizeChecklistCounts counts = validationRunMapper.findFinalizeChecklistCounts(currentRunId);
+        FinalizeChecklistCounts counts = validationRunRepository.findFinalizeChecklistCounts(currentRunId)
+                .orElseThrow();
 
         assertThat(counts.getIncompleteRunCount()).isZero();
         assertThat(counts.getJournalImbalanceCount()).isEqualTo(1);
@@ -83,7 +85,8 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
     void reportsStateConditionAsOneFailureForNonCompletedRun() {
         Long runId = createRunningRun(TEST_MONTH.plusMonths(2));
 
-        FinalizeChecklistCounts counts = validationRunMapper.findFinalizeChecklistCounts(runId);
+        FinalizeChecklistCounts counts = validationRunRepository.findFinalizeChecklistCounts(runId)
+                .orElseThrow();
 
         assertThat(counts.getIncompleteRunCount()).isEqualTo(1);
     }
@@ -102,10 +105,71 @@ class ValidationRunFinalizeChecklistMapperIntegrationTest {
         insertCapDetails(insertCapCheck(mismatchRunId, contractId, "1.00"), "0.50", "0.50");
         insertCapDetails(insertCapCheck(matchedRunId, contractId, "2.00"), "0.50", "0.50");
 
-        assertThat(validationRunMapper.findFinalizeChecklistCounts(mismatchRunId)
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(mismatchRunId).orElseThrow()
                 .getCapDetailMismatchCount()).isEqualTo(1);
-        assertThat(validationRunMapper.findFinalizeChecklistCounts(matchedRunId)
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(matchedRunId).orElseThrow()
                 .getCapDetailMismatchCount()).isZero();
+    }
+
+    // 2026-10-11 yslee - #491 조건 7: 같은 검증월의 더 최근 월 전체 실행 수
+    // 뒤 실행은 상태를 가리지 않고(FAILED 포함) 세고, 일일 배치(MANUAL_CONTRACT)와 다른 달은 세지 않는다
+    @Test
+    void countsNewerWholeMonthRunsOfAnyStatusButNotDailyRunsOrOtherMonths() {
+        LocalDate month = TEST_MONTH.plusMonths(5);
+        Long oldest = createCompletedRun(month);
+        // DB 상태전이 가드상 FAILED 는 RUNNING 에서만 갈 수 있다
+        Long failedNewer = createRunningRun(month);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status = 'FAILED' WHERE validation_run_id = ?",
+                failedNewer);
+        Long latest = createCompletedRun(month);
+        insertRun(month, "MANUAL_CONTRACT");
+        insertRun(month.plusMonths(1), "MONTHLY");
+
+        FinalizeChecklistCounts oldestCounts = validationRunRepository.findFinalizeChecklistCounts(oldest)
+                .orElseThrow();
+        FinalizeChecklistCounts latestCounts = validationRunRepository.findFinalizeChecklistCounts(latest)
+                .orElseThrow();
+
+        assertThat(oldestCounts.getSupersededRunCount()).isEqualTo(2);
+        assertThat(oldestCounts.getLatestRunId()).isEqualTo(latest);
+        assertThat(latestCounts.getSupersededRunCount()).isZero();
+        assertThat(latestCounts.getLatestRunId()).isNull();
+    }
+
+    // 2026-10-12 yslee - #494 조건 8: 같은 검증월에 이미 FINALIZED 인 다른 실행 수
+    // 유형은 가리지 않고, 자기 자신과 다른 달은 세지 않는다
+    @Test
+    void countsOtherFinalizedRunsInTheSameMonthOnly() {
+        LocalDate month = TEST_MONTH.plusMonths(6);
+        Long finalized = createCompletedRun(month);
+        jdbcTemplate.update("""
+                UPDATE fgc.validation_run
+                   SET status = 'FINALIZED', current_step = 10, finalized_at = clock_timestamp()
+                 WHERE validation_run_id = ?
+                """, finalized);
+        Long revalidation = createCompletedRun(month);
+        Long otherMonth = createCompletedRun(month.plusMonths(1));
+
+        FinalizeChecklistCounts revalidationCounts = validationRunRepository
+                .findFinalizeChecklistCounts(revalidation).orElseThrow();
+        FinalizeChecklistCounts finalizedCounts = validationRunRepository
+                .findFinalizeChecklistCounts(finalized).orElseThrow();
+        FinalizeChecklistCounts otherMonthCounts = validationRunRepository
+                .findFinalizeChecklistCounts(otherMonth).orElseThrow();
+
+        assertThat(revalidationCounts.getFinalizedRunCount()).isEqualTo(1);
+        assertThat(revalidationCounts.getFinalizedRunId()).isEqualTo(finalized);
+        assertThat(finalizedCounts.getFinalizedRunCount()).isZero();
+        assertThat(otherMonthCounts.getFinalizedRunCount()).isZero();
+        assertThat(otherMonthCounts.getFinalizedRunId()).isNull();
+    }
+
+    private Long insertRun(LocalDate month, String runType) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
+                VALUES (?, ?, ?)
+                RETURNING validation_run_id
+                """, Long.class, month, ThreadLocalRandom.current().nextInt(1, 1_000_000), runType);
     }
 
     private Long createCompletedRun(LocalDate month) {

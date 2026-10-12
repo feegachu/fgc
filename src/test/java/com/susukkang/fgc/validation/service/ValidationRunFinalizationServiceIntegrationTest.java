@@ -88,6 +88,35 @@ class ValidationRunFinalizationServiceIntegrationTest {
                 String.class, runId)).isEqualTo("COMPLETED");
     }
 
+    // 2026-10-11 yslee - #491 같은 달을 다시 검증했으면 이전 실행은 확정할 수 없고 최신 실행만 확정된다
+    // (확정에 실제로 쓰이는 ValidationRunRepository 네이티브 쿼리 경로)
+    @Test
+    @WithMockUser(username = "admin", roles = "SYSTEM_ADMIN")
+    void rejectsSupersededRunAndFinalizesOnlyTheLatestRunOfTheMonth() {
+        LocalDate month = LocalDate.of(2087, 4, 1);
+        Long olderRunId = createCompletedRun(month);
+        Long latestRunId = createCompletedRun(month);
+        Long userId = systemAdminUserId();
+
+        assertThat(validationRunFinalizationService.getChecklist(olderRunId).conditions().get(6))
+                .satisfies(condition -> {
+                    assertThat(condition.passed()).isFalse();
+                    assertThat(condition.linkUrl()).isEqualTo("/validation-runs/" + latestRunId);
+                });
+        assertThatThrownBy(() -> validationRunFinalizationService.finalizeRun(
+                olderRunId, userId, "FUN044-SUPERSEDED-" + UUID.randomUUID()))
+                .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_002);
+                    assertThat(exception.getParams()).containsEntry("n", 1L);
+                });
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.validation_run WHERE validation_run_id = ?",
+                String.class, olderRunId)).isEqualTo("COMPLETED");
+
+        assertThat(validationRunFinalizationService.finalizeRun(
+                latestRunId, userId, "FUN044-LATEST-" + UUID.randomUUID()).status()).isEqualTo("FINALIZED");
+    }
+
     @Test
     @WithMockUser(username = "settle01", roles = "SETTLEMENT")
     void serviceLayerAlsoRejectsSettlementRole() {

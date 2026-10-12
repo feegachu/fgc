@@ -58,8 +58,8 @@
     <span class="material-symbols-rounded guidance-icon" aria-hidden="true">gavel</span>
     <div>
       <p>
-        <strong id="notice-finalize">확정하면 이 실행의 결과는 고칠 수 없습니다.</strong>
-        바로잡으려면 새 실행을 만들어야 합니다. (운영정책서 제43조)
+        <strong id="notice-finalize">확정하면 이 실행의 결과는 고칠 수 없고, 같은 달은 다시 확정할 수 없습니다.</strong>
+        확정 뒤 같은 달을 다시 검증한 실행은 확정 결과와 비교하는 용도로만 남습니다. (운영정책서 제43·44조)
       </p>
     </div>
   </div>
@@ -363,7 +363,7 @@
   <!-- ⑤ 확정 조건 체크리스트 — IF-API-50 응답의 문서 순서·문구를 그대로 표시한다. -->
   <section class="surface" aria-labelledby="vrun-checklist-title">
     <header class="surface-header">
-      <h2 class="surface-title" id="vrun-checklist-title">⑤ 확정 조건 (운영정책서 제44조 · 6개 전부 통과해야 함)</h2>
+      <h2 class="surface-title" id="vrun-checklist-title">⑤ 확정 조건 (운영정책서 제44조 · 8개 전부 통과해야 함)</h2>
       <span id="cond-summary" class="vrun-card-note">확인 중</span>
     </header>
     <div class="surface-body" id="cond-body" aria-live="polite" aria-busy="true">
@@ -381,10 +381,10 @@
         <!-- 문제: aria-describedby가 빈 p를 가리켜 접근성 안내가 제공되지 않고 확정을 송금 마감으로 오인할 수 있음 -->
         <!-- 개선: 단일 안내 요소에 검증 결과 잠금이며 실제 송금·회계 마감이 아니라는 고정 문구를 표시 -->
         <p class="field-helper vrun-finalize-guide" id="finalize-action-guide">
-          위 6개 조건이 모두 통과한 실행만 확정할 수 있습니다.<br>
+          위 8개 조건이 모두 통과한 실행만 확정할 수 있습니다. 확정은 한 달에 한 건이며, 같은 달을 다시 검증했다면 가장 최근 실행을 확정합니다.<br>
           확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 <strong>잠깁니다</strong>.
           <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong><br>
-          <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요.
+          <strong>되돌릴 수 없습니다.</strong> 확정 뒤 같은 달을 다시 검증하면, 그 실행은 확정 결과와 비교만 할 수 있습니다.
           확정 권한은 <span class="tabular-nums">GA_ADMIN</span> · <span class="tabular-nums">SYSTEM_ADMIN</span> 에게만 있습니다.
         </p>
         <!-- 비활성 사유를 가시 텍스트로 둔다 — disabled 버튼은 포커스가 가지 않아 title 로는 닿지 않는다. -->
@@ -397,7 +397,7 @@
       <!-- 서버 권한과 IF-API-50 체크리스트가 모두 통과해야 스크립트가 활성화한다. -->
       <button class="button button-primary" id="btn-finalize" type="button" data-fgc-action="finalize" disabled
               data-checklist-passed="false"
-              th:attr="data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}"
+              th:attr="data-can-finalize=${roleCode == 'GA_ADMIN' or roleCode == 'SYSTEM_ADMIN'}, data-run-finalizable=${detail.header().runType().isFinalizable()}"
               aria-describedby="finalize-action-guide finalize-action-note">
         <span class="material-symbols-rounded" aria-hidden="true">lock</span><span id="btn-finalize-label">확정</span>
       </button>

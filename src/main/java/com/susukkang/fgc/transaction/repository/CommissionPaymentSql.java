@@ -38,7 +38,8 @@ final class CommissionPaymentSql {
                   ta.allocation_basis_snapshot ->> 'allocationBasis' AS allocation_basis,
                   COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
                   ta.attribution_method,
-                  c.contract_date
+                  c.contract_date,
+                  ct.cashflow_type
              FROM fgc.commission_transaction ct
              JOIN fgc.commission_item ci
                ON ci.commission_item_id = ct.commission_item_id

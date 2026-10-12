@@ -31,4 +31,8 @@ public class ArbitrageCalculationSource {
     private BigDecimal surrenderValue; // 실제 해약환급금
     private String surrenderValueType; // 금융 스냅샷 환급금 유형
     private Long snapshotRefundRateTableId; // 금융 스냅샷의 환급률표 ID
+    private Long financialSnapshotId; // 계산에 실제 사용한 스냅샷 ID
+    private Integer financialSnapshotVersion; // 동일 업무 기준일·유형의 버전
+    private Long previousFinancialSnapshotId; // 직전 정정 버전 ID
+    private String financialSnapshotSourceRef; // 실제/시드/수기 합성 출처
 }

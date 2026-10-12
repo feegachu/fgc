@@ -29,26 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    services:
-      postgres:
-        image: postgres:17          # docker-compose.yml과 동일 버전 (FGC-ECR-003)
-        env:
-          POSTGRES_DB: fgc
-          POSTGRES_USER: fgc
-          POSTGRES_PASSWORD: fgc_local_only   # 로컬/CI 전용. 실제 비밀번호가 아님
-          TZ: Asia/Seoul
-        # docker-compose.yml은 "5433:5432"인데 여기가 5432인 건 의도된 차이다.
-        # 왼쪽은 호스트 포트일 뿐이고 컨테이너 안 PostgreSQL은 양쪽 다 5432로 뜬다.
-        # 로컬이 5433인 이유는 개발자 PC에 이미 깔린 PostgreSQL(5432)과 겹치지 않게
-        # 비키는 것이고, 러너는 매번 새 VM이라 5432가 비어 있어 피할 이유가 없다.
-        # ⚠️ 이 값을 바꾸면 아래 SPRING_DATASOURCE_URL의 포트도 같이 바꿔야 한다.
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U fgc -d fgc"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+    # DB는 서비스 컨테이너가 아니라 test 프로필의 Testcontainers(jdbc:tc:postgresql:17)가 띄운다.
+    # 로컬과 같은 설정 하나(application-test.yml)만 쓰며, 시드 위치(db/migration+db/demo)도 거기 있다.
+    # 테스트 fork 병렬(maxParallelForks=2)은 PR #502에서 측정했으나 4코어 러너에서 :test 시간이 줄지 않아 넣지 않았다.
 
     steps:
       - name: Checkout
@@ -65,15 +48,6 @@ jobs:
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
       - name: Build and test
-        env:
-          # 위 services가 띄운 컨테이너를 그대로 가리킨다.
-          # 값이 이 파일에 이미 평문으로 있으므로 secrets로 감출 실익이 없다.
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/fgc
-          SPRING_DATASOURCE_USERNAME: fgc
-          SPRING_DATASOURCE_PASSWORD: fgc_local_only
-          # 시드까지 올려야 통합테스트가 돈다.
-          # migration/demo 간 버전 중복도 여기서 걸린다 (PR #30 재발 방지).
-          SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
         run: ./gradlew build
 
       # Dependabot/fork PR의 토큰은 read-only이므로, 권한 있는 별도 workflow_run이
@@ -140,3 +114,58 @@ jobs:
       - run: npm test -- --run
       # tsc -b(타입 검사) 후 vite build
       - run: npm run build
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: [build, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io/feegachu/fgc
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build both images
+        run: |
+          set -euo pipefail
+          # docker build는 .containerignore를 읽지 않는다 (위 주의 참고)
+          cp .containerignore .dockerignore
+          for app in api web; do
+            docker build --pull \
+              --label org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}" \
+              --label org.opencontainers.image.revision="$GITHUB_SHA" \
+              -f "Containerfile.$app" -t "$REGISTRY/$app:sha-$GITHUB_SHA" .
+          done
+      - name: Scan API
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/feegachu/fgc/api:sha-${{ github.sha }}
+          severity: CRITICAL
+          exit-code: '1'
+          ignore-unfixed: false
+          trivyignores: .trivyignore
+          format: table
+      - name: Scan WEB
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/feegachu/fgc/web:sha-${{ github.sha }}
+          severity: CRITICAL
+          exit-code: '1'
+          ignore-unfixed: false
+          trivyignores: .trivyignore
+          format: table
+      - name: Push only after both scans pass
+        run: |
+          set -euo pipefail
+          for app in api web; do
+            docker push "$REGISTRY/$app:sha-$GITHUB_SHA"
+          done

@@ -86,7 +86,7 @@ test('COMPLIANCE의 지급 등록 딥링크는 403으로 차단한다', async ({
   await authFixture(page, 'COMPLIANCE')
   await page.goto('login?redirect=%2Ftransactions%2Fnew')
   await login(page)
-  await expect(page.getByRole('heading', { name: '접근 권한이 없습니다.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
   await expect(page.getByRole('link', { name: '기존 화면으로 이동' })).toHaveCount(0)
 })
 

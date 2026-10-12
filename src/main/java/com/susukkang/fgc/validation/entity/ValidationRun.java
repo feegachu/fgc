@@ -49,7 +49,13 @@ import java.time.OffsetDateTime;
                 @ColumnResult(name = "unresolvedCriticalExceptionCount", type = Long.class),
                 @ColumnResult(name = "unresolvedPolicyExceptionCount", type = Long.class),
                 @ColumnResult(name = "attributionImbalanceCount", type = Long.class),
-                @ColumnResult(name = "capDetailMismatchCount", type = Long.class)
+                @ColumnResult(name = "capDetailMismatchCount", type = Long.class),
+                // #491 조건 7 — FinalizeChecklistCounts 생성자(@AllArgsConstructor) 필드 순서와 같아야 한다
+                @ColumnResult(name = "supersededRunCount", type = Long.class),
+                @ColumnResult(name = "latestRunId", type = Long.class),
+                // #494 조건 8 — 같은 순서로 FinalizeChecklistCounts 끝에 붙는다
+                @ColumnResult(name = "finalizedRunCount", type = Long.class),
+                @ColumnResult(name = "finalizedRunId", type = Long.class)
         }
 ))
 @SqlResultSetMapping(name = "ValidationRunResultSummaryRowMapping", classes = @ConstructorResult(

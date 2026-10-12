@@ -157,7 +157,7 @@ describe('AUDT-W01 감사로그 조회', () => {
 
   it('SETTLEMENT 는 403 화면을 보고 감사로그 API 를 부르지 않는다', async () => {
     renderAt('/audit-logs', 'SETTLEMENT')
-    expect(await screen.findByRole('heading', { name: '접근 권한이 없습니다.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
     expect(requested.filter((url) => url.startsWith('/api/v1/audit-logs'))).toEqual([])
   })
 
