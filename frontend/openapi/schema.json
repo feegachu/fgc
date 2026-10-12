@@ -2566,12 +2566,14 @@
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
           },
+          "contractStatusLabel" : {
+            "type" : "string"
+          },
           "dataOrigin" : {
             "enum" : [ "SEED", "NORMALIZED_DB", "MANUAL" ],
             "type" : "string"
           },
-          "updatedAt" : {
-            "format" : "date-time",
+          "dataOriginLabel" : {
             "type" : "string"
           },
           "firstPremiumAmount" : {
@@ -2601,6 +2603,9 @@
             "enum" : [ "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "SINGLE", "OTHER" ],
             "type" : "string"
           },
+          "paymentCycleCodeLabel" : {
+            "type" : "string"
+          },
           "paymentTermMonths" : {
             "format" : "int32",
             "type" : "integer"
@@ -2617,6 +2622,10 @@
           },
           "standardSurrenderDeductionAmount" : {
             "type" : "number"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -2855,8 +2864,14 @@
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
           },
+          "newStatusLabel" : {
+            "type" : "string"
+          },
           "previousStatus" : {
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "previousStatusLabel" : {
             "type" : "string"
           },
           "processings" : {
@@ -3066,6 +3081,9 @@
             "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED" ],
             "type" : "string"
           },
+          "capResultStatusLabel" : {
+            "type" : "string"
+          },
           "contractDate" : {
             "format" : "date",
             "type" : "string"
@@ -3081,8 +3099,14 @@
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
           },
+          "contractStatusLabel" : {
+            "type" : "string"
+          },
           "dataOrigin" : {
             "enum" : [ "SEED", "NORMALIZED_DB", "MANUAL" ],
+            "type" : "string"
+          },
+          "dataOriginLabel" : {
             "type" : "string"
           },
           "insurerName" : {

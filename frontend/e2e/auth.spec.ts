@@ -4,6 +4,10 @@ import type { Page } from '@playwright/test'
 // #404 UI 계약 검증. 실제 JWT 서명·DB 세션 무효화 시연은 #418 실서버 시나리오로 인계한다.
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'auth-ui-fixture' })
 async function authFixture(page: Page, roleCode = 'SETTLEMENT', session = { version: 0 }, initial = false) {
+  // 인증 시나리오의 가짜 토큰이 실제 업무 서버로 전달되지 않게 조회도 격리한다.
+  await page.route('**/api/v1/contracts?**', route => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
+  await page.route('**/api/v1/base/**', route => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
+  await page.route('**/api/v1/dashboard/**', route => route.fulfill({ json: envelope({ recentExceptions: [], recentRuns: [] }) }))
   let issued = initial ? ++session.version : 0
   let expired = false
   const token = () => envelope({ accessToken: `fixture-${issued}`, tokenType: 'Bearer', expiresIn: 1800 })

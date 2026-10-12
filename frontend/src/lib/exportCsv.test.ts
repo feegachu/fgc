@@ -4,7 +4,10 @@ import { apiClient } from './api/client'
 import { subscribeApiErrors } from './api/errorNotifications'
 import { ApiError } from './api/errors'
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 it('Content-Disposition 일반·UTF-8 파일명을 해석한다', () => {
   expect(csvFilename('attachment; filename="contracts.csv"')).toBe('contracts.csv')
   expect(csvFilename("attachment; filename=plain.csv; filename*=UTF-8''%EA%B3%84%EC%95%BD.csv")).toBe('계약.csv')
@@ -41,10 +44,37 @@ it('오류 봉투는 공통 Toast 연결점에 전달한 뒤 호출자에게 반
   unsubscribe()
 })
 it('CSV는 text/csv로 요청하고 JSON 실패를 ApiError로 반환한다', async () => {
-  const fetcher = vi.fn().mockResolvedValue(new Response('id\n1', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=x.csv' } }))
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue(
+      new Response('id\n1', {
+        headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=x.csv' },
+      }),
+    )
   vi.stubGlobal('fetch', fetcher)
   expect((await apiClient.requestBlob('/api/v1/contracts/export')).disposition).toContain('x.csv')
   expect(new Headers(fetcher.mock.calls[0][1].headers).get('Accept')).toBe('text/csv')
-  fetcher.mockResolvedValue(Response.json({ data: null, error: { code: 'FGC-CONT-001', message: '실패' }, requestId: 'x' }, { status: 400 }))
-  await expect(apiClient.requestBlob('/api/v1/contracts/export')).rejects.toMatchObject({ code: 'FGC-CONT-001', requestId: 'x', status: 400 })
+  fetcher.mockResolvedValue(
+    Response.json({ data: null, error: { code: 'FGC-CONT-001', message: '실패' }, requestId: 'x' }, { status: 400 }),
+  )
+  await expect(apiClient.requestBlob('/api/v1/contracts/export')).rejects.toMatchObject({
+    code: 'FGC-CONT-001',
+    requestId: 'x',
+    status: 400,
+  })
+})
+it('화면이 오류를 처리하면 공통 Toast를 중복 발행하지 않는다', async () => {
+  const error = new ApiError({ code: 'FGC-COMMON-500', message: 'internal CSV error' }, 'csv-500', 500)
+  const request = vi.spyOn(apiClient, 'requestBlob').mockRejectedValue(error)
+  const listener = vi.fn()
+  const unsubscribe = subscribeApiErrors(listener)
+  try {
+    await expect(
+      exportCsv('/api/v1/contracts/export.csv', { filename: 'contracts.csv', notifyError: false }),
+    ).rejects.toBe(error)
+    expect(listener).not.toHaveBeenCalled()
+    expect(request).toHaveBeenCalledWith('/api/v1/contracts/export.csv', {})
+  } finally {
+    unsubscribe()
+  }
 })

@@ -30,4 +30,17 @@ public class ContractView {
     private ContractStatus contractStatus; //계약 상태
     private CapResultStatus capResultStatus; //1200% 판정
     private DataOrigin dataOrigin; //데이터 출처
+
+    /** SIR-008: 조회 화면은 서버 enum의 한글 라벨을 우선 사용한다. */
+    public String getContractStatusLabel() {
+        return contractStatus == null ? null : contractStatus.label();
+    }
+
+    public String getCapResultStatusLabel() {
+        return capResultStatus == null ? null : capResultStatus.label();
+    }
+
+    public String getDataOriginLabel() {
+        return dataOrigin == null ? null : dataOrigin.label();
+    }
 }

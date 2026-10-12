@@ -152,13 +152,13 @@ describe('AUTH-W01 로그인', () => {
     const { router, actions } = renderAt('/app/login?reason=duplicate&redirect=%2Fcontracts%3Fmonth%3D2026-07')
     expect(screen.getByRole('status')).toHaveTextContent(authMessages.superseded)
     await enterCredentials(actions)
-    await screen.findByRole('heading', { name: '보험계약' })
+    await screen.findByRole('heading', { name: '보험계약 목록' })
     expect(router.state.location.pathname).toBe('/app/contracts')
   })
 
   it('로그아웃은 토큰·캐시·워크스페이스를 지우고 뒤로 가도 보호 화면을 열지 않는다', async () => {
     const { router, client, actions } = renderAt('/app/contracts', true)
-    await screen.findByRole('heading', { name: '보험계약' })
+    await screen.findByRole('heading', { name: '보험계약 목록' })
     await act(() => router.navigate('/transactions?month=2026-07'))
     await screen.findByRole('heading', { name: '수수료 지급' })
     client.setQueryData(['private'], 'secret')
@@ -180,7 +180,7 @@ describe('AUTH-W01 로그인', () => {
       throw new Error('network')
     })
     const { actions } = renderAt('/app/contracts', true)
-    await screen.findByRole('heading', { name: '보험계약' })
+    await screen.findByRole('heading', { name: '보험계약 목록' })
     await actions.click(screen.getByRole('button', { name: '로그아웃' }))
     expect(await screen.findByRole('button', { name: '로그아웃 다시 시도' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent(authMessages.logoutFailed)
@@ -191,7 +191,7 @@ describe('AUTH-W01 로그인', () => {
 
   it('인증이 사라지면 캐시를 비우고 보호 화면 경로를 보존한다', async () => {
     const { router, client } = renderAt('/app/contracts?month=2026-07', true)
-    await screen.findByRole('heading', { name: '보험계약' })
+    await screen.findByRole('heading', { name: '보험계약 목록' })
     client.setQueryData(['private'], 'secret')
     act(() => useAuthStore.getState().setAccessToken(null))
     await screen.findByRole('heading', { name: '로그인' })

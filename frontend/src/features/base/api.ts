@@ -66,11 +66,7 @@ export function useCommissionItems(asOf: string, enabled = true) {
   })
 }
 // Dropdowns must include every page; preserve activeYn so input screens can disable inactive options.
-export async function getAllBaseOptions<K extends 'organizations' | 'insurers'>(
-  kind: K,
-  criteria: BaseCriteria,
-  signal?: AbortSignal,
-) {
+export async function getAllBaseOptions<K extends keyof Pages>(kind: K, criteria: BaseCriteria, signal?: AbortSignal) {
   const rows: NonNullable<Pages[K]['content']> = []
   let page = 1
   let totalPages: number
@@ -95,6 +91,22 @@ export function useOrganizationOptions(asOf: string, enabled = true) {
   return useQuery({
     queryKey: ['base', 'organizations', 'options', asOf],
     queryFn: ({ signal }) => getAllBaseOptions('organizations', { asOf }, signal),
+    enabled: enabled && Boolean(asOf),
+    meta: { errorToast: false },
+  })
+}
+export function useProductOptions(asOf: string, insurerId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['base', 'products', 'options', asOf, insurerId],
+    queryFn: ({ signal }) => getAllBaseOptions('products', { asOf, insurerId }, signal),
+    enabled: enabled && Boolean(asOf && insurerId),
+    meta: { errorToast: false },
+  })
+}
+export function useAgentOptions(asOf: string, organizationId = '', enabled = true) {
+  return useQuery({
+    queryKey: ['base', 'agents', 'options', asOf, organizationId],
+    queryFn: ({ signal }) => getAllBaseOptions('agents', { asOf, organizationId }, signal),
     enabled: enabled && Boolean(asOf),
     meta: { errorToast: false },
   })

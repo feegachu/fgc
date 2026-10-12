@@ -2317,10 +2317,10 @@ export interface components {
             contractNo?: string;
             /** @enum {string} */
             contractStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            contractStatusLabel?: string;
             /** @enum {string} */
             dataOrigin?: "SEED" | "NORMALIZED_DB" | "MANUAL";
-            /** Format: date-time */
-            updatedAt?: string;
+            dataOriginLabel?: string;
             firstPremiumAmount?: number;
             /** Format: int64 */
             insurerId?: number;
@@ -2332,6 +2332,7 @@ export interface components {
             organizationName?: string;
             /** @enum {string} */
             paymentCycleCode?: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL" | "SINGLE" | "OTHER";
+            paymentCycleCodeLabel?: string;
             /** Format: int32 */
             paymentTermMonths?: number;
             premiumPerCycleAmount?: number;
@@ -2339,6 +2340,8 @@ export interface components {
             /** Format: int64 */
             productOfferingId?: number;
             standardSurrenderDeductionAmount?: number;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         ContractJournalLineResponse: {
             accountCode?: string;
@@ -2434,8 +2437,10 @@ export interface components {
             eventSeq?: number;
             /** @enum {string} */
             newStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            newStatusLabel?: string;
             /** @enum {string} */
             previousStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            previousStatusLabel?: string;
             processings?: components["schemas"]["ContractStatusEventProcessingResponse"][];
             /** Format: date-time */
             receivedAt?: string;
@@ -2509,6 +2514,7 @@ export interface components {
             agentIdName?: string;
             /** @enum {string} */
             capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            capResultStatusLabel?: string;
             /** Format: date */
             contractDate?: string;
             /** Format: int64 */
@@ -2516,8 +2522,10 @@ export interface components {
             contractNo?: string;
             /** @enum {string} */
             contractStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            contractStatusLabel?: string;
             /** @enum {string} */
             dataOrigin?: "SEED" | "NORMALIZED_DB" | "MANUAL";
+            dataOriginLabel?: string;
             insurerName?: string;
             monthlyEquivalentFirstPremium?: number;
             productName?: string;

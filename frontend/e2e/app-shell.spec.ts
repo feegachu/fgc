@@ -7,6 +7,9 @@ async function session(page: Page, roleCode = 'SETTLEMENT') {
     route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }),
   )
   await page.route('**/api/v1/policies**', (route) => route.fulfill({ json: envelope([]) }))
+  await page.route('**/api/v1/contracts?**', (route) =>
+    route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }),
+  )
   await page.route('**/api/v1/auth/refresh', (route) =>
     route.fulfill({ json: envelope({ accessToken: 'shell-fixture', tokenType: 'Bearer', expiresIn: 1800 }) }),
   )
@@ -28,7 +31,7 @@ for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
   test(`${role}: menu flags, collapse and restore`, async ({ page }) => {
     await session(page, role)
     await page.goto('contracts')
-    await expect(page.getByRole('heading', { name: '보험계약' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '보험계약 목록' })).toBeVisible()
     await page.locator('summary').filter({ hasText: '관리' }).click()
     await expect(page.locator('.sidebar-subnav-link').filter({ hasText: '감사로그' })).toHaveCount(
       ['COMPLIANCE', 'SYSTEM_ADMIN'].includes(role) ? 1 : 0,
