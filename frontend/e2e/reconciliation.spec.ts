@@ -64,6 +64,28 @@ test('비교 모달의 null 회차는 대시로 표시한다', async ({ page }) 
   await expect(page.getByRole('dialog')).not.toContainText('—회차')
 })
 
+test('상태 미확인 실행은 일괄 예외 버튼을 활성화하지 않는다', async ({ page }) => {
+  await historyFixture(page)
+  await page.goto('reconciliations?month=2026-07&runId=999')
+  await expect(page.getByRole('button', { name: '불일치 예외 일괄 생성' })).toBeDisabled()
+})
+
+test('화면 월 변경은 탭 영향 확인 후 취소하거나 명시적으로 적용한다', async ({ page }) => {
+  await historyFixture(page)
+  await page.goto('reconciliations?month=2026-07')
+  await page.locator('input[type="month"]').fill('2026-08')
+  await page.getByRole('button', { name: '조회', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '기준 정산월 변경 확인' })
+  await expect(dialog).toContainText('열린 업무 탭')
+  await dialog.getByRole('button', { name: '취소', exact: true }).click()
+  await expect(page).toHaveURL(/month=2026-07/)
+  await page.getByRole('button', { name: '조회', exact: true }).click()
+  const response = page.waitForResponse((res) => new URL(res.url()).searchParams.get('month') === '2026-08')
+  await dialog.getByRole('button', { name: '변경하고 조회' }).click()
+  expect((await response).ok()).toBe(true)
+  await expect(page).toHaveURL(/month=2026-08/)
+})
+
 test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외', async ({ page }) => {
   let created = false
   await page.route('**/api/v1/**', async (route) => {

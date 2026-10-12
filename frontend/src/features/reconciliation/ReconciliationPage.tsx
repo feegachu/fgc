@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
@@ -7,6 +7,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { KpiCard } from '../../components/KpiCard'
+import { Modal } from '../../components/Modal'
 import { Pagination } from '../../components/Pagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
@@ -164,10 +165,19 @@ export default function ReconciliationPage() {
   const client = useQueryClient()
   const canProcess = usePermission('canProcess')
   const [bulkMessage, setBulkMessage] = useState<{ runId: string; message: string } | null>(null)
+  const previousRun = useRef<{ id: string; status: string } | null>(null)
   useEffect(() => {
-    // 마지막 결과 폴링 직후 완료될 수 있으므로 완료 전이에 최종 결과를 한 번 더 받는다.
-    if (runId && (status === 'COMPLETED' || status === 'FINALIZED'))
+    const previous = previousRun.current
+    // 같은 실행의 진행 → 완료 전이에만 최종 결과를 갱신한다. 완료 실행 재선택은 일반 Query 조회에 맡긴다.
+    if (
+      runId &&
+      previous?.id === runId &&
+      (previous.status === 'RUNNING' || previous.status === 'CREATED') &&
+      (status === 'COMPLETED' || status === 'FINALIZED')
+    )
       void client.invalidateQueries({ queryKey: ['reconciliations', 'results', runId] })
+    if (runId && status) previousRun.current = { id: runId, status }
+    else if (!runId || previous?.id !== runId) previousRun.current = null
   }, [client, runId, status])
   const execution = useMutation({
     mutationFn: createRun,
@@ -239,10 +249,11 @@ export default function ReconciliationPage() {
             !runId ||
             bulk.isPending ||
             execution.isPending ||
-            (status != null && status !== 'COMPLETED' && status !== 'FINALIZED')
+            (status !== 'COMPLETED' && status !== 'FINALIZED')
           }
           onBulk={() => {
-            if (canProcess && runId && !bulk.isPending) bulk.mutate(runId)
+            if (canProcess && runId && !bulk.isPending && (status === 'COMPLETED' || status === 'FINALIZED'))
+              bulk.mutate(runId)
           }}
         />
         {!canProcess && (
@@ -316,7 +327,9 @@ export default function ReconciliationPage() {
                 ? '대사를 실행하거나 이력을 선택하면 결과가 여기 표시됩니다.'
                 : results.isPending
                   ? '대사 결과를 불러오는 중입니다.'
-                  : '조건에 맞는 자료가 없습니다.'
+                  : onlyMismatch && (results.data?.items?.content?.length ?? 0) > 0 && filteredRows.length === 0
+                    ? '이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.'
+                    : '조건에 맞는 자료가 없습니다.'
             }
           />
           {results.data?.summary && (
@@ -391,12 +404,19 @@ function RunFilters({
   })
   const insurers = useInsurerOptions()
   const insurer = insurers.data?.find((row) => String(row.insurerId) === fields.insurer)
+  const tabCount = useWorkspaceStore((state) => state.tabs.length)
+  const [monthAction, setMonthAction] = useState<{ kind: 'search' | 'run'; input: RunInput } | null>(null)
+  const submit = (kind: 'search' | 'run') => {
+    if (fields.month !== criteria.month) setMonthAction({ kind, input: { ...fields } })
+    else if (kind === 'search') onSearch(fields)
+    else onRun(fields)
+  }
   return (
     <>
       <FilterBar
         className="reco-react-filters"
         icons
-        onSubmit={() => onSearch(fields)}
+        onSubmit={() => submit('search')}
         actions={
           <>
             <Button
@@ -409,7 +429,7 @@ function RunFilters({
                 !insurer ||
                 insurer.activeYn === false
               }
-              onClick={() => onRun(fields)}
+              onClick={() => submit('run')}
             >
               대사 실행
             </Button>
@@ -448,6 +468,36 @@ function RunFilters({
         </Field>
       </FilterBar>
       <Failure error={insurers.error} />
+      {monthAction && (
+        <Modal
+          open
+          title="기준 정산월 변경 확인"
+          onClose={() => setMonthAction(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setMonthAction(null)}>
+                취소
+              </Button>
+              <Button
+                onClick={() => {
+                  const action = monthAction
+                  setMonthAction(null)
+                  if (action.kind === 'search') onSearch(action.input)
+                  else onRun(action.input)
+                }}
+              >
+                변경하고 {monthAction.kind === 'search' ? '조회' : '실행'}
+              </Button>
+            </>
+          }
+        >
+          <p>
+            기준 정산월을 {monthAction.input.month}로 변경합니다. 열린 업무 탭 {tabCount}개의 조회 기준도 함께
+            변경됩니다.
+          </p>
+          <p>취소하면 기준월을 변경하거나 대사 실행을 요청하지 않습니다.</p>
+        </Modal>
+      )}
     </>
   )
 }
@@ -461,7 +511,8 @@ function RunSummary({ summary }: { summary?: Summary }) {
         <KpiCard label="일치" value={summary ? int(summary.matchedCount) : EMPTY} unit="건" tone="success" />
         <KpiCard label="불일치" value={summary ? int(summary.exceptionCount) : EMPTY} unit="건" tone="error" />
         <KpiCard
-          label="일치율"
+          label="일치율 (건수 기준)"
+          footer="대상·일치 건수로 계산합니다. 이력은 서버 반올림 값이므로 표시가 다를 수 있습니다."
           value={matchRate}
           unit="%"
           tone={summary && summary.resultCount === summary.matchedCount ? 'success' : 'warning'}

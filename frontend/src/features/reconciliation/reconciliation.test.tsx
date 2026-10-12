@@ -125,12 +125,13 @@ function renderAt(path = '/reconciliations', handler?: Handler, role = 'SETTLEME
     return { data, error: null, requestId: 'reco-test' }
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, user: userEvent.setup() }
+  return { router, client, user: userEvent.setup() }
 }
 beforeAll(async () => {
   await import('./ReconciliationPage')
@@ -147,6 +148,77 @@ afterEach(() => {
 const bodyPosts = () =>
   calls.filter((call) => call.url === '/api/v1/reconciliations' && call.options?.method === 'POST')
 describe('RECO-W01·W02 React 전환', () => {
+  it('BOTH 원천은 예상·실제 양쪽의 올바른 원천 ID로 표시한다', async () => {
+    renderAt('/reconciliations?month=2026-07&resultId=7', (url) =>
+      url.endsWith('/results/7')
+        ? { ...result, matches: [{ ...result.matches![0], ...result.matches![1], matchRole: 'BOTH' }] }
+        : undefined,
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('예상 원천 1 · schedule_line #12')).toBeVisible()
+    expect(within(dialog).getByText('실제 원천 1 · commission_transaction #8')).toBeVisible()
+    expect(within(dialog).getAllByText('1개 원천')).toHaveLength(2)
+    expect(within(dialog).queryByText('예상 없음')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('실제 없음')).not.toBeInTheDocument()
+  })
+  it('이력에 없는 실행 상태는 일괄 예외 요청을 허용하지 않는다', async () => {
+    renderAt('/reconciliations?month=2026-07&runId=999', (url) =>
+      url.startsWith('/api/v1/reconciliations?') ? { ...history, content: [] } : undefined,
+    )
+    await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
+    const button = screen.getByRole('button', { name: '불일치 예외 일괄 생성' })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(calls.some((call) => call.options?.method === 'POST')).toBe(false)
+  })
+  it('완료 실행의 최초 조회는 완료 전이 무효화를 하지 않는다', async () => {
+    const { client } = renderAt('/reconciliations?month=2026-07&runId=41')
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
+    expect(invalidate).not.toHaveBeenCalled()
+    expect(calls.filter((call) => call.url.includes('/41/results'))).toHaveLength(1)
+  })
+  it('캐시가 있는 완료 실행을 재선택해도 별도의 완료 무효화를 하지 않는다', async () => {
+    const { client, user } = renderAt('/reconciliations?month=2026-07&runId=41', (url) =>
+      url.startsWith('/api/v1/reconciliations?')
+        ? { ...history, content: [run, { ...run, reconciliationRunId: 42 }] }
+        : undefined,
+    )
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
+    await user.click(screen.getByRole('button', { name: '42' }))
+    await waitFor(() => expect(calls.some((call) => call.url.includes('/42/results'))).toBe(true))
+    await user.click(screen.getByRole('button', { name: '41' }))
+    await waitFor(() => expect(calls.filter((call) => call.url.includes('/41/results'))).toHaveLength(2))
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+  it('현재 페이지가 전부 일치여도 전체 합계·다음 페이지를 유지하며 구체적으로 안내한다', async () => {
+    renderAt('/reconciliations?month=2026-07&runId=41&onlyMismatch=true', (url) =>
+      url.includes('/41/results')
+        ? { ...results, items: { ...results.items, content: [matched], totalPages: 2 } }
+        : undefined,
+    )
+    expect(await screen.findByText('이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.')).toBeVisible()
+    expect(
+      within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '다음 페이지' }),
+    ).toBeEnabled()
+    expect(screen.getByText(/실행 전체 합계/)).toHaveTextContent('24,000원')
+    expect(screen.getByRole('region', { name: '일치율 (건수 기준)' })).toHaveTextContent('이력은 서버 반올림 값')
+  })
+  for (const action of ['조회', '대사 실행'])
+    it(`다른 월 ${action}은 전역 탭 영향 확인 후 취소하면 URL·기준월·POST를 변경하지 않는다`, async () => {
+      const { router, user } = renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=1')
+      await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+      fireEvent.change(screen.getByLabelText(/정산월/, { selector: 'input' }), { target: { value: '2026-08' } })
+      await user.click(screen.getByRole('button', { name: action }))
+      const dialog = screen.getByRole('dialog', { name: '기준 정산월 변경 확인' })
+      expect(within(dialog).getByText(/열린 업무 탭/)).toHaveTextContent('2026-08')
+      expect(bodyPosts()).toHaveLength(0)
+      await user.click(within(dialog).getByRole('button', { name: '취소' }))
+      expect(router.state.location.search).toContain('month=2026-07')
+      expect(useWorkspaceStore.getState().month).toBe('2026-07')
+      expect(bodyPosts()).toHaveLength(0)
+    })
   it('비활성 보험회사도 과거 이력을 조회할 수 있지만 새 실행은 차단한다', async () => {
     const { router, user } = renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC', (url) =>
       url.startsWith('/api/v1/base/insurers')
@@ -331,7 +403,7 @@ describe('RECO-W01·W02 React 전환', () => {
   })
   it('RUNNING 이력을 폴링하고 완료 시 최종 결과를 재조회한다', async () => {
     let reads = 0
-    renderAt('/reconciliations?runId=41', (url) =>
+    const { client } = renderAt('/reconciliations?runId=41', (url) =>
       url.startsWith('/api/v1/reconciliations?')
         ? {
             ...history,
@@ -341,6 +413,7 @@ describe('RECO-W01·W02 React 전환', () => {
           }
         : undefined,
     )
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
     expect(await screen.findByText('대사 실행 중입니다. 완료될 때까지 결과를 갱신합니다.')).toBeVisible()
     expect(screen.getByRole('button', { name: '불일치 예외 일괄 생성' })).toBeDisabled()
     await waitFor(
@@ -349,6 +422,7 @@ describe('RECO-W01·W02 React 전환', () => {
     )
     expect(reads).toBeGreaterThan(1)
     await waitFor(() => expect(calls.filter((call) => call.url.includes('/41/results')).length).toBeGreaterThan(1))
+    expect(invalidate.mock.calls.filter(([options]) => options?.queryKey?.[1] === 'results')).toHaveLength(1)
   }, 10000)
   it('500 상세 조회는 requestId만 표시하고 임의 id는 호출하지 않는다', async () => {
     renderAt('/reconciliations?resultId=7', (url) => {
@@ -376,6 +450,7 @@ describe('RECO-W01·W02 React 전환', () => {
     await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
     fireEvent.change(screen.getByLabelText(/정산월/, { selector: 'input' }), { target: { value: '2026-08' } })
     await user.click(screen.getByRole('button', { name: '대사 실행' }))
+    await user.click(screen.getByRole('button', { name: '변경하고 실행' }))
     await waitFor(() => expect(router.state.location.search).toContain('runMonth=2026-08'))
     expect(bodyPosts()[0].options?.body).toMatchObject({ settlementMonth: '2026-08' })
     await waitFor(() => expect(calls.some((call) => call.url.includes('/42/results'))).toBe(true))
