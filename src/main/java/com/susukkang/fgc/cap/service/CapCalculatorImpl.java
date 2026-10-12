@@ -79,7 +79,7 @@ public class CapCalculatorImpl implements CapCalculator {
         // "한도"(② 계산식의 결과)지 "기준 보험료" 자체가 아니다.
         BigDecimal basePremiumAmount = contract.getMonthlyEquivalentFirstPremium();
 
-        // 한도식의 기준액(월납 원액 × 배수, 기본 12). 저장·노출하지 않고 grossLimit 계산에만 쓴다.
+        // 한도식의 기준액(월납 원액 × 배수, 기본 12). 저장하지 않고 한도·주의 판정에만 쓴다.
         BigDecimal annualizedLimitBase = MoneyUtil.multiplyAndRound(
                 basePremiumAmount, ruleSet.getPremiumMultiplier());
 
@@ -170,8 +170,9 @@ public class CapCalculatorImpl implements CapCalculator {
                 ? ONE_HUNDRED
                 : MoneyUtil.usagePercent(includedAmount, limitAmount);
 
-        CapResultStatus resultStatus = determineResultStatus(
-                anyReviewRequired, includedAmount, limitAmount, usagePct, ruleSet.getWarningUsagePct());
+        CapResultStatus resultStatus = anyReviewRequired
+                ? CapResultStatus.REVIEW_REQUIRED
+                : CapResultStatus.judge(remainingAmount, annualizedLimitBase, ruleSet.getWarningUsagePct());
 
         // 6) 감사·재현용 스냅샷 구성 (저장은 CapCheckService 책임)
         Map<String, Object> snapshot = buildSnapshot(ruleSet, refundAddition, complianceDeduction);
@@ -237,21 +238,6 @@ public class CapCalculatorImpl implements CapCalculator {
                 verifiedAmount.min(maximumAmount),
                 false
         );
-    }
-
-    private CapResultStatus determineResultStatus(boolean anyReviewRequired, BigDecimal includedAmount,
-                                                    BigDecimal limitAmount, BigDecimal usagePct,
-                                                    BigDecimal warningUsagePct) {
-        if (anyReviewRequired) {
-            return CapResultStatus.REVIEW_REQUIRED;
-        }
-        if (includedAmount.compareTo(limitAmount) > 0) {
-            return CapResultStatus.VIOLATION;
-        }
-        if (usagePct.compareTo(warningUsagePct) >= 0) {
-            return CapResultStatus.WARNING;
-        }
-        return CapResultStatus.NORMAL;
     }
 
     // 컬럼으로 뽑아내지 않은 "그때 어떤 정책값을 썼는지"를 감사·재현용으로 남김

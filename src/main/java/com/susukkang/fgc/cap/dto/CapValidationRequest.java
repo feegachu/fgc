@@ -13,6 +13,8 @@ import java.math.BigDecimal;
  */
 public record CapValidationRequest(
         BigDecimal limitAmount,
+        // 주의 판정 기준액 L(월납 × 배수) — CapCalculationResult#annualizedLimitBase (#490)
+        BigDecimal annualizedLimitBase,
         BigDecimal warningUsagePct,
         BigDecimal existingIncludedAmount,
         BigDecimal candidateAmount,

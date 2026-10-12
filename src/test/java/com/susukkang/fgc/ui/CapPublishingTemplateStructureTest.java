@@ -80,7 +80,7 @@ class CapPublishingTemplateStructureTest {
         assertThat(resource("static/js/features/cap/cap-list.js"))
                 .contains("룰셋 ID ")
                 .contains("cap_check #")
-                .contains("snapshot.warningUsagePct")
+                .contains("data.warningStartUsagePct")
                 .contains("item.resultStatus")
                 .contains("증빙 미연결 / 후속 연결 대기")
                 .doesNotContain("item.checkKind");
@@ -91,7 +91,7 @@ class CapPublishingTemplateStructureTest {
                 .contains("status-badge \" + capClassificationClass")
                 .contains("syncCapDisclosures(content)")
                 .contains("formula-limit")
-                .contains("snapshot.warningUsagePct")
+                .contains("data.warningStartUsagePct")
                 .doesNotContain("item.checkKind");
 
         assertThat(resource("templates/contract/detail.html"))
