@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -108,10 +108,13 @@ describe('DASH-W01 업무 대시보드', () => {
   })
 
   it('기준월을 바꾸면 해당 월로 다시 조회한다', async () => {
-    renderDashboard()
+    const { router, actions } = renderDashboard()
     await screen.findByRole('region', { name: '주요 검증 지표' })
-    act(() => useWorkspaceStore.getState().applyMonth('2026-08'))
+    await actions.click(screen.getByRole('button', { name: '기준 정산월 2026-07' }))
+    await actions.click(screen.getByRole('gridcell', { name: '8월' }))
+    await actions.click(screen.getByRole('button', { name: '적용' }))
     await waitFor(() => expect(summaryCalls()).toContain('/api/v1/dashboard/summary?month=2026-08'))
+    expect(router.state.location.search).toContain('month=2026-08')
   })
 
   it('KPI 카드와 행 클릭은 필터·기준월을 유지한 채 업무 화면으로 이동한다', async () => {
