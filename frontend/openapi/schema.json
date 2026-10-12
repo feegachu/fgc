@@ -6306,7 +6306,7 @@
     },
     "/api/v1/base/agents" : {
       "get" : {
-        "description" : "기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.",
+        "description" : "기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.",
         "operationId" : "search_8",
         "parameters" : [ {
           "description" : "소속 조직 ID",
@@ -6334,6 +6334,15 @@
           "schema" : {
             "format" : "date",
             "type" : "string"
+          }
+        }, {
+          "description" : "기준일 이전 해촉 설계사 포함 여부(계약 이력 검색용, 위촉일은 기준일 이하로 유지)",
+          "in" : "query",
+          "name" : "includeTerminated",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
           }
         }, {
           "description" : "페이지(1-base)",

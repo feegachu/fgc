@@ -1,45 +1,47 @@
 import { expect, test } from '@playwright/test'
-import { mkdir } from 'node:fs/promises'
 
 // #418 인계: 격리한 demo DB에서만 수행한다. 실제 저장/수정이 있으므로 명시적으로 활성화한다.
-test('실서버 CONT-W01·W02·W03 전후 대조와 등록 → 상세 → 수정', async ({ page, context }) => {
+test('실서버 CONT-W01·W02·W03 전후 대조와 등록 → 상세 → 수정', async ({ page, context }, testInfo) => {
   test.skip(process.env.FGC_CONTRACT_REAL_SERVER !== '1', '격리 검증 DB가 준비된 경우에 실행한다')
   const loginId = process.env.FGC_CONTRACT_QA_LOGIN_ID
   const password = process.env.FGC_CONTRACT_QA_PASSWORD
-  test.skip(!loginId || !password, 'QA 로그인 정보는 환경변수로 제공한다')
+  if (!loginId || !password) {
+    throw new Error('실서버 검증을 활성화하면 FGC_CONTRACT_QA_LOGIN_ID와 FGC_CONTRACT_QA_PASSWORD가 필요합니다.')
+  }
+  const apiTarget = process.env.FGC_API_TARGET ?? 'http://localhost:8081'
   test.setTimeout(120000)
   page.setDefaultTimeout(15000)
   await page.setViewportSize({ width: 1440, height: 1000 })
-  await mkdir('docs/408', { recursive: true })
   const capture = async (name: string) => {
-    if (process.env.FGC_CONTRACT_CAPTURE === '1')
-      await page.screenshot({ path: `docs/408/${name}.png`, fullPage: true })
+    if (process.env.FGC_CONTRACT_CAPTURE === '1') {
+      const path = testInfo.outputPath(`${name}.png`)
+      await page.screenshot({ path, fullPage: true })
+      await testInfo.attach(name, { path, contentType: 'image/png' })
+    }
   }
-  await page.goto('http://localhost:8081/login')
-  await page.getByLabel('아이디', { exact: true }).fill(loginId!)
-  await page.locator('input[name="password"]').fill(password!)
+  await page.goto(`${apiTarget}/login`)
+  await page.getByLabel('아이디', { exact: true }).fill(loginId)
+  await page.locator('input[name="password"]').fill(password)
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page).not.toHaveURL(/\/login/)
-  await page.goto('http://localhost:8081/contracts')
+  await page.goto(`${apiTarget}/contracts`)
   await expect(page.locator('#filter-insurer')).toBeEnabled()
-  const list = (await (await context.request.get('http://localhost:8081/api/v1/contracts?page=1&size=20')).json()).data
+  const list = (await (await context.request.get(`${apiTarget}/api/v1/contracts?page=1&size=20`)).json()).data
   expect(list.content.length).toBeGreaterThan(0)
   const first = list.content[0]
-  const detail = (
-    await (await context.request.get(`http://localhost:8081/api/v1/contracts/${first.contractId}`)).json()
-  ).data
+  const detail = (await (await context.request.get(`${apiTarget}/api/v1/contracts/${first.contractId}`)).json()).data
   await expect(page.locator('.contract-table tbody tr')).toHaveCount(list.content.length)
   await capture('legacy-contract-list')
-  await page.goto(`http://localhost:8081/contracts/${first.contractId}`)
+  await page.goto(`${apiTarget}/contracts/${first.contractId}`)
   await expect(page.locator('main')).toContainText(first.contractNo)
   await capture('legacy-contract-detail')
-  await page.goto('http://localhost:8081/contracts/new')
+  await page.goto(`${apiTarget}/contracts/new`)
   await expect(page.locator('select[name="insurerId"]')).toBeEnabled()
   await capture('legacy-contract-form')
 
   await page.goto('login?redirect=%2Fcontracts')
-  await page.getByLabel(/^아이디/).fill(loginId!)
-  await page.getByLabel(/^비밀번호\s*\*?$/).fill(password!)
+  await page.getByLabel(/^아이디/).fill(loginId)
+  await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
   const listResponse = page.waitForResponse(
     (response) => response.url().includes('/api/v1/contracts?') && response.ok(),
   )
@@ -84,7 +86,7 @@ test('실서버 CONT-W01·W02·W03 전후 대조와 등록 → 상세 → 수정
   const created = await createResponse
   expect(created.ok(), await created.text()).toBe(true)
   const createdId = (await created.json()).data.contractId
-  await expect(page).toHaveURL(new RegExp(`/contracts/${createdId}(\\?|$)`))
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`/app/contracts/${createdId}`)
   await expect(page.getByRole('main')).toContainText(unique)
   await expect(page.getByText(/보험계약을 저장했습니다/)).toBeVisible()
   await page.getByRole('button', { name: '수정', exact: true }).click()

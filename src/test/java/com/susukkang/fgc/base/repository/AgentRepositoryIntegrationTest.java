@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -54,7 +55,7 @@ class AgentRepositoryIntegrationTest {
         long agentId = insertAgent(agentCode, "설계사", organizationId, rank,
                 AS_OF.minusMonths(1), AS_OF, "INACTIVE", false);
 
-        Page<AgentRow> result = agentRepository.search(organizationId, agentCode, AS_OF, page(0, 1));
+        Page<AgentRow> result = agentRepository.search(organizationId, agentCode, AS_OF, false, page(0, 1));
 
         assertThat(result.getContent()).containsExactly(new AgentRow(
                 agentId, agentCode, "설계사", rank.name(), organizationId, organizationCode,
@@ -76,7 +77,7 @@ class AgentRepositoryIntegrationTest {
                 RETURNING agent_id
                 """, Long.class, organizationId, code, AS_OF);
 
-        Page<AgentRow> result = agentRepository.search(organizationId, code, AS_OF, page(0, 1));
+        Page<AgentRow> result = agentRepository.search(organizationId, code, AS_OF, false, page(0, 1));
 
         assertThat(result.getContent()).singleElement().satisfies(row -> {
             assertThat(row.agentId()).isEqualTo(agentId);
@@ -115,7 +116,7 @@ class AgentRepositoryIntegrationTest {
                 AS_OF, null, "ACTIVE", true);
 
         // 페이지를 채워 countQuery에도 조직·유효기간 조건이 적용되는지 검증한다.
-        Page<AgentRow> result = agentRepository.search(organizationId, prefix, AS_OF, page(0, 3));
+        Page<AgentRow> result = agentRepository.search(organizationId, prefix, AS_OF, false, page(0, 3));
 
         assertThat(result.getContent()).extracting(AgentRow::agentCode)
                 .containsExactly(prefix + "-A", prefix + "-B", prefix + "-C");
@@ -139,9 +140,9 @@ class AgentRepositoryIntegrationTest {
         }
         String keyword = prefix.toUpperCase(Locale.ROOT);
 
-        Page<AgentRow> first = agentRepository.search(null, keyword, AS_OF, page(0, 20));
-        Page<AgentRow> second = agentRepository.search(null, keyword, AS_OF, page(1, 20));
-        Page<AgentRow> beyondLast = agentRepository.search(null, keyword, AS_OF, page(2, 20));
+        Page<AgentRow> first = agentRepository.search(null, keyword, AS_OF, false, page(0, 20));
+        Page<AgentRow> second = agentRepository.search(null, keyword, AS_OF, false, page(1, 20));
+        Page<AgentRow> beyondLast = agentRepository.search(null, keyword, AS_OF, false, page(2, 20));
 
         List<String> expectedFirst = IntStream.rangeClosed(1, 20)
                 .mapToObj(index -> "%s-%02d".formatted(prefix, index)).toList();
@@ -155,6 +156,48 @@ class AgentRepositoryIntegrationTest {
         assertThat(beyondLast.getTotalElements()).isEqualTo(21);
     }
 
+    @ParameterizedTest(name = "includeTerminated={0}: 해촉일 조건만 선택적으로 해제한다")
+    @ValueSource(booleans = {false, true})
+    void includesExpiredAgentsOnlyWhenRequestedAndPreservesOtherFiltersAndCount(boolean includeTerminated) {
+        long organizationId = insertOrganization(uniqueCode(), null);
+        long otherOrganizationId = insertOrganization(uniqueCode(), null);
+        String prefix = uniqueCode();
+        long activeId = insertAgent(prefix + "-A", "현재 설계사", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), null, "ACTIVE", true);
+        long terminatedId = insertAgent(prefix + "-B", "과거 계약 담당", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF.minusDays(1), "TERMINATED", false);
+        long boundaryId = insertAgent(prefix + "-C", "기준일 해촉", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF, "TERMINATED", false);
+        insertAgent(prefix + "-D", "미래 위촉", organizationId, AgentRankCode.FC,
+                AS_OF.plusDays(1), null, "ACTIVE", true);
+        insertAgent(prefix + "-E", "다른 조직 과거 계약 담당", otherOrganizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF.minusDays(1), "TERMINATED", false);
+        insertAgent(uniqueCode(), "검색어 불일치", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF.minusDays(1), "TERMINATED", false);
+
+        // 첫 페이지를 채워 목록 쿼리와 countQuery 양쪽의 플래그·필터 동작을 검증한다.
+        Page<AgentRow> first = agentRepository.search(organizationId, prefix, AS_OF, includeTerminated, page(0, 1));
+        Page<AgentRow> second = agentRepository.search(organizationId, prefix, AS_OF, includeTerminated, page(1, 1));
+        Page<AgentRow> third = agentRepository.search(organizationId, prefix, AS_OF, includeTerminated, page(2, 1));
+
+        assertThat(first.getContent()).extracting(AgentRow::agentId).containsExactly(activeId);
+        assertThat(second.getContent()).extracting(AgentRow::agentId)
+                .containsExactly(includeTerminated ? terminatedId : boundaryId);
+        assertThat(first.getTotalElements()).isEqualTo(includeTerminated ? 3 : 2);
+        assertThat(second.getTotalElements()).isEqualTo(includeTerminated ? 3 : 2);
+        assertThat(third.getTotalElements()).isEqualTo(includeTerminated ? 3 : 2);
+        if (includeTerminated) {
+            assertThat(second.getContent()).singleElement().satisfies(row -> {
+                assertThat(row.terminationDate()).isEqualTo(AS_OF.minusDays(1));
+                assertThat(row.agentStatus()).isEqualTo("TERMINATED");
+                assertThat(row.activeYn()).isFalse();
+            });
+            assertThat(third.getContent()).extracting(AgentRow::agentId).containsExactly(boundaryId);
+        } else {
+            assertThat(third.getContent()).isEmpty();
+        }
+    }
+
     @Test
     void searchesNameIgnoringCase() {
         long organizationId = insertOrganization(uniqueCode(), null);
@@ -163,7 +206,7 @@ class AgentRepositoryIntegrationTest {
                 AgentRankCode.FC, AS_OF, null, "ACTIVE", true);
 
         Page<AgentRow> result = agentRepository.search(
-                null, keyword.toUpperCase(Locale.ROOT), AS_OF, page(0, 1));
+                null, keyword.toUpperCase(Locale.ROOT), AS_OF, false, page(0, 1));
 
         assertThat(result.getContent()).extracting(AgentRow::agentId).containsExactly(id);
         assertThat(result.getTotalElements()).isEqualTo(1);
@@ -183,7 +226,7 @@ class AgentRepositoryIntegrationTest {
                 ORDER BY agent_code
                 """, Long.class, AS_OF, AS_OF);
 
-        Page<AgentRow> result = agentRepository.search(null, null, AS_OF, page(0, expectedIds.size()));
+        Page<AgentRow> result = agentRepository.search(null, null, AS_OF, false, page(0, expectedIds.size()));
 
         assertThat(result.getContent()).extracting(AgentRow::agentId).containsExactlyElementsOf(expectedIds);
         assertThat(result.getTotalElements()).isEqualTo(expectedIds.size());
@@ -191,7 +234,7 @@ class AgentRepositoryIntegrationTest {
 
     @Test
     void returnsEmptyPageWhenNothingMatches() {
-        Page<AgentRow> result = agentRepository.search(null, uniqueCode(), AS_OF, page(0, 20));
+        Page<AgentRow> result = agentRepository.search(null, uniqueCode(), AS_OF, false, page(0, 20));
 
         assertThat(result.getContent()).isEmpty();
         assertThat(result.getTotalElements()).isZero();

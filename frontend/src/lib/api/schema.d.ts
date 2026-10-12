@@ -153,7 +153,7 @@ export interface paths {
         };
         /**
          * 보험설계사 기준정보 조회·선택 (IF-API-07)
-         * @description 기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.
+         * @description 기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.
          */
         get: operations["search_8"];
         put?: never;
@@ -4075,6 +4075,8 @@ export interface operations {
                  * @example 2026-08-11
                  */
                 asOf: string;
+                /** @description 기준일 이전 해촉 설계사 포함 여부(계약 이력 검색용, 위촉일은 기준일 이하로 유지) */
+                includeTerminated?: boolean;
                 /**
                  * @description 페이지(1-base)
                  * @example 1

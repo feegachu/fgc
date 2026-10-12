@@ -60,8 +60,23 @@ function mount(path = '/contracts', canProcess = true, list?: (url: URL) => unkn
           },
         ]),
       )
-    if (url.pathname.endsWith('/agents'))
-      return envelope(pageData([{ agentId: 4, agentCode: 'FC4', agentName: '김설계', agentStatus: 'ACTIVE' }]))
+    if (url.pathname.endsWith('/agents')) {
+      const agents = [
+        { agentId: 4, agentCode: 'FC4', agentName: '김설계', agentStatus: 'ACTIVE', activeYn: true },
+        { agentId: 5, agentCode: 'FC5', agentName: '비활동 설계사', agentStatus: 'INACTIVE', activeYn: true },
+        { agentId: 6, agentCode: 'FC6', agentName: '사용중지 설계사', agentStatus: 'ACTIVE', activeYn: false },
+      ]
+      // 실제 API도 이 플래그 없이는 해촉일이 지난 설계사를 제외한다.
+      if (url.searchParams.get('includeTerminated') === 'true')
+        agents.push({
+          agentId: 7,
+          agentCode: 'FC7',
+          agentName: '퇴사 설계사',
+          agentStatus: 'TERMINATED',
+          activeYn: false,
+        })
+      return envelope(pageData(agents))
+    }
     throw new Error(`Unexpected request: ${path}`)
   })
   const router = createMemoryRouter(
@@ -139,6 +154,48 @@ it('보험사를 바꾸면 이전 상품을 지우고 조회 시 페이지를 �
   expect(router.state.location.search).toContain('insurerId=2')
   expect(router.state.location.search).not.toContain('productOfferingId')
   expect(router.state.location.search).not.toContain('page=')
+})
+
+it('과거 계약 검색에서는 해촉·비활동·사용중지 설계사 이름을 선택하고 검색 조건에 전달한다', async () => {
+  const { router, user } = mount('/contracts?orgId=3', false)
+  const terminated = await screen.findByRole('option', { name: 'FC7 · 퇴사 설계사 (해촉 · 기준정보 사용중지)' })
+  expect(terminated).toBeEnabled()
+  expect(screen.getByRole('option', { name: 'FC5 · 비활동 설계사 (비활동)' })).toBeEnabled()
+  expect(screen.getByRole('option', { name: 'FC6 · 사용중지 설계사 (활동 · 기준정보 사용중지)' })).toBeEnabled()
+  const agentRequest = requests
+    .map((path) => new URL(path, 'http://localhost'))
+    .find((url) => url.pathname === '/api/v1/base/agents')!
+  expect(agentRequest.searchParams.get('includeTerminated')).toBe('true')
+  expect(agentRequest.searchParams.get('organizationId')).toBe('3')
+  await user.selectOptions(screen.getByLabelText('모집 설계사'), terminated)
+  await user.click(screen.getByRole('button', { name: '조회' }))
+  expect(new URLSearchParams(router.state.location.search).get('agentId')).toBe('7')
+  await waitFor(() =>
+    expect(
+      requests.some((path) => {
+        const url = new URL(path, 'http://localhost')
+        return (
+          url.pathname === '/api/v1/contracts' &&
+          url.searchParams.get('agentId') === '7' &&
+          url.searchParams.get('orgId') === '3'
+        )
+      }),
+    ).toBe(true),
+  )
+})
+
+it('해촉 설계사 URL 검색조건을 ID 대체문구 대신 이름과 상태로 복원한다', async () => {
+  const { user } = mount('/contracts?agentId=7')
+  await waitFor(() => expect(screen.getByLabelText('모집 설계사')).toBeEnabled())
+  const agent = screen.getByLabelText('모집 설계사') as HTMLSelectElement
+  expect(agent).toHaveValue('7')
+  expect(agent.selectedOptions[0]).toHaveTextContent('퇴사 설계사 (해촉 · 기준정보 사용중지)')
+  expect(screen.queryByRole('option', { name: '선택된 ID: 7' })).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'CSV 내보내기' }))
+  expect(exportCsv).toHaveBeenCalledWith('/api/v1/contracts/export.csv?agentId=7', {
+    filename: 'contracts.csv',
+    notifyError: false,
+  })
 })
 
 it('늦게 도착한 이전 보험사 응답을 적용하지 않는다', async () => {

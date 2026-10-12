@@ -7,8 +7,14 @@ import java.util.Objects;
 public record AgentSearchCriteria(
         Long organizationId,
         String keyword,
-        LocalDate asOf
+        LocalDate asOf,
+        boolean includeTerminated
 ) {
+    /** 기존 기준정보·등록 화면은 기준일에 위촉 기간이 유효한 설계사만 조회한다. */
+    public AgentSearchCriteria(Long organizationId, String keyword, LocalDate asOf) {
+        this(organizationId, keyword, asOf, false);
+    }
+
     public AgentSearchCriteria {
         Objects.requireNonNull(asOf, "asOf는 null일 수 없습니다.");
     }

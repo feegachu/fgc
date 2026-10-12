@@ -41,7 +41,7 @@ public class AgentServiceImpl implements AgentService {
         );
 
         Page<AgentResponse> result = agentRepository
-                .search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), pageable)
+                .search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), pageable)
                 .map(AgentResponse::from);
 
         return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), SORT);

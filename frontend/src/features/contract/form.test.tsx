@@ -121,7 +121,7 @@ afterEach(() => {
   useToastStore.setState({ messages: [] })
 })
 
-describe('보험계약 입력 안전성', () => {
+describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
   it('최초 수정 시 저장된 보험료·납입기간·공제액·소속과 마이크로초 토큰을 보존한다', async () => {
     const { user, writes, router } = renderAt()
     await ready()
@@ -344,7 +344,7 @@ describe('보험계약 입력 안전성', () => {
   })
 })
 
-describe('서버 오류·과거 기준정보', () => {
+describe('[FGC-FUN-018] 서버 오류·과거 기준정보', () => {
   it('저장 오류 COMMON-500은 내부 message·detail·필드를 노출하지 않고 요청 ID만 표시한다', async () => {
     const { user } = renderAt(undefined, (_url, options) => {
       if (options?.method)
@@ -405,7 +405,7 @@ describe('서버 오류·과거 기준정보', () => {
   })
 })
 
-describe('보험료 파생·입력 검증', () => {
+describe('[FGC-FUN-018·030] 보험료 파생·입력 검증', () => {
   it('직접 입력한 원주기 보험료는 보존하고, 비운 경우만 자동 계산한다', () => {
     const loaded = initialDraft('2026-10-12', contract)
     expect(fillCyclePremium({ ...loaded, monthlyEquivalentFirstPremium: '200000' }).premiumPerCycleAmount).toBe(
@@ -415,7 +415,7 @@ describe('보험료 파생·입력 검증', () => {
     expect(empty.premiumPerCycleAmount).toBe('300000')
     expect(fillCyclePremium({ ...empty, paymentCycleCode: 'SINGLE' }).premiumPerCycleAmount).toBe('')
   })
-  it('누락·공백 계약번호·미래/존재하지 않는 날짜·음수·소수·정밀도 손실을 거부한다', () => {
+  it('[FGC-FUN-018] 누락·공백 계약번호·미래/존재하지 않는 날짜·음수·소수·정밀도 손실을 거부한다', () => {
     const draft = initialDraft('2026-10-12', contract)
     expect(validateDraft(draft, '2026-10-12')).toEqual({})
     for (const contractDate of ['2026-10-13', '2026-02-30', ''])
@@ -444,5 +444,45 @@ describe('보험료 파생·입력 검증', () => {
     expect(
       createRequest({ ...draft, standardSurrenderDeductionAmount: '' }).standardSurrenderDeductionAmount,
     ).toBeUndefined()
+  })
+
+  const moneyFields = [
+    'premiumPerCycleAmount',
+    'firstPremiumAmount',
+    'monthlyEquivalentFirstPremium',
+    'standardSurrenderDeductionAmount',
+  ] as const
+
+  it.each(['0', '9007199254740991'])('[FGC-FUN-018] 금액 경계값 %s는 손실 없이 저장 요청에 담는다', (value) => {
+    const draft = initialDraft('2026-10-12', contract)
+    for (const name of moneyFields) draft[name] = value
+    expect(validateDraft(draft, '2026-10-12')).toEqual({})
+    const body = createRequest(draft)
+    for (const name of moneyFields) expect(body[name]).toBe(value === '0' ? 0 : Number.MAX_SAFE_INTEGER)
+  })
+
+  it.each(moneyFields)('[FGC-FUN-018] %s가 안전한 정수 상한을 1원 초과하면 해당 필드에서 거부한다', (name) => {
+    const draft = { ...initialDraft('2026-10-12', contract), [name]: '9007199254740992' }
+    expect(validateDraft(draft, '2026-10-12')).toEqual({ [name]: expect.any(String) })
+  })
+
+  it('[FGC-FUN-018] 납입기간은 서버 Integer 상한까지 허용하고 다음 정수는 거부한다', () => {
+    const draft = { ...initialDraft('2026-10-12', contract), paymentTermMonths: '2147483647' }
+    expect(validateDraft(draft, '2026-10-12')).toEqual({})
+    expect(createRequest(draft).paymentTermMonths).toBe(2147483647)
+    expect(validateDraft({ ...draft, paymentTermMonths: '2147483648' }, '2026-10-12')).toEqual({
+      paymentTermMonths: expect.any(String),
+    })
+  })
+
+  it('[FGC-FUN-030] 한도 미리보기는 12배 결과의 안전한 정수 경계 직전까지 표시하고 초과 시 숨긴다', async () => {
+    renderAt()
+    await ready()
+    const preview = within(screen.getByRole('complementary', { name: '1,200% 한도 참고 미리보기' }))
+    fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '750599937895082' } })
+    expect(preview.getByText('9,007,199,254,740,984 원')).toBeInTheDocument()
+    fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '750599937895083' } })
+    expect(preview.getByText('— 원')).toBeInTheDocument()
+    expect(preview.queryByText('9,007,199,254,740,984 원')).not.toBeInTheDocument()
   })
 })

@@ -42,7 +42,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             FROM Agent a
             JOIN Organization o ON o.organizationId = a.organizationId
             WHERE a.appointmentDate <= :asOf
-              AND (a.terminationDate IS NULL OR a.terminationDate >= :asOf)
+              AND (:includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
               AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId)
               AND (
                   CAST(:keyword AS String) IS NULL
@@ -54,7 +54,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             SELECT COUNT(a)
             FROM Agent a
             WHERE a.appointmentDate <= :asOf
-              AND (a.terminationDate IS NULL OR a.terminationDate >= :asOf)
+              AND (:includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
               AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId)
               AND (
                   CAST(:keyword AS String) IS NULL
@@ -66,6 +66,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             @Param("organizationId") Long organizationId,
             @Param("keyword") String keyword,
             @Param("asOf") LocalDate asOf,
+            @Param("includeTerminated") boolean includeTerminated,
             Pageable pageable
     );
 

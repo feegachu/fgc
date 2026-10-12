@@ -112,6 +112,41 @@ class AgentControllerTest {
     }
 
     @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void passesExplicitIncludeTerminatedFlagWithoutChangingOtherSearchConditions(boolean includeTerminated) throws Exception {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(11L, "과거설계사", asOf, includeTerminated);
+        given(agentService.search(criteria, 2, 10)).willReturn(
+                PageResponse.of(List.of(), 2, 10, 0, "agentCode,asc")
+        );
+
+        mockMvc.perform(get("/api/v1/base/agents")
+                        .param("organizationId", "11")
+                        .param("keyword", "과거설계사")
+                        .param("asOf", "2026-08-11")
+                        .param("includeTerminated", String.valueOf(includeTerminated))
+                        .param("page", "2")
+                        .param("size", "10")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(2))
+                .andExpect(jsonPath("$.data.size").value(10));
+
+        verify(agentService).search(criteria, 2, 10);
+    }
+
+    @Test
+    void rejectsInvalidIncludeTerminatedFlag() throws Exception {
+        mockMvc.perform(get("/api/v1/base/agents")
+                        .param("asOf", "2026-08-11")
+                        .param("includeTerminated", "invalid")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("includeTerminated"));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE"})
     void allowsEveryAuthenticatedRole(String role) throws Exception {
         LocalDate asOf = LocalDate.of(2026, 8, 11);

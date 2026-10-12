@@ -14,6 +14,7 @@ import { date, int, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { usePermission } from '../auth/useAuth'
 import { useAgentOptions, useInsurerOptions, useOrganizationOptions, useProductOptions } from '../base/api'
+import type { Agent } from '../base/api'
 import { Amount, CapStatus } from '../cap/badges'
 import { STATUSES } from '../cap/labels'
 import { QueryState } from '../reference/ReferenceUI'
@@ -39,6 +40,12 @@ const FILTER_KEYS = {
 }
 const detailHref = (row: ContractSummary) => `/contracts/${encodeURIComponent(String(row.contractId))}`
 const textCell = (value?: string) => <CellDisclosure singleLine preview={value || '-'} full={value || '-'} />
+const agentStatusLabels = { ACTIVE: '활동', INACTIVE: '비활동', TERMINATED: '해촉' }
+function agentOptionLabel(agent: Agent) {
+  const status = agent.agentStatusLabel || (agent.agentStatus ? agentStatusLabels[agent.agentStatus] : '')
+  const details = [status, agent.activeYn === false ? '기준정보 사용중지' : ''].filter(Boolean)
+  return `${agent.agentCode} · ${agent.agentName}${details.length ? ` (${details.join(' · ')})` : ''}`
+}
 const columns: TableColumn<ContractSummary>[] = [
   {
     key: 'contractNo',
@@ -190,7 +197,8 @@ function ContractFilters({
   const insurers = useInsurerOptions()
   const organizations = useOrganizationOptions(asOf)
   const products = useProductOptions(asOf, draft.insurerId)
-  const agents = useAgentOptions(asOf, draft.orgId)
+  // 과거 계약 검색에서는 해촉·비활동·사용중지 설계사도 선택할 수 있어야 한다.
+  const agents = useAgentOptions(asOf, draft.orgId, true, true)
   const set = (key: string, value: string) =>
     setDraft((current) => ({
       ...current,
@@ -274,9 +282,7 @@ function ContractFilters({
       {select(
         'agentId',
         '모집 설계사',
-        (agents.data ?? [])
-          .filter((row) => row.activeYn !== false && row.agentStatus === 'ACTIVE')
-          .map((row) => ({ value: String(row.agentId), label: `${row.agentCode} · ${row.agentName}` })),
+        (agents.data ?? []).map((row) => ({ value: String(row.agentId), label: agentOptionLabel(row) })),
         agents,
       )}
       {select(

@@ -12,6 +12,7 @@ export interface BaseCriteria {
   keyword?: string
   insurerId?: string
   organizationId?: string
+  includeTerminated?: boolean
   page?: number
   size?: number
 }
@@ -103,10 +104,11 @@ export function useProductOptions(asOf: string, insurerId: string, enabled = tru
     meta: { errorToast: false },
   })
 }
-export function useAgentOptions(asOf: string, organizationId = '', enabled = true) {
+export function useAgentOptions(asOf: string, organizationId = '', enabled = true, includeTerminated = false) {
   return useQuery({
-    queryKey: ['base', 'agents', 'options', asOf, organizationId],
-    queryFn: ({ signal }) => getAllBaseOptions('agents', { asOf, organizationId }, signal),
+    queryKey: ['base', 'agents', 'options', asOf, organizationId, includeTerminated],
+    queryFn: ({ signal }) =>
+      getAllBaseOptions('agents', { asOf, organizationId, includeTerminated: includeTerminated || undefined }, signal),
     enabled: enabled && Boolean(asOf),
     meta: { errorToast: false },
   })
