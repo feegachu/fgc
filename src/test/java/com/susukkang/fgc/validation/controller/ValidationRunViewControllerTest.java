@@ -112,7 +112,7 @@ class ValidationRunViewControllerTest {
                 new ValidationRunDetailResponse.ArbitrageSummary(0, 0, 0),
                 new ValidationRunDetailResponse.LedgerSummary(0, 0),
                 new ValidationRunDetailResponse.ReconciliationSummary(0, 0, 0, 0, 0, java.math.BigDecimal.ZERO),
-                new ValidationRunDetailResponse.ExceptionSummary(49, 0, 49, 0, 0, 49));
+                new ValidationRunDetailResponse.ExceptionSummary(49, 0, 49, 0, 0, 49, 0, null));
     }
 
     // ── W01 목록 ────────────────────────────────────────────────────
@@ -228,7 +228,28 @@ class ValidationRunViewControllerTest {
                 // 스텝 이름은 화면 상수 10개
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("담당자 검토")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("기존 업무건 재검출")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("미처리 업무건")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("미처리 업무건")))
+                // 비교 기준(확정 실행)이 없는 실행에는 "확정 결과와 다른 건"을 보이지 않는다(#498)
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("id=\"finalized-result-diff\""))));
+    }
+
+    /** #498 확정된 달의 재검증 실행: 확정 실행 링크·차이 건수·예외함 바로가기를 보인다. */
+    @Test
+    void detailShowsFinalizedResultDiffForRevalidationOfFinalizedMonth() throws Exception {
+        ValidationRunDetailResponse base = detailResponse("COMPLETED", 8);
+        given(validationRunDetailService.detail(100L)).willReturn(new ValidationRunDetailResponse(
+                base.header(), base.targets(), base.targetSummary(), base.capSummary(), base.arbitrageSummary(),
+                base.ledgerSummary(), base.reconciliationSummary(),
+                new ValidationRunDetailResponse.ExceptionSummary(3, 1, 2, 0, 0, 3, 1, 90L)));
+        given(validationRunSearchService.search(any(), anyInt(), anyInt()))
+                .willReturn(pageOf(listRow("COMPLETED", 8)));
+
+        mvc.perform(get("/validation-runs/100").with(user(settleUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/validation-runs/90\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "/exceptions?status=&amp;type=CAP_REVIEW_REQUIRED&amp;reasonCode=FINALIZED_RESULT_DIFF&amp;validationMonth=2026-07-01")));
     }
 
     /** COMPLIANCE 는 조회만 — 실행 버튼은 비활성으로 렌더링된다(화면정의서 :229). */

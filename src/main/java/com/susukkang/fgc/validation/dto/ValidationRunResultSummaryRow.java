@@ -48,4 +48,7 @@ public class ValidationRunResultSummaryRow {
     private long exceptionReopenedCount;
     private long exceptionNotDetectedCount;
     private long exceptionOpenWorkItemCount;
+    // #498 확정된 달의 재검증이면 비교 기준 확정 실행과, 이번 실행이 남긴 "확정 결과와 다름" 검출 수
+    private long finalizedResultDiffCount;
+    private Long comparedFinalizedRunId;
 }
