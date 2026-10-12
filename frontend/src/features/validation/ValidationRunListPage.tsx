@@ -191,6 +191,7 @@ function CreateSection() {
   const monthOk = validMonth(month)
   const active = useQuery({ ...activeMonthlyQuery(month), enabled: monthOk })
   const hasActive = active.data?.exists === true
+  const blockedByActive = runType === 'MONTHLY' && hasActive
   const mutation = useMutation({
     mutationFn: () => createRun(month, runType),
     meta: { errorToast: false },
@@ -239,7 +240,7 @@ function CreateSection() {
           id="btn-create"
           aria-describedby="create-hint"
           loading={mutation.isPending}
-          disabled={!canProcess || !monthOk || (runType === 'MONTHLY' && hasActive)}
+          disabled={!canProcess || !monthOk || blockedByActive}
         >
           <span className="material-symbols-rounded" aria-hidden="true">
             add
@@ -249,8 +250,8 @@ function CreateSection() {
         <p className="field-helper vrun-create-hint" id="create-hint">
           {!canProcess
             ? '실행 생성은 정산 담당자만 할 수 있습니다.'
-            : hasActive
-              ? '기준월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.'
+            : blockedByActive
+              ? '선택한 검증월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.'
               : '같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.'}
         </p>
       </form>

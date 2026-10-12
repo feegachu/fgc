@@ -118,20 +118,25 @@ function DetailBody({
   }, [finished, client])
 
   // 일시 오류는 다음 폴링에서 회복되므로 연속 3회 실패해야 한 번만 알린다.
+  // errorUpdateCount 는 누적값이라, 마지막 성공 시점의 값을 기준으로 연속 실패만 센다.
   const warned = useRef(false)
+  const baseErrors = useRef(0)
   useEffect(() => {
-    if (progress.errorUpdateCount >= 3 && !warned.current) {
+    if (progress.isSuccess && !progress.isError) {
+      if (warned.current) {
+        warned.current = false
+        toast('진행률 조회가 정상으로 돌아왔습니다.', 'info', 3000)
+      }
+      baseErrors.current = progress.errorUpdateCount
+    } else if (progress.errorUpdateCount - baseErrors.current >= 3 && !warned.current) {
       warned.current = true
       toast(
         errorText(progress.error as Error, '진행률을 불러오지 못하고 있습니다. 연결을 확인해 주세요.'),
         'warning',
         6000,
       )
-    } else if (warned.current && progress.errorUpdateCount === 0 && progress.isSuccess) {
-      warned.current = false
-      toast('진행률 조회가 정상으로 돌아왔습니다.', 'info', 3000)
     }
-  }, [progress.errorUpdateCount, progress.error, progress.isSuccess])
+  }, [progress.errorUpdateCount, progress.dataUpdatedAt, progress.error, progress.isSuccess, progress.isError])
 
   const execute = useMutation({
     mutationFn: () => executeRun(id),
@@ -313,7 +318,7 @@ function DetailBody({
         onDone={() => {
           void client.invalidateQueries({ queryKey: ['validation-runs'] })
         }}
-        onFailed={() => void checklist.refetch()}
+        onFailed={() => void client.invalidateQueries({ queryKey: ['validation-runs'] })}
       />
     </div>
   )
