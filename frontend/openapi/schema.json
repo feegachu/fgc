@@ -1438,6 +1438,9 @@
               "$ref" : "#/components/schemas/CapCheckDetailResponse"
             },
             "type" : "array"
+          },
+          "warningStartUsagePct" : {
+            "type" : "string"
           }
         },
         "type" : "object"
