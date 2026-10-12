@@ -35,6 +35,38 @@ public class ReconciliationResultRepository {
     private static final String CONTRACT_ID_PARAM = "contractId";
     private static final String RESULT_TYPE_PARAM = "resultType";
     private static final String RECONCILIATION_RUN_ID_PARAM = "reconciliationRunId";
+    private static final String VALIDATION_RUN_ID_PARAM = "validationRunId";
+    private static final String CLASSIFICATION_CONTEXT_SQL = """
+            SELECT EXISTS (SELECT 1 FROM fgc.insurance_contract c
+                            WHERE c.contract_id = :contractId
+                              AND c.current_status IN %1$s
+                              AND (c.current_status = 'CANCELLED'
+                                   OR CAST(:dueDate AS date) IS NULL
+                                   OR (SELECT l.new_status FROM fgc.contract_status_event l
+                                        WHERE l.contract_id = c.contract_id
+                                        ORDER BY l.effective_at DESC, l.event_seq DESC
+                                        LIMIT 1) IS DISTINCT FROM c.current_status
+                                   OR %2$s IN %1$s))
+                AS invalidContractPayment,
+            CASE WHEN CAST(:expectedAgentId AS bigint) IS NULL
+                   OR CAST(:actualAgentId AS bigint) IS NULL THEN FALSE
+                 ELSE COALESCE((SELECT expected.organization_id <> actual.organization_id
+                                  FROM fgc.agent expected, fgc.agent actual
+                                 WHERE expected.agent_id = :expectedAgentId
+                                   AND actual.agent_id = :actualAgentId), FALSE)
+            END AS organizationMismatch,
+            (:hasJournals AND (SELECT COUNT(DISTINCT policy_version_id) > 1
+                                FROM fgc.journal_header
+                               WHERE journal_header_id IN (:journalHeaderIds)
+                                 AND policy_version_id IS NOT NULL)) AS policyVersionError,
+            (:hasJournals AND EXISTS (SELECT 1 FROM fgc.vw_journal_imbalance
+                                      WHERE journal_header_id IN (:journalHeaderIds))) AS journalImbalance,
+            EXISTS (SELECT 1 FROM fgc.validation_target vt
+                     WHERE vt.validation_run_id = CAST(:validationRunId AS bigint)
+                       AND vt.contract_id = :contractId
+                       AND vt.selection_status = 'REVIEW_REQUIRED') AS targetReviewRequired
+            """.formatted(ContractStatusOnDueDateSql.NON_PAYABLE_STATUSES,
+            ContractStatusOnDueDateSql.statusOn("c.contract_id", ":dueDate"));
     private static final List<ReconciliationNativeProjection.Column> RESULT_COLUMNS = List.of(
             new ReconciliationNativeProjection.Column(RECONCILIATION_RESULT_ID_PARAM, Long.class),
             new ReconciliationNativeProjection.Column("contractNo", String.class),
@@ -132,42 +164,17 @@ public class ReconciliationResultRepository {
      * 계약 수정 화면의 상태 변경은 아직 사건을 남기지 않아(FUN-026 2차) 이력을 믿을 수 없다.
      * "같은 상태 사건이 한 번이라도 있었는가"로 보면 LAPSED→REVIVED 이력 뒤 화면에서 다시 LAPSED로 바꾼
      * 계약이 옛 사건으로 판정돼 비유효 신호가 사라진다(PR #515 리뷰).
+     * <p>
+     * #518 — {@code targetReviewRequired}는 이 계약이 이 검증 실행에서 검토필요(REVIEW_REQUIRED)로 보류된
+     * 대상인지다. 보류 대상은 스케줄 재생성 등 하위 검증을 받지 않으므로(FUN-042) 예상 내역 없음을
+     * 확정 불일치로 단정하지 않는다. 검증 실행에 묶이지 않은 수동 대사(validationRunId NULL)는 항상 FALSE다.
      */
     public ReconciliationClassificationContext findClassificationContext(
-            Long contractId, Long expectedAgentId, Long actualAgentId, List<Long> journalHeaderIds,
-            LocalDate dueDate) {
+            Long validationRunId, Long contractId, Long expectedAgentId, Long actualAgentId,
+            List<Long> journalHeaderIds, LocalDate dueDate) {
         boolean hasJournals = journalHeaderIds != null && !journalHeaderIds.isEmpty();
-        NativeQuery<?> query = entityManager.createNativeQuery("""
-                SELECT EXISTS (SELECT 1 FROM fgc.insurance_contract c
-                                WHERE c.contract_id = :contractId
-                                  AND c.current_status IN ('CANCELLED','TERMINATED','MATURED','LAPSED')
-                                  AND (c.current_status = 'CANCELLED'
-                                       OR CAST(:dueDate AS date) IS NULL
-                                       OR (SELECT l.new_status FROM fgc.contract_status_event l
-                                            WHERE l.contract_id = c.contract_id
-                                            ORDER BY l.effective_at DESC, l.event_seq DESC
-                                            LIMIT 1) IS DISTINCT FROM c.current_status
-                                       OR (SELECT e.new_status FROM fgc.contract_status_event e
-                                            WHERE e.contract_id = c.contract_id
-                                              AND e.effective_at < (CAST(:dueDate AS timestamp) + INTERVAL '1 day')
-                                                                   AT TIME ZONE 'Asia/Seoul'
-                                            ORDER BY e.effective_at DESC, e.event_seq DESC
-                                            LIMIT 1) IN ('CANCELLED','TERMINATED','MATURED','LAPSED')))
-                    AS invalidContractPayment,
-                CASE WHEN CAST(:expectedAgentId AS bigint) IS NULL
-                       OR CAST(:actualAgentId AS bigint) IS NULL THEN FALSE
-                     ELSE COALESCE((SELECT expected.organization_id <> actual.organization_id
-                                      FROM fgc.agent expected, fgc.agent actual
-                                     WHERE expected.agent_id = :expectedAgentId
-                                       AND actual.agent_id = :actualAgentId), FALSE)
-                END AS organizationMismatch,
-                (:hasJournals AND (SELECT COUNT(DISTINCT policy_version_id) > 1
-                                    FROM fgc.journal_header
-                                   WHERE journal_header_id IN (:journalHeaderIds)
-                                     AND policy_version_id IS NOT NULL)) AS policyVersionError,
-                (:hasJournals AND EXISTS (SELECT 1 FROM fgc.vw_journal_imbalance
-                                          WHERE journal_header_id IN (:journalHeaderIds))) AS journalImbalance
-                """).unwrap(NativeQuery.class);
+        NativeQuery<?> query = entityManager.createNativeQuery(CLASSIFICATION_CONTEXT_SQL).unwrap(NativeQuery.class);
+        query.setParameter(VALIDATION_RUN_ID_PARAM, validationRunId, Long.class);
         query.setParameter(CONTRACT_ID_PARAM, contractId);
         query.setParameter(EXPECTED_AGENT_ID_PARAM, expectedAgentId);
         query.setParameter(ACTUAL_AGENT_ID_PARAM, actualAgentId);
@@ -179,12 +186,14 @@ public class ReconciliationResultRepository {
         query.addScalar("organizationmismatch", Boolean.class);
         query.addScalar("policyversionerror", Boolean.class);
         query.addScalar("journalimbalance", Boolean.class);
+        query.addScalar("targetreviewrequired", Boolean.class);
         return query.setTupleTransformer((values, aliases) -> {
             ReconciliationClassificationContext row = new ReconciliationClassificationContext();
             row.setInvalidContractPayment((Boolean) values[0]);
             row.setOrganizationMismatch((Boolean) values[1]);
             row.setPolicyVersionError((Boolean) values[2]);
             row.setJournalImbalance((Boolean) values[3]);
+            row.setTargetReviewRequired((Boolean) values[4]);
             return row;
         }).uniqueResult();
     }
