@@ -25,15 +25,18 @@ public class AuditLogSearchImpl implements AuditLogSearch {
     @Override
     public List<AuditLogRow> selectAuditLogs(AuditLogSearchCriteria criteria, Pageable pageable) {
         var al = auditLog;
-        return queryFactory.select(Projections.constructor(AuditLogRow.class,
+        var query = queryFactory.select(Projections.constructor(AuditLogRow.class,
                         al.auditLogId, al.occurredAt, al.userId, appUser.loginId,
                         al.actionCode, al.entityType, al.entityId,
                         Expressions.stringTemplate("cast({0} as string)", al.beforeValue),
                         Expressions.stringTemplate("cast({0} as string)", al.afterValue),
                         al.reason, al.requestId, al.policyVersionId))
                 .from(al).leftJoin(al.user, appUser).where(filters(criteria))
-                .orderBy(al.occurredAt.desc(), al.auditLogId.desc())
-                .offset(pageable.getOffset()).limit(pageable.getPageSize()).fetch();
+                .orderBy(al.occurredAt.desc(), al.auditLogId.desc());
+        if (pageable.isPaged()) {
+            query.offset(pageable.getOffset()).limit(pageable.getPageSize());
+        }
+        return query.fetch();
     }
 
     @Override

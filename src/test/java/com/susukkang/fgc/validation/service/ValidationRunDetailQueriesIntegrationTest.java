@@ -222,8 +222,12 @@ class ValidationRunDetailQueriesIntegrationTest {
 
         ValidationRunResultSummaryRow fromRepository = validationRunRepository.summarize(runId).orElseThrow();
 
+        // #498: 비교 기준 확정 실행이 없으면 ID는 null이고 확정 결과 차이 건수는 0이다.
+        assertThat(fromRepository.getComparedFinalizedRunId()).isNull();
+        assertThat(fromRepository.getFinalizedResultDiffCount()).isZero();
         for (var field : ValidationRunResultSummaryRow.class.getDeclaredFields()) {
             if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+            if (field.getName().equals("comparedFinalizedRunId")) continue; // 위에서 nullable ID 계약을 검증했다.
             Object value = org.springframework.test.util.ReflectionTestUtils.getField(fromRepository, field.getName());
             assertThat(value).as(field.getName()).isInstanceOf(Number.class);
             assertThat(new BigDecimal(value.toString())).as(field.getName()).isEqualByComparingTo(BigDecimal.ZERO);

@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 설명 : b5b4692의 격리된 JDBC SQL과 같은 DB·트랜잭션에서 원천·결과 projection을 비교한다.
  * JDBC 계측은 기존 테스트 도구를 재사용하며 호출 시간은 DB 서버 실행시간과 다르다.
+ * #515의 예정일 시점 판정은 원본 SQL과 의도적으로 다르므로 분류 문맥 비교는 예정일 없는 fallback에 한정한다.
+ * 예정일·효력일 경계·수동 상태 변경은 ReconciliationClassificationContextIntegrationTest에서 검증한다.
  *
  * @author C4t4ddict
  * @since 2026-10-05
@@ -238,11 +239,30 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
             Map<String, Object> p = params("contractId", null, "expectedAgentId", null,
                     "actualAgentId", null, "journalHeaderIds", journalIds);
             compare("classification_context", () -> baseline.selectOne(NS + "ReconciliationResult.findClassificationContext", p),
-                    () -> results.findClassificationContext(null, null, null, journalIds));
+                    () -> results.findClassificationContext(null, null, null, journalIds, null));
         }
         assertThat(results.findDetail(Long.MAX_VALUE)).isNull();
         assertThat(runs.findById(Long.MAX_VALUE)).isNull();
         assertThat(results.findResults(id, null, "asc", 100, 20)).isEmpty();
+    }
+
+    @Test
+    void comparesOriginalClassificationSqlWhenDueDateIsUnavailable() {
+        Map<String, Boolean> expectedInvalidPayments = Map.of(
+                "FGC-FGN01-202605-0001", true,
+                "FGC-FGN01-202603-0001", true,
+                "FGC-FGL01-202607-0001", false);
+        expectedInvalidPayments.forEach((contractNo, expectedInvalid) -> {
+            Long contractId = jdbc.queryForObject(
+                    "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = ?", Long.class, contractNo);
+            Map<String, Object> parameters = params("contractId", contractId, "expectedAgentId", null,
+                    "actualAgentId", null, "journalHeaderIds", List.of());
+            compare("classification_without_due_date", () -> baseline.selectOne(
+                            NS + "ReconciliationResult.findClassificationContext", parameters),
+                    () -> results.findClassificationContext(contractId, null, null, List.of(), null));
+            assertThat(results.findClassificationContext(contractId, null, null, List.of(), null)
+                    .isInvalidContractPayment()).as(contractNo).isEqualTo(expectedInvalid);
+        });
     }
 
     private Long createRun() {

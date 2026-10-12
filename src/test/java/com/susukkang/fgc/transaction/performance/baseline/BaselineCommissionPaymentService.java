@@ -228,6 +228,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
 
             CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                     calculation.limitAmount(),
+                    calculation.annualizedLimitBase(),
                     rule.warningUsagePct(),
                     rule.existingIncludedAmount(),
                     data.attributedAmount(),
@@ -352,6 +353,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 }
                 CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                         calculation.limitAmount(),
+                        calculation.annualizedLimitBase(),
                         rule.warningUsagePct(),
                         rule.existingIncludedAmount(),
                         data.attributedAmount(),

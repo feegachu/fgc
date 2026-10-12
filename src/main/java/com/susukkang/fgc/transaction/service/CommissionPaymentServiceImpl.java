@@ -232,6 +232,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
             CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                     calculation.limitAmount(),
+                    calculation.annualizedLimitBase(),
                     rule.warningUsagePct(),
                     rule.existingIncludedAmount(),
                     currentIncludedAmount(attributions, data),
@@ -349,6 +350,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 }
                 CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
                         calculation.limitAmount(),
+                        calculation.annualizedLimitBase(),
                         rule.warningUsagePct(),
                         rule.existingIncludedAmount(),
                         currentIncludedAmount(attributions, data),
@@ -1572,17 +1574,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         calculation.limitAmount()
                 );
 
+        // #490: 결합 산입액도 계산기·CapValidator와 같은 1,200% 예산 기준으로 판정
+        CapResultStatus effectiveStatus = CapResultStatus.judge(
+                remainingAmount, calculation.annualizedLimitBase(), warningUsagePct);
         CapResultStatus resultStatus;
         if (calculation.resultStatus() == CapResultStatus.REVIEW_REQUIRED
                 || actualValidation.resultStatus() == CapResultStatus.REVIEW_REQUIRED) {
             resultStatus = CapResultStatus.REVIEW_REQUIRED;
         } else if (calculation.resultStatus() == CapResultStatus.VIOLATION
                 || actualValidation.resultStatus() == CapResultStatus.VIOLATION
-                || remainingAmount.signum() < 0) {
+                || effectiveStatus == CapResultStatus.VIOLATION) {
             resultStatus = CapResultStatus.VIOLATION;
         } else if (calculation.resultStatus() == CapResultStatus.WARNING
                 || actualValidation.resultStatus() == CapResultStatus.WARNING
-                || usagePct.compareTo(warningUsagePct) >= 0) {
+                || effectiveStatus == CapResultStatus.WARNING) {
             resultStatus = CapResultStatus.WARNING;
         } else {
             resultStatus = CapResultStatus.NORMAL;
