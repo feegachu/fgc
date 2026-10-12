@@ -6,7 +6,7 @@ import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRes
 import com.susukkang.fgc.reconciliation.dto.ReconciliationExceptionBulkCreateRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunRow;
 import com.susukkang.fgc.reconciliation.repository.ReconciliationRunRepository;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,13 +26,13 @@ class ReconciliationExceptionServiceTest {
     private ReconciliationRunRepository reconciliationRunRepository;
 
     @Mock
-    private ExceptionCaseMapper exceptionCaseMapper;
+    private ExceptionCaseRepository exceptionCaseRepository;
 
     private ReconciliationExceptionService service;
 
     @BeforeEach
     void setUp() {
-        service = new ReconciliationExceptionService(reconciliationRunRepository, exceptionCaseMapper);
+        service = new ReconciliationExceptionService(reconciliationRunRepository, exceptionCaseRepository);
     }
 
     @Test
@@ -41,7 +41,7 @@ class ReconciliationExceptionServiceTest {
         ReconciliationExceptionBulkCreateRow row = new ReconciliationExceptionBulkCreateRow();
         row.setCandidateCount(5L);
         row.setCreatedCount(2L);
-        given(exceptionCaseMapper.bulkCreateFromReconciliationResultsByRun(41L)).willReturn(row);
+        given(exceptionCaseRepository.bulkCreateFromReconciliationResultsByRun(41L)).willReturn(row);
 
         ReconciliationExceptionBulkCreateResponse response = service.bulkCreate(41L);
 
@@ -58,12 +58,12 @@ class ReconciliationExceptionServiceTest {
                 .satisfies(exception ->
                         assertThat(((FgcBusinessException) exception).getErrorCode())
                                 .isEqualTo(FgcErrorCode.COMMON_004));
-        verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(99L);
+        verify(exceptionCaseRepository, never()).bulkCreateFromReconciliationResultsByRun(99L);
     }
 
     // fgc.record_exception_detection()이 validation_run_id를 필수로 요구해서(V23_1),
-    // 월 검증 실행과 연결되지 않은 단독 대사 실행은 Mapper까지 가지 않고 여기서 막아야 한다
-    // (안 막으면 Mapper의 INNER JOIN 때문에 "후보 0건"으로 조용히 넘어가 버린다).
+    // 월 검증 실행과 연결되지 않은 단독 대사 실행은 Repository까지 가지 않고 여기서 막아야 한다
+    // (안 막으면 Repository의 INNER JOIN 때문에 "후보 0건"으로 조용히 넘어가 버린다).
     @Test
     void throwsReco003WhenReconciliationRunHasNoLinkedValidationRun() {
         ReconciliationRunRow standaloneRun = new ReconciliationRunRow();
@@ -76,7 +76,7 @@ class ReconciliationExceptionServiceTest {
                 .satisfies(exception ->
                         assertThat(((FgcBusinessException) exception).getErrorCode())
                                 .isEqualTo(FgcErrorCode.RECO_003));
-        verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(41L);
+        verify(exceptionCaseRepository, never()).bulkCreateFromReconciliationResultsByRun(41L);
     }
 
     // 실행이 아직 COMPLETED/FINALIZED가 아니면(CREATED·RUNNING·FAILED) 결과가 안정적이지
@@ -92,7 +92,7 @@ class ReconciliationExceptionServiceTest {
                 .satisfies(exception ->
                         assertThat(((FgcBusinessException) exception).getErrorCode())
                                 .isEqualTo(FgcErrorCode.RECO_004));
-        verify(exceptionCaseMapper, never()).bulkCreateFromReconciliationResultsByRun(41L);
+        verify(exceptionCaseRepository, never()).bulkCreateFromReconciliationResultsByRun(41L);
     }
 
     private static ReconciliationRunRow runLinkedToValidationRun(Long reconciliationRunId, Long validationRunId) {

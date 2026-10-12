@@ -6,7 +6,7 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
-import com.susukkang.fgc.schedule.mapper.ScheduleMapper;
+import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.dto.ValidationScheduleState;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
@@ -34,7 +34,7 @@ class ValidationRunScheduleServiceTest {
 
     @Mock ValidationTargetRepository validationTargetRepository;
     @Mock CommissionPolicyService commissionPolicyService;
-    @Mock ScheduleMapper scheduleMapper;
+    @Mock ScheduleWriteRepository scheduleMapper;
     @Mock ExceptionCaseRepository exceptionCaseRepository;
     @Mock ScheduleRegenerationBatchItemService itemService;
 

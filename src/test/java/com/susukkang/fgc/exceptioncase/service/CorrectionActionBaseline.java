@@ -1,5 +1,7 @@
 package com.susukkang.fgc.exceptioncase.service;
 
+import com.susukkang.fgc.common.persistence.baseline.JdbcBaseline;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.entity.AuditLog;
@@ -20,7 +22,6 @@ import com.susukkang.fgc.journal.dto.JournalRepostLineCommand;
 import com.susukkang.fgc.journal.service.JournalCorrectionService;
 import jakarta.persistence.EntityManager;
 import org.hibernate.query.NativeQuery;
-import org.mybatis.spring.SqlSessionTemplate;
 
 import java.time.OffsetDateTime;
 import java.util.HashMap;
@@ -28,19 +29,19 @@ import java.util.Map;
 
 /**
  * bc35de82 ExceptionCaseService 조치 알고리즘의 테스트 전용 복원본.
- * 삭제 예정 Mapper/Insert DTO만 고정 XML SqlSessionTemplate/Map으로 대체했다.
+ * 삭제 예정 Mapper/Insert DTO만 고정 XML JdbcBaseline/Map으로 대체했다.
  * 최초 정정 대상 잠금과 원장 정정, 감사 저장은 기준 리비전에서도 JPA였으며 이를 유지한다.
  * 트랜잭션 시작/commit은 비교 테스트의 동일 REQUIRED TransactionTemplate이 담당한다.
  */
 public final class CorrectionActionBaseline {
     private static final String MAPPER = "correction-action-baseline.";
-    private final SqlSessionTemplate session;
+    private final JdbcBaseline session;
     private final AuditLogRepository audits;
     private final ObjectMapper mapper;
     private final EntityManager entityManager;
     private final JournalCorrectionService corrections;
 
-    CorrectionActionBaseline(SqlSessionTemplate session, AuditLogRepository audits, ObjectMapper mapper,
+    CorrectionActionBaseline(JdbcBaseline session, AuditLogRepository audits, ObjectMapper mapper,
                              EntityManager entityManager, JournalCorrectionService corrections) {
         this.session = session;
         this.audits = audits;

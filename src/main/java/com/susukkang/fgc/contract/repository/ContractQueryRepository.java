@@ -1,16 +1,22 @@
 package com.susukkang.fgc.contract.repository;
 
-import com.susukkang.fgc.common.code.CapResultStatus;
-import com.susukkang.fgc.common.code.ContractStatus;
-import com.susukkang.fgc.common.code.DataOrigin;
-import com.susukkang.fgc.common.code.PaymentCycleCode;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
 import com.susukkang.fgc.contract.dto.ContractView;
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.impl.JPAQuery;
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import static com.susukkang.fgc.contract.entity.QInsuranceContract.insuranceContract;
+import static com.susukkang.fgc.base.entity.QInsurer.insurer;
+import static com.susukkang.fgc.base.entity.QProductOffering.productOffering;
+import static com.susukkang.fgc.base.entity.QProduct.product;
+import static com.susukkang.fgc.base.entity.QAgent.agent;
+import static com.susukkang.fgc.cap.entity.QLatestCapCheck.latestCapCheck;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
 import org.springframework.data.domain.Page;
@@ -21,15 +27,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
  * 설명 : 계약 검색·CSV·상세 화면용 조회와 등록·수정에 필요한 기준정보 검증을 담당한다.
- * 여러 도메인의 테이블과 뷰를 결합하는 조회는 네이티브 SQL로 수행하고 DTO로 반환한다.
+ * 동적 검색은 QueryDSL, 고정 상세는 JPQL, PostgreSQL 금액 집계는 네이티브 SQL로 조회한다.
  *
  * @author hjKang
  * @version 1.0
@@ -39,7 +43,10 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ContractQueryRepository {
 
+    private static final String CONTRACT_ID_PARAMETER = "contractId";
+
     private final EntityManager entityManager;
+    private final JPAQueryFactory queryFactory;
 
     /** 계약 상세 화면에 필요한 기준정보를 함께 조회한다. */
     @Transactional(readOnly = true)
@@ -47,94 +54,37 @@ public class ContractQueryRepository {
         if (contractId == null) {
             return Optional.empty();
         }
-        NativeQuery<?> query = nativeQuery("""
-                SELECT ic.contract_id, ic.insurer_id, i.insurer_name,
-                       ic.product_offering_id, ic.contract_no, p.product_name,
-                       po.offering_version, ic.contract_date, ic.agent_id, a.agent_name,
-                       ic.organization_id, o.organization_name, ic.premium_per_cycle_amount,
-                       ic.payment_cycle_code, ic.first_premium_amount,
-                       ic.monthly_equivalent_first_premium, ic.payment_term_months,
-                       ic.standard_surrender_deduction_amount,
-                       ic.current_status AS contract_status, ic.data_origin, ic.updated_at
-                  FROM fgc.insurance_contract ic
-                  JOIN fgc.insurer i ON i.insurer_id = ic.insurer_id
-                  JOIN fgc.product_offering po ON po.product_offering_id = ic.product_offering_id
-                  JOIN fgc.product p ON p.product_id = po.product_id
-                  JOIN fgc.agent a ON a.agent_id = ic.agent_id
-                  JOIN fgc.organization o ON o.organization_id = ic.organization_id
-                 WHERE ic.contract_id = :contractId
-                """);
-        query.setParameter("contractId", contractId);
-        query.addScalar("contract_id", Long.class);
-        query.addScalar("insurer_id", Long.class);
-        query.addScalar("insurer_name", String.class);
-        query.addScalar("product_offering_id", Long.class);
-        query.addScalar("contract_no", String.class);
-        query.addScalar("product_name", String.class);
-        query.addScalar("offering_version", String.class);
-        query.addScalar("contract_date", LocalDate.class);
-        query.addScalar("agent_id", Long.class);
-        query.addScalar("agent_name", String.class);
-        query.addScalar("organization_id", Long.class);
-        query.addScalar("organization_name", String.class);
-        query.addScalar("premium_per_cycle_amount", BigDecimal.class);
-        query.addScalar("payment_cycle_code", String.class);
-        query.addScalar("first_premium_amount", BigDecimal.class);
-        query.addScalar("monthly_equivalent_first_premium", BigDecimal.class);
-        query.addScalar("payment_term_months", Integer.class);
-        query.addScalar("standard_surrender_deduction_amount", BigDecimal.class);
-        query.addScalar("contract_status", String.class);
-        query.addScalar("data_origin", String.class);
-
-        query.addScalar("updated_at", OffsetDateTime.class);
-
-        return query.setTupleTransformer((row, aliases) -> ContractDetailResponse.builder()
-                        .contractId((Long) row[0])
-                        .insurerId((Long) row[1])
-                        .insurerName((String) row[2])
-                        .productOfferingId((Long) row[3])
-                        .contractNo((String) row[4])
-                        .productName((String) row[5])
-                        .offeringVersion((String) row[6])
-                        .contractDate((LocalDate) row[7])
-                        .agentId((Long) row[8])
-                        .agentName((String) row[9])
-                        .organizationId((Long) row[10])
-                        .organizationName((String) row[11])
-                        .premiumPerCycleAmount((BigDecimal) row[12])
-                        .paymentCycleCode(PaymentCycleCode.valueOf((String) row[13]))
-                        .firstPremiumAmount((BigDecimal) row[14])
-                        .monthlyEquivalentFirstPremium((BigDecimal) row[15])
-                        .paymentTermMonths((Integer) row[16])
-                        .standardSurrenderDeductionAmount((BigDecimal) row[17])
-                        .contractStatus(ContractStatus.valueOf((String) row[18]))
-                        .dataOrigin(DataOrigin.valueOf((String) row[19]))
-                        .updatedAt((OffsetDateTime) row[20])
-                        .build())
-                .getResultList().stream().findFirst();
+        return entityManager.createQuery("""
+                SELECT new com.susukkang.fgc.contract.dto.ContractDetailResponse(
+                    c.contractId, c.insurerId, i.insurerName, c.productOfferingId,
+                    c.contractNo, p.productName, po.offeringVersion, c.contractDate,
+                    c.agentId, a.agentName, c.organizationId, o.organizationName,
+                    c.premiumPerCycleAmount, c.paymentCycleCode, c.firstPremiumAmount,
+                    c.monthlyEquivalentFirstPremium, c.paymentTermMonths,
+                    c.standardSurrenderDeductionAmount, c.currentStatus, c.dataOrigin, c.updatedAt)
+                  FROM InsuranceContract c
+                  JOIN Insurer i ON i.insurerId = c.insurerId
+                  JOIN ProductOffering po ON po.productOfferingId = c.productOfferingId
+                  JOIN Product p ON p.productId = po.productId
+                  JOIN Agent a ON a.agentId = c.agentId
+                  JOIN Organization o ON o.organizationId = c.organizationId
+                 WHERE c.contractId = :contractId
+                """, ContractDetailResponse.class)
+                .setParameter(CONTRACT_ID_PARAMETER, contractId).getResultList().stream().findFirst();
     }
 
     /** 사건 원본이 아닌 Job별 처리 테이블에서 처리 이력을 조회한다. */
     @Transactional(readOnly = true)
     public List<ContractStatusEventProcessingRow> findStatusEventProcessingsByContractId(Long contractId) {
-        NativeQuery<?> query = nativeQuery("""
-                SELECT p.contract_status_event_id, p.processing_job,
-                       p.processing_status, p.processed_at
-                  FROM fgc.contract_status_event_processing p
-                  JOIN fgc.contract_status_event e
-                    ON e.contract_status_event_id = p.contract_status_event_id
-                 WHERE e.contract_id = :contractId
-                 ORDER BY p.contract_status_event_id ASC, p.processed_at ASC,
-                          p.contract_status_event_processing_id ASC
-                """);
-        query.setParameter("contractId", contractId);
-        query.addScalar("contract_status_event_id", Long.class);
-        query.addScalar("processing_job", String.class);
-        query.addScalar("processing_status", String.class);
-        query.addScalar("processed_at", OffsetDateTime.class);
-        return query.setTupleTransformer((row, aliases) -> new ContractStatusEventProcessingRow(
-                (Long) row[0], (String) row[1], (String) row[2], (OffsetDateTime) row[3]
-        )).getResultList();
+        return entityManager.createQuery("""
+                SELECT new com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow(
+                    p.contractStatusEventId, p.processingJob, p.processingStatus, p.processedAt)
+                  FROM ContractStatusEventProcessing p
+                  JOIN ContractStatusEvent e ON e.contractStatusEventId = p.contractStatusEventId
+                 WHERE e.contractId = :contractId
+                 ORDER BY p.contractStatusEventId, p.processedAt, p.contractStatusEventProcessingId
+                """, ContractStatusEventProcessingRow.class)
+                .setParameter(CONTRACT_ID_PARAMETER, contractId).getResultList();
     }
 
     @Transactional(readOnly = true)
@@ -143,10 +93,7 @@ public class ContractQueryRepository {
             return false;
         }
         return exists("""
-                SELECT EXISTS (
-                    SELECT 1 FROM fgc.insurer
-                     WHERE insurer_id = :insurerId AND active_yn = TRUE
-                )
+                SELECT COUNT(i) FROM Insurer i WHERE i.insurerId = :insurerId AND i.activeYn = TRUE
                 """, Map.of("insurerId", insurerId));
     }
 
@@ -156,15 +103,12 @@ public class ContractQueryRepository {
             return false;
         }
         return exists("""
-                SELECT EXISTS (
-                    SELECT 1 FROM fgc.product_offering po
-                    JOIN fgc.product p ON p.product_id = po.product_id
-                     WHERE p.insurer_id = :insurerId
-                       AND po.product_offering_id = :productOfferingId
-                       AND p.active_yn = TRUE AND po.active_yn = TRUE
-                       AND po.sales_start_date <= :contractDate
-                       AND (po.sales_end_date IS NULL OR po.sales_end_date >= :contractDate)
-                )
+                SELECT COUNT(po) FROM ProductOffering po
+                    JOIN Product p ON p.productId = po.productId
+                     WHERE p.insurerId = :insurerId AND po.productOfferingId = :productOfferingId
+                       AND p.activeYn = TRUE AND po.activeYn = TRUE
+                       AND po.salesStartDate <= :contractDate
+                       AND (po.salesEndDate IS NULL OR po.salesEndDate >= :contractDate)
                 """, Map.of("insurerId", insurerId, "productOfferingId", productOfferingId,
                 "contractDate", contractDate));
     }
@@ -175,13 +119,11 @@ public class ContractQueryRepository {
             return false;
         }
         return exists("""
-                SELECT EXISTS (
-                    SELECT 1 FROM fgc.agent
-                     WHERE agent_id = :agentId AND rank_code = 'FC'
-                       AND active_yn = TRUE AND agent_status = 'ACTIVE'
-                       AND appointment_date <= :contractDate
-                       AND (termination_date IS NULL OR termination_date >= :contractDate)
-                )
+                SELECT COUNT(a) FROM Agent a
+                     WHERE a.agentId = :agentId AND a.rankCode = com.susukkang.fgc.common.code.AgentRankCode.FC
+                       AND a.activeYn = TRUE AND a.agentStatus = 'ACTIVE'
+                       AND a.appointmentDate <= :contractDate
+                       AND (a.terminationDate IS NULL OR a.terminationDate >= :contractDate)
                 """, Map.of("agentId", agentId, "contractDate", contractDate));
     }
 
@@ -191,13 +133,10 @@ public class ContractQueryRepository {
             return false;
         }
         return exists("""
-                SELECT EXISTS (
-                    SELECT 1 FROM fgc.agent a
-                    JOIN fgc.organization o ON o.organization_id = a.organization_id
-                     WHERE a.agent_id = :agentId AND a.organization_id = :organizationId
-                       AND o.active_yn = TRUE AND o.effective_from <= :contractDate
-                       AND (o.effective_to IS NULL OR o.effective_to >= :contractDate)
-                )
+                SELECT COUNT(a) FROM Agent a JOIN Organization o ON o.organizationId = a.organizationId
+                     WHERE a.agentId = :agentId AND a.organizationId = :organizationId
+                       AND o.activeYn = TRUE AND o.effectiveFrom <= :contractDate
+                       AND (o.effectiveTo IS NULL OR o.effectiveTo >= :contractDate)
                 """, Map.of("agentId", agentId, "organizationId", organizationId,
                 "contractDate", contractDate));
     }
@@ -220,260 +159,74 @@ public class ContractQueryRepository {
                    AND ta.attribution_date >= c.contract_date
                    AND ta.attribution_date < c.contract_date + INTERVAL '12 months'
                 """);
-        query.setParameter("contractId", contractId);
+        query.setParameter(CONTRACT_ID_PARAMETER, contractId);
         query.setParameter("paymentStage", paymentStage.name());
         query.addScalar("evidence_amount", BigDecimal.class);
         return (BigDecimal) query.getSingleResult();
     }
 
     private boolean exists(String sql, Map<String, Object> parameters) {
-        Query query = entityManager.createNativeQuery(sql);
+        var query = entityManager.createQuery(sql, Long.class);
         parameters.forEach(query::setParameter);
-        return Boolean.TRUE.equals(query.getSingleResult());
+        return query.getSingleResult() > 0;
     }
 
     private NativeQuery<?> nativeQuery(String sql) {
         return entityManager.createNativeQuery(sql).unwrap(NativeQuery.class);
     }
 
-    private static final String SELECT_SQL = """
-            SELECT
-                ic.contract_id AS contract_id,
-                ic.contract_no AS contract_no,
-                i.insurer_name AS insurer_name,
-                p.product_name AS product_name,
-                ic.contract_date AS contract_date,
-                ic.monthly_equivalent_first_premium
-                    AS monthly_equivalent_first_premium,
-                CONCAT(
-                    'FC-',
-                    LPAD(CAST(a.agent_id AS text), 4, '0'),
-                    ' ',
-                    a.agent_name
-                ) AS agent_id_name,
-                ic.current_status AS contract_status,
-                cc.result_status AS cap_result_status,
-                ic.data_origin AS data_origin
-            """;
 
-    private static final String FROM_SQL = """
-            FROM fgc.insurance_contract ic
-            JOIN fgc.insurer i
-                ON i.insurer_id = ic.insurer_id
-            JOIN fgc.product_offering po
-                ON po.product_offering_id = ic.product_offering_id
-            JOIN fgc.product p
-                ON p.product_id = po.product_id
-            JOIN fgc.agent a
-                ON a.agent_id = ic.agent_id
-            LEFT JOIN fgc.vw_latest_cap_check cc
-                ON cc.contract_id = ic.contract_id
-               AND cc.payment_stage = 'GA_TO_FC'
-            """;
-
-    // S2077 검토: buildWhere는 코드에 정의된 조건식만 조합하며 사용자 입력은 모두 setParameter로 바인딩한다.
-    // ORDER BY도 고정이고 페이징은 JPA API를 사용한다. 조건식에 검색값을 직접 연결하지 않는다.
-    // 회귀 검증: ContractRepositoryIntegrationTest.bindsSqlLikeContractNumberAsData
-    @SuppressWarnings("java:S2077")
+    /** 목록·CSV·건수에 동일한 조건과 조인을 적용한다. 최신 판정은 기존 뷰를 그대로 사용한다. */
     @Transactional(readOnly = true)
-    public Page<ContractView> search(
-            ContractSearchCondition condition,
-            Pageable pageable
-    ) {
-        Map<String, Object> parameters = new LinkedHashMap<>();
-
-        // 목록과 건수 조회에서 같은 JOIN·검색 조건 사용
-        String fromAndWhere = FROM_SQL + buildWhere(condition, parameters);
-
-        NativeQuery<ContractView> contentQuery = createContentQuery(
-                SELECT_SQL
-                        + fromAndWhere
-                        + " ORDER BY ic.contract_id DESC"
-        );
-
-        Query countQuery = entityManager.createNativeQuery(
-                "SELECT COUNT(*) " + fromAndWhere
-        );
-
-        // 검색값은 SQL 문자열에 직접 넣지 않고 파라미터로 바인딩
-        parameters.forEach((name, value) -> {
-            contentQuery.setParameter(name, value);
-            countQuery.setParameter(name, value);
-        });
-
-        // 기존 LIMIT·OFFSET에 해당
-        contentQuery.setFirstResult(
-                Math.toIntExact(pageable.getOffset())
-        );
-        contentQuery.setMaxResults(pageable.getPageSize());
-
-        List<ContractView> content = contentQuery.getResultList();
-
-        long totalCount =
-                ((Number) countQuery.getSingleResult()).longValue();
-
-        return new PageImpl<>(content, pageable, totalCount);
-    }
-
-    private String buildWhere(
-            ContractSearchCondition condition,
-            Map<String, Object> parameters
-    ) {
-        StringBuilder where = new StringBuilder(" WHERE 1 = 1");
-
-        if (condition == null) {
-            return where.toString();
-        }
-
-        // 기존 XML과 동일하게 null·빈 문자열만 제외
-        if (condition.getContractNo() != null
-                && !condition.getContractNo().isEmpty()) {
-            appendCondition(
-                    where,
-                    parameters,
-                    "ic.contract_no LIKE CONCAT('%', :contractNo, '%')",
-                    "contractNo",
-                    condition.getContractNo()
-            );
-        }
-
-        appendCondition(
-                where, parameters,
-                "ic.insurer_id = :insurerId",
-                "insurerId", condition.getInsurerId()
-        );
-
-        appendCondition(
-                where, parameters,
-                "ic.product_offering_id = :productOfferingId",
-                "productOfferingId", condition.getProductOfferingId()
-        );
-
-        appendCondition(
-                where, parameters,
-                "ic.agent_id = :agentId",
-                "agentId", condition.getAgentId()
-        );
-
-        appendCondition(
-                where, parameters,
-                "ic.organization_id = :orgId",
-                "orgId", condition.getOrgId()
-        );
-
-        appendCondition(
-                where, parameters,
-                "cc.result_status = :capResultStatus",
-                "capResultStatus", condition.getCapResultStatus()
-        );
-
-        appendCondition(
-                where, parameters,
-                "ic.current_status = :currentStatus",
-                "currentStatus", condition.getCurrentStatus()
-        );
-
-        appendCondition(
-                where, parameters,
-                "ic.contract_date >= :contractDateFrom",
-                "contractDateFrom", condition.getContractDateFrom()
-        );
-
-        appendCondition(
-                where, parameters,
-                "ic.contract_date <= :contractDateTo",
-                "contractDateTo", condition.getContractDateTo()
-        );
-
-        return where.toString();
-    }
-
-    private void appendCondition(
-            StringBuilder where,
-            Map<String, Object> parameters,
-            String expression,
-            String parameterName,
-            Object value
-    ) {
-        if (value == null) {
-            return;
-        }
-
-        where.append(" AND ").append(expression);
-
-        // 네이티브 SQL에서는 DB에 저장된 enum 이름으로 비교
-        Object parameterValue =
-                value instanceof Enum<?> enumValue
-                        ? enumValue.name()
-                        : value;
-
-        parameters.put(parameterName, parameterValue);
-    }
-
-    private NativeQuery<ContractView> createContentQuery(String sql) {
-        NativeQuery<?> query = entityManager
-                .createNativeQuery(sql)
-                .unwrap(NativeQuery.class);
-
-        // 조회 결과의 Java 타입을 명시
-        query.addScalar("contract_id", Long.class);
-        query.addScalar("contract_no", String.class);
-        query.addScalar("insurer_name", String.class);
-        query.addScalar("product_name", String.class);
-        query.addScalar("contract_date", LocalDate.class);
-        query.addScalar("monthly_equivalent_first_premium", BigDecimal.class);
-        query.addScalar("agent_id_name", String.class);
-        query.addScalar("contract_status", String.class);
-        query.addScalar("cap_result_status", String.class);
-        query.addScalar("data_origin", String.class);
-
-        return query.setTupleTransformer(
-                (row, aliases) -> toContractView(row)
-        );
-    }
-
-    private ContractView toContractView(Object[] row) {
-        String capResultStatus = (String) row[8];
-
-        return ContractView.builder()
-                .contractId((Long) row[0])
-                .contractNo((String) row[1])
-                .insurerName((String) row[2])
-                .productName((String) row[3])
-                .contractDate((LocalDate) row[4])
-                .monthlyEquivalentFirstPremium((BigDecimal) row[5])
-                .agentIdName((String) row[6])
-                .contractStatus(
-                        ContractStatus.valueOf((String) row[7])
-                )
-                .capResultStatus(
-                        capResultStatus == null
-                                ? null
-                                : CapResultStatus.valueOf(capResultStatus)
-                )
-                .dataOrigin(
-                        DataOrigin.valueOf((String) row[9])
-                )
-                .build();
+    public Page<ContractView> search(ContractSearchCondition condition, Pageable pageable) {
+        List<ContractView> content = contentQuery(condition)
+                .offset(pageable.getOffset()).limit(pageable.getPageSize()).fetch();
+        long total = joins(queryFactory.select(insuranceContract.count()).from(insuranceContract))
+                .where(filters(condition)).fetchOne();
+        return new PageImpl<>(content, pageable, total);
     }
 
     @Transactional(readOnly = true)
-    public List<ContractView> searchAll(
-            ContractSearchCondition condition
-    ) {
-        Map<String, Object> parameters = new LinkedHashMap<>();
+    public List<ContractView> searchAll(ContractSearchCondition condition) {
+        return contentQuery(condition).fetch();
+    }
 
-        String sql = SELECT_SQL
-                + FROM_SQL
-                + buildWhere(condition, parameters)
-                + " ORDER BY ic.contract_id DESC";
+    private JPAQuery<ContractView> contentQuery(ContractSearchCondition condition) {
+        var c = insuranceContract;
+        return joins(queryFactory.select(Projections.constructor(ContractView.class,
+                        c.contractId, c.contractNo, insurer.insurerName, product.productName,
+                        c.contractDate, c.monthlyEquivalentFirstPremium,
+                        Expressions.stringTemplate("concat('FC-', lpad(cast({0} as string), 4, '0'), ' ', {1})",
+                                agent.agentId, agent.agentName),
+                        c.currentStatus, latestCapCheck.resultStatus, c.dataOrigin)).from(c))
+                .where(filters(condition)).orderBy(c.contractId.desc());
+    }
 
-        NativeQuery<ContractView> query = createContentQuery(sql);
+    private <T> JPAQuery<T> joins(JPAQuery<T> query) {
+        var c = insuranceContract;
+        return query.join(insurer).on(insurer.insurerId.eq(c.insurerId))
+                .join(productOffering).on(productOffering.productOfferingId.eq(c.productOfferingId))
+                .join(product).on(product.productId.eq(productOffering.productId))
+                .join(agent).on(agent.agentId.eq(c.agentId))
+                .leftJoin(latestCapCheck).on(latestCapCheck.contractId.eq(c.contractId)
+                        .and(latestCapCheck.paymentStage.eq(PaymentStage.GA_TO_FC)));
+    }
 
-        parameters.forEach((name, value) ->
-                query.setParameter(name, value)
-        );
-
-        return query.getResultList();
+    private BooleanBuilder filters(ContractSearchCondition condition) {
+        BooleanBuilder where = new BooleanBuilder();
+        if (condition == null) return where;
+        var c = insuranceContract;
+        // LIKE의 %, _와 PostgreSQL 기본 역슬래시 이스케이프 의미를 기존 그대로 보존한다.
+        if (condition.getContractNo() != null && !condition.getContractNo().isEmpty())
+            where.and(c.contractNo.like("%" + condition.getContractNo() + "%", (char) 92));
+        if (condition.getInsurerId() != null) where.and(c.insurerId.eq(condition.getInsurerId()));
+        if (condition.getProductOfferingId() != null) where.and(c.productOfferingId.eq(condition.getProductOfferingId()));
+        if (condition.getAgentId() != null) where.and(c.agentId.eq(condition.getAgentId()));
+        if (condition.getOrgId() != null) where.and(c.organizationId.eq(condition.getOrgId()));
+        if (condition.getCapResultStatus() != null) where.and(latestCapCheck.resultStatus.eq(condition.getCapResultStatus()));
+        if (condition.getCurrentStatus() != null) where.and(c.currentStatus.eq(condition.getCurrentStatus()));
+        if (condition.getContractDateFrom() != null) where.and(c.contractDate.goe(condition.getContractDateFrom()));
+        if (condition.getContractDateTo() != null) where.and(c.contractDate.loe(condition.getContractDateTo()));
+        return where;
     }
 }
