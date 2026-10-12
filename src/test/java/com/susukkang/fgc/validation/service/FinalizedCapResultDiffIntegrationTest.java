@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.service;
 
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.validation.batch.contract.ExceptionGenerationPort;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -169,6 +171,45 @@ class FinalizedCapResultDiffIntegrationTest {
                 .containsEntry("detection_count", 2)
                 .containsEntry("first_detected_run_id", secondRunId)
                 .containsEntry("last_detected_run_id", thirdRunId);
+    }
+
+    // 운영정책서 제44조 종결 방식: 확정 결과는 바뀌지 않아 재검증마다 같은 차이가 다시 검출된다.
+    // 확정 유지로 반려(REJECTED)한 건은 증거가 같으면 닫힌 채 남고, 해결(RESOLVED)로 닫은 건은 NEW로 다시 열린다(V24).
+    @Test
+    void rejectedCaseStaysClosedButResolvedCaseReopensOnSameDifference() {
+        Long finalizedRunId = runningRun(1);
+        insertCapCheck(finalizedRunId, contractIds.get(0), "INSURER_TO_GA", "NORMAL", LIMIT);
+        insertCapCheck(finalizedRunId, contractIds.get(1), "INSURER_TO_GA", "NORMAL", LIMIT);
+        finalize(finalizedRunId);
+
+        Long secondRunId = runningRun(2);
+        insertCapCheck(secondRunId, contractIds.get(0), "INSURER_TO_GA", "VIOLATION", LIMIT);
+        insertCapCheck(secondRunId, contractIds.get(1), "INSURER_TO_GA", "VIOLATION", LIMIT);
+        exceptionCaseRepository.insertFromFinalizedCapResultDiffs(secondRunId);
+        Long rejectedCaseId = diffCaseId(contractIds.get(0));
+        Long resolvedCaseId = diffCaseId(contractIds.get(1));
+        exceptionCaseRepository.updateCaseAfterAction(rejectedCaseId, ExceptionStatus.REJECTED, null, OffsetDateTime.now());
+        exceptionCaseRepository.updateCaseAfterAction(resolvedCaseId, ExceptionStatus.RESOLVED, null, OffsetDateTime.now());
+
+        Long thirdRunId = runningRun(3);
+        insertCapCheck(thirdRunId, contractIds.get(0), "INSURER_TO_GA", "VIOLATION", LIMIT);
+        insertCapCheck(thirdRunId, contractIds.get(1), "INSURER_TO_GA", "VIOLATION", LIMIT);
+        exceptionCaseRepository.insertFromFinalizedCapResultDiffs(thirdRunId);
+
+        assertThat(caseStatus(rejectedCaseId)).isEqualTo("REJECTED");
+        assertThat(caseStatus(resolvedCaseId)).isEqualTo("NEW");
+    }
+
+    private Long diffCaseId(Long contractId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT exception_case_id FROM fgc.exception_case
+                 WHERE validation_month = ? AND reason_code = 'FINALIZED_RESULT_DIFF' AND contract_id = ?
+                """, Long.class, MONTH, contractId);
+    }
+
+    private String caseStatus(Long caseId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM fgc.exception_case WHERE exception_case_id = ?", String.class, caseId);
     }
 
     @Test

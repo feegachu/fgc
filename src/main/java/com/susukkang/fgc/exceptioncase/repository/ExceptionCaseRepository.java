@@ -231,6 +231,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
     @Query(value = """
             SELECT COUNT(*) FILTER (WHERE recorded.new_case)
               FROM fgc.validation_run vr
+              -- 비교 기준 선택: ValidationRunRepository#summarize 의 comparedFinalizedRunId 와 같은 조건을 유지한다
               JOIN LATERAL (
                   SELECT finalized.validation_run_id
                     FROM fgc.validation_run finalized

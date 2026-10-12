@@ -356,6 +356,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                    ex.exceptionDetectedCount, ex.exceptionNewCount, ex.exceptionRecurringCount,
                    ex.exceptionReopenedCount, ex.exceptionNotDetectedCount,
                    ex.exceptionOpenWorkItemCount, ex.finalizedResultDiffCount,
+                   -- #498 비교 기준: ExceptionCaseRepository#insertFromFinalizedCapResultDiffs 와 같은 조건을 유지한다
                    (SELECT MAX(finalized.validation_run_id)
                       FROM fgc.validation_run finalized
                       JOIN fgc.validation_run target_run
