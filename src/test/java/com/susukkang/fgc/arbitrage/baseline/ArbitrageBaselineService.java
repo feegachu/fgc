@@ -1,9 +1,10 @@
 package com.susukkang.fgc.arbitrage.baseline;
 
+import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
-import com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineMapper;
+import com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
@@ -16,8 +17,8 @@ import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.CreateValidationRunCommand;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,10 +49,10 @@ public class ArbitrageBaselineService {
     private static final String AUDIT_ENTITY_TYPE = "ARBITRAGE_CHECK";
     private static final String AUDIT_ARBITRAGE_RECHECKED = "ARBITRAGE_RECHECKED";
 
-    private final ArbitrageBaselineMapper arbitrageMapper;
+    private final ArbitrageJdbcBaseline arbitrageMapper;
     private final ValidationRunCreateService validationRunCreateService;
-    private final ValidationRunMapper validationRunMapper;
-    private final ExceptionCaseMapper exceptionCaseMapper;
+    private final ValidationRunRepository validationRunMapper;
+    private final ExceptionCaseRepository exceptionCaseMapper;
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
 
@@ -147,16 +148,16 @@ public class ArbitrageBaselineService {
                 ValidationRunType.MANUAL_CONTRACT,
                 triggeredBy
         ));
-        if (validationRunMapper.transitionToRunning(run.getValidationRunId()) != 1)
+        if (validationRunMapper.transitionToRunning(run.getValidationRunId(), ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
-        if (validationRunMapper.updateCurrentStep(run.getValidationRunId(), 5) != 1)
+        if (validationRunMapper.updateCurrentStep(run.getValidationRunId(), 5, ValidationRunStatus.RUNNING) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
 
         ArbitrageCheckInsertDTO row = executeArbitrageCheck(
                 run.getValidationRunId(), contractId, request);
 
         // 수동 검증 실행 완료 처리
-        if (validationRunMapper.transitionToCompleted(run.getValidationRunId()) != 1)
+        if (validationRunMapper.transitionToCompleted(run.getValidationRunId(), ValidationRunStatus.RUNNING, ValidationRunStatus.COMPLETED) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
 
         Map<String, Object> auditValue = new LinkedHashMap<>();

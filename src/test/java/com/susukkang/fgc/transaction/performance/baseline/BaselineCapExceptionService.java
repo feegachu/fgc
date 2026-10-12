@@ -9,7 +9,7 @@ import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapExceptionInsertDTO;
 import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
 import com.susukkang.fgc.transaction.performance.baseline.BaselineCapExceptionStatusRow;
-import com.susukkang.fgc.transaction.performance.baseline.BaselineCapExceptionMapper;
+import com.susukkang.fgc.transaction.performance.baseline.PaymentCapExceptionJdbcBaseline;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
@@ -32,7 +32,7 @@ import java.text.DecimalFormat;
 @RequiredArgsConstructor
 public class BaselineCapExceptionService implements CapExceptionService {
 
-    private final BaselineCapExceptionMapper capExceptionMapper;
+    private final PaymentCapExceptionJdbcBaseline capExceptionMapper;
 
     /**
      * 설명 : 실시간·배치 한도 판정 결과가 주의 또는 위반인 경우 예외 건을 생성한다
@@ -45,7 +45,7 @@ public class BaselineCapExceptionService implements CapExceptionService {
     @Transactional
     public void createIfNecessary(CapExceptionCreateCommand command) {
         // 이 메서드는 실시간 사전확정(FUN-034) 전용이다 — 월 통합검증 8단계의 CAP 예외는
-        // ExceptionCaseMapper.insertFromCapChecks(record_exception_detection 경유)가 만든다.
+        // ExceptionCaseRepository.insertFromCapChecks(record_exception_detection 경유)가 만든다.
         // validationRunId 를 여기로 넘기면 키에 실행 ID가 들어가 재실행마다 중복 예외가
         // 생기므로(FGC-FUN-052 위반) 배치에서 이 메서드를 호출하지 않는다.
         // 연계 요구사항 : FGC-FUN-034, FGC-FUN-042, FGC-FUN-043
@@ -98,7 +98,7 @@ public class BaselineCapExceptionService implements CapExceptionService {
     @Transactional(readOnly = true)
     public boolean hasUnresolvedViolation(Long paymentId) {
         // FUN-034의 OPEN은 공통 예외 상태인 NEW와 IN_REVIEW로 해석한다(정의: ExceptionStatus).
-        // SQL 은 BaselineCapExceptionMapper.existsUnresolvedViolation 의 IN ('NEW','IN_REVIEW') — 같은 정의.
+        // SQL 은 PaymentCapExceptionJdbcBaseline.existsUnresolvedViolation 의 IN ('NEW','IN_REVIEW') — 같은 정의.
         if (paymentId == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
         return capExceptionMapper.existsUnresolvedViolation(paymentId);
     }

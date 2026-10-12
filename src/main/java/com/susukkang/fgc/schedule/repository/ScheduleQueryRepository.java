@@ -7,8 +7,15 @@ import com.susukkang.fgc.common.code.ScheduleLineStatus;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import com.susukkang.fgc.schedule.dto.*;
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.impl.JPAQuery;
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import static com.susukkang.fgc.schedule.entity.QScheduleHeader.scheduleHeader;
+import static com.susukkang.fgc.schedule.entity.QScheduleLine.scheduleLine;
+import static com.susukkang.fgc.contract.entity.QInsuranceContract.insuranceContract;
+import static com.susukkang.fgc.policy.entity.QPolicyVersion.policyVersion;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +42,7 @@ import java.util.Objects;
 public class ScheduleQueryRepository {
 
     private final EntityManager entityManager;
+    private final JPAQueryFactory queryFactory;
 
     // 목록·버전·상세가 공유하는 헤더 집계. 헤더 PK로 묶으므로 헤더 컬럼은 함수 종속으로 선택된다.
     // 모든 쿼리는 리터럴만 이어 붙인 컴파일 시점 상수다. 입력값은 전부 바인딩 파라미터로만 전달한다.
@@ -59,23 +67,6 @@ public class ScheduleQueryRepository {
               LEFT JOIN ScheduleLine sl ON sl.scheduleHeaderId = sh.scheduleHeaderId
             """;
     private static final String GROUP_BY = " GROUP BY sh.scheduleHeaderId, c.contractNo, pv.policyCode, pv.versionNo";
-    // 값이 없는(null) 조건은 필터에서 제외한다. 계약번호는 기존처럼 부분 일치(LIKE '%값%')다.
-    // 문자열 null 파라미터는 PostgreSQL에 bytea로 전달돼 LIKE가 실패하므로 명시적으로 형변환한다.
-    private static final String SEARCH_WHERE = """
-             WHERE (CAST(:contractNo AS String) IS NULL
-                    OR c.contractNo LIKE CONCAT('%', CAST(:contractNo AS String), '%'))
-               AND (:stage IS NULL OR sh.paymentStage = :stage)
-               AND (:regime IS NULL OR sh.scheduleRegime = :regime)
-               AND (:purpose IS NULL OR sh.schedulePurpose = :purpose)
-               AND (:status IS NULL OR sh.status = :status)
-            """;
-    private static final String SEARCH_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + SEARCH_WHERE
-            + GROUP_BY + " ORDER BY sh.scheduleHeaderId DESC";
-    private static final String COUNT_QUERY = """
-            SELECT COUNT(sh)
-              FROM ScheduleHeader sh
-              JOIN InsuranceContract c ON c.contractId = sh.contractId
-            """ + SEARCH_WHERE;
     private static final String VERSIONS_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + """
              WHERE EXISTS (SELECT 1 FROM ScheduleHeader t
                             WHERE t.scheduleHeaderId = :scheduleHeaderId
@@ -97,17 +88,19 @@ public class ScheduleQueryRepository {
             return List.of();
         }
         return headerQuery(condition)
-                .setFirstResult((int) offset)
-                .setMaxResults(size)
-                .getResultList().stream().map(ScheduleQueryRepository::toHeader).toList();
+                .offset(offset)
+                .limit(size)
+                .fetch().stream().map(row -> toHeader(row.toArray())).toList();
     }
 
     public List<ScheduleHeaderResponse> selectAllByCondition(ScheduleSearchCondition condition) {
-        return headerQuery(condition).getResultList().stream().map(ScheduleQueryRepository::toHeader).toList();
+        return headerQuery(condition).fetch().stream().map(row -> toHeader(row.toArray())).toList();
     }
 
     public long countByCondition(ScheduleSearchCondition condition) {
-        return bindSearch(entityManager.createQuery(COUNT_QUERY, Long.class), condition).getSingleResult();
+        return queryFactory.select(scheduleHeader.count()).from(scheduleHeader)
+                .join(insuranceContract).on(insuranceContract.contractId.eq(scheduleHeader.contractId))
+                .where(searchFilters(condition)).fetchOne();
     }
 
     /** 대상 헤더와 같은 계약·지급단계의 모든 버전(용도 무관)을 최신 버전부터 조회한다. */
@@ -244,18 +237,34 @@ public class ScheduleQueryRepository {
                 .getResultList();
     }
 
-    private TypedQuery<Object[]> headerQuery(ScheduleSearchCondition condition) {
-        return bindSearch(entityManager.createQuery(SEARCH_QUERY, Object[].class), condition);
+    private JPAQuery<com.querydsl.core.Tuple> headerQuery(ScheduleSearchCondition condition) {
+        var sh = scheduleHeader;
+        var c = insuranceContract;
+        var pv = policyVersion;
+        var sl = scheduleLine;
+        return queryFactory.select(
+                        sh.scheduleHeaderId, c.contractNo,
+                        Expressions.nullExpression(String.class), Expressions.nullExpression(String.class),
+                        sh.paymentStage, sh.scheduleRegime, sh.schedulePurpose, sh.scheduleVersionNo,
+                        sh.status, sh.activeYn, sh.generatedAt, sh.generationReason,
+                        sl.scheduleLineId.count(), sl.expectedAmount.sumAggregate(), pv.policyCode, pv.versionNo)
+                .from(sh).join(c).on(c.contractId.eq(sh.contractId))
+                .join(pv).on(pv.policyVersionId.eq(sh.policyVersionId))
+                .leftJoin(sl).on(sl.scheduleHeaderId.eq(sh.scheduleHeaderId))
+                .where(searchFilters(condition))
+                .groupBy(sh.scheduleHeaderId, c.contractNo, pv.policyCode, pv.versionNo)
+                .orderBy(sh.scheduleHeaderId.desc());
     }
 
-    private static <T> TypedQuery<T> bindSearch(TypedQuery<T> query, ScheduleSearchCondition condition) {
-        String contractNo = condition.getContractNo();
-        // 기존처럼 빈 문자열은 조건 없음으로 본다.
-        return query.setParameter("contractNo", contractNo == null || contractNo.isEmpty() ? null : contractNo)
-                .setParameter("stage", condition.getStage())
-                .setParameter("regime", condition.getRegime())
-                .setParameter("purpose", condition.getPurpose())
-                .setParameter("status", condition.getStatus());
+    private BooleanBuilder searchFilters(ScheduleSearchCondition c) {
+        BooleanBuilder where = new BooleanBuilder();
+        if (c.getContractNo() != null && !c.getContractNo().isEmpty())
+            where.and(insuranceContract.contractNo.like("%" + c.getContractNo() + "%", (char) 92));
+        if (c.getStage() != null) where.and(scheduleHeader.paymentStage.eq(c.getStage()));
+        if (c.getRegime() != null) where.and(scheduleHeader.scheduleRegime.eq(c.getRegime()));
+        if (c.getPurpose() != null) where.and(scheduleHeader.schedulePurpose.eq(c.getPurpose()));
+        if (c.getStatus() != null) where.and(scheduleHeader.status.eq(c.getStatus()));
+        return where;
     }
 
     private static ScheduleHeaderResponse toHeader(Object[] row) {
