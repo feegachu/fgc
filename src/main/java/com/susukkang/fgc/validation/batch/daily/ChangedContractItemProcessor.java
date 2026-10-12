@@ -84,17 +84,21 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
             // 어느 한쪽이라도 실패하면 스킵으로 돌려 상태 사건을 FAILED로 남긴다(다음 날 Reader가 다시 잡는다).
             List<String> failures = new ArrayList<>();
             LocalDate asOfDate = LocalDate.now(DateUtil.SEOUL_ZONE);
+            // 순서 주의: 차익거래를 1,200%보다 먼저 부른다. 1,200%(CapCheckServiceImpl)는 이 청크 트랜잭션에서
+            // 계약 행을 FOR UPDATE로 잠가 청크 커밋까지 쥐고 있는데, 그 뒤에 REQUIRES_NEW(다른 연결)로
+            // arbitrage_check를 넣으면 FK 검사가 그 잠금을 기다리고 이 스레드는 차익거래를 기다려 끝없이 멈춘다
+            // (PostgreSQL은 교착으로 감지하지 못한다). ChangedContractArbitrageIntegrationTest가 이 순서를 지킨다.
+            try {
+                // REQUIRES_NEW — 실패하면 이 계약의 차익거래 결과·예외는 함께 롤백되어 남지 않는다.
+                arbitrageCheckBatchItemService.process(validationRunId, contractId, arbitrageAsOfDate(contract, asOfDate));
+            } catch (FgcBusinessException e) {
+                failures.add(describe(e));
+            }
             try {
                 for (PaymentStage paymentStage : PaymentStage.values()) {
                     capCheckService.calculateAndSave(
                             CapCalculationCommand.dailyBatch(contractId, paymentStage, asOfDate, validationRunId));
                 }
-            } catch (FgcBusinessException e) {
-                failures.add(describe(e));
-            }
-            try {
-                // REQUIRES_NEW — 실패하면 이 계약의 차익거래 결과·예외는 함께 롤백되어 남지 않는다.
-                arbitrageCheckBatchItemService.process(validationRunId, contractId, arbitrageAsOfDate(contract, asOfDate));
             } catch (FgcBusinessException e) {
                 failures.add(describe(e));
             }

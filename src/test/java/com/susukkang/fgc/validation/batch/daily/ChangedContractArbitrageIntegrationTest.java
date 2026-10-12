@@ -9,6 +9,7 @@ import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.JobParameters;
@@ -16,10 +17,13 @@ import org.springframework.batch.core.StepExecution;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -32,6 +36,11 @@ import static org.mockito.Mockito.mock;
  *
  * 스케줄 재생성은 이 테스트의 관심사가 아니고 시드 계약의 공유 스케줄을 바꾸므로 mock으로 둔다.
  * 차익거래·1,200%는 실제 빈을 쓴다.
+ *
+ * Processor는 실제 Step처럼 청크 트랜잭션 안에서 부른다. 1,200%는 청크 트랜잭션에서 계약 행을
+ * FOR UPDATE로 잠그는데(CapCheckServiceImpl), 그 뒤에 REQUIRES_NEW(다른 연결)로 arbitrage_check를
+ * 넣으면 FK 검사(FOR KEY SHARE)가 그 잠금을 기다리고 청크 스레드는 차익거래를 기다려 끝없이 멈춘다.
+ * PostgreSQL은 대기자가 하나뿐이라 교착으로 감지하지 못한다 — 순서가 바뀌면 @Timeout으로 실패한다.
  */
 @SpringBootTest
 class ChangedContractArbitrageIntegrationTest {
@@ -50,6 +59,8 @@ class ChangedContractArbitrageIntegrationTest {
     private ContractStatusEventRepository contractStatusEventRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private ChangedContractItemProcessor processor;
     private Long validationRunId;
@@ -83,8 +94,9 @@ class ChangedContractArbitrageIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void terminatedContractGetsArbitrageRowAsOfEffectiveDateAndRerunAddsNothing() {
-        ChangedContractResult first = processor.process(contractId);
+        ChangedContractResult first = processInChunkTransaction();
 
         // A1은 2026-01 계약이라 1,200% 룰셋이 없다(CAP_004). 그래도 차익거래는 점검되고,
         // 결과는 스킵이라 상태 사건은 FAILED로 남는다. 차익거래 자체는 실패하지 않았다.
@@ -105,12 +117,16 @@ class ChangedContractArbitrageIntegrationTest {
 
         // 같은 날 같은 실행으로 다시 돌려도(IF-BAT-02 멱등성) uq_arbitrage_check의 UPSERT와
         // 예외 업무키·실행별 occurrence 멱등 기록 덕분에 행이 늘지 않는다.
-        ChangedContractResult second = processor.process(contractId);
+        ChangedContractResult second = processInChunkTransaction();
 
         assertThat(second.failureReason()).isEqualTo(first.failureReason());
         assertThat(arbitrageRows()).isEqualTo(1);
         assertThat(candidateCases()).isEqualTo(1);
         assertThat(candidateOccurrences()).isEqualTo(1);
+    }
+
+    private ChangedContractResult processInChunkTransaction() {
+        return new TransactionTemplate(transactionManager).execute(status -> processor.process(contractId));
     }
 
     private Integer arbitrageRows() {
