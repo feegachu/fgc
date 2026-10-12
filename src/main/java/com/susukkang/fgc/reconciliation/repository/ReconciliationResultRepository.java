@@ -36,17 +36,24 @@ public class ReconciliationResultRepository {
     private static final String RESULT_TYPE_PARAM = "resultType";
     private static final String RECONCILIATION_RUN_ID_PARAM = "reconciliationRunId";
     private static final String VALIDATION_RUN_ID_PARAM = "validationRunId";
+    // 2026-10-12 yslee - #518 지급예정일 시점 판정을 현재 상태 조건에서 분리한다(PR #520 리뷰).
+    // 기존 코드: 현재 상태가 비유효(해지·실효·만기·청약철회)인 계약만 지급예정일 시점 상태를 봤다.
+    // 문제: 실효 뒤 부활(REVIVED)한 계약의 실효 기간 회차에 지급하면 현재 상태 필터에 막혀 비유효로 잡히지 않았다.
+    //       예상 원천은 같은 회차를 지급 대상 아님으로 빼므로 두 판정이 어긋났다.
+    // 개선: 상태 사건으로 확인된 판정(NON_PAYABLE_ON_DUE_DATE)은 예상 원천과 같은 식을 현재 상태와 무관하게 쓰고,
+    //       현재 상태 대체 판정(지급예정일 없음·이력 불신)만 현재 상태가 비유효일 때 적용한다.
     private static final String CLASSIFICATION_CONTEXT_SQL = """
             SELECT EXISTS (SELECT 1 FROM fgc.insurance_contract c
+                            CROSS JOIN (SELECT CAST(:dueDate AS date) AS due_date) sl
                             WHERE c.contract_id = :contractId
-                              AND c.current_status IN %1$s
-                              AND (c.current_status = 'CANCELLED'
-                                   OR CAST(:dueDate AS date) IS NULL
-                                   OR (SELECT l.new_status FROM fgc.contract_status_event l
-                                        WHERE l.contract_id = c.contract_id
-                                        ORDER BY l.effective_at DESC, l.event_seq DESC
-                                        LIMIT 1) IS DISTINCT FROM c.current_status
-                                   OR %2$s IN %1$s))
+                              AND (""" + ContractStatusOnDueDateSql.NON_PAYABLE_ON_DUE_DATE + """
+
+                                   OR (c.current_status IN """ + ContractStatusOnDueDateSql.NON_PAYABLE_STATUSES + """
+
+                                       AND (sl.due_date IS NULL
+                                            OR """ + ContractStatusOnDueDateSql.LATEST_EVENT_STATUS + """
+
+                                               IS DISTINCT FROM c.current_status))))
                 AS invalidContractPayment,
             CASE WHEN CAST(:expectedAgentId AS bigint) IS NULL
                    OR CAST(:actualAgentId AS bigint) IS NULL THEN FALSE
@@ -65,8 +72,7 @@ public class ReconciliationResultRepository {
                      WHERE vt.validation_run_id = CAST(:validationRunId AS bigint)
                        AND vt.contract_id = :contractId
                        AND vt.selection_status = 'REVIEW_REQUIRED') AS targetReviewRequired
-            """.formatted(ContractStatusOnDueDateSql.NON_PAYABLE_STATUSES,
-            ContractStatusOnDueDateSql.statusOn("c.contract_id", ":dueDate"));
+            """;
     private static final List<ReconciliationNativeProjection.Column> RESULT_COLUMNS = List.of(
             new ReconciliationNativeProjection.Column(RECONCILIATION_RESULT_ID_PARAM, Long.class),
             new ReconciliationNativeProjection.Column("contractNo", String.class),
@@ -164,6 +170,8 @@ public class ReconciliationResultRepository {
      * 계약 수정 화면의 상태 변경은 아직 사건을 남기지 않아(FUN-026 2차) 이력을 믿을 수 없다.
      * "같은 상태 사건이 한 번이라도 있었는가"로 보면 LAPSED→REVIVED 이력 뒤 화면에서 다시 LAPSED로 바꾼
      * 계약이 옛 사건으로 판정돼 비유효 신호가 사라진다(PR #515 리뷰).
+     * 이력을 믿을 수 있으면(최신 상태 사건 = 현재 상태) 현재 상태와 무관하게 지급예정일 시점 상태를 본다 —
+     * 실효 뒤 부활한 계약의 실효 기간 회차 지급도 비유효다(#518, PR #520 리뷰).
      * <p>
      * #518 — {@code targetReviewRequired}는 이 계약이 이 검증 실행에서 검토필요(REVIEW_REQUIRED)로 보류된
      * 대상인지다. 보류 대상은 스케줄 재생성 등 하위 검증을 받지 않으므로(FUN-042) 예상 내역 없음을

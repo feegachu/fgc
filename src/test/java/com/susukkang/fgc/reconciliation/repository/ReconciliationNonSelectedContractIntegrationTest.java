@@ -1,6 +1,10 @@
 package com.susukkang.fgc.reconciliation.repository;
 
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.reconciliation.dto.GaFcExpectedSourceRow;
+import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
+import com.susukkang.fgc.reconciliation.service.GaFcReconciliationMatcher;
+import com.susukkang.fgc.reconciliation.service.ReconciliationResultPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +34,10 @@ class ReconciliationNonSelectedContractIntegrationTest {
     private GaFcReconciliationRepository gaFcSources;
     @Autowired
     private ReconciliationResultRepository results;
+    @Autowired
+    private GaFcReconciliationMatcher gaFcMatcher;
+    @Autowired
+    private ReconciliationResultPersistenceService persistenceService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -80,6 +88,56 @@ class ReconciliationNonSelectedContractIntegrationTest {
     }
 
     @Test
+    void 최신_상태_사건이_현재_상태와_다르면_이력을_믿지_않고_예상에_남긴다() {
+        Long contractId = insertContract("ACTIVE");
+        insertEvent(contractId, 1, "ACTIVE", "2098-01-15 00:00+09");
+        insertEvent(contractId, 2, "LAPSED", "2098-05-10 00:00+09");
+        Long line = insertLine(contractId, 1, MONTH.withDayOfMonth(25));
+
+        assertThat(expectedLineIds(contractId)).contains(line);
+    }
+
+    /** PR #520 리뷰: 부활 계약도 실효 기간 회차 지급은 비유효다. 현재 상태(REVIVED)에 막히지 않아야 한다. */
+    @Test
+    void 부활_계약의_실효_기간_회차_지급은_비유효_계약_지급이다() {
+        Long contractId = insertContract("REVIVED");
+        insertEvent(contractId, 1, "ACTIVE", "2098-01-15 00:00+09");
+        insertEvent(contractId, 2, "LAPSED", "2098-05-10 00:00+09");
+        insertEvent(contractId, 3, "REVIVED", "2098-05-20 00:00+09");
+        LocalDate lapsedPeriod = MONTH.withDayOfMonth(15);
+        insertLine(contractId, 1, lapsedPeriod);
+        insertConfirmedPayment(contractId, 1, lapsedPeriod);
+        Long insurerId = jdbcTemplate.queryForObject(
+                "SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id = ?", Long.class, contractId);
+        Long runId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.reconciliation_run (settlement_month, payment_stage, insurer_id)
+                VALUES (?, 'GA_TO_FC', ?)
+                RETURNING reconciliation_run_id
+                """, Long.class, MONTH, insurerId);
+        ReconciliationExecutionRequest request = new ReconciliationExecutionRequest(
+                runId, null, MONTH, PaymentStage.GA_TO_FC, insurerId, null);
+
+        persistenceService.persist(request, gaFcMatcher.match(request).stream()
+                .filter(candidate -> contractId.equals(candidate.contractId()))
+                .toList());
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT primary_reason_code FROM fgc.reconciliation_result
+                 WHERE reconciliation_run_id = ? AND contract_id = ?
+                """, String.class, runId, contractId)).isEqualTo("INVALID_CONTRACT_PAYMENT");
+        assertThat(invalidOn(contractId, MONTH.withDayOfMonth(25))).isFalse();
+    }
+
+    @Test
+    void 이력을_믿을_수_없으면_현재_상태가_정상인_계약의_지급은_비유효가_아니다() {
+        Long contractId = insertContract("ACTIVE");
+        insertEvent(contractId, 1, "ACTIVE", "2098-01-15 00:00+09");
+        insertEvent(contractId, 2, "LAPSED", "2098-05-10 00:00+09");
+
+        assertThat(invalidOn(contractId, MONTH.withDayOfMonth(25))).isFalse();
+    }
+
+    @Test
     void 이_검증_실행에서_검토필요로_보류된_대상만_보류_신호가_켜진다() {
         Long held = insertContract("ACTIVE");
         Long selected = insertContract("ACTIVE");
@@ -105,6 +163,38 @@ class ReconciliationNonSelectedContractIntegrationTest {
     private boolean reviewRequired(Long validationRunId, Long contractId) {
         return results.findClassificationContext(validationRunId, contractId, null, null, List.of(), null)
                 .isTargetReviewRequired();
+    }
+
+    private boolean invalidOn(Long contractId, LocalDate dueDate) {
+        return results.findClassificationContext(null, contractId, null, null, List.of(), dueDate)
+                .isInvalidContractPayment();
+    }
+
+    private void insertConfirmedPayment(Long contractId, int installmentNo, LocalDate dueDate) {
+        Long transactionId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction (
+                    payment_stage, source_type, source_business_key, source_contract_id,
+                    recipient_agent_id, commission_item_id, installment_no,
+                    settlement_month, due_date, amount, cashflow_type, status
+                )
+                SELECT 'GA_TO_FC', 'GA_MANUAL_PAYMENT', ?, c.contract_id, c.agent_id,
+                       (SELECT commission_item_id FROM fgc.commission_item
+                         WHERE cashflow_type = 'PAYMENT' ORDER BY commission_item_id LIMIT 1),
+                       ?, ?, ?, 5000, 'PAYMENT', 'DRAFT'
+                  FROM fgc.insurance_contract c
+                 WHERE c.contract_id = ?
+                RETURNING commission_transaction_id
+                """, Long.class, "IT-518-" + UUID.randomUUID(), installmentNo, MONTH, dueDate, contractId);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.transaction_attribution (
+                    commission_transaction_id, attribution_seq, attribution_scope, contract_id,
+                    attribution_date, attribution_month, attributed_amount,
+                    inclusion_status_snapshot, attribution_method
+                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, 5000, 'INCLUDED', 'DIRECT')
+                """, transactionId, contractId, dueDate, MONTH);
+        jdbcTemplate.update(
+                "UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?",
+                transactionId);
     }
 
     private Long insertContract(String currentStatus) {

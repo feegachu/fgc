@@ -39,10 +39,9 @@ class ReconciliationExpectedSourceQuery {
     //       남는다. 실제 지급이 없으면 "비유효 계약 지급"으로 잘못 분류됐다(시드 C005 7·8월 5,000원).
     // 개선: 인터페이스정의서 §9-5 상태별 처리표(STATUS_MONTH_RULE = PAY_IF_ACTIVE_ON_DUE_DATE)대로
     //       청약철회 계약과 지급예정일 시점 실효·해지·만기 회차를 지급 대상에서 뺀다 — 2차의 CANCELLED와 같은 효과.
-    //       청약철회는 처음부터 무효라 현재 상태로 뺀다. 나머지는 분류 쿼리와 달리 "현재 상태 대체 판정"을
-    //       쓰지 않는다 — 데이터를 빼는 쪽이라 상태 사건으로 확인된 경우만 빼고, 사건이 없으면
-    //       예상에 남겨 사람이 보게 한다.
-    //       실효 뒤 부활한 계약의 실효 기간 회차도 빠진다(REVIVAL_BACKFILL_RULE = NO_RETROACTIVE).
+    //       판정식은 ContractStatusOnDueDateSql.NON_PAYABLE_ON_DUE_DATE 하나를 분류 쿼리와 같이 쓴다.
+    //       분류 쿼리의 "현재 상태 대체 판정"은 쓰지 않는다 — 데이터를 빼는 쪽이라 상태 사건으로 확인된
+    //       경우만 빼고, 사건이 없거나 이력을 믿을 수 없으면 예상에 남겨 사람이 보게 한다.
     private static final String EXPECTED_SOURCE_SQL = """
                 SELECT sl.schedule_line_id AS scheduleLineId,
                        jh.journal_header_id AS journalHeaderId,
@@ -67,13 +66,11 @@ class ReconciliationExpectedSourceQuery {
                    AND sh.status NOT IN ('HOLD', 'CANCELLED')
                    AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
                    AND sl.due_month = :settlementMonth AND c.insurer_id = :insurerId
-                   AND c.current_status <> 'CANCELLED'
-                   AND COALESCE(%s, '') NOT IN %s
+                   AND NOT """ + ContractStatusOnDueDateSql.NON_PAYABLE_ON_DUE_DATE + """
+
                  ORDER BY sh.contract_id, sl.commission_item_id, sl.due_month,
                           sl.installment_no, sl.schedule_line_id
-                """.formatted(
-            ContractStatusOnDueDateSql.statusOn("c.contract_id", "sl.due_date"),
-            ContractStatusOnDueDateSql.NON_PAYABLE_STATUSES);
+                """;
 
     <T> List<T> find(LocalDate month, Long insurerId, PaymentStage stage, Supplier<T> factory) {
         NativeQuery<?> query = entityManager.createNativeQuery(EXPECTED_SOURCE_SQL).unwrap(NativeQuery.class);
