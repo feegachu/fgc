@@ -78,7 +78,7 @@ export function draftRows(draft: Payment | undefined, month: string): Attributio
     amount: String(row.amount ?? ''),
     decision:
       row.inclusionDecisionStatus === 'EXCLUDED'
-        ? `EXCLUDED:${row.exclusionType ?? 'VOICE_RECORDING'}`
+        ? `EXCLUDED:${row.exclusionType ?? 'NEW_AGENT_SUPPORT'}`
         : (row.inclusionDecisionStatus ?? 'INCLUDED'),
     attributionMethod: row.attributionMethod ?? 'DIRECT',
     allocationBasis: row.allocationBasis ?? '',
@@ -103,8 +103,6 @@ export function inclusionOptions(insurer: boolean, newcomer: boolean): [string, 
   return [
     ['INCLUDED', '산입'],
     ['REVIEW_REQUIRED', '검토필요'],
-    ['EXCLUDED:VOICE_RECORDING', '제외 · 녹취'],
-    ['EXCLUDED:BROADCAST', '제외 · 방송'],
     ...(insurer
       ? [['EXCLUDED:COMPLIANCE_3PCT', '제외 · 준법경영비']]
       : [['EXCLUDED:NEW_AGENT_SUPPORT', '제외 · 신인 지원']]),
@@ -172,13 +170,11 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
       throw new FormValidationError('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.', `attr-${row.key}-evidenceRef`)
     if (row.attributionMethod === 'APPROVED_ALLOCATION' && !blank(row.allocationBasis))
       throw new FormValidationError('승인 배부에는 배부정책을 입력해야 합니다.', `attr-${row.key}-allocationBasis`)
-    const exclusions = {
-      VOICE_RECORDING: '녹취 관련 비용',
-      BROADCAST: '방송 관련 비용',
-      NEW_AGENT_SUPPORT: '신인활동지원비',
-      COMPLIANCE_3PCT: '준법경영비',
-      NONE: '',
-    }
+    const exclusions = new Map([
+      ['NEW_AGENT_SUPPORT', '신인활동지원비'],
+      ['COMPLIANCE_3PCT', '준법경영비'],
+      ['NONE', ''],
+    ])
     return {
       contractId: newcomer ? null : Number(row.contractId),
       attributionDate: row.attributionDate,
@@ -187,7 +183,7 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
       exclusionType: exclusion,
       inclusionDecisionReason:
         status === 'EXCLUDED'
-          ? `한도 제외: ${exclusions[exclusion ?? 'NONE']}`
+          ? `한도 제외: ${exclusions.get(exclusion ?? 'NONE')}`
           : status === 'INCLUDED'
             ? '화면에서 산입으로 지정'
             : '화면에서 검토필요로 지정',

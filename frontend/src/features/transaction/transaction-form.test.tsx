@@ -284,7 +284,7 @@ describe('TRAN-W02 React form workflow', () => {
   it('requires attribution and evidence but allows an imbalanced draft for server precheck', async () => {
     const { user } = mount()
     await fillNew(user)
-    await user.selectOptions(screen.getByLabelText('1번 귀속행 산입 판정'), 'EXCLUDED:VOICE_RECORDING')
+    await user.selectOptions(screen.getByLabelText('1번 귀속행 산입 판정'), 'EXCLUDED:NEW_AGENT_SUPPORT')
     await user.click(button('btn-save'))
     expect(await screen.findByText('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.')).toBeVisible()
     expect(writes()).toHaveLength(0)

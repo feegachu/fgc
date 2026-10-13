@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   blockedContractNo,
   buildPayload,
+  draftRows,
+  inclusionOptions,
   filterAgentId,
   gateStates,
   hasRecordableBlocker,
@@ -15,6 +17,21 @@ const form = { ...initialForm('2026-07'), sourceBusinessKey: 'GA-MANUAL-test', a
 const row = { ...newRow(1, '2026-07-01', '250000'), contractId: '3' }
 
 describe('transaction draft and attribution contract', () => {
+  it('uses only in-scope exclusions and defaults an excluded draft to newcomer support (SRC-036)', () => {
+    expect(inclusionOptions(false, false).map(([value]) => value)).toEqual([
+      'INCLUDED',
+      'REVIEW_REQUIRED',
+      'EXCLUDED:NEW_AGENT_SUPPORT',
+    ])
+    expect(inclusionOptions(true, false).map(([value]) => value)).toEqual([
+      'INCLUDED',
+      'REVIEW_REQUIRED',
+      'EXCLUDED:COMPLIANCE_3PCT',
+    ])
+    expect(draftRows({ attributions: [{ inclusionDecisionStatus: 'EXCLUDED' }] }, '2026-07')[0].decision).toBe(
+      'EXCLUDED:NEW_AGENT_SUPPORT',
+    )
+  })
   it('saves the month first day, legacy nulls and unmatched sums without client CAP calculation', () => {
     const payload = buildPayload(form, [{ ...row, amount: '1' }], false)
     expect(payload).toMatchObject({
@@ -39,7 +56,7 @@ describe('transaction draft and attribution contract', () => {
   it('rejects missing rows, negative amounts, exclusion evidence and approved allocation basis', () => {
     expect(() => buildPayload(form, [], false)).toThrow('귀속행을 하나 이상 추가하세요.')
     expect(() => buildPayload({ ...form, amount: '-1' }, [row], false)).toThrow('금액')
-    expect(() => buildPayload(form, [{ ...row, decision: 'EXCLUDED:VOICE_RECORDING' }], false)).toThrow('제외 귀속행')
+    expect(() => buildPayload(form, [{ ...row, decision: 'EXCLUDED:NEW_AGENT_SUPPORT' }], false)).toThrow('제외 귀속행')
     expect(() =>
       buildPayload(form, [{ ...row, attributionMethod: 'APPROVED_ALLOCATION', allocationBasis: ' ' }], false),
     ).toThrow('배부정책')
