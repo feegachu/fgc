@@ -15,7 +15,6 @@ export const SCHEDULE_REGIME = {
   CURRENT: '현행',
   FOUR_YEAR_2027: '4년 분급(2027)',
   SEVEN_YEAR_2029: '7년 분급(2029)',
-  TM_SPECIAL: 'TM 특례',
 } as const
 
 export const SCHEDULE_PURPOSE = { OPERATIONAL: '운영', COMPARISON: '비교', SIMULATION: '시뮬레이션' } as const

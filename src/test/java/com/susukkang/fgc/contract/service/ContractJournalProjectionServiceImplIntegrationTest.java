@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * FGC-FGL02-202611-0001(contract_id=14)을 쓴다 — 확인 시점 기준 journal_header/
  * transaction_attribution이 전혀 없는 계약이라 "데이터 없음" 테스트와, 이 테스트가 만드는
  * 분개만 깨끗하게 담기는 "정상 조회" 테스트 둘 다에 적합하다. POSTED 테스트는 같은 이유로
- * 아직 안 쓴 FGC-FGL03-202608-0002(contract_id=18)를 따로 쓴다 — 트랜잭션이 롤백되긴
+ * 분개가 없는 FGC-FGL01-202703-0001을 따로 쓴다(다른 테스트는 이 계약을 읽기만 한다) — 트랜잭션이 롤백되긴
  * 하지만, 혹시 모를 상황에도 다른 테스트의 조회 결과와 절대 안 섞이게 하기 위해서다.
  */
 @SpringBootTest
@@ -50,7 +50,7 @@ class ContractJournalProjectionServiceImplIntegrationTest {
 
     private static final String TEST_MARKER = "#108 통합테스트";
     private static final String EMPTY_CONTRACT_NO = "FGC-FGL02-202611-0001";
-    private static final String POSTED_TEST_CONTRACT_NO = "FGC-FGL03-202608-0002";
+    private static final String POSTED_TEST_CONTRACT_NO = "FGC-FGL01-202703-0001";
 
     @Autowired
     private ContractJournalProjectionService contractJournalProjectionService;

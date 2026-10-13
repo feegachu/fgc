@@ -17,7 +17,6 @@ public record ProductRow(
         String basicDocumentVersion,
         LocalDate basicDocumentDate,
         String channelCode,
-        boolean channelSpecialRuleYn,
         String feeRegimeCode,
         boolean standardDeduction80Yn,
         Integer paymentTermMonths

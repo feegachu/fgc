@@ -102,11 +102,7 @@ export const productColumns: TableColumn<Product>[] = [
   {
     key: 'channel',
     label: '채널',
-    render: (r) => (
-      <>
-        {present(r.channelCode)} {r.channelSpecialRuleYn && <span className="base-secondary-line">채널 특례</span>}
-      </>
-    ),
+    render: (r) => present(r.channelCode),
   },
   { key: 'fee', label: '수수료체계', render: (r) => present(r.feeRegimeCode) },
   {
