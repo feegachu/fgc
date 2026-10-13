@@ -16,6 +16,7 @@ import { ProtectedRoute } from './ProtectedRoute'
 import { RequirePermission } from './RequirePermission'
 // React로 전환을 마친 화면. lazy()로 등록한 화면만 별도 청크로 나뉘어 그 경로에 들어갈 때 받는다
 // (현재 /audit-logs, /cap-checks, /schedules, /schedules/:id). 직접 import한 화면은 초기 번들에 들어간다.
+
 // 여기 없는 경로는 기존 Thymeleaf 화면으로 안내하는 TransitionPage를 그린다.
 const pages: Record<string, ComponentType> = {
   '/': DashboardPage,
@@ -24,6 +25,8 @@ const pages: Record<string, ComponentType> = {
   '/exceptions': ExceptionPage,
   '/cap-checks': lazy(() => import('../features/cap/CapListPage')),
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
+  '/validation-runs': lazy(() => import('../features/validation/ValidationRunListPage')),
+  '/validation-runs/:id': lazy(() => import('../features/validation/ValidationRunDetailPage')),
   '/schedules': lazy(() => import('../features/schedule/ScheduleListPage')),
   '/schedules/:id': lazy(() => import('../features/schedule/ScheduleDetailPage')),
   '/reconciliations': lazy(() => import('../features/reconciliation/ReconciliationPage')),
