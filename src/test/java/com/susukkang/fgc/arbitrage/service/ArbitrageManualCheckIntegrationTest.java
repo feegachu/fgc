@@ -57,6 +57,32 @@ class ArbitrageManualCheckIntegrationTest {
         assertThat(savedCheckId).isEqualTo(result.getArbitrageCheckId());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "FGC-FGL02-202601-0001, CLEAR, NOT_APPLICABLE",
+            "FGC-FGL01-202601-0001, CLEAR, NOT_APPLICABLE",
+            "FGC-FGL02-202603-0475, CANDIDATE, CURRENT_EXCESS",
+            "FGC-FGL01-202603-0475, CANDIDATE, CURRENT_EXCESS"})
+    void verifiesOldAndPostEffectiveDemoContracts(String contractNo, String status, String candidateType) {
+        Long contractId = jdbcTemplate.queryForObject("SELECT contract_id FROM fgc.insurance_contract WHERE contract_no=?", Long.class, contractNo);
+        var result = arbitrageService.checkInExistingRun(insertValidationRun(), contractId, LocalDate.of(2026, 8, 31));
+        assertThat(result.getResultStatus().name()).isEqualTo(status);
+        assertThat(result.getCalculationSnapshot()).contains(candidateType, "2026-03-01");
+        Long cases = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.exception_case WHERE source_entity_type='ARBITRAGE_CHECK' AND source_entity_id=?", Long.class, result.getArbitrageCheckId().toString());
+        assertThat(cases).isEqualTo("CLEAR".equals(status) ? 0L : 1L);
+    }
+
+    @Test
+    void missingActivePolicyPersistsReviewInsteadOfSilentlyApplyingFallback() {
+        jdbcTemplate.update("UPDATE fgc.policy_version SET status='RETIRED' WHERE policy_type='ARBITRAGE' AND status='ACTIVE'");
+        Long id = jdbcTemplate.queryForObject("SELECT contract_id FROM fgc.insurance_contract WHERE contract_no='FGC-FGL02-202603-0475'", Long.class);
+        var result = arbitrageService.checkInExistingRun(insertValidationRun(), id, LocalDate.of(2026, 8, 31));
+        assertThat(result.getResultStatus().name()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(result.getCalculationSnapshot()).contains("정책이 없습니다");
+        assertThat(jdbcTemplate.queryForObject("SELECT exception_type FROM fgc.exception_case WHERE source_entity_type='ARBITRAGE_CHECK' AND source_entity_id=?",
+                String.class, result.getArbitrageCheckId().toString())).isEqualTo("DATA_QUALITY");
+    }
+
     private TestReference testReference() {
         return jdbcTemplate.queryForObject("""
                 SELECT cfs.contract_id,

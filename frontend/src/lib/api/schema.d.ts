@@ -3268,7 +3268,7 @@ export interface components {
              * @description 정책 유형
              * @enum {string}
              */
-            policyType?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY";
+            policyType?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY" | "ARBITRAGE";
             /**
              * @description 정책 유형 한글 라벨
              * @example 1,200% 한도
@@ -4958,7 +4958,7 @@ export interface operations {
                  * @description 정책 유형
                  * @example CAP_1200
                  */
-                type?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY";
+                type?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY" | "ARBITRAGE";
                 /**
                  * @description 기준일(yyyy-MM-dd) — 해당 일자에 유효한 버전만 조회
                  * @example 2026-07-01

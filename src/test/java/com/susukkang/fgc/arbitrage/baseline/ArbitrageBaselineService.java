@@ -4,6 +4,8 @@ import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
+import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService;
+import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService.Applicability;
 import com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
@@ -55,6 +57,7 @@ public class ArbitrageBaselineService {
     private final ExceptionCaseRepository exceptionCaseMapper;
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
+    private final ArbitrageApplicabilityPolicyService applicabilityPolicyService;
 
     /**
      * 설명 : 검색 조건에 해당하는 차익거래 검증 결과 요약과 페이징 목록을 조회한다.
@@ -235,11 +238,12 @@ public class ArbitrageBaselineService {
                 contractId, REGULATORY_PAYMENT_STAGE));
 
         // 금융자료 및 해약환급금 적용 조건 확인
+        var applicability = applicabilityPolicyService.resolve(request.getAsOfDate());
         CalculationDecision decision = calculateDecision(
                 source,
                 paidCommissionAmount,
                 plannedCommissionAmount,
-                request
+                request, applicability
         );
 
         // 계산 결과와 재현 가능한 계산 근거 저장
@@ -261,7 +265,7 @@ public class ArbitrageBaselineService {
                 .resultStatus(decision.resultStatus())
                 .calculationSnapshot(writeCalculationSnapshot(
                         source, confirmedPaymentAmount, confirmedDeductionAmount,
-                        paidCommissionAmount, plannedCommissionAmount, decision, request))
+                        paidCommissionAmount, plannedCommissionAmount, decision, request, applicability))
                 .build();
         int insertedRows = arbitrageMapper.insertArbitrageCheck(row);
         if (insertedRows != 1 || row.getArbitrageCheckId() == null)
@@ -308,13 +312,22 @@ public class ArbitrageBaselineService {
             ArbitrageCalculationSource source,
             BigDecimal paidCommissionAmount,
             BigDecimal plannedCommissionAmount,
-            ReArbitrageCheckRequest request) {
+            ReArbitrageCheckRequest request,
+            Applicability applicability) {
+        int fallbackMonth = source.getContractDate() == null ? 1 : Math.max(1, Math.toIntExact(
+                ChronoUnit.MONTHS.between(source.getContractDate().withDayOfMonth(1),
+                        request.getAsOfDate().withDayOfMonth(1)) + 1));
+        if (source.getContractDate() == null) return reviewRequired(fallbackMonth, "계약일이 없습니다.");
+        if (applicability.reviewReason() != null) return reviewRequired(fallbackMonth, applicability.reviewReason());
+        if (source.getContractDate().isBefore(applicability.effectiveContractDate())) {
+            return new CalculationDecision(
+                    fallbackMonth, valueOrZero(source.getCumulativePaidPremium()), BigDecimal.ZERO, false,
+                    SurrenderValueSourceType.NOT_APPLICABLE, null, BigDecimal.ZERO, BigDecimal.ZERO,
+                    ArbitrageCheckStatus.CLEAR, "NOT_APPLICABLE",
+                    "적용대상 아님 — " + applicability.effectiveContractDate() + " 이전 체결");
+        }
         if (source.getCumulativePaidPremium() == null || source.getContractMonthNo() == null) {
-            int monthNo = Math.max(1, Math.toIntExact(
-                    ChronoUnit.MONTHS.between(
-                            source.getContractDate().withDayOfMonth(1),
-                            request.getAsOfDate().withDayOfMonth(1)) + 1));
-            return reviewRequired(monthNo, "기준일 이하 계약 금융 스냅샷이 없습니다.");
+            return reviewRequired(fallbackMonth, "기준일 이하 계약 금융 스냅샷이 없습니다.");
         }
 
         int contractMonthNo = source.getContractMonthNo();
@@ -437,8 +450,12 @@ public class ArbitrageBaselineService {
             BigDecimal paidCommissionAmount,
             BigDecimal plannedCommissionAmount,
             CalculationDecision decision,
-            ReArbitrageCheckRequest request) {
+            ReArbitrageCheckRequest request,
+            Applicability applicability) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("contractDate", source.getContractDate());
+        snapshot.put("applicabilityPolicyVersionId", applicability.policyVersionId());
+        snapshot.put("effectiveContractDate", applicability.effectiveContractDate());
         snapshot.put("manualReason", request.getReason());
         snapshot.put("snapshotAsOfDate", source.getSnapshotAsOfDate());
         snapshot.put("cumulativePaidPremium", decision.cumulativePaidPremium());

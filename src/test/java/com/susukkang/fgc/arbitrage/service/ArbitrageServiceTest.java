@@ -51,6 +51,8 @@ class ArbitrageServiceTest {
     private ExceptionCaseRepository exceptionCaseRepository;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private ArbitrageApplicabilityPolicyService applicabilityPolicyService;
 
     private ArbitrageService arbitrageService;
 
@@ -62,8 +64,10 @@ class ArbitrageServiceTest {
                 validationRunRepository,
                 exceptionCaseRepository,
                 new ObjectMapper().findAndRegisterModules(),
-                auditLogService
+                auditLogService, applicabilityPolicyService
         );
+        org.mockito.Mockito.lenient().when(applicabilityPolicyService.resolve(any())).thenReturn(
+                new ArbitrageApplicabilityPolicyService.Applicability(1L, LocalDate.of(2026, 3, 1), null));
     }
 
     /**
@@ -246,6 +250,50 @@ class ArbitrageServiceTest {
                 "GA_TO_FC", "차익거래 검증 자료 확인 필요", "금융 스냅샷과 적용 환급률표가 일치하지 않습니다.");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"2026-02-28, CLEAR", "2026-03-01, CANDIDATE"})
+    void appliesOnlyToContractsSignedFromEffectiveDate(String contractDate, ArbitrageCheckStatus expected) {
+        var source = calculationSource(new BigDecimal("800000"), 5, false, BigDecimal.ZERO);
+        source.setContractDate(LocalDate.parse(contractDate));
+        var row = checkExisting(source, "890000", "0");
+        assertThat(row.getResultStatus()).isEqualTo(expected);
+        if (expected == ArbitrageCheckStatus.CLEAR) {
+            assertThat(row.getCalculationSnapshot()).contains("NOT_APPLICABLE", "2026-03-01 이전 체결");
+            assertThat(row.getNetDifferenceAmount()).isEqualByComparingTo("0");
+            org.mockito.Mockito.verifyNoInteractions(exceptionCaseRepository);
+        }
+    }
+
+    @Test
+    void oldContractWithoutFinancialSnapshotIsNotApplicableInsteadOfDataReview() {
+        var source = calculationSource(null, null, true, null);
+        source.setContractDate(LocalDate.of(2026, 2, 28));
+        var row = checkExisting(source, "890000", "900000");
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CLEAR);
+        assertThat(row.getIncludedSurrenderValueAmount()).isEqualByComparingTo("0");
+        assertThat(row.getCalculationSnapshot()).contains("NOT_APPLICABLE", "applicabilityPolicyVersionId", "effectiveContractDate");
+        org.mockito.Mockito.verifyNoInteractions(exceptionCaseRepository);
+        org.mockito.Mockito.verify(arbitrageCheckRepository, org.mockito.Mockito.never()).selectRefundRateCandidates(any(), any());
+    }
+
+    @Test
+    void policyValueChangesApplicabilityWithoutCodeChange() {
+        given(applicabilityPolicyService.resolve(any())).willReturn(
+                new ArbitrageApplicabilityPolicyService.Applicability(9L, LocalDate.of(2027, 1, 1), null));
+        var row = checkExisting(calculationSource(new BigDecimal("800000"), 5, false, BigDecimal.ZERO), "890000", "0");
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CLEAR);
+        assertThat(row.getCalculationSnapshot()).contains("2027-01-01 이전 체결");
+    }
+
+    @Test
+    void missingPolicyProducesReviewAndNeverCandidate() {
+        given(applicabilityPolicyService.resolve(any())).willReturn(
+                new ArbitrageApplicabilityPolicyService.Applicability(null, null, "차익거래 적용일 정책이 없습니다."));
+        var row = checkExisting(calculationSource(new BigDecimal("800000"), 5, false, BigDecimal.ZERO), "890000", "0");
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
+        assertThat(row.getCalculationSnapshot()).contains("정책이 없습니다");
+    }
+
     private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(ArbitrageCalculationSource source, String paid, String planned) {
         LocalDate date = LocalDate.of(2026, 7, 31);
         given(arbitrageCheckRepository.selectCalculationSource(10L, date)).willReturn(source);
@@ -265,7 +313,7 @@ class ArbitrageServiceTest {
             BigDecimal surrenderValue) {
         ArbitrageCalculationSource source = new ArbitrageCalculationSource();
         source.setContractId(10L);
-        source.setContractDate(LocalDate.of(2026, 1, 1));
+        source.setContractDate(LocalDate.of(2026, 3, 1));
         source.setInsurerId(1L);
         source.setProductId(1L);
         source.setProductOfferingId(1L);

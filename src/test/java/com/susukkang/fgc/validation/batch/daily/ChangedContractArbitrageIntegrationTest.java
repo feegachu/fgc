@@ -8,7 +8,6 @@ import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobInstance;
@@ -31,7 +30,7 @@ import static org.mockito.Mockito.mock;
 /**
  * #512 — changedContractStep의 Processor가 해지 계약의 차익거래를 효력일 기준으로 저장하고,
  * 같은 실행으로 다시 돌려도 결과행·예외가 늘지 않는지 실제 PostgreSQL로 확인한다.
- * 시드 A1(FGC-FGL02-202601-0001): 8/20 해지, 지급 890,000 + 해약환급금 120,000 − 납입 800,000 = 210,000 → CANDIDATE.
+ * 시행 전 A1은 적용대상 아님, V45.1의 시행 후 A1은 410,000 초과 후보로 각각 저장한다.
  * A1은 1,200% 룰셋이 없어(CAP_004) 1,200% 점검이 실패하는 계약이라, 그 실패가 차익거래를 막지 않는지도 함께 본다.
  *
  * 스케줄 재생성은 이 테스트의 관심사가 아니고 시드 계약의 공유 스케줄을 바꾸므로 mock으로 둔다.
@@ -93,12 +92,18 @@ class ChangedContractArbitrageIntegrationTest {
         processor.beforeStep(new StepExecution("changedContractStep", jobExecution));
     }
 
-    @Test
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "FGC-FGL02-202601-0001, CLEAR, 0, 0",
+            "FGC-FGL02-202603-0475, CANDIDATE, 410000, 1"})
     @Timeout(value = 2, unit = TimeUnit.MINUTES, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
-    void terminatedContractGetsArbitrageRowAsOfEffectiveDateAndRerunAddsNothing() {
+    void terminatedContractGetsArbitrageRowAsOfEffectiveDateAndRerunAddsNothing(
+            String contractNo, String expectedStatus, String excess, int candidates) {
+        contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no=?", Long.class, contractNo);
         ChangedContractResult first = processInChunkTransaction();
 
-        // A1은 2026-01 계약이라 1,200% 룰셋이 없다(CAP_004). 그래도 차익거래는 점검되고,
+        // 두 시연 계약은 2026-07 이전 계약이라 GA→FC 1,200% 룰셋이 없다(CAP_004). 그래도 차익거래는 점검되고,
         // 결과는 스킵이라 상태 사건은 FAILED로 남는다. 차익거래 자체는 실패하지 않았다.
         assertThat(first.success()).isFalse();
         assertThat(first.failureReason()).isEqualTo(FgcErrorCode.CAP_004.getCode() + ": 적용 가능한 1,200% 룰셋이 없습니다.");
@@ -109,11 +114,11 @@ class ChangedContractArbitrageIntegrationTest {
                  WHERE validation_run_id = ? AND contract_id = ?
                 """, validationRunId, contractId);
         assertThat(row.get("as_of_date").toString()).isEqualTo("2026-08-20");
-        assertThat(row.get("result_status")).isEqualTo("CANDIDATE");
-        assertThat(row.get("current_excess")).isEqualTo(new java.math.BigDecimal("210000"));
+        assertThat(row.get("result_status")).isEqualTo(expectedStatus);
+        assertThat(row.get("current_excess")).isEqualTo(new java.math.BigDecimal(excess));
         assertThat(arbitrageRows()).isEqualTo(1);
-        assertThat(candidateCases()).isEqualTo(1);
-        assertThat(candidateOccurrences()).isEqualTo(1);
+        assertThat(candidateCases()).isEqualTo(candidates);
+        assertThat(candidateOccurrences()).isEqualTo(candidates);
 
         // 같은 날 같은 실행으로 다시 돌려도(IF-BAT-02 멱등성) uq_arbitrage_check의 UPSERT와
         // 예외 업무키·실행별 occurrence 멱등 기록 덕분에 행이 늘지 않는다.
@@ -121,12 +126,20 @@ class ChangedContractArbitrageIntegrationTest {
 
         assertThat(second.failureReason()).isEqualTo(first.failureReason());
         assertThat(arbitrageRows()).isEqualTo(1);
-        assertThat(candidateCases()).isEqualTo(1);
-        assertThat(candidateOccurrences()).isEqualTo(1);
+        assertThat(candidateCases()).isEqualTo(candidates);
+        assertThat(candidateOccurrences()).isEqualTo(candidates);
     }
 
     private ChangedContractResult processInChunkTransaction() {
         return new TransactionTemplate(transactionManager).execute(status -> processor.process(contractId));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void finishOwnRunWithoutDeletingAppendOnlyDetectionHistory() {
+        if (validationRunId != null) {
+            jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=? AND status='CREATED'", validationRunId);
+            jdbcTemplate.update("UPDATE fgc.validation_run SET status='FAILED' WHERE validation_run_id=? AND status='RUNNING'", validationRunId);
+        }
     }
 
     private Integer arbitrageRows() {

@@ -31,7 +31,7 @@ class ArbitrageTransactionBoundaryIntegrationTest {
 
     @Test
     void rollsBackPartialDetectionRetriesWithoutDuplicatesAndCommitsOtherContractIndependently() {
-        List<Reference> references = jdbc.query("SELECT contract_id, contract_date FROM fgc.insurance_contract ORDER BY contract_id LIMIT 2",
+        List<Reference> references = jdbc.query("SELECT contract_id, contract_date FROM fgc.insurance_contract WHERE contract_date >= DATE '2026-03-01' ORDER BY contract_id LIMIT 2",
                 (rs, i) -> new Reference(rs.getLong(1), LocalDate.of(1900, 1, 1)));
         assertThat(references).hasSize(2);
         Long runId = jdbc.queryForObject("""
