@@ -239,7 +239,7 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
             Map<String, Object> p = params("contractId", null, "expectedAgentId", null,
                     "actualAgentId", null, "journalHeaderIds", journalIds);
             compare("classification_context", () -> baseline.selectOne(NS + "ReconciliationResult.findClassificationContext", p),
-                    () -> results.findClassificationContext(null, null, null, journalIds, null));
+                    () -> results.findClassificationContext(null, null, null, null, journalIds, null));
         }
         assertThat(results.findDetail(Long.MAX_VALUE)).isNull();
         assertThat(runs.findById(Long.MAX_VALUE)).isNull();
@@ -259,8 +259,8 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
                     "actualAgentId", null, "journalHeaderIds", List.of());
             compare("classification_without_due_date", () -> baseline.selectOne(
                             NS + "ReconciliationResult.findClassificationContext", parameters),
-                    () -> results.findClassificationContext(contractId, null, null, List.of(), null));
-            assertThat(results.findClassificationContext(contractId, null, null, List.of(), null)
+                    () -> results.findClassificationContext(null, contractId, null, null, List.of(), null));
+            assertThat(results.findClassificationContext(null, contractId, null, null, List.of(), null)
                     .isInvalidContractPayment()).as(contractNo).isEqualTo(expectedInvalid);
         });
     }
