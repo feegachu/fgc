@@ -10,7 +10,8 @@ package com.susukkang.fgc.common.code;
 public enum ArbitrageCheckStatus {
     CLEAR("이상없음"),           // 차익거래 징후 없음
     CANDIDATE("검토대상"),       // 차익거래 검토대상
-    REVIEW_REQUIRED("자료부족"); // 데이터 확인 필요
+    REVIEW_REQUIRED("자료부족"), // 데이터 확인 필요
+    NOT_APPLICABLE("적용대상 아님"); // 보장성보험이 아니라 규제 대상이 아님 (#477)
 
     private final String label;
 

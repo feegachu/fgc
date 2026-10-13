@@ -5,7 +5,7 @@ import java.math.RoundingMode;
 
 /**
  * cap_check.result_status 의 자바측 표현
- * DB CHECK (result_status IN ('NORMAL','WARNING','VIOLATION','REVIEW_REQUIRED')) 와 반드시 일치해야 함
+ * DB CHECK (result_status IN ('NORMAL','WARNING','VIOLATION','REVIEW_REQUIRED','NOT_APPLICABLE')) 와 반드시 일치해야 함
  *
  * 판정 우선순위(위에서부터 순서대로 확인, 먼저 걸리는 조건이 최종 결과):
  * 1. REVIEW_REQUIRED — 룰셋 미분류 항목이나 환급률표 부재 등 사람 판단이 필요한 경우가 하나라도 있으면 최우선
@@ -18,7 +18,9 @@ public enum CapResultStatus {
     NORMAL,
     WARNING,
     VIOLATION,
-    REVIEW_REQUIRED;
+    REVIEW_REQUIRED,
+    /** 보장성보험이 아니라 1,200% 규제 대상이 아님 (#477) — 위반·검토필요가 아니다. */
+    NOT_APPLICABLE;
 
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
@@ -74,6 +76,7 @@ public enum CapResultStatus {
             case WARNING -> "주의";
             case VIOLATION -> "위반";
             case REVIEW_REQUIRED -> "검토필요";
+            case NOT_APPLICABLE -> "적용대상 아님";
         };
     }
 }

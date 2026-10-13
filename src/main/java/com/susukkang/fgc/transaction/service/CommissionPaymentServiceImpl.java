@@ -24,6 +24,7 @@ import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ProtectionType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
@@ -155,6 +156,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return afterRow.toResponse(afterAttributions, List.of());
     }
 
+    /**
+     * 지급 건을 확정한다(IF-API-25). 운영정책서 제31조 확정 게이트를 순서대로 통과해야 하며,
+     * 첫 차단 사유에서 예외 이력을 남기고 거절한다. 같은 멱등키의 재요청은 최초 확정 결과를 돌려준다.
+     *
+     * @param paymentId      지급 건 ID
+     * @param idempotencyKey 확정 멱등키(없으면 null)
+     * @return 확정된 지급 건과 저장된 한도 점검 ID
+     */
     @Override
     // 2026-08-10 yslee - 확정 검증 결과와 예외 이력을 지급 건 확정 트랜잭션으로 통합
     // 기존 코드: 잠긴 지급 건을 참조하는 한도 점검을 REQUIRES_NEW 트랜잭션에서 저장
@@ -189,7 +198,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -209,8 +218,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 개선: 귀속행별 정책·한도·증빙 공제를 계산하고 하나라도 실패하면 확정을 차단
         for (ConfirmationData data : attributions) {
             failFirst(attributionFailures(data));
+            // #478: CLAWBACK만 비적용이다. 미분류 RECOVERY 등 다른 차감 항목의 분류 검사는 유지한다.
+            if (isClawback(data)) continue;
             if (isNonContractNewcomerAttribution(data)) {
                 failFirst(newcomerSupportEligibilityFailure(data));
+                continue;
+            }
+            if (isOutsideCapScope(data)) {
                 continue;
             }
             CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -279,6 +293,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return requirePayment(paymentId, capCheckIds);
     }
 
+    /**
+     * 확정 게이트를 저장 없이 미리 계산한다(IF-API-24). confirm 과 같은 판정 메서드를 쓰되
+     * 첫 실패에서 멈추지 않고 모든 차단 사유를 blockers 로 모은다.
+     *
+     * @param paymentId 지급 건 ID
+     * @return 한도 미리보기, 차단 사유, 확정 가능 여부
+     */
     @Override
     // 2026-08-16 yslee - IF-API-24 지급 전 한도 사전검증 미리보기 (FGC-FUN-033)
     // confirm()과 같은 판정 메서드·계산 엔진(REALTIME)을 재사용하되 아무것도 저장하지 않는다.
@@ -297,7 +318,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -313,6 +334,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ));
             for (ConfirmationData data : attributions) {
                 failures.addAll(attributionFailures(data));
+                if (isClawback(data)) continue;
                 if (isNonContractNewcomerAttribution(data)) {
                     GateFailure newcomerFailure = newcomerSupportEligibilityFailure(data);
                     if (newcomerFailure != null) {
@@ -321,6 +343,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     continue;
                 }
                 if (data.contractId() == null || data.attributedAmount() == null) {
+                    continue;
+                }
+                if (isOutsideCapScope(data)) {
                     continue;
                 }
                 CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -431,10 +456,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         );
     }
 
+    /** 게이트 실패를 사전검증 응답의 차단 사유로 바꾼다. 같은 사유는 한 줄로 접는다. */
     private List<TransactionPrecheckResponse.Blocker> toBlockers(List<GateFailure> failures) {
         return failures.stream()
                 .map(failure -> {
-                    // CAP_003(미해결 위반)은 hasUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
+                    // CAP_003(미해결 위반)은 hasBlockingUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
                     // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 예외 건을
                     // 찾게 되므로 계약·귀속행 ID를 비운다
                     boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
@@ -622,6 +648,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     sourceContractId,
                     agentId,
                     settlementMonth,
+                    dueDate,
                     paymentStage,
                     item.commissionItemId(),
                     effectivePolicyVersionId,
@@ -731,6 +758,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long sourceContractId,
             Long agentId,
             LocalDate settlementMonth,
+            LocalDate dueDate,
             com.susukkang.fgc.common.code.PaymentStage paymentStage,
             Long commissionItemId,
             Long policyVersionId,
@@ -746,6 +774,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 paymentStage,
                 request.attributionMethod()
         );
+        validateSettlementSupportDueDate(request.attributionMethod(), settlementMonth, dueDate);
         Long allocationPolicyId = resolveAllocationPolicy(
                 policyVersionId,
                 request.allocationBasis(),
@@ -869,6 +898,22 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return distinct.size() == 1 ? distinct.get(0) : null;
     }
 
+    // 2026-10-13 #476 - 정산월은 지급월이 아니라 실적(발생)월(정착지원금은 모집월)이다 (REG-20, FAQ 2차 Q7-1)
+    // 기존 코드: 메시지가 "지급월의 신계약"이었고 지급예정일이 모집월보다 앞서도 통과했다.
+    // 문제: 정산월의 뜻이 모집월인데 문구는 지급월이라 8월 지급분을 7월 모집분에 귀속하는 FAQ 예시와 어긋났다.
+    // 개선: 지급예정일은 모집월 1일과 같거나 뒤여야 한다. 13차월 이후 이연 지급은 막지 않는다.
+    private void validateSettlementSupportDueDate(
+            AttributionMethod attributionMethod,
+            LocalDate settlementMonth,
+            LocalDate dueDate
+    ) {
+        if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                && dueDate != null
+                && dueDate.isBefore(YearMonth.from(settlementMonth).atDay(1))) {
+            invalid("scheduledPaymentDate", "정착지원금 지급예정일은 모집월(정산월) 1일 이후여야 합니다.");
+        }
+    }
+
     private Long resolveAttributedContract(
             Long sourceContractId,
             Long requestedAttributedContractId,
@@ -914,7 +959,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
                 || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
-            invalid("attributionDate", "정착지원금은 지급월의 신계약에 실제 귀속해야 합니다.");
+            invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {
@@ -1184,7 +1229,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     Map.of()
             ));
         }
-        if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
+        // 2026-10-13 #477 - 산입 분류(1,200%) 검토필요는 규제 대상 계약에만 걸린다.
+        // 보장성이 아닌 계약은 한도 판정 대상이 아니므로 분류 때문에 확정을 막지 않는다.
+        // 귀속금액·계약일·배부근거 같은 별도 검사는 그대로 유지한다.
+        if ((data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED && !isOutsideCapScope(data))
                 || (data.contractId() == null && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
@@ -1243,6 +1291,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         return failures;
+    }
+
+    private boolean isClawback(ConfirmationData data) {
+        return "DEDUCTION".equals(data.cashflowType()) && "CLAWBACK".equals(data.itemCode());
     }
 
     private boolean isNonContractNewcomerAttribution(ConfirmationData data) {
@@ -1350,12 +1402,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         .commissionItemId(candidate.commissionItemId()).itemCode(candidate.itemCode())
                         .itemName(candidate.itemName()).transactionAttributionId(candidate.transactionAttributionId())
                         .classificationSnapshot(candidate.inclusionDecisionStatus().name())
-                        .amount(signedAttributedAmount(candidate))
+                        .amount(roundedAttributedAmount(candidate))
                         .decisionReason(candidate.inclusionDecisionReason()).evidenceRef(candidate.evidenceRef())
                         .build());
             }
         } else if (actualSum.compareTo(check.getIncludedAmount()) == 0) {
-            // 상세 금액은 음수를 허용하지 않으므로 차감이 있는 실제 판정은 순산입액으로 설명한다.
+            // 상세행을 재현할 수 없는 기존 데이터는 지급 누계 한 행으로 설명한다.
             rows.add(netActualDetailRow(check));
         } else {
             for (CapCheckDetailLine d : calculation.details()) {
@@ -1402,8 +1454,40 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .capCheckId(check.getCapCheckId()).detailSeq(1)
                 .commissionItemId(check.getCommissionItemId()).itemCode(check.getItemCode()).itemName(check.getItemName())
                 .classificationSnapshot("INCLUDED").amount(check.getIncludedAmount())
-                .decisionReason("기존 확정액과 계약별 지급·차감 합계의 순산입액. 부호와 귀속행은 계산 스냅샷 참조")
+                .decisionReason("기존 확정 지급액과 현재 지급 후보의 총 산입액. 환수는 포함하지 않으며 귀속행은 계산 스냅샷 참조")
                 .build();
+    }
+
+    // 2026-10-13 #477 - 보장성보험이 아닌 계약은 1,200% 규제 대상이 아니다 (감독규정 제4-32조⑤, FAQ 2차 Q11)
+    // 기존 코드: protection_type 을 읽지 않아 저축성·일반손해·자동차 계약 귀속도 한도 판정에 걸렸다.
+    // 문제: 규정상 한도가 없는 계약의 지급확정이 한도 위반으로 막힐 수 있었다.
+    // 개선: 룰셋 조회 앞에서 거른다. 확정과 사전검증이 같은 메서드를 써서 판정이 갈리지 않는다.
+    /** 귀속행의 계약이 1,200% 규제 대상(보장성)이 아닌지. 계약이 없는 귀속행은 대상 밖으로 보지 않는다. */
+    private boolean isOutsideCapScope(ConfirmationData data) {
+        return isOutsideCapScope(data.contractId());
+    }
+
+    /** 계약 상품의 보장성 구분으로 1,200% 규제 대상이 아닌지 판정한다. null 계약은 false. */
+    private boolean isOutsideCapScope(Long contractId) {
+        return contractId != null
+                && !ProtectionType.isRegulated(queryRepository.findProtectionType(contractId));
+    }
+
+    // 2026-10-13 #477 후속 - 미해결 CAP_VIOLATION(CAP_003) 차단도 규제 대상 계약에만 건다
+    // 기존 코드: hasUnresolvedViolation 이 지급 건 단위로 위반 존재만 보아, 비보장성 계약에 남은 위반
+    //           (#477 이전 판정분, 보장성 구분 정정 전 판정분)만 있어도 확정·사전검증이 막혔다.
+    // 문제: 한도 판정 루프는 비대상 계약을 건너뛰는데 CAP_003 게이트만 같은 계약을 이유로 차단했다.
+    // 개선: 위반이 걸린 계약마다 isOutsideCapScope 로 다시 판정해 대상 계약에 걸린 위반만 차단한다.
+    //       계약이 비어 있는 위반은 대상 여부를 알 수 없으므로 종전처럼 차단한다.
+    /**
+     * 지급 건에 확정을 막아야 하는 미해결 CAP_VIOLATION 이 있는지 — 규제 대상 계약 또는 계약 미상인 위반만 센다.
+     *
+     * @param paymentId 지급 건 ID
+     * @return CAP_003 으로 차단해야 하면 true
+     */
+    private boolean hasBlockingUnresolvedViolation(Long paymentId) {
+        return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
+                .anyMatch(contractId -> contractId == null || !isOutsideCapScope(contractId));
     }
 
     private CapCheckCommand buildCapCheck(
@@ -1420,7 +1504,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         snapshot.put("candidateAttributions", currentPeriodAttributions(attributions, data).stream()
                 .map(row -> Map.of("transactionAttributionId", row.transactionAttributionId(),
                         "classification", row.inclusionDecisionStatus().name(),
-                        "signedAmount", signedAttributedAmount(row))).toList());
+                        "signedAmount", roundedAttributedAmount(row))).toList());
         snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
                 .add(result.candidateIncludedAmount()));
         snapshot.put("effectiveIncludedAmount", result.includedAmount());
@@ -1475,6 +1559,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             case WARNING -> 1;
             case VIOLATION -> 2;
             case REVIEW_REQUIRED -> 3;
+            case NOT_APPLICABLE -> -1;
         };
     }
 
@@ -1502,18 +1587,18 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private List<ConfirmationData> currentIncludedAttributions(List<ConfirmationData> attributions, ConfirmationData data) {
         return currentPeriodAttributions(attributions, data).stream()
+                .filter(row -> "PAYMENT".equals(row.cashflowType()))
                 .filter(row -> row.inclusionDecisionStatus() == InclusionDecisionStatus.INCLUDED)
                 .toList();
     }
 
     private BigDecimal currentIncludedAmount(List<ConfirmationData> attributions, ConfirmationData data) {
         return currentIncludedAttributions(attributions, data).stream()
-                .map(this::signedAttributedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map(this::roundedAttributedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private BigDecimal signedAttributedAmount(ConfirmationData data) {
-        BigDecimal amount = MoneyUtil.roundWon(data.attributedAmount());
-        return "DEDUCTION".equals(data.cashflowType()) ? amount.negate() : amount;
+    private BigDecimal roundedAttributedAmount(ConfirmationData data) {
+        return MoneyUtil.roundWon(data.attributedAmount());
     }
 
     /**

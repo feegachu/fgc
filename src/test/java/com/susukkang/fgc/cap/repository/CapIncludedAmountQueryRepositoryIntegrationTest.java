@@ -152,13 +152,13 @@ class CapIncludedAmountQueryRepositoryIntegrationTest {
     }
 
     /**
-     * 설명 : 월 재합산 시 확정된 차감 지급 건을 상세행 반올림 후 산입액에서 차감하는지 검증한다
+     * 설명 : 월 재합산에서 환수는 지급 총액을 줄이지 않는다
      *
      * @author hjKang
      * @since 2026-08-12
      */
     @Test
-    void subtractsConfirmedDeductionFromMonthlyIncludedAmount() {
+    void excludesConfirmedDeductionWithoutReducingGrossPayments() {
         TestReference reference = testReference();
         BigDecimal amountBeforeTest = includedAmountForAgent(
                 capIncludedAmountQueryRepository.sumConfirmedIncludedAmountByContractAndAgent(
@@ -182,17 +182,17 @@ class CapIncludedAmountQueryRepositoryIntegrationTest {
                         reference.contractId(), PaymentStage.GA_TO_FC);
 
         assertThat(includedAmountForAgent(summaries, reference.agentId()))
-                .isEqualByComparingTo(amountBeforeTest.add(new BigDecimal("800")));
+                .isEqualByComparingTo(amountBeforeTest.add(new BigDecimal("1001")));
     }
 
     /**
-     * 설명 : 지급 확정 직전 현재 DRAFT 차감 지급 건을 산입액에서 차감하는지 검증한다
+     * 설명 : 지급 확정 직전 현재 환수 건은 산입액을 줄이지 않는다
      *
      * @author hjKang
      * @since 2026-08-12
      */
     @Test
-    void subtractsCurrentDraftDeductionBeforeConfirmation() {
+    void excludesCurrentDraftDeductionWithoutReducingGrossPayments() {
         TestReference reference = testReference();
         BigDecimal amountBeforeTest = includedAmountForAgent(
                 capIncludedAmountQueryRepository.sumConfirmedIncludedAmountByContractAndAgent(
@@ -215,7 +215,7 @@ class CapIncludedAmountQueryRepositoryIntegrationTest {
                         reference.contractId(), currentDeductionTransactionId, PaymentStage.GA_TO_FC);
 
         assertThat(includedAmountForAgent(summaries, reference.agentId()))
-                .isEqualByComparingTo(amountBeforeTest.add(new BigDecimal("800")));
+                .isEqualByComparingTo(amountBeforeTest.add(new BigDecimal("1001")));
     }
 
     @ParameterizedTest

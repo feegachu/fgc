@@ -18,8 +18,9 @@ public class ArbitrageCheckSummary {
     private long clearCount; //이상없음
     private long candidateCount; //검토대상
     private long reviewRequiredCount; //자료부족
+    private long notApplicableCount; //적용대상 아님 (#477)
 
     public long getTotalArbitrageChecks() {
-        return clearCount + candidateCount + reviewRequiredCount;
+        return clearCount + candidateCount + reviewRequiredCount + notApplicableCount;
     }
 }
