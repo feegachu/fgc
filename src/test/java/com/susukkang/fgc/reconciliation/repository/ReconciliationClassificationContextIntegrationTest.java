@@ -113,7 +113,7 @@ class ReconciliationClassificationContextIntegrationTest {
     }
 
     private boolean invalid(Long contractId, LocalDate dueDate) {
-        return repository.findClassificationContext(contractId, null, null, List.of(), dueDate)
+        return repository.findClassificationContext(null, contractId, null, null, List.of(), dueDate)
                 .isInvalidContractPayment();
     }
 

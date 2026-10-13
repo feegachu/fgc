@@ -13,6 +13,7 @@ import com.susukkang.fgc.cap.repository.CapContractQueryRepository;
 import com.susukkang.fgc.cap.repository.CapRuleQueryRepository;
 import com.susukkang.fgc.cap.repository.CapScheduleAmountQueryRepository;
 import com.susukkang.fgc.common.code.CapResultStatus;
+import com.susukkang.fgc.common.code.ProtectionType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.MoneyUtil;
@@ -56,6 +57,14 @@ public class CapCalculatorImpl implements CapCalculator {
         if (contract == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500,
                     null, Map.of(), "contractId=" + command.contractId() + " not found");
+        }
+
+        // 2026-10-13 #477 - 보장성보험만 1,200% 규제 대상이다 (감독규정 제4-32조⑤, FAQ 2차 Q11)
+        // 기존 코드: protection_type 을 읽지 않아 저축성·일반손해·자동차 계약도 룰셋을 찾아 판정했다.
+        // 문제: 규정상 한도가 없는 계약이 위반·검토필요가 되고, 룰셋이 없으면 CAP_004 예외가 쌓였다.
+        // 개선: 룰셋 조회 전에 거른다. 조회 SQL 에 조건을 넣으면 "룰셋 없음"으로 보여 예외가 생기므로 여기서 처리한다.
+        if (!ProtectionType.isRegulated(contract.getProtectionType())) {
+            return notApplicable(command, contract);
         }
 
         // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)
@@ -182,6 +191,19 @@ public class CapCalculatorImpl implements CapCalculator {
                 ruleSet.getCapRuleSetId(), refundAddition.refundRateTableId(),
                 basePremiumAmount, refundAddition.amount(), complianceDeduction.appliedAmount(), limitAmount,
                 includedAmount, remainingAmount, usagePct, resultStatus, details, snapshot);
+    }
+
+    // 보장성이 아닌 계약의 결과 — 한도·산입액은 0, 룰셋·환급률표는 연결하지 않고 사유를 스냅샷에 남긴다
+    private CapCalculationResult notApplicable(CapCalculationCommand command, CapContractView contract) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("notApplicable", true);
+        snapshot.put("notApplicableReason", "보장성보험이 아니라 1,200% 규제 대상이 아니다 (감독규정 제4-32조⑤)");
+        snapshot.put("protectionType", contract.getProtectionType());
+        return new CapCalculationResult(
+                command.contractId(), command.paymentStage(), command.checkKind(), command.asOfDate(),
+                null, null,
+                contract.getMonthlyEquivalentFirstPremium(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, null, CapResultStatus.NOT_APPLICABLE, List.of(), snapshot);
     }
 
     // 80% 이상 공제 대상 상품이면 수수료등에 합산할(= 한도에서 뺄) 12차월 예상 해약환급금과, 그 판정에 쓴

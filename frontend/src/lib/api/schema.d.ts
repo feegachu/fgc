@@ -1013,6 +1013,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation-runs/active-monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 진행 중인 월간 실행 존재 여부 (IF-API-46A)
+         * @description 검증월에 활성(CREATED/RUNNING) MONTHLY 실행이 있는지 돌려준다. VRUN-W01 이 실행 생성 버튼을 끄는 판정이며, 최종 차단은 생성 API 의 409(FGC-VRUN-001)다.
+         */
+        get: operations["activeMonthly"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/validation-runs/{id}": {
         parameters: {
             query?: never;
@@ -1117,6 +1137,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActiveMonthlyRunResponse: {
+            exists?: boolean;
+        };
         Agent: {
             agentCode?: string;
             /** Format: int64 */
@@ -1219,6 +1242,11 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             };
+        };
+        ApiResponseActiveMonthlyRunResponse: {
+            data?: components["schemas"]["ActiveMonthlyRunResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
         };
         ApiResponseArbitrageSearchResponse: {
             data?: components["schemas"]["ArbitrageSearchResponse"];
@@ -1528,13 +1556,15 @@ export interface components {
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
-            status?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            status?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
         };
         ArbitrageCheckSummary: {
             /** Format: int64 */
             candidateCount?: number;
             /** Format: int64 */
             clearCount?: number;
+            /** Format: int64 */
+            notApplicableCount?: number;
             /** Format: int64 */
             reviewRequiredCount?: number;
             /** Format: int64 */
@@ -1561,7 +1591,7 @@ export interface components {
             plannedCommissionAmount?: number;
             refundAdditionAppliedYn?: boolean;
             /** @enum {string} */
-            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
             /** @enum {string} */
             surrenderValueSourceType?: "ACTUAL" | "EXPECTED_TABLE" | "NOT_APPLICABLE";
@@ -1737,7 +1767,7 @@ export interface components {
             refundRateTableId?: number;
             remainingAmount?: number;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             usagePct?: number;
         };
         CapCheckBasisResponse: {
@@ -1800,7 +1830,7 @@ export interface components {
             /** Format: int64 */
             remainingAmount?: number;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
             usagePct?: string;
         };
@@ -1864,7 +1894,7 @@ export interface components {
             /** Format: int64 */
             remainingAmount?: number;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
             usagePct?: string;
         };
@@ -2406,7 +2436,7 @@ export interface components {
             /** Format: int64 */
             agentId?: number;
             /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: date */
             contractDateFrom?: string;
             /** Format: date */
@@ -2508,7 +2538,7 @@ export interface components {
         ContractView: {
             agentIdName?: string;
             /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: date */
             contractDate?: string;
             /** Format: int64 */
@@ -3268,7 +3298,7 @@ export interface components {
              * @description 정책 유형
              * @enum {string}
              */
-            policyType?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY";
+            policyType?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY" | "ARBITRAGE";
             /**
              * @description 정책 유형 한글 라벨
              * @example 1,200% 한도
@@ -3401,7 +3431,7 @@ export interface components {
             /** Format: int64 */
             arbitrageCheckId?: number;
             /** @enum {string} */
-            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: int64 */
             validationRunId?: number;
         };
@@ -4244,7 +4274,7 @@ export interface operations {
                 /** @description 지급단계 */
                 stage?: "INSURER_TO_GA" | "GA_TO_FC";
                 /** @description 판정 */
-                status?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+                status?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
                 /** @description 보험회사 ID */
                 insurerId?: number;
                 /** @description 계약 소속 조직 ID */
@@ -4958,7 +4988,7 @@ export interface operations {
                  * @description 정책 유형
                  * @example CAP_1200
                  */
-                type?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY";
+                type?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY" | "ARBITRAGE";
                 /**
                  * @description 기준일(yyyy-MM-dd) — 해당 일자에 유효한 버전만 조회
                  * @example 2026-07-01
@@ -5697,6 +5727,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                };
+            };
+        };
+    };
+    activeMonthly: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 검증월(yyyy-MM)
+                 * @example 2026-08
+                 */
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 조회 성공 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
                 };
             };
         };

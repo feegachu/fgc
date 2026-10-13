@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CapCheckQueryRepositoryIntegrationTest {
 
     @Autowired CapCheckQueryRepository capCheckQueryRepository;
+    @Autowired com.susukkang.fgc.contract.repository.ContractQueryRepository contractQueryRepository;
     @Autowired JdbcTemplate jdbcTemplate;
 
     @ParameterizedTest
@@ -85,10 +86,10 @@ class CapCheckQueryRepositoryIntegrationTest {
         assertThat(capCheckQueryRepository.findById(-1L)).isNull();
     }
 
-    // REG-10, 운영정책 §7-2: 귀속행별 원 단위 반올림 후 DEDUCTION을 차감한다.
+    // #478: CAP 증빙 집계도 지급행만 행별 반올림하며 환수는 차감하지 않는다.
     @ParameterizedTest
     @EnumSource(PaymentStage.class)
-    void sumsRoundedComplianceEvidenceWithDeductionSignWithinFirstYearAndStage(PaymentStage paymentStage) {
+    void sumsRoundedPaymentComplianceEvidenceWithinFirstYearAndStage(PaymentStage paymentStage) {
         TestContract contract = insertTestContract();
         PaymentStage otherStage = paymentStage == PaymentStage.INSURER_TO_GA
                 ? PaymentStage.GA_TO_FC : PaymentStage.INSURER_TO_GA;
@@ -115,7 +116,9 @@ class CapCheckQueryRepositoryIntegrationTest {
         BigDecimal amount = capCheckQueryRepository.selectComplianceEvidenceAmount(
                 contract.contractId(), paymentStage);
 
-        assertThat(amount).isEqualByComparingTo("24"); // ROUND(10.5)+ROUND(10.5)-ROUND(3.5)+ROUND(5.5)
+        assertThat(amount).isEqualByComparingTo("28"); // ROUND(10.5)+ROUND(10.5)+ROUND(5.5), 환수 제외
+        assertThat(contractQueryRepository.findComplianceEvidenceAmount(contract.contractId(), paymentStage))
+                .isEqualByComparingTo(amount);
     }
 
     @ParameterizedTest
@@ -125,6 +128,7 @@ class CapCheckQueryRepositoryIntegrationTest {
 
         assertThat(capCheckQueryRepository.selectComplianceEvidenceAmount(
                 contract.contractId(), paymentStage)).isNull();
+        assertThat(contractQueryRepository.findComplianceEvidenceAmount(contract.contractId(), paymentStage)).isNull();
     }
 
     // REG-19: GA_TO_FC 룰 시행일 이전 계약은 실패가 아니라 해당 단계 검증 미적용이다.

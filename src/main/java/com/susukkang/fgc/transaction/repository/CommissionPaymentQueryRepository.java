@@ -365,6 +365,14 @@ public class CommissionPaymentQueryRepository {
         )).getResultList().stream().findFirst().orElse(null);
     }
 
+    /** 계약 상품의 보장성 구분(product.protection_type). 계약이나 상품을 찾지 못하면 null. */
+    public String findProtectionType(Long contractId) {
+        NativeQuery<?> query = nativeQuery(FIND_PROTECTION_TYPE);
+        query.setParameter("contractId", contractId);
+        return query.setTupleTransformer((row, aliases) -> (String) row[0])
+                .getResultList().stream().findFirst().map(Object::toString).orElse(null);
+    }
+
     public boolean existsApplicableCapRuleSet(Long paymentId, Long transactionAttributionId) {
         NativeQuery<?> query = nativeQuery(EXISTS_APPLICABLE_CAP_RULE_SET);
         query.setParameter("paymentId", paymentId);

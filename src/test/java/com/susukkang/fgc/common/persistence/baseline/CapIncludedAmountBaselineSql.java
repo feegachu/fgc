@@ -18,13 +18,7 @@ final class CapIncludedAmountBaselineSql {
                         ta.agent_id,
                         ct.payment_stage,
                         COALESCE(
-                            SUM(
-                                CASE
-                                    WHEN ct.cashflow_type = 'DEDUCTION'
-                                        THEN -ROUND(ta.attributed_amount, 0)
-                                    ELSE ROUND(ta.attributed_amount, 0)
-                                END
-                            ),
+                            SUM(ROUND(ta.attributed_amount, 0)),
                             0
                         ) AS included_amount
                     FROM
@@ -40,7 +34,7 @@ final class CapIncludedAmountBaselineSql {
                     WHERE
                         ta.contract_id = :p0
                     AND
-                        ct.payment_stage = :p1
+                        ct.payment_stage = :p1 AND ct.cashflow_type = 'PAYMENT'
                     AND
                         ta.inclusion_status_snapshot = 'INCLUDED'
                     AND
@@ -68,13 +62,7 @@ final class CapIncludedAmountBaselineSql {
                         ta.agent_id,
                         ct.payment_stage,
                         COALESCE(
-                            SUM(
-                                CASE
-                                    WHEN ct.cashflow_type = 'DEDUCTION'
-                                        THEN -ROUND(ta.attributed_amount, 0)
-                                    ELSE ROUND(ta.attributed_amount, 0)
-                                END
-                            ),
+                            SUM(ROUND(ta.attributed_amount, 0)),
                             0
                         ) AS included_amount
                     FROM
@@ -90,7 +78,7 @@ final class CapIncludedAmountBaselineSql {
                     WHERE
                         ta.contract_id = :p0
                     AND
-                        ct.payment_stage = :p1
+                        ct.payment_stage = :p1 AND ct.cashflow_type = 'PAYMENT'
                     AND
                         ta.inclusion_status_snapshot = 'INCLUDED'
                     AND
