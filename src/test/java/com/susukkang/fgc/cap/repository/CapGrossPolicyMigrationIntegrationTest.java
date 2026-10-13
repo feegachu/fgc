@@ -16,6 +16,12 @@ class CapGrossPolicyMigrationIntegrationTest {
         String url="jdbc:tc:postgresql:17:///fgc_cap478_policy_"+duplicate;
         try (var connection=DriverManager.getConnection(url,"fgc","fgc_test_only")) {
             flyway(url,"44").migrate();
+            // #475와 함께 배포될 때 선행 버전은 별도 트랜잭션으로 정상 커밋된다.
+            // V46 거절의 롤백 범위만 검사하도록 적용 가능한 선행 데모 버전을 먼저 올린다.
+            if (java.util.Arrays.stream(flyway(url,null).info().all()).anyMatch(info ->
+                    info.getVersion()!=null && "45.1".equals(info.getVersion().toString()))) {
+                flyway(url,"45.1").migrate();
+            }
             var jdbc=new JdbcTemplate(new SingleConnectionDataSource(connection,true));
             Long maxItem=jdbc.queryForObject("SELECT MAX(cap_rule_item_id) FROM fgc.cap_rule_item",Long.class);
             var original=jdbc.queryForList("SELECT to_jsonb(i)::text FROM fgc.cap_rule_item i ORDER BY cap_rule_item_id",String.class);
