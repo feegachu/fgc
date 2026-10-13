@@ -986,6 +986,53 @@ class CommissionPaymentIntegrationTest {
                 """);
     }
 
+    @Test
+    void clawbackCannotRestoreCapBudgetAndDoesNotCreateCapChecks() {
+        Long contractId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.insurance_contract(insurer_id,product_offering_id,contract_no,contract_date,
+                    agent_id,organization_id,premium_per_cycle_amount,first_premium_amount,
+                    monthly_equivalent_first_premium,premium_conversion_rule_code,payment_cycle_code,
+                    payment_term_months,standard_surrender_deduction_amount,current_status,data_origin)
+                SELECT insurer_id,product_offering_id,?,contract_date,agent_id,organization_id,
+                    premium_per_cycle_amount,first_premium_amount,monthly_equivalent_first_premium,
+                    premium_conversion_rule_code,payment_cycle_code,payment_term_months,
+                    standard_surrender_deduction_amount,current_status,'MANUAL'
+                FROM fgc.insurance_contract WHERE contract_id=1 RETURNING contract_id
+                """, Long.class, "IT-478-"+UUID.randomUUID());
+        var first = commissionPaymentService.create(grossScenarioRequest(contractId, "PAYMENT", "900000"));
+        assertThat(commissionPaymentService.precheck(first.paymentId()).confirmable()).isTrue();
+        commissionPaymentService.confirm(first.paymentId(), "IT-478-FIRST-"+first.paymentId());
+        var deduction = commissionPaymentService.create(grossScenarioRequest(contractId, "DEDUCTION", "300000"));
+        var preview = commissionPaymentService.precheck(deduction.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).isEmpty();
+        var confirmed = commissionPaymentService.confirm(deduction.paymentId(), "IT-478-CLAWBACK-"+deduction.paymentId());
+        assertThat(confirmed.capCheckIds()).isEmpty();
+        assertThat(commissionPaymentService.confirm(deduction.paymentId(), "IT-478-CLAWBACK-"+deduction.paymentId()).paymentId())
+                .isEqualTo(deduction.paymentId());
+        var repayment = commissionPaymentService.create(grossScenarioRequest(contractId, "PAYMENT", "600000"));
+        var blocked = commissionPaymentService.precheck(repayment.paymentId());
+        assertThat(blocked.confirmable()).isFalse();
+        assertThat(blocked.capPreview().getFirst().includedAmount()).isEqualTo(1500000L);
+        assertThat(blocked.capPreview().getFirst().resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        assertThatThrownBy(() -> commissionPaymentService.confirm(repayment.paymentId(), "IT-478-REPAY-"+repayment.paymentId()))
+                .isInstanceOf(FgcBusinessException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, repayment.paymentId())).isEqualTo("DRAFT");
+    }
+
+    private CommissionPaymentCreateRequest grossScenarioRequest(Long contractId, String cashflow, String amount) {
+        var base = request("IT-478-"+UUID.randomUUID(), new BigDecimal(amount));
+        Long itemId = "PAYMENT".equals(cashflow) ? base.commissionItemId() : jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code='CLAWBACK'", Long.class);
+        return new CommissionPaymentCreateRequest(base.sourceType(), base.sourceBusinessKey(), contractId,
+                base.agentId(), itemId, base.amount(), base.settlementMonth(), cashflow, base.scheduledPaymentDate(),
+                base.paymentStage(), base.allocationPolicyVersion(), List.of(new CommissionPaymentAttributionRequest(
+                contractId, base.scheduledPaymentDate(), base.amount(), InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, "#478 gross 지급 누계", "DIRECT", "IT-478-EVIDENCE", AttributionMethod.DIRECT)),
+                base.evidenceRef(), base.note());
+    }
+
     private CommissionPaymentCreateRequest request(
             String sourceBusinessKey
     ) {
