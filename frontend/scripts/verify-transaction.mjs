@@ -189,6 +189,19 @@ try {
     assert.ok(exceptions.content.length > 0, 'Rejected confirmation persisted the exception')
     await screenshot(page, `${name}-violation-rejected`)
     evidence.flows.push({ name, scenario: 'violation', id: payment.commissionTransactionId, status: 'DRAFT', code: 'FGC-CAP-001', contractNo: targets[index].contractNo })
+
+    // The next precheck sees an already recorded violation (CAP-003), not a new recordable failure.
+    await page.getByRole('button', { name: '취소', exact: true }).click()
+    await page.locator('#btn-precheck').click()
+    await expect(page.locator('#btn-confirm')).toBeEnabled()
+    await page.locator('#btn-confirm').click()
+    await expect(page.getByRole('dialog')).toContainText('FGC-CAP-003')
+    const existingLink = page.getByRole('link', { name: '예외함에서 처리하기' })
+    await expect(existingLink).toHaveAttribute('href', /type=CAP_VIOLATION/)
+    await expect(existingLink).not.toHaveAttribute('href', /contractNo=/)
+    assert.equal((await api('/api/v1/transactions/' + payment.commissionTransactionId)).status, 'DRAFT')
+    evidence.flows.push({ name, scenario: 'existing-violation', id: payment.commissionTransactionId,
+      status: 'DRAFT', code: 'FGC-CAP-003' })
   }
   if (react) {
     const reader = await createReactPage(readerAccess)

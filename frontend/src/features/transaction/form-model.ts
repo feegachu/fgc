@@ -243,9 +243,10 @@ export function gateStates(result: Precheck | null) {
 // confirm failFirst records only the first blocker, never a later CAP code.
 export const hasRecordableBlocker = (result: Precheck) => RECORDABLE_CODES.includes(result.blockers?.[0]?.code ?? '')
 export function blockedContractId(result: Precheck, code: string) {
-  const blockers = (result.blockers ?? []).filter((blocker) => RECORDABLE_CODES.includes(blocker.code ?? ''))
-  const target = blockers.find((blocker) => blocker.code === code) ?? blockers[0]
-  return target?.contractId ?? undefined
+  const blocker = result.blockers?.[0]
+  // If server state changed after precheck, the rejection alone cannot identify a contract.
+  if (blocker?.code !== code || !RECORDABLE_CODES.includes(code)) return undefined
+  return blocker.contractId ?? undefined
 }
 export function blockedContractNo(result: Precheck, code: string, contracts: Contract[]) {
   const id = blockedContractId(result, code)

@@ -133,7 +133,7 @@ describe('server confirmation gates', () => {
     expect(blockedContractNo(result, 'FGC-CAP-002', [{ contractId: 7, contractNo: 'UNCLASSIFIED' }])).toBe(
       'UNCLASSIFIED',
     )
-    expect(blockedContractNo(result, 'FGC-CAP-001', [{ contractId: 3, contractNo: 'VIOLATION' }])).toBe('VIOLATION')
+    expect(blockedContractNo(result, 'FGC-CAP-001', [{ contractId: 3, contractNo: 'VIOLATION' }])).toBeUndefined()
   })
 })
 
@@ -151,7 +151,7 @@ describe('legacy defect model regressions (#410)', () => {
     }
     expect(blockedContractId(result, 'FGC-CAP-002')).toBe(103)
     expect(blockedContractNo(result, 'FGC-CAP-002', [{ contractId: 104, contractNo: 'WRONG' }])).toBe('REVIEW-103')
-    expect(blockedContractNo(result, 'FGC-CAP-001', [])).toBe('VIOLATION-104')
+    expect(blockedContractNo(result, 'FGC-CAP-001', [])).toBeUndefined()
     expect(
       blockedContractNo(
         { blockers: [{ code: 'FGC-CAP-002', contractId: 103 }], capPreview: result.capPreview.slice(0, 1) },

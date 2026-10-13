@@ -160,7 +160,11 @@ export function ConfirmationModal({
   onConfirm: () => void
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
-  const recorded = failure != null && RECORDABLE_CODES.includes(failure.code)
+  const recorded = failure != null && !isRetryableConfirmation(failure) && RECORDABLE_CODES.includes(failure.code)
+  const existingViolation =
+    (failure != null && !isRetryableConfirmation(failure) && failure.code === 'FGC-CAP-003') ||
+    (!failure && result?.blockers?.[0]?.code === 'FGC-CAP-003')
+  const hasException = recorded || existingViolation
   const reviewRequired = failure?.code === 'FGC-CAP-002'
   const recordable = result != null && !result.confirmable && hasRecordableBlocker(result)
   // A transport error leaves the last server precheck intact, so an explicit retry
@@ -244,9 +248,9 @@ export function ConfirmationModal({
             )}
           </div>
         )}
-        {(recordable || recorded || capCheckId) && (
+        {(recordable || hasException || capCheckId) && (
           <div id="transaction-confirm-followup" className="transaction-confirm-followup">
-            {recordable && !recorded && (
+            {recordable && !hasException && (
               <p className="transaction-confirm-notice">
                 확정되지 않습니다. 서버가 이 판정을 기록하고 예외함에 등록한 뒤 확정을 거부합니다. 지급 건은 작성중으로
                 남습니다.
@@ -262,7 +266,7 @@ export function ConfirmationModal({
                   귀속행 판정 다시 확인
                 </Link>
               )}
-              {recorded && (
+              {hasException && (
                 <Link className="button button-secondary" to={withMonth(`/exceptions?${exceptionParams}`, month)}>
                   예외함에서 처리하기
                 </Link>

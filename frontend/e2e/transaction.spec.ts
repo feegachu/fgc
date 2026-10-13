@@ -17,11 +17,13 @@ async function installApi(
     retryConfirmation?: boolean
     lostConfirmationResponse?: boolean
     lostConfirmationServerError?: boolean
+    emptyConfirmationResponse?: boolean
     initialDraft?: Record<string, unknown>
     blockerContractId?: number
     missingPreview?: boolean
     capCode?: string
     detailFailure?: boolean
+    lostCapRejection?: boolean
     emptyAttributions?: boolean
   } = {},
 ) {
@@ -147,18 +149,24 @@ async function installApi(
           status: 401,
           json: { data: null, error: { code: 'FGC-AUTH-002', message: '인증이 필요합니다.' }, requestId: 'retry-auth' },
         })
+      if (options.lostCapRejection && confirmationAttempts === 1) return route.abort('failed')
       if (options.violation)
         return route.fulfill({
           status: 422,
           json: {
             data: null,
-            error: { code: options.capCode ?? 'FGC-CAP-001', message: '1,200% 한도를 초과했습니다.' },
+            error: {
+              code: options.lostCapRejection ? 'FGC-CAP-003' : (options.capCode ?? 'FGC-CAP-001'),
+              message: '1,200% 한도를 초과했습니다.',
+            },
             requestId: 'recorded-violation',
           },
         })
       payment = { ...payment, status: 'CONFIRMED', capCheckIds: [201, 202] }
       // Model a committed operation whose HTTP response is lost. Retrying must use the
       // original key and return the existing result, rather than creating a second payment.
+      if (options.emptyConfirmationResponse && confirmationAttempts === 1)
+        return route.fulfill({ json: envelope(null) })
       if (options.lostConfirmationResponse && confirmationAttempts === 1) return route.abort('failed')
       if (options.lostConfirmationServerError && confirmationAttempts === 1)
         return route.fulfill({
@@ -324,11 +332,12 @@ test('기준월 없는 목록 딥링크에 기본월을 넣어도 2페이지와 
   expect(new URL(page.url()).searchParams.get('page')).toBe('2')
 })
 
-for (const failure of ['network', '500']) {
+for (const failure of ['network', '500', 'empty response']) {
   test('확정 ' + failure + ' 오류 후 창을 닫고 다시 열어 같은 키로 복구한다', async ({ page }) => {
     const fixture = await installApi(page, {
       lostConfirmationResponse: failure === 'network',
       lostConfirmationServerError: failure === '500',
+      emptyConfirmationResponse: failure === 'empty response',
     })
     await enterDraft(page, 20, 2)
     await page.getByRole('button', { name: '확정 실행', exact: true }).click()
@@ -425,4 +434,23 @@ test('빈 저장 초안은 빈 귀속표로 보여 주고 서버 입력 오류�
   await page.locator('#btn-confirm').click()
   await expect(page.getByRole('dialog')).toContainText('FGC-TRAN-002')
   await expect(page.locator('#btn-confirm-submit')).toHaveCount(0)
+})
+
+test('기록된 한도 거절 응답 유실 뒤 CAP-003 재응답에도 예외함 동선을 유지한다', async ({ page }) => {
+  const fixture = await installApi(page, { violation: true, lostCapRejection: true })
+  await enterDraft(page, 1300000, 1)
+  await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
+  await expect(page.locator('#transaction-confirm-blockers')).toBeVisible()
+  await page.getByRole('button', { name: '취소', exact: true }).click()
+  await page.locator('#btn-confirm').click()
+  await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
+  await expect(page.getByRole('dialog')).toContainText('FGC-CAP-003')
+  const link = page.getByRole('link', { name: '예외함에서 처리하기' })
+  await expect(link).toHaveAttribute('href', /type=CAP_VIOLATION/)
+  await expect(link).not.toHaveAttribute('href', /contractNo=/)
+  await expect(page.locator('#btn-confirm-submit')).toBeHidden()
+  expect(fixture.payment().status).toBe('DRAFT')
+  expect(fixture.requests.filter((request) => request.path.endsWith('/confirm')).map((request) => request.key)).toEqual(
+    ['TRAN-CONFIRM-101', 'TRAN-CONFIRM-101'],
+  )
 })

@@ -66,6 +66,7 @@ async function mount(
       draft = { ...draft, status: 'CONFIRMED' }
       if (options.transport && confirms === 1) {
         if (options.transport === 'network') throw new TypeError('Failed to fetch')
+        if (options.transport === 'empty response') return { data: null, error: null, requestId: 'CONFIRM' }
         throw new ApiError({ code: 'FGC-COMMON-500', message: 'private error' }, 'CONFIRM', 500)
       }
       data = draft
@@ -119,7 +120,7 @@ it('legacy normal saved draft prechecks and confirms once with the original key 
     request.mock.calls.filter(([path]) => path.endsWith('/confirm')).map(([, args]) => args?.idempotencyKey),
   ).toEqual(['TRAN-CONFIRM-77'])
 })
-it.each(['network', '500'])(
+it.each(['network', '500', 'empty response'])(
   'legacy %s response loss survives close/reopen without losing precheck recovery (#410)',
   async (transport) => {
     const { request, dialog, modal } = await mount({ transport })
@@ -228,4 +229,47 @@ it('legacy ignores a precheck response that predates a draft edit and save (#410
   await pending
   await waitFor(() => expect(el('btn-precheck')).not.toHaveClass('is-loading'))
   expect(el('btn-confirm')).toBeDisabled()
+})
+
+it('legacy lost CAP rejection recovers an existing CAP-003 exception link without guessing a contract (#410)', async () => {
+  const { request, dialog } = await mount({
+    precheck: {
+      confirmable: false,
+      blockers: [{ code: 'FGC-CAP-001', contractId: 3 }],
+      capPreview: [{ contractId: 3, contractNo: 'C-003' }],
+    },
+  })
+  await precheckAndOpen()
+  request.mockRejectedValueOnce(new TypeError('Lost rejection response'))
+  el('btn-confirm-submit').click()
+  await waitFor(() => expect(el('btn-confirm')).toBeEnabled())
+  dialog.querySelector<HTMLButtonElement>('[data-modal-close]')!.click()
+  el('btn-confirm').click()
+  request.mockRejectedValueOnce(new ApiError({ code: 'FGC-CAP-003', message: '기존 위반' }, 'EXISTING', 422))
+  el('btn-confirm-submit').click()
+  const link = () => el('transaction-confirm-followup').querySelector<HTMLAnchorElement>('a[href*="/exceptions?"]')
+  await waitFor(() => expect(link()).not.toBeNull())
+  expect(link()!.href).toContain('type=CAP_VIOLATION')
+  expect(link()!.href).not.toContain('contractNo=')
+  expect(el('btn-confirm-submit')).not.toBeVisible()
+  expect(
+    request.mock.calls.filter(([path]) => path.endsWith('/confirm')).map(([, args]) => args?.idempotencyKey),
+  ).toEqual(['TRAN-CONFIRM-77', 'TRAN-CONFIRM-77'])
+})
+it('legacy temporary confirmation lock releases only previously editable controls after a 4xx (#410)', async () => {
+  const { request, dialog } = await mount()
+  await precheckAndOpen()
+  request.mockRejectedValueOnce(new ApiError({ code: 'FGC-COMMON-500' }, 'FAILED', 500))
+  el('btn-confirm-submit').click()
+  await waitFor(() => expect(el('btn-confirm')).toBeEnabled())
+  expect(el('bizKey')).toBeDisabled()
+  dialog.querySelector<HTMLButtonElement>('[data-modal-close]')!.click()
+  el('btn-confirm').click()
+  request.mockRejectedValueOnce(new ApiError({ code: 'FGC-TRAN-004' }, 'REJECT', 422))
+  el('btn-confirm-submit').click()
+  await waitFor(() => expect(el('btn-precheck')).toBeEnabled())
+  expect(el('bizKey')).toBeEnabled()
+  expect(el('btn-save')).toBeEnabled()
+  expect(el('btn-confirm')).toBeDisabled()
+  expect(el('transaction-form-status')).not.toBeVisible()
 })

@@ -351,13 +351,14 @@ describe('TRAN-W02 React form workflow', () => {
 })
 
 describe('TRAN-W02 legacy defect regressions (#410)', () => {
-  it.each(['network', '500'])(
+  it.each(['network', '500', 'empty response'])(
     'reopens confirmation after %s failure with the same key without losing recovery to precheck',
     async (kind) => {
       const { user } = mount()
       let dialog = await saveAndPrecheck(user)
       mutation = () => {
         if (kind === 'network') throw new TypeError('Failed to fetch')
+        if (kind === 'empty response') return null
         throw new ApiError({ code: 'FGC-COMMON-500', message: 'private error' }, 'CONFIRM-REQ', 500)
       }
       await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
@@ -486,5 +487,79 @@ describe('TRAN-W02 legacy defect regressions (#410)', () => {
       attributions: [{ inclusionDecisionStatus: 'INCLUDED', attributionMethod: 'DIRECT' }],
     })
     expect(screen.queryByText(/귀속 입력을 조정/)).not.toBeInTheDocument()
+  })
+})
+
+describe('CAP rejection recovery and resolved transport failures (#410)', () => {
+  it('links the existing violation after a lost CAP-001 rejection is retried and returns CAP-003', async () => {
+    precheckResult = {
+      confirmable: false,
+      blockers: [{ code: 'FGC-CAP-001', contractId: 7, message: '한도 위반' }],
+      capPreview: [{ contractId: 7, contractNo: 'C-007' }],
+    }
+    const { user } = mount()
+    let dialog = await saveAndPrecheck(user)
+    mutation = () => {
+      throw new TypeError('Lost rejection response')
+    }
+    await user.click(within(dialog).getByRole('button', { name: '확정 시도 · 예외 등록' }))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '확정 시도 · 예외 등록' })).toBeEnabled())
+    await user.click(within(dialog).getByRole('button', { name: '취소' }))
+    mutation = () => {
+      throw new ApiError({ code: 'FGC-CAP-003', message: '미해결 위반 존재' }, 'EXISTING', 422)
+    }
+    await user.click(button('btn-confirm'))
+    dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
+    await user.click(within(dialog).getByRole('button', { name: '확정 시도 · 예외 등록' }))
+    const link = await within(dialog).findByRole('link', { name: '예외함에서 처리하기' })
+    expect(link.getAttribute('href')).toContain('type=CAP_VIOLATION')
+    expect(link.getAttribute('href')).not.toContain('contractNo=')
+    expect(within(dialog).queryByRole('button', { name: '확정 시도 · 예외 등록' })).not.toBeInTheDocument()
+    expect(
+      writes()
+        .filter(([path]) => path.endsWith('/confirm'))
+        .map(([, args]) => args?.idempotencyKey),
+    ).toEqual(['TRAN-CONFIRM-77', 'TRAN-CONFIRM-77'])
+    await user.click(within(dialog).getByRole('button', { name: '취소' }))
+    precheckResult = {
+      confirmable: false,
+      blockers: [{ code: 'FGC-CAP-003', message: '미해결 위반 존재' }],
+      capPreview: [],
+    }
+    mutation = () => precheckResult
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    await user.click(button('btn-confirm'))
+    expect(await screen.findByRole('link', { name: '예외함에서 처리하기' })).toHaveAttribute(
+      'href',
+      '/app/exceptions?type=CAP_VIOLATION&month=2026-07',
+    )
+  })
+  it('unlocks a reopened draft after the explicit retry returns a business rejection', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    await user.click(button('btn-confirm'))
+    let dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
+    mutation = () => {
+      throw new ApiError({ code: 'FGC-COMMON-500', message: 'internal' }, 'FAILED', 500)
+    }
+    await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '확정 실행' })).toBeEnabled())
+    await user.click(within(dialog).getByRole('button', { name: '취소' }))
+    expect(screen.getByLabelText(/업무키/)).toBeDisabled()
+    mutation = () => {
+      throw new ApiError({ code: 'FGC-TRAN-004', message: '증빙 필요' }, 'REJECT', 422)
+    }
+    await user.click(button('btn-confirm'))
+    dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
+    await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+    await within(dialog).findByText(/FGC-TRAN-004/)
+    await user.click(within(dialog).getByRole('button', { name: '취소' }))
+    expect(screen.getByLabelText(/업무키/)).toBeEnabled()
+    expect(button('btn-save')).toBeEnabled()
+    expect(button('btn-precheck')).toBeEnabled()
+    expect(button('btn-confirm')).toBeDisabled()
   })
 })

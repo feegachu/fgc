@@ -22,6 +22,7 @@
   var confirmationPending = false;
   var confirmationRetryError = null;
   var lastConfirmationError = null;
+  var confirmationInputState = null;
   /*
    * 확정 게이트 6단계 — 화면정의서 :710-718 · 운영정책서 제31조의 순서를 그대로 옮긴다.
    * 게이트를 임의로 늘리거나 줄이지 않는다. 이전 구현은 차익거래·업무키 게이트를 만들어 넣었는데
@@ -751,13 +752,10 @@
   // Blocker의 계약 ID를 먼저 고르고 그 ID의 preview·목록·상세 순서로 계약번호를 찾는다.
   // rule이 없는 CAP-002는 preview가 없으므로 목록·상세 조회가 여전히 필요하다.
   function blockedContract(result, errorCode) {
-    var blockers = (result.blockers || []).filter(function (blocker) {
-      return RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0;
-    });
-    var matched = errorCode
-      ? blockers.filter(function (blocker) { return blocker.code === errorCode; })
-      : [];
-    return matched.length ? matched[0] : blockers[0];
+    var blocker = (result.blockers || [])[0];
+    if (!blocker || blocker.code !== errorCode
+        || !(RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0)) return null;
+    return blocker;
   }
 
   function blockedContractNo(result, errorCode) {
@@ -807,6 +805,7 @@
       notice.className = "transaction-confirm-notice";
       confirmFollowUp.appendChild(notice);
     }
+    if (blockers[0] && blockers[0].code === "FGC-CAP-003") renderFollowUpLinks(null, false);
     confirmFollowUp.hidden = !confirmFollowUp.childElementCount;
   }
 
@@ -903,6 +902,7 @@
     if (!paymentId || !lastPrecheckResult || !canProcess || draftDirty || confirmationPending) return;
     if (lastPrecheckResult.confirmable !== true && !hasRecordableBlocker(lastPrecheckResult)) return;
     confirmationPending = true;
+    lockConfirmationInputs();
     lastConfirmationError = null;
     confirmSubmitButton.disabled = true;
     confirmButton.disabled = true;
@@ -912,7 +912,9 @@
       method: "POST",
       idempotencyKey: "TRAN-CONFIRM-" + paymentId
     }).then(function (envelope) {
+      if (!envelope || !envelope.data) throw new Error("확정 결과를 확인하지 못했습니다.");
       confirmationRetryError = null;
+      confirmationInputState = null;
       setTransactionStatus("확정 · #" + paymentId, "status-badge-success");
       toast("수수료 지급 건을 확정했습니다.", "success", 3000);
       modal.close("transaction-confirm");
@@ -932,15 +934,15 @@
         confirmationRetryError = error;
         prepareConfirmation(lastPrecheckResult);
         renderConfirmationFailure(error);
-        lockDraftInputs();
         confirmButton.disabled = !canProcess;
         precheckButton.disabled = true;
         formStatus.textContent = "확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 같은 요청으로 결과를 확인하세요.";
         formStatus.hidden = false;
       } else {
         confirmationRetryError = null;
+        unlockConfirmationInputs();
         prepareConfirmation(failedResult);
-        if (RECORDABLE_BLOCKER_CODES.indexOf(error.code) >= 0) {
+        if (RECORDABLE_BLOCKER_CODES.indexOf(error.code) >= 0 || error.code === "FGC-CAP-003") {
           renderRecordedFollowUp(error);
           confirmSubmitButton.hidden = true;
           confirmSubmitButton.disabled = true;
@@ -954,6 +956,23 @@
         lastPrecheckResult && !lastPrecheckResult.confirmable && hasRecordableBlocker(lastPrecheckResult)
           ? "확정 시도 · 예외 등록" : "확정 실행");
     });
+  }
+
+  function lockConfirmationInputs() {
+    if (confirmationInputState == null) {
+      confirmationInputState = Array.from(main.querySelectorAll("input, select"))
+        .concat(Array.from(attrBody.querySelectorAll("button")), [addButton, saveButton])
+        .filter(function (control) { return !control.disabled; });
+    }
+    lockDraftInputs();
+  }
+
+  function unlockConfirmationInputs() {
+    if (confirmationInputState == null) return;
+    confirmationInputState.forEach(function (control) { control.disabled = false; });
+    if (confirmationInputState.length) lockNotice.hidden = true;
+    confirmationInputState = null;
+    if (!initializationError && !draftDirty) formStatus.hidden = true;
   }
 
   function lockDraftInputs() {

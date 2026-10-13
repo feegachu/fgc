@@ -132,7 +132,7 @@ function TransactionForm({
   const insurer = form.paymentStage === 'INSURER_TO_GA'
   const newcomer = isNewcomer(form, items)
   const rows = rawRows.map((row) => normalizeRow(row, insurer, newcomer))
-  const normalized = rows.some((row, index) => rowWasNormalized(rawRows[index], row))
+  const normalized = !loading && !referenceError && rows.some((row, index) => rowWasNormalized(rawRows[index], row))
   const needsSave = dirty || normalized
   const confirmationNeedsRetry = Boolean(confirmError) && isRetryableConfirmation(confirmFailure)
   const confirmationRejected = confirmFailure != null && !isRetryableConfirmation(confirmFailure)
@@ -144,7 +144,7 @@ function TransactionForm({
     enabled:
       blockerId != null &&
       blockerId > 0 &&
-      Boolean(confirmFailure && RECORDABLE_CODES.includes(confirmFailure.code)) &&
+      Boolean(confirmationRejected && confirmFailure && RECORDABLE_CODES.includes(confirmFailure.code)) &&
       !knownContractNo,
     retry: false,
   })
