@@ -170,11 +170,11 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
       throw new FormValidationError('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.', `attr-${row.key}-evidenceRef`)
     if (row.attributionMethod === 'APPROVED_ALLOCATION' && !blank(row.allocationBasis))
       throw new FormValidationError('승인 배부에는 배부정책을 입력해야 합니다.', `attr-${row.key}-allocationBasis`)
-    const exclusions = new Map([
-      ['NEW_AGENT_SUPPORT', '신인활동지원비'],
-      ['COMPLIANCE_3PCT', '준법경영비'],
-      ['NONE', ''],
-    ])
+    const exclusions = {
+      NEW_AGENT_SUPPORT: '신인활동지원비',
+      COMPLIANCE_3PCT: '준법경영비',
+      NONE: '',
+    }
     return {
       contractId: newcomer ? null : Number(row.contractId),
       attributionDate: row.attributionDate,
@@ -183,7 +183,7 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
       exclusionType: exclusion,
       inclusionDecisionReason:
         status === 'EXCLUDED'
-          ? `한도 제외: ${exclusions.get(exclusion ?? 'NONE')}`
+          ? `한도 제외: ${exclusions[exclusion ?? 'NONE']}`
           : status === 'INCLUDED'
             ? '화면에서 산입으로 지정'
             : '화면에서 검토필요로 지정',
