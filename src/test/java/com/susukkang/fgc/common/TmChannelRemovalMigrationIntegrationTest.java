@@ -3,6 +3,8 @@ package com.susukkang.fgc.common;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
@@ -32,6 +34,10 @@ class TmChannelRemovalMigrationIntegrationTest {
                     .hasMessageContaining("시드 밖 TM 판매버전");
             jdbc.update("DELETE FROM fgc.product_offering WHERE offering_version = 'TM-REMOVAL-TEST'");
             migrate("49");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.insurance_contract", Integer.class)).isEqualTo(21);
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL03-202608-0002'
+                    """, Integer.class)).isZero();
 
             Long headerId = insertScheduleHeader(jdbc, "TM_SPECIAL");
             assertThatThrownBy(() -> migrate(null)).isInstanceOf(FlywayException.class)
@@ -58,6 +64,91 @@ class TmChannelRemovalMigrationIntegrationTest {
             assertThat(jdbc.queryForObject(
                     "SELECT count(*) FROM fgc.product_offering WHERE channel_code = 'TM'", Integer.class)).isZero();
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MANUAL", "SEED"})
+    void v49PreservesOtherContractsUsingTheSeedOffering(String origin) throws Exception {
+        try (var connection = DriverManager.getConnection(URL, "fgc", "fgc_test_only")) {
+            migrate("48");
+            JdbcTemplate jdbc = new JdbcTemplate(new SingleConnectionDataSource(connection, true));
+            jdbc.update("""
+                    INSERT INTO fgc.insurance_contract (insurer_id, product_offering_id, contract_no, contract_date,
+                        agent_id, organization_id, premium_per_cycle_amount, first_premium_amount,
+                        monthly_equivalent_first_premium, premium_conversion_rule_code, payment_cycle_code,
+                        payment_term_months, standard_surrender_deduction_amount, current_status, data_origin)
+                    SELECT insurer_id, product_offering_id, 'TM-REMOVAL-EXTRA', contract_date,
+                           agent_id, organization_id, premium_per_cycle_amount, first_premium_amount,
+                           monthly_equivalent_first_premium, premium_conversion_rule_code, payment_cycle_code,
+                           payment_term_months, standard_surrender_deduction_amount, current_status, ?
+                      FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL03-202608-0002'
+                    """, origin);
+            jdbc.update("""
+                    INSERT INTO fgc.contract_status_event (contract_id, event_seq, new_status, effective_at,
+                        received_at, source_system, source_event_key, data_origin)
+                    SELECT contract_id, 1, 'ACTIVE', now(), now(), 'LOCAL_TEST', 'TM-REMOVAL-EXTRA', ?
+                      FROM fgc.insurance_contract WHERE contract_no = 'TM-REMOVAL-EXTRA'
+                    """, origin);
+
+            assertThatThrownBy(() -> migrate("49")).isInstanceOf(FlywayException.class)
+                    .hasMessageContaining("시드 밖 계약");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.insurance_contract", Integer.class)).isEqualTo(23);
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM fgc.contract_status_event e JOIN fgc.insurance_contract c USING (contract_id)
+                     WHERE c.contract_no = 'TM-REMOVAL-EXTRA'
+                    """, Integer.class)).isEqualTo(1);
+            assertG3Preserved(jdbc);
+        }
+    }
+
+    @Test
+    void v49PreservesG3WhenItIsNotSeedData() throws Exception {
+        try (var connection = DriverManager.getConnection(URL, "fgc", "fgc_test_only")) {
+            migrate("48");
+            JdbcTemplate jdbc = new JdbcTemplate(new SingleConnectionDataSource(connection, true));
+            jdbc.update("""
+                    UPDATE fgc.insurance_contract SET data_origin = 'MANUAL' WHERE contract_no = 'FGC-FGL03-202608-0002'
+                    """);
+            assertThatThrownBy(() -> migrate("49")).isInstanceOf(FlywayException.class)
+                    .hasMessageContaining("시드 밖 계약");
+            assertG3Preserved(jdbc);
+        }
+    }
+
+    @Test
+    void v49RollsBackSeedDeletionAndTriggerChangeWhenG3HasASchedule() throws Exception {
+        try (var connection = DriverManager.getConnection(URL, "fgc", "fgc_test_only")) {
+            migrate("48");
+            JdbcTemplate jdbc = new JdbcTemplate(new SingleConnectionDataSource(connection, true));
+            jdbc.update("""
+                    INSERT INTO fgc.schedule_header (contract_id, payment_stage, policy_version_id, schedule_version_no,
+                        schedule_purpose, scenario_code, schedule_regime)
+                    SELECT contract_id, 'GA_TO_FC', (SELECT min(policy_version_id) FROM fgc.policy_version),
+                           1, 'SIMULATION', 'TM-REMOVAL-TEST', 'TM_SPECIAL'
+                      FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL03-202608-0002'
+                    """);
+            assertThatThrownBy(() -> migrate("49")).isInstanceOf(FlywayException.class)
+                    .hasMessageContaining("foreign key constraint");
+            assertG3Preserved(jdbc);
+            assertThatThrownBy(() -> jdbc.update("""
+                    DELETE FROM fgc.contract_status_event WHERE contract_id = (
+                        SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL03-202608-0002')
+                    """)).isInstanceOf(org.springframework.dao.DataAccessException.class)
+                    .hasMessageContaining("append-only");
+        }
+    }
+
+    private void assertG3Preserved(JdbcTemplate jdbc) {
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.insurance_contract c
+                JOIN fgc.contract_status_event e USING (contract_id)
+                JOIN fgc.contract_financial_snapshot s USING (contract_id)
+                JOIN fgc.product_offering po USING (product_offering_id)
+                 WHERE c.contract_no = 'FGC-FGL03-202608-0002' AND po.channel_code = 'TM'
+                """, Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT tgenabled::text FROM pg_trigger WHERE tgname = 'trg_contract_status_event_append_only'
+                """, String.class)).isEqualTo("O");
     }
 
     private void migrate(String target) {

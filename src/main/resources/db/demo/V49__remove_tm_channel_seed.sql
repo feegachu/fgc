@@ -6,9 +6,9 @@
 --     G3 FGC-FGL03-202608-0002 는 더 이상 시나리오가 아니다.
 --     V4 는 이미 적용됐으므로 고치지 않고 여기서 지운다(SRC-027 D-04).
 --
--- 범위: V4 시드 키(STD-TERM-A '2026-TM-A' 와 그 판매버전의 계약)만 지운다.
+-- 범위: V4 시드 키(STD-TERM-A '2026-TM-A', 계약번호 G3·data_origin=SEED)만 지운다.
 --     계약의 상태이벤트·재무스냅샷·계약, 그리고 판매버전.
---     이 밖에 TM 판매버전이 남아 있으면(로컬에서 직접 만든 행) 지우지 않고 실패한다
+--     같은 판매버전의 다른 계약이나 이 밖의 TM 판매버전이 있으면 지우지 않고 실패한다
 --     — 무엇을 지울지는 그 DB 주인이 정한다.
 --     V4 시드 기준으로 G3 에 딸린 행은 상태이벤트 1건(ACTIVE)과 재무스냅샷 1건(버전 1)뿐이다.
 --     로컬 DB 에서 G3 로 스케줄·검증·분개를 만들었다면 FK 가 이 마이그레이션을 막는다
@@ -30,7 +30,20 @@ SELECT po.product_offering_id
 CREATE TEMP TABLE tmp_tm_contract ON COMMIT DROP AS
 SELECT c.contract_id
   FROM insurance_contract c
- WHERE c.product_offering_id IN (SELECT product_offering_id FROM tmp_tm_offering);
+ WHERE c.product_offering_id IN (SELECT product_offering_id FROM tmp_tm_offering)
+   AND c.contract_no = 'FGC-FGL03-202608-0002'
+   AND c.data_origin = 'SEED';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM insurance_contract
+     WHERE product_offering_id IN (SELECT product_offering_id FROM tmp_tm_offering)
+       AND contract_id NOT IN (SELECT contract_id FROM tmp_tm_contract)
+  ) THEN
+    RAISE EXCEPTION 'V49: TM 시드 판매버전에 시드 밖 계약이 남아 있다(SRC-036). 로컬 DB 를 다시 만들거나 직접 정리한다';
+  END IF;
+END $$;
 
 ALTER TABLE contract_status_event DISABLE TRIGGER trg_contract_status_event_append_only;
 DELETE FROM contract_status_event WHERE contract_id IN (SELECT contract_id FROM tmp_tm_contract);
