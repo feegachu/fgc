@@ -622,6 +622,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     sourceContractId,
                     agentId,
                     settlementMonth,
+                    dueDate,
                     paymentStage,
                     item.commissionItemId(),
                     effectivePolicyVersionId,
@@ -731,6 +732,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long sourceContractId,
             Long agentId,
             LocalDate settlementMonth,
+            LocalDate dueDate,
             com.susukkang.fgc.common.code.PaymentStage paymentStage,
             Long commissionItemId,
             Long policyVersionId,
@@ -742,6 +744,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 request.contractId(),
                 agentId,
                 settlementMonth,
+                dueDate,
                 request.attributionDate(),
                 paymentStage,
                 request.attributionMethod()
@@ -874,6 +877,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             Long requestedAttributedContractId,
             Long agentId,
             LocalDate settlementMonth,
+            LocalDate dueDate,
             LocalDate attributionDate,
             PaymentStage paymentStage,
             AttributionMethod attributionMethod
@@ -914,7 +918,16 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
                 || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
-            invalid("attributionDate", "정착지원금은 지급월의 신계약에 실제 귀속해야 합니다.");
+            invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
+        }
+        // 2026-10-13 #476 - 정산월은 지급월이 아니라 실적(모집)월이다 (REG-20, FAQ 2차 Q7-1)
+        // 기존 코드: 메시지가 "지급월의 신계약"이었고 지급예정일이 모집월보다 앞서도 통과했다.
+        // 문제: 정산월의 뜻이 모집월인데 문구는 지급월이라 8월 지급분을 7월 모집분에 귀속하는 FAQ 예시와 어긋났다.
+        // 개선: 지급예정일은 모집월 1일과 같거나 뒤여야 한다. 13차월 이후 이연 지급은 막지 않는다.
+        if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
+                && dueDate != null
+                && dueDate.isBefore(YearMonth.from(settlementMonth).atDay(1))) {
+            invalid("scheduledPaymentDate", "정착지원금 지급일은 모집월(정산월) 1일 이후여야 합니다.");
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {

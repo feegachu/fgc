@@ -915,7 +915,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
                 || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
-            invalid("attributionDate", "정착지원금은 지급월의 신계약에 실제 귀속해야 합니다.");
+            invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {

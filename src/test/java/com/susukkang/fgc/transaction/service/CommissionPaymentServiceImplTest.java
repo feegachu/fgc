@@ -563,10 +563,10 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository, never()).insertTransaction(any());
     }
 
-    // 2026-08-11 yslee - REG-20 지급월 신계약 귀속 정상 시나리오 검증
+    // 2026-08-11 yslee - REG-20 모집월 신계약 귀속 정상 시나리오 검증
     // 기존 코드: 정착지원금 귀속월 규칙을 구현했지만 수수료 항목과 귀속방식 조합을 확인하지 않음
     // 문제: 다른 수수료가 정착지원금 방식으로 우회 귀속되거나 정착지원금이 일반 귀속으로 저장 가능
-    // 개선: SETTLEMENT_SUPPORT 항목의 지급월 신계약·실제 귀속일·월초 파생을 함께 검증
+    // 개선: SETTLEMENT_SUPPORT 항목의 모집월(정산월) 신계약·실제 귀속일·월초 파생을 함께 검증
     @Test
     void attributesSettlementSupportToNewContractInSettlementMonth() {
         stubReferences(3L);
@@ -588,6 +588,58 @@ class CommissionPaymentServiceImplTest {
             assertThat(attribution.getAttributionDate()).isEqualTo(LocalDate.of(2026, 7, 3));
             assertThat(attribution.getAttributionMonth()).isEqualTo(LocalDate.of(2026, 7, 1));
         });
+    }
+
+    // 2026-10-13 #476 - FAQ 2차 Q7-1 예시: 8월 지급 정착지원금은 7월 모집 신계약에 귀속
+    @Test
+    void allowsSettlementSupportPaidAfterRecruitmentMonth() {
+        stubReferences(3L);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(
+                        11L, "SETTLEMENT_SUPPORT", "PAYMENT"
+                ));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+
+        service.create(withScheduledPaymentDate(
+                createRequest(List.of(
+                        attribution(3L, "500000", AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY)
+                )),
+                LocalDate.of(2026, 8, 25)
+        ));
+
+        verify(writeRepository).insertTransaction(any());
+    }
+
+    @Test
+    void rejectsSettlementSupportPaidBeforeRecruitmentMonth() {
+        stubReferences(3L);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(
+                        11L, "SETTLEMENT_SUPPORT", "PAYMENT"
+                ));
+
+        assertThatThrownBy(() -> service.create(withScheduledPaymentDate(
+                createRequest(List.of(
+                        attribution(3L, "500000", AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY)
+                )),
+                LocalDate.of(2026, 6, 25)
+        ))).isInstanceOfSatisfying(FgcBusinessException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(FgcErrorCode.COMMON_002));
+
+        verify(writeRepository, never()).insertTransaction(any());
+    }
+
+    private CommissionPaymentCreateRequest withScheduledPaymentDate(
+            CommissionPaymentCreateRequest source,
+            LocalDate scheduledPaymentDate
+    ) {
+        return new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), source.agentId(),
+                source.commissionItemId(), source.amount(), source.settlementMonth(), source.cashflowType(),
+                scheduledPaymentDate, source.paymentStage(), source.allocationPolicyVersion(), source.attributions(),
+                source.evidenceRef(), source.note()
+        );
     }
 
     @Test
