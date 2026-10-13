@@ -49,6 +49,7 @@ class CapExceptionRepositoryIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
+    /** 같은 업무키의 위반은 한 건으로 갱신되고, 해결조치 후에는 미해결 조회에서 빠지며 다시 열리지 않는다. */
     @Test
     void updatesSameViolationWithoutDuplicateAndResolvesWithAction() {
         TestReference reference = testReference();
@@ -88,6 +89,8 @@ class CapExceptionRepositoryIntegrationTest {
                 //       월 통합검증 확정 게이트(제44조)가 셀 수 있어야 한다
                 .containsEntry("validation_month", java.sql.Date.valueOf("2026-08-01"));
         assertThat(capExceptionService.hasUnresolvedViolation(paymentId)).isTrue();
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId))
+                .containsExactly(reference.contractId());
 
         capExceptionService.resolve(CapExceptionResolveCommand.builder()
                 .exceptionCaseId(exceptionCaseId)
@@ -108,6 +111,7 @@ class CapExceptionRepositoryIntegrationTest {
                  WHERE exception_case_id = ?
                 """, String.class, exceptionCaseId)).isEqualTo("REDUCE");
         assertThat(capExceptionService.hasUnresolvedViolation(paymentId)).isFalse();
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId)).isEmpty();
         assertThat(entityManager.find(ExceptionCase.class, exceptionCaseId).getStatus())
                 .isEqualTo(ExceptionStatus.RESOLVED);
 
@@ -125,6 +129,52 @@ class CapExceptionRepositoryIntegrationTest {
                 String.class,
                 exceptionKey
         )).isEqualTo("RESOLVED");
+    }
+
+    /**
+     * #477 후속: CAP_003 계약 단위 판정의 입력 — 다계약 위반은 계약별로 중복 없이, 계약이 빈 위반은
+     * null 원소로 돌려주고, 종결·주의·다른 지급 건 예외는 빼며, IN_REVIEW 는 미해결로 남긴다.
+     */
+    @Test
+    void listsUnresolvedViolationContractsAcrossContractsIncludingMissingContract() {
+        TestReference reference = testReference();
+        Long paymentId = insertDraftPayment(reference);
+        Long otherPaymentId = insertDraftPayment(reference);
+        Long contractA = reference.contractId();
+        Long contractB = otherContractId(contractA);
+        String prefix = "IT-CAP003:" + UUID.randomUUID() + ":";
+
+        capExceptionRepository.insertException(exception(prefix + "A-1", paymentId, reference,
+                contractA, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "A-2", paymentId, reference,
+                contractA, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "B", paymentId, reference,
+                contractB, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "NULL", paymentId, reference,
+                null, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "WARN", paymentId, reference,
+                contractB, ExceptionType.CAP_WARNING));
+        capExceptionRepository.insertException(exception(prefix + "OTHER", otherPaymentId, reference,
+                contractB, ExceptionType.CAP_VIOLATION));
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status = 'IN_REVIEW' WHERE exception_key = ?",
+                prefix + "NULL");
+        entityManager.clear();
+
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId))
+                .containsExactlyInAnyOrder(contractA, contractB, null);
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(otherPaymentId))
+                .containsExactly(contractB);
+
+        capExceptionService.resolve(CapExceptionResolveCommand.builder()
+                .exceptionCaseId(exceptionCaseId(prefix + "B"))
+                .actionType(ExceptionActionType.REDUCE)
+                .reason("지급액 감액 완료")
+                .evidenceRef("IT-CAP003")
+                .actionBy(reference.userId())
+                .build());
+
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId))
+                .containsExactlyInAnyOrder(contractA, null);
     }
 
     @Test
@@ -290,6 +340,47 @@ class CapExceptionRepositoryIntegrationTest {
                 .title("통합 테스트 한도 예외")
                 .description("FGC-FUN-034 통합 테스트")
                 .build();
+    }
+
+    /** 계약·예외 유형을 지정한 지급 건 한도 예외 입력. 위반은 CRITICAL, 그 밖은 WARNING 심각도로 만든다. */
+    private CapExceptionInsertDTO exception(
+            String exceptionKey,
+            Long paymentId,
+            TestReference reference,
+            Long contractId,
+            ExceptionType exceptionType
+    ) {
+        return CapExceptionInsertDTO.builder()
+                .exceptionKey(exceptionKey)
+                .exceptionType(exceptionType)
+                .severity(exceptionType == ExceptionType.CAP_VIOLATION
+                        ? ExceptionSeverity.CRITICAL
+                        : ExceptionSeverity.WARNING)
+                .contractId(contractId)
+                .agentId(reference.agentId())
+                .policyVersionId(reference.policyVersionId())
+                .paymentId(paymentId)
+                .title("통합 테스트 한도 예외")
+                .description("CAP_003 계약 단위 판정 통합 테스트")
+                .build();
+    }
+
+    /** 주어진 계약과 다른 시드 계약 ID — 다계약 위반 시나리오용. */
+    private Long otherContractId(Long contractId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT contract_id
+                  FROM fgc.insurance_contract
+                 WHERE contract_id <> ?
+                 ORDER BY contract_id
+                 LIMIT 1
+                """, Long.class, contractId);
+    }
+
+    /** 업무키로 저장된 예외 건 ID를 찾는다. */
+    private Long exceptionCaseId(String exceptionKey) {
+        return jdbcTemplate.queryForObject(
+                "SELECT exception_case_id FROM fgc.exception_case WHERE exception_key = ?",
+                Long.class, exceptionKey);
     }
 
     private TestReference testReference() {

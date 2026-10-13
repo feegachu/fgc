@@ -685,7 +685,7 @@
    *
    * "하나라도 있으면" 이 아니라 **첫 번째만** 본다. confirm 은 failFirst 로 게이트 순서상
    * 먼저 걸리는 사유 하나만 기록·거부한다. precheck 의 수집 순서는 confirm 의 평가 순서와
-   * 같으므로(hasUnresolvedViolation → requiredValueFailures → 귀속행 루프의
+   * 같으므로(hasBlockingUnresolvedViolation → requiredValueFailures → 귀속행 루프의
    * attributionFailures → newcomer → capRule → ruleConsistency → capResult)
    * blockers[0] 이 곧 confirm 이 던질 코드다.
    *
