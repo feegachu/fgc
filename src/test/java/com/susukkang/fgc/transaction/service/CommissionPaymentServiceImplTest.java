@@ -1603,8 +1603,8 @@ class CommissionPaymentServiceImplTest {
                 LocalDate.of(2026, 7, 3),
                 new BigDecimal("500000"),
                 InclusionDecisionStatus.EXCLUDED,
-                ExclusionType.VOICE_RECORDING,
-                "녹취비 제외",
+                ExclusionType.NEW_AGENT_SUPPORT,
+                "신인 활동지원비 제외",
                 "DIRECT",
                 "ATTRIBUTION-EVIDENCE",
                 AttributionMethod.DIRECT
@@ -2174,7 +2174,7 @@ class CommissionPaymentServiceImplTest {
         ConfirmationData included = confirmation(201L, 3L, "600000", "1300000",
                 InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, AttributionMethod.DIRECT, "INCLUDED-EVD");
         ConfirmationData other = confirmation(202L, 3L, "700000", "1300000",
-                otherStatus, otherStatus == InclusionDecisionStatus.EXCLUDED ? ExclusionType.VOICE_RECORDING : ExclusionType.NONE,
+                otherStatus, otherStatus == InclusionDecisionStatus.EXCLUDED ? ExclusionType.NEW_AGENT_SUPPORT : ExclusionType.NONE,
                 AttributionMethod.DIRECT, "OTHER-EVD");
         CapRuleSnapshot rule = capRule("0", null);
         given(queryRepository.findConfirmationData(101L)).willReturn(List.of(other, included));

@@ -123,11 +123,11 @@ class RefundRateQueryRepositoryIntegrationTest {
                 INSERT INTO fgc.product_offering (
                     product_id, offering_version, sales_start_date,
                     basic_document_version, basic_document_date, channel_code,
-                    channel_special_rule_yn, fee_regime_code, standard_deduction_80_yn
+                    fee_regime_code, standard_deduction_80_yn
                 )
                 SELECT product_id, ?, DATE '2035-01-01',
                        basic_document_version, basic_document_date, channel_code,
-                       channel_special_rule_yn, fee_regime_code, standard_deduction_80_yn
+                       fee_regime_code, standard_deduction_80_yn
                   FROM fgc.product_offering WHERE product_offering_id = ?
                 """, UUID.randomUUID().toString(), scope.offeringId());
         LocalDate newestFrom = FROM.plusMonths(1);
