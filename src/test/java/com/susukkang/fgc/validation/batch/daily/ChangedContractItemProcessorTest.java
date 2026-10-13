@@ -1,10 +1,15 @@
 package com.susukkang.fgc.validation.batch.daily;
 
+import com.susukkang.fgc.arbitrage.service.ArbitrageCheckBatchItemService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.common.code.ContractStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.contract.entity.ContractStatusEvent;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
+import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
@@ -20,6 +25,7 @@ import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -46,6 +53,10 @@ class ChangedContractItemProcessorTest {
     private CapCheckService capCheckService;
     @Mock
     private ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
+    @Mock
+    private ArbitrageCheckBatchItemService arbitrageCheckBatchItemService;
+    @Mock
+    private ContractStatusEventRepository contractStatusEventRepository;
 
     private ChangedContractItemProcessor processor;
     private final OffsetDateTime watermark = OffsetDateTime.parse("2026-08-10T02:00:00+09:00");
@@ -53,7 +64,8 @@ class ChangedContractItemProcessorTest {
     @BeforeEach
     void setUp() {
         processor = new ChangedContractItemProcessor(
-                insuranceContractRepository, scheduleService, capCheckService, contractStatusEventProcessingRepository);
+                insuranceContractRepository, scheduleService, capCheckService, contractStatusEventProcessingRepository,
+                arbitrageCheckBatchItemService, contractStatusEventRepository);
 
         JobExecution jobExecution = new JobExecution(
                 new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), new JobParameters());
@@ -93,6 +105,8 @@ class ChangedContractItemProcessorTest {
         verify(capCheckService, times(2)).calculateAndSave(captor.capture());
         assertThat(captor.getAllValues())
                 .allSatisfy(command -> assertThat(command.validationRunId()).isEqualTo(777L));
+        // #512 — 차익거래도 같은 validation_run 밑에, 해지·실효가 아닌 계약은 오늘 기준으로 점검한다.
+        verify(arbitrageCheckBatchItemService).process(777L, 1L, LocalDate.now(DateUtil.SEOUL_ZONE));
     }
 
     @Test
@@ -149,5 +163,78 @@ class ChangedContractItemProcessorTest {
         assertThat(result.success()).isFalse();
         assertThat(result.contractId()).isEqualTo(3L);
         assertThat(result.failureReason()).contains(FgcErrorCode.CONT_001.getCode());
+    }
+
+    // #512 — 해지·실효 계약의 차익거래 기준일은 효력일(Asia/Seoul 날짜)이다(제4-32조⑥ "해지시점까지", FAQ 2차 Q12).
+    // effective_at 2026-08-20 00:00 KST는 UTC로 8/19 15:00이라, 서울 시간대로 바꾸지 않으면 하루 앞당겨진다.
+    @Test
+    void terminatedContractIsCheckedForArbitrageAsOfEffectiveDateInSeoul() {
+        InsuranceContract contract = contract(4L);
+        ReflectionTestUtils.setField(contract, "currentStatus", ContractStatus.TERMINATED);
+        given(insuranceContractRepository.findById(4L)).willReturn(Optional.of(contract));
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
+                .willReturn(List.of(200L));
+        given(contractStatusEventRepository.findFirstByContractIdOrderByEffectiveAtDescEventSeqDesc(4L))
+                .willReturn(Optional.of(event(ContractStatus.TERMINATED, OffsetDateTime.parse("2026-08-19T15:00:00Z"))));
+
+        ChangedContractResult result = processor.process(4L);
+
+        assertThat(result.success()).isTrue();
+        verify(arbitrageCheckBatchItemService).process(777L, 4L, LocalDate.of(2026, 8, 20));
+    }
+
+    // 사건 없이 상태만 바뀐 계약(최근 사건 ACTIVE, 현재 LAPSED)은 효력일을 알 수 없어 오늘을 쓴다.
+    @Test
+    void lapsedContractWhoseLatestEventDisagreesFallsBackToToday() {
+        InsuranceContract contract = contract(5L);
+        ReflectionTestUtils.setField(contract, "currentStatus", ContractStatus.LAPSED);
+        given(insuranceContractRepository.findById(5L)).willReturn(Optional.of(contract));
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
+                .willReturn(List.of());
+        given(contractStatusEventRepository.findFirstByContractIdOrderByEffectiveAtDescEventSeqDesc(5L))
+                .willReturn(Optional.of(event(ContractStatus.ACTIVE, OffsetDateTime.parse("2026-01-15T00:00:00+09:00"))));
+
+        processor.process(5L);
+
+        verify(arbitrageCheckBatchItemService).process(777L, 5L, LocalDate.now(DateUtil.SEOUL_ZONE));
+    }
+
+    // #512 — 차익거래만 실패해도 SUCCEEDED로 찍히면 그 해지 사건은 다시 점검되지 않는다.
+    // 데이터 품질 스킵으로 돌려 Writer가 사건을 FAILED로 남기게 한다(다음 날 Reader가 다시 잡는다).
+    @Test
+    void arbitrageFailureIsDataQualitySkipSoPendingEventsStayRetryable() {
+        given(insuranceContractRepository.findById(6L)).willReturn(Optional.of(contract(6L)));
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
+                .willReturn(List.of(300L));
+        willThrow(new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", 6L)))
+                .given(arbitrageCheckBatchItemService).process(eq(777L), eq(6L), any(LocalDate.class));
+
+        ChangedContractResult result = processor.process(6L);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.pendingEventIds()).containsExactly(300L);
+        assertThat(result.failureReason()).contains(FgcErrorCode.COMMON_004.getCode());
+    }
+
+    // #512 — 1,200% 룰셋이 없는 계약(CAP_004, 2026-07 이전 계약)도 차익거래는 점검한다.
+    // 월 실행처럼 두 검증이 서로를 막지 않되, 실패가 있으면 사건은 FAILED로 남도록 스킵을 돌려준다.
+    @Test
+    void capFailureStillRunsArbitrageAndReturnsSkip() {
+        given(insuranceContractRepository.findById(7L)).willReturn(Optional.of(contract(7L)));
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
+                .willReturn(List.of(400L));
+        willThrow(new FgcBusinessException(FgcErrorCode.CAP_004, Map.of()))
+                .given(capCheckService).calculateAndSave(any(CapCalculationCommand.class));
+
+        ChangedContractResult result = processor.process(7L);
+
+        verify(arbitrageCheckBatchItemService).process(777L, 7L, LocalDate.now(DateUtil.SEOUL_ZONE));
+        assertThat(result.success()).isFalse();
+        assertThat(result.pendingEventIds()).containsExactly(400L);
+        assertThat(result.failureReason()).contains(FgcErrorCode.CAP_004.getCode());
+    }
+
+    private ContractStatusEvent event(ContractStatus newStatus, OffsetDateTime effectiveAt) {
+        return ContractStatusEvent.builder().newStatus(newStatus).effectiveAt(effectiveAt).build();
     }
 }
