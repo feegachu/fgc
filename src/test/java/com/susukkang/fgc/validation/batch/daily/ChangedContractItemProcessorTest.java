@@ -36,7 +36,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
@@ -221,7 +220,7 @@ class ChangedContractItemProcessorTest {
 
     // #512 — 1,200% 점검이 실패해도 차익거래는 점검한다.
     // 월 실행처럼 두 검증이 서로를 막지 않되, 실패가 있으면 사건은 FAILED로 남도록 스킵을 돌려준다.
-    // (CAP_004는 실패가 아니게 바뀌어(#522) 다른 업무 예외로 의도를 지킨다.)
+    // (시행 전 계약의 CAP_004는 실패가 아니게 바뀌어(#522) 다른 업무 예외로 의도를 지킨다.)
     @Test
     void capFailureStillRunsArbitrageAndReturnsSkip() {
         given(insuranceContractRepository.findById(7L)).willReturn(Optional.of(contract(7L)));
@@ -239,42 +238,69 @@ class ChangedContractItemProcessorTest {
         verify(scheduleService, never()).registerCapRuleReview(anyLong(), any(), anyString());
     }
 
-    // #522 — 룰셋 없음(CAP_004)은 그 단계가 1,200% 대상이 아니라는 뜻이다. 실패로 돌리면 사건이 FAILED로
-    // 남아 매일 재처리되므로 성공으로 끝내고, 검토 큐(계약 저장 경로와 같은 POLICY_MISSING)에만 남긴다.
-    // 앞 단계가 CAP_004여도 뒤 단계는 계산한다.
+    // #522 — 1,200%룰은 보험회사 '21.1.1, 보험대리점 '26.7.1. "이후 체결한 신계약"에 적용된다(FAQ 2차 Q1-1).
+    // 시행 전 체결 계약의 룰셋 없음(CAP_004)은 정상이라 실패도 검토 대상도 아니다. 앞 단계가 CAP_004여도 뒤 단계는 계산한다.
     @Test
-    void missingCapRuleSetIsReviewNotFailureAndOtherStageIsStillChecked() {
-        given(insuranceContractRepository.findById(8L)).willReturn(Optional.of(contract(8L)));
+    void missingRuleSetForContractBeforeCapRuleEffectiveDateIsNeitherFailureNorReview() {
+        given(insuranceContractRepository.findById(8L)).willReturn(Optional.of(contract(8L, LocalDate.of(2020, 12, 31))));
         given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of(500L));
-        failCapStages(Map.of(PaymentStage.INSURER_TO_GA,
-                new FgcBusinessException(FgcErrorCode.CAP_004, "paymentStage", Map.of(), "적용 가능한 1,200% 룰셋이 없습니다.")));
+        failCapStages(Map.of(
+                PaymentStage.INSURER_TO_GA, missingRuleSet(),
+                PaymentStage.GA_TO_FC, missingRuleSet()));
 
         ChangedContractResult result = processor.process(8L);
 
         assertThat(result.success()).isTrue();
         assertThat(result.pendingEventIds()).containsExactly(500L);
-        verify(scheduleService).registerCapRuleReview(8L, PaymentStage.INSURER_TO_GA, "적용 가능한 1,200% 룰셋이 없습니다.");
-        verify(scheduleService, never()).registerCapRuleReview(eq(8L), eq(PaymentStage.GA_TO_FC), anyString());
-        verify(capCheckService).calculateAndSave(argThat(command -> command.paymentStage() == PaymentStage.GA_TO_FC));
+        verify(capCheckService, times(2)).calculateAndSave(any(CapCalculationCommand.class));
+        verify(scheduleService, never()).registerCapRuleReview(anyLong(), any(), anyString());
         verify(arbitrageCheckBatchItemService).process(777L, 8L, LocalDate.now(DateUtil.SEOUL_ZONE));
     }
 
-    // #522 — CAP_004와 다른 업무 예외가 함께 나면 다른 예외만 실패 사유가 된다(재시도는 유지).
+    // #522 — 대상 단계(시행일 당일 체결 = "이후"에 포함)인데 룰셋이 없으면 설정 누락이다.
+    // 검토 큐에 남기고 실패로 돌려 사건이 FAILED로 남게 한다(다음 날 다시 점검).
     @Test
-    void otherCapFailureAlongsideMissingRuleSetStillSkips() {
-        given(insuranceContractRepository.findById(9L)).willReturn(Optional.of(contract(9L)));
+    void missingRuleSetForApplicableStageIsReviewedAndStaysRetryable() {
+        given(insuranceContractRepository.findById(9L)).willReturn(Optional.of(contract(9L, LocalDate.of(2026, 7, 1))));
         given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
                 .willReturn(List.of(600L));
-        failCapStages(Map.of(
-                PaymentStage.INSURER_TO_GA, new FgcBusinessException(FgcErrorCode.CAP_002, Map.of()),
-                PaymentStage.GA_TO_FC, new FgcBusinessException(FgcErrorCode.CAP_004, Map.of())));
+        failCapStages(Map.of(PaymentStage.GA_TO_FC, missingRuleSet()));
 
         ChangedContractResult result = processor.process(9L);
 
         assertThat(result.success()).isFalse();
-        assertThat(result.failureReason()).isEqualTo(FgcErrorCode.CAP_002.getCode());
+        assertThat(result.pendingEventIds()).containsExactly(600L);
+        assertThat(result.failureReason()).isEqualTo(FgcErrorCode.CAP_004.getCode() + ": 적용 가능한 1,200% 룰셋이 없습니다.");
         verify(scheduleService).registerCapRuleReview(9L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 룰셋이 없습니다.");
+        verify(scheduleService, never()).registerCapRuleReview(eq(9L), eq(PaymentStage.INSURER_TO_GA), anyString());
+    }
+
+    // #522 — 시행 전 단계의 CAP_004는 빠지고, 다른 업무 예외만 실패 사유로 남는다(재시도는 유지).
+    @Test
+    void otherCapFailureAlongsidePreEffectiveMissingRuleSetStillSkips() {
+        given(insuranceContractRepository.findById(10L)).willReturn(Optional.of(contract(10L, LocalDate.of(2026, 6, 30))));
+        given(contractStatusEventProcessingRepository.findPendingEventIds(anyLong(), anyString()))
+                .willReturn(List.of(700L));
+        failCapStages(Map.of(
+                PaymentStage.INSURER_TO_GA, new FgcBusinessException(FgcErrorCode.CAP_002, Map.of()),
+                PaymentStage.GA_TO_FC, missingRuleSet()));
+
+        ChangedContractResult result = processor.process(10L);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.failureReason()).isEqualTo(FgcErrorCode.CAP_002.getCode());
+        verify(scheduleService, never()).registerCapRuleReview(anyLong(), any(), anyString());
+    }
+
+    private InsuranceContract contract(long contractId, LocalDate contractDate) {
+        InsuranceContract contract = contract(contractId);
+        ReflectionTestUtils.setField(contract, "contractDate", contractDate);
+        return contract;
+    }
+
+    private FgcBusinessException missingRuleSet() {
+        return new FgcBusinessException(FgcErrorCode.CAP_004, "paymentStage", Map.of(), "적용 가능한 1,200% 룰셋이 없습니다.");
     }
 
     private void failCapStages(Map<PaymentStage, FgcBusinessException> failures) {

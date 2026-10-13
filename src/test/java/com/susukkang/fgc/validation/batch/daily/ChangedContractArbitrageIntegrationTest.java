@@ -29,18 +29,20 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * #512 — changedContractStep의 Processor가 해지 계약의 차익거래를 효력일 기준으로 저장하고,
  * 같은 실행으로 다시 돌려도 결과행·예외가 늘지 않는지 실제 PostgreSQL로 확인한다.
  * 시드 A1(FGC-FGL02-202601-0001): 8/20 해지, 지급 890,000 + 해약환급금 120,000 − 납입 800,000 = 210,000 → CANDIDATE.
- * A1은 GA→FC 1,200% 룰셋이 없는(CAP_004) 계약이라, 그 단계가 실패가 아니라 검토 큐로만 남고(#522)
- * 상태 사건이 SUCCEEDED로 끝나 다음 날 Reader 후보에서 빠지는지도 함께 본다.
+ * A1은 2026-01 체결이라 GA→FC 1,200% 룰셋이 없는(CAP_004) 계약이다. 보험대리점 1,200%룰은 '26.7.1. 이후 체결
+ * 신계약에 적용되므로(FAQ 2차 Q1-1) 그 단계는 실패도 검토 대상도 아니고, 상태 사건이 SUCCEEDED로 끝나
+ * 다음 날 Reader 후보에서 빠지는지도 함께 본다(#522).
  *
  * 스케줄 재생성은 이 테스트의 관심사가 아니고 시드 계약의 공유 스케줄을 바꾸므로 mock으로 둔다.
- * 검토 큐 등록(registerCapRuleReview)만 실제 빈에 위임한다. 차익거래·1,200%·Writer는 실제 빈을 쓴다.
+ * 차익거래·1,200%·Writer는 실제 빈을 쓴다.
  *
  * Processor는 실제 Step처럼 청크 트랜잭션 안에서 부른다. 1,200%는 청크 트랜잭션에서 계약 행을
  * FOR UPDATE로 잠그는데(CapCheckServiceImpl), 그 뒤에 REQUIRES_NEW(다른 연결)로 arbitrage_check를
@@ -63,8 +65,6 @@ class ChangedContractArbitrageIntegrationTest {
     @Autowired
     private ContractStatusEventRepository contractStatusEventRepository;
     @Autowired
-    private ScheduleService scheduleService;
-    @Autowired
     private ExceptionCaseRepository exceptionCaseRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -73,19 +73,15 @@ class ChangedContractArbitrageIntegrationTest {
 
     private ChangedContractItemProcessor processor;
     private ChangedContractItemWriter writer;
+    private ScheduleService scheduleService;
     private Long validationRunId;
     private Long contractId;
 
     @BeforeEach
     void setUp() {
-        ScheduleService scheduleServiceWithRealReview = mock(ScheduleService.class);
-        willAnswer(invocation -> {
-            scheduleService.registerCapRuleReview(
-                    invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
-            return null;
-        }).given(scheduleServiceWithRealReview).registerCapRuleReview(any(), any(), any());
+        scheduleService = mock(ScheduleService.class);
         processor = new ChangedContractItemProcessor(
-                insuranceContractRepository, scheduleServiceWithRealReview, capCheckService,
+                insuranceContractRepository, scheduleService, capCheckService,
                 contractStatusEventProcessingRepository, arbitrageCheckBatchItemService, contractStatusEventRepository);
         writer = new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository);
 
@@ -117,11 +113,11 @@ class ChangedContractArbitrageIntegrationTest {
     void terminatedContractGetsArbitrageRowAsOfEffectiveDateAndRerunAddsNothing() {
         ChangedContractResult first = processInChunkTransaction();
 
-        // A1은 2026-01 계약이라 GA→FC 1,200% 룰셋이 없다(CAP_004) — 그 단계는 1,200% 대상이 아니라
-        // 실패가 아니다(#522). INSURER→GA는 룰셋이 있어 계산되고, 차익거래도 점검된다.
+        // A1은 2026-01 계약이라 GA→FC 1,200% 룰셋이 없다(CAP_004) — 시행 전 체결이라 그 단계는 1,200% 대상이
+        // 아니고 실패도 검토 대상도 아니다(#522). INSURER→GA는 룰셋이 있어 계산되고, 차익거래도 점검된다.
         assertThat(first.success()).isTrue();
         assertThat(capCheckStages()).containsExactly("INSURER_TO_GA");
-        assertThat(policyMissingReviews()).isEqualTo(1);
+        verify(scheduleService, never()).registerCapRuleReview(any(), any(), any());
         assertThat(revalidationFailures()).isZero();
         assertThat(failedProcessingRows()).isZero();
         // 상태 사건이 SUCCEEDED로 끝나 Reader의 NOT EXISTS(...SUCCEEDED) 조건에서 빠진다 — 다음 날 다시 읽지 않는다.
@@ -142,14 +138,12 @@ class ChangedContractArbitrageIntegrationTest {
 
         // 같은 날 같은 실행으로 다시 돌려도(IF-BAT-02 멱등성) uq_arbitrage_check의 UPSERT와
         // 예외 업무키·실행별 occurrence 멱등 기록 덕분에 행이 늘지 않는다.
-        // 검토 건도 계약·단계·유형 업무키 UPSERT라 늘지 않는다.
         ChangedContractResult second = processInChunkTransaction();
 
         assertThat(second.success()).isTrue();
         assertThat(arbitrageRows()).isEqualTo(1);
         assertThat(candidateCases()).isEqualTo(1);
         assertThat(candidateOccurrences()).isEqualTo(1);
-        assertThat(policyMissingReviews()).isEqualTo(1);
         assertThat(revalidationFailures()).isZero();
         assertThat(failedProcessingRows()).isZero();
     }
@@ -166,12 +160,6 @@ class ChangedContractArbitrageIntegrationTest {
         return jdbcTemplate.queryForList(
                 "SELECT payment_stage FROM fgc.cap_check WHERE validation_run_id = ? AND contract_id = ?",
                 String.class, validationRunId, contractId);
-    }
-
-    private Integer policyMissingReviews() {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM fgc.exception_case WHERE exception_key = ? AND status = 'NEW'",
-                Integer.class, "SCHEDULE_POLICY:" + contractId + ":GA_TO_FC:POLICY_MISSING");
     }
 
     private Integer revalidationFailures() {

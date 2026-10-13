@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * changedContractStep의 Processor: 계약 1건을 다시 검증
@@ -34,6 +35,12 @@ import java.util.List;
  */
 @RequiredArgsConstructor
 public class ChangedContractItemProcessor implements ItemProcessor<Long, ChangedContractResult> {
+
+    // 1,200%룰은 "보험회사는 '21.1.1, 보험대리점은 '26.7.1. 이후 체결한 신계약에 적용"(FAQ 2차 Q1-1, REG-08·09).
+    // 계약 체결일이 이보다 앞서면 그 지급단계는 대상이 아니다 — 룰셋(설정) 유무가 아니라 규정으로 판정한다(#522).
+    private static final Map<PaymentStage, LocalDate> CAP_RULE_CONTRACT_DATE_FROM = Map.of(
+            PaymentStage.INSURER_TO_GA, LocalDate.of(2021, 1, 1),
+            PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 1));
 
     private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
@@ -83,7 +90,7 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
             // 한쪽 실패가 다른 쪽을 막지 않는 것(CapCheckBatchAdapter·ArbitrageCheckBatchAdapter)과 같게,
             // 1,200% 룰셋이 없는 계약(CAP_004, 2026-07 이전 계약)도 차익거래는 점검한다(#512).
             // 어느 한쪽이라도 실패하면 스킵으로 돌려 상태 사건을 FAILED로 남긴다(다음 날 Reader가 다시 잡는다).
-            // 단, CAP_004(룰셋 없음)는 실패가 아니다(#522, 아래 단계 루프 참고).
+            // 단, 시행 전 체결 계약의 CAP_004(룰셋 없음)는 실패가 아니다(#522, 아래 단계 루프 참고).
             List<String> failures = new ArrayList<>();
             LocalDate asOfDate = LocalDate.now(DateUtil.SEOUL_ZONE);
             // 순서 주의: 차익거래를 1,200%보다 먼저 부른다. 1,200%(CapCheckServiceImpl)는 이 청크 트랜잭션에서
@@ -101,17 +108,19 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
                     capCheckService.calculateAndSave(
                             CapCalculationCommand.dailyBatch(contractId, paymentStage, asOfDate, validationRunId));
                 } catch (FgcBusinessException e) {
-                    if (e.getErrorCode() != FgcErrorCode.CAP_004) {
-                        failures.add(describe(e));
-                        continue;
+                    // calculateAndSave가 noRollbackFor라 여기서 잡아도 청크 트랜잭션은 rollback-only가 되지 않는다.
+                    if (e.getErrorCode() == FgcErrorCode.CAP_004) {
+                        if (contract.getContractDate().isBefore(CAP_RULE_CONTRACT_DATE_FROM.get(paymentStage))) {
+                            // 시행 전 체결 계약(예: 2026-07 이전 계약의 GA→FC) — 룰셋이 없는 게 정상이라 실패도
+                            // 검토 대상도 아니다. 실패로 돌리면 사건이 FAILED로 남아 매일 재처리된다(#522).
+                            continue;
+                        }
+                        // 대상 단계인데 룰셋이 없다 = 설정 누락. 계약 저장 경로(ContractServiceImpl)처럼 검토 큐에
+                        // 남기고(계약·단계·유형 업무키 UPSERT라 한 건 유지), 실패로 돌려 다음 날 다시 점검한다.
+                        scheduleService.registerCapRuleReview(contractId, paymentStage,
+                                e.getDetail() == null ? "적용 가능한 1,200% 룰셋이 없습니다." : e.getDetail());
                     }
-                    // 룰셋 없음은 그 단계가 1,200% 대상이 아니라는 판정이다(예: 2026-07 이전 계약의 GA→FC,
-                    // REG-09 ①⑤ 2026.7.1·REG-19 계약일 기준). 실패로 돌리면 사건이 FAILED로 남아 매일
-                    // 재처리되므로(#522), 계약 저장 경로(ContractServiceImpl)처럼 검토 큐에만 남긴다.
-                    // 검토 건은 계약·단계·유형 업무키 UPSERT라 다시 처리돼도 한 건으로 유지된다.
-                    // calculateAndSave가 noRollbackFor라 청크 트랜잭션은 rollback-only가 되지 않는다.
-                    scheduleService.registerCapRuleReview(contractId, paymentStage,
-                            e.getDetail() == null ? "적용 가능한 1,200% 룰셋이 없습니다." : e.getDetail());
+                    failures.add(describe(e));
                 }
             }
 
