@@ -88,6 +88,8 @@ class CapExceptionRepositoryIntegrationTest {
                 //       월 통합검증 확정 게이트(제44조)가 셀 수 있어야 한다
                 .containsEntry("validation_month", java.sql.Date.valueOf("2026-08-01"));
         assertThat(capExceptionService.hasUnresolvedViolation(paymentId)).isTrue();
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId))
+                .containsExactly(reference.contractId());
 
         capExceptionService.resolve(CapExceptionResolveCommand.builder()
                 .exceptionCaseId(exceptionCaseId)
@@ -108,6 +110,7 @@ class CapExceptionRepositoryIntegrationTest {
                  WHERE exception_case_id = ?
                 """, String.class, exceptionCaseId)).isEqualTo("REDUCE");
         assertThat(capExceptionService.hasUnresolvedViolation(paymentId)).isFalse();
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId)).isEmpty();
         assertThat(entityManager.find(ExceptionCase.class, exceptionCaseId).getStatus())
                 .isEqualTo(ExceptionStatus.RESOLVED);
 

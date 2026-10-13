@@ -1516,7 +1516,7 @@ class CommissionPaymentServiceImplTest {
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
         given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
-        given(capExceptionService.hasUnresolvedViolation(101L)).willReturn(true);
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(3L));
 
         assertThatThrownBy(() -> service.confirm(101L, null))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
@@ -1524,6 +1524,140 @@ class CommissionPaymentServiceImplTest {
 
         verify(capCalculator, never()).calculate(any());
         verify(writeRepository, never()).confirm(any(), any(), any());
+    }
+
+    // #477 후속: 보장성(3)·저축성(9) 혼합 지급 건에서 미해결 위반이 저축성 계약에만 남아 있으면
+    // CAP_003으로 막지 않고, 보장성 계약은 종전대로 1,200% 판정을 거쳐 확정된다.
+    @Test
+    void confirmsMixedPaymentWhenUnresolvedViolationIsOnlyOnNonProtectionContract() {
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(9L));
+        given(queryRepository.findProtectionType(3L)).willReturn("PROTECTION");
+        given(queryRepository.findProtectionType(9L)).willReturn("SAVINGS");
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(55L);
+            return null;
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "mixed-ok", "55")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(
+                attributionRow(1, 3L, "300000"),
+                attributionRow(2, 9L, "200000")
+        ));
+
+        CommissionPaymentResponse response = service.confirm(101L, "mixed-ok");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        // 보장성 계약만 한도 판정 대상 — 저축성 귀속행은 룰 조회·계산을 건너뛴다
+        verify(queryRepository).findCapRuleSnapshot(101L, 201L);
+        verify(queryRepository, never()).findCapRuleSnapshot(101L, 202L);
+        verify(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        verify(writeRepository).confirm(101L, "mixed-ok", "55");
+    }
+
+    // #477 후속: 혼합 지급 건이라도 미해결 위반이 보장성 계약에 걸려 있으면 종전대로 CAP_003으로 막는다
+    @Test
+    void blocksMixedPaymentWhenUnresolvedViolationIsOnProtectionContract() {
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(9L, 3L));
+        given(queryRepository.findProtectionType(9L)).willReturn("SAVINGS");
+        given(queryRepository.findProtectionType(3L)).willReturn("PROTECTION");
+
+        assertThatThrownBy(() -> service.confirm(101L, "mixed-blocked"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_003));
+
+        verify(capCalculator, never()).calculate(any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
+    }
+
+    // #477 후속: 계약이 비어 있는 위반은 대상 여부를 알 수 없으므로 비대상 계약과 섞여 있어도 막는다
+    @Test
+    void blocksWhenUnresolvedViolationHasNoContract() {
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
+        given(capExceptionService.findUnresolvedViolationContractIds(101L))
+                .willReturn(java.util.Arrays.asList(9L, null));
+        given(queryRepository.findProtectionType(9L)).willReturn("SAVINGS");
+
+        assertThatThrownBy(() -> service.confirm(101L, "no-contract"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_003));
+
+        verify(writeRepository, never()).confirm(any(), any(), any());
+    }
+
+    // #477 후속: 보장성 계약의 위반으로 CAP_003 거절된 혼합 지급 건이, 그 위반을 해결(정정)한 뒤 같은 멱등키로
+    // 재시도하면 저축성 계약에 남은 미해결 위반 때문에 다시 막히지 않고 확정된다.
+    @Test
+    void retriesMixedPaymentAfterProtectionViolationIsResolved() {
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
+        given(capExceptionService.findUnresolvedViolationContractIds(101L))
+                .willReturn(List.of(3L, 9L), List.of(9L));
+        given(queryRepository.findProtectionType(3L)).willReturn("PROTECTION");
+        given(queryRepository.findProtectionType(9L)).willReturn("SAVINGS");
+
+        assertThatThrownBy(() -> service.confirm(101L, "retry-after-resolve"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_003));
+        verify(writeRepository, never()).confirm(any(), any(), any());
+
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        doAnswer(invocation -> {
+            invocation.<CapCheckCommand>getArgument(0).setCapCheckId(55L);
+            return null;
+        }).when(capCheckWriteRepository).insertCapCheck(any(CapCheckCommand.class));
+        given(writeRepository.confirm(101L, "retry-after-resolve", "55")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(
+                attributionRow(1, 3L, "300000"),
+                attributionRow(2, 9L, "200000")
+        ));
+
+        CommissionPaymentResponse response = service.confirm(101L, "retry-after-resolve");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        verify(writeRepository).confirm(101L, "retry-after-resolve", "55");
+    }
+
+    // #477 후속: 보장성으로 잘못 분류돼 위반이 남은 계약의 상품 보장성 구분을 저축성으로 정정하면,
+    // 위반 예외를 따로 종결하지 않아도 재시도 확정이 CAP_003으로 막히지 않는다.
+    @Test
+    void retriesAfterProtectionTypeIsCorrectedToNonProtection() {
+        ConfirmationData data = confirmation(
+                201L, 9L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(9L));
+        given(queryRepository.findProtectionType(9L)).willReturn("PROTECTION");
+
+        assertThatThrownBy(() -> service.confirm(101L, "retry-after-correction"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.CAP_003));
+
+        // 상품 마스터 정정: 보장성 → 저축성
+        given(queryRepository.findProtectionType(9L)).willReturn("SAVINGS");
+        given(writeRepository.confirm(101L, "retry-after-correction", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 9L, "500000")));
+
+        CommissionPaymentResponse response = service.confirm(101L, "retry-after-correction");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        verify(capCalculator, never()).calculate(any());
+        verify(writeRepository).confirm(101L, "retry-after-correction", "");
+    }
+
+    private List<ConfirmationData> mixedProtectionAndSavings() {
+        return List.of(
+                confirmation(201L, 3L, "300000", "500000", InclusionDecisionStatus.INCLUDED,
+                        ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION, "EVIDENCE-1"),
+                confirmation(202L, 9L, "200000", "500000", InclusionDecisionStatus.INCLUDED,
+                        ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION, "EVIDENCE-2")
+        );
     }
 
     // 2026-08-10 yslee - 지급기준 스케줄이 이미 한도를 넘은 후보 지급 확정 차단
@@ -2130,7 +2264,7 @@ class CommissionPaymentServiceImplTest {
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
         );
         given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
-        given(capExceptionService.hasUnresolvedViolation(101L)).willReturn(true);
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(3L));
         given(queryRepository.findAttributedContractNumbers(101L))
                 .willReturn(List.of(new AttributedContractNo(3L, "CT-2026-0003")));
         given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
@@ -2149,6 +2283,39 @@ class CommissionPaymentServiceImplTest {
                 .orElseThrow();
         assertThat(violation.contractId()).isNull();
         assertThat(violation.transactionAttributionId()).isNull();
+        assertPrecheckSavesNothing();
+    }
+
+    // #477 후속: 사전검증도 확정과 같은 판정 — 비대상 계약에만 걸린 미해결 위반은 blocker가 아니고,
+    // 보장성 계약에 걸린 위반은 FGC-CAP-003 blocker로 남는다.
+    @ParameterizedTest
+    @CsvSource({"9, true", "3, false"})
+    void precheckScopesUnresolvedViolationToRegulatedContracts(long violatedContractId, boolean confirmable) {
+        given(queryRepository.findConfirmationData(101L)).willReturn(mixedProtectionAndSavings());
+        given(capExceptionService.findUnresolvedViolationContractIds(101L))
+                .willReturn(List.of(violatedContractId));
+        given(queryRepository.findProtectionType(3L)).willReturn("PROTECTION");
+        given(queryRepository.findProtectionType(9L)).willReturn("SAVINGS");
+        given(queryRepository.findAttributedContractNumbers(101L)).willReturn(List.of(
+                new AttributedContractNo(3L, "CT-2026-0003"),
+                new AttributedContractNo(9L, "CT-2026-0009")
+        ));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isEqualTo(confirmable);
+        if (confirmable) {
+            assertThat(response.blockers()).isEmpty();
+        } else {
+            assertThat(response.blockers())
+                    .extracting(TransactionPrecheckResponse.Blocker::code)
+                    .containsExactly("FGC-CAP-003");
+        }
+        assertThat(response.capPreview())
+                .extracting(TransactionPrecheckResponse.CapPreviewItem::contractNo)
+                .containsExactly("CT-2026-0003");
         assertPrecheckSavesNothing();
     }
 
@@ -2344,7 +2511,7 @@ class CommissionPaymentServiceImplTest {
         verify(queryRepository, never()).findCapRuleSnapshot(any(), any());
         verify(capCalculator, never()).calculate(any());
         verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
-        verify(capExceptionService, never()).hasUnresolvedViolation(any());
+        verify(capExceptionService, never()).findUnresolvedViolationContractIds(any());
         verify(writeRepository).confirm(101L, "deduction", "");
     }
 

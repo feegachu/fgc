@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -189,6 +190,13 @@ class CapExceptionServiceImplTest {
         given(capExceptionRepository.existsUnresolvedViolation(10L)).willReturn(true);
 
         assertThat(capExceptionService.hasUnresolvedViolation(10L)).isTrue();
+    }
+
+    @Test
+    void findsUnresolvedViolationContractIdsByPaymentId() {
+        given(capExceptionRepository.findUnresolvedViolationContractIds(10L)).willReturn(List.of(1L, 2L));
+
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(10L)).containsExactly(1L, 2L);
     }
 
     private CapExceptionCreateCommand command(

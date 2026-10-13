@@ -206,4 +206,21 @@ public class CapExceptionRepository {
                 .setMaxResults(1)
                 .getResultList().isEmpty();
     }
+
+    // #477 후속: CAP_003 차단을 계약 단위로 판정하려고 미해결 위반이 걸린 계약을 돌려준다.
+    // 계약이 비어 있는 위반 행은 null 원소로 남겨 호출부가 "대상 판단 불가 → 차단"으로 처리하게 한다.
+    public List<Long> findUnresolvedViolationContractIds(Long paymentId) {
+        return entityManager.createQuery("""
+                SELECT DISTINCT e.contractId FROM ExceptionCase e
+                 WHERE e.sourceEntityType = 'COMMISSION_TRANSACTION'
+                   AND e.sourceEntityId = :paymentId
+                   AND e.exceptionType = :exceptionType
+                   AND e.status IN (:newStatus, :reviewStatus)
+                """, Long.class)
+                .setParameter("paymentId", String.valueOf(paymentId))
+                .setParameter("exceptionType", ExceptionType.CAP_VIOLATION)
+                .setParameter("newStatus", ExceptionStatus.NEW)
+                .setParameter("reviewStatus", ExceptionStatus.IN_REVIEW)
+                .getResultList();
+    }
 }
