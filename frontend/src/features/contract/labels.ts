@@ -33,6 +33,7 @@ export const capStatusLabels = {
   NORMAL: '정상',
   WARNING: '주의',
   VIOLATION: '위반',
+  NOT_APPLICABLE: '적용대상 아님',
   REVIEW_REQUIRED: '검토필요',
 } satisfies Record<NonNullable<Schema['ContractView']['capResultStatus']>, string>
 
@@ -40,6 +41,7 @@ export const capStatusLabels = {
 export const arbitrageStatusLabels = {
   CLEAR: '이상없음',
   CANDIDATE: '검토대상',
+  NOT_APPLICABLE: '적용대상 아님',
   REVIEW_REQUIRED: '자료부족',
 } satisfies Record<NonNullable<Schema['ArbitrageCheckView']['resultStatus']>, string>
 

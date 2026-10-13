@@ -27,4 +27,6 @@ public class CapContractView {
     private Boolean standardDeduction80Yn;
     private Long productId;
     private String productGroupCode;
+    /** product.protection_type — 보장성(PROTECTION)이 아니면 1,200% 판정 대상이 아니다 (#477). */
+    private String protectionType;
 }

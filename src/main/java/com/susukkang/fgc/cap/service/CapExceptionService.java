@@ -3,6 +3,8 @@ package com.susukkang.fgc.cap.service;
 import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapExceptionResolveCommand;
 
+import java.util.List;
+
 /**
  * 설명 : 한도 검증 결과에 따라 주의·위반 예외 건을 등록하는 서비스
  *
@@ -39,4 +41,13 @@ public interface CapExceptionService {
      * @since 2026-08-12
      */
     boolean hasUnresolvedViolation(Long paymentId);
+
+    /**
+     * 설명 : 지급 건의 미해결 한도 위반 예외가 걸린 계약 ID를 조회한다 (#477 후속)
+     * 계약이 비어 있는 위반은 null 원소로 포함한다 — 호출부는 대상 여부를 판단할 수 없으므로 차단한다.
+     *
+     * @param paymentId 지급 건 ID
+     * @return 미해결 한도 위반 예외의 계약 ID 목록(중복 제거)
+     */
+    List<Long> findUnresolvedViolationContractIds(Long paymentId);
 }

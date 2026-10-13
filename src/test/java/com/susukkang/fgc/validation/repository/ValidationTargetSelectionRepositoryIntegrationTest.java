@@ -71,7 +71,9 @@ class ValidationTargetSelectionRepositoryIntegrationTest {
                 "FGC-FGL02-202605-0001",
                 "FGC-FGN01-202605-0001",
                 "FGC-FGL02-202601-0001",
-                "FGC-FGL01-202601-0001");
+                "FGC-FGL01-202601-0001",
+                "FGC-FGL02-202603-0475",
+                "FGC-FGL01-202603-0475");
         assertThat(selected).isPositive();          // 시드의 정상 시나리오 계약이 선정돼야 한다
         assertThat(productCodeMismatch).isZero();   // 시드 정본 코드 체계에서 불일치는 없어야 한다
         assertThat(selectedWithoutTable).isZero();  // 선정 건은 환급률표가 반드시 배정된다

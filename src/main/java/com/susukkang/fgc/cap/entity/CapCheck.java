@@ -52,7 +52,7 @@ public class CapCheck {
     @Column(name = "payment_stage", nullable = false, length = 20)
     private PaymentStage paymentStage;
 
-    @Column(name = "cap_rule_set_id", nullable = false)
+    @Column(name = "cap_rule_set_id")
     private Long capRuleSetId;
 
     @Column(name = "refund_rate_table_id")
