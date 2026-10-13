@@ -98,6 +98,14 @@ class CapValidatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(expected);
     }
 
+    @Test
+    void grossPaymentTotalCannotBeReducedByASeparateClawback() {
+        var result = validator.validate(request("900000", "600000", InclusionDecisionStatus.INCLUDED));
+        assertThat(result.includedAmount()).isEqualByComparingTo("1500000");
+        assertThat(result.remainingAmount()).isEqualByComparingTo("-300000");
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+    }
+
     private CapValidationRequest request(
             String existing,
             String candidate,

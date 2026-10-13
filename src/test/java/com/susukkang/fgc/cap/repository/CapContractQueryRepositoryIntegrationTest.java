@@ -110,7 +110,8 @@ class CapContractQueryRepositoryIntegrationTest {
                        po.channel_code,
                        po.standard_deduction_80_yn,
                        p.product_id,
-                       p.product_group_code
+                       p.product_group_code,
+                       p.protection_type
                   FROM fgc.insurance_contract c
                   JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
                   JOIN fgc.product p ON p.product_id = po.product_id
@@ -126,6 +127,7 @@ class CapContractQueryRepositoryIntegrationTest {
                 rs.getString("channel_code"),
                 rs.getBoolean("standard_deduction_80_yn"),
                 rs.getLong("product_id"),
-                rs.getString("product_group_code")), contractId);
+                rs.getString("product_group_code"),
+                rs.getString("protection_type")), contractId);
     }
 }

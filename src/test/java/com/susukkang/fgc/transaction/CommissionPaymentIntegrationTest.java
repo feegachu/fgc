@@ -85,6 +85,8 @@ class CommissionPaymentIntegrationTest {
 
     @Autowired
     private CommissionPaymentWriteRepository paymentWriteRepository;
+    @Autowired
+    private com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository arbitrageCheckRepository;
 
     @Test
     void identicalDraftUpdateStillRunsDatabaseTimestampTrigger() {
@@ -163,7 +165,7 @@ class CommissionPaymentIntegrationTest {
         assertThat(confirmed.attributions()).singleElement()
                 .extracting(attribution -> attribution.contractId())
                 .isEqualTo(1L);
-        assertThat(confirmed.allocationPolicyVersion()).isEqualTo(4L);
+        assertThat(confirmed.allocationPolicyVersion()).isEqualTo(currentGaCapPolicy());
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT evidence_ref
                   FROM fgc.commission_transaction
@@ -424,7 +426,7 @@ class CommissionPaymentIntegrationTest {
                 "PAYMENT",
                 LocalDate.of(2026, 7, 31),
                 PaymentStage.GA_TO_FC,
-                4L,
+                currentGaCapPolicy(),
                 List.of(
                         attribution(1L, new BigDecimal("10")),
                         attribution(secondContractId, new BigDecimal("10"))
@@ -986,6 +988,82 @@ class CommissionPaymentIntegrationTest {
                 """);
     }
 
+    @Test
+    void clawbackCannotRestoreCapBudgetAndDoesNotCreateCapChecks() {
+        Long contractId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.insurance_contract(insurer_id,product_offering_id,contract_no,contract_date,
+                    agent_id,organization_id,premium_per_cycle_amount,first_premium_amount,
+                    monthly_equivalent_first_premium,premium_conversion_rule_code,payment_cycle_code,
+                    payment_term_months,standard_surrender_deduction_amount,current_status,data_origin)
+                SELECT insurer_id,product_offering_id,?,contract_date,agent_id,organization_id,
+                    premium_per_cycle_amount,first_premium_amount,monthly_equivalent_first_premium,
+                    premium_conversion_rule_code,payment_cycle_code,payment_term_months,
+                    standard_surrender_deduction_amount,current_status,'MANUAL'
+                FROM fgc.insurance_contract WHERE contract_id=1 RETURNING contract_id
+                """, Long.class, "IT-478-"+UUID.randomUUID());
+        var first = commissionPaymentService.create(grossScenarioRequest(contractId, "PAYMENT", "900000"));
+        assertThat(commissionPaymentService.precheck(first.paymentId()).confirmable()).isTrue();
+        commissionPaymentService.confirm(first.paymentId(), "IT-478-FIRST-"+first.paymentId());
+        var deduction = commissionPaymentService.create(grossScenarioRequest(contractId, "DEDUCTION", "300000"));
+        var preview = commissionPaymentService.precheck(deduction.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).isEmpty();
+        var confirmed = commissionPaymentService.confirm(deduction.paymentId(), "IT-478-CLAWBACK-"+deduction.paymentId());
+        assertThat(confirmed.capCheckIds()).isEmpty();
+        assertThat(commissionPaymentService.confirm(deduction.paymentId(), "IT-478-CLAWBACK-"+deduction.paymentId()).paymentId())
+                .isEqualTo(deduction.paymentId());
+        var net = arbitrageCheckRepository.sumConfirmedCommissionAmount(contractId, PaymentStage.GA_TO_FC,
+                LocalDate.of(2026, 7, 31));
+        assertThat(net.getConfirmedPaymentAmount()).isEqualByComparingTo("900000");
+        assertThat(net.getConfirmedDeductionAmount()).isEqualByComparingTo("300000");
+        assertThat(net.getPaidCommissionAmount()).isEqualByComparingTo("600000");
+        var repayment = commissionPaymentService.create(grossScenarioRequest(contractId, "PAYMENT", "600000"));
+        var blocked = commissionPaymentService.precheck(repayment.paymentId());
+        assertThat(blocked.confirmable()).isFalse();
+        assertThat(blocked.capPreview().getFirst().includedAmount()).isEqualTo(1500000L);
+        assertThat(blocked.capPreview().getFirst().resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+        assertThatThrownBy(() -> commissionPaymentService.confirm(repayment.paymentId(), "IT-478-REPAY-"+repayment.paymentId()))
+                .isInstanceOf(FgcBusinessException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, repayment.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT SUM(d.amount) FROM fgc.cap_check_detail d JOIN fgc.cap_check c ON c.cap_check_id=d.cap_check_id
+                WHERE c.candidate_transaction_id=? AND d.classification_snapshot='INCLUDED'
+                """, BigDecimal.class, repayment.paymentId())).isEqualByComparingTo("1500000");
+    }
+
+    @Test
+    void unclassifiedRecoveryIsRejectedAndRecordsReviewWithoutConfirming() {
+        var created = commissionPaymentService.create(grossScenarioRequest(1L, "DEDUCTION", "300000", "RECOVERY"));
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-RECOVERY-"+created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+        var review = jdbcTemplate.queryForMap("SELECT exception_type,reason_code FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                created.paymentId().toString());
+        assertThat(review).containsEntry("exception_type", "CAP_REVIEW_REQUIRED")
+                .containsEntry("reason_code", "CAP_ITEM_UNCLASSIFIED");
+    }
+
+    private CommissionPaymentCreateRequest grossScenarioRequest(Long contractId, String cashflow, String amount) {
+        return grossScenarioRequest(contractId, cashflow, amount, "PAYMENT".equals(cashflow) ? "BASE_COMMISSION" : "CLAWBACK");
+    }
+
+    private CommissionPaymentCreateRequest grossScenarioRequest(Long contractId, String cashflow, String amount, String itemCode) {
+        var base = request("IT-478-"+UUID.randomUUID(), new BigDecimal(amount));
+        Long itemId = jdbcTemplate.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE item_code=?", Long.class, itemCode);
+        return new CommissionPaymentCreateRequest(base.sourceType(), base.sourceBusinessKey(), contractId,
+                base.agentId(), itemId, base.amount(), base.settlementMonth(), cashflow, base.scheduledPaymentDate(),
+                base.paymentStage(), base.allocationPolicyVersion(), List.of(new CommissionPaymentAttributionRequest(
+                contractId, base.scheduledPaymentDate(), base.amount(), InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, "#478 gross 지급 누계", "DIRECT", "IT-478-EVIDENCE", AttributionMethod.DIRECT)),
+                base.evidenceRef(), base.note());
+    }
+
     private CommissionPaymentCreateRequest request(
             String sourceBusinessKey
     ) {
@@ -1007,7 +1085,7 @@ class CommissionPaymentIntegrationTest {
                 "PAYMENT",
                 LocalDate.of(2026, 7, 31),
                 PaymentStage.GA_TO_FC,
-                4L,
+                currentGaCapPolicy(),
                 List.of(new CommissionPaymentAttributionRequest(
                         1L,
                         LocalDate.of(2026, 7, 31),
@@ -1097,6 +1175,10 @@ class CommissionPaymentIntegrationTest {
         start.await();
         // 호출 스레드마다 서비스 프록시가 별도 PostgreSQL 트랜잭션을 연다.
         return commissionPaymentService.confirm(paymentId, idempotencyKey);
+    }
+
+    private Long currentGaCapPolicy() {
+        return jdbcTemplate.queryForObject("SELECT policy_version_id FROM fgc.policy_version WHERE policy_code='REG-CAP-GA-2026-V1' AND status='ACTIVE'", Long.class);
     }
 
     private Long commissionItemId() {

@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -184,11 +185,20 @@ class CapExceptionServiceImplTest {
         verify(capExceptionRepository, never()).selectExceptionForUpdate(5L);
     }
 
+    /** 지급 건의 미해결 위반 존재 여부를 저장소에 위임한다. */
     @Test
     void checksUnresolvedViolationByPaymentId() {
         given(capExceptionRepository.existsUnresolvedViolation(10L)).willReturn(true);
 
         assertThat(capExceptionService.hasUnresolvedViolation(10L)).isTrue();
+    }
+
+    /** #477 후속: 미해결 위반의 계약 ID 목록을 저장소에서 그대로 돌려준다. */
+    @Test
+    void findsUnresolvedViolationContractIdsByPaymentId() {
+        given(capExceptionRepository.findUnresolvedViolationContractIds(10L)).willReturn(List.of(1L, 2L));
+
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(10L)).containsExactly(1L, 2L);
     }
 
     private CapExceptionCreateCommand command(
