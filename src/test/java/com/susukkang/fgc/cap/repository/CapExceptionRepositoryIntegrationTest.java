@@ -130,6 +130,50 @@ class CapExceptionRepositoryIntegrationTest {
         )).isEqualTo("RESOLVED");
     }
 
+    // #477 후속: CAP_003 계약 단위 판정의 입력 — 다계약 위반은 계약별로 중복 없이, 계약이 빈 위반은
+    // null 원소로 돌려주고, 종결·주의·다른 지급 건 예외는 빼며, IN_REVIEW 는 미해결로 남긴다.
+    @Test
+    void listsUnresolvedViolationContractsAcrossContractsIncludingMissingContract() {
+        TestReference reference = testReference();
+        Long paymentId = insertDraftPayment(reference);
+        Long otherPaymentId = insertDraftPayment(reference);
+        Long contractA = reference.contractId();
+        Long contractB = otherContractId(contractA);
+        String prefix = "IT-CAP003:" + UUID.randomUUID() + ":";
+
+        capExceptionRepository.insertException(exception(prefix + "A-1", paymentId, reference,
+                contractA, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "A-2", paymentId, reference,
+                contractA, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "B", paymentId, reference,
+                contractB, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "NULL", paymentId, reference,
+                null, ExceptionType.CAP_VIOLATION));
+        capExceptionRepository.insertException(exception(prefix + "WARN", paymentId, reference,
+                contractB, ExceptionType.CAP_WARNING));
+        capExceptionRepository.insertException(exception(prefix + "OTHER", otherPaymentId, reference,
+                contractB, ExceptionType.CAP_VIOLATION));
+        jdbcTemplate.update("UPDATE fgc.exception_case SET status = 'IN_REVIEW' WHERE exception_key = ?",
+                prefix + "NULL");
+        entityManager.clear();
+
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId))
+                .containsExactlyInAnyOrder(contractA, contractB, null);
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(otherPaymentId))
+                .containsExactly(contractB);
+
+        capExceptionService.resolve(CapExceptionResolveCommand.builder()
+                .exceptionCaseId(exceptionCaseId(prefix + "B"))
+                .actionType(ExceptionActionType.REDUCE)
+                .reason("지급액 감액 완료")
+                .evidenceRef("IT-CAP003")
+                .actionBy(reference.userId())
+                .build());
+
+        assertThat(capExceptionService.findUnresolvedViolationContractIds(paymentId))
+                .containsExactlyInAnyOrder(contractA, null);
+    }
+
     @Test
     void preservesReviewStatusAndAssigneeWhenCapExceptionIsUpdatedAndResolved() {
         TestReference reference = testReference();
@@ -293,6 +337,44 @@ class CapExceptionRepositoryIntegrationTest {
                 .title("통합 테스트 한도 예외")
                 .description("FGC-FUN-034 통합 테스트")
                 .build();
+    }
+
+    private CapExceptionInsertDTO exception(
+            String exceptionKey,
+            Long paymentId,
+            TestReference reference,
+            Long contractId,
+            ExceptionType exceptionType
+    ) {
+        return CapExceptionInsertDTO.builder()
+                .exceptionKey(exceptionKey)
+                .exceptionType(exceptionType)
+                .severity(exceptionType == ExceptionType.CAP_VIOLATION
+                        ? ExceptionSeverity.CRITICAL
+                        : ExceptionSeverity.WARNING)
+                .contractId(contractId)
+                .agentId(reference.agentId())
+                .policyVersionId(reference.policyVersionId())
+                .paymentId(paymentId)
+                .title("통합 테스트 한도 예외")
+                .description("CAP_003 계약 단위 판정 통합 테스트")
+                .build();
+    }
+
+    private Long otherContractId(Long contractId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT contract_id
+                  FROM fgc.insurance_contract
+                 WHERE contract_id <> ?
+                 ORDER BY contract_id
+                 LIMIT 1
+                """, Long.class, contractId);
+    }
+
+    private Long exceptionCaseId(String exceptionKey) {
+        return jdbcTemplate.queryForObject(
+                "SELECT exception_case_id FROM fgc.exception_case WHERE exception_key = ?",
+                Long.class, exceptionKey);
     }
 
     private TestReference testReference() {
