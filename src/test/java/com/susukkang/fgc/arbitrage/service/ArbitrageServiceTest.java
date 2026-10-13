@@ -10,6 +10,7 @@ import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
@@ -31,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * 설명 : 계약 단건 차익거래 수동 검증의 계산과 결과 저장을 검증한다.
@@ -260,7 +263,7 @@ class ArbitrageServiceTest {
         if (expected == ArbitrageCheckStatus.CLEAR) {
             assertThat(row.getCalculationSnapshot()).contains("NOT_APPLICABLE", "2026-03-01 이전 체결");
             assertThat(row.getNetDifferenceAmount()).isEqualByComparingTo("0");
-            org.mockito.Mockito.verifyNoInteractions(exceptionCaseRepository);
+            verifyNoInteractions(exceptionCaseRepository);
         }
     }
 
@@ -272,8 +275,8 @@ class ArbitrageServiceTest {
         assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CLEAR);
         assertThat(row.getIncludedSurrenderValueAmount()).isEqualByComparingTo("0");
         assertThat(row.getCalculationSnapshot()).contains("NOT_APPLICABLE", "applicabilityPolicyVersionId", "effectiveContractDate");
-        org.mockito.Mockito.verifyNoInteractions(exceptionCaseRepository);
-        org.mockito.Mockito.verify(arbitrageCheckRepository, org.mockito.Mockito.never()).selectRefundRateCandidates(any(), any());
+        verifyNoInteractions(exceptionCaseRepository);
+        verify(arbitrageCheckRepository, never()).selectRefundRateCandidates(any(), any());
     }
 
     @Test
@@ -285,13 +288,20 @@ class ArbitrageServiceTest {
         assertThat(row.getCalculationSnapshot()).contains("2027-01-01 이전 체결");
     }
 
-    @Test
-    void missingPolicyProducesReviewAndNeverCandidate() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "차익거래 적용일 정책이 없습니다., POLICY_MISSING",
+            "차익거래 적용일 정책값이 없습니다., POLICY_MISSING",
+            "차익거래 적용일 정책이 여러 건입니다., POLICY_DUPLICATE",
+            "차익거래 적용일 정책값이 올바른 날짜가 아닙니다., DATA_QUALITY"})
+    void policyProblemsProduceReviewWithSpecificExceptionType(String reason, ExceptionType expected) {
         given(applicabilityPolicyService.resolve(any())).willReturn(
-                new ArbitrageApplicabilityPolicyService.Applicability(null, null, "차익거래 적용일 정책이 없습니다."));
+                new ArbitrageApplicabilityPolicyService.Applicability(null, null, reason));
         var row = checkExisting(calculationSource(new BigDecimal("800000"), 5, false, BigDecimal.ZERO), "890000", "0");
         assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
-        assertThat(row.getCalculationSnapshot()).contains("정책이 없습니다");
+        assertThat(row.getCalculationSnapshot()).contains(reason);
+        verify(exceptionCaseRepository).insertArbitrageReviewCase(expected.name(), 100L, 10L, 200L,
+                "GA_TO_FC", "차익거래 검증 자료 확인 필요", reason);
     }
 
     private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(ArbitrageCalculationSource source, String paid, String planned) {

@@ -1,5 +1,5 @@
 -- #475: 데모 전용. V4의 시행 전 A1/A2 및 저장된 결과는 그대로 보존한다.
--- 운영에는 정책 담당자의 별도 등록·승인이 필요하다. TM 별도 날짜는 확정하지 않는다.
+-- 운영에는 정책 담당자의 별도 등록·승인이 필요하다.
 SET search_path TO fgc, public;
 INSERT INTO policy_version(policy_code, policy_name, policy_type, source_class, version_no,
                            effective_from, status, regulation_refs, source_refs, created_by)
@@ -8,7 +8,7 @@ SELECT 'ARB-APPLICABILITY-2026', 'GA→FC 차익거래 적용 시작일', 'ARBIT
        (SELECT user_id FROM app_user WHERE login_id='settle01');
 INSERT INTO policy_parameter(policy_version_id, parameter_key, parameter_value, description)
 SELECT policy_version_id, 'ARBITRAGE_EFFECTIVE_CONTRACT_DATE', '"2026-03-01"'::jsonb,
-       'GA→FC 판정은 이 날짜 이상 체결된 신계약에 적용한다. TM 별도 적용일은 미확정이다.'
+       'GA→FC 판정은 이 날짜 이상 체결된 신계약에 적용한다.'
 FROM policy_version WHERE policy_code='ARB-APPLICABILITY-2026' AND status='DRAFT';
 UPDATE policy_version SET status='APPROVED', approved_at=TIMESTAMPTZ '2026-10-13 09:00+09',
        approved_by=(SELECT user_id FROM app_user WHERE login_id='gaadmin'),

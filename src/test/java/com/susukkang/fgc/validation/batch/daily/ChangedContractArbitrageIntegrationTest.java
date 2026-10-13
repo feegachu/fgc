@@ -114,8 +114,8 @@ class ChangedContractArbitrageIntegrationTest {
                  WHERE validation_run_id = ? AND contract_id = ?
                 """, validationRunId, contractId);
         assertThat(row.get("as_of_date").toString()).isEqualTo("2026-08-20");
-        assertThat(row.get("result_status")).isEqualTo(expectedStatus);
-        assertThat(row.get("current_excess")).isEqualTo(new java.math.BigDecimal(excess));
+        assertThat(row).containsEntry("result_status", expectedStatus)
+                .containsEntry("current_excess", new java.math.BigDecimal(excess));
         assertThat(arbitrageRows()).isEqualTo(1);
         assertThat(candidateCases()).isEqualTo(candidates);
         assertThat(candidateOccurrences()).isEqualTo(candidates);

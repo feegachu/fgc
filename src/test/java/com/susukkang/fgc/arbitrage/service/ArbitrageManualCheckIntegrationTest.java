@@ -80,7 +80,27 @@ class ArbitrageManualCheckIntegrationTest {
         assertThat(result.getResultStatus().name()).isEqualTo("REVIEW_REQUIRED");
         assertThat(result.getCalculationSnapshot()).contains("정책이 없습니다");
         assertThat(jdbcTemplate.queryForObject("SELECT exception_type FROM fgc.exception_case WHERE source_entity_type='ARBITRAGE_CHECK' AND source_entity_id=?",
-                String.class, result.getArbitrageCheckId().toString())).isEqualTo("DATA_QUALITY");
+                String.class, result.getArbitrageCheckId().toString())).isEqualTo("POLICY_MISSING");
+        var exception = jdbcTemplate.queryForMap("SELECT exception_case_id,exception_key,reason_code FROM fgc.exception_case WHERE source_entity_type='ARBITRAGE_CHECK' AND source_entity_id=?",
+                result.getArbitrageCheckId().toString());
+        assertThat(exception.get("reason_code")).isEqualTo("POLICY_MISSING");
+        assertThat(exception.get("exception_key").toString()).startsWith("POLICY_MISSING:").endsWith(":POLICY_MISSING");
+        var repeated = arbitrageService.checkInExistingRun(result.getValidationRunId(), id, LocalDate.of(2026, 8, 31));
+        assertThat(repeated.getArbitrageCheckId()).isEqualTo(result.getArbitrageCheckId());
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id=?", Long.class,
+                exception.get("exception_case_id"))).isEqualTo(1L);
+    }
+
+    @Test
+    void seedPolicyUsesOneEffectiveDateAndNoUnresolvedChannelDescription() {
+        var policy = jdbcTemplate.queryForMap("""
+                SELECT pp.description,pp.parameter_value #>> '{}' AS effective_date
+                FROM fgc.policy_parameter pp JOIN fgc.policy_version pv USING(policy_version_id)
+                WHERE pv.policy_type='ARBITRAGE' AND pv.status='ACTIVE'
+                  AND pp.parameter_key='ARBITRAGE_EFFECTIVE_CONTRACT_DATE'
+                """);
+        assertThat(policy.get("effective_date")).isEqualTo("2026-03-01");
+        assertThat(policy.get("description")).isEqualTo("GA→FC 판정은 이 날짜 이상 체결된 신계약에 적용한다.");
     }
 
     private TestReference testReference() {

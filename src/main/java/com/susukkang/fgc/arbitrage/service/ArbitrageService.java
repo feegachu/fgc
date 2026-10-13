@@ -271,8 +271,8 @@ public class ArbitrageService {
                 .standardDeduction80Yn(Boolean.TRUE.equals(source.getStandardDeduction80Yn()))
                 .resultStatus(decision.resultStatus())
                 .calculationSnapshot(writeCalculationSnapshot(
-                        source, confirmedPaymentAmount, confirmedDeductionAmount,
-                        paidCommissionAmount, plannedCommissionAmount, decision, request, applicability))
+                        source, new CommissionAmounts(confirmedPaymentAmount, confirmedDeductionAmount,
+                        paidCommissionAmount, plannedCommissionAmount), decision, request, applicability))
                 .build();
         int insertedRows = arbitrageCheckRepository.insertArbitrageCheck(row);
         if (insertedRows != 1 || row.getArbitrageCheckId() == null)
@@ -306,6 +306,8 @@ public class ArbitrageService {
     private ExceptionType reviewExceptionType(String reason) {
         if (reason == null)
             return ExceptionType.DATA_QUALITY;
+        if (reason.startsWith("차익거래 적용일 정책") && reason.contains("없습니다"))
+            return ExceptionType.POLICY_MISSING;
         if (reason.contains("환급률표 후보가 없습니다") || reason.contains("환급률표 ID가 없습니다"))
             return ExceptionType.REFUND_TABLE_MISSING;
         if (reason.contains("상품코드") || reason.contains("환급률표가 일치하지 않습니다"))
@@ -454,10 +456,7 @@ public class ArbitrageService {
 
     private String writeCalculationSnapshot(
             ArbitrageCalculationSource source,
-            BigDecimal confirmedPaymentAmount,
-            BigDecimal confirmedDeductionAmount,
-            BigDecimal paidCommissionAmount,
-            BigDecimal plannedCommissionAmount,
+            CommissionAmounts amounts,
             CalculationDecision decision,
             ReArbitrageCheckRequest request,
             Applicability applicability) {
@@ -472,10 +471,10 @@ public class ArbitrageService {
         snapshot.put("previousFinancialSnapshotId", source.getPreviousFinancialSnapshotId());
         snapshot.put("financialSnapshotSourceRef", source.getFinancialSnapshotSourceRef());
         snapshot.put("cumulativePaidPremium", decision.cumulativePaidPremium());
-        snapshot.put("confirmedPaymentAmount", confirmedPaymentAmount);
-        snapshot.put("confirmedDeductionAmount", confirmedDeductionAmount);
-        snapshot.put("paidCommissionAmount", paidCommissionAmount);
-        snapshot.put("plannedCommissionAmount", plannedCommissionAmount);
+        snapshot.put("confirmedPaymentAmount", amounts.confirmedPaymentAmount());
+        snapshot.put("confirmedDeductionAmount", amounts.confirmedDeductionAmount());
+        snapshot.put("paidCommissionAmount", amounts.paidCommissionAmount());
+        snapshot.put("plannedCommissionAmount", amounts.plannedCommissionAmount());
         snapshot.put("includedSurrenderValueAmount", decision.includedSurrenderValueAmount());
         snapshot.put("currentExcessAmount", decision.currentExcessAmount());
         snapshot.put("projectedExcessAmount", decision.projectedExcessAmount());
@@ -523,6 +522,12 @@ public class ArbitrageService {
                 detail
         );
     }
+
+    private record CommissionAmounts(
+            BigDecimal confirmedPaymentAmount,
+            BigDecimal confirmedDeductionAmount,
+            BigDecimal paidCommissionAmount,
+            BigDecimal plannedCommissionAmount) { }
 
     private record RefundDecision(
             BigDecimal amount,
