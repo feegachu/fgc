@@ -625,7 +625,7 @@ class CommissionPaymentServiceImplTest {
                 LocalDate.of(2026, 6, 25)
         ))).isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
             assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_002);
-            // 다른 COMMON_002 와 구분: 지급일 검증에서 거부됐는지
+            // 다른 COMMON_002 와 구분: 지급예정일 검증에서 거부됐는지
             assertThat(exception.getField()).isEqualTo("scheduledPaymentDate");
         });
 
