@@ -185,6 +185,7 @@ class CapExceptionServiceImplTest {
         verify(capExceptionRepository, never()).selectExceptionForUpdate(5L);
     }
 
+    /** 지급 건의 미해결 위반 존재 여부를 저장소에 위임한다. */
     @Test
     void checksUnresolvedViolationByPaymentId() {
         given(capExceptionRepository.existsUnresolvedViolation(10L)).willReturn(true);
@@ -192,6 +193,7 @@ class CapExceptionServiceImplTest {
         assertThat(capExceptionService.hasUnresolvedViolation(10L)).isTrue();
     }
 
+    /** #477 후속: 미해결 위반의 계약 ID 목록을 저장소에서 그대로 돌려준다. */
     @Test
     void findsUnresolvedViolationContractIdsByPaymentId() {
         given(capExceptionRepository.findUnresolvedViolationContractIds(10L)).willReturn(List.of(1L, 2L));

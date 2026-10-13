@@ -101,6 +101,12 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         return capExceptionRepository.existsUnresolvedViolation(paymentId);
     }
 
+    /**
+     * 설명 : 지급 건의 미해결 한도 위반 예외가 걸린 계약 ID를 조회한다 (#477 후속)
+     *
+     * @param paymentId 지급 건 ID
+     * @return 미해결 한도 위반 예외의 계약 ID 목록(중복 제거, 계약 미상은 null)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<Long> findUnresolvedViolationContractIds(Long paymentId) {

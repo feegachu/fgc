@@ -1509,6 +1509,7 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
+    /** 보장성 계약에 미해결 CAP_VIOLATION 이 남아 있으면 한도 계산 전에 CAP_003으로 확정을 막는다. */
     @Test
     void blocksConfirmationWhileCapViolationExceptionIsUnresolved() {
         ConfirmationData data = confirmation(
@@ -1526,8 +1527,10 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
-    // #477 후속: 보장성(3)·저축성(9) 혼합 지급 건에서 미해결 위반이 저축성 계약에만 남아 있으면
-    // CAP_003으로 막지 않고, 보장성 계약은 종전대로 1,200% 판정을 거쳐 확정된다.
+    /**
+     * #477 후속: 보장성(3)·저축성(9) 혼합 지급 건에서 미해결 위반이 저축성 계약에만 남아 있으면
+     * CAP_003으로 막지 않고, 보장성 계약은 종전대로 1,200% 판정을 거쳐 확정된다.
+     */
     @Test
     void confirmsMixedPaymentWhenUnresolvedViolationIsOnlyOnNonProtectionContract() {
         given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
@@ -1557,7 +1560,7 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository).confirm(101L, "mixed-ok", "55");
     }
 
-    // #477 후속: 혼합 지급 건이라도 미해결 위반이 보장성 계약에 걸려 있으면 종전대로 CAP_003으로 막는다
+    /** #477 후속: 혼합 지급 건이라도 미해결 위반이 보장성 계약에 걸려 있으면 종전대로 CAP_003으로 막는다 */
     @Test
     void blocksMixedPaymentWhenUnresolvedViolationIsOnProtectionContract() {
         given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
@@ -1573,7 +1576,7 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
-    // #477 후속: 계약이 비어 있는 위반은 대상 여부를 알 수 없으므로 비대상 계약과 섞여 있어도 막는다
+    /** #477 후속: 계약이 비어 있는 위반은 대상 여부를 알 수 없으므로 비대상 계약과 섞여 있어도 막는다 */
     @Test
     void blocksWhenUnresolvedViolationHasNoContract() {
         given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
@@ -1588,8 +1591,10 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository, never()).confirm(any(), any(), any());
     }
 
-    // #477 후속: 보장성 계약의 위반으로 CAP_003 거절된 혼합 지급 건이, 그 위반을 해결(정정)한 뒤 같은 멱등키로
-    // 재시도하면 저축성 계약에 남은 미해결 위반 때문에 다시 막히지 않고 확정된다.
+    /**
+     * #477 후속: 보장성 계약의 위반으로 CAP_003 거절된 혼합 지급 건이, 그 위반을 해결(정정)한 뒤 같은 멱등키로
+     * 재시도하면 저축성 계약에 남은 미해결 위반 때문에 다시 막히지 않고 확정된다.
+     */
     @Test
     void retriesMixedPaymentAfterProtectionViolationIsResolved() {
         given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(mixedProtectionAndSavings());
@@ -1622,8 +1627,10 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository).confirm(101L, "retry-after-resolve", "55");
     }
 
-    // #477 후속: 보장성으로 잘못 분류돼 위반이 남은 계약의 상품 보장성 구분을 저축성으로 정정하면,
-    // 위반 예외를 따로 종결하지 않아도 재시도 확정이 CAP_003으로 막히지 않는다.
+    /**
+     * #477 후속: 보장성으로 잘못 분류돼 위반이 남은 계약의 상품 보장성 구분을 저축성으로 정정하면,
+     * 위반 예외를 따로 종결하지 않아도 재시도 확정이 CAP_003으로 막히지 않는다.
+     */
     @Test
     void retriesAfterProtectionTypeIsCorrectedToNonProtection() {
         ConfirmationData data = confirmation(
@@ -1651,6 +1658,7 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository).confirm(101L, "retry-after-correction", "");
     }
 
+    /** 보장성 계약(3)·저축성 계약(9)에 300,000·200,000원씩 배부한 혼합 지급 건 귀속행. */
     private List<ConfirmationData> mixedProtectionAndSavings() {
         return List.of(
                 confirmation(201L, 3L, "300000", "500000", InclusionDecisionStatus.INCLUDED,
@@ -2256,7 +2264,7 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
-    // FGC-FUN-033·FGC-FUN-034 연계 — 미해결 CAP_VIOLATION 예외가 남아 있으면 FGC-CAP-003 blocker로 표시된다
+    /** FGC-FUN-033·FGC-FUN-034 연계 — 미해결 CAP_VIOLATION 예외가 남아 있으면 FGC-CAP-003 blocker로 표시된다 */
     @Test
     void precheckReportsUnresolvedViolationBlocker() {
         ConfirmationData data = confirmation(
@@ -2286,8 +2294,10 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
-    // #477 후속: 사전검증도 확정과 같은 판정 — 비대상 계약에만 걸린 미해결 위반은 blocker가 아니고,
-    // 보장성 계약에 걸린 위반은 FGC-CAP-003 blocker로 남는다.
+    /**
+     * #477 후속: 사전검증도 확정과 같은 판정 — 비대상 계약에만 걸린 미해결 위반은 blocker가 아니고,
+     * 보장성 계약에 걸린 위반은 FGC-CAP-003 blocker로 남는다.
+     */
     @ParameterizedTest
     @CsvSource({"9, true", "3, false"})
     void precheckScopesUnresolvedViolationToRegulatedContracts(long violatedContractId, boolean confirmable) {
@@ -2495,6 +2505,7 @@ class CommissionPaymentServiceImplTest {
         );
     }
 
+    /** 환수(CLAWBACK) 차감은 1,200% 판정과 미해결 위반 게이트를 건너뛰되 확정 흐름은 그대로 탄다. */
     @Test
     void deductionConfirmationAndPreviewSkipCapButPreservePaymentLifecycle() {
         var data = deduction(confirmation(201L, 3L, "2000000", "2000000", InclusionDecisionStatus.INCLUDED,

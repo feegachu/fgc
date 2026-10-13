@@ -103,7 +103,11 @@ public class BaselineCapExceptionService implements CapExceptionService {
         return capExceptionMapper.existsUnresolvedViolation(paymentId);
     }
 
-    // 스냅샷 이후 인터페이스에 추가된 메서드(#477 후속) — 기준선 지급 서비스는 hasUnresolvedViolation 만 호출한다.
+    /**
+     * 스냅샷 이후 인터페이스에 추가된 메서드(#477 후속) — 기준선 지급 서비스는 hasUnresolvedViolation 만 호출한다.
+     *
+     * @throws UnsupportedOperationException 항상
+     */
     @Override
     public java.util.List<Long> findUnresolvedViolationContractIds(Long paymentId) {
         throw new UnsupportedOperationException("baseline snapshot does not include contract-scoped CAP_003");

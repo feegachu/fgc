@@ -209,6 +209,12 @@ public class CapExceptionRepository {
 
     // #477 후속: CAP_003 차단을 계약 단위로 판정하려고 미해결 위반이 걸린 계약을 돌려준다.
     // 계약이 비어 있는 위반 행은 null 원소로 남겨 호출부가 "대상 판단 불가 → 차단"으로 처리하게 한다.
+    /**
+     * 지급 건의 미해결(NEW·IN_REVIEW) CAP_VIOLATION 예외가 걸린 계약 ID를 중복 없이 조회한다.
+     *
+     * @param paymentId 지급 건 ID
+     * @return 계약 ID 목록. 계약이 빈 위반은 null 원소로 포함한다
+     */
     public List<Long> findUnresolvedViolationContractIds(Long paymentId) {
         return entityManager.createQuery("""
                 SELECT DISTINCT e.contractId FROM ExceptionCase e

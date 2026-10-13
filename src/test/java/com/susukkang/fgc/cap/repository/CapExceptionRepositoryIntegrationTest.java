@@ -49,6 +49,7 @@ class CapExceptionRepositoryIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
+    /** 같은 업무키의 위반은 한 건으로 갱신되고, 해결조치 후에는 미해결 조회에서 빠지며 다시 열리지 않는다. */
     @Test
     void updatesSameViolationWithoutDuplicateAndResolvesWithAction() {
         TestReference reference = testReference();
@@ -130,8 +131,10 @@ class CapExceptionRepositoryIntegrationTest {
         )).isEqualTo("RESOLVED");
     }
 
-    // #477 후속: CAP_003 계약 단위 판정의 입력 — 다계약 위반은 계약별로 중복 없이, 계약이 빈 위반은
-    // null 원소로 돌려주고, 종결·주의·다른 지급 건 예외는 빼며, IN_REVIEW 는 미해결로 남긴다.
+    /**
+     * #477 후속: CAP_003 계약 단위 판정의 입력 — 다계약 위반은 계약별로 중복 없이, 계약이 빈 위반은
+     * null 원소로 돌려주고, 종결·주의·다른 지급 건 예외는 빼며, IN_REVIEW 는 미해결로 남긴다.
+     */
     @Test
     void listsUnresolvedViolationContractsAcrossContractsIncludingMissingContract() {
         TestReference reference = testReference();
@@ -339,6 +342,7 @@ class CapExceptionRepositoryIntegrationTest {
                 .build();
     }
 
+    /** 계약·예외 유형을 지정한 지급 건 한도 예외 입력. 위반은 CRITICAL, 그 밖은 WARNING 심각도로 만든다. */
     private CapExceptionInsertDTO exception(
             String exceptionKey,
             Long paymentId,
@@ -361,6 +365,7 @@ class CapExceptionRepositoryIntegrationTest {
                 .build();
     }
 
+    /** 주어진 계약과 다른 시드 계약 ID — 다계약 위반 시나리오용. */
     private Long otherContractId(Long contractId) {
         return jdbcTemplate.queryForObject("""
                 SELECT contract_id
@@ -371,6 +376,7 @@ class CapExceptionRepositoryIntegrationTest {
                 """, Long.class, contractId);
     }
 
+    /** 업무키로 저장된 예외 건 ID를 찾는다. */
     private Long exceptionCaseId(String exceptionKey) {
         return jdbcTemplate.queryForObject(
                 "SELECT exception_case_id FROM fgc.exception_case WHERE exception_key = ?",
