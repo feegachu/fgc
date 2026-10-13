@@ -215,13 +215,7 @@ final class CommissionPaymentSql {
                    crs.premium_multiplier,
                    crs.warning_usage_pct,
                    COALESCE((
-                       SELECT SUM(
-                                  CASE
-                                      WHEN other_ct.cashflow_type = 'DEDUCTION'
-                                          THEN -ROUND(other_ta.attributed_amount, 0)
-                                      ELSE ROUND(other_ta.attributed_amount, 0)
-                                  END
-                              )
+                       SELECT SUM(ROUND(other_ta.attributed_amount, 0))
                          FROM fgc.transaction_attribution other_ta
                          JOIN fgc.commission_transaction other_ct
                            ON other_ct.commission_transaction_id = other_ta.commission_transaction_id
@@ -229,18 +223,13 @@ final class CommissionPaymentSql {
                           AND other_ta.inclusion_status_snapshot = 'INCLUDED'
                           AND other_ct.payment_stage = ct.payment_stage
                           AND other_ct.status = 'CONFIRMED'
+                          AND other_ct.cashflow_type = 'PAYMENT'
                           AND other_ct.commission_transaction_id <> ct.commission_transaction_id
                           AND other_ta.attribution_date >= c.contract_date
                           AND other_ta.attribution_date < c.contract_date + INTERVAL '12 months'
                    ), 0) AS existing_included_amount,
                    (
-                        SELECT SUM(
-                                   CASE
-                                       WHEN compliance_ct.cashflow_type = 'DEDUCTION'
-                                           THEN -ROUND(compliance_ta.attributed_amount, 0)
-                                       ELSE ROUND(compliance_ta.attributed_amount, 0)
-                                   END
-                               )
+                        SELECT SUM(ROUND(compliance_ta.attributed_amount, 0))
                          FROM fgc.transaction_attribution compliance_ta
                          JOIN fgc.commission_transaction compliance_ct
                            ON compliance_ct.commission_transaction_id = compliance_ta.commission_transaction_id
@@ -248,6 +237,7 @@ final class CommissionPaymentSql {
                           AND compliance_ta.exclusion_type_snapshot = 'COMPLIANCE_3PCT'
                           AND NULLIF(BTRIM(compliance_ta.evidence_ref), '') IS NOT NULL
                           AND compliance_ct.payment_stage = ct.payment_stage
+                          AND compliance_ct.cashflow_type = 'PAYMENT'
                           AND (
                               compliance_ct.status = 'CONFIRMED'
                               OR compliance_ct.commission_transaction_id = ct.commission_transaction_id
@@ -321,11 +311,7 @@ final class CommissionPaymentSql {
                    ci.item_code                        AS item_code,
                    ci.item_name                        AS item_name,
                    other_ta.inclusion_status_snapshot  AS classification_snapshot,
-                   CASE
-                       WHEN other_ct.cashflow_type = 'DEDUCTION'
-                           THEN -ROUND(other_ta.attributed_amount, 0)
-                       ELSE ROUND(other_ta.attributed_amount, 0)
-                   END                                 AS amount,
+                   ROUND(other_ta.attributed_amount, 0) AS amount,
                    COALESCE(NULLIF(BTRIM(cri.decision_reason), ''),
                             '확정 당시 산입 판정 스냅샷') AS decision_reason,
                    other_ta.evidence_ref               AS evidence_ref
@@ -347,6 +333,7 @@ final class CommissionPaymentSql {
                AND other_ta.inclusion_status_snapshot = 'INCLUDED'
                AND other_ct.payment_stage = ct.payment_stage
                AND other_ct.status = 'CONFIRMED'
+               AND other_ct.cashflow_type = 'PAYMENT'
                AND other_ct.commission_transaction_id <> ct.commission_transaction_id
                AND other_ta.attribution_date >= c.contract_date
                AND other_ta.attribution_date < c.contract_date + INTERVAL '12 months'

@@ -836,13 +836,7 @@ final class PaymentCapCheckBaselineSql {
                 parameters.addValue("p0", parameter(value(input, "contractId")));
                 parameters.addValue("p1", parameter(value(input, "paymentStage")));
                 sql.append("""
-                    SELECT SUM(
-                       CASE
-                           WHEN ct.cashflow_type = 'DEDUCTION'
-                               THEN -ROUND(ta.attributed_amount, 0)
-                           ELSE ROUND(ta.attributed_amount, 0)
-                       END
-                    )
+                    SELECT SUM(ROUND(ta.attributed_amount, 0))
                     FROM fgc.transaction_attribution ta
                              JOIN fgc.commission_transaction ct
                                   ON ct.commission_transaction_id = ta.commission_transaction_id
@@ -850,6 +844,7 @@ final class PaymentCapCheckBaselineSql {
                                   ON c.contract_id = ta.contract_id
                     WHERE ta.contract_id = :p0
                       AND ta.exclusion_type_snapshot = 'COMPLIANCE_3PCT'
+                      AND ct.cashflow_type = 'PAYMENT'
                       AND NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL
                       AND ct.payment_stage = :p1
                       AND ct.status = 'CONFIRMED'
