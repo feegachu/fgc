@@ -57,7 +57,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             SELECT
             COUNT(*) FILTER (WHERE ac.result_status = 'CLEAR') AS clear_count,
             COUNT(*) FILTER (WHERE ac.result_status = 'CANDIDATE') AS candidate_count,
-            COUNT(*) FILTER (WHERE ac.result_status = 'REVIEW_REQUIRED') AS review_required_count
+            COUNT(*) FILTER (WHERE ac.result_status = 'REVIEW_REQUIRED') AS review_required_count,
+            COUNT(*) FILTER (WHERE ac.result_status = 'NOT_APPLICABLE') AS not_applicable_count
             FROM
             (SELECT DISTINCT ON (contract_id, payment_stage, as_of_date) *
             FROM fgc.arbitrage_check
@@ -320,7 +321,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
     @Override
     public ArbitrageCheckSummary arbitrageCheckSummary(ArbitrageCheckSearchCondition condition) {
         Object[] row = (Object[]) search(ARBITRAGE_CHECK_SUMMARY, condition).getSingleResult();
-        return new ArbitrageCheckSummary(((Number) row[0]).longValue(), ((Number) row[1]).longValue(), ((Number) row[2]).longValue());
+        return new ArbitrageCheckSummary(((Number) row[0]).longValue(), ((Number) row[1]).longValue(),
+                ((Number) row[2]).longValue(), ((Number) row[3]).longValue());
     }
 
     @Override

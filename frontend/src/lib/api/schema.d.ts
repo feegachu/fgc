@@ -1564,6 +1564,8 @@ export interface components {
             /** Format: int64 */
             clearCount?: number;
             /** Format: int64 */
+            notApplicableCount?: number;
+            /** Format: int64 */
             reviewRequiredCount?: number;
             /** Format: int64 */
             totalArbitrageChecks?: number;

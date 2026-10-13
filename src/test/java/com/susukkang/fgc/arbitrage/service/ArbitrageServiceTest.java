@@ -170,13 +170,14 @@ class ArbitrageServiceTest {
         summary.setClearCount(3);
         summary.setCandidateCount(2);
         summary.setReviewRequiredCount(1);
+        summary.setNotApplicableCount(4);
         given(arbitrageCheckRepository.selectByCondition(condition, 0, 20)).willReturn(List.of());
         given(arbitrageCheckRepository.arbitrageCheckSummary(any())).willReturn(summary);
         given(arbitrageCheckRepository.countByCondition(condition)).willReturn(2L);
 
         var response = arbitrageService.selectByCondition(condition, 1, 20);
 
-        assertThat(response.getSummary().getTotalArbitrageChecks()).isEqualTo(6);
+        assertThat(response.getSummary().getTotalArbitrageChecks()).isEqualTo(10);
         assertThat(response.getItems().totalElements()).isEqualTo(2);
         org.mockito.ArgumentCaptor<ArbitrageCheckSearchCondition> summaryCondition =
                 org.mockito.ArgumentCaptor.forClass(ArbitrageCheckSearchCondition.class);

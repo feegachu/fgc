@@ -1008,6 +1008,25 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository).confirm(101L, "savings-ok", "");
     }
 
+    // #477: 산입 분류가 검토필요여도 보장성이 아닌 계약은 분류 때문에 확정이 막히지 않는다
+    @Test
+    void confirmsNonProtectionContractEvenWhenInclusionClassificationNeedsReview() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "2000000", "2000000", InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findProtectionType(3L)).willReturn("SAVINGS");
+        given(writeRepository.confirm(101L, "savings-review", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "2000000")));
+
+        CommissionPaymentResponse response = service.confirm(101L, "savings-review");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+    }
+
     @Test
     void confirmsOneWonBelowTwelveHundredPercentBoundary() {
         ConfirmationData data = confirmation(

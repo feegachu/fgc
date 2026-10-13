@@ -1052,6 +1052,10 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "notApplicableCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "reviewRequiredCount" : {
             "format" : "int64",
             "type" : "integer"
