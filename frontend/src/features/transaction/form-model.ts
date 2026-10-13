@@ -70,8 +70,8 @@ export function newRow(key: number, date: string, amount = '0'): AttributionRow 
   }
 }
 export function draftRows(draft: Payment | undefined, month: string): AttributionRow[] {
-  if (!draft?.attributions?.length) return [newRow(1, `${month}-01`, String(draft?.amount ?? 250000))]
-  return draft.attributions.map((row, index) => ({
+  if (!draft) return [newRow(1, `${month}-01`, '250000')]
+  return (draft.attributions ?? []).map((row, index) => ({
     key: index + 1,
     contractId: row.contractId == null ? '' : String(row.contractId),
     attributionDate: row.attributionDate ?? '',
@@ -242,11 +242,24 @@ export function gateStates(result: Precheck | null) {
 }
 // confirm failFirst records only the first blocker, never a later CAP code.
 export const hasRecordableBlocker = (result: Precheck) => RECORDABLE_CODES.includes(result.blockers?.[0]?.code ?? '')
-export function blockedContractNo(result: Precheck, code: string, contracts: Contract[]) {
-  const blockers = (result.blockers ?? []).filter(
-    (blocker) => blocker.contractId != null && RECORDABLE_CODES.includes(blocker.code ?? ''),
-  )
+export function blockedContractId(result: Precheck, code: string) {
+  const blockers = (result.blockers ?? []).filter((blocker) => RECORDABLE_CODES.includes(blocker.code ?? ''))
   const target = blockers.find((blocker) => blocker.code === code) ?? blockers[0]
-  if (!target) return undefined
-  return contracts.find((contract) => contract.contractId === target?.contractId)?.contractNo
+  return target?.contractId ?? undefined
 }
+export function blockedContractNo(result: Precheck, code: string, contracts: Contract[]) {
+  const id = blockedContractId(result, code)
+  if (id == null) return undefined
+  return (
+    result.capPreview?.find((preview) => preview.contractId === id)?.contractNo ||
+    contracts.find((contract) => contract.contractId === id)?.contractNo
+  )
+}
+// Only an HTTP business rejection establishes that this attempt was rejected.
+export const isRetryableConfirmation = (failure: { status: number } | null) =>
+  !failure || failure.status < 400 || failure.status >= 500
+
+export const rowWasNormalized = (raw: AttributionRow, shown: AttributionRow) =>
+  raw.contractId !== shown.contractId ||
+  raw.decision !== shown.decision ||
+  raw.attributionMethod !== shown.attributionMethod

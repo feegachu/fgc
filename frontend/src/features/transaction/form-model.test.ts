@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  blockedContractId,
   blockedContractNo,
   buildPayload,
   draftRows,
@@ -8,6 +9,7 @@ import {
   gateStates,
   hasRecordableBlocker,
   initialForm,
+  isRetryableConfirmation,
   newRow,
   normalizeRow,
   selectContract,
@@ -133,4 +135,48 @@ describe('server confirmation gates', () => {
     )
     expect(blockedContractNo(result, 'FGC-CAP-001', [{ contractId: 3, contractNo: 'VIOLATION' }])).toBe('VIOLATION')
   })
+})
+
+describe('legacy defect model regressions (#410)', () => {
+  it('resolves the actual blocker contract from preview before the first contracts page', () => {
+    const result = {
+      blockers: [
+        { code: 'FGC-CAP-002', contractId: 103 },
+        { code: 'FGC-CAP-001', contractId: 104 },
+      ],
+      capPreview: [
+        { contractId: 104, contractNo: 'VIOLATION-104' },
+        { contractId: 103, contractNo: 'REVIEW-103' },
+      ],
+    }
+    expect(blockedContractId(result, 'FGC-CAP-002')).toBe(103)
+    expect(blockedContractNo(result, 'FGC-CAP-002', [{ contractId: 104, contractNo: 'WRONG' }])).toBe('REVIEW-103')
+    expect(blockedContractNo(result, 'FGC-CAP-001', [])).toBe('VIOLATION-104')
+    expect(
+      blockedContractNo(
+        { blockers: [{ code: 'FGC-CAP-002', contractId: 103 }], capPreview: result.capPreview.slice(0, 1) },
+        'FGC-CAP-002',
+        [],
+      ),
+    ).toBeUndefined()
+  })
+  it('preserves zero saved rows but retains the default row for a new form', () => {
+    expect(draftRows({ attributions: [] }, '2026-07')).toEqual([])
+    expect(draftRows(undefined, '2026-07')).toHaveLength(1)
+  })
+})
+
+it('keeps a first non-contract CAP blocker from linking a later contract (#410)', () => {
+  const result = {
+    blockers: [{ code: 'FGC-CAP-002' }, { code: 'FGC-CAP-002', contractId: 7 }],
+    capPreview: [{ contractId: 7, contractNo: 'LATER-CONTRACT' }],
+  }
+  expect(blockedContractId(result, 'FGC-CAP-002')).toBeUndefined()
+  expect(blockedContractNo(result, 'FGC-CAP-002', [{ contractId: 7, contractNo: 'LATER-CONTRACT' }])).toBeUndefined()
+})
+
+it('retries transport and malformed-success responses but requires a fresh precheck for business rejections (#410)', () => {
+  expect(isRetryableConfirmation(null)).toBe(true)
+  for (const status of [0, 200, 500, 503]) expect(isRetryableConfirmation({ status })).toBe(true)
+  for (const status of [400, 401, 403, 409, 422]) expect(isRetryableConfirmation({ status })).toBe(false)
 })

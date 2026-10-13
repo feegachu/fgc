@@ -8,7 +8,7 @@ import { isNegative, usageRate, won } from '../../lib/format'
 import { withMonth } from '../../stores/workspace'
 import type { ApiError } from '../../lib/api/client'
 import type { CapPreview, Precheck } from './form-api'
-import { gateStates, hasRecordableBlocker, RECORDABLE_CODES } from './form-model'
+import { gateStates, hasRecordableBlocker, isRetryableConfirmation, RECORDABLE_CODES } from './form-model'
 import type { FormValues } from './form-model'
 
 export function GatePanel({ result }: { result: Precheck | null }) {
@@ -165,7 +165,7 @@ export function ConfirmationModal({
   const recordable = result != null && !result.confirmable && hasRecordableBlocker(result)
   // A transport error leaves the last server precheck intact, so an explicit retry
   // uses the identical idempotency key; a business rejection requires a fresh precheck.
-  const retryable = !failure || failure.status >= 500
+  const retryable = isRetryableConfirmation(failure)
   const canSubmit = result != null && (result.confirmable === true || recordable) && !recorded && retryable
   const capCheckId = positiveId(failure?.params.capCheckId)
   const exceptionCaseId = positiveId(failure?.params.exceptionCaseId)
@@ -262,7 +262,7 @@ export function ConfirmationModal({
                   귀속행 판정 다시 확인
                 </Link>
               )}
-              {recorded && (contractNo || exceptionCaseId) && (
+              {recorded && (
                 <Link className="button button-secondary" to={withMonth(`/exceptions?${exceptionParams}`, month)}>
                   예외함에서 처리하기
                 </Link>

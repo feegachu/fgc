@@ -50,10 +50,12 @@ let precheckResult: Precheck
 let mutation: (path: string, options: RequestOptions) => unknown
 let referenceFailure: ApiError | null
 let draftResponse: Payment
+let contractDetailFailure = false
 beforeEach(() => {
   precheckResult = { confirmable: true, capPreview: [], blockers: [] }
   referenceFailure = null
   draftResponse = saved
+  contractDetailFailure = false
   mutation = (path) => (path.endsWith('/precheck') ? precheckResult : saved)
   useToastStore.setState({ messages: [] })
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, options: RequestOptions = {}) => {
@@ -61,6 +63,11 @@ beforeEach(() => {
     if (referenceFailure) throw referenceFailure
     if (path.startsWith('/api/v1/base/agents')) return envelope({ content: agents })
     if (path.startsWith('/api/v1/base/commission-items')) return envelope(items)
+    if (path === '/api/v1/contracts/103') {
+      if (contractDetailFailure)
+        throw new ApiError({ code: 'FGC-COMMON-404', message: '계약 조회 실패' }, 'LOOKUP', 404)
+      return envelope({ contractId: 103, contractNo: 'C-103' })
+    }
     if (path.startsWith('/api/v1/contracts')) return envelope({ content: contracts })
     if (path === '/api/v1/transactions/77') return envelope(draftResponse)
     throw new Error(`Unexpected API path: ${path}`)
@@ -340,5 +347,144 @@ describe('TRAN-W02 React form workflow', () => {
     expect(button('btn-precheck')).toBeDisabled()
     expect(button('btn-confirm')).toBeDisabled()
     expect(writes()).toHaveLength(0)
+  })
+})
+
+describe('TRAN-W02 legacy defect regressions (#410)', () => {
+  it.each(['network', '500'])(
+    'reopens confirmation after %s failure with the same key without losing recovery to precheck',
+    async (kind) => {
+      const { user } = mount()
+      let dialog = await saveAndPrecheck(user)
+      mutation = () => {
+        if (kind === 'network') throw new TypeError('Failed to fetch')
+        throw new ApiError({ code: 'FGC-COMMON-500', message: 'private error' }, 'CONFIRM-REQ', 500)
+      }
+      await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: '확정 실행' })).toBeEnabled())
+      await user.click(within(dialog).getByRole('button', { name: '취소' }))
+      expect(button('btn-confirm')).toBeEnabled()
+      expect(button('btn-precheck')).toBeDisabled()
+      expect(button('btn-save')).toBeDisabled()
+      expect(screen.getByLabelText(/업무키/)).toBeDisabled()
+      await user.click(button('btn-precheck'))
+      expect(writes().filter(([path]) => path.endsWith('/precheck'))).toHaveLength(1)
+      expect(screen.getByText(/확정 창을 다시 열어/)).toBeVisible()
+      mutation = () => ({ ...saved, status: 'CONFIRMED' })
+      await user.click(button('btn-confirm'))
+      dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
+      await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+      await screen.findByRole('heading', { name: '지급 목록 결과' })
+      expect(
+        writes()
+          .filter(([path]) => path.endsWith('/confirm'))
+          .map(([, options]) => options?.idempotencyKey),
+      ).toEqual(['TRAN-CONFIRM-77', 'TRAN-CONFIRM-77'])
+      expect(writes().filter(([path]) => path === '/api/v1/transactions')).toHaveLength(1)
+    },
+  )
+  it('requires a fresh precheck after a business rejection rather than replaying it', async () => {
+    const { user } = mount()
+    const dialog = await saveAndPrecheck(user)
+    mutation = () => {
+      throw new ApiError({ code: 'FGC-TRAN-005', message: '확정 불가' }, 'REJECT', 409)
+    }
+    await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+    await within(dialog).findByText(/FGC-TRAN-005/)
+    expect(within(dialog).queryByRole('button', { name: '확정 실행' })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: '취소' }))
+    expect(button('btn-confirm')).toBeDisabled()
+    expect(button('btn-precheck')).toBeEnabled()
+    mutation = () => precheckResult
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+  })
+  it.each(['preview', 'detail', 'lookup failure'])(
+    'retains the exception link for an out-of-page contract using %s',
+    async (source) => {
+      draftResponse = {
+        ...saved,
+        paymentStage: 'INSURER_TO_GA',
+        agentId: undefined,
+        attributions: [{ ...saved.attributions![0], contractId: 103 }],
+      }
+      const code = source === 'preview' ? 'FGC-CAP-001' : 'FGC-CAP-002'
+      precheckResult = {
+        confirmable: false,
+        blockers: [{ code, message: '계약 차단', contractId: 103 }],
+        capPreview: source === 'preview' ? [{ contractId: 103, contractNo: 'C-103' }] : [],
+      }
+      contractDetailFailure = source === 'lookup failure'
+      const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+      await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+      await user.click(button('btn-precheck'))
+      await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+      await user.click(button('btn-confirm'))
+      const dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
+      expect(within(dialog).queryByRole('link', { name: '예외함에서 처리하기' })).not.toBeInTheDocument()
+      mutation = () => {
+        throw new ApiError({ code, message: '계약 차단', params: {} }, 'CAP', 422)
+      }
+      await user.click(within(dialog).getByRole('button', { name: '확정 시도 · 예외 등록' }))
+      const link = await within(dialog).findByRole('link', { name: '예외함에서 처리하기' })
+      if (source !== 'lookup failure')
+        await waitFor(() => expect(link.getAttribute('href')).toContain('contractNo=C-103'))
+      else expect(link.getAttribute('href')).toContain('type=CAP_REVIEW_REQUIRED')
+      if (source === 'preview')
+        expect(
+          vi.mocked(apiClient.request).mock.calls.filter(([path]) => path === '/api/v1/contracts/103'),
+        ).toHaveLength(0)
+      if (source === 'lookup failure')
+        await waitFor(() =>
+          expect(vi.mocked(apiClient.request)).toHaveBeenCalledWith('/api/v1/contracts/103', expect.anything()),
+        )
+      expect(link.getAttribute('href')).not.toContain('C-003')
+      expect(within(dialog).queryByRole('link', { name: '계산근거 확인' })).not.toBeInTheDocument()
+    },
+  )
+  it('displays an empty saved draft as empty and uses the server missing-attribution blocker', async () => {
+    draftResponse = { ...saved, attributions: [] }
+    precheckResult = { confirmable: false, blockers: [{ code: 'FGC-TRAN-002', message: '귀속행 없음' }] }
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    expect(screen.queryByLabelText('1번 귀속행 계약번호')).not.toBeInTheDocument()
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    await user.click(button('btn-confirm'))
+    const dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
+    expect(within(dialog).getByText(/귀속행 없음/)).toBeVisible()
+    expect(within(dialog).queryByRole('button', { name: /확정 실행|확정 시도/ })).not.toBeInTheDocument()
+    expect(writes().filter(([path]) => !path.endsWith('/precheck'))).toHaveLength(0)
+  })
+  it('requires saving silently normalized draft values and then enables precheck for the stored values', async () => {
+    draftResponse = {
+      ...saved,
+      paymentStage: 'INSURER_TO_GA',
+      agentId: undefined,
+      attributions: [
+        {
+          ...saved.attributions![0],
+          inclusionDecisionStatus: 'EXCLUDED',
+          exclusionType: 'NEW_AGENT_SUPPORT',
+          evidenceRef: 'EVIDENCE',
+        },
+      ],
+    }
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    expect(screen.getByLabelText('1번 귀속행 산입 판정')).toHaveValue('INCLUDED')
+    expect(button('btn-precheck')).toBeDisabled()
+    expect(button('btn-confirm')).toBeDisabled()
+    expect(screen.getByText(/현재 지급 단계·항목에 맞춰 귀속 입력을 조정/)).toBeVisible()
+    mutation = (_path, options) => ({ ...draftResponse, ...(options.body as object) })
+    await user.click(button('btn-save'))
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    expect(writes()[0][0]).toBe('/api/v1/transactions/77')
+    expect(writes()[0][1]?.body).toMatchObject({
+      paymentStage: 'INSURER_TO_GA',
+      agentId: null,
+      attributions: [{ inclusionDecisionStatus: 'INCLUDED', attributionMethod: 'DIRECT' }],
+    })
+    expect(screen.queryByText(/귀속 입력을 조정/)).not.toBeInTheDocument()
   })
 })

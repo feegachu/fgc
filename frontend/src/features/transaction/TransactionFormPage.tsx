@@ -14,6 +14,7 @@ import { CapPanel, ConfirmationModal, GatePanel } from './ConfirmationPanels'
 import {
   agentsQuery,
   confirmPayment,
+  contractQuery,
   contractsQuery,
   draftQuery,
   formError,
@@ -24,6 +25,7 @@ import {
 import type { Payment, Precheck } from './form-api'
 import {
   availableItems,
+  blockedContractId,
   blockedContractNo,
   buildPayload,
   draftRows,
@@ -32,8 +34,11 @@ import {
   hasRecordableBlocker,
   initialForm,
   isNewcomer,
+  isRetryableConfirmation,
   newRow,
   normalizeRow,
+  RECORDABLE_CODES,
+  rowWasNormalized,
   SOURCE_TYPE,
 } from './form-model'
 import type { FormValues } from './form-model'
@@ -118,16 +123,33 @@ function TransactionForm({
   const [confirmed, setConfirmed] = useState(false)
   const agentQuery = useQuery({ ...agentsQuery(form.settlementMonth), retry: false })
   const itemQuery = useQuery({ ...itemsQuery(form.settlementMonth), retry: false })
-  const contractQuery = useQuery({ ...contractsQuery(filterAgent), retry: false })
+  const contractListQuery = useQuery({ ...contractsQuery(filterAgent), retry: false })
   const agents = agentQuery.data ?? []
   const items = itemQuery.data ?? []
-  const contracts = contractQuery.data ?? []
-  const referenceError = agentQuery.error ?? itemQuery.error ?? contractQuery.error
-  const loading = agentQuery.isFetching || itemQuery.isFetching || contractQuery.isFetching
+  const contracts = contractListQuery.data ?? []
+  const referenceError = agentQuery.error ?? itemQuery.error ?? contractListQuery.error
+  const loading = agentQuery.isFetching || itemQuery.isFetching || contractListQuery.isFetching
   const insurer = form.paymentStage === 'INSURER_TO_GA'
   const newcomer = isNewcomer(form, items)
   const rows = rawRows.map((row) => normalizeRow(row, insurer, newcomer))
-  const inputDisabled = !canProcess || locked || busy !== null || loading || Boolean(referenceError)
+  const normalized = rows.some((row, index) => rowWasNormalized(rawRows[index], row))
+  const needsSave = dirty || normalized
+  const confirmationNeedsRetry = Boolean(confirmError) && isRetryableConfirmation(confirmFailure)
+  const confirmationRejected = confirmFailure != null && !isRetryableConfirmation(confirmFailure)
+  const blockerId = result && confirmFailure ? blockedContractId(result, confirmFailure.code) : undefined
+  const knownContractNo =
+    result && confirmFailure ? blockedContractNo(result, confirmFailure.code, contracts) : undefined
+  const blockerContract = useQuery({
+    ...contractQuery(blockerId),
+    enabled:
+      blockerId != null &&
+      blockerId > 0 &&
+      Boolean(confirmFailure && RECORDABLE_CODES.includes(confirmFailure.code)) &&
+      !knownContractNo,
+    retry: false,
+  })
+  const inputDisabled =
+    !canProcess || locked || busy !== null || loading || Boolean(referenceError) || confirmationNeedsRetry
   const selectedAgent = agents.find((agent) => String(agent.agentId) === form.agentId)
   const agentLabel = selectedAgent ? `${selectedAgent.agentCode} ${selectedAgent.agentName}` : '—'
   const ready = canProcess && !loading && !referenceError && busy == null && !confirmed
@@ -182,7 +204,7 @@ function TransactionForm({
     setFieldError(error)
   }
   async function save() {
-    if (!ready || locked || actionLock.current) return
+    if (!ready || locked || confirmationNeedsRetry || actionLock.current) return
     setFieldError(undefined)
     setSaveError('')
     let payload
@@ -213,6 +235,8 @@ function TransactionForm({
       const saved = await saveDraft(paymentId, payload)
       if (!saved.commissionTransactionId) throw new Error('저장된 지급 건 번호를 확인할 수 없습니다.')
       setPaymentId(String(saved.commissionTransactionId))
+      setForm(initialForm(month, saved))
+      setRows(draftRows(saved, saved.settlementMonth?.slice(0, 7) ?? month))
       setLocked(true)
       setDirty(false)
       setResult(null)
@@ -240,7 +264,7 @@ function TransactionForm({
     }
   }
   async function precheck() {
-    if (!ready || !paymentId || dirty || actionLock.current) return
+    if (!ready || !paymentId || needsSave || confirmationNeedsRetry || actionLock.current) return
     actionLock.current = true
     setBusy('precheck')
     setResult(null)
@@ -267,7 +291,8 @@ function TransactionForm({
     if (
       !ready ||
       !paymentId ||
-      dirty ||
+      needsSave ||
+      confirmationRejected ||
       !result ||
       (!result.confirmable && !hasRecordableBlocker(result)) ||
       actionLock.current
@@ -343,7 +368,7 @@ function TransactionForm({
                 onClick={() => {
                   void agentQuery.refetch()
                   void itemQuery.refetch()
-                  void contractQuery.refetch()
+                  void contractListQuery.refetch()
                 }}
               >
                 다시 시도
@@ -548,7 +573,7 @@ function TransactionForm({
                 id="btn-save"
                 variant="secondary"
                 loading={busy === 'save'}
-                disabled={!ready || locked}
+                disabled={!ready || locked || confirmationNeedsRetry}
                 onClick={() => void save()}
                 aria-describedby="transaction-action-help transaction-permission-help"
               >
@@ -561,7 +586,7 @@ function TransactionForm({
                 id="btn-precheck"
                 variant="secondary"
                 loading={busy === 'precheck'}
-                disabled={!ready || !paymentId || dirty}
+                disabled={!ready || !paymentId || needsSave || confirmationNeedsRetry}
                 onClick={() => void precheck()}
                 aria-describedby="transaction-action-help transaction-permission-help"
               >
@@ -572,7 +597,7 @@ function TransactionForm({
               </Button>
               <Button
                 id="btn-confirm"
-                disabled={!ready || !result || dirty || Boolean(confirmError)}
+                disabled={!ready || !result || needsSave || confirmationRejected}
                 onClick={() => setModalOpen(true)}
                 aria-describedby="transaction-action-help transaction-permission-help"
               >
@@ -584,7 +609,18 @@ function TransactionForm({
               <p className="field-helper" id="transaction-action-help">
                 확정은 서버가 판정한 6단계를 모두 통과해야 합니다.
               </p>
-              {dirty && initialId && <p className="field-helper">변경한 내용을 먼저 저장한 뒤 사전검증하세요.</p>}
+              {needsSave && initialId && (
+                <p className="field-helper">
+                  {normalized
+                    ? '현재 지급 단계·항목에 맞춰 귀속 입력을 조정했습니다. 먼저 저장한 뒤 사전검증하세요.'
+                    : '변경한 내용을 먼저 저장한 뒤 사전검증하세요.'}
+                </p>
+              )}
+              {confirmationNeedsRetry && (
+                <p className="field-helper" role="status">
+                  확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 같은 요청으로 결과를 확인하세요.
+                </p>
+              )}
               {!canProcess && (
                 <p className="field-error" id="transaction-permission-help">
                   현재 계정은 조회만 가능하며 저장·사전검증·확정을 실행할 수 없습니다.
@@ -608,7 +644,7 @@ function TransactionForm({
         pending={busy === 'confirm'}
         failure={confirmFailure}
         failureText={confirmError}
-        contractNo={result && confirmFailure ? blockedContractNo(result, confirmFailure.code, contracts) : undefined}
+        contractNo={knownContractNo || blockerContract.data?.contractNo}
         onClose={() => setModalOpen(false)}
         onConfirm={() => void confirm()}
       />

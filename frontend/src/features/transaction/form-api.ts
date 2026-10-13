@@ -67,6 +67,13 @@ export const contractsQuery = (agentId = '') =>
       return result.content ?? []
     },
   })
+export const contractQuery = (id: number | undefined) =>
+  queryOptions({
+    meta: { errorToast: false },
+    queryKey: ['transactions', 'contract', id],
+    queryFn: ({ signal }) => data<Schemas['ContractDetailResponse']>('/api/v1/contracts/' + id, { signal }),
+    enabled: id != null && id > 0,
+  })
 export const itemsQuery = (month: string) =>
   queryOptions({
     meta: { errorToast: false },
