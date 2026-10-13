@@ -188,7 +188,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -205,6 +205,8 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         // 개선: 귀속행별 정책·한도·증빙 공제를 계산하고 하나라도 실패하면 확정을 차단
         for (ConfirmationData data : attributions) {
             failFirst(attributionFailures(data));
+            // #478: CLAWBACK만 비적용이다. 미분류 RECOVERY 등 다른 차감 항목의 분류 검사는 유지한다.
+            if (isClawback(data)) continue;
             if (isNonContractNewcomerAttribution(data)) {
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
@@ -301,7 +303,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -316,6 +318,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     ));
             for (ConfirmationData data : attributions) {
                 failures.addAll(attributionFailures(data));
+                if (isClawback(data)) continue;
                 if (isNonContractNewcomerAttribution(data)) {
                     GateFailure newcomerFailure = newcomerSupportEligibilityFailure(data);
                     if (newcomerFailure != null) {
@@ -915,7 +918,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         if (attributionMethod == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                 && (!YearMonth.from(target.contractDate()).equals(YearMonth.from(settlementMonth))
                 || !YearMonth.from(attributionDate).equals(YearMonth.from(settlementMonth)))) {
-            invalid("attributionDate", "정착지원금은 지급월의 신계약에 실제 귀속해야 합니다.");
+            invalid("attributionDate", "정착지원금은 모집월(정산월)의 신계약에 실제 귀속해야 합니다.");
         }
 
         if (attributionMethod == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD) {
@@ -1244,6 +1247,10 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
             ));
         }
         return failures;
+    }
+
+    private boolean isClawback(ConfirmationData data) {
+        return "DEDUCTION".equals(data.cashflowType()) && "CLAWBACK".equals(data.itemCode());
     }
 
     private boolean isNonContractNewcomerAttribution(ConfirmationData data) {

@@ -3,9 +3,12 @@ package com.susukkang.fgc.arbitrage.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
+import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService;
+import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService.Applicability;
 import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.ProtectionType;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -58,6 +61,7 @@ public class ArbitrageService {
     private final ExceptionCaseRepository exceptionCaseRepository;
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
+    private final ArbitrageApplicabilityPolicyService applicabilityPolicyService;
 
     /**
      * 설명 : 검색 조건에 해당하는 차익거래 검증 결과 요약과 페이징 목록을 조회한다.
@@ -242,11 +246,12 @@ public class ArbitrageService {
                 contractId, REGULATORY_PAYMENT_STAGE));
 
         // 금융자료 및 해약환급금 적용 조건 확인
+        var applicability = applicabilityPolicyService.resolve(request.getAsOfDate());
         CalculationDecision decision = calculateDecision(
                 source,
                 paidCommissionAmount,
                 plannedCommissionAmount,
-                request
+                request, applicability
         );
 
         // 계산 결과와 재현 가능한 계산 근거 저장
@@ -267,8 +272,8 @@ public class ArbitrageService {
                 .standardDeduction80Yn(Boolean.TRUE.equals(source.getStandardDeduction80Yn()))
                 .resultStatus(decision.resultStatus())
                 .calculationSnapshot(writeCalculationSnapshot(
-                        source, confirmedPaymentAmount, confirmedDeductionAmount,
-                        paidCommissionAmount, plannedCommissionAmount, decision, request))
+                        source, new CommissionAmounts(confirmedPaymentAmount, confirmedDeductionAmount,
+                        paidCommissionAmount, plannedCommissionAmount), decision, request, applicability))
                 .build();
         int insertedRows = arbitrageCheckRepository.insertArbitrageCheck(row);
         if (insertedRows != 1 || row.getArbitrageCheckId() == null)
@@ -302,6 +307,8 @@ public class ArbitrageService {
     private ExceptionType reviewExceptionType(String reason) {
         if (reason == null)
             return ExceptionType.DATA_QUALITY;
+        if (reason.startsWith("차익거래 적용일 정책") && reason.contains("없습니다"))
+            return ExceptionType.POLICY_MISSING;
         if (reason.contains("환급률표 후보가 없습니다") || reason.contains("환급률표 ID가 없습니다"))
             return ExceptionType.REFUND_TABLE_MISSING;
         if (reason.contains("상품코드") || reason.contains("환급률표가 일치하지 않습니다"))
@@ -315,13 +322,29 @@ public class ArbitrageService {
             ArbitrageCalculationSource source,
             BigDecimal paidCommissionAmount,
             BigDecimal plannedCommissionAmount,
-            ReArbitrageCheckRequest request) {
+            ReArbitrageCheckRequest request,
+            Applicability applicability) {
+        // 2026-10-13 #477 - 보장성보험만 차익거래 규제 대상이다 (감독규정 제4-32조⑥, FAQ 2차 Q11)
+        // 기존 코드: protection_type 을 읽지 않아 저축성·일반손해·자동차 계약도 후보로 판정했다.
+        // 문제: 규정상 대상이 아닌 계약이 검토대상·자료부족 예외로 쌓였다.
+        // 개선: 적용일 정책·금융 스냅샷 확인보다 먼저 "적용대상 아님"으로 거른다. 예외는 만들지 않는다.
+        if (!ProtectionType.isRegulated(source.getProtectionType())) {
+            return notApplicable(source, request);
+        }
+        int fallbackMonth = source.getContractDate() == null ? 1 : Math.max(1, Math.toIntExact(
+                ChronoUnit.MONTHS.between(source.getContractDate().withDayOfMonth(1),
+                        request.getAsOfDate().withDayOfMonth(1)) + 1));
+        if (source.getContractDate() == null) return reviewRequired(fallbackMonth, "계약일이 없습니다.");
+        if (applicability.reviewReason() != null) return reviewRequired(fallbackMonth, applicability.reviewReason());
+        if (source.getContractDate().isBefore(applicability.effectiveContractDate())) {
+            return new CalculationDecision(
+                    fallbackMonth, valueOrZero(source.getCumulativePaidPremium()), BigDecimal.ZERO, false,
+                    SurrenderValueSourceType.NOT_APPLICABLE, null, BigDecimal.ZERO, BigDecimal.ZERO,
+                    ArbitrageCheckStatus.CLEAR, "NOT_APPLICABLE",
+                    "적용대상 아님 — " + applicability.effectiveContractDate() + " 이전 체결");
+        }
         if (source.getCumulativePaidPremium() == null || source.getContractMonthNo() == null) {
-            int monthNo = Math.max(1, Math.toIntExact(
-                    ChronoUnit.MONTHS.between(
-                            source.getContractDate().withDayOfMonth(1),
-                            request.getAsOfDate().withDayOfMonth(1)) + 1));
-            return reviewRequired(monthNo, "기준일 이하 계약 금융 스냅샷이 없습니다.");
+            return reviewRequired(fallbackMonth, "기준일 이하 계약 금융 스냅샷이 없습니다.");
         }
 
         int contractMonthNo = source.getContractMonthNo();
@@ -416,6 +439,34 @@ public class ArbitrageService {
         );
     }
 
+    private int contractMonthNoFallback(ArbitrageCalculationSource source, ReArbitrageCheckRequest request) {
+        if (source.getContractDate() == null) return 1;
+        return Math.max(1, Math.toIntExact(
+                ChronoUnit.MONTHS.between(
+                        source.getContractDate().withDayOfMonth(1),
+                        request.getAsOfDate().withDayOfMonth(1)) + 1));
+    }
+
+    // 보장성이 아닌 계약 — 금액은 모두 0, 환급금 가산 없음. 사유는 reason·candidateType 으로 스냅샷에 남는다.
+    private CalculationDecision notApplicable(ArbitrageCalculationSource source, ReArbitrageCheckRequest request) {
+        int monthNo = source.getContractMonthNo() != null
+                ? source.getContractMonthNo()
+                : contractMonthNoFallback(source, request);
+        return new CalculationDecision(
+                monthNo,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                false,
+                SurrenderValueSourceType.NOT_APPLICABLE,
+                null,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                ArbitrageCheckStatus.NOT_APPLICABLE,
+                "NOT_APPLICABLE",
+                "보장성보험이 아니라 차익거래 규제 대상이 아닙니다."
+        );
+    }
+
     private CalculationDecision reviewRequired(int contractMonthNo, String reason) {
         return reviewRequired(contractMonthNo, reason, BigDecimal.ZERO);
     }
@@ -441,13 +492,14 @@ public class ArbitrageService {
 
     private String writeCalculationSnapshot(
             ArbitrageCalculationSource source,
-            BigDecimal confirmedPaymentAmount,
-            BigDecimal confirmedDeductionAmount,
-            BigDecimal paidCommissionAmount,
-            BigDecimal plannedCommissionAmount,
+            CommissionAmounts amounts,
             CalculationDecision decision,
-            ReArbitrageCheckRequest request) {
+            ReArbitrageCheckRequest request,
+            Applicability applicability) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("contractDate", source.getContractDate());
+        snapshot.put("applicabilityPolicyVersionId", applicability.policyVersionId());
+        snapshot.put("effectiveContractDate", applicability.effectiveContractDate());
         snapshot.put("manualReason", request.getReason());
         snapshot.put("snapshotAsOfDate", source.getSnapshotAsOfDate());
         snapshot.put("financialSnapshotId", source.getFinancialSnapshotId());
@@ -455,10 +507,10 @@ public class ArbitrageService {
         snapshot.put("previousFinancialSnapshotId", source.getPreviousFinancialSnapshotId());
         snapshot.put("financialSnapshotSourceRef", source.getFinancialSnapshotSourceRef());
         snapshot.put("cumulativePaidPremium", decision.cumulativePaidPremium());
-        snapshot.put("confirmedPaymentAmount", confirmedPaymentAmount);
-        snapshot.put("confirmedDeductionAmount", confirmedDeductionAmount);
-        snapshot.put("paidCommissionAmount", paidCommissionAmount);
-        snapshot.put("plannedCommissionAmount", plannedCommissionAmount);
+        snapshot.put("confirmedPaymentAmount", amounts.confirmedPaymentAmount());
+        snapshot.put("confirmedDeductionAmount", amounts.confirmedDeductionAmount());
+        snapshot.put("paidCommissionAmount", amounts.paidCommissionAmount());
+        snapshot.put("plannedCommissionAmount", amounts.plannedCommissionAmount());
         snapshot.put("includedSurrenderValueAmount", decision.includedSurrenderValueAmount());
         snapshot.put("currentExcessAmount", decision.currentExcessAmount());
         snapshot.put("projectedExcessAmount", decision.projectedExcessAmount());
@@ -506,6 +558,12 @@ public class ArbitrageService {
                 detail
         );
     }
+
+    private record CommissionAmounts(
+            BigDecimal confirmedPaymentAmount,
+            BigDecimal confirmedDeductionAmount,
+            BigDecimal paidCommissionAmount,
+            BigDecimal plannedCommissionAmount) { }
 
     private record RefundDecision(
             BigDecimal amount,

@@ -703,7 +703,7 @@ contract_date <= 귀속일 < contract_date + 1 year
 - 예상 스케줄의 귀속일: `schedule_line.due_date`
 - 실제 지급·귀속의 귀속일: `transaction_attribution.attribution_date`
 - `attribution_month`는 월별 집계키이며 초년도 경계 판정에 사용하지 않는다.
-- `settlement_month`는 월 명세 묶음일 뿐 초년도 귀속판정일로 사용하지 않는다.
+- `settlement_month`는 실적(발생)월이며 월 명세 묶음 기준이다. 지급월이 아니다 — 회차 수수료는 그 회차가 발생하는 달(`schedule_line.due_month` = 계약일 + 회차−1개월, 예: 7월 계약의 2회차는 8월)로 등록하고, 정착지원금은 신계약을 모집한 달로 등록해 그 달의 신계약에 귀속한다. 정착지원금의 지급예정일은 모집월 1일 이후여야 한다(`REG-20`, #476). 초년도 귀속판정일로는 사용하지 않는다.
 
 ## 제28조 기본 한도
 
@@ -1402,7 +1402,7 @@ APPROVED → RETIRED
   - 실제행은 `transaction_attribution.attribution_date` (일 단위)
 - 초년도 판정식은 `계약일 <= 귀속일 < 계약일 + 1년`이다.
 - `attribution_month`는 월별 집계키이며 초년도 경계 판정에 사용하지 않는다.
-- `settlement_month`는 월 명세 묶음 기준이며 초년도 판정일로 사용하지 않는다.
+- `settlement_month`는 실적(발생)월(정착지원금은 모집월)이자 월 명세 묶음 기준이며 초년도 판정일로 사용하지 않는다.
 
 ### 4. 공통비
 

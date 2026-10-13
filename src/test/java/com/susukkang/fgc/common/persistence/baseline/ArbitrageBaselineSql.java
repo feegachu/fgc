@@ -238,7 +238,8 @@ final class ArbitrageBaselineSql {
                         fs.cumulative_paid_premium,
                         fs.surrender_value,
                         fs.surrender_value_type,
-                        fs.refund_rate_table_id AS snapshot_refund_rate_table_id
+                        fs.refund_rate_table_id AS snapshot_refund_rate_table_id,
+                        p.protection_type
                     FROM
                         insurance_contract c
                     JOIN

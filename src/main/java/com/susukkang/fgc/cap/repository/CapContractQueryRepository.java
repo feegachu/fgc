@@ -30,7 +30,8 @@ public interface CapContractQueryRepository extends Repository<InsuranceContract
                 po.channelCode,
                 po.standardDeduction80Yn,
                 p.productId,
-                p.productGroupCode
+                p.productGroupCode,
+                p.protectionType
             )
               FROM InsuranceContract c, ProductOffering po, Product p
              WHERE c.contractId = :contractId
