@@ -196,7 +196,8 @@ function ContractFilters({
   const asOf = today()
   const insurers = useInsurerOptions()
   const organizations = useOrganizationOptions(asOf)
-  const products = useProductOptions(asOf, draft.insurerId)
+  // 과거 계약 검색에는 판매가 종료된 버전도 포함한다. 등록·수정은 기본 조회를 사용한다.
+  const products = useProductOptions(asOf, draft.insurerId, true, true)
   // 과거 계약 검색에서는 해촉·비활동·사용중지 설계사도 선택할 수 있어야 한다.
   const agents = useAgentOptions(asOf, draft.orgId, true, true)
   const set = (key: string, value: string) =>

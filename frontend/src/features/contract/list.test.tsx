@@ -50,16 +50,18 @@ function mount(path = '/contracts', canProcess = true, list?: (url: URL) => unkn
       )
     if (url.pathname.endsWith('/organizations'))
       return envelope(pageData([{ organizationId: 3, organizationCode: 'O', organizationName: '서울' }]))
-    if (url.pathname.endsWith('/products'))
-      return envelope(
-        pageData([
-          {
-            productOfferingId: url.searchParams.get('insurerId') === '1' ? 11 : 22,
-            productName: '종신보험',
-            offeringVersion: 'v1',
-          },
-        ]),
-      )
+    if (url.pathname.endsWith('/products')) {
+      const products = [
+        {
+          productOfferingId: url.searchParams.get('insurerId') === '1' ? 11 : 22,
+          productName: '종신보험',
+          offeringVersion: 'v1',
+        },
+      ]
+      if (url.searchParams.get('insurerId') === '1' && url.searchParams.get('includeExpired') === 'true')
+        products.push({ productOfferingId: 12, productName: '상반기 보험', offeringVersion: '2026-H1-B' })
+      return envelope(pageData(products))
+    }
     if (url.pathname.endsWith('/agents')) {
       const agents = [
         { agentId: 4, agentCode: 'FC4', agentName: '김설계', agentStatus: 'ACTIVE', activeYn: true },
@@ -154,6 +156,36 @@ it('보험사를 바꾸면 이전 상품을 지우고 조회 시 페이지를 �
   expect(router.state.location.search).toContain('insurerId=2')
   expect(router.state.location.search).not.toContain('productOfferingId')
   expect(router.state.location.search).not.toContain('page=')
+})
+
+it('[FGC-FUN-018] 판매 종료 버전을 이름으로 복원·선택하고 검색과 CSV 조건에 유지한다', async () => {
+  const { router, user } = mount('/contracts?insurerId=1&productOfferingId=12&page=2')
+  const expired = await screen.findByRole('option', { name: '상반기 보험 · 2026-H1-B' })
+  const product = screen.getByLabelText('상품') as HTMLSelectElement
+  await waitFor(() => expect(product).toBeEnabled())
+  expect(product).toHaveValue('12')
+  expect(product.selectedOptions[0]).toHaveTextContent('상반기 보험 · 2026-H1-B')
+  expect(screen.queryByRole('option', { name: '선택된 ID: 12' })).toBeNull()
+  const query = new URL(
+    requests.find((path) => path.startsWith('/api/v1/base/products?'))!,
+    'http://localhost',
+  )
+  expect(query.searchParams.get('includeExpired')).toBe('true')
+  await user.selectOptions(product, '11')
+  await user.selectOptions(product, expired)
+  await user.click(screen.getByRole('button', { name: '조회' }))
+  expect(new URLSearchParams(router.state.location.search).get('productOfferingId')).toBe('12')
+  expect(router.state.location.search).not.toContain('page=')
+  await waitFor(() =>
+    expect(
+      requests.some((path) => path.startsWith('/api/v1/contracts?') && path.includes('productOfferingId=12')),
+    ).toBe(true),
+  )
+  await user.click(screen.getByRole('button', { name: 'CSV 내보내기' }))
+  expect(exportCsv).toHaveBeenCalledWith('/api/v1/contracts/export.csv?insurerId=1&productOfferingId=12', {
+    filename: 'contracts.csv',
+    notifyError: false,
+  })
 })
 
 it('과거 계약 검색에서는 해촉·비활동·사용중지 설계사 이름을 선택하고 검색 조건에 전달한다', async () => {

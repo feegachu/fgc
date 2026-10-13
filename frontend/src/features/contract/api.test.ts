@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import type { ReactNode } from 'react'
+import { renderHook, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
-import { getAllBaseOptions } from '../base/api'
+import { getAllBaseOptions, useProductOptions } from '../base/api'
 import {
   contractSchedulesQuery,
   criteriaFromParams,
@@ -80,6 +84,35 @@ describe('contract URL and labels', () => {
 })
 
 describe('contract requests', () => {
+  it('[FGC-FUN-018] separates history/input product caches and keeps the history flag across every option page', async () => {
+    const request = vi.spyOn(apiClient, 'request').mockImplementation(async (path) => {
+      const params = new URL(path, 'http://localhost').searchParams
+      if (params.get('includeExpired') === 'true') {
+        return envelope({ content: [{ productOfferingId: params.get('page') === '1' ? 11 : 12 }], totalPages: 2 })
+      }
+      return envelope({ content: [{ productOfferingId: 11 }], totalPages: 1 })
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children)
+    const { result, unmount } = renderHook(
+      () => ({
+        history: useProductOptions('2026-10-13', '2', true, true),
+        input: useProductOptions('2026-10-13', '2'),
+      }),
+      { wrapper },
+    )
+    await waitFor(() => expect(result.current.history.isSuccess && result.current.input.isSuccess).toBe(true))
+    expect(result.current.history.data).toEqual([{ productOfferingId: 11 }, { productOfferingId: 12 }])
+    expect(result.current.input.data).toEqual([{ productOfferingId: 11 }])
+    const historyPages = request.mock.calls
+      .map(([path]) => new URL(path, 'http://localhost').searchParams)
+      .filter((params) => params.get('includeExpired') === 'true')
+      .map((params) => params.get('page'))
+    expect(historyPages).toEqual(['1', '2'])
+    unmount()
+    client.clear()
+  })
+
   it('keeps optimistic concurrency timestamps intact and rejects malformed success bodies', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({ contractId: 21 }))
     const body: ContractUpdateRequest = {

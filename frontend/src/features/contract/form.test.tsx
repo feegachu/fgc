@@ -122,6 +122,20 @@ afterEach(() => {
 })
 
 describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
+  it('등록·수정용 상품 조회는 계약일을 사용하고 판매 종료 버전 포함을 활성화하지 않는다', async () => {
+    renderAt()
+    await ready()
+    const calls = vi
+      .mocked(apiClient.request)
+      .mock.calls.map(([path]) => new URL(path, 'http://localhost'))
+      .filter((url) => url.pathname === '/api/v1/base/products')
+    expect(calls.length).toBeGreaterThan(0)
+    for (const url of calls) {
+      expect(url.searchParams.get('asOf')).toBe(contract.contractDate)
+      expect(url.searchParams.has('includeExpired')).toBe(false)
+    }
+  })
+
   it('최초 수정 시 저장된 보험료·납입기간·공제액·소속과 마이크로초 토큰을 보존한다', async () => {
     const { user, writes, router } = renderAt()
     await ready()

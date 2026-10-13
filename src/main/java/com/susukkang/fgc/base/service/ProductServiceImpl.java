@@ -41,7 +41,7 @@ public class ProductServiceImpl implements ProductService {
             throw validationException("page");
         }
         Page<ProductResponse> result = productRepository
-                .search(criteria.insurerId(), criteria.asOf(), PageRequest.of(page - 1, size))
+                .search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), PageRequest.of(page - 1, size))
                 .map(ProductResponse::from);
 
         return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), SORT);

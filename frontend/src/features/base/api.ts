@@ -13,6 +13,7 @@ export interface BaseCriteria {
   insurerId?: string
   organizationId?: string
   includeTerminated?: boolean
+  includeExpired?: boolean
   page?: number
   size?: number
 }
@@ -96,10 +97,11 @@ export function useOrganizationOptions(asOf: string, enabled = true) {
     meta: { errorToast: false },
   })
 }
-export function useProductOptions(asOf: string, insurerId: string, enabled = true) {
+export function useProductOptions(asOf: string, insurerId: string, enabled = true, includeExpired = false) {
   return useQuery({
-    queryKey: ['base', 'products', 'options', asOf, insurerId],
-    queryFn: ({ signal }) => getAllBaseOptions('products', { asOf, insurerId }, signal),
+    queryKey: ['base', 'products', 'options', asOf, insurerId, includeExpired],
+    queryFn: ({ signal }) =>
+      getAllBaseOptions('products', { asOf, insurerId, includeExpired: includeExpired || undefined }, signal),
     enabled: enabled && Boolean(asOf && insurerId),
     meta: { errorToast: false },
   })

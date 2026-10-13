@@ -29,7 +29,8 @@ public class ProductController {
 
     @Operation(
             summary = "보험상품 기준정보 조회·선택",
-            description = "보험회사와 기준일자에 해당하는 활성 상품 판매버전을 조회합니다."
+            description = "보험회사와 기준일자에 해당하는 활성 상품 판매버전을 조회합니다. "
+                    + "계약 이력 검색에서 includeExpired=true를 지정하면 기준일 이전에 판매가 종료된 버전도 포함합니다."
     )
     @GetMapping
     @PreAuthorize(Roles.ANY_ROLE)
@@ -41,6 +42,9 @@ public class ProductController {
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate asOf,
+            @Parameter(description = "판매 종료 버전 포함 여부(계약 이력 검색용, 판매시작일은 기준일 이하로 유지)")
+            @RequestParam(defaultValue = "false")
+            boolean includeExpired,
             @Parameter(description = "페이지(1-base)", example = "1")
             @RequestParam(defaultValue = "1")
             int page,
@@ -48,7 +52,7 @@ public class ProductController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        ProductSearchCriteria criteria = new ProductSearchCriteria(insurerId, asOf);
+        ProductSearchCriteria criteria = new ProductSearchCriteria(insurerId, asOf, includeExpired);
         return ApiResponse.success(productService.search(criteria, page, size));
     }
 }
