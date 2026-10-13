@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.util.DisplayFormat;
@@ -34,18 +35,29 @@ public record TransactionPrecheckResponse(
             String paymentStageLabel,
             LocalDate asOfDate,
             long basePremiumAmount,
-            long refund12mAmount,
-            long complianceDeductionAmount,
-            long limitAmount,
-            long existingIncludedAmount,
-            long candidateAmount,
-            long includedAmount,
-            long remainingAmount,
+            @Schema(types = {"integer", "null"})
+            Long refund12mAmount,
+            @Schema(types = {"integer", "null"})
+            Long complianceDeductionAmount,
+            @Schema(types = {"integer", "null"})
+            Long limitAmount,
+            @Schema(types = {"integer", "null"})
+            Long existingIncludedAmount,
+            @Schema(types = {"integer", "null"})
+            Long candidateAmount,
+            @Schema(types = {"integer", "null"})
+            Long includedAmount,
+            @Schema(types = {"integer", "null"})
+            Long remainingAmount,
+            @Schema(types = {"string", "null"})
             String usagePct,
             CapResultStatus resultStatus,
             String resultStatusLabel,
+            @Schema(types = {"integer", "null"})
             Long capRuleSetId,
-            Long capCheckId
+            Long capCheckId,
+            String applicabilityReasonCode,
+            String applicabilityReason
     ) {
         /** 확정 경로와 같은 buildCapCheck 결과를 저장하지 않고 그대로 표시 형식으로 변환한다. */
         public static CapPreviewItem from(
@@ -61,19 +73,21 @@ public record TransactionPrecheckResponse(
                     stage,
                     stage.label(),
                     check.getAsOfDate(),
-                    DisplayFormat.won(check.getBasePremiumAmount()),
-                    DisplayFormat.won(check.getRefund12mAmount()),
-                    DisplayFormat.won(check.getComplianceDeductionAmount()),
-                    DisplayFormat.won(check.getLimitAmount()),
-                    DisplayFormat.won(rule.existingIncludedAmount()),
-                    DisplayFormat.won(check.getCandidateAmount()),
-                    DisplayFormat.won(check.getIncludedAmount()),
-                    DisplayFormat.won(check.getRemainingAmount()),
+                    DisplayFormat.nullableWon(check.getBasePremiumAmount()),
+                    DisplayFormat.nullableWon(check.getRefund12mAmount()),
+                    DisplayFormat.nullableWon(check.getComplianceDeductionAmount()),
+                    DisplayFormat.nullableWon(check.getLimitAmount()),
+                    rule == null ? null : DisplayFormat.nullableWon(rule.existingIncludedAmount()),
+                    DisplayFormat.nullableWon(check.getCandidateAmount()),
+                    DisplayFormat.nullableWon(check.getIncludedAmount()),
+                    DisplayFormat.nullableWon(check.getRemainingAmount()),
                     DisplayFormat.rate(check.getUsagePct()),
                     status,
                     status.label(),
                     check.getCapRuleSetId(),
-                    null
+                    null,
+                    check.getResultStatus() == CapResultStatus.NOT_APPLICABLE ? com.susukkang.fgc.cap.service.CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE : null,
+                    status == CapResultStatus.NOT_APPLICABLE ? check.getDecisionReason() : null
             );
         }
     }

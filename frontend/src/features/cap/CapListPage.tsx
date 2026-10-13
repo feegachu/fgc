@@ -135,7 +135,7 @@ export default function CapListPage() {
           onClick={() => openDetail(row)}
           aria-label={`${row.contractNo || '선택한 계약'} 계산근거 열기`}
         >
-          <Amount value={row.includedAmount} />
+          {row.resultStatus === 'NOT_APPLICABLE' ? '사유 보기' : <Amount value={row.includedAmount} />}
         </Button>
       ),
     },
@@ -177,20 +177,22 @@ export default function CapListPage() {
         onReset={() => update({ ...FILTER_KEYS, month: workspaceMonth ?? '', size: '20' })}
       />
       <div className="cap-react-kpis" aria-busy={list.isFetching}>
-        {Object.entries(STATUSES).map(([code, label]) => (
-          <button
-            key={code}
-            type="button"
-            className={`surface cap-react-kpi cap-react-kpi-${code}`}
-            aria-pressed={criteria.status === code}
-            aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}`}
-            onClick={() => update({ status: criteria.status === code ? '' : code, capCheckId: '' })}
-          >
-            <span>{label}</span>
-            <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
-            <small>건 · {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}</small>
-          </button>
-        ))}
+        {Object.entries(STATUSES)
+          .filter(([code]) => code !== 'NOT_APPLICABLE')
+          .map(([code, label]) => (
+            <button
+              key={code}
+              type="button"
+              className={`surface cap-react-kpi cap-react-kpi-${code}`}
+              aria-pressed={criteria.status === code}
+              aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}`}
+              onClick={() => update({ status: criteria.status === code ? '' : code, capCheckId: '' })}
+            >
+              <span>{label}</span>
+              <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
+              <small>건 · {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}</small>
+            </button>
+          ))}
       </div>
       <section className="surface">
         <header className="surface-header">

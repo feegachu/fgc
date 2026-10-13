@@ -383,7 +383,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                            COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
                       FROM fgc.validation_target
                      WHERE validation_run_id = :validationRunId) vt
-             CROSS JOIN (SELECT COUNT(*)                                                  AS capCheckedCount,
+             CROSS JOIN (SELECT COUNT(*) FILTER (WHERE result_status <> 'NOT_APPLICABLE')    AS capCheckedCount,
                                 COUNT(*) FILTER (WHERE result_status = 'VIOLATION')       AS capViolationCount,
                                 COUNT(*) FILTER (WHERE result_status = 'WARNING')         AS capWarningCount,
                                 COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS capReviewRequiredCount
@@ -463,6 +463,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
               JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
               JOIN fgc.agent ag ON ag.agent_id = ic.agent_id
              WHERE cc.validation_run_id = :validationRunId
+               AND cc.result_status <> 'NOT_APPLICABLE'
              GROUP BY ag.agent_id, ag.agent_name, cc.payment_stage
              ORDER BY ag.agent_id, cc.payment_stage
             """, sqlResultSetMapping = "AgentCapMonitoringRowMapping")

@@ -13,6 +13,7 @@ import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.service.CapApplicabilityPolicy;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.common.code.AgentRankCode;
@@ -215,6 +216,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
+            if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(),
+                        data.attributionDate(), null);
+                CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
+                evaluations.put(new CapGroupKey(data.contractId(), data.paymentStage()),
+                        new CapEvaluation(data, null, calculation, check));
+                continue;
+            }
             CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
                     paymentId,
                     data.transactionAttributionId()
@@ -324,6 +333,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     continue;
                 }
                 if (data.contractId() == null || data.attributedAmount() == null) {
+                    continue;
+                }
+                if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                    CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(),
+                            data.attributionDate(), null);
+                    CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
+                    evaluations.put(new CapGroupKey(data.contractId(), data.paymentStage()),
+                            new CapEvaluation(data, null, calculation, check));
                     continue;
                 }
                 CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -502,6 +519,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         summary.put("usagePct", check.getUsagePct());
         summary.put("limitAmount", check.getLimitAmount());
         summary.put("includedAmount", check.getIncludedAmount());
+        if (check.getResultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            summary.put("applicabilityReasonCode", CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE);
+            summary.put("applicabilityReason", check.getDecisionReason());
+        }
         return summary;
     }
 
@@ -1480,6 +1501,32 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .build();
     }
 
+    private Map<String, Object> notApplicableCandidateSnapshot(ConfirmationData row) {
+        Map<String, Object> candidate = new LinkedHashMap<>();
+        candidate.put("transactionAttributionId", row.transactionAttributionId());
+        candidate.put("attributionDate", row.attributionDate() == null ? null : row.attributionDate().toString());
+        candidate.put("amount", row.attributedAmount() == null ? null : roundedAttributedAmount(row));
+        candidate.put("cashflowType", row.cashflowType());
+        candidate.put("classification", row.inclusionDecisionStatus());
+        candidate.put("reasonCode", CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE);
+        candidate.put("reason", CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE_LABEL);
+        return candidate;
+    }
+
+    private CapCheckCommand buildNotApplicableCheck(ConfirmationData data, CapCalculationResult calculation,
+                                                   List<ConfirmationData> attributions) {
+        Map<String, Object> snapshot = new LinkedHashMap<>(calculation.calculationSnapshot());
+        snapshot.put("candidateAttributions", attributions.stream()
+                .filter(row -> java.util.Objects.equals(row.contractId(), data.contractId())
+                        && row.paymentStage() == data.paymentStage())
+                .map(this::notApplicableCandidateSnapshot).toList());
+        return CapCheckCommand.builder().paymentId(data.paymentId()).contractId(data.contractId())
+                .paymentStage(data.paymentStage().name()).asOfDate(data.attributionDate())
+                .basePremiumAmount(calculation.basePremiumAmount()).resultStatus(CapResultStatus.NOT_APPLICABLE)
+                .decisionReason(CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE_LABEL)
+                .calculationSnapshotJson(json(snapshot)).build();
+    }
+
     private record CapGroupKey(Long contractId, PaymentStage paymentStage) { }
 
     private record CapEvaluation(ConfirmationData data, CapRuleSnapshot rule,
@@ -1489,7 +1536,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private CapEvaluation stricterCapEvaluation(CapEvaluation left, CapEvaluation right) {
         int comparison = Integer.compare(capResultPriority(right.check().getResultStatus()),
                 capResultPriority(left.check().getResultStatus()));
-        if (comparison == 0) comparison = right.check().getUsagePct().compareTo(left.check().getUsagePct());
+        if (comparison == 0 && right.check().getUsagePct() != null && left.check().getUsagePct() != null)
+            comparison = right.check().getUsagePct().compareTo(left.check().getUsagePct());
         if (comparison == 0) comparison = right.check().getAsOfDate().compareTo(left.check().getAsOfDate());
         if (comparison == 0) comparison = Long.compare(left.data().transactionAttributionId(), right.data().transactionAttributionId());
         return comparison > 0 ? right : left;
@@ -1497,7 +1545,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private int capResultPriority(CapResultStatus status) {
         return switch (status) {
-            case NORMAL -> 0;
+            case NORMAL, NOT_APPLICABLE -> 0;
             case WARNING -> 1;
             case VIOLATION -> 2;
             case REVIEW_REQUIRED -> 3;
@@ -1509,10 +1557,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         for (CapEvaluation evaluation : evaluations.values()) {
             CapCheckCommand check = evaluation.check();
             capCheckWriteRepository.insertCapCheck(check);
-            insertCapCheckDetails(check, evaluation.data(), evaluation.calculation(), attributions);
+            if (check.getResultStatus() != CapResultStatus.NOT_APPLICABLE)
+                insertCapCheckDetails(check, evaluation.data(), evaluation.calculation(), attributions);
             capCheckIds.add(check.getCapCheckId());
             capChecks.add(check);
-            capExceptionService.createIfNecessary(capExceptionCommand(evaluation.data(), check));
+            if (check.getResultStatus() != CapResultStatus.NOT_APPLICABLE)
+                capExceptionService.createIfNecessary(capExceptionCommand(evaluation.data(), check));
         }
     }
 

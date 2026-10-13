@@ -5,7 +5,7 @@ import java.math.RoundingMode;
 
 /**
  * cap_check.result_status 의 자바측 표현
- * DB CHECK (result_status IN ('NORMAL','WARNING','VIOLATION','REVIEW_REQUIRED')) 와 반드시 일치해야 함
+ * DB CHECK (result_status IN ('NORMAL','WARNING','VIOLATION','REVIEW_REQUIRED','NOT_APPLICABLE')) 와 반드시 일치해야 함
  *
  * 판정 우선순위(위에서부터 순서대로 확인, 먼저 걸리는 조건이 최종 결과):
  * 1. REVIEW_REQUIRED — 룰셋 미분류 항목이나 환급률표 부재 등 사람 판단이 필요한 경우가 하나라도 있으면 최우선
@@ -18,7 +18,8 @@ public enum CapResultStatus {
     NORMAL,
     WARNING,
     VIOLATION,
-    REVIEW_REQUIRED;
+    REVIEW_REQUIRED,
+    NOT_APPLICABLE;
 
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
@@ -70,6 +71,7 @@ public enum CapResultStatus {
     /** SIR-008: 코드값은 항상 한글 라벨과 함께 응답한다 — 화면이 아니라 서버가 라벨을 만든다. */
     public String label() {
         return switch (this) {
+            case NOT_APPLICABLE -> "적용대상 아님";
             case NORMAL -> "정상";
             case WARNING -> "주의";
             case VIOLATION -> "위반";

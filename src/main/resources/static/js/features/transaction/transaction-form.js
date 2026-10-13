@@ -592,6 +592,11 @@
     heading.appendChild(badge);
     card.appendChild(heading);
 
+    if (preview.resultStatus === "NOT_APPLICABLE") {
+      card.appendChild(textElement("p", preview.applicabilityReason || "적용대상 아님 — 시행 전 계약"));
+      card.appendChild(textElement("p", "사유 코드: " + (preview.applicabilityReasonCode || "—")));
+      return card;
+    }
     var usage = Math.max(0, number(preview.usagePct));
     var progress = document.createElement("progress");
     progress.className = "transaction-cap-progress " + capBarClass(preview.resultStatus);

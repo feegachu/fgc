@@ -58,6 +58,13 @@ public class CapCalculatorImpl implements CapCalculator {
                     null, Map.of(), "contractId=" + command.contractId() + " not found");
         }
 
+        if (CapApplicabilityPolicy.isBeforeEffectiveDate(command.paymentStage(), contract.getContractDate())) {
+            return new CapCalculationResult(command.contractId(), command.paymentStage(), command.checkKind(),
+                    command.asOfDate(), null, null, contract.getMonthlyEquivalentFirstPremium(),
+                    null, null, null, null, null, null, CapResultStatus.NOT_APPLICABLE, List.of(),
+                    CapApplicabilityPolicy.snapshot(command.paymentStage(), contract.getContractDate()));
+        }
+
         // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)
         CapRuleSetView ruleSet = capRuleQueryRepository.findApplicableRuleSet(
                 command.paymentStage().name(), contract.getContractDate(),

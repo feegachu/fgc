@@ -19,6 +19,7 @@ import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.transaction.performance.baseline.PaymentCapCheckJdbcBaseline;
 import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.service.CapApplicabilityPolicy;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.common.code.AgentRankCode;
@@ -211,6 +212,13 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
+            if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                CapCheckCommand check = buildNotApplicableCheck(data);
+                mapper.insertCapCheck(check);
+                capCheckIds.add(check.getCapCheckId());
+                capChecks.add(check);
+                continue;
+            }
             CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
                     paymentId,
                     data.transactionAttributionId()
@@ -327,6 +335,11 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     continue;
                 }
                 if (data.contractId() == null || data.attributedAmount() == null) {
+                    continue;
+                }
+                if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                    previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
+                            buildNotApplicableCheck(data), null, contractNos.get(data.contractId())));
                     continue;
                 }
                 CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
@@ -1395,6 +1408,15 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 .decisionReason(check.getDecisionReason())
                 .evidenceRef(check.getEvidenceRef())
                 .build();
+    }
+
+    private CapCheckCommand buildNotApplicableCheck(ConfirmationData data) {
+        CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(), data.attributionDate(), null);
+        return CapCheckCommand.builder().paymentId(data.paymentId()).contractId(data.contractId())
+                .paymentStage(data.paymentStage().name()).asOfDate(data.attributionDate())
+                .basePremiumAmount(calculation.basePremiumAmount()).resultStatus(CapResultStatus.NOT_APPLICABLE)
+                .decisionReason(CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE_LABEL)
+                .calculationSnapshotJson(json(calculation.calculationSnapshot())).build();
     }
 
     private CapCheckCommand buildCapCheck(

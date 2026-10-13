@@ -1,7 +1,13 @@
 import type { CapStage, CapAgent } from './api'
 
 export const STAGES = { INSURER_TO_GA: '원수사 → GA', GA_TO_FC: 'GA → 설계사' }
-export const STATUSES = { NORMAL: '정상', WARNING: '주의', VIOLATION: '위반', REVIEW_REQUIRED: '검토필요' }
+export const STATUSES = {
+  NORMAL: '정상',
+  WARNING: '주의',
+  VIOLATION: '위반',
+  REVIEW_REQUIRED: '검토필요',
+  NOT_APPLICABLE: '적용대상 아님',
+}
 
 /** 1차 stageStatus: 집계 모니터링 우선순위. 계약별 저장 판정을 재계산하지 않는다. */
 export function monitoringStatus(row: CapStage | CapAgent) {

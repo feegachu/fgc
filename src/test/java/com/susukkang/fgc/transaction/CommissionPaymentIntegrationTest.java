@@ -89,6 +89,37 @@ class CommissionPaymentIntegrationTest {
     private com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository arbitrageCheckRepository;
 
     @Test
+    void preEffectivePaymentPrecheckAndConfirmationPersistReasonWithoutCapPolicy() {
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date = DATE '2026-06-30' WHERE contract_id = 1");
+        CommissionPaymentResponse created = commissionPaymentService.create(
+                request("IT-482-" + UUID.randomUUID(), new BigDecimal("2000000")));
+        long before = jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check", Long.class);
+        TransactionPrecheckResponse preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).singleElement().satisfies(item -> {
+            assertThat(item.resultStatus()).isEqualTo(com.susukkang.fgc.common.code.CapResultStatus.NOT_APPLICABLE);
+            assertThat(item.capRuleSetId()).isNull();
+            assertThat(item.limitAmount()).isNull();
+            assertThat(item.usagePct()).isNull();
+            assertThat(item.applicabilityReasonCode()).isEqualTo("CONTRACT_BEFORE_EFFECTIVE_DATE");
+        });
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check", Long.class)).isEqualTo(before);
+        CommissionPaymentResponse confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-482");
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).hasSize(1);
+        assertThat(jdbcTemplate.queryForMap("SELECT result_status, cap_rule_set_id, limit_amount, usage_pct, "
+                + "calculation_snapshot #>> '{applicability,reasonCode}' AS reason_code FROM fgc.cap_check WHERE cap_check_id=?",
+                confirmed.capCheckIds().getFirst()))
+                .containsEntry("result_status", "NOT_APPLICABLE").containsEntry("cap_rule_set_id", null)
+                .containsEntry("limit_amount", null).containsEntry("usage_pct", null)
+                .containsEntry("reason_code", "CONTRACT_BEFORE_EFFECTIVE_DATE");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check_detail WHERE cap_check_id=?",
+                Long.class, confirmed.capCheckIds().getFirst())).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                Long.class, created.paymentId().toString())).isZero();
+    }
+
+    @Test
     void identicalDraftUpdateStillRunsDatabaseTimestampTrigger() {
         CommissionPaymentCreateRequest request = request("IT-JPA-NOOP-" + UUID.randomUUID());
         CommissionPaymentResponse created = commissionPaymentService.create(request);

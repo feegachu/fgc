@@ -2,7 +2,6 @@ package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.arbitrage.service.ArbitrageCheckBatchItemService;
 import com.susukkang.fgc.cap.service.CapCheckService;
-import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
@@ -31,7 +30,7 @@ import static org.mockito.Mockito.mock;
  * #512 — changedContractStep의 Processor가 해지 계약의 차익거래를 효력일 기준으로 저장하고,
  * 같은 실행으로 다시 돌려도 결과행·예외가 늘지 않는지 실제 PostgreSQL로 확인한다.
  * 시행 전 A1은 적용대상 아님, V45.1의 시행 후 A1은 410,000 초과 후보로 각각 저장한다.
- * A1은 1,200% 룰셋이 없어(CAP_004) 1,200% 점검이 실패하는 계약이라, 그 실패가 차익거래를 막지 않는지도 함께 본다.
+ * #482: 시행 전 계약의 GA→FC는 비대상으로 기록하고 성공한다. 독립적인 차익거래 결과는 그대로 유지한다.
  *
  * 스케줄 재생성은 이 테스트의 관심사가 아니고 시드 계약의 공유 스케줄을 바꾸므로 mock으로 둔다.
  * 차익거래·1,200%는 실제 빈을 쓴다.
@@ -103,10 +102,17 @@ class ChangedContractArbitrageIntegrationTest {
                 "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no=?", Long.class, contractNo);
         ChangedContractResult first = processInChunkTransaction();
 
-        // 두 시연 계약은 2026-07 이전 계약이라 GA→FC 1,200% 룰셋이 없다(CAP_004). 그래도 차익거래는 점검되고,
-        // 결과는 스킵이라 상태 사건은 FAILED로 남는다. 차익거래 자체는 실패하지 않았다.
-        assertThat(first.success()).isFalse();
-        assertThat(first.failureReason()).isEqualTo(FgcErrorCode.CAP_004.getCode() + ": 적용 가능한 1,200% 룰셋이 없습니다.");
+        // #482: 시행 전 계약은 룰셋 누락 오류가 아니다. 비대상 사유를 저장하고 독립 검증도 완료한다.
+        assertThat(first.success()).isTrue();
+        assertThat(first.failureReason()).isNull();
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT result_status, limit_amount,
+                       calculation_snapshot #>> '{applicability,reasonCode}' AS reason_code
+                  FROM fgc.cap_check
+                 WHERE validation_run_id=? AND contract_id=? AND payment_stage='GA_TO_FC'
+                """, validationRunId, contractId))
+                .containsEntry("result_status", "NOT_APPLICABLE").containsEntry("limit_amount", null)
+                .containsEntry("reason_code", "CONTRACT_BEFORE_EFFECTIVE_DATE");
         Map<String, Object> row = jdbcTemplate.queryForMap("""
                 SELECT as_of_date, result_status,
                        (calculation_snapshot ->> 'currentExcessAmount')::numeric AS current_excess
@@ -124,7 +130,11 @@ class ChangedContractArbitrageIntegrationTest {
         // 예외 업무키·실행별 occurrence 멱등 기록 덕분에 행이 늘지 않는다.
         ChangedContractResult second = processInChunkTransaction();
 
+        assertThat(second.success()).isTrue();
         assertThat(second.failureReason()).isEqualTo(first.failureReason());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check "
+                + "WHERE validation_run_id=? AND contract_id=? AND payment_stage='GA_TO_FC'", Integer.class,
+                validationRunId, contractId)).isEqualTo(1);
         assertThat(arbitrageRows()).isEqualTo(1);
         assertThat(candidateCases()).isEqualTo(candidates);
         assertThat(candidateOccurrences()).isEqualTo(candidates);

@@ -1749,24 +1749,24 @@ export interface components {
                 [key: string]: unknown;
             };
             /** Format: int64 */
-            capRuleSetId?: number;
+            capRuleSetId?: number | null;
             /** @enum {string} */
             checkKind?: "REALTIME" | "MANUAL" | "MONTHLY" | "PRE_CONFIRM";
-            complianceDeductionAmount?: number;
+            complianceDeductionAmount?: number | null;
             /** Format: int64 */
             contractId?: number;
             details?: components["schemas"]["CapCheckDetailLine"][];
-            includedAmount?: number;
-            limitAmount?: number;
+            includedAmount?: number | null;
+            limitAmount?: number | null;
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
-            refund12mAmount?: number;
+            refund12mAmount?: number | null;
             /** Format: int64 */
             refundRateTableId?: number;
-            remainingAmount?: number;
+            remainingAmount?: number | null;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
-            usagePct?: number;
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            usagePct?: number | null;
         };
         CapCheckBasisResponse: {
             calculationSnapshot?: {
@@ -1810,27 +1810,27 @@ export interface components {
             /** Format: int64 */
             capCheckId?: number;
             /** Format: int64 */
-            capRuleSetId?: number;
+            capRuleSetId?: number | null;
             /** Format: int64 */
-            complianceDeductionAmount?: number;
+            complianceDeductionAmount?: number | null;
             /** Format: int64 */
             contractId?: number;
             contractNo?: string;
             /** Format: int64 */
-            includedAmount?: number;
+            includedAmount?: number | null;
             /** Format: int64 */
-            limitAmount?: number;
+            limitAmount?: number | null;
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             paymentStageLabel?: string;
             /** Format: int64 */
-            refund12mAmount?: number;
+            refund12mAmount?: number | null;
             /** Format: int64 */
-            remainingAmount?: number;
+            remainingAmount?: number | null;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
-            usagePct?: string;
+            usagePct?: string | null;
         };
         CapCheckSaveResult: {
             /** Format: int64 */
@@ -1863,38 +1863,40 @@ export interface components {
             warning?: number;
         };
         CapPreviewItem: {
+            applicabilityReason?: string;
+            applicabilityReasonCode?: string;
             /** Format: date */
             asOfDate?: string;
             /** Format: int64 */
             basePremiumAmount?: number;
             /** Format: int64 */
-            candidateAmount?: number;
+            candidateAmount?: number | null;
             /** Format: int64 */
             capCheckId?: number;
             /** Format: int64 */
-            capRuleSetId?: number;
+            capRuleSetId?: number | null;
             /** Format: int64 */
-            complianceDeductionAmount?: number;
+            complianceDeductionAmount?: number | null;
             /** Format: int64 */
             contractId?: number;
             contractNo?: string;
             /** Format: int64 */
-            existingIncludedAmount?: number;
+            existingIncludedAmount?: number | null;
             /** Format: int64 */
-            includedAmount?: number;
+            includedAmount?: number | null;
             /** Format: int64 */
-            limitAmount?: number;
+            limitAmount?: number | null;
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             paymentStageLabel?: string;
             /** Format: int64 */
-            refund12mAmount?: number;
+            refund12mAmount?: number | null;
             /** Format: int64 */
-            remainingAmount?: number;
+            remainingAmount?: number | null;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
-            usagePct?: string;
+            usagePct?: string | null;
         };
         /** @description 1,200% 룰셋 항목별 산입 판정 */
         CapRuleItemResponse: {
@@ -2347,8 +2349,6 @@ export interface components {
             contractStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             /** @enum {string} */
             dataOrigin?: "SEED" | "NORMALIZED_DB" | "MANUAL";
-            /** Format: date-time */
-            updatedAt?: string;
             firstPremiumAmount?: number;
             /** Format: int64 */
             insurerId?: number;
@@ -2367,6 +2367,8 @@ export interface components {
             /** Format: int64 */
             productOfferingId?: number;
             standardSurrenderDeductionAmount?: number;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         ContractJournalLineResponse: {
             accountCode?: string;
@@ -2434,7 +2436,7 @@ export interface components {
             /** Format: int64 */
             agentId?: number;
             /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: date */
             contractDateFrom?: string;
             /** Format: date */
@@ -2536,7 +2538,7 @@ export interface components {
         ContractView: {
             agentIdName?: string;
             /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: date */
             contractDate?: string;
             /** Format: int64 */
@@ -4272,7 +4274,7 @@ export interface operations {
                 /** @description 지급단계 */
                 stage?: "INSURER_TO_GA" | "GA_TO_FC";
                 /** @description 판정 */
-                status?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+                status?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
                 /** @description 보험회사 ID */
                 insurerId?: number;
                 /** @description 계약 소속 조직 ID */
@@ -5746,6 +5748,24 @@ export interface operations {
         responses: {
             /** @description 조회 성공 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ActiveMonthlyRunResponse"];
+                };
+            };
+            /** @description month 누락 또는 형식(yyyy-MM) 오류 (FGC-COMMON-002) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
+                };
+            };
+            /** @description 인증되지 않은 요청 */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
