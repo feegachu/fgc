@@ -10,6 +10,7 @@
 --   schedule_header.schedule_regime   'TM_SPECIAL' 제거 (V1 인라인 CHECK)
 --   transaction_attribution            'VOICE_RECORDING'·'BROADCAST' 제거 (V10 ck_attribution_exclusion_type)
 --   product_offering                   channel_special_rule_yn 컬럼 삭제 (TM·방송 특례 여부 플래그)
+--   product·product_offering 테이블 주석  V1 의 "채널별 적용체계" 문구 교체 — 판매채널은 판정 기준이 아니다
 --
 -- 기존 행이 지운 값을 쓰고 있으면 ADD CONSTRAINT 가 실패한다. 조용히 바꾸지 않는다.
 -- 데모 DB 의 TM 시드는 V48(db/demo)이 먼저 지운다.
@@ -25,3 +26,6 @@ ALTER TABLE transaction_attribution ADD CONSTRAINT ck_attribution_exclusion_type
            OR exclusion_type_snapshot IN ('NEW_AGENT_SUPPORT', 'COMPLIANCE_3PCT'));
 
 ALTER TABLE product_offering DROP COLUMN channel_special_rule_yn;
+
+COMMENT ON TABLE product IS '보험상품의 안정적인 식별자. 판매버전별 적용체계는 product_offering에서 관리';
+COMMENT ON TABLE product_offering IS '상품 판매개시일·기초서류 버전·판매채널·적용 수수료체계. REG-19 적용체계는 판매개시일·기초서류·수수료체계로 판정(판매채널은 대면 하나, SRC-036)';
