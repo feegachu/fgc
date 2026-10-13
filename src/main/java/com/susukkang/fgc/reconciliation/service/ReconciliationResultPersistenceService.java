@@ -82,6 +82,7 @@ public class ReconciliationResultPersistenceService {
                 .sorted()
                 .toList();
         ReconciliationClassificationContext context = reconciliationResultRepository.findClassificationContext(
+                request.validationRunId(),
                 candidate.contractId(),
                 candidate.expectedAgentId(),
                 candidate.actualAgentId(),
