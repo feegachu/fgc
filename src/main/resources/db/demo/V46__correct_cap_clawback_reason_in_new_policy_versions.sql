@@ -1,6 +1,15 @@
 -- #478: ACTIVE 정책 자식은 수정하지 않는다. 각 현행 CAP 정책의 새 승인 버전으로 정정한다.
 -- 기존 룰셋·귀속 스냅샷·검증 이력은 보존하며, 다음 재검증부터 새 버전을 조회한다.
 SET search_path TO fgc, public;
+-- 중복 활성 버전은 임의 선택/복제하지 않는다. Flyway 트랜잭션 전체를 중단한다.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM policy_version WHERE policy_type='CAP_1200' AND status='ACTIVE'
+               GROUP BY policy_code HAVING COUNT(*) > 1) THEN
+        RAISE EXCEPTION '#478: duplicate ACTIVE CAP policy versions; resolve policy approval before migration';
+    END IF;
+END;
+$$;
 CREATE TEMP TABLE cap478_versions(old_id bigint, new_id bigint) ON COMMIT DROP;
 WITH created AS (
     INSERT INTO policy_version(policy_code,policy_name,policy_type,source_class,version_no,
