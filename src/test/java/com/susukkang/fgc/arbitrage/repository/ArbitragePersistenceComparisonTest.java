@@ -42,6 +42,7 @@ class ArbitragePersistenceComparisonTest {
     @Autowired com.susukkang.fgc.validation.repository.ValidationRunRepository oldRunMapper;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     @Autowired com.susukkang.fgc.audit.service.AuditLogService auditLogService;
+    @Autowired com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService applicabilityPolicyService;
     private ArbitrageJdbcBaseline baseline;
 
     @BeforeEach
@@ -168,7 +169,7 @@ class ArbitragePersistenceComparisonTest {
         var row = row(insertRun(), contractId, date);
         compare("upsert", () -> baseline.insertArbitrageCheck(row), () -> repository.insertArbitrageCheck(row), 1);
         var oldService = new com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineService(
-                baseline, createService, oldRunMapper, exceptionRepository, objectMapper, auditLogService);
+                baseline, createService, oldRunMapper, exceptionRepository, objectMapper, auditLogService, applicabilityPolicyService);
         Long batchRunId = insertRun();
         Supplier<?> oldBatch = () -> oldService.checkInExistingRun(batchRunId, contractId, date);
         Supplier<?> newBatch = () -> service.checkInExistingRun(batchRunId, contractId, date);
