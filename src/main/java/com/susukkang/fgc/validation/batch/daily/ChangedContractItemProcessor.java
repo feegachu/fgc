@@ -6,6 +6,7 @@ import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.ContractStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
@@ -82,6 +83,7 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
             // 한쪽 실패가 다른 쪽을 막지 않는 것(CapCheckBatchAdapter·ArbitrageCheckBatchAdapter)과 같게,
             // 1,200% 룰셋이 없는 계약(CAP_004, 2026-07 이전 계약)도 차익거래는 점검한다(#512).
             // 어느 한쪽이라도 실패하면 스킵으로 돌려 상태 사건을 FAILED로 남긴다(다음 날 Reader가 다시 잡는다).
+            // 단, CAP_004(룰셋 없음)는 실패가 아니다(#522, 아래 단계 루프 참고).
             List<String> failures = new ArrayList<>();
             LocalDate asOfDate = LocalDate.now(DateUtil.SEOUL_ZONE);
             // 순서 주의: 차익거래를 1,200%보다 먼저 부른다. 1,200%(CapCheckServiceImpl)는 이 청크 트랜잭션에서
@@ -94,13 +96,23 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
             } catch (FgcBusinessException e) {
                 failures.add(describe(e));
             }
-            try {
-                for (PaymentStage paymentStage : PaymentStage.values()) {
+            for (PaymentStage paymentStage : PaymentStage.values()) {
+                try {
                     capCheckService.calculateAndSave(
                             CapCalculationCommand.dailyBatch(contractId, paymentStage, asOfDate, validationRunId));
+                } catch (FgcBusinessException e) {
+                    if (e.getErrorCode() != FgcErrorCode.CAP_004) {
+                        failures.add(describe(e));
+                        continue;
+                    }
+                    // 룰셋 없음은 그 단계가 1,200% 대상이 아니라는 판정이다(예: 2026-07 이전 계약의 GA→FC,
+                    // REG-09 ①⑤ 2026.7.1·REG-19 계약일 기준). 실패로 돌리면 사건이 FAILED로 남아 매일
+                    // 재처리되므로(#522), 계약 저장 경로(ContractServiceImpl)처럼 검토 큐에만 남긴다.
+                    // 검토 건은 계약·단계·유형 업무키 UPSERT라 다시 처리돼도 한 건으로 유지된다.
+                    // calculateAndSave가 noRollbackFor라 청크 트랜잭션은 rollback-only가 되지 않는다.
+                    scheduleService.registerCapRuleReview(contractId, paymentStage,
+                            e.getDetail() == null ? "적용 가능한 1,200% 룰셋이 없습니다." : e.getDetail());
                 }
-            } catch (FgcBusinessException e) {
-                failures.add(describe(e));
             }
 
             return failures.isEmpty()
