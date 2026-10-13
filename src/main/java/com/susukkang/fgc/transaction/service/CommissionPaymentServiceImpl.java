@@ -189,7 +189,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -209,6 +209,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // 개선: 귀속행별 정책·한도·증빙 공제를 계산하고 하나라도 실패하면 확정을 차단
         for (ConfirmationData data : attributions) {
             failFirst(attributionFailures(data));
+            // #478: CLAWBACK만 비적용이다. 미분류 RECOVERY 등 다른 차감 항목의 분류 검사는 유지한다.
+            if (isClawback(data)) continue;
             if (isNonContractNewcomerAttribution(data)) {
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
@@ -297,7 +299,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -313,6 +315,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ));
             for (ConfirmationData data : attributions) {
                 failures.addAll(attributionFailures(data));
+                if (isClawback(data)) continue;
                 if (isNonContractNewcomerAttribution(data)) {
                     GateFailure newcomerFailure = newcomerSupportEligibilityFailure(data);
                     if (newcomerFailure != null) {
@@ -1264,6 +1267,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return failures;
     }
 
+    private boolean isClawback(ConfirmationData data) {
+        return "DEDUCTION".equals(data.cashflowType()) && "CLAWBACK".equals(data.itemCode());
+    }
+
     private boolean isNonContractNewcomerAttribution(ConfirmationData data) {
         return data.contractId() == null
                 && data.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT;
@@ -1369,12 +1376,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         .commissionItemId(candidate.commissionItemId()).itemCode(candidate.itemCode())
                         .itemName(candidate.itemName()).transactionAttributionId(candidate.transactionAttributionId())
                         .classificationSnapshot(candidate.inclusionDecisionStatus().name())
-                        .amount(signedAttributedAmount(candidate))
+                        .amount(roundedAttributedAmount(candidate))
                         .decisionReason(candidate.inclusionDecisionReason()).evidenceRef(candidate.evidenceRef())
                         .build());
             }
         } else if (actualSum.compareTo(check.getIncludedAmount()) == 0) {
-            // 상세 금액은 음수를 허용하지 않으므로 차감이 있는 실제 판정은 순산입액으로 설명한다.
+            // 상세행을 재현할 수 없는 기존 데이터는 지급 누계 한 행으로 설명한다.
             rows.add(netActualDetailRow(check));
         } else {
             for (CapCheckDetailLine d : calculation.details()) {
@@ -1421,7 +1428,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .capCheckId(check.getCapCheckId()).detailSeq(1)
                 .commissionItemId(check.getCommissionItemId()).itemCode(check.getItemCode()).itemName(check.getItemName())
                 .classificationSnapshot("INCLUDED").amount(check.getIncludedAmount())
-                .decisionReason("기존 확정액과 계약별 지급·차감 합계의 순산입액. 부호와 귀속행은 계산 스냅샷 참조")
+                .decisionReason("기존 확정 지급액과 현재 지급 후보의 총 산입액. 환수는 포함하지 않으며 귀속행은 계산 스냅샷 참조")
                 .build();
     }
 
@@ -1439,7 +1446,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         snapshot.put("candidateAttributions", currentPeriodAttributions(attributions, data).stream()
                 .map(row -> Map.of("transactionAttributionId", row.transactionAttributionId(),
                         "classification", row.inclusionDecisionStatus().name(),
-                        "signedAmount", signedAttributedAmount(row))).toList());
+                        "signedAmount", roundedAttributedAmount(row))).toList());
         snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
                 .add(result.candidateIncludedAmount()));
         snapshot.put("effectiveIncludedAmount", result.includedAmount());
@@ -1521,18 +1528,18 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private List<ConfirmationData> currentIncludedAttributions(List<ConfirmationData> attributions, ConfirmationData data) {
         return currentPeriodAttributions(attributions, data).stream()
+                .filter(row -> "PAYMENT".equals(row.cashflowType()))
                 .filter(row -> row.inclusionDecisionStatus() == InclusionDecisionStatus.INCLUDED)
                 .toList();
     }
 
     private BigDecimal currentIncludedAmount(List<ConfirmationData> attributions, ConfirmationData data) {
         return currentIncludedAttributions(attributions, data).stream()
-                .map(this::signedAttributedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map(this::roundedAttributedAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private BigDecimal signedAttributedAmount(ConfirmationData data) {
-        BigDecimal amount = MoneyUtil.roundWon(data.attributedAmount());
-        return "DEDUCTION".equals(data.cashflowType()) ? amount.negate() : amount;
+    private BigDecimal roundedAttributedAmount(ConfirmationData data) {
+        return MoneyUtil.roundWon(data.attributedAmount());
     }
 
     /**

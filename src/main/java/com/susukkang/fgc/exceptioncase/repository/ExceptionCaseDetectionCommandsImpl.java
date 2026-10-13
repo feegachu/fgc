@@ -65,6 +65,7 @@ public class ExceptionCaseDetectionCommandsImpl implements ExceptionCaseDetectio
                 WHEN CAST(:exceptionType AS varchar) = 'REFUND_TABLE_MISSING' THEN 'REFUND_TABLE_MISSING'
                 WHEN CAST(:exceptionType AS varchar) = 'PRODUCT_CODE_MISMATCH' THEN 'PRODUCT_CODE_MISMATCH'
                 WHEN CAST(:exceptionType AS varchar) = 'POLICY_DUPLICATE' THEN 'POLICY_DUPLICATE'
+                WHEN CAST(:exceptionType AS varchar) = 'POLICY_MISSING' THEN 'POLICY_MISSING'
                 WHEN CAST(:description AS varchar) LIKE '%금융 스냅샷이 없습니다%' THEN 'FINANCIAL_SNAPSHOT_MISSING'
                 ELSE 'ARBITRAGE_DATA_REVIEW_REQUIRED'
                 END),
@@ -73,6 +74,7 @@ public class ExceptionCaseDetectionCommandsImpl implements ExceptionCaseDetectio
                 WHEN CAST(:exceptionType AS varchar) = 'REFUND_TABLE_MISSING' THEN 'REFUND_TABLE_MISSING'
                 WHEN CAST(:exceptionType AS varchar) = 'PRODUCT_CODE_MISMATCH' THEN 'PRODUCT_CODE_MISMATCH'
                 WHEN CAST(:exceptionType AS varchar) = 'POLICY_DUPLICATE' THEN 'POLICY_DUPLICATE'
+                WHEN CAST(:exceptionType AS varchar) = 'POLICY_MISSING' THEN 'POLICY_MISSING'
                 WHEN CAST(:description AS varchar) LIKE '%금융 스냅샷이 없습니다%' THEN 'FINANCIAL_SNAPSHOT_MISSING'
                 ELSE 'ARBITRAGE_DATA_REVIEW_REQUIRED'
                 END,
