@@ -12,7 +12,7 @@ import java.sql.DriverManager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** V49(SRC-036): 지운 값을 쓰는 행이 있으면 실패하고, 적용 뒤에는 지운 값을 거부한다. */
+/** 데모 V49·V50(SRC-036): 지운 값을 쓰는 행이 있으면 실패하고, 적용 뒤에는 지운 값을 거부한다. */
 class TmChannelRemovalMigrationIntegrationTest {
     private static final String URL = "jdbc:tc:postgresql:17:///fgc_tm_removal_migration";
 
@@ -21,6 +21,17 @@ class TmChannelRemovalMigrationIntegrationTest {
         try (var connection = DriverManager.getConnection(URL, "fgc", "fgc_test_only")) {
             migrate("48");
             JdbcTemplate jdbc = new JdbcTemplate(new SingleConnectionDataSource(connection, true));
+
+            jdbc.update("""
+                    INSERT INTO fgc.product_offering (product_id, offering_version, sales_start_date,
+                        basic_document_version, basic_document_date, channel_code, fee_regime_code)
+                    SELECT product_id, 'TM-REMOVAL-TEST', DATE '2026-01-01', 'BD-TEST', DATE '2026-01-01', 'TM', 'CURRENT'
+                      FROM fgc.product WHERE standard_product_code = 'STD-TERM-A'
+                    """);
+            assertThatThrownBy(() -> migrate("49")).isInstanceOf(FlywayException.class)
+                    .hasMessageContaining("시드 밖 TM 판매버전");
+            jdbc.update("DELETE FROM fgc.product_offering WHERE offering_version = 'TM-REMOVAL-TEST'");
+            migrate("49");
 
             Long headerId = insertScheduleHeader(jdbc, "TM_SPECIAL");
             assertThatThrownBy(() -> migrate(null)).isInstanceOf(FlywayException.class)
