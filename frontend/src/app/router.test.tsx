@@ -11,6 +11,16 @@ import { screens } from './screens'
 import { queryClient } from './queryClient'
 import { subscribeApiErrors } from '../lib/api/errorNotifications'
 import { useAuthStore } from '../stores/auth'
+import { TransitionPage } from './TransitionPage'
+
+// 셸·기존 링크 계약은 업무 화면의 React 전환 여부와 독립적으로 검증한다.
+vi.mock('../features/validation/ValidationRunListPage', () => ({
+  default: () => <TransitionPage screen={screens.find((item) => item.id === 'VRUN-W01')!} />,
+}))
+vi.mock('../features/validation/ValidationRunDetailPage', () => ({
+  default: () => <TransitionPage screen={screens.find((item) => item.id === 'VRUN-W02')!} />,
+}))
+
 beforeEach(() => {
   useAuthStore.setState({ accessToken: 'shell-fixture', loggingOut: false })
   useWorkspaceStore.getState().clear()
