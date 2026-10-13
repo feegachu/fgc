@@ -29,6 +29,7 @@ const pages: Record<string, ComponentType> = {
   '/validation-runs/:id': lazy(() => import('../features/validation/ValidationRunDetailPage')),
   '/schedules': lazy(() => import('../features/schedule/ScheduleListPage')),
   '/schedules/:id': lazy(() => import('../features/schedule/ScheduleDetailPage')),
+  '/reconciliations': lazy(() => import('../features/reconciliation/ReconciliationPage')),
 }
 export const screenRoutes: RouteObject[] = screens.map((screen) => {
   const Page = pages[screen.path]
