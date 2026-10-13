@@ -1036,7 +1036,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED" ],
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           }
         },
@@ -1049,6 +1049,10 @@
             "type" : "integer"
           },
           "clearCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "notApplicableCount" : {
             "format" : "int64",
             "type" : "integer"
           },
@@ -1113,7 +1117,7 @@
             "type" : "boolean"
           },
           "resultStatus" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED" ],
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "resultStatusLabel" : {
@@ -1437,7 +1441,7 @@
             "type" : "number"
           },
           "resultStatus" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED" ],
+            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "usagePct" : {
@@ -1584,7 +1588,7 @@
             "type" : "integer"
           },
           "resultStatus" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED" ],
+            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "resultStatusLabel" : {
@@ -1735,7 +1739,7 @@
             "type" : "integer"
           },
           "resultStatus" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED" ],
+            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "resultStatusLabel" : {
@@ -2815,7 +2819,7 @@
             "type" : "integer"
           },
           "capResultStatus" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED" ],
+            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "contractDateFrom" : {
@@ -3085,7 +3089,7 @@
             "type" : "string"
           },
           "capResultStatus" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED" ],
+            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "contractDate" : {
@@ -4998,7 +5002,7 @@
             "type" : "integer"
           },
           "resultStatus" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED" ],
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "validationRunId" : {
@@ -6606,7 +6610,7 @@
           "name" : "status",
           "required" : false,
           "schema" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED" ],
+            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           }
         }, {

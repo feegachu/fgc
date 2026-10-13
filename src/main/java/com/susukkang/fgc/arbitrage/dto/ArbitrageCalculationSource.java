@@ -35,4 +35,5 @@ public class ArbitrageCalculationSource {
     private Integer financialSnapshotVersion; // 동일 업무 기준일·유형의 버전
     private Long previousFinancialSnapshotId; // 직전 정정 버전 ID
     private String financialSnapshotSourceRef; // 실제/시드/수기 합성 출처
+    private String protectionType; // 상품 보장성 구분(product.protection_type) — 보장성이 아니면 차익거래 규제 대상이 아니다
 }

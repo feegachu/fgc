@@ -278,6 +278,16 @@ final class CommissionPaymentSql {
              LIMIT 1
             """;
 
+    static final String FIND_PROTECTION_TYPE = """
+            SELECT p.protection_type
+              FROM fgc.insurance_contract c
+              JOIN fgc.product_offering po
+                ON po.product_offering_id = c.product_offering_id
+              JOIN fgc.product p
+                ON p.product_id = po.product_id
+             WHERE c.contract_id = :contractId
+            """;
+
     static final String EXISTS_APPLICABLE_CAP_RULE_SET = """
             SELECT EXISTS (
                 SELECT 1

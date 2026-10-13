@@ -24,6 +24,7 @@ import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.code.ProtectionType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.FgcMessageResolver;
@@ -215,6 +216,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
+            if (isOutsideCapScope(data)) {
+                continue;
+            }
             CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
                     paymentId,
                     data.transactionAttributionId()
@@ -324,6 +328,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     continue;
                 }
                 if (data.contractId() == null || data.attributedAmount() == null) {
+                    continue;
+                }
+                if (isOutsideCapScope(data)) {
                     continue;
                 }
                 CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -1206,7 +1213,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     Map.of()
             ));
         }
-        if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
+        // 2026-10-13 #477 - 산입 분류(1,200%) 검토필요는 규제 대상 계약에만 걸린다.
+        // 보장성이 아닌 계약은 한도 판정 대상이 아니므로 분류 때문에 확정을 막지 않는다.
+        // 귀속금액·계약일·배부근거 같은 별도 검사는 그대로 유지한다.
+        if ((data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED && !isOutsideCapScope(data))
                 || (data.contractId() == null && !nonContractNewcomer)) {
             failures.add(new GateFailure(
                     data,
@@ -1432,6 +1442,15 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .build();
     }
 
+    // 2026-10-13 #477 - 보장성보험이 아닌 계약은 1,200% 규제 대상이 아니다 (감독규정 제4-32조⑤, FAQ 2차 Q11)
+    // 기존 코드: protection_type 을 읽지 않아 저축성·일반손해·자동차 계약 귀속도 한도 판정에 걸렸다.
+    // 문제: 규정상 한도가 없는 계약의 지급확정이 한도 위반으로 막힐 수 있었다.
+    // 개선: 룰셋 조회 앞에서 거른다. 확정과 사전검증이 같은 메서드를 써서 판정이 갈리지 않는다.
+    private boolean isOutsideCapScope(ConfirmationData data) {
+        return data.contractId() != null
+                && !ProtectionType.isRegulated(queryRepository.findProtectionType(data.contractId()));
+    }
+
     private CapCheckCommand buildCapCheck(
             ConfirmationData data,
             CapRuleSnapshot rule,
@@ -1501,6 +1520,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             case WARNING -> 1;
             case VIOLATION -> 2;
             case REVIEW_REQUIRED -> 3;
+            case NOT_APPLICABLE -> -1;
         };
     }
 

@@ -1556,13 +1556,15 @@ export interface components {
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
-            status?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            status?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
         };
         ArbitrageCheckSummary: {
             /** Format: int64 */
             candidateCount?: number;
             /** Format: int64 */
             clearCount?: number;
+            /** Format: int64 */
+            notApplicableCount?: number;
             /** Format: int64 */
             reviewRequiredCount?: number;
             /** Format: int64 */
@@ -1589,7 +1591,7 @@ export interface components {
             plannedCommissionAmount?: number;
             refundAdditionAppliedYn?: boolean;
             /** @enum {string} */
-            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
             /** @enum {string} */
             surrenderValueSourceType?: "ACTUAL" | "EXPECTED_TABLE" | "NOT_APPLICABLE";
@@ -1765,7 +1767,7 @@ export interface components {
             refundRateTableId?: number;
             remainingAmount?: number;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             usagePct?: number;
         };
         CapCheckBasisResponse: {
@@ -1828,7 +1830,7 @@ export interface components {
             /** Format: int64 */
             remainingAmount?: number;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
             usagePct?: string;
         };
@@ -1892,7 +1894,7 @@ export interface components {
             /** Format: int64 */
             remainingAmount?: number;
             /** @enum {string} */
-            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
             usagePct?: string;
         };
@@ -2434,7 +2436,7 @@ export interface components {
             /** Format: int64 */
             agentId?: number;
             /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: date */
             contractDateFrom?: string;
             /** Format: date */
@@ -2536,7 +2538,7 @@ export interface components {
         ContractView: {
             agentIdName?: string;
             /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: date */
             contractDate?: string;
             /** Format: int64 */
@@ -3429,7 +3431,7 @@ export interface components {
             /** Format: int64 */
             arbitrageCheckId?: number;
             /** @enum {string} */
-            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: int64 */
             validationRunId?: number;
         };
@@ -4272,7 +4274,7 @@ export interface operations {
                 /** @description 지급단계 */
                 stage?: "INSURER_TO_GA" | "GA_TO_FC";
                 /** @description 판정 */
-                status?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED";
+                status?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
                 /** @description 보험회사 ID */
                 insurerId?: number;
                 /** @description 계약 소속 조직 ID */

@@ -383,13 +383,13 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                            COUNT(*) FILTER (WHERE selection_status = 'REVIEW_REQUIRED') AS targetReviewRequiredCount
                       FROM fgc.validation_target
                      WHERE validation_run_id = :validationRunId) vt
-             CROSS JOIN (SELECT COUNT(*)                                                  AS capCheckedCount,
+             CROSS JOIN (SELECT COUNT(*) FILTER (WHERE result_status <> 'NOT_APPLICABLE')   AS capCheckedCount,
                                 COUNT(*) FILTER (WHERE result_status = 'VIOLATION')       AS capViolationCount,
                                 COUNT(*) FILTER (WHERE result_status = 'WARNING')         AS capWarningCount,
                                 COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS capReviewRequiredCount
                            FROM fgc.cap_check
                           WHERE validation_run_id = :validationRunId) cc
-             CROSS JOIN (SELECT COUNT(*)                                                  AS arbitrageCheckedCount,
+             CROSS JOIN (SELECT COUNT(*) FILTER (WHERE result_status <> 'NOT_APPLICABLE')   AS arbitrageCheckedCount,
                                 COUNT(*) FILTER (WHERE result_status = 'CANDIDATE')       AS arbitrageCandidateCount,
                                 COUNT(*) FILTER (WHERE result_status = 'REVIEW_REQUIRED') AS arbitrageReviewRequiredCount
                            FROM fgc.arbitrage_check
@@ -455,7 +455,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
             SELECT ag.agent_id                                                    AS agentId,
                    ag.agent_name                                                  AS agentName,
                    cc.payment_stage                                               AS paymentStage,
-                   COUNT(*)                                                       AS checkedCount,
+                   COUNT(*) FILTER (WHERE cc.result_status <> 'NOT_APPLICABLE')    AS checkedCount,
                    COUNT(*) FILTER (WHERE cc.result_status = 'VIOLATION')         AS violationCount,
                    COUNT(*) FILTER (WHERE cc.result_status = 'WARNING')           AS warningCount,
                    COUNT(*) FILTER (WHERE cc.result_status = 'REVIEW_REQUIRED')   AS reviewRequiredCount
