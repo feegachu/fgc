@@ -1,0 +1,97 @@
+import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import { apiClient } from '../../lib/api/client'
+import type { components } from '../../lib/api/schema'
+import { safeRedirect } from '../../lib/api/redirect'
+import { JOURNAL_STATUS, JOURNAL_TYPE } from './labels'
+
+type Schemas = components['schemas']
+export type Journal = Schemas['JournalItemResponse']
+export type JournalDetail = Schemas['JournalDetailResponse']
+export type JournalLine = Schemas['JournalDetailLineResponse']
+export type JournalSearch = Schemas['JournalSearchResponse']
+export const PAGE_SIZE = 20
+export const FILTER_KEYS = {
+  from: '',
+  to: '',
+  type: '',
+  account: '',
+  contract: '',
+  status: '',
+  searched: '',
+  selected: '',
+  page: '',
+}
+export function positiveId(value: string | null) {
+  return value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? value : ''
+}
+function validDate(value: string | null) {
+  return value &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(value)) &&
+    new Date(value).toISOString().slice(0, 10) === value
+    ? value
+    : ''
+}
+export function criteriaFromParams(params: URLSearchParams) {
+  const type = params.get('type') ?? ''
+  const status = params.get('status') ?? ''
+  return {
+    from: validDate(params.get('from')),
+    to: validDate(params.get('to')),
+    type: Object.hasOwn(JOURNAL_TYPE, type) ? type : '',
+    account: params.get('account')?.trim() ?? '',
+    contract: positiveId(params.get('contract')),
+    status: Object.hasOwn(JOURNAL_STATUS, status) ? status : '',
+    page: Number(positiveId(params.get('page')) || 1),
+  }
+}
+export type JournalCriteria = ReturnType<typeof criteriaFromParams>
+export async function get<T>(path: string, signal?: AbortSignal) {
+  const { data } = await apiClient.request<T>(path, { signal })
+  if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  return data
+}
+export const journalSearchQuery = (criteria: JournalCriteria, searched: boolean) =>
+  queryOptions({
+    queryKey: ['journals', 'search', criteria],
+    queryFn: ({ signal }) => {
+      const query = new URLSearchParams({ page: String(criteria.page), size: String(PAGE_SIZE) })
+      Object.entries(criteria).forEach(([key, value]) => {
+        if (key !== 'page' && value) query.set(key, String(value))
+      })
+      return get<JournalSearch>(`/api/v1/journals?${query}`, signal)
+    },
+    enabled: searched,
+    placeholderData: keepPreviousData,
+    meta: { errorToast: false },
+  })
+export const imbalanceQuery = (id?: number) =>
+  queryOptions({
+    queryKey: ['journals', 'imbalances', id],
+    queryFn: ({ signal }) =>
+      get<Schemas['JournalImbalanceSearchResponse']>(`/api/v1/journals/imbalances?validationRunId=${id}`, signal),
+    enabled: id != null,
+    meta: { errorToast: false },
+  })
+export async function reverseJournal(id: number, body: Schemas['ReverseJournalRequest']) {
+  const { data } = await apiClient.request<Schemas['ReverseJournalResponse']>(`/api/v1/journals/${id}/reverse`, {
+    method: 'POST',
+    body,
+  })
+  if (!data) throw new Error('역분개 결과를 확인할 수 없습니다.')
+  return data
+}
+export async function requestCorrection(id: number, body: Schemas['JournalCorrectionExceptionRequest']) {
+  const { data } = await apiClient.request<Schemas['JournalCorrectionExceptionResponse']>(
+    `/api/v1/journals/${id}/correction-exceptions`,
+    { method: 'POST', body },
+  )
+  if (!data) throw new Error('정정 요청 결과를 확인할 수 없습니다.')
+  return data
+}
+/** #414 응답의 selected 쿼리를 그대로 유지하며, 외부 주소·잘못된 경로로 이동하지 않는다. */
+export function correctionTarget(value?: string) {
+  const target = safeRedirect(value)
+  const url = new URL(target, 'https://redirect.local')
+  return url.pathname === '/exceptions' ? target : null
+}
