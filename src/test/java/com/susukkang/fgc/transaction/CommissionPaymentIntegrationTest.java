@@ -1032,10 +1032,30 @@ class CommissionPaymentIntegrationTest {
                 """, BigDecimal.class, repayment.paymentId())).isEqualByComparingTo("1500000");
     }
 
+    @Test
+    void unclassifiedRecoveryIsRejectedAndRecordsReviewWithoutConfirming() {
+        var created = commissionPaymentService.create(grossScenarioRequest(1L, "DEDUCTION", "300000", "RECOVERY"));
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-RECOVERY-"+created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+        var review = jdbcTemplate.queryForMap("SELECT exception_type,reason_code FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                created.paymentId().toString());
+        assertThat(review).containsEntry("exception_type", "CAP_REVIEW_REQUIRED")
+                .containsEntry("reason_code", "CAP_ITEM_UNCLASSIFIED");
+    }
+
     private CommissionPaymentCreateRequest grossScenarioRequest(Long contractId, String cashflow, String amount) {
+        return grossScenarioRequest(contractId, cashflow, amount, "PAYMENT".equals(cashflow) ? "BASE_COMMISSION" : "CLAWBACK");
+    }
+
+    private CommissionPaymentCreateRequest grossScenarioRequest(Long contractId, String cashflow, String amount, String itemCode) {
         var base = request("IT-478-"+UUID.randomUUID(), new BigDecimal(amount));
-        Long itemId = "PAYMENT".equals(cashflow) ? base.commissionItemId() : jdbcTemplate.queryForObject(
-                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code='CLAWBACK'", Long.class);
+        Long itemId = jdbcTemplate.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE item_code=?", Long.class, itemCode);
         return new CommissionPaymentCreateRequest(base.sourceType(), base.sourceBusinessKey(), contractId,
                 base.agentId(), itemId, base.amount(), base.settlementMonth(), cashflow, base.scheduledPaymentDate(),
                 base.paymentStage(), base.allocationPolicyVersion(), List.of(new CommissionPaymentAttributionRequest(

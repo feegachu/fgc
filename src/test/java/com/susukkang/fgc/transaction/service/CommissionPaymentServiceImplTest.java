@@ -2265,10 +2265,36 @@ class CommissionPaymentServiceImplTest {
     }
 
     private ConfirmationData deduction(ConfirmationData data) {
+        return deduction(data, "CLAWBACK");
+    }
+
+    @Test
+    void unclassifiedRecoveryStillBlocksPreviewAndConfirmation() {
+        var data = deduction(confirmation(201L, 3L, "300000", "300000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), "RECOVERY");
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
+        var preview = service.precheck(101L);
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+        assertThatThrownBy(() -> service.confirm(101L, "recovery-review"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
+                ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
+        verify(capExceptionRepository).insertExceptionCase(captor.capture());
+        assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_REVIEW_REQUIRED");
+        assertThat(captor.getValue().getReasonCode()).isEqualTo("CAP_ITEM_UNCLASSIFIED");
+        verify(capCalculator, never()).calculate(any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
+    }
+
+    private ConfirmationData deduction(ConfirmationData data, String itemCode) {
         return new ConfirmationData(data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
                 data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(),
                 data.attributionMonth(), data.transactionAttributionId(), data.contractId(), data.agentId(),
-                data.paymentStage(), data.commissionItemId(), data.itemCode(), data.itemName(), data.policyVersionId(),
+                data.paymentStage(), data.commissionItemId(), itemCode, data.itemName(), data.policyVersionId(),
                 data.inclusionDecisionStatus(), data.exclusionType(), data.inclusionDecisionReason(),
                 data.allocationBasis(), data.evidenceRef(), data.attributionMethod(), data.contractDate(), "DEDUCTION");
     }

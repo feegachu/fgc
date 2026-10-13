@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CapCheckQueryRepositoryIntegrationTest {
 
     @Autowired CapCheckQueryRepository capCheckQueryRepository;
+    @Autowired com.susukkang.fgc.contract.repository.ContractQueryRepository contractQueryRepository;
     @Autowired JdbcTemplate jdbcTemplate;
 
     @ParameterizedTest
@@ -116,6 +117,8 @@ class CapCheckQueryRepositoryIntegrationTest {
                 contract.contractId(), paymentStage);
 
         assertThat(amount).isEqualByComparingTo("28"); // ROUND(10.5)+ROUND(10.5)+ROUND(5.5), 환수 제외
+        assertThat(contractQueryRepository.findComplianceEvidenceAmount(contract.contractId(), paymentStage))
+                .isEqualByComparingTo(amount);
     }
 
     @ParameterizedTest
@@ -125,6 +128,7 @@ class CapCheckQueryRepositoryIntegrationTest {
 
         assertThat(capCheckQueryRepository.selectComplianceEvidenceAmount(
                 contract.contractId(), paymentStage)).isNull();
+        assertThat(contractQueryRepository.findComplianceEvidenceAmount(contract.contractId(), paymentStage)).isNull();
     }
 
     // REG-19: GA_TO_FC 룰 시행일 이전 계약은 실패가 아니라 해당 단계 검증 미적용이다.

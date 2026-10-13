@@ -32,7 +32,8 @@ INSERT INTO cap_rule_set(policy_version_id,payment_stage,contract_date_from,cont
 SELECT m.new_id,r.payment_stage,r.contract_date_from,r.contract_date_to,r.insurer_id,
  r.product_group_code,r.channel_code,r.first_year_months,r.premium_multiplier,
  r.compliance_deduction_pct,r.refund_addition_condition,r.warning_usage_pct
-FROM cap_rule_set r JOIN cap478_versions m ON m.old_id=r.policy_version_id;
+FROM cap_rule_set r JOIN cap478_versions m ON m.old_id=r.policy_version_id
+ORDER BY r.cap_rule_set_id;
 INSERT INTO cap_rule_item(cap_rule_set_id,commission_item_id,inclusion_status,exclusion_type,
  evidence_required_yn,attribution_method,allocation_policy_id,decision_reason)
 SELECT new.cap_rule_set_id,i.commission_item_id,i.inclusion_status,i.exclusion_type,

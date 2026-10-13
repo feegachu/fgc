@@ -23,6 +23,7 @@ class CapGrossPolicyMigrationIntegrationTest {
                 flyway(url,"45.1").migrate();
             }
             var jdbc=new JdbcTemplate(new SingleConnectionDataSource(connection,true));
+            var originalRuleOrder = activeRuleOrder(jdbc);
             Long maxItem=jdbc.queryForObject("SELECT MAX(cap_rule_item_id) FROM fgc.cap_rule_item",Long.class);
             var original=jdbc.queryForList("SELECT to_jsonb(i)::text FROM fgc.cap_rule_item i ORDER BY cap_rule_item_id",String.class);
             if (duplicate) {
@@ -40,6 +41,9 @@ class CapGrossPolicyMigrationIntegrationTest {
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.policy_version",Long.class)).isEqualTo(before);
             } else {
                 flyway(url,null).migrate();
+                assertThat(activeRuleOrder(jdbc)).containsExactlyElementsOf(originalRuleOrder);
+                assertInsurerPolicyWinner(jdbc, "2026-07-01", "REG-CAP-INS-2021-V2", "0");
+                assertInsurerPolicyWinner(jdbc, "2027-01-01", "REG-CAP-INS-2027-V1", "3");
                 assertThat(jdbc.queryForObject("""
                         SELECT COUNT(*) FROM fgc.cap_rule_item i
                         JOIN fgc.cap_rule_set r ON r.cap_rule_set_id=i.cap_rule_set_id
@@ -57,6 +61,29 @@ class CapGrossPolicyMigrationIntegrationTest {
             assertThat(jdbc.queryForList("SELECT to_jsonb(i)::text FROM fgc.cap_rule_item i WHERE cap_rule_item_id<=? ORDER BY cap_rule_item_id",
                     String.class,maxItem)).containsExactlyElementsOf(original);
         }
+    }
+
+    private java.util.List<String> activeRuleOrder(JdbcTemplate jdbc) {
+        return jdbc.queryForList("""
+                SELECT CONCAT(p.policy_code,':',r.payment_stage,':',r.contract_date_from,':',
+                              r.contract_date_to,':',r.compliance_deduction_pct)
+                FROM fgc.cap_rule_set r JOIN fgc.policy_version p USING(policy_version_id)
+                WHERE p.policy_type='CAP_1200' AND p.status='ACTIVE'
+                ORDER BY r.cap_rule_set_id
+                """, String.class);
+    }
+
+    private void assertInsurerPolicyWinner(JdbcTemplate jdbc, String date, String code, String deduction) {
+        var winner = jdbc.queryForMap("""
+                SELECT p.policy_code,r.compliance_deduction_pct
+                FROM fgc.cap_rule_set r JOIN fgc.policy_version p USING(policy_version_id)
+                WHERE p.status='ACTIVE' AND r.payment_stage='INSURER_TO_GA'
+                  AND r.insurer_id IS NULL AND r.product_group_code IS NULL AND r.channel_code IS NULL
+                  AND r.contract_date_from<=? AND (r.contract_date_to IS NULL OR r.contract_date_to>=?)
+                ORDER BY r.contract_date_from DESC,r.cap_rule_set_id DESC LIMIT 1
+                """, java.time.LocalDate.parse(date), java.time.LocalDate.parse(date));
+        assertThat(winner.get("policy_code")).isEqualTo(code);
+        assertThat((java.math.BigDecimal)winner.get("compliance_deduction_pct")).isEqualByComparingTo(deduction);
     }
 
     private Flyway flyway(String url,String target) {
