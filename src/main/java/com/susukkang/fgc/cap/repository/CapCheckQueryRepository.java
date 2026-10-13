@@ -272,13 +272,7 @@ public class CapCheckQueryRepository {
             """;
 
     private static final String SELECT_COMPLIANCE_EVIDENCE_AMOUNT = """
-            SELECT SUM(
-               CASE
-                   WHEN ct.cashflow_type = 'DEDUCTION'
-                       THEN -ROUND(ta.attributed_amount, 0)
-                   ELSE ROUND(ta.attributed_amount, 0)
-               END
-            )
+            SELECT SUM(ROUND(ta.attributed_amount, 0))
             FROM fgc.transaction_attribution ta
                      JOIN fgc.commission_transaction ct
                           ON ct.commission_transaction_id = ta.commission_transaction_id
@@ -286,6 +280,7 @@ public class CapCheckQueryRepository {
                           ON c.contract_id = ta.contract_id
             WHERE ta.contract_id = :contractId
               AND ta.exclusion_type_snapshot = 'COMPLIANCE_3PCT'
+              AND ct.cashflow_type = 'PAYMENT'
               AND NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL
               AND ct.payment_stage = :paymentStage
               AND ct.status = 'CONFIRMED'
