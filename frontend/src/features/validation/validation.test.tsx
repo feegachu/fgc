@@ -211,7 +211,7 @@ describe('VRUN-W01 실행 목록', () => {
     renderAt('/app/validation-runs')
     const button = await screen.findByRole('button', { name: /실행 생성/ })
     await waitFor(() => expect(button).toBeDisabled())
-    expect(screen.getByText('기준월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.')).toBeInTheDocument()
+    expect(screen.getByText('선택한 검증월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.')).toBeInTheDocument()
   })
 
   it('서버가 중복 생성을 거절하면 오류를 안내하고 목록에 남는다', async () => {
