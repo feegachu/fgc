@@ -18,7 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class ScheduleDetailResponse {
-    /** MyBatis가 헤더 1건과 라인 N건을 하나의 상세 응답으로 묶기 위한 루트 식별자. */
+    /** 헤더 1건과 라인 N건을 하나의 상세 응답으로 묶는 루트 식별자. */
     @JsonIgnore
     private Long scheduleHeaderId;
     private ScheduleHeaderResponse header; // 스케줄 헤더

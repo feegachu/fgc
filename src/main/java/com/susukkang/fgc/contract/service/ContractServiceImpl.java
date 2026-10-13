@@ -271,7 +271,7 @@ public class ContractServiceImpl implements ContractService {
                 request.getStandardSurrenderDeductionAmount(),
                 request.getContractStatus()
         );
-        // 6. 변경 감지를 DB에 반영하여 후속 네이티브 SQL·MyBatis 조회에 수정값 전달
+        // 6. 변경 감지를 DB에 반영하여 후속 네이티브 SQL 조회에 수정값 전달
         insuranceContractRepository.flush();
 
         // #389: 최신 수기 합성 초회값이 변경된 경우 직전 버전에 연결한 새 행을 추가한다.

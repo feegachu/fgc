@@ -75,7 +75,9 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
                         summary.getExceptionRecurringCount(),
                         summary.getExceptionReopenedCount(),
                         summary.getExceptionNotDetectedCount(),
-                        summary.getExceptionOpenWorkItemCount()));
+                        summary.getExceptionOpenWorkItemCount(),
+                        summary.getFinalizedResultDiffCount(),
+                        summary.getComparedFinalizedRunId()));
     }
 
     @Override

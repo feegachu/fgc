@@ -85,7 +85,8 @@ public class ReconciliationResultPersistenceService {
                 candidate.contractId(),
                 candidate.expectedAgentId(),
                 candidate.actualAgentId(),
-                journalHeaderIds
+                journalHeaderIds,
+                candidate.dueDate()
         );
         context.setMissingJournalEvidence(candidate.sourceMatches().stream()
                 .anyMatch(source -> source.journalHeaderId() == null));

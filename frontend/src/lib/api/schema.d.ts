@@ -1774,6 +1774,7 @@ export interface components {
             };
             capCheck?: components["schemas"]["CapCheckItemResponse"];
             details?: components["schemas"]["CapCheckDetailResponse"][];
+            warningStartUsagePct?: string;
         };
         CapCheckDetailLine: {
             amount?: number;
@@ -2735,7 +2736,11 @@ export interface components {
         };
         ExceptionSummary: {
             /** Format: int64 */
+            comparedFinalizedRunId?: number;
+            /** Format: int64 */
             detectedCount?: number;
+            /** Format: int64 */
+            finalizedResultDiffCount?: number;
             /** Format: int64 */
             newCount?: number;
             /** Format: int64 */

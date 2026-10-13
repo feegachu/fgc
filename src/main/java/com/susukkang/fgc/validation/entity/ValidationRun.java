@@ -85,7 +85,9 @@ import java.time.OffsetDateTime;
                 @ColumnResult(name = "exceptionRecurringCount", type = Long.class),
                 @ColumnResult(name = "exceptionReopenedCount", type = Long.class),
                 @ColumnResult(name = "exceptionNotDetectedCount", type = Long.class),
-                @ColumnResult(name = "exceptionOpenWorkItemCount", type = Long.class)
+                @ColumnResult(name = "exceptionOpenWorkItemCount", type = Long.class),
+                @ColumnResult(name = "finalizedResultDiffCount", type = Long.class),
+                @ColumnResult(name = "comparedFinalizedRunId", type = Long.class)
         }
 ))
 @SqlResultSetMapping(name = "AgentCapMonitoringRowMapping", classes = @ConstructorResult(

@@ -1460,6 +1460,9 @@
               "$ref" : "#/components/schemas/CapCheckDetailResponse"
             },
             "type" : "array"
+          },
+          "warningStartUsagePct" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -3609,7 +3612,15 @@
       },
       "ExceptionSummary" : {
         "properties" : {
+          "comparedFinalizedRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "detectedCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "finalizedResultDiffCount" : {
             "format" : "int64",
             "type" : "integer"
           },

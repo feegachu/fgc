@@ -489,7 +489,7 @@ public class CommissionPaymentQueryRepository {
     private record SearchFilter(String sql, Map<String, Object> parameters) { }
 
     private NativeQuery<?> nativeQuery(String sql) {
-        // JPA 쓰기와 잔여 MyBatis 읽기가 공존하므로 스냅샷/잠금 전에 미반영 변경을 반영한다.
+        // 스냅샷/잠금용 네이티브 조회 전에 영속성 컨텍스트의 미반영 변경을 DB에 반영한다.
         if (entityManager.isJoinedToTransaction() && !TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
             entityManager.flush();
         }

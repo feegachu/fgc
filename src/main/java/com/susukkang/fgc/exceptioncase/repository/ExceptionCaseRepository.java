@@ -90,8 +90,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
     //
     // #378의 차익거래 단건 탐지 2종은 ExceptionCaseDetectionCommands fragment로 제공한다.
     // ArbitrageService는 이 공용 Repository를 직접 소비하며 기존 flush/clear 계약을 유지한다.
-    // bulkCreateFromReconciliationResultsByRun 등 다른 소비자와 테스트 baseline의 Mapper
-    // 참조는 남아 있으므로 공유 ExceptionCaseMapper/XML 제거는 #366/#383에서 확인한다.
+    // IF-API-42의 대사 실행별 일괄 생성도 동일 fragment에서 DB 함수로 처리한다.
 
     /** 일일 변경 계약 재검증 실패를 검증월 기준 안정 업무키로 기록한다. */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -209,6 +208,95 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                AND cc.result_status IN ('VIOLATION', 'REVIEW_REQUIRED')
             """, nativeQuery = true)
     long insertFromCapChecks(@Param("validationRunId") Long validationRunId);
+
+    /**
+     * 월 검증 8단계(#498): 이미 확정된 달을 다시 검증한 실행이면, 확정 실행과 1,200% 판정을
+     * 계약·지급단계별로 비교해 판정(result_status)이나 한도액(limit_amount)이 다른 건을 기록한다.
+     * 확정 결과는 고칠 수 없으므로(SRC-027 D-02) 이 예외가 운영정책서 제44조의 사후 점검 기록이다.
+     *
+     * <ul>
+     *   <li>비교 기준: 같은 검증월에서 이 실행보다 먼저 확정된 실행 중 가장 최근 것. 실행 생성과 확정이 같은
+     *       검증월 잠금으로 직렬화되므로(#491) 이 실행이 생긴 뒤에는 기준이 바뀌지 않는다.</li>
+     *   <li>두 실행 모두에 있는 계약·지급단계만 비교한다 — #494 이전에 확정된 계약수동 실행은 일부 계약만
+     *       계산했으므로 한쪽에만 있는 행을 차이로 세면 오탐이 된다.</li>
+     *   <li>상위 유형은 새로 만들지 않고 {@code CAP_REVIEW_REQUIRED}의 상세 원인
+     *       {@code FINALIZED_RESULT_DIFF}로 둔다(SRC-032 D-05 — 같은 1,200% 담당자가 처리).
+     *       심각도는 HIGH 로 CRITICAL(확정조건 3)과 엮이지 않는다.</li>
+     *   <li>업무키에 실행 ID를 넣지 않아 다음 재검증에서 같은 차이가 나오면 검출 이력만 늘어난다.
+     *       같은 실행을 다시 처리해도 실행별 이력은 한 건이다(uq_exception_occurrence_case_run).</li>
+     * </ul>
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query(value = """
+            SELECT COUNT(*) FILTER (WHERE recorded.new_case)
+              FROM fgc.validation_run vr
+              -- 비교 기준 선택: ValidationRunRepository#summarize 의 comparedFinalizedRunId 와 같은 조건을 유지한다
+              JOIN LATERAL (
+                  SELECT finalized.validation_run_id
+                    FROM fgc.validation_run finalized
+                   WHERE finalized.validation_month = vr.validation_month
+                     AND finalized.status = 'FINALIZED'
+                     AND finalized.validation_run_id < vr.validation_run_id
+                   ORDER BY finalized.validation_run_id DESC
+                   LIMIT 1
+              ) base ON true
+              JOIN fgc.cap_check cur ON cur.validation_run_id = vr.validation_run_id
+              JOIN fgc.cap_check fin
+                ON fin.validation_run_id = base.validation_run_id
+               AND fin.contract_id = cur.contract_id
+               AND fin.payment_stage = cur.payment_stage
+              LEFT JOIN fgc.cap_rule_set crs ON crs.cap_rule_set_id = cur.cap_rule_set_id
+              CROSS JOIN LATERAL (
+                  SELECT CASE fin.result_status
+                             WHEN 'NORMAL' THEN '정상' WHEN 'WARNING' THEN '주의'
+                             WHEN 'VIOLATION' THEN '위반' ELSE '검토필요'
+                         END AS before_label,
+                         CASE cur.result_status
+                             WHEN 'NORMAL' THEN '정상' WHEN 'WARNING' THEN '주의'
+                             WHEN 'VIOLATION' THEN '위반' ELSE '검토필요'
+                         END AS after_label
+              ) label
+              CROSS JOIN LATERAL fgc.record_exception_detection(
+                  CONCAT('CAP_REVIEW_REQUIRED:', TO_CHAR(vr.validation_month, 'YYYY-MM'),
+                         ':CONTRACT:', cur.contract_id, ':', cur.payment_stage, ':FINALIZED_RESULT_DIFF'),
+                  'CAP_REVIEW_REQUIRED', 'FINALIZED_RESULT_DIFF', 'HIGH',
+                  vr.validation_run_id, cur.contract_id, NULL, crs.policy_version_id,
+                  'CAP_CHECK', CAST(cur.cap_check_id AS varchar),
+                  CASE WHEN fin.result_status <> cur.result_status
+                       THEN CONCAT('확정 결과와 1,200% 판정 다름 — ', label.before_label, ' → ', label.after_label)
+                       ELSE CONCAT('확정 결과와 1,200% 한도액 다름 — ',
+                                   TO_CHAR(fin.limit_amount, 'FM999,999,999,990'), '원 → ',
+                                   TO_CHAR(cur.limit_amount, 'FM999,999,999,990'), '원')
+                  END,
+                  CONCAT(
+                      '지급단계 ', cur.payment_stage,
+                      ' · 확정 실행 #', base.validation_run_id,
+                      ' 판정 ', label.before_label,
+                      ' / 한도액 ', TO_CHAR(fin.limit_amount, 'FM999,999,999,990'), '원',
+                      ' / 산입액 ', TO_CHAR(fin.included_amount, 'FM999,999,999,990'), '원',
+                      ' → 재검증 실행 #', vr.validation_run_id,
+                      ' 판정 ', label.after_label,
+                      ' / 한도액 ', TO_CHAR(cur.limit_amount, 'FM999,999,999,990'), '원',
+                      ' / 산입액 ', TO_CHAR(cur.included_amount, 'FM999,999,999,990'), '원',
+                      '. 확정 결과는 바뀌지 않습니다.'
+                  ),
+                  jsonb_build_object(
+                      'capCheckId', cur.cap_check_id,
+                      'paymentStage', cur.payment_stage,
+                      'finalizedRunId', base.validation_run_id,
+                      'finalizedCapCheckId', fin.cap_check_id,
+                      'finalizedResultStatus', fin.result_status,
+                      'finalizedLimitAmount', fin.limit_amount,
+                      'finalizedIncludedAmount', fin.included_amount,
+                      'resultStatus', cur.result_status,
+                      'limitAmount', cur.limit_amount,
+                      'includedAmount', cur.included_amount
+                  )
+              ) recorded
+             WHERE vr.validation_run_id = :validationRunId
+               AND (cur.result_status <> fin.result_status OR cur.limit_amount <> fin.limit_amount)
+            """, nativeQuery = true)
+    long insertFromFinalizedCapResultDiffs(@Param("validationRunId") Long validationRunId);
 
     /**
      * 월 검증 8단계: 이번 실행의 차익거래 검토대상·검토필요 전부를 한 번에 탐지·기록한다.

@@ -1,6 +1,5 @@
 package com.susukkang.fgc.exceptioncase.repository;
 
-import com.susukkang.fgc.validation.mapper.ExceptionCaseMapper;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
@@ -19,22 +18,14 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * #380의 구 MyBatis {@code ExceptionCaseMapper}와 공용
- * {@code ExceptionCaseRepository}(네이티브 쿼리로 fgc.record_exception_detection을
- * 감싼 6개 메서드)가 같은 입력에 대해 완전히 동일한 exception_case 행을 만드는지
- * 직접 비교한다. 비교 실행을 서로 다른 검증월로 나눠 같은 시드의 종류·심각도·제목·본문을
- * 확인한다. #378 단건 탐지의 미조회·호출자 트랜잭션·같은 월 재검출·일괄 탐지 수렴도 검증한다.
- */
+/** 서로 다른 검증월의 탐지 내용·건수와 동일 실행 재검출 멱등성을 검증한다. */
 @SpringBootTest
 @Transactional
 class ExceptionCaseRepositoryDetectionIntegrationTest {
 
-    private static final LocalDate LEGACY_MONTH = LocalDate.of(2097, 8, 1);
+    private static final LocalDate FIRST_MONTH = LocalDate.of(2097, 8, 1);
     private static final LocalDate NEW_MONTH = LocalDate.of(2097, 9, 1);
 
-    @Autowired
-    private ExceptionCaseMapper exceptionCaseMapper;
     @Autowired
     private ExceptionCaseRepository exceptionCaseRepository;
     @Autowired
@@ -114,73 +105,73 @@ class ExceptionCaseRepositoryDetectionIntegrationTest {
     }
 
     @Test
-    void bulkDetectionMethodsProduceIdenticalExceptionsToLegacyMapper() {
+    void bulkDetectionMethodsProduceIdenticalExceptionsAcrossValidationMonths() {
         List<Long> contractIds = jdbcTemplate.queryForList("""
                 SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 3
                 """, Long.class);
         assertThat(contractIds).hasSizeGreaterThanOrEqualTo(3);
 
-        Long legacyRunId = insertValidationRun(LEGACY_MONTH);
+        Long firstRunId = insertValidationRun(FIRST_MONTH);
         Long newRunId = insertValidationRun(NEW_MONTH);
-        seedDetectionSources(legacyRunId, LEGACY_MONTH, contractIds);
+        seedDetectionSources(firstRunId, FIRST_MONTH, contractIds);
         seedDetectionSources(newRunId, NEW_MONTH, contractIds);
 
-        long legacyCap = exceptionCaseMapper.insertFromCapChecks(legacyRunId);
-        long legacyArbitrage = exceptionCaseMapper.insertFromArbitrageChecks(legacyRunId);
-        long legacyReconciliation = exceptionCaseMapper.insertFromReconciliationResults(legacyRunId);
-        long legacyJournal = exceptionCaseMapper.insertFromJournalImbalances(legacyRunId);
+        long firstCap = exceptionCaseRepository.insertFromCapChecks(firstRunId);
+        long firstArbitrage = exceptionCaseRepository.insertFromArbitrageChecks(firstRunId);
+        long firstReconciliation = exceptionCaseRepository.insertFromReconciliationResults(firstRunId);
+        long firstJournal = exceptionCaseRepository.insertFromJournalImbalances(firstRunId);
 
         long newCap = exceptionCaseRepository.insertFromCapChecks(newRunId);
         long newArbitrage = exceptionCaseRepository.insertFromArbitrageChecks(newRunId);
         long newReconciliation = exceptionCaseRepository.insertFromReconciliationResults(newRunId);
         long newJournal = exceptionCaseRepository.insertFromJournalImbalances(newRunId);
 
-        assertThat(newCap).isEqualTo(legacyCap).isEqualTo(2L);
-        assertThat(newArbitrage).isEqualTo(legacyArbitrage).isEqualTo(3L);
-        assertThat(newReconciliation).isEqualTo(legacyReconciliation).isEqualTo(2L);
-        assertThat(newJournal).isEqualTo(legacyJournal).isEqualTo(1L);
+        assertThat(newCap).isEqualTo(firstCap).isEqualTo(2L);
+        assertThat(newArbitrage).isEqualTo(firstArbitrage).isEqualTo(3L);
+        assertThat(newReconciliation).isEqualTo(firstReconciliation).isEqualTo(2L);
+        assertThat(newJournal).isEqualTo(firstJournal).isEqualTo(1L);
 
-        List<Map<String, Object>> legacyRows = normalizedExceptionRows(legacyRunId);
+        List<Map<String, Object>> firstRows = normalizedExceptionRows(firstRunId);
         List<Map<String, Object>> newRows = normalizedExceptionRows(newRunId);
-        assertThat(newRows).containsExactlyInAnyOrderElementsOf(legacyRows);
+        assertThat(newRows).containsExactlyInAnyOrderElementsOf(firstRows);
 
         // 멱등성도 양쪽 다 같이 재확인 — 재호출은 전부 0(새 업무건 없음, 재검출 이력만 추가).
-        assertThat(exceptionCaseMapper.insertFromCapChecks(legacyRunId)).isZero();
+        assertThat(exceptionCaseRepository.insertFromCapChecks(firstRunId)).isZero();
         assertThat(exceptionCaseRepository.insertFromCapChecks(newRunId)).isZero();
     }
 
     @Test
-    void insertDataQualityCaseProducesIdenticalCaseToLegacyMapper() {
+    void insertDataQualityCaseProducesIdenticalCaseAcrossValidationMonths() {
         Long contractId = jdbcTemplate.queryForObject(
                 "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
-        Long legacyRunId = insertValidationRun(LEGACY_MONTH);
+        Long firstRunId = insertValidationRun(FIRST_MONTH);
         Long newRunId = insertValidationRun(NEW_MONTH);
 
-        Long legacyCaseId = exceptionCaseMapper.insertDataQualityCase(
-                legacyRunId, contractId, "예상 스케줄 정합성 오류", "라인 수 불일치");
+        Long firstCaseId = exceptionCaseRepository.insertDataQualityCase(
+                firstRunId, contractId, "예상 스케줄 정합성 오류", "라인 수 불일치");
         Long newCaseId = exceptionCaseRepository.insertDataQualityCase(
                 newRunId, contractId, "예상 스케줄 정합성 오류", "라인 수 불일치");
 
-        assertThat(legacyCaseId).isNotNull();
+        assertThat(firstCaseId).isNotNull();
         assertThat(newCaseId).isNotNull();
-        assertThat(caseFields(newCaseId)).isEqualTo(caseFields(legacyCaseId));
+        assertThat(caseFields(newCaseId)).isEqualTo(caseFields(firstCaseId));
     }
 
     @Test
-    void insertCapCheckFailureProducesIdenticalCaseToLegacyMapper() {
+    void insertCapCheckFailureProducesIdenticalCaseAcrossValidationMonths() {
         Long contractId = jdbcTemplate.queryForObject(
                 "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
-        Long legacyRunId = insertValidationRun(LEGACY_MONTH);
+        Long firstRunId = insertValidationRun(FIRST_MONTH);
         Long newRunId = insertValidationRun(NEW_MONTH);
 
-        Long legacyCaseId = exceptionCaseMapper.insertCapCheckFailure(
-                legacyRunId, contractId, "INSURER_TO_GA", "계산 중 예외 발생");
+        Long firstCaseId = exceptionCaseRepository.insertCapCheckFailure(
+                firstRunId, contractId, "INSURER_TO_GA", "계산 중 예외 발생");
         Long newCaseId = exceptionCaseRepository.insertCapCheckFailure(
                 newRunId, contractId, "INSURER_TO_GA", "계산 중 예외 발생");
 
-        assertThat(legacyCaseId).isNotNull();
+        assertThat(firstCaseId).isNotNull();
         assertThat(newCaseId).isNotNull();
-        assertThat(caseFields(newCaseId)).isEqualTo(caseFields(legacyCaseId));
+        assertThat(caseFields(newCaseId)).isEqualTo(caseFields(firstCaseId));
     }
 
     private Map<String, Object> caseFields(Long exceptionCaseId) {

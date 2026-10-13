@@ -48,10 +48,12 @@ dependencies {
     // 입력값 검증
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // DB / MyBatis
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
-    // JPA
+    // DB / JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // 동적 검색: Jakarta JPA용 QueryDSL(OpenFeign). Q 타입은 Gradle의 generated 디렉터리에 생성한다.
+    implementation 'io.github.openfeign.querydsl:querydsl-jpa:7.7'
+    annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:7.7:jpa'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
     // ConstraintErrorCodeResolver가 PSQLException에서 위반된 제약 이름을 직접 읽어야 해서
     // runtimeOnly로는 컴파일이 안 된다.
     implementation 'org.postgresql:postgresql'
@@ -75,7 +77,6 @@ dependencies {
 
     // 테스트
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5'
     testImplementation 'org.springframework.batch:spring-batch-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.testcontainers:jdbc'
@@ -97,4 +98,24 @@ tasks.named('test') {
     // 통합 테스트가 개발자가 localhost:8081에서 쓰는 fgc DB를 공유하면 @AfterEach 정리가
     // 실제 실행 이력까지 훼손할 수 있다. 모든 테스트를 Docker 임시 PostgreSQL로 격리한다.
     systemProperty 'spring.profiles.active', 'test'
+}
+
+// 제거한 영속성 프레임워크가 전이 의존성이나 테스트 starter로 다시 들어오지 않게 CI에서도 검사한다.
+tasks.register('verifyPersistenceDependencies') {
+    group = 'verification'
+    description = 'Checks that production and test runtime classpaths contain no MyBatis artifacts.'
+    doLast {
+        [configurations.runtimeClasspath, configurations.testRuntimeClasspath].each { configuration ->
+            def remaining = configuration.resolvedConfiguration.resolvedArtifacts.findAll {
+                it.moduleVersion.id.group.startsWith('org.mybatis') || it.name.toLowerCase().contains('mybatis')
+            }
+            if (!remaining.empty) {
+                throw new GradleException("MyBatis remains in ${configuration.name}: ${remaining}")
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyPersistenceDependencies')
 }

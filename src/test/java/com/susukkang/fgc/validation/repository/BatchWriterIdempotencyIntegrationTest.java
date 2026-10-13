@@ -1,0 +1,85 @@
+package com.susukkang.fgc.validation.repository;
+
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * 모든 배치 Writer가 UPSERT 또는 ON CONFLICT DO NOTHING 기반으로 동작하는지,
+ * 재실행 시 업무 결과가 중복 생성되지 않는지 검증
+ *
+ * ExceptionCaseRepository는 reconciliation/arbitrage/cap 패키지가 아직 직접 참조해 유지한다
+ * (#380 Phase 1 이후에도 남는 공유 Mapper). contract_status_event_processing 쪽
+ * 멱등성(SUCCEEDED 중복방지/FAILED 누적)은 #380 Phase 3에서 ContractStatusEventProcessingMapper가
+ * JPA Repository로 전환되며 ContractStatusEventProcessingRepositoryIntegrationTest로 이전했다.
+ */
+@SpringBootTest
+@Transactional
+class BatchWriterIdempotencyIntegrationTest {
+
+    @Autowired
+    private ExceptionCaseRepository exceptionCaseMapper;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private Long contractId;
+    private Long validationRunId;
+
+    private Long seedContractId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = ?",
+                Long.class, "FGC-FGL01-202607-0001");
+    }
+
+    private Long seedValidationRun() {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
+                VALUES (?, ?, 'MANUAL_CONTRACT')
+                RETURNING validation_run_id
+                """, Long.class, LocalDate.of(2031, 4, 1), (int) (System.nanoTime() % 100000));
+    }
+
+    @Test
+    void insertDataQualityCaseTwiceForSameRunAndContractLeavesOnlyOneRow() {
+        contractId = seedContractId();
+        validationRunId = seedValidationRun();
+
+        exceptionCaseMapper.insertDataQualityCase(validationRunId, contractId, "재검증 실패", "첫 시도");
+        // 재실행 시나리오: 같은 실행·같은 계약에 대해 다시 데이터 품질 예외를 만들려 한다.
+        exceptionCaseMapper.insertDataQualityCase(validationRunId, contractId, "재검증 실패", "재시도");
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.exception_case WHERE validation_run_id = ? AND contract_id = ?",
+                Integer.class, validationRunId, contractId);
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void insertCapCheckFailureIsIdempotentPerRunContractAndPaymentStage() {
+        contractId = seedContractId();
+        validationRunId = seedValidationRun();
+
+        exceptionCaseMapper.insertCapCheckFailure(
+                validationRunId, contractId, "GA_TO_FC", "first failure");
+        exceptionCaseMapper.insertCapCheckFailure(
+                validationRunId, contractId, "GA_TO_FC", "retry failure");
+        exceptionCaseMapper.insertCapCheckFailure(
+                validationRunId, contractId, "INSURER_TO_GA", "other stage failure");
+
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM fgc.exception_case
+                 WHERE validation_run_id = ?
+                   AND contract_id = ?
+                   AND exception_key LIKE 'DATA_QUALITY:%'
+                """, Integer.class, validationRunId, contractId);
+        assertThat(count).isEqualTo(2);
+    }
+}

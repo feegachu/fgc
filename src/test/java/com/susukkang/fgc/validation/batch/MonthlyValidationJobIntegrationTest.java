@@ -1,7 +1,7 @@
 package com.susukkang.fgc.validation.batch;
 
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
-import com.susukkang.fgc.validation.mapper.ValidationRunMapper;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
@@ -55,7 +55,7 @@ class MonthlyValidationJobIntegrationTest {
     private Job monthlyValidationJob;
 
     @Autowired
-    private ValidationRunMapper validationRunMapper;
+    private ValidationRunRepository validationRunRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -237,7 +237,7 @@ class MonthlyValidationJobIntegrationTest {
                 .filteredOn(step -> step.getStatus() == BatchStatus.FAILED)
                 .isEmpty();
 
-        ValidationRunRow row = validationRunMapper.findById(validationRunId);
+        ValidationRunRow row = validationRunRepository.findById(validationRunId).map(ValidationRunRow::from).orElse(null);
         assertThat(row.getStatus()).isEqualTo("COMPLETED");
         assertThat(row.getValidationMonth()).isEqualTo(TEST_MONTH);
         assertThat(row.getRunNo()).isEqualTo(Math.toIntExact(runNo));
@@ -332,7 +332,7 @@ class MonthlyValidationJobIntegrationTest {
                     "capCheckStep", "arbitrageCheckStep", "journalPostingStep",
                     "imbalanceCheckStep", "reconciliationStep", "exceptionGenerationStep");
 
-            ValidationRunRow row = validationRunMapper.findById(validationRunId);
+            ValidationRunRow row = validationRunRepository.findById(validationRunId).map(ValidationRunRow::from).orElse(null);
             assertThat(row.getStatus()).isEqualTo("COMPLETED");
             assertThat(row.getRunNo()).isEqualTo(Math.toIntExact(runNo));
         }

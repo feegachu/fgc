@@ -24,10 +24,22 @@ import java.util.List;
 public interface ValidationTargetRepository extends JpaRepository<ValidationTarget, Long> {
 
     /**
-     * asOfDate 기준 활성 계약 중 환급률표 매칭 결과로 선정 상태(SELECTED/EXCLUDED/REVIEW_REQUIRED)를
+     * asOfDate 기준 유지 계약(ACTIVE·UNPAID·REVIVED)과 검증월 시작 이후 해지·실효 효력이 생긴 계약(#474) 중 환급률표 매칭 결과로 선정 상태(SELECTED/EXCLUDED/REVIEW_REQUIRED)를
      * 판정해 벌크 INSERT한다. 상품코드 비교·집합 연산(FILTER, GROUP BY)이 DB 전용 로직이라
      * 엔티티 조작 대신 네이티브 SQL을 그대로 유지한다(기존 MyBatis SQL과 동일).
      * {@code ON CONFLICT (validation_run_id, contract_id) DO NOTHING}으로 재시도 멱등성을 보장한다.
+     * <p>
+     * #474 — 차익거래 규제(감독규정 제4-32조⑥, REG-12)는 해지·실효 계약을 겨냥하므로, 검증월 1일 이후
+     * 해지·실효 효력이 생긴 계약을 그 달 대상에 넣는다. 기준은 수신일이 아니라
+     * {@code contract_status_event.effective_at}(효력일)이고, 날짜 경계는 세션 타임존과 무관하게
+     * Asia/Seoul 자정으로 고정한다. 검증월 이전에 해지·실효된 계약은 그 달 실행에서 이미 점검했으므로 넣지 않는다.
+     * 효력일에 상한(검증월 말일)을 두지 않는다 — 검증월을 나중에 다시 돌려도, 그 사이 해지된 계약이
+     * 현재 상태 때문에 빠지지 않고 검증월에 살아 있던 계약이 그대로 대상이 된다(재실행 결과 재현성).
+     * <p>
+     * UNPAID·REVIVED도 유지 계약이다. 표준약관(보험업감독업무시행세칙 별표15, 생명보험 제26조)상 보험료가
+     * 연체돼도 납입최고(독촉)기간이 끝난 다음 날에야 해지되고 그 전 보험금 지급사유는 보상하며, 부활은
+     * 해지계약의 "효력회복"이다. V2 SCHEDULE_ELIGIBILITY도 두 상태를 지급(REVIVED)·보류(UNPAID) 대상으로 둔다.
+     * CANCELLED(청약철회)·MATURED(만기)는 차익거래 조문(제4-32조⑥)의 "해지"가 아니라 넣지 않는다.
      *
      * @return 실제로 삽입된 행 수(충돌로 스킵된 행은 제외)
      */
@@ -52,8 +64,17 @@ public interface ValidationTargetRepository extends JpaRepository<ValidationTarg
                   JOIN product p
                     ON p.product_id = po.product_id
                    AND p.active_yn = true
-                 WHERE ic.current_status = 'ACTIVE'
-                   AND ic.contract_date <= :asOfDate
+                 WHERE ic.contract_date <= :asOfDate
+                   AND (
+                        ic.current_status IN ('ACTIVE', 'UNPAID', 'REVIVED')
+                        OR EXISTS (
+                            SELECT 1
+                              FROM contract_status_event e
+                             WHERE e.contract_id = ic.contract_id
+                               AND e.new_status IN ('TERMINATED', 'LAPSED')
+                               AND e.effective_at >= CAST(:validationMonth AS timestamp) AT TIME ZONE 'Asia/Seoul'
+                        )
+                   )
             ),
             candidate AS (
                 SELECT ec.*,
