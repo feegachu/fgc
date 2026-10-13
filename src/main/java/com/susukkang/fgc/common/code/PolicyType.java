@@ -17,7 +17,8 @@ public enum PolicyType {
     REFUND_RATE, //환수율 표
     CLAWBACK, //환수
     RECONCILIATION_TOLERANCE, //조정
-    SCHEDULE_ELIGIBILITY; //월중 실효·부활 시 그 달 회차 지급 여부 (V2, v2.1.3 신규)
+    SCHEDULE_ELIGIBILITY, //월중 실효·부활 시 그 달 회차 지급 여부 (V2, v2.1.3 신규)
+    ARBITRAGE; //차익거래 적용 대상과 시행일
 
     /** SIR-008: 코드값은 항상 한글 라벨과 함께 응답한다 — 화면이 아니라 서버가 라벨을 만든다. */
     public String label() {
@@ -31,6 +32,7 @@ public enum PolicyType {
             case CLAWBACK -> "환수";
             case RECONCILIATION_TOLERANCE -> "대사 허용오차";
             case SCHEDULE_ELIGIBILITY -> "월중 상태 처리 기준";
+            case ARBITRAGE -> "차익거래 적용 기준";
         };
     }
 }
