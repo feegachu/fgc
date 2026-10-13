@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.batch.daily;
 
+import com.susukkang.fgc.arbitrage.service.ArbitrageCheckBatchItemService;
 import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
@@ -58,6 +60,8 @@ public class DailyChangedContractJobConfig {
     private final CapCheckService capCheckService;
     private final ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
     private final ExceptionCaseRepository exceptionCaseRepository;
+    private final ArbitrageCheckBatchItemService arbitrageCheckBatchItemService;
+    private final ContractStatusEventRepository contractStatusEventRepository;
 
     @Bean
     public Job dailyChangedContractJob(JobRepository jobRepository,
@@ -151,7 +155,9 @@ public class DailyChangedContractJobConfig {
                 insuranceContractRepository,
                 scheduleService,
                 capCheckService,
-                contractStatusEventProcessingRepository
+                contractStatusEventProcessingRepository,
+                arbitrageCheckBatchItemService,
+                contractStatusEventRepository
         );
     }
 
