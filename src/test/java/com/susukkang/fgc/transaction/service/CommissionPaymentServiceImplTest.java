@@ -2233,6 +2233,46 @@ class CommissionPaymentServiceImplTest {
         );
     }
 
+    @Test
+    void deductionConfirmationAndPreviewSkipCapButPreservePaymentLifecycle() {
+        var data = deduction(confirmation(201L, 3L, "2000000", "2000000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(writeRepository.confirm(101L, "deduction", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "2000000")));
+        var preview = service.precheck(101L);
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).isEmpty();
+        assertThat(service.confirm(101L, "deduction").capCheckIds()).isEmpty();
+        verify(queryRepository, never()).findCapRuleSnapshot(any(), any());
+        verify(capCalculator, never()).calculate(any());
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+        verify(capExceptionService, never()).hasUnresolvedViolation(any());
+        verify(writeRepository).confirm(101L, "deduction", "");
+    }
+
+    @Test
+    void deductionStillRejectsReviewRequiredAttribution() {
+        var data = deduction(confirmation(201L, 3L, "300000", "300000", InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        assertThat(service.precheck(101L).confirmable()).isFalse();
+        assertThatThrownBy(() -> service.confirm(101L, "deduction-review")).isInstanceOf(FgcBusinessException.class);
+        verify(writeRepository, never()).confirm(any(), any(), any());
+    }
+
+    private ConfirmationData deduction(ConfirmationData data) {
+        return new ConfirmationData(data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(),
+                data.attributionMonth(), data.transactionAttributionId(), data.contractId(), data.agentId(),
+                data.paymentStage(), data.commissionItemId(), data.itemCode(), data.itemName(), data.policyVersionId(),
+                data.inclusionDecisionStatus(), data.exclusionType(), data.inclusionDecisionReason(),
+                data.allocationBasis(), data.evidenceRef(), data.attributionMethod(), data.contractDate(), "DEDUCTION");
+    }
+
     private ConfirmationData withPolicyVersion(ConfirmationData data, Long policyVersionId) {
         return new ConfirmationData(
                 data.paymentId(), data.status(), data.amount(), data.attributedAmount(),

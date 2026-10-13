@@ -129,6 +129,14 @@ class ChangedContractArbitrageIntegrationTest {
         return new TransactionTemplate(transactionManager).execute(status -> processor.process(contractId));
     }
 
+    @org.junit.jupiter.api.AfterEach
+    void finishOwnRunWithoutDeletingAppendOnlyDetectionHistory() {
+        if (validationRunId != null) {
+            jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=? AND status='CREATED'", validationRunId);
+            jdbcTemplate.update("UPDATE fgc.validation_run SET status='FAILED' WHERE validation_run_id=? AND status='RUNNING'", validationRunId);
+        }
+    }
+
     private Integer arbitrageRows() {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.arbitrage_check WHERE validation_run_id = ? AND contract_id = ?",
