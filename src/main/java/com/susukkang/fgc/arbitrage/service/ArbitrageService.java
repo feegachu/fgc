@@ -6,6 +6,7 @@ import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.ProtectionType;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -316,11 +317,15 @@ public class ArbitrageService {
             BigDecimal paidCommissionAmount,
             BigDecimal plannedCommissionAmount,
             ReArbitrageCheckRequest request) {
+        // 2026-10-13 #477 - 보장성보험만 차익거래 규제 대상이다 (감독규정 제4-32조⑥, FAQ 2차 Q11)
+        // 기존 코드: protection_type 을 읽지 않아 저축성·일반손해·자동차 계약도 후보로 판정했다.
+        // 문제: 규정상 대상이 아닌 계약이 검토대상·자료부족 예외로 쌓였다.
+        // 개선: 금융 스냅샷 확인보다 먼저 "적용대상 아님"으로 거른다. 예외는 만들지 않는다.
+        if (!ProtectionType.isRegulated(source.getProtectionType())) {
+            return notApplicable(source, request);
+        }
         if (source.getCumulativePaidPremium() == null || source.getContractMonthNo() == null) {
-            int monthNo = Math.max(1, Math.toIntExact(
-                    ChronoUnit.MONTHS.between(
-                            source.getContractDate().withDayOfMonth(1),
-                            request.getAsOfDate().withDayOfMonth(1)) + 1));
+            int monthNo = contractMonthNoFallback(source, request);
             return reviewRequired(monthNo, "기준일 이하 계약 금융 스냅샷이 없습니다.");
         }
 
@@ -413,6 +418,33 @@ public class ArbitrageService {
                 candidate.getRefundRateTableId(),
                 false,
                 null
+        );
+    }
+
+    private int contractMonthNoFallback(ArbitrageCalculationSource source, ReArbitrageCheckRequest request) {
+        return Math.max(1, Math.toIntExact(
+                ChronoUnit.MONTHS.between(
+                        source.getContractDate().withDayOfMonth(1),
+                        request.getAsOfDate().withDayOfMonth(1)) + 1));
+    }
+
+    // 보장성이 아닌 계약 — 금액은 모두 0, 환급금 가산 없음. 사유는 reason·candidateType 으로 스냅샷에 남는다.
+    private CalculationDecision notApplicable(ArbitrageCalculationSource source, ReArbitrageCheckRequest request) {
+        int monthNo = source.getContractMonthNo() != null
+                ? source.getContractMonthNo()
+                : contractMonthNoFallback(source, request);
+        return new CalculationDecision(
+                monthNo,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                false,
+                SurrenderValueSourceType.NOT_APPLICABLE,
+                null,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                ArbitrageCheckStatus.NOT_APPLICABLE,
+                "NOT_APPLICABLE",
+                "보장성보험이 아니라 차익거래 규제 대상이 아닙니다."
         );
     }
 

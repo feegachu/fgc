@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -38,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -155,6 +157,44 @@ class CapCalculatorImplTest {
         assertThat(result.refund12mAmount()).isEqualByComparingTo("0");
         assertThat(result.includedAmount()).isEqualByComparingTo("0");
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
+    }
+
+    // #477: 보장성이 아닌 계약은 룰셋을 찾지 않고 "적용대상 아님"으로 남긴다 (CAP_004·검토필요가 아니다)
+    @ParameterizedTest
+    @ValueSource(strings = {"SAVINGS", "GENERAL", "AUTO", "OTHER"})
+    void marksNonProtectionContractAsNotApplicable(String protectionType) {
+        CapContractView savings = contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false);
+        savings.setProtectionType(protectionType);
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID)).thenReturn(savings);
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        assertThat(result.capRuleSetId()).isNull();
+        assertThat(result.limitAmount()).isEqualByComparingTo("0");
+        assertThat(result.includedAmount()).isEqualByComparingTo("0");
+        assertThat(result.details()).isEmpty();
+        assertThat(result.calculationSnapshot()).containsEntry("notApplicable", true)
+                .containsEntry("protectionType", protectionType);
+        verifyNoInteractions(capRuleQueryRepository, capScheduleAmountQueryRepository);
+    }
+
+    @Test
+    void stillCalculatesProtectionContract() {
+        CapContractView protection = contract(LocalDate.of(2026, 7, 10), new BigDecimal("100000"), false);
+        protection.setProtectionType("PROTECTION");
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID)).thenReturn(protection);
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
+        assertThat(result.limitAmount()).isEqualByComparingTo("1200000");
     }
 
     // 표준해약공제액 80% 이상 공제 대상은 12차월 예상 해약환급금을 수수료등에 합산한다(= 한도에서 뺀다, #468)

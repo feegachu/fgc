@@ -10,6 +10,7 @@ import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.SurrenderValueSourceType;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * 설명 : 계약 단건 차익거래 수동 검증의 계산과 결과 저장을 검증한다.
@@ -230,6 +232,21 @@ class ArbitrageServiceTest {
         var row = checkExisting(calculationSource(new BigDecimal("1000000"), 12, false, BigDecimal.ZERO), paid, "0");
         assertThat(row.getResultStatus()).isEqualTo(expected);
         assertThat(row.getNetDifferenceAmount()).isEqualByComparingTo(expected == ArbitrageCheckStatus.CLEAR ? "0" : "1");
+    }
+
+    // #477: 보장성보험이 아니면 후보·자료부족이 아니라 "적용대상 아님"으로 남기고 예외는 만들지 않는다
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SAVINGS", "GENERAL", "AUTO", "OTHER"})
+    void marksNonProtectionContractAsNotApplicableWithoutException(String protectionType) {
+        // 스냅샷이 없어도, 납입보험료를 초과하는 수수료가 있어도 후보로 판정하지 않는다
+        var source = calculationSource(null, null, false, BigDecimal.ZERO);
+        source.setProtectionType(protectionType);
+        var row = checkExisting(source, "5000000", "1000000");
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.NOT_APPLICABLE);
+        assertThat(row.getNetDifferenceAmount()).isEqualByComparingTo("0");
+        assertThat(row.getSurrenderValueSourceType()).isEqualTo(SurrenderValueSourceType.NOT_APPLICABLE);
+        assertThat(row.getContractMonthNo()).isPositive();
+        verifyNoInteractions(exceptionCaseRepository);
     }
 
     @Test

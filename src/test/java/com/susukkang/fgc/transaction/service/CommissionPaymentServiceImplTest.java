@@ -68,6 +68,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
@@ -986,6 +987,27 @@ class CommissionPaymentServiceImplTest {
     // 기존 코드: 한도와 정확히 같은 금액 및 1원 초과 금액만 검증하여 한도 직전 정상 확정을 증명하지 못함
     // 문제: 경계 비교식이 잘못 변경되면 1,199,999원도 CAP_001로 차단될 수 있음
     // 개선: 1,200,000원 한도보다 1원 적은 산입액은 지급 확정되는지 검증
+    // #477: 보장성보험이 아닌 계약은 1,200% 한도를 넘어도 지급확정이 막히지 않는다
+    @Test
+    void confirmsNonProtectionContractWithoutCapEvaluation() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "2000000", "2000000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findProtectionType(3L)).willReturn("SAVINGS");
+        given(writeRepository.confirm(101L, "savings-ok", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "2000000")));
+
+        CommissionPaymentResponse response = service.confirm(101L, "savings-ok");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        verify(queryRepository, never()).findCapRuleSnapshot(anyLong(), anyLong());
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+        verify(writeRepository).confirm(101L, "savings-ok", "");
+    }
+
     @Test
     void confirmsOneWonBelowTwelveHundredPercentBoundary() {
         ConfirmationData data = confirmation(

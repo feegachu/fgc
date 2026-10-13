@@ -98,7 +98,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             fs.contract_financial_snapshot_id,
             fs.snapshot_version,
             fs.previous_snapshot_id,
-            fs.source_ref
+            fs.source_ref,
+            p.protection_type
             FROM fgc.insurance_contract c
             JOIN fgc.product_offering po
             ON
@@ -445,6 +446,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         result.setFinancialSnapshotVersion((Integer) row[16]);
         result.setPreviousFinancialSnapshotId((Long) row[17]);
         result.setFinancialSnapshotSourceRef((String) row[18]);
+        result.setProtectionType((String) row[19]);
         return result;
     }
 }
