@@ -74,7 +74,9 @@ class ValidationTargetRepositoryIntegrationTest {
                 "FGC-FGL02-202605-0001",
                 "FGC-FGN01-202605-0001",
                 "FGC-FGL02-202601-0001",
-                "FGC-FGL01-202601-0001");
+                "FGC-FGL01-202601-0001",
+                "FGC-FGL02-202603-0475",
+                "FGC-FGL01-202603-0475");
         assertThat(selected).isPositive();
         assertThat(productCodeMismatch).isZero();
         assertThat(selectedWithoutTable).isZero();

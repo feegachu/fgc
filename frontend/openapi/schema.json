@@ -4840,7 +4840,7 @@
           },
           "policyType" : {
             "description" : "정책 유형",
-            "enum" : [ "CURRENT_COMMISSION", "FOUR_YEAR_COMMISSION", "SEVEN_YEAR_COMMISSION", "CAP_1200", "ALLOCATION", "REFUND_RATE", "CLAWBACK", "RECONCILIATION_TOLERANCE", "SCHEDULE_ELIGIBILITY" ],
+            "enum" : [ "CURRENT_COMMISSION", "FOUR_YEAR_COMMISSION", "SEVEN_YEAR_COMMISSION", "CAP_1200", "ALLOCATION", "REFUND_RATE", "CLAWBACK", "RECONCILIATION_TOLERANCE", "SCHEDULE_ELIGIBILITY", "ARBITRAGE" ],
             "type" : "string"
           },
           "policyTypeLabel" : {
@@ -7616,7 +7616,7 @@
           "name" : "type",
           "required" : false,
           "schema" : {
-            "enum" : [ "CURRENT_COMMISSION", "FOUR_YEAR_COMMISSION", "SEVEN_YEAR_COMMISSION", "CAP_1200", "ALLOCATION", "REFUND_RATE", "CLAWBACK", "RECONCILIATION_TOLERANCE", "SCHEDULE_ELIGIBILITY" ],
+            "enum" : [ "CURRENT_COMMISSION", "FOUR_YEAR_COMMISSION", "SEVEN_YEAR_COMMISSION", "CAP_1200", "ALLOCATION", "REFUND_RATE", "CLAWBACK", "RECONCILIATION_TOLERANCE", "SCHEDULE_ELIGIBILITY", "ARBITRAGE" ],
             "type" : "string"
           }
         }, {
