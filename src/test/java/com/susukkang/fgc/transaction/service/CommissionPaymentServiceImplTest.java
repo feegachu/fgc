@@ -68,6 +68,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doAnswer;
@@ -563,10 +564,10 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository, never()).insertTransaction(any());
     }
 
-    // 2026-08-11 yslee - REG-20 지급월 신계약 귀속 정상 시나리오 검증
+    // 2026-08-11 yslee - REG-20 모집월 신계약 귀속 정상 시나리오 검증
     // 기존 코드: 정착지원금 귀속월 규칙을 구현했지만 수수료 항목과 귀속방식 조합을 확인하지 않음
     // 문제: 다른 수수료가 정착지원금 방식으로 우회 귀속되거나 정착지원금이 일반 귀속으로 저장 가능
-    // 개선: SETTLEMENT_SUPPORT 항목의 지급월 신계약·실제 귀속일·월초 파생을 함께 검증
+    // 개선: SETTLEMENT_SUPPORT 항목의 모집월(정산월) 신계약·실제 귀속일·월초 파생을 함께 검증
     @Test
     void attributesSettlementSupportToNewContractInSettlementMonth() {
         stubReferences(3L);
@@ -588,6 +589,60 @@ class CommissionPaymentServiceImplTest {
             assertThat(attribution.getAttributionDate()).isEqualTo(LocalDate.of(2026, 7, 3));
             assertThat(attribution.getAttributionMonth()).isEqualTo(LocalDate.of(2026, 7, 1));
         });
+    }
+
+    // 2026-10-13 #476 - FAQ 2차 Q7-1 예시: 8월 지급 정착지원금은 7월 모집 신계약에 귀속
+    @Test
+    void allowsSettlementSupportPaidAfterRecruitmentMonth() {
+        stubReferences(3L);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(
+                        11L, "SETTLEMENT_SUPPORT", "PAYMENT"
+                ));
+        stubInsertAndResponse(List.of(attributionRow(1, 3L, "500000")));
+
+        service.create(withScheduledPaymentDate(
+                createRequest(List.of(
+                        attribution(3L, "500000", AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY)
+                )),
+                LocalDate.of(2026, 8, 25)
+        ));
+
+        verify(writeRepository).insertTransaction(any());
+    }
+
+    @Test
+    void rejectsSettlementSupportPaidBeforeRecruitmentMonth() {
+        stubReferences(3L);
+        given(queryRepository.findCommissionItem(11L, LocalDate.of(2026, 7, 1)))
+                .willReturn(new CommissionItemReference(
+                        11L, "SETTLEMENT_SUPPORT", "PAYMENT"
+                ));
+
+        assertThatThrownBy(() -> service.create(withScheduledPaymentDate(
+                createRequest(List.of(
+                        attribution(3L, "500000", AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY)
+                )),
+                LocalDate.of(2026, 6, 25)
+        ))).isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
+            assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_002);
+            // 다른 COMMON_002 와 구분: 지급예정일 검증에서 거부됐는지
+            assertThat(exception.getField()).isEqualTo("scheduledPaymentDate");
+        });
+
+        verify(writeRepository, never()).insertTransaction(any());
+    }
+
+    private CommissionPaymentCreateRequest withScheduledPaymentDate(
+            CommissionPaymentCreateRequest source,
+            LocalDate scheduledPaymentDate
+    ) {
+        return new CommissionPaymentCreateRequest(
+                source.sourceType(), source.sourceBusinessKey(), source.contractId(), source.agentId(),
+                source.commissionItemId(), source.amount(), source.settlementMonth(), source.cashflowType(),
+                scheduledPaymentDate, source.paymentStage(), source.allocationPolicyVersion(), source.attributions(),
+                source.evidenceRef(), source.note()
+        );
     }
 
     @Test
@@ -986,6 +1041,46 @@ class CommissionPaymentServiceImplTest {
     // 기존 코드: 한도와 정확히 같은 금액 및 1원 초과 금액만 검증하여 한도 직전 정상 확정을 증명하지 못함
     // 문제: 경계 비교식이 잘못 변경되면 1,199,999원도 CAP_001로 차단될 수 있음
     // 개선: 1,200,000원 한도보다 1원 적은 산입액은 지급 확정되는지 검증
+    // #477: 보장성보험이 아닌 계약은 1,200% 한도를 넘어도 지급확정이 막히지 않는다
+    @Test
+    void confirmsNonProtectionContractWithoutCapEvaluation() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "2000000", "2000000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findProtectionType(3L)).willReturn("SAVINGS");
+        given(writeRepository.confirm(101L, "savings-ok", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "2000000")));
+
+        CommissionPaymentResponse response = service.confirm(101L, "savings-ok");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        verify(queryRepository, never()).findCapRuleSnapshot(anyLong(), anyLong());
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+        verify(writeRepository).confirm(101L, "savings-ok", "");
+    }
+
+    // #477: 산입 분류가 검토필요여도 보장성이 아닌 계약은 분류 때문에 확정이 막히지 않는다
+    @Test
+    void confirmsNonProtectionContractEvenWhenInclusionClassificationNeedsReview() {
+        ConfirmationData data = confirmation(
+                201L, 3L, "2000000", "2000000", InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        );
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.findProtectionType(3L)).willReturn("SAVINGS");
+        given(writeRepository.confirm(101L, "savings-review", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "2000000")));
+
+        CommissionPaymentResponse response = service.confirm(101L, "savings-review");
+
+        assertThat(response.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+    }
+
     @Test
     void confirmsOneWonBelowTwelveHundredPercentBoundary() {
         ConfirmationData data = confirmation(
@@ -2231,6 +2326,72 @@ class CommissionPaymentServiceImplTest {
                 data.evidenceRef(),
                 data.attributionMethod()
         );
+    }
+
+    @Test
+    void deductionConfirmationAndPreviewSkipCapButPreservePaymentLifecycle() {
+        var data = deduction(confirmation(201L, 3L, "2000000", "2000000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(writeRepository.confirm(101L, "deduction", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "2000000")));
+        var preview = service.precheck(101L);
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).isEmpty();
+        assertThat(service.confirm(101L, "deduction").capCheckIds()).isEmpty();
+        verify(queryRepository, never()).findCapRuleSnapshot(any(), any());
+        verify(capCalculator, never()).calculate(any());
+        verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
+        verify(capExceptionService, never()).hasUnresolvedViolation(any());
+        verify(writeRepository).confirm(101L, "deduction", "");
+    }
+
+    @Test
+    void deductionStillRejectsReviewRequiredAttribution() {
+        var data = deduction(confirmation(201L, 3L, "300000", "300000", InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        assertThat(service.precheck(101L).confirmable()).isFalse();
+        assertThatThrownBy(() -> service.confirm(101L, "deduction-review")).isInstanceOf(FgcBusinessException.class);
+        verify(writeRepository, never()).confirm(any(), any(), any());
+    }
+
+    private ConfirmationData deduction(ConfirmationData data) {
+        return deduction(data, "CLAWBACK");
+    }
+
+    @Test
+    void unclassifiedRecoveryStillBlocksPreviewAndConfirmation() {
+        var data = deduction(confirmation(201L, 3L, "300000", "300000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), "RECOVERY");
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(queryRepository.existsApplicableCapRuleSet(101L, 201L)).willReturn(true);
+        var preview = service.precheck(101L);
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+        assertThatThrownBy(() -> service.confirm(101L, "recovery-review"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        ArgumentCaptor<com.susukkang.fgc.transaction.domain.ExceptionCaseCommand> captor =
+                ArgumentCaptor.forClass(com.susukkang.fgc.transaction.domain.ExceptionCaseCommand.class);
+        verify(capExceptionRepository).insertExceptionCase(captor.capture());
+        assertThat(captor.getValue().getExceptionType()).isEqualTo("CAP_REVIEW_REQUIRED");
+        assertThat(captor.getValue().getReasonCode()).isEqualTo("CAP_ITEM_UNCLASSIFIED");
+        verify(capCalculator, never()).calculate(any());
+        verify(writeRepository, never()).confirm(any(), any(), any());
+    }
+
+    private ConfirmationData deduction(ConfirmationData data, String itemCode) {
+        return new ConfirmationData(data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(),
+                data.attributionMonth(), data.transactionAttributionId(), data.contractId(), data.agentId(),
+                data.paymentStage(), data.commissionItemId(), itemCode, data.itemName(), data.policyVersionId(),
+                data.inclusionDecisionStatus(), data.exclusionType(), data.inclusionDecisionReason(),
+                data.allocationBasis(), data.evidenceRef(), data.attributionMethod(), data.contractDate(), "DEDUCTION");
     }
 
     private ConfirmationData withPolicyVersion(ConfirmationData data, Long policyVersionId) {

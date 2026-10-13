@@ -108,6 +108,60 @@ class ReconciliationReasonClassifierTest {
         assertThat(first.secondaryReasonCodes()).containsExactly("AMOUNT_DIFFERENCE", "REVIEW_REQUIRED");
     }
 
+    // #518: 검토필요로 보류된 대상의 예상 내역 없음은 확정 불일치(HIGH)가 아니라 검토 필요로 남긴다.
+    @Test
+    void 보류_대상의_예상_내역_없음은_검토_필요로_낮추고_보조사유로_남긴다() {
+        ReconciliationCandidate candidate = candidate(
+                ReconciliationResultType.EXPECTED_MISSING, "EXPECTED_MISSING", List.of());
+        ReconciliationClassificationContext context = new ReconciliationClassificationContext();
+        context.setTargetReviewRequired(true);
+
+        ReconciliationClassification result = classifier.classify(candidate, context);
+
+        assertThat(result.resultType()).isEqualTo(ReconciliationResultType.REVIEW_REQUIRED);
+        assertThat(result.primaryReasonCode()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(result.secondaryReasonCodes()).containsExactly("EXPECTED_MISSING");
+    }
+
+    @Test
+    void 보류_대상이어도_우선순위가_높은_신호는_주사유로_남는다() {
+        ReconciliationCandidate candidate = candidate(
+                ReconciliationResultType.EXPECTED_MISSING, "EXPECTED_MISSING", List.of());
+        ReconciliationClassificationContext context = new ReconciliationClassificationContext();
+        context.setTargetReviewRequired(true);
+        context.setInvalidContractPayment(true);
+
+        ReconciliationClassification result = classifier.classify(candidate, context);
+
+        assertThat(result.primaryReasonCode()).isEqualTo("INVALID_CONTRACT_PAYMENT");
+        assertThat(result.secondaryReasonCodes()).containsExactly("EXPECTED_MISSING", "REVIEW_REQUIRED");
+    }
+
+    @Test
+    void 보류_대상이_아니면_예상_내역_없음은_그대로다() {
+        ReconciliationCandidate candidate = candidate(
+                ReconciliationResultType.EXPECTED_MISSING, "EXPECTED_MISSING", List.of());
+
+        ReconciliationClassification result = classifier.classify(
+                candidate, new ReconciliationClassificationContext());
+
+        assertThat(result.primaryReasonCode()).isEqualTo("EXPECTED_MISSING");
+        assertThat(result.secondaryReasonCodes()).isEmpty();
+    }
+
+    @Test
+    void 보류_대상이어도_예상_내역이_있는_불일치는_바꾸지_않는다() {
+        ReconciliationCandidate candidate = candidate(
+                ReconciliationResultType.ACTUAL_MISSING, "ACTUAL_MISSING", List.of());
+        ReconciliationClassificationContext context = new ReconciliationClassificationContext();
+        context.setTargetReviewRequired(true);
+
+        ReconciliationClassification result = classifier.classify(candidate, context);
+
+        assertThat(result.primaryReasonCode()).isEqualTo("ACTUAL_MISSING");
+        assertThat(result.secondaryReasonCodes()).isEmpty();
+    }
+
     private static ReconciliationCandidate candidate(
             ReconciliationResultType resultType,
             String primaryReason,

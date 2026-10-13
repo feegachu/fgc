@@ -12,4 +12,6 @@ public class ReconciliationClassificationContext {
     private boolean policyVersionError;
     private boolean journalImbalance;
     private boolean missingJournalEvidence;
+    /** #518 이 검증 실행에서 검토필요(REVIEW_REQUIRED)로 보류된 대상 계약이다. */
+    private boolean targetReviewRequired;
 }

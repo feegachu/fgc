@@ -28,12 +28,7 @@ public class CapIncludedAmountQueryRepository {
             SELECT ta.contract_id,
                    ta.agent_id,
                    ct.payment_stage,
-                   COALESCE(SUM(
-                       CASE WHEN ct.cashflow_type = 'DEDUCTION'
-                            THEN -ROUND(ta.attributed_amount, 0)
-                            ELSE ROUND(ta.attributed_amount, 0)
-                       END
-                   ), 0) AS included_amount
+                   COALESCE(SUM(ROUND(ta.attributed_amount, 0)), 0) AS included_amount
               FROM fgc.transaction_attribution ta
               JOIN fgc.commission_transaction ct
                 ON ct.commission_transaction_id = ta.commission_transaction_id
@@ -41,6 +36,7 @@ public class CapIncludedAmountQueryRepository {
                 ON c.contract_id = ta.contract_id
              WHERE ta.contract_id = :contractId
                AND ct.payment_stage = :paymentStage
+               AND ct.cashflow_type = 'PAYMENT'
                AND ta.inclusion_status_snapshot = 'INCLUDED'
                AND ta.attribution_date >= c.contract_date
                AND ta.attribution_date < c.contract_date + INTERVAL '1 year'

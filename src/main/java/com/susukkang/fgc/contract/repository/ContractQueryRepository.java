@@ -145,9 +145,7 @@ public class ContractQueryRepository {
     @Transactional(readOnly = true)
     public BigDecimal findComplianceEvidenceAmount(Long contractId, PaymentStage paymentStage) {
         NativeQuery<?> query = nativeQuery("""
-                SELECT SUM(CASE WHEN ct.cashflow_type = 'DEDUCTION'
-                                THEN -ROUND(ta.attributed_amount, 0)
-                                ELSE ROUND(ta.attributed_amount, 0) END) AS evidence_amount
+                SELECT SUM(ROUND(ta.attributed_amount, 0)) AS evidence_amount
                   FROM fgc.transaction_attribution ta
                   JOIN fgc.commission_transaction ct
                     ON ct.commission_transaction_id = ta.commission_transaction_id
@@ -156,6 +154,7 @@ public class ContractQueryRepository {
                    AND ta.exclusion_type_snapshot = 'COMPLIANCE_3PCT'
                    AND NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL
                    AND ct.payment_stage = :paymentStage AND ct.status = 'CONFIRMED'
+                   AND ct.cashflow_type = 'PAYMENT'
                    AND ta.attribution_date >= c.contract_date
                    AND ta.attribution_date < c.contract_date + INTERVAL '12 months'
                 """);
