@@ -479,6 +479,32 @@ class ScheduleServiceTest {
     }
 
     @Test
+    void keepsExistingHeaderWhenRegeneratedPolicyDoesNotMatchOfferingRegime() {
+        // #484: 체계 불일치는 기존 헤더를 비활성화하기 전에 걸러 검토 건만 남긴다.
+        ScheduleHeaderInsertDTO oldHeader = ScheduleHeaderInsertDTO.builder().scheduleHeaderId(10L).contractId(20L).paymentStage(PaymentStage.INSURER_TO_GA).scheduleVersionNo(1).status(ScheduleHeaderStatus.PLANNED).activeYn(true).build();
+        given(scheduleQueryRepository.selectScheduleHeaderById(10L)).willReturn(oldHeader);
+        given(insuranceContractRepository.findById(20L)).willReturn(Optional.of(withContractId(20L, InsuranceContract.builder().build())));
+        given(commissionPolicyService.resolveCurrentCommission(20L, PaymentStage.INSURER_TO_GA)).willReturn(
+                ResolvedCommissionPolicy.builder()
+                        .policyVersionId(100L)
+                        .policyType(PolicyType.CURRENT_COMMISSION)
+                        .paymentStage(PaymentStage.INSURER_TO_GA)
+                        .scheduleRegime(ScheduleRegime.FOUR_YEAR_2027)
+                        .rules(List.of(rule(1000L, null, 1, 1, "900.000000")))
+                        .build());
+        given(scheduleWriteRepository.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
+
+        ScheduleRegenResponse response = scheduleService.regenerateSchedules(10L, "판매버전 변경");
+
+        assertThat(response.getScheduleHeaderId()).isEqualTo(10L);
+        verify(scheduleWriteRepository).upsertPolicyReviewCase(eq(20L), eq(PaymentStage.INSURER_TO_GA),
+                eq("POLICY_MISSING"), eq("수수료 정책 검토 필요 - INSURER_TO_GA"), anyString());
+        verify(scheduleWriteRepository, never()).updateScheduleHeaderStatus(
+                anyLong(), any(ScheduleHeaderStatus.class), anyBoolean());
+        verify(scheduleWriteRepository, never()).insertScheduleHeader(any());
+    }
+
+    @Test
     void rejectsInvalidRegenerationReasonBeforeAccessingDatabase() {
         assertThatThrownBy(() -> scheduleService.regenerateSchedules(10L, " ")).isInstanceOf(FgcBusinessException.class);
         assertThatThrownBy(() -> scheduleService.regenerateSchedules(10L, "가".repeat(41))).isInstanceOf(FgcBusinessException.class);
