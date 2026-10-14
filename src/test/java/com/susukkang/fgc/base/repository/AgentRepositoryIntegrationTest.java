@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -361,6 +362,57 @@ class AgentRepositoryIntegrationTest {
         assertThat(history.getContent()).extracting(AgentRow::agentId).containsExactly(agentId);
         assertThat(history.getTotalElements()).isEqualTo(1);
         assertThat(history.getContent().getFirst().organizationId()).isEqualTo(currentOrganization);
+    }
+
+    @Test
+    void historicalFilterKeepsCurrentMembersAndDeduplicatesFormerMembersAcrossPages() {
+        String prefix = uniqueCode();
+        long previousOrganization = insertOrganization(uniqueCode(), null);
+        long currentOrganization = insertOrganization(uniqueCode(), null);
+        long currentMember = insertAgent(prefix + "-00", "현재 소속", previousOrganization, AgentRankCode.FC,
+                AS_OF.minusYears(1), null, "ACTIVE", true);
+        List<Long> expected = new ArrayList<>();
+        expected.add(currentMember);
+        for (int index = 1; index <= 21; index++) {
+            String code = prefix + "-" + String.format(Locale.ROOT, "%02d", index);
+            long formerMember = insertAgent(code, "이전 소속", currentOrganization, AgentRankCode.FC,
+                    AS_OF.minusYears(1), AS_OF.minusDays(1), "TERMINATED", false);
+            insertHistoricalContracts(code, formerMember, previousOrganization);
+            expected.add(formerMember);
+        }
+        insertAgent(prefix + "-99", "관계없는 설계사", currentOrganization, AgentRankCode.FC,
+                AS_OF.minusYears(1), null, "ACTIVE", true);
+        long otherOrganizationMember = insertAgent(prefix + "-98", "다른 조직의 계약", currentOrganization,
+                AgentRankCode.FC, AS_OF.minusYears(1), null, "ACTIVE", true);
+        insertHistoricalContracts(prefix + "-98", otherOrganizationMember, currentOrganization);
+
+        Page<AgentRow> first = agentRepository.search(previousOrganization, prefix, AS_OF, false, true, page(0, 20));
+        Page<AgentRow> second = agentRepository.search(previousOrganization, prefix, AS_OF, false, true, page(1, 20));
+        Page<AgentRow> beyondLast = agentRepository.search(previousOrganization, prefix, AS_OF, false, true, page(2, 20));
+        assertThat(first.getContent()).extracting(AgentRow::agentId).containsExactlyElementsOf(expected.subList(0, 20));
+        assertThat(second.getContent()).extracting(AgentRow::agentId).containsExactlyElementsOf(expected.subList(20, 22));
+        assertThat(first.getTotalElements()).isEqualTo(22);
+        assertThat(second.getTotalElements()).isEqualTo(22);
+        assertThat(beyondLast.getContent()).isEmpty();
+        assertThat(beyondLast.getTotalElements()).isEqualTo(22);
+        assertThat(agentRepository.search(previousOrganization, prefix, AS_OF, true, page(0, 20)).getContent())
+                .extracting(AgentRow::agentId).containsExactly(currentMember);
+    }
+
+    private void insertHistoricalContracts(String prefix, long agentId, long organizationId) {
+        jdbcTemplate.update("""
+                INSERT INTO fgc.insurance_contract
+                    (insurer_id, product_offering_id, contract_no, contract_date, agent_id, organization_id,
+                     premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium,
+                     premium_conversion_rule_code, payment_cycle_code, payment_term_months,
+                     standard_surrender_deduction_amount, current_status, data_origin)
+                SELECT c.insurer_id, c.product_offering_id, ? || '-' || n, c.contract_date, ?, ?,
+                       c.premium_per_cycle_amount, c.first_premium_amount, c.monthly_equivalent_first_premium,
+                       c.premium_conversion_rule_code, c.payment_cycle_code, c.payment_term_months,
+                       c.standard_surrender_deduction_amount, c.current_status, c.data_origin
+                FROM (SELECT * FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1) c
+                CROSS JOIN generate_series(1, 2) n
+                """, prefix, agentId, organizationId);
     }
 
     private long insertOrganization(String code, Long parentId) {

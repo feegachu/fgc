@@ -44,9 +44,9 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             WHERE (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
               AND (:includeHistorical = TRUE OR :includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
               AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId
-                   OR (:includeHistorical = TRUE AND EXISTS (
-                       SELECT c.contractId FROM InsuranceContract c
-                       WHERE c.agentId = a.agentId AND c.organizationId = :organizationId
+                   OR (:includeHistorical = TRUE AND a.agentId IN (
+                       SELECT DISTINCT c.agentId FROM InsuranceContract c
+                       WHERE c.organizationId = :organizationId
                    )))
               AND (
                   CAST(:keyword AS String) IS NULL
@@ -60,9 +60,9 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             WHERE (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
               AND (:includeHistorical = TRUE OR :includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
               AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId
-                   OR (:includeHistorical = TRUE AND EXISTS (
-                       SELECT c.contractId FROM InsuranceContract c
-                       WHERE c.agentId = a.agentId AND c.organizationId = :organizationId
+                   OR (:includeHistorical = TRUE AND a.agentId IN (
+                       SELECT DISTINCT c.agentId FROM InsuranceContract c
+                       WHERE c.organizationId = :organizationId
                    )))
               AND (
                   CAST(:keyword AS String) IS NULL
