@@ -29,6 +29,34 @@ test('실서버 CONT-W01·W02·W03 전후 대조와 등록 → 상세 → 수정
   const list = (await (await context.request.get(`${apiTarget}/api/v1/contracts?page=1&size=20`)).json()).data
   expect(list.content.length).toBeGreaterThan(0)
   const first = list.content[0]
+  // Claude review: selecting the expired 2026-H1-B offering must find A1/R6,
+  // and exporting that same filter must preserve those contracts.
+  const insurers = (await (await context.request.get(`${apiTarget}/api/v1/base/insurers?page=1&size=100`)).json()).data
+    .content
+  const historicalInsurer = insurers.find((insurer: { insurerCode: string }) => insurer.insurerCode === 'FGL02')
+  expect(historicalInsurer).toBeTruthy()
+  const historicalProducts = (
+    await (
+      await context.request.get(
+        `${apiTarget}/api/v1/base/products?insurerId=${historicalInsurer.insurerId}&asOf=2026-10-14&includeExpired=true&page=1&size=100`,
+      )
+    ).json()
+  ).data.content
+  const historicalProduct = historicalProducts.find(
+    (product: { offeringVersion: string }) => product.offeringVersion === '2026-H1-B',
+  )
+  expect(historicalProduct).toBeTruthy()
+  const historicalFilter = `insurerId=${historicalInsurer.insurerId}&productOfferingId=${historicalProduct.productOfferingId}`
+  const historicalContracts = (
+    await (await context.request.get(`${apiTarget}/api/v1/contracts?${historicalFilter}&page=1&size=20`)).json()
+  ).data.content
+  expect(historicalContracts.map((contract: { contractNo: string }) => contract.contractNo)).toEqual(
+    expect.arrayContaining(['FGC-FGL02-202601-0001', 'FGC-FGL02-202605-0001']),
+  )
+  const historicalCsv = await context.request.get(`${apiTarget}/api/v1/contracts/export.csv?${historicalFilter}`)
+  expect(historicalCsv.ok()).toBe(true)
+  for (const contractNo of ['FGC-FGL02-202601-0001', 'FGC-FGL02-202605-0001'])
+    expect(await historicalCsv.text()).toContain(contractNo)
   const detail = (await (await context.request.get(`${apiTarget}/api/v1/contracts/${first.contractId}`)).json()).data
   await expect(page.locator('.contract-table tbody tr')).toHaveCount(list.content.length)
   await capture('legacy-contract-list')
@@ -81,6 +109,7 @@ test('실서버 CONT-W01·W02·W03 전후 대조와 등록 → 상세 → 수정
   if (await term.isEditable()) await term.fill(String(detail.paymentTermMonths))
   const createResponse = page.waitForResponse(
     (response) => response.request().method() === 'POST' && response.url().endsWith('/api/v1/contracts'),
+    { timeout: 45000 },
   )
   await page.locator('button[type=submit]').click()
   const created = await createResponse
@@ -94,6 +123,7 @@ test('실서버 CONT-W01·W02·W03 전후 대조와 등록 → 상세 → 수정
   await page.locator('input[name=contractNo]').fill(editedNo)
   const updateResponse = page.waitForResponse(
     (response) => response.request().method() === 'PUT' && response.url().endsWith(`/api/v1/contracts/${createdId}`),
+    { timeout: 45000 },
   )
   await page.locator('button[type=submit]').click()
   const updated = await updateResponse

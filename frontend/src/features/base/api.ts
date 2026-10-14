@@ -112,6 +112,9 @@ export function useAgentOptions(asOf: string, organizationId = '', enabled = tru
     queryFn: ({ signal }) =>
       getAllBaseOptions('agents', { asOf, organizationId, includeTerminated: includeTerminated || undefined }, signal),
     enabled: enabled && Boolean(asOf),
+    // Historical list options may span many pages. Reuse them on navigation/focus;
+    // input options still refresh immediately when the contract date changes.
+    staleTime: includeTerminated ? 5 * 60 * 1000 : 0,
     meta: { errorToast: false },
   })
 }

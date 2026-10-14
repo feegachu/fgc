@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -46,10 +46,16 @@ function mount(path = '/contracts', canProcess = true, list?: (url: URL) => unkn
         pageData([
           { insurerId: 1, insurerCode: 'A', insurerName: '한빛생명' },
           { insurerId: 2, insurerCode: 'B', insurerName: '새빛생명' },
+          { insurerId: 9, insurerCode: 'OLD', insurerName: '과거 보험사', activeYn: false },
         ]),
       )
     if (url.pathname.endsWith('/organizations'))
-      return envelope(pageData([{ organizationId: 3, organizationCode: 'O', organizationName: '서울' }]))
+      return envelope(
+        pageData([
+          { organizationId: 3, organizationCode: 'O', organizationName: '서울' },
+          { organizationId: 9, organizationCode: 'OLD', organizationName: '폐쇄 조직', activeYn: false },
+        ]),
+      )
     if (url.pathname.endsWith('/products')) {
       const products = [
         {
@@ -228,6 +234,24 @@ it('해촉 설계사 URL 검색조건을 ID 대체문구 대신 이름과 상태
     filename: 'contracts.csv',
     notifyError: false,
   })
+})
+
+it('검색에서는 비활성 보험사·조직을 선택할 수 있으며 설계사 옵션은 재진입할 때 재사용한다', async () => {
+  const { router, user } = mount()
+  await waitFor(() => expect(screen.getByLabelText('조직')).toBeEnabled())
+  await user.selectOptions(screen.getByLabelText('보험회사'), '9')
+  await user.selectOptions(screen.getByLabelText('조직'), '9')
+  await user.click(screen.getByRole('button', { name: '조회' }))
+  expect(router.state.location.search).toContain('insurerId=9')
+  expect(router.state.location.search).toContain('orgId=9')
+  await waitFor(() => expect(screen.getByLabelText('모집 설계사')).toBeEnabled())
+  const count = requests.filter((url) => url.includes('/base/agents?')).length
+  await act(() => router.navigate('/contracts/1'))
+  await screen.findByText('상세 이동')
+  await act(() => router.navigate(-1))
+  await screen.findByRole('table')
+  expect(screen.getByLabelText('모집 설계사')).toBeEnabled()
+  expect(requests.filter((url) => url.includes('/base/agents?'))).toHaveLength(count)
 })
 
 it('늦게 도착한 이전 보험사 응답을 적용하지 않는다', async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { date, int, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
@@ -10,6 +10,7 @@ import { ContractStatusBadge, DataOriginBadge } from './badges'
 import { ContractFacts, ContractLoadState, ContractTabs } from './ContractTabs'
 import { contractErrorText, contractTab } from './detailState'
 import type { ContractTab } from './detailState'
+import '../../../../src/main/resources/static/css/features/contract.css'
 import './detail.css'
 
 export default function ContractDetailPage() {
@@ -93,14 +94,11 @@ function ContractDetailView({ id }: { id: string }) {
   const contract = detail.data
 
   return (
-    <div className="contract-react-detail">
-      <header className="page-header">
+    <div className="contract-react-detail contract-detail-page">
+      <header className="page-header contract-detail-page-header">
         <div className="page-header-copy">
           <h1 className="page-title">보험계약 상세</h1>
         </div>
-        <Link className="button button-secondary" to="/contracts">
-          목록
-        </Link>
       </header>
       {!validId ? (
         <ContractLoadState message="계약 식별자를 확인할 수 없습니다." error />
@@ -114,23 +112,28 @@ function ContractDetailView({ id }: { id: string }) {
         <ContractLoadState message="계약 정보를 불러오는 중입니다." />
       ) : (
         <>
-          <section className="surface contract-detail-summary" aria-labelledby="contract-summary-title">
-            <div className="contract-detail-summary-top">
-              <div>
-                <p className="contract-detail-eyebrow">계약번호</p>
-                <div className="contract-detail-identity">
-                  <h2 id="contract-summary-title">{contract.contractNo || '—'}</h2>
+          <section className="surface contract-summary-card" aria-labelledby="contract-summary-title">
+            <div className="contract-summary-primary">
+              <div className="contract-summary-identity">
+                <p className="contract-summary-label">계약번호</p>
+                <div className="contract-summary-title-row">
+                  <h2 id="contract-summary-title" className="contract-summary-number">
+                    {contract.contractNo || '—'}
+                  </h2>
                   <ContractStatusBadge code={contract.contractStatus} label={contract.contractStatusLabel} />
                   <DataOriginBadge code={contract.dataOrigin} label={contract.dataOriginLabel} />
                 </div>
               </div>
-              <div className="contract-detail-actions" aria-label="계약 작업">
+              <div className="contract-summary-actions" aria-label="계약 작업">
                 <Button
                   variant="secondary"
                   disabled={actionDisabled}
                   aria-describedby={!canProcess ? 'contract-action-note' : undefined}
                   onClick={() => void navigate(`/contracts/${id}/edit`)}
                 >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    edit
+                  </span>
                   수정
                 </Button>
                 <Button
@@ -142,6 +145,11 @@ function ContractDetailView({ id }: { id: string }) {
                     if (!actionDisabled) regenerate.mutate()
                   }}
                 >
+                  {!regenerate.isPending && (
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      restart_alt
+                    </span>
+                  )}
                   스케줄 재생성
                 </Button>
                 <Button
@@ -152,16 +160,22 @@ function ContractDetailView({ id }: { id: string }) {
                     if (!actionDisabled) recheck.mutate()
                   }}
                 >
+                  {!recheck.isPending && (
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      speed
+                    </span>
+                  )}
                   한도 재검증
                 </Button>
               </div>
             </div>
             {!canProcess && (
-              <p id="contract-action-note" className="contract-detail-note">
+              <p id="contract-action-note" className="contract-permission-note">
                 수정·스케줄 재생성·한도 재검증은 SETTLEMENT 권한이 필요합니다.
               </p>
             )}
             <ContractFacts
+              className="contract-summary-grid"
               items={[
                 ['보험회사', contract.insurerName],
                 ['상품', contract.productName],
@@ -173,7 +187,13 @@ function ContractDetailView({ id }: { id: string }) {
               ]}
             />
           </section>
-          <ContractTabs id={id} contract={contract} active={active} onSelect={selectTab} />
+          <ContractTabs
+            id={id}
+            contract={contract}
+            active={active}
+            onSelect={selectTab}
+            fetchedAt={detail.dataUpdatedAt}
+          />
         </>
       )}
     </div>

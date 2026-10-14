@@ -52,11 +52,20 @@ export function ContractLoadState({ message, error, retry }: { message: string; 
   )
 }
 
-export function ContractFacts({ items }: { items: [string, ReactNode][] }) {
+export function ContractFacts({ items, className = '' }: { items: [string, ReactNode][]; className?: string }) {
   return (
-    <dl className="contract-detail-facts">
+    <dl className={className || 'contract-detail-facts'}>
       {items.map(([label, value]) => (
-        <div key={label}>
+        <div
+          key={label}
+          className={
+            className === 'contract-information-grid'
+              ? 'contract-information-item'
+              : className === 'contract-summary-grid'
+                ? 'contract-summary-item'
+                : undefined
+          }
+        >
           <dt>{label}</dt>
           <dd>{value ?? '—'}</dd>
         </div>
@@ -108,11 +117,13 @@ export function ContractTabs({
   contract,
   active,
   onSelect,
+  fetchedAt,
 }: {
   id: string
   contract: ContractDetail
   active: ContractTab
   onSelect: (tab: ContractTab) => void
+  fetchedAt: number
 }) {
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])
   return (
@@ -161,11 +172,11 @@ export function ContractTabs({
           aria-labelledby={`contract-tab-${name}`}
           tabIndex={0}
           hidden={active !== name}
-          className="surface contract-detail-panel"
+          className={`surface contract-detail-panel ${name === 'basic' ? 'contract-basic-card' : ''}`}
         >
           {active === name &&
             (name === 'basic' ? (
-              <BasicTab id={id} contract={contract} />
+              <BasicTab id={id} contract={contract} fetchedAt={fetchedAt} />
             ) : name === 'schedules' ? (
               <SchedulesTab id={id} />
             ) : name === 'cap' ? (
@@ -194,90 +205,138 @@ function PanelHeading({ title, children }: { title: string; children: ReactNode 
   )
 }
 
-function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
+function BasicTab({ id, contract, fetchedAt }: { id: string; contract: ContractDetail; fetchedAt: number }) {
   const history = useQuery(contractEventsQuery(id))
   const [sort, setSort] = useState<StatusSort>('effectiveAt')
   return (
     <>
-      <PanelHeading title="계약 기본정보">계약 정보와 상태 사건의 후속 처리 결과를 조회합니다.</PanelHeading>
-      <ContractFacts
-        items={[
-          ['계약번호', contract.contractNo],
-          ['상품명', contract.productName],
-          ['계약일', date(contract.contractDate)],
-          ['계약상태', <ContractStatusBadge code={contract.contractStatus} label={contract.contractStatusLabel} />],
-          ['주기 보험료', won(contract.premiumPerCycleAmount)],
-          ['납입주기', responseLabel(contract.paymentCycleCodeLabel, paymentCycleLabels, contract.paymentCycleCode)],
-          ['초회보험료', won(contract.firstPremiumAmount)],
-          ['월납환산 초회보험료', won(contract.monthlyEquivalentFirstPremium)],
-          ['납입기간', contract.paymentTermMonths == null ? '—' : `${int(contract.paymentTermMonths)}개월`],
-          ['표준해약공제액', won(contract.standardSurrenderDeductionAmount)],
-          ['데이터 출처', <DataOriginBadge code={contract.dataOrigin} label={contract.dataOriginLabel} />],
-          ['통화 단위', 'KRW (원)'],
-        ]}
-      />
-      <section className="contract-detail-history" aria-labelledby="contract-history-title">
-        <header>
-          <div>
-            <h3 id="contract-history-title">상태이력</h3>
-            <p>사건 발생과 후속 처리 작업을 분리해 표시합니다.</p>
-          </div>
-          <div role="group" aria-label="상태이력 정렬 기준">
-            <Button variant="secondary" aria-pressed={sort === 'effectiveAt'} onClick={() => setSort('effectiveAt')}>
-              효력 순
-            </Button>
-            <Button variant="secondary" aria-pressed={sort === 'receivedAt'} onClick={() => setSort('receivedAt')}>
-              도착 순
-            </Button>
-          </div>
-        </header>
-        <QueryContent query={history}>
-          {(events) =>
-            events.length ? (
-              <ol className="contract-detail-events" aria-label="상태 사건" aria-live="polite">
-                {sortStatusEvents(events, sort).map((event, index) => (
-                  <li key={`${event.sourceSystem ?? ''}-${event.sourceEventKey ?? event.eventSeq ?? index}`}>
-                    <article>
-                      <header>
-                        <h4>
-                          #{event.eventSeq ?? '—'}{' '}
-                          {event.previousStatus
-                            ? responseLabel(event.previousStatusLabel, contractStatusLabels, event.previousStatus)
-                            : '최초'}{' '}
-                          → {responseLabel(event.newStatusLabel, contractStatusLabels, event.newStatus)}
-                        </h4>
-                        <span>
-                          {event.sourceSystem || '계약 상태 사건'}
-                          {!event.processings?.length ? ' · 처리 대기' : ''}
-                        </span>
-                      </header>
-                      <ContractFacts
-                        items={[
-                          ['효력', dateTime(event.effectiveAt)],
-                          ['수신', dateTime(event.receivedAt)],
-                        ]}
-                      />
-                      {!!event.processings?.length && (
-                        <ul className="contract-detail-processings" aria-label="후속 처리 작업">
-                          {event.processings.map((job, jobIndex) => (
-                            <li key={`${job.processingJob}-${jobIndex}`}>
-                              <strong>{job.processingJob || '처리 작업'}</strong>
-                              <ResultStatus code={job.processingStatus} labels={processingStatusLabels} />
-                              <time dateTime={job.processedAt}>{dateTime(job.processedAt)}</time>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </article>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="contract-detail-state">등록된 상태이력이 없습니다.</p>
-            )
-          }
-        </QueryContent>
-      </section>
+      <header className="surface-header contract-basic-header">
+        <h2 className="surface-title">계약 기본정보</h2>
+        <p className="contract-lazy-note" role="status">
+          계약 정보를 불러왔습니다.
+        </p>
+      </header>
+      <div className="contract-basic-layout">
+        <section className="contract-information-panel" aria-labelledby="contract-information-title">
+          <h3 id="contract-information-title">계약 정보</h3>
+          <ContractFacts
+            className="contract-information-grid"
+            items={[
+              ['계약번호', contract.contractNo],
+              ['상품명', contract.productName],
+              ['계약일', date(contract.contractDate)],
+              ['계약상태', <ContractStatusBadge code={contract.contractStatus} label={contract.contractStatusLabel} />],
+              ['주기 보험료', won(contract.premiumPerCycleAmount)],
+              [
+                '납입주기',
+                responseLabel(contract.paymentCycleCodeLabel, paymentCycleLabels, contract.paymentCycleCode),
+              ],
+              ['초회보험료', won(contract.firstPremiumAmount)],
+              ['월납환산 초회보험료', won(contract.monthlyEquivalentFirstPremium)],
+              ['납입기간', contract.paymentTermMonths == null ? '—' : `${int(contract.paymentTermMonths)}개월`],
+              ['표준해약공제액', won(contract.standardSurrenderDeductionAmount)],
+              ['데이터 출처', <DataOriginBadge code={contract.dataOrigin} label={contract.dataOriginLabel} />],
+              ['통화 단위', 'KRW (원)'],
+            ]}
+          />
+        </section>
+        <div className="contract-side-panels">
+          <section className="contract-history-panel" aria-labelledby="contract-history-title">
+            <header className="contract-history-panel-header">
+              <div>
+                <h3 id="contract-history-title">상태이력</h3>
+                <p>사건 발생과 후속 처리 작업을 분리해 표시합니다.</p>
+              </div>
+              <div className="contract-history-sort" role="group" aria-label="상태이력 정렬 기준">
+                <Button
+                  className={`contract-history-sort-button ${sort === 'effectiveAt' ? 'is-active' : ''}`}
+                  variant="secondary"
+                  aria-pressed={sort === 'effectiveAt'}
+                  onClick={() => setSort('effectiveAt')}
+                >
+                  효력 순
+                </Button>
+                <Button
+                  className={`contract-history-sort-button ${sort === 'receivedAt' ? 'is-active' : ''}`}
+                  variant="secondary"
+                  aria-pressed={sort === 'receivedAt'}
+                  onClick={() => setSort('receivedAt')}
+                >
+                  도착 순
+                </Button>
+              </div>
+            </header>
+            <QueryContent query={history}>
+              {(events) =>
+                events.length ? (
+                  <ol className="contract-history-list" aria-label="상태 사건" aria-live="polite">
+                    {sortStatusEvents(events, sort).map((event, index) => (
+                      <li
+                        className="contract-history-event"
+                        key={`${event.sourceSystem ?? ''}-${event.sourceEventKey ?? event.eventSeq ?? index}`}
+                      >
+                        <span className="contract-history-marker" aria-hidden="true" />
+                        <article className="contract-history-event-card">
+                          <header>
+                            <h4>
+                              #{event.eventSeq ?? '—'}{' '}
+                              {event.previousStatus
+                                ? responseLabel(event.previousStatusLabel, contractStatusLabels, event.previousStatus)
+                                : '최초'}{' '}
+                              → {responseLabel(event.newStatusLabel, contractStatusLabels, event.newStatus)}
+                            </h4>
+                            <span>
+                              {event.sourceSystem || '계약 상태 사건'}
+                              {!event.processings?.length ? ' · 처리 대기' : ''}
+                            </span>
+                          </header>
+                          <ContractFacts
+                            className="contract-history-times"
+                            items={[
+                              ['효력', dateTime(event.effectiveAt)],
+                              ['수신', dateTime(event.receivedAt)],
+                            ]}
+                          />
+                          {!!event.processings?.length && (
+                            <ul className="contract-processing-list" aria-label="후속 처리 작업">
+                              {event.processings.map((job, jobIndex) => (
+                                <li className="contract-processing-row" key={`${job.processingJob}-${jobIndex}`}>
+                                  <strong>{job.processingJob || '처리 작업'}</strong>
+                                  <ResultStatus code={job.processingStatus} labels={processingStatusLabels} />
+                                  <time dateTime={job.processedAt}>{dateTime(job.processedAt)}</time>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </article>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="contract-detail-state">등록된 상태이력이 없습니다.</p>
+                )
+              }
+            </QueryContent>
+          </section>
+          <section className="contract-data-panel" aria-labelledby="contract-data-title">
+            <h3 id="contract-data-title">데이터 관리</h3>
+            <dl>
+              <div>
+                <dt>조회 API</dt>
+                <dd>/api/v1/contracts/{id}</dd>
+              </div>
+              <div>
+                <dt>기본 정렬</dt>
+                <dd>효력일시 오름차순</dd>
+              </div>
+              <div>
+                <dt>최종 조회</dt>
+                <dd>{fetchedAt ? dateTime(new Date(fetchedAt).toISOString()) : '—'}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+      </div>
     </>
   )
 }
@@ -298,35 +357,22 @@ const scheduleColumns: TableColumn<ScheduleLine>[] = [
   },
 ]
 function SchedulesTab({ id }: { id: string }) {
-  const [params, setParams] = useSearchParams()
-  const stage = params.get('stage') === 'GA_TO_FC' ? 'GA_TO_FC' : 'INSURER_TO_GA'
-  const query = useQuery(contractSchedulesQuery(id, stage))
   return (
     <>
       <PanelHeading title="예상 스케줄">지급단계별 현재 운영 스케줄과 회차를 조회합니다.</PanelHeading>
-      <div className="field contract-detail-stage">
-        <label htmlFor="contract-schedule-stage" className="field-label">
-          지급단계
-        </label>
-        <select
-          id="contract-schedule-stage"
-          className="select-control"
-          value={stage}
-          onChange={(event) =>
-            setParams((current) => {
-              const next = new URLSearchParams(current)
-              next.set('stage', event.target.value)
-              return next
-            })
-          }
-        >
-          {Object.entries(PAYMENT_STAGE).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+      <div className="contract-detail-schedule-stages">
+        <ScheduleStage id={id} stage="INSURER_TO_GA" />
+        <ScheduleStage id={id} stage="GA_TO_FC" />
       </div>
+    </>
+  )
+}
+
+function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA_TO_FC' }) {
+  const query = useQuery(contractSchedulesQuery(id, stage))
+  return (
+    <section aria-label={PAYMENT_STAGE[stage]} className="contract-tab-section">
+      <h3 className="contract-detail-subheading">{PAYMENT_STAGE[stage]}</h3>
       <QueryContent query={query}>
         {(data) => (
           <>
@@ -364,7 +410,7 @@ function SchedulesTab({ id }: { id: string }) {
           </>
         )}
       </QueryContent>
-    </>
+    </section>
   )
 }
 
@@ -375,12 +421,15 @@ function CapTab({ id }: { id: string }) {
   // 이 계약에 속한 판정만 모달로 연다. URL을 직접 바꾼 경우에도 다른 계약의 근거를 섞지 않는다.
   const capCheckId = query.data?.find((row) => String(row.capCheckId) === requested)?.capCheckId ?? null
   const select = (capId: number | null) =>
-    setParams((current) => {
-      const next = new URLSearchParams(current)
-      if (capId == null) next.delete('capCheckId')
-      else next.set('capCheckId', String(capId))
-      return next
-    })
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (capId == null) next.delete('capCheckId')
+        else next.set('capCheckId', String(capId))
+        return next
+      },
+      { replace: capId == null },
+    )
   const columns: TableColumn<ContractCapCheck>[] = [
     { key: 'stage', label: '지급단계', render: (row) => stageLabel(row.result?.paymentStage) },
     { key: 'date', label: '기준일', render: (row) => date(row.result?.asOfDate) },

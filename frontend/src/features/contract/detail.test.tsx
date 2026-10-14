@@ -132,7 +132,7 @@ describe('CONT-W02 계약 상세', () => {
     expect(events.map((row) => row.eventSeq)).toEqual([9, 3, 2])
   })
 
-  it('스케줄 deep link와 지급단계 전환·뒤로가기는 URL과 요청 지급단계를 일치시킨다', async () => {
+  it('스케줄 deep link에서도 두 지급단계를 함께 표시하고 각 단계의 상세로 이동한다', async () => {
     const { router, actions } = renderAt('/contracts/1?tab=schedules&stage=GA_TO_FC', (url) => {
       if (!url.includes('/schedules?')) return
       const fc = url.endsWith('GA_TO_FC')
@@ -161,16 +161,14 @@ describe('CONT-W02 계약 상세', () => {
     })
     await screen.findByRole('cell', { name: '팀장' })
     expect(screen.getByRole('tab', { name: '예상 스케줄' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('(12,500)원')).toHaveClass('is-negative-amount')
+    const fc = screen.getByRole('region', { name: 'GA→설계사' })
+    expect(within(fc).getByText('(12,500)원')).toHaveClass('is-negative-amount')
     expect(calls('/status-events')).toHaveLength(0)
-    expect(calls('/schedules?paymentStage=INSURER_TO_GA')).toHaveLength(0)
-    await actions.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
-    await screen.findByRole('cell', { name: 'GA' })
-    expect(router.state.location.search).toContain('stage=INSURER_TO_GA')
-    await act(() => router.navigate(-1))
-    await screen.findByRole('cell', { name: '팀장' })
-    expect(screen.getByLabelText('지급단계')).toHaveValue('GA_TO_FC')
-    await actions.click(screen.getByRole('link', { name: '버전 2 상세' }))
+    expect(calls('/schedules?paymentStage=INSURER_TO_GA')).toHaveLength(1)
+    expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
+    expect(await screen.findByRole('cell', { name: 'GA' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('지급단계')).toBeNull()
+    await actions.click(within(fc).getByRole('link', { name: '버전 2 상세' }))
     expect(router.state.location.pathname).toBe('/schedules/10')
   })
 
@@ -245,6 +243,9 @@ describe('CONT-W02 계약 상세', () => {
     expect(router.state.location.search).not.toContain('capCheckId')
     expect(open).toHaveFocus()
     expect(requested.filter(({ url }) => url === '/api/v1/cap-checks/32/details')).toHaveLength(1)
+    await act(() => router.navigate(-1))
+    expect(router.state.location.search).toBe('?tab=cap')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('다른 계약 판정 ID를 URL에 넣어도 계산근거를 요청하지 않는다', async () => {
@@ -416,6 +417,20 @@ describe('CONT-W02 계약 상세', () => {
     renderAt('/contracts/not-an-id')
     expect(await screen.findByRole('alert')).toHaveTextContent('계약 식별자를 확인할 수 없습니다.')
     expect(requested.some(({ url }) => url.startsWith('/api/v1/contracts'))).toBe(false)
+  })
+
+  it('존재하지 않는 숫자 계약은 기존 COMMON-002 응답을 표시하고 재시도할 수 있다', async () => {
+    renderAt('/contracts/999999', (url) => {
+      if (url === '/api/v1/contracts/999999')
+        throw new ApiError(
+          { code: 'FGC-COMMON-002', message: '존재하지 않는 보험계약입니다.' },
+          'missing-contract',
+          400,
+        )
+    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('존재하지 않는 보험계약입니다.')
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeEnabled()
+    expect(requested.some(({ url }) => url.endsWith('/status-events'))).toBe(false)
   })
 
   it('처리 중 다른 계약으로 이동하면 이전 작업 완료가 현재 계약의 탭을 바꾸지 않는다', async () => {

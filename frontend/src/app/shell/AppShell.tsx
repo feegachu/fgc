@@ -58,11 +58,13 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   ])
   // 1차 화면 제목(layout/default의 "제목 (화면ID) · FGC")과 맞춘다. 에러 바운더리가 그린 오류 화면이 있으면 그 제목이 먼저다.
   useEffect(() => {
-    document.title = errorTitle ?? (!current
-      ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
-      : allowed
-        ? `${current.title} (${current.id}) · FGC`
-        : '권한 없음 (FGC-UI-ERR-403) · FGC')
+    document.title =
+      errorTitle ??
+      (!current
+        ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
+        : allowed
+          ? `${current.title} (${current.id}) · FGC`
+          : '권한 없음 (FGC-UI-ERR-403) · FGC')
   }, [errorTitle, current, allowed])
   return (
     <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''}`}>
@@ -80,9 +82,11 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         <header className="app-header app-header-rail">
           <WorkspaceTabs activeId={current?.id} />
           <div className="app-header-actions">
-            <span className="shell-user-name">
-              {user.userName} · {roleLabels[user.roleCode] ?? user.roleCode}
-            </span>
+            {!current?.id.startsWith('CONT-') && (
+              <span className="shell-user-name">
+                {user.userName} · {roleLabels[user.roleCode] ?? user.roleCode}
+              </span>
+            )}
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
               {month && (
@@ -110,6 +114,14 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
 }
 export function AppShell() {
   const auth = useAuth()
-  if (!auth.user) return <AuthStatus error={auth.error} retry={() => { void auth.refetch() }} />
+  if (!auth.user)
+    return (
+      <AuthStatus
+        error={auth.error}
+        retry={() => {
+          void auth.refetch()
+        }}
+      />
+    )
   return <AppShellView user={auth.user} defaultMonth={auth.user.demoMonth} />
 }

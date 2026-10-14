@@ -114,6 +114,18 @@ jobs:
       - run: npm test -- --run
       # tsc -b(타입 검사) 후 vite build
       - run: npm run build
+      # Contract migration regressions run without an external DB or QA credentials.
+      - name: Install Chromium for contract browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Verify contract routes, schedule stages, conflicts and permissions
+        run: npm run test:e2e -- e2e/contract-ui.spec.ts --workers=1
+      - name: Upload contract browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: contract-browser-failure
+          path: frontend/test-results
+          retention-days: 7
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'

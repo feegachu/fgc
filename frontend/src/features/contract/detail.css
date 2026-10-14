@@ -1,6 +1,7 @@
 .contract-react-detail {
   display: grid;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
   min-width: 0;
 }
 .contract-detail-summary,
@@ -55,6 +56,7 @@
   margin: 16px 0;
 }
 .contract-detail-tabs {
+  min-width: 0;
   overflow-x: auto;
   flex-wrap: nowrap;
 }
@@ -130,6 +132,71 @@
 }
 .contract-detail-subheading {
   margin: 28px 0 0;
+}
+.contract-detail-panel.contract-basic-card {
+  padding: 0;
+}
+.contract-detail-panel > .contract-basic-header {
+  padding: var(--space-3) var(--space-4);
+}
+.contract-information-grid > div {
+  min-width: 0;
+  min-height: 3.5rem;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.contract-information-grid > div:nth-child(odd) {
+  border-right: 1px solid var(--color-border-subtle);
+}
+.contract-information-grid > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+.contract-information-grid dt {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+.contract-information-grid dd {
+  margin-top: var(--space-1);
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.contract-history-sort .button {
+  min-width: 3.25rem;
+  border: 0;
+}
+.contract-history-event-card h4 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+.contract-information-grid,
+.contract-summary-grid,
+.contract-data-panel dl,
+.contract-history-times {
+  margin-block: 1em;
+}
+.contract-information-grid dd,
+.contract-summary-grid dd,
+.contract-data-panel dd,
+.contract-history-times dd {
+  margin-left: 40px;
+}
+.contract-history-list {
+  margin: 0;
+  list-style: none;
+}
+@media (max-width: 767px) {
+  .contract-information-grid > div:nth-child(odd) {
+    border-right: 0;
+  }
+  .contract-information-grid > div:nth-last-child(2) {
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
 }
 @media (max-width: 640px) {
   .contract-detail-summary,

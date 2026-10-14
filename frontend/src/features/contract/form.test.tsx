@@ -122,6 +122,22 @@ afterEach(() => {
 })
 
 describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
+  it.each(['/contracts/new', '/contracts/21/edit'])('등록·수정 취소는 목록으로 이동한다: %s', async (path) => {
+    const { user, router, writes } = renderAt(path)
+    await screen.findByRole('link', { name: '취소' })
+    await user.click(screen.getByRole('link', { name: '취소' }))
+    expect(router.state.location.pathname).toBe('/contracts')
+    expect(writes).toHaveLength(0)
+  })
+
+  it('없는 숫자 계약의 수정 화면은 기존 서버 오류를 표시하고 저장 폼을 열지 않는다', async () => {
+    renderAt('/contracts/999999/edit', (url) => {
+      if (url === '/api/v1/contracts/999999')
+        throw new ApiError({ code: 'FGC-COMMON-002', message: '존재하지 않는 보험계약입니다.' }, 'missing-edit', 400)
+    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('존재하지 않는 보험계약입니다.')
+    expect(screen.queryByRole('button', { name: /스케줄 (재생성|만들기)/ })).not.toBeInTheDocument()
+  })
   it('등록·수정용 상품 조회는 계약일을 사용하고 판매 종료 버전 포함을 활성화하지 않는다', async () => {
     renderAt()
     await ready()
@@ -174,14 +190,23 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
       if (url === '/api/v1/contracts/21' && !options?.method)
         return ++reads === 1 ? contract : { ...contract, updatedAt: latest, contractNo: 'LATEST' }
       if (options?.method && ++attempts === 1)
-        throw new ApiError({ code: 'FGC-CONT-003', message: '서버 충돌 응답 원문' }, 'conflict-trace', 409)
+        throw new ApiError(
+          {
+            code: 'FGC-CONT-003',
+            message:
+              '다른 요청에서 계약을 수정했습니다. 현재 입력은 유지됩니다. 변경 내용을 확인한 뒤 ‘최신 계약 다시 불러오기’를 눌러 다시 수정하세요.',
+          },
+          'conflict-trace',
+          409,
+        )
     })
     await ready()
     fireEvent.change(field('계약번호'), { target: { value: 'MY-DRAFT' } })
     await user.click(save())
     await screen.findByText(/현재 입력은 유지됩니다/)
     expect(screen.getByText(/FGC-CONT-003/)).toHaveTextContent('conflict-trace')
-    expect(screen.getByText(/FGC-CONT-003/)).toHaveTextContent('서버 충돌 응답 원문')
+    expect(screen.getByText(/FGC-CONT-003/)).toHaveTextContent('다른 요청에서 계약을 수정했습니다.')
+    expect(screen.getAllByText(/현재 입력은 유지됩니다/)).toHaveLength(1)
     expect(field('계약번호')).toHaveValue('MY-DRAFT')
     expect(save()).toBeDisabled()
     fireEvent.submit(screen.getByRole('form'))
@@ -494,9 +519,9 @@ describe('[FGC-FUN-018·030] 보험료 파생·입력 검증', () => {
     await ready()
     const preview = within(screen.getByRole('complementary', { name: '1,200% 한도 참고 미리보기' }))
     fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '750599937895082' } })
-    expect(preview.getByText('9,007,199,254,740,984 원')).toBeInTheDocument()
+    expect(preview.getByText('9,007,199,254,740,984')).toBeInTheDocument()
     fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '750599937895083' } })
-    expect(preview.getByText('— 원')).toBeInTheDocument()
-    expect(preview.queryByText('9,007,199,254,740,984 원')).not.toBeInTheDocument()
+    expect(preview.getByText('—')).toBeInTheDocument()
+    expect(preview.queryByText('9,007,199,254,740,984')).not.toBeInTheDocument()
   })
 })

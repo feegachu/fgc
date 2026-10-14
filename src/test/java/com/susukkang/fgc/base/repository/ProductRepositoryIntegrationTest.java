@@ -215,19 +215,19 @@ class ProductRepositoryIntegrationTest {
         long inactiveProductId = insertProduct(insurerId, "P-I-" + suffix, "STD-I-" + suffix, false);
         long otherProductId = insertProduct(otherInsurerId, "P-O-" + suffix, "STD-O-" + suffix, true);
         long currentId = insertOffering(productId, "A-CURRENT", asOf, null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         long expiredId = insertOffering(productId, "B-EXPIRED", asOf.minusMonths(2), asOf.minusDays(1),
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         long boundaryId = insertOffering(productId, "C-ENDS-TODAY", asOf.minusMonths(2), asOf,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         insertOffering(productId, "D-FUTURE", asOf.plusDays(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         insertOffering(productId, "E-INACTIVE", asOf.minusMonths(2), asOf.minusDays(1),
-                "FACE_TO_FACE", false, "CURRENT", false, false);
+                "CURRENT", false, false);
         insertOffering(inactiveProductId, "A-INACTIVE-PRODUCT", asOf.minusMonths(2), asOf.minusDays(1),
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         insertOffering(otherProductId, "A-OTHER-INSURER", asOf.minusMonths(2), asOf.minusDays(1),
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
 
         var first = productRepository.search(insurerId, asOf, includeExpired, PageRequest.of(0, 1));
         var second = productRepository.search(insurerId, asOf, includeExpired, PageRequest.of(1, 1));

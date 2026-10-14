@@ -16,6 +16,7 @@ import { contractStatusLabels, paymentCycleLabels } from './labels'
 import { contractErrorText } from './detailState'
 import { createRequest, fillCyclePremium, initialDraft, validateDraft } from './form'
 import type { ContractDraft, ContractField, ContractFieldErrors } from './form'
+import '../../../../src/main/resources/static/css/features/contract.css'
 import './form.css'
 
 export default function ContractFormPage() {
@@ -27,10 +28,13 @@ export default function ContractFormPage() {
     setRevision((current) => current + 1)
   }
   return (
-    <div className="page-content contract-form-page">
-      <header className="page-header">
+    <div className="contract-form-page">
+      <header className="page-header contract-form-page-header">
         <h1 className="page-title">보험계약 {id ? '수정' : '등록'}</h1>
         <Link className="button button-secondary" to="/contracts">
+          <span className="material-symbols-rounded" aria-hidden="true">
+            arrow_back
+          </span>
           목록으로
         </Link>
       </header>
@@ -200,7 +204,20 @@ function ContractEditor({
   }
 
   const amountInput = (field: ContractField, label: string, helper?: string, optional = false) => (
-    <Field label={label} required={!optional} error={errors[field]} helper={helper}>
+    <Field
+      label={label}
+      required={!optional}
+      error={errors[field]}
+      helper={helper}
+      labelAccessory={
+        field === 'standardSurrenderDeductionAmount' ? (
+          <EvidenceLink label="표준해약공제액 근거" icon="help">
+            REG-08 · 제4-32조제5항: 표준해약공제액 80% 이상 공제 상품은 1년 경과시점 예상 해약환급금을 합산합니다.
+            REG-12 · 제4-32조제6항: 차익거래 판정에서도 일정 상품의 36개월 이내 해지는 해약환급금을 합산합니다.
+          </EvidenceLink>
+        ) : undefined
+      }
+    >
       <input
         type="number"
         name={field}
@@ -208,6 +225,7 @@ function ContractEditor({
         step="1"
         inputMode="numeric"
         max={field === 'paymentTermMonths' ? 2147483647 : Number.MAX_SAFE_INTEGER}
+        placeholder={field === 'standardSurrenderDeductionAmount' ? '해당 상품만 입력' : undefined}
         value={draft[field]}
         onChange={(event) => change(field, event.target.value)}
         readOnly={field === 'paymentTermMonths' && hasProductTerm}
@@ -222,9 +240,6 @@ function ContractEditor({
         <div className="surface contract-form-error" role="alert">
           <strong>입력 내용을 확인해 주세요.</strong>
           <p>{saveError}</p>
-          {conflict && (
-            <p>현재 입력은 유지됩니다. 변경 내용을 확인한 뒤 ‘최신 계약 다시 불러오기’를 눌러 다시 수정하세요.</p>
-          )}
         </div>
       )}
       {referenceError && (
@@ -249,18 +264,24 @@ function ContractEditor({
         noValidate
         aria-label={`보험계약 ${id ? '수정' : '등록'} 입력`}
       >
-        <fieldset className="contract-editor-fields" disabled={saving || reloading}>
-          <section className="surface contract-editor-card" aria-labelledby="contract-basic-heading">
-            <header className="surface-header">
+        <fieldset className="contract-editor-fields contract-form-layout" disabled={saving || reloading}>
+          <section
+            className="surface contract-form-card contract-basic-form-card contract-editor-basic"
+            aria-labelledby="contract-basic-heading"
+          >
+            <header className="surface-header contract-form-card-header">
               <div>
-                <h2 id="contract-basic-heading">계약 기본</h2>
+                <h2 id="contract-basic-heading" className="surface-title">
+                  계약 기본
+                </h2>
                 <p>보험회사와 계약일을 먼저 선택하면 판매 가능한 상품 버전을 조회합니다.</p>
               </div>
             </header>
-            <div className="contract-editor-grid">
+            <div className="contract-form-fields">
               <Field label="보험회사" required error={errors.insurerId}>
                 <select
                   name="insurerId"
+                  className="select-control"
                   value={draft.insurerId}
                   disabled={insurers.isFetching}
                   onChange={(event) => change('insurerId', event.target.value)}
@@ -281,15 +302,31 @@ function ContractEditor({
                 </select>
               </Field>
               <div>
-                <Field label="상품 판매버전" required error={errors.productOfferingId}>
+                <Field
+                  label="상품 판매버전"
+                  required
+                  error={errors.productOfferingId}
+                  labelAccessory={
+                    <EvidenceLink label="판매버전 근거" icon="help">
+                      REG-19 · 부칙 제2조 [개정고시]. 분급 관련 조항은 시행 후 최초로 작성·변경된 기초서류로서
+                      판매개시일이 2027-01-01 이후인 상품부터 적용합니다. 1,200%룰·차익거래 적용 여부는 계약 체결일
+                      기준으로 별도 판단하므로 계약일에 유효한 판매버전을 선택해야 합니다.
+                    </EvidenceLink>
+                  }
+                >
                   <select
                     name="productOfferingId"
+                    className="select-control"
                     value={draft.productOfferingId}
                     disabled={!draft.insurerId || !draft.contractDate || products.isFetching || Boolean(products.error)}
                     onChange={(event) => change('productOfferingId', event.target.value)}
                   >
                     <option value="">
-                      {products.isFetching ? '상품 판매버전을 불러오는 중...' : '상품 판매버전을 선택하세요'}
+                      {!draft.insurerId || !draft.contractDate
+                        ? '보험회사와 계약일을 먼저 선택하세요'
+                        : products.isFetching
+                          ? '상품 판매버전을 불러오는 중...'
+                          : '상품 판매버전을 선택하세요'}
                     </option>
                     {(products.data ?? []).map((row) => (
                       <option key={row.productOfferingId} value={row.productOfferingId}>
@@ -305,10 +342,6 @@ function ContractEditor({
                       )}
                   </select>
                 </Field>
-                <EvidenceLink label="판매버전 근거">
-                  REG-19 · 계약일에 유효한 판매버전을 선택해야 합니다. 분급 관련 조항은 시행 후 최초로 작성·변경된
-                  기초서류로서 판매개시일이 2027-01-01 이후인 상품부터 적용합니다.
-                </EvidenceLink>
               </div>
               <Field
                 label="계약번호"
@@ -318,6 +351,7 @@ function ContractEditor({
               >
                 <input
                   name="contractNo"
+                  placeholder="계약번호 입력"
                   maxLength={80}
                   autoComplete="off"
                   value={draft.contractNo}
@@ -336,6 +370,7 @@ function ContractEditor({
               <Field label="계약상태" required error={errors.contractStatus}>
                 <select
                   name="contractStatus"
+                  className="select-control"
                   value={draft.contractStatus}
                   onChange={(event) => change('contractStatus', event.target.value)}
                 >
@@ -348,18 +383,33 @@ function ContractEditor({
               </Field>
             </div>
           </section>
-          <section className="surface contract-editor-card" aria-labelledby="contract-agent-heading">
-            <header className="surface-header">
+          <section
+            className="surface contract-form-card contract-agent-card contract-editor-agent"
+            aria-labelledby="contract-agent-heading"
+          >
+            <header className="surface-header contract-form-card-header">
               <div>
-                <h2 id="contract-agent-heading">모집 설계사 · 소속</h2>
+                <h2 id="contract-agent-heading" className="surface-title">
+                  모집 설계사 · 소속
+                </h2>
                 <p>설계사를 선택하면 계약일 기준 소속 조직을 자동으로 채웁니다.</p>
               </div>
             </header>
-            <div className="contract-editor-grid">
+            <div className="contract-form-fields contract-agent-fields">
               <div>
-                <Field label="모집 설계사" required error={errors.agentId}>
+                <Field
+                  label="모집 설계사"
+                  required
+                  error={errors.agentId}
+                  labelAccessory={
+                    <EvidenceLink label="모집 설계사 근거" icon="help">
+                      REG-07 · 계약을 모집한 설계사를 저장합니다. 계약을 유지관리하는 담당 설계사는 별도로 관리합니다.
+                    </EvidenceLink>
+                  }
+                >
                   <select
                     name="agentId"
+                    className="select-control"
                     value={draft.agentId}
                     disabled={!draft.contractDate || agents.isFetching || Boolean(agents.error)}
                     onChange={(event) => change('agentId', event.target.value)}
@@ -379,15 +429,12 @@ function ContractEditor({
                       )}
                   </select>
                 </Field>
-                <EvidenceLink label="모집 설계사 근거">
-                  REG-07 · 계약을 모집한 설계사를 저장합니다. 계약을 유지관리하는 담당 설계사는 별도로 관리합니다.
-                </EvidenceLink>
               </div>
               <Field
                 label="소속 조직"
                 required
                 error={errors.organizationId}
-                helper="계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다."
+                helper="직접 수정하지 않습니다. 계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다."
               >
                 <input
                   name="organizationName"
@@ -398,17 +445,23 @@ function ContractEditor({
               </Field>
             </div>
           </section>
-          <section className="surface contract-editor-card" aria-labelledby="contract-premium-heading">
-            <header className="surface-header">
+          <section
+            className="surface contract-form-card contract-premium-card contract-editor-premium"
+            aria-labelledby="contract-premium-heading"
+          >
+            <header className="surface-header contract-form-card-header">
               <div>
-                <h2 id="contract-premium-heading">보험료 · 납입 조건</h2>
+                <h2 id="contract-premium-heading" className="surface-title">
+                  보험료 · 납입 조건
+                </h2>
                 <p>원주기 보험료와 월납환산 초회보험료를 구분해 입력합니다.</p>
               </div>
             </header>
-            <div className="contract-editor-grid">
+            <div className="contract-form-fields contract-premium-fields">
               <Field label="납입주기" required error={errors.paymentCycleCode}>
                 <select
                   name="paymentCycleCode"
+                  className="select-control"
                   value={draft.paymentCycleCode}
                   onChange={(event) => change('paymentCycleCode', event.target.value)}
                 >
@@ -446,10 +499,6 @@ function ContractEditor({
                   '비워 두면 한도 가산에 사용하지 않습니다.',
                   true,
                 )}
-                <EvidenceLink label="표준해약공제액 근거">
-                  REG-08 · 제4-32조제5항: 표준해약공제액 80% 이상 공제 상품은 1년 경과시점 예상 해약환급금을 합산합니다.
-                  REG-12 · 제4-32조제6항: 차익거래 판정에서도 일정 상품의 36개월 이내 해지는 해약환급금을 합산합니다.
-                </EvidenceLink>
               </div>
             </div>
             {missingRefundTable && (
@@ -457,15 +506,17 @@ function ContractEditor({
                 선택한 상품버전에 적용할 해약환급률표가 없습니다. 저장 후 월 통합검증에서 검토필요로 처리됩니다.
               </p>
             )}
-            <aside className="contract-editor-preview" aria-label="1,200% 한도 참고 미리보기">
+            <aside className="contract-limit-preview" aria-label="1,200% 한도 참고 미리보기">
               <p>GA→설계사 초년도 1,200% 한도 참고값</p>
-              <strong>
-                {draft.monthlyEquivalentFirstPremium === '' ||
-                !Number.isSafeInteger(Number(draft.monthlyEquivalentFirstPremium) * 12)
-                  ? '—'
-                  : int(Number(draft.monthlyEquivalentFirstPremium) * 12)}{' '}
-                원
-              </strong>
+              <div className="contract-limit-value-row">
+                <strong>
+                  {draft.monthlyEquivalentFirstPremium === '' ||
+                  !Number.isSafeInteger(Number(draft.monthlyEquivalentFirstPremium) * 12)
+                    ? '—'
+                    : int(Number(draft.monthlyEquivalentFirstPremium) * 12)}
+                </strong>
+                <span>원</span>
+              </div>
               <p>월납환산 초회보험료 × 12</p>
               <p>
                 참고용 기본 계산식입니다. 실제 한도는 저장 후 적용 룰셋·해약환급금 합산 등을 반영해 서버가 다시
@@ -474,8 +525,8 @@ function ContractEditor({
             </aside>
           </section>
         </fieldset>
-        <div className="surface contract-editor-actions">
-          <p id="contract-save-hint" role="status">
+        <div className="surface contract-form-actions">
+          <p id="contract-save-hint" className="contract-save-hint" role="status">
             {saving
               ? '계약과 스케줄을 저장하고 있습니다.'
               : loadingReferences
@@ -488,16 +539,27 @@ function ContractEditor({
                       ? '저장할 준비가 되었습니다.'
                       : '필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.'}
           </p>
-          <div className="contract-editor-buttons">
+          <div className="contract-action-buttons">
             {(conflict || missingToken) && (
               <Button variant="secondary" onClick={() => setConfirmReload(true)}>
                 최신 계약 다시 불러오기
               </Button>
             )}
-            <Link className="button button-secondary" to={id ? `/contracts/${id}` : '/contracts'}>
+            <Link className="button button-secondary" to="/contracts">
               취소
             </Link>
-            <Button type="submit" loading={saving} disabled={disabled} aria-describedby="contract-save-hint">
+            <Button
+              className="contract-save-button"
+              type="submit"
+              loading={saving}
+              disabled={disabled}
+              aria-describedby="contract-save-hint"
+            >
+              {!saving && (
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  save
+                </span>
+              )}
               {id ? '수정하고 스케줄 재생성' : '저장하고 예상 스케줄 만들기'}
             </Button>
           </div>

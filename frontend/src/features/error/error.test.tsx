@@ -119,7 +119,7 @@ describe('오류 화면 (#417)', () => {
     expect(router.state.location.pathname).toBe('/contracts')
     expect(screen.queryByRole('heading', { name: '500 · 처리 오류' })).toBeNull()
     // 바운더리가 초기화되면 등록한 제목도 지워져 이동한 화면의 제목으로 돌아온다(#467).
-    await waitFor(() => expect(document.title).toBe('보험계약 (CONT-W01) · FGC'))
+    await waitFor(() => expect(document.title).toBe('보험계약 목록 (CONT-W01) · FGC'))
     expect(reported.every((error) => (error as Error).cause === page.thrown)).toBe(true)
   })
 

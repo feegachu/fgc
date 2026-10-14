@@ -13,6 +13,7 @@ WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+COPY src/main/resources/static/css/features/contract.css /src/src/main/resources/static/css/features/contract.css
 RUN npm run build
 
 # ---------- 2단계: 실행 ----------

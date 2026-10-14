@@ -6,6 +6,15 @@
 .contract-list-page > .surface {
   min-width: 0;
 }
+.contract-filter-fields .field-label {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+}
+.contract-filter-fields .field {
+  gap: var(--space-1);
+}
 .contract-list-page .data-table .contract-number-cell {
   white-space: normal;
   overflow-wrap: anywhere;
