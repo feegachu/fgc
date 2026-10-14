@@ -31,7 +31,6 @@ import java.time.LocalDate;
                         @ColumnResult(name = "basic_document_version", type = String.class),
                         @ColumnResult(name = "basic_document_date", type = LocalDate.class),
                         @ColumnResult(name = "channel_code", type = String.class),
-                        @ColumnResult(name = "channel_special_rule_yn", type = Boolean.class),
                         @ColumnResult(name = "fee_regime_code", type = String.class),
                         @ColumnResult(name = "standard_deduction_80_yn", type = Boolean.class),
                         @ColumnResult(name = "payment_term_months", type = Integer.class)

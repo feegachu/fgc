@@ -346,7 +346,7 @@ class CapCalculatorIntegrationTest {
                     inclusion_status_snapshot, exclusion_type_snapshot, attribution_method,
                     allocation_basis_snapshot, evidence_ref
                 ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, DATE '2026-07-10', DATE '2026-07-01', 100,
-                          'EXCLUDED', 'VOICE_RECORDING', 'DIRECT', '{}'::jsonb, 'EVD-LINE-1')
+                          'EXCLUDED', 'NEW_AGENT_SUPPORT', 'DIRECT', '{}'::jsonb, 'EVD-LINE-1')
                 """, paymentId, contractId, agentId, lineIds.get(0));
         jdbcTemplate.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", paymentId);
 

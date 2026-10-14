@@ -156,6 +156,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return afterRow.toResponse(afterAttributions, List.of());
     }
 
+    /**
+     * 지급 건을 확정한다(IF-API-25). 운영정책서 제31조 확정 게이트를 순서대로 통과해야 하며,
+     * 첫 차단 사유에서 예외 이력을 남기고 거절한다. 같은 멱등키의 재요청은 최초 확정 결과를 돌려준다.
+     *
+     * @param paymentId      지급 건 ID
+     * @param idempotencyKey 확정 멱등키(없으면 null)
+     * @return 확정된 지급 건과 저장된 한도 점검 ID
+     */
     @Override
     // 2026-08-10 yslee - 확정 검증 결과와 예외 이력을 지급 건 확정 트랜잭션으로 통합
     // 기존 코드: 잠긴 지급 건을 참조하는 한도 점검을 REQUIRES_NEW 트랜잭션에서 저장
@@ -190,7 +198,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -285,6 +293,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return requirePayment(paymentId, capCheckIds);
     }
 
+    /**
+     * 확정 게이트를 저장 없이 미리 계산한다(IF-API-24). confirm 과 같은 판정 메서드를 쓰되
+     * 첫 실패에서 멈추지 않고 모든 차단 사유를 blockers 로 모은다.
+     *
+     * @param paymentId 지급 건 ID
+     * @return 한도 미리보기, 차단 사유, 확정 가능 여부
+     */
     @Override
     // 2026-08-16 yslee - IF-API-24 지급 전 한도 사전검증 미리보기 (FGC-FUN-033)
     // confirm()과 같은 판정 메서드·계산 엔진(REALTIME)을 재사용하되 아무것도 저장하지 않는다.
@@ -303,7 +318,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -441,10 +456,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         );
     }
 
+    /** 게이트 실패를 사전검증 응답의 차단 사유로 바꾼다. 같은 사유는 한 줄로 접는다. */
     private List<TransactionPrecheckResponse.Blocker> toBlockers(List<GateFailure> failures) {
         return failures.stream()
                 .map(failure -> {
-                    // CAP_003(미해결 위반)은 hasUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
+                    // CAP_003(미해결 위반)은 hasBlockingUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
                     // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 예외 건을
                     // 찾게 되므로 계약·귀속행 ID를 비운다
                     boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
@@ -1446,9 +1462,32 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 기존 코드: protection_type 을 읽지 않아 저축성·일반손해·자동차 계약 귀속도 한도 판정에 걸렸다.
     // 문제: 규정상 한도가 없는 계약의 지급확정이 한도 위반으로 막힐 수 있었다.
     // 개선: 룰셋 조회 앞에서 거른다. 확정과 사전검증이 같은 메서드를 써서 판정이 갈리지 않는다.
+    /** 귀속행의 계약이 1,200% 규제 대상(보장성)이 아닌지. 계약이 없는 귀속행은 대상 밖으로 보지 않는다. */
     private boolean isOutsideCapScope(ConfirmationData data) {
-        return data.contractId() != null
-                && !ProtectionType.isRegulated(queryRepository.findProtectionType(data.contractId()));
+        return isOutsideCapScope(data.contractId());
+    }
+
+    /** 계약 상품의 보장성 구분으로 1,200% 규제 대상이 아닌지 판정한다. null 계약은 false. */
+    private boolean isOutsideCapScope(Long contractId) {
+        return contractId != null
+                && !ProtectionType.isRegulated(queryRepository.findProtectionType(contractId));
+    }
+
+    // 2026-10-13 #477 후속 - 미해결 CAP_VIOLATION(CAP_003) 차단도 규제 대상 계약에만 건다
+    // 기존 코드: hasUnresolvedViolation 이 지급 건 단위로 위반 존재만 보아, 비보장성 계약에 남은 위반
+    //           (#477 이전 판정분, 보장성 구분 정정 전 판정분)만 있어도 확정·사전검증이 막혔다.
+    // 문제: 한도 판정 루프는 비대상 계약을 건너뛰는데 CAP_003 게이트만 같은 계약을 이유로 차단했다.
+    // 개선: 위반이 걸린 계약마다 isOutsideCapScope 로 다시 판정해 대상 계약에 걸린 위반만 차단한다.
+    //       계약이 비어 있는 위반은 대상 여부를 알 수 없으므로 종전처럼 차단한다.
+    /**
+     * 지급 건에 확정을 막아야 하는 미해결 CAP_VIOLATION 이 있는지 — 규제 대상 계약 또는 계약 미상인 위반만 센다.
+     *
+     * @param paymentId 지급 건 ID
+     * @return CAP_003 으로 차단해야 하면 true
+     */
+    private boolean hasBlockingUnresolvedViolation(Long paymentId) {
+        return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
+                .anyMatch(contractId -> contractId == null || !isOutsideCapScope(contractId));
     }
 
     private CapCheckCommand buildCapCheck(
