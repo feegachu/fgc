@@ -181,6 +181,31 @@ class ContractFinancialSnapshotCorrectionIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT calculation_snapshot::text FROM fgc.arbitrage_check WHERE arbitrage_check_id=?", String.class, before.getArbitrageCheckId())).isEqualTo(beforeJson);
     }
 
+    @Test
+    void premiumCorrectionPreservesHistoricalReferencesAfterTerminationAndReorganization() {
+        Long id = newContract();
+        InsuranceContract original = latest(id);
+        Long oldOrganization = original.getOrganizationId();
+        Long agent = original.getAgentId();
+        Long newOrganization = jdbc.queryForObject(
+                "SELECT organization_id FROM fgc.organization WHERE organization_id <> ? ORDER BY organization_id LIMIT 1",
+                Long.class, oldOrganization);
+        jdbc.update("UPDATE fgc.agent SET organization_id=?, agent_status='TERMINATED', active_yn=FALSE, termination_date=? WHERE agent_id=?",
+                newOrganization, original.getContractDate().plusDays(1), agent);
+        jdbc.update("UPDATE fgc.organization SET active_yn=FALSE, effective_to=? WHERE organization_id=?",
+                original.getContractDate().plusDays(1), oldOrganization);
+        jdbc.update("UPDATE fgc.product_offering SET active_yn=FALSE WHERE product_offering_id=?", original.getProductOfferingId());
+        jdbc.update("UPDATE fgc.insurer SET active_yn=FALSE WHERE insurer_id=?", original.getInsurerId());
+        entityManager.clear();
+        correct(id, "150000", null);
+        InsuranceContract corrected = latest(id);
+        assertThat(corrected.getAgentId()).isEqualTo(agent);
+        assertThat(corrected.getOrganizationId()).isEqualTo(oldOrganization);
+        assertThat(corrected.getFirstPremiumAmount()).isEqualByComparingTo("150000");
+        assertThat(arbitrage.selectCalculationSource(id, corrected.getContractDate()).getCumulativePaidPremium())
+                .isEqualByComparingTo("150000");
+    }
+
     private Long insertRun() {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.validation_run(validation_month,run_no,run_type,status)

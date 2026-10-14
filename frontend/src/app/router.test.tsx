@@ -11,6 +11,16 @@ import { screens } from './screens'
 import { queryClient } from './queryClient'
 import { subscribeApiErrors } from '../lib/api/errorNotifications'
 import { useAuthStore } from '../stores/auth'
+import { TransitionPage } from './TransitionPage'
+
+// 셸·기존 링크 계약은 업무 화면의 React 전환 여부와 독립적으로 검증한다.
+vi.mock('../features/validation/ValidationRunListPage', () => ({
+  default: () => <TransitionPage screen={screens.find((item) => item.id === 'VRUN-W01')!} />,
+}))
+vi.mock('../features/validation/ValidationRunDetailPage', () => ({
+  default: () => <TransitionPage screen={screens.find((item) => item.id === 'VRUN-W02')!} />,
+}))
+
 beforeEach(() => {
   useAuthStore.setState({ accessToken: 'shell-fixture', loggingOut: false })
   useWorkspaceStore.getState().clear()
@@ -45,8 +55,8 @@ describe('AppShell·라우트', () => {
   it.each(['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN'])(
     '%s 역할의 감사로그 메뉴는 서버 권한 플래그를 따른다',
     async (role) => {
-      renderAt('/contracts', role)
-      await screen.findByRole('heading', { name: '보험계약' })
+      renderAt('/validation-runs', role)
+      await screen.findByRole('heading', { name: '월 통합검증' })
       const audit = screen.queryByRole('link', { name: '감사로그', hidden: true })
       expect(Boolean(audit)).toBe(['COMPLIANCE', 'SYSTEM_ADMIN'].includes(role))
       const labels = [...screen.getByRole('navigation', { name: '주요 업무 메뉴' }).querySelectorAll('a')].map(
@@ -69,12 +79,12 @@ describe('AppShell·라우트', () => {
     },
   )
   it('서버 기본월을 적용하며 상세 기존 경로와 검색 조건을 유지한다', async () => {
-    const router = renderAt('/contracts/12?status=ACTIVE&page=2')
-    await screen.findByRole('heading', { name: '계약 상세' })
+    const router = renderAt('/validation-runs/12?status=ACTIVE&page=2')
+    await screen.findByRole('heading', { name: '월 통합검증 상세' })
     await waitFor(() =>
       expect(screen.getByRole('link', { name: '기존 화면으로 이동' })).toHaveAttribute(
         'href',
-        '/contracts/12?status=ACTIVE&page=2&month=2026-07',
+        '/validation-runs/12?status=ACTIVE&page=2&month=2026-07',
       ),
     )
     expect(router.state.location.search).toContain('month=2026-07')

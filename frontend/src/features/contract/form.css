@@ -1,0 +1,50 @@
+.contract-editor,
+.contract-editor-fields {
+  display: grid;
+  gap: var(--space-4);
+}
+.contract-editor-fields {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.03fr);
+  grid-template-areas: 'basic premium' 'agent premium';
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.contract-editor-basic {
+  grid-area: basic;
+}
+.contract-editor-agent {
+  grid-area: agent;
+}
+.contract-editor-premium {
+  grid-area: premium;
+}
+.contract-form-fields .field-label .evidence {
+  margin-left: var(--space-1);
+}
+.contract-form-fields input[readonly] {
+  background: var(--color-bg-subtle);
+}
+.contract-editor-warning {
+  margin: 0 var(--space-5) var(--space-4);
+  color: var(--color-status-warning-text);
+}
+.contract-form-error {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  color: var(--color-status-error-text);
+  border-color: var(--color-status-error-border);
+}
+.contract-form-error p {
+  margin: var(--space-2) 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1199px) {
+  .contract-editor-fields {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'basic' 'agent' 'premium';
+    grid-template-rows: auto;
+  }
+}

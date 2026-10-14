@@ -70,7 +70,7 @@ export function Sidebar({
               {definition.icon}
             </span>
           )}
-          <span className={sub ? undefined : 'sidebar-nav-label'}>{definition.title}</span>
+          <span className={sub ? undefined : 'sidebar-nav-label'}>{definition.menuTitle ?? definition.title}</span>
         </Link>
       </li>
     )

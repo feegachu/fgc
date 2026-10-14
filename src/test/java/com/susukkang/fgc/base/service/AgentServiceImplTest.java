@@ -54,12 +54,12 @@ class AgentServiceImplTest {
         AgentRow row = row("FC", "INACTIVE", false);
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         PageRequest expectedPage = PageRequest.of(1, 20, Sort.by("agentCode"));
-        when(agentRepository.search(eq(11L), eq("kim"), eq(asOf), any(Pageable.class)))
+        when(agentRepository.search(eq(11L), eq("kim"), eq(asOf), eq(false), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(row), expectedPage, 21));
 
         PageResponse<AgentResponse> result = agentService.search(input, 2, 20);
 
-        verify(agentRepository).search(eq(11L), eq("kim"), eq(asOf), pageableCaptor.capture());
+        verify(agentRepository).search(eq(11L), eq("kim"), eq(asOf), eq(false), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue()).isEqualTo(expectedPage);
         assertThat(result.page()).isEqualTo(2);
         assertThat(result.size()).isEqualTo(20);
@@ -80,13 +80,13 @@ class AgentServiceImplTest {
     void convertsBlankKeywordToNull(String keyword) {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         PageRequest expectedPage = PageRequest.of(0, 20, Sort.by("agentCode"));
-        when(agentRepository.search(isNull(), isNull(), eq(asOf), any(Pageable.class)))
+        when(agentRepository.search(isNull(), isNull(), eq(asOf), eq(false), any(Pageable.class)))
                 .thenReturn(Page.empty(expectedPage));
 
         PageResponse<AgentResponse> result = agentService.search(
                 new AgentSearchCriteria(null, keyword, asOf), 1, 20);
 
-        verify(agentRepository).search(isNull(), isNull(), eq(asOf), eq(expectedPage));
+        verify(agentRepository).search(isNull(), isNull(), eq(asOf), eq(false), eq(expectedPage));
         assertThat(result.content()).isEmpty();
         assertThat(result.totalElements()).isZero();
         assertThat(result.totalPages()).isZero();
@@ -124,7 +124,7 @@ class AgentServiceImplTest {
     void keepsRequestedPageAndTotalWhenPageIsBeyondLastResult() {
         AgentSearchCriteria criteria = criteria();
         PageRequest requestedPage = PageRequest.of(2, 20, Sort.by("agentCode"));
-        when(agentRepository.search(isNull(), isNull(), eq(criteria.asOf()), eq(requestedPage)))
+        when(agentRepository.search(isNull(), isNull(), eq(criteria.asOf()), eq(false), eq(requestedPage)))
                 .thenReturn(new PageImpl<>(List.of(), requestedPage, 21));
 
         PageResponse<AgentResponse> result = agentService.search(criteria, 3, 20);
@@ -137,6 +137,27 @@ class AgentServiceImplTest {
 
     private AgentSearchCriteria criteria() {
         return new AgentSearchCriteria(null, null, LocalDate.of(2026, 8, 11));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void passesIncludeTerminatedWhilePreservingKeywordOrganizationDateAndPaging(boolean includeTerminated) {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(11L, "  과거설계사  ", asOf, includeTerminated);
+        PageRequest requestedPage = PageRequest.of(1, 10, Sort.by("agentCode"));
+        when(agentRepository.search(11L, "과거설계사", asOf, includeTerminated, requestedPage))
+                .thenReturn(new PageImpl<>(List.of(row("FC", "TERMINATED", false)), requestedPage, 11));
+
+        PageResponse<AgentResponse> result = agentService.search(criteria, 2, 10);
+
+        verify(agentRepository).search(11L, "과거설계사", asOf, includeTerminated, requestedPage);
+        assertThat(result.page()).isEqualTo(2);
+        assertThat(result.size()).isEqualTo(10);
+        assertThat(result.totalElements()).isEqualTo(11);
+        assertThat(result.content()).singleElement().satisfies(agent -> {
+            assertThat(agent.agentStatus()).isEqualTo("TERMINATED");
+            assertThat(agent.activeYn()).isFalse();
+        });
     }
 
     private AgentRow row(String rankCode, String status, boolean activeYn) {

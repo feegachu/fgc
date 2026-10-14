@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -16,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -54,7 +56,7 @@ class AgentRepositoryIntegrationTest {
         long agentId = insertAgent(agentCode, "설계사", organizationId, rank,
                 AS_OF.minusMonths(1), AS_OF, "INACTIVE", false);
 
-        Page<AgentRow> result = agentRepository.search(organizationId, agentCode, AS_OF, page(0, 1));
+        Page<AgentRow> result = agentRepository.search(organizationId, agentCode, AS_OF, false, page(0, 1));
 
         assertThat(result.getContent()).containsExactly(new AgentRow(
                 agentId, agentCode, "설계사", rank.name(), organizationId, organizationCode,
@@ -76,7 +78,7 @@ class AgentRepositoryIntegrationTest {
                 RETURNING agent_id
                 """, Long.class, organizationId, code, AS_OF);
 
-        Page<AgentRow> result = agentRepository.search(organizationId, code, AS_OF, page(0, 1));
+        Page<AgentRow> result = agentRepository.search(organizationId, code, AS_OF, false, page(0, 1));
 
         assertThat(result.getContent()).singleElement().satisfies(row -> {
             assertThat(row.agentId()).isEqualTo(agentId);
@@ -115,7 +117,7 @@ class AgentRepositoryIntegrationTest {
                 AS_OF, null, "ACTIVE", true);
 
         // 페이지를 채워 countQuery에도 조직·유효기간 조건이 적용되는지 검증한다.
-        Page<AgentRow> result = agentRepository.search(organizationId, prefix, AS_OF, page(0, 3));
+        Page<AgentRow> result = agentRepository.search(organizationId, prefix, AS_OF, false, page(0, 3));
 
         assertThat(result.getContent()).extracting(AgentRow::agentCode)
                 .containsExactly(prefix + "-A", prefix + "-B", prefix + "-C");
@@ -139,9 +141,9 @@ class AgentRepositoryIntegrationTest {
         }
         String keyword = prefix.toUpperCase(Locale.ROOT);
 
-        Page<AgentRow> first = agentRepository.search(null, keyword, AS_OF, page(0, 20));
-        Page<AgentRow> second = agentRepository.search(null, keyword, AS_OF, page(1, 20));
-        Page<AgentRow> beyondLast = agentRepository.search(null, keyword, AS_OF, page(2, 20));
+        Page<AgentRow> first = agentRepository.search(null, keyword, AS_OF, false, page(0, 20));
+        Page<AgentRow> second = agentRepository.search(null, keyword, AS_OF, false, page(1, 20));
+        Page<AgentRow> beyondLast = agentRepository.search(null, keyword, AS_OF, false, page(2, 20));
 
         List<String> expectedFirst = IntStream.rangeClosed(1, 20)
                 .mapToObj(index -> "%s-%02d".formatted(prefix, index)).toList();
@@ -155,6 +157,48 @@ class AgentRepositoryIntegrationTest {
         assertThat(beyondLast.getTotalElements()).isEqualTo(21);
     }
 
+    @ParameterizedTest(name = "includeTerminated={0}: 해촉일 조건만 선택적으로 해제한다")
+    @ValueSource(booleans = {false, true})
+    void includesExpiredAgentsOnlyWhenRequestedAndPreservesOtherFiltersAndCount(boolean includeTerminated) {
+        long organizationId = insertOrganization(uniqueCode(), null);
+        long otherOrganizationId = insertOrganization(uniqueCode(), null);
+        String prefix = uniqueCode();
+        long activeId = insertAgent(prefix + "-A", "현재 설계사", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), null, "ACTIVE", true);
+        long terminatedId = insertAgent(prefix + "-B", "과거 계약 담당", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF.minusDays(1), "TERMINATED", false);
+        long boundaryId = insertAgent(prefix + "-C", "기준일 해촉", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF, "TERMINATED", false);
+        insertAgent(prefix + "-D", "미래 위촉", organizationId, AgentRankCode.FC,
+                AS_OF.plusDays(1), null, "ACTIVE", true);
+        insertAgent(prefix + "-E", "다른 조직 과거 계약 담당", otherOrganizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF.minusDays(1), "TERMINATED", false);
+        insertAgent(uniqueCode(), "검색어 불일치", organizationId, AgentRankCode.FC,
+                AS_OF.minusMonths(2), AS_OF.minusDays(1), "TERMINATED", false);
+
+        // 첫 페이지를 채워 목록 쿼리와 countQuery 양쪽의 플래그·필터 동작을 검증한다.
+        Page<AgentRow> first = agentRepository.search(organizationId, prefix, AS_OF, includeTerminated, page(0, 1));
+        Page<AgentRow> second = agentRepository.search(organizationId, prefix, AS_OF, includeTerminated, page(1, 1));
+        Page<AgentRow> third = agentRepository.search(organizationId, prefix, AS_OF, includeTerminated, page(2, 1));
+
+        assertThat(first.getContent()).extracting(AgentRow::agentId).containsExactly(activeId);
+        assertThat(second.getContent()).extracting(AgentRow::agentId)
+                .containsExactly(includeTerminated ? terminatedId : boundaryId);
+        assertThat(first.getTotalElements()).isEqualTo(includeTerminated ? 3 : 2);
+        assertThat(second.getTotalElements()).isEqualTo(includeTerminated ? 3 : 2);
+        assertThat(third.getTotalElements()).isEqualTo(includeTerminated ? 3 : 2);
+        if (includeTerminated) {
+            assertThat(second.getContent()).singleElement().satisfies(row -> {
+                assertThat(row.terminationDate()).isEqualTo(AS_OF.minusDays(1));
+                assertThat(row.agentStatus()).isEqualTo("TERMINATED");
+                assertThat(row.activeYn()).isFalse();
+            });
+            assertThat(third.getContent()).extracting(AgentRow::agentId).containsExactly(boundaryId);
+        } else {
+            assertThat(third.getContent()).isEmpty();
+        }
+    }
+
     @Test
     void searchesNameIgnoringCase() {
         long organizationId = insertOrganization(uniqueCode(), null);
@@ -163,7 +207,7 @@ class AgentRepositoryIntegrationTest {
                 AgentRankCode.FC, AS_OF, null, "ACTIVE", true);
 
         Page<AgentRow> result = agentRepository.search(
-                null, keyword.toUpperCase(Locale.ROOT), AS_OF, page(0, 1));
+                null, keyword.toUpperCase(Locale.ROOT), AS_OF, false, page(0, 1));
 
         assertThat(result.getContent()).extracting(AgentRow::agentId).containsExactly(id);
         assertThat(result.getTotalElements()).isEqualTo(1);
@@ -183,7 +227,7 @@ class AgentRepositoryIntegrationTest {
                 ORDER BY agent_code
                 """, Long.class, AS_OF, AS_OF);
 
-        Page<AgentRow> result = agentRepository.search(null, null, AS_OF, page(0, expectedIds.size()));
+        Page<AgentRow> result = agentRepository.search(null, null, AS_OF, false, page(0, expectedIds.size()));
 
         assertThat(result.getContent()).extracting(AgentRow::agentId).containsExactlyElementsOf(expectedIds);
         assertThat(result.getTotalElements()).isEqualTo(expectedIds.size());
@@ -191,7 +235,7 @@ class AgentRepositoryIntegrationTest {
 
     @Test
     void returnsEmptyPageWhenNothingMatches() {
-        Page<AgentRow> result = agentRepository.search(null, uniqueCode(), AS_OF, page(0, 20));
+        Page<AgentRow> result = agentRepository.search(null, uniqueCode(), AS_OF, false, page(0, 20));
 
         assertThat(result.getContent()).isEmpty();
         assertThat(result.getTotalElements()).isZero();
@@ -296,6 +340,79 @@ class AgentRepositoryIntegrationTest {
     }
 
     private record SeedFc(String agentCode, long organizationId) {
+    }
+
+    @Test
+    void historicalOrganizationFilterIncludesFormerRecipientWithoutDuplicates() {
+        List<Long> refs = jdbcTemplate.query("""
+                SELECT agent_id, organization_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
+                """, (rs, rowNum) -> List.of(rs.getLong(1), rs.getLong(2))).getFirst();
+        long agentId = refs.getFirst();
+        long previousOrganization = refs.get(1);
+        long currentOrganization = insertOrganization(uniqueCode(), null);
+        String keyword = uniqueCode();
+        jdbcTemplate.update("""
+                UPDATE fgc.agent SET organization_id = ?, agent_name = ?, agent_status = 'TERMINATED',
+                    active_yn = FALSE, termination_date = ? WHERE agent_id = ?
+                """, currentOrganization, keyword, AS_OF.minusDays(1), agentId);
+        assertThat(agentRepository.search(previousOrganization, keyword, AS_OF, true,
+                PageRequest.of(0, 1)).getContent()).isEmpty();
+        Page<AgentRow> history = agentRepository.search(previousOrganization, keyword, AS_OF, false, true,
+                PageRequest.of(0, 1));
+        assertThat(history.getContent()).extracting(AgentRow::agentId).containsExactly(agentId);
+        assertThat(history.getTotalElements()).isEqualTo(1);
+        assertThat(history.getContent().getFirst().organizationId()).isEqualTo(currentOrganization);
+    }
+
+    @Test
+    void historicalFilterKeepsCurrentMembersAndDeduplicatesFormerMembersAcrossPages() {
+        String prefix = uniqueCode();
+        long previousOrganization = insertOrganization(uniqueCode(), null);
+        long currentOrganization = insertOrganization(uniqueCode(), null);
+        long currentMember = insertAgent(prefix + "-00", "현재 소속", previousOrganization, AgentRankCode.FC,
+                AS_OF.minusYears(1), null, "ACTIVE", true);
+        List<Long> expected = new ArrayList<>();
+        expected.add(currentMember);
+        for (int index = 1; index <= 21; index++) {
+            String code = prefix + "-" + String.format(Locale.ROOT, "%02d", index);
+            long formerMember = insertAgent(code, "이전 소속", currentOrganization, AgentRankCode.FC,
+                    AS_OF.minusYears(1), AS_OF.minusDays(1), "TERMINATED", false);
+            insertHistoricalContracts(code, formerMember, previousOrganization);
+            expected.add(formerMember);
+        }
+        insertAgent(prefix + "-99", "관계없는 설계사", currentOrganization, AgentRankCode.FC,
+                AS_OF.minusYears(1), null, "ACTIVE", true);
+        long otherOrganizationMember = insertAgent(prefix + "-98", "다른 조직의 계약", currentOrganization,
+                AgentRankCode.FC, AS_OF.minusYears(1), null, "ACTIVE", true);
+        insertHistoricalContracts(prefix + "-98", otherOrganizationMember, currentOrganization);
+
+        Page<AgentRow> first = agentRepository.search(previousOrganization, prefix, AS_OF, false, true, page(0, 20));
+        Page<AgentRow> second = agentRepository.search(previousOrganization, prefix, AS_OF, false, true, page(1, 20));
+        Page<AgentRow> beyondLast = agentRepository.search(previousOrganization, prefix, AS_OF, false, true, page(2, 20));
+        assertThat(first.getContent()).extracting(AgentRow::agentId).containsExactlyElementsOf(expected.subList(0, 20));
+        assertThat(second.getContent()).extracting(AgentRow::agentId).containsExactlyElementsOf(expected.subList(20, 22));
+        assertThat(first.getTotalElements()).isEqualTo(22);
+        assertThat(second.getTotalElements()).isEqualTo(22);
+        assertThat(beyondLast.getContent()).isEmpty();
+        assertThat(beyondLast.getTotalElements()).isEqualTo(22);
+        assertThat(agentRepository.search(previousOrganization, prefix, AS_OF, true, page(0, 20)).getContent())
+                .extracting(AgentRow::agentId).containsExactly(currentMember);
+    }
+
+    private void insertHistoricalContracts(String prefix, long agentId, long organizationId) {
+        jdbcTemplate.update("""
+                INSERT INTO fgc.insurance_contract
+                    (insurer_id, product_offering_id, contract_no, contract_date, agent_id, organization_id,
+                     premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium,
+                     premium_conversion_rule_code, payment_cycle_code, payment_term_months,
+                     standard_surrender_deduction_amount, current_status, data_origin)
+                SELECT c.insurer_id, c.product_offering_id, ? || '-' || n, c.contract_date, ?, ?,
+                       c.premium_per_cycle_amount, c.first_premium_amount, c.monthly_equivalent_first_premium,
+                       c.premium_conversion_rule_code, c.payment_cycle_code, c.payment_term_months,
+                       c.standard_surrender_deduction_amount, c.current_status, c.data_origin
+                FROM (SELECT * FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1) c
+                CROSS JOIN generate_series(1, 2) n
+                """, prefix, agentId, organizationId);
     }
 
     private long insertOrganization(String code, Long parentId) {

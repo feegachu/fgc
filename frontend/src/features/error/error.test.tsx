@@ -115,11 +115,11 @@ describe('오류 화면 (#417)', () => {
     expect(screen.queryByText(/secret\.stack/)).toBeNull()
     await waitFor(() => expect(document.title).toBe('처리 오류 (FGC-UI-ERR-500) · FGC'))
     await userEvent.click(screen.getByRole('link', { name: '보험계약' }))
-    expect(await screen.findByRole('heading', { name: '보험계약' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '보험계약 목록' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/contracts')
     expect(screen.queryByRole('heading', { name: '500 · 처리 오류' })).toBeNull()
     // 바운더리가 초기화되면 등록한 제목도 지워져 이동한 화면의 제목으로 돌아온다(#467).
-    await waitFor(() => expect(document.title).toBe('보험계약 (CONT-W01) · FGC'))
+    await waitFor(() => expect(document.title).toBe('보험계약 목록 (CONT-W01) · FGC'))
     expect(reported.every((error) => (error as Error).cause === page.thrown)).toBe(true)
   })
 

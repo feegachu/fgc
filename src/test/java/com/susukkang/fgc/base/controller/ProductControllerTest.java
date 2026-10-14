@@ -52,6 +52,18 @@ class ProductControllerTest {
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
 
     @Test
+    void bindsHistoricalSearchModeWithoutChangingDefault() throws Exception {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        ProductSearchCriteria criteria = new ProductSearchCriteria(1L, asOf, false, true);
+        given(productService.search(criteria, 1, 20)).willReturn(PageResponse.of(List.of(), 1, 20, 0, ""));
+        mockMvc.perform(get("/api/v1/base/products")
+                        .param("asOf", "2026-08-11").param("includeHistorical", "true").param("insurerId", "1")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        verify(productService).search(criteria, 1, 20);
+    }
+
+    @Test
     void returnsPagedProductOfferingsWithDefaultPaging() throws Exception {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         ProductSearchCriteria criteria = new ProductSearchCriteria(2L, asOf);
@@ -102,6 +114,35 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.requestId", matchesPattern("^\\d{8}-[0-9a-f]{6}$")));
 
         verify(productService).search(criteria, 1, 20);
+    }
+
+    // FGC-FUN-007·018: 선택적 이력 검색 파라미터의 기본 계약과 검증을 유지한다.
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void passesIncludeExpiredWithoutChangingInsurerDateAndPaging(boolean includeExpired) throws Exception {
+        var criteria = new ProductSearchCriteria(2L, LocalDate.of(2026, 10, 13), includeExpired);
+        given(productService.search(criteria, 2, 10)).willReturn(PageResponse.of(List.of(), 2, 10, 0, SORT));
+
+        mockMvc.perform(get("/api/v1/base/products")
+                        .param("insurerId", "2").param("asOf", "2026-10-13")
+                        .param("includeExpired", String.valueOf(includeExpired))
+                        .param("page", "2").param("size", "10")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(2))
+                .andExpect(jsonPath("$.data.size").value(10));
+        verify(productService).search(criteria, 2, 10);
+    }
+
+    @Test
+    void rejectsInvalidIncludeExpired() throws Exception {
+        mockMvc.perform(get("/api/v1/base/products")
+                        .param("insurerId", "2").param("asOf", "2026-10-13")
+                        .param("includeExpired", "invalid")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("includeExpired"));
     }
 
     @ParameterizedTest

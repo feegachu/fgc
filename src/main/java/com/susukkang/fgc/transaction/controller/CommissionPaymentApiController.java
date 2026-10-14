@@ -7,8 +7,6 @@ import com.susukkang.fgc.transaction.dto.*;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -157,7 +155,7 @@ public class CommissionPaymentApiController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "사전검증 결과 (차단 사유가 있어도 200 + blockers[])",
-                    content = @Content(schema = @Schema(implementation = TransactionPrecheckResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "지급 건 없음 (FGC-COMMON-002)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
