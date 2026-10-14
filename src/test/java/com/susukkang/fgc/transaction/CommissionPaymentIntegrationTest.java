@@ -1149,6 +1149,36 @@ class CommissionPaymentIntegrationTest {
                 .containsEntry("reason_code", "OUTSIDE_FIRST_YEAR_PAYMENT_DATE_INVALID");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(value = {"2026-07-31", "NULL"}, nullValues = "NULL")
+    void nonProtectionContractDoesNotEnterFirstYearPaymentDateGate(String paymentDate) {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        jdbcTemplate.update("""
+                UPDATE fgc.product SET protection_type='SAVINGS'
+                 WHERE product_id=(SELECT po.product_id FROM fgc.insurance_contract c
+                    JOIN fgc.product_offering po ON po.product_offering_id=c.product_offering_id
+                    WHERE c.contract_id=?)
+                """, contractId);
+        var created = commissionPaymentService.create(candidateRequest(contractId, "200000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000"))));
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET due_date=? WHERE commission_transaction_id=?",
+                paymentDate == null ? null : LocalDate.parse(paymentDate), created.paymentId());
+        entityManager.clear();
+        var baselineQuery = new com.susukkang.fgc.transaction.performance.baseline.CommissionPaymentJdbcBaseline(jdbcTemplate.getDataSource());
+        assertThat(baselineQuery.findProtectionType(contractId)).isEqualTo("SAVINGS");
+        assertThat(baselineQuery.findConfirmationData(created.paymentId()).getFirst().scheduledPaymentDate())
+                .isEqualTo(paymentDate == null ? null : LocalDate.parse(paymentDate));
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.blockers()).isEmpty();
+        assertThat(preview.capPreview()).isEmpty();
+        var confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-479-NONPROTECTION-" + created.paymentId());
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                Integer.class, created.paymentId().toString())).isZero();
+    }
+
     @Test
     void mixedCandidateWithPrematurePaymentIsBlockedWithoutReportingExclusion() {
         Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));

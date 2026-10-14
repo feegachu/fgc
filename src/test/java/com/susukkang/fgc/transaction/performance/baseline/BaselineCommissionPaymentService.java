@@ -1269,7 +1269,8 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     Map.of()
             ));
         }
-        if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)) {
+        if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)
+                && com.susukkang.fgc.common.code.ProtectionType.isRegulated(mapper.findProtectionType(data.contractId()))) {
             String paymentDate = Objects.toString(data.scheduledPaymentDate(), "미입력");
             failures.add(new GateFailure(
                     data, ExceptionType.CAP_REVIEW_REQUIRED, CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,

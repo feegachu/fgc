@@ -1319,7 +1319,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     Map.of()
             ));
         }
-        if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)) {
+        if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)
+                && !isOutsideCapScope(data)) {
             String paymentDate = Objects.toString(data.scheduledPaymentDate(), "미입력");
             failures.add(new GateFailure(
                     data, ExceptionType.CAP_REVIEW_REQUIRED, CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
