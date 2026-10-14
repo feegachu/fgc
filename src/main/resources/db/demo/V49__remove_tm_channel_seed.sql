@@ -1,0 +1,61 @@
+-- ============================================================================
+-- V49: TM 채널 시드 제거 (SRC-036)
+--
+-- 왜: 2026-10-13 팀 결정으로 FGC 가상 GA는 대면 모집만 한다(SRC-036 D-01·D-02).
+--     V4 가 만든 TM 판매버전 STD-TERM-A '2026-TM-A' 와 그 계약
+--     G3 FGC-FGL03-202608-0002 는 더 이상 시나리오가 아니다.
+--     V4 는 이미 적용됐으므로 고치지 않고 여기서 지운다(SRC-027 D-04).
+--
+-- 범위: V4 시드 키(STD-TERM-A '2026-TM-A', 계약번호 G3·data_origin=SEED)만 지운다.
+--     계약의 상태이벤트·재무스냅샷·계약, 그리고 판매버전.
+--     같은 판매버전의 다른 계약이나 이 밖의 TM 판매버전이 있으면 지우지 않고 실패한다
+--     — 무엇을 지울지는 그 DB 주인이 정한다.
+--     V4 시드 기준으로 G3 에 딸린 행은 상태이벤트 1건(ACTIVE)과 재무스냅샷 1건(버전 1)뿐이다.
+--     로컬 DB 에서 G3 로 스케줄·검증·분개를 만들었다면 FK 가 이 마이그레이션을 막는다
+--     — 그 경우 로컬 DB 를 다시 만든다(데모 시드는 test·local 에만 적용된다).
+--
+-- 방법: contract_status_event 는 append-only 트리거가 DELETE 를 막으므로
+--     이 삭제 동안만 끈다(V23_1 선례). 재무스냅샷 트리거는 후속 버전이 없는
+--     버전 1 행의 삭제를 허용한다(V44).
+-- ============================================================================
+
+CREATE TEMP TABLE tmp_tm_offering ON COMMIT DROP AS
+SELECT po.product_offering_id
+  FROM product_offering po
+  JOIN product p ON p.product_id = po.product_id
+ WHERE p.standard_product_code = 'STD-TERM-A'
+   AND po.offering_version = '2026-TM-A'
+   AND po.channel_code = 'TM';
+
+CREATE TEMP TABLE tmp_tm_contract ON COMMIT DROP AS
+SELECT c.contract_id
+  FROM insurance_contract c
+ WHERE c.product_offering_id IN (SELECT product_offering_id FROM tmp_tm_offering)
+   AND c.contract_no = 'FGC-FGL03-202608-0002'
+   AND c.data_origin = 'SEED';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM insurance_contract
+     WHERE product_offering_id IN (SELECT product_offering_id FROM tmp_tm_offering)
+       AND contract_id NOT IN (SELECT contract_id FROM tmp_tm_contract)
+  ) THEN
+    RAISE EXCEPTION 'V49: TM 시드 판매버전에 시드 밖 계약이 남아 있다(SRC-036). 로컬 DB 를 다시 만들거나 직접 정리한다';
+  END IF;
+END $$;
+
+ALTER TABLE contract_status_event DISABLE TRIGGER trg_contract_status_event_append_only;
+DELETE FROM contract_status_event WHERE contract_id IN (SELECT contract_id FROM tmp_tm_contract);
+ALTER TABLE contract_status_event ENABLE TRIGGER trg_contract_status_event_append_only;
+
+DELETE FROM contract_financial_snapshot WHERE contract_id IN (SELECT contract_id FROM tmp_tm_contract);
+DELETE FROM insurance_contract WHERE contract_id IN (SELECT contract_id FROM tmp_tm_contract);
+DELETE FROM product_offering WHERE product_offering_id IN (SELECT product_offering_id FROM tmp_tm_offering);
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM product_offering WHERE channel_code = 'TM') THEN
+    RAISE EXCEPTION 'V49: 시드 밖 TM 판매버전이 남아 있다(SRC-036). 로컬 DB 를 다시 만들거나 직접 정리한다';
+  END IF;
+END $$;

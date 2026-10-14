@@ -9,8 +9,6 @@ package com.susukkang.fgc.common.code;
  */
 public enum ExclusionType {
     NONE,
-    VOICE_RECORDING,
-    BROADCAST,
     NEW_AGENT_SUPPORT,
     COMPLIANCE_3PCT
 }
