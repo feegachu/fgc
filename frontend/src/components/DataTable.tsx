@@ -23,6 +23,7 @@ export interface DataTableProps<T> {
   onSelectionChange?: (keys: string[]) => void
   onRowClick?: (row: T) => void
   onRowActivate?: (row: T) => void
+  rowLabel?: (row: T) => string
   rowClassName?: (row: T) => string
   emptyMessage?: ReactNode
   footer?: ReactNode
@@ -58,6 +59,7 @@ export function DataTable<T>({
   onRowClick,
   onRowActivate,
   rowClassName,
+  rowLabel,
   emptyMessage = '조건에 맞는 자료가 없습니다.',
   footer,
   bodyId,
@@ -142,6 +144,19 @@ export function DataTable<T>({
             rows.map((row) => (
               <tr
                 key={rowKey(row)}
+                tabIndex={onRowActivate ? 0 : undefined}
+                aria-label={rowLabel?.(row)}
+                aria-selected={onRowActivate ? selectedKeys.includes(rowKey(row)) : undefined}
+                onKeyDown={
+                  onRowActivate
+                    ? (event) => {
+                        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                          event.preventDefault()
+                          onRowActivate(row)
+                        }
+                      }
+                    : undefined
+                }
                 className={[selectedKeys.includes(rowKey(row)) ? 'is-selected' : '', rowClassName?.(row)]
                   .filter(Boolean)
                   .join(' ')}
