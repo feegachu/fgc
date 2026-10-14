@@ -3,18 +3,29 @@ import type { ReactElement, ReactNode, HTMLAttributes } from 'react'
 export interface FieldProps {
   label: string
   labelAccessory?: ReactNode
+  variant?: 'default' | 'filter'
   className?: string
   required?: boolean
   helper?: string
   error?: string
   children: ReactElement<HTMLAttributes<HTMLElement> & { id?: string; required?: boolean }>
 }
-export function Field({ label, labelAccessory, className = '', required, helper, error, children }: FieldProps) {
+export function Field({
+  label,
+  labelAccessory,
+  variant = 'default',
+  className = '',
+  required,
+  helper,
+  error,
+  children,
+}: FieldProps) {
   const generatedId = useId()
   const id = children.props.id ?? generatedId
   const messageId = `${id}-message`
+  const labelClassName = variant === 'filter' ? 'filter-field-label' : 'field-label'
   const fieldLabel = (
-    <label className={labelAccessory ? undefined : 'field-label'} htmlFor={id}>
+    <label className={labelAccessory ? undefined : labelClassName} htmlFor={id}>
       {label}
       {required && (
         <span className="field-required" aria-hidden="true">
@@ -25,9 +36,9 @@ export function Field({ label, labelAccessory, className = '', required, helper,
     </label>
   )
   return (
-    <div className={`field ${className} ${error ? 'is-error' : ''}`}>
+    <div className={`${variant === 'filter' ? 'filter-field' : 'field'} ${className} ${error ? 'is-error' : ''}`}>
       {labelAccessory ? (
-        <div className="field-label">
+        <div className={labelClassName}>
           {fieldLabel}
           {labelAccessory}
         </div>

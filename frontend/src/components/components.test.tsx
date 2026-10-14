@@ -174,6 +174,32 @@ describe('Modal', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('button', { name: '열기' })).toHaveFocus()
   })
+  it('Escape 옵션 변경은 포커스를 유지하고 최신 닫기 설정을 적용한다', async () => {
+    const user = userEvent.setup()
+    const close = vi.fn()
+    const { rerender } = render(
+      <Modal title="검증" open onClose={close}>
+        <input aria-label="사유" />
+      </Modal>,
+    )
+    await user.click(screen.getByLabelText('사유'))
+    rerender(
+      <Modal title="검증" open closeOnEscape={false} onClose={close}>
+        <input aria-label="사유" />
+      </Modal>,
+    )
+    expect(screen.getByLabelText('사유')).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(close).not.toHaveBeenCalled()
+    rerender(
+      <Modal title="검증" open onClose={close}>
+        <input aria-label="사유" />
+      </Modal>,
+    )
+    expect(screen.getByLabelText('사유')).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(close).toHaveBeenCalledOnce()
+  })
   it('배경 클릭은 옵션에 따라서만 닫는다', () => {
     const close = vi.fn()
     const { rerender } = render(

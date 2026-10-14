@@ -201,6 +201,32 @@ class ScheduleRepositoryIntegrationTest {
     }
 
     @Test
+    void fourYearOfferingWithoutDedicatedPolicyRegistersReviewInsteadOfCurrentSchedule() {
+        // #484: 판매기간 안의 4년 분급 계약에 현행 정책(체계 NULL)을 적용하지 않는다(REG-19).
+        inRolledBackTransaction(() -> {
+            Long contractId = jdbc.queryForObject("""
+                    INSERT INTO fgc.insurance_contract (
+                        insurer_id, product_offering_id, contract_no, contract_date, agent_id, organization_id,
+                        premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium,
+                        payment_term_months, current_status)
+                    SELECT insurer_id, product_offering_id, ?, DATE '2027-01-15', agent_id, organization_id,
+                           100000, 100000, 100000, 240, 'ACTIVE'
+                      FROM fgc.insurance_contract WHERE contract_no = 'FGC-FGL02-202611-0001'
+                    RETURNING contract_id
+                    """, Long.class, "SCH-484-" + UUID.randomUUID());
+
+            assertThat(scheduleService.generateSchedulesByContractId(contractId))
+                    .isEqualTo(new ScheduleGenerationResult(List.of(), 0));
+            assertThat(headerCount(contractId)).isZero();
+            assertThat(jdbc.queryForList("""
+                    SELECT exception_type FROM fgc.exception_case
+                     WHERE contract_id = ? AND exception_key LIKE 'SCHEDULE_POLICY:%'
+                    """, String.class, contractId))
+                    .containsExactly("POLICY_MISSING", "POLICY_MISSING");
+        });
+    }
+
+    @Test
     void regenerationKeepsConfirmedLinesAndSwitchesTheActiveVersion() {
         inRolledBackTransaction(() -> {
             Long contractId = createContract(ContractStatus.ACTIVE);
