@@ -123,6 +123,41 @@ async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('TRAN-W02 React form workflow', () => {
+  it('shows a non-applicable precheck reason without a usage gauge or numeric amounts', async () => {
+    precheckResult = {
+      confirmable: true,
+      blockers: [],
+      capPreview: [
+        {
+          contractId: 3,
+          contractNo: 'C-003',
+          paymentStage: 'GA_TO_FC',
+          paymentStageLabel: 'GA → 설계사',
+          resultStatus: 'NOT_APPLICABLE',
+          resultStatusLabel: '적용대상 아님',
+          limitAmount: null,
+          includedAmount: null,
+          remainingAmount: null,
+          candidateAmount: null,
+          existingIncludedAmount: null,
+          usagePct: null,
+          applicabilityReasonCode: 'CONTRACT_BEFORE_EFFECTIVE_DATE',
+          applicabilityReason: '적용대상 아님 — 시행 전 계약',
+        },
+      ],
+    }
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(button('btn-precheck'))
+    const panel = screen.getByRole('region', { name: '1,200% 사전검증' })
+    expect(await within(panel).findByText('적용대상 아님 — 시행 전 계약')).toBeVisible()
+    expect(within(panel).getByText('사유 코드: CONTRACT_BEFORE_EFFECTIVE_DATE')).toBeVisible()
+    expect(within(panel).getByText('적용대상 아님')).toHaveClass('status-badge-neutral')
+    expect(within(panel).queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('이번 건 산입액')).not.toBeInTheDocument()
+    expect(button('btn-confirm')).toBeEnabled()
+  })
+
   it('keeps a failed precheck unconfirmed until an explicit retry succeeds', async () => {
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())

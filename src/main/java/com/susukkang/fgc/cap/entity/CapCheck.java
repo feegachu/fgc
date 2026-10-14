@@ -72,20 +72,20 @@ public class CapCheck {
     @Column(name = "base_premium_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal basePremiumAmount;
 
-    @Column(name = "refund_12m_amount", nullable = false, precision = 15, scale = 2)
+    @Column(name = "refund_12m_amount", precision = 15, scale = 2)
     private BigDecimal refund12mAmount = BigDecimal.ZERO;
 
-    @Column(name = "compliance_deduction_amount", nullable = false, precision = 15, scale = 2)
+    @Column(name = "compliance_deduction_amount", precision = 15, scale = 2)
     private BigDecimal complianceDeductionAmount = BigDecimal.ZERO;
 
-    @Column(name = "limit_amount", nullable = false, precision = 15, scale = 2)
+    @Column(name = "limit_amount", precision = 15, scale = 2)
     private BigDecimal limitAmount;
 
-    @Column(name = "included_amount", nullable = false, precision = 15, scale = 2)
+    @Column(name = "included_amount", precision = 15, scale = 2)
     private BigDecimal includedAmount;
 
     // 한도를 초과하면 음수가 될 수 있다.
-    @Column(name = "remaining_amount", nullable = false, precision = 15, scale = 2)
+    @Column(name = "remaining_amount", precision = 15, scale = 2)
     private BigDecimal remainingAmount;
 
     @Column(name = "usage_pct", precision = 12, scale = 6)
@@ -122,9 +122,10 @@ public class CapCheck {
         this.checkKind = checkKind;
         this.asOfDate = asOfDate;
         this.basePremiumAmount = basePremiumAmount;
-        this.refund12mAmount = refund12mAmount != null ? refund12mAmount : BigDecimal.ZERO;
-        this.complianceDeductionAmount = complianceDeductionAmount != null
-                ? complianceDeductionAmount : BigDecimal.ZERO;
+        this.refund12mAmount = refund12mAmount != null ? refund12mAmount
+                : resultStatus == CapResultStatus.NOT_APPLICABLE ? null : BigDecimal.ZERO;
+        this.complianceDeductionAmount = complianceDeductionAmount != null ? complianceDeductionAmount
+                : resultStatus == CapResultStatus.NOT_APPLICABLE ? null : BigDecimal.ZERO;
         this.limitAmount = limitAmount;
         this.includedAmount = includedAmount;
         this.remainingAmount = remainingAmount;

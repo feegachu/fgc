@@ -18,6 +18,11 @@ public final class DisplayFormat {
         return amount.setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
 
+    /** 비대상 등 계산하지 않은 금액은 0원이 아니라 null이다. */
+    public static Long nullableWon(BigDecimal amount) {
+        return amount == null ? null : won(amount);
+    }
+
     /** usage_pct(12,6) 등 소수를 오차 없이 그대로 문자열로 넘긴다. */
     public static String rate(BigDecimal rate) {
         return rate == null ? null : rate.toPlainString();

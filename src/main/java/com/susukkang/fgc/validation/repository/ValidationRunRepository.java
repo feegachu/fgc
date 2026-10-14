@@ -463,6 +463,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
               JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
               JOIN fgc.agent ag ON ag.agent_id = ic.agent_id
              WHERE cc.validation_run_id = :validationRunId
+               AND cc.result_status <> 'NOT_APPLICABLE'
              GROUP BY ag.agent_id, ag.agent_name, cc.payment_stage
              ORDER BY ag.agent_id, cc.payment_stage
             """, sqlResultSetMapping = "AgentCapMonitoringRowMapping")

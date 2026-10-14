@@ -19,7 +19,7 @@ public enum CapResultStatus {
     WARNING,
     VIOLATION,
     REVIEW_REQUIRED,
-    /** 보장성보험이 아니라 1,200% 규제 대상이 아님 (#477) — 위반·검토필요가 아니다. */
+    /** 계약·지급단계가 1,200% 규제 적용대상이 아님 (#477, #482). */
     NOT_APPLICABLE;
 
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");

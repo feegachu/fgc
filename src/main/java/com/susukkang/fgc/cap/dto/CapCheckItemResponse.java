@@ -1,5 +1,6 @@
 package com.susukkang.fgc.cap.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.util.DisplayFormat;
@@ -17,14 +18,21 @@ public record CapCheckItemResponse(
         String paymentStageLabel,
         LocalDate asOfDate,
         long basePremiumAmount,
-        long refund12mAmount,
-        long complianceDeductionAmount,
-        long limitAmount,
-        long includedAmount,
-        long remainingAmount,
+        @Schema(types = {"integer", "null"})
+        Long refund12mAmount,
+        @Schema(types = {"integer", "null"})
+        Long complianceDeductionAmount,
+        @Schema(types = {"integer", "null"})
+        Long limitAmount,
+        @Schema(types = {"integer", "null"})
+        Long includedAmount,
+        @Schema(types = {"integer", "null"})
+        Long remainingAmount,
+        @Schema(types = {"string", "null"})
         String usagePct,
         CapResultStatus resultStatus,
         String resultStatusLabel,
+        @Schema(types = {"integer", "null"})
         Long capRuleSetId
 ) {
     /** IF-API-30 목록 1행 — insurance_contract 조인으로 contractNo 를 이미 갖고 있다. */
@@ -34,9 +42,9 @@ public record CapCheckItemResponse(
         return new CapCheckItemResponse(
                 row.getCapCheckId(), row.getContractId(), row.getContractNo(),
                 stage, stage.label(), row.getAsOfDate(),
-                DisplayFormat.won(row.getBasePremiumAmount()), DisplayFormat.won(row.getRefund12mAmount()),
-                DisplayFormat.won(row.getComplianceDeductionAmount()), DisplayFormat.won(row.getLimitAmount()),
-                DisplayFormat.won(row.getIncludedAmount()), DisplayFormat.won(row.getRemainingAmount()),
+                DisplayFormat.nullableWon(row.getBasePremiumAmount()), DisplayFormat.nullableWon(row.getRefund12mAmount()),
+                DisplayFormat.nullableWon(row.getComplianceDeductionAmount()), DisplayFormat.nullableWon(row.getLimitAmount()),
+                DisplayFormat.nullableWon(row.getIncludedAmount()), DisplayFormat.nullableWon(row.getRemainingAmount()),
                 DisplayFormat.rate(row.getUsagePct()), status, status.label(), row.getCapRuleSetId());
     }
 
@@ -46,9 +54,9 @@ public record CapCheckItemResponse(
         return new CapCheckItemResponse(
                 saved.capCheckId(), r.contractId(), contractNo,
                 r.paymentStage(), r.paymentStage().label(), r.asOfDate(),
-                DisplayFormat.won(r.basePremiumAmount()), DisplayFormat.won(r.refund12mAmount()),
-                DisplayFormat.won(r.complianceDeductionAmount()), DisplayFormat.won(r.limitAmount()),
-                DisplayFormat.won(r.includedAmount()), DisplayFormat.won(r.remainingAmount()),
+                DisplayFormat.nullableWon(r.basePremiumAmount()), DisplayFormat.nullableWon(r.refund12mAmount()),
+                DisplayFormat.nullableWon(r.complianceDeductionAmount()), DisplayFormat.nullableWon(r.limitAmount()),
+                DisplayFormat.nullableWon(r.includedAmount()), DisplayFormat.nullableWon(r.remainingAmount()),
                 DisplayFormat.rate(r.usagePct()), r.resultStatus(), r.resultStatus().label(), r.capRuleSetId());
     }
 }

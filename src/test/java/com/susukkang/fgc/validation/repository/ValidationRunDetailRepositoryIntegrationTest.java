@@ -233,6 +233,21 @@ class ValidationRunDetailRepositoryIntegrationTest {
     }
 
     @Test
+    void excludesNotApplicableFromCapCheckedAndAgentMonitoringCounts() {
+        Long runId = insertValidationRun(LocalDate.of(2031, 3, 1), 1, "RUNNING");
+        Long id = contractId("FGC-FGL01-202607-0001");
+        insertCapCheck(runId, id, "INSURER_TO_GA", "NORMAL");
+        jdbcTemplate.update("""
+                INSERT INTO fgc.cap_check(validation_run_id,contract_id,payment_stage,check_kind,as_of_date,
+                    base_premium_amount,refund_12m_amount,compliance_deduction_amount,result_status,calculation_snapshot)
+                VALUES(?,?,'GA_TO_FC','MONTHLY',DATE '2031-03-31',100000,NULL,NULL,'NOT_APPLICABLE',
+                    '{"applicability":{"status":"NOT_APPLICABLE","reasonCode":"CONTRACT_BEFORE_EFFECTIVE_DATE", "reason":"시행 전 계약"}}'::jsonb)
+                """, runId, id);
+        assertThat(mapper.summarize(runId).orElseThrow().getCapCheckedCount()).isEqualTo(1);
+        assertThat(mapper.summarizeCapByAgent(runId)).hasSize(1);
+    }
+
+    @Test
     void summarizeScopesEveryBlockToTheGivenRun() {
         Long runId = insertValidationRun(LocalDate.of(2031, 3, 1), 1, "RUNNING");
         Long otherRunId = insertValidationRun(LocalDate.of(2031, 4, 1), 1, "RUNNING");
