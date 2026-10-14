@@ -189,3 +189,49 @@ FOR EACH ROW EXECUTE FUNCTION fgc.guard_policy_child_mutation();
 CREATE TRIGGER trg_fee_regime_transition_rule_policy_lock
 BEFORE INSERT OR UPDATE OR DELETE ON fgc.fee_regime_transition_rule
 FOR EACH ROW EXECUTE FUNCTION fgc.guard_policy_child_mutation();
+
+-- ----------------------------------------------------------------------------
+-- 룰셋 체계 코드는 소속 정책버전의 체계와 같아야 한다.
+--   FOUR_YEAR_COMMISSION  -> FOUR_YEAR_2027
+--   SEVEN_YEAR_COMMISSION -> SEVEN_YEAR_2029
+--   그 밖의 정책 유형 아래에는 룰셋을 둘 수 없다.
+--   정책버전에 fee_regime_code·basic_document_version 이 있으면 룰셋 값과 같아야 한다.
+-- 한 계약에 두 체계가 섞이지 않게 한다(스케줄 생성은 policy_type 으로 체계를 정한다).
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fgc.check_fee_regime_ruleset_policy()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_type varchar(40);
+  v_regime varchar(40);
+  v_document varchar(80);
+BEGIN
+  SELECT policy_type, fee_regime_code, basic_document_version
+    INTO v_type, v_regime, v_document
+    FROM fgc.policy_version WHERE policy_version_id = NEW.policy_version_id
+    FOR SHARE;
+
+  IF NOT ((v_type = 'FOUR_YEAR_COMMISSION'  AND NEW.fee_regime_code = 'FOUR_YEAR_2027')
+       OR (v_type = 'SEVEN_YEAR_COMMISSION' AND NEW.fee_regime_code = 'SEVEN_YEAR_2029')) THEN
+    RAISE EXCEPTION 'Fee regime ruleset % does not match policy type % of policy version %',
+      NEW.fee_regime_code, v_type, NEW.policy_version_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_regime IS NOT NULL AND v_regime <> NEW.fee_regime_code THEN
+    RAISE EXCEPTION 'Fee regime ruleset % does not match fee_regime_code % of policy version %',
+      NEW.fee_regime_code, v_regime, NEW.policy_version_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_document IS NOT NULL AND v_document <> NEW.basic_document_version THEN
+    RAISE EXCEPTION 'Fee regime ruleset document version % does not match basic_document_version % of policy version %',
+      NEW.basic_document_version, v_document, NEW.policy_version_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_fee_regime_ruleset_policy_match
+BEFORE INSERT OR UPDATE ON fgc.fee_regime_ruleset
+FOR EACH ROW EXECUTE FUNCTION fgc.check_fee_regime_ruleset_policy();
