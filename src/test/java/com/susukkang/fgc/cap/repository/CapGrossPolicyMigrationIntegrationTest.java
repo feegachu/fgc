@@ -52,6 +52,15 @@ class CapGrossPolicyMigrationIntegrationTest {
                         WHERE p.status='ACTIVE' AND c.item_code='CLAWBACK'
                           AND i.decision_reason NOT LIKE '%지급 누계에서 차감하지%'
                         """,Long.class)).isZero();
+                // #525 V53: 원수사→GA·GA→설계사 모든 현행 룰셋의 정착지원금은 모집월 기준이다.
+                assertThat(jdbc.queryForList("""
+                        SELECT DISTINCT i.decision_reason FROM fgc.cap_rule_item i
+                        JOIN fgc.cap_rule_set r ON r.cap_rule_set_id=i.cap_rule_set_id
+                        JOIN fgc.policy_version p ON p.policy_version_id=r.policy_version_id
+                        JOIN fgc.commission_item c ON c.commission_item_id=i.commission_item_id
+                        WHERE p.status='ACTIVE' AND c.item_code='SETTLEMENT_SUPPORT'
+                        """,String.class)).containsExactly(
+                        "경력설계사 정착지원금은 수수료등에 포함하며 모집월 신계약에 월 단위로 귀속·배분한다 (REG-20)");
                 assertThat(jdbc.queryForObject("""
                         SELECT COUNT(*) FROM (SELECT policy_code FROM fgc.policy_version
                         WHERE policy_type='CAP_1200' AND status='ACTIVE'
