@@ -467,12 +467,14 @@ class PublishingTemplateStructureTest {
                 .doesNotContain("(result.blockers || []).some(")
                 .contains("확정 시도 · 예외 등록")
                 /*
-                 * 후속 링크의 계약은 blockers[] 에서 뽑아야 한다 — capPreview 가 아니다.
-                 * precheck 는 rule == null(미분류) 귀속행을 capPreview 에 넣지 않고 건너뛰므로
-                 * (CommissionPaymentServiceImpl:330), capPreview 기준으로 고르면 미분류가 유일한
-                 * 차단 사유일 때 링크가 사라지고 다중 귀속행일 때 다른 계약을 가리킨다.
+                 * 후속 링크의 계약 ID는 첫 blocker와 실제 거절 코드가 일치할 때만 쓴다.
+                 * 계약번호만 같은 ID의 preview·목록·기존 상세 API 순서로 조회한다 (#410).
+                 * 미분류 CAP-002는 preview가 없을 수 있고 첫 blocker가 비계약일 수도 있다.
+                 * 해당 동작은 frontend의 레거시 실행·React·브라우저 회귀 테스트로 검증한다.
                  */
-                .contains("renderFollowUpLinks(blockedContractNo(lastPrecheckResult, error.code)")
+                .contains("renderRecordedFollowUp(error)")
+                .contains("var contractNo = blockedContractNo(lastPrecheckResult, error.code)")
+                .contains("var target = blockedContract(result, errorCode)")
                 /*
                  * 인터페이스정의서 :219-220 — 두 코드의 "사용자가 할 일" 이 다르다.
                  * CAP-001 은 예외함, CAP-002 는 귀속행 판정 확정이 주 동선이다.
@@ -480,7 +482,7 @@ class PublishingTemplateStructureTest {
                 .contains("귀속행 판정 다시 확인")
                 .contains("예외함에서 처리하기")
                 .contains("RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0")
-                .doesNotContain("(result.capPreview || []).filter")
+                .contains("String(item.contractId) === String(target.contractId)")
                 /*
                  * 확정 게이트는 화면정의서 :710-718 · 운영정책서 제31조의 6단계 그대로다.
                  * 문서에 없는 게이트(차익거래·업무키)를 만들어 넣지 않는다 —
