@@ -1,0 +1,21 @@
+/* Keep the legacy grid and copy; only shared React component integration lives here. */
+.transaction-form-page .transaction-form-grid .field-control {
+  min-width: 0;
+  width: 100%;
+}
+.transaction-form-page .transaction-screen-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.transaction-form-page .transaction-attribution-table .table-empty {
+  text-align: center;
+}
+/* Contain the absolute, visually hidden column label inside the scroll viewport. */
+.transaction-form-page .transaction-attribution-viewport {
+  position: relative;
+}
+.transaction-confirm-modal .transaction-confirm-blockers p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
