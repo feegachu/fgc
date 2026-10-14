@@ -29,6 +29,7 @@ import com.susukkang.fgc.schedule.dto.ScheduleDetailResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse;
 import com.susukkang.fgc.schedule.dto.ScheduleRegenResponse;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
+import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import com.susukkang.fgc.schedule.repository.ScheduleQueryRepository;
 import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
@@ -445,6 +448,34 @@ class ScheduleServiceTest {
     @Test
     void registersReviewAndKeepsExistingHeaderWhenPoliciesAreDuplicated() {
         assertRegenerationRegistersReview("POLICY_DUPLICATE");
+    }
+
+    @Test
+    void registersReviewWithoutHeaderWhenPolicyTypeDoesNotMatchOfferingRegime() {
+        // #484: 현행 정책이 분급 판매버전에 선택되면 라인은 현행 산식, 헤더는 분급 체계가 된다.
+        InsuranceContract contract = withContractId(10L, InsuranceContract.builder().build());
+        given(insuranceContractRepository.findById(10L)).willReturn(Optional.of(contract));
+        for (PaymentStage stage : PaymentStage.values()) {
+            given(commissionPolicyService.resolveCurrentCommission(10L, stage)).willReturn(
+                    ResolvedCommissionPolicy.builder()
+                            .policyVersionId(100L)
+                            .policyType(PolicyType.CURRENT_COMMISSION)
+                            .paymentStage(stage)
+                            .scheduleRegime(ScheduleRegime.FOUR_YEAR_2027)
+                            .rules(List.of(rule(1000L, null, 1, 1, "900.000000")))
+                            .build());
+        }
+        given(scheduleWriteRepository.upsertPolicyReviewCase(any(), any(), any(), any(), any())).willReturn(1);
+
+        ScheduleGenerationResult result = scheduleService.generateSchedulesByContractId(10L);
+
+        assertThat(result).isEqualTo(new ScheduleGenerationResult(List.of(), 0));
+        for (PaymentStage stage : PaymentStage.values()) {
+            verify(scheduleWriteRepository).upsertPolicyReviewCase(eq(10L), eq(stage), eq("POLICY_MISSING"),
+                    eq("수수료 정책 검토 필요 - " + stage.name()), anyString());
+        }
+        verify(scheduleWriteRepository, never()).insertScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).insertAllScheduleLines(any());
     }
 
     @Test
