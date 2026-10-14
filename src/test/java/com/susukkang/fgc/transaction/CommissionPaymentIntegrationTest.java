@@ -120,6 +120,25 @@ class CommissionPaymentIntegrationTest {
     }
 
     @Test
+    void preEffectivePaymentIgnoresOldViolationWithoutResolvingHistory() {
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-06-30' WHERE contract_id=1");
+        var created = commissionPaymentService.create(request("IT-482-REVIEW-" + UUID.randomUUID(), new BigDecimal("2000000")));
+        jdbcTemplate.update("""
+                INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,contract_id,
+                    source_entity_type,source_entity_id,title,description)
+                VALUES(?,'CAP_VIOLATION','HIGH','NEW',1,'COMMISSION_TRANSACTION',?,'기존 판정','시행 기준 정정 전 판정')
+                """, "IT-482-OLD-" + UUID.randomUUID(), created.paymentId().toString());
+        entityManager.clear();
+        assertThat(commissionPaymentService.precheck(created.paymentId()).confirmable()).isTrue();
+        var confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-482-REVIEW");
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                String.class, created.paymentId().toString())).isEqualTo("NEW");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                Long.class, created.paymentId().toString())).isEqualTo(1);
+    }
+
+    @Test
     void identicalDraftUpdateStillRunsDatabaseTimestampTrigger() {
         CommissionPaymentCreateRequest request = request("IT-JPA-NOOP-" + UUID.randomUUID());
         CommissionPaymentResponse created = commissionPaymentService.create(request);

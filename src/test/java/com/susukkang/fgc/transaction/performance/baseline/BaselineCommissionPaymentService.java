@@ -65,6 +65,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 
@@ -189,7 +190,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -311,7 +312,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -1260,6 +1261,13 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
             ));
         }
         return failures;
+    }
+
+    private boolean hasBlockingUnresolvedViolation(Long paymentId, List<ConfirmationData> attributions) {
+        return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
+                .anyMatch(id -> id == null || attributions.stream().noneMatch(row -> Objects.equals(row.contractId(), id))
+                        || attributions.stream().anyMatch(row -> Objects.equals(row.contractId(), id)
+                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())));
     }
 
     private boolean isClawback(ConfirmationData data) {

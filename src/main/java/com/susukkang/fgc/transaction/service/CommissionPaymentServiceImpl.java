@@ -199,7 +199,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -207,6 +207,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         queryRepository.lockAttributedContracts(paymentId);
         // #433: 최초 지급 조회의 계약일은 잠금 대기 중 변경될 수 있다.
         attributions = requireConfirmationData(paymentId);
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
+            failFirst(unresolvedViolationFailure(attributions.get(0)));
+        }
         failFirst(requiredValueFailures(attributions));
 
         List<Long> capCheckIds = new ArrayList<>();
@@ -327,7 +330,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -1506,9 +1509,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      * @param paymentId 지급 건 ID
      * @return CAP_003 으로 차단해야 하면 true
      */
-    private boolean hasBlockingUnresolvedViolation(Long paymentId) {
+    private boolean hasBlockingUnresolvedViolation(Long paymentId, List<ConfirmationData> attributions) {
         return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
-                .anyMatch(contractId -> contractId == null || !isOutsideCapScope(contractId));
+                .anyMatch(contractId -> contractId == null || (!isOutsideCapScope(contractId)
+                        && (attributions.stream().noneMatch(row -> Objects.equals(row.contractId(), contractId))
+                        || attributions.stream().anyMatch(row -> Objects.equals(row.contractId(), contractId)
+                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())))));
     }
 
     private CapCheckCommand buildCapCheck(
