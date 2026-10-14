@@ -3,6 +3,7 @@ package com.susukkang.fgc.validation.batch.daily;
 import com.susukkang.fgc.arbitrage.service.ArbitrageCheckBatchItemService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.cap.service.CapApplicabilityPolicy;
 import com.susukkang.fgc.common.code.ContractStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -23,7 +24,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * changedContractStep의 Processor: 계약 1건을 다시 검증
@@ -35,12 +35,6 @@ import java.util.Map;
  */
 @RequiredArgsConstructor
 public class ChangedContractItemProcessor implements ItemProcessor<Long, ChangedContractResult> {
-
-    // 1,200%룰은 "보험회사는 '21.1.1, 보험대리점은 '26.7.1. 이후 체결한 신계약에 적용"(FAQ 2차 Q1-1, REG-08·09).
-    // 계약 체결일이 이보다 앞서면 그 지급단계는 대상이 아니다 — 룰셋(설정) 유무가 아니라 규정으로 판정한다(#522).
-    private static final Map<PaymentStage, LocalDate> CAP_RULE_CONTRACT_DATE_FROM = Map.of(
-            PaymentStage.INSURER_TO_GA, LocalDate.of(2021, 1, 1),
-            PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 1));
 
     private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
@@ -110,7 +104,7 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
                 } catch (FgcBusinessException e) {
                     // calculateAndSave가 noRollbackFor라 여기서 잡아도 청크 트랜잭션은 rollback-only가 되지 않는다.
                     if (e.getErrorCode() == FgcErrorCode.CAP_004) {
-                        if (contract.getContractDate().isBefore(CAP_RULE_CONTRACT_DATE_FROM.get(paymentStage))) {
+                        if (CapApplicabilityPolicy.isBeforeEffectiveDate(paymentStage, contract.getContractDate())) {
                             // 시행 전 체결 계약(예: 2026-07 이전 계약의 GA→FC) — 룰셋이 없는 게 정상이라 실패도
                             // 검토 대상도 아니다. 실패로 돌리면 사건이 FAILED로 남아 매일 재처리된다(#522).
                             continue;

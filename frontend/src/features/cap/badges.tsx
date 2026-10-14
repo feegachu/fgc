@@ -19,11 +19,12 @@ export function CapStatus({ code, label }: { code?: string; label?: string }) {
     </StatusBadge>
   )
 }
-export function Amount({ value }: { value?: number }) {
+export function Amount({ value }: { value?: number | null }) {
   return <span className={isNegative(value) ? 'is-negative-amount' : undefined}>{won(value)}</span>
 }
 /** Number는 시각적 막대 폭에만 사용. 수치 표시와 판정은 서버 값 그대로다. */
-export function CapUsage({ value, status, warning }: { value?: string; status?: string; warning?: unknown }) {
+export function CapUsage({ value, status, warning }: { value?: string | null; status?: string; warning?: unknown }) {
+  if (status === 'NOT_APPLICABLE') return <span aria-label="적용대상 아님: 사용률 없음">—</span>
   const width = Math.max(0, Math.min(100, Number(value) || 0))
   const warningWidth = typeof warning === 'number' || typeof warning === 'string' ? Number(warning) : NaN
   return (

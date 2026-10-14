@@ -19,6 +19,7 @@ import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.transaction.performance.baseline.PaymentCapCheckJdbcBaseline;
 import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.service.CapApplicabilityPolicy;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.common.code.AgentRankCode;
@@ -64,6 +65,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 
@@ -188,7 +190,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -209,6 +211,13 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
             if (isClawback(data)) continue;
             if (isNonContractNewcomerAttribution(data)) {
                 failFirst(newcomerSupportEligibilityFailure(data));
+                continue;
+            }
+            if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                CapCheckCommand check = buildNotApplicableCheck(data);
+                mapper.insertCapCheck(check);
+                capCheckIds.add(check.getCapCheckId());
+                capChecks.add(check);
                 continue;
             }
             CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
@@ -303,7 +312,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (!isClawback(first) && capExceptionService.hasUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -327,6 +336,11 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     continue;
                 }
                 if (data.contractId() == null || data.attributedAmount() == null) {
+                    continue;
+                }
+                if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                    previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
+                            buildNotApplicableCheck(data), null, contractNos.get(data.contractId())));
                     continue;
                 }
                 CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
@@ -503,6 +517,10 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         summary.put("usagePct", check.getUsagePct());
         summary.put("limitAmount", check.getLimitAmount());
         summary.put("includedAmount", check.getIncludedAmount());
+        if (check.getResultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            summary.put("applicabilityReasonCode", check.getApplicabilityReasonCode());
+            summary.put("applicabilityReason", check.getDecisionReason());
+        }
         return summary;
     }
 
@@ -1249,6 +1267,13 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         return failures;
     }
 
+    private boolean hasBlockingUnresolvedViolation(Long paymentId, List<ConfirmationData> attributions) {
+        return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
+                .anyMatch(id -> id == null || attributions.stream().noneMatch(row -> Objects.equals(row.contractId(), id))
+                        || attributions.stream().anyMatch(row -> Objects.equals(row.contractId(), id)
+                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())));
+    }
+
     private boolean isClawback(ConfirmationData data) {
         return "DEDUCTION".equals(data.cashflowType()) && "CLAWBACK".equals(data.itemCode());
     }
@@ -1397,6 +1422,20 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 .build();
     }
 
+    private CapCheckCommand buildNotApplicableCheck(ConfirmationData data) {
+        CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(), data.attributionDate(), null);
+        Map<String, Object> snapshot = calculation.calculationSnapshot();
+        Map<?, ?> applicability = snapshot.get("applicability") instanceof Map<?, ?> decision ? decision : Map.of();
+        String reasonCode = Objects.toString(applicability.get("reasonCode"), null);
+        String reason = Objects.toString(applicability.get("reason"),
+                Objects.toString(snapshot.get("notApplicableReason"), "적용대상 아님"));
+        return CapCheckCommand.builder().paymentId(data.paymentId()).contractId(data.contractId())
+                .paymentStage(data.paymentStage().name()).asOfDate(data.attributionDate())
+                .basePremiumAmount(calculation.basePremiumAmount()).resultStatus(CapResultStatus.NOT_APPLICABLE)
+                .decisionReason(reason).applicabilityReasonCode(reasonCode)
+                .calculationSnapshotJson(json(calculation.calculationSnapshot())).build();
+    }
+
     private CapCheckCommand buildCapCheck(
             ConfirmationData data,
             CapRuleSnapshot rule,
@@ -1490,6 +1529,10 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
             CapValidationResult actualValidation,
             BigDecimal warningUsagePct
     ) {
+        if (calculation.resultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            return new CapValidationResult(calculation.limitAmount(), null, calculation.includedAmount(),
+                    calculation.remainingAmount(), calculation.usagePct(), CapResultStatus.NOT_APPLICABLE);
+        }
         BigDecimal effectiveIncludedAmount = calculation.includedAmount()
                 .max(actualValidation.includedAmount());
         BigDecimal remainingAmount = calculation.limitAmount()

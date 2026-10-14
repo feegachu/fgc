@@ -1,5 +1,6 @@
 package com.susukkang.fgc.cap.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -36,14 +37,21 @@ public record CapCalculationResult(
         PaymentStage paymentStage,
         CapCheckKind checkKind,
         LocalDate asOfDate,
+        @Schema(types = {"integer", "null"})
         Long capRuleSetId,
         Long refundRateTableId,
         BigDecimal basePremiumAmount,
+        @Schema(types = {"number", "null"})
         BigDecimal refund12mAmount,
+        @Schema(types = {"number", "null"})
         BigDecimal complianceDeductionAmount,
+        @Schema(types = {"number", "null"})
         BigDecimal limitAmount,
+        @Schema(types = {"number", "null"})
         BigDecimal includedAmount,
+        @Schema(types = {"number", "null"})
         BigDecimal remainingAmount,
+        @Schema(types = {"number", "null"})
         BigDecimal usagePct,
         CapResultStatus resultStatus,
         List<CapCheckDetailLine> details,
@@ -54,6 +62,7 @@ public record CapCalculationResult(
      * limit이 max(0)으로 잘린 경우(환급률 100% 초과)만 실제 L과 다른데, 그 판정은 REVIEW_REQUIRED가 우선한다.
      */
     public BigDecimal annualizedLimitBase() {
-        return limitAmount.add(refund12mAmount).subtract(complianceDeductionAmount);
+        return resultStatus == CapResultStatus.NOT_APPLICABLE ? null
+                : limitAmount.add(refund12mAmount).subtract(complianceDeductionAmount);
     }
 }

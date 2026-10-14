@@ -80,6 +80,7 @@ class ContractConsistencyIntegrationTest {
     @MockitoSpyBean private ScheduleWriteRepository scheduleWrites;
     @MockitoSpyBean private CommissionPaymentQueryRepository paymentQueries;
     @MockitoSpyBean private CapScheduleAmountQueryRepository capSchedules;
+    @MockitoSpyBean private com.susukkang.fgc.cap.repository.CapRuleQueryRepository capRules;
     @MockitoSpyBean private com.susukkang.fgc.contract.repository.ContractLockRepository contractLocks;
 
     @ParameterizedTest
@@ -290,8 +291,8 @@ class ContractConsistencyIntegrationTest {
     @ValueSource(booleans = {false, true})
     void missingCapRuleKeepsTheContractLockedUntilTheOuterTransactionEnds(boolean rollback) throws Exception {
         Long id = newContract();
-        // 운영 룰셋 시행 전 계약을 만들어 실제 계산기에서 CAP_004를 발생시킨다.
-        jdbc.update("UPDATE fgc.insurance_contract SET contract_date='1900-01-01' WHERE contract_id=?", id);
+        // #482: 시행 전 계약은 비대상이다. 적용대상 계약의 룰셋 조회 실패로 CAP_004를 재현한다.
+        org.mockito.Mockito.doReturn(null).when(capRules).findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any());
         int checksBefore = jdbc.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE contract_id=?", Integer.class, id);
         CountDownLatch reviewWritten = new CountDownLatch(1);
         CountDownLatch finishTransaction = new CountDownLatch(1);
