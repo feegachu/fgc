@@ -68,7 +68,41 @@ async function fixture(page: Page, canProcess = true) {
       return route.fulfill({
         json: envelope({ content: [contract], page: 1, size: 20, totalPages: 1, totalElements: 1 }),
       })
-    if (path.endsWith('/schedules')) return route.fulfill({ json: envelope({ headers: [], lines: [] }) })
+    if (path.endsWith('/schedules'))
+      return route.fulfill({
+        json: envelope({
+          headers: [{ scheduleHeaderId: 10, scheduleVersionNo: 1, lineCount: 1, status: 'EXPECTED' }],
+          lines: [
+            {
+              lineNo: 1,
+              installmentNo: 1,
+              dueDate: '2026-07-01',
+              commissionItemName: '초회수수료',
+              recipientName: '시연 설계사',
+              expectedAmount: 100000,
+              lineStatus: 'EXPECTED',
+            },
+          ],
+        }),
+      })
+    if (path.endsWith('/transactions'))
+      return route.fulfill({
+        json: envelope({
+          transactions: [
+            {
+              commissionTransactionId: 1,
+              settlementMonth: '2026-07',
+              paymentStage: 'INSURER_TO_GA',
+              amount: 700000,
+              attributionTotal: 700000,
+              differenceAmount: 0,
+              status: 'CONFIRMED',
+              sourceType: 'INSURER_STATEMENT',
+            },
+          ],
+          reconciliations: [],
+        }),
+      })
     if (path.endsWith('/base/insurers'))
       return route.fulfill({
         json: envelope({ content: [{ insurerId: 1, insurerName: '시연 보험사', activeYn: true }] }),
@@ -108,12 +142,16 @@ async function fixture(page: Page, canProcess = true) {
   })
 }
 
-test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수정 취소를 검증한다', async ({ page }) => {
+test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수정 취소를 검증한다', async ({ page }, testInfo) => {
   await fixture(page)
   await page.goto('contracts/1?tab=schedules')
   await expect(page.getByRole('tab', { name: '예상 스케줄' })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('table', { name: '원수사→GA 예상 스케줄' })).toBeVisible()
   await expect(page.getByRole('table', { name: 'GA→설계사 예상 스케줄' })).toBeVisible()
+  await expect(page.getByText('버전 1 · 1회차', { exact: true })).toHaveCount(2)
+  await expect(page.getByRole('link', { name: /버전.*상세/ })).toHaveCount(0)
+  await expect(page.locator('.contract-detail-schedule-stages header .status-badge')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('contract-schedule-summary.png'), fullPage: true })
   await page.reload()
   await expect(page.getByRole('table', { name: 'GA→설계사 예상 스케줄' })).toBeVisible()
   await page.getByRole('button', { name: '수정', exact: true }).click()
@@ -136,4 +174,37 @@ test('없는 계약의 기존 오류와 COMPLIANCE의 폼 직접 진입 권한�
   await page.goto('contracts/1/edit')
   await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
   await expect(page.getByRole('button', { name: /저장하고 예상 스케줄/ })).toHaveCount(0)
+})
+
+test('상세 값 정렬·가로 한도 안내문·지급 표 전체 열의 가시성을 유지한다', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 900, height: 1000 })
+  await fixture(page)
+  await page.goto('contracts/1')
+  await expect(page.locator('.contract-summary-number')).toHaveText('CONT-UI-001')
+  for (const selector of ['.contract-summary-item', '.contract-information-item']) {
+    const item = page.locator(selector).first()
+    const label = await item.locator('dt').boundingBox()
+    const value = await item.locator('dd').boundingBox()
+    expect(Math.abs(label!.x - value!.x)).toBeLessThanOrEqual(1)
+    expect(value!.y - label!.y - label!.height).toBeLessThanOrEqual(8)
+  }
+  await page.screenshot({ path: testInfo.outputPath('contract-detail-aligned.png'), fullPage: true })
+  await page.getByRole('tab', { name: '1,200%', exact: true }).click()
+  const note = page.locator('.contract-tab-guidance')
+  await expect(note).toContainText('두 규제를 더하지 마세요')
+  await expect(note.locator('.guidance-icon')).toHaveText('warning')
+  await expect(page.getByRole('region', { name: '지급단계별 판정' })).toContainText('조회된 자료가 없습니다.')
+  expect((await note.boundingBox())!.height).toBeLessThan(80)
+  expect((await note.locator('.guidance-copy').boundingBox())!.width).toBeGreaterThan(200)
+  await page.screenshot({ path: testInfo.outputPath('contract-cap-compact.png'), fullPage: true })
+  await page.getByRole('tab', { name: '지급·대사' }).click()
+  const table = page.getByRole('table', { name: '수수료 지급 건' })
+  await expect(table.getByRole('cell', { name: '700,000원' })).toHaveCount(2)
+  const viewport = await table.locator('..').boundingBox()
+  const last = await table.getByRole('columnheader', { name: '원천' }).boundingBox()
+  expect(last!.x + last!.width).toBeLessThanOrEqual(viewport!.x + viewport!.width + 1)
+  const stage = await table.getByRole('cell', { name: '원수사→GA' }).boundingBox()
+  const amount = await table.getByRole('cell', { name: '700,000원' }).first().boundingBox()
+  expect(amount!.x - stage!.x).toBeLessThan(120)
+  await page.screenshot({ path: testInfo.outputPath('contract-payment-compact.png'), fullPage: true })
 })

@@ -132,8 +132,8 @@ describe('CONT-W02 계약 상세', () => {
     expect(events.map((row) => row.eventSeq)).toEqual([9, 3, 2])
   })
 
-  it('스케줄 deep link에서도 두 지급단계를 함께 표시하고 각 단계의 상세로 이동한다', async () => {
-    const { router, actions } = renderAt('/contracts/1?tab=schedules&stage=GA_TO_FC', (url) => {
+  it('스케줄 deep link에서도 두 지급단계를 함께 표시하고 기존 읽기 전용 버전 요약을 유지한다', async () => {
+    renderAt('/contracts/1?tab=schedules&stage=GA_TO_FC', (url) => {
       if (!url.includes('/schedules?')) return
       const fc = url.endsWith('GA_TO_FC')
       return {
@@ -168,8 +168,9 @@ describe('CONT-W02 계약 상세', () => {
     expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
     expect(await screen.findByRole('cell', { name: 'GA' })).toBeInTheDocument()
     expect(screen.queryByLabelText('지급단계')).toBeNull()
-    await actions.click(within(fc).getByRole('link', { name: '버전 2 상세' }))
-    expect(router.state.location.pathname).toBe('/schedules/10')
+    expect(within(fc).getByText('버전 2 · 1회차')).toBeInTheDocument()
+    expect(within(fc).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(fc).queryByText('서버 확정')).not.toBeInTheDocument()
   })
 
   it('탭 키보드 이동과 뒤로가기는 올바른 패널을 표시하고 선택한 탭만 조회한다', async () => {
@@ -180,7 +181,8 @@ describe('CONT-W02 계약 상세', () => {
     basic.focus()
     fireEvent.keyDown(basic, { key: 'End' })
     expect(screen.getByRole('tab', { name: '지급·대사' })).toHaveFocus()
-    expect(await screen.findByText('조회된 대사 결과가 없습니다.')).toBeInTheDocument()
+    const reconciliation = await screen.findByRole('region', { name: '대사 결과' })
+    expect(within(reconciliation).getByText('조회된 자료가 없습니다.')).toBeInTheDocument()
     expect(router.state.location.search).toBe('?tab=payment')
     expect(calls('/cap-checks')).toHaveLength(0)
     await act(() => router.navigate(-1))

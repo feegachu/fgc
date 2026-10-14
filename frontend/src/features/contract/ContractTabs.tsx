@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { UseQueryResult } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
@@ -172,7 +172,7 @@ export function ContractTabs({
           aria-labelledby={`contract-tab-${name}`}
           tabIndex={0}
           hidden={active !== name}
-          className={`surface contract-detail-panel ${name === 'basic' ? 'contract-basic-card' : ''}`}
+          className={`surface contract-detail-panel ${['basic', 'schedules', 'cap', 'payment'].includes(name) ? 'contract-basic-card' : ''}`}
         >
           {active === name &&
             (name === 'basic' ? (
@@ -194,9 +194,9 @@ export function ContractTabs({
   )
 }
 
-function PanelHeading({ title, children }: { title: string; children: ReactNode }) {
+function PanelHeading({ title, children, legacy = false }: { title: string; children: ReactNode; legacy?: boolean }) {
   return (
-    <header className="surface-header">
+    <header className={`surface-header ${legacy ? 'contract-basic-header contract-lazy-panel-header' : ''}`}>
       <div>
         <h2 className="surface-title">{title}</h2>
         <p>{children}</p>
@@ -359,10 +359,14 @@ const scheduleColumns: TableColumn<ScheduleLine>[] = [
 function SchedulesTab({ id }: { id: string }) {
   return (
     <>
-      <PanelHeading title="예상 스케줄">지급단계별 현재 운영 스케줄과 회차를 조회합니다.</PanelHeading>
-      <div className="contract-detail-schedule-stages">
-        <ScheduleStage id={id} stage="INSURER_TO_GA" />
-        <ScheduleStage id={id} stage="GA_TO_FC" />
+      <PanelHeading title="예상 스케줄" legacy>
+        지급단계별 현재 운영 스케줄과 회차를 조회합니다.
+      </PanelHeading>
+      <div className="contract-tab-body">
+        <div className="contract-detail-schedule-stages">
+          <ScheduleStage id={id} stage="INSURER_TO_GA" />
+          <ScheduleStage id={id} stage="GA_TO_FC" />
+        </div>
       </div>
     </>
   )
@@ -372,35 +376,21 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
   const query = useQuery(contractSchedulesQuery(id, stage))
   return (
     <section aria-label={PAYMENT_STAGE[stage]} className="contract-tab-section">
-      <h3 className="contract-detail-subheading">{PAYMENT_STAGE[stage]}</h3>
       <QueryContent query={query}>
         {(data) => (
           <>
-            <div className="contract-detail-schedule-headers">
-              {data.headers?.length ? (
-                data.headers.map((header, index) => (
-                  <div key={header.scheduleHeaderId ?? index}>
-                    <strong>
-                      {header.scheduleHeaderId == null ? (
-                        `버전 ${header.scheduleVersionNo ?? '—'}`
-                      ) : (
-                        <Link to={`/schedules/${header.scheduleHeaderId}`}>
-                          버전 {header.scheduleVersionNo ?? '—'} 상세
-                        </Link>
-                      )}
-                    </strong>
-                    <span>{int(header.lineCount ?? data.lines?.length)}회차</span>
-                    <ScheduleStatusBadge
-                      code={header.status}
-                      label={responseLabel(header.statusLabel, LINE_STATUS, header.status)}
-                    />
-                  </div>
-                ))
-              ) : (
-                <p>현재 운영 스케줄이 없습니다.</p>
-              )}
-            </div>
+            <header className="surface-header contract-basic-header">
+              <div>
+                <h3 className="surface-title">{PAYMENT_STAGE[stage]}</h3>
+                <p>
+                  {data.headers?.[0]
+                    ? `버전 ${data.headers[0].scheduleVersionNo ?? '—'} · ${int(data.headers[0].lineCount ?? data.lines?.length)}회차`
+                    : '현재 운영 스케줄이 없습니다.'}
+                </p>
+              </div>
+            </header>
             <DataTable
+              viewportClassName="contract-tab-viewport"
               caption={`${PAYMENT_STAGE[stage]} 예상 스케줄`}
               columns={scheduleColumns}
               rows={data.lines ?? []}
@@ -474,21 +464,32 @@ function CapTab({ id }: { id: string }) {
   ]
   return (
     <>
-      <PanelHeading title="1,200% 한도 검증">지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.</PanelHeading>
-      <p className="guidance guidance-warning contract-detail-note">
-        두 규제를 더하지 마세요 — 원수사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
+      <PanelHeading title="1,200% 한도 검증" legacy>
+        지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.
+      </PanelHeading>
+      <p className="guidance guidance-warning contract-tab-guidance">
+        <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
+          warning
+        </span>
+        <span className="guidance-copy">
+          두 규제를 더하지 마세요 — 원수사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
+        </span>
       </p>
-      <QueryContent query={query}>
-        {(rows) => (
-          <DataTable
-            caption="1,200% 한도 판정"
-            columns={columns}
-            rows={rows}
-            rowKey={(row) => String(row.capCheckId ?? rows.indexOf(row))}
-            emptyMessage="조회된 한도 판정이 없습니다."
-          />
-        )}
-      </QueryContent>
+      <div className="contract-tab-body">
+        <QueryContent query={query}>
+          {(rows) => (
+            <TabSection title="지급단계별 판정" count={rows.length}>
+              <DataTable
+                caption="1,200% 한도 판정"
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => String(row.capCheckId ?? rows.indexOf(row))}
+                emptyMessage="조회된 한도 판정이 없습니다."
+              />
+            </TabSection>
+          )}
+        </QueryContent>
+      </div>
       <CapDetailModal capCheckId={capCheckId} onClose={() => select(null)} />
     </>
   )
@@ -580,9 +581,9 @@ type Reconciliation = NonNullable<ContractTransactions['reconciliations']>[numbe
 const transactionColumns: TableColumn<Transaction>[] = [
   { key: 'month', label: '정산월', render: (row) => month(row.settlementMonth) },
   { key: 'stage', label: '지급단계', render: (row) => stageLabel(row.paymentStage, row.paymentStageLabel) },
-  { key: 'amount', label: '금액', align: 'number', render: (row) => <Amount value={row.amount} /> },
-  { key: 'attributed', label: '귀속금액', align: 'number', render: (row) => <Amount value={row.attributionTotal} /> },
-  { key: 'difference', label: '차액', align: 'number', render: (row) => <Amount value={row.differenceAmount} /> },
+  { key: 'amount', label: '금액', render: (row) => <Amount value={row.amount} /> },
+  { key: 'attributed', label: '귀속금액', render: (row) => <Amount value={row.attributionTotal} /> },
+  { key: 'difference', label: '차액', render: (row) => <Amount value={row.differenceAmount} /> },
   { key: 'status', label: '상태', render: (row) => <ResultStatus code={row.status} label={row.statusLabel} /> },
   { key: 'source', label: '원천', render: (row) => <Text value={row.sourceType} /> },
 ]
@@ -594,33 +595,56 @@ const reconciliationColumns: TableColumn<Reconciliation>[] = [
   { key: 'difference', label: '차액', align: 'number', render: (row) => <Amount value={row.differenceAmount} /> },
   { key: 'reason', label: '주원인', render: (row) => <Text value={row.primaryReasonCode} /> },
 ]
+function TabSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  return (
+    <section className="contract-tab-section" aria-label={title}>
+      <header className="surface-header contract-basic-header">
+        <div>
+          <h3 className="surface-title">{title}</h3>
+          <p>{int(count)}건</p>
+        </div>
+      </header>
+      {count ? children : <div className="empty-state contract-tab-state is-empty">조회된 자료가 없습니다.</div>}
+    </section>
+  )
+}
 function PaymentTab({ id }: { id: string }) {
   const query = useQuery(contractTransactionsQuery(id))
   return (
     <>
-      <PanelHeading title="지급·대사">수수료 지급 건과 대사 결과를 함께 표시합니다.</PanelHeading>
-      <QueryContent query={query}>
-        {(data) => (
-          <>
-            <h3 className="contract-detail-subheading">수수료 지급</h3>
-            <DataTable
-              caption="수수료 지급 건"
-              columns={transactionColumns}
-              rows={data.transactions ?? []}
-              rowKey={(row) => String(row.commissionTransactionId ?? data.transactions!.indexOf(row))}
-              emptyMessage="조회된 수수료 지급 건이 없습니다."
-            />
-            <h3 className="contract-detail-subheading">대사 결과</h3>
-            <DataTable
-              caption="대사 결과"
-              columns={reconciliationColumns}
-              rows={data.reconciliations ?? []}
-              rowKey={(row) => String(row.reconciliationResultId ?? data.reconciliations!.indexOf(row))}
-              emptyMessage="조회된 대사 결과가 없습니다."
-            />
-          </>
-        )}
-      </QueryContent>
+      <PanelHeading title="지급·대사" legacy>
+        수수료 지급 건과 대사 결과를 함께 표시합니다.
+      </PanelHeading>
+      <div className="contract-tab-body">
+        <QueryContent query={query}>
+          {(data) => (
+            <>
+              <TabSection title="수수료 지급" count={data.transactions?.length ?? 0}>
+                <DataTable
+                  className="contract-payment-table"
+                  viewportClassName="contract-tab-viewport"
+                  caption="수수료 지급 건"
+                  columns={transactionColumns}
+                  rows={data.transactions ?? []}
+                  rowKey={(row) => String(row.commissionTransactionId ?? data.transactions!.indexOf(row))}
+                  emptyMessage="조회된 수수료 지급 건이 없습니다."
+                />
+              </TabSection>
+              <TabSection title="대사 결과" count={data.reconciliations?.length ?? 0}>
+                <DataTable
+                  className="contract-payment-table"
+                  viewportClassName="contract-tab-viewport"
+                  caption="대사 결과"
+                  columns={reconciliationColumns}
+                  rows={data.reconciliations ?? []}
+                  rowKey={(row) => String(row.reconciliationResultId ?? data.reconciliations!.indexOf(row))}
+                  emptyMessage="조회된 대사 결과가 없습니다."
+                />
+              </TabSection>
+            </>
+          )}
+        </QueryContent>
+      </div>
     </>
   )
 }

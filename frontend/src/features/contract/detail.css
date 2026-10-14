@@ -75,6 +75,15 @@
 .contract-detail-panel .data-table {
   min-width: 780px;
 }
+.contract-detail-panel .contract-payment-table {
+  min-width: 42rem;
+}
+.contract-tab-section > .data-table-viewport {
+  margin-top: var(--space-3);
+}
+.contract-tab-section > .contract-tab-state {
+  margin-top: var(--space-3);
+}
 .contract-detail-state {
   padding: 18px;
   color: var(--color-text-secondary);
@@ -184,7 +193,7 @@
 .contract-summary-grid dd,
 .contract-data-panel dd,
 .contract-history-times dd {
-  margin-left: 40px;
+  margin-left: 0;
 }
 .contract-history-list {
   margin: 0;
