@@ -53,6 +53,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CapCalculatorIntegrationTest {
 
     @Autowired
+    private com.susukkang.fgc.cap.repository.CapCheckQueryRepository capCheckQueryRepository;
+    @Autowired
     private CapCalculator capCalculator;
     @Autowired
     private CapCheckService capCheckService;
@@ -64,6 +66,66 @@ class CapCalculatorIntegrationTest {
     private CapScheduleAmountQueryRepository capScheduleAmountQueryRepository;
     @Autowired
     private ScheduleService scheduleService;
+
+    @Test
+    void preservesExistingZeroAmountNotApplicableReasonShape() {
+        Long checkId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.cap_check(contract_id,payment_stage,check_kind,as_of_date,base_premium_amount,
+                    refund_12m_amount,compliance_deduction_amount,limit_amount,included_amount,remaining_amount,
+                    result_status,calculation_snapshot)
+                VALUES(1,'GA_TO_FC','REALTIME',DATE '2026-07-31',100000,0,0,0,0,0,'NOT_APPLICABLE',
+                    '{"notApplicable":true,"notApplicableReason":"기존 제외 사유"}'::jsonb)
+                RETURNING cap_check_id
+                """, Long.class);
+        assertThat(capCheckService.findLatest(1L, PaymentStage.GA_TO_FC)).isPresent();
+        assertThat(jdbcTemplate.queryForObject("SELECT calculation_snapshot->>'notApplicableReason' "
+                + "FROM fgc.cap_check WHERE cap_check_id=?", String.class, checkId)).isEqualTo("기존 제외 사유");
+    }
+
+    @Test
+    void databaseRejectsNotApplicableWithoutReasonSnapshot() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO fgc.cap_check(contract_id,payment_stage,check_kind,as_of_date,base_premium_amount,
+                    refund_12m_amount,compliance_deduction_amount,result_status)
+                VALUES(1,'GA_TO_FC','REALTIME',DATE '2026-07-31',100000,NULL,NULL,'NOT_APPLICABLE')
+                """))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_cap_check_applicability_shape");
+    }
+
+    @Test
+    void databaseRejectsRegularResultWithoutRuleSet() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO fgc.cap_check(contract_id,payment_stage,check_kind,as_of_date,base_premium_amount,
+                    limit_amount,included_amount,remaining_amount,result_status)
+                VALUES(1,'GA_TO_FC','REALTIME',DATE '2026-07-31',100000,1200000,0,1200000,'NORMAL')
+                """))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_cap_check_applicability_shape");
+    }
+
+    @Test
+    void storesNotApplicableAndDisplaysBasisWithoutPollutingMonitoring() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-06-30' WHERE contract_id=?", id);
+        CapCheckSaveResult saved = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
+                id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 31), null));
+        assertThat(saved.result().resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        CapCheckSaveResult latest = capCheckService.findLatest(id, PaymentStage.GA_TO_FC).orElseThrow();
+        CapCheckBasisResponse basis = CapCheckBasisResponse.from(latest, "FGC-FGL01-202607-0001");
+        assertThat(basis.capCheck().limitAmount()).isNull();
+        assertThat(basis.capCheck().usagePct()).isNull();
+        assertThat(basis.warningStartUsagePct()).isNull();
+        assertThat(basis.details()).isEmpty();
+        assertThat(basis.calculationSnapshot()).containsKey("applicability");
+        assertThat(capCheckQueryRepository.summarizeByStage(LocalDate.of(2026, 7, 1), null, null,
+                "FGC-FGL01-202607-0001")).noneMatch(row -> row.getPaymentStage().equals("GA_TO_FC"));
+        assertThat(capCheckQueryRepository.search(LocalDate.of(2026, 7, 1), "GA_TO_FC", "NOT_APPLICABLE", null, null,
+                "FGC-FGL01-202607-0001", 0, 20)).singleElement()
+                .satisfies(row -> assertThat(row.getResultStatus()).isEqualTo("NOT_APPLICABLE"));
+        assertThat(jdbcTemplate.queryForObject("SELECT cap_rule_set_id FROM fgc.cap_check WHERE cap_check_id=?",
+                Long.class, saved.capCheckId())).isNull();
+    }
 
     @ParameterizedTest
     @EnumSource(value = ScheduleLineStatus.class, names = {"CONFIRMED", "MATCHED", "ADJUSTED"})

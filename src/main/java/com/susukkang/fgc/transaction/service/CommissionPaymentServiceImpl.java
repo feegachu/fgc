@@ -13,6 +13,7 @@ import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
 import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.service.CapApplicabilityPolicy;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.common.code.AgentRankCode;
@@ -198,7 +199,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
          * 문제: 해결조치가 기록되지 않은 기존 한도 위반 예외를 우회할 수 있음
          * 개선: 지급확정 전에 미해결 CAP_VIOLATION 존재 여부를 확인하여 확정을 차단
          */
-        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failFirst(unresolvedViolationFailure(first));
         }
 
@@ -206,6 +207,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         queryRepository.lockAttributedContracts(paymentId);
         // #433: 최초 지급 조회의 계약일은 잠금 대기 중 변경될 수 있다.
         attributions = requireConfirmationData(paymentId);
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
+            failFirst(unresolvedViolationFailure(attributions.get(0)));
+        }
         failFirst(requiredValueFailures(attributions));
 
         List<Long> capCheckIds = new ArrayList<>();
@@ -225,6 +229,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 continue;
             }
             if (isOutsideCapScope(data)) {
+                continue;
+            }
+            if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(),
+                        data.attributionDate(), null);
+                CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
+                evaluations.put(new CapGroupKey(data.contractId(), data.paymentStage()),
+                        new CapEvaluation(data, null, calculation, check));
                 continue;
             }
             CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -318,7 +330,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         requireDraft(first);
 
         List<GateFailure> failures = new ArrayList<>();
-        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId)) {
+        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failures.add(unresolvedViolationFailure(first));
         }
         failures.addAll(requiredValueFailures(attributions));
@@ -346,6 +358,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     continue;
                 }
                 if (isOutsideCapScope(data)) {
+                    continue;
+                }
+                if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+                    CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(),
+                            data.attributionDate(), null);
+                    CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
+                    evaluations.put(new CapGroupKey(data.contractId(), data.paymentStage()),
+                            new CapEvaluation(data, null, calculation, check));
                     continue;
                 }
                 CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -525,6 +545,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         summary.put("usagePct", check.getUsagePct());
         summary.put("limitAmount", check.getLimitAmount());
         summary.put("includedAmount", check.getIncludedAmount());
+        if (check.getResultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            summary.put("applicabilityReasonCode", check.getApplicabilityReasonCode());
+            summary.put("applicabilityReason", check.getDecisionReason());
+        }
         return summary;
     }
 
@@ -1485,9 +1509,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
      * @param paymentId 지급 건 ID
      * @return CAP_003 으로 차단해야 하면 true
      */
-    private boolean hasBlockingUnresolvedViolation(Long paymentId) {
+    private boolean hasBlockingUnresolvedViolation(Long paymentId, List<ConfirmationData> attributions) {
         return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
-                .anyMatch(contractId -> contractId == null || !isOutsideCapScope(contractId));
+                .anyMatch(contractId -> contractId == null || (!isOutsideCapScope(contractId)
+                        && (attributions.stream().noneMatch(row -> Objects.equals(row.contractId(), contractId))
+                        || attributions.stream().anyMatch(row -> Objects.equals(row.contractId(), contractId)
+                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())))));
     }
 
     private CapCheckCommand buildCapCheck(
@@ -1538,6 +1565,36 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .build();
     }
 
+    private Map<String, Object> notApplicableCandidateSnapshot(ConfirmationData row, String reasonCode, String reason) {
+        Map<String, Object> candidate = new LinkedHashMap<>();
+        candidate.put("transactionAttributionId", row.transactionAttributionId());
+        candidate.put("attributionDate", row.attributionDate() == null ? null : row.attributionDate().toString());
+        candidate.put("amount", row.attributedAmount() == null ? null : roundedAttributedAmount(row));
+        candidate.put("cashflowType", row.cashflowType());
+        candidate.put("classification", row.inclusionDecisionStatus());
+        candidate.put("reasonCode", reasonCode);
+        candidate.put("reason", reason);
+        return candidate;
+    }
+
+    private CapCheckCommand buildNotApplicableCheck(ConfirmationData data, CapCalculationResult calculation,
+                                                   List<ConfirmationData> attributions) {
+        Map<String, Object> snapshot = new LinkedHashMap<>(calculation.calculationSnapshot());
+        Map<?, ?> applicability = snapshot.get("applicability") instanceof Map<?, ?> decision ? decision : Map.of();
+        String reasonCode = Objects.toString(applicability.get("reasonCode"), null);
+        String reason = Objects.toString(applicability.get("reason"),
+                Objects.toString(snapshot.get("notApplicableReason"), "적용대상 아님"));
+        snapshot.put("candidateAttributions", attributions.stream()
+                .filter(row -> java.util.Objects.equals(row.contractId(), data.contractId())
+                        && row.paymentStage() == data.paymentStage())
+                .map(row -> notApplicableCandidateSnapshot(row, reasonCode, reason)).toList());
+        return CapCheckCommand.builder().paymentId(data.paymentId()).contractId(data.contractId())
+                .paymentStage(data.paymentStage().name()).asOfDate(data.attributionDate())
+                .basePremiumAmount(calculation.basePremiumAmount()).resultStatus(CapResultStatus.NOT_APPLICABLE)
+                .decisionReason(reason).applicabilityReasonCode(reasonCode)
+                .calculationSnapshotJson(json(snapshot)).build();
+    }
+
     private record CapGroupKey(Long contractId, PaymentStage paymentStage) { }
 
     private record CapEvaluation(ConfirmationData data, CapRuleSnapshot rule,
@@ -1547,7 +1604,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private CapEvaluation stricterCapEvaluation(CapEvaluation left, CapEvaluation right) {
         int comparison = Integer.compare(capResultPriority(right.check().getResultStatus()),
                 capResultPriority(left.check().getResultStatus()));
-        if (comparison == 0) comparison = right.check().getUsagePct().compareTo(left.check().getUsagePct());
+        if (comparison == 0 && right.check().getUsagePct() != null && left.check().getUsagePct() != null)
+            comparison = right.check().getUsagePct().compareTo(left.check().getUsagePct());
         if (comparison == 0) comparison = right.check().getAsOfDate().compareTo(left.check().getAsOfDate());
         if (comparison == 0) comparison = Long.compare(left.data().transactionAttributionId(), right.data().transactionAttributionId());
         return comparison > 0 ? right : left;
@@ -1568,10 +1626,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         for (CapEvaluation evaluation : evaluations.values()) {
             CapCheckCommand check = evaluation.check();
             capCheckWriteRepository.insertCapCheck(check);
-            insertCapCheckDetails(check, evaluation.data(), evaluation.calculation(), attributions);
+            if (check.getResultStatus() != CapResultStatus.NOT_APPLICABLE)
+                insertCapCheckDetails(check, evaluation.data(), evaluation.calculation(), attributions);
             capCheckIds.add(check.getCapCheckId());
             capChecks.add(check);
-            capExceptionService.createIfNecessary(capExceptionCommand(evaluation.data(), check));
+            if (check.getResultStatus() != CapResultStatus.NOT_APPLICABLE)
+                capExceptionService.createIfNecessary(capExceptionCommand(evaluation.data(), check));
         }
     }
 
@@ -1646,6 +1706,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             CapValidationResult actualValidation,
             BigDecimal warningUsagePct
     ) {
+        // 비대상 결과는 금액이 null이며 일반 한도 판정의 입력이 아니다.
+        if (calculation.resultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            return new CapValidationResult(calculation.limitAmount(), null, calculation.includedAmount(),
+                    calculation.remainingAmount(), calculation.usagePct(), CapResultStatus.NOT_APPLICABLE);
+        }
+        BigDecimal annualizedLimitBase = Objects.requireNonNull(calculation.annualizedLimitBase(),
+                "적용대상 계산에는 연간 한도 기준액이 필요합니다.");
         BigDecimal effectiveIncludedAmount = calculation.includedAmount()
                 .max(actualValidation.includedAmount());
         BigDecimal remainingAmount = calculation.limitAmount()
@@ -1661,7 +1728,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         // #490: 결합 산입액도 계산기·CapValidator와 같은 1,200% 예산 기준으로 판정
         CapResultStatus effectiveStatus = CapResultStatus.judge(
-                remainingAmount, calculation.annualizedLimitBase(), warningUsagePct);
+                remainingAmount, annualizedLimitBase, warningUsagePct);
         CapResultStatus resultStatus;
         if (calculation.resultStatus() == CapResultStatus.REVIEW_REQUIRED
                 || actualValidation.resultStatus() == CapResultStatus.REVIEW_REQUIRED) {

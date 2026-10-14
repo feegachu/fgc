@@ -204,6 +204,7 @@ public class CapCheckQueryRepository {
                         usage_pct DESC NULLS LAST,
                         cap_check_id DESC))[1] AS "worstUsagePct"
               FROM latest_cap_check
+             WHERE result_status <> 'NOT_APPLICABLE'
              GROUP BY payment_stage
              ORDER BY CASE payment_stage WHEN 'INSURER_TO_GA' THEN 1 ELSE 2 END
             """;
@@ -250,6 +251,7 @@ public class CapCheckQueryRepository {
               JOIN fgc.agent a ON a.agent_id = lcc.agent_id
               JOIN fgc.organization o ON o.organization_id = lcc.organization_id
              WHERE lcc.payment_stage = 'GA_TO_FC'
+               AND lcc.result_status <> 'NOT_APPLICABLE'
              GROUP BY a.agent_id, a.agent_code, a.agent_name,
                       o.organization_id, o.organization_code, o.organization_name
              ORDER BY SUM(ROUND(lcc.included_amount, 0)) DESC, a.agent_code

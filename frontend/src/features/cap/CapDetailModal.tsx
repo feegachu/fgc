@@ -101,6 +101,37 @@ export function CapDetailModal({ capCheckId, onClose }: CapDetailModalProps) {
 function BasisContent({ data }: { data: CapBasis }) {
   const item = data.capCheck!
   const snapshot = data.calculationSnapshot ?? {}
+  if (item.resultStatus === 'NOT_APPLICABLE') {
+    const decision = snapshot.applicability as Record<string, unknown> | undefined
+    return (
+      <section className="surface">
+        <h3>
+          {item.contractNo || '—'} · {item.paymentStageLabel || '—'}
+        </h3>
+        <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
+        <p>{String(decision?.reason ?? snapshot.notApplicableReason ?? '적용대상 아님')}</p>
+        <dl>
+          <div>
+            <dt>계약일</dt>
+            <dd>{String(decision?.contractDate ?? '—')}</dd>
+          </div>
+          <div>
+            <dt>적용 시작 계약일</dt>
+            <dd>{String(decision?.effectiveContractDate ?? '—')}</dd>
+          </div>
+          <div>
+            <dt>사유 코드</dt>
+            <dd>{String(decision?.reasonCode ?? '—')}</dd>
+          </div>
+          <div>
+            <dt>판정 기준 버전</dt>
+            <dd>{String(decision?.policyVersion ?? '—')}</dd>
+          </div>
+        </dl>
+        <p>한도·산입금액·사용률 계산 대상이 아닙니다.</p>
+      </section>
+    )
+  }
   const details = data.details ?? []
   const insurerStage = item.paymentStage === 'INSURER_TO_GA'
   const multiplier =

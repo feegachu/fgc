@@ -2133,6 +2133,86 @@ class CommissionPaymentServiceImplTest {
      * precheck는 confirm과 같은 판정 메서드를 재사용하되 아무것도 저장하지 않는다.
      */
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"3,false", "9,true"})
+    void preEffectiveOnlyBypassesKnownOutOfScopeViolation(long violationContract, boolean blocked) {
+        var data = withContractDate(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 6, 30));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(violationContract));
+        given(capCalculator.calculate(any())).willReturn(preEffectiveCalculation());
+        var result = service.precheck(101L);
+        assertThat(result.confirmable()).isEqualTo(!blocked);
+        assertThat(result.capPreview().getFirst().resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        assertThat(result.blockers()).extracting(TransactionPrecheckResponse.Blocker::code)
+                .doesNotContain("FGC-CAP-002");
+        verify(queryRepository, never()).findCapRuleSnapshot(anyLong(), anyLong());
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void preEffectiveContractKeepsAllocationEvidenceGate() {
+        var data = withContractDate(withAllocationBasis(confirmation(201L, 3L, "200000", "200000",
+                InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION,
+                "EVIDENCE"), null), LocalDate.of(2026, 6, 30));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capCalculator.calculate(any())).willReturn(preEffectiveCalculation());
+        assertThat(service.precheck(101L).blockers()).extracting(TransactionPrecheckResponse.Blocker::code)
+                .containsExactly("FGC-TRAN-004");
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void preEffectiveContractKeepsReviewRequiredConfirmationGate() {
+        var data = withContractDate(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 6, 30));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capCalculator.calculate(any())).willReturn(preEffectiveCalculation());
+        assertThat(service.precheck(101L).blockers()).extracting(TransactionPrecheckResponse.Blocker::code)
+                .containsExactly("FGC-CAP-002");
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void nonApplicableCalculationDoesNotEnterNumericMergedJudgement() {
+        com.susukkang.fgc.cap.dto.CapValidationResult result = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "mergeScheduleAndActualValidation", preEffectiveCalculation(), null, null);
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        assertThat(result.limitAmount()).isNull();
+        assertThat(result.includedAmount()).isNull();
+        assertThat(result.usagePct()).isNull();
+    }
+
+    @Test
+    void precheckAndAuditPreserveTheCalculationSnapshotReason() {
+        var data = withContractDate(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 6, 30));
+        var calculation = new CapCalculationResult(3L, PaymentStage.GA_TO_FC, CapCheckKind.REALTIME,
+                LocalDate.of(2026, 7, 3), null, null, new BigDecimal("100000"), null, null, null, null,
+                null, null, CapResultStatus.NOT_APPLICABLE, List.of(), Map.of("applicability", Map.of(
+                "status", "NOT_APPLICABLE", "reasonCode", "OTHER_EXCLUSION", "reason", "다른 적용제외 사유")));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capCalculator.calculate(any())).willReturn(calculation);
+        var preview = service.precheck(101L).capPreview().getFirst();
+        assertThat(preview.applicabilityReasonCode()).isEqualTo("OTHER_EXCLUSION");
+        assertThat(preview.applicabilityReason()).isEqualTo("다른 적용제외 사유");
+        CapCheckCommand check = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "buildNotApplicableCheck", data, calculation, List.of(data));
+        Map<String, Object> audit = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "capCheckAuditSummary", check);
+        assertThat(audit).containsEntry("applicabilityReasonCode", "OTHER_EXCLUSION")
+                .containsEntry("applicabilityReason", "다른 적용제외 사유");
+        assertThat(check.getCalculationSnapshotJson()).contains("OTHER_EXCLUSION", "다른 적용제외 사유");
+        assertPrecheckSavesNothing();
+    }
+
+    private CapCalculationResult preEffectiveCalculation() {
+        return new CapCalculationResult(3L, PaymentStage.GA_TO_FC, CapCheckKind.REALTIME,
+                LocalDate.of(2026, 7, 3), null, null, new BigDecimal("100000"), null, null, null, null,
+                null, null, CapResultStatus.NOT_APPLICABLE, List.of(),
+                com.susukkang.fgc.cap.service.CapApplicabilityPolicy.snapshot(PaymentStage.GA_TO_FC, LocalDate.of(2026, 6, 30)));
+    }
+
     @Test
     void precheckPassesCleanDraftWithoutSaving() {
         ConfirmationData data = confirmation(
