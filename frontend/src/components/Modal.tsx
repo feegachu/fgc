@@ -27,9 +27,11 @@ export function Modal({
   const titleId = useId()
   const dialog = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
+  const closeOnEscapeRef = useRef(closeOnEscape)
   useEffect(() => {
     onCloseRef.current = onClose
-  }, [onClose])
+    closeOnEscapeRef.current = closeOnEscape
+  }, [onClose, closeOnEscape])
   useEffect(() => {
     if (!open) return
     const previous = document.activeElement as HTMLElement | null
@@ -42,7 +44,7 @@ export function Modal({
       )
     ;(initialFocusRef?.current ?? focusable()[0] ?? element).focus()
     const keydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && closeOnEscape) {
+      if (event.key === 'Escape' && closeOnEscapeRef.current) {
         event.preventDefault()
         onCloseRef.current()
         return
@@ -75,7 +77,19 @@ export function Modal({
       document.body.style.overflow = previousOverflow
       if (previous?.isConnected) previous.focus()
     }
-  }, [open, closeOnEscape, initialFocusRef])
+  }, [open, initialFocusRef])
+  // Disabling a focused control can move browser focus to the body during a request.
+  useEffect(() => {
+    const element = dialog.current
+    if (
+      open &&
+      element &&
+      (!element.contains(document.activeElement) || document.activeElement?.matches(':disabled'))
+    ) {
+      const next = element.querySelector<HTMLElement>(focusSelector)
+      ;(next ?? element).focus()
+    }
+  })
   if (!open) return null
   return createPortal(
     <div

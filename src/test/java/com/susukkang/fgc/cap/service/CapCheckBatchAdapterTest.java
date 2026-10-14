@@ -43,10 +43,6 @@ class CapCheckBatchAdapterTest {
     void processesEverySelectedContractWithPartitionStageAndMonthEnd() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L, 20L));
-        given(capCheckQueryRepository.existsApplicableRuleSet(10L, PaymentStage.GA_TO_FC))
-                .willReturn(true);
-        given(capCheckQueryRepository.existsApplicableRuleSet(20L, PaymentStage.GA_TO_FC))
-                .willReturn(true);
         given(capCheckQueryRepository.selectComplianceEvidenceAmount(10L, PaymentStage.GA_TO_FC))
                 .willReturn(new BigDecimal("30000"));
         given(capCheckQueryRepository.selectComplianceEvidenceAmount(20L, PaymentStage.GA_TO_FC))
@@ -83,10 +79,6 @@ class CapCheckBatchAdapterTest {
     void skipsOnlyContractThatRaisesBusinessException() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L, 20L));
-        given(capCheckQueryRepository.existsApplicableRuleSet(10L, PaymentStage.INSURER_TO_GA))
-                .willReturn(true);
-        given(capCheckQueryRepository.existsApplicableRuleSet(20L, PaymentStage.INSURER_TO_GA))
-                .willReturn(true);
         doThrow(new FgcBusinessException(
                 FgcErrorCode.COMMON_002,
                 "contractId",
@@ -120,8 +112,6 @@ class CapCheckBatchAdapterTest {
     void propagatesUnexpectedSystemFailure() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L));
-        given(capCheckQueryRepository.existsApplicableRuleSet(10L, PaymentStage.GA_TO_FC))
-                .willReturn(true);
         doThrow(new IllegalStateException("database unavailable"))
                 .when(itemService).process(argThat(command -> command.contractId().equals(10L)));
         CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(
@@ -135,11 +125,9 @@ class CapCheckBatchAdapterTest {
     }
 
     @Test
-    void ignoresContractWhenNoRuleAppliesToPaymentStage() {
+    void delegatesApplicabilityAndPersistsDecisionEvenWithoutRuleSet() {
         given(validationMapper.selectSelectedContractIds(118L))
                 .willReturn(List.of(10L));
-        given(capCheckQueryRepository.existsApplicableRuleSet(10L, PaymentStage.GA_TO_FC))
-                .willReturn(false);
         CapCheckBatchAdapter adapter = new CapCheckBatchAdapter(
                 validationMapper, capCheckQueryRepository, itemService, failureRecordService);
 
@@ -147,12 +135,12 @@ class CapCheckBatchAdapterTest {
                 context(118L, LocalDate.of(2026, 8, 1)),
                 PaymentStage.GA_TO_FC);
 
-        assertThat(result.processedCount()).isZero();
+        assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.skippedCount()).isZero();
         assertThat(result.skips()).isEmpty();
-        verify(capCheckQueryRepository, never()).selectComplianceEvidenceAmount(
+        verify(capCheckQueryRepository).selectComplianceEvidenceAmount(
                 10L, PaymentStage.GA_TO_FC);
-        verify(itemService, never()).process(argThat(command -> command.contractId().equals(10L)));
+        verify(itemService).process(argThat(command -> command.contractId().equals(10L)));
         verify(failureRecordService, never()).record(
                 118L, 10L, PaymentStage.GA_TO_FC, "FGC-COMMON-500");
     }

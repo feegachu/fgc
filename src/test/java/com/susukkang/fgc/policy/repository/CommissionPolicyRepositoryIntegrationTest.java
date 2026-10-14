@@ -131,6 +131,27 @@ class CommissionPolicyRepositoryIntegrationTest {
     }
 
     @Test
+    void matchesCurrentCommissionPoliciesOnlyToCurrentRegimeOfferings() {
+        // #484: 현행 정책은 판매버전 체계가 CURRENT일 때만 고른다(REG-19). 분급 판매버전에 현행 규칙을 쓰면
+        // 라인은 현행 산식, 헤더는 분급 체계로 어긋난다.
+        Fixture fixture = insertFixture();
+        long unscoped = activePolicy(CONTRACT_DATE, null, 1, null, null, STAGE, fixture.scope());
+        long current = activePolicy(CONTRACT_DATE, null, 1, "CURRENT", null, STAGE, fixture.scope());
+        activePolicy(CONTRACT_DATE, null, 1, "FOUR_YEAR_2027", null, STAGE, fixture.scope());
+        activePolicy(CONTRACT_DATE, null, 1, "SEVEN_YEAR_2029", null, STAGE, fixture.scope());
+
+        assertThat(policiesFor(fixture.contractId(), STAGE)).extracting(ResolvedCommissionPolicy::getPolicyVersionId)
+                .containsExactlyInAnyOrder(unscoped, current);
+
+        for (String regime : List.of("FOUR_YEAR_2027", "SEVEN_YEAR_2029")) {
+            jdbcTemplate.update("UPDATE fgc.product_offering SET fee_regime_code = ? WHERE product_offering_id = ?",
+                    regime, fixture.offeringId());
+            // 현행 정책 유형에 분급 체계를 적은 정책도 모순이므로 고르지 않는다.
+            assertThat(policiesFor(fixture.contractId(), STAGE)).as(regime).isEmpty();
+        }
+    }
+
+    @Test
     void resolvesMatchingRulesWithEnumNullDecimalMappingsAndPriorityInstallmentIdOrder() {
         Fixture fixture = insertFixture();
         long policyId = draftPolicy(CONTRACT_DATE, null, 1, "CURRENT", fixture.documentVersion());

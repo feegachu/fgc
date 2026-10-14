@@ -36,9 +36,8 @@ import static org.mockito.Mockito.verify;
  * #512 — changedContractStep의 Processor가 해지 계약의 차익거래를 효력일 기준으로 저장하고,
  * 같은 실행으로 다시 돌려도 결과행·예외가 늘지 않는지 실제 PostgreSQL로 확인한다.
  * 시행 전 A1은 적용대상 아님, V45.1의 시행 후 A1(0475)은 410,000 초과 후보로 각각 저장한다.
- * 두 계약 모두 2026-07 이전 체결이라 GA→FC 1,200% 룰셋이 없는(CAP_004) 계약이다. 보험대리점 1,200%룰은
- * '26.7.1. 이후 체결 신계약에 적용되므로(FAQ 2차 Q1-1) 그 단계는 실패도 검토 대상도 아니고, 상태 사건이
- * SUCCEEDED로 끝나 다음 날 Reader 후보에서 빠지는지도 함께 본다(#522).
+ * #482: 두 계약의 GA→FC는 시행 전 비대상 사유를 저장한다. 독립적인 차익거래 결과도 유지한다.
+ * #522: 상태 사건은 SUCCEEDED로 끝나 다음 날 Reader 후보에서 제외되며 검토·실패가 추가되지 않는다.
  *
  * 스케줄 재생성은 이 테스트의 관심사가 아니고 시드 계약의 공유 스케줄을 바꾸므로 mock으로 둔다.
  * 차익거래·1,200%·Writer는 실제 빈을 쓴다.
@@ -118,14 +117,21 @@ class ChangedContractArbitrageIntegrationTest {
                 "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no=?", Long.class, contractNo);
         ChangedContractResult first = processInChunkTransaction();
 
-        // 두 시연 계약은 2026-07 이전 계약이라 GA→FC 1,200% 룰셋이 없다(CAP_004) — 시행 전 체결이라 그 단계는
-        // 1,200% 대상이 아니고 실패도 검토 대상도 아니다(#522). INSURER→GA는 룰셋이 있어 계산되고, 차익거래도 점검된다.
+        // #482 비대상 판정 저장과 #522 성공 처리·재처리 방지를 함께 검증한다.
         assertThat(first.success()).isTrue();
-        assertThat(capCheckStages()).containsExactly("INSURER_TO_GA");
+        assertThat(first.failureReason()).isNull();
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT result_status, limit_amount,
+                       calculation_snapshot #>> '{applicability,reasonCode}' AS reason_code
+                  FROM fgc.cap_check
+                 WHERE validation_run_id=? AND contract_id=? AND payment_stage='GA_TO_FC'
+                """, validationRunId, contractId))
+                .containsEntry("result_status", "NOT_APPLICABLE").containsEntry("limit_amount", null)
+                .containsEntry("reason_code", "CONTRACT_BEFORE_EFFECTIVE_DATE");
+        assertThat(capCheckStages()).containsExactlyInAnyOrder("INSURER_TO_GA", "GA_TO_FC");
         verify(scheduleService, never()).registerCapRuleReview(any(), any(), any());
         assertThat(revalidationFailures()).isZero();
         assertThat(failedProcessingRows()).isZero();
-        // 상태 사건이 SUCCEEDED로 끝나 Reader의 NOT EXISTS(...SUCCEEDED) 조건에서 빠진다 — 다음 날 다시 읽지 않는다.
         assertThat(contractStatusEventProcessingRepository.findPendingEventIds(
                 contractId, DailyChangedContractJobNames.JOB_NAME)).isEmpty();
         Map<String, Object> row = jdbcTemplate.queryForMap("""
@@ -146,6 +152,10 @@ class ChangedContractArbitrageIntegrationTest {
         ChangedContractResult second = processInChunkTransaction();
 
         assertThat(second.success()).isTrue();
+        assertThat(second.failureReason()).isEqualTo(first.failureReason());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check "
+                + "WHERE validation_run_id=? AND contract_id=? AND payment_stage='GA_TO_FC'", Integer.class,
+                validationRunId, contractId)).isEqualTo(1);
         assertThat(arbitrageRows()).isEqualTo(1);
         assertThat(candidateCases()).isEqualTo(candidates);
         assertThat(candidateOccurrences()).isEqualTo(candidates);
