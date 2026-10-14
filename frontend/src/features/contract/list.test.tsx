@@ -224,7 +224,7 @@ it('과거 계약 검색에서는 해촉·비활동·사용중지 설계사 이�
 
 it('해촉 설계사 URL 검색조건을 ID 대체문구 대신 이름과 상태로 복원한다', async () => {
   const { user } = mount('/contracts?agentId=7')
-  await waitFor(() => expect(screen.getByLabelText('모집 설계사')).toBeEnabled())
+  await screen.findByRole('option', { name: 'FC7 · 퇴사 설계사 (해촉 · 기준정보 사용중지)' })
   const agent = screen.getByLabelText('모집 설계사') as HTMLSelectElement
   expect(agent).toHaveValue('7')
   expect(agent.selectedOptions[0]).toHaveTextContent('퇴사 설계사 (해촉 · 기준정보 사용중지)')
@@ -234,6 +234,17 @@ it('해촉 설계사 URL 검색조건을 ID 대체문구 대신 이름과 상태
     filename: 'contracts.csv',
     notifyError: false,
   })
+})
+
+it('조직·설계사 조건이 없으면 전체 설계사 이력을 미리 조회하지 않고 선택할 때 불러온다', async () => {
+  const { user } = mount()
+  await screen.findByRole('table', { name: '보험계약 검색 결과' })
+  await waitFor(() => expect(screen.getByLabelText('조직')).toBeEnabled())
+  expect(requests.some((path) => path.startsWith('/api/v1/base/agents?'))).toBe(false)
+
+  await user.click(screen.getByLabelText('모집 설계사'))
+  expect(await screen.findByRole('option', { name: 'FC7 · 퇴사 설계사 (해촉 · 기준정보 사용중지)' })).toBeEnabled()
+  expect(requests.filter((path) => path.startsWith('/api/v1/base/agents?'))).toHaveLength(1)
 })
 
 it('검색에서는 비활성 보험사·조직을 선택할 수 있으며 설계사 옵션은 재진입할 때 재사용한다', async () => {

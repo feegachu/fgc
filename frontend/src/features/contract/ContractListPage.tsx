@@ -227,19 +227,23 @@ function ContractFilters({
     ),
   )
   const asOf = today()
+  const [agentOptionsRequested, setAgentOptionsRequested] = useState(Boolean(initial.agentId || initial.orgId))
   const insurers = useInsurerOptions()
   const organizations = useOrganizationOptions(asOf, true, true)
   // 과거 계약 검색에는 판매가 종료된 버전도 포함한다. 등록·수정은 기본 조회를 사용한다.
   const products = useProductOptions(asOf, draft.insurerId, true, true, true)
-  // 과거 계약 검색에서는 해촉·비활동·사용중지 설계사도 선택할 수 있어야 한다.
-  const agents = useAgentOptions(asOf, draft.orgId, true, true, true)
-  const set = (key: string, value: string) =>
+  // 전체 설계사 이력은 많을 수 있으므로 목록 진입 시에는 조회하지 않는다.
+  // 조직/설계사 URL 필터가 있거나 사용자가 선택 목록을 열 때 조회한다.
+  const agents = useAgentOptions(asOf, draft.orgId, agentOptionsRequested, true, true)
+  const set = (key: string, value: string) => {
+    if (key === 'orgId' && value) setAgentOptionsRequested(true)
     setDraft((current) => ({
       ...current,
       [key]: value,
       ...(key === 'insurerId' ? { productOfferingId: '' } : {}),
       ...(key === 'orgId' ? { agentId: '' } : {}),
     }))
+  }
   const input = (key: string, label: string, type = 'text', placeholder?: string) => (
     <Field key={key} label={label} className="filter-field">
       <input
@@ -257,14 +261,17 @@ function ContractFilters({
     query?: { isFetching: boolean; error: Error | null; refetch: () => unknown },
     placeholder = '전체',
     disabled = false,
+    onFocus?: () => void,
+    blockWhileFetching = true,
   ) => (
     <div key={key} className="filter-field">
       <Field label={label}>
         <select
           className="select-control"
           value={draft[key]}
-          disabled={disabled || query?.isFetching || Boolean(query?.error)}
+          disabled={disabled || (blockWhileFetching && query?.isFetching) || Boolean(query?.error)}
           aria-busy={query?.isFetching}
+          onFocus={onFocus}
           onChange={(event) => set(key, event.target.value)}
         >
           <option value="">{query?.isFetching ? '불러오는 중' : placeholder}</option>
@@ -299,6 +306,7 @@ function ContractFilters({
           className="contract-reset-button"
           onClick={() => {
             setDraft(Object.fromEntries(Object.keys(draft).map((key) => [key, ''])))
+            setAgentOptionsRequested(false)
             onReset()
           }}
         >
@@ -333,6 +341,10 @@ function ContractFilters({
             '모집 설계사',
             (agents.data ?? []).map((row) => ({ value: String(row.agentId), label: agentOptionLabel(row) })),
             agents,
+            '전체',
+            false,
+            () => setAgentOptionsRequested(true),
+            false,
           )}
           {select(
             'orgId',
