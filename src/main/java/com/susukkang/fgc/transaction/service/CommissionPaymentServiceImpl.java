@@ -1702,6 +1702,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             CapValidationResult actualValidation,
             BigDecimal warningUsagePct
     ) {
+        // 비대상 결과는 금액이 null이며 일반 한도 판정의 입력이 아니다.
+        if (calculation.resultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            return new CapValidationResult(calculation.limitAmount(), null, calculation.includedAmount(),
+                    calculation.remainingAmount(), calculation.usagePct(), CapResultStatus.NOT_APPLICABLE);
+        }
+        BigDecimal annualizedLimitBase = Objects.requireNonNull(calculation.annualizedLimitBase(),
+                "적용대상 계산에는 연간 한도 기준액이 필요합니다.");
         BigDecimal effectiveIncludedAmount = calculation.includedAmount()
                 .max(actualValidation.includedAmount());
         BigDecimal remainingAmount = calculation.limitAmount()
@@ -1717,7 +1724,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
         // #490: 결합 산입액도 계산기·CapValidator와 같은 1,200% 예산 기준으로 판정
         CapResultStatus effectiveStatus = CapResultStatus.judge(
-                remainingAmount, calculation.annualizedLimitBase(), warningUsagePct);
+                remainingAmount, annualizedLimitBase, warningUsagePct);
         CapResultStatus resultStatus;
         if (calculation.resultStatus() == CapResultStatus.REVIEW_REQUIRED
                 || actualValidation.resultStatus() == CapResultStatus.REVIEW_REQUIRED) {

@@ -1520,6 +1520,10 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
             CapValidationResult actualValidation,
             BigDecimal warningUsagePct
     ) {
+        if (calculation.resultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            return new CapValidationResult(calculation.limitAmount(), null, calculation.includedAmount(),
+                    calculation.remainingAmount(), calculation.usagePct(), CapResultStatus.NOT_APPLICABLE);
+        }
         BigDecimal effectiveIncludedAmount = calculation.includedAmount()
                 .max(actualValidation.includedAmount());
         BigDecimal remainingAmount = calculation.limitAmount()

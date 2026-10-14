@@ -2173,6 +2173,16 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
+    @Test
+    void nonApplicableCalculationDoesNotEnterNumericMergedJudgement() {
+        com.susukkang.fgc.cap.dto.CapValidationResult result = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "mergeScheduleAndActualValidation", preEffectiveCalculation(), null, null);
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        assertThat(result.limitAmount()).isNull();
+        assertThat(result.includedAmount()).isNull();
+        assertThat(result.usagePct()).isNull();
+    }
+
     private CapCalculationResult preEffectiveCalculation() {
         return new CapCalculationResult(3L, PaymentStage.GA_TO_FC, CapCheckKind.REALTIME,
                 LocalDate.of(2026, 7, 3), null, null, new BigDecimal("100000"), null, null, null, null,
