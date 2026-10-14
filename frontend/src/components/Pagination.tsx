@@ -4,10 +4,12 @@ export function Pagination({
   totalPages,
   onPageChange,
   compact = false,
+  legacy = false,
   allPages = false,
   label = '페이지 선택',
 }: {
   compact?: boolean
+  legacy?: boolean
   allPages?: boolean
   label?: string
   page: number
@@ -23,43 +25,64 @@ export function Pagination({
       : Math.floor((current - 1) / 5) * 5 + 1
   return (
     <nav className="pagination-controls" aria-label={label}>
-      {!compact && (
+      {!compact && !legacy && (
         <Button variant="ghost" disabled={current === 1} onClick={() => onPageChange(1)}>
           처음
         </Button>
       )}
       <button
         type="button"
-        className={compact ? 'pagination-button' : 'button button-ghost'}
-        aria-label={compact ? '이전 페이지' : undefined}
+        className={compact || legacy ? 'pagination-button' : 'button button-ghost'}
+        aria-label={legacy ? '이전 5페이지' : compact ? '이전 페이지' : undefined}
         disabled={compact ? current === 1 : start === 1}
         onClick={() => onPageChange(compact ? current - 1 : start - 1)}
       >
-        {compact ? '‹' : '이전'}
+        {legacy ? (
+          <span className="material-symbols-rounded" aria-hidden="true">
+            chevron_left
+          </span>
+        ) : compact ? (
+          '‹'
+        ) : (
+          '이전'
+        )}
       </button>
       {Array.from({ length: allPages ? last : Math.min(5, last - start + 1) }, (_, index) => start + index).map(
-        (number) => (
-          <button
-            type="button"
-            className={`pagination-button ${current === number ? 'is-active' : ''}`}
-            key={number}
-            aria-current={current === number ? 'page' : undefined}
-            onClick={() => onPageChange(number)}
-          >
-            {number}
-          </button>
-        ),
+        (number) =>
+          legacy && current === number ? (
+            <span className="pagination-button is-active" key={number} aria-current="page">
+              {number}
+            </span>
+          ) : (
+            <button
+              type="button"
+              className={`pagination-button ${current === number ? 'is-active' : ''}`}
+              key={number}
+              aria-current={current === number ? 'page' : undefined}
+              onClick={() => onPageChange(number)}
+            >
+              {number}
+            </button>
+          ),
       )}
       <button
         type="button"
-        className={compact ? 'pagination-button' : 'button button-ghost'}
-        aria-label={compact ? '다음 페이지' : undefined}
+        className={compact || legacy ? 'pagination-button' : 'button button-ghost'}
+        aria-label={legacy ? '다음 5페이지' : compact ? '다음 페이지' : undefined}
         disabled={compact ? current === last : start + 4 >= last}
         onClick={() => onPageChange(compact ? current + 1 : start + 5)}
       >
-        {compact ? '›' : '다음'}
+        {legacy ? (
+          <span className="material-symbols-rounded" aria-hidden="true">
+            chevron_right
+          </span>
+        ) : compact ? (
+          '›'
+        ) : (
+          '다음'
+        )}
       </button>
-      {!compact && (
+      {!compact && !legacy && (
         <Button variant="ghost" disabled={current === last} onClick={() => onPageChange(last)}>
           마지막
         </Button>

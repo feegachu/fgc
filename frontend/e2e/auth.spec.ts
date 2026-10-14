@@ -4,10 +4,11 @@ import type { Page } from '@playwright/test'
 // #404 UI 계약 검증. 실제 JWT 서명·DB 세션 무효화 시연은 #418 실서버 시나리오로 인계한다.
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'auth-ui-fixture' })
 async function authFixture(page: Page, roleCode = 'SETTLEMENT', session = { version: 0 }, initial = false) {
-  // TRAN-W02 now renders the real form after login instead of a transition placeholder.
-  await page.route('**/api/v1/base/agents?**', (route) => route.fulfill({ json: envelope({ content: [] }) }))
+  // 인증 fixture 토큰이 실제 업무 서버로 전달되지 않도록 조회를 격리한다.
+  await page.route('**/api/v1/contracts?**', (route) => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
+  await page.route('**/api/v1/base/**', (route) => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
   await page.route('**/api/v1/base/commission-items?**', (route) => route.fulfill({ json: envelope([]) }))
-  await page.route('**/api/v1/contracts?**', (route) => route.fulfill({ json: envelope({ content: [] }) }))
+  await page.route('**/api/v1/dashboard/**', (route) => route.fulfill({ json: envelope({ recentExceptions: [], recentRuns: [] }) }))
   let issued = initial ? ++session.version : 0
   let expired = false
   const token = () => envelope({ accessToken: `fixture-${issued}`, tokenType: 'Bearer', expiresIn: 1800 })
@@ -54,7 +55,8 @@ for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
     await page.goto('login')
     await login(page)
     await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
-    await expect(page.locator('.shell-user-name')).toContainText('테스트 사용자')
+    await expect(page.locator('.app-header .shell-user-name')).toHaveCount(0)
+    await expect(page.locator('.sidebar-user-name')).toContainText('테스트 사용자')
     await expect(page.locator('.sidebar-user-role')).toHaveText({
       SETTLEMENT: '정산담당자', COMPLIANCE: '준법·감사', GA_ADMIN: 'GA관리자', SYSTEM_ADMIN: '시스템관리자',
     }[role]!)

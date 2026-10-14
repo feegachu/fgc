@@ -49,6 +49,19 @@ public class ContractDetailResponse {
     private DataOrigin dataOrigin; //계약 출처
     private OffsetDateTime updatedAt; // 수정 요청의 expectedUpdatedAt으로 원문 그대로 전달
 
+    /** SIR-008: 조회 화면은 서버 enum의 한글 라벨을 우선 사용한다. */
+    public String getContractStatusLabel() {
+        return contractStatus == null ? null : contractStatus.label();
+    }
+
+    public String getPaymentCycleCodeLabel() {
+        return paymentCycleCode == null ? null : paymentCycleCode.label();
+    }
+
+    public String getDataOriginLabel() {
+        return dataOrigin == null ? null : dataOrigin.label();
+    }
+
     //계약상태 사건 이력 List 2차
     //private List<ContractStatusEventResponse> contractStatusEventResponses;
 }

@@ -1,7 +1,8 @@
 import { cloneElement, useId } from 'react'
-import type { ReactElement, HTMLAttributes } from 'react'
+import type { ReactElement, ReactNode, HTMLAttributes } from 'react'
 export interface FieldProps {
   label: string
+  labelAccessory?: ReactNode
   variant?: 'default' | 'filter'
   className?: string
   required?: boolean
@@ -9,21 +10,41 @@ export interface FieldProps {
   error?: string
   children: ReactElement<HTMLAttributes<HTMLElement> & { id?: string; required?: boolean }>
 }
-export function Field({ label, variant = 'default', className = '', required, helper, error, children }: FieldProps) {
+export function Field({
+  label,
+  labelAccessory,
+  variant = 'default',
+  className = '',
+  required,
+  helper,
+  error,
+  children,
+}: FieldProps) {
   const generatedId = useId()
   const id = children.props.id ?? generatedId
   const messageId = `${id}-message`
+  const labelClassName = variant === 'filter' ? 'filter-field-label' : 'field-label'
+  const fieldLabel = (
+    <label className={labelAccessory ? undefined : labelClassName} htmlFor={id}>
+      {label}
+      {required && (
+        <span className="field-required" aria-hidden="true">
+          {' '}
+          *
+        </span>
+      )}
+    </label>
+  )
   return (
     <div className={`${variant === 'filter' ? 'filter-field' : 'field'} ${className} ${error ? 'is-error' : ''}`}>
-      <label className={variant === 'filter' ? 'filter-field-label' : 'field-label'} htmlFor={id}>
-        {label}
-        {required && (
-          <span className="field-required" aria-hidden="true">
-            {' '}
-            *
-          </span>
-        )}
-      </label>
+      {labelAccessory ? (
+        <div className={labelClassName}>
+          {fieldLabel}
+          {labelAccessory}
+        </div>
+      ) : (
+        fieldLabel
+      )}
       {cloneElement(children, {
         id,
         required: required ?? children.props.required,

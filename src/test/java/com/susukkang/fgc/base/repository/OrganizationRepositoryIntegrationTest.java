@@ -195,6 +195,22 @@ class OrganizationRepositoryIntegrationTest {
         assertThat(result.getTotalPages()).isZero();
     }
 
+    @Test
+    void historicalSearchIncludesExpiredAndFutureOrganizationsWithoutChangingDefault() {
+        String prefix = uniqueCode();
+        long expired = insertOrganization(prefix + "-1", "만료 조직", "TEAM", null,
+                AS_OF.minusYears(1), AS_OF.minusDays(1), false);
+        long future = insertOrganization(prefix + "-2", "미래 조직", "TEAM", null,
+                AS_OF.plusDays(1), null, true);
+        assertThat(organizationRepository.search(prefix, AS_OF, pageRequest(0, 1)).getContent()).isEmpty();
+        Page<OrganizationRow> first = organizationRepository.search(prefix, AS_OF, true, pageRequest(0, 1));
+        Page<OrganizationRow> second = organizationRepository.search(prefix, AS_OF, true, pageRequest(1, 1));
+        assertThat(first.getContent()).extracting(OrganizationRow::organizationId).containsExactly(expired);
+        assertThat(second.getContent()).extracting(OrganizationRow::organizationId).containsExactly(future);
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(second.getTotalElements()).isEqualTo(2);
+    }
+
     private long insertOrganization(String code, String name, String type, Long parentId,
                                     LocalDate effectiveFrom, LocalDate effectiveTo, boolean activeYn) {
         return jdbcTemplate.queryForObject("""

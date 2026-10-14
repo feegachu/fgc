@@ -33,8 +33,8 @@ public interface OrganizationRepository extends JpaRepository<Organization,Long>
         FROM Organization o
         LEFT JOIN Organization parent
             ON parent.organizationId = o.parentId
-        WHERE o.effectiveFrom <= :asOf
-              AND (o.effectiveTo IS NULL OR o.effectiveTo >= :asOf)
+        WHERE (:includeHistorical = TRUE OR o.effectiveFrom <= :asOf)
+              AND (:includeHistorical = TRUE OR o.effectiveTo IS NULL OR o.effectiveTo >= :asOf)
               AND (
                   CAST(:keyword AS String) IS NULL
                   OR LOWER(o.organizationCode)
@@ -46,8 +46,8 @@ public interface OrganizationRepository extends JpaRepository<Organization,Long>
             countQuery = """
             SELECT COUNT(o)
             FROM Organization o
-            WHERE o.effectiveFrom <= :asOf
-              AND (o.effectiveTo IS NULL OR o.effectiveTo >= :asOf)
+            WHERE (:includeHistorical = TRUE OR o.effectiveFrom <= :asOf)
+              AND (:includeHistorical = TRUE OR o.effectiveTo IS NULL OR o.effectiveTo >= :asOf)
               AND (
                   CAST(:keyword AS String) IS NULL
                   OR LOWER(o.organizationCode)
@@ -60,6 +60,11 @@ public interface OrganizationRepository extends JpaRepository<Organization,Long>
     Page<OrganizationRow> search(
             @Param("keyword") String keyword,
             @Param("asOf") LocalDate asOf,
+            @Param("includeHistorical") boolean includeHistorical,
             Pageable pageable
     );
+
+    default Page<OrganizationRow> search(String keyword, LocalDate asOf, Pageable pageable) {
+        return search(keyword, asOf, false, pageable);
+    }
 }

@@ -153,7 +153,7 @@ export interface paths {
         };
         /**
          * 보험설계사 기준정보 조회·선택 (IF-API-07)
-         * @description 기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.
+         * @description 기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.
          */
         get: operations["search_8"];
         put?: never;
@@ -213,7 +213,7 @@ export interface paths {
         };
         /**
          * GA·조직 기준정보 조회·선택
-         * @description 기준일자에 적용되는 조직을 코드 또는 이름으로 검색합니다. 적용기간 안의 비활성 조직도 반환되며 activeYn=false인 항목은 선택할 수 없습니다.
+         * @description 기준일자에 적용되는 조직을 코드 또는 이름으로 검색합니다. includeHistorical=true이면 기간 밖 조직도 계약 검색용으로 반환합니다. 비활성 조직도 조회되며 신규 입력에서는 선택을 제한합니다.
          */
         get: operations["search_6"];
         put?: never;
@@ -233,7 +233,7 @@ export interface paths {
         };
         /**
          * 보험상품 기준정보 조회·선택
-         * @description 보험회사와 기준일자에 해당하는 활성 상품 판매버전을 조회합니다.
+         * @description 보험회사와 기준일자에 해당하는 활성 상품 판매버전을 조회합니다. includeExpired=true이면 판매 종료 버전을 포함하고, includeHistorical=true이면 판매기간·활성 조건을 해제해 계약 검색용 전체 버전을 반환합니다.
          */
         get: operations["search_5"];
         put?: never;
@@ -2349,8 +2349,10 @@ export interface components {
             contractNo?: string;
             /** @enum {string} */
             contractStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            contractStatusLabel?: string;
             /** @enum {string} */
             dataOrigin?: "SEED" | "NORMALIZED_DB" | "MANUAL";
+            dataOriginLabel?: string;
             firstPremiumAmount?: number;
             /** Format: int64 */
             insurerId?: number;
@@ -2362,6 +2364,7 @@ export interface components {
             organizationName?: string;
             /** @enum {string} */
             paymentCycleCode?: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL" | "SINGLE" | "OTHER";
+            paymentCycleCodeLabel?: string;
             /** Format: int32 */
             paymentTermMonths?: number;
             premiumPerCycleAmount?: number;
@@ -2466,8 +2469,10 @@ export interface components {
             eventSeq?: number;
             /** @enum {string} */
             newStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            newStatusLabel?: string;
             /** @enum {string} */
             previousStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            previousStatusLabel?: string;
             processings?: components["schemas"]["ContractStatusEventProcessingResponse"][];
             /** Format: date-time */
             receivedAt?: string;
@@ -2541,6 +2546,7 @@ export interface components {
             agentIdName?: string;
             /** @enum {string} */
             capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            capResultStatusLabel?: string;
             /** Format: date */
             contractDate?: string;
             /** Format: int64 */
@@ -2548,8 +2554,10 @@ export interface components {
             contractNo?: string;
             /** @enum {string} */
             contractStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            contractStatusLabel?: string;
             /** @enum {string} */
             dataOrigin?: "SEED" | "NORMALIZED_DB" | "MANUAL";
+            dataOriginLabel?: string;
             insurerName?: string;
             monthlyEquivalentFirstPremium?: number;
             productName?: string;
@@ -4094,6 +4102,10 @@ export interface operations {
                  * @example 2026-08-11
                  */
                 asOf: string;
+                /** @description 기준일 이전 해촉 설계사 포함 여부(계약 이력 검색용, 위촉일은 기준일 이하로 유지) */
+                includeTerminated?: boolean;
+                /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
+                includeHistorical?: boolean;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4191,6 +4203,8 @@ export interface operations {
                  * @example 2026-08-11
                  */
                 asOf: string;
+                /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
+                includeHistorical?: boolean;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4232,6 +4246,10 @@ export interface operations {
                  * @example 2026-08-11
                  */
                 asOf: string;
+                /** @description 판매 종료 버전 포함 여부(계약 이력 검색용, 판매시작일은 기준일 이하로 유지) */
+                includeExpired?: boolean;
+                /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
+                includeHistorical?: boolean;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4295,7 +4313,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CapCheckSearchResponse"];
+                    "*/*": components["schemas"]["ApiResponseCapCheckSearchResponse"];
                 };
             };
             /** @description page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류 등 (FGC-COMMON-002) */
@@ -4336,7 +4354,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CapCheckBasisResponse"];
+                    "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
                 };
             };
             /** @description 인증되지 않은 요청 */
@@ -4704,7 +4722,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["DashboardSummaryResponse"];
+                    "*/*": components["schemas"]["ApiResponseDashboardSummaryResponse"];
                 };
             };
             /** @description month 형식(yyyy-MM) 오류 (FGC-COMMON-002) */
@@ -5035,7 +5053,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PolicyDetailResponse"];
+                    "*/*": components["schemas"]["ApiResponsePolicyDetailResponse"];
                 };
             };
             /** @description 정책 버전 없음 (FGC-COMMON-004) */
@@ -5586,7 +5604,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["TransactionPrecheckResponse"];
+                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
                 };
             };
             /** @description 지급 건 없음 (FGC-COMMON-002) */
@@ -5645,7 +5663,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ValidationRunSearchResponse"];
+                    "*/*": components["schemas"]["ApiResponseValidationRunSearchResponse"];
                 };
             };
             /** @description page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류, status 값 오류 등 (FGC-COMMON-002) */
@@ -5687,7 +5705,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CreateValidationRunResponse"];
+                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
                 };
             };
             /** @description validationMonth 형식(yyyy-MM) 오류, runType 값 오류 등 (FGC-COMMON-002) */
@@ -5749,7 +5767,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ActiveMonthlyRunResponse"];
+                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
                 };
             };
             /** @description month 누락 또는 형식(yyyy-MM) 오류 (FGC-COMMON-002) */
@@ -5790,7 +5808,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ValidationRunDetailResponse"];
+                    "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
                 };
             };
             /** @description 인증되지 않은 요청 */
@@ -5831,7 +5849,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ValidationRunExecuteResponse"];
+                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
                 };
             };
             /** @description 인증되지 않은 요청 */
@@ -5891,7 +5909,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["FinalizeValidationRunResponse"];
+                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
                 };
             };
             /** @description Idempotency-Key 형식 오류 (FGC-COMMON-002) */
@@ -5958,7 +5976,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["FinalizeChecklistResponse"];
+                    "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
                 };
             };
             /** @description 인증되지 않은 요청 */
@@ -5999,7 +6017,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ValidationRunProgressResponse"];
+                    "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
                 };
             };
             /** @description 인증되지 않은 요청 */

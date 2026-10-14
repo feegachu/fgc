@@ -10,7 +10,7 @@ export function EvidenceLink({
 }: {
   label: string
   children: ReactNode
-  icon?: boolean
+  icon?: boolean | 'help'
 }) {
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
@@ -91,7 +91,7 @@ export function EvidenceLink({
       >
         {icon ? (
           <span className="material-symbols-rounded" aria-hidden="true">
-            info
+            {icon === 'help' ? 'help' : 'info'}
           </span>
         ) : (
           label

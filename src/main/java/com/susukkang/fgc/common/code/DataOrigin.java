@@ -12,5 +12,13 @@ package com.susukkang.fgc.common.code;
 public enum DataOrigin {
     SEED,           //
     NORMALIZED_DB,
-    MANUAL
+    MANUAL;
+
+    public String label() {
+        return switch (this) {
+            case SEED -> "시드";
+            case NORMALIZED_DB -> "정규화 DB";
+            case MANUAL -> "수동 입력";
+        };
+    }
 }
