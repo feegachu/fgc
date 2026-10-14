@@ -22,10 +22,10 @@ CREATE TABLE fgc.fee_regime_ruleset (
     policy_version_id               bigint       NOT NULL REFERENCES fgc.policy_version(policy_version_id),
     fee_regime_code                 varchar(40)  NOT NULL
                                         CHECK (fee_regime_code IN ('FOUR_YEAR_2027', 'SEVEN_YEAR_2029')),
-    -- 룰셋 선택 키. NULL 은 "제한 없음".
+    -- 룰셋 선택 키. 기초서류 버전은 필수(상품 판매버전에는 항상 있다). 판매개시일·작성/변경일 구간의 NULL 경계는 무제한.
     sales_start_date_from           date         NOT NULL,
     sales_start_date_to             date,
-    basic_document_version          varchar(80),
+    basic_document_version          varchar(80)  NOT NULL,
     basic_document_date_from        date,
     basic_document_date_to          date,
     -- 분급 파라미터
@@ -48,16 +48,23 @@ CREATE TABLE fgc.fee_regime_ruleset (
             AND long_term_maintenance_from > 0
             AND long_term_maintenance_to >= long_term_maintenance_from
             AND long_term_maintenance_to <= total_installments)
+    ),
+    -- 체계별 법정 상한(REG-03·04·05): 4년은 최대 48회차·장기유지 없음, 7년은 최대 84회차.
+    -- 장기유지 시작회차(49/61)는 미결(P1-01)이라 고정하지 않는다.
+    CONSTRAINT ck_fee_regime_ruleset_installments CHECK (
+        (fee_regime_code = 'FOUR_YEAR_2027'
+            AND total_installments <= 48 AND long_term_maintenance_from IS NULL)
+        OR (fee_regime_code = 'SEVEN_YEAR_2029' AND total_installments <= 84)
     )
 );
 -- 같은 정책·체계·기초서류 버전에서 판매개시일 구간과 작성/변경일 구간이 겹치는 룰셋은 둘 수 없다
--- (선택기가 후보를 두 개 받지 않게 한다). 구간만 다른 룰셋은 등록할 수 있다. NULL 경계는 무제한.
+-- (선택기가 후보를 두 개 받지 않게 한다). 구간만 다른 룰셋은 등록할 수 있다. 날짜 구간의 NULL 경계는 무제한.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 ALTER TABLE fgc.fee_regime_ruleset
     ADD CONSTRAINT ex_fee_regime_ruleset_scope EXCLUDE USING gist (
         policy_version_id WITH =,
         fee_regime_code WITH =,
-        (COALESCE(basic_document_version, '')) WITH =,
+        basic_document_version WITH =,
         daterange(sales_start_date_from, sales_start_date_to, '[]') WITH &&,
         daterange(basic_document_date_from, basic_document_date_to, '[]') WITH &&
     );

@@ -49,6 +49,15 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                     """, rulesetId)).isInstanceOf(DataIntegrityViolationException.class);
             assertThatThrownBy(() -> insertRuleset(jdbc, policyId, "SEVEN_YEAR_2029", 84, 61, 90))
                     .isInstanceOf(DataIntegrityViolationException.class);
+            // 체계별 법정 상한: 4년은 48회차 이내·장기유지 없음, 7년은 84회차 이내. 기초서류 버전은 필수
+            assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, policyId, "FOUR_YEAR_2027", "BD-NEG-1", 84, null, null))
+                    .hasMessageContaining("ck_fee_regime_ruleset_installments");
+            assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, policyId, "FOUR_YEAR_2027", "BD-NEG-2", 48, 37, 48))
+                    .hasMessageContaining("ck_fee_regime_ruleset_installments");
+            assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, policyId, "SEVEN_YEAR_2029", "BD-NEG-3", 85, null, null))
+                    .hasMessageContaining("ck_fee_regime_ruleset_installments");
+            assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, policyId, "SEVEN_YEAR_2029", null, 84, null, null))
+                    .isInstanceOf(DataIntegrityViolationException.class);
             // 같은 정책·체계·기초서류 버전에서 구간이 겹치는 룰셋은 거부
             assertThatThrownBy(() -> insertRuleset(jdbc, policyId, "FOUR_YEAR_2027", 48, null, null))
                     .isInstanceOf(DataIntegrityViolationException.class);
@@ -82,18 +91,28 @@ class FeeRegimeRulesetMigrationIntegrationTest {
 
     private void insertRulesetWithDocumentPeriod(JdbcTemplate jdbc, long policyId, String from, String to) {
         jdbc.update("""
-                INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from,
+                INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from, basic_document_version,
                     basic_document_date_from, basic_document_date_to, total_installments, monthly_rate_pct)
-                VALUES (?, 'SEVEN_YEAR_2029', DATE '2029-01-01', ?::date, ?::date, 84, 2)
+                VALUES (?, 'SEVEN_YEAR_2029', DATE '2029-01-01', 'BD-2029-01', ?::date, ?::date, 84, 2)
                 """, policyId, from, to);
+    }
+
+    private void insertRulesetWithVersion(JdbcTemplate jdbc, long policyId, String regime, String version,
+                                          int installments, Integer ltFrom, Integer ltTo) {
+        jdbc.update("""
+                INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from,
+                    basic_document_version, total_installments, monthly_rate_pct,
+                    long_term_maintenance_from, long_term_maintenance_to)
+                VALUES (?, ?, DATE '2027-01-01', ?, ?, 2, ?, ?)
+                """, policyId, regime, version, installments, ltFrom, ltTo);
     }
 
     private long insertRuleset(JdbcTemplate jdbc, long policyId, String regime, int installments,
                                Integer ltFrom, Integer ltTo) {
         return jdbc.queryForObject("""
-                INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from,
+                INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from, basic_document_version,
                     total_installments, monthly_rate_pct, long_term_maintenance_from, long_term_maintenance_to)
-                VALUES (?, ?, DATE '2027-01-01', ?, 2, ?, ?)
+                VALUES (?, ?, DATE '2027-01-01', 'BD-2027-01', ?, 2, ?, ?)
                 RETURNING fee_regime_ruleset_id
                 """, Long.class, policyId, regime, installments, ltFrom, ltTo);
     }
