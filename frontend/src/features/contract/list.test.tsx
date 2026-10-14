@@ -305,3 +305,17 @@ it('범위를 초과한 페이지는 마지막 페이지로 교정한다', async
   const { router } = mount('/contracts?page=999', true, () => pageData([row], 3))
   await waitFor(() => expect(new URLSearchParams(router.state.location.search).get('page')).toBe('3'))
 })
+
+it('계약 목록의 조직·상품·설계사는 이력 조회 모드를 사용한다', async () => {
+  mount('/contracts?insurerId=1&orgId=9')
+  await screen.findByRole('link', { name: row.contractNo })
+  await waitFor(() => {
+    for (const kind of ['organizations', 'products', 'agents']) {
+      const paths = requests.filter((path) => path.startsWith(`/api/v1/base/${kind}?`))
+      expect(paths.length).toBeGreaterThan(0)
+      expect(
+        paths.every((path) => new URL(path, 'http://localhost').searchParams.get('includeHistorical') === 'true'),
+      ).toBe(true)
+    }
+  })
+})

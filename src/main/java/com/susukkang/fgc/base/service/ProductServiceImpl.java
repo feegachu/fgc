@@ -40,8 +40,9 @@ public class ProductServiceImpl implements ProductService {
         if (offsetLong > Integer.MAX_VALUE) {
             throw validationException("page");
         }
-        Page<ProductResponse> result = productRepository
-                .search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), PageRequest.of(page - 1, size))
+        Page<ProductResponse> result = (criteria.includeHistorical()
+                ? productRepository.search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), true, PageRequest.of(page - 1, size))
+                : productRepository.search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), PageRequest.of(page - 1, size)))
                 .map(ProductResponse::from);
 
         return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), SORT);

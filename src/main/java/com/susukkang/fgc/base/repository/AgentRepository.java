@@ -41,9 +41,13 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             )
             FROM Agent a
             JOIN Organization o ON o.organizationId = a.organizationId
-            WHERE a.appointmentDate <= :asOf
-              AND (:includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
-              AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId)
+            WHERE (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
+              AND (:includeHistorical = TRUE OR :includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
+              AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId
+                   OR (:includeHistorical = TRUE AND EXISTS (
+                       SELECT c.contractId FROM InsuranceContract c
+                       WHERE c.agentId = a.agentId AND c.organizationId = :organizationId
+                   )))
               AND (
                   CAST(:keyword AS String) IS NULL
                   OR LOWER(a.agentCode) LIKE CONCAT('%', LOWER(CAST(:keyword AS String)), '%')
@@ -53,9 +57,13 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             countQuery = """
             SELECT COUNT(a)
             FROM Agent a
-            WHERE a.appointmentDate <= :asOf
-              AND (:includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
-              AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId)
+            WHERE (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
+              AND (:includeHistorical = TRUE OR :includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
+              AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId
+                   OR (:includeHistorical = TRUE AND EXISTS (
+                       SELECT c.contractId FROM InsuranceContract c
+                       WHERE c.agentId = a.agentId AND c.organizationId = :organizationId
+                   )))
               AND (
                   CAST(:keyword AS String) IS NULL
                   OR LOWER(a.agentCode) LIKE CONCAT('%', LOWER(CAST(:keyword AS String)), '%')
@@ -67,8 +75,13 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             @Param("keyword") String keyword,
             @Param("asOf") LocalDate asOf,
             @Param("includeTerminated") boolean includeTerminated,
+            @Param("includeHistorical") boolean includeHistorical,
             Pageable pageable
     );
+
+    default Page<AgentRow> search(Long organizationId, String keyword, LocalDate asOf, boolean includeTerminated, Pageable pageable) {
+        return search(organizationId, keyword, asOf, includeTerminated, false, pageable);
+    }
 
     /**
      * 소속 조직부터 상위 조직을 탐색해 가장 가까운 활성 설계사 ID를 반환한다.

@@ -295,6 +295,23 @@ class ProductRepositoryIntegrationTest {
                 """, policyId, insurerId, productId, paymentTerm, channel, effectiveFrom, effectiveTo);
     }
 
+    @Test
+    void historicalSearchIncludesFutureAndInactiveProductsWithMatchingCounts() {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        String suffix = suffix();
+        long insurer = insertInsurer("HIST-" + suffix);
+        long inactive = insertProduct(insurer, "HIST-P-" + suffix, "HIST-STD-" + suffix, false);
+        long future = insertOffering(inactive, "A-FUTURE", asOf.plusYears(1), null, "CURRENT", false, false);
+        long expired = insertOffering(inactive, "B-EXPIRED", asOf.minusYears(1), asOf.minusDays(1), "CURRENT", false, false);
+        assertThat(productRepository.search(insurer, asOf, true, PageRequest.of(0, 1)).getContent()).isEmpty();
+        Page<ProductRow> first = productRepository.search(insurer, asOf, false, true, PageRequest.of(0, 1));
+        Page<ProductRow> second = productRepository.search(insurer, asOf, false, true, PageRequest.of(1, 1));
+        assertThat(first.getContent()).extracting(ProductRow::productOfferingId).containsExactly(future);
+        assertThat(second.getContent()).extracting(ProductRow::productOfferingId).containsExactly(expired);
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(second.getTotalElements()).isEqualTo(2);
+    }
+
     private long insertInsurer(String code) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.insurer (insurer_code, insurer_name, insurer_type)

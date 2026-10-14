@@ -6,7 +6,6 @@ import { useErrorTitleStore } from '../../stores/errorTitle'
 import { MonthSelector } from '../../components/MonthSelector'
 import { canOpen, screenFor } from '../screens'
 import { Sidebar } from './Sidebar'
-import { roleLabels } from './labels'
 import type { ShellUser } from './Sidebar'
 import { WorkspaceTabs } from './WorkspaceTabs'
 import { useAuth } from '../../features/auth/useAuth'
@@ -82,11 +81,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         <header className="app-header app-header-rail">
           <WorkspaceTabs activeId={current?.id} />
           <div className="app-header-actions">
-            {!current?.id.startsWith('CONT-') && (
-              <span className="shell-user-name">
-                {user.userName} · {roleLabels[user.roleCode] ?? user.roleCode}
-              </span>
-            )}
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
               {month && (

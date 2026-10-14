@@ -53,7 +53,7 @@ const agent = {
 }
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'form-test' })
 type Handler = (url: string, options?: RequestOptions) => unknown
-function renderAt(path = '/contracts/21/edit', handler?: Handler) {
+function renderAt(path = '/contracts/21/edit', handler?: Handler, cached?: ContractDetail) {
   const writes: { url: string; options?: RequestOptions }[] = []
   vi.spyOn(apiClient, 'request').mockImplementation(async (url, options) => {
     if (options?.method) writes.push({ url, options })
@@ -94,6 +94,7 @@ function renderAt(path = '/contracts/21/edit', handler?: Handler) {
     throw new Error(`unexpected ${url}`)
   })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  if (cached) client.setQueryData(['contracts', 'detail', '21'], cached)
   const router = createMemoryRouter(
     [
       { path: '/contracts', element: <p>계약 목록</p> },
@@ -122,6 +123,56 @@ afterEach(() => {
 })
 
 describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
+  it('수정 화면은 상세 캐시의 옛 값 대신 새 조회가 끝난 값으로 초기화한다', async () => {
+    let finish!: (value: ContractDetail) => void
+    const pending = new Promise<ContractDetail>((resolve) => {
+      finish = resolve
+    })
+    renderAt(
+      '/contracts/21/edit',
+      (url, options) => {
+        if (url === '/api/v1/contracts/21' && !options?.method) return pending
+      },
+      { ...contract, contractNo: 'STALE-CACHED-NO' },
+    )
+    expect(screen.queryByDisplayValue('STALE-CACHED-NO')).not.toBeInTheDocument()
+    expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    await act(async () => finish({ ...contract, contractNo: 'FRESH-SERVER-NO' }))
+    await ready()
+    expect(field('계약번호')).toHaveValue('FRESH-SERVER-NO')
+  })
+
+  it('규제 근거는 REG-07·08·12의 조문·판정 범위를 생략하지 않는다', async () => {
+    const { user } = renderAt()
+    await ready()
+    await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('제4-32조제12항제1·2호 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('지급 대상은 최초 모집자로 고정되지 않고')
+    await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
+    await user.click(screen.getByRole('button', { name: '표준해약공제액 근거' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-08 · 제4-32조제5항 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('1,200% 한도 계산에서')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-12 · 제4-32조제6항 [현행규정]')
+  })
+
+  it.each(['duplicate', 'network'])('저장 실패 %s는 입력을 보존하고 다시 저장할 수 있다', async (kind) => {
+    const message = kind === 'duplicate' ? '저장 불가 — 이미 등록된 계약번호입니다.' : 'Failed to fetch'
+    const { user, writes } = renderAt('/contracts/21/edit', (_url, options) => {
+      if (options?.method) {
+        if (kind === 'duplicate')
+          throw new ApiError({ code: 'FGC-CONT-001', message, field: 'contractNo' }, 'duplicate-save', 409)
+        throw new TypeError(message)
+      }
+    })
+    await ready()
+    await user.click(save())
+    await waitFor(() => expect(writes).toHaveLength(1))
+    await waitFor(() => expect(save()).toBeEnabled())
+    expect(field('계약번호')).toHaveValue(contract.contractNo)
+    if (kind === 'duplicate') expect(field('계약번호')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getAllByText(new RegExp(message))).not.toHaveLength(0)
+  })
+
   it.each(['/contracts/new', '/contracts/21/edit'])('등록·수정 취소는 목록으로 이동한다: %s', async (path) => {
     const { user, router, writes } = renderAt(path)
     await screen.findByRole('link', { name: '취소' })

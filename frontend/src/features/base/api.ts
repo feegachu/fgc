@@ -14,6 +14,7 @@ export interface BaseCriteria {
   organizationId?: string
   includeTerminated?: boolean
   includeExpired?: boolean
+  includeHistorical?: boolean
   page?: number
   size?: number
 }
@@ -89,32 +90,63 @@ export function useInsurerOptions(enabled = true) {
     meta: { errorToast: false },
   })
 }
-export function useOrganizationOptions(asOf: string, enabled = true) {
+export function useOrganizationOptions(asOf: string, enabled = true, includeHistorical = false) {
   return useQuery({
-    queryKey: ['base', 'organizations', 'options', asOf],
-    queryFn: ({ signal }) => getAllBaseOptions('organizations', { asOf }, signal),
+    queryKey: ['base', 'organizations', 'options', asOf, includeHistorical],
+    queryFn: ({ signal }) =>
+      getAllBaseOptions('organizations', { asOf, includeHistorical: includeHistorical || undefined }, signal),
     enabled: enabled && Boolean(asOf),
     meta: { errorToast: false },
   })
 }
-export function useProductOptions(asOf: string, insurerId: string, enabled = true, includeExpired = false) {
+export function useProductOptions(
+  asOf: string,
+  insurerId: string,
+  enabled = true,
+  includeExpired = false,
+  includeHistorical = false,
+) {
   return useQuery({
-    queryKey: ['base', 'products', 'options', asOf, insurerId, includeExpired],
+    queryKey: ['base', 'products', 'options', asOf, insurerId, includeExpired, includeHistorical],
     queryFn: ({ signal }) =>
-      getAllBaseOptions('products', { asOf, insurerId, includeExpired: includeExpired || undefined }, signal),
+      getAllBaseOptions(
+        'products',
+        {
+          asOf,
+          insurerId,
+          includeExpired: includeExpired || undefined,
+          includeHistorical: includeHistorical || undefined,
+        },
+        signal,
+      ),
     enabled: enabled && Boolean(asOf && insurerId),
     meta: { errorToast: false },
   })
 }
-export function useAgentOptions(asOf: string, organizationId = '', enabled = true, includeTerminated = false) {
+export function useAgentOptions(
+  asOf: string,
+  organizationId = '',
+  enabled = true,
+  includeTerminated = false,
+  includeHistorical = false,
+) {
   return useQuery({
-    queryKey: ['base', 'agents', 'options', asOf, organizationId, includeTerminated],
+    queryKey: ['base', 'agents', 'options', asOf, organizationId, includeTerminated, includeHistorical],
     queryFn: ({ signal }) =>
-      getAllBaseOptions('agents', { asOf, organizationId, includeTerminated: includeTerminated || undefined }, signal),
+      getAllBaseOptions(
+        'agents',
+        {
+          asOf,
+          organizationId,
+          includeTerminated: includeTerminated || undefined,
+          includeHistorical: includeHistorical || undefined,
+        },
+        signal,
+      ),
     enabled: enabled && Boolean(asOf),
     // Historical list options may span many pages. Reuse them on navigation/focus;
     // input options still refresh immediately when the contract date changes.
-    staleTime: includeTerminated ? 5 * 60 * 1000 : 0,
+    staleTime: includeTerminated || includeHistorical ? 5 * 60 * 1000 : 0,
     meta: { errorToast: false },
   })
 }

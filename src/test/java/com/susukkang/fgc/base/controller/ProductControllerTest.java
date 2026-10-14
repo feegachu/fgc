@@ -52,6 +52,18 @@ class ProductControllerTest {
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
 
     @Test
+    void bindsHistoricalSearchModeWithoutChangingDefault() throws Exception {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        ProductSearchCriteria criteria = new ProductSearchCriteria(1L, asOf, false, true);
+        given(productService.search(criteria, 1, 20)).willReturn(PageResponse.of(List.of(), 1, 20, 0, ""));
+        mockMvc.perform(get("/api/v1/base/products")
+                        .param("asOf", "2026-08-11").param("includeHistorical", "true").param("insurerId", "1")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        verify(productService).search(criteria, 1, 20);
+    }
+
+    @Test
     void returnsPagedProductOfferingsWithDefaultPaging() throws Exception {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         ProductSearchCriteria criteria = new ProductSearchCriteria(2L, asOf);

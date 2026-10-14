@@ -40,8 +40,9 @@ public class AgentServiceImpl implements AgentService {
                 Sort.by(Sort.Direction.ASC, "agentCode")
         );
 
-        Page<AgentResponse> result = agentRepository
-                .search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), pageable)
+        Page<AgentResponse> result = (criteria.includeHistorical()
+                ? agentRepository.search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), true, pageable)
+                : agentRepository.search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), pageable))
                 .map(AgentResponse::from);
 
         return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), SORT);

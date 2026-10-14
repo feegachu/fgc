@@ -10,7 +10,7 @@ import { ContractStatusBadge, DataOriginBadge } from './badges'
 import { ContractFacts, ContractLoadState, ContractTabs } from './ContractTabs'
 import { contractErrorText, contractTab } from './detailState'
 import type { ContractTab } from './detailState'
-import '../../../../src/main/resources/static/css/features/contract.css'
+import './legacy.css'
 import './detail.css'
 
 export default function ContractDetailPage() {
@@ -181,7 +181,7 @@ function ContractDetailView({ id }: { id: string }) {
                 ['상품', contract.productName],
                 ['계약일', date(contract.contractDate)],
                 ['월납환산 초회보험료', won(contract.monthlyEquivalentFirstPremium)],
-                ['담당 설계사', contract.agentName],
+                ['모집 설계사', contract.agentName],
                 ['소속 조직', contract.organizationName],
                 ['납입기간', contract.paymentTermMonths == null ? '—' : `${int(contract.paymentTermMonths)}개월`],
               ]}

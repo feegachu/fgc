@@ -49,6 +49,18 @@ class AgentControllerTest {
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
 
     @Test
+    void bindsHistoricalSearchModeWithoutChangingDefault() throws Exception {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(null, null, asOf, false, true);
+        given(agentService.search(criteria, 1, 20)).willReturn(PageResponse.of(List.of(), 1, 20, 0, ""));
+        mockMvc.perform(get("/api/v1/base/agents")
+                        .param("asOf", "2026-08-11").param("includeHistorical", "true")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        verify(agentService).search(criteria, 1, 20);
+    }
+
+    @Test
     void returnsPagedAgentsForBaseAndContractScreens() throws Exception {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         AgentSearchCriteria criteria = new AgentSearchCriteria(11L, "김설계", asOf);

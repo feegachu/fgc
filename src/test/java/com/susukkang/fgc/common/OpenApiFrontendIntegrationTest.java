@@ -58,6 +58,16 @@ class OpenApiFrontendIntegrationTest {
         assertThat(paths.has("/api/v1/auth/login")).isTrue();
         assertThat(paths.has("/api/v1/auth/refresh")).isTrue();
         assertThat(paths.has("/api/v1/contracts")).isTrue();
+        paths.fields().forEachRemaining(path -> path.getValue().fields().forEachRemaining(operation ->
+                operation.getValue().path("responses").path("200").path("content").elements().forEachRemaining(media -> {
+                    JsonNode response = media.path("schema");
+                    if (response.has("$ref") && path.getKey().startsWith("/api/v1/")) {
+                        String ref = response.get("$ref").asText();
+                        JsonNode definition = root.path("components").path("schemas").path(ref.substring(ref.lastIndexOf('/') + 1));
+                        assertThat(definition.path("properties").has("data"))
+                                .as("응답 봉투: %s %s", operation.getKey(), path.getKey()).isTrue();
+                    }
+                })));
         // Origin is environment-specific, not part of the API type contract.
         root.putArray("servers").addObject().put("url", "/");
         Path output = Path.of("frontend/openapi/schema.json");

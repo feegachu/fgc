@@ -24,7 +24,7 @@ import type { ContractCriteria, ContractSummary } from './api'
 import { contractStatusLabels } from './labels'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
 import { contractErrorText } from './detailState'
-import '../../../../src/main/resources/static/css/features/contract.css'
+import './legacy.css'
 import './list.css'
 
 const FILTER_KEYS = {
@@ -57,8 +57,20 @@ const columns: TableColumn<ContractSummary>[] = [
     render: (row) =>
       row.contractId ? <Link to={detailHref(row)}>{row.contractNo || '-'}</Link> : row.contractNo || '-',
   },
-  { key: 'insurerName', label: '보험회사', width: '6.5rem', cellClassName: 'contract-disclosure-cell', render: (row) => textCell(row.insurerName) },
-  { key: 'productName', label: '상품명', width: '11.75rem', cellClassName: 'contract-disclosure-cell', render: (row) => textCell(row.productName) },
+  {
+    key: 'insurerName',
+    label: '보험회사',
+    width: '6.5rem',
+    cellClassName: 'contract-disclosure-cell',
+    render: (row) => textCell(row.insurerName),
+  },
+  {
+    key: 'productName',
+    label: '상품명',
+    width: '11.75rem',
+    cellClassName: 'contract-disclosure-cell',
+    render: (row) => textCell(row.productName),
+  },
   { key: 'contractDate', label: '계약일', width: '5.75rem', render: (row) => date(row.contractDate) },
   {
     key: 'premium',
@@ -74,7 +86,13 @@ const columns: TableColumn<ContractSummary>[] = [
     align: 'number',
     render: (row) => <Amount value={row.monthlyEquivalentFirstPremium} />,
   },
-  { key: 'agent', label: '모집 설계사', width: '8.5rem', cellClassName: 'contract-disclosure-cell', render: (row) => textCell(row.agentIdName) },
+  {
+    key: 'agent',
+    label: '모집 설계사',
+    width: '8.5rem',
+    cellClassName: 'contract-disclosure-cell',
+    render: (row) => textCell(row.agentIdName),
+  },
   {
     key: 'status',
     label: '계약상태',
@@ -210,11 +228,11 @@ function ContractFilters({
   )
   const asOf = today()
   const insurers = useInsurerOptions()
-  const organizations = useOrganizationOptions(asOf)
+  const organizations = useOrganizationOptions(asOf, true, true)
   // 과거 계약 검색에는 판매가 종료된 버전도 포함한다. 등록·수정은 기본 조회를 사용한다.
-  const products = useProductOptions(asOf, draft.insurerId, true, true)
+  const products = useProductOptions(asOf, draft.insurerId, true, true, true)
   // 과거 계약 검색에서는 해촉·비활동·사용중지 설계사도 선택할 수 있어야 한다.
-  const agents = useAgentOptions(asOf, draft.orgId, true, true)
+  const agents = useAgentOptions(asOf, draft.orgId, true, true, true)
   const set = (key: string, value: string) =>
     setDraft((current) => ({
       ...current,

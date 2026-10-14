@@ -341,6 +341,28 @@ class AgentRepositoryIntegrationTest {
     private record SeedFc(String agentCode, long organizationId) {
     }
 
+    @Test
+    void historicalOrganizationFilterIncludesFormerRecipientWithoutDuplicates() {
+        List<Long> refs = jdbcTemplate.query("""
+                SELECT agent_id, organization_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
+                """, (rs, rowNum) -> List.of(rs.getLong(1), rs.getLong(2))).getFirst();
+        long agentId = refs.getFirst();
+        long previousOrganization = refs.get(1);
+        long currentOrganization = insertOrganization(uniqueCode(), null);
+        String keyword = uniqueCode();
+        jdbcTemplate.update("""
+                UPDATE fgc.agent SET organization_id = ?, agent_name = ?, agent_status = 'TERMINATED',
+                    active_yn = FALSE, termination_date = ? WHERE agent_id = ?
+                """, currentOrganization, keyword, AS_OF.minusDays(1), agentId);
+        assertThat(agentRepository.search(previousOrganization, keyword, AS_OF, true,
+                PageRequest.of(0, 1)).getContent()).isEmpty();
+        Page<AgentRow> history = agentRepository.search(previousOrganization, keyword, AS_OF, false, true,
+                PageRequest.of(0, 1));
+        assertThat(history.getContent()).extracting(AgentRow::agentId).containsExactly(agentId);
+        assertThat(history.getTotalElements()).isEqualTo(1);
+        assertThat(history.getContent().getFirst().organizationId()).isEqualTo(currentOrganization);
+    }
+
     private long insertOrganization(String code, Long parentId) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.organization (

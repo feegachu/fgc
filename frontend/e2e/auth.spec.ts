@@ -55,7 +55,8 @@ for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
     await page.goto('login')
     await login(page)
     await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
-    await expect(page.locator('.shell-user-name')).toContainText('테스트 사용자')
+    await expect(page.locator('.app-header .shell-user-name')).toHaveCount(0)
+    await expect(page.locator('.sidebar-user-name')).toContainText('테스트 사용자')
     await expect(page.locator('.sidebar-user-role')).toHaveText({
       SETTLEMENT: '정산담당자', COMPLIANCE: '준법·감사', GA_ADMIN: 'GA관리자', SYSTEM_ADMIN: '시스템관리자',
     }[role]!)

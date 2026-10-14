@@ -50,10 +50,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             FROM fgc.product p
             JOIN fgc.product_offering po ON po.product_id = p.product_id
             WHERE p.insurer_id = :insurerId
-              AND p.active_yn = true
-              AND po.active_yn = true
-              AND po.sales_start_date <= :asOf
-              AND (:includeExpired = TRUE OR po.sales_end_date IS NULL OR po.sales_end_date >= :asOf)
+              AND (:includeHistorical = TRUE OR p.active_yn = true)
+              AND (:includeHistorical = TRUE OR po.active_yn = true)
+              AND (:includeHistorical = TRUE OR po.sales_start_date <= :asOf)
+              AND (:includeHistorical = TRUE OR :includeExpired = TRUE OR po.sales_end_date IS NULL OR po.sales_end_date >= :asOf)
             ORDER BY p.insurer_product_code, po.offering_version, po.channel_code, po.product_offering_id
             """,
             countQuery = """
@@ -61,16 +61,21 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             FROM fgc.product p
             JOIN fgc.product_offering po ON po.product_id = p.product_id
             WHERE p.insurer_id = :insurerId
-              AND p.active_yn = true
-              AND po.active_yn = true
-              AND po.sales_start_date <= :asOf
-              AND (:includeExpired = TRUE OR po.sales_end_date IS NULL OR po.sales_end_date >= :asOf)
+              AND (:includeHistorical = TRUE OR p.active_yn = true)
+              AND (:includeHistorical = TRUE OR po.active_yn = true)
+              AND (:includeHistorical = TRUE OR po.sales_start_date <= :asOf)
+              AND (:includeHistorical = TRUE OR :includeExpired = TRUE OR po.sales_end_date IS NULL OR po.sales_end_date >= :asOf)
             """,
             sqlResultSetMapping = "ProductRowMapping")
     Page<ProductRow> search(
             @Param("insurerId") long insurerId,
             @Param("asOf") LocalDate asOf,
             @Param("includeExpired") boolean includeExpired,
+            @Param("includeHistorical") boolean includeHistorical,
             Pageable pageable
     );
+
+    default Page<ProductRow> search(long insurerId, LocalDate asOf, boolean includeExpired, Pageable pageable) {
+        return search(insurerId, asOf, includeExpired, false, pageable);
+    }
 }

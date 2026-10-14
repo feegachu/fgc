@@ -16,13 +16,21 @@ import { contractStatusLabels, paymentCycleLabels } from './labels'
 import { contractErrorText } from './detailState'
 import { createRequest, fillCyclePremium, initialDraft, validateDraft } from './form'
 import type { ContractDraft, ContractField, ContractFieldErrors } from './form'
-import '../../../../src/main/resources/static/css/features/contract.css'
+import './legacy.css'
 import './form.css'
 
 export default function ContractFormPage() {
   const { id } = useParams()
   const [revision, setRevision] = useState(0)
-  const detail = useQuery({ ...contractDetailQuery(id ?? ''), enabled: Boolean(id), refetchOnWindowFocus: false })
+  const detail = useQuery({
+    ...contractDetailQuery(id ?? ''),
+    queryKey: ['contracts', 'editor', id ?? ''],
+    enabled: Boolean(id),
+    gcTime: 0,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
   async function reload() {
     await detail.refetch({ throwOnError: true })
     setRevision((current) => current + 1)
@@ -212,8 +220,9 @@ function ContractEditor({
       labelAccessory={
         field === 'standardSurrenderDeductionAmount' ? (
           <EvidenceLink label="표준해약공제액 근거" icon="help">
-            REG-08 · 제4-32조제5항: 표준해약공제액 80% 이상 공제 상품은 1년 경과시점 예상 해약환급금을 합산합니다.
-            REG-12 · 제4-32조제6항: 차익거래 판정에서도 일정 상품의 36개월 이내 해지는 해약환급금을 합산합니다.
+            REG-08 · 제4-32조제5항 [현행규정]. 표준해약공제액 80% 이상을 공제하는 상품은 1,200% 한도 계산에서 1년
+            경과시점 예상 해약환급금을 합산합니다. REG-12 · 제4-32조제6항 [현행규정]. 차익거래 판정에서도 일정 상품의
+            36개월 이내 해지는 해약환급금을 합산합니다.
           </EvidenceLink>
         ) : undefined
       }
@@ -403,7 +412,9 @@ function ContractEditor({
                   error={errors.agentId}
                   labelAccessory={
                     <EvidenceLink label="모집 설계사 근거" icon="help">
-                      REG-07 · 계약을 모집한 설계사를 저장합니다. 계약을 유지관리하는 담당 설계사는 별도로 관리합니다.
+                      REG-07 · 제4-32조제12항제1·2호 [현행규정]. 여기서 저장하는 값은 모집 설계사입니다. 지급 대상은
+                      최초 모집자로 고정되지 않고 계약을 유지관리하는 모집종사자이므로, 유지관리 담당 설계사는 별도로
+                      관리합니다.
                     </EvidenceLink>
                   }
                 >
