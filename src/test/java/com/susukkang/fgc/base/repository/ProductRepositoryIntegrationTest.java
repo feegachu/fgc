@@ -50,21 +50,21 @@ class ProductRepositoryIntegrationTest {
                 "STD-300-" + suffix, true);
 
         long startsTodayId = insertOffering(productId, "A-START", asOf, null,
-                "TM", true, "TM_SPECIAL", true, true);
+                "FOUR_YEAR_2027", true, true);
         long endsTodayId = insertOffering(productId, "B-END", asOf.minusMonths(1), asOf,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         long openEndedId = insertOffering(productId, "C-OPEN", asOf.minusYears(1), null,
-                "FACE_TO_FACE", false, "CURRENT", true, true);
+                "CURRENT", true, true);
         insertOffering(productId, "D-FUTURE", asOf.plusDays(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         insertOffering(productId, "E-EXPIRED", asOf.minusMonths(1), asOf.minusDays(1),
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         insertOffering(productId, "F-INACTIVE", asOf.minusMonths(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, false);
+                "CURRENT", false, false);
         insertOffering(inactiveProductId, "A-INACTIVE-PRODUCT", asOf.minusMonths(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         insertOffering(otherProductId, "A-OTHER-INSURER", asOf.minusMonths(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
 
         Page<ProductRow> result = productRepository.search(insurerId, asOf, false, PageRequest.of(0, 3));
         List<ProductRow> rows = result.getContent();
@@ -74,7 +74,6 @@ class ProductRepositoryIntegrationTest {
         assertThat(result.getTotalElements()).isEqualTo(3);
         assertThat(rows.get(1)).satisfies(row -> {
             assertThat(row.salesEndDate()).isEqualTo(asOf);
-            assertThat(row.channelSpecialRuleYn()).isFalse();
             assertThat(row.standardDeduction80Yn()).isFalse();
         });
         assertThat(rows.get(0)).satisfies(row -> {
@@ -86,16 +85,15 @@ class ProductRepositoryIntegrationTest {
             assertThat(row.salesEndDate()).isNull();
             assertThat(row.basicDocumentVersion()).isEqualTo("BD-A-START");
             assertThat(row.basicDocumentDate()).isEqualTo(asOf.minusYears(1));
-            assertThat(row.channelCode()).isEqualTo("TM");
-            assertThat(row.channelSpecialRuleYn()).isTrue();
-            assertThat(row.feeRegimeCode()).isEqualTo("TM_SPECIAL");
+            assertThat(row.channelCode()).isEqualTo("FACE_TO_FACE");
+            assertThat(row.feeRegimeCode()).isEqualTo("FOUR_YEAR_2027");
             assertThat(row.standardDeduction80Yn()).isTrue();
             assertThat(row.paymentTermMonths()).isNull();
         });
     }
 
     @Test
-    void ordersByProductCodeVersionChannelAndIdAndAppliesPaging() {
+    void ordersByProductCodeAndVersionAndAppliesPaging() {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         String suffix = suffix();
         long insurerId = insertInsurer("I-P-" + suffix);
@@ -105,13 +103,11 @@ class ProductRepositoryIntegrationTest {
                 "STD-A-" + suffix, true);
 
         long aV1Face = insertOffering(productA, "V1", asOf.minusDays(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
-        long aV1Tm = insertOffering(productA, "V1", asOf.minusDays(1), null,
-                "TM", true, "TM_SPECIAL", false, true);
+                "CURRENT", false, true);
         long aV2 = insertOffering(productA, "V2", asOf.minusDays(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         long bV1 = insertOffering(productB, "V1", asOf.minusDays(1), null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
 
         Page<ProductRow> first = productRepository.search(insurerId, asOf, false, PageRequest.of(0, 2));
         Page<ProductRow> second = productRepository.search(insurerId, asOf, false, PageRequest.of(1, 2));
@@ -119,14 +115,14 @@ class ProductRepositoryIntegrationTest {
 
         assertThat(first.getContent())
                 .extracting(ProductRow::productOfferingId)
-                .containsExactly(aV1Face, aV1Tm);
+                .containsExactly(aV1Face, aV2);
         assertThat(second.getContent())
                 .extracting(ProductRow::productOfferingId)
-                .containsExactly(aV2, bV1);
-        assertThat(first.getTotalElements()).isEqualTo(4);
-        assertThat(second.getTotalElements()).isEqualTo(4);
+                .containsExactly(bV1);
+        assertThat(first.getTotalElements()).isEqualTo(3);
+        assertThat(second.getTotalElements()).isEqualTo(3);
         assertThat(beyondLast.getContent()).isEmpty();
-        assertThat(beyondLast.getTotalElements()).isEqualTo(4);
+        assertThat(beyondLast.getTotalElements()).isEqualTo(3);
     }
 
     @Test
@@ -168,13 +164,11 @@ class ProductRepositoryIntegrationTest {
         long productA = insertProduct(insurerId, "A-" + suffix, "STD-A-" + suffix, true);
         long productB = insertProduct(insurerId, "B-" + suffix, "STD-B-" + suffix, true);
         long aFaceV1 = insertOffering(productA, "V1", asOf, null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
-        long aTm = insertOffering(productA, "V1", asOf, null,
-                "TM", true, "TM_SPECIAL", false, true);
+                "CURRENT", false, true);
         long aFaceV2 = insertOffering(productA, "V2", asOf, null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         long bFace = insertOffering(productB, "V1", asOf, null,
-                "FACE_TO_FACE", false, "CURRENT", false, true);
+                "CURRENT", false, true);
         long activePolicyId = insertDraftRefundPolicy("TEST-ACTIVE-" + suffix, asOf.minusDays(2));
         long draftPolicyId = insertDraftRefundPolicy("TEST-DRAFT-" + suffix, asOf);
 
@@ -188,24 +182,25 @@ class ProductRepositoryIntegrationTest {
                 asOf.minusDays(2), asOf.minusDays(1));
         insertRefundTable(draftPolicyId, insurerId, productA, "FACE_TO_FACE", 960, asOf, null);
         insertRefundTable(activePolicyId, otherInsurerId, productA, "FACE_TO_FACE", 60, asOf, null);
-        insertRefundTable(activePolicyId, insurerId, productA, "TM", 120, asOf, null);
+        // 같은 상품이라도 다른 채널의 표는 고르지 않는다(가장 늦게 넣어 ID가 가장 크다).
+        insertRefundTable(activePolicyId, insurerId, productA, "OTHER_CHANNEL", 120, asOf, null);
         insertRefundTable(activePolicyId, insurerId, productB, "FACE_TO_FACE", 84, asOf, null);
         // 환수율표를 모두 작성한 다음 승인·활성화하여 정책 불변성 제약을 지킨다.
         activatePolicy(activePolicyId);
 
         Page<ProductRow> result = productRepository.search(insurerId, asOf, false, PageRequest.of(0, 4));
 
-        assertThat(result.getTotalElements()).isEqualTo(4);
+        assertThat(result.getTotalElements()).isEqualTo(3);
         assertThat(result.getContent()).extracting(ProductRow::productOfferingId)
-                .containsExactly(aFaceV1, aTm, aFaceV2, bFace);
+                .containsExactly(aFaceV1, aFaceV2, bFace);
         assertThat(result.getContent()).extracting(ProductRow::paymentTermMonths)
-                .containsExactly(180, 120, 180, 84);
+                .containsExactly(180, 180, 84);
 
         // 기준일 다음 날에는 만료된 표를 제외하고 새로 유효해진 표를 선택한다.
         List<ProductRow> nextDay = productRepository.search(
                 insurerId, asOf.plusDays(1), false, PageRequest.of(0, 4)).getContent();
         assertThat(nextDay).extracting(ProductRow::paymentTermMonths)
-                .containsExactly(600, 120, 600, 84);
+                .containsExactly(600, 600, 84);
     }
 
     // FGC-FUN-018: 과거 계약 조회와 계약 입력의 판매버전 선택 조건을 분리한다.
@@ -321,16 +316,15 @@ class ProductRepositoryIntegrationTest {
 
     private long insertOffering(long productId, String version,
                                 LocalDate salesStartDate, LocalDate salesEndDate,
-                                String channelCode, boolean channelSpecialRuleYn,
                                 String feeRegimeCode, boolean standardDeduction80Yn,
                                 boolean activeYn) {
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.product_offering (
                     product_id, offering_version, sales_start_date, sales_end_date,
                     basic_document_version, basic_document_date, channel_code,
-                    channel_special_rule_yn, fee_regime_code,
+                    fee_regime_code,
                     standard_deduction_80_yn, active_yn
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, 'FACE_TO_FACE', ?, ?, ?)
                 RETURNING product_offering_id
                 """,
                 Long.class,
@@ -340,8 +334,6 @@ class ProductRepositoryIntegrationTest {
                 salesEndDate,
                 "BD-" + version,
                 LocalDate.of(2025, 8, 11),
-                channelCode,
-                channelSpecialRuleYn,
                 feeRegimeCode,
                 standardDeduction80Yn,
                 activeYn

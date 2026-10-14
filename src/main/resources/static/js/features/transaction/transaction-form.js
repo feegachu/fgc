@@ -329,8 +329,6 @@
     var options = [
       ["INCLUDED", "산입"],
       ["REVIEW_REQUIRED", "검토필요"],
-      ["EXCLUDED:VOICE_RECORDING", "제외 · 녹취"],
-      ["EXCLUDED:BROADCAST", "제외 · 방송"],
       ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"]
     ];
     if (isInsurerToGa()) options.push(["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]);
@@ -339,7 +337,7 @@
 
   function setInclusionDecision(select, inclusionStatus, exclusionType) {
     var value = inclusionStatus === "EXCLUDED"
-      ? "EXCLUDED:" + (exclusionType || "VOICE_RECORDING")
+      ? "EXCLUDED:" + (exclusionType || "NEW_AGENT_SUPPORT")
       : inclusionStatus;
     select.value = value;
   }
@@ -1010,8 +1008,6 @@
   }
   function decisionReason(decision) {
     var labels = {
-      VOICE_RECORDING: "녹취 관련 비용",
-      BROADCAST: "방송 관련 비용",
       NEW_AGENT_SUPPORT: "신인활동지원비",
       COMPLIANCE_3PCT: "준법경영비"
     };

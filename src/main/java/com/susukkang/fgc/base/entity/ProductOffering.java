@@ -47,9 +47,6 @@ public class ProductOffering {
     @Column(name = "channel_code", nullable = false, length = 30)
     private String channelCode;
 
-    @Column(name = "channel_special_rule_yn", nullable = false)
-    private boolean channelSpecialRuleYn;
-
     @Column(name = "fee_regime_code", nullable = false, length = 40)
     private String feeRegimeCode;
 

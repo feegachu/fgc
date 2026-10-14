@@ -188,7 +188,7 @@
       '<td class="tabular-nums">' + display(item.offeringVersion) + "</td>" +
       '<td class="tabular-nums">' + salesPeriod + "</td>" +
       '<td class="tabular-nums">' + documentVersion + "</td>" +
-      "<td>" + display(item.channelCode) + (item.channelSpecialRuleYn ? '<span class="base-secondary-line">채널 특례</span>' : "") + "</td>" +
+      "<td>" + display(item.channelCode) + "</td>" +
       '<td class="tabular-nums">' + display(item.feeRegimeCode) + "</td>" +
       "<td>" + (item.standardDeduction80Yn
         ? '<span class="status-badge status-badge-warning">예</span>'

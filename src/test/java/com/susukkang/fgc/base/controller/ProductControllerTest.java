@@ -67,7 +67,6 @@ class ProductControllerTest {
                 "BD-2026-07",
                 LocalDate.of(2026, 7, 1),
                 "FACE_TO_FACE",
-                false,
                 "CURRENT",
                 true,
                 240
@@ -92,7 +91,6 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.data.content[0].basicDocumentVersion").value("BD-2026-07"))
                 .andExpect(jsonPath("$.data.content[0].basicDocumentDate").value("2026-07-01"))
                 .andExpect(jsonPath("$.data.content[0].channelCode").value("FACE_TO_FACE"))
-                .andExpect(jsonPath("$.data.content[0].channelSpecialRuleYn").value(false))
                 .andExpect(jsonPath("$.data.content[0].feeRegimeCode").value("CURRENT"))
                 .andExpect(jsonPath("$.data.content[0].standardDeduction80Yn").value(true))
                 .andExpect(jsonPath("$.data.page").value(1))

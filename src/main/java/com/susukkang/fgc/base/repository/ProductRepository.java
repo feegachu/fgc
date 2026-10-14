@@ -32,7 +32,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                    po.basic_document_version,
                    po.basic_document_date,
                    po.channel_code,
-                   po.channel_special_rule_yn,
                    po.fee_regime_code,
                    po.standard_deduction_80_yn,
                    (
