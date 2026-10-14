@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createMemoryRouter } from 'react-router'
+import { createMemoryRouter, MemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { routes } from '../../app/routes'
@@ -230,6 +230,74 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
 })
 
 describe('CAP-W02 공유 모달·스냅샷', () => {
+  it('기존 비대상 사유를 시행 전 계약 사유로 바꾸지 않는다', async () => {
+    const storedReason = '기존 비대상 사유'
+    vi.spyOn(apiClient, 'request').mockResolvedValue(
+      envelope({
+        capCheck: {
+          ...item,
+          resultStatus: 'NOT_APPLICABLE',
+          resultStatusLabel: '적용대상 아님',
+          capRuleSetId: null,
+          limitAmount: 0,
+          includedAmount: 0,
+          remainingAmount: 0,
+          usagePct: null,
+        },
+        details: [],
+        calculationSnapshot: { notApplicable: true, notApplicableReason: storedReason },
+      }),
+    )
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <CapDetailModal capCheckId={11} onClose={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText(storedReason)).toBeInTheDocument()
+    expect(screen.queryByText('적용대상 아님 — 시행 전 계약')).not.toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('적용대상 아님은 저장된 제외 사유를 보여주고 계산식과 게이지를 숨긴다', async () => {
+    const nonApplicable: CapBasis = {
+      capCheck: {
+        ...item,
+        resultStatus: 'NOT_APPLICABLE',
+        resultStatusLabel: '적용대상 아님',
+        capRuleSetId: null,
+        limitAmount: null,
+        includedAmount: null,
+        remainingAmount: null,
+        usagePct: null,
+      },
+      details: [],
+      calculationSnapshot: {
+        applicability: {
+          reason: '적용대상 아님 — 시행 전 계약',
+          reasonCode: 'CONTRACT_BEFORE_EFFECTIVE_DATE',
+          contractDate: '2026-06-30',
+          effectiveContractDate: '2026-07-01',
+          policyVersion: 'CAP_APPLICABILITY_V1',
+        },
+      },
+    }
+    vi.spyOn(apiClient, 'request').mockResolvedValue(envelope(nonApplicable))
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <CapDetailModal capCheckId={11} onClose={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText('적용대상 아님 — 시행 전 계약')).toBeInTheDocument()
+    expect(screen.getByText('CONTRACT_BEFORE_EFFECTIVE_DATE')).toBeInTheDocument()
+    expect(screen.getByText('2026-06-30')).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(screen.queryByText('② 계산식')).not.toBeInTheDocument()
+    expect(screen.queryByText('저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.')).not.toBeInTheDocument()
+  })
   it('행·산입 버튼으로 열고 닫아도 검색/페이지가 유지된다', async () => {
     const { router, user } = renderAt('/cap-checks?month=2026-07&page=2')
     await user.click(await screen.findByRole('button', { name: 'C-2026-0001 계산근거 열기' }))

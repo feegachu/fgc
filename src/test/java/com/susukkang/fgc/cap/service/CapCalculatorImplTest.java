@@ -77,6 +77,38 @@ class CapCalculatorImplTest {
                 refundRateResolver);
     }
 
+    @ParameterizedTest
+    @CsvSource({"GA_TO_FC,2026-06-30", "INSURER_TO_GA,2020-12-31"})
+    void recordsPreEffectiveContractWithoutLookingUpRuleSet(String stage, String date) {
+        LocalDate contractDate = LocalDate.parse(date);
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
+                .thenReturn(contract(contractDate, new BigDecimal("100000"), false));
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.valueOf(stage), LocalDate.of(2026, 10, 12), null));
+        assertThat(result.resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        assertThat(result.capRuleSetId()).isNull();
+        assertThat(result.limitAmount()).isNull();
+        assertThat(result.includedAmount()).isNull();
+        assertThat(result.usagePct()).isNull();
+        assertThat(result.details()).isEmpty();
+        java.util.Map<?, ?> decision = (java.util.Map<?, ?>) result.calculationSnapshot().get("applicability");
+        assertThat(decision.get("reasonCode")).isEqualTo("CONTRACT_BEFORE_EFFECTIVE_DATE");
+        assertThat(decision.get("contractDate")).isEqualTo(date);
+        assertThat(decision.get("scope")).isEqualTo("CONTRACT_PAYMENT_STAGE");
+        org.mockito.Mockito.verifyNoInteractions(capRuleQueryRepository, capScheduleAmountQueryRepository, refundRateResolver);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"GA_TO_FC,2026-07-01", "GA_TO_FC,2026-07-02", "INSURER_TO_GA,2021-01-01"})
+    void keepsMissingRuleErrorOnAndAfterEffectiveDate(String stage, String date) {
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
+                .thenReturn(contract(LocalDate.parse(date), new BigDecimal("100000"), false));
+        assertThatThrownBy(() -> capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.valueOf(stage), LocalDate.of(2026, 10, 12), null)))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_004));
+    }
+
     private CapContractView contract(LocalDate contractDate, BigDecimal monthlyEquivalent,
                                       boolean standardDeduction80Yn) {
         CapContractView v = new CapContractView();
@@ -201,7 +233,7 @@ class CapCalculatorImplTest {
     @Test
     void subtractsMonth12RefundFromLimitForStandardDeduction80Product() {
         when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
-                .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
+                .thenReturn(contract(LocalDate.of(2026, 7, 15), new BigDecimal("100000"), true));
         when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
         when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
@@ -210,7 +242,7 @@ class CapCalculatorImplTest {
                 .thenReturn(Optional.of(new RefundRateResolution(777L, 55L, 3, new BigDecimal("24.000000"))));
 
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
-                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 1, 15)));
+                CONTRACT_ID, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 15)));
 
         // base 1,200,000 × 24% = 288,000 → 산입 + 288,000 ≤ 1,200,000 → limit 912,000
         assertThat(result.refund12mAmount()).isEqualByComparingTo("288000");
@@ -383,7 +415,7 @@ class CapCalculatorImplTest {
     @Test
     void ignoresComplianceEvidenceForGaToFcStage() {
         when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
-                .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), false));
+                .thenReturn(contract(LocalDate.of(2026, 7, 15), new BigDecimal("100000"), false));
         when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
                 .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "NONE"));
         when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
@@ -392,7 +424,7 @@ class CapCalculatorImplTest {
         CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
                 CONTRACT_ID,
                 PaymentStage.GA_TO_FC,
-                LocalDate.of(2026, 1, 15),
+                LocalDate.of(2026, 7, 15),
                 new BigDecimal("5000")
         ));
 
@@ -402,7 +434,7 @@ class CapCalculatorImplTest {
 
     private void stubComplianceCalculation(String stage, BigDecimal maximumPct) {
         when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
-                .thenReturn(contract(LocalDate.of(2026, 1, 15), new BigDecimal("100000"), true));
+                .thenReturn(contract(LocalDate.of(2026, 7, 15), new BigDecimal("100000"), true));
         when(capRuleQueryRepository.findApplicableRuleSet(eq(stage), any(), any(), any(), any()))
                 .thenReturn(ruleSet(stage, maximumPct, "STANDARD_DEDUCTION_80"));
         when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID)).thenReturn(List.of());
@@ -552,7 +584,7 @@ class CapCalculatorImplTest {
     // (MONTHLY 재검증의 asOfDate는 계약일보다 뒤일 수 있으나, REG-19상 기준일은 계약 체결일이다)
     @Test
     void resolvesRefundRateByContractDateNotValidationAsOfDate() {
-        LocalDate contractDate = LocalDate.of(2026, 1, 15);
+        LocalDate contractDate = LocalDate.of(2026, 7, 15);
         LocalDate validationAsOfDate = LocalDate.of(2026, 9, 1);
 
         when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))

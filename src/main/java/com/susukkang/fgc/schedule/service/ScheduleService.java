@@ -318,6 +318,8 @@ public class ScheduleService {
                             paymentStage
                     );
             validateResolvedPolicy(policy, paymentStage);
+            // 저장 전에 체계를 확인해 불일치하면 헤더·라인 없이 검토 건으로 넘긴다.
+            determineScheduleRegime(policy);
             return policy;
         } catch (FgcBusinessException exception) {
             Object reasonValue = exception.getParams().get("reason");
@@ -1036,16 +1038,14 @@ public class ScheduleService {
     /**
      * 설명 : 들어온 정책의 유형에 따라 매핑되어서 스케줄 헤더의 regime로 반환된다.
      * 현행 , 4년 , 7년에 따라 맞춰서 반환하며 다른 commission일 경우 에러를 반환함.
+     * #484: 라인은 정책 유형의 규칙으로 계산하므로 헤더 체계도 정책 유형에서 정한다.
+     * 판매버전 체계가 다르면 그 체계용 정책이 없는 것이므로 POLICY_MISSING으로 검토 건을 남긴다.
      * @param policy 조회된 정책과 상품 판매버전의 적용 체계
      * @return 스케줄 헤더 DTO
      */
     private ScheduleRegime determineScheduleRegime(ResolvedCommissionPolicy policy) {
-        if (policy.getScheduleRegime() != null) {
-            return policy.getScheduleRegime();
-        }
-
         PolicyType policyType = policy.getPolicyType();
-        return switch(policyType){
+        ScheduleRegime policyRegime = switch(policyType){
             case CURRENT_COMMISSION->ScheduleRegime.CURRENT;//현행
             case FOUR_YEAR_COMMISSION->ScheduleRegime.FOUR_YEAR_2027; //4년 분급
             case SEVEN_YEAR_COMMISSION->ScheduleRegime.SEVEN_YEAR_2029; //7년분급
@@ -1053,6 +1053,22 @@ public class ScheduleService {
                     "스케줄을 생성할 수 없는 정책 유형입니다: " + policyType
             );
         };
+        ScheduleRegime offeringRegime = policy.getScheduleRegime();
+        if (offeringRegime != null && offeringRegime != policyRegime) {
+            throw new FgcBusinessException(
+                    FgcErrorCode.COMMON_002,
+                    "commissionPolicy",
+                    Map.of(
+                            "policyVersionId", policy.getPolicyVersionId(),
+                            "policyType", policyType.name(),
+                            "scheduleRegime", offeringRegime.name(),
+                            "reason", "POLICY_MISSING"
+                    ),
+                    "판매버전 체계(" + offeringRegime.label() + ")에 맞는 수수료 정책이 없습니다. 조회된 정책 유형: "
+                            + policyType.label()
+            );
+        }
+        return policyRegime;
     }
 
     /**

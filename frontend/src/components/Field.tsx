@@ -2,19 +2,20 @@ import { cloneElement, useId } from 'react'
 import type { ReactElement, HTMLAttributes } from 'react'
 export interface FieldProps {
   label: string
+  variant?: 'default' | 'filter'
   className?: string
   required?: boolean
   helper?: string
   error?: string
   children: ReactElement<HTMLAttributes<HTMLElement> & { id?: string; required?: boolean }>
 }
-export function Field({ label, className = '', required, helper, error, children }: FieldProps) {
+export function Field({ label, variant = 'default', className = '', required, helper, error, children }: FieldProps) {
   const generatedId = useId()
   const id = children.props.id ?? generatedId
   const messageId = `${id}-message`
   return (
-    <div className={`field ${className} ${error ? 'is-error' : ''}`}>
-      <label className="field-label" htmlFor={id}>
+    <div className={`${variant === 'filter' ? 'filter-field' : 'field'} ${className} ${error ? 'is-error' : ''}`}>
+      <label className={variant === 'filter' ? 'filter-field-label' : 'field-label'} htmlFor={id}>
         {label}
         {required && (
           <span className="field-required" aria-hidden="true">

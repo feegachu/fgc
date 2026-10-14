@@ -337,6 +337,7 @@
   function renderCapDetail(data) {
     var item = data.capCheck || {};
     var snapshot = data.calculationSnapshot || {};
+    var notApplicable = item.resultStatus === "NOT_APPLICABLE";
     capText("sum-contract", item.contractNo);
     capText("sum-stage", item.paymentStageLabel || stageLabel(item.paymentStage));
     capText("sum-asof", date(item.asOfDate));
@@ -435,6 +436,22 @@
     capText("detail-included-note", includedMatches
       ? "제외 항목 미포함"
       : "저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.");
+    ["formula-limit", "formula-included", "formula-usage", "formula-result", "final-usage", "detail-included"].forEach(function (id) {
+      var element = document.getElementById(id);
+      if (element && notApplicable) element.textContent = "—";
+    });
+    var gauge = document.getElementById("final-bar");
+    if (gauge) gauge.hidden = notApplicable;
+    var note = document.getElementById("detail-included-note");
+    if (note && notApplicable) {
+      var applicability = snapshot.applicability || {};
+      note.classList.remove("cap-detail-mismatch");
+      note.textContent = (applicability.reason || snapshot.notApplicableReason || "적용대상 아님")
+        + " · 계약일 " + (applicability.contractDate || "—")
+        + " · 적용 시작 계약일 " + (applicability.effectiveContractDate || "—")
+        + " · " + (applicability.reasonCode || "—");
+    }
+
   }
 
   function capResultRow(label, displayValue) {
@@ -523,6 +540,7 @@
   }
   function capProgressWidth(input) { return Math.max(0, Math.min(100, number(input))) + "%"; }
   function usageGauge(input, status) {
+    if (status === "NOT_APPLICABLE") return document.createTextNode("—");
     var usage = Number(input);
     if (!Number.isFinite(usage)) return value(input);
     var cell = document.createElement("div");

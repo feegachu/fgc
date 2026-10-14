@@ -43,5 +43,6 @@ public class CapCheckCommand {
     private final String classificationSnapshot;
     private final BigDecimal candidateAmount;
     private final String decisionReason;
+    private final String applicabilityReasonCode;
     private final String evidenceRef;
 }

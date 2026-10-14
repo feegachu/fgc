@@ -417,7 +417,7 @@ class CommissionPaymentApiControllerTest {
                         CapResultStatus.VIOLATION,
                         CapResultStatus.VIOLATION.label(),
                         31L,
-                        null
+                        null, null, null
                 )),
                 List.of(new TransactionPrecheckResponse.Blocker(
                         "FGC-CAP-001",

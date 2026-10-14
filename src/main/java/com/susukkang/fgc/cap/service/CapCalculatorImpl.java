@@ -59,12 +59,16 @@ public class CapCalculatorImpl implements CapCalculator {
                     null, Map.of(), "contractId=" + command.contractId() + " not found");
         }
 
-        // 2026-10-13 #477 - 보장성보험만 1,200% 규제 대상이다 (감독규정 제4-32조⑤, FAQ 2차 Q11)
-        // 기존 코드: protection_type 을 읽지 않아 저축성·일반손해·자동차 계약도 룰셋을 찾아 판정했다.
-        // 문제: 규정상 한도가 없는 계약이 위반·검토필요가 되고, 룰셋이 없으면 CAP_004 예외가 쌓였다.
-        // 개선: 룰셋 조회 전에 거른다. 조회 SQL 에 조건을 넣으면 "룰셋 없음"으로 보여 예외가 생기므로 여기서 처리한다.
+        // #477: 비보장성 계약은 기존 비적용 사유와 저장 형태를 유지한다.
         if (!ProtectionType.isRegulated(contract.getProtectionType())) {
             return notApplicable(command, contract);
+        }
+        // #482: 보장성 계약의 시행 기준은 활성 룰셋 유무와 독립적으로 판정한다.
+        if (CapApplicabilityPolicy.isBeforeEffectiveDate(command.paymentStage(), contract.getContractDate())) {
+            return new CapCalculationResult(command.contractId(), command.paymentStage(), command.checkKind(),
+                    command.asOfDate(), null, null, contract.getMonthlyEquivalentFirstPremium(),
+                    null, null, null, null, null, null, CapResultStatus.NOT_APPLICABLE, List.of(),
+                    CapApplicabilityPolicy.snapshot(command.paymentStage(), contract.getContractDate()));
         }
 
         // "어떤 규칙을 적용할지"는 항상 계약 체결일 기준으로 찾음 (REG-19)

@@ -4,17 +4,25 @@ export function Pagination({
   totalPages,
   onPageChange,
   compact = false,
+  allPages = false,
+  label = '페이지 선택',
 }: {
   compact?: boolean
+  allPages?: boolean
+  label?: string
   page: number
   totalPages: number
   onPageChange: (page: number) => void
 }) {
   const last = Math.max(1, totalPages)
   const current = Math.max(1, Math.min(last, page))
-  const start = compact ? Math.max(1, Math.min(current - 2, last - 4)) : Math.floor((current - 1) / 5) * 5 + 1
+  const start = allPages
+    ? 1
+    : compact
+      ? Math.max(1, Math.min(current - 2, last - 4))
+      : Math.floor((current - 1) / 5) * 5 + 1
   return (
-    <nav className="pagination-controls" aria-label="페이지 선택">
+    <nav className="pagination-controls" aria-label={label}>
       {!compact && (
         <Button variant="ghost" disabled={current === 1} onClick={() => onPageChange(1)}>
           처음
@@ -29,17 +37,19 @@ export function Pagination({
       >
         {compact ? '‹' : '이전'}
       </button>
-      {Array.from({ length: Math.min(5, last - start + 1) }, (_, index) => start + index).map((number) => (
-        <button
-          type="button"
-          className={`pagination-button ${current === number ? 'is-active' : ''}`}
-          key={number}
-          aria-current={current === number ? 'page' : undefined}
-          onClick={() => onPageChange(number)}
-        >
-          {number}
-        </button>
-      ))}
+      {Array.from({ length: allPages ? last : Math.min(5, last - start + 1) }, (_, index) => start + index).map(
+        (number) => (
+          <button
+            type="button"
+            className={`pagination-button ${current === number ? 'is-active' : ''}`}
+            key={number}
+            aria-current={current === number ? 'page' : undefined}
+            onClick={() => onPageChange(number)}
+          >
+            {number}
+          </button>
+        ),
+      )}
       <button
         type="button"
         className={compact ? 'pagination-button' : 'button button-ghost'}

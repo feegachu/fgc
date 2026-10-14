@@ -61,6 +61,7 @@ function CapCard({ preview }: { preview: CapPreview }) {
     WARNING: 'warning',
     VIOLATION: 'error',
     REVIEW_REQUIRED: 'review',
+    NOT_APPLICABLE: 'neutral',
   }
   const bar: Record<string, string> = { NORMAL: 'normal', WARNING: 'warning', VIOLATION: 'violation' }
   return (
@@ -74,20 +75,33 @@ function CapCard({ preview }: { preview: CapPreview }) {
           {status === 'VIOLATION' ? '(100% 초과)' : ''}
         </StatusBadge>
       </div>
-      <progress
-        className={`transaction-cap-progress is-${bar[status] ?? 'review'}`}
-        max={100}
-        value={Math.min(Math.max(Number(preview.usagePct) || 0, 0), 100)}
-        aria-label={`한도 사용률 ${usageRate(preview.usagePct)}%`}
-      />
-      <div className="transaction-cap-usage">
-        <span>사용률 {usageRate(preview.usagePct)}%</span>
-        <span>한도 {won(preview.limitAmount)}</span>
-      </div>
-      <AmountLine label="이번 건 전 산입 누계" value={preview.existingIncludedAmount} />
-      <AmountLine label="이번 건 산입액" value={preview.candidateAmount} />
-      <AmountLine label="합계" value={preview.includedAmount} emphasize />
-      <AmountLine label="잔여 한도" value={preview.remainingAmount} emphasize={isNegative(preview.remainingAmount)} />
+      {status === 'NOT_APPLICABLE' ? (
+        <>
+          <p>{preview.applicabilityReason || '적용대상 아님 — 사유 정보 없음'}</p>
+          <p>사유 코드: {preview.applicabilityReasonCode || '—'}</p>
+        </>
+      ) : (
+        <>
+          <progress
+            className={`transaction-cap-progress is-${bar[status] ?? 'review'}`}
+            max={100}
+            value={Math.min(Math.max(Number(preview.usagePct) || 0, 0), 100)}
+            aria-label={`한도 사용률 ${usageRate(preview.usagePct)}%`}
+          />
+          <div className="transaction-cap-usage">
+            <span>사용률 {usageRate(preview.usagePct)}%</span>
+            <span>한도 {won(preview.limitAmount)}</span>
+          </div>
+          <AmountLine label="이번 건 전 산입 누계" value={preview.existingIncludedAmount} />
+          <AmountLine label="이번 건 산입액" value={preview.candidateAmount} />
+          <AmountLine label="합계" value={preview.includedAmount} emphasize />
+          <AmountLine
+            label="잔여 한도"
+            value={preview.remainingAmount}
+            emphasize={isNegative(preview.remainingAmount)}
+          />
+        </>
+      )}
     </div>
   )
 }
