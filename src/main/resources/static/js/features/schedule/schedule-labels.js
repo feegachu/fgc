@@ -29,8 +29,7 @@
   var SCHEDULE_REGIME = {
     CURRENT: "현행",
     FOUR_YEAR_2027: "4년 분급(2027)",
-    SEVEN_YEAR_2029: "7년 분급(2029)",
-    TM_SPECIAL: "TM 특례"
+    SEVEN_YEAR_2029: "7년 분급(2029)"
   };
 
   var SCHEDULE_PURPOSE = {
