@@ -3,8 +3,8 @@
 --
 -- 왜: 4년(2027)·7년(2029) 분급의 회차 수·월 요율·매월 동일 금액 조건·장기유지수수료·
 --     계약체결비용 한도·경과조치를 코드 상수가 아니라 버전 데이터로 둔다(COR-004).
---     계약일이 같아도 판매개시일·기초서류·작성/변경일·판매채널이 다르면 적용 체계가 달라지므로
---     (REG-19) 룰셋 행이 이 4개 키의 적용 범위를 직접 가진다.
+--     계약일이 같아도 판매개시일·기초서류 버전·작성/변경일·수수료체계가 다르면 적용 체계가 달라지므로
+--     (REG-19) 룰셋 행이 이 키의 적용 범위를 직접 가진다. 판매채널은 대면 하나라 판정 기준이 아니다(SRC-036).
 --
 -- 무엇을
 --   fee_regime_ruleset             정책버전(policy_version) 아래의 룰셋 헤더. 회차 수·월 요율·장기유지 구간
@@ -22,13 +22,12 @@ CREATE TABLE fgc.fee_regime_ruleset (
     policy_version_id               bigint       NOT NULL REFERENCES fgc.policy_version(policy_version_id),
     fee_regime_code                 varchar(40)  NOT NULL
                                         CHECK (fee_regime_code IN ('FOUR_YEAR_2027', 'SEVEN_YEAR_2029')),
-    -- 룰셋 선택 키 4개. NULL 은 "제한 없음".
+    -- 룰셋 선택 키. NULL 은 "제한 없음".
     sales_start_date_from           date         NOT NULL,
     sales_start_date_to             date,
     basic_document_version          varchar(80),
     basic_document_date_from        date,
     basic_document_date_to          date,
-    channel_code                    varchar(30),
     -- 분급 파라미터
     total_installments              integer      NOT NULL CHECK (total_installments > 0),
     monthly_rate_pct                numeric(9,6) NOT NULL CHECK (monthly_rate_pct >= 0),
@@ -51,14 +50,21 @@ CREATE TABLE fgc.fee_regime_ruleset (
             AND long_term_maintenance_to <= total_installments)
     )
 );
-CREATE UNIQUE INDEX uq_fee_regime_ruleset_scope
-    ON fgc.fee_regime_ruleset (
-        policy_version_id, fee_regime_code, sales_start_date_from,
-        COALESCE(basic_document_version, ''), COALESCE(channel_code, ''));
+-- 같은 정책·체계·기초서류 버전에서 판매개시일 구간과 작성/변경일 구간이 겹치는 룰셋은 둘 수 없다
+-- (선택기가 후보를 두 개 받지 않게 한다). 구간만 다른 룰셋은 등록할 수 있다. NULL 경계는 무제한.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+ALTER TABLE fgc.fee_regime_ruleset
+    ADD CONSTRAINT ex_fee_regime_ruleset_scope EXCLUDE USING gist (
+        policy_version_id WITH =,
+        fee_regime_code WITH =,
+        (COALESCE(basic_document_version, '')) WITH =,
+        daterange(sales_start_date_from, sales_start_date_to, '[]') WITH &&,
+        daterange(basic_document_date_from, basic_document_date_to, '[]') WITH &&
+    );
 CREATE INDEX ix_fee_regime_ruleset_lookup
     ON fgc.fee_regime_ruleset (fee_regime_code, sales_start_date_from);
 COMMENT ON TABLE fgc.fee_regime_ruleset IS
-    '4년·7년 분급 룰셋 헤더. 판매개시일·기초서류·작성/변경일·판매채널 키로 선택(REG-19), 값은 정책버전 소속';
+    '4년·7년 분급 룰셋 헤더. 판매개시일·기초서류 버전·작성/변경일 키로 선택(REG-19, 판매채널은 기준 아님), 값은 정책버전 소속';
 COMMENT ON COLUMN fgc.fee_regime_ruleset.review_required_yn IS
     '규정만으로 적용 여부를 확정할 수 없는 경계 룰셋. true 면 선택기는 자동 확정하지 않고 REVIEW_REQUIRED 로 돌려준다';
 

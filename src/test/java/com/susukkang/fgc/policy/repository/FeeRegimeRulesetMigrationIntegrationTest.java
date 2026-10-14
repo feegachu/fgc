@@ -49,8 +49,14 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                     """, rulesetId)).isInstanceOf(DataIntegrityViolationException.class);
             assertThatThrownBy(() -> insertRuleset(jdbc, policyId, "SEVEN_YEAR_2029", 84, 61, 90))
                     .isInstanceOf(DataIntegrityViolationException.class);
-            // 같은 정책·체계·판매개시일·기초서류·채널 중복
+            // 같은 정책·체계·기초서류 버전에서 구간이 겹치는 룰셋은 거부
             assertThatThrownBy(() -> insertRuleset(jdbc, policyId, "FOUR_YEAR_2027", 48, null, null))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+
+            // 작성/변경일 구간만 다른 룰셋은 등록되고, 구간이 겹치면 거부된다
+            insertRulesetWithDocumentPeriod(jdbc, policyId, "2026-01-01", "2026-06-30");
+            insertRulesetWithDocumentPeriod(jdbc, policyId, "2026-07-01", "2026-12-31");
+            assertThatThrownBy(() -> insertRulesetWithDocumentPeriod(jdbc, policyId, "2026-06-01", "2026-07-31"))
                     .isInstanceOf(DataIntegrityViolationException.class);
 
             // 승인된 정책 아래 룰셋·한도·경과조치는 변경 불가
@@ -70,8 +76,16 @@ class FeeRegimeRulesetMigrationIntegrationTest {
             assertThatThrownBy(() -> jdbc.update(
                     "DELETE FROM fgc.fee_regime_transition_rule WHERE fee_regime_ruleset_id = ?", rulesetId))
                     .hasMessageContaining("immutable");
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset", Integer.class)).isEqualTo(3);
         }
+    }
+
+    private void insertRulesetWithDocumentPeriod(JdbcTemplate jdbc, long policyId, String from, String to) {
+        jdbc.update("""
+                INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from,
+                    basic_document_date_from, basic_document_date_to, total_installments, monthly_rate_pct)
+                VALUES (?, 'SEVEN_YEAR_2029', DATE '2029-01-01', ?::date, ?::date, 84, 2)
+                """, policyId, from, to);
     }
 
     private long insertRuleset(JdbcTemplate jdbc, long policyId, String regime, int installments,
