@@ -54,10 +54,12 @@
   }
 
   function won(value) {
+    if (value == null) return "—";
     return number(value) + "원";
   }
 
   function refundAddition(value) {
+    if (value == null) return "—";
     return Number(value) === 0 ? "해당없음" : won(value);
   }
 
@@ -67,6 +69,7 @@
    * 화면마다 표기가 갈리지 않도록 여기서만 바꾸지 말 것.
    */
   function remainingAmount(value) {
+    if (value == null) return "—";
     var parsed = Number(value);
     if (parsed < 0) {
       return '<span class="cap-negative-amount">(' + number(Math.abs(parsed)) + ")원</span>";
@@ -307,9 +310,9 @@
       '<td class="text-right tabular-nums">' + won(item.limitAmount) + '</td>' +
       '<td class="text-right tabular-nums"><button class="cap-basis-button" type="button" data-cap-detail-id="' + escapeHtml(item.capCheckId) + '">' + won(item.includedAmount) + '</button></td>' +
       '<td class="text-right tabular-nums">' + remainingAmount(item.remainingAmount) + '</td>' +
-      '<td><div class="cap-usage-cell"><span class="cap-usage-track"><span class="cap-usage-bar ' + (STATUS_PROGRESS_CLASS[item.resultStatus] || "") + '" style="--cap-progress:' + visualWidth(item.usagePct) + '"></span></span><span class="cap-usage-value">' + escapeHtml(percent(item.usagePct)) + '</span></div></td>' +
+      (item.resultStatus === "NOT_APPLICABLE" ? '<td>—</td>' : '<td><div class="cap-usage-cell"><span class="cap-usage-track"><span class="cap-usage-bar ' + (STATUS_PROGRESS_CLASS[item.resultStatus] || "") + '" style="--cap-progress:' + visualWidth(item.usagePct) + '"></span></span><span class="cap-usage-value">' + escapeHtml(percent(item.usagePct)) + '</span></div></td>') +
       '<td class="text-center">' + statusBadge(item) + '</td>' +
-      '<td class="tabular-nums">ID ' + escapeHtml(item.capRuleSetId) + '</td></tr>';
+      '<td class="tabular-nums">' + (item.capRuleSetId == null ? '—' : 'ID ' + escapeHtml(item.capRuleSetId)) + '</td></tr>';
   }
 
   function renderContracts(data) {
@@ -450,6 +453,7 @@
   function renderDetail(data) {
     var item = data.capCheck;
     var snapshot = data.calculationSnapshot || {};
+    var notApplicable = item.resultStatus === "NOT_APPLICABLE";
     document.getElementById("sum-contract").textContent = item.contractNo || "—";
     document.getElementById("sum-stage").textContent = item.paymentStageLabel || "—";
     document.getElementById("sum-asof").textContent = item.asOfDate || "—";
@@ -517,6 +521,22 @@
       ? "제외 항목 미포함"
       : "저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.";
     scheduleDisclosureSync(document.getElementById("cap-detail-content"));
+    ["formula-limit", "formula-included", "formula-usage", "formula-result", "final-usage", "detail-included"].forEach(function (id) {
+      var element = document.getElementById(id);
+      if (element && notApplicable) element.textContent = "—";
+    });
+    var gauge = document.getElementById("final-bar");
+    if (gauge) gauge.hidden = notApplicable;
+    var note = document.getElementById("detail-included-note");
+    if (note && notApplicable) {
+      var applicability = snapshot.applicability || {};
+      note.classList.remove("cap-detail-mismatch");
+      note.textContent = (applicability.reason || snapshot.notApplicableReason || "적용대상 아님")
+        + " · 계약일 " + (applicability.contractDate || "—")
+        + " · 적용 시작 계약일 " + (applicability.effectiveContractDate || "—")
+        + " · " + (applicability.reasonCode || "—");
+    }
+
   }
 
   function openDetail(capCheckId) {

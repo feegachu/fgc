@@ -1401,14 +1401,14 @@
           },
           "capRuleSetId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "checkKind" : {
             "enum" : [ "REALTIME", "MANUAL", "MONTHLY", "PRE_CONFIRM" ],
             "type" : "string"
           },
           "complianceDeductionAmount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "contractId" : {
             "format" : "int64",
@@ -1421,31 +1421,31 @@
             "type" : "array"
           },
           "includedAmount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "limitAmount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "paymentStage" : {
             "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
             "type" : "string"
           },
           "refund12mAmount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "refundRateTableId" : {
             "format" : "int64",
             "type" : "integer"
           },
           "remainingAmount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "resultStatus" : {
             "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "usagePct" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           }
         },
         "type" : "object"
@@ -1551,11 +1551,11 @@
           },
           "capRuleSetId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "complianceDeductionAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "contractId" : {
             "format" : "int64",
@@ -1566,11 +1566,11 @@
           },
           "includedAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "limitAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "paymentStage" : {
             "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
@@ -1581,11 +1581,11 @@
           },
           "refund12mAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "remainingAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "resultStatus" : {
             "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
@@ -1595,7 +1595,7 @@
             "type" : "string"
           },
           "usagePct" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           }
         },
         "type" : "object"
@@ -1680,6 +1680,12 @@
       },
       "CapPreviewItem" : {
         "properties" : {
+          "applicabilityReason" : {
+            "type" : [ "string", "null" ]
+          },
+          "applicabilityReasonCode" : {
+            "type" : [ "string", "null" ]
+          },
           "asOfDate" : {
             "format" : "date",
             "type" : "string"
@@ -1690,7 +1696,7 @@
           },
           "candidateAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "capCheckId" : {
             "format" : "int64",
@@ -1698,11 +1704,11 @@
           },
           "capRuleSetId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "complianceDeductionAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "contractId" : {
             "format" : "int64",
@@ -1713,15 +1719,15 @@
           },
           "existingIncludedAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "includedAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "limitAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "paymentStage" : {
             "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
@@ -1732,11 +1738,11 @@
           },
           "refund12mAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "remainingAmount" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "resultStatus" : {
             "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
@@ -1746,7 +1752,7 @@
             "type" : "string"
           },
           "usagePct" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           }
         },
         "type" : "object"
@@ -2596,10 +2602,6 @@
             "enum" : [ "SEED", "NORMALIZED_DB", "MANUAL" ],
             "type" : "string"
           },
-          "updatedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
           "firstPremiumAmount" : {
             "type" : "number"
           },
@@ -2643,6 +2645,10 @@
           },
           "standardSurrenderDeductionAmount" : {
             "type" : "number"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -8660,11 +8666,31 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseActiveMonthlyRunResponse"
+                  "$ref" : "#/components/schemas/ActiveMonthlyRunResponse"
                 }
               }
             },
             "description" : "조회 성공"
+          },
+          "400" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseActiveMonthlyRunResponse"
+                }
+              }
+            },
+            "description" : "month 누락 또는 형식(yyyy-MM) 오류 (FGC-COMMON-002)"
+          },
+          "401" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseActiveMonthlyRunResponse"
+                }
+              }
+            },
+            "description" : "인증되지 않은 요청"
           }
         },
         "summary" : "진행 중인 월간 실행 존재 여부 (IF-API-46A)",
