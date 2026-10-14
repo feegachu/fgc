@@ -4,10 +4,11 @@ import type { Page } from '@playwright/test'
 // #404 UI 계약 검증. 실제 JWT 서명·DB 세션 무효화 시연은 #418 실서버 시나리오로 인계한다.
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'auth-ui-fixture' })
 async function authFixture(page: Page, roleCode = 'SETTLEMENT', session = { version: 0 }, initial = false) {
-  // 인증 시나리오의 가짜 토큰이 실제 업무 서버로 전달되지 않게 조회도 격리한다.
-  await page.route('**/api/v1/contracts?**', route => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
-  await page.route('**/api/v1/base/**', route => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
-  await page.route('**/api/v1/dashboard/**', route => route.fulfill({ json: envelope({ recentExceptions: [], recentRuns: [] }) }))
+  // 인증 fixture 토큰이 실제 업무 서버로 전달되지 않도록 조회를 격리한다.
+  await page.route('**/api/v1/contracts?**', (route) => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
+  await page.route('**/api/v1/base/**', (route) => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
+  await page.route('**/api/v1/base/commission-items?**', (route) => route.fulfill({ json: envelope([]) }))
+  await page.route('**/api/v1/dashboard/**', (route) => route.fulfill({ json: envelope({ recentExceptions: [], recentRuns: [] }) }))
   let issued = initial ? ++session.version : 0
   let expired = false
   const token = () => envelope({ accessToken: `fixture-${issued}`, tokenType: 'Bearer', expiresIn: 1800 })
@@ -68,7 +69,7 @@ test('보호 딥링크로 복귀하고 로그아웃 뒤 뒤로 가기로 접근�
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
   expect(new URL(page.url()).searchParams.get('redirect')).toBe('/transactions/new?month=2026-08&status=ACTIVE#form')
   await login(page)
-  await expect(page.getByRole('heading', { name: '수수료 지급 등록' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '지급 건 등록 · 귀속 · 확정' })).toBeVisible()
   await expect(page).toHaveURL(/\/app\/transactions\/new\?month=2026-08&status=ACTIVE#form$/)
   await page.getByRole('link', { name: 'FGC 업무 대시보드' }).click()
   await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
@@ -105,18 +106,18 @@ test('쿠키 만료 후 재진입 시 로그인으로 이동하고 경로를 보
   expect(new URL(page.url()).searchParams.get('redirect')).toBe('/contracts?month=2026-07')
 })
 
-test('두 브라우저의 중복 로그인: A 안내·경로 보존, B 정상, A 재로그인 복귀', async ({ browser }) => {
-  const a = await browser.newContext()
-  const b = await browser.newContext()
+test('두 브라우저의 중복 로그인: A 안내·경로 보존, B 정상, A 재로그인 복귀', async ({ browser, baseURL }) => {
+  const a = await browser.newContext({ baseURL })
+  const b = await browser.newContext({ baseURL })
   try {
     const pageA = await a.newPage(), pageB = await b.newPage()
     const session = { version: 0 }
     await authFixture(pageA, 'SETTLEMENT', session)
     await authFixture(pageB, 'SETTLEMENT', session)
-    await pageA.goto('http://localhost:5173/app/login?redirect=%2Fcontracts%3Fmonth%3D2026-07')
+    await pageA.goto('login?redirect=%2Fcontracts%3Fmonth%3D2026-07')
     await login(pageA)
     await expect(pageA.getByRole('heading', { name: '보험계약' })).toBeVisible()
-    await pageB.goto('http://localhost:5173/app/login')
+    await pageB.goto('login')
     await login(pageB)
     await expect(pageB.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
     await pageA.reload()

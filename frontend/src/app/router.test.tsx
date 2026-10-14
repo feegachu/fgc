@@ -84,11 +84,11 @@ describe('AppShell·라우트', () => {
     await waitFor(() =>
       expect(screen.getByRole('link', { name: '기존 화면으로 이동' })).toHaveAttribute(
         'href',
-        '/validation-runs/12?status=ACTIVE&month=2026-07',
+        '/validation-runs/12?status=ACTIVE&page=2&month=2026-07',
       ),
     )
     expect(router.state.location.search).toContain('month=2026-07')
-    expect(router.state.location.search).not.toContain('page=')
+    expect(router.state.location.search).toContain('page=2')
   })
   it('미등록 경로를 404 연결 화면으로 보낸다', async () => {
     renderAt('/xyz')
