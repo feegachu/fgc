@@ -56,7 +56,9 @@ public record TransactionPrecheckResponse(
             @Schema(types = {"integer", "null"})
             Long capRuleSetId,
             Long capCheckId,
+            @Schema(types = {"string", "null"})
             String applicabilityReasonCode,
+            @Schema(types = {"string", "null"})
             String applicabilityReason
     ) {
         /** 확정 경로와 같은 buildCapCheck 결과를 저장하지 않고 그대로 표시 형식으로 변환한다. */
@@ -86,7 +88,7 @@ public record TransactionPrecheckResponse(
                     status.label(),
                     check.getCapRuleSetId(),
                     null,
-                    check.getResultStatus() == CapResultStatus.NOT_APPLICABLE ? com.susukkang.fgc.cap.service.CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE : null,
+                    status == CapResultStatus.NOT_APPLICABLE ? check.getApplicabilityReasonCode() : null,
                     status == CapResultStatus.NOT_APPLICABLE ? check.getDecisionReason() : null
             );
         }

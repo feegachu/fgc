@@ -120,6 +120,26 @@ class CommissionPaymentIntegrationTest {
     }
 
     @Test
+    void effectiveDatePaymentWithoutRuleIsBlockedAndRecordsPolicyMissing() {
+        jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-07-01' WHERE contract_id=1");
+        var created = commissionPaymentService.create(request("IT-482-BOUNDARY-" + UUID.randomUUID(), new BigDecimal("200000")));
+        jdbcTemplate.update("UPDATE fgc.policy_version SET status='RETIRED' WHERE status='ACTIVE' AND policy_version_id IN (SELECT policy_version_id FROM fgc.cap_rule_set WHERE payment_stage='GA_TO_FC')");
+        entityManager.clear();
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-004");
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-482-BOUNDARY"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_004));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("SELECT exception_type FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                String.class, created.paymentId().toString())).isEqualTo("POLICY_MISSING");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, created.paymentId())).isZero();
+    }
+
+    @Test
     void preEffectivePaymentIgnoresOldViolationWithoutResolvingHistory() {
         jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-06-30' WHERE contract_id=1");
         var created = commissionPaymentService.create(request("IT-482-REVIEW-" + UUID.randomUUID(), new BigDecimal("2000000")));

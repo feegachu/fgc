@@ -2183,6 +2183,29 @@ class CommissionPaymentServiceImplTest {
         assertThat(result.usagePct()).isNull();
     }
 
+    @Test
+    void precheckAndAuditPreserveTheCalculationSnapshotReason() {
+        var data = withContractDate(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 6, 30));
+        var calculation = new CapCalculationResult(3L, PaymentStage.GA_TO_FC, CapCheckKind.REALTIME,
+                LocalDate.of(2026, 7, 3), null, null, new BigDecimal("100000"), null, null, null, null,
+                null, null, CapResultStatus.NOT_APPLICABLE, List.of(), Map.of("applicability", Map.of(
+                "status", "NOT_APPLICABLE", "reasonCode", "OTHER_EXCLUSION", "reason", "다른 적용제외 사유")));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capCalculator.calculate(any())).willReturn(calculation);
+        var preview = service.precheck(101L).capPreview().getFirst();
+        assertThat(preview.applicabilityReasonCode()).isEqualTo("OTHER_EXCLUSION");
+        assertThat(preview.applicabilityReason()).isEqualTo("다른 적용제외 사유");
+        CapCheckCommand check = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "buildNotApplicableCheck", data, calculation, List.of(data));
+        Map<String, Object> audit = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "capCheckAuditSummary", check);
+        assertThat(audit).containsEntry("applicabilityReasonCode", "OTHER_EXCLUSION")
+                .containsEntry("applicabilityReason", "다른 적용제외 사유");
+        assertThat(check.getCalculationSnapshotJson()).contains("OTHER_EXCLUSION", "다른 적용제외 사유");
+        assertPrecheckSavesNothing();
+    }
+
     private CapCalculationResult preEffectiveCalculation() {
         return new CapCalculationResult(3L, PaymentStage.GA_TO_FC, CapCheckKind.REALTIME,
                 LocalDate.of(2026, 7, 3), null, null, new BigDecimal("100000"), null, null, null, null,

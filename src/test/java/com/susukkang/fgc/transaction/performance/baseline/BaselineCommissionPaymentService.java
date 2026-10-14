@@ -517,6 +517,10 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         summary.put("usagePct", check.getUsagePct());
         summary.put("limitAmount", check.getLimitAmount());
         summary.put("includedAmount", check.getIncludedAmount());
+        if (check.getResultStatus() == CapResultStatus.NOT_APPLICABLE) {
+            summary.put("applicabilityReasonCode", check.getApplicabilityReasonCode());
+            summary.put("applicabilityReason", check.getDecisionReason());
+        }
         return summary;
     }
 
@@ -1420,10 +1424,15 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
 
     private CapCheckCommand buildNotApplicableCheck(ConfirmationData data) {
         CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(), data.attributionDate(), null);
+        Map<String, Object> snapshot = calculation.calculationSnapshot();
+        Map<?, ?> applicability = snapshot.get("applicability") instanceof Map<?, ?> decision ? decision : Map.of();
+        String reasonCode = Objects.toString(applicability.get("reasonCode"), null);
+        String reason = Objects.toString(applicability.get("reason"),
+                Objects.toString(snapshot.get("notApplicableReason"), "적용대상 아님"));
         return CapCheckCommand.builder().paymentId(data.paymentId()).contractId(data.contractId())
                 .paymentStage(data.paymentStage().name()).asOfDate(data.attributionDate())
                 .basePremiumAmount(calculation.basePremiumAmount()).resultStatus(CapResultStatus.NOT_APPLICABLE)
-                .decisionReason(CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE_LABEL)
+                .decisionReason(reason).applicabilityReasonCode(reasonCode)
                 .calculationSnapshotJson(json(calculation.calculationSnapshot())).build();
     }
 

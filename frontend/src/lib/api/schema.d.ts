@@ -1865,8 +1865,8 @@ export interface components {
             warning?: number;
         };
         CapPreviewItem: {
-            applicabilityReason?: string;
-            applicabilityReasonCode?: string;
+            applicabilityReason?: string | null;
+            applicabilityReasonCode?: string | null;
             /** Format: date */
             asOfDate?: string;
             /** Format: int64 */

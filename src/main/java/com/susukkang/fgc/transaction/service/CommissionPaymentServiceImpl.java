@@ -546,7 +546,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         summary.put("limitAmount", check.getLimitAmount());
         summary.put("includedAmount", check.getIncludedAmount());
         if (check.getResultStatus() == CapResultStatus.NOT_APPLICABLE) {
-            summary.put("applicabilityReasonCode", CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE);
+            summary.put("applicabilityReasonCode", check.getApplicabilityReasonCode());
             summary.put("applicabilityReason", check.getDecisionReason());
         }
         return summary;
@@ -1565,29 +1565,33 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .build();
     }
 
-    private Map<String, Object> notApplicableCandidateSnapshot(ConfirmationData row) {
+    private Map<String, Object> notApplicableCandidateSnapshot(ConfirmationData row, String reasonCode, String reason) {
         Map<String, Object> candidate = new LinkedHashMap<>();
         candidate.put("transactionAttributionId", row.transactionAttributionId());
         candidate.put("attributionDate", row.attributionDate() == null ? null : row.attributionDate().toString());
         candidate.put("amount", row.attributedAmount() == null ? null : roundedAttributedAmount(row));
         candidate.put("cashflowType", row.cashflowType());
         candidate.put("classification", row.inclusionDecisionStatus());
-        candidate.put("reasonCode", CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE);
-        candidate.put("reason", CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE_LABEL);
+        candidate.put("reasonCode", reasonCode);
+        candidate.put("reason", reason);
         return candidate;
     }
 
     private CapCheckCommand buildNotApplicableCheck(ConfirmationData data, CapCalculationResult calculation,
                                                    List<ConfirmationData> attributions) {
         Map<String, Object> snapshot = new LinkedHashMap<>(calculation.calculationSnapshot());
+        Map<?, ?> applicability = snapshot.get("applicability") instanceof Map<?, ?> decision ? decision : Map.of();
+        String reasonCode = Objects.toString(applicability.get("reasonCode"), null);
+        String reason = Objects.toString(applicability.get("reason"),
+                Objects.toString(snapshot.get("notApplicableReason"), "적용대상 아님"));
         snapshot.put("candidateAttributions", attributions.stream()
                 .filter(row -> java.util.Objects.equals(row.contractId(), data.contractId())
                         && row.paymentStage() == data.paymentStage())
-                .map(this::notApplicableCandidateSnapshot).toList());
+                .map(row -> notApplicableCandidateSnapshot(row, reasonCode, reason)).toList());
         return CapCheckCommand.builder().paymentId(data.paymentId()).contractId(data.contractId())
                 .paymentStage(data.paymentStage().name()).asOfDate(data.attributionDate())
                 .basePremiumAmount(calculation.basePremiumAmount()).resultStatus(CapResultStatus.NOT_APPLICABLE)
-                .decisionReason(CapApplicabilityPolicy.BEFORE_EFFECTIVE_DATE_LABEL)
+                .decisionReason(reason).applicabilityReasonCode(reasonCode)
                 .calculationSnapshotJson(json(snapshot)).build();
     }
 

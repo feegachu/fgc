@@ -1681,10 +1681,10 @@
       "CapPreviewItem" : {
         "properties" : {
           "applicabilityReason" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "applicabilityReasonCode" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "asOfDate" : {
             "format" : "date",
