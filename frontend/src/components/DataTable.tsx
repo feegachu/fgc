@@ -24,7 +24,9 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void
   onRowActivate?: (row: T) => void
   rowClassName?: (row: T) => string
-  emptyMessage?: string
+  emptyMessage?: ReactNode
+  footer?: ReactNode
+  bodyId?: string
 }
 function ExpandableCell({ children }: { children: ReactNode }) {
   const [expanded, setExpanded] = useState(false)
@@ -57,6 +59,8 @@ export function DataTable<T>({
   onRowActivate,
   rowClassName,
   emptyMessage = '조건에 맞는 자료가 없습니다.',
+  footer,
+  bodyId,
 }: DataTableProps<T>) {
   const keys = rows.map(rowKey)
   const allSelected = keys.length > 0 && keys.every((key) => selectedKeys.includes(key))
@@ -133,7 +137,7 @@ export function DataTable<T>({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody id={bodyId}>
           {rows.length ? (
             rows.map((row) => (
               <tr
@@ -184,6 +188,7 @@ export function DataTable<T>({
             </tr>
           )}
         </tbody>
+        {footer && <tfoot>{footer}</tfoot>}
       </table>
     </div>
   )

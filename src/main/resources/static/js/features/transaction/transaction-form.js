@@ -16,6 +16,13 @@
   var initializationError = false;
   var paymentId = new URLSearchParams(window.location.search).get("id");
   var lastPrecheckResult = null;
+  var draftDirty = false;
+  var draftRevision = 0;
+  var precheckSequence = 0;
+  var confirmationPending = false;
+  var confirmationRetryError = null;
+  var lastConfirmationError = null;
+  var confirmationInputState = null;
   /*
    * 확정 게이트 6단계 — 화면정의서 :710-718 · 운영정책서 제31조의 순서를 그대로 옮긴다.
    * 게이트를 임의로 늘리거나 줄이지 않는다. 이전 구현은 차익거래·업무키 게이트를 만들어 넣었는데
@@ -83,7 +90,12 @@
   fillOptions(recipient, [], "설계사를 불러오는 중입니다.");
   if (!paymentId && !bizKey.value) bizKey.value = generateBusinessKey();
 
-  addButton.addEventListener("click", addAttributionRow);
+  addButton.addEventListener("click", function () {
+    addAttributionRow();
+    markDraftChanged();
+  });
+  main.addEventListener("input", markDraftChanged);
+  main.addEventListener("change", markDraftChanged);
   saveButton.addEventListener("click", save);
   precheckButton.addEventListener("click", precheck);
   confirmButton.addEventListener("click", openConfirmation);
@@ -115,12 +127,12 @@
     })
     .then(function () {
       main.setAttribute("aria-busy", "false");
-      if (!initializationError) formStatus.hidden = true;
+      if (!initializationError) formStatus.hidden = !draftDirty;
     })
     .catch(function (error) {
       main.setAttribute("aria-busy", "false");
       formStatus.classList.add("is-error");
-      formStatus.textContent = format.errorText(error, "지급 건 화면을 초기화하지 못했습니다. 화면을 새로고침하세요.");
+      formStatus.textContent = formErrorText(error, "지급 건 화면을 초기화하지 못했습니다. 화면을 새로고침하세요.");
       showError(error, "지급 건 화면을 초기화하지 못했습니다. 화면을 새로고침하세요.");
     });
 
@@ -237,8 +249,16 @@
             row.querySelector("[data-allocation-basis]").value = attribution.allocationBasis || "";
             row.querySelector("[data-attr-evidence]").value = attribution.evidenceRef || "";
             applyAttributionMode(row);
+            var storedDecision = attribution.inclusionDecisionStatus === "EXCLUDED"
+              ? "EXCLUDED:" + (attribution.exclusionType || "NEW_AGENT_SUPPORT")
+              : (attribution.inclusionDecisionStatus || "INCLUDED");
+            if (row.querySelector("[data-inclusion]").value !== storedDecision
+                || row.querySelector("[data-attr-method]").value !== (attribution.attributionMethod || "DIRECT")
+                || (isNewcomerSupportSelected() && attribution.contractId != null)) {
+              markDraftChanged();
+            }
           });
-          if (!attrBody.querySelector("[data-attr-row]")) addAttributionRow();
+          if (!attrBody.querySelector("[data-attr-row]")) renderEmptyAttributions();
           setTransactionStatus("작성중 · #" + id, "status-badge-neutral");
           setButtonLabel(saveButton, "수정 저장");
           syncPaymentStageUi();
@@ -276,6 +296,7 @@
     removeButton.setAttribute("aria-label", attributionSequence + "번 귀속행 삭제");
     removeButton.addEventListener("click", function () {
       row.remove();
+      markDraftChanged();
       renumberRows();
       updateAttributionSummary();
       if (!attrBody.querySelector("[data-attr-row]")) renderEmptyAttributions();
@@ -504,8 +525,23 @@
     toast("수령 설계사가 변경되어 기존 귀속행을 비웠습니다. 계약을 다시 선택하세요.", "warning", 5000);
   }
 
+  // 2026-10-13 hjKang - 자동 보정·미저장 입력은 서버 저장본 판정과 분리한다 (#410).
+  function markDraftChanged() {
+    if (!paymentId || saving || confirmationPending || confirmationRetryError) return;
+    draftDirty = true;
+    draftRevision += 1;
+    renderGates([], null);
+    renderCapMessage("empty", "변경한 내용을 먼저 저장한 뒤 사전검증하세요.");
+    lastPrecheckResult = null;
+    lastConfirmationError = null;
+    precheckButton.disabled = true;
+    confirmButton.disabled = true;
+    formStatus.textContent = "귀속 입력 또는 지급 내용이 변경됐습니다. 먼저 저장한 뒤 사전검증하세요.";
+    formStatus.hidden = false;
+  }
+
   function save() {
-    if (saving) return;
+    if (saving || initializationError || confirmationPending || confirmationRetryError || !canProcess) return;
     var payload;
     clearFieldErrors();
     try { payload = buildPayload(); } catch (error) { showValidationError(error); return; }
@@ -519,6 +555,11 @@
     apiClient.request(path, { method: editing ? "PUT" : "POST", body: payload })
       .then(function (envelope) {
         paymentId = envelope.data && envelope.data.commissionTransactionId;
+        draftDirty = false;
+        draftRevision += 1;
+        lastPrecheckResult = null;
+        lastConfirmationError = null;
+        formStatus.hidden = true;
         setTransactionStatus("작성중 · #" + paymentId, "status-badge-neutral");
         lockDraftInputs();
         precheckButton.disabled = false;
@@ -535,7 +576,11 @@
   }
 
   function precheck() {
-    if (!paymentId) return;
+    if (!paymentId || !canProcess || draftDirty || confirmationPending || confirmationRetryError) return;
+    var revision = ++draftRevision;
+    var sequence = ++precheckSequence;
+    lastConfirmationError = null;
+    lastPrecheckResult = null;
     precheckButton.disabled = true;
     confirmButton.disabled = true;
     setBusy(precheckButton, true, "검증 중");
@@ -544,6 +589,7 @@
     apiClient.request("/api/v1/transactions/" + encodeURIComponent(paymentId) + "/precheck", {
       method: "POST"
     }).then(function (envelope) {
+      if (revision !== draftRevision || draftDirty) return;
       var result = envelope.data;
       lastPrecheckResult = result;
       renderPrecheck(result);
@@ -557,11 +603,13 @@
         5000
       );
     }).catch(function (error) {
+      if (revision !== draftRevision || draftDirty) return;
       showError(error, "1,200% 사전검증을 수행하지 못했습니다.");
-      renderCapMessage("error", format.errorText(error, "사전검증 중 오류가 발생했습니다. 다시 시도하세요."));
+      renderCapMessage("error", formErrorText(error, "사전검증 중 오류가 발생했습니다. 다시 시도하세요."));
     }).finally(function () {
+      if (sequence !== precheckSequence) return;
       setBusy(precheckButton, false, "사전검증");
-      precheckButton.disabled = !canProcess;
+      precheckButton.disabled = !canProcess || draftDirty || Boolean(confirmationRetryError);
     });
   }
 
@@ -682,6 +730,7 @@
   function openConfirmation() {
     if (!paymentId || confirmButton.disabled || !lastPrecheckResult) return;
     prepareConfirmation(lastPrecheckResult);
+    if (confirmationRetryError) renderConfirmationFailure(confirmationRetryError);
     modal.open("transaction-confirm");
   }
 
@@ -705,32 +754,22 @@
       && RECORDABLE_BLOCKER_CODES.indexOf(blockers[0].code) >= 0;
   }
 
-  /*
-   * 후속 링크가 가리킬 계약 — 서버가 실제로 거부한 그 귀속행의 계약이어야 한다.
-   *
-   * capPreview 에서 찾으면 안 된다. precheck 는 rule == null(룰셋은 있으나 그 항목의 산입
-   * 기준이 없는 미분류 경로) 귀속행을 capPreview 에 넣지 않고 건너뛴다
-   * (CommissionPaymentServiceImpl:330 `if (rule == null) { continue; }`) — 차단 사유는
-   * blockers[] 에만 실린다. 그래서 capPreview 기준으로 고르면
-   *  - 미분류가 유일한 차단 사유일 때 capPreview 가 비어 링크가 통째로 사라지고,
-   *  - 다중 귀속행일 때 confirm 이 먼저 막히는 행(attribution_seq 순, failFirst)과
-   *    다른 계약을 가리킬 수 있다.
-   * Blocker 는 contractId 를 그대로 실어 오므로(TransactionPrecheckResponse.Blocker) 그것을 쓴다.
-   *
-   * errorCode 를 주면 서버가 실제로 던진 그 코드의 blocker 를 우선한다 — 확정 거부 응답의
-   * 코드가 곧 confirm 이 멈춘 지점이라 가장 정확하다.
-   */
+  // Blocker의 계약 ID를 먼저 고르고 그 ID의 preview·목록·상세 순서로 계약번호를 찾는다.
+  // rule이 없는 CAP-002는 preview가 없으므로 목록·상세 조회가 여전히 필요하다.
+  function blockedContract(result, errorCode) {
+    var blocker = (result.blockers || [])[0];
+    if (!blocker || blocker.code !== errorCode
+        || !(RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0)) return null;
+    return blocker;
+  }
+
   function blockedContractNo(result, errorCode) {
-    var blockers = (result.blockers || []).filter(function (blocker) {
-      return blocker.contractId != null
-        && RECORDABLE_BLOCKER_CODES.indexOf(blocker.code) >= 0;
-    });
-    if (!blockers.length) return null;
-    var matched = errorCode
-      ? blockers.filter(function (blocker) { return blocker.code === errorCode; })
-      : [];
-    var target = matched.length ? matched[0] : blockers[0];
-    return contractNoById(target.contractId);
+    var target = blockedContract(result, errorCode);
+    if (!target || target.contractId == null) return null;
+    var preview = (result.capPreview || []).filter(function (item) {
+      return String(item.contractId) === String(target.contractId);
+    })[0];
+    return (preview && preview.contractNo) || contractNoById(target.contractId);
   }
 
   function contractNoById(contractId) {
@@ -771,6 +810,7 @@
       notice.className = "transaction-confirm-notice";
       confirmFollowUp.appendChild(notice);
     }
+    if (blockers[0] && blockers[0].code === "FGC-CAP-003") renderFollowUpLinks(null, false);
     confirmFollowUp.hidden = !confirmFollowUp.childElementCount;
   }
 
@@ -787,11 +827,10 @@
    * 그 판단이 정리된 뒤에 이 링크를 추가한다.
    */
   function renderFollowUpLinks(contractNo, reviewRequired) {
-    if (!contractNo) return;
     var excParams = new URLSearchParams({
-      type: reviewRequired ? "CAP_REVIEW_REQUIRED" : "CAP_VIOLATION",
-      contractNo: contractNo
+      type: reviewRequired ? "CAP_REVIEW_REQUIRED" : "CAP_VIOLATION"
     });
+    if (contractNo) excParams.set("contractNo", contractNo);
 
     var actions = document.createElement("div");
     actions.className = "transaction-confirm-followup-actions";
@@ -832,9 +871,44 @@
    * 링크는 서버가 실제로 판정을 기록한 뒤(확정 거부 응답)에만 노출한다.
    */
 
+  function formErrorText(error, fallback) {
+    if (error && (error.status >= 500 || error.code === "FGC-COMMON-500")) {
+      return "요청을 처리하지 못했습니다." + (error.requestId ? " 요청 ID: " + error.requestId : "");
+    }
+    return format.errorText(error, fallback);
+  }
+
+  function renderConfirmationFailure(error) {
+    clear(confirmBlockers);
+    confirmBlockers.appendChild(textElement("p", formErrorText(error,
+      "확정 결과를 확인하지 못했습니다.")));
+    confirmBlockers.hidden = false;
+  }
+
+  function renderRecordedFollowUp(error) {
+    var contractNo = blockedContractNo(lastPrecheckResult, error.code);
+    var target = blockedContract(lastPrecheckResult, error.code);
+    clear(confirmFollowUp);
+    renderFollowUpLinks(contractNo, error.code === "FGC-CAP-002");
+    if (contractNo || !target || !(Number(target.contractId) > 0)) return;
+    apiClient.request("/api/v1/contracts/" + encodeURIComponent(target.contractId))
+      .then(function (envelope) {
+        if (lastConfirmationError !== error) return;
+        var number = envelope && envelope.data && envelope.data.contractNo;
+        if (!number) return;
+        clear(confirmFollowUp);
+        renderFollowUpLinks(number, error.code === "FGC-CAP-002");
+      })
+      .catch(function () { /* 상세 조회가 실패해도 유형별 예외함 링크는 유지한다. */ });
+  }
+
+  // 2026-10-13 hjKang - 응답 유실은 기존 사전검증과 같은 멱등키로 명시적으로 복구한다 (#410).
   function confirmPayment() {
-    if (!paymentId || !lastPrecheckResult) return;
+    if (!paymentId || !lastPrecheckResult || !canProcess || draftDirty || confirmationPending) return;
     if (lastPrecheckResult.confirmable !== true && !hasRecordableBlocker(lastPrecheckResult)) return;
+    confirmationPending = true;
+    lockConfirmationInputs();
+    lastConfirmationError = null;
     confirmSubmitButton.disabled = true;
     confirmButton.disabled = true;
     main.setAttribute("aria-busy", "true");
@@ -843,6 +917,9 @@
       method: "POST",
       idempotencyKey: "TRAN-CONFIRM-" + paymentId
     }).then(function (envelope) {
+      if (!envelope || !envelope.data) throw new Error("확정 결과를 확인하지 못했습니다.");
+      confirmationRetryError = null;
+      confirmationInputState = null;
       setTransactionStatus("확정 · #" + paymentId, "status-badge-success");
       toast("수수료 지급 건을 확정했습니다.", "success", 3000);
       modal.close("transaction-confirm");
@@ -851,27 +928,56 @@
       showError(error, "수수료 지급 건을 확정하지 못했습니다.");
       var failedResult = {
         confirmable: false,
-        blockers: [{ code: error.code, message: format.errorText(error, "수수료 지급 건을 확정하지 못했습니다. 입력값과 예외함을 확인하세요.") }],
+        blockers: [{ code: error.code, message: formErrorText(error, "수수료 지급 건을 확정하지 못했습니다. 입력값과 예외함을 확인하세요.") }],
         capCheckId: error.params && error.params.capCheckId,
         exceptionCaseId: error.params && error.params.exceptionCaseId,
         capPreview: []
       };
-      prepareConfirmation(failedResult);
-      /*
-       * 서버가 판정을 기록하고 거부한 경우에만 후속 동선을 연다 — 이 시점에는
-       * cap_check 과 exception_case 가 실제로 존재하므로 빈 화면으로 보내지 않는다.
-       * 재시도는 의미가 없다(같은 판정 + 미해결 위반 게이트 FGC-CAP-003 에 걸린다).
-       */
-      if (RECORDABLE_BLOCKER_CODES.indexOf(error.code) >= 0) {
-        renderFollowUpLinks(blockedContractNo(lastPrecheckResult, error.code), error.code === "FGC-CAP-002");
-        confirmSubmitButton.hidden = true;
-        confirmSubmitButton.disabled = true;
+      lastConfirmationError = error;
+      var retryable = !error.status || error.status < 400 || error.status >= 500;
+      if (retryable) {
+        confirmationRetryError = error;
+        prepareConfirmation(lastPrecheckResult);
+        renderConfirmationFailure(error);
+        confirmButton.disabled = !canProcess;
+        precheckButton.disabled = true;
+        formStatus.textContent = "확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 같은 요청으로 결과를 확인하세요.";
+        formStatus.hidden = false;
+      } else {
+        confirmationRetryError = null;
+        unlockConfirmationInputs();
+        prepareConfirmation(failedResult);
+        if (RECORDABLE_BLOCKER_CODES.indexOf(error.code) >= 0 || error.code === "FGC-CAP-003") {
+          renderRecordedFollowUp(error);
+          confirmSubmitButton.hidden = true;
+          confirmSubmitButton.disabled = true;
+        }
+        precheckButton.disabled = !canProcess || draftDirty;
       }
-      precheckButton.disabled = !canProcess;
     }).finally(function () {
+      confirmationPending = false;
       main.setAttribute("aria-busy", "false");
-      setBusy(confirmSubmitButton, false, "확정 실행");
+      setBusy(confirmSubmitButton, false,
+        lastPrecheckResult && !lastPrecheckResult.confirmable && hasRecordableBlocker(lastPrecheckResult)
+          ? "확정 시도 · 예외 등록" : "확정 실행");
     });
+  }
+
+  function lockConfirmationInputs() {
+    if (confirmationInputState == null) {
+      confirmationInputState = Array.from(main.querySelectorAll("input, select"))
+        .concat(Array.from(attrBody.querySelectorAll("button")), [addButton, saveButton])
+        .filter(function (control) { return !control.disabled; });
+    }
+    lockDraftInputs();
+  }
+
+  function unlockConfirmationInputs() {
+    if (confirmationInputState == null) return;
+    confirmationInputState.forEach(function (control) { control.disabled = false; });
+    if (confirmationInputState.length) lockNotice.hidden = true;
+    confirmationInputState = null;
+    if (!initializationError && !draftDirty) formStatus.hidden = true;
   }
 
   function lockDraftInputs() {
@@ -1111,7 +1217,7 @@
     initializationError = true;
     formStatus.hidden = false;
     formStatus.classList.add("is-error");
-    formStatus.textContent = format.errorText(error, fallback);
+    formStatus.textContent = formErrorText(error, fallback);
   }
 
   function fillOptions(select, entries, placeholder) {
@@ -1132,7 +1238,7 @@
     }
   }
   function showError(error, fallback) {
-    var message = format.errorText(error, fallback);
+    var message = formErrorText(error, fallback);
     if (error && error.field) showServerFieldError(error.field, message);
     toast(message, "error", 8000);
   }
