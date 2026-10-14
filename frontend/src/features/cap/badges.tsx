@@ -4,7 +4,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { errorText, isNegative, usageRate, won } from '../../lib/format'
 import { ApiError } from '../../lib/api/errors'
-import { STATUSES } from './labels'
+import { STATUS_LABELS } from './labels'
 
 const tones: Record<string, StatusTone> = {
   NORMAL: 'success',
@@ -15,7 +15,7 @@ const tones: Record<string, StatusTone> = {
 export function CapStatus({ code, label }: { code?: string; label?: string }) {
   return (
     <StatusBadge tone={tones[code ?? ''] ?? 'neutral'}>
-      {label || STATUSES[code as keyof typeof STATUSES] || code || '—'}
+      {label || STATUS_LABELS[code ?? ''] || code || '—'}
     </StatusBadge>
   )
 }

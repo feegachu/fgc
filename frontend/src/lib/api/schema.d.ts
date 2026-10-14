@@ -1556,13 +1556,15 @@ export interface components {
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
-            status?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            status?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
         };
         ArbitrageCheckSummary: {
             /** Format: int64 */
             candidateCount?: number;
             /** Format: int64 */
             clearCount?: number;
+            /** Format: int64 */
+            notApplicableCount?: number;
             /** Format: int64 */
             reviewRequiredCount?: number;
             /** Format: int64 */
@@ -1589,7 +1591,7 @@ export interface components {
             plannedCommissionAmount?: number;
             refundAdditionAppliedYn?: boolean;
             /** @enum {string} */
-            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             resultStatusLabel?: string;
             /** @enum {string} */
             surrenderValueSourceType?: "ACTUAL" | "EXPECTED_TABLE" | "NOT_APPLICABLE";
@@ -2075,7 +2077,7 @@ export interface components {
             contractId?: number;
             evidenceRef?: string;
             /** @enum {string} */
-            exclusionType?: "NONE" | "VOICE_RECORDING" | "BROADCAST" | "NEW_AGENT_SUPPORT" | "COMPLIANCE_3PCT";
+            exclusionType?: "NONE" | "NEW_AGENT_SUPPORT" | "COMPLIANCE_3PCT";
             inclusionDecisionReason: string;
             /** @enum {string} */
             inclusionDecisionStatus: "INCLUDED" | "EXCLUDED" | "REVIEW_REQUIRED";
@@ -2095,7 +2097,7 @@ export interface components {
             contractId?: number;
             evidenceRef?: string;
             /** @enum {string} */
-            exclusionType?: "NONE" | "VOICE_RECORDING" | "BROADCAST" | "NEW_AGENT_SUPPORT" | "COMPLIANCE_3PCT";
+            exclusionType?: "NONE" | "NEW_AGENT_SUPPORT" | "COMPLIANCE_3PCT";
             inclusionDecisionReason?: string;
             /** @enum {string} */
             inclusionDecisionStatus?: "INCLUDED" | "EXCLUDED" | "REVIEW_REQUIRED";
@@ -3358,11 +3360,6 @@ export interface components {
              */
             channelCode?: string;
             /**
-             * @description 채널 특례 적용 여부
-             * @example false
-             */
-            channelSpecialRuleYn?: boolean;
-            /**
              * @description 수수료 체계 코드
              * @example CURRENT
              */
@@ -3431,7 +3428,7 @@ export interface components {
             /** Format: int64 */
             arbitrageCheckId?: number;
             /** @enum {string} */
-            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED";
+            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             /** Format: int64 */
             validationRunId?: number;
         };
@@ -3748,7 +3745,7 @@ export interface components {
             /** @enum {string} */
             purpose?: "OPERATIONAL" | "COMPARISON" | "SIMULATION";
             /** @enum {string} */
-            regime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029" | "TM_SPECIAL";
+            regime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */

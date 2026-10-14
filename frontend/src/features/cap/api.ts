@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import { validMonth } from '../../stores/workspace'
-import { STAGES, STATUSES } from './labels'
+import { STAGES, STATUS_LABELS } from './labels'
 
 type Schemas = components['schemas']
 export type CapItem = Schemas['CapCheckItemResponse']
@@ -47,7 +47,7 @@ export function criteriaFromParams(params: URLSearchParams, workspaceMonth: stri
   return {
     month: validMonth(month) ? month : (workspaceMonth ?? ''),
     stage: code(STAGES, params.get('stage')),
-    status: code(STATUSES, params.get('status')),
+    status: code(STATUS_LABELS, params.get('status')),
     insurerId: referenceId(params.get('insurerId')),
     orgId: referenceId(params.get('orgId')),
     contractNo: params.get('contractNo')?.trim() ?? '',

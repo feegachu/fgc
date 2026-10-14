@@ -1036,7 +1036,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED" ],
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           }
         },
@@ -1049,6 +1049,10 @@
             "type" : "integer"
           },
           "clearCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "notApplicableCount" : {
             "format" : "int64",
             "type" : "integer"
           },
@@ -1113,7 +1117,7 @@
             "type" : "boolean"
           },
           "resultStatus" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED" ],
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "resultStatusLabel" : {
@@ -2006,7 +2010,7 @@
             "type" : "string"
           },
           "exclusionType" : {
-            "enum" : [ "NONE", "VOICE_RECORDING", "BROADCAST", "NEW_AGENT_SUPPORT", "COMPLIANCE_3PCT" ],
+            "enum" : [ "NONE", "NEW_AGENT_SUPPORT", "COMPLIANCE_3PCT" ],
             "type" : "string"
           },
           "inclusionDecisionReason" : {
@@ -2054,7 +2058,7 @@
             "type" : "string"
           },
           "exclusionType" : {
-            "enum" : [ "NONE", "VOICE_RECORDING", "BROADCAST", "NEW_AGENT_SUPPORT", "COMPLIANCE_3PCT" ],
+            "enum" : [ "NONE", "NEW_AGENT_SUPPORT", "COMPLIANCE_3PCT" ],
             "type" : "string"
           },
           "inclusionDecisionReason" : {
@@ -4915,11 +4919,6 @@
             "example" : "FACE_TO_FACE",
             "type" : "string"
           },
-          "channelSpecialRuleYn" : {
-            "description" : "채널 특례 적용 여부",
-            "example" : false,
-            "type" : "boolean"
-          },
           "feeRegimeCode" : {
             "description" : "수수료 체계 코드",
             "example" : "CURRENT",
@@ -5004,7 +5003,7 @@
             "type" : "integer"
           },
           "resultStatus" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED" ],
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
           "validationRunId" : {
@@ -5732,7 +5731,7 @@
             "type" : "string"
           },
           "regime" : {
-            "enum" : [ "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029", "TM_SPECIAL" ],
+            "enum" : [ "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029" ],
             "type" : "string"
           },
           "stage" : {

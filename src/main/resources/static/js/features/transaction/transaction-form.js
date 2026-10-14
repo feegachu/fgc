@@ -329,8 +329,6 @@
     var options = [
       ["INCLUDED", "산입"],
       ["REVIEW_REQUIRED", "검토필요"],
-      ["EXCLUDED:VOICE_RECORDING", "제외 · 녹취"],
-      ["EXCLUDED:BROADCAST", "제외 · 방송"],
       ["EXCLUDED:NEW_AGENT_SUPPORT", "제외 · 신인 지원"]
     ];
     if (isInsurerToGa()) options.push(["EXCLUDED:COMPLIANCE_3PCT", "제외 · 준법경영비"]);
@@ -339,7 +337,7 @@
 
   function setInclusionDecision(select, inclusionStatus, exclusionType) {
     var value = inclusionStatus === "EXCLUDED"
-      ? "EXCLUDED:" + (exclusionType || "VOICE_RECORDING")
+      ? "EXCLUDED:" + (exclusionType || "NEW_AGENT_SUPPORT")
       : inclusionStatus;
     select.value = value;
   }
@@ -692,7 +690,7 @@
    *
    * "하나라도 있으면" 이 아니라 **첫 번째만** 본다. confirm 은 failFirst 로 게이트 순서상
    * 먼저 걸리는 사유 하나만 기록·거부한다. precheck 의 수집 순서는 confirm 의 평가 순서와
-   * 같으므로(hasUnresolvedViolation → requiredValueFailures → 귀속행 루프의
+   * 같으므로(hasBlockingUnresolvedViolation → requiredValueFailures → 귀속행 루프의
    * attributionFailures → newcomer → capRule → ruleConsistency → capResult)
    * blockers[0] 이 곧 confirm 이 던질 코드다.
    *
@@ -1015,8 +1013,6 @@
   }
   function decisionReason(decision) {
     var labels = {
-      VOICE_RECORDING: "녹취 관련 비용",
-      BROADCAST: "방송 관련 비용",
       NEW_AGENT_SUPPORT: "신인활동지원비",
       COMPLIANCE_3PCT: "준법경영비"
     };

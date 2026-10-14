@@ -46,7 +46,7 @@ class ProductServiceImplTest {
                 21L, "P-B-001", "STD-LIFE-B", "가상 저해지 건강보험 B",
                 "HEALTH_PROTECTION", "2026-CURRENT-B",
                 LocalDate.of(2026, 7, 1), null, "BD-2026-07",
-                LocalDate.of(2026, 7, 1), "FACE_TO_FACE", false, "CURRENT", true, 240
+                LocalDate.of(2026, 7, 1), "FACE_TO_FACE", "CURRENT", true, 240
         );
         PageRequest pageable = PageRequest.of(1, 20);
         when(productRepository.search(criteria.insurerId(), criteria.asOf(), pageable))

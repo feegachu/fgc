@@ -19,6 +19,7 @@ public enum CapResultStatus {
     WARNING,
     VIOLATION,
     REVIEW_REQUIRED,
+    /** 계약·지급단계가 1,200% 규제 적용대상이 아님 (#477, #482). */
     NOT_APPLICABLE;
 
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
@@ -71,11 +72,11 @@ public enum CapResultStatus {
     /** SIR-008: 코드값은 항상 한글 라벨과 함께 응답한다 — 화면이 아니라 서버가 라벨을 만든다. */
     public String label() {
         return switch (this) {
-            case NOT_APPLICABLE -> "적용대상 아님";
             case NORMAL -> "정상";
             case WARNING -> "주의";
             case VIOLATION -> "위반";
             case REVIEW_REQUIRED -> "검토필요";
+            case NOT_APPLICABLE -> "적용대상 아님";
         };
     }
 }

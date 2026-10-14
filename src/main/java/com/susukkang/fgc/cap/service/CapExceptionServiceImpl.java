@@ -17,6 +17,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.util.List;
 
 /**
  * 설명 : 한도 검증 결과가 주의 또는 위반인 경우 중복 없는 한도 예외 건을 생성하는 서비스 구현체
@@ -98,6 +99,20 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         // Repository도 NEW와 IN_REVIEW를 같은 미처리 상태로 조회한다.
         if (paymentId == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
         return capExceptionRepository.existsUnresolvedViolation(paymentId);
+    }
+
+    /**
+     * 설명 : 지급 건의 미해결 한도 위반 예외가 걸린 계약 ID를 조회한다 (#477 후속)
+     *
+     * @param paymentId 지급 건 ID
+     * @return 미해결 한도 위반 예외의 계약 ID 목록(중복 제거, 계약 미상은 null)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> findUnresolvedViolationContractIds(Long paymentId) {
+        // 미처리 정의(NEW + IN_REVIEW)는 hasUnresolvedViolation 과 같다.
+        if (paymentId == null) throw new IllegalArgumentException("지급 건 ID가 없습니다.");
+        return capExceptionRepository.findUnresolvedViolationContractIds(paymentId);
     }
 
     private ExceptionType resolveExceptionType(CapResultStatus resultStatus) {

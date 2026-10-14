@@ -187,8 +187,8 @@ class ContractConsistencyIntegrationTest {
         registerExcludedItemPolicy(id);
         List<CommissionPaymentAttributionRequest> excluded = List.of("300000", "400000").stream()
                 .map(amount -> new CommissionPaymentAttributionRequest(id, LocalDate.of(2026, 7, 31),
-                        new BigDecimal(amount), InclusionDecisionStatus.EXCLUDED, ExclusionType.VOICE_RECORDING,
-                        "녹취 지원 제외 증빙", "DIRECT", "VOICE-EVIDENCE", AttributionMethod.DIRECT))
+                        new BigDecimal(amount), InclusionDecisionStatus.EXCLUDED, ExclusionType.NEW_AGENT_SUPPORT,
+                        "신인 활동지원 제외 증빙", "DIRECT", "NEW-AGENT-EVIDENCE", AttributionMethod.DIRECT))
                 .toList();
         Long payment = payment(id, new BigDecimal("700000"), excluded, "CONS_EXCLUDED");
         TransactionPrecheckResponse preview = payments.precheck(payment);
@@ -694,7 +694,7 @@ class ContractConsistencyIntegrationTest {
                 id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 31))).capRuleSetId();
         Long item = jdbc.queryForObject("""
                 INSERT INTO fgc.commission_item(item_code,item_name,cashflow_type,item_category,effective_from)
-                VALUES ('CONS_EXCLUDED','녹취 지원 검증 항목','PAYMENT','COST',DATE '2026-01-01')
+                VALUES ('CONS_EXCLUDED','신인 활동지원 검증 항목','PAYMENT','COST',DATE '2026-01-01')
                 RETURNING commission_item_id
                 """, Long.class);
         Long policy = jdbc.queryForObject("""
@@ -715,7 +715,7 @@ class ContractConsistencyIntegrationTest {
         jdbc.update("""
                 INSERT INTO fgc.cap_rule_item(cap_rule_set_id,commission_item_id,inclusion_status,
                     exclusion_type,evidence_required_yn,attribution_method,decision_reason)
-                VALUES (?,?,'EXCLUDED','VOICE_RECORDING',true,'DIRECT','증빙 있는 녹취 지원 항목 제외')
+                VALUES (?,?,'EXCLUDED','NEW_AGENT_SUPPORT',true,'DIRECT','증빙 있는 신인 활동지원 항목 제외')
                 """, rule, item);
         jdbc.update("""
                 UPDATE fgc.policy_version target SET status='APPROVED',approved_at=clock_timestamp(),

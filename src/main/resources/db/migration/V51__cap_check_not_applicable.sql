@@ -1,4 +1,4 @@
--- #482 V50: 2026-10-13 사용자 확인으로 팀 예약 완료. 기존 공유 migration 수정 금지.
+-- #482 V51: 2026-10-14 사용자 지시로 V50 충돌 해소. 개발 DB에는 미적용. SQL 동작은 유지.
 -- 이전 버전의 상태 제약 이름에 관계없이 이번 상태 확장을 적용한다.
 ALTER TABLE fgc.cap_check DROP CONSTRAINT IF EXISTS cap_check_result_status_check;
 ALTER TABLE fgc.cap_check DROP CONSTRAINT IF EXISTS ck_cap_check_result_status;

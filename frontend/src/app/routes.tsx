@@ -25,10 +25,12 @@ const pages: Record<string, ComponentType> = {
   '/exceptions': ExceptionPage,
   '/cap-checks': lazy(() => import('../features/cap/CapListPage')),
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
+  '/journals': lazy(() => import('../features/ledger/LedgerPage')),
   '/validation-runs': lazy(() => import('../features/validation/ValidationRunListPage')),
   '/validation-runs/:id': lazy(() => import('../features/validation/ValidationRunDetailPage')),
   '/schedules': lazy(() => import('../features/schedule/ScheduleListPage')),
   '/schedules/:id': lazy(() => import('../features/schedule/ScheduleDetailPage')),
+  '/reconciliations': lazy(() => import('../features/reconciliation/ReconciliationPage')),
 }
 export const screenRoutes: RouteObject[] = screens.map((screen) => {
   const Page = pages[screen.path]

@@ -14,7 +14,7 @@ import { capInsurersQuery, capListQuery, capOrganizationsQuery, criteriaFromPara
 import type { CapAgent, CapCriteria, CapItem, CapStage } from './api'
 import { CapDetailModal } from './CapDetailModal'
 import { Amount, CapError, CapEvidence, CapStatus, CapUsage } from './badges'
-import { monitoringStatus, STAGES, STATUSES } from './labels'
+import { monitoringStatus, STAGES, STATUSES, STATUS_LABELS } from './labels'
 import './cap.css'
 
 const summaryKeys = {
@@ -378,7 +378,7 @@ function CapFilter({
           <label htmlFor="cap-filter-status">판정</label>
           <select className="select-control" {...bind('status')}>
             <option value="">전체</option>
-            {options(STATUSES)}
+            {options(STATUS_LABELS)}
           </select>
         </div>
         <div className="filter-field">

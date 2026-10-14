@@ -57,6 +57,32 @@ class ArbitrageManualCheckIntegrationTest {
         assertThat(savedCheckId).isEqualTo(result.getArbitrageCheckId());
     }
 
+    /**
+     * 설명 : 보장성보험이 아닌 계약은 차익거래 후보·자료부족이 아니라 "적용대상 아님"으로 저장되고 예외를 만들지 않는다. (#477)
+     */
+    @Test
+    void savesNotApplicableForNonProtectionContractWithoutException() {
+        TestReference reference = testReference();
+        jdbcTemplate.update("""
+                UPDATE fgc.product SET protection_type = 'SAVINGS'
+                 WHERE product_id = (SELECT po.product_id
+                                       FROM fgc.insurance_contract c
+                                       JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
+                                      WHERE c.contract_id = ?)
+                """, reference.contractId());
+        Long validationRunId = insertValidationRun();
+
+        ArbitrageCheckInsertDTO result = arbitrageService.checkInExistingRun(
+                validationRunId, reference.contractId(), reference.asOfDate());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT result_status FROM fgc.arbitrage_check WHERE arbitrage_check_id = ?",
+                String.class, result.getArbitrageCheckId())).isEqualTo("NOT_APPLICABLE");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.exception_case WHERE source_entity_type = 'ARBITRAGE_CHECK' AND source_entity_id = CAST(? AS varchar)",
+                Integer.class, result.getArbitrageCheckId())).isZero();
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({
             "FGC-FGL02-202601-0001, CLEAR, NOT_APPLICABLE",
