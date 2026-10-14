@@ -2214,6 +2214,97 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void precheckOutsideFirstYearSkipsCapRuleAndOldViolation() {
+        ConfirmationData data = withDates(confirmation(
+                201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 7, 3), LocalDate.of(2027, 7, 3));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(3L));
+
+        var response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isTrue();
+        assertThat(response.capPreview()).isEmpty();
+        verify(queryRepository, never()).findCapRuleSnapshot(anyLong(), anyLong());
+        verify(capCalculator, never()).calculate(any());
+        assertPrecheckSavesNothing();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"2026-07-03,2027-07-03", "2028-02-29,2029-02-28", "2026-07-03,2027-08-10"})
+    void outsideFirstYearClassificationReviewStillBlocks(String start, String date) {
+        var data = withDates(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.REVIEW_REQUIRED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.parse(start), LocalDate.parse(date));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        var result = service.precheck(101L);
+        assertThat(result.confirmable()).isFalse();
+        assertThat(result.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+        assertThat(result.capExclusions()).hasSize(1);
+        var excluded = result.capExclusions().getFirst();
+        assertThat(excluded.reasonCode()).isEqualTo("OUTSIDE_FIRST_YEAR");
+        assertThat(excluded.excludedAmount()).isEqualTo(200000L);
+        assertThat(excluded.firstYearEndExclusive()).isEqualTo(LocalDate.parse(start).plusMonths(12));
+        assertThat(excluded.resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        verify(capCalculator, never()).calculate(any());
+        assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void lastDayOfFirstYearStillBlocksOverLimitCandidate() {
+        var data = withDates(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2028, 2, 29), LocalDate.of(2029, 2, 27));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("1100000", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        var result = service.precheck(101L);
+        assertThat(result.confirmable()).isFalse();
+        assertThat(result.capExclusions()).isEmpty();
+        assertThat(result.capPreview().getFirst().includedAmount()).isEqualTo(1300000L);
+        assertThat(result.capPreview().getFirst().resultStatus()).isEqualTo(CapResultStatus.VIOLATION);
+    }
+
+    @Test
+    void outsideFirstYearDoesNotBypassMissingAllocationBasis() {
+        var data = withDates(withAllocationBasis(confirmation(201L, 3L, "200000", "200000",
+                InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, AttributionMethod.APPROVED_ALLOCATION, "EVIDENCE"), null),
+                LocalDate.of(2026, 7, 3), LocalDate.of(2027, 7, 3));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        assertThat(service.precheck(101L).confirmable()).isFalse();
+    }
+
+    @Test
+    void outsideFirstYearDoesNotBypassUnknownViolationContract() {
+        var data = withDates(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 7, 3), LocalDate.of(2027, 7, 3));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(java.util.Arrays.asList((Long) null));
+        assertThat(service.precheck(101L).blockers()).extracting(TransactionPrecheckResponse.Blocker::code)
+                .contains("FGC-CAP-003");
+    }
+
+    @Test
+    void mixedCandidateStillBlocksExistingViolationForInPeriodAttribution() {
+        var inside = withDates(confirmation(201L, 3L, "100000", "300000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 7, 3), LocalDate.of(2026, 7, 31));
+        var outside = withDates(confirmation(202L, 3L, "200000", "300000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2026, 7, 3), LocalDate.of(2027, 7, 3));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(outside, inside));
+        given(capExceptionService.findUnresolvedViolationContractIds(101L)).willReturn(List.of(3L));
+        assertThat(service.precheck(101L).blockers()).extracting(TransactionPrecheckResponse.Blocker::code)
+                .contains("FGC-CAP-003");
+        verify(queryRepository, never()).findCapRuleSnapshot(101L, 202L);
+    }
+
+    private ConfirmationData withDates(ConfirmationData data, LocalDate contractDate, LocalDate attributionDate) {
+        return new ConfirmationData(data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), attributionDate, attributionDate.withDayOfMonth(1),
+                data.transactionAttributionId(), data.contractId(), data.agentId(), data.paymentStage(), data.commissionItemId(),
+                data.itemCode(), data.itemName(), data.policyVersionId(), data.inclusionDecisionStatus(), data.exclusionType(),
+                data.inclusionDecisionReason(), data.allocationBasis(), data.evidenceRef(), data.attributionMethod(), contractDate,
+                data.cashflowType());
+    }
+
+    @Test
     void precheckPassesCleanDraftWithoutSaving() {
         ConfirmationData data = confirmation(
                 201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,

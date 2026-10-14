@@ -620,7 +620,16 @@
     (result.capPreview || []).forEach(function (preview) {
       capBody.appendChild(capPreviewCard(preview));
     });
-    if (!result.capPreview || result.capPreview.length === 0) {
+    (result.capExclusions || []).forEach(function (excluded) {
+      var card = document.createElement("div");
+      card.className = "transaction-cap-card";
+      card.appendChild(textElement("div", "계약 " + excluded.contractId + " · 귀속 " + excluded.transactionAttributionId));
+      card.appendChild(textElement("p", excluded.reason));
+      card.appendChild(amountLine("초년도 산입 제외액", excluded.excludedAmount));
+      card.appendChild(textElement("p", "귀속일 " + excluded.attributionDate + " · 초년도 종료일 " + excluded.firstYearEndExclusive + " (미포함)"));
+      capBody.appendChild(card);
+    });
+    if (!(result.capPreview || []).length && !(result.capExclusions || []).length) {
       renderCapMessage("empty", "표시할 1,200% 검증 결과가 없습니다.");
     }
     renderGates(result.blockers || [], result.confirmable);

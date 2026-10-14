@@ -213,6 +213,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
+            if (CapCandidateExclusion.isOutsideFirstYear(data)) continue;
             if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
                 CapCheckCommand check = buildNotApplicableCheck(data);
                 mapper.insertCapCheck(check);
@@ -282,6 +283,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         Map<String, Object> confirmedValue = new LinkedHashMap<>();
         confirmedValue.put("status", CommissionPaymentStatus.CONFIRMED);
         confirmedValue.put("idempotencyKey", normalizedIdempotencyKey);
+        confirmedValue.put("capExclusions", capExclusions(attributions));
         confirmedValue.put("capChecks", capChecks.stream().map(this::capCheckAuditSummary).toList());
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_CONFIRMED)
@@ -338,6 +340,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 if (data.contractId() == null || data.attributedAmount() == null) {
                     continue;
                 }
+                if (CapCandidateExclusion.isOutsideFirstYear(data)) continue;
                 if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
                     previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
                             buildNotApplicableCheck(data), null, contractNos.get(data.contractId())));
@@ -410,7 +413,8 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 paymentId,
                 previews,
                 toBlockers(failures),
-                failures.isEmpty()
+                failures.isEmpty(),
+                capExclusions(attributions)
         );
     }
 
@@ -1267,11 +1271,17 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         return failures;
     }
 
+    private List<CapCandidateExclusion> capExclusions(List<ConfirmationData> attributions) {
+        return attributions.stream().filter(row -> !isClawback(row)).filter(CapCandidateExclusion::isOutsideFirstYear)
+                .map(CapCandidateExclusion::from).toList();
+    }
+
     private boolean hasBlockingUnresolvedViolation(Long paymentId, List<ConfirmationData> attributions) {
         return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
                 .anyMatch(id -> id == null || attributions.stream().noneMatch(row -> Objects.equals(row.contractId(), id))
                         || attributions.stream().anyMatch(row -> Objects.equals(row.contractId(), id)
-                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())));
+                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())
+                        && !CapCandidateExclusion.isOutsideFirstYear(row)));
     }
 
     private boolean isClawback(ConfirmationData data) {

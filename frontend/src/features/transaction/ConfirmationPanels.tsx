@@ -128,10 +128,28 @@ export function CapPanel({ result, pending, error }: { result: Precheck | null; 
             {error}
           </p>
         ) : result ? (
-          result.capPreview?.length ? (
-            result.capPreview.map((preview, index) => (
-              <CapCard key={`${preview.contractId}-${index}`} preview={preview} />
-            ))
+          result.capPreview?.length || result.capExclusions?.length ? (
+            <>
+              {result.capPreview?.map((preview, index) => (
+                <CapCard key={`${preview.contractId}-${index}`} preview={preview} />
+              ))}
+              {result.capExclusions?.map((excluded, index) => (
+                <div className="transaction-cap-card" key={`excluded-${excluded.transactionAttributionId}-${index}`}>
+                  <div className="transaction-cap-heading">
+                    <span>
+                      계약 {excluded.contractId} · 귀속 {excluded.transactionAttributionId}
+                    </span>
+                    <StatusBadge tone="neutral">적용대상 아님</StatusBadge>
+                  </div>
+                  <p>{excluded.reason}</p>
+                  <p>사유 코드: {excluded.reasonCode}</p>
+                  <AmountLine label="초년도 산입 제외액" value={excluded.excludedAmount} />
+                  <p>
+                    귀속일 {excluded.attributionDate} · 초년도 종료일 {excluded.firstYearEndExclusive} (미포함)
+                  </p>
+                </div>
+              ))}
+            </>
           ) : (
             <p className="transaction-panel-placeholder">표시할 1,200% 검증 결과가 없습니다.</p>
           )
