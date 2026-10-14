@@ -250,7 +250,7 @@ class ProductRepositoryIntegrationTest {
         var asOf = LocalDate.of(2026, 10, 13);
         var inputRows = productRepository.search(insurerId, asOf, false, PageRequest.of(0, 100)).getContent();
         var historyRows = productRepository.search(insurerId, asOf, true, PageRequest.of(0, 100)).getContent();
-        assertThat(inputRows).extracting(ProductRow::offeringVersion).doesNotContain("2026-H1-B");
+        assertThat(inputRows).isNotEmpty().extracting(ProductRow::offeringVersion).doesNotContain("2026-H1-B");
         assertThat(historyRows).filteredOn(row -> "2026-H1-B".equals(row.offeringVersion()))
                 .singleElement().satisfies(row -> assertThat(row.salesEndDate()).isEqualTo(LocalDate.of(2026, 6, 30)));
     }
