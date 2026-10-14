@@ -365,7 +365,7 @@ describe('CONT-W02 계약 상세', () => {
       if (url.includes('/schedules?')) return { headers: [], lines: [] }
     })
     await actions.click(await screen.findByRole('button', { name: '스케줄 재생성' }))
-    await screen.findByText('현재 운영 스케줄이 없습니다.')
+    await waitFor(() => expect(screen.getAllByText('현재 운영 스케줄이 없습니다.')).toHaveLength(2))
     expect(router.state.location.search).toBe('?tab=schedules')
     expect(calls('/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL')[0].options?.method).toBe('POST')
     expect(messages()).toContain('예상 스케줄을 새 버전으로 재생성했습니다.')
