@@ -213,7 +213,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
-            if (CapCandidateExclusion.isOutsideFirstYear(data)) continue;
+            if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) continue;
             if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
                 CapCheckCommand check = buildNotApplicableCheck(data);
                 mapper.insertCapCheck(check);
@@ -340,7 +340,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 if (data.contractId() == null || data.attributedAmount() == null) {
                     continue;
                 }
-                if (CapCandidateExclusion.isOutsideFirstYear(data)) continue;
+                if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) continue;
                 if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
                     previews.add(TransactionPrecheckResponse.CapPreviewItem.from(
                             buildNotApplicableCheck(data), null, contractNos.get(data.contractId())));
@@ -462,7 +462,8 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
                     return new TransactionPrecheckResponse.Blocker(
                             failure.errorCode().getCode(),
-                            messageResolver.resolve(failure.errorCode(), failure.params()),
+                            CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE.equals(failure.reasonCode())
+                                    ? failure.description() : messageResolver.resolve(failure.errorCode(), failure.params()),
                             paymentLevel ? null : failure.data().contractId(),
                             paymentLevel ? null : failure.data().transactionAttributionId()
                     );
@@ -1266,6 +1267,19 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     "산입 제외 건에는 증빙 참조 정보가 필요합니다.",
                     FgcErrorCode.TRAN_004,
                     Map.of()
+            ));
+        }
+        if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)) {
+            String paymentDate = Objects.toString(data.scheduledPaymentDate(), "미입력");
+            failures.add(new GateFailure(
+                    data, ExceptionType.CAP_REVIEW_REQUIRED, CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+                    "HIGH", "초년도 밖 지급일 확인 필요",
+                    "초년도 밖 귀속은 지급예정일도 초년도 종료일 이후여야 합니다. 귀속일: " + data.attributionDate()
+                            + ", 지급예정일: " + paymentDate + ", 초년도 종료일(미포함): " + data.contractDate().plusMonths(12),
+                    FgcErrorCode.CAP_002,
+                    Map.of("reasonCode", CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+                            "attributionDate", data.attributionDate().toString(), "scheduledPaymentDate", paymentDate,
+                            "firstYearEndExclusive", data.contractDate().plusMonths(12).toString())
             ));
         }
         return failures;

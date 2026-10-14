@@ -2253,6 +2253,7 @@ class CommissionPaymentServiceImplTest {
     void lastDayOfFirstYearStillBlocksOverLimitCandidate() {
         var data = withDates(confirmation(201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
                 ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"), LocalDate.of(2028, 2, 29), LocalDate.of(2029, 2, 27));
+        data = withScheduledPaymentDate(data, LocalDate.of(2029, 3, 1));
         given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
         given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("1100000", null));
         given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
@@ -2295,13 +2296,47 @@ class CommissionPaymentServiceImplTest {
         verify(queryRepository, never()).findCapRuleSnapshot(101L, 202L);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(value = {
+            "2026-07-03,2027-07-03,2027-07-02,false",
+            "2026-07-03,2027-07-03,2027-07-03,true",
+            "2028-02-29,2029-02-28,2029-02-27,false",
+            "2028-02-29,2029-02-28,2029-02-28,true",
+            "2026-07-03,2027-07-03,NULL,false"
+    }, nullValues = "NULL")
+    void exclusionRequiresBothAttributionAndPaymentOutsideFirstYear(String contract, String attribution,
+            String scheduled, boolean confirmable) {
+        var data = withScheduledPaymentDate(withDates(confirmation(201L, 3L, "200000", "200000",
+                InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"),
+                LocalDate.parse(contract), LocalDate.parse(attribution)), scheduled == null ? null : LocalDate.parse(scheduled));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        var result = service.precheck(101L);
+        assertThat(result.confirmable()).isEqualTo(confirmable);
+        assertThat(result.capExclusions()).hasSize(confirmable ? 1 : 0);
+        if (!confirmable) {
+            assertThat(result.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+            assertThat(result.blockers().getFirst().message()).contains(attribution, "지급예정일", "초년도 종료일");
+        }
+        verify(queryRepository, never()).findCapRuleSnapshot(anyLong(), anyLong());
+        assertPrecheckSavesNothing();
+    }
+
+    private ConfirmationData withScheduledPaymentDate(ConfirmationData data, LocalDate scheduled) {
+        return new ConfirmationData(data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
+                data.totalAttributedAmount(), data.confirmIdempotencyKey(), data.attributionDate(), data.attributionMonth(),
+                data.transactionAttributionId(), data.contractId(), data.agentId(), data.paymentStage(), data.commissionItemId(),
+                data.itemCode(), data.itemName(), data.policyVersionId(), data.inclusionDecisionStatus(), data.exclusionType(),
+                data.inclusionDecisionReason(), data.allocationBasis(), data.evidenceRef(), data.attributionMethod(), data.contractDate(),
+                data.cashflowType(), scheduled);
+    }
+
     private ConfirmationData withDates(ConfirmationData data, LocalDate contractDate, LocalDate attributionDate) {
         return new ConfirmationData(data.paymentId(), data.status(), data.amount(), data.attributedAmount(),
                 data.totalAttributedAmount(), data.confirmIdempotencyKey(), attributionDate, attributionDate.withDayOfMonth(1),
                 data.transactionAttributionId(), data.contractId(), data.agentId(), data.paymentStage(), data.commissionItemId(),
                 data.itemCode(), data.itemName(), data.policyVersionId(), data.inclusionDecisionStatus(), data.exclusionType(),
                 data.inclusionDecisionReason(), data.allocationBasis(), data.evidenceRef(), data.attributionMethod(), contractDate,
-                data.cashflowType());
+                data.cashflowType(), attributionDate);
     }
 
     @Test

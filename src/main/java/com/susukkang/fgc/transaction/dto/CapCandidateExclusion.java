@@ -12,9 +12,19 @@ public record CapCandidateExclusion(
         LocalDate attributionDate, LocalDate firstYearStartInclusive, LocalDate firstYearEndExclusive,
         long excludedAmount, CapResultStatus resultStatus, String reasonCode, String reason
 ) {
-    public static final String REASON = "초년도 밖 — 판정 대상 아님";
+    public static final String INVALID_PAYMENT_DATE_REASON_CODE = "OUTSIDE_FIRST_YEAR_PAYMENT_DATE_INVALID";
+    public static final String EXCLUSION_REASON = "초년도 밖 — 판정 대상 아님";
 
     public static boolean isOutsideFirstYear(ConfirmationData data) {
+        return isAttributionOutsideFirstYear(data) && data.scheduledPaymentDate() != null
+                && !data.scheduledPaymentDate().isBefore(data.contractDate().plusMonths(12));
+    }
+
+    public static boolean hasInvalidPaymentDate(ConfirmationData data) {
+        return isAttributionOutsideFirstYear(data) && !isOutsideFirstYear(data);
+    }
+
+    private static boolean isAttributionOutsideFirstYear(ConfirmationData data) {
         return data.contractId() != null && data.contractDate() != null && data.attributionDate() != null
                 && !data.attributionDate().isBefore(data.contractDate().plusMonths(12));
     }
@@ -23,6 +33,6 @@ public record CapCandidateExclusion(
         return new CapCandidateExclusion(data.transactionAttributionId(), data.contractId(), data.paymentStage(),
                 data.attributionDate(), data.contractDate(), data.contractDate().plusMonths(12),
                 data.attributedAmount() == null ? 0 : MoneyUtil.roundWon(data.attributedAmount()).longValueExact(),
-                CapResultStatus.NOT_APPLICABLE, "OUTSIDE_FIRST_YEAR", REASON);
+                CapResultStatus.NOT_APPLICABLE, "OUTSIDE_FIRST_YEAR", EXCLUSION_REASON);
     }
 }

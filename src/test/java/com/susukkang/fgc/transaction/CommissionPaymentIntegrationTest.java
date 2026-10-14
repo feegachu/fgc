@@ -1119,6 +1119,56 @@ class CommissionPaymentIntegrationTest {
                 .containsEntry("reason_code", "CAP_ITEM_UNCLASSIFIED");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(value = {"2026-07-31", "NULL"}, nullValues = "NULL")
+    void outsideFirstYearRequiresPaymentDateOutsideFirstYear(String paymentDate) {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        var request = candidateRequest(contractId, "200000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000")));
+        var created = commissionPaymentService.create(request);
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET due_date=? WHERE commission_transaction_id=?",
+                paymentDate == null ? null : LocalDate.parse(paymentDate), created.paymentId());
+        entityManager.clear();
+
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.capExclusions()).isEmpty();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+        assertThat(preview.blockers().getFirst().message()).contains("2027-07-03", "지급예정일",
+                paymentDate == null ? "미입력" : paymentDate);
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-479-DATES-" + created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, created.paymentId())).isZero();
+        var review = jdbcTemplate.queryForMap("SELECT exception_type, reason_code FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                created.paymentId().toString());
+        assertThat(review).containsEntry("exception_type", "CAP_REVIEW_REQUIRED")
+                .containsEntry("reason_code", "OUTSIDE_FIRST_YEAR_PAYMENT_DATE_INVALID");
+    }
+
+    @Test
+    void mixedCandidateWithPrematurePaymentIsBlockedWithoutReportingExclusion() {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        var created = commissionPaymentService.create(candidateRequest(contractId, "300000", List.of(
+                candidateAttribution(contractId, LocalDate.of(2026, 7, 31), "100000"),
+                candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000"))));
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET due_date='2026-07-31' WHERE commission_transaction_id=?",
+                created.paymentId());
+        entityManager.clear();
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.capExclusions()).isEmpty();
+        assertThat(preview.capPreview()).hasSize(1);
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-479-MIXED-DATES-" + created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+    }
+
     @Test
     void outsideFirstYearReviewRequiredIsBlockedConsistentlyBeforeDatabaseUpdate() {
         Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
@@ -1212,7 +1262,7 @@ class CommissionPaymentIntegrationTest {
         var base = request("IT-479-" + UUID.randomUUID(), new BigDecimal(amount));
         return new CommissionPaymentCreateRequest(base.sourceType(), base.sourceBusinessKey(), contractId,
                 base.agentId(), base.commissionItemId(), base.amount(), base.settlementMonth(), base.cashflowType(),
-                base.scheduledPaymentDate(), base.paymentStage(), base.allocationPolicyVersion(), attributions,
+                attributions.stream().map(CommissionPaymentAttributionRequest::attributionDate).max(LocalDate::compareTo).orElseThrow(), base.paymentStage(), base.allocationPolicyVersion(), attributions,
                 base.evidenceRef(), base.note());
     }
 
