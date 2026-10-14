@@ -60,6 +60,10 @@ public class CommissionPaymentJdbcBaseline {
         parameters.put("agentId", agentId);
         return jdbc.selectOne("com.susukkang.fgc.transaction.performance.baseline.CommissionPaymentJdbcBaseline.findAgentRankCode", parameters);
     }
+    public String findProtectionType(Long contractId) {
+        return jdbc.selectOne("com.susukkang.fgc.transaction.performance.baseline.CommissionPaymentJdbcBaseline.findProtectionType",
+                java.util.Map.of("contractId", contractId));
+    }
     public ContractReference findContract(Long contractId) {
         var parameters = new HashMap<String, Object>();
         parameters.put("contractId", contractId);

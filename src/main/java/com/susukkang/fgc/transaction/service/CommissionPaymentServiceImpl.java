@@ -228,7 +228,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
-            if (isOutsideCapScope(data)) {
+            if (isOutsideCapScope(data) || CapCandidateExclusion.isOutsideFirstYear(data)
+                    || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
                 continue;
             }
             if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
@@ -293,6 +294,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         Map<String, Object> confirmedValue = new LinkedHashMap<>();
         confirmedValue.put("status", CommissionPaymentStatus.CONFIRMED);
         confirmedValue.put("idempotencyKey", normalizedIdempotencyKey);
+        confirmedValue.put("capExclusions", capExclusions(attributions));
         confirmedValue.put("capChecks", capChecks.stream().map(this::capCheckAuditSummary).toList());
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_CONFIRMED)
@@ -357,7 +359,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 if (data.contractId() == null || data.attributedAmount() == null) {
                     continue;
                 }
-                if (isOutsideCapScope(data)) {
+                if (isOutsideCapScope(data) || CapCandidateExclusion.isOutsideFirstYear(data)
+                        || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
                     continue;
                 }
                 if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
@@ -437,7 +440,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 paymentId,
                 previews,
                 toBlockers(failures),
-                failures.isEmpty()
+                failures.isEmpty(),
+                capExclusions(attributions)
         );
     }
 
@@ -486,7 +490,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
                     return new TransactionPrecheckResponse.Blocker(
                             failure.errorCode().getCode(),
-                            messageResolver.resolve(failure.errorCode(), failure.params()),
+                            CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE.equals(failure.reasonCode())
+                                    ? failure.description() : messageResolver.resolve(failure.errorCode(), failure.params()),
                             paymentLevel ? null : failure.data().contractId(),
                             paymentLevel ? null : failure.data().transactionAttributionId()
                     );
@@ -1314,6 +1319,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     Map.of()
             ));
         }
+        if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)
+                && !isOutsideCapScope(data)) {
+            String paymentDate = Objects.toString(data.scheduledPaymentDate(), "미입력");
+            failures.add(new GateFailure(
+                    data, ExceptionType.CAP_REVIEW_REQUIRED, CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+                    "HIGH", "초년도 밖 지급일 확인 필요",
+                    "초년도 밖 귀속은 지급예정일도 초년도 종료일 이후여야 합니다. 귀속일: " + data.attributionDate()
+                            + ", 지급예정일: " + paymentDate + ", 초년도 종료일(미포함): " + data.contractDate().plusMonths(12),
+                    FgcErrorCode.CAP_002,
+                    Map.of("reasonCode", CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+                            "attributionDate", data.attributionDate().toString(), "scheduledPaymentDate", paymentDate,
+                            "firstYearEndExclusive", data.contractDate().plusMonths(12).toString())
+            ));
+        }
         return failures;
     }
 
@@ -1455,6 +1474,17 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         ? netActualDetailRow(check) : candidateDetailRow(check, 1));
             }
         }
+        int excludedSeq = rows.stream().mapToInt(CapCheckDetailInsertRow::getDetailSeq).max().orElse(0) + 1;
+        for (ConfirmationData excluded : attributions) {
+            if (!Objects.equals(excluded.contractId(), data.contractId()) || excluded.paymentStage() != data.paymentStage()
+                    || !CapCandidateExclusion.isOutsideFirstYear(excluded) || isClawback(excluded)) continue;
+            rows.add(CapCheckDetailInsertRow.builder().capCheckId(check.getCapCheckId()).detailSeq(excludedSeq++)
+                    .commissionItemId(excluded.commissionItemId()).itemCode(excluded.itemCode()).itemName(excluded.itemName())
+                    .transactionAttributionId(excluded.transactionAttributionId()).classificationSnapshot("EXCLUDED")
+                    .amount(roundedAttributedAmount(excluded)).decisionReason(CapCandidateExclusion.EXCLUSION_REASON
+                            + " (귀속일 " + excluded.attributionDate() + ", 종료일 " + excluded.contractDate().plusMonths(12) + ")")
+                    .evidenceRef(excluded.evidenceRef()).build());
+        }
         capCheckWriteRepository.insertCapCheckDetails(rows);
     }
 
@@ -1504,7 +1534,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 개선: 위반이 걸린 계약마다 isOutsideCapScope 로 다시 판정해 대상 계약에 걸린 위반만 차단한다.
     //       계약이 비어 있는 위반은 대상 여부를 알 수 없으므로 종전처럼 차단한다.
     /**
-     * 지급 건에 확정을 막아야 하는 미해결 CAP_VIOLATION 이 있는지 — 규제 대상 계약 또는 계약 미상인 위반만 센다.
+     * 미해결 위반은 초년도 안 후보가 남은 규제 대상 계약에만 적용한다. 계약 미상은 계속 차단한다.
      *
      * @param paymentId 지급 건 ID
      * @return CAP_003 으로 차단해야 하면 true
@@ -1514,7 +1544,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .anyMatch(contractId -> contractId == null || (!isOutsideCapScope(contractId)
                         && (attributions.stream().noneMatch(row -> Objects.equals(row.contractId(), contractId))
                         || attributions.stream().anyMatch(row -> Objects.equals(row.contractId(), contractId)
-                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())))));
+                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())
+                        && !CapCandidateExclusion.isOutsideFirstYear(row)))));
+    }
+
+    private List<CapCandidateExclusion> capExclusions(List<ConfirmationData> attributions) {
+        return attributions.stream().filter(row -> !isClawback(row))
+                .filter(CapCandidateExclusion::isOutsideFirstYear).map(CapCandidateExclusion::from).toList();
     }
 
     private CapCheckCommand buildCapCheck(
@@ -1532,6 +1568,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .map(row -> Map.of("transactionAttributionId", row.transactionAttributionId(),
                         "classification", row.inclusionDecisionStatus().name(),
                         "signedAmount", roundedAttributedAmount(row))).toList());
+        snapshot.put("excludedCandidateAttributions", capExclusions(attributions).stream()
+                .filter(row -> Objects.equals(row.contractId(), data.contractId()) && row.paymentStage() == data.paymentStage())
+                .map(row -> Map.of("transactionAttributionId", row.transactionAttributionId(),
+                        "classification", "EXCLUDED", "signedAmount", row.excludedAmount(),
+                        "attributionDate", row.attributionDate().toString(),
+                        "firstYearStartInclusive", row.firstYearStartInclusive().toString(),
+                        "firstYearEndExclusive", row.firstYearEndExclusive().toString(),
+                        "reasonCode", row.reasonCode(), "reason", row.reason())).toList());
         snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
                 .add(result.candidateIncludedAmount()));
         snapshot.put("effectiveIncludedAmount", result.includedAmount());

@@ -158,6 +158,69 @@ describe('TRAN-W02 React form workflow', () => {
     expect(button('btn-confirm')).toBeEnabled()
   })
 
+  it.each([false, true])('shows outside-first-year reasons alongside in-period previews: %s', async (mixed) => {
+    precheckResult = {
+      confirmable: true,
+      blockers: [],
+      capPreview: mixed
+        ? [
+            {
+              contractId: 3,
+              contractNo: 'C-003',
+              paymentStage: 'GA_TO_FC',
+              resultStatus: 'NORMAL',
+              resultStatusLabel: '정상',
+              usagePct: '10.0',
+              candidateAmount: 100000,
+            },
+          ]
+        : [],
+      capExclusions: [
+        {
+          transactionAttributionId: 201,
+          contractId: 3,
+          paymentStage: 'GA_TO_FC',
+          attributionDate: '2027-07-18',
+          firstYearStartInclusive: '2026-07-18',
+          firstYearEndExclusive: '2027-07-18',
+          excludedAmount: 200000,
+          resultStatus: 'NOT_APPLICABLE',
+          reasonCode: 'OUTSIDE_FIRST_YEAR',
+          reason: '초년도 밖 — 판정 대상 아님',
+        },
+      ],
+    }
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(button('btn-precheck'))
+    const panel = screen.getByRole('region', { name: '1,200% 사전검증' })
+    expect(await within(panel).findByText('초년도 밖 — 판정 대상 아님')).toBeVisible()
+    expect(within(panel).getByText('사유 코드: OUTSIDE_FIRST_YEAR')).toBeVisible()
+    expect(within(panel).getByText('200,000원')).toBeVisible()
+    expect(within(panel).getByText(/귀속일 2027-07-18/)).toBeVisible()
+    expect(within(panel).getByText(/초년도 종료일 2027-07-18/)).toBeVisible()
+    expect(within(panel).queryByText('표시할 1,200% 검증 결과가 없습니다.')).not.toBeInTheDocument()
+    expect(within(panel).queryAllByRole('progressbar')).toHaveLength(mixed ? 1 : 0)
+    expect(button('btn-confirm')).toBeEnabled()
+  })
+
+  it('shows conflicting payment dates as a blocker instead of a valid exclusion', async () => {
+    const message =
+      '초년도 밖 귀속은 지급예정일도 초년도 종료일 이후여야 합니다. 귀속일: 2027-07-18, 지급예정일: 2026-07-31, 초년도 종료일(미포함): 2027-07-18'
+    precheckResult = {
+      confirmable: false,
+      capPreview: [],
+      capExclusions: [],
+      blockers: [{ code: 'FGC-CAP-002', message, contractId: 3, transactionAttributionId: 201 }],
+    }
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(button('btn-precheck'))
+    expect(await screen.findByText(message)).toBeVisible()
+    expect(screen.queryByText('초년도 밖 — 판정 대상 아님')).not.toBeInTheDocument()
+    expect(screen.getByText('4. 검토필요 귀속 해소 · 차단')).toBeVisible()
+  })
+
   it('keeps a failed precheck unconfirmed until an explicit retry succeeds', async () => {
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())

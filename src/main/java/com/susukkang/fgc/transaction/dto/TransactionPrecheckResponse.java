@@ -24,8 +24,14 @@ public record TransactionPrecheckResponse(
         Long paymentId,
         List<CapPreviewItem> capPreview,
         List<Blocker> blockers,
-        boolean confirmable
+        boolean confirmable,
+        List<CapCandidateExclusion> capExclusions
 ) {
+
+    public TransactionPrecheckResponse(Long paymentId, List<CapPreviewItem> capPreview,
+                                       List<Blocker> blockers, boolean confirmable) {
+        this(paymentId, capPreview, blockers, confirmable, List.of());
+    }
 
     /** 귀속 계약 × 지급단계별 1,200% 게이지 1행 (화면 ③ 검증 결과 패널) — 표시 형식은 SIR-008. */
     public record CapPreviewItem(

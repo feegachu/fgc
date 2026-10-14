@@ -1119,6 +1119,183 @@ class CommissionPaymentIntegrationTest {
                 .containsEntry("reason_code", "CAP_ITEM_UNCLASSIFIED");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(value = {"2026-07-31", "NULL"}, nullValues = "NULL")
+    void outsideFirstYearRequiresPaymentDateOutsideFirstYear(String paymentDate) {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        var request = candidateRequest(contractId, "200000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000")));
+        var created = commissionPaymentService.create(request);
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET due_date=? WHERE commission_transaction_id=?",
+                paymentDate == null ? null : LocalDate.parse(paymentDate), created.paymentId());
+        entityManager.clear();
+
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.capExclusions()).isEmpty();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code).contains("FGC-CAP-002");
+        assertThat(preview.blockers().getFirst().message()).contains("2027-07-03", "지급예정일",
+                paymentDate == null ? "미입력" : paymentDate);
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-479-DATES-" + created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, created.paymentId())).isZero();
+        var review = jdbcTemplate.queryForMap("SELECT exception_type, reason_code FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                created.paymentId().toString());
+        assertThat(review).containsEntry("exception_type", "CAP_REVIEW_REQUIRED")
+                .containsEntry("reason_code", "OUTSIDE_FIRST_YEAR_PAYMENT_DATE_INVALID");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(value = {"2026-07-31", "NULL"}, nullValues = "NULL")
+    void nonProtectionContractDoesNotEnterFirstYearPaymentDateGate(String paymentDate) {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        jdbcTemplate.update("""
+                UPDATE fgc.product SET protection_type='SAVINGS'
+                 WHERE product_id=(SELECT po.product_id FROM fgc.insurance_contract c
+                    JOIN fgc.product_offering po ON po.product_offering_id=c.product_offering_id
+                    WHERE c.contract_id=?)
+                """, contractId);
+        var created = commissionPaymentService.create(candidateRequest(contractId, "200000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000"))));
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET due_date=? WHERE commission_transaction_id=?",
+                paymentDate == null ? null : LocalDate.parse(paymentDate), created.paymentId());
+        entityManager.clear();
+        var baselineQuery = new com.susukkang.fgc.transaction.performance.baseline.CommissionPaymentJdbcBaseline(jdbcTemplate.getDataSource());
+        assertThat(baselineQuery.findProtectionType(contractId)).isEqualTo("SAVINGS");
+        assertThat(baselineQuery.findConfirmationData(created.paymentId()).getFirst().scheduledPaymentDate())
+                .isEqualTo(paymentDate == null ? null : LocalDate.parse(paymentDate));
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.blockers()).isEmpty();
+        assertThat(preview.capPreview()).isEmpty();
+        var confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-479-NONPROTECTION-" + created.paymentId());
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                Integer.class, created.paymentId().toString())).isZero();
+    }
+
+    @Test
+    void mixedCandidateWithPrematurePaymentIsBlockedWithoutReportingExclusion() {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        var created = commissionPaymentService.create(candidateRequest(contractId, "300000", List.of(
+                candidateAttribution(contractId, LocalDate.of(2026, 7, 31), "100000"),
+                candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000"))));
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET due_date='2026-07-31' WHERE commission_transaction_id=?",
+                created.paymentId());
+        entityManager.clear();
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.capExclusions()).isEmpty();
+        assertThat(preview.capPreview()).hasSize(1);
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-479-MIXED-DATES-" + created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+    }
+
+    @Test
+    void outsideFirstYearReviewRequiredIsBlockedConsistentlyBeforeDatabaseUpdate() {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        var created = commissionPaymentService.create(candidateRequest(contractId, "200000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000"))));
+        jdbcTemplate.update("UPDATE fgc.transaction_attribution SET inclusion_status_snapshot='REVIEW_REQUIRED' WHERE commission_transaction_id=?",
+                created.paymentId());
+        entityManager.clear();
+
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isFalse();
+        assertThat(preview.blockers()).extracting(TransactionPrecheckResponse.Blocker::code)
+                .contains("FGC-CAP-002");
+        assertThat(preview.capExclusions()).hasSize(1);
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-479-REVIEW-" + created.paymentId()))
+                .isInstanceOf(FgcBusinessException.class)
+                .hasMessageContaining(FgcErrorCode.CAP_002.getCode());
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id=?",
+                String.class, created.paymentId())).isEqualTo("DRAFT");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, created.paymentId())).isZero();
+    }
+
+    @Test
+    void outsideFirstYearConfirmsWithAuditWithoutReplacingContractCapCheck() {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        var first = commissionPaymentService.create(candidateRequest(contractId, "1100000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2026, 7, 31), "1100000"))));
+        var firstConfirmed = commissionPaymentService.confirm(first.paymentId(), "IT-479-FIRST-" + first.paymentId());
+        var late = commissionPaymentService.create(candidateRequest(contractId, "200000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000"))));
+        var preview = commissionPaymentService.precheck(late.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview()).isEmpty();
+        assertThat(preview.capExclusions()).hasSize(1);
+        var confirmed = commissionPaymentService.confirm(late.paymentId(), "IT-479-LATE-" + late.paymentId());
+        assertThat(confirmed.capCheckIds()).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT max(cap_check_id) FROM fgc.cap_check WHERE contract_id=?",
+                Long.class, contractId)).isEqualTo(firstConfirmed.capCheckIds().getFirst());
+        assertThat(jdbcTemplate.queryForObject("SELECT after_value->'capExclusions'->0->>'reasonCode' FROM fgc.audit_log WHERE action_code='PAYMENT_CONFIRMED' AND entity_id=?",
+                String.class, late.paymentId().toString())).isEqualTo("OUTSIDE_FIRST_YEAR");
+        assertThat(jdbcTemplate.queryForObject("SELECT after_value->'capExclusions'->0->>'firstYearEndExclusive' FROM fgc.audit_log WHERE action_code='PAYMENT_CONFIRMED' AND entity_id=?",
+                String.class, late.paymentId().toString())).isEqualTo("2027-07-03");
+        commissionPaymentService.confirm(late.paymentId(), "IT-479-LATE-" + late.paymentId());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='PAYMENT_CONFIRMED' AND entity_id=?",
+                Integer.class, late.paymentId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void mixedFirstYearCandidatesKeepExcludedDetailAndOnlyIncludeInPeriodAmount() {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
+        var created = commissionPaymentService.create(candidateRequest(contractId, "300000", List.of(
+                candidateAttribution(contractId, LocalDate.of(2026, 7, 31), "100000"),
+                candidateAttribution(contractId, LocalDate.of(2027, 7, 3), "200000"))));
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.capPreview().getFirst().candidateAmount()).isEqualTo(100000L);
+        assertThat(preview.capExclusions()).hasSize(1);
+        var confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-479-MIXED-" + created.paymentId());
+        Long checkId = confirmed.capCheckIds().getFirst();
+        assertThat(jdbcTemplate.queryForObject("SELECT sum(amount) FROM fgc.cap_check_detail WHERE cap_check_id=? AND classification_snapshot='INCLUDED'",
+                BigDecimal.class, checkId)).isEqualByComparingTo("100000");
+        var excluded = jdbcTemplate.queryForMap("SELECT amount,decision_reason FROM fgc.cap_check_detail WHERE cap_check_id=? AND classification_snapshot='EXCLUDED'", checkId);
+        assertThat((BigDecimal) excluded.get("amount")).isEqualByComparingTo("200000");
+        assertThat((String) excluded.get("decision_reason")).contains("초년도 밖", "2027-07-03");
+        assertThat(jdbcTemplate.queryForObject("SELECT calculation_snapshot->'excludedCandidateAttributions'->0->>'reasonCode' FROM fgc.cap_check WHERE cap_check_id=?",
+                String.class, checkId)).isEqualTo("OUTSIDE_FIRST_YEAR");
+    }
+
+    private Long firstYearCandidateContract(LocalDate contractDate) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.insurance_contract(insurer_id,product_offering_id,contract_no,contract_date,
+                    agent_id,organization_id,premium_per_cycle_amount,first_premium_amount,
+                    monthly_equivalent_first_premium,premium_conversion_rule_code,payment_cycle_code,
+                    payment_term_months,standard_surrender_deduction_amount,current_status,data_origin)
+                SELECT insurer_id,product_offering_id,?,?::date,agent_id,organization_id,
+                    premium_per_cycle_amount,first_premium_amount,monthly_equivalent_first_premium,
+                    premium_conversion_rule_code,payment_cycle_code,payment_term_months,
+                    standard_surrender_deduction_amount,current_status,'MANUAL'
+                FROM fgc.insurance_contract WHERE contract_id=1 RETURNING contract_id
+                """, Long.class, "IT-479-" + UUID.randomUUID(), contractDate);
+    }
+
+    private CommissionPaymentAttributionRequest candidateAttribution(Long contractId, LocalDate date, String amount) {
+        return new CommissionPaymentAttributionRequest(contractId, date, new BigDecimal(amount),
+                InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, "#479 기간 판정", "DIRECT", "IT-479-EVIDENCE", AttributionMethod.DIRECT);
+    }
+
+    private CommissionPaymentCreateRequest candidateRequest(Long contractId, String amount,
+            List<CommissionPaymentAttributionRequest> attributions) {
+        var base = request("IT-479-" + UUID.randomUUID(), new BigDecimal(amount));
+        return new CommissionPaymentCreateRequest(base.sourceType(), base.sourceBusinessKey(), contractId,
+                base.agentId(), base.commissionItemId(), base.amount(), base.settlementMonth(), base.cashflowType(),
+                attributions.stream().map(CommissionPaymentAttributionRequest::attributionDate).max(LocalDate::compareTo).orElseThrow(), base.paymentStage(), base.allocationPolicyVersion(), attributions,
+                base.evidenceRef(), base.note());
+    }
+
     private CommissionPaymentCreateRequest grossScenarioRequest(Long contractId, String cashflow, String amount) {
         return grossScenarioRequest(contractId, cashflow, amount, "PAYMENT".equals(cashflow) ? "BASE_COMMISSION" : "CLAWBACK");
     }
