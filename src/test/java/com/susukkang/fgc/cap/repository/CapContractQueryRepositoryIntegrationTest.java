@@ -38,7 +38,7 @@ class CapContractQueryRepositoryIntegrationTest {
                 SELECT product_offering_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1
                 """, Long.class);
         insertOffering(sourceOfferingId, "FACE_TO_FACE", !standardDeduction80Yn);
-        Long selectedOfferingId = insertOffering(sourceOfferingId, "TM", standardDeduction80Yn);
+        Long selectedOfferingId = insertOffering(sourceOfferingId, "FACE_TO_FACE", standardDeduction80Yn);
         BigDecimal surrenderDeduction = standardDeduction80Yn ? new BigDecimal("4321.09") : null;
         Long contractId = insertContract(sourceOfferingId, selectedOfferingId, surrenderDeduction);
 
@@ -48,7 +48,7 @@ class CapContractQueryRepositoryIntegrationTest {
         assertThat(actual).isNotNull();
         assertThat(actual).usingRecursiveComparison().isEqualTo(sqlBaseline);
         assertThat(actual.getProductOfferingId()).isEqualTo(selectedOfferingId);
-        assertThat(actual.getChannelCode()).isEqualTo("TM");
+        assertThat(actual.getChannelCode()).isEqualTo("FACE_TO_FACE");
         assertThat(actual.getStandardDeduction80Yn()).isEqualTo(standardDeduction80Yn);
         assertThat(actual.getStandardSurrenderDeductionAmount()).isEqualTo(surrenderDeduction);
     }
@@ -63,11 +63,11 @@ class CapContractQueryRepositoryIntegrationTest {
                 INSERT INTO fgc.product_offering (
                     product_id, offering_version, sales_start_date,
                     basic_document_version, basic_document_date, channel_code,
-                    channel_special_rule_yn, fee_regime_code, standard_deduction_80_yn
+                    fee_regime_code, standard_deduction_80_yn
                 )
                 SELECT product_id, ?, DATE '2035-01-01',
                        basic_document_version, basic_document_date, ?,
-                       channel_special_rule_yn, fee_regime_code, ?
+                       fee_regime_code, ?
                   FROM fgc.product_offering
                  WHERE product_offering_id = ?
                 RETURNING product_offering_id
@@ -110,7 +110,8 @@ class CapContractQueryRepositoryIntegrationTest {
                        po.channel_code,
                        po.standard_deduction_80_yn,
                        p.product_id,
-                       p.product_group_code
+                       p.product_group_code,
+                       p.protection_type
                   FROM fgc.insurance_contract c
                   JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
                   JOIN fgc.product p ON p.product_id = po.product_id
@@ -126,6 +127,7 @@ class CapContractQueryRepositoryIntegrationTest {
                 rs.getString("channel_code"),
                 rs.getBoolean("standard_deduction_80_yn"),
                 rs.getLong("product_id"),
-                rs.getString("product_group_code")), contractId);
+                rs.getString("product_group_code"),
+                rs.getString("protection_type")), contractId);
     }
 }

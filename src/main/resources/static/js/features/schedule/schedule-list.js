@@ -105,7 +105,7 @@
   var FILTER_NAMES = ["contractNo", "stage", "regime", "purpose", "status"];
   var ALLOWED = {
     stage: ["", "INSURER_TO_GA", "GA_TO_FC"],
-    regime: ["", "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029", "TM_SPECIAL"],
+    regime: ["", "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029"],
     purpose: ["OPERATIONAL", "COMPARISON", "SIMULATION"],
     status: ["", "PLANNED", "CONFIRMED", "MATCHED", "ADJUSTED", "HOLD", "CANCELLED", "RESTARTED"]
   };

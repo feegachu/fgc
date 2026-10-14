@@ -28,8 +28,6 @@ public record ProductResponse(
         LocalDate basicDocumentDate,
         @Schema(description = "판매 채널 코드", example = "FACE_TO_FACE")
         String channelCode,
-        @Schema(description = "채널 특례 적용 여부", example = "false")
-        boolean channelSpecialRuleYn,
         @Schema(description = "수수료 체계 코드", example = "CURRENT")
         String feeRegimeCode,
         @Schema(description = "표준해약공제액 80% 이상 공제 상품 여부", example = "true")
@@ -50,7 +48,6 @@ public record ProductResponse(
                 row.basicDocumentVersion(),
                 row.basicDocumentDate(),
                 row.channelCode(),
-                row.channelSpecialRuleYn(),
                 row.feeRegimeCode(),
                 row.standardDeduction80Yn(),
                 row.paymentTermMonths()

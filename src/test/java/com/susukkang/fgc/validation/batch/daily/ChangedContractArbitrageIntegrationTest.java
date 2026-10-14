@@ -8,7 +8,6 @@ import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobInstance;
@@ -36,10 +35,10 @@ import static org.mockito.Mockito.verify;
 /**
  * #512 — changedContractStep의 Processor가 해지 계약의 차익거래를 효력일 기준으로 저장하고,
  * 같은 실행으로 다시 돌려도 결과행·예외가 늘지 않는지 실제 PostgreSQL로 확인한다.
- * 시드 A1(FGC-FGL02-202601-0001): 8/20 해지, 지급 890,000 + 해약환급금 120,000 − 납입 800,000 = 210,000 → CANDIDATE.
- * A1은 2026-01 체결이라 GA→FC 1,200% 룰셋이 없는(CAP_004) 계약이다. 보험대리점 1,200%룰은 '26.7.1. 이후 체결
- * 신계약에 적용되므로(FAQ 2차 Q1-1) 그 단계는 실패도 검토 대상도 아니고, 상태 사건이 SUCCEEDED로 끝나
- * 다음 날 Reader 후보에서 빠지는지도 함께 본다(#522).
+ * 시행 전 A1은 적용대상 아님, V45.1의 시행 후 A1(0475)은 410,000 초과 후보로 각각 저장한다.
+ * 두 계약 모두 2026-07 이전 체결이라 GA→FC 1,200% 룰셋이 없는(CAP_004) 계약이다. 보험대리점 1,200%룰은
+ * '26.7.1. 이후 체결 신계약에 적용되므로(FAQ 2차 Q1-1) 그 단계는 실패도 검토 대상도 아니고, 상태 사건이
+ * SUCCEEDED로 끝나 다음 날 Reader 후보에서 빠지는지도 함께 본다(#522).
  *
  * 스케줄 재생성은 이 테스트의 관심사가 아니고 시드 계약의 공유 스케줄을 바꾸므로 mock으로 둔다.
  * 차익거래·1,200%·Writer는 실제 빈을 쓴다.
@@ -108,13 +107,19 @@ class ChangedContractArbitrageIntegrationTest {
         writer.beforeStep(stepExecution);
     }
 
-    @Test
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "FGC-FGL02-202601-0001, CLEAR, 0, 0",
+            "FGC-FGL02-202603-0475, CANDIDATE, 410000, 1"})
     @Timeout(value = 2, unit = TimeUnit.MINUTES, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
-    void terminatedContractGetsArbitrageRowAsOfEffectiveDateAndRerunAddsNothing() {
+    void terminatedContractGetsArbitrageRowAsOfEffectiveDateAndRerunAddsNothing(
+            String contractNo, String expectedStatus, String excess, int candidates) {
+        contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no=?", Long.class, contractNo);
         ChangedContractResult first = processInChunkTransaction();
 
-        // A1은 2026-01 계약이라 GA→FC 1,200% 룰셋이 없다(CAP_004) — 시행 전 체결이라 그 단계는 1,200% 대상이
-        // 아니고 실패도 검토 대상도 아니다(#522). INSURER→GA는 룰셋이 있어 계산되고, 차익거래도 점검된다.
+        // 두 시연 계약은 2026-07 이전 계약이라 GA→FC 1,200% 룰셋이 없다(CAP_004) — 시행 전 체결이라 그 단계는
+        // 1,200% 대상이 아니고 실패도 검토 대상도 아니다(#522). INSURER→GA는 룰셋이 있어 계산되고, 차익거래도 점검된다.
         assertThat(first.success()).isTrue();
         assertThat(capCheckStages()).containsExactly("INSURER_TO_GA");
         verify(scheduleService, never()).registerCapRuleReview(any(), any(), any());
@@ -130,11 +135,11 @@ class ChangedContractArbitrageIntegrationTest {
                  WHERE validation_run_id = ? AND contract_id = ?
                 """, validationRunId, contractId);
         assertThat(row.get("as_of_date").toString()).isEqualTo("2026-08-20");
-        assertThat(row.get("result_status")).isEqualTo("CANDIDATE");
-        assertThat(row.get("current_excess")).isEqualTo(new java.math.BigDecimal("210000"));
+        assertThat(row).containsEntry("result_status", expectedStatus)
+                .containsEntry("current_excess", new java.math.BigDecimal(excess));
         assertThat(arbitrageRows()).isEqualTo(1);
-        assertThat(candidateCases()).isEqualTo(1);
-        assertThat(candidateOccurrences()).isEqualTo(1);
+        assertThat(candidateCases()).isEqualTo(candidates);
+        assertThat(candidateOccurrences()).isEqualTo(candidates);
 
         // 같은 날 같은 실행으로 다시 돌려도(IF-BAT-02 멱등성) uq_arbitrage_check의 UPSERT와
         // 예외 업무키·실행별 occurrence 멱등 기록 덕분에 행이 늘지 않는다.
@@ -142,8 +147,8 @@ class ChangedContractArbitrageIntegrationTest {
 
         assertThat(second.success()).isTrue();
         assertThat(arbitrageRows()).isEqualTo(1);
-        assertThat(candidateCases()).isEqualTo(1);
-        assertThat(candidateOccurrences()).isEqualTo(1);
+        assertThat(candidateCases()).isEqualTo(candidates);
+        assertThat(candidateOccurrences()).isEqualTo(candidates);
         assertThat(revalidationFailures()).isZero();
         assertThat(failedProcessingRows()).isZero();
     }
@@ -175,6 +180,14 @@ class ChangedContractArbitrageIntegrationTest {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.contract_status_event_processing WHERE validation_run_id = ? AND processing_status = 'FAILED'",
                 Integer.class, validationRunId);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void finishOwnRunWithoutDeletingAppendOnlyDetectionHistory() {
+        if (validationRunId != null) {
+            jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=? AND status='CREATED'", validationRunId);
+            jdbcTemplate.update("UPDATE fgc.validation_run SET status='FAILED' WHERE validation_run_id=? AND status='RUNNING'", validationRunId);
+        }
     }
 
     private Integer arbitrageRows() {

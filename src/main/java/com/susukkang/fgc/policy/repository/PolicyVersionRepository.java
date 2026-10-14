@@ -85,4 +85,24 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
         Long getUserId();
         String getLoginId();
     }
+
+    // 계약일이 아닌 검증 기준일로 정책을 선택한 뒤, 정책값과 계약일을 비교한다.
+    // LIMIT 1로 중복 정책을 숨기지 않으며 파라미터 누락도 검토필요로 반환한다.
+    @Query(value = """
+            SELECT pv.policy_version_id AS "policyVersionId",
+                   pp.parameter_value #>> '{}' AS "effectiveContractDate"
+              FROM fgc.policy_version pv
+              LEFT JOIN fgc.policy_parameter pp ON pp.policy_version_id = pv.policy_version_id
+               AND pp.parameter_key = 'ARBITRAGE_EFFECTIVE_CONTRACT_DATE'
+             WHERE pv.policy_type = 'ARBITRAGE' AND pv.status = 'ACTIVE'
+               AND pv.effective_from <= :asOf
+               AND (pv.effective_to IS NULL OR pv.effective_to >= :asOf)
+             ORDER BY pv.policy_version_id
+            """, nativeQuery = true)
+    List<ArbitrageApplicability> findArbitrageApplicability(@Param("asOf") LocalDate asOf);
+
+    interface ArbitrageApplicability {
+        Long getPolicyVersionId();
+        String getEffectiveContractDate();
+    }
 }

@@ -126,6 +126,7 @@ class CommissionPaymentPersistencePerformanceTest {
                                Long itemId, String key, int pair, int order, boolean record) {
         return new TransactionTemplate(transactionManager).execute(tx -> {
             try {
+                Long capPolicy = jdbc.queryForObject("SELECT policy_version_id FROM fgc.policy_version WHERE policy_code='REG-CAP-GA-2026-V1' AND status='ACTIVE'", Long.class);
                 List<CommissionPaymentAttributionRequest> attributions = contracts.stream().map(id ->
                         new CommissionPaymentAttributionRequest(id, LocalDate.of(2026, 7, 31), BigDecimal.TEN,
                                 InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, "지급 성능 검증",
@@ -134,7 +135,7 @@ class CommissionPaymentPersistencePerformanceTest {
                         "GA_MANUAL_PAYMENT", key, 1L, 6L, itemId,
                         BigDecimal.TEN.multiply(BigDecimal.valueOf(contracts.size())),
                         LocalDate.of(2026, 7, 1), "PAYMENT", LocalDate.of(2026, 7, 31),
-                        PaymentStage.GA_TO_FC, 4L, attributions, "PERF-EVIDENCE", "issue 373");
+                        PaymentStage.GA_TO_FC, capPolicy, attributions, "PERF-EVIDENCE", "issue 373");
                 CommissionPaymentResponse created = measure(implementation, contracts.size(), "create", pair, order,
                         record, () -> service.create(request));
                 assertThat(created.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
@@ -142,7 +143,7 @@ class CommissionPaymentPersistencePerformanceTest {
                 CommissionPaymentUpdateRequest update = new CommissionPaymentUpdateRequest(
                         request.sourceType(), key, 1L, 6L, itemId, request.amount(), request.settlementMonth(),
                         request.cashflowType(), request.scheduledPaymentDate(), request.paymentStage(),
-                        4L, attributions, "PERF-EVIDENCE", "updated");
+                        capPolicy, attributions, "PERF-EVIDENCE", "updated");
                 CommissionPaymentResponse updated = measure(implementation, contracts.size(), "update", pair, order,
                         record, () -> service.update(created.paymentId(), update));
                 TransactionPrecheckResponse preview = measure(implementation, contracts.size(), "precheck", pair,

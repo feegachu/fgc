@@ -37,7 +37,8 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       workspace.applyMonth(requestedMonth)
     const activeMonth = useWorkspaceStore.getState().month!
     const href = location.pathname + location.search + location.hash
-    const normalized = withMonth(href, activeMonth, requestedMonth !== activeMonth)
+    // Adding the server default month must not discard a page from an existing deep link.
+    const normalized = withMonth(href, activeMonth, requestedMonth !== null && requestedMonth !== activeMonth)
     if (href !== normalized) {
       void navigate(normalized, { replace: true })
       return

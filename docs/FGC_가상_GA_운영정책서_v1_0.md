@@ -58,6 +58,7 @@ FGC 팀은 실제 보험회사·GA와 전산 연계하거나 현업 담당자에
 | 소속 설계사 규모 | 3,200명 |
 | 조직구조 | 본사 1 → 본부 4 → 지사 20 → 팀 100 → 설계사 |
 | 취급 영역 | 생명보험·손해보험의 장기 보장성보험 중심 |
+| 모집 채널 | **대면 모집만**(`FACE_TO_FACE`). 통신판매종사자(TM)를 두지 않고 방송채널사용사업자로 승인된 보험대리점도 아니다 — `PROJECT_ASSUMPTION`, 2026-10-13 팀 결정 (SRC-036) |
 | 1차 데모 보험회사 | 가상 생보 4개사, 가상 손보 2개사 |
 | 1차 사용자 | 시스템관리자, GA관리자, 정산담당자, 준법·감사 |
 | 정산 기준 통화 | 원(KRW) |
@@ -96,6 +97,7 @@ FGC는 다음 제품으로 정의한다.
 - 세금 원천징수·세무신고
 - GA 전체 인사·평가·승격·민원·광고 시스템
 - 보험협회 비교설명 확인서 작성 전체 기능
+- TM(전화 모집)·방송채널(홈쇼핑) 모집과 그 채널 특례. 감독규정 부칙(제2026-3호) 제1조②·제2조 단서·제3조②와 제4-32조⑦ 제1·2호는 FGC에 적용할 대상이 없으므로 시행일·특례기간은 일반 채널 값 하나만 쓴다 (SRC-036, SRC-022 `:5094-5100`·`:919-921`)
 - 법정 회계장부와 재무제표 작성
 
 ## 제3조 근거의 종류
@@ -189,14 +191,14 @@ FGC는 다음 제품으로 정의한다.
 | REG-01 | 선지급·유지관리 구조를 상품 판매버전별로 판정 | `product_offering`, `policy_version`, `commission_rule` | 2차 서비스 강제 |
 | REG-02 | 선지급 예정총액을 계약체결비용과 비교 | `acquisition_cost_check`, `acquisition_cost_check_detail(UPFRONT_TOTAL)` | 2차 서비스 강제 |
 | REG-03 | 유지기간·동일 월액·월 0.8%·84개월·총액한도 검증 | `commission_rule`, `maintenance_check`, 계약체결비용 상세검증 | 2차 서비스 강제 |
-| REG-04 | 일반 2027~2028, TM 2028~2029의 1.5%·48개월 특례 | `product_offering.fee_regime_code`, 규칙버전 | 2차 서비스 강제 |
+| REG-04 | 2027~2028의 1.5%·48개월 특례 (TM·방송 특례기간은 FGC 범위 밖, SRC-036) | `product_offering.fee_regime_code`, 규칙버전 | 2차 서비스 강제 |
 | REG-05 | 5년 이상 유지 후 월 0.4% 장기유지 검증 | `commission_rule`, `maintenance_check`, 계약체결비용 상세검증 | 2차 서비스 강제 |
 | REG-06 | 1,200% 공통비·유지관리 간접지원경비·회사 안분정책 분리 | `commission_item`, `allocation_policy`, `transaction_attribution` | 1차 입력검증, 범용 안분엔진 미구현 |
 | REG-07 | 최초 모집자와 현재 유지관리 담당자 이력 분리 | `contract_manager_assignment`, `schedule_line.beneficiary_agent_id` | 물리 선반영, 2차 서비스 강제 |
 | REG-08 | 지급단계별 초년도 한도와 80% 공제상품 환급금 가산 | `cap_rule_set`, `cap_check`, `cap_check_detail`, `refund_rate_*` | 서비스 계산, 결과·스냅샷 DB 보존 |
 | REG-09 | 직·간접 귀속비용을 항목별 산입 | `cap_rule_item`, `transaction_attribution` | 서비스 분류, 일부 증빙조건 DB 강제 |
-| REG-10 | 준법경영비 3%를 보험회사→GA에만, 시행일·채널별 적용 | `cap_rule_set.compliance_deduction_pct` | 지급단계는 DB 강제, 시행일·채널 선택은 서비스 강제 |
-| REG-11 | 녹취·방송·신인활동지원 제외는 요건·증빙 충족 시에만 적용 | `cap_rule_item`, 귀속 스냅샷·`evidence_ref` | 일부 DB 강제, 증빙 적격성은 사람/서비스 검토 |
+| REG-10 | 준법경영비 3%를 보험회사→GA에만, 시행일(2027-01-01)부터 적용 | `cap_rule_set.compliance_deduction_pct` | 지급단계는 DB 강제, 시행일 선택은 서비스 강제 |
+| REG-11 | 신인활동지원 제외는 요건·증빙 충족 시에만 적용 (제7항 제1·2호 녹취·방송은 FGC 적용 대상 없음, SRC-036) | `cap_rule_item`, 귀속 스냅샷·`evidence_ref` | 일부 DB 강제, 증빙 적격성은 사람/서비스 검토 |
 | REG-12 | 해지·실효 계약의 전기간 차익거래 후보 검증 | `contract_status_event`, `contract_financial_snapshot`, `arbitrage_check` | 서비스 후보검증 |
 | REG-13 | 해지·실효 후 미래 유지관리 미지급을 법정 환수와 구분 | 스케줄 상태, `maintenance_check` | 2차 서비스 강제 |
 | REG-14 | 회사별 환수율·책임사유를 별도 정책버전으로 관리 | `clawback_rule`, `clawback_case`, `clawback_line` | 물리 선반영, 2차 서비스 강제 |
@@ -204,7 +206,7 @@ FGC는 다음 제품으로 정의한다.
 | REG-16 | 정착지원금 환수를 회사 약정과 계약귀속에 연결 | 환수 테이블, 귀속행 | 2차 서비스 강제 |
 | REG-17 | 별표 1의1 산식의 입력값·검산값 보존 | 상품·스케줄·정책·계산 스냅샷 | 메타데이터/검산만, 공시화면 미구현 |
 | REG-18 | 비교상품·등급·추천사유의 외부 결과 연계 | 전용 비교설명 테이블 없음 | 시스템 경계 밖, 현재 미구현 |
-| REG-19 | 상품버전으로 분급, 계약일로 1,200%·차익거래, 채널로 특례 판정 | `product_offering`, `cap_rule_set` | 서비스 정책선택 |
+| REG-19 | 상품버전으로 분급, 계약일로 1,200%·차익거래 판정 | `product_offering`, `cap_rule_set` | 서비스 정책선택 |
 | REG-20 | 경력 정착지원금을 모집월 신계약에 배부하고 무실적분 이월 | 지급 건·`transaction_attribution` | 서비스 배부, 귀속합계 DB 강제 |
 | REG-21 | 등록예정일 직전 3년의 등록·모집 이력을 순서대로 조회하고 등록 후 1년·지원증빙으로 신인 여부 판정 | `agent`, `agent_history`, `cap_rule_item` | 데이터 보유, 적격판정은 서비스/사람 (`SRC-025`) |
 | REG-22 | 지급기준 버전 불변·작성자/승인자 분리·우회지급 근거 추적 | `policy_version`, `policy_approval_action`, 감사·증빙 | 신규 정책 일부 DB 강제, 우회지급 실질판단은 서비스/사람 |
@@ -701,7 +703,7 @@ contract_date <= 귀속일 < contract_date + 1 year
 - 예상 스케줄의 귀속일: `schedule_line.due_date`
 - 실제 지급·귀속의 귀속일: `transaction_attribution.attribution_date`
 - `attribution_month`는 월별 집계키이며 초년도 경계 판정에 사용하지 않는다.
-- `settlement_month`는 월 명세 묶음일 뿐 초년도 귀속판정일로 사용하지 않는다.
+- `settlement_month`는 실적(발생)월이며 월 명세 묶음 기준이다. 지급월이 아니다 — 회차 수수료는 그 회차가 발생하는 달(`schedule_line.due_month` = 계약일 + 회차−1개월, 예: 7월 계약의 2회차는 8월)로 등록하고, 정착지원금은 신계약을 모집한 달로 등록해 그 달의 신계약에 귀속한다. 정착지원금의 지급예정일은 모집월 1일 이후여야 한다(`REG-20`, #476). 초년도 귀속판정일로는 사용하지 않는다.
 
 ## 제28조 기본 한도
 
@@ -734,11 +736,11 @@ contract_date <= 귀속일 < contract_date + 1 year
 | 13차월 이후 실제 지급 시책 | 초년도 밖 |
 | 오입력 정정 차감 | 확정된 정정만 누계에 반영 |
 | 환수(지급 후 회수) | 1,200% 누계에서 빼지 않는다. 일시적으로라도 한도를 넘은 시점에 위반이며(SRC-025 Q1-1), 지급 후 회수·재지급은 편법 예시에 해당한다(SRC-025 Q4 예시 4) `[해석]`. 환수는 차익거래(제33조)에서만 뺀다 |
-| 준법경영비 3% | `INSURER_TO_GA`에서만 증빙 충족분을 공제. 일반채널은 2027-01-01, TM·방송채널은 2028-01-01부터. 시행 전과 `GA_TO_FC`는 0 |
+| 준법경영비 3% | `INSURER_TO_GA`에서만 증빙 충족분을 공제. 2027-01-01부터(FGC는 대면만이라 TM·방송 2028-01-01 특례 없음, SRC-036). 시행 전과 `GA_TO_FC`는 0 |
 
 준법경영비는 한도에서 빼는 금액이 아니라 **수수료등(산입금액)에서 제외**하는 금액이다(SRC-022 제4-32조제14항 "제외할 수 있다", 실질 한도 1,203%). 또한 자동으로 초회보험료의 3%를 빼는 정액공제가 아니다. 실제 지급액 중 비교설명·업무기준 준수 및 내부통제 인력 운영 목적에 해당하고 증빙된 금액을, 월납 기준 초회보험료의 3% 이내에서만 제외한다. `cap_rule_set.compliance_deduction_pct=3`은 최대 허용률이며 실제 공제액은 `cap_check.compliance_deduction_amount`와 상세 근거로 보존한다.
 
-현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 일반채널 시행일 보정을 제공하지만 `channel_code` 범위를 나누지 않는다. 따라서 TM·방송채널의 2027년 계약에는 이 fixture를 규제 통과 근거로 사용하지 않고 `REVIEW_REQUIRED`로 처리한다. TM 2028 시행 룰셋을 별도 추가하기 전에는 일반채널 테스트에만 사용한다.
+현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 2027-01-01 시행일 보정을 제공한다. FGC는 대면 모집만 다루므로(SRC-036) 채널별 룰셋을 나누지 않는다.
 
 ## 제30조 판정상태
 
@@ -784,7 +786,7 @@ DRAFT 생성
 - 보장성보험
 - 일반손해보험·자동차보험 제외
 - 해지·실효를 포함
-- 2026-03-01 이후 체결 신계약(TM·방송채널 보험대리점 수수료는 2027-01-01 이후) — SRC-022 부칙 제1조, SRC-025 Q11
+- 2026-03-01 이후 체결 신계약 — SRC-022 부칙 제1조①, SRC-025 Q11 (TM·방송 승인 대리점의 2027-01-01 특례는 FGC 범위 밖, SRC-036)
 - 계약 전 기간 점검
 - 표준해약공제액 80% 이상 공제 상품이 계약 체결일부터 3년(경과기간, 납입회차 아님) 이내 해지·실효되면 해약환급금 합산(REG-12 `[해석]`)
 
@@ -1096,10 +1098,11 @@ REJECTED → REOPEN → IN_REVIEW
 product_offering.sales_start_date
 + basic_document_version
 + basic_document_date
-+ channel_code
 + fee_regime_code
 → 분급체계 선택
 ```
+
+판매채널은 분급체계 판정 입력이 아니다. FGC는 대면 모집만 하므로 TM·방송 특례(부칙 제2조 단서·제3조②)를 판정할 대상이 없다 (SRC-036).
 
 1,200%와 차익거래 적용은 계약체결일 기준으로 별도 판정한다.
 
@@ -1399,7 +1402,7 @@ APPROVED → RETIRED
   - 실제행은 `transaction_attribution.attribution_date` (일 단위)
 - 초년도 판정식은 `계약일 <= 귀속일 < 계약일 + 1년`이다.
 - `attribution_month`는 월별 집계키이며 초년도 경계 판정에 사용하지 않는다.
-- `settlement_month`는 월 명세 묶음 기준이며 초년도 판정일로 사용하지 않는다.
+- `settlement_month`는 실적(발생)월(정착지원금은 모집월)이자 월 명세 묶음 기준이며 초년도 판정일로 사용하지 않는다.
 
 ### 4. 공통비
 
@@ -1443,7 +1446,7 @@ APPROVED → RETIRED
 1. 요구사항명세서 v2.2.1에 제53조의 여섯 문구 반영
 2. 현재 축소 `db/demo`와 별도로 전체 GOLDEN 시드 SQL 작성 (정책 승격 순서를 반드시 지킬 것)
 3. `src/test/resources/sql/golden_reset.sql`, `golden_expected_assertions.sql`, `load_data_generator.sql` 작성
-4. REG-10 TM 2028 채널분리 룰셋 및 REG-17·18·24 범위표시 회귀테스트
+4. REG-17·18·24 범위표시 회귀테스트 (REG-10 TM 2028 채널분리 룰셋은 SRC-036으로 삭제)
 5. 월 통합검증 서비스·배치 구현 후 전체 회귀테스트 실행
 
 ### 다음 개정이 필요해지는 조건

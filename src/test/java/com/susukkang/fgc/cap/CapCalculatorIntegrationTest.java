@@ -257,6 +257,33 @@ class CapCalculatorIntegrationTest {
         assertThat(savedResultStatus(aboveSaved.capCheckId())).isEqualTo("VIOLATION");
     }
 
+    // #477: 보장성이 아닌 계약은 한도를 넘어도 위반이 아니라 "적용대상 아님"으로 저장된다 (룰셋 연결 없음)
+    @Test
+    void savesNotApplicableForSavingsContractEvenWhenAmountExceedsTwelveHundredPercent() {
+        Long id = contractId("FGC-FGL01-202607-0001");
+        insertOperationalScheduleWithBaseCommissionLines(
+                id, LocalDate.of(2026, 7, 10), new BigDecimal("1200001"));
+        jdbcTemplate.update("""
+                UPDATE fgc.product SET protection_type = 'SAVINGS'
+                 WHERE product_id = (SELECT po.product_id
+                                       FROM fgc.insurance_contract c
+                                       JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
+                                      WHERE c.contract_id = ?)
+                """, id);
+
+        CapCheckSaveResult saved = capCheckService.calculateAndSave(CapCalculationCommand.realtime(
+                id, PaymentStage.GA_TO_FC, LocalDate.of(2026, 7, 10)));
+
+        assertThat(saved.result().resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+        assertThat(savedResultStatus(saved.capCheckId())).isEqualTo("NOT_APPLICABLE");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT cap_rule_set_id FROM fgc.cap_check WHERE cap_check_id = ?", Long.class, saved.capCheckId()))
+                .isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.cap_check_detail WHERE cap_check_id = ?", Integer.class, saved.capCheckId()))
+                .isZero();
+    }
+
     // FUN-030: 계약 12개월 차는 포함하고 13개월 차는 첫해 한도에서 제외한다.
     @Test
     void includesMonthTwelveAndExcludesMonthThirteenFromTheFirstYearAmount() {
@@ -319,7 +346,7 @@ class CapCalculatorIntegrationTest {
                     inclusion_status_snapshot, exclusion_type_snapshot, attribution_method,
                     allocation_basis_snapshot, evidence_ref
                 ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, DATE '2026-07-10', DATE '2026-07-01', 100,
-                          'EXCLUDED', 'VOICE_RECORDING', 'DIRECT', '{}'::jsonb, 'EVD-LINE-1')
+                          'EXCLUDED', 'NEW_AGENT_SUPPORT', 'DIRECT', '{}'::jsonb, 'EVD-LINE-1')
                 """, paymentId, contractId, agentId, lineIds.get(0));
         jdbcTemplate.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", paymentId);
 

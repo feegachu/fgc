@@ -25,7 +25,7 @@ class FinancialSnapshotVersionMigrationIntegrationTest {
             assertThat(previousRows).isNotEmpty();
             Flyway.configure().dataSource(url, "fgc", "fgc_test_only")
                     .schemas("fgc").locations("classpath:db/migration", "classpath:db/demo")
-                    .load().migrate();
+                    .target("44").load().migrate();
             assertThat(jdbc.queryForList("SELECT (to_jsonb(fs)-'snapshot_version'-'previous_snapshot_id')::text FROM fgc.contract_financial_snapshot fs ORDER BY contract_financial_snapshot_id", String.class))
                     .containsExactlyElementsOf(previousRows);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.contract_financial_snapshot WHERE snapshot_version<>1 OR previous_snapshot_id IS NOT NULL", Integer.class)).isZero();
