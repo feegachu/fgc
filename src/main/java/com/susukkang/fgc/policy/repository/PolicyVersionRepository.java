@@ -40,6 +40,7 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
     );
 
     // 계약 도메인의 엔티티를 중복 정의하지 않고 기존 계약 조인 조건을 유지한다.
+    // #484: 현행 정책은 현행 판매버전에만 적용한다. 분급 판매버전은 전용 정책이 생길 때까지 정책 없음(검토필요)이다(REG-19).
     @NativeQuery(value = """
             SELECT pv.policy_version_id,
                    pv.policy_type,
@@ -52,7 +53,8 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
               AND pv.status = 'ACTIVE'
               AND pv.effective_from <= c.contract_date
               AND (pv.effective_to IS NULL OR pv.effective_to >= c.contract_date)
-              AND (pv.fee_regime_code IS NULL OR pv.fee_regime_code = po.fee_regime_code)
+              AND po.fee_regime_code = 'CURRENT'
+              AND (pv.fee_regime_code IS NULL OR pv.fee_regime_code = 'CURRENT')
               AND (pv.basic_document_version IS NULL OR pv.basic_document_version = po.basic_document_version)
               AND po.active_yn = TRUE
               AND po.sales_start_date <= c.contract_date
