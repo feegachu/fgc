@@ -68,7 +68,7 @@ const detail = (header = run()) => ({
   },
 })
 const conditions = (passed: boolean) =>
-  Array.from({ length: 6 }, (_, index) => ({
+  Array.from({ length: 8 }, (_, index) => ({
     no: index + 1,
     label: `조건 ${index + 1}`,
     passed: passed || index > 0,
@@ -270,7 +270,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     })
   }, 20000)
 
-  it('GA_ADMIN 은 6개 조건 통과 후 확정하고 완료 모달을 본다 — 실패 후 재시도는 같은 멱등키를 쓴다', async () => {
+  it('GA_ADMIN 은 8개 조건 통과 후 확정하고 완료 모달을 본다 — 실패 후 재시도는 같은 멱등키를 쓴다', async () => {
     currentUser = gaAdmin
     detailHandlers()
     const keys: (string | undefined)[] = []
@@ -308,13 +308,26 @@ describe('VRUN-W02 상세·실행·확정', () => {
       '/app/exceptions?status=OPEN&type=CAP_VIOLATION',
     )
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
-    expect(screen.getByText('확정 조건 6개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.')).toBeInTheDocument()
+    expect(screen.getByText('확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.')).toBeInTheDocument()
   })
 
   it('SETTLEMENT 는 확정할 수 없고 사유를 안내한다', async () => {
     detailHandlers()
     renderAt('/app/validation-runs/7')
+    // Wait for the passing server checklist, so loading state cannot hide a permission regression.
+    expect(await screen.findByText('8. 조건 8', { selector: '.table-cell-preview' })).toBeInTheDocument()
     expect(await screen.findByText('확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+    expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
+  })
+
+  it.each([7, 8])('서버 확정 조건 %i 미충족도 표시하고 확정을 차단한다 (#418)', async (no) => {
+    currentUser = gaAdmin
+    const checklist = conditions(true)
+    checklist[no - 1] = { ...checklist[no - 1], passed: false, count: 1 }
+    detailHandlers(run(), checklist)
+    renderAt('/app/validation-runs/7')
+    expect(await screen.findByText(`${no}. 조건 ${no}`, { selector: '.table-cell-preview' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
     expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
   })

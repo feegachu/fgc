@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "checkJs": false,
+    "lib": ["es2023", "DOM"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo"
+  },
+  "include": ["playwright.demo.config.ts", "e2e-demo/**/*.ts", "scripts/e2e-*.mjs"]
+}
