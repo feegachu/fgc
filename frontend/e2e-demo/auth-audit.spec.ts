@@ -1,10 +1,30 @@
 import { test, expect, login, legacyLogin, backend, completeMonthly, password } from './fixtures'
 
-test('로그인 4개 역할·보호 딥링크·로그아웃', async ({ browser, baseURL }) => {
-  for (const account of ['admin', 'gaadmin', 'settle01', 'audit01']) {
+test('로그인 4개 역할·대시보드·사용자·메뉴·로그아웃', async ({ browser, baseURL }) => {
+  for (const [account, userName, roleName, auditMenu] of [
+    ['admin', '시스템관리자', '시스템관리자', true],
+    ['gaadmin', 'GA관리자', 'GA관리자', false],
+    ['settle01', '정산담당자', '정산담당자', false],
+    ['audit01', '준법감사자', '준법·감사', true],
+  ] as const) {
     const context = await browser.newContext({ baseURL })
     const page = await context.newPage()
-    await login(page, account)
+    await page.goto('login')
+    await page.getByLabel(/^아이디/).fill(account)
+    await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
+    await page.getByRole('button', { name: '로그인', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
+    await expect(page.locator('.sidebar-user-name')).toHaveText(userName)
+    await expect(page.locator('.sidebar-user-role')).toHaveText(roleName)
+    await expect(
+      page.locator('aside').getByRole('link', { name: '감사로그', exact: true, includeHidden: true }),
+    ).toHaveCount(auditMenu ? 1 : 0)
+    if (auditMenu) {
+      const management = page.locator('aside details').filter({ has: page.locator('summary', { hasText: '관리' }) })
+      await management.locator('summary').click()
+      await expect(management.getByRole('link', { name: '감사로그', exact: true })).toBeVisible()
+    }
+    await page.goto('contracts?month=2026-07')
     await expect(page.getByRole('heading', { name: '보험계약 목록', exact: true })).toBeVisible()
     await page.goto('schedules?month=2026-07')
     await page.getByRole('button', { name: '로그아웃' }).click()
@@ -13,6 +33,18 @@ test('로그인 4개 역할·보호 딥링크·로그아웃', async ({ browser, 
     await expect(page).toHaveURL(/\/login/)
     await context.close()
   }
+})
+
+test('비로그인 지급 등록 딥링크 → 로그인 → 쿼리·해시 복원', async ({ page }) => {
+  const route = '/transactions/new?month=2026-07&status=ACTIVE#form'
+  await page.goto(route.slice(1))
+  await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
+  expect(new URL(page.url()).searchParams.get('redirect')).toBe(route)
+  await page.getByLabel(/^아이디/).fill('settle01')
+  await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '지급 건 등록 · 귀속 · 확정' })).toBeVisible()
+  await expect(page).toHaveURL(new URL(`/app${route}`, page.url()).href)
 })
 
 test('중복 로그인은 이전 브라우저를 차단하고 재로그인 후 경로 복원', async ({ page, browser, baseURL }) => {
@@ -43,6 +75,7 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1�
   await page.goto(`${backend}/audit-logs?action=JOURNAL_DRAFT_SAVED&page=2`)
   const legacyRows = page.locator('tr[data-audit-detail-href]')
   await expect(legacyRows.first()).toBeVisible()
+  const oldCount = (await page.locator('#row-count').innerText()).replace(/,/g, '')
   const oldCells = await legacyRows.evaluateAll((rows) =>
     rows.map((row) =>
       [...row.querySelectorAll('td')].map((cell) =>
@@ -62,6 +95,7 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1�
   await page.getByLabel('행위 종류').selectOption('JOURNAL_DRAFT_SAVED')
   await page.getByRole('button', { name: '조회', exact: true }).click()
   await expect(page).toHaveURL(/action=JOURNAL_DRAFT_SAVED/)
+  await expect(page.locator('.audit-panel-caption .tabular-nums')).toHaveText(Number(oldCount).toLocaleString('en-US'))
   await page.getByRole('button', { name: '2', exact: true }).click()
   await expect(page).toHaveURL(/page=2/)
   await expect(page.locator('.audit-pagination-status')).toContainText('2 /')
@@ -84,6 +118,14 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1�
   await expect(row).toHaveAttribute('aria-selected', 'true')
   await expect(page).toHaveURL(/selected=\d+/)
   await expect(page.locator('#diff-body')).toContainText('JOURNAL_DRAFT_SAVED')
+  // A4 includes any non-button cell, in addition to the keyboard path above.
+  const mouseRow = rows.nth(1)
+  await mouseRow.locator('td').nth(3).click()
+  await expect(mouseRow).toHaveAttribute('aria-selected', 'true')
+  await expect(row).toHaveAttribute('aria-selected', 'false')
+  await expect(page.locator('.audit-diff-context')).toHaveText(
+    `${newCells[1][2]} · ${newCells[1][3]} #${newCells[1][4]}`,
+  )
   const selected = new URL(page.url()).searchParams.get('selected')
   await page.reload()
   await expect(table.locator('tr.is-selected')).toHaveCount(1)

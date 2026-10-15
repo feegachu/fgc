@@ -45,7 +45,7 @@ for (const name of classes) {
     const end = methods[index + 1]?.index ?? source.indexOf('\n    private ', method.index)
     const body = source.slice(method.index, end < 0 ? undefined : end)
     const assertions = [
-      ...body.matchAll(/\.(?:contains\w*|doesNotContain\w*|isEqualTo|isTrue|isFalse|hasSize)\(/g),
+      ...body.matchAll(/\.(?:contains\w*|doesNotContain\w*|isEqualTo|isLessThan|isTrue|isFalse|hasSize)\(/g),
     ].map((match) => {
       const start = match.index + match[0].length - 1
       return {

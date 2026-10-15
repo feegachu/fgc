@@ -7,7 +7,7 @@
 | D1 | 백엔드와 1차 화면은 확정 조건 8개(#491/#494), React는 6개 응답만 허용해 확정 불가 | 사용자 승인에 따라 React 응답 검사·안내·fixture를 8개로 수정. 7/8 미충족과 SETTLEMENT 권한 회귀 검증 추가. 업무 조건은 그대로 |
 | D2 | #407 인계는 행 포커스 없음이라고 했으나 현재 DataTable은 tabindex/Enter/Space 지원. 사유 열은 잘림 여부와 무관하게 전체 보기 표시. 빈 상태는 audit-empty-state 대신 table-empty | 키보드를 Vitest/실서버에서 확인. 긴 값·빈 상태의 제품 코드는 변경하지 않음. PL이 동등성/차이 승인 또는 보완을 결정 |
 | D3 | 구조 검사에는 CSS 치수·breakpoint·class명·전체 안내문 목록·팝오버 clipping 포함 | 동작/포맷/권한은 대응. 시연 캡처를 남기지만 전 화면 픽셀 일치나 모든 문구의 동등성은 주장하지 않음. 전수 목록에서 유지할 시각 계약과 구현 전용 제외 항목의 PL 검토 필요 |
-| D4 | tokens.test.ts·감사 CSS 비교·legacy/contract-form.test.ts·transaction/legacy-form.test.ts·cap/legacy-cap.test.ts는 기존 static/template 파일을 직접 읽음 | 모두 유지. 이들의 통과만으로 삭제 승인 불가. #419에서 원본 삭제와 해당 테스트 의존을 함께 이관/정리 |
+| D4 | tokens.test.ts·감사 CSS 비교·legacy/contract-form.test.ts·transaction/legacy-form.test.ts·cap/legacy-cap.test.ts는 기존 static/template 파일을 직접 읽음. 실서버 E2E도 `legacyLogin()`의 `/login`, 계약 `/contracts`, 감사 `/audit-logs` MPA 화면과 DOM에 의존 | 모두 유지. 이들의 통과만으로 삭제 승인 불가. #419에서 원본 삭제 전에 MPA 비교를 승인된 기록/독립 React 검증으로 이관하고 legacyLogin·캡처·셀/건수 비교 의존도 함께 정리. 서버 readiness의 `/login`도 SPA base 전환과 함께 검토 |
 | D5 | 시연콘티_v0.md가 작업 환경에 없음. #299 PR #301은 대상 없는 과거 월의 배치 반복 검증 | 기존 db/demo·화면 이슈·인계로 실제 HTTP/DB 시연 작성. 2026-07, 기존 demo 계정 사용. 콘티와 수치/순서의 최종 일치 확인 필요 |
 | D6 | 월 배치가 시드 보험사의 양방향 대사를 이미 수행함. 새 보험사 조합은 결과 0건, 같은 조합은 중복 거절 | 전용 DB에서 완료·미확정 대사 1건의 파생 match/result/run만 초기화하고 UI로 재실행. 실제 입력 보존·요약 비교. 이 준비 단계를 콘티와 합의해야 함. 운영 API/트리거 우회 없음 |
 | D7 | 7월 월 검증에서 긴급 미처리 예외가 발생해 즉시 확정 불가 | 차단 확인 → UI START_REVIEW/RESOLVE로 합성 데모 예외 처리 → GA_ADMIN 확정. 시연 처리 사유/순서 확인 필요. 실제 업무의 해결 판단을 새로 정의하지 않음 |
@@ -19,12 +19,17 @@
 [원문](https://github.com/feegachu/fgc/issues/418#issuecomment-6034311598).
 A1–A3는 월 배치로 감사행을 실제 생성한 뒤 목록 20행·행위 필터·2페이지를 확인한다.
 1차의 숨겨진 전체 보기 텍스트를 중복 합산하지 않고 셀별 표시 데이터를 비교한다.
-A4/A5는 행 선택·Enter·selected URL·새로고침 복원, A6는 settle01 메뉴 비노출·화면/API 403이다.
+A4/A5는 행 선택·Enter·버튼 없는 대상 종류 칸 클릭·`행위 · 대상종류 #대상ID`·selected URL·새로고침 복원, A6는 settle01 메뉴 비노출·화면/API 403이다.
+필터 결과의 전체 건수도 1차와 비교한다. 공통 class 이름 자체의 대체 단언은 없으며, 이 부분을 동작 검증으로 대체 완료했다고 간주하지 않는다. PL이 D2/D3과 함께 보존/제외를 결정한다.
 diff의 바뀐 칸/변하지 않은 칸·before 없는 생성 로그는 기존 Vitest도 유지한다.
 `month`를 명시한다. 월 없는 외부 딥링크의 page 유지 문제를 해결했다고 주장하지 않는다.
 
 ## 보존 및 승인
 
+기존 `e2e/{cap,contract-parity,contract,ledger,reconciliation}.spec.ts`의 선택 실행 실서버 비교 5개도
+1차 로그인·화면에 의존한다. 이번 기본 UI 실행에서는 기존 조건대로 skip되며, #419의 MPA 의존 정리 범위에 포함한다.
+
 기존 Java 구조 9개/48메서드와 node 4개/17테스트를 수정/삭제하지 않는다.
 프론트 기존 테스트도 유지하며 VRUN의 조건 개수·문구를 현행 API에 맞추고 회귀 검증을 추가한다.
 대응표 PL 승인과 GitHub Actions 실서버 3회 기록 전에는 #418 종료나 #419 삭제를 승인하지 않는다.
+권한 회귀 주입·백엔드 미기동의 로컬 실패 검증과 CI 실패 증빙도 구별한다. CI 오류 시나리오 증빙은 별도로 남아 있다.

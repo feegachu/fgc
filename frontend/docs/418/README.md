@@ -31,6 +31,8 @@ PowerShell: `./gradlew.bat bootJar`, `$env:FGC_E2E_DB_CONTAINER='fgc-e2e-418'` �
 `FGC_E2E_PASSWORD` 기본값은 V3 시드의 합성 demo 계정 비밀번호다. 운영 자격 증명을 쓰지 않는다.
 
 e2e 프로필 bootJar는 18081, Vite는 15173에서 실행한다. 기존 서버를 재사용하지 않는다.
+`SPRING_PROFILES_ACTIVE=e2e`는 기본 local 프로필과 application-local.yml의 로컬 설정을 배제한다.
+별도 application-e2e.yml은 없으며 DB/포트/Flyway/예약 배치 설정은 `scripts/e2e-server.mjs`의 환경변수로 주입한다.
 Flyway는 기존 db/migration,db/demo를 적용하고 예약 배치를 끈다.
 첫 기동 후 pg_dump로 초기 상태를 보관하고 시나리오 전·후에 복원한다. workers=1, retries=0.
 초기화는 전용 컨테이너 label·DB명·사용자명을 검사하며 진행 중 검증이 있으면 거부한다.

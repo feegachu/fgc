@@ -4,7 +4,7 @@
 **PL 승인 전이다. 이 문서는 구조 테스트 삭제 승인이 아니다. 기존 Java/node 테스트는 모두 유지한다.**
 
 9개 구조 테스트의 48개 메서드, node 4개 파일의 17개 테스트를 아래에 각각 나열했다.
-각 메서드 안의 검사식은 [전수 목록](assertion-inventory.md)에 원본 위치와 함께 1개씩 나열한다.
+각 메서드 안의 1,220개 검사식은 [전수 목록](assertion-inventory.md)에 원본 위치와 함께 1개씩 나열한다.
 CSS 클래스·스크립트 문자열을 동일하게 만드는 것과 사용자가 하는 동작의 동등성은 구분한다.
 행의 '구조 제외'는 Thymeleaf 구현 방식만 제외한다는 뜻이다. 접근성·권한·금액·필터·문구 계약은 제외하지 않는다.
 시각적 치수/전체 문구의 미검증 범위는 [차이와 확인 사항](differences.md)에 남긴다.
@@ -56,7 +56,7 @@ CSS 클래스·스크립트 문자열을 동일하게 만드는 것과 사용자
 | evidencePopoverComponentEscapesTableClipping | COMMON EvidenceLink 및 표 안 팝오버 | portal의 실제 clipping/배치 전체는 D3 |
 | evidenceOpensOnHoverFocusAndClick | COMMON `EvidenceLink는 hover·focus로 열고 클릭 고정·Esc로 해제한다` | 기존 이벤트 함수명 제외 |
 | policyListUsesCommonComponentsWithoutInlinePresentation | REFERENCE 정책 탭/수치/빈값/긴 텍스트·FORMAT | legacy inline 금지 및 class 이름 제외 |
-| auditListUsesCommonComponentsWithoutInlinePresentation | AUDIT 목록·패널·키보드·403 | 빈 상태 class 차이 D2, CSS import는 layout 링크 대체 |
+| auditListUsesCommonComponentsWithoutInlinePresentation | AUDIT 목록·패널·키보드·403. 공통 class 이름 자체의 대체 단언은 없음 | `filter-bar audit-filter-bar`, `surface audit-list-panel`, `data-table audit-log-table`, `empty-state audit-empty-state` 보존/제외는 PL 판단 필요(D2/D3). 빈 상태 class 차이 D2, CSS import는 layout 링크 대체 |
 | exceptionListUsesFlexibleColumnsSharedBadgesAndProductionToast | EXCEPTION URL·선택·조치·이력·권한·금액·CAP 링크 | 템플릿 class와 폭 문자열 제외; 시각 검증 D3 |
 | reconciliationListUsesCommonComponentsAndProductionToast | RECO 실행·자동선택·비교·중복 오류·예외 링크·COMMON | 템플릿 scope·id·script 분리 제외 |
 | contractListUsesCommonFilterTableAndStatusBadges | CONTRACT 목록 필터·페이지·CSV·금액·상태·빈값 | legacy class·템플릿 script 연결 제외 |

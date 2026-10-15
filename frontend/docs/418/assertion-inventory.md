@@ -498,9 +498,9 @@
 
 <a id="mapping-17"></a>
 
-대체 테스트: AUDIT 목록·패널·키보드·403.
+대체 테스트: AUDIT 목록·패널·키보드·403. 공통 class 이름 자체의 대체 단언은 없음.
 
-구조 제외·남은 확인: 빈 상태 class 차이 D2, CSS import는 layout 링크 대체.
+구조 제외·남은 확인: `filter-bar audit-filter-bar`, `surface audit-list-panel`, `data-table audit-log-table`, `empty-state audit-empty-state` 보존/제외는 PL 판단 필요(D2/D3). 빈 상태 class 차이 D2, CSS import는 layout 링크 대체.
 
 | 원본 위치 | 검사 항목 | 대체 / 제외 근거 |
 |---|---|---|
@@ -763,6 +763,7 @@
 | [L913](../../../src/test/java/com/susukkang/fgc/ui/PublishingTemplateStructureTest.java#L913) | `doesNotContain("codeLabel(\"resultStatus\"")` | [이 메서드의 대응·제외](#mapping-21) |
 | [L914](../../../src/test/java/com/susukkang/fgc/ui/PublishingTemplateStructureTest.java#L914) | `doesNotContain("fetch(")` | [이 메서드의 대응·제외](#mapping-21) |
 | [L917](../../../src/test/java/com/susukkang/fgc/ui/PublishingTemplateStructureTest.java#L917) | `containsPattern("(?s)<script[^>]*th:if=\"\\$\\{screenId == 'FGC-UI-CONT-W02'\\}\"[^>]*"                         + "th:src=\"@\\{/js/features/contract/contract-detail\\.js}\"[^>]*\\bdefer\\b[^>]*>")` | [이 메서드의 대응·제외](#mapping-21) |
+| [L922](../../../src/test/java/com/susukkang/fgc/ui/PublishingTemplateStructureTest.java#L922) | `isLessThan(layout.indexOf("contract/contract-tabs.js"))` | [이 메서드의 대응·제외](#mapping-21) |
 
 ## PublishingTemplateStructureTest#contractFormUsesSeparatedApiAndPageScriptsWithoutInlineBehavior
 
@@ -1221,6 +1222,8 @@
 | 원본 위치 | 검사 항목 | 대체 / 제외 근거 |
 |---|---|---|
 | [L1506](../../../src/test/java/com/susukkang/fgc/ui/PublishingTemplateStructureTest.java#L1506) | `contains("th:src=\"@{/js/features/schedule/schedule-labels.js}\" defer")` | [이 메서드의 대응·제외](#mapping-30) |
+| [L1510](../../../src/test/java/com/susukkang/fgc/ui/PublishingTemplateStructureTest.java#L1510) | `isLessThan(layout.indexOf("schedule-list.js"))` | [이 메서드의 대응·제외](#mapping-30) |
+| [L1513](../../../src/test/java/com/susukkang/fgc/ui/PublishingTemplateStructureTest.java#L1513) | `isLessThan(layout.indexOf("schedule-detail.js"))` | [이 메서드의 대응·제외](#mapping-30) |
 
 ## AppShellWorkspaceStructureTest#headerRailContainsWorkspaceTabsAndFixedControlsWithoutLegacyTitleArea
 
