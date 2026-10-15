@@ -125,7 +125,7 @@ Ubuntu / Java 21 / Node 22.22.2 / PostgreSQL 17에서 기존 UI 53 통과·기�
 ### CI 오류 탐지 자동 검증 추가 (2026-10-15)
 
 `Frontend E2E`에 독립 `negative` job을 추가했다. 기존 필수 build/frontend 및 playwright job을 유지한다.
-`npm run test:e2e:negative`의 로컬 결과는 다음과 같다. 실제 CI 실행 링크는 실행 후 기록한다.
+`npm run test:e2e:negative`의 로컬 결과는 다음과 같다.
 
 | 검증 | 결과 |
 |---|---|
@@ -138,8 +138,45 @@ Ubuntu / Java 21 / Node 22.22.2 / PostgreSQL 17에서 기존 UI 53 통과·기�
 일반 실행 오류, 임의의 실패, 권한 회귀를 놓친 테스트 통과는 증빙으로 인정하지 않는다.
 기존 Java/node/컴포넌트/브라우저 테스트와 제품 코드에는 변경이 없다.
 
+커밋 `47ac4b49`의 [negative CI job](https://github.com/feegachu/fgc/actions/runs/38730662648/job/116407341242)도 성공했다.
+`frontend-negative-evidence` artifact(ID 11970009290, 6,429 bytes)를 내려받아 다음 값을 직접 확인했다.
+
+- `passed`, `sourceUnchanged`, `testUnchanged`: 모두 true.
+- 정상/복구 Vitest: 각각 정확히 1개 통과·exit 0. 회귀 주입: 같은 1개 실패·exit 1,
+  `expect(element).toBeDisabled()` 및 `Received element is not disabled` 포함.
+- 미기동: exit 1, `http://127.0.0.1:34197/login`, `within 1000ms (ECONNREFUSED)`와
+  `e2e-artifacts/backend.log`, `Docker/PostgreSQL and Flyway`, 미기동 가능성 안내 포함.
+
+CI 운영체제의 줄바꿈이 로컬과 달라 SHA 값 자체는 서로 다를 수 있다. 각 실행 전후 동일 파일의 해시 일치를 검사한다.
+이는 #418 검증 시나리오 4·5의 CI 증빙이며 PL의 대응표/시각 차이 승인을 대신하지 않는다.
+
+같은 커밋의 [필수 CI](https://github.com/feegachu/fgc/actions/runs/38730647744)는 build/frontend 모두 성공했고,
+frontend-coverage artifact(1,168,349 bytes)를 생성했다.
+[Frontend E2E 전체](https://github.com/feegachu/fgc/actions/runs/38730662648)도 negative/playwright 모두 성공했다.
+기존 UI 53 통과·기존 skip 5, 실서버 12개 × 3회 = 36 통과·실패/skip/retry 0이다.
+실서버 회차는 KST 20:56:35–20:58:38, 20:58:38–21:00:41, 21:00:41–21:02:43이었다.
+frontend-e2e-evidence(2,899,684 bytes)를 내려받아 stability.json의 exit 0 세 개와 demo-seed.sql 제외를 확인했다.
+이후 변경은 아래 ESLint 생성 파일 제외 한 줄과 검증 문서뿐이며, 최종 로컬 lint는 경고/오류 0으로 통과했다.
+
+### Claude 재검토 및 판단
+
+[47ac4b49 재검토](https://github.com/feegachu/fgc/pull/544#issuecomment-6191445423)는 이전 필수 보완이 모두 반영됐고,
+새 오류 검증에서 잘못된 성공 판정 경로나 새 유효 결함을 찾지 못했다고 정리했다.
+리뷰는 현재 파일과 앞선 댓글의 요구사항 인용을 읽은 결과이며, diff 실행/이슈 원문 재조회 제한이 있었다.
+진행 중이던 CI를 성공으로 간주하지 않은 판단도 유지한다. 실제 결과는 위 별도 증빙을 따른다.
+
+- P3-a 반영: ESLint가 생성된 `e2e-artifacts`·`coverage`를 검사하지 않도록 제외했다.
+  강제 종료로 임시 복사본이 남아도 제품 테스트와 함께 lint하지 않는다. 기존 테스트 파일은 제외하지 않는다.
+- P3-b 후속 개선: Java 조기 종료 코드 추가 출력은 진단 개선이다. 현재 `within`은 최대 대기 한도이고
+  readiness 오류·backend.log 안내는 이미 제공한다. 이번 ECONNREFUSED 검증 범위를 조기 종료 검증으로 확대하지 않는다.
+- 검사 없는 이동/탭 클릭 정리는 후속으로 남긴다. 이 동작만으로 해당 화면의 검증 완료를 주장하지 않는다.
+- CAP 목록→모달 누락 지적은 적용하지 않는다. 기존 `e2e/cap.spec.ts`의
+  `필터 URL·계산근거·Escape 닫기·딥링크를 확인한다`가 목록의 계산근거 버튼 클릭과 모달을 검증한다.
+  실서버 suite는 거절한 지급과 동일한 CAP 근거 연결을 맡는다. 두 검증의 범위를 구분한다.
+
 ### 남은 완료 조건
 
 - PL: 1,220개 검사식 대응/제외 범위, 감사 class·시각 차이(D2/D3/D9), 시연콘티·대사 준비·예외 조치 순서(D5/D6/D7) 승인.
-- CI 오류 증빙: 권한 회귀 주입과 백엔드 미기동의 명확한 실패를 CI에서 확인. 기존 로컬 실패 검증을 CI 증빙으로 간주하지 않는다.
+- PL: 검증 시나리오 4의 "회귀를 넣은 브랜치의 CI 실패"를 임시 복사본의 실제 실패(exit 1)를 엄격히 검사하는
+  성공 job의 아티팩트로 인정할지 확인. 의도적으로 깨진 브랜치/실패한 workflow run을 만들지는 않았다.
 - #419: Vitest의 원본 파일 참조와 실제 서버 MPA 비교 의존을 먼저 이관한 후 삭제 검토. 기존 Java/node 테스트는 그대로 유지한다.
