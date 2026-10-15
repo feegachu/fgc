@@ -52,11 +52,25 @@ Flyway는 기존 db/migration,db/demo를 적용하고 예약 배치를 끈다.
 - 기존 build/frontend 이름과 액션 SHA 고정을 유지한다.
 - frontend: Vitest V8 text/html/lcov/json-summary, frontend-coverage artifact.
 - Frontend E2E: develop push 또는 workflow_dispatch, PostgreSQL 서비스, 기존 브라우저 테스트와 실제 서버 3회 실행.
+- 같은 workflow의 `negative` job은 별도 runner에서 `npm run test:e2e:negative`를 실행한다. 백엔드/DB 기동은 필요 없다.
 - 3회는 별도 Playwright 호출이다. 재시도로 성공한 것을 무흔들림 성공으로 세지 않는다.
 - 증거: e2e-artifacts/stability.json, 회차별 outcomes.json/JUnit/서버 로그, HTML report, 실패 trace/video/screenshot.
 - 기동 실패는 FGC E2E backend readiness failed와 URL·대기 시간·backend.log 위치를 출력한다.
 - `npx playwright show-trace <trace.zip>`으로 요청/화면을 확인한다.
 - demo-seed.sql은 초기화 전용이며 CI artifact에서 제외한다.
+
+### 오류 탐지 증거
+
+`npm run test:e2e:negative`는 `src`를 임시 디렉터리에 복사하고 기존 Vitest 설정·권한 테스트를 그대로 실행한다.
+정상 통과 → 복사본에서 월 검증 확정의 `canFinalize &&` 제거 → 같은 테스트의 `toBeDisabled` 실패(exit 1)
+→ 복사본 복구 후 통과를 확인한다. 테스트 미실행·다른 오류·회귀를 놓친 성공은 검증 실패로 처리한다.
+원본 소스·테스트는 수정하지 않으며 SHA-256 보존도 검사한다. 임시 복사본은 종료 시 정리한다.
+
+백엔드 검증은 예약 후 해제한 localhost 임시 포트로 실제 `check-backend.mjs` CLI를 호출한다.
+exit 1뿐 아니라 URL·1000ms·ECONNREFUSED·backend.log·PostgreSQL/Flyway 안내가 모두 있어야 통과한다.
+예상한 오류를 탐지해야 job이 성공하므로, 의도적으로 깨진 제품 코드를 push하거나 실패를 무조건 무시하지 않는다.
+`frontend-negative-evidence` artifact에는 정상/주입/복구 Vitest JSON·로그, 미기동 로그,
+종합 `summary.json`을 7일 보관한다. 로컬 경로는 `e2e-artifacts/negative/`다.
 
 ## 리뷰
 

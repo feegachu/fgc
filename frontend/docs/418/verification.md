@@ -122,6 +122,22 @@ Ubuntu / Java 21 / Node 22.22.2 / PostgreSQL 17에서 기존 UI 53 통과·기�
 | 2 | 20:33:03 → 20:35:09 | 12/12, exit 0, DB 결과 일치 |
 | 3 | 20:35:09 → 20:37:12 | 12/12, exit 0, DB 결과 일치 |
 
+### CI 오류 탐지 자동 검증 추가 (2026-10-15)
+
+`Frontend E2E`에 독립 `negative` job을 추가했다. 기존 필수 build/frontend 및 playwright job을 유지한다.
+`npm run test:e2e:negative`의 로컬 결과는 다음과 같다. 실제 CI 실행 링크는 실행 후 기록한다.
+
+| 검증 | 결과 |
+|---|---|
+| 기존 SETTLEMENT 확정 권한 테스트 | 정상 복사본 exit 0 → `canFinalize &&` 제거 시 exit 1 / `toBeDisabled`·`Received element is not disabled` → 복구 후 exit 0 |
+| 백엔드 미기동 | 실제 readiness CLI exit 1, 1000ms·ECONNREFUSED·요청 URL·backend.log·PostgreSQL/Flyway 안내 확인 |
+| 원본 보존 | 소스/테스트 SHA-256 일치. 변형은 임시 복사본에만 적용하고 종료 시 삭제 |
+| workflow 정적 검사 | actionlint 및 git diff --check 통과 |
+
+예상한 실패의 종료 코드와 단언/진단 내용이 모두 맞아야 검증 job을 성공으로 처리한다.
+일반 실행 오류, 임의의 실패, 권한 회귀를 놓친 테스트 통과는 증빙으로 인정하지 않는다.
+기존 Java/node/컴포넌트/브라우저 테스트와 제품 코드에는 변경이 없다.
+
 ### 남은 완료 조건
 
 - PL: 1,220개 검사식 대응/제외 범위, 감사 class·시각 차이(D2/D3/D9), 시연콘티·대사 준비·예외 조치 순서(D5/D6/D7) 승인.
