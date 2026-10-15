@@ -1,0 +1,65 @@
+name: Frontend E2E
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: fgc_e2e
+          POSTGRES_USER: fgc_e2e
+          POSTGRES_PASSWORD: fgc_e2e_only
+        ports:
+          - 55418:5432
+        options: >-
+          --label com.fgc.e2e=418
+          --health-cmd "pg_isready -U fgc_e2e -d fgc_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      FGC_E2E_DB_CONTAINER: ${{ job.services.postgres.id }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: '21'
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: ./gradlew bootJar
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run check:e2e
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Existing browser UI regression tests
+        run: npm run test:e2e
+        working-directory: frontend
+      - name: Three consecutive real-server demo runs (no retries)
+        run: npm run test:e2e:stable
+        working-directory: frontend
+      - name: Upload browser reports, screenshots, traces and backend diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-e2e-evidence
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            frontend/e2e-artifacts/
+            !frontend/**/demo-seed.sql
+          retention-days: 7

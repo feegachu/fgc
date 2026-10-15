@@ -10,6 +10,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e:demo": "playwright test --config playwright.demo.config.ts",
+    "test:e2e:stable": "node scripts/e2e-repeat.mjs",
+    "check:e2e": "tsc -p tsconfig.e2e.json",
     "generate:api": "openapi-typescript openapi/schema.json -o src/lib/api/schema.d.ts",
     "check:api": "node scripts/check-api.mjs"
   },
@@ -30,6 +34,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.3",
     "autoprefixer": "^10.6.1",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
