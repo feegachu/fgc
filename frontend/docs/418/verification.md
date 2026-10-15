@@ -37,9 +37,11 @@ CI는 저장소 `.nvmrc`의 Node 22.22.2를 사용한다. 아래 로컬 결과�
 - 초기 자동 리뷰: Claude 도메인 지적 없음, SonarCloud 통과. 후속 요구사항 리뷰의 보완은 하단에 기록했다. CodeRabbit의 `job` 컨텍스트 위치 지적을 확인하여 신규 E2E의 컨테이너 ID 환경변수를 job 수준에서 실행 step 수준으로 이동했다. 최신 커밋의 재검증 상태는 PR 체크를 따른다.
 - `actionlint 1.7.12`로 수정된 `frontend-e2e.yml`과 `ci.yml` 검증 성공. YAML 파싱만으로 확인하지 못한 Actions 컨텍스트 규칙도 검사했다.
 - 신규 `Frontend E2E`는 develop push / workflow_dispatch만 실행한다.
-- 신규 workflow가 아직 기본 브랜치 develop에 없으므로 현재 브랜치만 push한 상태에서는 수동 실행할 수 없다.
-  병합 후 첫 develop 실행의 `frontend-e2e-evidence` artifact와 3회 결과를 확인해야 한다.
-- PL 대응표 승인과 GitHub Actions 실서버 3회 기록은 아직 완료가 아니다. #418 / #399를 닫지 않는다.
+- 신규 workflow의 develop 파일 존재 여부만으로 수동 실행 불가라고 판단했던 안내를 정정한다.
+  `gh workflow run frontend-e2e.yml --ref 418-test-react-playwright-e2e`가 접수되어
+  [최종 코드의 수동 실행](https://github.com/feegachu/fgc/actions/runs/38727592700)이 성공했다.
+  3회 결과와 `frontend-e2e-evidence` artifact를 확인했다. develop push 트리거는 병합 후 추가 확인한다.
+- PL 대응표 승인은 아직 완료가 아니다. #418 / #399를 닫지 않는다. 최종 실서버 CI 기록은 하단을 따른다.
 
 상세 실행법과 결과 파일 위치는 [README](README.md), 잔여 차이는 [differences](differences.md)를 따른다.
 
@@ -105,9 +107,23 @@ CAP-001 응답은 현재 예외/CAP ID를 직접 제공하지 않는다. 신규 
 로컬 증거는 `e2e-artifacts/stability.json`과 `round-{1,2,3}/{demo.xml,outcomes.json}`에 있다.
 GitHub Actions 증거와 구별한다. 아래 미완료 조건을 완료 처리하지 않는다.
 
+[보완 커밋 a1cda06a의 CI](https://github.com/feegachu/fgc/actions/runs/38727572006)는
+필수 `build`·`frontend` 모두 성공했다. `frontend-coverage` artifact(1,168,290 bytes) 생성도 확인했다.
+
+[동일 코드 커밋의 실서버 CI](https://github.com/feegachu/fgc/actions/runs/38727592700)도 성공했다.
+Ubuntu / Java 21 / Node 22.22.2 / PostgreSQL 17에서 기존 UI 53 통과·기존 skip 5,
+실서버 12/12 × 3 = 36 통과·실패/skip/retry 0을 확인했다. 회차 간 DB 결과 비교와 advisory lock 검사도 통과했다.
+`frontend-e2e-evidence` artifact(2,915,050 bytes)를 내려받아 stability.json의 exit code 0 세 개와
+초기화용 demo-seed.sql 제외를 확인했다. 수동 실행도 #418이 허용한 CI 실행 방식이다.
+
+| CI 회차 (KST, 2026-10-15) | 시작 → 종료 | 결과 |
+|---|---|---|
+| 1 | 20:30:57 → 20:33:03 | 12/12, exit 0 |
+| 2 | 20:33:03 → 20:35:09 | 12/12, exit 0, DB 결과 일치 |
+| 3 | 20:35:09 → 20:37:12 | 12/12, exit 0, DB 결과 일치 |
+
 ### 남은 완료 조건
 
 - PL: 1,220개 검사식 대응/제외 범위, 감사 class·시각 차이(D2/D3/D9), 시연콘티·대사 준비·예외 조치 순서(D5/D6/D7) 승인.
-- CI: 병합 후 develop의 실제 서버 3회 실행 및 `frontend-e2e-evidence` artifact 확인.
 - CI 오류 증빙: 권한 회귀 주입과 백엔드 미기동의 명확한 실패를 CI에서 확인. 기존 로컬 실패 검증을 CI 증빙으로 간주하지 않는다.
 - #419: Vitest의 원본 파일 참조와 실제 서버 MPA 비교 의존을 먼저 이관한 후 삭제 검토. 기존 Java/node 테스트는 그대로 유지한다.
