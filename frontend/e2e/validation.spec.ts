@@ -96,7 +96,7 @@ test('실행을 만들고 돌려 확정한다', async ({ page }) => {
       json: envelope({
         validationRunId: 7,
         passed: true,
-        conditions: Array.from({ length: 6 }, (_, index) => ({
+        conditions: Array.from({ length: 8 }, (_, index) => ({
           no: index + 1,
           label: `조건 ${index + 1}`,
           passed: true,
