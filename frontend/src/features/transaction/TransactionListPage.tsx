@@ -251,6 +251,8 @@ export default function TransactionListPage() {
               {page} / {totalPages} 페이지
             </span>
             <Pagination
+              legacy
+              label="수수료 지급 건 목록 페이지 선택"
               page={page}
               totalPages={totalPages}
               onPageChange={(next) => apply({ ...filters, page: next })}
