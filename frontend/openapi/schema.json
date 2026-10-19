@@ -1129,6 +1129,12 @@
           },
           "surrenderValueSourceTypeLabel" : {
             "type" : "string"
+          },
+          "projectedExcessAmount" : {
+            "type" : "number"
+          },
+          "candidateType" : {
+            "type" : "string"
           }
         },
         "type" : "object"

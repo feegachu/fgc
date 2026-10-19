@@ -243,7 +243,7 @@ public class ArbitrageService {
         BigDecimal paidCommissionAmount = confirmedCommission == null
                 ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getPaidCommissionAmount());
         BigDecimal plannedCommissionAmount = valueOrZero(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                contractId, REGULATORY_PAYMENT_STAGE));
+                contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate()));
 
         // 금융자료 및 해약환급금 적용 조건 확인
         var applicability = applicabilityPolicyService.resolve(request.getAsOfDate());
@@ -267,7 +267,7 @@ public class ArbitrageService {
                 .includedSurrenderValueAmount(decision.includedSurrenderValueAmount())
                 .refundAdditionAppliedYn(decision.refundAdditionAppliedYn())
                 .surrenderValueSourceType(decision.surrenderValueSourceType())
-                .netDifferenceAmount(decision.projectedExcessAmount())
+                .netDifferenceAmount(decision.currentExcessAmount())
                 .refundRateTableId(decision.refundRateTableId())
                 .standardDeduction80Yn(Boolean.TRUE.equals(source.getStandardDeduction80Yn()))
                 .resultStatus(decision.resultStatus())
@@ -363,7 +363,7 @@ public class ArbitrageService {
                         .add(refund.amount())
                         .subtract(cumulativePaidPremium));
 
-        ArbitrageCheckStatus resultStatus = projectedExcessAmount.signum() > 0
+        ArbitrageCheckStatus resultStatus = currentExcessAmount.signum() > 0
                 ? ArbitrageCheckStatus.CANDIDATE
                 : ArbitrageCheckStatus.CLEAR;
         String candidateType = currentExcessAmount.signum() > 0

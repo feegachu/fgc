@@ -44,10 +44,11 @@ public class ArbitrageJdbcBaseline {
         parameters.put("asOfDate", asOfDate);
         return jdbc.selectOne("com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline.sumConfirmedCommissionAmount", parameters);
     }
-    public BigDecimal sumPlannedCommissionAmount(Long contractId, PaymentStage paymentStage) {
+    public BigDecimal sumPlannedCommissionAmount(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
         var parameters = new HashMap<String, Object>();
         parameters.put("contractId", contractId);
         parameters.put("paymentStage", paymentStage);
+        parameters.put("asOfDate", asOfDate);
         return jdbc.selectOne("com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline.sumPlannedCommissionAmount", parameters);
     }
     public List<ArbitrageRefundRateCandidate> selectRefundRateCandidates(ArbitrageCalculationSource source, LocalDate asOfDate) {
