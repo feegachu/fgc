@@ -226,7 +226,7 @@ describe('RECO-W01·W02 React 전환', () => {
     )
     expect(await screen.findByText('이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.')).toBeVisible()
     expect(
-      within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '다음 페이지' }),
+      within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '2' }),
     ).toBeEnabled()
     expect(screen.getByText(/실행 전체 합계/)).toHaveTextContent('24,000원')
     expect(screen.getByRole('region', { name: '일치율 (건수 기준)' })).toHaveTextContent('이력은 서버 반올림 값')
@@ -304,41 +304,51 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(screen.getByText('50.0000%')).toBeVisible()
     expect(screen.getByText('(1,000)원')).toHaveClass('is-negative-amount')
     const pagination = within(screen.getByRole('region', { name: '실행 이력' }))
-    await user.click(pagination.getByRole('button', { name: '다음 페이지' }))
+    await user.click(pagination.getByRole('button', { name: '2' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
     await waitFor(() => expect(calls.some((call) => call.url.includes('page=2'))).toBe(true))
   })
-  it('결과와 이력은 화살표·현재/전체 표시로 각각 한 페이지씩 이동한다', async () => {
+  it('결과와 이력은 공통 숫자·5페이지 묶음으로 독립적으로 이동한다', async () => {
     const { router, user } = renderAt(
-      '/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=1&runId=41&runMonth=2026-07&resultType=AMOUNT_DIFFERENCE&onlyMismatch=true&page=1&resultPage=1',
+      '/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=1&runId=41&runMonth=2026-07&resultType=AMOUNT_DIFFERENCE&onlyMismatch=true&page=4&resultPage=4',
       (url) => {
         const page = Number(new URLSearchParams(url.split('?')[1]).get('page'))
-        if (url.startsWith('/api/v1/reconciliations?')) return { ...history, page }
-        if (url.includes('/41/results')) return { ...results, items: { ...results.items, page, totalPages: 2 } }
+        if (url.startsWith('/api/v1/reconciliations?')) return { ...history, page, totalPages: 12 }
+        if (url.includes('/41/results')) return { ...results, items: { ...results.items, page, totalPages: 12 } }
       },
     )
     const resultNav = () => within(screen.getByRole('navigation', { name: '대사 결과 페이지 이동' }))
     const historyNav = () => within(screen.getByRole('navigation', { name: '실행 이력 페이지 이동' }))
+    const current = (name: string) => screen.getByRole('navigation', { name }).querySelector('[aria-current="page"]')
     await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
     for (const controls of [resultNav, historyNav]) {
-      expect(controls().getAllByRole('button')).toHaveLength(2)
-      expect(controls().queryByRole('button', { name: '1' })).toBeNull()
-      expect(controls().getByText('1 / 2')).toHaveAttribute('aria-live', 'polite')
-      expect(controls().getByRole('button', { name: '이전 페이지' })).toBeDisabled()
+      expect(controls().getByText('4')).toHaveAttribute('aria-current', 'page')
+      expect(controls().getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+      expect(controls().queryByText('4 / 12')).toBeNull()
     }
-    await user.click(resultNav().getByRole('button', { name: '다음 페이지' }))
-    await waitFor(() => expect(resultNav().getByText('2 / 2')).toBeInTheDocument())
-    expect(new URLSearchParams(router.state.location.search).get('page')).toBe('1')
-    expect(resultNav().getByRole('button', { name: '다음 페이지' })).toBeDisabled()
-    await user.click(historyNav().getByRole('button', { name: '다음 페이지' }))
-    await waitFor(() => expect(historyNav().getByText('2 / 2')).toBeInTheDocument())
-    expect(new URLSearchParams(router.state.location.search).get('resultPage')).toBe('2')
-    expect(historyNav().getByRole('button', { name: '다음 페이지' })).toBeDisabled()
-    await user.click(resultNav().getByRole('button', { name: '이전 페이지' }))
-    await waitFor(() => expect(resultNav().getByText('1 / 2')).toBeInTheDocument())
-    expect(new URLSearchParams(router.state.location.search).get('page')).toBe('2')
-    await user.click(historyNav().getByRole('button', { name: '이전 페이지' }))
-    await waitFor(() => expect(historyNav().getByText('1 / 2')).toBeInTheDocument())
+    for (const [name, controls, otherKey] of [
+      ['대사 결과 페이지 이동', resultNav, 'page'],
+      ['실행 이력 페이지 이동', historyNav, 'resultPage'],
+    ] as const) {
+      await user.click(controls().getByRole('button', { name: '다음 5페이지' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('6'))
+      expect(new URLSearchParams(router.state.location.search).get(otherKey)).toBe('4')
+      await user.click(controls().getByRole('button', { name: '이전 5페이지' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('5'))
+      await user.click(controls().getByRole('button', { name: '다음 5페이지' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('6'))
+      await user.click(controls().getByRole('button', { name: '다음 5페이지' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('11'))
+      expect(controls().getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
+      await user.click(controls().getByRole('button', { name: '12' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('12'))
+      await user.click(controls().getByRole('button', { name: '이전 5페이지' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('10'))
+      await user.click(controls().getByRole('button', { name: '이전 5페이지' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('5'))
+      await user.click(controls().getByRole('button', { name: '4' }))
+      await waitFor(() => expect(current(name)).toHaveTextContent('4'))
+    }
     const params = new URLSearchParams(router.state.location.search)
     for (const [key, value] of Object.entries({
       month: '2026-07', stage: 'GA_TO_FC', insurer: '1', runId: '41',
@@ -479,7 +489,7 @@ describe('RECO-W01·W02 React 전환', () => {
     await user.selectOptions(screen.getByLabelText('결과 유형'), 'AMOUNT_DIFFERENCE')
     await waitFor(() => expect(calls.some((call) => call.url.includes('resultType=AMOUNT_DIFFERENCE'))).toBe(true))
     await user.click(
-      within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '다음 페이지' }),
+      within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '2' }),
     )
     expect(router.state.location.search).toContain('resultPage=2')
     expect(new URLSearchParams(router.state.location.search).get('page')).toBe('2')

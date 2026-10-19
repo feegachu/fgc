@@ -102,21 +102,7 @@
   padding: var(--space-2) var(--space-4);
   border-top: 1px solid var(--color-border-subtle);
 }
-.reco-react-pagination-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.reco-react-pagination-status {
-  min-width: 4.5rem;
-  color: var(--color-text-tertiary);
-  font-size: 0.75rem;
-  text-align: center;
-}
-.reco-react-pagination .icon-button:disabled {
-  color: var(--color-text-disabled);
-}
-.reco-react-pagination .icon-button:disabled:hover {
-  color: var(--color-text-disabled);
-  background: transparent;
+.reco-react-pagination .pagination-controls {
+  width: auto;
+  justify-content: flex-end;
 }
