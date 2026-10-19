@@ -1,5 +1,8 @@
 # FGC frontend (React + TypeScript)
 
+#418 실제 서버 Playwright 실행·CI·1차 구조/node 테스트 대응은 [검증 안내](docs/418/README.md)를 참고한다.
+개별 검사식과 확인이 필요한 차이를 함께 기록하며, PL 승인 전에는 #419 삭제 근거가 확정된 것으로 보지 않는다.
+
 2차 Thymeleaf → React 전환 화면. 공존기에는 nginx가 `/app/`에서 서빙하고, 기존 화면은 `/`에 그대로 있다.
 웨이브 C(#419)에서 base를 `/`로 바꾼다.
 

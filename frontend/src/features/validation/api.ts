@@ -102,7 +102,7 @@ export const finalizeChecklistQuery = (id: string, enabled: boolean) =>
         `/api/v1/validation-runs/${encodeURIComponent(id)}/finalize-checklist`,
         signal,
       )
-      if (!Array.isArray(checklist.conditions) || checklist.conditions.length !== 6) {
+      if (!Array.isArray(checklist.conditions) || checklist.conditions.length !== 8) {
         throw new Error('확정 조건 응답 형식이 올바르지 않습니다.')
       }
       return checklist

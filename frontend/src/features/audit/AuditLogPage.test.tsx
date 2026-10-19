@@ -141,6 +141,24 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(await screen.findByText('STARTED')).toBeInTheDocument()
   })
 
+  it('감사 행을 키보드 Enter·Space로 선택하고 첫 열 버튼으로도 선택한다 (#418)', async () => {
+    const { router, actions } = renderAt('/audit-logs?month=2026-07')
+    const batch = await screen.findByText('BATCH')
+    const row = batch.closest('tr')!
+    row.focus()
+    expect(row).toHaveFocus()
+    await actions.keyboard('{Enter}')
+    await waitFor(() => expect(router.state.location.search).toContain('selected=2'))
+    expect(row).toHaveAttribute('aria-selected', 'true')
+    const [first] = screen.getAllByRole('button', { name: '2026-08-16 10:00:07' })
+    first.focus()
+    await actions.keyboard('{Enter}')
+    await waitFor(() => expect(router.state.location.search).toContain('selected=1'))
+    row.focus()
+    await actions.keyboard(' ')
+    await waitFor(() => expect(router.state.location.search).toContain('selected=2'))
+  })
+
   it('?selected= 로 새로 열어도 같은 로그의 선택 상태와 diff 를 복원한다', async () => {
     renderAt('/audit-logs?selected=1')
     expect(await screen.findByText('payment.amount')).toBeInTheDocument()
