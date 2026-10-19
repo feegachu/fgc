@@ -239,7 +239,8 @@ final class ArbitrageBaselineSql {
                         fs.surrender_value,
                         fs.surrender_value_type,
                         fs.refund_rate_table_id AS snapshot_refund_rate_table_id,
-                        p.protection_type
+                        p.protection_type,
+                        termination.termination_date
                     FROM
                         insurance_contract c
                     JOIN
@@ -250,6 +251,12 @@ final class ArbitrageBaselineSql {
                         product p
                     ON
                         p.product_id = po.product_id
+                    LEFT JOIN LATERAL (
+                        SELECT MIN((e.effective_at AT TIME ZONE 'Asia/Seoul')::date) AS termination_date
+                          FROM fgc.contract_status_event e
+                         WHERE e.contract_id = c.contract_id AND e.new_status IN ('TERMINATED', 'LAPSED')
+                           AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :p0
+                    ) termination ON true
                     LEFT JOIN LATERAL (
                         SELECT
                             cfs.as_of_date,
@@ -263,7 +270,7 @@ final class ArbitrageBaselineSql {
                         WHERE
                             cfs.contract_id = c.contract_id
                         AND
-                            cfs.as_of_date  <=  :p0
+                            cfs.as_of_date <= COALESCE(termination.termination_date, :p0)
                         ORDER BY
                             cfs.as_of_date DESC,
                             CASE WHEN cfs.surrender_value_type = 'ACTUAL' THEN 0 ELSE 1 END,

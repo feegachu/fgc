@@ -164,6 +164,39 @@ class ArbitrageCheckRepositoryIntegrationTest {
         assertThat(summary.getClearCount()).isEqualTo(1);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"TERMINATED", "LAPSED"})
+    void freezesFinancialSnapshotAtFirstEffectiveTerminationInSeoul(String status) {
+        Long id = jdbcTemplate.queryForObject("""
+                SELECT c.contract_id FROM fgc.insurance_contract c
+                WHERE NOT EXISTS (SELECT 1 FROM fgc.contract_status_event e
+                    WHERE e.contract_id=c.contract_id AND e.new_status IN ('TERMINATED','LAPSED'))
+                ORDER BY c.contract_id LIMIT 1
+                """, Long.class);
+        for (String day : List.of("2030-08-30", "2030-08-31", "2030-09-01")) {
+            jdbcTemplate.update("""
+                    INSERT INTO fgc.contract_financial_snapshot(contract_id, as_of_date, contract_month_no,
+                        cumulative_paid_premium, surrender_value, surrender_value_type)
+                    VALUES (?, ?::date, 37, 1000000, 120000, 'ACTUAL')
+                    """, id, day);
+        }
+        // UTC 8/30 15:30 is Seoul 8/31. A later event must not move the first termination date.
+        for (String instant : List.of("2030-08-30T15:30:00Z", "2030-09-01T00:00:00Z")) {
+            jdbcTemplate.update("""
+                    INSERT INTO fgc.contract_status_event(contract_id,event_seq,new_status,effective_at,
+                        received_at,source_system,source_event_key,data_origin)
+                    SELECT ?, COALESCE(MAX(event_seq),0)+1, ?, ?::timestamptz, now(),
+                        'TEST-480', ?, 'MANUAL' FROM fgc.contract_status_event WHERE contract_id=?
+                    """, id, status, instant, status + instant, id);
+        }
+        var before = arbitrageCheckRepository.selectCalculationSource(id, LocalDate.of(2030, 8, 30));
+        assertThat(before.getTerminationDate()).isNull();
+        assertThat(before.getSnapshotAsOfDate()).isEqualTo(LocalDate.of(2030, 8, 30));
+        var after = arbitrageCheckRepository.selectCalculationSource(id, LocalDate.of(2030, 9, 2));
+        assertThat(after.getTerminationDate()).isEqualTo(LocalDate.of(2030, 8, 31));
+        assertThat(after.getSnapshotAsOfDate()).isEqualTo(LocalDate.of(2030, 8, 31));
+    }
+
     private ArbitrageCheckSearchCondition condition(
             YearMonth month,
             ArbitrageCheckStatus status,

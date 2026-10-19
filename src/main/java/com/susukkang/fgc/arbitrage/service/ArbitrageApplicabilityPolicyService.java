@@ -23,18 +23,33 @@ public class ArbitrageApplicabilityPolicyService {
     @Transactional(readOnly = true)
     public Applicability resolve(LocalDate asOf) {
         var policies = policyVersionRepository.findArbitrageApplicability(asOf);
-        if (policies.isEmpty()) return new Applicability(null, null, "차익거래 적용일 정책이 없습니다.");
-        if (policies.size() != 1) return new Applicability(null, null, "차익거래 적용일 정책이 여러 건입니다.");
+        if (policies.isEmpty()) return new Applicability(null, null, null, null, "차익거래 적용일 정책이 없습니다.");
+        if (policies.size() != 1) return new Applicability(null, null, null, null, "차익거래 적용일 정책이 여러 건입니다.");
         var policy = policies.getFirst();
         try {
             if (policy.getEffectiveContractDate() == null) {
-                return new Applicability(policy.getPolicyVersionId(), null, "차익거래 적용일 정책값이 없습니다.");
+                return new Applicability(policy.getPolicyVersionId(), null, null, null, "차익거래 적용일 정책값이 없습니다.");
             }
-            return new Applicability(policy.getPolicyVersionId(), LocalDate.parse(policy.getEffectiveContractDate()), null);
+            LocalDate effectiveDate = LocalDate.parse(policy.getEffectiveContractDate());
+            Integer months;
+            try {
+                months = Integer.valueOf(policy.getRefundAdditionMonths());
+            } catch (NumberFormatException e) {
+                return new Applicability(policy.getPolicyVersionId(), effectiveDate, null, null,
+                        "차익거래 환급금 합산 기간 정책값이 없거나 올바르지 않습니다.");
+            }
+            String boundary = policy.getRefundAdditionBoundaryInclusive();
+            if (months < 1 || months > 1200 || !("true".equals(boundary) || "false".equals(boundary))) {
+                return new Applicability(policy.getPolicyVersionId(), effectiveDate, null, null,
+                        "차익거래 환급금 합산 기간·경계 정책값이 올바르지 않습니다.");
+            }
+            return new Applicability(policy.getPolicyVersionId(), effectiveDate, months, Boolean.valueOf(boundary), null);
         } catch (DateTimeParseException e) {
-            return new Applicability(policy.getPolicyVersionId(), null, "차익거래 적용일 정책값이 올바른 날짜가 아닙니다.");
+            return new Applicability(policy.getPolicyVersionId(), null, null, null, "차익거래 적용일 정책값이 올바른 날짜가 아닙니다.");
         }
     }
 
-    public record Applicability(Long policyVersionId, LocalDate effectiveContractDate, String reviewReason) { }
+    public record Applicability(Long policyVersionId, LocalDate effectiveContractDate,
+                                Integer refundAdditionMonths, Boolean refundAdditionBoundaryInclusive,
+                                String reviewReason) { }
 }

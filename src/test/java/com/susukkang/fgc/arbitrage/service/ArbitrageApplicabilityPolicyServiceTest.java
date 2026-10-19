@@ -41,10 +41,30 @@ class ArbitrageApplicabilityPolicyServiceTest {
         assertThat(service.resolve(asOf).effectiveContractDate()).isNull();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"0,false", "-1,false", "invalid,false", "36,invalid"})
+    void rejectsInvalidRefundPeriodAndBoundary(String months, String boundary) {
+        var policy = policy("2026-03-01");
+        when(policy.getRefundAdditionMonths()).thenReturn(months);
+        lenient().when(policy.getRefundAdditionBoundaryInclusive()).thenReturn(boundary);
+        when(repository.findArbitrageApplicability(asOf)).thenReturn(List.of(policy));
+        assertThat(service.resolve(asOf).reviewReason()).contains("정책값");
+    }
+
+    @Test
+    void missingRefundPeriodRequiresReviewWithoutFallback() {
+        var policy = policy("2026-03-01");
+        when(policy.getRefundAdditionMonths()).thenReturn(null);
+        when(repository.findArbitrageApplicability(asOf)).thenReturn(List.of(policy));
+        assertThat(service.resolve(asOf).reviewReason()).contains("없거나");
+    }
+
     private PolicyVersionRepository.ArbitrageApplicability policy(String value) {
         var policy = mock(PolicyVersionRepository.ArbitrageApplicability.class);
         when(policy.getPolicyVersionId()).thenReturn(99L);
         when(policy.getEffectiveContractDate()).thenReturn(value);
+        lenient().when(policy.getRefundAdditionMonths()).thenReturn("36");
+        lenient().when(policy.getRefundAdditionBoundaryInclusive()).thenReturn("false");
         return policy;
     }
 }
