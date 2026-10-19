@@ -130,6 +130,7 @@ public class ReconciliationRunRepository {
                 AND payment_stage = :paymentStage
                 AND insurer_id = :insurerId
                 AND validation_run_id = :validationRunId
+                AND NOT superseded_yn
                 """).unwrap(NativeQuery.class);
         query.setParameter(SETTLEMENT_MONTH_PARAM, settlementMonth);
         query.setParameter(PAYMENT_STAGE_PARAM, paymentStage == null ? null : paymentStage.name());

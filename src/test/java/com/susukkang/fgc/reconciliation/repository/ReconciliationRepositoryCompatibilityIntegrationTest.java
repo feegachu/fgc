@@ -322,7 +322,9 @@ class ReconciliationRepositoryCompatibilityIntegrationTest {
         T current;
         PaymentJdbcObservation.Snapshot newStats;
         try { current = newQuery.get(); } finally { newStats = PaymentJdbcObservation.stop(); }
-        assertThat(current).as(operation).usingRecursiveComparison().isEqualTo(previous);
+        // 정정 이력 메타데이터는 과거 JDBC 계약에 없던 신규 필드다. 공통 필드는 그대로 비교한다.
+        assertThat(current).as(operation).usingRecursiveComparison()
+                .ignoringFields("superseded", "correctsReconciliationRunId").isEqualTo(previous);
         assertThat(oldStats.executions()).as(operation + " baseline SQL count").hasSize(1);
         assertThat(newStats.executions()).as(operation + " JPA SQL count").hasSize(1);
         org.slf4j.LoggerFactory.getLogger(getClass()).info(
