@@ -52,7 +52,7 @@ class CapGrossPolicyMigrationIntegrationTest {
                         WHERE p.status='ACTIVE' AND c.item_code='CLAWBACK'
                           AND i.decision_reason NOT LIKE '%지급 누계에서 차감하지%'
                         """,Long.class)).isZero();
-                // #525 V52: 원수사→GA·GA→설계사 모든 현행 룰셋의 정착지원금은 모집월 기준이다.
+                // #525 V52 (REG-20, FGC-FUN-031): 원수사→GA·GA→설계사 모든 현행 룰셋의 정착지원금은 모집월 기준이다.
                 assertThat(jdbc.queryForList("""
                         SELECT DISTINCT i.decision_reason FROM fgc.cap_rule_item i
                         JOIN fgc.cap_rule_set r ON r.cap_rule_set_id=i.cap_rule_set_id
@@ -72,7 +72,7 @@ class CapGrossPolicyMigrationIntegrationTest {
         }
     }
 
-    // 복제 버전이 판정 파라미터(배수·초년도 개월·경고율·환급금 조건·적용범위)를 그대로 가져왔는지까지 비교한다.
+    // REG-08, FGC-FUN-030·032: 복제 버전이 판정 파라미터(배수·초년도 개월·경고율·환급금 조건·적용범위)를 그대로 가져왔는지까지 비교한다.
     private java.util.List<String> activeRuleOrder(JdbcTemplate jdbc) {
         return jdbc.queryForList("""
                 SELECT CONCAT(p.policy_code,':',r.payment_stage,':',r.contract_date_from,':',

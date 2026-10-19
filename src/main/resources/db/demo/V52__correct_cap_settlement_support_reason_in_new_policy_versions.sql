@@ -46,7 +46,7 @@ INSERT INTO cap_rule_item(cap_rule_set_id,commission_item_id,inclusion_status,ex
  evidence_required_yn,attribution_method,allocation_policy_id,decision_reason)
 SELECT new.cap_rule_set_id,i.commission_item_id,i.inclusion_status,i.exclusion_type,
  i.evidence_required_yn,i.attribution_method,i.allocation_policy_id,
- CASE WHEN ci.item_code='SETTLEMENT_SUPPORT'
+ CASE WHEN ci.item_code='SETTLEMENT_SUPPORT' AND i.decision_reason LIKE '%지급월 신계약%'
  THEN '경력설계사 정착지원금은 수수료등에 포함하며 모집월 신계약에 월 단위로 귀속·배분한다 (REG-20)'
  ELSE i.decision_reason END
 FROM cap525_versions m JOIN cap_rule_set old ON old.policy_version_id=m.old_id

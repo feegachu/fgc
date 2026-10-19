@@ -1118,7 +1118,7 @@ class CommissionPaymentIntegrationTest {
                 .contains("모집월 신계약").doesNotContain("지급월");
     }
 
-    // #525: 시드의 확정 귀속행은 확정 당시 룰 항목을 가리키므로 새 판정의 상세에서도 당시 사유를 유지한다.
+    // #525 (FGC-FUN-017·035): 시드의 확정 귀속행은 확정 당시 룰 항목을 가리키므로 새 판정의 상세에서도 당시 사유를 유지한다.
     @Test
     void settlementSupportConfirmationKeepsHistoricReasonOfConfirmedSeedAttribution() {
         var created = commissionPaymentService.create(settlementSupportRequest(InclusionDecisionStatus.INCLUDED, ExclusionType.NONE));
