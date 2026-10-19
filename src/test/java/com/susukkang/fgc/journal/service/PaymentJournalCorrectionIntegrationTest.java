@@ -153,6 +153,24 @@ class PaymentJournalCorrectionIntegrationTest {
     }
 
     @Test
+    void secondCorrectionResolvesExceptionStillReferencingFirstReconciliation() {
+        Fixture f = fixture();
+        var first = corrections.reverseAndRepost(command(f,"70000"));
+        Long replacement = id("SELECT replacement_payment_id FROM fgc.payment_journal_correction WHERE original_payment_id=?",f.payment());
+        Long secondRun = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?",f.run());
+        assertThat(resultType(secondRun)).isEqualTo("AMOUNT_DIFFERENCE");
+        assertThat(status(f.exception())).isEqualTo("NEW");
+        // 같은 validation_run의 재감지는 발생 이력을 중복 저장하지 않으므로 최초 원천 참조가 유지된다.
+        assertThat(id("SELECT r.reconciliation_run_id FROM fgc.exception_case e JOIN fgc.reconciliation_result r ON e.source_entity_id=CAST(r.reconciliation_result_id AS varchar) WHERE e.exception_case_id=?",f.exception())).isEqualTo(f.run());
+        Fixture next = new Fixture(replacement,first.repostedJournalHeaderId(),secondRun,f.exception(),f.agent(),f.item());
+        corrections.reverseAndRepost(command(next,"100000"));
+        Long thirdRun = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?",secondRun);
+        assertThat(resultType(thirdRun)).isEqualTo("MATCHED");
+        assertThat(status(f.exception())).isEqualTo("RESOLVED");
+        assertThat(id("SELECT COUNT(*) FROM fgc.exception_action WHERE exception_case_id=?",f.exception())).isEqualTo(2);
+    }
+
+    @Test
     void insurerStatementCorrectionRetainsProvenanceAndMatchesManualReplacement() {
         Fixture f = fixture(PaymentStage.INSURER_TO_GA);
         Long originalBatch = id("SELECT statement_batch_id FROM fgc.commission_transaction WHERE commission_transaction_id=?",f.payment());

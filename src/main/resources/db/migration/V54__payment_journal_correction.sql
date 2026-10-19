@@ -88,7 +88,21 @@ BEGIN
              WHERE pc.correction_group_key = NEW.correction_group_key
                AND pc.original_payment_id::text = v_original_source_id
                AND pc.replacement_payment_id::text = NEW.source_entity_id
-               AND o.status = 'CANCELLED' AND n.status = 'CONFIRMED'
+               AND o.status = 'CANCELLED'
+               AND (n.status = 'CONFIRMED' OR (
+                 TG_OP = 'UPDATE' AND OLD.status = 'POSTED' AND NEW.status = 'REVERSED'
+                 AND n.status = 'CANCELLED' AND EXISTS (
+                   SELECT 1 FROM fgc.payment_journal_correction successor
+                   JOIN fgc.journal_correction_group next_group
+                     ON next_group.correction_group_key = successor.correction_group_key
+                   JOIN fgc.journal_header next_reversal
+                     ON next_reversal.correction_group_key = next_group.correction_group_key
+                   WHERE successor.original_payment_id = n.commission_transaction_id
+                     AND next_group.original_journal_header_id = NEW.journal_header_id
+                     AND next_reversal.reversal_of_id = NEW.journal_header_id
+                     AND next_reversal.journal_type = 'REVERSAL' AND next_reversal.status = 'POSTED'
+                 )
+               ))
                AND o.payment_stage = n.payment_stage AND o.cashflow_type = n.cashflow_type
            )
          )

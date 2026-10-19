@@ -65,11 +65,19 @@ public class PaymentCorrectionReconciliationRepository {
 
     public List<?> lockMatchedExceptions(Long oldId, Long newId) {
         return entityManager.createNativeQuery("""
+                WITH RECURSIVE prior_runs(reconciliation_run_id) AS (
+                    SELECT CAST(:oldId AS bigint)
+                    UNION
+                    SELECT r.corrects_reconciliation_run_id
+                    FROM fgc.reconciliation_run r
+                    JOIN prior_runs p ON p.reconciliation_run_id = r.reconciliation_run_id
+                    WHERE r.corrects_reconciliation_run_id IS NOT NULL
+                )
                 SELECT e.exception_case_id, e.status FROM fgc.exception_case e
                 JOIN fgc.reconciliation_result old ON e.source_entity_type = 'RECONCILIATION_RESULT'
                     AND e.source_entity_id = CAST(old.reconciliation_result_id AS varchar)
                 WHERE e.exception_type = 'RECONCILIATION_MISMATCH' AND e.status IN ('NEW', 'IN_REVIEW')
-                AND old.reconciliation_run_id = :oldId
+                AND old.reconciliation_run_id IN (SELECT reconciliation_run_id FROM prior_runs)
                 AND EXISTS (SELECT 1 FROM fgc.reconciliation_result n
                     WHERE n.reconciliation_run_id = :newId AND n.match_group_key = old.match_group_key
                     AND n.result_type = 'MATCHED')
