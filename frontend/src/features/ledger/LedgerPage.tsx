@@ -1,3 +1,4 @@
+import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
@@ -393,7 +394,7 @@ function JournalActionModal({
         navigate(month ? withMonth(result.target, month) : result.target)
       } else {
         toast(`역분개 ${result.journalHeaderId}을 생성했습니다.`, 'success')
-        await client.invalidateQueries({ queryKey: ['journals'] })
+        await invalidateJournalCorrectionQueries(client)
         onClose()
       }
     },

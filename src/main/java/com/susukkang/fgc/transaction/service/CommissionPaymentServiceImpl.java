@@ -175,6 +175,20 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // 서비스 계층에서 한 번 더 막는다. @EnableMethodSecurity는 SecurityConfig에 이미 켜져 있다.
     @PreAuthorize(Roles.CAN_PROCESS)
     public CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey) {
+        return confirmPayment(paymentId, idempotencyKey);
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize(Roles.CAN_REVERSE_JOURNAL)
+    public CommissionPaymentResponse confirmJournalCorrection(Long paymentId, String correctionGroupKey) {
+        if (!writeRepository.isJournalCorrectionReplacement(paymentId, correctionGroupKey)) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, Map.of("field", "correctionGroupKey"));
+        }
+        return confirmPayment(paymentId, "JC:" + correctionGroupKey);
+    }
+
+    private CommissionPaymentResponse confirmPayment(Long paymentId, String idempotencyKey) {
         // 2026-08-11 yslee - 운영정책서 제31조의 확정 게이트 6단계 순서를 코드에 명시
         // 기존 코드: 실제 확정 로직은 정책 순서를 따르지만 단계별 주석이 없어 문서와 코드의 대응 확인이 어려움
         // 문제: 검증 순서가 변경되어도 리뷰 과정에서 정책 위반을 즉시 식별하기 어려움
