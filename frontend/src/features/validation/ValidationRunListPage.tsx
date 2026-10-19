@@ -116,7 +116,7 @@ export default function ValidationRunListPage() {
   ]
 
   return (
-    <div className="page-content vrun-page vrun-list-page">
+    <div className="vrun-page vrun-list-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 실행 목록</h1>
