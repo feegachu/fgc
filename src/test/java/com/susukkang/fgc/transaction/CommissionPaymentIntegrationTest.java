@@ -1102,6 +1102,57 @@ class CommissionPaymentIntegrationTest {
                 """, BigDecimal.class, repayment.paymentId())).isEqualByComparingTo("1500000");
     }
 
+    // #525 REG-20: 정착지원금을 신인 지원으로 제외하려 하면 현행 룰셋의 "모집월 신계약" 산입 사유로 검토에 올린다.
+    @Test
+    void settlementSupportReviewUsesRecruitingMonthReasonOfActiveRuleSet() {
+        var created = commissionPaymentService.create(
+                settlementSupportRequest(InclusionDecisionStatus.EXCLUDED, ExclusionType.NEW_AGENT_SUPPORT));
+
+        assertThatThrownBy(() -> commissionPaymentService.confirm(created.paymentId(), "IT-525-" + created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.CAP_002));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT description FROM fgc.exception_case
+                 WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?
+                """, String.class, created.paymentId().toString()))
+                .contains("모집월 신계약").doesNotContain("지급월");
+    }
+
+    // #525 (FGC-FUN-017·035): 시드의 확정 귀속행은 확정 당시 룰 항목을 가리키므로 새 판정의 상세에서도 당시 사유를 유지한다.
+    @Test
+    void settlementSupportConfirmationKeepsHistoricReasonOfConfirmedSeedAttribution() {
+        var created = commissionPaymentService.create(settlementSupportRequest(InclusionDecisionStatus.INCLUDED, ExclusionType.NONE));
+
+        var confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-525-" + created.paymentId());
+
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT d.decision_reason
+                  FROM fgc.cap_check_detail d
+                  JOIN fgc.transaction_attribution ta ON ta.transaction_attribution_id = d.transaction_attribution_id
+                  JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
+                 WHERE d.cap_check_id = ? AND ct.source_business_key = 'GA-2026-07-9001'
+                """, String.class, confirmed.capCheckIds().getFirst()))
+                .singleElement().asString().contains("지급월 신계약");
+    }
+
+    // A-FC-002의 2026-07 모집 계약(C002)에 귀속하는 정착지원금 지급 건
+    private CommissionPaymentCreateRequest settlementSupportRequest(InclusionDecisionStatus inclusion,
+                                                                    ExclusionType exclusion) {
+        Long contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract WHERE contract_no='FGC-FGL01-202607-0002'", Long.class);
+        Long agentId = jdbcTemplate.queryForObject("SELECT agent_id FROM fgc.agent WHERE agent_code='A-FC-002'", Long.class);
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code='SETTLEMENT_SUPPORT'", Long.class);
+        BigDecimal amount = new BigDecimal("10000");
+        return new CommissionPaymentCreateRequest("GA_MANUAL_PAYMENT", "IT-525-" + UUID.randomUUID(), contractId,
+                agentId, itemId, amount, LocalDate.of(2026, 7, 1), "PAYMENT", LocalDate.of(2026, 8, 25),
+                PaymentStage.GA_TO_FC, currentGaCapPolicy(), List.of(new CommissionPaymentAttributionRequest(
+                contractId, LocalDate.of(2026, 7, 25), amount, inclusion, exclusion,
+                "#525 정착지원금 모집월 귀속", "MONTHLY_EQUIVALENT_FIRST_PREMIUM_PROPORTIONAL", "IT-525-EVIDENCE",
+                AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY)), "IT-525-EVIDENCE", "rollback integration test");
+    }
+
     @Test
     void unclassifiedRecoveryIsRejectedAndRecordsReviewWithoutConfirming() {
         var created = commissionPaymentService.create(grossScenarioRequest(1L, "DEDUCTION", "300000", "RECOVERY"));
