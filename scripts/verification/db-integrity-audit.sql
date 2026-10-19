@@ -8,6 +8,15 @@ SELECT current_database() AS database_name, session_user, current_user,
        current_setting('server_version') AS server_version,
        current_setting('session_replication_role') AS replication_role;
 
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN (session_user, current_user) AND rolsuper) THEN
+        RAISE WARNING 'Superuser session/current role detected (session=%, current=%). Confirm the intended runtime login; results describe current_user, not another application account.',
+            session_user, current_user;
+    END IF;
+END;
+$$;
+
 SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls,
        has_parameter_privilege(oid, 'session_replication_role', 'SET') AS can_set_replication_role
 FROM pg_roles WHERE rolname = current_user;
@@ -22,11 +31,23 @@ WHERE oid <> (SELECT oid FROM pg_roles WHERE rolname = current_user)
        OR has_parameter_privilege(oid, 'session_replication_role', 'SET'))
 ORDER BY rolname;
 
--- A table/function owner (including a reachable owner role) can alter its guards.
-SELECT c.relname AS table_name, pg_get_userbyid(c.relowner) AS owner
+-- MEMBER includes INHERIT-only grants as well as SET ROLE paths. It is a candidate list:
+-- membership alone need not confer usable ownership; show immediate USAGE and SET separately.
+SELECT c.relname AS table_name, pg_get_userbyid(c.relowner) AS owner,
+       pg_has_role(current_user, c.relowner, 'USAGE') AS inherits_owner,
+       pg_has_role(current_user, c.relowner, 'SET') AS can_set_owner
 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'fgc' AND c.relkind IN ('r', 'p')
-  AND pg_has_role(current_user, c.relowner, 'SET')
+  AND pg_has_role(current_user, c.relowner, 'MEMBER')
+ORDER BY c.relname;
+
+-- Row-level DELETE guards do not guard TRUNCATE. Check explicit/inherited table grants too.
+SELECT c.relname AS table_name,
+       has_table_privilege(current_user, c.oid, 'TRUNCATE') AS can_truncate,
+       has_table_privilege(current_user, c.oid, 'TRIGGER') AS can_create_trigger
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'fgc' AND c.relkind IN ('r', 'p')
+  AND has_table_privilege(current_user, c.oid, 'TRUNCATE, TRIGGER')
 ORDER BY c.relname;
 
 SELECT p.proname AS function_name, pg_get_userbyid(p.proowner) AS owner,
@@ -35,9 +56,11 @@ FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'fgc' AND p.prorettype = 'trigger'::regtype
 ORDER BY p.proname;
 
-SELECT p.proname AS alterable_function, pg_get_userbyid(p.proowner) AS owner
+SELECT p.proname AS owner_function, pg_get_userbyid(p.proowner) AS owner,
+       pg_has_role(current_user, p.proowner, 'USAGE') AS inherits_owner,
+       pg_has_role(current_user, p.proowner, 'SET') AS can_set_owner
 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname = 'fgc' AND pg_has_role(current_user, p.proowner, 'SET')
+WHERE n.nspname = 'fgc' AND pg_has_role(current_user, p.proowner, 'MEMBER')
 ORDER BY p.proname;
 
 SELECT has_schema_privilege(current_user, 'fgc', 'CREATE') AS can_create_in_fgc,

@@ -30,11 +30,12 @@ class JournalGuardSearchPathMigrationIntegrationTest {
                     INSERT INTO fgc.journal_correction_group
                         (correction_group_key,original_journal_header_id,reason)
                     VALUES ('UPGRADE-CHECK',-1,'test')
-                    """)).isInstanceOf(SQLException.class).hasMessageContaining("relation \"journal_header\" does not exist");
+                    """)).isInstanceOf(SQLException.class).hasMessageContaining("relation \"journal_header\" does not exist")
+                    .satisfies(error -> assertThat(((SQLException) error).getSQLState()).isEqualTo("42P01"));
 
             // Also cover a deployed membership function whose setting was removed by a redefinition.
             execute(connection, "ALTER FUNCTION fgc.guard_journal_correction_membership() RESET search_path");
-            migrate(null);
+            migrate("55");
             assertThat(definition(connection, "guard_journal_correction_group_write", "prosrc")).isEqualTo(groupBody);
             assertThat(definition(connection, "guard_journal_correction_membership", "prosrc")).isEqualTo(membershipBody);
             for (String function : new String[]{"guard_journal_correction_group_write", "guard_journal_correction_membership"}) {
@@ -44,16 +45,16 @@ class JournalGuardSearchPathMigrationIntegrationTest {
                     INSERT INTO fgc.journal_correction_group
                         (correction_group_key,original_journal_header_id,reason)
                     VALUES ('UPGRADE-CHECK',-1,'test')
-                    """)).isInstanceOf(SQLException.class).hasMessageContaining("Original journal -1 does not exist");
-            // Execute the delivered read-only audit against this disposable DB only.
+                    """)).isInstanceOf(SQLException.class).hasMessageContaining("Original journal -1 does not exist")
+                    .satisfies(error -> assertThat(((SQLException) error).getSQLState()).isEqualTo("P0001"));
+            // Syntax/catalog smoke check as container admin only; role results have separate audit tests.
             execute(connection, Files.readString(Path.of("scripts/verification/db-integrity-audit.sql")));
         }
     }
 
     private void migrate(String target) {
         var config = Flyway.configure().dataSource(URL, "fgc", "fgc_test_only").schemas("fgc")
-                .locations("classpath:db/migration", "classpath:db/demo");
-        if (target != null) config.target(target);
+                .locations("classpath:db/migration", "classpath:db/demo").target(target);
         config.load().migrate();
     }
 
