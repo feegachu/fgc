@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 const screens = [
+  { id: 'contract', path: 'contracts', filter: 'contractNo=QA&currentStatus=ACTIVE' },
+  { id: 'transaction', path: 'transactions', filter: 'contractNo=QA&settlementMonth=2026-07&status=CONFIRMED' },
+  { id: 'exception', path: 'exceptions', filter: 'contractNo=QA&validationMonth=2026-07&type=CAP_VIOLATION&status=OPEN' },
   { id: 'base-organization', path: 'base', filter: 'tab=organization&keyword=QA&asOf=2026-07-01' },
   { id: 'base-insurer', path: 'base', filter: 'tab=insurer&keyword=QA&asOf=2026-07-01' },
   { id: 'base-product', path: 'base', filter: 'tab=product&keyword=QA&asOf=2026-07-01&insurerId=1' },
@@ -16,6 +19,7 @@ const screens = [
 for (const screen of screens) {
   test(`${screen.id}: five-page groups preserve filters and boundaries`, async ({ page }, testInfo) => {
     const requested: URL[] = []
+    let totalPages = 12
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url())
@@ -23,8 +27,8 @@ for (const screen of screens) {
       const paging = {
         content: [], page: Number(url.searchParams.get('page') || 1),
         size: Number(url.searchParams.get('size') || 20),
-        totalPages: url.searchParams.get('size') === '100' ? 1 : 12,
-        totalElements: url.searchParams.get('size') === '100' ? 1 : 240,
+        totalPages: url.searchParams.get('size') === '100' ? 1 : totalPages,
+        totalElements: url.searchParams.get('size') === '100' ? 1 : totalPages * 20,
       }
       let data: unknown = paging
       if (url.pathname.endsWith('/auth/refresh')) data = { accessToken: 'pagination-fixture', expiresIn: 1800 }
@@ -32,6 +36,10 @@ for (const screen of screens) {
         loginId: 'pagination-qa', userName: '검증 담당자', roleCode: 'SYSTEM_ADMIN', demoMonth: '2026-07',
         canProcess: true, canViewAuditLog: true, canHandleException: true,
       }
+      else if (url.pathname.endsWith('/exceptions/options')) data = {
+        types: [], reasons: [], severities: [], assignees: [], validationMonths: [],
+      }
+      else if (url.pathname.endsWith('/exceptions')) data = { ...paging, summary: [] }
       else if (url.pathname.endsWith('/audit-logs/options')) data = {
         users: [{ userId: 12, loginId: 'pagination-qa' }], actionCodes: ['PAYMENT_CONFIRMED'], entityTypes: [],
       }
@@ -64,8 +72,15 @@ for (const screen of screens) {
     const pagination = page.locator('.pagination-controls')
     await expect(pagination).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
-    await pagination.screenshot({ path: testInfo.outputPath(`${screen.id}-desktop.png`) })
+    await page.locator('footer.list-pagination').screenshot({ path: testInfo.outputPath(`${screen.id}-desktop.png`) })
     // Assert group behavior.
+    const footer = page.locator('footer.list-pagination')
+    await expect(footer.getByText('4 / 12 페이지')).toBeVisible()
+    const footerBounds = await footer.boundingBox()
+    const navBounds = await pagination.boundingBox()
+    const rightInset = footerBounds!.x + footerBounds!.width - navBounds!.x - navBounds!.width
+    expect(rightInset).toBeGreaterThanOrEqual(15)
+    expect(rightInset).toBeLessThanOrEqual(18)
     await expect(pagination.locator('.pagination-button')).toHaveText([
       'chevron_left', '1', '2', '3', '4', '5', 'chevron_right',
     ])
@@ -98,6 +113,21 @@ for (const screen of screens) {
     expect(bounds).not.toBeNull()
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(375)
-    await pagination.screenshot({ path: testInfo.outputPath(`${screen.id}-mobile.png`) })
+    await footer.screenshot({ path: testInfo.outputPath(`${screen.id}-mobile.png`) })
+    for (const total of [0, 1]) {
+      totalPages = total
+      const query = new URLSearchParams(initial)
+      query.set('page', '1')
+      await page.goto(`${screen.path}?${query}`)
+      await page.waitForLoadState('networkidle')
+      await expect(pagination).toHaveCount(0)
+      if (screen.id === 'cap') {
+        const size = page.getByLabel('한 화면 행 수')
+        await expect(size).toBeVisible()
+        await size.selectOption('50')
+        await expect.poll(() => new URL(page.url()).searchParams.get('size')).toBe('50')
+        await expect.poll(() => requested.some((url) => url.pathname.endsWith('/cap-checks') && url.searchParams.get('size') === '50')).toBe(true)
+      }
+    }
   })
 }

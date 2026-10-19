@@ -22,7 +22,7 @@ const contract = {
   paymentTermMonths: 120,
   updatedAt: '2026-07-01T00:00:00.123456Z',
 }
-async function fixture(page: Page, canProcess = true) {
+async function fixture(page: Page, canProcess = true, totalPages = 1) {
   const envelope = (data: unknown) => ({ data, error: null, requestId: 'contract-browser' })
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
@@ -66,7 +66,7 @@ async function fixture(page: Page, canProcess = true) {
     }
     if (path.endsWith('/contracts'))
       return route.fulfill({
-        json: envelope({ content: [contract], page: 1, size: 20, totalPages: 1, totalElements: 1 }),
+        json: envelope({ content: [contract], page: 1, size: 20, totalPages, totalElements: totalPages > 1 ? 21 : 1 }),
       })
     if (path.endsWith('/schedules'))
       return route.fulfill({
@@ -210,7 +210,7 @@ test('상세 값 정렬·가로 한도 안내문·지급 표 전체 열의 가�
 })
 
 test('페이지네이션은 현재 페이지 hover 색상과 비활성 화살표 표시를 유지한다', async ({ page }) => {
-  await fixture(page)
+  await fixture(page, true, 2)
   await page.goto('contracts')
   const pagination = page.locator('.contract-pagination')
   const current = pagination.locator('[aria-current="page"]')

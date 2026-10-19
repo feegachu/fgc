@@ -9,7 +9,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTime, errorText, month as formatMonth } from '../../lib/format'
 import { toast } from '../../stores/toasts'
@@ -147,18 +147,13 @@ export default function ValidationRunListPage() {
           emptyMessage={runs.isPending ? '불러오는 중입니다.' : undefined}
         />
         {totalPages > 1 && (
-          <footer className="vrun-pagination">
-            <span className="tabular-nums" aria-live="polite">
-              {criteria.page} / {totalPages} 페이지
-            </span>
-            <Pagination
-              legacy
-              label="월 통합검증 실행 목록 페이지 선택"
-              page={criteria.page}
-              totalPages={totalPages}
-              onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-            />
-          </footer>
+          <ListPagination
+            className="vrun-pagination"
+            label="월 통합검증 실행 목록 페이지 선택"
+            page={criteria.page}
+            totalPages={totalPages}
+            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+          />
         )}
       </section>
     </div>

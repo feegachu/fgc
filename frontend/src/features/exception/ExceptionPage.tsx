@@ -4,7 +4,7 @@ import { Link, useOutletContext, useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { dateTime, errorText, int } from '../../lib/format'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -228,16 +228,13 @@ export function ExceptionPage() {
                   onRowClick={(row) => select(String(row.exceptionCaseId))}
                   emptyMessage={EMPTY_MESSAGE}
                 />
-                <div className="exception-pagination">
-                  <span>
-                    {data?.page ?? 1} / {data?.totalPages || 1} 페이지
-                  </span>
-                  <Pagination
-                    page={data?.page ?? 1}
-                    totalPages={data?.totalPages ?? 1}
-                    onPageChange={(page) => apply({ page: String(page) }, false)}
-                  />
-                </div>
+                <ListPagination
+                  className="exception-pagination"
+                  label="예외 목록 페이지 선택"
+                  page={data?.page ?? 1}
+                  totalPages={data?.totalPages ?? 1}
+                  onPageChange={(page) => apply({ page: String(page) }, false)}
+                />
               </>
             )}
           </section>
