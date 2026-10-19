@@ -144,15 +144,43 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     await waitFor(() => expect(lastRequest().has('attributionImbalanceOnly')).toBe(false))
     expect(lastRequest().get('settlementMonth')).toBe('2026-07')
   })
-  it('페이지는 1부터 시작하고 다음 그룹은 6페이지, 이전 그룹은 5페이지다', async () => {
+  it('페이지는 1부터 시작하고 이전·다음은 한 페이지씩 이동하며 숨은 필터를 유지한다', async () => {
     const { actions } = renderAt('/app/transactions?page=0&attributionImbalanceOnly=true')
     await screen.findByText('TRAN-410')
     expect(lastRequest().get('page')).toBe('1')
-    await actions.click(screen.getByRole('button', { name: '다음' }))
-    await waitFor(() => expect(screen.getByText('6 / 7 페이지')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: '이전 페이지' })).toBeDisabled()
+    await actions.click(screen.getByRole('button', { name: '다음 페이지' }))
+    await waitFor(() => expect(screen.getByText('2 / 7 페이지')).toBeInTheDocument())
     expect(lastRequest().get('attributionImbalanceOnly')).toBe('true')
-    await actions.click(screen.getByRole('button', { name: '이전' }))
-    await waitFor(() => expect(lastRequest().get('page')).toBe('5'))
+    await actions.click(screen.getByRole('button', { name: '이전 페이지' }))
+    await waitFor(() => expect(lastRequest().get('page')).toBe('1'))
+  })
+  it('4페이지에서도 양방향 이동이 가능하고 첫·끝 경계와 숫자 범위를 표시한다', async () => {
+    const { actions } = renderAt(
+      '/app/transactions?month=2026-07&settlementMonth=2026-07&contractNo=POL-2&page=4',
+    )
+    await screen.findByText('4 / 7 페이지')
+    const pagination = () => within(screen.getByRole('navigation', { name: '수수료 지급 건 목록 페이지 선택' }))
+    expect(pagination().queryByRole('button', { name: '처음' })).toBeNull()
+    expect(pagination().queryByRole('button', { name: '마지막' })).toBeNull()
+    expect(pagination().getAllByRole('button').map((button) => button.textContent)).toEqual([
+      '‹', '2', '3', '4', '5', '6', '›',
+    ])
+    expect(pagination().getByRole('button', { name: '이전 페이지' })).toBeEnabled()
+    expect(pagination().getByRole('button', { name: '다음 페이지' })).toBeEnabled()
+    await actions.click(pagination().getByRole('button', { name: '이전 페이지' }))
+    await screen.findByText('3 / 7 페이지')
+    await actions.click(pagination().getByRole('button', { name: '다음 페이지' }))
+    await screen.findByText('4 / 7 페이지')
+    await actions.click(pagination().getByRole('button', { name: '다음 페이지' }))
+    await screen.findByText('5 / 7 페이지')
+    expect(lastRequest().get('contractNo')).toBe('POL-2')
+    expect(lastRequest().get('settlementMonth')).toBe('2026-07')
+    await actions.click(pagination().getByRole('button', { name: '7' }))
+    await screen.findByText('7 / 7 페이지')
+    expect(pagination().getByRole('button', { name: '다음 페이지' })).toBeDisabled()
+    await actions.click(pagination().getByRole('button', { name: '이전 페이지' }))
+    await screen.findByText('6 / 7 페이지')
   })
   it('정산월을 지운 뒤 조회·재조회해도 전체 월 상태와 빈 입력을 유지한다', async () => {
     const { router, actions } = renderAt('/app/transactions?month=2026-07&settlementMonth=2026-07')
@@ -174,7 +202,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     const { router, actions } = renderAt()
     await screen.findByRole('option', { name: '홍길동' })
     resultRows = [{ ...row, commissionTransactionId: 42, recipientAgentId: 4, recipientAgentName: '김길동' }]
-    await actions.click(screen.getByRole('button', { name: '다음' }))
+    await actions.click(screen.getByRole('button', { name: '다음 페이지' }))
     expect(await screen.findByRole('option', { name: '김길동' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: '홍길동' })).toBeInTheDocument()
     await act(() => router.navigate('/transactions?month=2026-07&contractNo=RESTORED&agentId=999'))
