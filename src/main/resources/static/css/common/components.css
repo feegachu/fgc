@@ -679,7 +679,7 @@ a.kpi-card:active {
   font-weight: 500;
 }
 
-.pagination-button:hover:not(:disabled):not(.is-disabled) {
+.pagination-button:hover:not(:disabled):not(.is-disabled):not(.is-active) {
   border-color: var(--color-border-strong);
   background: var(--color-bg-subtle);
   text-decoration: none;
