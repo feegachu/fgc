@@ -208,3 +208,30 @@ test('상세 값 정렬·가로 한도 안내문·지급 표 전체 열의 가�
   expect(amount!.x - stage!.x).toBeLessThan(120)
   await page.screenshot({ path: testInfo.outputPath('contract-payment-compact.png'), fullPage: true })
 })
+
+test('페이지네이션은 현재 페이지 hover 색상과 비활성 화살표 표시를 유지한다', async ({ page }) => {
+  await fixture(page)
+  await page.goto('contracts')
+  const pagination = page.locator('.contract-pagination')
+  const current = pagination.locator('[aria-current="page"]')
+  await expect(current).toHaveText('1')
+  const colors = () =>
+    current.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { background: style.backgroundColor, border: style.borderColor, color: style.color }
+    })
+  await page.mouse.move(0, 0)
+  const normal = await colors()
+  await current.hover()
+  expect(await colors()).toEqual(normal)
+  for (const label of ['이전 5페이지', '다음 5페이지']) {
+    const arrow = pagination.getByRole('button', { name: label })
+    await expect(arrow).toBeDisabled()
+    await expect(arrow).toHaveCSS('opacity', '0.4')
+    const background = await arrow.evaluate((element) => getComputedStyle(element).backgroundColor)
+    const box = await arrow.boundingBox()
+    if (!box) throw new Error('페이지네이션 화살표가 표시되지 않습니다.')
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(arrow).toHaveCSS('background-color', background)
+  }
+})
