@@ -1,3 +1,4 @@
+import { invalidateJournalCorrectionQueries } from '../ledger/correction-cache'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
@@ -205,7 +206,7 @@ function CorrectionBody({
     meta: { errorToast: false },
     onSuccess: (done) => {
       applyActionToCache(client, item.exceptionCaseId!, toAction(item, done))
-      void client.invalidateQueries({ queryKey: ['journals'] })
+      void invalidateJournalCorrectionQueries(client)
       setResult(done)
       toast('원장 정정을 완료했습니다.', 'success')
     },

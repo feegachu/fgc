@@ -94,8 +94,8 @@ export default function TransactionListPage() {
       label: '흐름',
       width: '5rem',
       render: (row) => (
-        <StatusBadge tone={row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}>
-          {row.cashflowTypeLabel || row.cashflowType}
+        <StatusBadge tone={row.status === 'CANCELLED' ? 'neutral' : row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}>
+          {row.status === 'CANCELLED' ? '취소' : row.cashflowTypeLabel || row.cashflowType}
         </StatusBadge>
       ),
     },
