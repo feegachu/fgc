@@ -34,6 +34,7 @@ class PaymentJournalCorrectionIntegrationTest {
     @Autowired com.susukkang.fgc.validation.batch.contract.JournalPostingPort posting;
     private Long contractId;
     private Long validationRunId;
+    private PaymentStage paymentStage = PaymentStage.GA_TO_FC;
 
     @Test
     void repostCancelsOldPaymentAndMatchesReplacementWithoutDuplicateAndResolvesException() {
@@ -151,7 +152,44 @@ class PaymentJournalCorrectionIntegrationTest {
         assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
     }
 
-    private Fixture fixture() {
+    @Test
+    void insurerStatementCorrectionRetainsProvenanceAndMatchesManualReplacement() {
+        Fixture f = fixture(PaymentStage.INSURER_TO_GA);
+        Long originalBatch = id("SELECT statement_batch_id FROM fgc.commission_transaction WHERE commission_transaction_id=?",f.payment());
+        assertThat(originalBatch).isNotNull();
+        corrections.reverseAndRepost(command(f,"100000"));
+        Long replacement = id("SELECT replacement_payment_id FROM fgc.payment_journal_correction WHERE original_payment_id=?",f.payment());
+        assertThat(payments.get(replacement).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(id("SELECT statement_batch_id FROM fgc.commission_transaction WHERE commission_transaction_id=?",replacement)).isNull();
+        assertThat(id("SELECT o.statement_batch_id FROM fgc.payment_journal_correction pc JOIN fgc.commission_transaction o ON o.commission_transaction_id=pc.original_payment_id WHERE pc.replacement_payment_id=?",replacement)).isEqualTo(originalBatch);
+        Long current = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?",f.run());
+        assertThat(resultType(current)).isEqualTo("MATCHED");
+        assertThat(status(f.exception())).isEqualTo("RESOLVED");
+    }
+
+    @Test
+    void finalizedDifferentValidationIncludingPaymentPreventsCorrection() {
+        Fixture f = fixture();
+        Long originalValidation = validationRunId;
+        Long other = jdbcTemplate.queryForObject("INSERT INTO fgc.validation_run(validation_month,run_no,status) SELECT ?,MAX(run_no)+1,'CREATED' FROM fgc.validation_run WHERE validation_month=? RETURNING validation_run_id",Long.class,TEST_MONTH,TEST_MONTH);
+        Long insurer = id("SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=?",contractId);
+        Long otherReco = jdbcTemplate.queryForObject("INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,insurer_id,validation_run_id) VALUES (?,'GA_TO_FC',?,?) RETURNING reconciliation_run_id",Long.class,TEST_MONTH,insurer,other);
+        jdbcTemplate.update("UPDATE fgc.reconciliation_run SET status='RUNNING',started_at=clock_timestamp() WHERE reconciliation_run_id=?",otherReco);
+        execution.executeInTransaction(new ReconciliationExecutionRequest(otherReco,other,TEST_MONTH,PaymentStage.GA_TO_FC,insurer,1L));
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?",other);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status='COMPLETED',current_step=8 WHERE validation_run_id=?",other);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status='FINALIZED',current_step=10,finalized_at=clock_timestamp() WHERE validation_run_id=?",other);
+        assertThat(validationRunId).isEqualTo(originalValidation);
+        assertThatThrownBy(() -> corrections.reverseAndRepost(command(f,"100000")))
+                .isInstanceOfSatisfying(FgcBusinessException.class,error -> assertThat(error.getErrorCode()).isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.VRUN_003));
+        assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+    }
+
+    private Fixture fixture() { return fixture(PaymentStage.GA_TO_FC); }
+
+    private Fixture fixture(PaymentStage stage) {
+        paymentStage = stage;
+        boolean payout = stage == PaymentStage.GA_TO_FC;
         contractId = cloneContract();
         Long policy = id("SELECT policy_version_id FROM fgc.policy_version WHERE policy_code='REG-CAP-GA-2026-V1' AND status='ACTIVE'");
         Long item = id("SELECT commission_item_id FROM fgc.commission_item WHERE item_code='BASE_COMMISSION'");
@@ -163,14 +201,14 @@ class PaymentJournalCorrectionIntegrationTest {
                 RETURNING validation_run_id
                 """,Long.class,TEST_MONTH,TEST_MONTH);
         Long line = insertSchedule(contractId,policy,item,agent,1,"100000");
-        insertPostedJournal("EXPECTED_FC_PAYOUT","SCHEDULE_LINE",line,contractId,agent,item,"100000","EXPECTED_PAYOUT_EXPENSE","EXPECTED_PAYOUT_PAYABLE");
+        insertPostedJournal(payout ? "EXPECTED_FC_PAYOUT" : "EXPECTED_INSURER_INCOME","SCHEDULE_LINE",line,contractId,payout ? agent : null,item,"100000",payout ? "EXPECTED_PAYOUT_EXPENSE" : "EXPECTED_RECEIVABLE",payout ? "EXPECTED_PAYOUT_PAYABLE" : "EXPECTED_INCOME");
         var old = insertPayment(contractId,policy,item,agent,1,"50000","DRAFT",UUID.randomUUID().toString());
         jdbcTemplate.update("UPDATE fgc.transaction_attribution SET allocation_basis_snapshot='{\"inclusionDecisionReason\":\"direct\",\"allocationBasis\":\"DIRECT\"}'::jsonb,evidence_ref='548' WHERE transaction_attribution_id=?", old.attributionId());
         jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?",old.transactionId());
-        Long journal = insertPostedJournal("CONFIRMED_FC_PAYOUT","COMMISSION_TRANSACTION",old.transactionId(),contractId,agent,item,"50000","CONFIRMED_PAYOUT_EXPENSE","CONFIRMED_PAYOUT_PAYABLE");
-        Long run = jdbcTemplate.queryForObject("INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,insurer_id,validation_run_id) VALUES (?,'GA_TO_FC',?,?) RETURNING reconciliation_run_id",Long.class,TEST_MONTH,insurer,validationRunId);
+        Long journal = insertPostedJournal(payout ? "CONFIRMED_FC_PAYOUT" : "ACTUAL_INSURER_STATEMENT","COMMISSION_TRANSACTION",old.transactionId(),contractId,payout ? agent : null,item,"50000",payout ? "CONFIRMED_PAYOUT_EXPENSE" : "ACTUAL_RECEIVABLE",payout ? "CONFIRMED_PAYOUT_PAYABLE" : "ACTUAL_INCOME");
+        Long run = jdbcTemplate.queryForObject("INSERT INTO fgc.reconciliation_run(settlement_month,payment_stage,insurer_id,validation_run_id) VALUES (?,?,?,?) RETURNING reconciliation_run_id",Long.class,TEST_MONTH,stage.name(),insurer,validationRunId);
         jdbcTemplate.update("UPDATE fgc.reconciliation_run SET status='RUNNING',started_at=clock_timestamp() WHERE reconciliation_run_id=?",run);
-        execution.executeInTransaction(new ReconciliationExecutionRequest(run,validationRunId,TEST_MONTH,PaymentStage.GA_TO_FC,insurer,1L));
+        execution.executeInTransaction(new ReconciliationExecutionRequest(run,validationRunId,TEST_MONTH,stage,insurer,1L));
         detection.bulkCreate(run);
         Long exception = id("SELECT e.exception_case_id FROM fgc.exception_case e JOIN fgc.reconciliation_result r ON e.source_entity_id=CAST(r.reconciliation_result_id AS varchar) WHERE r.reconciliation_run_id=? AND r.contract_id=? AND e.exception_type='RECONCILIATION_MISMATCH'",run,contractId);
         jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING' WHERE validation_run_id=?", validationRunId);
@@ -181,10 +219,11 @@ class PaymentJournalCorrectionIntegrationTest {
 
     private ReverseAndRepostJournalCommand command(Fixture f,String amount) {
         BigDecimal value = new BigDecimal(amount);
-        var lines = List.of(JournalLineDraft.builder().lineNo(1).accountCode(JournalAccountCode.CONFIRMED_PAYOUT_EXPENSE).debitAmount(value).creditAmount(BigDecimal.ZERO).contractId(contractId).agentId(f.agent()).commissionItemId(f.item()).paymentStage(PaymentStage.GA_TO_FC).build(),
-                JournalLineDraft.builder().lineNo(2).accountCode(JournalAccountCode.CONFIRMED_PAYOUT_PAYABLE).debitAmount(BigDecimal.ZERO).creditAmount(value).contractId(contractId).agentId(f.agent()).commissionItemId(f.item()).paymentStage(PaymentStage.GA_TO_FC).build());
+        boolean payout = paymentStage == PaymentStage.GA_TO_FC;
+        var lines = List.of(JournalLineDraft.builder().lineNo(1).accountCode(payout ? JournalAccountCode.CONFIRMED_PAYOUT_EXPENSE : JournalAccountCode.ACTUAL_RECEIVABLE).debitAmount(value).creditAmount(BigDecimal.ZERO).contractId(contractId).agentId(payout ? f.agent() : null).commissionItemId(f.item()).paymentStage(paymentStage).build(),
+                JournalLineDraft.builder().lineNo(2).accountCode(payout ? JournalAccountCode.CONFIRMED_PAYOUT_PAYABLE : JournalAccountCode.ACTUAL_INCOME).debitAmount(BigDecimal.ZERO).creditAmount(value).contractId(contractId).agentId(payout ? f.agent() : null).commissionItemId(f.item()).paymentStage(paymentStage).build());
         return new ReverseAndRepostJournalCommand(new ReverseJournalCommand(f.journal(),"금액 정정","548",1L),
-                JournalHeaderDraft.builder().journalType(JournalType.CONFIRMED_FC_PAYOUT).journalDate(TEST_MONTH.plusDays(14)).sourceEntityType("COMMISSION_TRANSACTION").sourceEntityId(f.payment().toString()).revisionNo(2).validationRunId(validationRunId).contractId(contractId).description("정정").lines(lines).build());
+                JournalHeaderDraft.builder().journalType(payout ? JournalType.CONFIRMED_FC_PAYOUT : JournalType.ACTUAL_INSURER_STATEMENT).journalDate(TEST_MONTH.plusDays(14)).sourceEntityType("COMMISSION_TRANSACTION").sourceEntityId(f.payment().toString()).revisionNo(2).validationRunId(validationRunId).contractId(contractId).description("정정").lines(lines).build());
     }
     private String status(Long id) { return jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?",String.class,id); }
     private String resultType(Long run) { return jdbcTemplate.queryForObject("SELECT result_type FROM fgc.reconciliation_result WHERE reconciliation_run_id=? AND contract_id=?",String.class,run,contractId); }
@@ -235,10 +274,10 @@ class PaymentJournalCorrectionIntegrationTest {
                 INSERT INTO fgc.schedule_header (
                     contract_id, payment_stage, policy_version_id, schedule_version_no,
                     schedule_purpose, scenario_code, schedule_regime, active_yn
-                ) VALUES (?, 'GA_TO_FC', ?, ?, ?, ?, 'CURRENT', ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, 'CURRENT', ?)
                 RETURNING schedule_header_id
                 """, Long.class,
-                contractId, policyVersionId, scheduleVersionNo,
+                contractId, paymentStage.name(), policyVersionId, scheduleVersionNo,
                 schedulePurpose, scenarioCode, active);
         return jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.schedule_line (
@@ -256,29 +295,33 @@ class PaymentJournalCorrectionIntegrationTest {
     private PaymentInsert insertPayment(Long contractId, Long policyVersionId, Long commissionItemId,
                                         Long agentId, Integer installmentNo, String amount,
                                         String status, String suffix) {
-        String paymentStage = "GA_TO_FC";
-        String sourceType = "GA_MANUAL_PAYMENT";
+        String stage = paymentStage.name();
+        String sourceType = paymentStage == PaymentStage.GA_TO_FC ? "GA_MANUAL_PAYMENT" : "INSURER_STATEMENT";
+        Long insurer = id("SELECT insurer_id FROM fgc.insurance_contract WHERE contract_id=?",contractId);
+        Long batch = paymentStage == PaymentStage.GA_TO_FC ? null : jdbcTemplate.queryForObject(
+                "INSERT INTO fgc.statement_batch(insurer_id,settlement_month,statement_type,external_statement_no,received_on,source_ref) VALUES (?,?,'INSURER_COMMISSION',?,?,?) RETURNING statement_batch_id",Long.class,
+                insurer,TEST_MONTH,UUID.randomUUID().toString(),TEST_MONTH,"548");
         LocalDate dueDate = TEST_MONTH.plusDays(14);
         Long transactionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.commission_transaction (
                     payment_stage, source_type, source_business_key, source_contract_id,
                     recipient_agent_id, commission_item_id, policy_version_id, installment_no,
-                    settlement_month, due_date, amount, cashflow_type, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYMENT', 'DRAFT')
+                    settlement_month, due_date, amount, insurer_id, statement_batch_id, cashflow_type, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYMENT', 'DRAFT')
                 RETURNING commission_transaction_id
                 """, Long.class,
-                paymentStage, sourceType,
-                "IT-048-03:" + suffix, contractId, agentId, commissionItemId, policyVersionId,
-                installmentNo, TEST_MONTH, dueDate, new BigDecimal(amount));
+                stage, sourceType,
+                "IT-048-03:" + suffix, contractId, paymentStage == PaymentStage.GA_TO_FC ? agentId : null, commissionItemId, policyVersionId,
+                installmentNo, TEST_MONTH, dueDate, new BigDecimal(amount), insurer, batch);
         Long attributionId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.transaction_attribution (
                     commission_transaction_id, attribution_seq, attribution_scope, contract_id,
                     attribution_date, attribution_month, attributed_amount,
-                    inclusion_status_snapshot, attribution_method
-                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, 'INCLUDED', 'DIRECT')
+                    inclusion_status_snapshot, attribution_method, agent_id
+                ) VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, 'INCLUDED', 'DIRECT', ?)
                 RETURNING transaction_attribution_id
                 """, Long.class,
-                transactionId, contractId, dueDate, TEST_MONTH, new BigDecimal(amount));
+                transactionId, contractId, dueDate, TEST_MONTH, new BigDecimal(amount), agentId);
         if ("CONFIRMED".equals(status)) {
             jdbcTemplate.update("""
                     UPDATE fgc.commission_transaction
@@ -319,11 +362,11 @@ class PaymentJournalCorrectionIntegrationTest {
                 INSERT INTO fgc.journal_line (
                     journal_header_id, line_no, journal_account_id, debit_amount, credit_amount,
                     contract_id, agent_id, payment_stage, commission_item_id
-                ) VALUES (?, 1, ?, ?, 0, ?, ?, 'GA_TO_FC', ?),
-                         (?, 2, ?, 0, ?, ?, ?, 'GA_TO_FC', ?)
+                ) VALUES (?, 1, ?, ?, 0, ?, ?, ?, ?),
+                         (?, 2, ?, 0, ?, ?, ?, ?, ?)
                 """,
-                journalHeaderId, debitAccountId, journalAmount, contractId, agentId, commissionItemId,
-                journalHeaderId, creditAccountId, journalAmount, contractId, agentId, commissionItemId);
+                journalHeaderId, debitAccountId, journalAmount, contractId, agentId, paymentStage.name(), commissionItemId,
+                journalHeaderId, creditAccountId, journalAmount, contractId, agentId, paymentStage.name(), commissionItemId);
         jdbcTemplate.update(
                 "UPDATE fgc.journal_header SET status = 'POSTED' WHERE journal_header_id = ?",
                 journalHeaderId);

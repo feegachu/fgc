@@ -28,11 +28,13 @@ public class PaymentJournalCorrectionRepository {
         return changed;
     }
 
-    /** 등록 API에 없는 원 명세/귀속 식별자는 대체 지급이 아직 DRAFT일 때 승계한다. */
+    /** 수동 정정 건의 원 명세 배치는 정정 연결의 원 지급을 통해 추적한다.
+     * INSURER_TO_GA 수동 지급에 batch를 붙이면 실제 명세 대사 필터에서 빠지므로 직접 승계하지 않는다. */
     public void copySourceMetadata(Long oldId, Long newId) {
         entityManager.createNativeQuery("""
                 UPDATE fgc.commission_transaction n SET installment_no = o.installment_no, paid_on = o.paid_on,
-                    statement_batch_id = o.statement_batch_id, insurer_id = o.insurer_id
+                    statement_batch_id = CASE WHEN n.payment_stage = 'INSURER_TO_GA' THEN NULL
+                        ELSE o.statement_batch_id END, insurer_id = o.insurer_id
                 FROM fgc.commission_transaction o
                 WHERE n.commission_transaction_id = :newId AND o.commission_transaction_id = :oldId
                 """).setParameter("newId", newId).setParameter("oldId", oldId).executeUpdate();

@@ -15,7 +15,14 @@ public class PaymentCorrectionReconciliationRepository {
 
     public List<?> lockValidations(Long originalRun, Long paymentId) {
         return entityManager.createNativeQuery("""
-                SELECT vr.validation_run_id, vr.status FROM fgc.validation_run vr
+                SELECT vr.validation_run_id, vr.status,
+                    EXISTS (SELECT 1 FROM fgc.reconciliation_run fr
+                        JOIN fgc.reconciliation_result result ON result.reconciliation_run_id = fr.reconciliation_run_id
+                        JOIN fgc.reconciliation_match match ON match.reconciliation_result_id = result.reconciliation_result_id
+                        JOIN fgc.transaction_attribution ta ON ta.transaction_attribution_id = match.transaction_attribution_id
+                        WHERE fr.validation_run_id = vr.validation_run_id AND NOT fr.superseded_yn
+                          AND ta.commission_transaction_id = :paymentId) AS includes_payment
+                FROM fgc.validation_run vr
                 WHERE vr.validation_run_id = :originalRun OR vr.validation_run_id IN (
                     SELECT r.validation_run_id FROM fgc.reconciliation_run r
                     JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = :paymentId

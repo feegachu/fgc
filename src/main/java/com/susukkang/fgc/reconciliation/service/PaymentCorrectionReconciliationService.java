@@ -41,10 +41,11 @@ public class PaymentCorrectionReconciliationService {
         List<?> validations = repository.lockValidations(original.getValidationRunId(), paymentId);
         for (Object row : validations) {
             Object[] v = (Object[]) row;
-            if (original.getValidationRunId() != null
-                    && ((Number) v[0]).longValue() == original.getValidationRunId()
-                    && "FINALIZED".equals(v[1])) throw new FgcBusinessException(FgcErrorCode.VRUN_003,
-                    Map.of("validationRunId", original.getValidationRunId()));
+            boolean ownsOriginal = original.getValidationRunId() != null
+                    && ((Number) v[0]).longValue() == original.getValidationRunId();
+            if ("FINALIZED".equals(v[1]) && (ownsOriginal || Boolean.TRUE.equals(v[2]))) {
+                throw new FgcBusinessException(FgcErrorCode.VRUN_003, Map.of("validationRunId", v[0]));
+            }
         }
         List<?> rows = repository.lockRuns(paymentId, original.getContractId());
         return rows.stream().map(row -> {
