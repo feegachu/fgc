@@ -322,7 +322,8 @@ export function BasePage() {
                   {paged && (
                     <div className="base-pagination-footer">
                       <Pagination
-                        compact
+                        legacy
+                        label="기준정보 목록 페이지 선택"
                         page={paged.page ?? page}
                         totalPages={paged.totalPages ?? 0}
                         onPageChange={(nextPage) =>

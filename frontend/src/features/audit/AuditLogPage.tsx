@@ -99,7 +99,8 @@ export default function AuditLogPage() {
                 {criteria.page} / {totalPages} 페이지
               </span>
               <Pagination
-                compact
+                legacy
+                label="감사로그 목록 페이지 선택"
                 page={criteria.page}
                 totalPages={totalPages}
                 onPageChange={(page) => update({ page: String(page), selected: '' }, { resetPage: false })}

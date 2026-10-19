@@ -238,7 +238,8 @@ export default function ScheduleListPage() {
               {criteria.page} / {Math.max(1, totalPages)} 페이지
             </span>
             <Pagination
-              compact
+              legacy
+              label="예상 스케줄 목록 페이지 선택"
               page={criteria.page}
               totalPages={totalPages}
               onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}

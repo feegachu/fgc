@@ -147,17 +147,18 @@ export default function ValidationRunListPage() {
           emptyMessage={runs.isPending ? '불러오는 중입니다.' : undefined}
         />
         {totalPages > 1 && (
-          <nav className="vrun-pagination" aria-label="월 통합검증 실행 목록 페이지">
+          <footer className="vrun-pagination">
             <span className="tabular-nums" aria-live="polite">
               {criteria.page} / {totalPages} 페이지
             </span>
             <Pagination
-              compact
+              legacy
+              label="월 통합검증 실행 목록 페이지 선택"
               page={criteria.page}
               totalPages={totalPages}
               onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
             />
-          </nav>
+          </footer>
         )}
       </section>
     </div>

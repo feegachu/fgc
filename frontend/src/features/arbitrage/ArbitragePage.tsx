@@ -198,8 +198,7 @@ export default function ArbitragePage() {
           <footer className="arb-pagination-footer">
             {(query.data?.items?.totalPages ?? 0) > 1 && !query.error ? (
               <Pagination
-                compact
-                allPages
+                legacy
                 label="차익거래 검증 목록 페이지"
                 page={query.data?.items?.page ?? criteria.page}
                 totalPages={query.data?.items?.totalPages ?? 0}

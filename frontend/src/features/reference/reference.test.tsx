@@ -153,7 +153,7 @@ it('BASE five tabs, required product selection, dropdowns and item categories', 
   await user.click(screen.getByRole('tab', { name: '수수료 항목' }))
   await screen.findByText('기본수수료')
   expect(screen.getByText('모집수수료')).toBeVisible()
-  expect(screen.queryByRole('navigation', { name: '페이지 선택' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('navigation', { name: '기준정보 목록 페이지 선택' })).not.toBeInTheDocument()
 })
 it.each(['organization', 'insurer', 'product', 'agent', 'commission-item'])(
   'BASE %s supports empty 200',

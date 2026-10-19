@@ -247,7 +247,8 @@ export default function CapListPage() {
             </select>
           </label>
           <Pagination
-            compact
+            legacy
+            label="1,200% 한도 검증 목록 페이지 선택"
             page={criteria.page}
             totalPages={data?.totalPages ?? 0}
             onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}

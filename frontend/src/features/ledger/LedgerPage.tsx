@@ -174,7 +174,8 @@ export default function LedgerPage() {
             emptyMessage={searched ? '조건에 맞는 자료가 없습니다.' : '조회 조건을 설정하고 조회 버튼을 눌러 주세요.'}
           />
           <Pagination
-            compact
+            legacy
+            label="검증원장 목록 페이지 선택"
             page={criteria.page}
             totalPages={data?.totalPages ?? 0}
             onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
