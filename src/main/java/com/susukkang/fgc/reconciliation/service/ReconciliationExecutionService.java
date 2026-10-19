@@ -1,6 +1,5 @@
 package com.susukkang.fgc.reconciliation.service;
 
-import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationCandidate;
 import com.susukkang.fgc.reconciliation.port.ReconciliationExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +27,12 @@ public class ReconciliationExecutionService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public long execute(ReconciliationExecutionRequest request) {
+        return executeInTransaction(request);
+    }
+
+    /** 정정 지급의 미커밋 상태와 새 원장을 동일 트랜잭션에서 대사한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public long executeInTransaction(ReconciliationExecutionRequest request) {
         List<? extends ReconciliationCandidate> candidates = switch (request.paymentStage()) {
             case INSURER_TO_GA -> insurerGaMatcher.match(request);
             case GA_TO_FC -> gaFcMatcher.match(request);

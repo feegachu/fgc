@@ -1,6 +1,7 @@
 package com.susukkang.fgc.journal.service;
 
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.reconciliation.service.PaymentCorrectionReconciliationService;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -66,6 +67,8 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     private final JournalLineRepository journalLineRepository;
     private final JournalAccountRepository journalAccountRepository;
     private final AuditLogService auditLogService;
+    private final PaymentJournalCorrectionService paymentCorrection;
+    private final PaymentCorrectionReconciliationService reconciliationCorrection;
 
     @Override
     @Transactional
@@ -210,6 +213,8 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 ? List.of()
                 : validateCorrectedDraft(original, correctedDraft);
 
+        List<Long> affectedRuns = paymentCorrection.supports(original)
+                ? reconciliationCorrection.lockAffectedRuns(original) : List.of();
         lockNumberingMonths(original.getJournalDate(),
                 correctedDraft == null ? null : correctedDraft.getJournalDate());
 
@@ -221,6 +226,9 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
                 .evidenceRef(request.evidenceRef())
                 .createdBy(command.requestedBy())
                 .build());
+
+        correctedDraft = paymentCorrection.correct(original, correctedDraft, correctionGroupKey,
+                request.reason(), request.evidenceRef(), command.requestedBy());
 
         Long reversalId = insertReversal(
                 original, originalLines, correctionGroupKey, request.reason(), command.requestedBy());
@@ -240,6 +248,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
             }
         }
 
+        reconciliationCorrection.refresh(affectedRuns, correctionGroupKey, command.requestedBy());
         recordAudit(original, reversalId, repostedId, correctionGroupKey,
                 request, command.requestedBy(), originalLines, correctedDraft);
 

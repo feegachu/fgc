@@ -100,6 +100,20 @@ afterEach(() => {
 })
 
 describe('TRAN-W01 수수료 지급 목록', () => {
+  it('취소된 원 지급은 흐름도 취소로 표시하고 대체 지급은 지급으로 표시한다', async () => {
+    resultRows = [
+      { ...row, status: 'CANCELLED', statusLabel: '취소', sourceBusinessKey: 'OLD-548' },
+      { ...row, commissionTransactionId: 42, status: 'CONFIRMED', statusLabel: '확정', sourceBusinessKey: 'NEW-548' },
+    ]
+    renderAt()
+    const old = (await screen.findByText('OLD-548')).closest('tr')!
+    const replacement = (await screen.findByText('NEW-548')).closest('tr')!
+    expect(within(old).getAllByText('취소')).toHaveLength(2)
+    expect(within(old).queryByText('지급')).not.toBeInTheDocument()
+    expect(within(replacement).getByText('지급')).toBeInTheDocument()
+    expect(within(replacement).getByText('확정')).toBeInTheDocument()
+  })
+
   it('URL 필터·20행·서버 건수 및 현재 페이지 금액 합계를 유지한다', async () => {
     renderAt(
       '/app/transactions?settlementMonth=2026-08&paymentStage=GA_TO_FC&insurerId=8&contractNo=POL-001&sourceType=GA_MANUAL_PAYMENT&agentId=3&commissionItemId=2&status=DRAFT&noAttributionOnly=true&attributionImbalanceOnly=true&page=2',
