@@ -12,7 +12,7 @@ import java.sql.SQLException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** SRC-050: V54 -> V55 upgrade keeps the existing guard bodies and repairs function settings. */
+/** FGC-FUN-047 / SRC-050: V54 -> V55 upgrade keeps the existing guard bodies and repairs function settings. */
 class JournalGuardSearchPathMigrationIntegrationTest {
     private static final String URL = "jdbc:tc:postgresql:17:///fgc_journal_guard_upgrade";
 
