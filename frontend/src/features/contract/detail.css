@@ -185,13 +185,11 @@
 }
 .contract-information-grid,
 .contract-summary-grid,
-.contract-data-panel dl,
 .contract-history-times {
   margin-block: 1em;
 }
 .contract-information-grid dd,
 .contract-summary-grid dd,
-.contract-data-panel dd,
 .contract-history-times dd {
   margin-left: 0;
 }

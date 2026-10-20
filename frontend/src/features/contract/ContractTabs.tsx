@@ -117,13 +117,11 @@ export function ContractTabs({
   contract,
   active,
   onSelect,
-  fetchedAt,
 }: {
   id: string
   contract: ContractDetail
   active: ContractTab
   onSelect: (tab: ContractTab) => void
-  fetchedAt: number
 }) {
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])
   return (
@@ -176,7 +174,7 @@ export function ContractTabs({
         >
           {active === name &&
             (name === 'basic' ? (
-              <BasicTab id={id} contract={contract} fetchedAt={fetchedAt} />
+              <BasicTab id={id} contract={contract} />
             ) : name === 'schedules' ? (
               <SchedulesTab id={id} />
             ) : name === 'cap' ? (
@@ -205,7 +203,7 @@ function PanelHeading({ title, children, legacy = false }: { title: string; chil
   )
 }
 
-function BasicTab({ id, contract, fetchedAt }: { id: string; contract: ContractDetail; fetchedAt: number }) {
+function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
   const history = useQuery(contractEventsQuery(id))
   const [sort, setSort] = useState<StatusSort>('effectiveAt')
   return (
@@ -317,23 +315,6 @@ function BasicTab({ id, contract, fetchedAt }: { id: string; contract: ContractD
                 )
               }
             </QueryContent>
-          </section>
-          <section className="contract-data-panel" aria-labelledby="contract-data-title">
-            <h3 id="contract-data-title">데이터 관리</h3>
-            <dl>
-              <div>
-                <dt>조회 API</dt>
-                <dd>/api/v1/contracts/{id}</dd>
-              </div>
-              <div>
-                <dt>기본 정렬</dt>
-                <dd>효력일시 오름차순</dd>
-              </div>
-              <div>
-                <dt>최종 조회</dt>
-                <dd>{fetchedAt ? dateTime(new Date(fetchedAt).toISOString()) : '—'}</dd>
-              </div>
-            </dl>
           </section>
         </div>
       </div>
