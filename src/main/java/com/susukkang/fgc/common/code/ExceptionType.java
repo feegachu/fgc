@@ -8,58 +8,36 @@ package com.susukkang.fgc.common.code;
  * @since 2026-08-12
  */
 public enum ExceptionType {
-    CAP_WARNING,                 // 한도 사용률 주의
-    CAP_VIOLATION,               // 한도 초과 위반
-    CAP_REVIEW_REQUIRED,         // 한도 검토 필요
-    RECONCILIATION_MISMATCH,     // 대사 결과 불일치
-    JOURNAL_IMBALANCE,           // 회계 원장 차변·대변 불일치
-    JOURNAL_CORRECTION_REQUIRED, // 회계 원장 역분개·재기표 필요
-    ARBITRAGE_CANDIDATE,         // 차익거래 의심 후보
-    REFUND_TABLE_MISSING,        // 해약환급률표 누락
-    PRODUCT_CODE_MISMATCH,       // 상품 코드 불일치
-    POLICY_MISSING,              // 적용 가능한 정책 누락
-    POLICY_DUPLICATE,            // 적용 가능한 정책 중복
-    ALLOCATION_EVIDENCE_MISSING, // 배부 근거 누락
-    DATA_QUALITY,                // 데이터 품질 오류
-    OTHER;                       // 기타 예외
+    CAP_WARNING("1,200% 주의", "사용률 경고 기준 이상"),
+    CAP_VIOLATION("1,200% 위반", "확정 위반 판정"),
+    CAP_REVIEW_REQUIRED("1,200% 검토필요", "한도 판정 근거 확인 필요"),
+    RECONCILIATION_MISMATCH("대사 불일치", "대사 금액 차이 확인 필요"),
+    JOURNAL_IMBALANCE("원장 불균형", "차변·대변 합계 확인 필요"),
+    JOURNAL_CORRECTION_REQUIRED("원장 정정 필요", "역분개·재기표 검토 필요"),
+    ARBITRAGE_CANDIDATE("차익거래 검토대상", "위반 확정 아님"),
+    REFUND_TABLE_MISSING("환급률표 없음", "적용할 환급률표 확인 필요"),
+    PRODUCT_CODE_MISMATCH("상품코드 불일치", "상품코드 연결 확인 필요"),
+    POLICY_MISSING("정책 없음", "적용 가능한 정책 확인 필요"),
+    POLICY_DUPLICATE("정책 중복", "중복 적용 정책 확인 필요"),
+    ALLOCATION_EVIDENCE_MISSING("배부 근거 없음", "배부 근거 보완 필요"),
+    DATA_QUALITY("데이터 품질", "입력 데이터 확인 필요"),
+    OTHER("기타", "상세 내용 확인 필요");
+
+    private final String label;
+    private final String summaryDescription;
+
+    ExceptionType(String label, String summaryDescription) {
+        this.label = label;
+        this.summaryDescription = summaryDescription;
+    }
 
     /** EXCP-W01 요약 카드에서 유형의 업무 의미를 설명한다. */
     public String summaryDescription() {
-        return switch (this) {
-            case CAP_WARNING -> "사용률 경고 기준 이상";
-            case CAP_VIOLATION -> "확정 위반 판정";
-            case CAP_REVIEW_REQUIRED -> "한도 판정 근거 확인 필요";
-            case RECONCILIATION_MISMATCH -> "대사 금액 차이 확인 필요";
-            case JOURNAL_IMBALANCE -> "차변·대변 합계 확인 필요";
-            case JOURNAL_CORRECTION_REQUIRED -> "역분개·재기표 검토 필요";
-            case ARBITRAGE_CANDIDATE -> "위반 확정 아님";
-            case REFUND_TABLE_MISSING -> "적용할 환급률표 확인 필요";
-            case PRODUCT_CODE_MISMATCH -> "상품코드 연결 확인 필요";
-            case POLICY_MISSING -> "적용 가능한 정책 확인 필요";
-            case POLICY_DUPLICATE -> "중복 적용 정책 확인 필요";
-            case ALLOCATION_EVIDENCE_MISSING -> "배부 근거 보완 필요";
-            case DATA_QUALITY -> "입력 데이터 확인 필요";
-            case OTHER -> "상세 내용 확인 필요";
-        };
+        return summaryDescription;
     }
 
     /** 화면정의서 EXCP-W01의 예외 유형 코드-표기 매핑과 일치시킨다. */
     public String label() {
-        return switch (this) {
-            case CAP_WARNING -> "1,200% 주의";
-            case CAP_VIOLATION -> "1,200% 위반";
-            case CAP_REVIEW_REQUIRED -> "1,200% 검토필요";
-            case RECONCILIATION_MISMATCH -> "대사 불일치";
-            case JOURNAL_IMBALANCE -> "원장 불균형";
-            case JOURNAL_CORRECTION_REQUIRED -> "원장 정정 필요";
-            case ARBITRAGE_CANDIDATE -> "차익거래 검토대상";
-            case REFUND_TABLE_MISSING -> "환급률표 없음";
-            case PRODUCT_CODE_MISMATCH -> "상품코드 불일치";
-            case POLICY_MISSING -> "정책 없음";
-            case POLICY_DUPLICATE -> "정책 중복";
-            case ALLOCATION_EVIDENCE_MISSING -> "배부 근거 없음";
-            case DATA_QUALITY -> "데이터 품질";
-            case OTHER -> "기타";
-        };
+        return label;
     }
 }
