@@ -2,6 +2,7 @@
 -- Read-only catalog inspection; does not prove rejection scenarios or validate old data.
 -- Example: psql "$RUNTIME_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f scripts/verification/db-integrity-audit.sql
 BEGIN READ ONLY;
+SET LOCAL search_path = pg_catalog, pg_temp;
 SET LOCAL statement_timeout = '15s';
 
 SELECT current_database() AS database_name, session_user, current_user,

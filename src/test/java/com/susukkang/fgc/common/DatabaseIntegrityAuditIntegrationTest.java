@@ -135,6 +135,30 @@ class DatabaseIntegrityAuditIntegrationTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({"audit_plain,false,public", "audit_plain,false,'pg_temp, pg_catalog'",
+            "fgc,true,public", "fgc,true,'pg_temp, pg_catalog'"})
+    void ignoresShadowCatalogAndRestoresCallerSearchPath(String role, boolean superuser, String searchPath)
+            throws Exception {
+        try (var connection = connect(role)) {
+            execute(connection, "CREATE TEMP TABLE pg_roles AS SELECT * FROM pg_catalog.pg_roles");
+            execute(connection, "UPDATE pg_temp.pg_roles SET rolsuper = NOT rolsuper WHERE rolname = current_user");
+            execute(connection, "SET search_path = " + searchPath);
+
+            var result = audit(connection);
+            assertThat(result.rows()).anySatisfy(row -> assertThat(row)
+                    .containsEntry("rolname", role).containsEntry("rolsuper", superuser));
+            assertThat(result.warnings().stream()
+                    .anyMatch(message -> message.contains("Superuser session/current role detected")))
+                    .isEqualTo(superuser);
+            try (var statement = connection.createStatement();
+                 var settings = statement.executeQuery("SHOW search_path")) {
+                assertThat(settings.next()).isTrue();
+                assertThat(settings.getString(1)).isEqualTo(searchPath);
+            }
+        }
+    }
+
     private AuditResult audit(Connection connection) throws Exception {
         var rows = new ArrayList<Map<String, Object>>();
         var warnings = new ArrayList<String>();
