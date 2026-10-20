@@ -350,6 +350,9 @@ describe('EXCP-W01 예외함', () => {
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText(/J-0070/)).toBeInTheDocument()
     expect(within(dialog).getByText('차변·대변 검증 통과')).toBeInTheDocument()
+    // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
+    expect(within(dialog).getAllByText('미수수수료').length).toBeGreaterThan(0)
+    expect(within(dialog).queryByText(/1100|4100/)).not.toBeInTheDocument()
     await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
     await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
     expect(await within(dialog).findByText('역분개와 재기표를 완료했습니다.')).toBeInTheDocument()
