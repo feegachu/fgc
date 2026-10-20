@@ -1,4 +1,5 @@
 import { invalidateJournalCorrectionQueries } from '../ledger/correction-cache'
+import { accountDisplayName } from '../ledger/accountName'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
@@ -75,7 +76,7 @@ function OriginalJournal({ journal }: { journal: JournalDetail }) {
             {line.lineNo}
           </span>,
           <span key={`${line.lineNo}-account`} className="journal-correction-original-line">
-            {line.accountCode} · {line.accountName ?? '-'}
+            {accountDisplayName(line.accountCode, line.accountName)}
           </span>,
           <span key={`${line.lineNo}-debit`} className="journal-correction-original-line">
             {won(line.debitAmount)}
@@ -284,7 +285,7 @@ function CorrectionBody({
                         <option value="">계정과목 선택</option>
                         {accounts.map((account) => (
                           <option key={account.accountCode} value={account.accountCode}>
-                            {account.accountCode} · {account.accountName}
+                            {accountDisplayName(account.accountCode, account.accountName)}
                           </option>
                         ))}
                       </select>
