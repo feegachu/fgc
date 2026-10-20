@@ -1564,6 +1564,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     private List<CapCandidateExclusion> capExclusions(List<ConfirmationData> attributions) {
         return attributions.stream().filter(row -> !isClawback(row))
+                .filter(row -> !isOutsideCapScope(row))
                 .filter(CapCandidateExclusion::isOutsideFirstYear).map(CapCandidateExclusion::from).toList();
     }
 

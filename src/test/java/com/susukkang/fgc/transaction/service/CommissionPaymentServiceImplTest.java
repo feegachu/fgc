@@ -2214,6 +2214,41 @@ class CommissionPaymentServiceImplTest {
     }
 
     @Test
+    void nonProtectionSecondYearPaymentHasNoFirstYearExclusion() {
+        var data = withDates(confirmation(
+                201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"),
+                LocalDate.of(2026, 7, 3), LocalDate.of(2027, 7, 3));
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findProtectionType(3L)).willReturn("SAVINGS");
+
+        var response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isTrue();
+        assertThat(response.blockers()).isEmpty();
+        assertThat(response.capPreview()).isEmpty();
+        assertThat(response.capExclusions()).isEmpty();
+        verify(capCalculator, never()).calculate(any());
+        assertPrecheckSavesNothing();
+
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        given(writeRepository.confirm(101L, "savings-second-year", "")).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.CONFIRMED));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of(attributionRow(1, 3L, "200000")));
+
+        var confirmed = service.confirm(101L, "savings-second-year");
+
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).isEmpty();
+        ArgumentCaptor<AuditLogService.AuditEvent> captor =
+                ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(captor.capture());
+        assertThat(captor.getValue().actionCode()).isEqualTo("PAYMENT_CONFIRMED");
+        assertThat((Map<String, Object>) captor.getValue().after())
+                .containsEntry("capExclusions", List.of());
+    }
+
+    @Test
     void precheckOutsideFirstYearSkipsCapRuleAndOldViolation() {
         ConfirmationData data = withDates(confirmation(
                 201L, 3L, "200000", "200000", InclusionDecisionStatus.INCLUDED,

@@ -1292,7 +1292,10 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
     }
 
     private List<CapCandidateExclusion> capExclusions(List<ConfirmationData> attributions) {
-        return attributions.stream().filter(row -> !isClawback(row)).filter(CapCandidateExclusion::isOutsideFirstYear)
+        return attributions.stream().filter(row -> !isClawback(row))
+                .filter(row -> row.contractId() == null
+                        || com.susukkang.fgc.common.code.ProtectionType.isRegulated(mapper.findProtectionType(row.contractId())))
+                .filter(CapCandidateExclusion::isOutsideFirstYear)
                 .map(CapCandidateExclusion::from).toList();
     }
 
