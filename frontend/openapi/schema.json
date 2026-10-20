@@ -2641,8 +2641,14 @@
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
           },
+          "contractStatusLabel" : {
+            "type" : "string"
+          },
           "dataOrigin" : {
             "enum" : [ "SEED", "NORMALIZED_DB", "MANUAL" ],
+            "type" : "string"
+          },
+          "dataOriginLabel" : {
             "type" : "string"
           },
           "firstPremiumAmount" : {
@@ -2670,6 +2676,9 @@
           },
           "paymentCycleCode" : {
             "enum" : [ "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "SINGLE", "OTHER" ],
+            "type" : "string"
+          },
+          "paymentCycleCodeLabel" : {
             "type" : "string"
           },
           "paymentTermMonths" : {
@@ -2930,8 +2939,14 @@
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
           },
+          "newStatusLabel" : {
+            "type" : "string"
+          },
           "previousStatus" : {
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "previousStatusLabel" : {
             "type" : "string"
           },
           "processings" : {
@@ -3141,6 +3156,9 @@
             "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
             "type" : "string"
           },
+          "capResultStatusLabel" : {
+            "type" : "string"
+          },
           "contractDate" : {
             "format" : "date",
             "type" : "string"
@@ -3156,8 +3174,14 @@
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
           },
+          "contractStatusLabel" : {
+            "type" : "string"
+          },
           "dataOrigin" : {
             "enum" : [ "SEED", "NORMALIZED_DB", "MANUAL" ],
+            "type" : "string"
+          },
+          "dataOriginLabel" : {
             "type" : "string"
           },
           "insurerName" : {
@@ -6358,7 +6382,7 @@
     },
     "/api/v1/base/agents" : {
       "get" : {
-        "description" : "기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.",
+        "description" : "기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.",
         "operationId" : "search_8",
         "parameters" : [ {
           "description" : "소속 조직 ID",
@@ -6386,6 +6410,24 @@
           "schema" : {
             "format" : "date",
             "type" : "string"
+          }
+        }, {
+          "description" : "기준일 이전 해촉 설계사 포함 여부(계약 이력 검색용, 위촉일은 기준일 이하로 유지)",
+          "in" : "query",
+          "name" : "includeTerminated",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
+          }
+        }, {
+          "description" : "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.",
+          "in" : "query",
+          "name" : "includeHistorical",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
           }
         }, {
           "description" : "페이지(1-base)",
@@ -6510,7 +6552,7 @@
     },
     "/api/v1/base/organizations" : {
       "get" : {
-        "description" : "기준일자에 적용되는 조직을 코드 또는 이름으로 검색합니다. 적용기간 안의 비활성 조직도 반환되며 activeYn=false인 항목은 선택할 수 없습니다.",
+        "description" : "기준일자에 적용되는 조직을 코드 또는 이름으로 검색합니다. includeHistorical=true이면 기간 밖 조직도 계약 검색용으로 반환합니다. 비활성 조직도 조회되며 신규 입력에서는 선택을 제한합니다.",
         "operationId" : "search_6",
         "parameters" : [ {
           "description" : "조직 코드 또는 조직명 검색어",
@@ -6529,6 +6571,15 @@
           "schema" : {
             "format" : "date",
             "type" : "string"
+          }
+        }, {
+          "description" : "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.",
+          "in" : "query",
+          "name" : "includeHistorical",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
           }
         }, {
           "description" : "페이지(1-base)",
@@ -6571,7 +6622,7 @@
     },
     "/api/v1/base/products" : {
       "get" : {
-        "description" : "보험회사와 기준일자에 해당하는 활성 상품 판매버전을 조회합니다.",
+        "description" : "보험회사와 기준일자에 해당하는 활성 상품 판매버전을 조회합니다. includeExpired=true이면 판매 종료 버전을 포함하고, includeHistorical=true이면 판매기간·활성 조건을 해제해 계약 검색용 전체 버전을 반환합니다.",
         "operationId" : "search_5",
         "parameters" : [ {
           "description" : "보험회사 ID",
@@ -6592,6 +6643,24 @@
           "schema" : {
             "format" : "date",
             "type" : "string"
+          }
+        }, {
+          "description" : "판매 종료 버전 포함 여부(계약 이력 검색용, 판매시작일은 기준일 이하로 유지)",
+          "in" : "query",
+          "name" : "includeExpired",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
+          }
+        }, {
+          "description" : "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.",
+          "in" : "query",
+          "name" : "includeHistorical",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
           }
         }, {
           "description" : "페이지(1-base)",
@@ -6715,7 +6784,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/CapCheckSearchResponse"
+                  "$ref" : "#/components/schemas/ApiResponseCapCheckSearchResponse"
                 }
               }
             },
@@ -6765,7 +6834,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/CapCheckBasisResponse"
+                  "$ref" : "#/components/schemas/ApiResponseCapCheckBasisResponse"
                 }
               }
             },
@@ -7242,7 +7311,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/DashboardSummaryResponse"
+                  "$ref" : "#/components/schemas/ApiResponseDashboardSummaryResponse"
                 }
               }
             },
@@ -7730,7 +7799,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PolicyDetailResponse"
+                  "$ref" : "#/components/schemas/ApiResponsePolicyDetailResponse"
                 }
               }
             },
@@ -8509,7 +8578,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/TransactionPrecheckResponse"
+                  "$ref" : "#/components/schemas/ApiResponseTransactionPrecheckResponse"
                 }
               }
             },
@@ -8597,7 +8666,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ValidationRunSearchResponse"
+                  "$ref" : "#/components/schemas/ApiResponseValidationRunSearchResponse"
                 }
               }
             },
@@ -8645,7 +8714,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/CreateValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiResponseCreateValidationRunResponse"
                 }
               }
             },
@@ -8715,7 +8784,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ActiveMonthlyRunResponse"
+                  "$ref" : "#/components/schemas/ApiResponseActiveMonthlyRunResponse"
                 }
               }
             },
@@ -8765,7 +8834,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ValidationRunDetailResponse"
+                  "$ref" : "#/components/schemas/ApiResponseValidationRunDetailResponse"
                 }
               }
             },
@@ -8815,7 +8884,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ValidationRunExecuteResponse"
+                  "$ref" : "#/components/schemas/ApiResponseValidationRunExecuteResponse"
                 }
               }
             },
@@ -8891,7 +8960,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FinalizeValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiResponseFinalizeValidationRunResponse"
                 }
               }
             },
@@ -8970,7 +9039,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FinalizeChecklistResponse"
+                  "$ref" : "#/components/schemas/ApiResponseFinalizeChecklistResponse"
                 }
               }
             },
@@ -9020,7 +9089,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ValidationRunProgressResponse"
+                  "$ref" : "#/components/schemas/ApiResponseValidationRunProgressResponse"
                 }
               }
             },

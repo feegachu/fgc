@@ -9,6 +9,9 @@ import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.ContractStatus;
+import com.susukkang.fgc.common.code.DataOrigin;
+import com.susukkang.fgc.common.code.PaymentCycleCode;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
@@ -16,6 +19,7 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
+import com.susukkang.fgc.contract.dto.ContractStatusEventResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import com.susukkang.fgc.contract.service.ContractJournalProjectionService;
 import com.susukkang.fgc.contract.service.ContractService;
@@ -74,6 +78,9 @@ class ContractDetailControllerTest {
                         .contractId(21L)
                         .contractNo("TEST-20260806-001")
                         .productName("가상 건강보장보험 A")
+                        .contractStatus(ContractStatus.ACTIVE)
+                        .paymentCycleCode(PaymentCycleCode.MONTHLY)
+                        .dataOrigin(DataOrigin.MANUAL)
                         .build());
 
         mockMvc.perform(get("/api/v1/contracts/{id}", 21L)
@@ -81,7 +88,10 @@ class ContractDetailControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.contractId").value(21))
                 .andExpect(jsonPath("$.data.contractNo").value("TEST-20260806-001"))
-                .andExpect(jsonPath("$.data.productName").value("가상 건강보장보험 A"));
+                .andExpect(jsonPath("$.data.productName").value("가상 건강보장보험 A"))
+                .andExpect(jsonPath("$.data.contractStatusLabel").value("정상"))
+                .andExpect(jsonPath("$.data.paymentCycleCodeLabel").value("월납"))
+                .andExpect(jsonPath("$.data.dataOriginLabel").value("수동 입력"));
     }
 
     @Test
@@ -96,6 +106,20 @@ class ContractDetailControllerTest {
                 .andExpect(jsonPath("$.data").isEmpty());
 
         verify(contractService).selectStatusEventsByContractId(21L);
+    }
+
+    @Test
+    @DisplayName("계약 상태 사건은 이전 상태가 없어도 새 상태 라벨을 반환한다")
+    void statusEventLabelsKeepNullablePreviousStatus() throws Exception {
+        when(contractService.selectStatusEventsByContractId(21L)).thenReturn(List.of(
+                new ContractStatusEventResponse(1, null, ContractStatus.ACTIVE,
+                        null, null, List.of(), "TEST", "1")));
+
+        mockMvc.perform(get("/api/v1/contracts/{id}/status-events", 21L)
+                        .with(user("settlement").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].previousStatusLabel").doesNotExist())
+                .andExpect(jsonPath("$.data[0].newStatusLabel").value("정상"));
     }
 
     @Test

@@ -8,8 +8,6 @@ import com.susukkang.fgc.dashboard.service.DashboardService;
 import com.susukkang.fgc.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +38,7 @@ public class DashboardController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = DashboardSummaryResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "month 형식(yyyy-MM) 오류 (FGC-COMMON-002)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(

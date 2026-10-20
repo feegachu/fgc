@@ -5,6 +5,7 @@ export interface ScreenDefinition {
   id: string
   path: string
   title: string
+  menuTitle?: string
   menu: string
   section?: string
   icon: string
@@ -34,7 +35,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'CONT-W03',
     path: '/contracts/new',
-    title: '계약 등록',
+    title: '보험계약 등록·수정',
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',
@@ -44,7 +45,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'CONT-W03',
     path: '/contracts/:id/edit',
-    title: '계약 수정',
+    title: '보험계약 등록·수정',
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',
@@ -54,7 +55,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'CONT-W02',
     path: '/contracts/:id',
-    title: '계약 상세',
+    title: '보험계약 상세',
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',
@@ -63,7 +64,8 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'CONT-W01',
     path: '/contracts',
-    title: '보험계약',
+    title: '보험계약 목록',
+    menuTitle: '보험계약',
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',

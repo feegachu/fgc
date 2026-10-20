@@ -32,6 +32,10 @@ const pages: Record<string, ComponentType> = {
   '/validation-runs/:id': lazy(() => import('../features/validation/ValidationRunDetailPage')),
   '/schedules': lazy(() => import('../features/schedule/ScheduleListPage')),
   '/schedules/:id': lazy(() => import('../features/schedule/ScheduleDetailPage')),
+  '/contracts': lazy(() => import('../features/contract/ContractListPage')),
+  '/contracts/new': lazy(() => import('../features/contract/ContractFormPage')),
+  '/contracts/:id/edit': lazy(() => import('../features/contract/ContractFormPage')),
+  '/contracts/:id': lazy(() => import('../features/contract/ContractDetailPage')),
   '/reconciliations': lazy(() => import('../features/reconciliation/ReconciliationPage')),
 }
 export const screenRoutes: RouteObject[] = screens.map((screen) => {

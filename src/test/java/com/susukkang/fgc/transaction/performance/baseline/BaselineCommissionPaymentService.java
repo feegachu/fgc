@@ -157,6 +157,11 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
     }
 
     @Override
+    public CommissionPaymentResponse confirmJournalCorrection(Long paymentId, String correctionGroupKey) {
+        throw new UnsupportedOperationException("Historical performance baseline has no journal corrections");
+    }
+
+    @Override
     // 2026-08-10 yslee - 확정 검증 결과와 예외 이력을 지급 건 확정 트랜잭션으로 통합
     // 기존 코드: 잠긴 지급 건을 참조하는 한도 점검을 REQUIRES_NEW 트랜잭션에서 저장
     // 문제: 부모 지급 건의 FOR UPDATE 잠금과 FK 검사가 충돌하고 이슈 #14의 동일 트랜잭션 조건을 위반

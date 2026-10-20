@@ -49,6 +49,18 @@ class OrganizationControllerTest {
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
 
     @Test
+    void bindsHistoricalSearchModeWithoutChangingDefault() throws Exception {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        OrganizationSearchCriteria criteria = new OrganizationSearchCriteria(null, asOf, true);
+        given(organizationService.search(criteria, 1, 20)).willReturn(PageResponse.of(List.of(), 1, 20, 0, ""));
+        mockMvc.perform(get("/api/v1/base/organizations")
+                        .param("asOf", "2026-08-11").param("includeHistorical", "true")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        verify(organizationService).search(criteria, 1, 20);
+    }
+
+    @Test
     void returnsPagedOrganizationsWithDefaultPaging() throws Exception {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         OrganizationSearchCriteria criteria = new OrganizationSearchCriteria("서울", asOf);

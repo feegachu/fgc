@@ -110,6 +110,21 @@ it('Pagination은 1-base 5페이지 그룹이며 끝에서 다음을 막는다',
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   expect(screen.getByRole('button', { name: '마지막' })).toBeDisabled()
 })
+it('기존 방식 Pagination은 처음·마지막 없이 5페이지씩 이동하고 경계에서 멈춘다', async () => {
+  const change = vi.fn()
+  const { rerender } = render(<Pagination legacy page={6} totalPages={12} onPageChange={change} />)
+  expect(screen.queryByRole('button', { name: '처음' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '마지막' })).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: '이전 5페이지' }))
+  expect(change).toHaveBeenLastCalledWith(5)
+  await userEvent.click(screen.getByRole('button', { name: '다음 5페이지' }))
+  expect(change).toHaveBeenLastCalledWith(11)
+  rerender(<Pagination legacy page={1} totalPages={12} onPageChange={change} />)
+  expect(screen.getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+  rerender(<Pagination legacy page={12} totalPages={12} onPageChange={change} />)
+  expect(screen.getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
+})
+
 it('FilterBar와 URL 훅은 다른 조건·기준월을 보존하고 조회 시 page만 초기화한다', async () => {
   function Filters() {
     const { values, update, reset, params } = useSearchParamsState({ status: '' })

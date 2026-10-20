@@ -44,8 +44,9 @@ public class OrganizationServiceImpl implements OrganizationService {
                 Sort.by(Sort.Direction.ASC, "organizationCode")
         );
 
-        Page<OrganizationResponse> result = organizationRepository
-                .search(normalizedKeyword, criteria.asOf(), pageable)
+        Page<OrganizationResponse> result = (criteria.includeHistorical()
+                ? organizationRepository.search(normalizedKeyword, criteria.asOf(), true, pageable)
+                : organizationRepository.search(normalizedKeyword, criteria.asOf(), pageable))
                 .map(OrganizationResponse::from);
 
         return PageResponse.of(

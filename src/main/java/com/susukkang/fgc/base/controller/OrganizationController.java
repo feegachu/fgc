@@ -30,7 +30,7 @@ public class OrganizationController {
     @Operation(
             summary = "GA·조직 기준정보 조회·선택",
             description = "기준일자에 적용되는 조직을 코드 또는 이름으로 검색합니다. "
-                    + "적용기간 안의 비활성 조직도 반환되며 activeYn=false인 항목은 선택할 수 없습니다."
+                    + "includeHistorical=true이면 기간 밖 조직도 계약 검색용으로 반환합니다. 비활성 조직도 조회되며 신규 입력에서는 선택을 제한합니다."
     )
     @GetMapping
     @PreAuthorize(Roles.ANY_ROLE)
@@ -42,6 +42,9 @@ public class OrganizationController {
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate asOf,
+            @Parameter(description = "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.")
+            @RequestParam(defaultValue = "false")
+            boolean includeHistorical,
             @Parameter(description = "페이지(1-base)", example = "1")
             @RequestParam(defaultValue = "1")
             int page,
@@ -49,7 +52,7 @@ public class OrganizationController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        OrganizationSearchCriteria criteria = new OrganizationSearchCriteria(keyword, asOf);
+        OrganizationSearchCriteria criteria = new OrganizationSearchCriteria(keyword, asOf, includeHistorical);
         return ApiResponse.success(organizationService.search(criteria, page, size));
     }
 }

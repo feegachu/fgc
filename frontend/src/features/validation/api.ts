@@ -23,8 +23,8 @@ export const RUN_STATUSES = [
   { value: 'FINALIZED', label: '확정(잠김)' },
 ] as const
 export const RUN_TYPES = [
-  { value: 'MONTHLY', label: '월간 (MONTHLY)' },
-  { value: 'MANUAL_CONTRACT', label: '계약 수동 (MANUAL_CONTRACT)' },
+  { value: 'MONTHLY', label: '월간' },
+  { value: 'MANUAL_CONTRACT', label: '계약수동' },
 ] as const
 
 export interface RunCriteria {
@@ -102,7 +102,7 @@ export const finalizeChecklistQuery = (id: string, enabled: boolean) =>
         `/api/v1/validation-runs/${encodeURIComponent(id)}/finalize-checklist`,
         signal,
       )
-      if (!Array.isArray(checklist.conditions) || checklist.conditions.length !== 6) {
+      if (!Array.isArray(checklist.conditions) || checklist.conditions.length !== 8) {
         throw new Error('확정 조건 응답 형식이 올바르지 않습니다.')
       }
       return checklist
