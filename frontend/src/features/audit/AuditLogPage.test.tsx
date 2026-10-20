@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -29,7 +29,7 @@ const rows = [log(1), log(2, { userId: undefined, userLoginId: undefined, action
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'audit-test' })
 let requested: string[]
 
-function renderAt(path: string, roleCode = 'COMPLIANCE') {
+function renderAt(path: string, roleCode = 'COMPLIANCE', auditRows = rows) {
   requested = []
   vi.spyOn(apiClient, 'request').mockImplementation(async (url) => {
     requested.push(url)
@@ -43,22 +43,22 @@ function renderAt(path: string, roleCode = 'COMPLIANCE') {
       })
     if (url === '/api/v1/audit-logs/options')
       return envelope({
-        actionCodes: ['PAYMENT_CONFIRMED', 'VALIDATION_RUN_STARTED'],
-        entityTypes: ['COMMISSION_PAYMENT'],
+        actionCodes: [...new Set(auditRows.map((row) => row.actionCode).filter(Boolean))],
+        entityTypes: [...new Set(auditRows.map((row) => row.entityType).filter(Boolean))],
         users: [{ userId: 12, loginId: 'settle01' }],
       })
     if (url === '/api/v1/audit-logs/1')
       return envelope({
-        log: rows[0],
+        log: auditRows[0],
         diff: [
           { field: 'payment.amount', before: '500000', after: '700000', changed: true },
           { field: 'payment.status', before: 'DRAFT', after: 'DRAFT', changed: false },
         ],
       })
     if (url === '/api/v1/audit-logs/2')
-      return envelope({ log: rows[1], diff: [{ field: 'status', after: 'STARTED', changed: true }] })
+      return envelope({ log: auditRows[1], diff: [{ field: 'status', after: 'STARTED', changed: true }] })
     if (url.startsWith('/api/v1/audit-logs?'))
-      return envelope({ content: rows, page: 1, size: 20, totalElements: 45, totalPages: 3 })
+      return envelope({ content: auditRows, page: 1, size: 20, totalElements: 45, totalPages: 3 })
     throw new Error(`unexpected ${url}`)
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
@@ -87,7 +87,7 @@ afterEach(() => {
 })
 
 describe('AUDT-W01 감사로그 조회', () => {
-  it('URL 검색조건으로 목록을 조회하고 1차와 같은 열·BATCH 표기·선택지를 보여 준다', async () => {
+  it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 BATCH 표기를 유지한다', async () => {
     renderAt('/audit-logs?month=2026-07&userId=12&action=PAYMENT_CONFIRMED&from=2026-08-01&to=2026-08-16&page=2')
     expect(await screen.findByRole('heading', { name: '감사로그 조회' })).toBeInTheDocument()
     expect(await screen.findAllByRole('button', { name: '2026-08-16 10:00:07' })).toHaveLength(2)
@@ -105,6 +105,11 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(await screen.findByRole('option', { name: 'settle01' })).toBeInTheDocument()
     expect(screen.getByLabelText('행위자')).toHaveValue('12')
     expect(screen.getByLabelText('행위 종류')).toHaveValue('PAYMENT_CONFIRMED')
+    expect(screen.getByRole('option', { name: '지급 확정' })).toHaveValue('PAYMENT_CONFIRMED')
+    expect(screen.getByRole('option', { name: '수수료 지급' })).toHaveValue('COMMISSION_PAYMENT')
+    const list = screen.getByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    expect(within(list).getByText('지급 확정')).toBeInTheDocument()
+    expect(within(list).getByText('검증 실행 시작')).toBeInTheDocument()
     expect(screen.getByLabelText('발생 시각 (시작)')).toHaveValue('2026-08-01')
     expect(screen.getByText('왼쪽 목록에서 한 건을 고르세요.')).toBeInTheDocument()
     // 화면정의서 "막아야 할 것": 수정·삭제 버튼 자체를 만들지 않는다.
@@ -131,7 +136,66 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(table.querySelectorAll('.audit-diff-cell-changed')).toHaveLength(2)
     expect(within(table).getByText('700000')).toHaveClass('audit-diff-cell-changed')
     expect(within(table).getAllByText('DRAFT')[0]).not.toHaveClass('audit-diff-cell-changed')
-    expect(screen.getByText('COMMISSION_PAYMENT #42')).toBeInTheDocument()
+    expect(screen.getByText('지급 확정 (PAYMENT_CONFIRMED)')).toBeInTheDocument()
+    expect(screen.getByText('수수료 지급 (COMMISSION_PAYMENT) #42')).toBeInTheDocument()
+  })
+
+  it('한글 인증 이벤트를 선택해도 원본 코드로 검색하고 상세·뒤로/앞으로에서 복원한다', async () => {
+    const { router, actions } = renderAt('/audit-logs?month=2026-07', 'COMPLIANCE', [
+      log(1, { actionCode: 'TOKEN_REFRESH', entityType: 'APP_USER', entityId: 'admin', userLoginId: 'admin' }),
+    ])
+    await screen.findByRole('option', { name: '인증 토큰 갱신' })
+    await actions.selectOptions(
+      screen.getByLabelText('행위 종류'),
+      screen.getByRole('option', { name: '인증 토큰 갱신' }),
+    )
+    await actions.selectOptions(screen.getByLabelText('대상 종류'), screen.getByRole('option', { name: '사용자 계정' }))
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => {
+      const query = new URLSearchParams(
+        requested
+          .filter((url) => url.startsWith('/api/v1/audit-logs?'))
+          .at(-1)!
+          .split('?')[1],
+      )
+      expect(query.get('action')).toBe('TOKEN_REFRESH')
+      expect(query.get('entityType')).toBe('APP_USER')
+    })
+    const list = screen.getByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    expect(within(list).getAllByRole('cell')[1]).toHaveTextContent('admin')
+    expect(within(list).queryByText('TOKEN_REFRESH')).not.toBeInTheDocument()
+    await actions.click(screen.getByRole('button', { name: '2026-08-16 10:00:07' }))
+    expect(await screen.findByText('인증 토큰 갱신 (TOKEN_REFRESH)')).toBeInTheDocument()
+    expect(screen.getByText('사용자 계정 (APP_USER) #admin')).toBeInTheDocument()
+    expect(await screen.findByText('payment.status')).toBeInTheDocument()
+    expect(screen.getAllByText('DRAFT')).toHaveLength(2)
+    await act(() => router.navigate(-1))
+    expect(router.state.location.search).not.toContain('selected=')
+    expect(screen.getByLabelText('행위 종류')).toHaveValue('TOKEN_REFRESH')
+    await act(() => router.navigate(1))
+    expect(await screen.findByText('인증 토큰 갱신 (TOKEN_REFRESH)')).toBeInTheDocument()
+  })
+
+  it('미등록 코드는 검색과 상세에서 원문을 유지하고 중복 병기하지 않는다', async () => {
+    const { actions } = renderAt('/audit-logs?month=2026-07&selected=1', 'COMPLIANCE', [
+      log(1, { actionCode: 'FUTURE_ACTION', entityType: 'FUTURE_ENTITY' }),
+    ])
+    await screen.findByText('FUTURE_ENTITY #42')
+    expect(screen.getByRole('option', { name: 'FUTURE_ACTION' })).toHaveValue('FUTURE_ACTION')
+    expect(screen.queryByText('FUTURE_ACTION (FUTURE_ACTION)')).not.toBeInTheDocument()
+    await actions.selectOptions(screen.getByLabelText('행위 종류'), 'FUTURE_ACTION')
+    await actions.selectOptions(screen.getByLabelText('대상 종류'), 'FUTURE_ENTITY')
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(requested.at(-1)).toContain('action=FUTURE_ACTION'))
+    expect(requested.at(-1)).toContain('entityType=FUTURE_ENTITY')
+  })
+
+  it('누락된 코드는 목록과 상세에서 대시로 표시한다', async () => {
+    renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: undefined, entityType: '' })])
+    await screen.findByText('payment.amount')
+    expect(document.querySelector('.audit-diff-context')).toHaveTextContent('- · - #42')
+    const row = screen.getByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' }).querySelector('tbody tr')!
+    expect(within(row as HTMLElement).getAllByText('-')).toHaveLength(2)
   })
 
   it('1차처럼 행의 다른 칸을 눌러도 그 행을 선택한다', async () => {
