@@ -1,17 +1,27 @@
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
-import { errorText, isNegative, won } from '../../lib/format'
+import { errorText, isNegative } from '../../lib/format'
+import { amountText } from './amounts'
+import type { Amount } from './amounts'
 import { EMPTY, RESULT_TYPE, text } from './labels'
 export function Disclosure({ value }: { value: unknown }) {
   return <CellDisclosure singleLine preview={text(value)} full={text(value)} />
 }
-export function Money({ value, difference = false }: { value?: number; difference?: boolean }) {
+export function Money({
+  value,
+  difference = false,
+  unit = true,
+}: {
+  value?: Amount
+  difference?: boolean
+  unit?: boolean
+}) {
   return (
     <span
-      className={`${isNegative(value) ? 'is-negative-amount' : ''} ${difference && value !== 0 && value != null ? 'reco-react-difference' : ''}`}
+      className={`${isNegative(value) ? 'is-negative-amount' : ''} ${difference && value != null && Number(value) !== 0 ? 'reco-react-difference' : ''}`}
     >
-      {won(value)}
+      {amountText(value, unit)}
     </span>
   )
 }
