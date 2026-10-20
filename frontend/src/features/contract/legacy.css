@@ -273,8 +273,7 @@
 
 .contract-summary-label,
 .contract-summary-item dt,
-.contract-information-item dt,
-.contract-data-panel dt {
+.contract-information-item dt {
   color: var(--color-text-secondary);
   font-size: 0.6875rem;
   font-weight: 500;
@@ -384,8 +383,7 @@
 }
 
 .contract-information-panel,
-.contract-history-panel,
-.contract-data-panel {
+.contract-history-panel {
   overflow: clip;
   overflow-clip-margin: 4px;
   border: 1px solid var(--color-border-default);
@@ -393,8 +391,7 @@
   background: var(--color-bg-surface);
 }
 
-.contract-information-panel > h3,
-.contract-data-panel > h3 {
+.contract-information-panel > h3 {
   display: flex;
   min-height: 3rem;
   align-items: center;
@@ -495,7 +492,6 @@
 .contract-side-panels {
   display: grid;
   align-content: start;
-  gap: var(--space-4);
 }
 
 .contract-history-list {
@@ -696,36 +692,9 @@
   line-height: 1.125rem;
 }
 
-.contract-data-panel dl {
-  display: grid;
-  padding: var(--space-2) var(--space-4) var(--space-3);
-}
-
-.contract-data-panel dl > div {
-  display: grid;
-  grid-template-columns: 5.25rem minmax(0, 1fr);
-  gap: var(--space-3);
-  min-height: 1.75rem;
-  align-items: center;
-}
-
-.contract-data-panel dd {
-  overflow: hidden;
-  color: var(--color-text-primary);
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 74.9375rem) {
   .contract-basic-layout {
     grid-template-columns: 1fr;
-  }
-
-  .contract-side-panels {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -763,8 +732,7 @@
   }
 
   .contract-summary-grid,
-  .contract-information-grid,
-  .contract-side-panels {
+  .contract-information-grid {
     grid-template-columns: 1fr;
   }
 
