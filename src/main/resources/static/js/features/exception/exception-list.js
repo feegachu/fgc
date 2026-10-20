@@ -330,7 +330,7 @@
     (journal.lines || []).forEach((line) => {
       const values = [
         line.lineNo,
-        `${line.accountCode} · ${line.accountName || "-"}`,
+        (line.accountName && String(line.accountName).trim()) || (line.accountCode ? "계정명 확인 필요" : "-"),
         money(line.debitAmount),
         money(line.creditAmount),
         line.memo || "-"
