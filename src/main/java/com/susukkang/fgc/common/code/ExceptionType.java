@@ -23,6 +23,26 @@ public enum ExceptionType {
     DATA_QUALITY,                // 데이터 품질 오류
     OTHER;                       // 기타 예외
 
+    /** EXCP-W01 요약 카드에서 유형의 업무 의미를 설명한다. */
+    public String summaryDescription() {
+        return switch (this) {
+            case CAP_WARNING -> "사용률 경고 기준 이상";
+            case CAP_VIOLATION -> "확정 위반 판정";
+            case CAP_REVIEW_REQUIRED -> "한도 판정 근거 확인 필요";
+            case RECONCILIATION_MISMATCH -> "대사 금액 차이 확인 필요";
+            case JOURNAL_IMBALANCE -> "차변·대변 합계 확인 필요";
+            case JOURNAL_CORRECTION_REQUIRED -> "역분개·재기표 검토 필요";
+            case ARBITRAGE_CANDIDATE -> "위반 확정 아님";
+            case REFUND_TABLE_MISSING -> "적용할 환급률표 확인 필요";
+            case PRODUCT_CODE_MISMATCH -> "상품코드 연결 확인 필요";
+            case POLICY_MISSING -> "적용 가능한 정책 확인 필요";
+            case POLICY_DUPLICATE -> "중복 적용 정책 확인 필요";
+            case ALLOCATION_EVIDENCE_MISSING -> "배부 근거 보완 필요";
+            case DATA_QUALITY -> "입력 데이터 확인 필요";
+            case OTHER -> "상세 내용 확인 필요";
+        };
+    }
+
     /** 화면정의서 EXCP-W01의 예외 유형 코드-표기 매핑과 일치시킨다. */
     public String label() {
         return switch (this) {

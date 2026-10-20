@@ -169,6 +169,7 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("href=\"/transactions/new?id=77\"")))
                 .andExpect(content().string(containsString("page=2")))
                 .andExpect(content().string(containsString("데이터 품질")))
+                .andExpect(content().string(containsString("입력 데이터 확인 필요")))
                 .andExpect(content().string(containsString("status-badge-review")))
                 .andExpect(content().string(containsString("status-badge-warning")))
                 .andExpect(content().string(containsString("status-badge-info")))
