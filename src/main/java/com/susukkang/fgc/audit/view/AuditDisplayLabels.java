@@ -1,6 +1,9 @@
 package com.susukkang.fgc.audit.view;
 
+import com.susukkang.fgc.journal.domain.JournalType;
+
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /** 감사 화면의 표시 전용 매핑. 미등록 코드는 원문을 유지한다. */
 public final class AuditDisplayLabels {
@@ -44,8 +47,21 @@ public final class AuditDisplayLabels {
             Map.entry("VALIDATION_RUN", "검증 실행"),
             Map.entry("BATCH_JOB_EXECUTION", "배치 작업 실행"),
             Map.entry("JOURNAL_HEADER", "회계전표"),
-            Map.entry("EXCEPTION_CASE", "예외 건")
+            Map.entry("EXCEPTION_CASE", "예외 건"),
+            Map.entry("SCHEDULE_LINE", "스케줄행")
     );
+
+    private static final Map<String, String> LOGIN_FAILURE_REASONS = Map.of(
+            "BadCredentialsException", "아이디 또는 비밀번호 불일치",
+            "UsernameNotFoundException", "사용자 계정 없음",
+            "DisabledException", "사용 중지된 계정",
+            "LockedException", "잠긴 계정",
+            "AccountExpiredException", "계정 유효기간 만료",
+            "CredentialsExpiredException", "비밀번호 유효기간 만료"
+    );
+    private static final Pattern STEP_REASON = Pattern.compile("MonthlyValidationJob advanced to step ([0-9]+)");
+    private static final Pattern DRAFT_REASON = Pattern.compile(
+            "journalType=([A-Z_]+),sourceEntityType=([A-Z_]+),sourceEntityId=([0-9]+|null),validationRunId=([0-9]+|null)");
 
     public String action(String code) {
         return label(code, ACTIONS);
@@ -61,6 +77,38 @@ public final class AuditDisplayLabels {
 
     public String entityTypeWithCode(String code) {
         return withCode(code, entityType(code));
+    }
+
+    /** 자동 생성한 사유의 알려진 형식만 번역하며 저장 원문은 변경하지 않는다. */
+    public String reason(String actionCode, String reason) {
+        if (reason == null || reason.isEmpty()) return "-";
+        if ("VALIDATION_RUN_STARTED".equals(actionCode) && "MonthlyValidationJob started".equals(reason))
+            return "월 통합검증 시작";
+        if ("VALIDATION_RUN_COMPLETED".equals(actionCode) && "MonthlyValidationJob completed".equals(reason))
+            return "월 통합검증 완료";
+        if ("VALIDATION_RUN_RETRIED".equals(actionCode)
+                && "FAILED validation_run retried (status reverted to RUNNING)".equals(reason))
+            return "실패한 월 통합검증 재시도 · 실행 중으로 전환";
+        if ("VALIDATION_RUN_STEP_ADVANCED".equals(actionCode)) {
+            var step = STEP_REASON.matcher(reason);
+            if (step.matches()) return "월 통합검증 " + step.group(1) + "단계 진행";
+        }
+        if ("LOGIN_FAIL".equals(actionCode)) return LOGIN_FAILURE_REASONS.getOrDefault(reason, reason);
+        if ("JOURNAL_DRAFT_SAVED".equals(actionCode)) {
+            var draft = DRAFT_REASON.matcher(reason);
+            if (draft.matches() && ENTITY_TYPES.containsKey(draft.group(2))) {
+                JournalType type;
+                try {
+                    type = JournalType.valueOf(draft.group(1));
+                } catch (IllegalArgumentException unknownType) {
+                    return reason;
+                }
+                String sourceId = "null".equals(draft.group(3)) ? " (식별자 없음)" : " #" + draft.group(3);
+                String run = "null".equals(draft.group(4)) ? "검증 실행 없음" : "검증 실행 #" + draft.group(4);
+                return type.label() + " 분개 초안 저장 · 원천: " + ENTITY_TYPES.get(draft.group(2)) + sourceId + " · " + run;
+            }
+        }
+        return reason;
     }
 
     private static String label(String code, Map<String, String> labels) {

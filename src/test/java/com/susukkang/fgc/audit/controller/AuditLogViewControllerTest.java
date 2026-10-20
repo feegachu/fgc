@@ -243,6 +243,34 @@ class AuditLogViewControllerTest {
                 isNull(), isNull(), eq(1), eq(20));
     }
 
+    /** 자동 생성 사유는 한글로 읽고 원문은 선택한 상세에서 확인한다. */
+    @Test
+    void translates_automatic_reasons_and_preserves_original_details() throws Exception {
+        String stepReason = "MonthlyValidationJob advanced to step 7";
+        String draftReason = "journalType=CONFIRMED_FC_PAYOUT,sourceEntityType=COMMISSION_TRANSACTION,"
+                + "sourceEntityId=9007199254740993,validationRunId=42";
+        AuditLogResponse step = new AuditLogResponse(
+                1L, OffsetDateTime.parse("2026-08-16T10:00:00+09:00"), 12L, "admin",
+                "VALIDATION_RUN_STEP_ADVANCED", "VALIDATION_RUN", "42", null, null, stepReason, "step", null);
+        AuditLogResponse draft = new AuditLogResponse(
+                2L, step.occurredAt(), 12L, "admin", "JOURNAL_DRAFT_SAVED", "JOURNAL_HEADER", "70",
+                null, null, draftReason, "draft", null);
+        stubSearch(List.of(step, draft));
+
+        mvc.perform(get("/audit-logs").param("selected", "1").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("월 통합검증 7단계 진행")))
+                .andExpect(content().string(containsString(
+                        "확정 지급(GA→설계사) 분개 초안 저장 · 원천: 수수료 거래 #9007199254740993 · 검증 실행 #42")))
+                .andExpect(content().string(containsString("사유 원문 보기")))
+                .andExpect(content().string(containsString("<p>" + stepReason + "</p>")))
+                .andExpect(content().string(not(containsString(draftReason))));
+
+        mvc.perform(get("/audit-logs").param("selected", "2").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<p>" + draftReason + "</p>")));
+    }
+
     /** 선택한 행의 before/after 를 서버가 diff 계산해 바뀐 칸만 노랗게 칠한다. */
     @Test
     void renders_diff_panel_highlighting_only_changed_fields() throws Exception {

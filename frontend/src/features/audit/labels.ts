@@ -1,3 +1,5 @@
+import { JOURNAL_TYPE } from '../ledger/labels'
+
 // 감사 이벤트 기록 경로의 코드 표시용 매핑. 저장값과 검색값은 원본 코드를 유지한다.
 const actionLabels = {
   LOGIN_SUCCESS: '로그인 성공',
@@ -41,6 +43,7 @@ const entityTypeLabels = {
   BATCH_JOB_EXECUTION: '배치 작업 실행',
   JOURNAL_HEADER: '회계전표',
   EXCEPTION_CASE: '예외 건',
+  SCHEDULE_LINE: '스케줄행',
 } as const
 
 function label(code: string | null | undefined, labels: Record<string, string>) {
@@ -56,3 +59,50 @@ export const auditActionLabel = (code?: string | null) => label(code, actionLabe
 export const auditEntityTypeLabel = (code?: string | null) => label(code, entityTypeLabels)
 export const auditActionWithCode = (code?: string | null) => withCode(code, auditActionLabel(code))
 export const auditEntityTypeWithCode = (code?: string | null) => withCode(code, auditEntityTypeLabel(code))
+
+const loginFailureReasons = {
+  BadCredentialsException: '아이디 또는 비밀번호 불일치',
+  UsernameNotFoundException: '사용자 계정 없음',
+  DisabledException: '사용 중지된 계정',
+  LockedException: '잠긴 계정',
+  AccountExpiredException: '계정 유효기간 만료',
+  CredentialsExpiredException: '비밀번호 유효기간 만료',
+} as const
+
+/** 알려진 자동 생성 형식만 번역한다. 사용자 사유·오류 원문·미등록 형식은 보존한다. */
+export function auditReasonLabel(actionCode?: string | null, reason?: string | null) {
+  if (reason == null || reason === '') return '-'
+  if (actionCode === 'VALIDATION_RUN_STARTED' && reason === 'MonthlyValidationJob started') return '월 통합검증 시작'
+  if (actionCode === 'VALIDATION_RUN_COMPLETED' && reason === 'MonthlyValidationJob completed')
+    return '월 통합검증 완료'
+  if (
+    actionCode === 'VALIDATION_RUN_RETRIED' &&
+    reason === 'FAILED validation_run retried (status reverted to RUNNING)'
+  )
+    return '실패한 월 통합검증 재시도 · 실행 중으로 전환'
+  if (actionCode === 'VALIDATION_RUN_STEP_ADVANCED') {
+    const step = /^MonthlyValidationJob advanced to step ([0-9]+)$/.exec(reason)
+    if (step && step[0] === reason) return `월 통합검증 ${step[1]}단계 진행`
+  }
+  if (actionCode === 'LOGIN_FAIL' && Object.hasOwn(loginFailureReasons, reason))
+    return loginFailureReasons[reason as keyof typeof loginFailureReasons]
+  if (actionCode === 'JOURNAL_DRAFT_SAVED') {
+    const draft =
+      /^journalType=([A-Z_]+),sourceEntityType=([A-Z_]+),sourceEntityId=([0-9]+|null),validationRunId=([0-9]+|null)$/.exec(
+        reason,
+      )
+    if (
+      draft &&
+      draft[0] === reason &&
+      Object.hasOwn(JOURNAL_TYPE, draft[1]) &&
+      Object.hasOwn(entityTypeLabels, draft[2])
+    ) {
+      const type = JOURNAL_TYPE[draft[1] as keyof typeof JOURNAL_TYPE]
+      const source = entityTypeLabels[draft[2] as keyof typeof entityTypeLabels]
+      const sourceId = draft[3] === 'null' ? ' (식별자 없음)' : ` #${draft[3]}`
+      const run = draft[4] === 'null' ? '검증 실행 없음' : `검증 실행 #${draft[4]}`
+      return `${type} 분개 초안 저장 · 원천: ${source}${sourceId} · ${run}`
+    }
+  }
+  return reason
+}

@@ -205,6 +205,51 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(await screen.findByText('STARTED')).toBeInTheDocument()
   })
 
+  it('단계 진행과 분개 자동 사유를 한글로 표시하고 상세에서 원문과 큰 식별자를 보존한다', async () => {
+    const stepReason = 'MonthlyValidationJob advanced to step 7'
+    const draftReason =
+      'journalType=CONFIRMED_FC_PAYOUT,sourceEntityType=COMMISSION_TRANSACTION,sourceEntityId=9007199254740993,validationRunId=42'
+    const { actions } = renderAt('/audit-logs?selected=1', 'COMPLIANCE', [
+      log(1, { actionCode: 'VALIDATION_RUN_STEP_ADVANCED', reason: stepReason }),
+      log(2, { actionCode: 'JOURNAL_DRAFT_SAVED', reason: draftReason }),
+    ])
+    const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    expect(await within(table).findByText('월 통합검증 7단계 진행')).toBeInTheDocument()
+    expect(
+      within(table).getByText(
+        '확정 지급(GA→설계사) 분개 초안 저장 · 원천: 수수료 거래 #9007199254740993 · 검증 실행 #42',
+      ),
+    ).toBeInTheDocument()
+    expect(within(table).queryByText(stepReason)).not.toBeInTheDocument()
+    expect(within(table).queryByText(draftReason)).not.toBeInTheDocument()
+    await actions.click(screen.getByText('사유 원문 보기'))
+    expect(screen.getByText(stepReason)).toBeVisible()
+    await actions.click(screen.getAllByRole('button', { name: '2026-08-16 10:00:07' })[1])
+    expect(await screen.findByText(draftReason)).toBeInTheDocument()
+    expect(document.querySelector('.audit-reason-original')).toHaveTextContent(draftReason)
+  })
+
+  it.each([
+    ['EXCEPTION_ACTION', 'MonthlyValidationJob advanced to step 7'],
+    ['VALIDATION_RUN_STEP_ADVANCED', 'MonthlyValidationJob advanced to step 7; 재검토 필요'],
+    ['VALIDATION_RUN_STEP_ADVANCED', 'MonthlyValidationJob advanced to step 7\n'],
+    [
+      'JOURNAL_DRAFT_SAVED',
+      'journalType=FUTURE_TYPE,sourceEntityType=SCHEDULE_LINE,sourceEntityId=1,validationRunId=null',
+    ],
+    [
+      'JOURNAL_DRAFT_SAVED',
+      'journalType=CONFIRMED_FC_PAYOUT,sourceEntityType=FUTURE_SOURCE,sourceEntityId=1,validationRunId=null',
+    ],
+  ])('사용자 사유나 미등록 형식은 원문을 보존한다 (%s: %s)', async (actionCode, reason) => {
+    renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode, reason })])
+    await screen.findByText('payment.amount')
+    const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    const reasonCell = within(table).getAllByRole('cell')[5]
+    expect(reasonCell.querySelector('.cell-preview')!.textContent).toBe(reason)
+    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
+  })
+
   it('감사 행을 키보드 Enter·Space로 선택하고 첫 열 버튼으로도 선택한다 (#418)', async () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07')
     const batch = await screen.findByText('BATCH')

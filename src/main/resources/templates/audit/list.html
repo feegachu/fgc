@@ -160,10 +160,10 @@
             </td>
             <td class="audit-disclosure-cell">
               <div class="table-cell-disclosure">
-                <span class="table-cell-preview" th:text="${row.reason} ?: '-'">-</span>
+                <span class="table-cell-preview" th:text="${auditLabels.reason(row.actionCode, row.reason)}">-</span>
                 <details class="table-cell-details" hidden>
                   <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
-                  <p class="table-cell-full" th:text="${row.reason} ?: '-'">-</p>
+                  <p class="table-cell-full" th:text="${auditLabels.reason(row.actionCode, row.reason)}">-</p>
                 </details>
               </div>
             </td>
@@ -225,6 +225,11 @@
             <span th:text="${auditLabels.actionWithCode(selectedLog.actionCode)}">지급 확정 (PAYMENT_CONFIRMED)</span> ·
             <span th:text="${auditLabels.entityTypeWithCode(selectedLog.entityType) + ' #' + (selectedLog.entityId ?: '-')}">수수료 지급 (COMMISSION_PAYMENT) #42</span>
           </p>
+          <details class="audit-reason-original"
+                   th:if="${!#strings.isEmpty(selectedLog.reason) and auditLabels.reason(selectedLog.actionCode, selectedLog.reason) != selectedLog.reason}">
+            <summary>사유 원문 보기</summary>
+            <p th:text="${selectedLog.reason}"></p>
+          </details>
           <div class="data-table-viewport">
             <table class="data-table audit-diff-table">
               <caption class="visually-hidden">선택한 감사 기록의 변경 전후 값 비교</caption>
