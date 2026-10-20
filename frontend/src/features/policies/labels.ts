@@ -6,9 +6,9 @@ const agentRankLabels = {
   DIVISION_HEAD: '본부장',
 } as const
 
-export function policyAgentRankLabel(code?: string | null) {
-  // 수수료 규칙 API에서 null은 직급을 한정하지 않는 전체 적용을 뜻한다.
-  if (code === null) return '전체'
+export function policyAgentRankLabel(code?: string | null, paymentStage?: string) {
+  // 원수사→GA는 개인 직급이 해당 없고, 다른 단계의 null은 직급 정보 누락이다.
+  if (code === null) return paymentStage === 'INSURER_TO_GA' ? '해당 없음(GA 수령)' : '-'
   if (code == null || code.trim() === '') return '-'
   return Object.hasOwn(agentRankLabels, code) ? agentRankLabels[code as keyof typeof agentRankLabels] : code
 }

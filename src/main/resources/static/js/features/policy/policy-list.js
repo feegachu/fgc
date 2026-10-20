@@ -10,7 +10,7 @@
         .replace(/'/g, "&#39;");
   }
 
-  // 운영정책서 제15조의 공식 직급명. null만 전체 적용으로 해석한다.
+  // 운영정책서 제15조의 공식 직급명.
   var agentRankLabels = {
     FC: "설계사",
     TEAM_LEADER: "팀장",
@@ -18,8 +18,9 @@
     DIVISION_HEAD: "본부장"
   };
 
-  function rankLabel(code) {
-    if (code === null) return "전체";
+  function rankLabel(code, paymentStage) {
+    // 원수사→GA는 개인 직급이 해당 없고, 다른 단계의 null은 직급 정보 누락이다.
+    if (code === null) return paymentStage === "INSURER_TO_GA" ? "해당 없음(GA 수령)" : "-";
     if (code == null || String(code).trim() === "") return "-";
     return Object.prototype.hasOwnProperty.call(agentRankLabels, code) ? agentRankLabels[code] : escapeHtml(code);
   }
@@ -153,7 +154,7 @@
           + "<td>" + escapeHtml(rule.paymentStageLabel) + "</td>"
           + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(rule.insurerName == null ? "전체" : rule.insurerName, 24, true) + "</td>"
           + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(rule.productName == null ? "전체" : rule.productName, 28, false) + "</td>"
-          + "<td>" + rankLabel(rule.agentRankCode) + "</td>"
+          + "<td>" + rankLabel(rule.agentRankCode, rule.paymentStage) + "</td>"
           + "<td class='policy-disclosure-cell'>" + tableCellDisclosure(rule.itemName, 28, false) + "</td>"
           + "<td class='tabular-nums'>" + formatRange(rule.installmentFrom, rule.installmentTo) + "</td>"
           + "<td>" + escapeHtml(calculationType[rule.calculationType] || rule.calculationType) + "</td>"

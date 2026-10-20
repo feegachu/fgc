@@ -199,13 +199,24 @@ it('POL restores detail tab and selected id from a shared URL', async () => {
   expect(request.mock.calls.some(([p]) => p === '/api/v1/policies/2')).toBe(true)
 })
 
-it('POL 직급을 한글로 표시하고 전체 적용과 누락·미등록 값을 구분하며 탭 전환 후에도 유지한다', async () => {
+it('POL 직급을 한글로 표시하고 GA 수령과 누락·미등록 값을 구분하며 탭 전환 후에도 유지한다', async () => {
   const user = userEvent.setup()
-  const rankCodes = ['FC', 'TEAM_LEADER', 'BRANCH_MANAGER', 'DIVISION_HEAD', null, '', undefined, '<NEW_RANK>']
-  const commissionRules = rankCodes.map((agentRankCode, index) => ({
+  const rankInputs: Pick<NonNullable<PolicyDetail['commissionRules']>[number], 'agentRankCode' | 'paymentStage'>[] = [
+    { agentRankCode: 'FC', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: 'TEAM_LEADER', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: 'BRANCH_MANAGER', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: 'DIVISION_HEAD', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: null, paymentStage: 'INSURER_TO_GA' },
+    { agentRankCode: null, paymentStage: 'GA_TO_FC' },
+    { agentRankCode: null },
+    { agentRankCode: undefined, paymentStage: 'INSURER_TO_GA' },
+    { agentRankCode: '', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: '<NEW_RANK>', paymentStage: 'GA_TO_FC' },
+  ]
+  const commissionRules = rankInputs.map((rank, index) => ({
     ...detail.commissionRules![0],
     commissionRuleId: index + 1,
-    agentRankCode,
+    ...rank,
   }))
   mount('/policies?tab=commission&policyVersionId=1', (path) =>
     /\/policies\/\d/.test(path) ? envelope({ ...detail, commissionRules }) : fixtures(path),
@@ -221,13 +232,15 @@ it('POL 직급을 한글로 표시하고 전체 적용과 누락·미등록 값�
     '팀장',
     '지사장',
     '본부장',
-    '전체',
+    '해당 없음(GA 수령)',
+    '-',
+    '-',
     '-',
     '-',
     '<NEW_RANK>',
   ])
   expect(table.querySelector('NEW_RANK')).toBeNull()
-  expect(within(table).getAllByText('650.1234')).toHaveLength(rankCodes.length)
+  expect(within(table).getAllByText('650.1234')).toHaveLength(rankInputs.length)
   await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
   await screen.findByText('89.1234')
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))

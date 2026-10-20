@@ -43,8 +43,11 @@ test("POL-W01 only provides full-view disclosure for long escaped values", () =>
   assert.doesNotMatch(disclosure, /<정책>/);
 });
 
-test("POL-W01 distinguishes unrestricted ranks from missing values and escapes unknown rank codes", () => {
-  assert.equal(rankLabel(null), "전체");
+test("POL-W01 distinguishes GA receipt from missing ranks and escapes unknown rank codes", () => {
+  assert.equal(rankLabel(null, "INSURER_TO_GA"), "해당 없음(GA 수령)");
+  assert.equal(rankLabel(null, "GA_TO_FC"), "-");
+  assert.equal(rankLabel(null), "-");
+  assert.equal(rankLabel(undefined, "INSURER_TO_GA"), "-");
   assert.equal(rankLabel(undefined), "-");
   assert.equal(rankLabel("   "), "-");
   assert.equal(rankLabel("<NEW_RANK>"), "&lt;NEW_RANK&gt;");
