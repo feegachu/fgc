@@ -187,13 +187,7 @@ function ContractDetailView({ id }: { id: string }) {
               ]}
             />
           </section>
-          <ContractTabs
-            id={id}
-            contract={contract}
-            active={active}
-            onSelect={selectTab}
-            fetchedAt={detail.dataUpdatedAt}
-          />
+          <ContractTabs id={id} contract={contract} active={active} onSelect={selectTab} />
         </>
       )}
     </div>

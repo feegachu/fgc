@@ -566,7 +566,7 @@
 
   <template id="journal-account-options">
     <option th:each="account : ${journalAccounts}" th:value="${account.accountCode}"
-            th:text="${account.accountCode + ' · ' + account.accountName}">계정과목</option>
+            th:text="${account.accountName}">계정과목</option>
   </template>
 
 </main>
