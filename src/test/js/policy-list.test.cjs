@@ -5,6 +5,7 @@ const {
   formatNumber,
   formatRate,
   formatRange,
+  rankLabel,
   tableCellDisclosure
 } = require("../../main/resources/static/js/features/policy/policy-list.js");
 
@@ -40,4 +41,12 @@ test("POL-W01 only provides full-view disclosure for long escaped values", () =>
   assert.match(disclosure, /전체 보기/);
   assert.match(disclosure, /매우 긴 &lt;정책&gt; 이름과 판단 사유/);
   assert.doesNotMatch(disclosure, /<정책>/);
+});
+
+test("POL-W01 distinguishes unrestricted ranks from missing values and escapes unknown rank codes", () => {
+  assert.equal(rankLabel(null), "전체");
+  assert.equal(rankLabel(undefined), "-");
+  assert.equal(rankLabel("   "), "-");
+  assert.equal(rankLabel("<NEW_RANK>"), "&lt;NEW_RANK&gt;");
+  assert.equal(rankLabel("toString"), "toString");
 });

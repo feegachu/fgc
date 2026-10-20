@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -197,6 +197,42 @@ it('POL restores detail tab and selected id from a shared URL', async () => {
   await screen.findByText('34.5678%')
   expect(screen.getByRole('tab', { name: '예상 해약환급률표' })).toHaveAttribute('aria-selected', 'true')
   expect(request.mock.calls.some(([p]) => p === '/api/v1/policies/2')).toBe(true)
+})
+
+it('POL 직급을 한글로 표시하고 전체 적용과 누락·미등록 값을 구분하며 탭 전환 후에도 유지한다', async () => {
+  const user = userEvent.setup()
+  const rankCodes = ['FC', 'TEAM_LEADER', 'BRANCH_MANAGER', 'DIVISION_HEAD', null, '', undefined, '<NEW_RANK>']
+  const commissionRules = rankCodes.map((agentRankCode, index) => ({
+    ...detail.commissionRules![0],
+    commissionRuleId: index + 1,
+    agentRankCode,
+  }))
+  mount('/policies?tab=commission&policyVersionId=1', (path) =>
+    /\/policies\/\d/.test(path) ? envelope({ ...detail, commissionRules }) : fixtures(path),
+  )
+  const table = await screen.findByRole('table', { name: '수수료 규칙' })
+  const rankCells = () =>
+    within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[3])
+  expect(rankCells().map((cell) => cell.textContent)).toEqual([
+    '설계사',
+    '팀장',
+    '지사장',
+    '본부장',
+    '전체',
+    '-',
+    '-',
+    '<NEW_RANK>',
+  ])
+  expect(table.querySelector('NEW_RANK')).toBeNull()
+  expect(within(table).getAllByText('650.1234')).toHaveLength(rankCodes.length)
+  await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
+  await screen.findByText('89.1234')
+  await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
+  expect(await screen.findByText('지사장')).toBeVisible()
+  expect(commissionRules[2].agentRankCode).toBe('BRANCH_MANAGER')
 })
 it('POL asOf changes query and clears selected id while retaining month/tab', async () => {
   const { router, request } = mount('/policies?month=2026-08&tab=cap&policyVersionId=2')
