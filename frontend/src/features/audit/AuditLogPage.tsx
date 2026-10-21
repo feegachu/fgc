@@ -1,3 +1,4 @@
+import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '../../components/DataTable'
@@ -39,7 +40,6 @@ const columns: TableColumn<AuditLog>[] = [
     label: '사유',
     width: '14rem',
     render: (row) => auditReasonLabel(row.actionCode, row.reason),
-    expandable: true,
   },
   { key: 'policy', label: '정책버전', width: '7rem', render: (row) => dash(row.policyVersionId) },
   { key: 'requestId', label: '요청 ID', width: '10rem', render: (row) => dash(row.requestId) },
@@ -78,7 +78,12 @@ export default function AuditLogPage() {
         </p>
       )}
 
-      <div className="audit-layout">
+      <ResizableSplit
+        className="audit-layout"
+        storageKey="audit-workspace"
+        label="감사 기록과 변경 내용 비교 카드 너비"
+        defaultRatio={60}
+      >
         <section className="surface audit-list-panel" aria-labelledby="audit-list-title">
           <header className="surface-header audit-panel-header">
             <h2 id="audit-list-title" className="surface-title">
@@ -131,7 +136,7 @@ export default function AuditLogPage() {
             )}
           </div>
         </section>
-      </div>
+      </ResizableSplit>
     </div>
   )
 }

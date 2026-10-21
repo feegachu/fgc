@@ -2,6 +2,10 @@
   color: var(--color-text-link);
   text-align: left;
 }
+/* Help icons share the header line box instead of shifting its text baseline. */
+.data-table th .evidence {
+  vertical-align: top;
+}
 .cell-preview {
   display: -webkit-box;
   -webkit-line-clamp: 2;

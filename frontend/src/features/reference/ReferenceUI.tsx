@@ -1,5 +1,6 @@
-import { useId, useEffect, useRef } from 'react'
+import { useId } from 'react'
 import type { ReactNode } from 'react'
+import { CellDisclosure } from '../../components/CellDisclosure'
 import { ApiError } from '../../lib/api/client'
 import { errorText } from '../../lib/format'
 export function QueryState({ loading, error }: { loading?: boolean; error?: Error | null }) {
@@ -77,7 +78,6 @@ export function ReferenceTabs<T extends string>({
     </>
   )
 }
-// The legacy tables disclose only text that is actually clipped at the current width.
 export function ReferenceText({
   value,
   limit,
@@ -88,38 +88,6 @@ export function ReferenceText({
   singleLine?: boolean
 }) {
   const text = value || '-'
-  const container = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const node = container.current
-    if (!node) return
-    const preview = node.querySelector<HTMLElement>('.table-cell-preview')!
-    const details = node.querySelector<HTMLDetailsElement>('details')!
-    const sync = () => {
-      if (!preview.clientWidth) return
-      details.hidden =
-        preview.scrollWidth <= preview.clientWidth + 1 && preview.scrollHeight <= preview.clientHeight + 1
-      if (details.hidden) details.open = false
-    }
-    const observer = new ResizeObserver(sync)
-    observer.observe(preview)
-    sync()
-    void document.fonts?.ready.then(sync)
-    return () => observer.disconnect()
-  }, [text, limit])
   if (text.length <= limit) return <>{text}</>
-  return (
-    <div className="table-cell-disclosure" ref={container}>
-      <span className={`table-cell-preview ${singleLine ? 'is-single-line' : ''}`}>{text}</span>
-      <details className="table-cell-details" hidden>
-        <summary>
-          <span className="table-cell-more">전체 보기</span>
-          <span className="table-cell-less">접기</span>
-          <span className="material-symbols-rounded table-cell-chevron" aria-hidden="true">
-            expand_more
-          </span>
-        </summary>
-        <p className="table-cell-full">{text}</p>
-      </details>
-    </div>
-  )
+  return <CellDisclosure preview={text} singleLine={singleLine} />
 }

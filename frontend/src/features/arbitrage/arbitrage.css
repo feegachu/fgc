@@ -66,11 +66,7 @@
 }
 
 .arb-content-grid {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1.25fr) minmax(22rem, 1fr);
   align-items: start;
-  gap: var(--space-4);
 }
 
 .arb-list-panel,
@@ -293,12 +289,6 @@
 @keyframes arb-recheck-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 71.875rem) {
-  .arb-content-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 

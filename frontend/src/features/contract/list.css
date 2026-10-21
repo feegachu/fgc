@@ -16,8 +16,8 @@
   gap: var(--space-1);
 }
 .contract-list-page .data-table .contract-number-cell {
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 .contract-list-filters {
   padding: var(--space-4);

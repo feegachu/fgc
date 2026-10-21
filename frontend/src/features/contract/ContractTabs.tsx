@@ -332,6 +332,7 @@ const scheduleColumns: TableColumn<ScheduleLine>[] = [
   {
     key: 'status',
     label: '상태',
+    align: 'center',
     render: (row) => (
       <ScheduleStatusBadge code={row.lineStatus} label={responseLabel(undefined, LINE_STATUS, row.lineStatus)} />
     ),
@@ -427,7 +428,7 @@ function CapTab({ id }: { id: string }) {
         />
       ),
     },
-    { key: 'status', label: '판정', render: (row) => <CapStatus code={row.result?.resultStatus} /> },
+    { key: 'status', label: '판정', align: 'center', render: (row) => <CapStatus code={row.result?.resultStatus} /> },
     {
       key: 'basis',
       label: '계산근거',
@@ -502,6 +503,7 @@ const arbitrageColumns: TableColumn<ContractArbitrageCheck>[] = [
   {
     key: 'status',
     label: '판정',
+    align: 'center',
     render: (row) => (
       <ResultStatus code={row.resultStatus} label={row.resultStatusLabel} labels={arbitrageStatusLabels} />
     ),
@@ -535,7 +537,12 @@ const journalColumns: TableColumn<ContractJournal>[] = [
   { key: 'debit', label: '차변', align: 'number', render: (row) => <Amount value={row.debitTotal} /> },
   { key: 'credit', label: '대변', align: 'number', render: (row) => <Amount value={row.creditTotal} /> },
   { key: 'difference', label: '차액', align: 'number', render: (row) => <Amount value={row.differenceAmount} /> },
-  { key: 'status', label: '상태', render: (row) => <ResultStatus code={row.status} label={row.statusLabel} /> },
+  {
+    key: 'status',
+    label: '상태',
+    align: 'center',
+    render: (row) => <ResultStatus code={row.status} label={row.statusLabel} />,
+  },
 ]
 function LedgerTab({ id }: { id: string }) {
   const query = useQuery(contractJournalsQuery(id))
@@ -562,10 +569,15 @@ type Reconciliation = NonNullable<ContractTransactions['reconciliations']>[numbe
 const transactionColumns: TableColumn<Transaction>[] = [
   { key: 'month', label: '정산월', render: (row) => month(row.settlementMonth) },
   { key: 'stage', label: '지급단계', render: (row) => stageLabel(row.paymentStage, row.paymentStageLabel) },
-  { key: 'amount', label: '금액', render: (row) => <Amount value={row.amount} /> },
-  { key: 'attributed', label: '귀속금액', render: (row) => <Amount value={row.attributionTotal} /> },
-  { key: 'difference', label: '차액', render: (row) => <Amount value={row.differenceAmount} /> },
-  { key: 'status', label: '상태', render: (row) => <ResultStatus code={row.status} label={row.statusLabel} /> },
+  { key: 'amount', label: '금액', align: 'number', render: (row) => <Amount value={row.amount} /> },
+  { key: 'attributed', label: '귀속금액', align: 'number', render: (row) => <Amount value={row.attributionTotal} /> },
+  { key: 'difference', label: '차액', align: 'number', render: (row) => <Amount value={row.differenceAmount} /> },
+  {
+    key: 'status',
+    label: '상태',
+    align: 'center',
+    render: (row) => <ResultStatus code={row.status} label={row.statusLabel} />,
+  },
 ]
 const reconciliationColumns: TableColumn<Reconciliation>[] = [
   { key: 'result', label: '결과', render: (row) => <Text value={row.resultTypeLabel || row.resultType} /> },

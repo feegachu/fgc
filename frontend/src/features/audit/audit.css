@@ -33,10 +33,6 @@
 }
 
 .audit-layout {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1.5fr) minmax(22rem, 1fr);
-  gap: var(--space-4);
   align-items: start;
 }
 
@@ -183,12 +179,6 @@
 
 .data-table .audit-diff-cell-changed {
   background: var(--color-status-warning-bg);
-}
-
-@media (max-width: 56.25rem) {
-  .audit-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 63.9375rem) {

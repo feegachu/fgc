@@ -93,6 +93,7 @@ export default function TransactionListPage() {
       key: 'flow',
       label: '흐름',
       width: '5rem',
+      align: 'center',
       render: (row) => (
         <StatusBadge
           tone={row.status === 'CANCELLED' ? 'neutral' : row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}
@@ -105,6 +106,7 @@ export default function TransactionListPage() {
       key: 'status',
       label: '상태',
       width: '5.5rem',
+      align: 'center',
       render: (row) => (
         <StatusBadge tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}>
           {row.statusLabel || row.status}
@@ -115,6 +117,7 @@ export default function TransactionListPage() {
       key: 'attributions',
       label: '귀속',
       width: '6.5rem',
+      align: 'center',
       render: (row) => {
         const count = row.attributionCount ?? 0
         const imbalance = count === 0 || Number(row.differenceAmount ?? 0) !== 0

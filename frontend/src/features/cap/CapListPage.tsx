@@ -47,7 +47,7 @@ const agentColumns: TableColumn<CapAgent>[] = [
       />
     ),
   },
-  { key: 'count', label: '계약 수', align: 'number', render: (row) => `${int(row.contractCount)}건` },
+  { key: 'count', label: '계약 수', align: 'left', render: (row) => `${int(row.contractCount)}건` },
   { key: 'limit', label: '한도 합계', align: 'number', render: (row) => <Amount value={row.limitAmountTotal} /> },
   { key: 'included', label: '산입 합계', align: 'number', render: (row) => <Amount value={row.includedAmountTotal} /> },
   {
@@ -56,7 +56,7 @@ const agentColumns: TableColumn<CapAgent>[] = [
     width: '14rem',
     render: (row) => <CapUsage value={row.usagePct} status={monitoringStatus(row).code} />,
   },
-  { key: 'status', label: '모니터링', render: (row) => <CapStatus {...monitoringStatus(row)} /> },
+  { key: 'status', label: '모니터링', align: 'center', render: (row) => <CapStatus {...monitoringStatus(row)} /> },
 ]
 
 /** CAP-W01. 검색조건·상세 ID는 URL에, 판정·전체 검색범위 집계는 서버에 둔다. */
@@ -157,6 +157,7 @@ export default function CapListPage() {
       key: 'status',
       label: '판정',
       width: '6rem',
+      align: 'center',
       render: (row) => <CapStatus code={row.resultStatus} label={row.resultStatusLabel} />,
     },
     {
