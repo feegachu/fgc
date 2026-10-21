@@ -164,6 +164,9 @@ describe('LEDG-W01 검증원장 React 전환', () => {
       expect(query.has('from')).toBe(false)
       expect(query.has('to')).toBe(false)
     })
+    // 조회에 쓰인 조건과 입력칸이 같다: 비운 날짜가 기준 월로 다시 채워지지 않는다.
+    expect(screen.getByLabelText('분개일 (시작)')).toHaveValue('')
+    expect(screen.getByLabelText('분개일 (끝)')).toHaveValue('')
   })
   it('기간·유형·계정·계약·상태 조회조건과 1-base 페이징을 URL/API에 유지한다', async () => {
     const { router, user } = renderAt()
@@ -272,6 +275,15 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     })
     expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
     expect(screen.queryByText(/sensitive backend/)).not.toBeInTheDocument()
+  })
+  it('searched=true로 날짜 없이 다시 열어도 입력칸을 기준 월로 채우지 않고 기간 제한 없이 조회한다', async () => {
+    renderAt('/journals?searched=true')
+    await screen.findByRole('button', { name: 'JRN-001' })
+    const query = new URLSearchParams(calls.find((call) => call.url.startsWith('/api/v1/journals?'))!.url.split('?')[1])
+    expect(query.has('from')).toBe(false)
+    expect(query.has('to')).toBe(false)
+    expect(screen.getByLabelText('분개일 (시작)')).toHaveValue('')
+    expect(screen.getByLabelText('분개일 (끝)')).toHaveValue('')
   })
   it('불균형 필터 미지원 안내를 표시하고 초기화하면 기준 월 기본 조건으로 돌아간다', async () => {
     const { router, user } = renderAt('/journals?searched=true&imbalanceOnly=true&from=2026-06-01&to=2026-06-30')

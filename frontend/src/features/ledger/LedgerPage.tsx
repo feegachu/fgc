@@ -153,9 +153,10 @@ export default function LedgerPage() {
         </p>
       )}
       <LedgerFilters
-        key={JSON.stringify(criteria) + month}
+        key={JSON.stringify(criteria) + month + searched}
         criteria={criteria}
         month={month}
+        searched={searched}
         onSearch={(fields) => update({ ...fields, searched: 'true', selected: '' })}
         onReset={reset}
       />
@@ -267,11 +268,13 @@ export default function LedgerPage() {
 function LedgerFilters({
   criteria,
   month,
+  searched,
   onSearch,
   onReset,
 }: {
   criteria: JournalCriteria
   month: string | null
+  searched: boolean
   onSearch: (fields: Omit<JournalCriteria, 'page'>) => void
   onReset: () => void
 }) {
@@ -284,10 +287,12 @@ function LedgerFilters({
     status: criteria.status,
   }
   const range = monthRange(month)
+  // 조회 버튼을 누른 뒤(searched=true)에는 비운 날짜를 "기간 제한 없음"으로 보이는 그대로 유지하고,
+  // 처음 진입했을 때만 기준 월 범위를 입력칸에 채운다. 실제 조회 조건(effectiveCriteria)과 같은 규칙이다.
   const [fields, setFields] = useState({
     ...initial,
-    from: initial.from || range.from,
-    to: initial.to || range.to,
+    from: searched ? initial.from : initial.from || range.from,
+    to: searched ? initial.to : initial.to || range.to,
   })
   const accounts = useQuery(journalAccountsQueryOptions())
   const field = (key: keyof typeof fields, label: string, options?: Record<string, string>, type = 'text') => (
