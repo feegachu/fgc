@@ -42,12 +42,10 @@ python3 infra/scripts/shinhan_release.py origin "$FGC_PUBLIC_URL"
                     copyArtifacts(projectName: 'stage-fgc',
                         selector: specific(params.SOURCE_BUILD),
                         filter: 'bundle.tgz,release.json',
-                        fingerprintArtifacts: true,
-                        resultVariableSuffix: 'SHINHAN_STAGE')
+                        fingerprintArtifacts: true)
                 }
                 sh '''#!/usr/bin/env bash
 set -euo pipefail
-[[ "$COPYARTIFACT_BUILD_NUMBER_SHINHAN_STAGE" == "$SOURCE_BUILD" ]]
 python3 infra/scripts/shinhan_release.py promote \
   source/bundle.tgz source/release.json "$SOURCE_BUILD" "$JENKINS_URL" source/promotion.json
 cat source/promotion.json

@@ -34,6 +34,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fgc?currentSchema=fgc
       SPRING_DATASOURCE_USERNAME: fgc
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      # Existing Shinhan DB includes applied demo migrations; retain their validation history.
+      # Removing this location requires a separate data/history transition first.
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
       FGC_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       JAVA_TOOL_OPTIONS: "-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=384m"

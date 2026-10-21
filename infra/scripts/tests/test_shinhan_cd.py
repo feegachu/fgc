@@ -3,6 +3,7 @@ import io
 import json
 import tarfile
 import pathlib
+import re
 import os
 import shutil
 import subprocess
@@ -70,6 +71,34 @@ class PromotionTests(unittest.TestCase):
         self.assertEqual(value["source_job"], "stage-fgc")
         self.assertEqual(value["source_build"], 12)
         self.assertEqual(len(list(path.iterdir())), 2)
+
+    def test_jenkins_promotion_runs_without_copyartifact_result_variable(self):
+        path = self.bundle()
+        source = path / "source"
+        source.mkdir()
+        for name in ("bundle.tgz", "release.json"):
+            shutil.move(path / name, source / name)
+        helpers = path / "infra/scripts"
+        helpers.mkdir(parents=True)
+        shutil.copyfile(ROOT / "shinhan_release.py", helpers / "shinhan_release.py")
+        pipeline = (ROOT.parents[1] / "Jenkinsfile.shinhan").read_text(encoding="utf-8")
+        stage = pipeline.split("stage('Select verified AWS staging bundle')", 1)[1]
+        command = re.search("sh "+ "'" * 3 + "(.*?)" + "'" * 3, stage, re.DOTALL).group(1)
+        bin_dir = path / "bin"
+        bin_dir.mkdir()
+        wrapper = bin_dir / "python3"
+        wrapper.write_text("#!/usr/bin/env bash\nset -o pipefail\n'" + pathlib.Path(sys.executable).as_posix() + "' \"$@\" | sed 's/\\r$//'\n", newline="\n")
+        wrapper.chmod(0o755)
+        bash = r"C:/Program Files/Git/bin/bash.exe" if os.name == "nt" else shutil.which("bash")
+        env = {key: value for key, value in os.environ.items() if not key.startswith("COPYARTIFACT_BUILD_NUMBER")}
+        env.update({"SOURCE_BUILD": "12", "JENKINS_URL": "http://jenkins/", "TEST_BIN": bin_dir.as_posix(), "PYTHONUTF8": "1"})
+        bootstrap = 'if command -v cygpath >/dev/null; then export PATH="$(cygpath -u "$TEST_BIN"):/usr/bin:/bin"; else export PATH="$TEST_BIN:/usr/bin:/bin"; fi; exec bash "$@"'
+        result = subprocess.run([bash, "-c", bootstrap, "test", "-c", command], cwd=path,
+                                env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        value = json.loads((source / "promotion.json").read_text())
+        self.assertEqual(value["source_build"], 12)
+        self.assertEqual(value["release"], manifest())
 
     def test_mismatched_or_ambiguous_bundle_rejected(self):
         variants = [{"bundled": manifest() | {"api": f"{release.REGISTRY}/api@sha256:" + "e" * 64}},
