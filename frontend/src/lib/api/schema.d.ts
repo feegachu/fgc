@@ -1596,6 +1596,8 @@ export interface components {
             /** @enum {string} */
             surrenderValueSourceType?: "ACTUAL" | "EXPECTED_TABLE" | "NOT_APPLICABLE";
             surrenderValueSourceTypeLabel?: string;
+            projectedExcessAmount?: number;
+            candidateType?: string;
         };
         ArbitrageSearchResponse: {
             items?: components["schemas"]["PageResponseArbitrageCheckView"];
