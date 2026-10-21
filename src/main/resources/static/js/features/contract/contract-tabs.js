@@ -190,14 +190,12 @@
             statusBadge(row.statusLabel, row.status)];
         })));
       var recoSection = section("대사 결과", reconciliations.length + "건");
-      /* 주원인 코드는 RECO 화면(reco.js)과 같은 방식으로 전체 보기를 붙인다. */
       recoSection.appendChild(table("대사 결과",
-        ["결과", "회차", "예상액", "실제액", "차액", "주원인"],
+        ["결과", "회차", "예상액", "실제액", "차액"],
         reconciliations.map(function (row) {
           return [value(row.resultTypeLabel || row.resultType), value(row.installmentNo),
-            money(row.expectedTotalAmount), money(row.actualTotalAmount), money(row.differenceAmount),
-            value(row.primaryReasonCode)];
-        }), [0, 5]));
+            money(row.expectedTotalAmount), money(row.actualTotalAmount), money(row.differenceAmount)];
+        }), [0]));
       root.append(paymentSection, recoSection);
       return root;
     });
