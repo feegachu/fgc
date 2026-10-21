@@ -98,7 +98,10 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1�
   await expect(page.locator('.audit-panel-caption .tabular-nums')).toHaveText(Number(oldCount).toLocaleString('en-US'))
   await page.getByRole('button', { name: '2', exact: true }).click()
   await expect(page).toHaveURL(/page=2/)
-  await expect(page.locator('.audit-pagination-status')).toContainText('2 /')
+  await expect(page.locator('.audit-pagination .list-pagination-status')).toHaveText(/^2 \/ \d+ 페이지$/)
+  await expect(
+    page.getByRole('navigation', { name: '감사로그 목록 페이지 선택' }).locator('[aria-current="page"]'),
+  ).toHaveText('2')
   const rows = table.locator('tbody tr')
   await expect(rows).toHaveCount(oldCells.length)
   const newCells = await rows.evaluateAll((rows) =>
@@ -124,7 +127,7 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1�
   await expect(mouseRow).toHaveAttribute('aria-selected', 'true')
   await expect(row).toHaveAttribute('aria-selected', 'false')
   await expect(page.locator('.audit-diff-context')).toHaveText(
-    `${newCells[1][2]} · ${newCells[1][3]} #${newCells[1][4]}`,
+    `${newCells[1][2]} (JOURNAL_DRAFT_SAVED) · ${newCells[1][3]} (JOURNAL_HEADER) #${newCells[1][4]}`,
   )
   const selected = new URL(page.url()).searchParams.get('selected')
   await page.reload()
