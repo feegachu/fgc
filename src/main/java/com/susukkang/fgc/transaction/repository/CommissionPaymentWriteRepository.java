@@ -25,6 +25,14 @@ public class CommissionPaymentWriteRepository {
     private final TransactionAttributionRepository attributionRepository;
     private final EntityManager entityManager;
 
+    public boolean isJournalCorrectionReplacement(Long paymentId, String correctionGroupKey) {
+        return ((Number) entityManager.createNativeQuery("""
+                SELECT COUNT(*) FROM fgc.payment_journal_correction
+                WHERE replacement_payment_id = :paymentId AND correction_group_key = :groupKey
+                """).setParameter("paymentId", paymentId).setParameter("groupKey", correctionGroupKey)
+                .getSingleResult()).longValue() == 1;
+    }
+
     public void insertTransaction(CommissionPaymentCommand command) {
         CommissionTransaction saved = transactionRepository.saveAndFlush(
                 CommissionTransaction.draft(command, findInsurerId(command.getNaturalContractId())));

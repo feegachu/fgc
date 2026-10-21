@@ -23,8 +23,8 @@ export const RUN_STATUSES = [
   { value: 'FINALIZED', label: '확정(잠김)' },
 ] as const
 export const RUN_TYPES = [
-  { value: 'MONTHLY', label: '월간 (MONTHLY)' },
-  { value: 'MANUAL_CONTRACT', label: '계약 수동 (MANUAL_CONTRACT)' },
+  { value: 'MONTHLY', label: '월간' },
+  { value: 'MANUAL_CONTRACT', label: '계약수동' },
 ] as const
 
 export interface RunCriteria {

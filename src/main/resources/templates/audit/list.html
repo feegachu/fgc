@@ -50,7 +50,7 @@
           <option value="">전체</option>
           <option th:each="code : ${actionCodes}"
                   th:value="${code}"
-                  th:text="${code}"
+                  th:text="${auditLabels.action(code)}"
                   th:selected="${code == form.action}">PAYMENT_CONFIRMED</option>
         </select>
       </div>
@@ -60,7 +60,7 @@
           <option value="">전체</option>
           <option th:each="type : ${entityTypes}"
                   th:value="${type}"
-                  th:text="${type}"
+                  th:text="${auditLabels.entityType(type)}"
                   th:selected="${type == form.entityType}">COMMISSION_PAYMENT</option>
         </select>
       </div>
@@ -133,19 +133,19 @@
             <td th:text="${row.userLoginId} ?: 'BATCH'">settle01</td>
             <td class="tabular-nums audit-disclosure-cell">
               <div class="table-cell-disclosure">
-                <span class="table-cell-preview is-single-line" th:text="${row.actionCode} ?: '-'">PAYMENT_CONFIRMED</span>
+                <span class="table-cell-preview is-single-line" th:text="${auditLabels.action(row.actionCode)}">지급 확정</span>
                 <details class="table-cell-details" hidden>
                   <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
-                  <p class="table-cell-full" th:text="${row.actionCode} ?: '-'">PAYMENT_CONFIRMED</p>
+                  <p class="table-cell-full" th:text="${auditLabels.action(row.actionCode)}">지급 확정</p>
                 </details>
               </div>
             </td>
             <td class="tabular-nums audit-disclosure-cell">
               <div class="table-cell-disclosure">
-                <span class="table-cell-preview is-single-line" th:text="${row.entityType} ?: '-'">COMMISSION_PAYMENT</span>
+                <span class="table-cell-preview is-single-line" th:text="${auditLabels.entityType(row.entityType)}">수수료 지급</span>
                 <details class="table-cell-details" hidden>
                   <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
-                  <p class="table-cell-full" th:text="${row.entityType} ?: '-'">COMMISSION_PAYMENT</p>
+                  <p class="table-cell-full" th:text="${auditLabels.entityType(row.entityType)}">수수료 지급</p>
                 </details>
               </div>
             </td>
@@ -160,10 +160,10 @@
             </td>
             <td class="audit-disclosure-cell">
               <div class="table-cell-disclosure">
-                <span class="table-cell-preview" th:text="${row.reason} ?: '-'">-</span>
+                <span class="table-cell-preview" th:text="${auditLabels.reason(row.actionCode, row.reason)}">-</span>
                 <details class="table-cell-details" hidden>
                   <summary><span class="table-cell-more">전체 보기</span><span class="table-cell-less">접기</span><span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span></summary>
-                  <p class="table-cell-full" th:text="${row.reason} ?: '-'">-</p>
+                  <p class="table-cell-full" th:text="${auditLabels.reason(row.actionCode, row.reason)}">-</p>
                 </details>
               </div>
             </td>
@@ -222,9 +222,14 @@
         <p class="audit-diff-prompt" th:if="${selectedLog == null}">왼쪽 목록에서 한 건을 고르세요.</p>
         <div th:if="${selectedLog != null}">
           <p class="audit-diff-context">
-            <span class="tabular-nums" th:text="${selectedLog.actionCode}">PAYMENT_CONFIRMED</span> ·
-            <span class="tabular-nums" th:text="${selectedLog.entityType + ' #' + selectedLog.entityId}">COMMISSION_PAYMENT #42</span>
+            <span th:text="${auditLabels.actionWithCode(selectedLog.actionCode)}">지급 확정 (PAYMENT_CONFIRMED)</span> ·
+            <span th:text="${auditLabels.entityTypeWithCode(selectedLog.entityType) + ' #' + (selectedLog.entityId ?: '-')}">수수료 지급 (COMMISSION_PAYMENT) #42</span>
           </p>
+          <details class="audit-reason-original"
+                   th:if="${!#strings.isEmpty(selectedLog.reason) and auditLabels.reason(selectedLog.actionCode, selectedLog.reason) != selectedLog.reason}">
+            <summary>사유 원문 보기</summary>
+            <p th:text="${selectedLog.reason}"></p>
+          </details>
           <div class="data-table-viewport">
             <table class="data-table audit-diff-table">
               <caption class="visually-hidden">선택한 감사 기록의 변경 전후 값 비교</caption>

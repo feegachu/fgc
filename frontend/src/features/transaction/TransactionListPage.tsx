@@ -94,8 +94,8 @@ export default function TransactionListPage() {
       label: '흐름',
       width: '5rem',
       render: (row) => (
-        <StatusBadge tone={row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}>
-          {row.cashflowTypeLabel || row.cashflowType}
+        <StatusBadge tone={row.status === 'CANCELLED' ? 'neutral' : row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}>
+          {row.status === 'CANCELLED' ? '취소' : row.cashflowTypeLabel || row.cashflowType}
         </StatusBadge>
       ),
     },
@@ -251,6 +251,8 @@ export default function TransactionListPage() {
               {page} / {totalPages} 페이지
             </span>
             <Pagination
+              legacy
+              label="수수료 지급 건 목록 페이지 선택"
               page={page}
               totalPages={totalPages}
               onPageChange={(next) => apply({ ...filters, page: next })}

@@ -20,6 +20,9 @@ public interface CommissionPaymentService {
 
     CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey);
 
+    /** 원장 정정으로 연결된 대체 지급만 기존 확정 게이트로 승인한다. */
+    CommissionPaymentResponse confirmJournalCorrection(Long paymentId, String correctionGroupKey);
+
     // IF-API-24 — 저장·상태 변경 없이 확정 게이트를 미리 계산한다 (FGC-FUN-033)
     TransactionPrecheckResponse precheck(Long paymentId);
 

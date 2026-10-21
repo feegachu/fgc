@@ -1,3 +1,4 @@
+import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
@@ -28,6 +29,7 @@ import {
   reverseJournal,
 } from './api'
 import type { Journal, JournalCriteria, JournalDetail, JournalLine } from './api'
+import { accountDisplayName } from './accountName'
 import { JOURNAL_ACCOUNT, JOURNAL_STATUS, JOURNAL_TYPE } from './labels'
 import './ledger.css'
 
@@ -107,7 +109,7 @@ const lineColumns: TableColumn<JournalLine>[] = [
     key: 'account',
     label: '계정과목',
     width: '16rem',
-    render: (row) => disclose(`${text(row.accountCode)} · ${text(row.accountName)}`),
+    render: (row) => disclose(accountDisplayName(row.accountCode, row.accountName)),
   },
   { key: 'debit', label: '차변', width: '9rem', align: 'number', render: (row) => <Money value={row.debitAmount} /> },
   { key: 'credit', label: '대변', width: '9rem', align: 'number', render: (row) => <Money value={row.creditAmount} /> },
@@ -318,7 +320,7 @@ function LedgerFilters({
             ...Object.entries(JOURNAL_ACCOUNT),
             ...(accounts.data ?? [])
               .filter((a) => a.accountCode)
-              .map((a) => [a.accountCode!, a.accountName || a.accountCode!]),
+              .map((a) => [a.accountCode!, accountDisplayName(a.accountCode, a.accountName)]),
           ]),
         )}
         {field('contract', '계약 ID', undefined, 'number')}
@@ -393,7 +395,7 @@ function JournalActionModal({
         navigate(month ? withMonth(result.target, month) : result.target)
       } else {
         toast(`역분개 ${result.journalHeaderId}을 생성했습니다.`, 'success')
-        await client.invalidateQueries({ queryKey: ['journals'] })
+        await invalidateJournalCorrectionQueries(client)
         onClose()
       }
     },

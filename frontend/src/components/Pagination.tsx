@@ -33,6 +33,7 @@ export function Pagination({
       <button
         type="button"
         className={compact || legacy ? 'pagination-button' : 'button button-ghost'}
+        title={legacy ? '이전 5페이지' : undefined}
         aria-label={legacy ? '이전 5페이지' : compact ? '이전 페이지' : undefined}
         disabled={compact ? current === 1 : start === 1}
         onClick={() => onPageChange(compact ? current - 1 : start - 1)}
@@ -68,6 +69,7 @@ export function Pagination({
       <button
         type="button"
         className={compact || legacy ? 'pagination-button' : 'button button-ghost'}
+        title={legacy ? '다음 5페이지' : undefined}
         aria-label={legacy ? '다음 5페이지' : compact ? '다음 페이지' : undefined}
         disabled={compact ? current === last : start + 4 >= last}
         onClick={() => onPageChange(compact ? current + 1 : start + 5)}

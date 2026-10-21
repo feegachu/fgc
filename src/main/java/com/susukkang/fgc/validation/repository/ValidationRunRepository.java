@@ -410,7 +410,7 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                                                                                                         AS reconciliationDifferenceAmountTotal
                            FROM fgc.reconciliation_run recon
                            LEFT JOIN fgc.reconciliation_result r ON r.reconciliation_run_id = recon.reconciliation_run_id
-                          WHERE recon.validation_run_id = :validationRunId) rr
+                          WHERE recon.validation_run_id = :validationRunId AND NOT recon.superseded_yn) rr
              CROSS JOIN (SELECT COUNT(*) AS scheduleGeneratedCount
                            FROM fgc.schedule_header
                           WHERE validation_run_id = :validationRunId) sh

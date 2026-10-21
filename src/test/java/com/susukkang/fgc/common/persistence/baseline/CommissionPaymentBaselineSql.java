@@ -297,6 +297,16 @@ final class CommissionPaymentBaselineSql {
                 sql.append(" ");
                 yield new Statement(sql.toString(), parameters, scalar(java.time.LocalDate.class), "", "");
             }
+            case "findProtectionType" -> {
+                var parameters = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
+                parameters.addValue("contractId", parameter(value(input, "contractId")));
+                yield new Statement("""
+                        SELECT p.protection_type FROM fgc.insurance_contract c
+                        JOIN fgc.product_offering po ON po.product_offering_id=c.product_offering_id
+                        JOIN fgc.product p ON p.product_id=po.product_id
+                        WHERE c.contract_id=:contractId
+                        """, parameters, scalar(String.class), "", "");
+            }
             case "findContract" -> {
                 StringBuilder sql = new StringBuilder();
                 var parameters = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
@@ -804,7 +814,8 @@ final class CommissionPaymentBaselineSql {
                            COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
                            ta.attribution_method,
                            c.contract_date,
-                           ct.cashflow_type
+                           ct.cashflow_type,
+                           ct.due_date AS scheduled_payment_date
                       FROM fgc.commission_transaction ct
                       JOIN fgc.commission_item ci
                         ON ci.commission_item_id = ct.commission_item_id
@@ -862,7 +873,8 @@ final class CommissionPaymentBaselineSql {
                            COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
                            ta.attribution_method,
                            c.contract_date,
-                           ct.cashflow_type
+                           ct.cashflow_type,
+                           ct.due_date AS scheduled_payment_date
                       FROM fgc.commission_transaction ct
                       JOIN fgc.commission_item ci
                         ON ci.commission_item_id = ct.commission_item_id
