@@ -6,7 +6,7 @@ import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { date, int, usageRate, won } from '../../lib/format'
 import { useWorkspaceStore } from '../../stores/workspace'
@@ -230,29 +230,30 @@ export default function CapListPage() {
             emptyMessage={list.isPending ? '판정 목록을 불러오는 중입니다.' : '조건에 맞는 계약 판정이 없습니다.'}
           />
         )}
-        <footer className="cap-react-pagination">
-          <label>
-            한 화면{' '}
-            <select
-              className="select-control"
-              aria-label="한 화면 행 수"
-              value={criteria.size}
-              onChange={(event) => update({ size: event.target.value })}
-            >
-              {[10, 20, 50].map((size) => (
-                <option key={size} value={size}>
-                  {size}행
-                </option>
-              ))}
-            </select>
-          </label>
-          <Pagination
-            compact
-            page={criteria.page}
-            totalPages={data?.totalPages ?? 0}
-            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-          />
-        </footer>
+        <ListPagination
+          className="cap-react-pagination"
+          label="1,200% 한도 검증 목록 페이지 선택"
+          page={criteria.page}
+          totalPages={data?.totalPages ?? 0}
+          onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+          controls={
+            <label>
+              한 화면{' '}
+              <select
+                className="select-control"
+                aria-label="한 화면 행 수"
+                value={criteria.size}
+                onChange={(event) => update({ size: event.target.value })}
+              >
+                {[10, 20, 50].map((size) => (
+                  <option key={size} value={size}>
+                    {size}행
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+        />
       </section>
       <section className="surface">
         <header className="surface-header">

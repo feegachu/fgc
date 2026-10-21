@@ -300,19 +300,26 @@ it('timeline cache separates contract IDs even when contract number/stage match'
   expect((await client.fetchQuery(arbitrageTimelineQuery(other))).map((r) => r.contractId)).toEqual([99])
   client.clear()
 })
-it('legacy pagination includes more than five page numbers and moves one page at a time', async () => {
+it('pagination shows at most five numbers and moves between page groups', async () => {
   const user = userEvent.setup()
-  const { router } = mount(undefined, true, (p) =>
+  const { router } = mount('/arbitrage-checks?month=2026-07&page=4&contractNo=ARB', true, (p) =>
     p.includes('/insurers')
       ? fixtures(p)
-      : result([row], Number(new URL(p, 'http://test').searchParams.get('page') ?? 1), 7),
+      : result([row], Number(new URL(p, 'http://test').searchParams.get('page') ?? 1), 12),
   )
   await screen.findByText('서버 판정 근거')
-  await user.click(screen.getByRole('button', { name: '7' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '7' })).toHaveAttribute('aria-current', 'page'))
-  expect(router.state.location.search).toContain('page=7')
-  await user.click(screen.getByRole('button', { name: '이전 페이지' }))
-  expect(router.state.location.search).toContain('page=6')
+  const nav = () => screen.getByRole('navigation', { name: '차익거래 검증 목록 페이지' })
+  const controls = () => within(nav())
+  expect(nav().querySelectorAll('.pagination-button')).toHaveLength(7)
+  expect(controls().queryByRole('button', { name: '7' })).toBeNull()
+  expect(controls().getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+  await user.click(controls().getByRole('button', { name: '다음 5페이지' }))
+  await waitFor(() => expect(router.state.location.search).toContain('page=6'))
+  await waitFor(() => expect(nav().querySelector('[aria-current="page"]')).toHaveTextContent('6'))
+  await user.click(controls().getByRole('button', { name: '이전 5페이지' }))
+  await waitFor(() => expect(router.state.location.search).toContain('page=5'))
+  expect(router.state.location.search).toContain('month=2026-07')
+  expect(router.state.location.search).toContain('contractNo=ARB')
 })
 
 it('keeps projected-only excess separate from the CLEAR result in list and detail', async () => {

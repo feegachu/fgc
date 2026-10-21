@@ -8,7 +8,7 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { KpiCard } from '../../components/KpiCard'
 import { Modal } from '../../components/Modal'
-import { Pagination } from '../../components/Pagination'
+import { ReconciliationPagination } from './ReconciliationPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTime, int, month as formatMonth } from '../../lib/format'
@@ -365,14 +365,14 @@ export default function ReconciliationPage() {
               />
             }
           />
-          {(results.data?.items?.totalPages ?? 0) > 1 && (
-            <Pagination
-              compact
-              page={resultPage}
-              totalPages={results.data?.items?.totalPages ?? 0}
-              onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
-            />
-          )}
+
+          <ReconciliationPagination
+            label="대사 결과 페이지 이동"
+            page={resultPage}
+            totalPages={results.data?.items?.totalPages ?? 0}
+            onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
+          />
+
         </section>
         <section className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching}>
           <header className="surface-header reco-react-panel-header">
@@ -390,14 +390,13 @@ export default function ReconciliationPage() {
             onRowActivate={selectRun}
             rowClassName={(row) => (String(row.reconciliationRunId) === runId ? 'is-selected' : '')}
           />
-          {(history.data?.totalPages ?? 0) > 1 && (
-            <Pagination
-              compact
-              page={criteria.page}
-              totalPages={history.data?.totalPages ?? 0}
-              onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-            />
-          )}
+
+          <ReconciliationPagination
+            label="실행 이력 페이지 이동"
+            page={criteria.page}
+            totalPages={history.data?.totalPages ?? 0}
+            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+          />
         </section>
       </div>
       {resultId && (

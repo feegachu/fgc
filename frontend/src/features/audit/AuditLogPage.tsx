@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTimeSeconds, errorText, int } from '../../lib/format'
 import { auditLogDetailQuery, auditLogOptionsQuery, auditLogsQuery, normalizeCriteria } from './api'
@@ -107,17 +107,13 @@ export default function AuditLogPage() {
             emptyMessage={logs.isPending ? '불러오는 중입니다.' : undefined}
           />
           {totalPages > 1 && (
-            <footer className="audit-pagination">
-              <span className="audit-pagination-status tabular-nums" aria-live="polite">
-                {criteria.page} / {totalPages} 페이지
-              </span>
-              <Pagination
-                compact
-                page={criteria.page}
-                totalPages={totalPages}
-                onPageChange={(page) => update({ page: String(page), selected: '' }, { resetPage: false })}
-              />
-            </footer>
+            <ListPagination
+              className="audit-pagination"
+              label="감사로그 목록 페이지 선택"
+              page={criteria.page}
+              totalPages={totalPages}
+              onPageChange={(page) => update({ page: String(page), selected: '' }, { resetPage: false })}
+            />
           )}
         </section>
 

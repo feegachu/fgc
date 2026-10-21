@@ -164,7 +164,7 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     })
     expect(router.state.location.search).toContain('searched=true')
     expect(screen.getAllByText('1,200,000원')).toHaveLength(2)
-    await user.click(screen.getByRole('button', { name: '다음 페이지' }))
+    await user.click(screen.getByRole('button', { name: '2' }))
     await waitFor(() => expect(calls.some((call) => call.url.includes('page=2'))).toBe(true))
   })
   it('selected 딥링크는 searched 없이 상세와 검증 실행별 불균형을 조회한다', async () => {

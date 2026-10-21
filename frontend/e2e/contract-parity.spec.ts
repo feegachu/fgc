@@ -22,7 +22,7 @@ test('CONT-W01·W02·W03 기존 화면의 배치·문구·아이콘과 좁은 �
     return (await locator.boundingBox())!
   }
   const cases = [
-    { name: 'list', path: 'contracts', anchors: ['.page-title', '.contract-filter-card', '.contract-pagination'] },
+    { name: 'list', path: 'contracts', anchors: ['.page-title', '.contract-filter-card'] },
     {
       name: 'detail',
       path: `contracts/${id}`,
@@ -109,8 +109,16 @@ test('CONT-W01·W02·W03 기존 화면의 배치·문구·아이콘과 좁은 �
       )
       await expect(page.getByRole('link', { name: '신규 등록' }).locator('.material-symbols-rounded')).toHaveText('add')
       await expect(page.locator('.contract-section-header').getByRole('button', { name: '초기화' })).toBeVisible()
-      await expect(page.getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
-      await expect(page.getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
+      // #559: 페이지 이동부는 의도적으로 새 공통 배치를 사용하며 0·1페이지에서 숨긴다.
+      if (list.totalPages > 1) {
+        await expect(page.locator('.contract-pagination')).toBeVisible()
+        await expect(page.locator('.contract-pagination')).toContainText(`1 / ${list.totalPages} 페이지`)
+        await expect(page.getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+        if (list.totalPages <= 5) await expect(page.getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
+        else await expect(page.getByRole('button', { name: '다음 5페이지' })).toBeEnabled()
+      } else {
+        await expect(page.locator('.contract-pagination')).toHaveCount(0)
+      }
       await expect(page.getByRole('button', { name: '처음', exact: true })).toHaveCount(0)
       await expect(page.getByRole('button', { name: '마지막', exact: true })).toHaveCount(0)
     }

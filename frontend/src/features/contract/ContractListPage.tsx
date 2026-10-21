@@ -8,7 +8,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { exportCsv } from '../../lib/exportCsv'
 import { date, int, today } from '../../lib/format'
@@ -192,17 +192,13 @@ export default function ContractListPage() {
                 if (row.contractId) void navigate(detailHref(row))
               }}
             />
-            <div className="contract-pagination">
-              <span>
-                {criteria.page} / {Math.max(1, list.data?.totalPages ?? 0)} 페이지
-              </span>
-              <Pagination
-                legacy
-                page={criteria.page}
-                totalPages={list.data?.totalPages ?? 0}
-                onPageChange={(next) => update({ page: String(next) }, { resetPage: false })}
-              />
-            </div>
+            <ListPagination
+              className="contract-pagination"
+              label="보험계약 목록 페이지 선택"
+              page={criteria.page}
+              totalPages={list.data?.totalPages ?? 0}
+              onPageChange={(next) => update({ page: String(next) }, { resetPage: false })}
+            />
           </>
         )}
       </section>
