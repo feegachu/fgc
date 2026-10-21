@@ -190,6 +190,22 @@ describe('EXCP-W01 예외함', () => {
     expect(searchPaths()[0]).toContain('page=1')
   })
 
+  it('상세 원인·참조 컬럼은 헤더와 내용을 가운데 정렬한다', async () => {
+    renderPage()
+    const list = await table()
+    const headers = within(list).getAllByRole('columnheader')
+    const centered = ['상세 원인', '참조']
+    for (const name of centered) {
+      const index = headers.findIndex((header) => header.textContent === name)
+      expect(index).toBeGreaterThanOrEqual(0)
+      expect(headers[index]).toHaveClass('is-center')
+      const cell = within(list).getAllByRole('row')[1].querySelectorAll('td')[index]
+      expect(cell).toHaveClass('is-center')
+    }
+    // 다른 컬럼의 정렬은 바뀌지 않는다.
+    expect(headers.find((header) => header.textContent === '계약')).not.toHaveClass('is-center')
+  })
+
   it('페이지네이션은 간결한 화살표와 5페이지 묶음으로 이동하며 검색조건을 유지한다', async () => {
     searchResponse = (path) => ({
       ...search([baseCase]),

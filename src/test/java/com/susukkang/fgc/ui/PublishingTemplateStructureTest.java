@@ -649,6 +649,11 @@ class PublishingTemplateStructureTest {
                 .contains("class=\"empty-state")
                 // 상세 원인 컬럼에도 disclosure 를 넣었다 (PR #269 리뷰 지적)
                 .contains("th:text=\"${c.reasonLabel()} ?: '-'\"")
+                // 상세 원인·참조 컬럼은 헤더와 내용을 가운데 정렬한다 (React 예외함과 같다)
+                .contains("<th scope=\"col\" class=\"is-center\">상세 원인</th>")
+                .contains("<th scope=\"col\" class=\"is-center\">참조</th>")
+                .contains("class=\"exception-disclosure-cell is-center\"")
+                .contains("class=\"tabular-nums exception-disclosure-cell is-center\"")
                 // 필터·행 선택 계약은 골격이 바뀌어도 그대로여야 한다
                 .contains("data-selected-exception-id=${selectedExceptionId}")
                 .contains("id=\"summary-cards\"")
