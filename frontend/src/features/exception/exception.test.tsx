@@ -190,7 +190,6 @@ describe('EXCP-W01 예외함', () => {
     expect(searchPaths()[0]).toContain('page=1')
   })
 
-
   it('페이지네이션은 간결한 화살표와 5페이지 묶음으로 이동하며 검색조건을 유지한다', async () => {
     searchResponse = (path) => ({
       ...search([baseCase]),
@@ -242,6 +241,7 @@ describe('EXCP-W01 예외함', () => {
     expect(controls().getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
     await actions.click(controls().getByRole('button', { name: '4' }))
     await screen.findByText('4 / 4 페이지')
+  })
 
   it('요약 카드의 한글 설명을 눌러도 원본 유형과 미처리·월 조건으로 조회한다', async () => {
     const { router, actions } = renderPage()

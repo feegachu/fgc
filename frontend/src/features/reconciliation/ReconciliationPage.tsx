@@ -365,14 +365,6 @@ export default function ReconciliationPage() {
               />
             }
           />
-          {(results.data?.items?.totalPages ?? 0) > 1 && (
-            <Pagination
-              compact
-              page={resultPage}
-              totalPages={results.data?.items?.totalPages ?? 0}
-              onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
-            />
-          )}
 
           <ReconciliationPagination
             label="대사 결과 페이지 이동"
