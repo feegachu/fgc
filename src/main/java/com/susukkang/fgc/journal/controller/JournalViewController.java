@@ -77,7 +77,7 @@ public class JournalViewController {
 
         JournalSearchResponse journals = emptyPage(safePage);
 
-        if (doSearch) {
+        if (doSearch && contractNoError == null) {
             JournalSearchCriteria criteria = new JournalSearchCriteria(
                     safeFrom, safeTo, safeType, safeAccount, contractId, safeContractNo, safeStatus);
             PageResponse<JournalListRow> result = journalSearchService.search(criteria, safePage, PAGE_SIZE);
