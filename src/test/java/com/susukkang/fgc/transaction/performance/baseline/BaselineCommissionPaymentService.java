@@ -225,6 +225,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 capChecks.add(check);
                 continue;
             }
+            if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) continue;
             CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
                     paymentId,
                     data.transactionAttributionId()
@@ -287,6 +288,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
         Map<String, Object> confirmedValue = new LinkedHashMap<>();
         confirmedValue.put("status", CommissionPaymentStatus.CONFIRMED);
         confirmedValue.put("idempotencyKey", normalizedIdempotencyKey);
+        confirmedValue.put("capExclusions", capExclusions(attributions));
         confirmedValue.put("capChecks", capChecks.stream().map(this::capCheckAuditSummary).toList());
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_CONFIRMED)
@@ -348,6 +350,7 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                             buildNotApplicableCheck(data), null, contractNos.get(data.contractId())));
                     continue;
                 }
+                if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) continue;
                 CapRuleSnapshot rule = mapper.findCapRuleSnapshot(
                         paymentId,
                         data.transactionAttributionId()
@@ -415,7 +418,8 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                 paymentId,
                 previews,
                 toBlockers(failures),
-                failures.isEmpty()
+                failures.isEmpty(),
+                capExclusions(attributions)
         );
     }
 
@@ -463,7 +467,8 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
                     return new TransactionPrecheckResponse.Blocker(
                             failure.errorCode().getCode(),
-                            messageResolver.resolve(failure.errorCode(), failure.params()),
+                            CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE.equals(failure.reasonCode())
+                                    ? failure.description() : messageResolver.resolve(failure.errorCode(), failure.params()),
                             paymentLevel ? null : failure.data().contractId(),
                             paymentLevel ? null : failure.data().transactionAttributionId()
                     );
@@ -1269,14 +1274,39 @@ public class BaselineCommissionPaymentService implements CommissionPaymentServic
                     Map.of()
             ));
         }
+        if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)
+                && com.susukkang.fgc.common.code.ProtectionType.isRegulated(mapper.findProtectionType(data.contractId()))
+                && !CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+            String paymentDate = Objects.toString(data.scheduledPaymentDate(), "미입력");
+            failures.add(new GateFailure(
+                    data, ExceptionType.CAP_REVIEW_REQUIRED, CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+                    "HIGH", "초년도 밖 지급일 확인 필요",
+                    "초년도 밖 귀속은 지급예정일도 초년도 종료일 이후여야 합니다. 귀속일: " + data.attributionDate()
+                            + ", 지급예정일: " + paymentDate + ", 초년도 종료일(미포함): " + data.contractDate().plusMonths(12),
+                    FgcErrorCode.CAP_002,
+                    Map.of("reasonCode", CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+                            "attributionDate", data.attributionDate().toString(), "scheduledPaymentDate", paymentDate,
+                            "firstYearEndExclusive", data.contractDate().plusMonths(12).toString())
+            ));
+        }
         return failures;
+    }
+
+    private List<CapCandidateExclusion> capExclusions(List<ConfirmationData> attributions) {
+        return attributions.stream().filter(row -> !isClawback(row))
+                .filter(row -> row.contractId() == null
+                        || com.susukkang.fgc.common.code.ProtectionType.isRegulated(mapper.findProtectionType(row.contractId())))
+                .filter(row -> !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate()))
+                .filter(CapCandidateExclusion::isOutsideFirstYear)
+                .map(CapCandidateExclusion::from).toList();
     }
 
     private boolean hasBlockingUnresolvedViolation(Long paymentId, List<ConfirmationData> attributions) {
         return capExceptionService.findUnresolvedViolationContractIds(paymentId).stream()
                 .anyMatch(id -> id == null || attributions.stream().noneMatch(row -> Objects.equals(row.contractId(), id))
                         || attributions.stream().anyMatch(row -> Objects.equals(row.contractId(), id)
-                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())));
+                        && !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate())
+                        && !CapCandidateExclusion.isOutsideFirstYear(row)));
     }
 
     private boolean isClawback(ConfirmationData data) {

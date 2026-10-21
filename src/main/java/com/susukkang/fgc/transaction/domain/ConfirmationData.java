@@ -40,8 +40,25 @@ public record ConfirmationData(
         String evidenceRef,
         AttributionMethod attributionMethod,
         LocalDate contractDate,
-        String cashflowType
+        String cashflowType,
+        LocalDate scheduledPaymentDate
 ) {
+
+    /** 지급예정일을 제공하지 않는 기존 호출부는 기간 제외 근거 미확인으로 취급한다. */
+    public ConfirmationData(
+            Long paymentId, CommissionPaymentStatus status, BigDecimal amount, BigDecimal attributedAmount,
+            BigDecimal totalAttributedAmount, String confirmIdempotencyKey, LocalDate attributionDate,
+            LocalDate attributionMonth, Long transactionAttributionId, Long contractId, Long agentId,
+            PaymentStage paymentStage, Long commissionItemId, String itemCode, String itemName,
+            Long policyVersionId, InclusionDecisionStatus inclusionDecisionStatus, ExclusionType exclusionType,
+            String inclusionDecisionReason, String allocationBasis, String evidenceRef,
+            AttributionMethod attributionMethod, LocalDate contractDate, String cashflowType
+    ) {
+        this(paymentId, status, amount, attributedAmount, totalAttributedAmount, confirmIdempotencyKey,
+                attributionDate, attributionMonth, transactionAttributionId, contractId, agentId, paymentStage,
+                commissionItemId, itemCode, itemName, policyVersionId, inclusionDecisionStatus, exclusionType,
+                inclusionDecisionReason, allocationBasis, evidenceRef, attributionMethod, contractDate, cashflowType, null);
+    }
 
     /**
      * 기존 단위 테스트와 호출부 호환용 생성자입니다. DB 조회에서는 canonical 생성자에
