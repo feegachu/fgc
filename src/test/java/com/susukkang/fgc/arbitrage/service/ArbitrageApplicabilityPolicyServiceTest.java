@@ -56,7 +56,16 @@ class ArbitrageApplicabilityPolicyServiceTest {
         var policy = policy("2026-03-01");
         when(policy.getRefundAdditionMonths()).thenReturn(null);
         when(repository.findArbitrageApplicability(asOf)).thenReturn(List.of(policy));
-        assertThat(service.resolve(asOf).reviewReason()).contains("없거나");
+        assertThat(service.resolve(asOf).reviewReason()).contains("없습니다");
+    }
+
+    @Test
+    void missingBoundaryRequiresReviewWithoutFallback() {
+        var policy = policy("2026-03-01");
+        when(policy.getRefundAdditionBoundaryInclusive()).thenReturn(null);
+        when(repository.findArbitrageApplicability(asOf)).thenReturn(List.of(policy));
+        assertThat(service.resolve(asOf).reviewReason()).contains("없습니다");
+        assertThat(service.resolve(asOf).refundAdditionBoundaryInclusive()).isNull();
     }
 
     private PolicyVersionRepository.ArbitrageApplicability policy(String value) {

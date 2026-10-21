@@ -31,12 +31,16 @@ public class ArbitrageApplicabilityPolicyService {
                 return new Applicability(policy.getPolicyVersionId(), null, null, null, "차익거래 적용일 정책값이 없습니다.");
             }
             LocalDate effectiveDate = LocalDate.parse(policy.getEffectiveContractDate());
+            if (policy.getRefundAdditionMonths() == null || policy.getRefundAdditionBoundaryInclusive() == null) {
+                return new Applicability(policy.getPolicyVersionId(), effectiveDate, null, null,
+                        "차익거래 환급금 합산 기간·경계 정책값이 없습니다.");
+            }
             Integer months;
             try {
                 months = Integer.valueOf(policy.getRefundAdditionMonths());
             } catch (NumberFormatException e) {
                 return new Applicability(policy.getPolicyVersionId(), effectiveDate, null, null,
-                        "차익거래 환급금 합산 기간 정책값이 없거나 올바르지 않습니다.");
+                        "차익거래 환급금 합산 기간 정책값이 올바르지 않습니다.");
             }
             String boundary = policy.getRefundAdditionBoundaryInclusive();
             if (months < 1 || months > 1200 || !("true".equals(boundary) || "false".equals(boundary))) {

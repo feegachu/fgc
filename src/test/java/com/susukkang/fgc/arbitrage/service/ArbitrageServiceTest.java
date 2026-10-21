@@ -336,6 +336,9 @@ class ArbitrageServiceTest {
     @org.junit.jupiter.params.provider.CsvSource({
             "차익거래 적용일 정책이 없습니다., POLICY_MISSING",
             "차익거래 적용일 정책값이 없습니다., POLICY_MISSING",
+            "차익거래 환급금 합산 기간·경계 정책값이 없습니다., POLICY_MISSING",
+            "차익거래 환급금 합산 기간 정책값이 올바르지 않습니다., DATA_QUALITY",
+            "차익거래 환급금 합산 기간·경계 정책값이 올바르지 않습니다., DATA_QUALITY",
             "차익거래 적용일 정책이 여러 건입니다., POLICY_DUPLICATE",
             "차익거래 적용일 정책값이 올바른 날짜가 아닙니다., DATA_QUALITY"})
     void policyProblemsProduceReviewWithSpecificExceptionType(String reason, ExceptionType expected) {

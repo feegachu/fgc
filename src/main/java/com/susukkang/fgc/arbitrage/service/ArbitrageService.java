@@ -303,7 +303,7 @@ public class ArbitrageService {
     private ExceptionType reviewExceptionType(String reason) {
         if (reason == null)
             return ExceptionType.DATA_QUALITY;
-        if (reason.startsWith("차익거래 적용일 정책") && reason.contains("없습니다"))
+        if (reason.startsWith("차익거래 ") && reason.contains("정책") && reason.endsWith("없습니다."))
             return ExceptionType.POLICY_MISSING;
         if (reason.contains("환급률표 후보가 없습니다") || reason.contains("환급률표 ID가 없습니다"))
             return ExceptionType.REFUND_TABLE_MISSING;

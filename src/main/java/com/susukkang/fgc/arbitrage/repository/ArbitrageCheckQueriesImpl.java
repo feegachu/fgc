@@ -115,6 +115,14 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
                  WHERE e.contract_id = c.contract_id
                    AND e.new_status IN ('TERMINATED', 'LAPSED')
                    AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                   AND NOT EXISTS (
+                       SELECT 1 FROM fgc.contract_status_event resumed
+                        WHERE resumed.contract_id = e.contract_id
+                          AND resumed.new_status NOT IN ('TERMINATED', 'LAPSED')
+                          AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                          AND (resumed.effective_at, resumed.event_seq, resumed.contract_status_event_id)
+                              > (e.effective_at, e.event_seq, e.contract_status_event_id)
+                   )
             ) termination ON true
             LEFT JOIN LATERAL (
             SELECT

@@ -197,6 +197,61 @@ class ArbitrageCheckRepositoryIntegrationTest {
         assertThat(after.getSnapshotAsOfDate()).isEqualTo(LocalDate.of(2030, 8, 31));
     }
 
+    @Test
+    void revivalUsesCurrentSnapshotAndLaterLapseStartsANewTerminationPeriod() {
+        Long id = jdbcTemplate.queryForObject("""
+                SELECT c.contract_id FROM fgc.insurance_contract c
+                 WHERE NOT EXISTS (SELECT 1 FROM fgc.contract_status_event e WHERE e.contract_id=c.contract_id
+                    AND e.new_status IN ('TERMINATED', 'LAPSED'))
+                 ORDER BY c.contract_id LIMIT 1
+                """, Long.class);
+        for (String day : List.of("2030-08-30", "2030-08-31", "2030-09-02", "2030-09-03", "2030-09-04", "2030-09-05")) {
+            jdbcTemplate.update("""
+                    INSERT INTO fgc.contract_financial_snapshot(contract_id, as_of_date, contract_month_no,
+                        cumulative_paid_premium, surrender_value, surrender_value_type)
+                    VALUES (?, ?::date, 37, 1000000, 120000, 'ACTUAL')
+                    """, id, day);
+        }
+        statusEvent(id, "LAPSED", "2030-08-30T15:30:00Z");
+        statusEvent(id, "REVIVED", "2030-09-01T15:30:00Z");
+        statusEvent(id, "LAPSED", "2030-09-03T15:30:00Z");
+        statusEvent(id, "TERMINATED", "2030-09-04T15:30:00Z");
+        statusEvent(id, "REVIVED", "2030-09-09T15:30:00Z");
+        var lapsed = arbitrageCheckRepository.selectCalculationSource(id, LocalDate.of(2030, 9, 1));
+        assertThat(lapsed.getTerminationDate()).isEqualTo(LocalDate.of(2030, 8, 31));
+        for (int day : List.of(2, 3)) {
+            var revived = arbitrageCheckRepository.selectCalculationSource(id, LocalDate.of(2030, 9, day));
+            assertThat(revived.getTerminationDate()).isNull();
+            assertThat(revived.getSnapshotAsOfDate()).isEqualTo(LocalDate.of(2030, 9, day));
+        }
+        var terminated = arbitrageCheckRepository.selectCalculationSource(id, LocalDate.of(2030, 9, 6));
+        assertThat(terminated.getTerminationDate()).isEqualTo(LocalDate.of(2030, 9, 4));
+        assertThat(terminated.getSnapshotAsOfDate()).isEqualTo(LocalDate.of(2030, 9, 4));
+    }
+
+    @Test
+    void sameEffectiveTimeUsesEventSequenceToApplyRevival() {
+        Long id = jdbcTemplate.queryForObject("""
+                SELECT c.contract_id FROM fgc.insurance_contract c
+                 WHERE NOT EXISTS (SELECT 1 FROM fgc.contract_status_event e WHERE e.contract_id=c.contract_id
+                    AND e.new_status IN ('TERMINATED', 'LAPSED'))
+                 ORDER BY c.contract_id LIMIT 1
+                """, Long.class);
+        statusEvent(id, "LAPSED", "2030-08-30T15:30:00Z");
+        statusEvent(id, "REVIVED", "2030-08-30T15:30:00Z");
+        assertThat(arbitrageCheckRepository.selectCalculationSource(id, LocalDate.of(2030, 9, 1))
+                .getTerminationDate()).isNull();
+    }
+
+    private void statusEvent(Long id, String status, String instant) {
+        jdbcTemplate.update("""
+                INSERT INTO fgc.contract_status_event(contract_id,event_seq,new_status,effective_at,
+                    received_at,source_system,source_event_key,data_origin)
+                SELECT ?, COALESCE(MAX(event_seq),0)+1, ?, ?::timestamptz, now(),
+                    'TEST-480-REVIVAL', ?, 'MANUAL' FROM fgc.contract_status_event WHERE contract_id=?
+                """, id, status, instant, status + instant, id);
+    }
+
     private ArbitrageCheckSearchCondition condition(
             YearMonth month,
             ArbitrageCheckStatus status,
