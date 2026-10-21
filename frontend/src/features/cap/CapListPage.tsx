@@ -7,6 +7,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { date, int, usageRate, won } from '../../lib/format'
 import { useWorkspaceStore } from '../../stores/workspace'
@@ -188,16 +189,21 @@ export default function CapListPage() {
               aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}`}
               onClick={() => update({ status: criteria.status === code ? '' : code, capCheckId: '' })}
             >
-              <span>{label}</span>
-              <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
-              <small>건 · {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}</small>
+              <span className="kpi-label">{label}</span>
+              <span className="cap-react-kpi-value">
+                <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
+                <small>건</small>
+              </span>
+              <span className="kpi-comparison">
+                {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
+              </span>
             </button>
           ))}
       </div>
-      <section className="surface">
+      <section className="surface cap-react-stage-panel">
         <header className="surface-header">
           <h2 className="surface-title">지급단계별 한도 게이지</h2>
-          <span>전체 검색범위 집계</span>
+          <StatusBadge>전체 검색범위 집계</StatusBadge>
         </header>
         <div className="cap-react-stages">
           {data?.stageSummary?.length ? (
@@ -279,15 +285,18 @@ export default function CapListPage() {
   )
 }
 
+/** 지급단계별 전체 검색범위 집계와 사용률·공제 안내를 표시한다. */
 function StageCard({ stage }: { stage: CapStage }) {
   const status = monitoringStatus(stage)
   return (
     <article className="cap-react-stage">
       <header>
-        <h3>{stage.paymentStageLabel || STAGES[stage.paymentStage as keyof typeof STAGES]}</h3>
+        <div>
+          <h3>{stage.paymentStageLabel || STAGES[stage.paymentStage as keyof typeof STAGES]}</h3>
+          <p className="cap-react-stage-code">{stage.paymentStage}</p>
+        </div>
         <CapStatus {...status} />
       </header>
-      <p>{stage.paymentStage}</p>
       <dl>
         <div>
           <dt>계약 수</dt>
@@ -306,13 +315,15 @@ function StageCard({ stage }: { stage: CapStage }) {
           </dd>
         </div>
       </dl>
-      <CapUsage value={stage.usagePct} status={status.code} />
-      <p>
+      <div className="cap-react-stage-usage">
+        <span>사용률</span>
+        <CapUsage value={stage.usagePct} status={status.code} />
+      </div>
+      <p className="cap-react-stage-note">
         {stage.paymentStage === 'GA_TO_FC'
           ? '준법경영비 공제를 적용하지 않습니다.'
           : `준법경영비 공제 합계 ${won(stage.complianceDeductionAmountTotal)}`}
-      </p>
-      <p>
+        <br />
         {stage.worstContractNo
           ? `최고 사용률 ${stage.worstContractNo} · ${usageRate(stage.worstUsagePct)}%`
           : '판정 대상 계약이 없습니다.'}

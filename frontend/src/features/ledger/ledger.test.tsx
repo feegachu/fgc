@@ -141,13 +141,13 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     expect(screen.getByLabelText('분개일 (시작)')).toHaveValue('2026-07-01')
     expect(screen.getByLabelText('분개일 (끝)')).toHaveValue('2026-07-31')
   })
-  it('기간·유형·계정·계약·상태 조회조건과 1-base 페이징을 URL/API에 유지한다', async () => {
+  it('기간·유형·계정·계약번호·상태 조회조건과 1-base 페이징을 URL/API에 유지한다', async () => {
     const { router, user } = renderAt()
     await screen.findByRole('option', { name: '수수료 비용' })
     fireEvent.change(screen.getByLabelText('분개일 (시작)'), { target: { value: '2026-07-02' } })
     await user.selectOptions(screen.getByLabelText('분개 유형'), 'EXPECTED_FC_PAYOUT')
     await user.selectOptions(screen.getByLabelText('계정과목'), 'COMMISSION_EXPENSE')
-    await user.type(screen.getByLabelText('계약 ID'), '1')
+    await user.type(screen.getByLabelText('계약번호'), ' fgc-fgl02-202608 ')
     await user.selectOptions(screen.getByLabelText('상태'), 'POSTED')
     await user.click(screen.getByRole('button', { name: '조회' }))
     expect(await screen.findByRole('button', { name: 'JRN-001' })).toBeVisible()
@@ -157,7 +157,7 @@ describe('LEDG-W01 검증원장 React 전환', () => {
       to: '2026-07-31',
       type: 'EXPECTED_FC_PAYOUT',
       account: 'COMMISSION_EXPENSE',
-      contract: '1',
+      contractNo: 'fgc-fgl02-202608',
       status: 'POSTED',
       page: '1',
       size: '20',
@@ -253,10 +253,14 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.click(screen.getByRole('button', { name: '초기화' }))
     expect(await screen.findByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).toBeVisible()
   })
+  it('계약번호는 프런트에서 자르지 않고 그대로 백엔드 검증에 맡긴다', () => {
+    const long = 'A'.repeat(81)
+    expect(criteriaFromParams(new URLSearchParams({ contractNo: ` ${long} ` })).contractNo).toBe(long)
+  })
   it('날짜·enum·id 보정과 정정 요청 외부 이동 방지', () => {
     expect(
-      criteriaFromParams(new URLSearchParams('from=2026-02-30&type=BAD&status=BAD&contract=-1&page=1abc')),
-    ).toMatchObject({ from: '', type: '', status: '', contract: '', page: 1 })
+      criteriaFromParams(new URLSearchParams('from=2026-02-30&type=BAD&status=BAD&contractNo=%20FGC-A1%20&page=1abc')),
+    ).toMatchObject({ from: '', type: '', status: '', contractNo: 'FGC-A1', page: 1 })
     expect(correctionTarget('/exceptions?selected=8')).toBe('/exceptions?selected=8')
     for (const url of [
       '//evil.test/exceptions',

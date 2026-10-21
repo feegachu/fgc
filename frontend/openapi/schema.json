@@ -7493,7 +7493,7 @@
     },
     "/api/v1/journals" : {
       "get" : {
-        "description" : "기간(from/to)·분개유형·계정·계약·상태로 검색하고 페이징된 목록을 돌려준다.",
+        "description" : "기간(from/to)·분개유형·계정·계약(ID 또는 계약번호)·상태로 검색하고 페이징된 목록을 돌려준다.",
         "operationId" : "search_2",
         "parameters" : [ {
           "description" : "분개일 시작(yyyy-MM-dd)",
@@ -7535,6 +7535,14 @@
           "schema" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        }, {
+          "description" : "계약번호(대소문자 무시 부분 일치, 최대 80자)",
+          "in" : "query",
+          "name" : "contractNo",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         }, {
           "description" : "상태(DRAFT/POSTED/REVERSED)",
