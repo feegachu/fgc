@@ -171,7 +171,7 @@
             <tr>
               <th scope="col">번호</th>
               <th scope="col">유형</th>
-              <th scope="col">상세 원인</th>
+              <th scope="col" class="is-center">상세 원인</th>
               <th scope="col">심각도</th>
               <th scope="col">계약</th>
               <th scope="col">내용</th>
@@ -179,7 +179,7 @@
               <th scope="col">담당자</th>
               <th scope="col">최근 검출</th>
               <th scope="col">검출</th>
-              <th scope="col">참조</th>
+              <th scope="col" class="is-center">참조</th>
             </tr>
           </thead>
           <tbody id="list-body">
@@ -192,7 +192,7 @@
                         th:classappend="${typeCode == 'CAP_WARNING' or typeCode == 'ARBITRAGE_CANDIDATE' or typeCode == 'ALLOCATION_EVIDENCE_MISSING'} ? ' status-badge-warning' : (${typeCode == 'CAP_VIOLATION' or typeCode == 'RECONCILIATION_MISMATCH' or typeCode == 'JOURNAL_IMBALANCE' or typeCode == 'POLICY_MISSING' or typeCode == 'POLICY_DUPLICATE'} ? ' status-badge-error' : (${typeCode == 'CAP_REVIEW_REQUIRED' or typeCode == 'REFUND_TABLE_MISSING' or typeCode == 'PRODUCT_CODE_MISMATCH' or typeCode == 'DATA_QUALITY'} ? ' status-badge-review' : ' status-badge-neutral'))"
                         th:title="${typeCode}" th:text="${c.type().label()}">-</span></td>
               <!-- exception-col-reason 은 좁은 폭인데 disclosure 가 빠져 있어 잘리면 값을 볼 수 없었다 (PR #269 리뷰 지적) -->
-              <td class="exception-disclosure-cell">
+              <td class="exception-disclosure-cell is-center">
                 <div class="table-cell-disclosure">
                   <span class="table-cell-preview is-single-line" th:text="${c.reasonLabel()} ?: '-'">상세 원인</span>
                   <details class="table-cell-details" hidden>
@@ -230,7 +230,7 @@
               <td class="tabular-nums" th:text="${#temporals.format(c.lastDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</td>
               <td class="tabular-nums" th:text="|${c.detectionCount()}회|">1회</td>
               <!-- 참조 = 원천 화면 링크. 라우트가 없는 원천 유형은 텍스트로만 표시한다. -->
-              <td class="tabular-nums exception-disclosure-cell"
+              <td class="tabular-nums exception-disclosure-cell is-center"
                   th:with="referenceValue=|${c.sourceEntityType()}:${c.sourceEntityId()}|">
                 <div class="table-cell-disclosure">
                   <a class="table-cell-preview is-single-line"
