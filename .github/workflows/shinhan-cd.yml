@@ -12,6 +12,9 @@ on:
         required: true
         type: string
 
+env:
+  SHINHAN_PUBLIC_URL: ${{ vars.SHINHAN_PUBLIC_URL || 'https://xn--v42bn2m21nmmd.shinhanacademy.co.kr' }}
+
 permissions:
   contents: read
   actions: read
@@ -52,7 +55,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, shinhan-fgc]
     environment:
       name: shinhan-stg
-      url: https://xn--v42bn2m21nmmd.shinhanacademy.co.kr/app/login
+      url: ${{ vars.SHINHAN_PUBLIC_URL || 'https://xn--v42bn2m21nmmd.shinhanacademy.co.kr' }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -77,6 +80,7 @@ jobs:
         shell: bash
         env:
           FGC_COMMIT: ${{ needs.source.outputs.commit }}
+          FGC_PUBLIC_URL: ${{ env.SHINHAN_PUBLIC_URL }}
           FGC_CI_URL: ${{ needs.source.outputs.run_url }}
           GH_TOKEN: ${{ github.token }}
           REGISTRY_USER: ${{ github.actor }}
@@ -106,9 +110,10 @@ jobs:
       - name: Check public HTTPS and token login route
         shell: bash
         env:
-          BASE_URL: https://xn--v42bn2m21nmmd.shinhanacademy.co.kr
+          BASE_URL: ${{ env.SHINHAN_PUBLIC_URL }}
         run: |
           set -euo pipefail
+          BASE_URL=${BASE_URL%/}
           code=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 5 --max-time 15 -sS -o /dev/null -w '%{http_code}' "$BASE_URL/app/login")
           [[ "$code" == 200 ]] || { echo "Public React HTTP=$code"; exit 1; }
           code=$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/v1/auth/login" -H 'Content-Type: application/json' -H "Origin: $BASE_URL" -H 'X-FGC-Client: web' -d '{"loginId":"__shinhan_deploy_probe__","password":"x"}')

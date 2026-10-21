@@ -13,6 +13,12 @@ release="$state/releases/$(date -u +%Y%m%dT%H%M%SZ)-${commit:0:12}-${GITHUB_RUN_
 mkdir -p "$release/nginx" "$release/previous" "$state/backups"
 trap 'echo "Shinhan deployment failed; inspect DB/API/web state. Release: $release. DB is not automatically rolled back." >&2' ERR
 
+python3 "$root/infra/scripts/shinhan-release.py" --origin \
+    "${FGC_PUBLIC_URL:-https://xn--v42bn2m21nmmd.shinhanacademy.co.kr}" > "$release/origin.txt"
+mapfile -t public < "$release/origin.txt"
+origin=${public[0]}
+domain=${public[1]}
+
 for name in api web; do
     image="ghcr.io/feegachu/fgc/$name:sha-$commit"
     docker pull "$image"
@@ -66,9 +72,8 @@ for n in $(seq 1 20); do
     sleep 2
 done
 [[ "$code" == 200 ]] || { echo "React HTTP=$code"; exit 1; }
-domain=xn--v42bn2m21nmmd.shinhanacademy.co.kr
 code=$(curl --connect-timeout 3 --max-time 10 -sS -o /dev/null -w '%{http_code}' \
-    -X POST "$base/api/v1/auth/login" -H "Host: $domain" -H "Origin: https://$domain" \
+    -X POST "$base/api/v1/auth/login" -H "Host: $domain" -H "Origin: $origin" \
     -H 'Content-Type: application/json' -H 'X-FGC-Client: web' \
     -d '{"loginId":"__shinhan_deploy_probe__","password":"x"}')
 [[ "$code" == 401 ]] || { echo "Token login route HTTP=$code (expected 401)"; exit 1; }

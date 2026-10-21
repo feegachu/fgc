@@ -70,6 +70,12 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("location ^~ /app/assets/", actual)
         self.assertIn("proxy_set_header X-Forwarded-For", actual)
 
+    def test_public_origin_normalization_and_invalid_values(self):
+        self.assertEqual(release.public_origin("https://example.com:443/"), ("https://example.com", "example.com"))
+        for value in ("http://example.com", "https://user:pass@example.com", "https://example.com/app", "https://example.com:8080"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                release.public_origin(value)
+
     def test_changed_image_template_fails_instead_of_silent_misconfiguration(self):
         with self.assertRaises(ValueError):
             release.adapt_nginx("server { listen 80; }")

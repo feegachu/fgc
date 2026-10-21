@@ -3,6 +3,7 @@ import json
 import pathlib
 import re
 import sys
+import urllib.parse
 
 REGISTRY = "ghcr.io/feegachu/fgc"
 
@@ -29,7 +30,23 @@ def adapt_nginx(template):
     return template
 
 
+def public_origin(value):
+    parsed = urllib.parse.urlsplit(value)
+    if (parsed.scheme != "https" or not parsed.hostname
+            or parsed.username or parsed.password or parsed.port not in (None, 443)
+            or parsed.path not in ("", "/") or parsed.query or parsed.fragment
+            or "\n" in value or "\r" in value):
+        raise ValueError("SHINHAN_PUBLIC_URL must be an HTTPS origin without credentials or a path")
+    host = parsed.hostname.encode("idna").decode("ascii").lower()
+    if not re.fullmatch(r"[a-z0-9.-]+", host):
+        raise ValueError("Invalid public hostname")
+    return "https://" + host, host
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--origin":
+        print("\n".join(public_origin(sys.argv[2])))
+        return
     commit, run_url, directory = sys.argv[1:]
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Invalid commit")
