@@ -147,14 +147,11 @@ test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }
   const legacy = (await legacyResponse.json()).data
   expect(legacy.content.length).toBeGreaterThan(0)
   await expect(page.locator('#cap-total-count')).toHaveText(String(legacy.totalElements))
-  if (process.env.FGC_CAP_CAPTURE === '1')
-    await page.screenshot({ path: 'docs/411/legacy-cap-list.png', fullPage: true })
   const id = legacy.content[0].capCheckId
   await page.locator(`[data-cap-detail-id="${id}"]`).click()
   await expect(page.locator('#cap-detail-content')).toBeVisible()
   const legacyDetail = await context.request.get(`http://localhost:8081/api/v1/cap-checks/${id}/details`)
   const stored = (await legacyDetail.json()).data
-  if (process.env.FGC_CAP_CAPTURE === '1') await page.screenshot({ path: 'docs/411/legacy-cap-detail.png' })
   // SPA는 별도 JWT로 인증. 이 로그인은 동일한 임시 QA DB의 계정이다.
   await page.goto(`login?redirect=${encodeURIComponent(`/cap-checks?month=${month}`)}`)
   await page.getByLabel(/^아이디/).fill(qaLoginId!)
@@ -175,8 +172,6 @@ test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }
   await expect(firstRow).toContainText(won(first.remainingAmount))
   await expect(firstRow).toContainText(`${usageRate(first.usagePct)}%`)
   await expect(firstRow).toContainText(first.resultStatusLabel)
-  if (process.env.FGC_CAP_CAPTURE === '1')
-    await page.screenshot({ path: 'docs/411/react-cap-list.png', fullPage: true })
   await page.goto(`cap-checks?month=${month}&capCheckId=${id}`)
   const dialog = page.getByRole('dialog', { name: '계산근거' })
   await expect(dialog.getByText('① 입력값')).toBeVisible()
@@ -185,5 +180,4 @@ test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }
   await expect(dialog.getByRole('table', { name: '항목별 산입 내역' }).locator('tbody tr')).toHaveCount(
     stored.details.length || 1,
   )
-  if (process.env.FGC_CAP_CAPTURE === '1') await page.screenshot({ path: 'docs/411/react-cap-detail.png' })
 })

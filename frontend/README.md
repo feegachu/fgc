@@ -1,8 +1,5 @@
 # FGC frontend (React + TypeScript)
 
-#418 실제 서버 Playwright 실행·CI·1차 구조/node 테스트 대응은 [검증 안내](docs/418/README.md)를 참고한다.
-개별 검사식과 확인이 필요한 차이를 함께 기록하며, PL 승인 전에는 #419 삭제 근거가 확정된 것으로 보지 않는다.
-
 2차 Thymeleaf → React 전환 화면. 공존기에는 nginx가 `/app/`에서 서빙하고, 기존 화면은 `/`에 그대로 있다.
 웨이브 C(#419)에서 base를 `/`로 바꾼다.
 
@@ -348,5 +345,4 @@ HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 �
 #406 기준정보 옵션 훅과 공용 client/format/Field/FilterBar/DataTable/Pagination/Modal/Toast를 사용한다.
 목록 API의 `summary + items(PageResponse)` 봉투를 유지하고, 타임라인은 계약 ID·지급단계별 전체 이력으로 분리한다.
 재점검은 canProcess 역할 및 GA_TO_FC 행에서만 실행한다. 입력 검증·중복 제출 방지·성공 재조회·오류 입력 보존을 제공한다.
-API·업무 규칙·DB·기존 Thymeleaf는 변경하지 않았다. #481 관련 상세 설명의 의도적 차이와 검증·캡처는
-[412 검증 자료](docs/412/README.md)에 기록했다.
+API·업무 규칙·DB·기존 Thymeleaf는 변경하지 않았다. #481 관련 상세 설명의 의도적 차이는 해당 이슈·PR에 기록했다.
