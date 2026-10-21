@@ -41,11 +41,11 @@ public class JournalSearchServiceImpl implements JournalSearchService {
 
         List<JournalListRow> rows = journalQueryRepository.search(
                 criteria.from(), criteria.to(), criteria.journalType(), criteria.accountCode(),
-                criteria.contractId(), criteria.status(), offset, size
+                criteria.contractId(), criteria.contractNo(), criteria.status(), offset, size
         );
 
         long total = journalQueryRepository.count(criteria.from(), criteria.to(), criteria.journalType(),
-                criteria.accountCode(), criteria.contractId(), criteria.status());
+                criteria.accountCode(), criteria.contractId(), criteria.contractNo(), criteria.status());
 
         return PageResponse.of(rows, page, size, total, "journalDate,desc");
     }

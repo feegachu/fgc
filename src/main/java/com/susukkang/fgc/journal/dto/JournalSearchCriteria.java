@@ -11,6 +11,13 @@ public record JournalSearchCriteria(
         String journalType,
         String accountCode,
         Long contractId,
+        String contractNo,
         String status
 ) {
+
+    /** 계약번호 조건 없이 검색하는 기존 호출용 생성자. */
+    public JournalSearchCriteria(LocalDate from, LocalDate to, String journalType,
+                                 String accountCode, Long contractId, String status) {
+        this(from, to, journalType, accountCode, contractId, null, status);
+    }
 }

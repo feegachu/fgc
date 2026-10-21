@@ -33,10 +33,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class JournalSearchController {
 
+    private static final int MAX_CONTRACT_NO_LENGTH = 80;
+
     private final JournalSearchService journalSearchService;
 
     @Operation(summary = "검증원장 목록 조회",
-            description = "기간(from/to)·분개유형·계정·계약·상태로 검색하고 페이징된 목록을 돌려준다.")
+            description = "기간(from/to)·분개유형·계정·계약(ID 또는 계약번호)·상태로 검색하고 페이징된 목록을 돌려준다.")
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<JournalSearchResponse> search(
@@ -48,6 +50,8 @@ public class JournalSearchController {
             @RequestParam(name = "type", required = false) String journalType,
             @Parameter(description = "계정코드") @RequestParam(name = "account", required = false) String accountCode,
             @Parameter(description = "계약 ID") @RequestParam(name = "contract", required = false) Long contractId,
+            @Parameter(description = "계약번호(대소문자 무시 부분 일치, 최대 80자)")
+            @RequestParam(name = "contractNo", required = false) String contractNo,
             @Parameter(description = "상태(DRAFT/POSTED/REVERSED)") @RequestParam(required = false) String status,
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size
@@ -79,6 +83,14 @@ public class JournalSearchController {
             }
         }
 
+        String normalizedContractNo = contractNo == null ? null : contractNo.trim();
+        if (normalizedContractNo != null && normalizedContractNo.isEmpty()) {
+            normalizedContractNo = null;
+        }
+        if (normalizedContractNo != null && normalizedContractNo.length() > MAX_CONTRACT_NO_LENGTH) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, "contractNo", Map.of("field", "contractNo"), null);
+        }
+
         if(status!=null){
             try {
                 JournalHeaderStatus.valueOf(status);
@@ -88,7 +100,7 @@ public class JournalSearchController {
         }
 
         JournalSearchCriteria criteria = new JournalSearchCriteria(
-                journalFromDate, journalToDate, journalType, accountCode, contractId, status);
+                journalFromDate, journalToDate, journalType, accountCode, contractId, normalizedContractNo, status);
         PageResponse<JournalListRow> pageResponse = journalSearchService.search(criteria, page, size);
         return ApiResponse.success(JournalSearchResponse.from(pageResponse));
     }
