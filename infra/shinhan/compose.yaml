@@ -1,0 +1,64 @@
+name: fgc-shinhan
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fgc
+      POSTGRES_USER: fgc
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      TZ: Asia/Seoul
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fgc -d fgc"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 1g
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    image: ${API_IMAGE:?API_IMAGE required}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: stage
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fgc?currentSchema=fgc
+      SPRING_DATASOURCE_USERNAME: fgc
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
+      FGC_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
+      FGC_BATCH_DAILYCHANGEDCONTRACT_ENABLED: "false"
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=384m"
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:18081:8080"
+    mem_limit: 2g
+    logging: *logging
+
+  web:
+    image: ${WEB_IMAGE:?WEB_IMAGE required}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      API_UPSTREAM: api:8080
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx/guard.conf:/etc/nginx/fgc.d/guard.conf:ro
+    mem_limit: 256m
+    logging: *logging
+
+volumes:
+  pgdata:
