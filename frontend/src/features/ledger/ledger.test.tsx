@@ -118,6 +118,22 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.click(screen.getByRole('button', { name: '조회' }))
     await waitFor(() => expect(calls.some((call) => call.url.includes('account=EXPECTED_RECEIVABLE'))).toBe(true))
   })
+  it('계정명이 비어 있어도 영어 코드를 노출하지 않고 기존 한글 매핑을 유지한다', async () => {
+    const { user } = renderAt('/journals?month=2026-07', (url) =>
+      url === '/api/v1/journals/accounts'
+        ? [
+            { accountCode: 'EXPECTED_RECEIVABLE', accountName: '', activeYn: true },
+            { accountCode: 'LEGACY_UNKNOWN', accountName: '  ', activeYn: false },
+          ]
+        : undefined,
+    )
+    expect(await screen.findByRole('option', { name: '예상 수수료미수금' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: '계정명 확인 필요' })).toHaveValue('LEGACY_UNKNOWN')
+    expect(screen.queryByRole('option', { name: /LEGACY_UNKNOWN|EXPECTED_RECEIVABLE/ })).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('계정과목'), 'LEGACY_UNKNOWN')
+    await user.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(calls.some((call) => call.url.includes('account=LEGACY_UNKNOWN'))).toBe(true))
+  })
   it('명시적인 조회 전에는 목록 API를 호출하지 않는다', async () => {
     renderAt()
     expect(await screen.findByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).toBeVisible()

@@ -56,7 +56,7 @@
         <span class="kpi-unit">건</span>
       </div>
       <div class="kpi-card-footer">
-        <span class="kpi-comparison tabular-nums" th:text="${summary.type()}">EXCEPTION_TYPE</span>
+        <span class="kpi-comparison" th:text="${summary.type().summaryDescription()}">상세 내용 확인 필요</span>
       </div>
     </a>
     <p class="empty-state exception-summary-empty" th:if="${casePage.summary().isEmpty()}">미처리 예외가 없습니다.</p>
@@ -566,7 +566,7 @@
 
   <template id="journal-account-options">
     <option th:each="account : ${journalAccounts}" th:value="${account.accountCode}"
-            th:text="${account.accountCode + ' · ' + account.accountName}">계정과목</option>
+            th:text="${account.accountName}">계정과목</option>
   </template>
 
 </main>

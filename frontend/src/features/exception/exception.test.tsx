@@ -190,6 +190,7 @@ describe('EXCP-W01 예외함', () => {
     expect(searchPaths()[0]).toContain('page=1')
   })
 
+
   it('페이지네이션은 간결한 화살표와 5페이지 묶음으로 이동하며 검색조건을 유지한다', async () => {
     searchResponse = (path) => ({
       ...search([baseCase]),
@@ -241,6 +242,19 @@ describe('EXCP-W01 예외함', () => {
     expect(controls().getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
     await actions.click(controls().getByRole('button', { name: '4' }))
     await screen.findByText('4 / 4 페이지')
+
+  it('요약 카드의 한글 설명을 눌러도 원본 유형과 미처리·월 조건으로 조회한다', async () => {
+    const { router, actions } = renderPage()
+    const card = await screen.findByRole('link', { name: '1,200% 위반 1,234건' })
+    expect(within(card).getByText('확정 위반 판정')).toBeInTheDocument()
+    expect(within(card).queryByText('CAP_VIOLATION')).not.toBeInTheDocument()
+    await actions.click(within(card).getByText('확정 위반 판정'))
+    await waitFor(() => expect(router.state.location.search).toContain('type=CAP_VIOLATION'))
+    const query = new URLSearchParams(searchPaths().at(-1)!.split('?')[1])
+    expect(query.get('type')).toBe('CAP_VIOLATION')
+    expect(query.get('status')).toBe('OPEN')
+    expect(router.state.location.search).toContain('month=2026-07')
+    expect(screen.getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveAttribute('aria-current', 'true')
   })
 
   it('필터를 적용하면 URL 과 조회 조건이 바뀌고 초기화하면 되돌아간다', async () => {
@@ -261,6 +275,17 @@ describe('EXCP-W01 예외함', () => {
     expect(last.get('status')).toBe('')
     await actions.click(screen.getByRole('button', { name: '초기화' }))
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07'))
+  })
+
+  it('새 유형 코드가 응답에 추가되어도 카드에 기본 안내를 표시한다', async () => {
+    searchResponse = () => ({
+      ...search([baseCase]),
+      summary: [{ type: 'FUTURE_TYPE', typeLabel: '새 예외', count: 1 }],
+    })
+    renderPage()
+    const card = await screen.findByRole('link', { name: '새 예외 1건' })
+    expect(within(card).getByText('상세 내용 확인 필요')).toBeInTheDocument()
+    expect(within(card).queryByText('FUTURE_TYPE')).not.toBeInTheDocument()
   })
 
   it('행을 선택하면 상세·검출 이력·처리 이력을 보여 준다', async () => {
@@ -403,6 +428,9 @@ describe('EXCP-W01 예외함', () => {
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText(/J-0070/)).toBeInTheDocument()
     expect(within(dialog).getByText('차변·대변 검증 통과')).toBeInTheDocument()
+    // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
+    expect(within(dialog).getAllByText('미수수수료').length).toBeGreaterThan(0)
+    expect(within(dialog).queryByText(/1100|4100/)).not.toBeInTheDocument()
     await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
     await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
     expect(await within(dialog).findByText('역분개와 재기표를 완료했습니다.')).toBeInTheDocument()

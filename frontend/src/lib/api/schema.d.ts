@@ -1770,6 +1770,26 @@ export interface components {
             resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
             usagePct?: number | null;
         };
+        CapCandidateExclusion: {
+            /** Format: date */
+            attributionDate?: string;
+            /** Format: int64 */
+            contractId?: number;
+            /** Format: int64 */
+            excludedAmount?: number;
+            /** Format: date */
+            firstYearEndExclusive?: string;
+            /** Format: date */
+            firstYearStartInclusive?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            reason?: string;
+            reasonCode?: string;
+            /** @enum {string} */
+            resultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
         CapCheckBasisResponse: {
             calculationSnapshot?: {
                 [key: string]: unknown;
@@ -3775,6 +3795,7 @@ export interface components {
         };
         TransactionPrecheckResponse: {
             blockers?: components["schemas"]["Blocker"][];
+            capExclusions?: components["schemas"]["CapCandidateExclusion"][];
             capPreview?: components["schemas"]["CapPreviewItem"][];
             confirmable?: boolean;
             /** Format: int64 */

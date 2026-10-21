@@ -197,7 +197,7 @@
     const body = document.createElement("tbody");
     lines.forEach(function (line) {
       const row = document.createElement("tr");
-      const account = text(line.accountCode) + " · " + text(line.accountName);
+      const account = line.accountName && String(line.accountName).trim() ? String(line.accountName).trim() : (line.accountCode ? "계정명 확인 필요" : "-");
       row.appendChild(cell(text(line.lineNo), "tabular-nums"));
       row.appendChild(cell(disclosure(account, true), "ledger-disclosure-cell"));
       row.appendChild(cell(money(line.debitAmount), amountClass(line.debitAmount)));

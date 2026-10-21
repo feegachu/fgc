@@ -1450,6 +1450,49 @@
         },
         "type" : "object"
       },
+      "CapCandidateExclusion" : {
+        "properties" : {
+          "attributionDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "excludedAmount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "firstYearEndExclusive" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "firstYearStartInclusive" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "resultStatus" : {
+            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+            "type" : "string"
+          },
+          "transactionAttributionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "CapCheckBasisResponse" : {
         "properties" : {
           "calculationSnapshot" : {
@@ -5806,6 +5849,12 @@
           "blockers" : {
             "items" : {
               "$ref" : "#/components/schemas/Blocker"
+            },
+            "type" : "array"
+          },
+          "capExclusions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CapCandidateExclusion"
             },
             "type" : "array"
           },

@@ -39,7 +39,8 @@ final class CommissionPaymentSql {
                   COALESCE(ta.evidence_ref, ct.evidence_ref) AS evidence_ref,
                   ta.attribution_method,
                   c.contract_date,
-                  ct.cashflow_type
+                  ct.cashflow_type,
+                  ct.due_date AS scheduled_payment_date
              FROM fgc.commission_transaction ct
              JOIN fgc.commission_item ci
                ON ci.commission_item_id = ct.commission_item_id
