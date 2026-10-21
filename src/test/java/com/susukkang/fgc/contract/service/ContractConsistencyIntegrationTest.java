@@ -277,6 +277,10 @@ class ContractConsistencyIntegrationTest {
         CommissionPaymentAttributionRequest nextYear = new CommissionPaymentAttributionRequest(id, end, limit.multiply(BigDecimal.TWO),
                 InclusionDecisionStatus.INCLUDED, ExclusionType.NONE, "13차월 첫날", "DIRECT", "BOUNDARY", AttributionMethod.DIRECT);
         Long payment = payment(id, limit.multiply(new BigDecimal("3")), List.of(nextYear, lastDay));
+        // 혼합 귀속의 지급도 2년차에 수행한다. 초년도 귀속은 지연 지급이어도 계속 산입한다.
+        jdbc.update("UPDATE fgc.commission_transaction SET due_date=? WHERE commission_transaction_id=?", end, payment);
+        entityManager.clear();
+        assertThat(payments.precheck(payment).confirmable()).isTrue();
         assertThat(payments.precheck(payment).capPreview()).allSatisfy(row ->
                 assertThat(row.includedAmount()).isEqualTo(limit.longValueExact()));
         CommissionPaymentResponse confirmed = payments.confirm(payment, null);
