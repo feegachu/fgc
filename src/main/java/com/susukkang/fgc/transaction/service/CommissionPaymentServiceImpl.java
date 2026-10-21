@@ -242,8 +242,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 failFirst(newcomerSupportEligibilityFailure(data));
                 continue;
             }
-            if (isOutsideCapScope(data) || CapCandidateExclusion.isOutsideFirstYear(data)
-                    || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
+            if (isOutsideCapScope(data)) {
                 continue;
             }
             if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
@@ -252,6 +251,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
                 evaluations.put(new CapGroupKey(data.contractId(), data.paymentStage()),
                         new CapEvaluation(data, null, calculation, check));
+                continue;
+            }
+            if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
                 continue;
             }
             CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -373,8 +375,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 if (data.contractId() == null || data.attributedAmount() == null) {
                     continue;
                 }
-                if (isOutsideCapScope(data) || CapCandidateExclusion.isOutsideFirstYear(data)
-                        || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
+                if (isOutsideCapScope(data)) {
                     continue;
                 }
                 if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
@@ -383,6 +384,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
                     evaluations.put(new CapGroupKey(data.contractId(), data.paymentStage()),
                             new CapEvaluation(data, null, calculation, check));
+                    continue;
+                }
+                if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
                     continue;
                 }
                 CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
@@ -1334,7 +1338,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             ));
         }
         if (!isClawback(data) && CapCandidateExclusion.hasInvalidPaymentDate(data)
-                && !isOutsideCapScope(data)) {
+                && !isOutsideCapScope(data)
+                && !CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
             String paymentDate = Objects.toString(data.scheduledPaymentDate(), "미입력");
             failures.add(new GateFailure(
                     data, ExceptionType.CAP_REVIEW_REQUIRED, CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
@@ -1565,6 +1570,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private List<CapCandidateExclusion> capExclusions(List<ConfirmationData> attributions) {
         return attributions.stream().filter(row -> !isClawback(row))
                 .filter(row -> !isOutsideCapScope(row))
+                .filter(row -> !CapApplicabilityPolicy.isBeforeEffectiveDate(row.paymentStage(), row.contractDate()))
                 .filter(CapCandidateExclusion::isOutsideFirstYear).map(CapCandidateExclusion::from).toList();
     }
 

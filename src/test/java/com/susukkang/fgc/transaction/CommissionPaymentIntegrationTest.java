@@ -1201,7 +1201,7 @@ class CommissionPaymentIntegrationTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource(value = {"2026-07-31", "NULL"}, nullValues = "NULL")
+    @org.junit.jupiter.params.provider.CsvSource(value = {"2026-07-31", "NULL", "2027-07-03"}, nullValues = "NULL")
     void nonProtectionContractDoesNotEnterFirstYearPaymentDateGate(String paymentDate) {
         Long contractId = firstYearCandidateContract(LocalDate.of(2026, 7, 3));
         jdbcTemplate.update("""
@@ -1223,9 +1223,51 @@ class CommissionPaymentIntegrationTest {
         assertThat(preview.confirmable()).isTrue();
         assertThat(preview.blockers()).isEmpty();
         assertThat(preview.capPreview()).isEmpty();
+        assertThat(preview.capExclusions()).isEmpty();
         var confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-479-NONPROTECTION-" + created.paymentId());
         assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(confirmed.capCheckIds()).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT jsonb_array_length(after_value->'capExclusions')
+                  FROM fgc.audit_log WHERE action_code='PAYMENT_CONFIRMED' AND entity_id=?
+                """, Integer.class, created.paymentId().toString())).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
+                Integer.class, created.paymentId().toString())).isZero();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(value = {"NULL", "2026-07-31", "2027-07-01"}, nullValues = "NULL")
+    void preEffectiveSecondYearPaymentPreservesApplicabilityReason(String paymentDate) {
+        Long contractId = firstYearCandidateContract(LocalDate.of(2026, 6, 30));
+        var created = commissionPaymentService.create(candidateRequest(contractId, "200000",
+                List.of(candidateAttribution(contractId, LocalDate.of(2027, 7, 1), "200000"))));
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET due_date=? WHERE commission_transaction_id=?",
+                paymentDate == null ? null : LocalDate.parse(paymentDate), created.paymentId());
+        entityManager.clear();
+
+        var preview = commissionPaymentService.precheck(created.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        assertThat(preview.blockers()).isEmpty();
+        assertThat(preview.capExclusions()).isEmpty();
+        assertThat(preview.capPreview()).singleElement().satisfies(item -> {
+            assertThat(item.resultStatus()).isEqualTo(CapResultStatus.NOT_APPLICABLE);
+            assertThat(item.applicabilityReasonCode()).isEqualTo("CONTRACT_BEFORE_EFFECTIVE_DATE");
+        });
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
+                Integer.class, created.paymentId())).isZero();
+
+        var confirmed = commissionPaymentService.confirm(created.paymentId(), "IT-482-SECOND-YEAR-" + created.paymentId());
+        assertThat(confirmed.status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
+        assertThat(confirmed.capCheckIds()).hasSize(1);
+        assertThat(jdbcTemplate.queryForMap("SELECT result_status, "
+                + "calculation_snapshot #>> '{applicability,reasonCode}' AS reason_code FROM fgc.cap_check WHERE cap_check_id=?",
+                confirmed.capCheckIds().getFirst()))
+                .containsEntry("result_status", "NOT_APPLICABLE")
+                .containsEntry("reason_code", "CONTRACT_BEFORE_EFFECTIVE_DATE");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT jsonb_array_length(after_value->'capExclusions')
+                  FROM fgc.audit_log WHERE action_code='PAYMENT_CONFIRMED' AND entity_id=?
+                """, Integer.class, created.paymentId().toString())).isZero();
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id=?",
                 Integer.class, created.paymentId().toString())).isZero();
     }
