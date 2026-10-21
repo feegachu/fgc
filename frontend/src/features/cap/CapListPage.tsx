@@ -285,6 +285,7 @@ export default function CapListPage() {
   )
 }
 
+/** 지급단계별 전체 검색범위 집계와 사용률·공제 안내를 표시한다. */
 function StageCard({ stage }: { stage: CapStage }) {
   const status = monitoringStatus(stage)
   return (

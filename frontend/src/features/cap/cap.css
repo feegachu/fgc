@@ -128,12 +128,10 @@
   font-variant-numeric: tabular-nums;
 }
 .cap-react-stage dd {
-  overflow: hidden;
   margin-top: var(--space-1);
   font-size: 0.75rem;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .cap-react-stage h3 {
   margin: 0;
