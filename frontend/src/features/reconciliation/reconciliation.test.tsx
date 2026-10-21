@@ -443,7 +443,11 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(within(footer).getByRole('rowheader')).toHaveTextContent(/^합계$/)
     expect(within(footer).getByRole('rowheader')).toHaveAttribute('colspan', '5')
   })
-  it('결과 유형 필터 합계는 현재 페이지를 소수 손실과 행별 반올림 없이 더한다', async () => {
+  it.each([
+    { amount: 500.49, rowText: '500원', totalText: '1,000' },
+    { amount: 500.5, rowText: '501원', totalText: '1,002' },
+    { amount: -500.5, rowText: '(501)원', totalText: '(1,002)' },
+  ])('결과 유형 필터는 행별 HALF_UP 표시와 합계를 일치시킨다: $amount', async ({ amount, rowText, totalText }) => {
     renderAt('/reconciliations?runId=41&resultType=AMOUNT_DIFFERENCE', (url) =>
       /\/41\/results/.test(url)
         ? {
@@ -451,15 +455,17 @@ describe('RECO-W01·W02 React 전환', () => {
             items: {
               ...results.items,
               content: [
-                { ...result, expectedTotalAmount: 500.49 },
-                { ...result, reconciliationResultId: 8, expectedTotalAmount: 500.49 },
+                { ...result, expectedTotalAmount: amount },
+                { ...result, reconciliationResultId: 8, expectedTotalAmount: amount },
               ],
             },
           }
         : undefined,
     )
     const footer = (await screen.findByRole('region', { name: '대사 결과' })).querySelector('tfoot')!
-    expect(await within(footer).findByText('1,001')).toBeVisible()
+    expect(await within(footer).findByText(totalText)).toBeVisible()
+    const body = footer.closest('table')!.querySelector('tbody')!
+    expect(within(body).getAllByText(rowText)).toHaveLength(2)
     expect(footer).toHaveTextContent('이 페이지 합계')
   })
   it('조회 실패를 초기 0 합계나 정상적인 결과 없음으로 오인시키지 않는다', async () => {

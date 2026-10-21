@@ -8,33 +8,31 @@ function decimal(value: Amount) {
   return { coefficient: BigInt(`${match[1] === '-' ? '-' : ''}${match[2]}${fraction}`), scale: fraction.length }
 }
 
-/** Add the visible server page without binary floating-point arithmetic or per-row rounding. */
+/** Operating policy Article 17-2: HALF_UP each detail amount to whole won before aggregation. */
+function wholeWon(part: NonNullable<ReturnType<typeof decimal>>) {
+  const absolute = part.coefficient < 0n ? -part.coefficient : part.coefficient
+  const divisor = 10n ** BigInt(part.scale)
+  const rounded = (absolute + divisor / 2n) / divisor
+  return part.coefficient < 0n ? -rounded : rounded
+}
+
+/** Sum the displayed whole-won rows exactly, including negative correction amounts. */
 export function sumAmounts(values: Amount[]): string | null {
-  let coefficient = 0n
-  let scale = 0
+  let total = 0n
   for (const value of values) {
     const part = decimal(value)
     if (!part) return null
-    const nextScale = Math.max(scale, part.scale)
-    coefficient =
-      coefficient * 10n ** BigInt(nextScale - scale) + part.coefficient * 10n ** BigInt(nextScale - part.scale)
-    scale = nextScale
+    total += wholeWon(part)
   }
-  const sign = coefficient < 0n ? '-' : ''
-  const digits = (coefficient < 0n ? -coefficient : coefficient).toString().padStart(scale + 1, '0')
-  return (
-    sign + (scale ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}`.replace(/0+$/, '').replace(/\.$/, '') : digits)
-  )
+  return total.toString()
 }
 
-/** Keep the existing whole-won display rule, rounding only at the final display boundary. */
+/** Use the same per-detail HALF_UP rule for table cells and page totals. */
 export function amountText(value: Amount, unit = true) {
   const part = decimal(value)
   if (!part) return '—'
   const negative = part.coefficient < 0n
-  const absolute = negative ? -part.coefficient : part.coefficient
-  const divisor = 10n ** BigInt(part.scale)
-  const rounded = (absolute + divisor / 2n) / divisor
-  const digits = rounded.toLocaleString('ko-KR')
+  const rounded = wholeWon(part)
+  const digits = (rounded < 0n ? -rounded : rounded).toLocaleString('ko-KR')
   return `${negative ? `(${digits})` : digits}${unit ? '원' : ''}`
 }
