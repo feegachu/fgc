@@ -41,7 +41,7 @@ export default function ValidationRunDetailPage() {
   const detail = useQuery(runDetailQuery(id))
   if (detail.isPending) {
     return (
-      <div className="page-content vrun-page vrun-detail-page">
+      <div className="vrun-page vrun-detail-page">
         <p className="vrun-inline-state is-loading" role="status">
           불러오는 중입니다.
         </p>
@@ -55,7 +55,7 @@ export default function ValidationRunDetailPage() {
 function DetailError({ error, onRetry }: { error: Error; onRetry: () => void }) {
   const notFound = error instanceof ApiError && (error.status === 404 || error.code === 'FGC-COMMON-004')
   return (
-    <div className="page-content vrun-page vrun-detail-page">
+    <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세 · 확정</h1>
@@ -152,7 +152,7 @@ function DetailBody({
   const link = (path: string) => (shellMonth ? withMonth(path, shellMonth) : path)
 
   return (
-    <div className="page-content vrun-page vrun-detail-page">
+    <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세 · 확정</h1>

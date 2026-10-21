@@ -100,7 +100,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             fs.snapshot_version,
             fs.previous_snapshot_id,
             fs.source_ref,
-            p.protection_type
+            p.protection_type,
+            termination.termination_date
             FROM fgc.insurance_contract c
             JOIN fgc.product_offering po
             ON
@@ -108,6 +109,21 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             JOIN fgc.product p
             ON
             p.product_id = po.product_id
+            LEFT JOIN LATERAL (
+                SELECT MIN((e.effective_at AT TIME ZONE 'Asia/Seoul')::date) AS termination_date
+                  FROM fgc.contract_status_event e
+                 WHERE e.contract_id = c.contract_id
+                   AND e.new_status IN ('TERMINATED', 'LAPSED')
+                   AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                   AND NOT EXISTS (
+                       SELECT 1 FROM fgc.contract_status_event resumed
+                        WHERE resumed.contract_id = e.contract_id
+                          AND resumed.new_status NOT IN ('TERMINATED', 'LAPSED')
+                          AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                          AND (resumed.effective_at, resumed.event_seq, resumed.contract_status_event_id)
+                              > (e.effective_at, e.event_seq, e.contract_status_event_id)
+                   )
+            ) termination ON true
             LEFT JOIN LATERAL (
             SELECT
             cfs.as_of_date,
@@ -123,7 +139,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             FROM (
                 SELECT DISTINCT ON (as_of_date, surrender_value_type) *
                 FROM fgc.contract_financial_snapshot
-                WHERE contract_id = c.contract_id AND as_of_date <= :asOfDate
+                WHERE contract_id = c.contract_id AND as_of_date <= COALESCE(termination.termination_date, :asOfDate)
                   AND (source_ref IS DISTINCT FROM 'MANUAL_CONTRACT_INITIAL' OR as_of_date = c.contract_date)
                 ORDER BY as_of_date, surrender_value_type, snapshot_version DESC,
                          contract_financial_snapshot_id DESC
@@ -449,6 +465,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         result.setPreviousFinancialSnapshotId((Long) row[17]);
         result.setFinancialSnapshotSourceRef((String) row[18]);
         result.setProtectionType((String) row[19]);
+        result.setTerminationDate(row[20] == null ? null : ((java.sql.Date) row[20]).toLocalDate());
         return result;
     }
 }

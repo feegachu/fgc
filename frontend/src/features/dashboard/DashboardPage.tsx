@@ -112,7 +112,7 @@ function DashboardContent({ month }: { month: string }) {
     ] as const)
 
   return (
-    <div className="page-content dashboard-page">
+    <div className="dashboard-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>

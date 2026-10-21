@@ -18,6 +18,7 @@ import java.time.LocalDate;
 public class ArbitrageCalculationSource {
     private Long contractId; // 계약 ID
     private LocalDate contractDate; // 계약일
+    private LocalDate terminationDate; // 검증 기준일 이하 최초 해지·실효 효력일(서울 기준)
     private Long insurerId; // 보험사 ID
     private Long productId; // 상품 ID
     private Long productOfferingId; // 상품 판매 버전 ID

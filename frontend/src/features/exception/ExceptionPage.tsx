@@ -149,7 +149,7 @@ export function ExceptionPage() {
   ]
 
   return (
-    <div className="page-content exception-page">
+    <div className="exception-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">예외함</h1>
