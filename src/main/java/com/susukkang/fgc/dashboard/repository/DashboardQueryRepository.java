@@ -78,7 +78,7 @@ public class DashboardQueryRepository {
                   JOIN (
                       SELECT DISTINCT ON (settlement_month, payment_stage, insurer_id) reconciliation_run_id
                         FROM fgc.reconciliation_run
-                       WHERE date_trunc('month', settlement_month) = date_trunc('month', CAST(:month AS date))
+                       WHERE NOT superseded_yn AND date_trunc('month', settlement_month) = date_trunc('month', CAST(:month AS date))
                        ORDER BY settlement_month, payment_stage, insurer_id, created_at DESC, reconciliation_run_id DESC
                   ) AS latest_run ON latest_run.reconciliation_run_id = reconciliation_result.reconciliation_run_id
                  WHERE reconciliation_result.result_type <> 'MATCHED'

@@ -188,7 +188,6 @@
     text("contract-info-term", termText);
     text("contract-info-deduction", money(data.standardSurrenderDeductionAmount));
     applyBadge(document.getElementById("contract-info-origin"), data.dataOrigin, originLabel);
-    text("contract-data-fetched-at", dateTime(new Date()));
     setLoadState("계약 정보를 불러왔습니다.", "done");
   }
 
@@ -472,7 +471,6 @@
       return;
     }
 
-    text("contract-data-endpoint", "/api/v1/contracts/" + contractId);
     var editButton = document.getElementById("contract-edit-button");
     if (editButton && !editButton.disabled) {
       editButton.addEventListener("click", function () {

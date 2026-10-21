@@ -176,6 +176,8 @@ class AuditLogViewControllerTest {
                 .andExpect(content().string(containsString("data-audit-detail-href")))
                 .andExpect(content().string(containsString("aria-controls=\"diff-body\"")))
                 .andExpect(content().string(containsString("PAYMENT_CONFIRMED")))
+                .andExpect(content().string(containsString("지급 확정")))
+                .andExpect(content().string(containsString("수수료 지급")))
                 .andExpect(content().string(containsString("settle01")))
                 .andExpect(content().string(containsString("20260816-1a2b3c")))
                 .andExpect(content().string(containsString("확정 처리")));
@@ -202,7 +204,7 @@ class AuditLogViewControllerTest {
 
         mvc.perform(get("/audit-logs").with(user(complianceUser())))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("VALIDATION_RUN_FAILED")))
+                .andExpect(content().string(containsString("검증 실행 실패")))
                 .andExpect(content().string(containsString("table-cell-disclosure")))
                 .andExpect(content().string(containsString("table-cell-details")))
                 .andExpect(content().string(containsString("전체 보기")))
@@ -216,6 +218,57 @@ class AuditLogViewControllerTest {
         mvc.perform(get("/audit-logs").with(user(complianceUser())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("BATCH")));
+    }
+
+    @Test
+    void translates_auth_labels_but_keeps_filter_values_actor_and_detail_codes() throws Exception {
+        AuditLogResponse row = new AuditLogResponse(
+                1L, OffsetDateTime.parse("2026-08-16T10:00:00+09:00"), 12L, "admin",
+                "TOKEN_REFRESH", "APP_USER", "admin", null, null, null, "auth-request", null);
+        stubSearch(List.of(row));
+        given(auditLogQueryService.actionCodes()).willReturn(List.of("TOKEN_REFRESH"));
+        given(auditLogQueryService.entityTypes()).willReturn(List.of("APP_USER"));
+
+        String html = mvc.perform(get("/audit-logs").param("action", "TOKEN_REFRESH")
+                        .param("entityType", "APP_USER").param("selected", "1").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("인증 토큰 갱신 (TOKEN_REFRESH)")))
+                .andExpect(content().string(containsString("사용자 계정 (APP_USER) #admin")))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).containsPattern("value=\"TOKEN_REFRESH\"[^>]*>인증 토큰 갱신</option>");
+        assertThat(html).containsPattern("value=\"APP_USER\"[^>]*>사용자 계정</option>");
+        assertThat(html).contains("<td>admin</td>");
+        verify(auditLogQueryService).search(eq("APP_USER"), isNull(), isNull(), eq("TOKEN_REFRESH"),
+                isNull(), isNull(), eq(1), eq(20));
+    }
+
+    /** 자동 생성 사유는 한글로 읽고 원문은 선택한 상세에서 확인한다. */
+    @Test
+    void translates_automatic_reasons_and_preserves_original_details() throws Exception {
+        String stepReason = "MonthlyValidationJob advanced to step 7";
+        String draftReason = "journalType=CONFIRMED_FC_PAYOUT,sourceEntityType=COMMISSION_TRANSACTION,"
+                + "sourceEntityId=9007199254740993,validationRunId=42";
+        AuditLogResponse step = new AuditLogResponse(
+                1L, OffsetDateTime.parse("2026-08-16T10:00:00+09:00"), 12L, "admin",
+                "VALIDATION_RUN_STEP_ADVANCED", "VALIDATION_RUN", "42", null, null, stepReason, "step", null);
+        AuditLogResponse draft = new AuditLogResponse(
+                2L, step.occurredAt(), 12L, "admin", "JOURNAL_DRAFT_SAVED", "JOURNAL_HEADER", "70",
+                null, null, draftReason, "draft", null);
+        stubSearch(List.of(step, draft));
+
+        mvc.perform(get("/audit-logs").param("selected", "1").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("월 통합검증 7단계 진행")))
+                .andExpect(content().string(containsString(
+                        "확정 지급(GA→설계사) 분개 초안 저장 · 원천: 수수료 거래 #9007199254740993 · 검증 실행 #42")))
+                .andExpect(content().string(containsString("사유 원문 보기")))
+                .andExpect(content().string(containsString("<p>" + stepReason + "</p>")))
+                .andExpect(content().string(not(containsString(draftReason))));
+
+        mvc.perform(get("/audit-logs").param("selected", "2").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<p>" + draftReason + "</p>")));
     }
 
     /** 선택한 행의 before/after 를 서버가 diff 계산해 바뀐 칸만 노랗게 칠한다. */
