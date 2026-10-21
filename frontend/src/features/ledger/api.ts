@@ -40,7 +40,7 @@ export function criteriaFromParams(params: URLSearchParams) {
     to: validDate(params.get('to')),
     type: Object.hasOwn(JOURNAL_TYPE, type) ? type : '',
     account: params.get('account')?.trim() ?? '',
-    contractNo: params.get('contractNo')?.trim().slice(0, 80) ?? '',
+    contractNo: params.get('contractNo')?.trim() ?? '',
     status: Object.hasOwn(JOURNAL_STATUS, status) ? status : '',
     page: Number(positiveId(params.get('page')) || 1),
   }

@@ -253,6 +253,10 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.click(screen.getByRole('button', { name: '초기화' }))
     expect(await screen.findByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).toBeVisible()
   })
+  it('계약번호는 프런트에서 자르지 않고 그대로 백엔드 검증에 맡긴다', () => {
+    const long = 'A'.repeat(81)
+    expect(criteriaFromParams(new URLSearchParams({ contractNo: ` ${long} ` })).contractNo).toBe(long)
+  })
   it('날짜·enum·id 보정과 정정 요청 외부 이동 방지', () => {
     expect(
       criteriaFromParams(new URLSearchParams('from=2026-02-30&type=BAD&status=BAD&contractNo=%20FGC-A1%20&page=1abc')),

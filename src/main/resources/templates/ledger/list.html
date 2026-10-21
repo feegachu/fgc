@@ -114,6 +114,8 @@
       </button>
     </div>
   </form>
+  <p class="field-error ledger-contract-no-error" role="alert" th:if="${contractNoError != null}"
+     th:text="${contractNoError}">계약번호는 80자 이하로 입력해 주세요.</p>
 
   <div class="ledger-work-grid" id="ledger-grid">
     <!-- ③ 분개 목록 -->
