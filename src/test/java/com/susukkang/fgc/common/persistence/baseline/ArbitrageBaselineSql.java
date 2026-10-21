@@ -342,9 +342,19 @@ final class ArbitrageBaselineSql {
                         sl.line_status = 'PLANNED'
                         AND NOT EXISTS (
                             SELECT 1 FROM fgc.contract_status_event e
-                            WHERE e.contract_id=sh.contract_id AND e.new_status IN ('TERMINATED','LAPSED')
+                            WHERE e.contract_id=sh.contract_id
+                              AND e.new_status IN ('TERMINATED','LAPSED','MATURED','CANCELLED')
                               AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
                               AND sl.due_date > (e.effective_at AT TIME ZONE 'Asia/Seoul')::date
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM fgc.contract_status_event resumed
+                                   WHERE resumed.contract_id=e.contract_id
+                                     AND resumed.new_status IN ('ACTIVE','REVIVED')
+                                     AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                                     AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= sl.due_date
+                                     AND (resumed.effective_at, resumed.event_seq, resumed.contract_status_event_id)
+                                         > (e.effective_at, e.event_seq, e.contract_status_event_id)
+                              )
                         )
                     """);
                 sql.append(" ");
