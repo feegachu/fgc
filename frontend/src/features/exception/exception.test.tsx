@@ -190,6 +190,20 @@ describe('EXCP-W01 예외함', () => {
     expect(searchPaths()[0]).toContain('page=1')
   })
 
+  it('요약 카드의 한글 설명을 눌러도 원본 유형과 미처리·월 조건으로 조회한다', async () => {
+    const { router, actions } = renderPage()
+    const card = await screen.findByRole('link', { name: '1,200% 위반 1,234건' })
+    expect(within(card).getByText('확정 위반 판정')).toBeInTheDocument()
+    expect(within(card).queryByText('CAP_VIOLATION')).not.toBeInTheDocument()
+    await actions.click(within(card).getByText('확정 위반 판정'))
+    await waitFor(() => expect(router.state.location.search).toContain('type=CAP_VIOLATION'))
+    const query = new URLSearchParams(searchPaths().at(-1)!.split('?')[1])
+    expect(query.get('type')).toBe('CAP_VIOLATION')
+    expect(query.get('status')).toBe('OPEN')
+    expect(router.state.location.search).toContain('month=2026-07')
+    expect(screen.getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveAttribute('aria-current', 'true')
+  })
+
   it('필터를 적용하면 URL 과 조회 조건이 바뀌고 초기화하면 되돌아간다', async () => {
     const { router, actions } = renderPage()
     await table()
@@ -208,6 +222,17 @@ describe('EXCP-W01 예외함', () => {
     expect(last.get('status')).toBe('')
     await actions.click(screen.getByRole('button', { name: '초기화' }))
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07'))
+  })
+
+  it('새 유형 코드가 응답에 추가되어도 카드에 기본 안내를 표시한다', async () => {
+    searchResponse = () => ({
+      ...search([baseCase]),
+      summary: [{ type: 'FUTURE_TYPE', typeLabel: '새 예외', count: 1 }],
+    })
+    renderPage()
+    const card = await screen.findByRole('link', { name: '새 예외 1건' })
+    expect(within(card).getByText('상세 내용 확인 필요')).toBeInTheDocument()
+    expect(within(card).queryByText('FUTURE_TYPE')).not.toBeInTheDocument()
   })
 
   it('행을 선택하면 상세·검출 이력·처리 이력을 보여 준다', async () => {
