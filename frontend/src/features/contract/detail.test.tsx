@@ -322,8 +322,10 @@ describe('CONT-W02 계약 상세', () => {
     // #589 수수료 지급 표에는 원천 컬럼이 없다.
     expect(screen.queryByRole('columnheader', { name: '원천' })).not.toBeInTheDocument()
     expect(screen.queryByRole('cell', { name: 'SOURCE_A' })).not.toBeInTheDocument()
-    expect(screen.getByRole('cell', { name: 'REASON_A' })).toBeInTheDocument()
-
+    // #588 대사 결과 표에는 주원인 컬럼이 없다(원인 코드는 대사 비교 상세·예외함에서 확인).
+    expect(screen.queryByRole('columnheader', { name: '주원인' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: 'REASON_A' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('columnheader', { name: '차액' })).toHaveLength(2)
   })
 
   it('canProcess=false이면 세 작업은 안내와 함께 비활성이고 요청하지 않는다', async () => {
