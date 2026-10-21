@@ -203,14 +203,12 @@ test('실서버 RECO-W01·W02 전후 비교·일괄 예외·자동 선택·중�
   const mismatch = oldResults.items.content.find((item: { resultType: string }) => item.resultType !== 'MATCHED')
   expect(mismatch).toBeTruthy()
   await expect(page.locator(`[data-reco-compare-id="${mismatch.reconciliationResultId}"]`)).toBeVisible()
-  await page.screenshot({ path: 'docs/416/legacy-list.png', fullPage: true })
   const legacyDetailResponse = page.waitForResponse((response) =>
     response.url().endsWith(`/api/v1/reconciliations/results/${mismatch.reconciliationResultId}`),
   )
   await page.locator(`[data-reco-compare-id="${mismatch.reconciliationResultId}"]`).click()
   const oldDetail = (await (await legacyDetailResponse).json()).data
   await expect(page.locator('#h-contract')).toHaveText(oldDetail.contractNo)
-  await page.locator('[data-modal="reco-compare"] .modal').screenshot({ path: 'docs/416/legacy-compare.png' })
   await page.goto(`login?redirect=${encodeURIComponent(`/reconciliations?${query}`)}`)
   await page.getByRole('textbox', { name: /아이디/ }).fill(loginId!)
   await page.getByRole('textbox', { name: /비밀번호/ }).fill(password!)
@@ -230,14 +228,12 @@ test('실서버 RECO-W01·W02 전후 비교·일괄 예외·자동 선택·중�
   await expect(
     page.getByRole('button', { name: `대사 결과 ${mismatch.reconciliationResultId} 비교 보기` }),
   ).toBeVisible()
-  await page.screenshot({ path: 'docs/416/react-list.png', fullPage: true })
   const newDetailResponse = page.waitForResponse((response) =>
     response.url().endsWith(`/api/v1/reconciliations/results/${mismatch.reconciliationResultId}`),
   )
   await page.getByRole('button', { name: `대사 결과 ${mismatch.reconciliationResultId} 비교 보기` }).click()
   expect((await (await newDetailResponse).json()).data).toEqual(oldDetail)
   await expect(page.getByRole('dialog').getByText('허용오차 0원 · 시스템 계산 결과')).toBeVisible()
-  await page.getByRole('dialog').screenshot({ path: 'docs/416/react-compare.png' })
   await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).click()
   const bulkResponse = page.waitForResponse((response) => response.url().endsWith(`/${runId}/exceptions`))
   await page.getByRole('button', { name: '불일치 예외 일괄 생성' }).click()
