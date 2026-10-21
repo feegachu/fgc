@@ -89,6 +89,24 @@ class JournalViewControllerTest {
         assertThat(captor.getValue().status()).isEqualTo("POSTED");
     }
 
+    @Test
+    void contractNoConditionIsTrimmedAndPassedToSearchAndRenderedInFilter() throws Exception {
+        given(journalSearchService.search(any(), eq(1), eq(20)))
+                .willReturn(PageResponse.of(List.of(), 1, 20, 0, "journalDate,desc"));
+
+        mvc.perform(get("/journals")
+                        .param("searched", "true")
+                        .param("contractNo", "  fgc-fgl02-202608  ")
+                        .with(user(userWithRole("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("name=\"contractNo\"")))
+                .andExpect(content().string(containsString("value=\"fgc-fgl02-202608\"")));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(JournalSearchCriteria.class);
+        verify(journalSearchService).search(captor.capture(), eq(1), eq(20));
+        assertThat(captor.getValue().contractNo()).isEqualTo("fgc-fgl02-202608");
+    }
+
     @ParameterizedTest(name = "{0} LEDG-W01 역분개 가능={1}")
     @CsvSource({
             "SETTLEMENT,   true",

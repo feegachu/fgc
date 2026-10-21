@@ -30,6 +30,7 @@ import java.util.List;
 public class JournalViewController {
 
     private static final int PAGE_SIZE = 20;
+    private static final int MAX_CONTRACT_NO_LENGTH = 80;
 
     private final JournalSearchService journalSearchService;
 
@@ -40,6 +41,7 @@ public class JournalViewController {
             @RequestParam(name = "type", required = false) String journalType,
             @RequestParam(name = "account", required = false) String accountCode,
             @RequestParam(name = "contract", required = false) Long contractId,
+            @RequestParam(name = "contractNo", required = false) String contractNo,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long selected,
             @RequestParam(defaultValue = "1") int page,
@@ -56,11 +58,15 @@ public class JournalViewController {
         LocalDate safeFrom = dateOrNull(from);
         LocalDate safeTo = dateOrNull(to);
         int safePage = Math.max(page, 1);
+        String safeContractNo = contractNo == null || contractNo.isBlank() ? null : contractNo.trim();
+        if (safeContractNo != null && safeContractNo.length() > MAX_CONTRACT_NO_LENGTH) {
+            safeContractNo = safeContractNo.substring(0, MAX_CONTRACT_NO_LENGTH);
+        }
 
         JournalSearchResponse journals = emptyPage(safePage);
         if (searched) {
             JournalSearchCriteria criteria = new JournalSearchCriteria(
-                    safeFrom, safeTo, safeType, safeAccount, contractId, safeStatus);
+                    safeFrom, safeTo, safeType, safeAccount, contractId, safeContractNo, safeStatus);
             PageResponse<JournalListRow> result = journalSearchService.search(criteria, safePage, PAGE_SIZE);
             journals = JournalSearchResponse.from(result);
         }
@@ -72,6 +78,7 @@ public class JournalViewController {
         model.addAttribute("typeFilter", safeType);
         model.addAttribute("accountFilter", safeAccount);
         model.addAttribute("contractFilter", contractId);
+        model.addAttribute("contractNoFilter", safeContractNo);
         model.addAttribute("statusFilter", safeStatus);
         model.addAttribute("journalTypes", JournalType.values());
         model.addAttribute("journalStatuses", JournalHeaderStatus.values());

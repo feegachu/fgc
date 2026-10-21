@@ -15,7 +15,7 @@ export const FILTER_KEYS = {
   to: '',
   type: '',
   account: '',
-  contract: '',
+  contractNo: '',
   status: '',
   searched: '',
   selected: '',
@@ -40,7 +40,7 @@ export function criteriaFromParams(params: URLSearchParams) {
     to: validDate(params.get('to')),
     type: Object.hasOwn(JOURNAL_TYPE, type) ? type : '',
     account: params.get('account')?.trim() ?? '',
-    contract: positiveId(params.get('contract')),
+    contractNo: params.get('contractNo')?.trim().slice(0, 80) ?? '',
     status: Object.hasOwn(JOURNAL_STATUS, status) ? status : '',
     page: Number(positiveId(params.get('page')) || 1),
   }

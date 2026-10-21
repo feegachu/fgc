@@ -3,7 +3,7 @@
   FGC-UI-LEDG-W01 검증원장 조회 (복식부기)
   요구사항 FUN-046(원장 기록) · FUN-047(정정·역분개) / SAR-002
   데이터  읽기 journal_header, journal_line, journal_account, vw_journal_imbalance
-  API     GET  /api/v1/journals?period=&type=&account=&contract=&status=
+  API     GET  /api/v1/journals?period=&type=&account=&contract=&contractNo=&status=
           GET  /api/v1/journals/imbalances?validationRunId=   (Ajax · 불균형 배너)
           POST /api/v1/journals/{id}/reverse                  (사유 필수)
           POST /api/v1/journals/{id}/correction-exceptions    (정정 예외 생성·이동)
@@ -92,9 +92,9 @@
         </select>
       </div>
       <div class="filter-field ledger-filter-contract">
-        <label class="filter-field-label" for="f-contract">계약 ID</label>
-        <input class="field-control" id="f-contract" name="contract" type="number" min="1" inputmode="numeric"
-               th:value="${contractFilter}">
+        <label class="filter-field-label" for="f-contract-no">계약번호</label>
+        <input class="field-control" id="f-contract-no" name="contractNo" type="text" maxlength="80"
+               autocomplete="off" th:value="${contractNoFilter}">
       </div>
       <div class="filter-field ledger-filter-status">
         <label class="filter-field-label" for="f-status">상태</label>
@@ -212,11 +212,11 @@
       </div>
       <nav class="pagination-controls ledger-pagination" id="ledger-pagination" aria-label="검증원장 페이지 이동">
         <a class="pagination-button ledger-pagination-text" id="ledger-prev" th:if="${journals.page > 1}"
-           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},selected=${selectedJournalId},searched=true,page=${journals.page - 1})}">이전</a>
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},contractNo=${contractNoFilter},status=${statusFilter},selected=${selectedJournalId},searched=true,page=${journals.page - 1})}">이전</a>
         <span id="ledger-page-info" class="text-secondary tabular-nums"
               th:text="${journals.page + ' / ' + (journals.totalPages > 0 ? journals.totalPages : 1)}">1 / 1</span>
         <a class="pagination-button ledger-pagination-text" id="ledger-next" th:if="${journals.page < journals.totalPages}"
-           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},status=${statusFilter},selected=${selectedJournalId},searched=true,page=${journals.page + 1})}">다음</a>
+           th:href="@{/journals(from=${fromFilter},to=${toFilter},type=${typeFilter},account=${accountFilter},contract=${contractFilter},contractNo=${contractNoFilter},status=${statusFilter},selected=${selectedJournalId},searched=true,page=${journals.page + 1})}">다음</a>
       </nav>
     </section>
 
