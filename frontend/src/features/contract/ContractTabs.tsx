@@ -566,7 +566,6 @@ const transactionColumns: TableColumn<Transaction>[] = [
   { key: 'attributed', label: '귀속금액', render: (row) => <Amount value={row.attributionTotal} /> },
   { key: 'difference', label: '차액', render: (row) => <Amount value={row.differenceAmount} /> },
   { key: 'status', label: '상태', render: (row) => <ResultStatus code={row.status} label={row.statusLabel} /> },
-  { key: 'source', label: '원천', render: (row) => <Text value={row.sourceType} /> },
 ]
 const reconciliationColumns: TableColumn<Reconciliation>[] = [
   { key: 'result', label: '결과', render: (row) => <Text value={row.resultTypeLabel || row.resultType} /> },
