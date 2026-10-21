@@ -42,9 +42,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ArbitrageBaselineService {
     private static final PaymentStage REGULATORY_PAYMENT_STAGE = PaymentStage.GA_TO_FC;
-    // 전환 전 비교 기준: REG-12의 계약 체결 후 3년(36개월) 고정값을 보존한다.
-    // 정책 조회로의 변경은 이 baseline과 #378의 계산 동등성 검증 범위 밖이다.
-    private static final int REFUND_ADDITION_LAST_MONTH = 36;
 
     // FUN-061 — 수동 재검증은 사용자가 촉발하는 상태 변경이라 같은 트랜잭션에서 감사행을 남긴다.
     // 월 통합검증 경유(checkInExistingRun)는 배치의 VALIDATION_RUN_* 감사가 이미 커버하므로 제외.
@@ -334,7 +331,7 @@ public class ArbitrageBaselineService {
 
         int contractMonthNo = source.getContractMonthNo();
         BigDecimal cumulativePaidPremium = MoneyUtil.roundWon(source.getCumulativePaidPremium());
-        RefundDecision refund = resolveSurrenderValue(source);
+        RefundDecision refund = resolveSurrenderValue(source, request, applicability);
         if (refund.reviewRequired())
             return reviewRequired(contractMonthNo, refund.reason(), cumulativePaidPremium);
 
@@ -375,10 +372,17 @@ public class ArbitrageBaselineService {
         );
     }
 
-    private RefundDecision resolveSurrenderValue(ArbitrageCalculationSource source) {
+    private RefundDecision resolveSurrenderValue(
+            ArbitrageCalculationSource source,
+            ReArbitrageCheckRequest request,
+            Applicability applicability) {
+        LocalDate assessmentDate = source.getTerminationDate() == null
+                ? request.getAsOfDate() : source.getTerminationDate();
+        LocalDate boundary = source.getContractDate().plusMonths(applicability.refundAdditionMonths());
         boolean applies = Boolean.TRUE.equals(source.getStandardDeduction80Yn())
-                && source.getContractMonthNo() >= 1
-                && source.getContractMonthNo() <= REFUND_ADDITION_LAST_MONTH;
+                && !assessmentDate.isBefore(source.getContractDate())
+                && (assessmentDate.isBefore(boundary)
+                    || (Boolean.TRUE.equals(applicability.refundAdditionBoundaryInclusive()) && assessmentDate.equals(boundary)));
         if (!applies)
             return RefundDecision.notApplicable();
 
@@ -453,6 +457,10 @@ public class ArbitrageBaselineService {
             Applicability applicability) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("contractDate", source.getContractDate());
+        snapshot.put("terminationDate", source.getTerminationDate());
+        snapshot.put("refundAssessmentDate", source.getTerminationDate() == null ? request.getAsOfDate() : source.getTerminationDate());
+        snapshot.put("refundAdditionMonths", applicability.refundAdditionMonths());
+        snapshot.put("refundAdditionBoundaryInclusive", applicability.refundAdditionBoundaryInclusive());
         snapshot.put("applicabilityPolicyVersionId", applicability.policyVersionId());
         snapshot.put("effectiveContractDate", applicability.effectiveContractDate());
         snapshot.put("manualReason", request.getReason());

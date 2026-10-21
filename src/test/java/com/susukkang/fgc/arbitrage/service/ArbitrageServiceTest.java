@@ -71,7 +71,7 @@ class ArbitrageServiceTest {
                 auditLogService, applicabilityPolicyService
         );
         org.mockito.Mockito.lenient().when(applicabilityPolicyService.resolve(any())).thenReturn(
-                new ArbitrageApplicabilityPolicyService.Applicability(1L, LocalDate.of(2026, 3, 1), null));
+                new ArbitrageApplicabilityPolicyService.Applicability(1L, LocalDate.of(2026, 3, 1), 36, false, null));
     }
 
     /**
@@ -226,12 +226,39 @@ class ArbitrageServiceTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"36, 100000, CANDIDATE", "37, 0, CLEAR"})
-    void preservesRefundAdditionBoundary(int month, String refundAmount, ArbitrageCheckStatus status) {
+    @org.junit.jupiter.params.provider.CsvSource({
+            "2029-03-10, 37, 100000", "2029-03-16, 36, 0", "2029-03-20, 12, 0"})
+    void usesElapsedPeriodAtTerminationInsteadOfSnapshotMonth(String termination, int month, String refund) {
         var source = calculationSource(new BigDecimal("1000000"), month, true, new BigDecimal("100000.49"));
-        var row = checkExisting(source, "1000000", "0");
-        assertThat(row.getIncludedSurrenderValueAmount()).isEqualByComparingTo(refundAmount);
-        assertThat(row.getResultStatus()).isEqualTo(status);
+        source.setContractDate(LocalDate.of(2026, 3, 16));
+        source.setTerminationDate(LocalDate.parse(termination));
+        var row = checkExisting(source, "1000000", "0", LocalDate.of(2030, 7, 31));
+        assertThat(row.getIncludedSurrenderValueAmount()).isEqualByComparingTo(refund);
+        assertThat(row.getCalculationSnapshot()).contains("terminationDate", "refundAdditionMonths");
+    }
+
+    @Test
+    void honoursInclusiveBoundaryAndConfiguredPeriod() {
+        var source = calculationSource(new BigDecimal("1000000"), 99, true, new BigDecimal("100000"));
+        source.setTerminationDate(LocalDate.of(2028, 3, 1));
+        given(applicabilityPolicyService.resolve(any())).willReturn(
+                new ArbitrageApplicabilityPolicyService.Applicability(1L, LocalDate.of(2026, 3, 1), 24, true, null));
+        assertThat(checkExisting(source, "0", "0", LocalDate.of(2029, 7, 31)).getIncludedSurrenderValueAmount()).isEqualByComparingTo("100000");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"2031-02-27, true", "2031-02-28, false"})
+    void handlesLeapDayAnniversaryWithoutUsingInstallmentNumber(String termination, boolean applies) {
+        var source = calculationSource(new BigDecimal("1000000"),37,true,new BigDecimal("100000"));
+        source.setContractDate(LocalDate.of(2028,2,29));
+        source.setTerminationDate(LocalDate.parse(termination));
+        assertThat(checkExisting(source,"0","0",LocalDate.of(2031,3,1)).getRefundAdditionAppliedYn()).isEqualTo(applies);
+    }
+
+    @Test
+    void activeContractUsesAsOfDateForElapsedPeriod() {
+        var source = calculationSource(new BigDecimal("1000000"), 37, true, new BigDecimal("100000"));
+        assertThat(checkExisting(source, "0", "0").getRefundAdditionAppliedYn()).isTrue();
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -300,7 +327,7 @@ class ArbitrageServiceTest {
     @Test
     void policyValueChangesApplicabilityWithoutCodeChange() {
         given(applicabilityPolicyService.resolve(any())).willReturn(
-                new ArbitrageApplicabilityPolicyService.Applicability(9L, LocalDate.of(2027, 1, 1), null));
+                new ArbitrageApplicabilityPolicyService.Applicability(9L, LocalDate.of(2027, 1, 1), 36, false, null));
         var row = checkExisting(calculationSource(new BigDecimal("800000"), 5, false, BigDecimal.ZERO), "890000", "0");
         assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CLEAR);
         assertThat(row.getCalculationSnapshot()).contains("2027-01-01 이전 체결");
@@ -310,11 +337,14 @@ class ArbitrageServiceTest {
     @org.junit.jupiter.params.provider.CsvSource({
             "차익거래 적용일 정책이 없습니다., POLICY_MISSING",
             "차익거래 적용일 정책값이 없습니다., POLICY_MISSING",
+            "차익거래 환급금 합산 기간·경계 정책값이 없습니다., POLICY_MISSING",
+            "차익거래 환급금 합산 기간 정책값이 올바르지 않습니다., DATA_QUALITY",
+            "차익거래 환급금 합산 기간·경계 정책값이 올바르지 않습니다., DATA_QUALITY",
             "차익거래 적용일 정책이 여러 건입니다., POLICY_DUPLICATE",
             "차익거래 적용일 정책값이 올바른 날짜가 아닙니다., DATA_QUALITY"})
     void policyProblemsProduceReviewWithSpecificExceptionType(String reason, ExceptionType expected) {
         given(applicabilityPolicyService.resolve(any())).willReturn(
-                new ArbitrageApplicabilityPolicyService.Applicability(null, null, reason));
+                new ArbitrageApplicabilityPolicyService.Applicability(null, null, null, null, reason));
         var row = checkExisting(calculationSource(new BigDecimal("800000"), 5, false, BigDecimal.ZERO), "890000", "0");
         assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
         assertThat(row.getCalculationSnapshot()).contains(reason);
@@ -336,7 +366,11 @@ class ArbitrageServiceTest {
     }
 
     private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(ArbitrageCalculationSource source, String paid, String planned) {
-        LocalDate date = LocalDate.of(2026, 7, 31);
+        return checkExisting(source, paid, planned, LocalDate.of(2026, 7, 31));
+    }
+
+    private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(
+            ArbitrageCalculationSource source, String paid, String planned, LocalDate date) {
         given(arbitrageCheckRepository.selectCalculationSource(10L, date)).willReturn(source);
         given(arbitrageCheckRepository.sumConfirmedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(confirmed(paid, "0"));
         given(arbitrageCheckRepository.sumPlannedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(new BigDecimal(planned));
