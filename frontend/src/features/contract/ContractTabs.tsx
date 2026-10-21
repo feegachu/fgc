@@ -574,7 +574,6 @@ const reconciliationColumns: TableColumn<Reconciliation>[] = [
   { key: 'expected', label: '예상액', align: 'number', render: (row) => <Amount value={row.expectedTotalAmount} /> },
   { key: 'actual', label: '실제액', align: 'number', render: (row) => <Amount value={row.actualTotalAmount} /> },
   { key: 'difference', label: '차액', align: 'number', render: (row) => <Amount value={row.differenceAmount} /> },
-  { key: 'reason', label: '주원인', render: (row) => <Text value={row.primaryReasonCode} /> },
 ]
 function TabSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
   return (
