@@ -569,7 +569,7 @@ export interface paths {
         };
         /**
          * 검증원장 목록 조회
-         * @description 기간(from/to)·분개유형·계정·계약·상태로 검색하고 페이징된 목록을 돌려준다.
+         * @description 기간(from/to)·분개유형·계정·계약(ID 또는 계약번호)·상태로 검색하고 페이징된 목록을 돌려준다.
          */
         get: operations["search_2"];
         put?: never;
@@ -4878,6 +4878,8 @@ export interface operations {
                 account?: string;
                 /** @description 계약 ID */
                 contract?: number;
+                /** @description 계약번호(대소문자 무시 부분 일치, 최대 80자) */
+                contractNo?: string;
                 /** @description 상태(DRAFT/POSTED/REVERSED) */
                 status?: string;
                 /** @description 페이지(1-base) */

@@ -12,6 +12,7 @@ import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.susukkang.fgc.journal.entity.QJournalHeader;
 import com.susukkang.fgc.auth.entity.QAppUser;
+import com.susukkang.fgc.contract.entity.QInsuranceContract;
 import static com.susukkang.fgc.journal.entity.QJournalHeader.journalHeader;
 import static com.susukkang.fgc.journal.entity.QJournalLine.journalLine;
 import static com.susukkang.fgc.journal.entity.QJournalAccount.journalAccount;
@@ -58,9 +59,16 @@ public class JournalQueryRepository {
                 .setParameter("id", validationRunId).getSingleResult() > 0;
     }
 
-    /** 계정과목 필터는 EXISTS, 합계는 헤더의 모든 라인을 대상으로 유지한다. */
+    /** 계약번호 조건 없이 검색한다(기존 호출 호환). */
     public List<JournalListRow> search(LocalDate from, LocalDate to, String journalType,
                                        String accountCode, Long contractId, String status,
+                                       int offset, int limit) {
+        return search(from, to, journalType, accountCode, contractId, null, status, offset, limit);
+    }
+
+    /** 계정과목 필터는 EXISTS, 합계는 헤더의 모든 라인을 대상으로 유지한다. */
+    public List<JournalListRow> search(LocalDate from, LocalDate to, String journalType,
+                                       String accountCode, Long contractId, String contractNo, String status,
                                        int offset, int limit) {
         var h = journalHeader;
         var l = journalLine;
@@ -82,14 +90,19 @@ public class JournalQueryRepository {
                 .leftJoin(rev).on(rev.journalHeaderId.eq(h.reversalOfId))
                 .leftJoin(creator).on(creator.userId.eq(h.createdBy))
                 .leftJoin(poster).on(poster.userId.eq(h.postedBy))
-                .where(searchFilters(from, to, journalType, accountCode, contractId, status))
+                .where(searchFilters(from, to, journalType, accountCode, contractId, contractNo, status))
                 .orderBy(h.journalDate.desc(), h.journalHeaderId.desc()).offset(offset).limit(limit).fetch();
     }
 
     public long count(LocalDate from, LocalDate to, String journalType,
                       String accountCode, Long contractId, String status) {
+        return count(from, to, journalType, accountCode, contractId, null, status);
+    }
+
+    public long count(LocalDate from, LocalDate to, String journalType,
+                      String accountCode, Long contractId, String contractNo, String status) {
         return queryFactory.select(journalHeader.count()).from(journalHeader)
-                .where(searchFilters(from, to, journalType, accountCode, contractId, status)).fetchOne();
+                .where(searchFilters(from, to, journalType, accountCode, contractId, contractNo, status)).fetchOne();
     }
 
     /**
@@ -241,7 +254,7 @@ public class JournalQueryRepository {
     }
 
     private BooleanBuilder searchFilters(LocalDate from, LocalDate to, String journalType,
-                                          String accountCode, Long contractId, String status) {
+                                          String accountCode, Long contractId, String contractNo, String status) {
         var h = journalHeader;
         BooleanBuilder where = new BooleanBuilder();
         if (from != null) where.and(h.journalDate.goe(from));
@@ -249,6 +262,12 @@ public class JournalQueryRepository {
         // 문자열 조건은 미정의 코드·빈 문자열도 예외 없이 빈 결과를 반환한다.
         if (journalType != null) where.and(h.journalType.stringValue().eq(journalType));
         if (contractId != null) where.and(h.contractId.eq(contractId));
+        // 계약번호는 대소문자를 구분하지 않는 부분 일치다. 헤더에 조인을 늘리지 않으려고 서브쿼리로 건다.
+        if (contractNo != null && !contractNo.isBlank()) {
+            var filterContract = new QInsuranceContract("filterContract");
+            where.and(h.contractId.in(JPAExpressions.select(filterContract.contractId).from(filterContract)
+                    .where(filterContract.contractNo.containsIgnoreCase(contractNo.trim()))));
+        }
         if (status != null) where.and(h.status.stringValue().eq(status));
         if (accountCode != null) where.and(JPAExpressions.selectOne().from(journalLine)
                 .join(journalAccount).on(journalAccount.journalAccountId.eq(journalLine.journalAccountId))

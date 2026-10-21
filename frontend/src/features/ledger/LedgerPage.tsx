@@ -283,7 +283,7 @@ function LedgerFilters({
     to: criteria.to,
     type: criteria.type,
     account: criteria.account,
-    contract: criteria.contract,
+    contractNo: criteria.contractNo,
     status: criteria.status,
   }
   const range = monthRange(month)
@@ -309,7 +309,7 @@ function LedgerFilters({
       ) : (
         <input
           type={type}
-          min={type === 'number' ? '1' : undefined}
+          maxLength={key === 'contractNo' ? 80 : undefined}
           value={fields[key]}
           onChange={(e) => setFields({ ...fields, [key]: e.target.value })}
         />
@@ -332,7 +332,7 @@ function LedgerFilters({
               .map((a) => [a.accountCode!, accountDisplayName(a.accountCode, a.accountName)]),
           ]),
         )}
-        {field('contract', '계약 ID', undefined, 'number')}
+        {field('contractNo', '계약번호', undefined, 'text')}
         {field('status', '상태', JOURNAL_STATUS)}
       </FilterBar>
       <Failure error={accounts.error} />
