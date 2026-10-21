@@ -1,6 +1,7 @@
 package com.susukkang.fgc.journal.dto;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.journal.domain.JournalAccountCode;
 import com.susukkang.fgc.journal.domain.NormalBalance;
 
 import java.math.BigDecimal;
@@ -27,7 +28,8 @@ public record JournalDetailLineResponse(
         NormalBalance normalBalance = NormalBalance.valueOf(row.getNormalBalance());
         PaymentStage paymentStage = row.getPaymentStage() == null ? null : PaymentStage.valueOf(row.getPaymentStage());
         return new JournalDetailLineResponse(
-                row.getLineNo(), row.getAccountCode(), row.getAccountName(),
+                row.getLineNo(), row.getAccountCode(),
+                JournalAccountCode.displayName(row.getAccountCode(), row.getAccountName()),
                 normalBalance, normalBalance.label(),
                 row.getDebitAmount(), row.getCreditAmount(),
                 row.getContractId(), row.getAgentId(), row.getAgentName(),

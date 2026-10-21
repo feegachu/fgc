@@ -26,6 +26,22 @@ public enum JournalAccountCode {
         return description;
     }
 
+    /** 화면에 보이는 계정명: 한글 계정명 → 알려진 코드의 기본 한글명 → 안내 문구. 영어 코드는 노출하지 않는다. */
+    public static String displayName(String accountCode, String accountName) {
+        if (accountName != null && !accountName.isBlank()) {
+            return accountName.trim();
+        }
+        if (accountCode == null || accountCode.isBlank()) {
+            return "-";
+        }
+        for (JournalAccountCode known : values()) {
+            if (known.name().equals(accountCode)) {
+                return known.description;
+            }
+        }
+        return "계정명 확인 필요";
+    }
+
     public NormalBalance normalBalance() {
         return normalBalance;
     }
