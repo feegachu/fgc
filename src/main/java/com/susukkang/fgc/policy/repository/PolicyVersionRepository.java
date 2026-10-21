@@ -92,10 +92,16 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
     // LIMIT 1로 중복 정책을 숨기지 않으며 파라미터 누락도 검토필요로 반환한다.
     @Query(value = """
             SELECT pv.policy_version_id AS "policyVersionId",
-                   pp.parameter_value #>> '{}' AS "effectiveContractDate"
+                   pp.parameter_value #>> '{}' AS "effectiveContractDate",
+                   months.parameter_value #>> '{}' AS "refundAdditionMonths",
+                   boundary.parameter_value #>> '{}' AS "refundAdditionBoundaryInclusive"
               FROM fgc.policy_version pv
               LEFT JOIN fgc.policy_parameter pp ON pp.policy_version_id = pv.policy_version_id
                AND pp.parameter_key = 'ARBITRAGE_EFFECTIVE_CONTRACT_DATE'
+              LEFT JOIN fgc.policy_parameter months ON months.policy_version_id = pv.policy_version_id
+               AND months.parameter_key = 'ARBITRAGE_REFUND_ADDITION_MONTHS'
+              LEFT JOIN fgc.policy_parameter boundary ON boundary.policy_version_id = pv.policy_version_id
+               AND boundary.parameter_key = 'ARBITRAGE_REFUND_ADDITION_BOUNDARY_INCLUSIVE'
              WHERE pv.policy_type = 'ARBITRAGE' AND pv.status = 'ACTIVE'
                AND pv.effective_from <= :asOf
                AND (pv.effective_to IS NULL OR pv.effective_to >= :asOf)
@@ -106,5 +112,7 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
     interface ArbitrageApplicability {
         Long getPolicyVersionId();
         String getEffectiveContractDate();
+        String getRefundAdditionMonths();
+        String getRefundAdditionBoundaryInclusive();
     }
 }

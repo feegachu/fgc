@@ -1,0 +1,92 @@
+[
+  {
+    "width": 1440,
+    "id": "dashboard",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 24,
+    "contentTop": 16,
+    "gridGap": "12px",
+    "pageContentCount": 1
+  },
+  {
+    "width": 1440,
+    "id": "exception",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 24,
+    "contentTop": 16,
+    "gridGap": "16px",
+    "pageContentCount": 1
+  },
+  {
+    "width": 1440,
+    "id": "validation-list",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 24,
+    "contentTop": 16,
+    "gridGap": "16px",
+    "pageContentCount": 1
+  },
+  {
+    "width": 1440,
+    "id": "validation-detail",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 24,
+    "contentTop": 16,
+    "gridGap": "16px",
+    "pageContentCount": 1
+  },
+  {
+    "width": 375,
+    "id": "dashboard",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 16,
+    "contentTop": 16,
+    "gridGap": "12px",
+    "pageContentCount": 1
+  },
+  {
+    "width": 375,
+    "id": "exception",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 16,
+    "contentTop": 16,
+    "gridGap": "16px",
+    "pageContentCount": 1
+  },
+  {
+    "width": 375,
+    "id": "validation-list",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 16,
+    "contentTop": 16,
+    "gridGap": "16px",
+    "pageContentCount": 1
+  },
+  {
+    "width": 375,
+    "id": "validation-detail",
+    "rootPadding": "0px",
+    "rootMargin": "0px",
+    "contentLeft": 16,
+    "contentTop": 16,
+    "gridGap": "16px",
+    "pageContentCount": 1
+  },
+  {
+    "state": "loading",
+    "padding": "0px",
+    "count": 1
+  },
+  {
+    "state": "error",
+    "padding": "0px",
+    "count": 1
+  }
+]
