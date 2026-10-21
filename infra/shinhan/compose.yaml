@@ -30,13 +30,12 @@ services:
       db:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: stage
+      SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fgc?currentSchema=fgc
       SPRING_DATASOURCE_USERNAME: fgc
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo
       FGC_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
-      FGC_BATCH_DAILYCHANGEDCONTRACT_ENABLED: "false"
       JAVA_TOOL_OPTIONS: "-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=384m"
       TZ: Asia/Seoul
     ports:
