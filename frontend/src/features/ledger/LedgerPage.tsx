@@ -21,9 +21,11 @@ import { useWorkspaceStore, withMonth } from '../../stores/workspace'
 import {
   correctionTarget,
   criteriaFromParams,
+  effectiveCriteria,
   FILTER_KEYS,
   imbalanceQuery,
   journalSearchQuery,
+  monthRange,
   positiveId,
   requestCorrection,
   reverseJournal,
@@ -118,19 +120,20 @@ const lineColumns: TableColumn<JournalLine>[] = [
   { key: 'memo', label: '적요', width: '16rem', render: (row) => disclose(row.memo) },
 ]
 
-/** LEDG-W01: searched=true 목록 계약과 selected 독립 딥링크를 유지한다. */
+/** LEDG-W01: 진입하면 기준 정산월 목록을 바로 조회하고, 조회 버튼(searched=true)의 조건은 그대로 따른다. selected 딥링크를 유지한다. */
 export default function LedgerPage() {
   const { params, update, reset } = useSearchParamsState(FILTER_KEYS)
   const month = useWorkspaceStore((state) => state.month)
   const criteria = criteriaFromParams(params)
   const searched = params.get('searched') === 'true'
   const selected = positiveId(params.get('selected'))
-  const list = useQuery(journalSearchQuery(criteria, searched))
+  const searchCriteria = effectiveCriteria(criteria, searched, month)
+  const list = useQuery(journalSearchQuery(searchCriteria, searched || !!searchCriteria.from || !!searchCriteria.to))
   const detail = useQuery({ ...journalDetailQueryOptions(selected), enabled: !!selected })
   const imbalance = useQuery(imbalanceQuery(detail.data?.validationRunId))
   const canReverse = usePermission('canReverseJournal')
   const [action, setAction] = useState<'reverse' | 'correction' | null>(null)
-  const data = searched ? list.data : undefined
+  const data = list.data
   const eligible =
     detail.data?.status === 'POSTED' && detail.data.journalType !== 'REVERSAL' && !detail.data.reversedByJournalHeaderId
   const select = (row: Journal) =>
@@ -150,20 +153,21 @@ export default function LedgerPage() {
         </p>
       )}
       <LedgerFilters
-        key={JSON.stringify(criteria) + month}
+        key={JSON.stringify(criteria) + month + searched}
         criteria={criteria}
         month={month}
+        searched={searched}
         onSearch={(fields) => update({ ...fields, searched: 'true', selected: '' })}
         onReset={reset}
       />
       <div className="ledger-react-grid">
-        <section className="surface" aria-busy={searched && list.isFetching}>
+        <section className="surface" aria-busy={list.isFetching}>
           <header className="surface-header">
             <h2 className="surface-title">분개 목록</h2>
             <span>{int(data?.totalElements ?? 0)}건 · 한 화면 20행</span>
           </header>
-          <Failure error={searched ? list.error : null} />
-          {searched && list.isPending && <p role="status">분개 목록을 불러오는 중입니다.</p>}
+          <Failure error={list.error} />
+          {list.isPending && list.fetchStatus !== 'idle' && <p role="status">분개 목록을 불러오는 중입니다.</p>}
           <DataTable
             columns={columns}
             rows={data?.content ?? []}
@@ -172,7 +176,7 @@ export default function LedgerPage() {
             onRowClick={select}
             onRowActivate={select}
             rowClassName={(row) => (String(row.journalHeaderId) === selected ? 'is-selected' : '')}
-            emptyMessage={searched ? '조건에 맞는 자료가 없습니다.' : '조회 조건을 설정하고 조회 버튼을 눌러 주세요.'}
+            emptyMessage="조건에 맞는 자료가 없습니다."
           />
           <ListPagination
             className="ledger-pagination"
@@ -264,11 +268,13 @@ export default function LedgerPage() {
 function LedgerFilters({
   criteria,
   month,
+  searched,
   onSearch,
   onReset,
 }: {
   criteria: JournalCriteria
   month: string | null
+  searched: boolean
   onSearch: (fields: Omit<JournalCriteria, 'page'>) => void
   onReset: () => void
 }) {
@@ -280,11 +286,13 @@ function LedgerFilters({
     contractNo: criteria.contractNo,
     status: criteria.status,
   }
-  const lastDay = month ? new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate() : 0
+  const range = monthRange(month)
+  // 조회 버튼을 누른 뒤(searched=true)에는 비운 날짜를 "기간 제한 없음"으로 보이는 그대로 유지하고,
+  // 처음 진입했을 때만 기준 월 범위를 입력칸에 채운다. 실제 조회 조건(effectiveCriteria)과 같은 규칙이다.
   const [fields, setFields] = useState({
     ...initial,
-    from: initial.from || (month ? `${month}-01` : ''),
-    to: initial.to || (month ? `${month}-${lastDay}` : ''),
+    from: searched ? initial.from : initial.from || range.from,
+    to: searched ? initial.to : initial.to || range.to,
   })
   const accounts = useQuery(journalAccountsQueryOptions())
   const field = (key: keyof typeof fields, label: string, options?: Record<string, string>, type = 'text') => (

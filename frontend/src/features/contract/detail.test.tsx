@@ -292,6 +292,7 @@ describe('CONT-W02 계약 상세', () => {
               attributionTotal: 90,
               differenceAmount: 3,
               statusLabel: '서버 지급 상태',
+              sourceType: 'SOURCE_A',
             },
           ],
           reconciliations: [
@@ -317,6 +318,10 @@ describe('CONT-W02 계약 상세', () => {
     await screen.findByRole('cell', { name: '서버 대사 결과' })
     expect(screen.getByText('3원')).toBeInTheDocument()
     expect(screen.getByText('(12)원')).toBeInTheDocument()
+
+    // #589 수수료 지급 표에는 원천 컬럼이 없다.
+    expect(screen.queryByRole('columnheader', { name: '원천' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: 'SOURCE_A' })).not.toBeInTheDocument()
     // #588 대사 결과 표에는 주원인 컬럼이 없다(원인 코드는 대사 비교 상세·예외함에서 확인).
     expect(screen.queryByRole('columnheader', { name: '주원인' })).not.toBeInTheDocument()
     expect(screen.queryByRole('cell', { name: 'REASON_A' })).not.toBeInTheDocument()

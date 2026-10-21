@@ -201,11 +201,15 @@ test('상세 값 정렬·가로 한도 안내문·지급 표 전체 열의 가�
   const table = page.getByRole('table', { name: '수수료 지급 건' })
   await expect(table.getByRole('cell', { name: '700,000원' })).toHaveCount(2)
   const viewport = await table.locator('..').boundingBox()
-  const last = await table.getByRole('columnheader', { name: '원천' }).boundingBox()
+  // #589 원천 컬럼이 없어졌으므로 새 마지막 열인 상태 헤더가 뷰포트 안에 들어오는지 확인한다.
+  await expect(table.getByRole('columnheader', { name: '원천' })).toHaveCount(0)
+  await expect(table.getByRole('cell', { name: 'INSURER_STATEMENT' })).toHaveCount(0)
+  const last = await table.getByRole('columnheader', { name: '상태' }).boundingBox()
   expect(last!.x + last!.width).toBeLessThanOrEqual(viewport!.x + viewport!.width + 1)
   const stage = await table.getByRole('cell', { name: '원수사→GA' }).boundingBox()
   const amount = await table.getByRole('cell', { name: '700,000원' }).first().boundingBox()
-  expect(amount!.x - stage!.x).toBeLessThan(120)
+  // 원천 열이 빠져 남은 열이 넓어졌으므로 지급단계→금액 거리 상한을 120에서 140으로 맞춘다(여전히 한 화면 안의 근접 배치).
+  expect(amount!.x - stage!.x).toBeLessThan(140)
   await page.screenshot({ path: testInfo.outputPath('contract-payment-compact.png'), fullPage: true })
 })
 

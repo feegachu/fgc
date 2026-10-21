@@ -57,8 +57,38 @@ class JournalViewControllerTest {
     private JournalSearchService journalSearchService;
 
     @Test
-    void initialPageDoesNotSearchUntilButtonSubmission() throws Exception {
+    void initialEntrySearchesBaseMonthRangeWithoutButtonSubmission() throws Exception {
+        given(journalSearchService.search(any(), eq(1), eq(20)))
+                .willReturn(PageResponse.of(List.of(), 1, 20, 0, "journalDate,desc"));
+
         mvc.perform(get("/journals").with(user(userWithRole("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("value=\"2026-07-01\"")))
+                .andExpect(content().string(containsString("value=\"2026-07-31\"")));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(JournalSearchCriteria.class);
+        verify(journalSearchService).search(captor.capture(), eq(1), eq(20));
+        assertThat(captor.getValue().from()).isEqualTo(LocalDate.of(2026, 7, 1));
+        assertThat(captor.getValue().to()).isEqualTo(LocalDate.of(2026, 7, 31));
+    }
+
+    @Test
+    void buttonSubmissionWithClearedDatesSearchesWithoutPeriodLimit() throws Exception {
+        given(journalSearchService.search(any(), eq(1), eq(20)))
+                .willReturn(PageResponse.of(List.of(), 1, 20, 0, "journalDate,desc"));
+
+        mvc.perform(get("/journals").param("searched", "true").with(user(userWithRole("SETTLEMENT"))))
+                .andExpect(status().isOk());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(JournalSearchCriteria.class);
+        verify(journalSearchService).search(captor.capture(), eq(1), eq(20));
+        assertThat(captor.getValue().from()).isNull();
+        assertThat(captor.getValue().to()).isNull();
+    }
+
+    @Test
+    void explicitSearchedFalseDoesNotSearch() throws Exception {
+        mvc.perform(get("/journals").param("searched", "false").with(user(userWithRole("SETTLEMENT"))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("조회 조건을 설정하고 조회 버튼을 눌러 주세요.")));
 
@@ -137,6 +167,8 @@ class JournalViewControllerTest {
             "COMPLIANCE,   false",
     })
     void reverseCapabilityMatchesExistingApiRoles(String role, boolean allowed) throws Exception {
+        given(journalSearchService.search(any(), eq(1), eq(20)))
+                .willReturn(PageResponse.of(List.of(), 1, 20, 0, "journalDate,desc"));
         mvc.perform(get("/journals").with(user(userWithRole(role))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-can-reverse=\"" + allowed + "\"")));

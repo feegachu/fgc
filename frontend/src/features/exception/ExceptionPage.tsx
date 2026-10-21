@@ -92,6 +92,7 @@ export function ExceptionPage() {
     {
       key: 'reason',
       label: '상세 원인',
+      align: 'center',
       width: '8.5rem',
       cellClassName: 'exception-disclosure-cell',
       render: (row) => <Disclosure preview={row.reasonLabel || '-'} singleLine />,
@@ -127,6 +128,7 @@ export function ExceptionPage() {
     {
       key: 'reference',
       label: '참조',
+      align: 'center',
       width: '8rem',
       cellClassName: 'tabular-nums exception-disclosure-cell',
       render: (row) => {
