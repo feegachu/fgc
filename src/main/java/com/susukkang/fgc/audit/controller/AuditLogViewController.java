@@ -4,6 +4,7 @@ import com.susukkang.fgc.audit.dto.AuditDiffEntry;
 import com.susukkang.fgc.audit.dto.AuditLogResponse;
 import com.susukkang.fgc.audit.service.AuditDiffCalculator;
 import com.susukkang.fgc.audit.service.AuditLogQueryService;
+import com.susukkang.fgc.audit.view.AuditDisplayLabels;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.PageResponse;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class AuditLogViewController {
 
     /** 화면정의서 §4-1 공통 규칙 7 — 목록은 서버에서 20행씩. */
     private static final int PAGE_SIZE = 20;
+    private static final AuditDisplayLabels DISPLAY_LABELS = new AuditDisplayLabels();
 
     private final AuditLogQueryService auditLogQueryService;
     private final AuditDiffCalculator auditDiffCalculator;
@@ -64,6 +66,7 @@ public class AuditLogViewController {
                 auditLogQueryService.search(entityType, entityId, userId, action, from, to, page, PAGE_SIZE);
 
         model.addAttribute("logs", logs);
+        model.addAttribute("auditLabels", DISPLAY_LABELS);
         model.addAttribute("form", new SearchForm(entityType, entityId, userId, action, from, to));
         model.addAttribute("actionCodes", auditLogQueryService.actionCodes());
         model.addAttribute("entityTypes", auditLogQueryService.entityTypes());
