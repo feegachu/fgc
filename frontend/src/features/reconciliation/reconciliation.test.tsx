@@ -218,7 +218,7 @@ describe('RECO-W01·W02 React 전환', () => {
     await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
     expect(reads).toBe(2)
   })
-  it('현재 페이지가 전부 일치여도 전체 합계·다음 페이지를 유지하며 구체적으로 안내한다', async () => {
+  it('현재 페이지가 전부 일치여도 전체 요약·다음 페이지를 유지하고 페이지 합계는 0으로 구체적으로 안내한다', async () => {
     renderAt('/reconciliations?month=2026-07&runId=41&onlyMismatch=true', (url) =>
       url.includes('/41/results')
         ? { ...results, items: { ...results.items, content: [matched], totalPages: 2 } }
@@ -228,8 +228,12 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(
       within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '다음 페이지' }),
     ).toBeEnabled()
-    expect(screen.getByText(/실행 전체 합계/)).toHaveTextContent('24,000원')
-    expect(screen.getByRole('region', { name: '일치율 (건수 기준)' })).toHaveTextContent('이력은 서버 반올림 값')
+    const footer = screen.getByRole('region', { name: '대사 결과' }).querySelector('tfoot')!
+    expect(footer).toHaveTextContent('이 페이지 합계')
+    expect(within(footer).getAllByText('0')).toHaveLength(3)
+    expect(footer.querySelector('.reco-react-difference')).toBeNull()
+    expect(screen.getByRole('region', { name: '대상' })).toHaveTextContent('2건')
+    expect(screen.getByRole('region', { name: '일치율' })).toBeVisible()
   })
   it('단일 페이지가 전부 일치이면 존재하지 않는 다른 페이지를 안내하지 않는다', async () => {
     renderAt('/reconciliations?month=2026-07&runId=41&onlyMismatch=true', (url) =>
@@ -301,7 +305,7 @@ describe('RECO-W01·W02 React 전환', () => {
       size: '20',
       sort: 'createdAt,desc',
     })
-    expect(screen.getByText('50.0000%')).toBeVisible()
+    expect(screen.getByText('50.0%')).toBeVisible()
     expect(screen.getByText('(1,000)원')).toHaveClass('is-negative-amount')
     const pagination = within(screen.getByRole('region', { name: '실행 이력' }))
     await user.click(pagination.getByRole('button', { name: '다음 페이지' }))
@@ -415,13 +419,80 @@ describe('RECO-W01·W02 React 전환', () => {
       expect(screen.getByRole('button', { name: '불일치 예외 일괄 생성' })).toBeDisabled()
       expect(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })).toBeEnabled()
     })
-  it('대시보드 onlyMismatch는 현재 페이지에만 적용하고 전체 요약 합계를 유지한다', async () => {
+  it('불일치만은 현재 페이지 합계를 표시하고 실행 요약 카드와 범위를 구분한다', async () => {
     renderAt('/reconciliations?runId=41&onlyMismatch=true')
     expect(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })).toBeVisible()
     expect(screen.queryByRole('button', { name: '대사 결과 8 비교 보기' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('불일치만')).toBeChecked()
     expect(screen.getByText(/불일치만은 현재 서버 페이지/)).toBeVisible()
-    expect(screen.getByText(/실행 전체 합계/)).toHaveTextContent('24,000원')
+    const footer = screen.getByRole('region', { name: '대사 결과' }).querySelector('tfoot')!
+    expect(footer).toHaveTextContent('이 페이지 합계')
+    expect(within(footer).getByText('12,000')).toBeVisible()
+    expect(within(footer).getByText('11,000')).toBeVisible()
+    expect(screen.getByRole('region', { name: '대상' })).toHaveTextContent('2건')
+  })
+  it('미선택은 0 합계, 무필터 조회는 페이지 행이 아닌 서버 실행 합계를 표시한다', async () => {
+    const { user } = renderAt()
+    const table = await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
+    const footer = table.querySelector('tfoot')!
+    expect(within(footer).getAllByText('0')).toHaveLength(3)
+    expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('—원')
+    await user.click(await screen.findByRole('button', { name: '41' }))
+    await within(footer).findByText('24,000')
+    expect(within(footer).getByText('23,000')).toBeVisible()
+    expect(within(footer).getByRole('rowheader')).toHaveTextContent(/^합계$/)
+    expect(within(footer).getByRole('rowheader')).toHaveAttribute('colspan', '5')
+  })
+  it.each([
+    { amount: 500.49, rowText: '500원', totalText: '1,000' },
+    { amount: 500.5, rowText: '501원', totalText: '1,002' },
+    { amount: -500.5, rowText: '(501)원', totalText: '(1,002)' },
+  ])('결과 유형 필터는 행별 HALF_UP 표시와 합계를 일치시킨다: $amount', async ({ amount, rowText, totalText }) => {
+    renderAt('/reconciliations?runId=41&resultType=AMOUNT_DIFFERENCE', (url) =>
+      /\/41\/results/.test(url)
+        ? {
+            ...results,
+            items: {
+              ...results.items,
+              content: [
+                { ...result, expectedTotalAmount: amount },
+                { ...result, reconciliationResultId: 8, expectedTotalAmount: amount },
+              ],
+            },
+          }
+        : undefined,
+    )
+    const footer = (await screen.findByRole('region', { name: '대사 결과' })).querySelector('tfoot')!
+    expect(await within(footer).findByText(totalText)).toBeVisible()
+    const body = footer.closest('table')!.querySelector('tbody')!
+    expect(within(body).getAllByText(rowText)).toHaveLength(2)
+    expect(footer).toHaveTextContent('이 페이지 합계')
+  })
+  it('조회 실패를 초기 0 합계나 정상적인 결과 없음으로 오인시키지 않는다', async () => {
+    renderAt('/reconciliations?runId=41', (url) => {
+      if (/\/41\/results/.test(url))
+        throw new ApiError({ code: 'FGC-RECO-001', message: '조회 실패' }, 'totals-error', 400)
+    })
+    const region = await screen.findByRole('region', { name: '대사 결과' })
+    expect(await within(region).findByRole('alert')).toHaveTextContent('조회 실패')
+    expect(within(region).getByRole('status')).toHaveTextContent('대사 결과를 불러오지 못했습니다.')
+    expect(within(region.querySelector('tfoot')!).getAllByText('—')).toHaveLength(3)
+  })
+  it('요약의 일치율은 건수 기준 한 자리이며 도움말은 요청할 때 제공한다', async () => {
+    renderAt('/reconciliations?runId=41', (url) =>
+      /\/41\/results/.test(url)
+        ? {
+            ...results,
+            summary: { ...results.summary, resultCount: 3, matchedCount: 2 },
+          }
+        : undefined,
+    )
+    const rate = await screen.findByRole('region', { name: '일치율' })
+    expect(await within(rate).findByText('66.7')).toBeVisible()
+    const help = screen.getByLabelText('일치율 계산 안내')
+    expect(help.closest('details')).not.toHaveAttribute('open')
+    fireEvent.click(help)
+    expect(help.closest('details')).toHaveAttribute('open')
   })
   it('결과 유형은 API로 필터링하고 결과 페이지는 이력 페이지와 독립적이다', async () => {
     const { router, user } = renderAt('/reconciliations?month=2026-07&runId=41&page=2', (url) =>
