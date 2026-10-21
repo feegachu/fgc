@@ -190,6 +190,59 @@ describe('EXCP-W01 예외함', () => {
     expect(searchPaths()[0]).toContain('page=1')
   })
 
+  it('페이지네이션은 간결한 화살표와 5페이지 묶음으로 이동하며 검색조건을 유지한다', async () => {
+    searchResponse = (path) => ({
+      ...search([baseCase]),
+      page: Number(new URLSearchParams(path.split('?')[1]).get('page')),
+      totalPages: 12,
+      totalElements: 240,
+    })
+    const { router, actions } = renderPage(
+      '/app/exceptions?month=2026-07&validationMonth=2026-07&type=CAP_VIOLATION&status=OPEN&contractNo=C-0001&page=4&selected=11',
+    )
+    await screen.findByText('4 / 12 페이지')
+    const pagination = () => screen.getByRole('navigation', { name: '예외 목록 페이지 선택' })
+    const controls = () => within(pagination())
+    expect(controls().queryByRole('button', { name: '처음' })).toBeNull()
+    expect(controls().queryByRole('button', { name: '마지막' })).toBeNull()
+    expect(pagination().querySelector('[aria-current="page"]')).toHaveTextContent('4')
+    expect(pagination().querySelectorAll('.pagination-button')).toHaveLength(7)
+    expect(controls().getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+    await actions.click(controls().getByRole('button', { name: '다음 5페이지' }))
+    await screen.findByText('6 / 12 페이지')
+    const params = new URLSearchParams(router.state.location.search)
+    for (const [key, value] of Object.entries({
+      month: '2026-07', validationMonth: '2026-07', type: 'CAP_VIOLATION', status: 'OPEN', contractNo: 'C-0001',
+    })) expect(params.get(key)).toBe(value)
+    expect(params.has('selected')).toBe(false)
+    await actions.click(controls().getByRole('button', { name: '이전 5페이지' }))
+    await screen.findByText('5 / 12 페이지')
+    await actions.click(controls().getByRole('button', { name: '3' }))
+    await screen.findByText('3 / 12 페이지')
+    await actions.click(controls().getByRole('button', { name: '다음 5페이지' }))
+    await screen.findByText('6 / 12 페이지')
+    await actions.click(controls().getByRole('button', { name: '다음 5페이지' }))
+    await screen.findByText('11 / 12 페이지')
+    expect(controls().getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
+    expect(pagination().querySelectorAll('.pagination-button')).toHaveLength(4)
+  })
+
+  it('전체 4페이지면 양쪽 묶음 화살표가 비활성이어도 숫자 페이지는 선택할 수 있다', async () => {
+    searchResponse = (path) => ({
+      ...search([baseCase]),
+      page: Number(new URLSearchParams(path.split('?')[1]).get('page')),
+      totalPages: 4,
+      totalElements: 80,
+    })
+    const { actions } = renderPage('/app/exceptions?page=1')
+    await screen.findByText('1 / 4 페이지')
+    const controls = () => within(screen.getByRole('navigation', { name: '예외 목록 페이지 선택' }))
+    expect(controls().getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+    expect(controls().getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
+    await actions.click(controls().getByRole('button', { name: '4' }))
+    await screen.findByText('4 / 4 페이지')
+  })
+
   it('필터를 적용하면 URL 과 조회 조건이 바뀌고 초기화하면 되돌아간다', async () => {
     const { router, actions } = renderPage()
     await table()

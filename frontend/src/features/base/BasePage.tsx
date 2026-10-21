@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { int } from '../../lib/format'
 import { QueryState, ReferenceTabs } from '../reference/ReferenceUI'
 import {
@@ -320,21 +320,19 @@ export function BasePage() {
                     />
                   )}
                   {paged && (
-                    <div className="base-pagination-footer">
-                      <Pagination
-                        legacy
-                        label="기준정보 목록 페이지 선택"
-                        page={paged.page ?? page}
-                        totalPages={paged.totalPages ?? 0}
-                        onPageChange={(nextPage) =>
-                          setParams((current) => {
-                            const next = new URLSearchParams(current)
-                            next.set('page', String(nextPage))
-                            return next
-                          })
-                        }
-                      />
-                    </div>
+                    <ListPagination
+                      className="base-pagination-footer"
+                      label="기준정보 목록 페이지 선택"
+                      page={paged.page ?? page}
+                      totalPages={paged.totalPages ?? 0}
+                      onPageChange={(nextPage) =>
+                        setParams((current) => {
+                          const next = new URLSearchParams(current)
+                          next.set('page', String(nextPage))
+                          return next
+                        })
+                      }
+                    />
                   )}
                 </>
               ))

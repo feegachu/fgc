@@ -9,7 +9,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { Modal } from '../../components/Modal'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { usePermission } from '../auth/useAuth'
 import { journalAccountsQueryOptions, journalDetailQueryOptions } from '../exception/api'
@@ -173,8 +173,8 @@ export default function LedgerPage() {
             rowClassName={(row) => (String(row.journalHeaderId) === selected ? 'is-selected' : '')}
             emptyMessage={searched ? '조건에 맞는 자료가 없습니다.' : '조회 조건을 설정하고 조회 버튼을 눌러 주세요.'}
           />
-          <Pagination
-            legacy
+          <ListPagination
+            className="ledger-pagination"
             label="검증원장 목록 페이지 선택"
             page={criteria.page}
             totalPages={data?.totalPages ?? 0}

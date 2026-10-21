@@ -6,7 +6,7 @@ import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { exportCsv } from '../../lib/exportCsv'
 import { errorText, int, isNegative, won } from '../../lib/format'
@@ -233,18 +233,13 @@ export default function ScheduleListPage() {
         )}
 
         {data && !list.isError && (
-          <footer className="schedule-pagination">
-            <span className="tabular-nums">
-              {criteria.page} / {Math.max(1, totalPages)} 페이지
-            </span>
-            <Pagination
-              legacy
-              label="예상 스케줄 목록 페이지 선택"
-              page={criteria.page}
-              totalPages={totalPages}
-              onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-            />
-          </footer>
+          <ListPagination
+            className="schedule-pagination"
+            label="예상 스케줄 목록 페이지 선택"
+            page={criteria.page}
+            totalPages={totalPages}
+            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+          />
         )}
       </section>
     </div>

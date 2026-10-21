@@ -66,3 +66,36 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+footer.list-pagination {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+.list-pagination-group {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+.list-pagination-status {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.list-pagination-options {
+  margin-right: auto;
+}
+footer.list-pagination .pagination-controls {
+  width: auto;
+  justify-content: flex-end;
+}
