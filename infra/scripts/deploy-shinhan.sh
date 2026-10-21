@@ -3,6 +3,7 @@ set -Eeuo pipefail
 umask 077
 commit=${1:?Successful CI commit required}
 ci_url=${2:?CI run URL required}
+public_url=${FGC_PUBLIC_URL:?Set SHINHAN_PUBLIC_URL repository variable}
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid commit'; exit 1; }
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 state="$HOME/fgc-stg"
@@ -14,7 +15,7 @@ mkdir -p "$release/nginx" "$release/previous" "$state/backups"
 trap 'echo "Shinhan deployment failed; inspect DB/API/web state. Release: $release. DB is not automatically rolled back." >&2' ERR
 
 python3 "$root/infra/scripts/shinhan-release.py" --origin \
-    "${FGC_PUBLIC_URL:-https://xn--v42bn2m21nmmd.shinhanacademy.co.kr}" > "$release/origin.txt"
+    "$public_url" > "$release/origin.txt"
 mapfile -t public < "$release/origin.txt"
 origin=${public[0]}
 domain=${public[1]}

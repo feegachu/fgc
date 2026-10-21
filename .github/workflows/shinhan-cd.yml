@@ -13,7 +13,7 @@ on:
         type: string
 
 env:
-  SHINHAN_PUBLIC_URL: ${{ vars.SHINHAN_PUBLIC_URL || 'https://xn--v42bn2m21nmmd.shinhanacademy.co.kr' }}
+  SHINHAN_PUBLIC_URL: ${{ vars.SHINHAN_PUBLIC_URL }}
 
 permissions:
   contents: read
@@ -43,6 +43,14 @@ jobs:
         with:
           ref: develop
           persist-credentials: false
+      - name: Validate configured public URL
+        shell: bash
+        run: |
+          if [[ -z "$SHINHAN_PUBLIC_URL" ]]; then
+            echo '::error::Set repository variable SHINHAN_PUBLIC_URL to the actual assigned HTTPS origin (not the example hostname).'
+            exit 1
+          fi
+          python3 infra/scripts/shinhan-release.py --origin "$SHINHAN_PUBLIC_URL"
       - id: source
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,7 +63,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, shinhan-fgc]
     environment:
       name: shinhan-stg
-      url: ${{ vars.SHINHAN_PUBLIC_URL || 'https://xn--v42bn2m21nmmd.shinhanacademy.co.kr' }}
+      url: ${{ vars.SHINHAN_PUBLIC_URL }}
     timeout-minutes: 30
     permissions:
       contents: read

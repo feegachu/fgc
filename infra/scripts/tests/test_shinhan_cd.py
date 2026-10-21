@@ -143,7 +143,7 @@ fi
         env = os.environ | {"HOME": home.as_posix(), "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
                             "FIXTURES": fixtures.as_posix(), "DEPLOY_LOG": (base / "commands").as_posix(),
                             "BACKUP_FAILURE": str(int(backup_failure)), "API_FAILURE": str(int(api_failure)),
-                            "PYTHONUTF8": "1", "TEST_BIN": bin_dir.as_posix(), "TEST_HOME": home.as_posix()}
+                            "PYTHONUTF8": "1", "FGC_PUBLIC_URL": "https://example.com", "TEST_BIN": bin_dir.as_posix(), "TEST_HOME": home.as_posix()}
         bootstrap = 'if command -v cygpath >/dev/null; then export PATH="$(cygpath -u "$TEST_BIN"):/usr/bin:/bin"; export HOME="$(cygpath -u "$TEST_HOME")"; else export PATH="$TEST_BIN:/usr/bin:/bin"; fi; exec bash "$@"'
         result = subprocess.run([bash, "-c", bootstrap, "test", str(ROOT / "deploy-shinhan.sh"), SHA,
                                  "https://github.com/feegachu/fgc/actions/runs/123"],
