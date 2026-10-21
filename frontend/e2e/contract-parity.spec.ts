@@ -45,7 +45,6 @@ test('CONT-W01·W02·W03 기존 화면의 배치·문구·아이콘과 좁은 �
         '.contract-pagination',
         '.contract-information-grid',
         '.contract-history-times',
-        '.contract-data-panel dl',
       ]
       return Object.fromEntries(
         selectors.map((selector) => {

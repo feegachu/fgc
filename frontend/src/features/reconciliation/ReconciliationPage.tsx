@@ -11,7 +11,7 @@ import { Modal } from '../../components/Modal'
 import { Pagination } from '../../components/Pagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
-import { dateTime, int, month as formatMonth, rate as rate4 } from '../../lib/format'
+import { dateTime, int, month as formatMonth } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { useWorkspaceStore, withMonth } from '../../stores/workspace'
 import { usePermission } from '../auth/useAuth'
@@ -27,25 +27,26 @@ import {
 } from './api'
 import type { Criteria, Result, Run, RunInput, Summary } from './api'
 import { Disclosure, Failure, Money, ResultBadge } from './display'
+import { sumAmounts } from './amounts'
 import { EMPTY, PAYMENT_STAGE, RESULT_TYPE, RUN_STATUS, text } from './labels'
 import { CompareModal } from './CompareModal'
 import './reconciliation.css'
 
 const historyColumns: TableColumn<Run>[] = [
   { key: 'id', label: '실행 ID', width: '5rem', render: (row) => text(row.reconciliationRunId) },
-  { key: 'month', label: '정산월', width: '7rem', render: (row) => formatMonth(row.settlementMonth) },
+  { key: 'month', label: '정산월', width: '6rem', render: (row) => formatMonth(row.settlementMonth) },
   {
     key: 'stage',
     label: '지급단계',
-    width: '8rem',
+    width: '7rem',
     render: (row) =>
       row.paymentStageLabel || PAYMENT_STAGE[row.paymentStage as keyof typeof PAYMENT_STAGE] || text(row.paymentStage),
   },
-  { key: 'insurer', label: '보험회사', width: '9rem', render: (row) => <Disclosure value={row.insurerName} /> },
+  { key: 'insurer', label: '보험회사', width: '8rem', render: (row) => <Disclosure value={row.insurerName} /> },
   {
     key: 'status',
     label: '상태',
-    width: '7rem',
+    width: '6rem',
     render: (row) => (
       <StatusBadge
         tone={
@@ -62,83 +63,84 @@ const historyColumns: TableColumn<Run>[] = [
       </StatusBadge>
     ),
   },
-  { key: 'target', label: '대상', width: '5rem', align: 'number', render: (row) => int(row.targetCount) },
-  { key: 'matched', label: '일치', width: '5rem', align: 'number', render: (row) => int(row.matchedCount) },
-  { key: 'exception', label: '불일치', width: '5rem', align: 'number', render: (row) => int(row.exceptionCount) },
+  { key: 'target', label: '대상', width: '4.5rem', align: 'number', render: (row) => int(row.targetCount) },
+  { key: 'matched', label: '일치', width: '4.5rem', align: 'number', render: (row) => int(row.matchedCount) },
+  { key: 'exception', label: '불일치', width: '4.5rem', align: 'number', render: (row) => int(row.exceptionCount) },
   {
     key: 'rate',
     label: '일치율',
-    width: '8rem',
+    width: '5.5rem',
     align: 'number',
-    render: (row) => (row.matchRatePct == null ? EMPTY : `${rate4(row.matchRatePct)}%`),
+    render: (row) => (row.matchRatePct == null ? EMPTY : `${Number(row.matchRatePct).toFixed(1)}%`),
   },
   {
     key: 'diff',
     label: '차액 합계',
-    width: '10rem',
+    width: '7rem',
     align: 'number',
     render: (row) => <Money value={row.differenceTotal} difference />,
   },
   {
     key: 'period',
     label: '시작 · 완료',
-    width: '17rem',
+    width: '11rem',
     render: (row) => `${dateTime(row.startedAt)} · ${dateTime(row.completedAt)}`,
   },
 ]
 const resultColumns: TableColumn<Result>[] = [
-  { key: 'contract', label: '계약', width: '12rem', render: (row) => text(row.contractNo) },
-  { key: 'item', label: '수수료 항목', width: '10rem', render: (row) => <Disclosure value={row.commissionItemName} /> },
-  { key: 'installment', label: '회차', width: '4rem', render: (row) => int(row.installmentNo) },
+  { key: 'contract', label: '계약', width: '13rem', render: (row) => text(row.contractNo) },
+  { key: 'item', label: '수수료 항목', width: '8rem', render: (row) => <Disclosure value={row.commissionItemName} /> },
+  { key: 'installment', label: '회차', width: '3.5rem', render: (row) => int(row.installmentNo) },
   {
     key: 'expectedAgent',
     label: '예상 설계사',
-    width: '8rem',
+    width: '7rem',
     render: (row) => row.expectedAgent?.agentName || '예상 없음',
   },
   {
     key: 'actualAgent',
     label: '실제 설계사',
-    width: '8rem',
+    width: '7rem',
     render: (row) => row.actualAgent?.agentName || '실제 없음',
   },
   {
     key: 'expected',
     label: '예상 금액',
-    width: '10rem',
+    width: '6.5rem',
     align: 'number',
     render: (row) => <Money value={row.expectedTotalAmount} />,
   },
   {
     key: 'actual',
     label: '실제 금액',
-    width: '10rem',
+    width: '6.5rem',
     align: 'number',
     render: (row) => <Money value={row.actualTotalAmount} />,
   },
   {
     key: 'difference',
     label: '차액',
-    width: '10rem',
+    width: '6.5rem',
     align: 'number',
     render: (row) => <Money value={row.differenceAmount} difference />,
   },
   {
     key: 'type',
     label: '결과 유형',
-    width: '9rem',
+    align: 'center',
+    width: '7.5rem',
     render: (row) => <ResultBadge type={row.resultType} label={row.resultTypeLabel} />,
   },
   {
     key: 'primary',
     label: '주 원인',
-    width: '12rem',
+    width: '8.5rem',
     render: (row) => <Disclosure value={row.primaryReason?.label || row.primaryReasonCode} />,
   },
   {
     key: 'secondary',
     label: '보조 원인',
-    width: '12rem',
+    width: '6rem',
     render: (row) => (
       <Disclosure value={row.secondaryReasons?.map((reason) => reason.label || reason.code).join(', ')} />
     ),
@@ -220,7 +222,8 @@ export default function ReconciliationPage() {
     {
       key: 'detail',
       label: '상세',
-      width: '5rem',
+      width: '4rem',
+      align: 'center',
       render: (row) => (
         <Button
           variant="ghost"
@@ -238,8 +241,8 @@ export default function ReconciliationPage() {
       <header className="page-header">
         <h1 className="page-title">대사 실행 · 결과</h1>
       </header>
-      <section className="surface">
-        <header className="surface-header">
+      <section className="surface reco-react-run">
+        <header className="surface-header reco-react-panel-header">
           <h2 className="surface-title">대사 실행</h2>
         </header>
         <RunFilters
@@ -288,13 +291,20 @@ export default function ReconciliationPage() {
         </p>
       )}
       <div className="reco-react-grid">
-        <section className="surface" aria-label="대사 결과" aria-busy={!!runId && results.isFetching}>
-          <header className="surface-header">
+        <section
+          className="surface reco-react-results"
+          aria-label="대사 결과"
+          aria-busy={!!runId && results.isFetching}
+        >
+          <header className="surface-header reco-react-panel-header">
             <h2 className="surface-title">대사 결과</h2>
-          </header>
-          <div className="reco-react-result-filters">
-            <Field label="결과 유형">
+            <div className="reco-react-result-filters">
+              <label className="filter-field-label" htmlFor="reco-result-type">
+                결과 유형
+              </label>
               <select
+                id="reco-result-type"
+                className="field-control select-control"
                 value={type}
                 onChange={(e) => update({ resultType: e.target.value, resultPage: '' }, { resetPage: false })}
               >
@@ -305,18 +315,18 @@ export default function ReconciliationPage() {
                   </option>
                 ))}
               </select>
-            </Field>
-            <label>
-              <input
-                type="checkbox"
-                checked={onlyMismatch}
-                onChange={(e) =>
-                  update({ onlyMismatch: e.target.checked ? 'true' : '', resultPage: '' }, { resetPage: false })
-                }
-              />{' '}
-              불일치만
-            </label>
-          </div>
+              <label className="reco-react-checkbox">
+                <input
+                  type="checkbox"
+                  checked={onlyMismatch}
+                  onChange={(e) =>
+                    update({ onlyMismatch: e.target.checked ? 'true' : '', resultPage: '' }, { resetPage: false })
+                  }
+                />{' '}
+                불일치만
+              </label>
+            </div>
+          </header>
           {onlyMismatch && (
             <p className="reco-react-note" role="status">
               불일치만은 현재 서버 페이지에서 일치 행을 숨깁니다. 전체 불일치 건수는 실행 요약이며, 다음 페이지에도
@@ -325,43 +335,53 @@ export default function ReconciliationPage() {
           )}
           <Failure error={results.error} />
           <DataTable
+            className="reco-react-result-table"
             columns={compareColumns}
             rows={filteredRows}
             rowKey={(row) => String(row.reconciliationResultId)}
             caption="선택한 대사 실행의 계약별 결과"
             emptyMessage={
-              !runId
-                ? '대사를 실행하거나 이력을 선택하면 결과가 여기 표시됩니다.'
-                : results.isPending
-                  ? '대사 결과를 불러오는 중입니다.'
-                  : onlyMismatch && (results.data?.items?.content?.length ?? 0) > 0 && filteredRows.length === 0
-                    ? (results.data?.items?.totalPages ?? 0) > 1
-                      ? '이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.'
-                      : '이 페이지에는 불일치가 없습니다.'
-                    : '조건에 맞는 자료가 없습니다.'
+              <div className="reco-react-empty" role="status">
+                {!runId
+                  ? '대사를 실행하거나 이력을 선택하면 결과가 여기 표시됩니다.'
+                  : results.isError
+                    ? '대사 결과를 불러오지 못했습니다. 오류 안내를 확인하세요.'
+                    : results.isPending
+                      ? '대사 결과를 불러오는 중입니다.'
+                      : onlyMismatch && (results.data?.items?.content?.length ?? 0) > 0 && filteredRows.length === 0
+                        ? (results.data?.items?.totalPages ?? 0) > 1
+                          ? '이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.'
+                          : '이 페이지에는 불일치가 없습니다.'
+                        : '조건에 맞는 자료가 없습니다.'}
+              </div>
+            }
+            footer={
+              <ResultTotals
+                initial={!runId}
+                available={results.isSuccess}
+                filtered={!!type || onlyMismatch}
+                summary={results.data?.summary}
+                rows={filteredRows}
+              />
             }
           />
-          {results.data?.summary && (
-            <p className="reco-react-note">
-              실행 전체 합계 — 예상 <Money value={results.data.summary.expectedTotal} /> · 실제{' '}
-              <Money value={results.data.summary.actualTotal} /> · 차액{' '}
-              <Money value={results.data.summary.differenceTotal} difference />
-            </p>
+          {(results.data?.items?.totalPages ?? 0) > 1 && (
+            <Pagination
+              compact
+              page={resultPage}
+              totalPages={results.data?.items?.totalPages ?? 0}
+              onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
+            />
           )}
-          <Pagination
-            compact
-            page={resultPage}
-            totalPages={results.data?.items?.totalPages ?? 0}
-            onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
-          />
         </section>
-        <section className="surface" aria-label="실행 이력" aria-busy={history.isFetching}>
-          <header className="surface-header">
+        <section className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching}>
+          <header className="surface-header reco-react-panel-header">
             <h2 className="surface-title">실행 이력</h2>
-            <span>{int(history.data?.totalElements ?? 0)}건</span>
           </header>
           <Failure error={history.error} />
           <DataTable
+            className="reco-react-history-table"
+            emptyMessage={<div className="reco-react-empty">조건에 맞는 자료가 없습니다.</div>}
             columns={historyColumns}
             rows={history.data?.content ?? []}
             rowKey={(row) => String(row.reconciliationRunId)}
@@ -370,12 +390,14 @@ export default function ReconciliationPage() {
             onRowActivate={selectRun}
             rowClassName={(row) => (String(row.reconciliationRunId) === runId ? 'is-selected' : '')}
           />
-          <Pagination
-            compact
-            page={criteria.page}
-            totalPages={history.data?.totalPages ?? 0}
-            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-          />
+          {(history.data?.totalPages ?? 0) > 1 && (
+            <Pagination
+              compact
+              page={criteria.page}
+              totalPages={history.data?.totalPages ?? 0}
+              onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+            />
+          )}
         </section>
       </div>
       {resultId && (
@@ -424,10 +446,16 @@ function RunFilters({
     <>
       <FilterBar
         className="reco-react-filters"
-        icons
+        showSubmit={false}
         onSubmit={() => submit('search')}
         actions={
           <>
+            <Button type="submit" variant="secondary">
+              <span className="material-symbols-rounded" aria-hidden="true">
+                search
+              </span>
+              조회
+            </Button>
             <Button
               loading={pending}
               disabled={
@@ -440,19 +468,40 @@ function RunFilters({
               }
               onClick={() => submit('run')}
             >
+              {!pending && (
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  play_arrow
+                </span>
+              )}
               대사 실행
             </Button>
             <Button variant="secondary" disabled={bulkDisabled} onClick={onBulk}>
+              <span className="material-symbols-rounded" aria-hidden="true">
+                playlist_add
+              </span>
               불일치 예외 일괄 생성
             </Button>
           </>
         }
       >
-        <Field label="정산월" required>
+        <Field label="정산월" variant="filter" required>
           <input type="month" value={fields.month} onChange={(e) => setFields({ ...fields, month: e.target.value })} />
         </Field>
-        <Field label="지급단계">
-          <select value={fields.stage} onChange={(e) => setFields({ ...fields, stage: e.target.value })}>
+        <Field
+          label="지급단계"
+          variant="filter"
+          labelAccessory={
+            <span className="field-required" aria-hidden="true">
+              {' '}
+              *
+            </span>
+          }
+        >
+          <select
+            className="select-control"
+            value={fields.stage}
+            onChange={(e) => setFields({ ...fields, stage: e.target.value })}
+          >
             <option value="">전체</option>
             {Object.entries(PAYMENT_STAGE).map(([code, label]) => (
               <option key={code} value={code}>
@@ -461,8 +510,9 @@ function RunFilters({
             ))}
           </select>
         </Field>
-        <Field label="보험회사">
+        <Field label="보험회사" variant="filter">
           <select
+            className="select-control"
             value={fields.insurer}
             disabled={insurers.isPending || pending}
             onChange={(e) => setFields({ ...fields, insurer: e.target.value })}
@@ -511,27 +561,79 @@ function RunFilters({
   )
 }
 function RunSummary({ summary }: { summary?: Summary }) {
-  const matchRate = summary?.resultCount ? rate4(((summary.matchedCount ?? 0) / summary.resultCount) * 100) : EMPTY
+  const matchRate = summary?.resultCount
+    ? (((summary.matchedCount ?? 0) / summary.resultCount) * 100).toFixed(1)
+    : EMPTY
   return (
-    <section aria-label="실행 요약">
+    <section className="reco-react-summary" aria-label="실행 요약">
       <h2 className="surface-title">실행 요약</h2>
       <div className="reco-react-kpis">
         <KpiCard label="대상" value={summary ? int(summary.resultCount) : EMPTY} unit="건" />
         <KpiCard label="일치" value={summary ? int(summary.matchedCount) : EMPTY} unit="건" tone="success" />
         <KpiCard label="불일치" value={summary ? int(summary.exceptionCount) : EMPTY} unit="건" tone="error" />
-        <KpiCard
-          label="일치율 (건수 기준)"
-          footer="대상·일치 건수로 계산합니다. 이력은 서버 반올림 값이므로 표시가 다를 수 있습니다."
-          value={matchRate}
-          unit="%"
-          tone={summary && summary.resultCount === summary.matchedCount ? 'success' : 'warning'}
-        />
+        <div className="reco-react-rate">
+          <KpiCard
+            label="일치율"
+            value={matchRate}
+            unit="%"
+            tone={summary && summary.resultCount === summary.matchedCount ? 'success' : 'warning'}
+          />
+          <details className="reco-react-rate-help">
+            <summary aria-label="일치율 계산 안내">
+              <span className="material-symbols-rounded" aria-hidden="true">
+                info
+              </span>
+            </summary>
+            <p>
+              일치 건수 ÷ 대상 건수 × 100을 소수점 한 자리로 표시합니다. 이력은 서버 반올림 값이므로 차이가 있을 수
+              있습니다.
+            </p>
+          </details>
+        </div>
         <KpiCard
           label="차액 합계"
-          value={summary ? <Money value={summary.differenceTotal} difference /> : EMPTY}
+          value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
+          unit="원"
           tone={summary?.differenceTotal === 0 ? 'success' : 'error'}
         />
       </div>
     </section>
+  )
+}
+
+function ResultTotals({
+  initial,
+  available,
+  filtered,
+  summary,
+  rows,
+}: {
+  initial: boolean
+  available: boolean
+  filtered: boolean
+  summary?: Summary
+  rows: Result[]
+}) {
+  const total = (
+    field: 'expectedTotalAmount' | 'actualTotalAmount' | 'differenceAmount',
+    summaryField: 'expectedTotal' | 'actualTotal' | 'differenceTotal',
+  ) =>
+    initial ? 0 : !available ? null : filtered ? sumAmounts(rows.map((row) => row[field])) : summary?.[summaryField]
+  return (
+    <tr>
+      <th scope="row" colSpan={5}>
+        {filtered ? '이 페이지 합계' : '합계'}
+      </th>
+      <td className="is-number tabular-nums">
+        <Money value={total('expectedTotalAmount', 'expectedTotal')} unit={false} />
+      </td>
+      <td className="is-number tabular-nums">
+        <Money value={total('actualTotalAmount', 'actualTotal')} unit={false} />
+      </td>
+      <td className="is-number tabular-nums">
+        <Money value={total('differenceAmount', 'differenceTotal')} difference unit={false} />
+      </td>
+      <td colSpan={4} />
+    </tr>
   )
 }

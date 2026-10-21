@@ -14,6 +14,7 @@ import { Disclosure } from './Disclosure'
 import { ALL_STATUS, exceptionOptionsQueryOptions, exceptionSearchQueryOptions, OPEN_STATUS } from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
 import { severityTone, statusOptions, statusTone, typeTone } from './rules'
+import { exceptionSummaryDescription } from './labels'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
 const cardTone = (type: string) => {
@@ -176,7 +177,7 @@ export function ExceptionPage() {
               <span className="kpi-unit">건</span>
             </div>
             <div className="kpi-card-footer">
-              <span className="kpi-comparison tabular-nums">{summary.type}</span>
+              <span className="kpi-comparison">{exceptionSummaryDescription(summary.type)}</span>
             </div>
           </Link>
         ))}

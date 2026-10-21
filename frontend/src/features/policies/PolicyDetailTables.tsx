@@ -6,6 +6,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { date, int, isNegative, rate, won } from '../../lib/format'
 import type { PolicyDetail } from './api'
+import { policyAgentRankLabel } from './labels'
 export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['commissionRules']> }) {
   if (!rows.length)
     return (
@@ -35,7 +36,7 @@ export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['comm
           cellClassName: 'policy-disclosure-cell',
           render: (r) => <ReferenceText value={r.productName ?? '전체'} limit={28} />,
         },
-        { key: 'rank', label: '직급', render: (r) => present(r.agentRankCode) },
+        { key: 'rank', label: '직급', render: (r) => policyAgentRankLabel(r.agentRankCode, r.paymentStage) },
         {
           key: 'item',
           label: '수수료 항목',
