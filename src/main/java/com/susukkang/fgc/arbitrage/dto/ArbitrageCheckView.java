@@ -40,6 +40,9 @@ public class ArbitrageCheckView {
     private BigDecimal includedSurrenderValueAmount; // 계산에 포함된 해약환급금
     private BigDecimal netDifferenceAmount; // 수수료·환급금 합계와 보험료의 차액
 
+    private BigDecimal projectedExcessAmount; // 지급예정 포함 초과액: 사전 모니터링 전용
+    private String candidateType; // CURRENT_EXCESS / PROJECTED_EXCESS / NONE
+
     private Boolean refundAdditionAppliedYn; // 환급금 가산 여부
     private SurrenderValueSourceType surrenderValueSourceType; // 환급금 출처
 

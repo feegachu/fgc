@@ -75,13 +75,13 @@ class ArbitrageServiceTest {
     }
 
     /**
-     * 설명 : 현재는 미초과지만 남은 지급예정액을 포함하면 후보로 판정하는지 검증한다.
+     * 설명 : 지급예정 포함 초과만 있으면 CLEAR와 모니터링 근거를 남기고 예외를 만들지 않는다.
      *
      * @author hjKang
      * @since 2026-08-12
      */
     @Test
-    void marksProjectedExcessAsCandidate() {
+    void keepsProjectedOnlyExcessClearWithoutCreatingException() {
         LocalDate asOfDate = LocalDate.of(2026, 7, 31);
         ArbitrageCalculationSource source = calculationSource(
                 new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
@@ -89,7 +89,7 @@ class ArbitrageServiceTest {
         given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
         given(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC)).willReturn(new BigDecimal("400000"));
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(new BigDecimal("400000"));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
         given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -108,11 +108,12 @@ class ArbitrageServiceTest {
 
         assertThat(response.getArbitrageCheckId()).isEqualTo(200L);
         assertThat(response.getValidationRunId()).isEqualTo(100L);
-        assertThat(response.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CANDIDATE);
-        verify(arbitrageCheckRepository).insertArbitrageCheck(any());
-        verify(exceptionCaseRepository).insertArbitrageCandidate(
-                100L, 10L, 200L, "GA_TO_FC",
-                "지급예정 수수료를 포함하면 누적 납입보험료를 초과합니다.");
+        assertThat(response.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CLEAR);
+        verifyNoInteractions(exceptionCaseRepository);
+        var captor = org.mockito.ArgumentCaptor.forClass(com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO.class);
+        verify(arbitrageCheckRepository).insertArbitrageCheck(captor.capture());
+        assertThat(captor.getValue().getNetDifferenceAmount()).isEqualByComparingTo("0");
+        assertThat(captor.getValue().getCalculationSnapshot()).contains("PROJECTED_EXCESS", "100000");
     }
 
     /**
@@ -130,7 +131,7 @@ class ArbitrageServiceTest {
         given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
         given(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC)).willReturn(new BigDecimal("400000"));
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(new BigDecimal("400000"));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
         given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -200,7 +201,7 @@ class ArbitrageServiceTest {
         given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
                 10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("0", "0"));
         given(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC)).willReturn(BigDecimal.ZERO);
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(BigDecimal.ZERO);
         given(validationRunCreateService.create(any())).willReturn(validationRun(101L));
         given(validationRunRepository.transitionToRunning(101L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(101L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -351,6 +352,19 @@ class ArbitrageServiceTest {
                 "GA_TO_FC", "차익거래 검증 자료 확인 필요", reason);
     }
 
+    @Test
+    void savesCurrentExcessAndCreatesCandidateWhileKeepingProjectionSeparate() throws Exception {
+        var result = checkExisting(calculationSource(new BigDecimal("1000000"),12,false,BigDecimal.ZERO),
+                "1100000", "400000");
+        assertThat(result.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CANDIDATE);
+        assertThat(result.getNetDifferenceAmount()).isEqualByComparingTo("100000");
+        var snapshot = new ObjectMapper().readTree(result.getCalculationSnapshot());
+        assertThat(snapshot.get("currentExcessAmount").decimalValue()).isEqualByComparingTo("100000");
+        assertThat(snapshot.get("projectedExcessAmount").decimalValue()).isEqualByComparingTo("500000");
+        verify(exceptionCaseRepository).insertArbitrageCandidate(100L,10L,200L,"GA_TO_FC",
+                "현재 확정 수수료와 해약환급금이 누적 납입보험료를 초과합니다.");
+    }
+
     private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(ArbitrageCalculationSource source, String paid, String planned) {
         return checkExisting(source, paid, planned, LocalDate.of(2026, 7, 31));
     }
@@ -359,7 +373,7 @@ class ArbitrageServiceTest {
             ArbitrageCalculationSource source, String paid, String planned, LocalDate date) {
         given(arbitrageCheckRepository.selectCalculationSource(10L, date)).willReturn(source);
         given(arbitrageCheckRepository.sumConfirmedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(confirmed(paid, "0"));
-        given(arbitrageCheckRepository.sumPlannedCommissionAmount(10L, PaymentStage.GA_TO_FC)).willReturn(new BigDecimal(planned));
+        given(arbitrageCheckRepository.sumPlannedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(new BigDecimal(planned));
         given(arbitrageCheckRepository.insertArbitrageCheck(any())).willAnswer(invocation -> {
             invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0).setArbitrageCheckId(200L);
             return 1;

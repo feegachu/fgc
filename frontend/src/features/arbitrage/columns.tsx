@@ -34,7 +34,14 @@ export const columns: TableColumn<ArbitrageRow>[] = [
     label: '지급예정액',
     width: '8rem',
     align: 'number',
-    render: (r) => <ArbitrageAmount value={r.plannedCommissionAmount} />,
+    render: (r) => (
+      <>
+        <ArbitrageAmount value={r.plannedCommissionAmount} />
+        {Number(r.projectedExcessAmount) > 0 && (
+          <div>지급예정 포함 시 초과 (모니터링): <ArbitrageAmount value={r.projectedExcessAmount} /></div>
+        )}
+      </>
+    ),
   },
   {
     key: 'refund',

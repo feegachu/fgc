@@ -40,7 +40,9 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             ac.refund_addition_applied_yn,
             ac.surrender_value_source_type,
             ac.result_status,
-            ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
+            ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
+            CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
+            ac.calculation_snapshot ->> 'candidateType' AS candidate_type
             FROM
             (SELECT DISTINCT ON (contract_id, payment_stage, as_of_date) *
             FROM fgc.arbitrage_check
@@ -199,6 +201,22 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             sh.schedule_purpose = 'OPERATIONAL'
             AND
             sl.line_status = 'PLANNED'
+            AND NOT EXISTS (
+                SELECT 1 FROM fgc.contract_status_event e
+                WHERE e.contract_id = sh.contract_id
+                  AND e.new_status IN ('TERMINATED', 'LAPSED', 'MATURED', 'CANCELLED')
+                  AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                  AND sl.due_date > (e.effective_at AT TIME ZONE 'Asia/Seoul')::date
+                  AND NOT EXISTS (
+                      SELECT 1 FROM fgc.contract_status_event resumed
+                       WHERE resumed.contract_id = e.contract_id
+                         AND resumed.new_status IN ('ACTIVE', 'REVIVED')
+                         AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                         AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= sl.due_date
+                         AND (resumed.effective_at, resumed.event_seq, resumed.contract_status_event_id)
+                             > (e.effective_at, e.event_seq, e.contract_status_event_id)
+                  )
+            )
             """;
 
     // 공용 정책 엔티티를 재사용하는 일반 조인은 JPQL로 처리한다.
@@ -288,7 +306,9 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             ac.refund_addition_applied_yn,
             ac.surrender_value_source_type,
             ac.result_status,
-            ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
+            ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
+            CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
+            ac.calculation_snapshot ->> 'candidateType' AS candidate_type
             FROM
             (SELECT DISTINCT ON (contract_id, payment_stage, as_of_date) *
             FROM fgc.arbitrage_check
@@ -374,9 +394,10 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
     }
 
     @Override
-    public BigDecimal sumPlannedCommissionAmount(Long contractId, PaymentStage paymentStage) {
+    public BigDecimal sumPlannedCommissionAmount(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
         return (BigDecimal) query(SUM_PLANNED_COMMISSION_AMOUNT).setParameter(CONTRACT_ID, contractId, Long.class)
-                .setParameter(PAYMENT_STAGE, paymentStage.name(), String.class).getSingleResult();
+                .setParameter(PAYMENT_STAGE, paymentStage.name(), String.class)
+                .setParameter(AS_OF_DATE, asOfDate, LocalDate.class).getSingleResult();
     }
 
     @Override
@@ -440,6 +461,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         result.setSurrenderValueSourceType(row[12] == null ? null : SurrenderValueSourceType.valueOf((String) row[12]));
         result.setResultStatus(row[13] == null ? null : ArbitrageCheckStatus.valueOf((String) row[13]));
         result.setDecisionReason((String) row[14]);
+        result.setProjectedExcessAmount((BigDecimal) row[15]);
+        result.setCandidateType((String) row[16]);
         return result;
     }
 

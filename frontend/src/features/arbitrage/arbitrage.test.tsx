@@ -289,7 +289,7 @@ it('negative money uses common brackets/red and displays stored excess independe
   await screen.findByRole('img', { name: '기준일별 초과액 추이' })
   for (const amount of screen.getAllByText('(987)원')) expect(amount).toHaveClass('is-negative-amount')
   const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector('.arb-calculation')!
-  expect(stored).toHaveTextContent('초과액 (서버 저장값): (987)원')
+  expect(stored).toHaveTextContent('지급분 기준 초과액: (987)원')
 })
 
 it('timeline cache separates contract IDs even when contract number/stage match', async () => {
@@ -320,4 +320,14 @@ it('pagination shows at most five numbers and moves between page groups', async 
   await waitFor(() => expect(router.state.location.search).toContain('page=5'))
   expect(router.state.location.search).toContain('month=2026-07')
   expect(router.state.location.search).toContain('contractNo=ARB')
+})
+
+it('keeps projected-only excess separate from the CLEAR result in list and detail', async () => {
+  const projected = { ...row, resultStatus: 'CLEAR' as const, resultStatusLabel: '이상없음',
+    netDifferenceAmount: 0, projectedExcessAmount: 100000, candidateType: 'PROJECTED_EXCESS' }
+  mount(undefined, true, (path) => path.includes('/insurers') ? fixtures(path) : result([projected], 1, 1))
+  await screen.findByText('서버 판정 근거')
+  expect(screen.getByText(/지급예정 포함 시 초과 \(모니터링\)/)).toBeVisible()
+  expect(screen.getAllByText('이상없음').length).toBeGreaterThan(0)
+  expect(screen.getByText(/지급예정 포함 초과액 \(모니터링\)/)).toBeVisible()
 })

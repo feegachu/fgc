@@ -34,7 +34,8 @@ public interface ArbitrageCheckQueries {
     // 계약의 활성 운영 스케줄에 남은 지급예정 수수료를 조회한다
     BigDecimal sumPlannedCommissionAmount(
             Long contractId,
-            PaymentStage paymentStage);
+            PaymentStage paymentStage,
+            LocalDate asOfDate);
 
     // 계약 상품과 계약차월에 적용 가능한 예상 환급률표 후보를 조회한다
     List<ArbitrageRefundRateCandidate> selectRefundRateCandidates(
