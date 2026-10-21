@@ -21,9 +21,11 @@ import { useWorkspaceStore, withMonth } from '../../stores/workspace'
 import {
   correctionTarget,
   criteriaFromParams,
+  effectiveCriteria,
   FILTER_KEYS,
   imbalanceQuery,
   journalSearchQuery,
+  monthRange,
   positiveId,
   requestCorrection,
   reverseJournal,
@@ -118,19 +120,20 @@ const lineColumns: TableColumn<JournalLine>[] = [
   { key: 'memo', label: '적요', width: '16rem', render: (row) => disclose(row.memo) },
 ]
 
-/** LEDG-W01: searched=true 목록 계약과 selected 독립 딥링크를 유지한다. */
+/** LEDG-W01: 진입하면 기준 정산월 목록을 바로 조회하고, 조회 버튼(searched=true)의 조건은 그대로 따른다. selected 딥링크를 유지한다. */
 export default function LedgerPage() {
   const { params, update, reset } = useSearchParamsState(FILTER_KEYS)
   const month = useWorkspaceStore((state) => state.month)
   const criteria = criteriaFromParams(params)
   const searched = params.get('searched') === 'true'
   const selected = positiveId(params.get('selected'))
-  const list = useQuery(journalSearchQuery(criteria, searched))
+  const searchCriteria = effectiveCriteria(criteria, searched, month)
+  const list = useQuery(journalSearchQuery(searchCriteria, searched || !!searchCriteria.from || !!searchCriteria.to))
   const detail = useQuery({ ...journalDetailQueryOptions(selected), enabled: !!selected })
   const imbalance = useQuery(imbalanceQuery(detail.data?.validationRunId))
   const canReverse = usePermission('canReverseJournal')
   const [action, setAction] = useState<'reverse' | 'correction' | null>(null)
-  const data = searched ? list.data : undefined
+  const data = list.data
   const eligible =
     detail.data?.status === 'POSTED' && detail.data.journalType !== 'REVERSAL' && !detail.data.reversedByJournalHeaderId
   const select = (row: Journal) =>
@@ -157,13 +160,13 @@ export default function LedgerPage() {
         onReset={reset}
       />
       <div className="ledger-react-grid">
-        <section className="surface" aria-busy={searched && list.isFetching}>
+        <section className="surface" aria-busy={list.isFetching}>
           <header className="surface-header">
             <h2 className="surface-title">분개 목록</h2>
             <span>{int(data?.totalElements ?? 0)}건 · 한 화면 20행</span>
           </header>
-          <Failure error={searched ? list.error : null} />
-          {searched && list.isPending && <p role="status">분개 목록을 불러오는 중입니다.</p>}
+          <Failure error={list.error} />
+          {list.isPending && list.fetchStatus !== 'idle' && <p role="status">분개 목록을 불러오는 중입니다.</p>}
           <DataTable
             columns={columns}
             rows={data?.content ?? []}
@@ -172,7 +175,7 @@ export default function LedgerPage() {
             onRowClick={select}
             onRowActivate={select}
             rowClassName={(row) => (String(row.journalHeaderId) === selected ? 'is-selected' : '')}
-            emptyMessage={searched ? '조건에 맞는 자료가 없습니다.' : '조회 조건을 설정하고 조회 버튼을 눌러 주세요.'}
+            emptyMessage="조건에 맞는 자료가 없습니다."
           />
           <ListPagination
             className="ledger-pagination"
@@ -280,11 +283,11 @@ function LedgerFilters({
     contract: criteria.contract,
     status: criteria.status,
   }
-  const lastDay = month ? new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate() : 0
+  const range = monthRange(month)
   const [fields, setFields] = useState({
     ...initial,
-    from: initial.from || (month ? `${month}-01` : ''),
-    to: initial.to || (month ? `${month}-${lastDay}` : ''),
+    from: initial.from || range.from,
+    to: initial.to || range.to,
   })
   const accounts = useQuery(journalAccountsQueryOptions())
   const field = (key: keyof typeof fields, label: string, options?: Record<string, string>, type = 'text') => (

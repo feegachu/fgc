@@ -11,7 +11,7 @@ import { ApiError } from '../../lib/api/errors'
 import { useAuthStore } from '../../stores/auth'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { useToastStore } from '../../stores/toasts'
-import { correctionTarget, criteriaFromParams } from './api'
+import { correctionTarget, criteriaFromParams, effectiveCriteria, monthRange } from './api'
 import type { JournalDetail } from './api'
 
 const original: JournalDetail = {
@@ -134,12 +134,36 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.click(screen.getByRole('button', { name: '조회' }))
     await waitFor(() => expect(calls.some((call) => call.url.includes('account=LEGACY_UNKNOWN'))).toBe(true))
   })
-  it('명시적인 조회 전에는 목록 API를 호출하지 않는다', async () => {
-    renderAt()
-    expect(await screen.findByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).toBeVisible()
-    expect(calls.some((call) => call.url.startsWith('/api/v1/journals?'))).toBe(false)
+  it('진입하면 조회 버튼 없이 기준 정산월 범위로 목록을 바로 조회한다', async () => {
+    const { router } = renderAt()
+    expect(await screen.findByRole('button', { name: 'JRN-001' })).toBeVisible()
+    const query = new URLSearchParams(calls.find((call) => call.url.startsWith('/api/v1/journals?'))!.url.split('?')[1])
+    expect(Object.fromEntries(query)).toMatchObject({ from: '2026-07-01', to: '2026-07-31', page: '1' })
+    expect(router.state.location.search).not.toContain('searched')
     expect(screen.getByLabelText('분개일 (시작)')).toHaveValue('2026-07-01')
     expect(screen.getByLabelText('분개일 (끝)')).toHaveValue('2026-07-31')
+    expect(screen.queryByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).not.toBeInTheDocument()
+  })
+  it('기준 월에 자료가 없으면 빈 목록 안내를 표시한다', async () => {
+    renderAt('/journals', (url) =>
+      url.startsWith('/api/v1/journals?')
+        ? { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0, sort: 'journalDate,desc' }
+        : undefined,
+    )
+    expect(await screen.findByText('조건에 맞는 자료가 없습니다.')).toBeVisible()
+  })
+  it('조회 버튼으로 날짜를 비우면 기간 제한 없이 조회한다', async () => {
+    const { user } = renderAt()
+    await screen.findByRole('button', { name: 'JRN-001' })
+    fireEvent.change(screen.getByLabelText('분개일 (시작)'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('분개일 (끝)'), { target: { value: '' } })
+    await user.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => {
+      const last = calls.filter((call) => call.url.startsWith('/api/v1/journals?')).at(-1)!
+      const query = new URLSearchParams(last.url.split('?')[1])
+      expect(query.has('from')).toBe(false)
+      expect(query.has('to')).toBe(false)
+    })
   })
   it('기간·유형·계정·계약·상태 조회조건과 1-base 페이징을 URL/API에 유지한다', async () => {
     const { router, user } = renderAt()
@@ -151,7 +175,9 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.selectOptions(screen.getByLabelText('상태'), 'POSTED')
     await user.click(screen.getByRole('button', { name: '조회' }))
     expect(await screen.findByRole('button', { name: 'JRN-001' })).toBeVisible()
-    const query = new URLSearchParams(calls.find((call) => call.url.startsWith('/api/v1/journals?'))!.url.split('?')[1])
+    await waitFor(() => expect(calls.some((call) => call.url.includes('account=COMMISSION_EXPENSE'))).toBe(true))
+    const last = calls.filter((call) => call.url.startsWith('/api/v1/journals?')).at(-1)!
+    const query = new URLSearchParams(last.url.split('?')[1])
     expect(Object.fromEntries(query)).toMatchObject({
       from: '2026-07-02',
       to: '2026-07-31',
@@ -167,13 +193,13 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.click(screen.getByRole('button', { name: '2' }))
     await waitFor(() => expect(calls.some((call) => call.url.includes('page=2'))).toBe(true))
   })
-  it('selected 딥링크는 searched 없이 상세와 검증 실행별 불균형을 조회한다', async () => {
+  it('selected 딥링크는 기준 월 목록과 함께 상세와 검증 실행별 불균형을 조회한다', async () => {
     renderAt('/journals?selected=11', (url) =>
       url.startsWith('/api/v1/journals/imbalances') ? { totalCount: 2, content: [] } : undefined,
     )
     expect(await screen.findByText('이 검증 실행에 차변·대변이 맞지 않는 분개가 2건 있습니다.')).toBeVisible()
     expect(screen.getByRole('table', { name: '선택한 분개의 차변·대변 상세행' })).toBeVisible()
-    expect(calls.some((call) => call.url.startsWith('/api/v1/journals?'))).toBe(false)
+    expect(calls.some((call) => call.url.startsWith('/api/v1/journals?'))).toBe(true)
   })
   it('행 선택은 URL에 selected를 저장하고 상세를 표시한다', async () => {
     const { router, user } = renderAt('/journals?searched=true')
@@ -247,11 +273,28 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
     expect(screen.queryByText(/sensitive backend/)).not.toBeInTheDocument()
   })
-  it('불균형 필터 미지원 안내·초기화 후 검색 대기를 유지한다', async () => {
-    const { user } = renderAt('/journals?searched=true&imbalanceOnly=true')
+  it('불균형 필터 미지원 안내를 표시하고 초기화하면 기준 월 기본 조건으로 돌아간다', async () => {
+    const { router, user } = renderAt('/journals?searched=true&imbalanceOnly=true&from=2026-06-01&to=2026-06-30')
     expect(await screen.findByText(/불균형만 조회하는 목록 필터는 지원하지/)).toBeVisible()
     await user.click(screen.getByRole('button', { name: '초기화' }))
-    expect(await screen.findByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).toBeVisible()
+    await waitFor(() => {
+      const last = calls.filter((call) => call.url.startsWith('/api/v1/journals?')).at(-1)!
+      expect(new URLSearchParams(last.url.split('?')[1]).get('from')).toBe('2026-07-01')
+    })
+    expect(router.state.location.search).not.toContain('searched')
+    expect(screen.getByLabelText('분개일 (시작)')).toHaveValue('2026-07-01')
+  })
+  it('monthRange·effectiveCriteria: 조회 전 빈 날짜만 기준 월로 채운다', () => {
+    expect(monthRange('2026-02')).toEqual({ from: '2026-02-01', to: '2026-02-28' })
+    expect(monthRange('2028-02')).toEqual({ from: '2028-02-01', to: '2028-02-29' })
+    expect(monthRange(null)).toEqual({ from: '', to: '' })
+    const empty = criteriaFromParams(new URLSearchParams())
+    expect(effectiveCriteria(empty, false, '2026-07')).toMatchObject({ from: '2026-07-01', to: '2026-07-31' })
+    expect(effectiveCriteria(empty, true, '2026-07')).toMatchObject({ from: '', to: '' })
+    expect(effectiveCriteria({ ...empty, from: '2026-06-10' }, false, '2026-07')).toMatchObject({
+      from: '2026-06-10',
+      to: '',
+    })
   })
   it('날짜·enum·id 보정과 정정 요청 외부 이동 방지', () => {
     expect(
