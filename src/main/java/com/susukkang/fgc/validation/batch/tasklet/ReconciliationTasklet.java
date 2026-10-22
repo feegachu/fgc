@@ -6,6 +6,7 @@ import com.susukkang.fgc.validation.batch.contract.ReconciliationBatchPort;
 import com.susukkang.fgc.validation.batch.contract.ValidationJobContext;
 import com.susukkang.fgc.validation.batch.contract.ValidationStepContext;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
+import com.susukkang.fgc.validation.service.ReconciliationSkipService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
@@ -23,6 +24,7 @@ import org.springframework.batch.repeat.RepeatStatus;
 public class ReconciliationTasklet implements Tasklet {
 
     private final ReconciliationBatchPort reconciliationBatchPort;
+    private final ReconciliationSkipService reconciliationSkipService;
 
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
@@ -42,6 +44,7 @@ public class ReconciliationTasklet implements Tasklet {
         ValidationStepContext stepContext = new ValidationStepContext(validationRunId, jobContext);
         for (PaymentStage paymentStage : PaymentStage.values()) {
             var result = reconciliationBatchPort.reconcile(stepContext, paymentStage);
+            reconciliationSkipService.record(stepContext, paymentStage, result.skips());
             contribution.incrementWriteCount(result.processedCount());
             for (long skipped = 0; skipped < result.skippedCount(); skipped++) {
                 contribution.incrementProcessSkipCount();

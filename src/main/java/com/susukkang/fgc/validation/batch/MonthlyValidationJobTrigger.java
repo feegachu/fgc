@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.validation.repository.MonthlyJobExecutionLookup;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class MonthlyValidationJobTrigger {
     private final Job monthlyValidationJob;
     private final JobLauncher jobLauncher;
     private final ValidationRunRepository validationRunRepository;
+    private final MonthlyJobExecutionLookup monthlyJobExecutionLookup;
 
     private static ThreadPoolTaskExecutor createExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -69,7 +71,7 @@ public class MonthlyValidationJobTrigger {
                 .addLong("runNo", run.getRunNo().longValue())
                 .addString("runType", run.getRunType())
                 .addLong("triggeredBy", run.getTriggeredBy())
-                .addString("requestId", requestId)
+                .addString("requestId", requestId, false)
                 .toJobParameters();
 
         Long validationRunId = run.getValidationRunId();
@@ -77,7 +79,7 @@ public class MonthlyValidationJobTrigger {
         // whenComplete는 exceptionally와 달리 예외를 다른 값으로 바꿔치기하지 않는다 — 로그만
         // 남기고, 반환된 CompletableFuture는 실패 상태를 그대로 유지해 호출자가 원하면 알 수 있다.
         return CompletableFuture
-                .supplyAsync(() -> runOrWrap(validationRunId, jobParameters), taskExecutor)
+                .supplyAsync(() -> runOrWrap(run, jobParameters), taskExecutor)
                 .whenComplete((jobExecution, ex) -> {
                     if (ex != null) {
                         log.error("MonthlyValidationJob 실행 요청 실패 (validationRunId={}, requestId={})",
@@ -86,7 +88,8 @@ public class MonthlyValidationJobTrigger {
                 });
     }
 
-    private JobExecution runOrWrap(Long validationRunId, JobParameters jobParameters) {
+    private JobExecution runOrWrap(ValidationRunRow run, JobParameters jobParameters) {
+        Long validationRunId = run.getValidationRunId();
         // 단일 스레드 executor 안에서 상태를 재확인한다 — API guard(CREATED)와 이 재확인
         // 사이에 끼어든 중복 클릭은 여기서 걸러져 배치 메타에 쓰레기 FAILED 실행을 남기지 않는다.
         // 의도된 절충: 거의 동시의 두 요청이 둘 다 202를 받을 수 있고, 진 쪽은 여기서 예외로
@@ -94,11 +97,24 @@ public class MonthlyValidationJobTrigger {
         // IF-API-49 폴링이 보여주므로 사용자 관점의 결과는 동일하다(§3-2 VRUN-005 비고 참조).
         // 원자적 클레임(조건부 UPDATE)은 배치 리스너의 transitionToRunning이 최종 방어한다.
         Optional<ValidationRun> fresh = validationRunRepository.findById(validationRunId);
-        if (fresh.isEmpty() || fresh.get().getStatus() != ValidationRunStatus.CREATED) {
+        ValidationRunStatus expected = ValidationRunStatus.valueOf(run.getStatus());
+        if ((expected != ValidationRunStatus.CREATED && expected != ValidationRunStatus.FAILED)
+                || fresh.isEmpty() || fresh.get().getStatus() != expected) {
             throw new IllegalStateException("validation_run " + validationRunId + " 은 이미 기동됨(status="
                     + (fresh.isEmpty() ? "삭제됨" : fresh.get().getStatus()) + ") — 중복 실행 요청을 무시합니다.");
         }
         try {
+            if (expected == ValidationRunStatus.FAILED) {
+                JobExecution previous = monthlyJobExecutionLookup.findFailedExecution(run);
+                Long previousRunId = ValidationRunBatchContext.getValidationRunId(previous.getExecutionContext());
+                if (!validationRunId.equals(previousRunId)) {
+                    throw new IllegalStateException("재시작 실행과 저장된 체크포인트의 검증 ID가 다릅니다.");
+                }
+                jobParameters = new JobParametersBuilder(previous.getJobParameters())
+                        .addLong("restartValidationRunId", validationRunId, false)
+                        .addString("restartRequestId", jobParameters.getString("requestId"), false)
+                        .toJobParameters();
+            }
             return jobLauncher.run(monthlyValidationJob, jobParameters);
         } catch (Exception e) {
             // JobLauncher.run()의 checked 예외 4종을 supplyAsync의 Supplier는 못 던지므로

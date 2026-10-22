@@ -56,7 +56,7 @@ public record MonthlyValidationJobParameters(
 
         // requestId: 2-5절 헤더(X-Request-Id)와 같은 값을 배치에도 남겨서, 사람이 호출한
         // API 요청과 그 뒤에 돈 배치 실행을 하나의 요청 흐름으로 추적할 수 있게함
-        String requestId = jobParameters.getString("requestId");
+        String requestId = jobParameters.getString("restartRequestId", jobParameters.getString("requestId"));
         if (requestId == null || requestId.isBlank()) {
             throw new IllegalArgumentException("requestId는 필수입니다.");
         }

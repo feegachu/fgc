@@ -184,6 +184,16 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                              @Param("created") ValidationRunStatus created,
                              @Param("running") ValidationRunStatus running);
 
+    /** 재시작은 실패 단계·기존 시작 시각을 보존하고 동시 요청 한 건만 점유한다. */
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            UPDATE ValidationRun v SET v.status = :running, v.completedAt = NULL, v.failureMessage = NULL
+             WHERE v.validationRunId = :validationRunId AND v.status = :failed
+            """)
+    int restartFailed(@Param("validationRunId") Long validationRunId,
+                      @Param("failed") ValidationRunStatus failed,
+                      @Param("running") ValidationRunStatus running);
+
     /**
      * 배치 진행 기록 2/4: RUNNING 상태에서 current_step만 전진.
      * {@code currentStep <= :currentStep} 조건은 역행 방지 — journalPosting/imbalanceCheck가

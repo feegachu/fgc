@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.batch.tasklet;
 
 import com.susukkang.fgc.validation.batch.contract.ReconciliationBatchPort;
+import com.susukkang.fgc.validation.service.ReconciliationSkipService;
+import org.mockito.ArgumentCaptor;
 import com.susukkang.fgc.validation.batch.contract.ContractSkip;
 import com.susukkang.fgc.validation.batch.contract.StepProcessingResult;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
@@ -40,6 +42,8 @@ class ReconciliationTaskletTest {
 
     @Mock
     private ReconciliationBatchPort reconciliationBatchPort;
+    @Mock
+    private ReconciliationSkipService reconciliationSkipService;
 
     @Test
     void 양_지급단계의_처리와_skip_건수를_누적한다() {
@@ -54,12 +58,20 @@ class ReconciliationTaskletTest {
                 .willReturn(new StepProcessingResult(5, 1, 0, List.of(
                         new ContractSkip(3L, "RECONCILIATION_FAILED", "보험사 B 오류"))));
 
-        assertThat(new ReconciliationTasklet(reconciliationBatchPort).execute(contribution, context))
+        assertThat(new ReconciliationTasklet(reconciliationBatchPort, reconciliationSkipService).execute(contribution, context))
                 .isEqualTo(RepeatStatus.FINISHED);
         assertThat(contribution.getWriteCount()).isEqualTo(8);
         assertThat(contribution.getProcessSkipCount()).isEqualTo(3);
         verify(reconciliationBatchPort).reconcile(any(), eq(PaymentStage.INSURER_TO_GA));
         verify(reconciliationBatchPort).reconcile(any(), eq(PaymentStage.GA_TO_FC));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ContractSkip>> skips = ArgumentCaptor.forClass(List.class);
+        verify(reconciliationSkipService).record(any(), eq(PaymentStage.INSURER_TO_GA), skips.capture());
+        assertThat(skips.getValue()).containsExactly(
+                new ContractSkip(1L, "RECONCILIATION_FAILED", "보험사 A 오류"),
+                new ContractSkip(2L, "RECONCILIATION_FAILED", "보험사 A 오류"));
+        verify(reconciliationSkipService).record(any(), eq(PaymentStage.GA_TO_FC), eq(List.of(
+                new ContractSkip(3L, "RECONCILIATION_FAILED", "보험사 B 오류"))));
     }
 
     @Test
@@ -70,14 +82,15 @@ class ReconciliationTaskletTest {
         var failure = new IllegalStateException("DB 연결 장애");
         given(reconciliationBatchPort.reconcile(any(), eq(PaymentStage.INSURER_TO_GA))).willThrow(failure);
 
-        assertThatThrownBy(() -> new ReconciliationTasklet(reconciliationBatchPort).execute(contribution, context))
+        assertThatThrownBy(() -> new ReconciliationTasklet(reconciliationBatchPort, reconciliationSkipService).execute(contribution, context))
                 .isSameAs(failure);
         verify(reconciliationBatchPort, never()).reconcile(any(), eq(PaymentStage.GA_TO_FC));
+        verifyNoInteractions(reconciliationSkipService);
     }
 
     @Test
     void validationRunId가_없으면_대사를_호출하지_않고_즉시_실패한다() {
-        ReconciliationTasklet tasklet = new ReconciliationTasklet(reconciliationBatchPort);
+        ReconciliationTasklet tasklet = new ReconciliationTasklet(reconciliationBatchPort, reconciliationSkipService);
 
         assertThatThrownBy(() -> tasklet.execute(null, newChunkContext()))
                 .isInstanceOf(IllegalStateException.class)

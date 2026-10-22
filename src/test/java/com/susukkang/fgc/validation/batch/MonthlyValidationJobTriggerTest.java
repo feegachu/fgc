@@ -4,6 +4,7 @@ import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.validation.repository.MonthlyJobExecutionLookup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +15,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.JobInstance;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -46,6 +50,8 @@ class MonthlyValidationJobTriggerTest {
 
     @Mock
     private ValidationRunRepository validationRunRepository;
+    @Mock
+    private MonthlyJobExecutionLookup monthlyJobExecutionLookup;
 
     @InjectMocks
     private MonthlyValidationJobTrigger trigger;
@@ -94,6 +100,29 @@ class MonthlyValidationJobTriggerTest {
         assertThat(params.getString("runType")).isEqualTo("MONTHLY");
         assertThat(params.getLong("triggeredBy")).isEqualTo(7L);
         assertThat(params.getString("requestId")).isEqualTo("20260817-abc123");
+        assertThat(params.getParameters().get("requestId").isIdentifying()).isFalse();
+    }
+
+    @Test
+    void restartsLegacyInstanceWithoutChangingIdentifyingParameters() throws Exception {
+        var failed = row("FAILED");
+        given(validationRunRepository.findById(100L)).willReturn(Optional.of(entity(ValidationRunStatus.FAILED)));
+        var legacy = new JobParametersBuilder().addString("validationMonth", "2026-07")
+                .addLong("runNo", 2L).addString("runType", "MONTHLY").addLong("triggeredBy", 7L)
+                .addString("requestId", "legacy-request", true).toJobParameters();
+        var previous = new JobExecution(new JobInstance(50L, "MonthlyValidationJob"), legacy);
+        previous.setStatus(BatchStatus.FAILED);
+        previous.getExecutionContext().putLong("validationRunId", 100L);
+        given(monthlyJobExecutionLookup.findFailedExecution(failed)).willReturn(previous);
+        given(jobLauncher.run(eq(monthlyValidationJob), any())).willReturn(mock(JobExecution.class));
+
+        trigger.launch(failed, "new-retry-request").join();
+
+        var captor = ArgumentCaptor.forClass(JobParameters.class);
+        verify(jobLauncher).run(eq(monthlyValidationJob), captor.capture());
+        assertThat(captor.getValue().getIdentifyingParameters()).isEqualTo(legacy.getIdentifyingParameters());
+        assertThat(captor.getValue().getString("restartRequestId")).isEqualTo("new-retry-request");
+        assertThat(captor.getValue().getLong("restartValidationRunId")).isEqualTo(100L);
     }
 
     @Test
