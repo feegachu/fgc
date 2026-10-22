@@ -11,6 +11,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { normalizeCriteria } from './api'
 import type { AuditLog } from './api'
+import { diffFieldLabel } from './labels'
 
 const log = (auditLogId: number, overrides: Partial<AuditLog> = {}): AuditLog => ({
   auditLogId,
@@ -320,4 +321,12 @@ it('공통 리사이즈로 대체한 좌우 배치 외의 감사로그 CSS 는 1
     .replace(/\.audit-layout \{[^}]*\}/, '')
     .replace(/\n{3,}/g, '\n\n')
   expect(read('src/features/audit/audit.css')).toBe(read('../src/main/resources/static/css/features/audit.css'))
+})
+
+describe('diffFieldLabel', () => {
+  it('점 경로는 그대로 두고 배열 인덱스만 N번째로 푼다', () => {
+    expect(diffFieldLabel('payment.amount')).toBe('payment.amount')
+    expect(diffFieldLabel('[0].result.details[1].amount')).toBe('1번째.result.details.2번째.amount')
+    expect(diffFieldLabel('value')).toBe('value')
+  })
 })
