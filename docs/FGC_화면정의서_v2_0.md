@@ -624,8 +624,6 @@ FGC — GA 수수료 정산·검증 플랫폼
 | 원장 | 이 계약과 연결된 분개 목록 | `journal_header`, `journal_line` |
 | 지급·대사 | 실제 지급 건과 대사 결과 | `commission_transaction`, `reconciliation_result` |
 
-**원장 유형 표시 (#610, 2026-10-22 v2.0 보완)** — 원장 탭의 영문 분개 유형을 검증원장(LEDG-W01)과 같은 한국어 라벨로 표시합니다. 예: `EXPECTED_INSURER_INCOME` → 예상 수입(원수사→GA), `EXPECTED_FC_PAYOUT` → 예상 지급(GA→설계사), `CONFIRMED_FC_PAYOUT` → 확정 지급(GA→설계사), `REVERSAL` → 역분개. 화면 간 용어를 통일하기 위해 기존 유형 매핑을 재사용합니다. API 응답 구조·저장 코드·테이블·분개 처리에는 변경이 없습니다.
-
 **주요 기능·버튼**
 
 | 버튼 | 하는 일 |
