@@ -57,6 +57,15 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
         return findLatestAttemptTrace(validationRunId).map(AttemptTrace::getRequestId).orElse(null);
     }
 
+    /** 같은 실패 실행의 재시작 점유 이력은 재실패 후에도 소모된 채로 보존한다. */
+    @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM fgc.audit_log
+              WHERE entity_type='VALIDATION_RUN' AND entity_id=CAST(:runId AS varchar)
+                AND action_code='VALIDATION_RUN_RETRIED'
+                AND after_value ->> 'restartFromExecutionId'=CAST(:executionId AS varchar))
+            """, nativeQuery = true)
+    boolean hasRestartClaim(@Param("runId") Long runId, @Param("executionId") Long executionId);
+
     /**
      * 검증월 단위 트랜잭션 advisory lock(#491). 커밋·롤백 때 자동으로 풀린다.
      *

@@ -121,7 +121,7 @@ class ValidationRunBatchLifecycleServiceImplIntegrationTest {
                 if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("재시작 경합 준비 시간 초과");
                 try {
                     lifecycleService.restart(id, new MonthlyValidationJobParameters(
-                            TEST_MONTH, 1L, ValidationRunType.MONTHLY, userId, "restart-db-race"));
+                            TEST_MONTH, 1L, ValidationRunType.MONTHLY, userId, "restart-db-race", 42L));
                     return true;
                 } catch (FgcBusinessException expectedConflict) {
                     return false;
@@ -138,6 +138,26 @@ class ValidationRunBatchLifecycleServiceImplIntegrationTest {
                 SELECT COUNT(*) FROM fgc.audit_log WHERE entity_type='VALIDATION_RUN'
                   AND entity_id=? AND action_code='VALIDATION_RUN_RETRIED'
                 """, Long.class, id.toString())).isEqualTo(1L);
+    }
+
+    @Test
+    void consumedFailedExecutionCannotRestartAgainAfterItsRetryFails() {
+        Long id = insertFailedRun();
+        Long userId = jdbcTemplate.queryForObject("SELECT MIN(user_id) FROM fgc.app_user", Long.class);
+        var first = new MonthlyValidationJobParameters(TEST_MONTH, 1L, ValidationRunType.MONTHLY,
+                userId, "restart-db-parent", 42L);
+        lifecycleService.restart(id, first);
+        lifecycleService.fail(id, 6, first, "재시작도 실패");
+        assertThatThrownBy(() -> lifecycleService.restart(id, first)).isInstanceOf(FgcBusinessException.class);
+        assertThat(validationRunRepository.findById(id).orElseThrow().getStatus().name()).isEqualTo("FAILED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.audit_log WHERE entity_type='VALIDATION_RUN'
+                  AND entity_id=? AND action_code='VALIDATION_RUN_RETRIED'
+                """, Long.class, id.toString())).isEqualTo(1L);
+        // 새 실패를 확인한 뒤 사람이 새 요청을 보내는 것은 허용한다.
+        lifecycleService.restart(id, new MonthlyValidationJobParameters(TEST_MONTH, 1L, ValidationRunType.MONTHLY,
+                userId, "restart-db-new-parent", 43L));
+        assertThat(validationRunRepository.findById(id).orElseThrow().getStatus().name()).isEqualTo("RUNNING");
     }
 
     @Test

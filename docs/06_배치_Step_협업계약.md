@@ -37,6 +37,7 @@
 - Step 실패는 실패 단계와 사유를 `validation_run`에 기록한다. 진행상황 기록 중 예외가 나면 Step·Job을 FAILED로 올린다.
 - 자동 반복 재시작은 제공하지 않는다. `FAILED` 월 실행은 IF-API-48과 React 재시작 버튼으로 같은 JobInstance의 실패 Step부터 수동 재개한다(#672, FUN-045). 완료 Step과 저장된 ExecutionContext는 유지한다. `MANUAL_CONTRACT` 실패를 월 배치로 재개하지 않는다.
 - 재시작의 조건부 `FAILED → RUNNING` 점유와 `VALIDATION_RUN_RETRIED` 감사 저장은 한 트랜잭션이다. 실패 단계·최초 시작 시각은 유지하고 실패 메시지는 초기화한다. 최초 실행의 식별 파라미터는 보존하며, 새 요청 ID는 비식별 `restartRequestId`로 전달한다. 메타데이터가 없거나 여러 JobInstance로 모호하면 요청을 거절한다.
+- 요청 당시 실패 실행의 ID를 비식별 `restartFromExecutionId`로 보존한다. 대기열 실행 직전에 최신 실패 ID를 재확인하고, DB의 실행별 advisory lock 안에서 같은 실패의 재시작 점유 감사가 이미 있는지도 검사한다. 이 감사의 `after_value.restartFromExecutionId`는 재실패 후에도 남으므로 오래된 대기 요청이 자동으로 또 재시작하지 못한다. 새 실패를 확인한 사용자의 새 요청만 다음 ID로 재개할 수 있다.
 - 진행률 수치는 기존 `current_step / 10`을 유지한다. IF-API-49의 추가 추적 필드 `attemptId`·`requestId`는 감사 이력에서 읽는다. 동일 스냅샷으로 상태와 시도를 조회하고, 화면은 수락 이전 시도 번호의 FAILED 응답을 새 실패로 오인하지 않는다. 다른 탭이 먼저 재시작한 경우에도 새 시도를 따라간다.
 - 시작·완료·실패 감사 로그의 `user_id`는 `triggeredBy`, `request_id`는 JobParameter `requestId`다(`ValidationRunBatchAuditServiceImpl`).
 

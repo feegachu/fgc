@@ -110,6 +110,11 @@ public class MonthlyValidationJobTrigger {
                     + (fresh.isEmpty() ? "삭제됨" : fresh.get().getStatus()) + ") — 중복 실행 요청을 무시합니다.");
         }
         try {
+            Long expectedExecutionId = jobParameters.getLong("restartFromExecutionId");
+            if (expectedExecutionId != null
+                    && !expectedExecutionId.equals(monthlyJobExecutionLookup.findFailedExecution(run).getId())) {
+                throw new IllegalStateException("요청 이후 다른 재시작이 이미 시도되었습니다.");
+            }
             return jobLauncher.run(monthlyValidationJob, jobParameters);
         } catch (Exception e) {
             // JobLauncher.run()의 checked 예외 4종을 supplyAsync의 Supplier는 못 던지므로
@@ -127,6 +132,7 @@ public class MonthlyValidationJobTrigger {
             }
             return new JobParametersBuilder(previous.getJobParameters())
                     .addLong("restartValidationRunId", run.getValidationRunId(), false)
+                    .addLong("restartFromExecutionId", previous.getId(), false)
                     .addString("restartRequestId", requestId, false).toJobParameters();
         } catch (IllegalStateException exception) {
             log.warn("월 배치 재시작 불가 (validationRunId={})", run.getValidationRunId(), exception);

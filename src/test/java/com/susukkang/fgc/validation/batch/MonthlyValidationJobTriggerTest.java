@@ -26,6 +26,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import static org.mockito.Mockito.times;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -68,6 +72,43 @@ class MonthlyValidationJobTriggerTest {
 
     @InjectMocks
     private MonthlyValidationJobTrigger trigger;
+
+    @Test
+    void queuedDuplicateCannotRestartAgainWhenFirstRetryFails() throws Exception {
+        var failed = row("FAILED");
+        given(validationRunRepository.findById(100L)).willReturn(Optional.of(entity(ValidationRunStatus.FAILED)));
+        var params = new JobParametersBuilder().addString("validationMonth", "2026-07").addLong("runNo", 2L)
+                .addString("runType", "MONTHLY").addLong("triggeredBy", 7L).addString("requestId", "old").toJobParameters();
+        var old = new JobExecution(new JobInstance(50L, "MonthlyValidationJob"), params);
+        old.setId(60L);
+        old.setStatus(BatchStatus.FAILED);
+        old.getExecutionContext().putLong("validationRunId", 100L);
+        var latest = new AtomicReference<>(old);
+        given(monthlyJobExecutionLookup.findFailedExecution(failed)).willAnswer(ignored -> latest.get());
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        given(jobLauncher.run(eq(monthlyValidationJob), any())).willAnswer(invocation -> {
+            entered.countDown();
+            if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("테스트 대기 시간 초과");
+            var retry = new JobExecution(old.getJobInstance(), invocation.getArgument(1));
+            retry.setId(61L);
+            retry.setStatus(BatchStatus.FAILED);
+            retry.getExecutionContext().putLong("validationRunId", 100L);
+            latest.set(retry);
+            return retry;
+        });
+        var first = trigger.launch(failed, "first-request");
+        try {
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = trigger.launch(failed, "queued-request");
+            release.countDown();
+            assertThat(first.get(10, TimeUnit.SECONDS).getId()).isEqualTo(61L);
+            assertThatThrownBy(second::join).isInstanceOf(CompletionException.class);
+            verify(jobLauncher, times(1)).run(eq(monthlyValidationJob), any());
+        } finally {
+            release.countDown();
+        }
+    }
 
     @AfterEach
     void shutdownExecutor() {
@@ -125,6 +166,7 @@ class MonthlyValidationJobTriggerTest {
                 .addString("requestId", "legacy-request", true).toJobParameters();
         var previous = new JobExecution(new JobInstance(50L, "MonthlyValidationJob"), legacy);
         previous.setStatus(BatchStatus.FAILED);
+        previous.setId(60L);
         previous.getExecutionContext().putLong("validationRunId", 100L);
         given(monthlyJobExecutionLookup.findFailedExecution(failed)).willReturn(previous);
         given(jobLauncher.run(eq(monthlyValidationJob), any())).willReturn(mock(JobExecution.class));

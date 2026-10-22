@@ -15,8 +15,14 @@ public record MonthlyValidationJobParameters(
         Long runNo,
         ValidationRunType runType,
         Long triggeredBy,
-        String requestId
+        String requestId,
+        Long restartFromExecutionId
 ) {
+
+    public MonthlyValidationJobParameters(LocalDate validationMonth, Long runNo, ValidationRunType runType,
+                                         Long triggeredBy, String requestId) {
+        this(validationMonth, runNo, runType, triggeredBy, requestId, null);
+    }
 
     public static MonthlyValidationJobParameters from(JobParameters jobParameters) {
         // validationMonth: ValidationRunController#create가 request body의 validationMonth를
@@ -61,6 +67,7 @@ public record MonthlyValidationJobParameters(
             throw new IllegalArgumentException("requestId는 필수입니다.");
         }
 
-        return new MonthlyValidationJobParameters(validationMonth, runNo, runType, triggeredBy, requestId);
+        return new MonthlyValidationJobParameters(validationMonth, runNo, runType, triggeredBy, requestId,
+                jobParameters.getLong("restartFromExecutionId"));
     }
 }
