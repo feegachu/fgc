@@ -1,5 +1,4 @@
-import { render, screen, within, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { CommissionRules } from '../policies/PolicyDetailTables'
 import { ReferenceText } from './ReferenceUI'
@@ -44,37 +43,15 @@ it('정책 숫자·회차 표시는 1차 node 정책 테스트의 입력 계약�
   expect(within(rows[2]).getByText('1 ~ -회차')).toBeInTheDocument()
 })
 
-it('긴 정책 값은 HTML을 escape하고 실제 잘림일 때만 전체 보기·접기를 제공한다 (#418)', async () => {
-  let resized = () => {}
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      constructor(callback: () => void) {
-        resized = callback
-      }
-      observe() {}
-      disconnect() {}
-    },
-  )
+it('긴 정책 값은 HTML을 escape하고 전체 보기 없이 원문을 표시한다 (#597)', () => {
   const { container } = render(
     <>
       <ReferenceText value="짧은 정책명" limit={20} />
       <ReferenceText value="매우 긴 <정책> 이름과 판단 사유" limit={10} />
     </>,
   )
-  expect(container.querySelectorAll('details')).toHaveLength(1)
+  expect(screen.getByText('매우 긴 <정책> 이름과 판단 사유')).toBeInTheDocument()
+  expect(container.querySelectorAll('details, summary')).toHaveLength(0)
   expect(container.querySelector('정책')).toBeNull()
   expect(container.innerHTML).toContain('&lt;정책&gt;')
-  const preview = container.querySelector<HTMLElement>('.table-cell-preview')!
-  const details = container.querySelector('details')!
-  Object.defineProperty(preview, 'clientWidth', { configurable: true, value: 100 })
-  Object.defineProperty(preview, 'scrollWidth', { configurable: true, value: 200 })
-  act(() => resized())
-  expect(details.hidden).toBe(false)
-  await userEvent.click(container.querySelector('summary')!)
-  expect(details.open).toBe(true)
-  Object.defineProperty(preview, 'scrollWidth', { configurable: true, value: 100 })
-  act(() => resized())
-  expect(details.hidden).toBe(true)
-  expect(details.open).toBe(false)
 })

@@ -1,3 +1,4 @@
+import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router'
@@ -390,7 +391,13 @@ function TransactionForm({
           </div>
         </div>
       )}
-      <div className="transaction-form-layout" id="main-grid">
+      <ResizableSplit
+        className="transaction-form-layout"
+        storageKey="transaction-form-workspace"
+        label="지급 건·귀속행과 확정 게이트 카드 너비"
+        defaultRatio={61}
+        id="main-grid"
+      >
         <div className="transaction-form-column">
           <section className="surface transaction-form-panel" aria-labelledby="transaction-input-title">
             <header className="surface-header transaction-surface-header">
@@ -634,7 +641,7 @@ function TransactionForm({
             </div>
           </section>
         </div>
-      </div>
+      </ResizableSplit>
       <ConfirmationModal
         open={modalOpen}
         result={result}

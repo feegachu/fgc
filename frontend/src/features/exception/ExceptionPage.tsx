@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
+import { ResizableSplit } from '../../components/ResizableSplit'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
@@ -82,11 +83,12 @@ export function ExceptionPage() {
   }
 
   const columns: TableColumn<ExceptionCase>[] = [
-    { key: 'id', label: '번호', width: '4rem', align: 'number', render: (row) => row.exceptionCaseId },
+    { key: 'id', label: '번호', width: '4rem', align: 'left', render: (row) => row.exceptionCaseId },
     {
       key: 'type',
       label: '유형',
       width: '8.5rem',
+      align: 'center',
       render: (row) => <StatusBadge tone={typeTone(row.type)}>{row.typeLabel ?? '-'}</StatusBadge>,
     },
     {
@@ -101,9 +103,10 @@ export function ExceptionPage() {
       key: 'severity',
       label: '심각도',
       width: '5rem',
+      align: 'center',
       render: (row) => <StatusBadge tone={severityTone(row.severity)}>{row.severityLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'contract', label: '계약', width: '12rem', align: 'number', render: (row) => row.contractNo ?? '-' },
+    { key: 'contract', label: '계약', width: '12rem', render: (row) => row.contractNo ?? '-' },
     {
       key: 'title',
       label: '내용',
@@ -114,6 +117,7 @@ export function ExceptionPage() {
       key: 'status',
       label: '상태',
       width: '5.75rem',
+      align: 'center',
       render: (row) => <StatusBadge tone={statusTone(row.status)}>{row.statusLabel ?? '-'}</StatusBadge>,
     },
     { key: 'assignee', label: '담당자', width: '6rem', render: (row) => row.assigneeLoginId ?? '미배정' },
@@ -121,10 +125,9 @@ export function ExceptionPage() {
       key: 'detectedAt',
       label: '최근 검출',
       width: '8.5rem',
-      align: 'number',
       render: (row) => dateTime(row.lastDetectedAt),
     },
-    { key: 'count', label: '검출', width: '4rem', align: 'number', render: (row) => `${row.detectionCount ?? 0}회` },
+    { key: 'count', label: '검출', width: '4rem', render: (row) => `${row.detectionCount ?? 0}회` },
     {
       key: 'reference',
       label: '참조',
@@ -204,78 +207,88 @@ export function ExceptionPage() {
           </button>
         </div>
       ) : (
-        <div className="exception-work-grid">
-          <section className="surface">
-            <div className="surface-header">
-              <span className="surface-title">예외 목록</span>
-              <span className="text-secondary exception-count-note">
-                <span aria-live="polite">{int(data?.totalElements ?? 0)}</span>건
-              </span>
+        <ResizableSplit
+          className="exception-work-grid"
+          storageKey="exceptions-workspace"
+          label="예외 목록과 상세 카드 너비"
+          primary={
+            <section className="surface">
+              <div className="surface-header">
+                <span className="surface-title">예외 목록</span>
+                <span className="text-secondary exception-count-note">
+                  <span aria-live="polite">{int(data?.totalElements ?? 0)}</span>건
+                </span>
+              </div>
+              {search.isPending ? (
+                <p role="status" className="empty-state">
+                  불러오는 중입니다.
+                </p>
+              ) : (
+                <>
+                  <DataTable
+                    caption="예외 목록"
+                    className="exception-table"
+                    viewportClassName="exception-table-viewport"
+                    rowClassName={() => 'exception-row'}
+                    onRowActivate={(row) => select(String(row.exceptionCaseId))}
+                    columns={columns}
+                    rows={rows}
+                    rowKey={(row) => String(row.exceptionCaseId)}
+                    selectedKeys={selectedId ? [selectedId] : []}
+                    onRowClick={(row) => select(String(row.exceptionCaseId))}
+                    emptyMessage={EMPTY_MESSAGE}
+                  />
+                  <ListPagination
+                    className="exception-pagination"
+                    label="예외 목록 페이지 선택"
+                    page={data?.page ?? 1}
+                    totalPages={data?.totalPages ?? 1}
+                    onPageChange={(page) => apply({ page: String(page) }, false)}
+                  />
+                </>
+              )}
+            </section>
+          }
+          secondary={
+            <div className="exception-side-panels">
+              <section className="surface">
+                <div className="surface-header">
+                  <span className="surface-title">검출 이력</span>
+                  <span className="text-secondary exception-card-note">실행별 증거는 고치거나 지울 수 없습니다</span>
+                </div>
+                <div className="surface-body">
+                  {selected ? (
+                    <Occurrences item={selected} />
+                  ) : (
+                    <p className="text-secondary exception-placeholder">—</p>
+                  )}
+                </div>
+              </section>
+              <section className="surface">
+                <div className="surface-header">
+                  <span className="surface-title">처리</span>
+                  {selected && <span>#{selected.exceptionCaseId}</span>}
+                </div>
+                <div className="surface-body">
+                  {selected ? (
+                    <ActionPanel key={selected.exceptionCaseId} item={selected} />
+                  ) : (
+                    <p className="text-secondary exception-placeholder">왼쪽 목록에서 한 건을 고르세요.</p>
+                  )}
+                </div>
+              </section>
+              <section className="surface">
+                <div className="surface-header">
+                  <span className="surface-title">처리 이력</span>
+                  <span className="text-secondary exception-card-note">기록만 쌓입니다. 고치거나 지울 수 없습니다</span>
+                </div>
+                <div className="surface-body">
+                  {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">—</p>}
+                </div>
+              </section>
             </div>
-            {search.isPending ? (
-              <p role="status" className="empty-state">
-                불러오는 중입니다.
-              </p>
-            ) : (
-              <>
-                <DataTable
-                  caption="예외 목록"
-                  className="exception-table"
-                  viewportClassName="exception-table-viewport"
-                  rowClassName={() => 'exception-row'}
-                  onRowActivate={(row) => select(String(row.exceptionCaseId))}
-                  columns={columns}
-                  rows={rows}
-                  rowKey={(row) => String(row.exceptionCaseId)}
-                  selectedKeys={selectedId ? [selectedId] : []}
-                  onRowClick={(row) => select(String(row.exceptionCaseId))}
-                  emptyMessage={EMPTY_MESSAGE}
-                />
-                <ListPagination
-                  className="exception-pagination"
-                  label="예외 목록 페이지 선택"
-                  page={data?.page ?? 1}
-                  totalPages={data?.totalPages ?? 1}
-                  onPageChange={(page) => apply({ page: String(page) }, false)}
-                />
-              </>
-            )}
-          </section>
-
-          <div className="exception-side-panels">
-            <section className="surface">
-              <div className="surface-header">
-                <span className="surface-title">검출 이력</span>
-                <span className="text-secondary exception-card-note">실행별 증거는 고치거나 지울 수 없습니다</span>
-              </div>
-              <div className="surface-body">
-                {selected ? <Occurrences item={selected} /> : <p className="text-secondary exception-placeholder">—</p>}
-              </div>
-            </section>
-            <section className="surface">
-              <div className="surface-header">
-                <span className="surface-title">처리</span>
-                {selected && <span>#{selected.exceptionCaseId}</span>}
-              </div>
-              <div className="surface-body">
-                {selected ? (
-                  <ActionPanel key={selected.exceptionCaseId} item={selected} />
-                ) : (
-                  <p className="text-secondary exception-placeholder">왼쪽 목록에서 한 건을 고르세요.</p>
-                )}
-              </div>
-            </section>
-            <section className="surface">
-              <div className="surface-header">
-                <span className="surface-title">처리 이력</span>
-                <span className="text-secondary exception-card-note">기록만 쌓입니다. 고치거나 지울 수 없습니다</span>
-              </div>
-              <div className="surface-body">
-                {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">—</p>}
-              </div>
-            </section>
-          </div>
-        </div>
+          }
+        />
       )}
     </div>
   )

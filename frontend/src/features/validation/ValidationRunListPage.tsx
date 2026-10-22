@@ -48,7 +48,7 @@ export default function ValidationRunListPage() {
       cellClassName: 'tabular-nums',
       render: (r) => formatMonth(r.validationMonth),
     },
-    { key: 'runNo', label: '회차', width: '3.5rem', align: 'number', render: (r) => r.runNo },
+    { key: 'runNo', label: '회차', width: '3.5rem', align: 'left', render: (r) => r.runNo },
     { key: 'type', label: '실행 유형', width: '7rem', render: (r) => dash(r.runTypeLabel) },
     {
       key: 'status',
@@ -110,7 +110,7 @@ export default function ValidationRunListPage() {
       key: 'open',
       label: '상세',
       width: '5rem',
-      align: 'center',
+      align: 'left',
       render: (r) => <OpenLink run={r} />,
     },
   ]

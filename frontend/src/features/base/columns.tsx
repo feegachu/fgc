@@ -37,7 +37,7 @@ export const organizationColumns: TableColumn<Organization>[] = [
   },
   { key: 'from', label: '적용 시작일', render: (r) => date(r.effectiveFrom) },
   { key: 'to', label: '적용 종료일', render: (r) => date(r.effectiveTo) },
-  { key: 'active', label: '상태', render: (r) => active(r.activeYn) },
+  { key: 'active', label: '상태', align: 'center', render: (r) => active(r.activeYn) },
 ]
 export const insurerColumns: TableColumn<Insurer>[] = [
   {
@@ -61,7 +61,7 @@ export const insurerColumns: TableColumn<Insurer>[] = [
       </>
     ),
   },
-  { key: 'active', label: '상태', render: (r) => active(r.activeYn) },
+  { key: 'active', label: '상태', align: 'center', render: (r) => active(r.activeYn) },
 ]
 export const productColumns: TableColumn<Product>[] = [
   {
@@ -108,6 +108,7 @@ export const productColumns: TableColumn<Product>[] = [
   {
     key: 'deduction',
     label: '80% 공제',
+    align: 'center',
     render: (r) => (
       <StatusBadge tone={r.standardDeduction80Yn ? 'warning' : 'neutral'}>
         {r.standardDeduction80Yn ? '예' : '아니오'}
@@ -148,6 +149,7 @@ export const agentColumns: TableColumn<Agent>[] = [
   {
     key: 'status',
     label: '상태',
+    align: 'center',
     render: (r) => (
       <>
         <StatusBadge tone={r.agentStatus === 'ACTIVE' ? 'success' : 'neutral'}>
@@ -166,6 +168,7 @@ export const agentColumns: TableColumn<Agent>[] = [
   {
     key: 'support',
     label: '신인지원',
+    align: 'center',
     render: (r) => (
       <>
         <StatusBadge tone={r.newcomerSupportEligibleYn ? 'warning' : 'neutral'}>
@@ -204,6 +207,7 @@ export const commissionColumns: TableColumn<CommissionItem>[] = [
   {
     key: 'cashflow',
     label: '지급/차감',
+    align: 'center',
     render: (r) => (
       <StatusBadge tone={r.cashflowType === 'PAYMENT' ? 'success' : 'warning'}>
         {r.cashflowType === 'PAYMENT' ? '지급' : r.cashflowType === 'DEDUCTION' ? '차감' : '-'}
