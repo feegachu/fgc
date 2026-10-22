@@ -38,7 +38,10 @@ def is_documentation(path):
             or path.startswith(("docs/", ".github/ISSUE_TEMPLATE/"))
             or path == ".github/pull_request_template.md"
         )
-    return path.startswith("docs/") and file.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
+    return path.startswith("docs/") and file.suffix.lower() in {
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf",
+        ".csv", ".xlsx", ".docx", ".pptx", ".drawio", ".mmd", ".puml",
+    }
 
 
 def git(*args):
@@ -106,22 +109,45 @@ def validate_gate(needs):
             raise ValueError(f"{job}: expected {expected}, got {actual}")
 
 
+def ci_plan(plan):
+    """Build and frontend run for every non-documentation change."""
+    return {"run_checks": plan["ui"] or plan["server"]}
+
+
+def validate_ci_plan(needs):
+    """Required jobs must fail if detection failed or did not report a valid plan."""
+    changes = needs.get("changes", {})
+    flag = changes.get("outputs", {}).get("run_checks")
+    if changes.get("result") != "success" or flag not in {"true", "false"}:
+        raise ValueError("CI change detection failed or returned an invalid plan")
+    return flag == "true"
+
+
 def main():
-    if sys.argv[1:] == ["plan"]:
+    if sys.argv[1:] in (["plan"], ["ci-plan"]):
         event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
         plan = plan_for_event(os.environ["GITHUB_EVENT_NAME"], event)
+        if sys.argv[1] == "ci-plan":
+            plan = ci_plan(plan)
         output = "".join(f"{key}={str(value).lower()}\n" for key, value in plan.items())
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as destination:
             destination.write(output)
         print(output, end="")
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-            summary.write("### E2E execution plan\n\n" + "\n".join(
+            summary.write("### Verification execution plan\n\n" + "\n".join(
                 f"- {key}: {str(value).lower()}" for key, value in plan.items()) + "\n")
     elif sys.argv[1:] == ["gate"]:
         validate_gate(json.loads(os.environ["E2E_NEEDS"]))
         print("Required E2E suites passed; unneeded suites were explicitly skipped.")
+    elif sys.argv[1:] == ["ci-gate"]:
+        required = validate_ci_plan(json.loads(os.environ["CI_NEEDS"]))
+        message = ("Code/configuration changes: normal verification is required."
+                   if required else "Documentation-only change: build and frontend checks are intentionally omitted.")
+        print(message)
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+            summary.write(message + "\n")
     else:
-        raise ValueError("Usage: e2e_policy.py plan|gate")
+        raise ValueError("Usage: e2e_policy.py plan|gate|ci-plan|ci-gate")
 
 
 if __name__ == "__main__":
