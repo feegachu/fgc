@@ -1693,7 +1693,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 ### FGC-UI-POL-W02 · 정책 등록·검토·승인
 정책을 `초안 → 검토 → 승인 → 활성 → 종료` 순서로 관리합니다.
 **작성자와 승인자는 반드시 다른 사람이어야 합니다.**
-주의: 정책은 `DRAFT`로 만들고 자식 규칙을 다 넣은 다음에 승격합니다. `DRAFT → ACTIVE` 직행은 DB가 막습니다. 반드시 `DRAFT → APPROVED → ACTIVE` 두 번의 단계를 거칩니다.
+주의: 정책은 `DRAFT`로 만들고 자식 규칙을 다 넣은 다음에 승격합니다. 2차 IF-API-75는 제출 `DRAFT → REVIEW`, 승인 `REVIEW → APPROVED`, 활성화 `APPROVED → ACTIVE`, 반려 `REVIEW → DRAFT`(사유 필수)만 허용합니다. `DRAFT → APPROVED → ACTIVE` 우회는 1차 Flyway 시드 전용이며, `DRAFT → ACTIVE` 직행은 DB가 막습니다(운영정책서 제49·50조, REG-22, SRC-049).
 테이블 `policy_version`, `policy_approval_action` / 요구사항 FUN-016, FUN-017
 **최소 승인 흐름(r18, FUN-067 Must의 필수 의존)**: 제출·승인·반려·활성화를 IF-API-75 하나로 처리한다. 승인·활성화는 GA_ADMIN, 작성자≠승인자(`FGC-POL-001`), 화면이 본 상태를 함께 보내 동시 승인 경합을 막고(`FGC-POL-003`), 같은 정책 유형·상품·납입기간의 적용기간이 겹치면 활성화를 막는다(`FGC-POL-002`). AI 문서함(INTK-W02)에서 확정한 환급률표·수수료율표 DRAFT는 이 흐름을 거쳐야 계산에 쓰인다.
 
