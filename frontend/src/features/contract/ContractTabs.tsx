@@ -12,6 +12,7 @@ import type { StatusTone } from '../../components/StatusBadge'
 import { date, dateTime, int, month, won } from '../../lib/format'
 import { CapDetailModal } from '../cap/CapDetailModal'
 import { Amount, CapStatus, CapUsage } from '../cap/badges'
+import { JOURNAL_TYPE } from '../ledger/labels'
 import { ScheduleStatusBadge } from '../schedule/badges'
 import { LINE_STATUS, PAYMENT_STAGE, responseLabel } from '../schedule/labels'
 import {
@@ -532,7 +533,11 @@ function ArbitrageTab({ id }: { id: string }) {
 const journalColumns: TableColumn<ContractJournal>[] = [
   { key: 'number', label: '분개번호', render: (row) => <Text value={row.journalNo} /> },
   { key: 'date', label: '일자', render: (row) => date(row.journalDate) },
-  { key: 'type', label: '유형', render: (row) => <Text value={row.journalType} /> },
+  {
+    key: 'type',
+    label: '유형',
+    render: (row) => <Text value={JOURNAL_TYPE[row.journalType as keyof typeof JOURNAL_TYPE]} />,
+  },
   { key: 'stage', label: '지급단계', render: (row) => stageLabel(row.paymentStage, row.paymentStageLabel) },
   { key: 'debit', label: '차변', align: 'number', render: (row) => <Amount value={row.debitTotal} /> },
   { key: 'credit', label: '대변', align: 'number', render: (row) => <Amount value={row.creditTotal} /> },
