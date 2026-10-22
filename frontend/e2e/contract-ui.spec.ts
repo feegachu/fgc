@@ -85,6 +85,23 @@ async function fixture(page: Page, canProcess = true, totalPages = 1) {
           ],
         }),
       })
+    if (path.endsWith('/journals'))
+      return route.fulfill({
+        json: envelope([
+          {
+            journalHeaderId: 1,
+            journalNo: 'JV-2026-07-0001',
+            journalDate: '2026-07-01',
+            journalType: 'EXPECTED_INSURER_INCOME',
+            paymentStage: 'INSURER_TO_GA',
+            debitTotal: 700000,
+            creditTotal: 700000,
+            differenceAmount: 0,
+            status: 'POSTED',
+          },
+          { journalHeaderId: 2, journalNo: 'JV-2026-07-0002', journalType: 'REVERSAL', status: 'POSTED' },
+        ]),
+      })
     if (path.endsWith('/transactions'))
       return route.fulfill({
         json: envelope({
@@ -211,6 +228,17 @@ test('상세 값 정렬·가로 한도 안내문·지급 표 전체 열의 가�
   // 원천 열이 빠져 남은 열이 넓어졌으므로 지급단계→금액 거리 상한을 120에서 140으로 맞춘다(여전히 한 화면 안의 근접 배치).
   expect(amount!.x - stage!.x).toBeLessThan(140)
   await page.screenshot({ path: testInfo.outputPath('contract-payment-compact.png'), fullPage: true })
+  await page.getByRole('tab', { name: '원장', exact: true }).click()
+  const journals = page.getByRole('table', { name: '이 계약의 분개 목록' })
+  await expect(journals.getByRole('cell', { name: '예상 수입(원수사→GA)', exact: true })).toBeVisible()
+  await expect(journals.getByRole('cell', { name: '역분개', exact: true })).toBeVisible()
+  await expect(journals).not.toContainText('EXPECTED_INSURER_INCOME')
+  const typeResize = page.getByRole('separator', { name: '유형 열 너비', exact: true })
+  await typeResize.press('Shift+ArrowRight')
+  await typeResize.press('Shift+ArrowRight')
+  const typeCell = journals.getByRole('cell', { name: '예상 수입(원수사→GA)', exact: true })
+  expect((await typeCell.boundingBox())!.width).toBeGreaterThan(200)
+  await page.screenshot({ path: testInfo.outputPath('contract-ledger-korean.png'), fullPage: true })
 })
 
 test('페이지네이션은 현재 페이지 hover 색상과 비활성 화살표 표시를 유지한다', async ({ page }) => {
