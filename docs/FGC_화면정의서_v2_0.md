@@ -313,6 +313,7 @@ FGC — GA 수수료 정산·검증 플랫폼
 | WARNING | 주의(1,200% 예산 90% 이상) | 주황 |
 | VIOLATION | 위반(100% 초과) | 빨강 |
 | REVIEW_REQUIRED | 검토필요 | 회색 |
+| NOT_APPLICABLE | 적용대상 아님 | 회색 |
 
 **차익거래 판정** `arbitrage_check.result_status`
 
@@ -321,6 +322,9 @@ FGC — GA 수수료 정산·검증 플랫폼
 | CLEAR | 이상없음 |
 | CANDIDATE | 검토대상 |
 | REVIEW_REQUIRED | 자료부족 |
+| NOT_APPLICABLE | 적용대상 아님 |
+
+두 표의 `NOT_APPLICABLE`은 기존 결과 코드의 표시 누락 보완이다(운영정책서 제30·34조, SRC-065). API enum은 변경하지 않는다.
 
 **대사 결과** `reconciliation_result.result_type`
 

@@ -215,7 +215,7 @@ INSERT INTO fgc.refund_rate_line (...) VALUES (...);
 --       (APPROVED 이후에는 approved_at도 수정 불가)
 UPDATE fgc.policy_version
    SET status = 'APPROVED',
-       approved_at = now(),
+       approved_at = TIMESTAMPTZ '2026-01-01 09:00:00+09', -- 고정 합성 승인 시각(§0, SRC-065)
        approved_by = (SELECT user_id FROM fgc.app_user WHERE login_id = 'gaadmin'),
        approval_evidence_ref = 'SYNTHETIC:POLICY-APPROVAL-2026-001'
  WHERE policy_code = 'GA-CUR-LIFE-A-2026-V1' AND version_no = 1;
@@ -242,7 +242,7 @@ UPDATE fgc.policy_version
 `ACTIVE` 정책의 요율을 고치는 마이그레이션은 작성하지 않는다.
 새 `version_no`의 정책버전을 `DRAFT`로 만들고 자식 행을 넣은 뒤 **APPROVED → (이전 버전 RETIRED) → ACTIVE** 순서로 바꾼다. 같은 `policy_code`에 ACTIVE가 둘이 되는 순간을 만들지 않는다(DB에 "코드당 ACTIVE 1개" 제약이 없다 — V46·V52·V56 선례, `CapGrossPolicyMigrationIntegrationTest`). 과거 계산 결과는 계속 이전 버전을 참조한다.
 
-`V2`가 직접 `ACTIVE`로 삽입한 `STATUS-MONTH-RULE-2026` v1은 유산 예외다. `db/demo/V3`가 적용되면 이를 폐기하고 작성자·승인자가 분리된 v2를 발행하지만, 기본 migration만 적용한 DB에는 v1이 남을 수 있다. 이 유산 행 때문에 v2.1.6의 저작자 CHECK는 `NOT VALID`다. 신규 시드가 이 예외를 모방해서는 안 되며, 운영 전 유산 행 폐기·정상 재발행·제약 VALIDATE를 별도 마이그레이션으로 수행한다. 2026-10-22 기준 VALIDATE는 아직 실행하지 않았다. 현재 모든 배포 환경은 `db/demo`를 적용해 v1이 RETIRED다(§2).
+`V2`가 직접 `ACTIVE`로 삽입한 `STATUS-MONTH-RULE-2026` v1은 유산 예외다. `db/demo/V3`가 적용되면 이를 폐기하고 작성자·승인자가 분리된 v2를 발행하지만, 기본 migration만 적용한 DB에는 v1이 남을 수 있다. 이 유산 행 때문에 v2.1.6의 저작자 CHECK는 `NOT VALID`다. 신규 시드가 이 예외를 모방해서는 안 되며, 운영 전 유산 행 폐기·정상 재발행·제약 VALIDATE를 별도 마이그레이션으로 수행한다. 2026-10-22 기준 VALIDATE는 아직 실행하지 않았다. 이 설명은 `db/demo`를 적용한 환경에서만 v1이 RETIRED가 된다는 뜻이다. 실제 운영 DB에는 `db/demo`를 적용하지 않으며, 유산 행 폐기·작성자/승인자 분리 정상 재발행·기존 행 정합성 점검·제약 `VALIDATE`를 별도 마이그레이션으로 완료해야 한다(SRC-027 D-04·SRC-049·SRC-065).
 
 다음 테이블은 초기 입력시 비워둔다.
 
@@ -302,7 +302,8 @@ auth_refresh_token
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
 
 - **AGENT 역할·`agent01`(2차)**: 새 demo 마이그레이션(V57 이후)으로 넣는다. 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정, 팀 확인 필요. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
-- **주의 — 기존 데모 계정**: V3 주석에 시연용 공통 비밀번호가 평문으로 남아 있고 V3는 고칠 수 없다(SRC-027 D-04). `db/demo`는 검증계·신한 prd에도 적재되므로(§2) **공개 환경에서는 첫 기동 후 4개 계정의 비밀번호를 바꾸거나 잠근다.** 새 시드 계정은 해시만 넣고 평문을 파일·문서·PR에 남기지 않는다. 신한 prd가 외부에 공개되는지는 근거 없음 — 확인 필요.
+- **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 네 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
+- **보호·검증을 보장할 수 없으면 배포 중단**: 신한 prd에서 `db/demo`를 제외하고 별도 기준정보·정책·보호된 계정 이관 절차를 마련한다. 이미 데모가 적재된 DB는 locations 변경만으로 계정이 없어지지 않으므로 기존 4개 계정 보호 검증도 필요하다. 새 시드·문서·PR·배포 로그에는 평문 비밀번호를 남기지 않는다. 현 배포 스크립트에 이 보호 단계가 구현됐다는 뜻은 아니며 S44의 배포 검증에서 증명해야 한다(SRC-065).
 
 ## 6. 조직
 
@@ -401,9 +402,10 @@ history_window_end_date = registration_scheduled_date - 1 day
 
 각 보험회사마다 다른 코드를 만든다.
 
+현재 시드(V3·V4)의 10건:
+
 | insurer_code | insurer_agent_code | agent_code | effective_from | source_ref |
 |---|---|---|---|---|
-현재 시드(V3·V4)의 10건:
 
 | insurer_code | insurer_agent_code | agent_code |
 |---|---|---|
@@ -601,7 +603,7 @@ warning_usage_pct = 90
 
 각 `cap_rule_item`은 실행 가능한 시드에서 `decision_reason`을 반드시 저장한다. `EXCLUDED`이면 `exclusion_type`과 `evidence_required_yn=true`, `APPROVED_ALLOCATION`이면 `allocation_policy_id`가 필수다. REG-11의 허용 제외유형은 적격 신인활동지원 하나다(제7항 제1·2호 녹취·방송송출은 FGC 적용 대상 없음, SRC-036). 그리고 REG-10 준법경영비는 GA→설계사 제외유형으로 재사용하지 않는다.
 
-현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 2021~2026 0%, 2027 이후 3%로 시행일을 보정한다. FGC는 대면 모집만 다루므로 채널별 룰셋을 나누지 않는다(SRC-036). 또한 V3의 기존 활성 룰셋과 보정 룰셋이 겹치므로 `cap_rule_set_id`만으로 조용히 승자를 정하는 방식을 일반 정책선택 규칙으로 승격하지 않는다. 유산 룰셋 폐기와 비중복 범위 정리는 별도 마이그레이션 대상이다. V46·V52가 이 유산 룰셋을 v3로 복제했고(승자는 여전히 `cap_rule_set_id` 순서), 폐기 마이그레이션은 아직 없다.
+현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 2021~2026 0%, 2027 이후 3%로 시행일을 보정한다. FGC는 대면 모집만 다루므로 채널별 룰셋을 나누지 않는다(SRC-036). 또한 V3의 기존 활성 룰셋과 보정 룰셋이 겹치므로 `cap_rule_set_id`만으로 조용히 승자를 정하는 방식을 일반 정책선택 규칙으로 승격하지 않는다. 유산 룰셋 폐기와 비중복 범위 정리는 별도 마이그레이션 대상이다. V46·V52가 이 유산 룰셋을 v3로 복제했고(승자는 여전히 `cap_rule_set_id` 순서), 폐기 마이그레이션은 아직 없다. §40 인수 검사는 이 정리 마이그레이션을 먼저 적용해야 한다(SRC-065).
 
 ## 16. 공통비 배부정책
 
@@ -1338,7 +1340,11 @@ A1·A2(및 0475 복제본)의 관리자수수료는 팀장 1명에게 90,000 1�
 
 ## 40. 입력 정합성
 
-시드 적재 직후 다음 결과가 0건이어야 한다.
+**선행 조건·적용 순서(SRC-027 D-04·SRC-065):** 기존 시드 적용 → 새 버전 마이그레이션으로 CAP 유산 정책 폐기·활성 범위 중복 정리 → 전체 입력 정합성 검사 → §41 생성결과 검사 순서로 진행한다. V3·V6_1과 이를 복제한 V46·V52의 동일 범위 활성 룰셋을 조사하고, 과거 참조는 보존하면서 유산 정책을 RETIRED로 전환하고 필요한 비중복 룰셋을 새 승인 버전으로 발행한다. 적용된 Flyway 파일이나 잠긴 자식 행을 직접 고치지 않는다.
+
+정리 전 검사는 결함 파악용으로만 실행할 수 있고 인수 합격으로 처리하지 않는다. 현재 `cap_rule_set_id` 정렬은 이 중복을 우회하는 기존 동작일 뿐 허용 예외나 일반 선택 정책이 아니다. 정리 후에는 같은 범위·유효기간의 활성 중복이 0건임과 계약 경계일의 정책 선택을 확인한다. S04의 시드·발표 데이터 인수 전에 이 선행 조건을 완료한다.
+
+위 선행 작업까지 적용한 뒤 다음 결과가 0건이어야 한다.
 
 - 상위조직 없는 비GA 조직
 - 유효기간 역전
