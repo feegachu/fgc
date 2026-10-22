@@ -183,6 +183,7 @@ describe('EXCP-W01 예외함', () => {
           sourceEntityType: 'COMMISSION_TRANSACTION',
           sourceEntityId: '41',
           sourceLink: null,
+          sourceDeleted: true,
         },
       ])
     renderPage('/app/exceptions?status=REJECTED')

@@ -3489,6 +3489,9 @@
           "severityLabel" : {
             "type" : "string"
           },
+          "sourceDeleted" : {
+            "type" : "boolean"
+          },
           "sourceEntityId" : {
             "type" : "string"
           },

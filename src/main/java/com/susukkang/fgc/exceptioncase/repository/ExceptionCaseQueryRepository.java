@@ -50,7 +50,7 @@ public class ExceptionCaseQueryRepository {
                    ec.first_detected_at, ec.last_detected_at, ec.detection_count, ec.created_at,
                    (ec.source_entity_type = 'COMMISSION_TRANSACTION' AND NOT EXISTS (
                        SELECT 1 FROM fgc.commission_transaction source_payment
-                        WHERE CAST(source_payment.commission_transaction_id AS varchar) = ec.source_entity_id
+                        WHERE source_payment.commission_transaction_id = CASE WHEN pg_input_is_valid(ec.source_entity_id, 'bigint') THEN CAST(ec.source_entity_id AS bigint) END
                    )) AS source_deleted
             """;
 

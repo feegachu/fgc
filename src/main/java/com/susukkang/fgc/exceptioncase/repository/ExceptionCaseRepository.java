@@ -55,7 +55,7 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                 SELECT 1 FROM fgc.exception_case ec
                  WHERE ec.exception_case_id = :id AND ec.source_entity_type = 'COMMISSION_TRANSACTION'
                    AND NOT EXISTS (SELECT 1 FROM fgc.commission_transaction ct
-                                    WHERE CAST(ct.commission_transaction_id AS varchar) = ec.source_entity_id)
+                                    WHERE ct.commission_transaction_id = CASE WHEN pg_input_is_valid(ec.source_entity_id, 'bigint') THEN CAST(ec.source_entity_id AS bigint) END)
             )
             """, nativeQuery = true)
     boolean isDeletedPaymentCase(@Param("id") Long id);

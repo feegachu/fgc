@@ -2701,6 +2701,7 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
             severityLabel?: string;
+            sourceDeleted?: boolean;
             sourceEntityId?: string;
             sourceEntityType?: string;
             sourceLink?: string | null;

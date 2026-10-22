@@ -1,7 +1,6 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.code.ExceptionType;
@@ -42,7 +41,7 @@ public record ExceptionCaseResponseDTO(
         OffsetDateTime createdAt,
         List<ExceptionOccurrenceResponse> occurrences,
         List<ExceptionActionResponse> actions,
-        @JsonIgnore boolean sourceDeleted
+        boolean sourceDeleted
 ) {
     public ExceptionCaseResponseDTO {
         occurrences = List.copyOf(occurrences);

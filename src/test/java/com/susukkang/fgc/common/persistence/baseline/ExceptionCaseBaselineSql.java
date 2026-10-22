@@ -36,7 +36,7 @@ final class ExceptionCaseBaselineSql {
                            ec.created_at         AS createdAt,
                            (ec.source_entity_type = 'COMMISSION_TRANSACTION' AND NOT EXISTS (
                                SELECT 1 FROM fgc.commission_transaction ct
-                                WHERE CAST(ct.commission_transaction_id AS varchar) = ec.source_entity_id
+                                WHERE ct.commission_transaction_id = CASE WHEN pg_input_is_valid(ec.source_entity_id, 'bigint') THEN CAST(ec.source_entity_id AS bigint) END
                            )) AS sourceDeleted
                       FROM fgc.exception_case ec
                       LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
