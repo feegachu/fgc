@@ -41,7 +41,11 @@ public class ReconciliationTasklet implements Tasklet {
         );
         ValidationStepContext stepContext = new ValidationStepContext(validationRunId, jobContext);
         for (PaymentStage paymentStage : PaymentStage.values()) {
-            reconciliationBatchPort.reconcile(stepContext, paymentStage);
+            var result = reconciliationBatchPort.reconcile(stepContext, paymentStage);
+            contribution.incrementWriteCount(result.processedCount());
+            for (long skipped = 0; skipped < result.skippedCount(); skipped++) {
+                contribution.incrementProcessSkipCount();
+            }
         }
         return RepeatStatus.FINISHED;
     }
