@@ -253,8 +253,14 @@ class CommissionPaymentIntegrationTest {
     }
 
     private void cleanupDeletionException(Long exceptionId) {
-        jdbcTemplate.update("DELETE FROM fgc.exception_action WHERE exception_case_id=?", exceptionId);
-        jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE exception_case_id=?", exceptionId);
+        TransactionTemplate cleanup = new TransactionTemplate(transactionManager);
+        cleanup.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
+        cleanup.executeWithoutResult(status -> {
+            // 임시 PostgreSQL의 테스트 전용 정리. append-only 운영 트리거는 변경하지 않는다.
+            jdbcTemplate.execute("SET LOCAL session_replication_role = replica");
+            jdbcTemplate.update("DELETE FROM fgc.exception_action WHERE exception_case_id=?", exceptionId);
+            jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE exception_case_id=?", exceptionId);
+        });
     }
 
     @org.junit.jupiter.params.ParameterizedTest
