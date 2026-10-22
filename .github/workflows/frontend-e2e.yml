@@ -47,7 +47,7 @@ jobs:
           node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - run: npm ci --no-audit
         working-directory: frontend
       - name: Prove permission regression detection and missing-backend diagnostics
         run: npm run test:e2e:negative
@@ -72,7 +72,7 @@ jobs:
           node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - run: npm ci --no-audit
         working-directory: frontend
       - run: npm run check:e2e
         working-directory: frontend
@@ -122,7 +122,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: ./gradlew bootJar
-      - run: npm ci
+      - run: npm ci --no-audit
         working-directory: frontend
       - run: npm run check:e2e
         working-directory: frontend
