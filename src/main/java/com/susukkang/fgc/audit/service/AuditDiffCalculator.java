@@ -28,7 +28,9 @@ public class AuditDiffCalculator {
      * before/after JSON 을 리프 경로("payment.amount", "attributions[0].contractId") 단위로
      * 펴서 나란히 비교한다 — 최상위 키만 비교하면 중첩 객체가 통째로 한 칸이 되어
      * "바뀐 칸만 노랗게"(화면정의서 :1537)가 필드 단위로 동작하지 않는다.
-     * 값이 있는 쪽이 하나라도 JSON 객체가 아니면(스칼라·배열·파싱 실패) 필드 비교 대신
+     * 최상위가 JSON 배열이어도 같은 방식으로 편다("[0].result.limitAmount") — 계약 한도 재검증처럼
+     * 결과 목록을 통째로 저장한 감사행(#603)이 한 칸짜리 원문 JSON 으로 보이지 않게 한다.
+     * 값이 있는 쪽이 하나라도 JSON 객체·배열이 아니면(스칼라·파싱 실패) 필드 비교 대신
      * 원문 한 줄 비교로 되돌린다 — 파싱 실패를 "값 없음"으로 취급하면 그쪽 원문이 diff 에서
      * 사라진다. 감사행은 이미 저장된 증거라 여기서 예외를 던져 화면을 깨뜨리지 않는다.
      */
@@ -38,8 +40,8 @@ public class AuditDiffCalculator {
         if (!beforePresent && !afterPresent) {
             return List.of();
         }
-        Map<String, Object> before = beforePresent ? parseObject(beforeJson) : null;
-        Map<String, Object> after = afterPresent ? parseObject(afterJson) : null;
+        Object before = beforePresent ? parseContainer(beforeJson) : null;
+        Object after = afterPresent ? parseContainer(afterJson) : null;
         if ((beforePresent && before == null) || (afterPresent && after == null)) {
             return List.of(new AuditDiffEntry("value", beforeJson, afterJson,
                     !Objects.equals(beforeJson, afterJson)));
@@ -89,10 +91,11 @@ public class AuditDiffCalculator {
         out.put(prefix, value);
     }
 
-    private Map<String, Object> parseObject(String json) {
+    /** JSON 객체(Map)나 배열(List)이면 그 값을, 스칼라·파싱 실패면 null 을 돌려준다. */
+    private Object parseContainer(String json) {
         try {
-            return objectMapper.readValue(json,
-                    objectMapper.getTypeFactory().constructMapType(LinkedHashMap.class, String.class, Object.class));
+            Object value = objectMapper.readValue(json, Object.class);
+            return value instanceof Map<?, ?> || value instanceof List<?> ? value : null;
         } catch (JsonProcessingException ex) {
             return null;
         }
