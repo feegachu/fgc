@@ -178,6 +178,9 @@ async function installApi(
           },
         })
       data = payment
+    } else if (path === '/api/v1/transactions/101' && request.method() === 'DELETE') {
+      payment = {}
+      data = null
     } else if (path === '/api/v1/transactions/101') data = payment
     else if (path === '/api/v1/transactions')
       data = {
@@ -211,6 +214,34 @@ async function installApi(
   })
   return { requests, payment: () => payment }
 }
+
+test('초안 삭제는 확인 후 실행하며 취소 시 목록을 유지한다', async ({ page }) => {
+  const fixture = await installApi(page, {
+    initialDraft: {
+      commissionTransactionId: 101,
+      status: 'DRAFT',
+      sourceBusinessKey: 'E2E-DELETE-DRAFT',
+      sourceType: 'GA_MANUAL_PAYMENT',
+      paymentStage: 'GA_TO_FC',
+      amount: 1000,
+      settlementMonth: '2026-07-01',
+    },
+  })
+  await page.goto('transactions?month=2026-07')
+  await expect(page.getByRole('columnheader', { name: '작업', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'E2E-DELETE-DRAFT 삭제', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '지급 초안 삭제' })
+  await expect(dialog).toContainText('E2E-DELETE-DRAFT')
+  await expect(dialog).toContainText('1,000원')
+  await dialog.getByRole('button', { name: '취소', exact: true }).click()
+  expect(fixture.requests.filter((request) => request.method === 'DELETE')).toHaveLength(0)
+  await expect(page.locator('#list-body')).toContainText('E2E-DELETE-DRAFT')
+  await page.getByRole('button', { name: 'E2E-DELETE-DRAFT 삭제', exact: true }).click()
+  await dialog.getByRole('button', { name: '삭제', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.locator('#list-body')).not.toContainText('E2E-DELETE-DRAFT')
+  expect(fixture.requests.filter((request) => request.method === 'DELETE')).toHaveLength(1)
+})
 
 async function enterDraft(page: Page, amount: number, count: number) {
   await page.goto('transactions/new?month=2026-07')

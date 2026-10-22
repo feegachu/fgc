@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
+import { Modal } from '../../components/Modal'
+import { apiClient } from '../../lib/api/client'
+import { toast } from '../../stores/toasts'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
@@ -10,7 +13,7 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
-import { int, isNegative, month as formatMonth, won } from '../../lib/format'
+import { errorText, int, isNegative, month as formatMonth, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { withMonth } from '../../stores/workspace'
 import { useInsurers } from '../base/api'
@@ -35,6 +38,33 @@ export default function TransactionListPage() {
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params)
   const search = useQuery(transactionListQuery(filters))
+  const queryClient = useQueryClient()
+  const [deleteTarget, setDeleteTarget] = useState<PaymentRow | null>(null)
+  const deletion = useMutation({
+    mutationFn: (id: number) => apiClient.request<null>(`/api/v1/transactions/${id}`, { method: 'DELETE' }),
+    onSuccess: async () => {
+      setDeleteTarget(null)
+      toast('지급 초안을 삭제했습니다.', 'success')
+      if (search.data?.content?.length === 1 && filters.page > 1) {
+        setParams(
+          (current) => {
+            const next = new URLSearchParams(current)
+            next.set('page', String(filters.page - 1))
+            return next
+          },
+          { replace: true },
+        )
+      }
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    },
+    onError: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+  })
+  function closeDelete() {
+    if (!deletion.isPending) {
+      setDeleteTarget(null)
+      deletion.reset()
+    }
+  }
   // TRAN-W01 offers the first 100 insurers and learns agent/item options from visited result pages.
   const insurers = useInsurers({ page: 1, size: 100 })
   const [known, setKnown] = useState<KnownOptions>({ agents: {}, items: {} })
@@ -143,32 +173,92 @@ export default function TransactionListPage() {
     },
     {
       key: 'action',
-      label: <span className="visually-hidden">행 작업</span>,
-      width: '5rem',
+      label: '작업',
+      width: '9rem',
+      align: 'center',
       render: (row) =>
         row.status !== 'DRAFT' ? (
           '-'
         ) : user.canProcess ? (
-          <Link
-            className="button button-ghost"
-            to={path(row.commissionTransactionId)}
-            aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정`}
-          >
-            수정
-          </Link>
+          <div className="transaction-row-actions">
+            <Link
+              className="button button-ghost"
+              to={path(row.commissionTransactionId)}
+              aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정`}
+            >
+              수정
+            </Link>
+            <Button
+              variant="ghost"
+              className="transaction-delete"
+              disabled={deletion.isPending || row.sourceType !== 'GA_MANUAL_PAYMENT'}
+              aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 삭제`}
+              onClick={() => {
+                deletion.reset()
+                setDeleteTarget(row)
+              }}
+            >
+              삭제
+            </Button>
+          </div>
         ) : (
-          <Button
-            variant="ghost"
-            disabled
-            aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정 (조회 전용 권한)`}
-          >
-            수정
-          </Button>
+          <div className="transaction-row-actions">
+            <Button
+              variant="ghost"
+              disabled
+              aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정 (조회 전용 권한)`}
+            >
+              수정
+            </Button>
+            <Button
+              variant="ghost"
+              disabled
+              aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 삭제 (조회 전용 권한)`}
+            >
+              삭제
+            </Button>
+          </div>
         ),
     },
   ]
   return (
     <div className="transaction-page transaction-list-page">
+      <Modal
+        open={deleteTarget !== null}
+        title="지급 초안 삭제"
+        onClose={closeDelete}
+        closeOnEscape={!deletion.isPending}
+        footer={
+          <>
+            <Button variant="secondary" disabled={deletion.isPending} onClick={closeDelete}>
+              취소
+            </Button>
+            <Button
+              loading={deletion.isPending}
+              disabled={deleteTarget?.commissionTransactionId == null}
+              onClick={() => {
+                if (deleteTarget?.commissionTransactionId != null && !deletion.isPending)
+                  deletion.mutate(deleteTarget.commissionTransactionId)
+              }}
+            >
+              {deletion.isPending ? '삭제 중' : '삭제'}
+            </Button>
+          </>
+        }
+      >
+        <p>
+          <strong>{deleteTarget?.sourceBusinessKey || '선택한 지급 건'}</strong> 초안을 삭제하시겠습니까?
+        </p>
+        <p>
+          {deleteTarget?.paymentStageLabel} · {formatMonth(deleteTarget?.settlementMonth)} · {won(deleteTarget?.amount)}
+        </p>
+        <p>삭제한 초안은 복구할 수 없습니다.</p>
+        {deletion.isError && (
+          <p role="alert" className="field-error">
+            {errorText(deletion.error, '초안을 삭제하지 못했습니다. 다시 시도해 주세요.')}
+          </p>
+        )}
+      </Modal>
       <header className="page-header transaction-page-header">
         <div className="page-header-copy">
           <h1 className="page-title">수수료 지급 건 목록</h1>
