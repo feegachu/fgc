@@ -260,11 +260,11 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     await actions.click(screen.getByRole('button', { name: '다시 시도' }))
     expect(await screen.findByText('TRAN-410')).toBeInTheDocument()
   })
-  it('음수 금액은 괄호·빨강, 귀속 0건/차액은 확인필요로 표시한다', async () => {
+  it('음수 금액은 마이너스 기호·빨강, 귀속 0건/차액은 확인필요로 표시한다', async () => {
     resultRows = [{ ...row, amount: -1000, attributionCount: 0, differenceAmount: -1000 }]
     renderAt()
     const table = await screen.findByRole('table')
-    const amounts = await within(table).findAllByText('(1,000)원')
+    const amounts = await within(table).findAllByText('-1,000원')
     expect(amounts.every((element) => element.classList.contains('is-negative-amount'))).toBe(true)
     expect(within(table).getByText('0건 · 확인필요')).toBeInTheDocument()
   })

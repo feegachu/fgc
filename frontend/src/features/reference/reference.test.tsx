@@ -177,7 +177,7 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
   await screen.findByText('650.1234')
   expect(screen.getByText('1 ~ 12회차')).toBeVisible()
-  expect(screen.getByText('(1,234)')).toHaveClass('is-negative-amount')
+  expect(screen.getByText('-1,234')).toHaveClass('is-negative-amount')
   await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
   await screen.findByText('89.1234')
   expect(screen.getByText('증빙 확인')).toBeVisible()
