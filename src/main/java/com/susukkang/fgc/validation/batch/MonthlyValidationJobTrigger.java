@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.batch;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
@@ -66,13 +68,17 @@ public class MonthlyValidationJobTrigger {
      * 사용자) 값을 쓰면 triggeredBy 불일치로 VRUN_005가 난다.
      */
     public CompletableFuture<JobExecution> launch(ValidationRunRow run, String requestId) {
-        JobParameters jobParameters = new JobParametersBuilder()
+        JobParameters requestedParameters = new JobParametersBuilder()
                 .addString("validationMonth", DateUtil.formatSettlementMonth(run.getValidationMonth()))
                 .addLong("runNo", run.getRunNo().longValue())
                 .addString("runType", run.getRunType())
                 .addLong("triggeredBy", run.getTriggeredBy())
                 .addString("requestId", requestId, false)
                 .toJobParameters();
+
+        // 메타데이터/체크포인트가 없으면 202 후 무한 대기시키지 않고 요청 단계에서 거절한다.
+        JobParameters jobParameters = ValidationRunStatus.FAILED.name().equals(run.getStatus())
+                ? restartParameters(run, requestId) : requestedParameters;
 
         Long validationRunId = run.getValidationRunId();
 
@@ -104,22 +110,28 @@ public class MonthlyValidationJobTrigger {
                     + (fresh.isEmpty() ? "삭제됨" : fresh.get().getStatus()) + ") — 중복 실행 요청을 무시합니다.");
         }
         try {
-            if (expected == ValidationRunStatus.FAILED) {
-                JobExecution previous = monthlyJobExecutionLookup.findFailedExecution(run);
-                Long previousRunId = ValidationRunBatchContext.getValidationRunId(previous.getExecutionContext());
-                if (!validationRunId.equals(previousRunId)) {
-                    throw new IllegalStateException("재시작 실행과 저장된 체크포인트의 검증 ID가 다릅니다.");
-                }
-                jobParameters = new JobParametersBuilder(previous.getJobParameters())
-                        .addLong("restartValidationRunId", validationRunId, false)
-                        .addString("restartRequestId", jobParameters.getString("requestId"), false)
-                        .toJobParameters();
-            }
             return jobLauncher.run(monthlyValidationJob, jobParameters);
         } catch (Exception e) {
             // JobLauncher.run()의 checked 예외 4종을 supplyAsync의 Supplier는 못 던지므로
             // unchecked로 감싸 전달한다. 최종적으로 whenComplete에서 로그로 남는다.
             throw new IllegalStateException("MonthlyValidationJob launch 실패", e);
+        }
+    }
+
+    private JobParameters restartParameters(ValidationRunRow run, String requestId) {
+        try {
+            JobExecution previous = monthlyJobExecutionLookup.findFailedExecution(run);
+            Long previousRunId = ValidationRunBatchContext.getValidationRunId(previous.getExecutionContext());
+            if (!run.getValidationRunId().equals(previousRunId)) {
+                throw new IllegalStateException("재시작 실행과 체크포인트의 검증 ID가 다릅니다.");
+            }
+            return new JobParametersBuilder(previous.getJobParameters())
+                    .addLong("restartValidationRunId", run.getValidationRunId(), false)
+                    .addString("restartRequestId", requestId, false).toJobParameters();
+        } catch (IllegalStateException exception) {
+            log.warn("월 배치 재시작 불가 (validationRunId={})", run.getValidationRunId(), exception);
+            throw new FgcBusinessException(FgcErrorCode.VRUN_005, null, java.util.Map.of(),
+                    "재시작 메타데이터를 확인할 수 없습니다. 실행 이력을 확인해 주세요.");
         }
     }
 }

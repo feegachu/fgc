@@ -1,6 +1,8 @@
 package com.susukkang.fgc.validation.batch;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
@@ -52,6 +54,17 @@ class MonthlyValidationJobTriggerTest {
     private ValidationRunRepository validationRunRepository;
     @Mock
     private MonthlyJobExecutionLookup monthlyJobExecutionLookup;
+
+    @Test
+    void missingCheckpointIsRejectedBeforeAsyncAcceptance() throws Exception {
+        var failed = row("FAILED");
+        given(monthlyJobExecutionLookup.findFailedExecution(failed))
+                .willThrow(new IllegalStateException("메타데이터 없음"));
+        assertThatThrownBy(() -> trigger.launch(failed, "retry"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_005));
+        verify(jobLauncher, never()).run(any(), any());
+    }
 
     @InjectMocks
     private MonthlyValidationJobTrigger trigger;

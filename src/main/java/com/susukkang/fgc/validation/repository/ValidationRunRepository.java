@@ -39,6 +39,15 @@ import java.util.Optional;
  */
 public interface ValidationRunRepository extends JpaRepository<ValidationRun, Long>, ValidationRunSearch {
 
+    /** 비동기 재시작 대기 중의 이전 FAILED와 새 시도 결과를 구별하는 추적 ID다. */
+    @Query(value = """
+            SELECT request_id FROM fgc.audit_log
+             WHERE entity_type='VALIDATION_RUN' AND entity_id=CAST(:validationRunId AS varchar)
+               AND action_code IN ('VALIDATION_RUN_STARTED', 'VALIDATION_RUN_RETRIED')
+             ORDER BY audit_log_id DESC LIMIT 1
+            """, nativeQuery = true)
+    String findLatestAttemptRequestId(@Param("validationRunId") Long validationRunId);
+
     /**
      * 검증월 단위 트랜잭션 advisory lock(#491). 커밋·롤백 때 자동으로 풀린다.
      *
