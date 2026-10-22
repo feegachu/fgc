@@ -238,7 +238,7 @@ if (typeof module !== "undefined" && module.exports) {
       remove.type = "button";
       remove.className = "button button-ghost transaction-delete";
       remove.textContent = "삭제";
-      remove.disabled = !canProcess;
+      remove.disabled = !canProcess || item.sourceType !== "GA_MANUAL_PAYMENT";
       remove.setAttribute("aria-label", (item.sourceBusinessKey || "선택한 지급 건") + " 삭제" + (canProcess ? "" : " (조회 전용 권한)"));
       remove.addEventListener("click", function () {
         if (remove.disabled || !window.confirm((item.sourceBusinessKey || "선택한 지급 건") + " · " + format.won(item.amount) + " 초안을 삭제하시겠습니까? 삭제한 초안은 복구할 수 없습니다.")) return;

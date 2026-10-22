@@ -177,7 +177,7 @@ export default function TransactionListPage() {
             <Button
               variant="ghost"
               className="transaction-delete"
-              disabled={deletion.isPending}
+              disabled={deletion.isPending || row.sourceType !== 'GA_MANUAL_PAYMENT'}
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 삭제`}
               onClick={() => {
                 deletion.reset()

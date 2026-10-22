@@ -3496,7 +3496,7 @@
             "type" : "string"
           },
           "sourceLink" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "status" : {
             "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],

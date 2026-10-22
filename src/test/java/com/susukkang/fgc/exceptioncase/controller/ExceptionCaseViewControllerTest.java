@@ -139,7 +139,7 @@ class ExceptionCaseViewControllerTest {
                 LocalDate.of(2026, 8, 1), null, null,
                 OffsetDateTime.parse("2026-08-21T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-08-21T09:00:00+09:00"), 1,
-                OffsetDateTime.parse("2026-08-21T09:00:00+09:00"), List.of(), List.of());
+                OffsetDateTime.parse("2026-08-21T09:00:00+09:00"), List.of(), List.of(), false);
     }
 
     @Test
@@ -411,7 +411,7 @@ class ExceptionCaseViewControllerTest {
                 LocalDate.of(2026, 8, 1), null, null,
                 OffsetDateTime.parse("2026-08-20T09:00:00+09:00"),
                 OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), 1,
-                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), List.of(), List.of());
+                OffsetDateTime.parse("2026-08-20T09:00:00+09:00"), List.of(), List.of(), false);
     }
 
     private static ExceptionCaseResponseDTO row(
@@ -459,7 +459,7 @@ class ExceptionCaseViewControllerTest {
                         id, 1506L, 2, LocalDate.of(2026, 7, 1), "DATA_QUALITY",
                         "FINANCIAL_SNAPSHOT_MISSING", sourceType, sourceId, "{}", false, false,
                         OffsetDateTime.parse("2026-07-11T09:00:00+09:00"))),
-                actions);
+                actions, false);
     }
 
     private static FgcUserDetails principal(String loginId, String userName, String roleCode) {

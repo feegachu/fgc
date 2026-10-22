@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 설명 : 공통 예외 저장 및 조치 직전 잠금·현재 상태 갱신 Repository
@@ -34,6 +35,30 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
              FOR UPDATE
             """, nativeQuery = true)
     LockedCaseView findLockedById(@Param("exceptionCaseId") Long exceptionCaseId);
+
+    /** 지급 행 잠금 이후 예외를 ID 순서로 잠가 수동 조치와 초안 삭제를 직렬화한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query(value = """
+            SELECT exception_case_id AS "exceptionCaseId", exception_type AS "exceptionType",
+                   status, assigned_to AS "assignedTo",
+                   source_entity_type AS "sourceEntityType", source_entity_id AS "sourceEntityId"
+              FROM fgc.exception_case
+             WHERE source_entity_type = 'COMMISSION_TRANSACTION' AND source_entity_id = :paymentId
+             ORDER BY exception_case_id
+             FOR UPDATE
+            """, nativeQuery = true)
+    List<LockedCaseView> findPaymentCasesForUpdate(@Param("paymentId") String paymentId);
+
+    /** 원천 ID는 증거로 보존하지만 이미 삭제된 지급의 예외는 다시 열지 않는다. */
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM fgc.exception_case ec
+                 WHERE ec.exception_case_id = :id AND ec.source_entity_type = 'COMMISSION_TRANSACTION'
+                   AND NOT EXISTS (SELECT 1 FROM fgc.commission_transaction ct
+                                    WHERE CAST(ct.commission_transaction_id AS varchar) = ec.source_entity_id)
+            )
+            """, nativeQuery = true)
+    boolean isDeletedPaymentCase(@Param("id") Long id);
 
     default ExceptionCaseActionTarget findByIdForUpdate(Long exceptionCaseId) {
         LockedCaseView row = findLockedById(exceptionCaseId);

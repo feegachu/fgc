@@ -43,7 +43,7 @@ class ExceptionResponseJsonTest {
                 "INSURANCE_CONTRACT", "3", null, null, LocalDate.of(2026, 7, 1), 44L, 44L,
                 OffsetDateTime.parse("2026-07-10T00:00:00+09:00"),
                 OffsetDateTime.parse("2026-07-10T00:00:00+09:00"), 1,
-                OffsetDateTime.parse("2026-07-10T00:00:00+09:00"), List.of(occurrence), List.of(action));
+                OffsetDateTime.parse("2026-07-10T00:00:00+09:00"), List.of(occurrence), List.of(action), false);
 
         JsonNode json = mapper.valueToTree(dto);
 

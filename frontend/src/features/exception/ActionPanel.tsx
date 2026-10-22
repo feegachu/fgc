@@ -206,7 +206,9 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
 export function ActionPanel({ item }: { item: ExceptionCase }) {
   const canHandle = usePermission('canHandleException')
   const [correctionOpen, setCorrectionOpen] = useState(false)
-  const actionable = isActionable(item.status)
+  const deletedRejectedPayment =
+    item.status === 'REJECTED' && item.sourceEntityType === 'COMMISSION_TRANSACTION' && item.sourceLink === null
+  const actionable = isActionable(item.status) && !deletedRejectedPayment
   const isCorrection = item.type === JOURNAL_CORRECTION_TYPE
   return (
     <>

@@ -2703,7 +2703,7 @@ export interface components {
             severityLabel?: string;
             sourceEntityId?: string;
             sourceEntityType?: string;
-            sourceLink?: string;
+            sourceLink?: string | null;
             /** @enum {string} */
             status?: "NEW" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
             statusLabel?: string;

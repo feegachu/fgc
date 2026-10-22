@@ -3,6 +3,7 @@ package com.susukkang.fgc.transaction.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
@@ -105,6 +106,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final FgcMessageResolver messageResolver;
     private final AuditLogService auditLogService;
     private final CommissionPolicyService commissionPolicyService;
+    private final ExceptionCaseService exceptionCaseService;
 
     @Override
     @Transactional
@@ -169,6 +171,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             throw new FgcBusinessException(FgcErrorCode.TRAN_009);
         }
         List<CommissionPaymentAttributionRow> attributions = queryRepository.findAttributions(paymentId);
+        exceptionCaseService.resolveForDraftDeletion(paymentId);
         capCheckWriteRepository.detachPreConfirmDetails(paymentId);
         writeRepository.archiveDraftChecks(paymentId);
         writeRepository.deleteAttributions(paymentId);

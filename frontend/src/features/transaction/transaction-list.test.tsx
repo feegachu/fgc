@@ -111,6 +111,16 @@ afterEach(() => {
 })
 
 describe('TRAN-W01 수수료 지급 목록', () => {
+  it('GA 수기지급 이외의 초안은 삭제 요청과 확인창을 열지 않는다', async () => {
+    resultRows = [{ ...row, sourceType: 'INSURER_STATEMENT' }]
+    const { actions } = renderAt()
+    const button = await screen.findByRole('button', { name: 'TRAN-410 삭제' })
+    expect(button).toBeDisabled()
+    await actions.click(button)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(deleteCalls).toHaveLength(0)
+  })
+
   it('작업 헤더와 초안 삭제 확인창을 표시하고 취소하면 요청하지 않는다', async () => {
     const { actions } = renderAt()
     await screen.findByRole('columnheader', { name: '작업' })

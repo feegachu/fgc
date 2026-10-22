@@ -2,6 +2,7 @@ package com.susukkang.fgc.exceptioncase.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.ExceptionActionType;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionStatus;
@@ -20,6 +21,8 @@ import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -216,6 +219,33 @@ public class ExceptionCaseService {
                 exceptionCaseId, request, actionUserId, actionUserLoginId, true);
     }
 
+    /** 삭제할 지급에서 발생한 열린 예외만 취소 조치로 종결하고 기존 검출·조치 이력을 보존한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void resolveForDraftDeletion(Long paymentId) {
+        var targets = exceptionCaseRepository.findPaymentCasesForUpdate(paymentId.toString()).stream()
+                .filter(target -> !isClosed(ExceptionStatus.valueOf(target.getStatus())))
+                .toList();
+        if (targets.isEmpty()) return;
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        FgcUserDetails user = authentication != null
+                && authentication.getPrincipal() instanceof FgcUserDetails details ? details : null;
+        if (user == null) throw new org.springframework.security.access.AccessDeniedException("예외 조치 처리자 정보가 필요합니다.");
+        Long userId = user.getUserId();
+        String loginId = user.getUsername();
+        String reason = "초안 삭제(PAYMENT_DELETED): 지급 " + paymentId + "의 지급 예정이 철회되어 종결";
+        for (var target : targets) {
+            ExceptionStatus status = ExceptionStatus.valueOf(target.getStatus());
+            if (status == ExceptionStatus.NEW) {
+                actionInternal(target.getExceptionCaseId(),
+                        new ExceptionActionRequest(ExceptionActionType.START_REVIEW, reason, null),
+                        userId, loginId, false);
+            }
+            actionInternal(target.getExceptionCaseId(),
+                    new ExceptionActionRequest(ExceptionActionType.CANCEL, reason, null),
+                    userId, loginId, false);
+        }
+    }
+
     /**
      * 설명 : 예외 조치와 상태 변경 및 감사로그를 호출자의 같은 트랜잭션에서 저장한다.
      *
@@ -249,6 +279,11 @@ public class ExceptionCaseService {
 
         ExceptionStatus fromStatus = target.status();
         ExceptionActionType actionType = request.actionType();
+
+        if (actionType == ExceptionActionType.REOPEN && exceptionCaseRepository.isDeletedPaymentCase(exceptionCaseId)) {
+            throw new FgcBusinessException(FgcErrorCode.EXCP_003,
+                    Map.of("status", fromStatus.name(), "actionType", actionType.name()));
+        }
 
         // 2026-08-20 yslee - 원장 정정 예외의 형식적 종결을 일반 조치 API에서 차단
         // 기존 코드: CORRECT·RESOLVE 이력만 저장해도 JOURNAL_CORRECTION_REQUIRED가 종결됨

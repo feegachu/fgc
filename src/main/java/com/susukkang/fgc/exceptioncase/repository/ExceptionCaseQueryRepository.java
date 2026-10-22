@@ -47,7 +47,11 @@ public class ExceptionCaseQueryRepository {
                    ec.source_entity_type, ec.source_entity_id, ec.cap_check_id,
                    reconciliation.result_type AS reconciliation_result_type,
                    ec.validation_month, ec.first_detected_run_id, ec.last_detected_run_id,
-                   ec.first_detected_at, ec.last_detected_at, ec.detection_count, ec.created_at
+                   ec.first_detected_at, ec.last_detected_at, ec.detection_count, ec.created_at,
+                   (ec.source_entity_type = 'COMMISSION_TRANSACTION' AND NOT EXISTS (
+                       SELECT 1 FROM fgc.commission_transaction source_payment
+                        WHERE CAST(source_payment.commission_transaction_id AS varchar) = ec.source_entity_id
+                   )) AS source_deleted
             """;
 
     private static final String DISPLAY_JOINS = """
@@ -102,6 +106,7 @@ public class ExceptionCaseQueryRepository {
         query.addScalar("last_detected_at", OffsetDateTime.class);
         query.addScalar("detection_count", Integer.class);
         query.addScalar("created_at", OffsetDateTime.class);
+        query.addScalar("source_deleted", Boolean.class);
         return query.setTupleTransformer((row, aliases) -> new ExceptionCaseSearchRow(
                 (Long) row[0], (String) row[1], (String) row[2], (String) row[3],
                 (String) row[4], (String) row[5], (String) row[6], (String) row[7],
@@ -109,7 +114,7 @@ public class ExceptionCaseQueryRepository {
                 (String) row[12], (String) row[13], (String) row[14], (Long) row[15],
                 (String) row[16], (LocalDate) row[17], (Long) row[18], (Long) row[19],
                 (OffsetDateTime) row[20], (OffsetDateTime) row[21], (Integer) row[22],
-                (OffsetDateTime) row[23])).getResultList();
+                (OffsetDateTime) row[23], Boolean.TRUE.equals(row[24]))).getResultList();
     }
 
     /** 목록과 동일한 필터로 먼저 전체 건수를 구한다. */
