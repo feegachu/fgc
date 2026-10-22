@@ -196,6 +196,32 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.click(screen.getByRole('button', { name: '2' }))
     await waitFor(() => expect(calls.some((call) => call.url.includes('page=2'))).toBe(true))
   })
+  it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 유지한다', async () => {
+    const { router, user } = renderAt('/journals?searched=true&contractNo=C-001&page=2&selected=11')
+    const table = await screen.findByRole('table', { name: '조회 조건에 해당하는 검증원장 분개 목록' })
+    const lastQuery = () =>
+      new URLSearchParams(calls.filter((call) => call.url.startsWith('/api/v1/journals?')).at(-1)!.url.split('?')[1])
+    // 순서 기준이 없는 상태·유형 컬럼은 정렬 버튼이 없다.
+    expect(within(table).queryByRole('button', { name: '상태' })).toBeNull()
+    expect(within(table).getByRole('columnheader', { name: /차변 합계/ })).toHaveAttribute('aria-sort', 'none')
+    await user.click(within(table).getByRole('button', { name: '차변 합계' }))
+    await waitFor(() => expect(lastQuery().get('sort')).toBe('debitTotal,asc'))
+    expect(lastQuery().get('page')).toBe('1')
+    expect(lastQuery().get('contractNo')).toBe('C-001')
+    expect(within(table).getByRole('columnheader', { name: /차변 합계/ })).toHaveAttribute('aria-sort', 'ascending')
+    await user.click(within(table).getByRole('button', { name: '차변 합계' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=debitTotal%2Cdesc'))
+    expect(within(table).getByRole('columnheader', { name: /차변 합계/ })).toHaveAttribute('aria-sort', 'descending')
+    // 정렬을 바꿔도 선택한 분개 상세는 그대로 유지하고, 다음 조회에도 정렬이 남는다.
+    expect(router.state.location.search).toContain('selected=11')
+    await user.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=debitTotal%2Cdesc'))
+  })
+  it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬을 쓴다', async () => {
+    renderAt('/journals?searched=true&sort=status,asc')
+    await screen.findByRole('button', { name: 'JRN-001' })
+    expect(calls.some((call) => call.url.startsWith('/api/v1/journals?') && call.url.includes('sort='))).toBe(false)
+  })
   it('selected 딥링크는 기준 월 목록과 함께 상세와 검증 실행별 불균형을 조회한다', async () => {
     renderAt('/journals?selected=11', (url) =>
       url.startsWith('/api/v1/journals/imbalances') ? { totalCount: 2, content: [] } : undefined,

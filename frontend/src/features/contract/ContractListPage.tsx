@@ -11,6 +11,7 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { exportCsv } from '../../lib/exportCsv'
+import { sortBinding } from '../../lib/tableSort'
 import { date, int, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { usePermission } from '../auth/useAuth'
@@ -19,7 +20,7 @@ import type { Agent } from '../base/api'
 import { Amount, CapStatus } from '../cap/badges'
 import { STATUSES } from '../cap/labels'
 import { QueryState } from '../reference/ReferenceUI'
-import { contractListQuery, criteriaFromParams, listCsvPath, normalizePage, PAGE_SIZE } from './api'
+import { CONTRACT_SORT_KEYS, contractListQuery, criteriaFromParams, listCsvPath, normalizePage, PAGE_SIZE } from './api'
 import type { ContractCriteria, ContractSummary } from './api'
 import { contractStatusLabels } from './labels'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
@@ -37,6 +38,7 @@ const FILTER_KEYS = {
   contractDateTo: '',
   currentStatus: '',
   capResultStatus: '',
+  sort: '',
   page: '',
   size: '',
 }
@@ -52,6 +54,7 @@ const columns: TableColumn<ContractSummary>[] = [
   {
     key: 'contractNo',
     label: '계약번호',
+    sortable: true,
     width: '12rem',
     cellClassName: 'contract-number-cell',
     render: (row) =>
@@ -60,6 +63,7 @@ const columns: TableColumn<ContractSummary>[] = [
   {
     key: 'insurerName',
     label: '보험회사',
+    sortable: true,
     width: '6.5rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.insurerName),
@@ -67,28 +71,29 @@ const columns: TableColumn<ContractSummary>[] = [
   {
     key: 'productName',
     label: '상품명',
+    sortable: true,
     width: '11.75rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.productName),
   },
-  { key: 'contractDate', label: '계약일', width: '5.75rem', render: (row) => date(row.contractDate) },
+  { key: 'contractDate', label: '계약일', sortable: true, width: '5.75rem', render: (row) => date(row.contractDate) },
   {
     key: 'premium',
-    label: (
-      <>
-        <span>월납환산 초회보험료</span>
-        <EvidenceLink label="월납환산 초회보험료 설명 보기" icon="help">
-          주기 보험료를 월 기준으로 환산한 값입니다. 1,200% 한도 계산 기준으로 사용합니다.
-        </EvidenceLink>
-      </>
+    label: <span>월납환산 초회보험료</span>,
+    labelExtra: (
+      <EvidenceLink label="월납환산 초회보험료 설명 보기" icon="help">
+        주기 보험료를 월 기준으로 환산한 값입니다. 1,200% 한도 계산 기준으로 사용합니다.
+      </EvidenceLink>
     ),
-    width: '10.25rem',
+    sortable: true,
+    width: '12rem',
     align: 'number',
     render: (row) => <Amount value={row.monthlyEquivalentFirstPremium} />,
   },
   {
     key: 'agent',
     label: '모집 설계사',
+    sortable: true,
     width: '8.5rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.agentIdName),
@@ -186,6 +191,7 @@ export default function ContractListPage() {
               viewportClassName="contract-table-viewport"
               caption="보험계약 검색 결과"
               columns={columns}
+              {...sortBinding(criteria.sort, CONTRACT_SORT_KEYS, (sort) => update({ sort }))}
               rows={list.data?.content ?? []}
               rowKey={(row) => String(row.contractId)}
               onRowActivate={(row) => {

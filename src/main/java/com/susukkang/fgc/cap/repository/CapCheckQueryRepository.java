@@ -2,6 +2,8 @@ package com.susukkang.fgc.cap.repository;
 
 import com.susukkang.fgc.cap.dto.*;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.SqlSort;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
@@ -12,6 +14,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 설명 : 한도 결과 화면의 월별 최신 판정·집계를 보존하는 JPA 네이티브 조회 저장소.
@@ -26,6 +29,17 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CapCheckQueryRepository {
+    // 목록 조회 결과 컬럼 별칭(addScalar)이자 화면 정렬 key — 두 곳이 어긋나지 않게 한 상수로 쓴다.
+    private static final String COL_AS_OF_DATE = "asOfDate";
+    private static final String COL_CONTRACT_NO = "contractNo";
+    private static final String COL_BASE_PREMIUM_AMOUNT = "basePremiumAmount";
+    private static final String COL_REFUND_12M_AMOUNT = "refund12mAmount";
+    private static final String COL_COMPLIANCE_DEDUCTION_AMOUNT = "complianceDeductionAmount";
+    private static final String COL_LIMIT_AMOUNT = "limitAmount";
+    private static final String COL_INCLUDED_AMOUNT = "includedAmount";
+    private static final String COL_REMAINING_AMOUNT = "remainingAmount";
+    private static final String COL_USAGE_PCT = "usagePct";
+
     private final EntityManager entityManager;
 
     private static final String FIND_LATEST_BY_CONTRACT_AND_STAGE = """
@@ -145,7 +159,7 @@ public class CapCheckQueryRepository {
                    cap_rule_set_id              AS "capRuleSetId"
               FROM latest_cap_check
             __resultFilterWhere__
-             ORDER BY as_of_date DESC, cap_check_id DESC
+             __order__
              LIMIT :limit OFFSET :offset
             """;
 
@@ -332,21 +346,21 @@ public class CapCheckQueryRepository {
         query.addScalar("contractId", Long.class);
         query.addScalar("paymentStage", String.class);
         query.addScalar("checkKind", String.class);
-        query.addScalar("asOfDate", LocalDate.class);
+        query.addScalar(COL_AS_OF_DATE, LocalDate.class);
         query.addScalar("capRuleSetId", Long.class);
         query.addScalar("refundRateTableId", Long.class);
-        query.addScalar("basePremiumAmount", BigDecimal.class);
-        query.addScalar("refund12mAmount", BigDecimal.class);
-        query.addScalar("complianceDeductionAmount", BigDecimal.class);
-        query.addScalar("limitAmount", BigDecimal.class);
-        query.addScalar("includedAmount", BigDecimal.class);
-        query.addScalar("remainingAmount", BigDecimal.class);
-        query.addScalar("usagePct", BigDecimal.class);
+        query.addScalar(COL_BASE_PREMIUM_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_REFUND_12M_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_COMPLIANCE_DEDUCTION_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_LIMIT_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_INCLUDED_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_REMAINING_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_USAGE_PCT, BigDecimal.class);
         query.addScalar("resultStatus", String.class);
         query.addScalar("calculationSnapshotJson", String.class);
         // 튜플은 SELECT 위치가 아니라 addScalar 등록 순서를 따른다. 상세 전용 계약번호를 끝에 둔다.
         if (includeContractNo) {
-            query.addScalar("contractNo", String.class);
+            query.addScalar(COL_CONTRACT_NO, String.class);
         }
         return query.setTupleTransformer((tuple, aliases) -> toCapCheckRow(tuple, includeContractNo))
                 .getResultList().stream().findFirst().orElse(null);
@@ -376,29 +390,55 @@ public class CapCheckQueryRepository {
         return row;
     }
 
+    /** 화면 정렬 key(CAP-W01 계약별 판정 목록) → latest_cap_check 컬럼. 지급단계·판정·룰셋은 순서 기준이 없어 제외한다. */
+    private static final Map<String, String> SORTABLE = Map.of(
+            COL_CONTRACT_NO, "contract_no",
+            COL_AS_OF_DATE, "as_of_date",
+            COL_BASE_PREMIUM_AMOUNT, "base_premium_amount",
+            COL_REFUND_12M_AMOUNT, "refund_12m_amount",
+            COL_COMPLIANCE_DEDUCTION_AMOUNT, "compliance_deduction_amount",
+            COL_LIMIT_AMOUNT, "limit_amount",
+            COL_INCLUDED_AMOUNT, "included_amount",
+            COL_REMAINING_AMOUNT, "remaining_amount",
+            COL_USAGE_PCT, "usage_pct");
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+    public static final ListSort DEFAULT_SORT = new ListSort(COL_AS_OF_DATE, false);
+
+    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 비어 있으면 기준일 내림차순. */
+    public static ListSort sortOf(String raw) {
+        return ListSort.parse(raw, SORT_KEYS, DEFAULT_SORT);
+    }
+
     public List<CapCheckListRow> search(LocalDate month, String paymentStage, String resultStatus, Long insurerId, Long organizationId, String contractNo, int offset, int limit) {
+        return search(month, paymentStage, resultStatus, insurerId, organizationId, contractNo, offset, limit, DEFAULT_SORT);
+    }
+
+    // S107: 기존 8개 검색 인자 시그니처에 정렬만 더했다(기존 호출 호환). 인자 묶음 객체로 바꾸면 기존 테스트·호출이 모두 바뀐다.
+    @SuppressWarnings("java:S107")
+    public List<CapCheckListRow> search(LocalDate month, String paymentStage, String resultStatus, Long insurerId, Long organizationId, String contractNo, int offset, int limit, ListSort sort) {
         Map<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("month", month);
         parameters.put("paymentStage", paymentStage);
         parameters.put("resultStatus", resultStatus);
         parameters.put("insurerId", insurerId);
         parameters.put("organizationId", organizationId);
-        parameters.put("contractNo", contractNo);
+        parameters.put(COL_CONTRACT_NO, contractNo);
         parameters.put("offset", offset);
         parameters.put("limit", limit);
-        NativeQuery<?> query = prepare(SEARCH, parameters);
+        NativeQuery<?> query = prepare(
+                SEARCH.replace("__order__", SqlSort.orderBy(sort, SORTABLE, "as_of_date DESC, cap_check_id DESC")), parameters);
         query.addScalar("capCheckId", Long.class);
         query.addScalar("contractId", Long.class);
-        query.addScalar("contractNo", String.class);
+        query.addScalar(COL_CONTRACT_NO, String.class);
         query.addScalar("paymentStage", String.class);
-        query.addScalar("asOfDate", LocalDate.class);
-        query.addScalar("basePremiumAmount", BigDecimal.class);
-        query.addScalar("refund12mAmount", BigDecimal.class);
-        query.addScalar("complianceDeductionAmount", BigDecimal.class);
-        query.addScalar("limitAmount", BigDecimal.class);
-        query.addScalar("includedAmount", BigDecimal.class);
-        query.addScalar("remainingAmount", BigDecimal.class);
-        query.addScalar("usagePct", BigDecimal.class);
+        query.addScalar(COL_AS_OF_DATE, LocalDate.class);
+        query.addScalar(COL_BASE_PREMIUM_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_REFUND_12M_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_COMPLIANCE_DEDUCTION_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_LIMIT_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_INCLUDED_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_REMAINING_AMOUNT, BigDecimal.class);
+        query.addScalar(COL_USAGE_PCT, BigDecimal.class);
         query.addScalar("resultStatus", String.class);
         query.addScalar("capRuleSetId", Long.class);
         return query.setTupleTransformer((tuple, aliases) -> {
@@ -428,7 +468,7 @@ public class CapCheckQueryRepository {
         parameters.put("resultStatus", resultStatus);
         parameters.put("insurerId", insurerId);
         parameters.put("organizationId", organizationId);
-        parameters.put("contractNo", contractNo);
+        parameters.put(COL_CONTRACT_NO, contractNo);
         NativeQuery<?> query = prepare(COUNT, parameters);
         return ((Number) query.getSingleResult()).longValue();
     }
@@ -439,7 +479,7 @@ public class CapCheckQueryRepository {
         parameters.put("paymentStage", paymentStage);
         parameters.put("insurerId", insurerId);
         parameters.put("organizationId", organizationId);
-        parameters.put("contractNo", contractNo);
+        parameters.put(COL_CONTRACT_NO, contractNo);
         NativeQuery<?> query = prepare(SUMMARIZE, parameters);
         query.addScalar("resultStatus", String.class);
         query.addScalar("count", Long.class);
@@ -456,14 +496,14 @@ public class CapCheckQueryRepository {
         parameters.put("month", month);
         parameters.put("insurerId", insurerId);
         parameters.put("organizationId", organizationId);
-        parameters.put("contractNo", contractNo);
+        parameters.put(COL_CONTRACT_NO, contractNo);
         NativeQuery<?> query = prepare(SUMMARIZE_BY_STAGE, parameters);
         query.addScalar("paymentStage", String.class);
         query.addScalar("contractCount", Long.class);
         query.addScalar("limitAmountTotal", BigDecimal.class);
         query.addScalar("includedAmountTotal", BigDecimal.class);
         query.addScalar("complianceDeductionAmountTotal", BigDecimal.class);
-        query.addScalar("usagePct", BigDecimal.class);
+        query.addScalar(COL_USAGE_PCT, BigDecimal.class);
         query.addScalar("violationCount", Long.class);
         query.addScalar("warningCount", Long.class);
         query.addScalar("reviewRequiredCount", Long.class);
@@ -491,7 +531,7 @@ public class CapCheckQueryRepository {
         parameters.put("month", month);
         parameters.put("insurerId", insurerId);
         parameters.put("organizationId", organizationId);
-        parameters.put("contractNo", contractNo);
+        parameters.put(COL_CONTRACT_NO, contractNo);
         NativeQuery<?> query = prepare(SUMMARIZE_BY_AGENT, parameters);
         query.addScalar("agentId", Long.class);
         query.addScalar("agentCode", String.class);
@@ -502,7 +542,7 @@ public class CapCheckQueryRepository {
         query.addScalar("contractCount", Long.class);
         query.addScalar("limitAmountTotal", BigDecimal.class);
         query.addScalar("includedAmountTotal", BigDecimal.class);
-        query.addScalar("usagePct", BigDecimal.class);
+        query.addScalar(COL_USAGE_PCT, BigDecimal.class);
         query.addScalar("violationCount", Long.class);
         query.addScalar("warningCount", Long.class);
         query.addScalar("reviewRequiredCount", Long.class);
@@ -569,7 +609,7 @@ public class CapCheckQueryRepository {
         appendFilter(scope, parameters, "month", "date_trunc('month', cc.as_of_date) = date_trunc('month', CAST(:month AS date))");
         appendFilter(scope, parameters, "insurerId", "ic.insurer_id = :insurerId");
         appendFilter(scope, parameters, "organizationId", "ic.organization_id = :organizationId");
-        appendFilter(scope, parameters, "contractNo", "ic.contract_no = :contractNo");
+        appendFilter(scope, parameters, COL_CONTRACT_NO, "ic.contract_no = :contractNo");
         StringBuilder result = new StringBuilder(" WHERE 1 = 1");
         appendFilter(result, parameters, "paymentStage", "payment_stage = :paymentStage");
         appendFilter(result, parameters, "resultStatus", "result_status = :resultStatus");

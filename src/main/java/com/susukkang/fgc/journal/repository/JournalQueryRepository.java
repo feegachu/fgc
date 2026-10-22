@@ -8,6 +8,10 @@ import com.susukkang.fgc.journal.dto.LedgerImbalanceRow;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.ExpressionUtils;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.ComparableExpressionBase;
+import com.querydsl.core.types.dsl.Expressions;
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.QuerydslSort;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.susukkang.fgc.journal.entity.QJournalHeader;
@@ -28,6 +32,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 설명 : 원장 목록·상세·차대변 합계를 조회한다.
@@ -41,6 +47,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class JournalQueryRepository {
+    private static final String DEBIT_TOTAL = "debitTotal";
+    private static final String CREDIT_TOTAL = "creditTotal";
+
 
     private static final String STATUS_ALIAS = "status";
     private static final String VALIDATION_RUN_ID_PARAMETER = "validationRunId";
@@ -54,6 +63,28 @@ public class JournalQueryRepository {
     private final EntityManager entityManager;
     private final JPAQueryFactory queryFactory;
 
+    /** 화면 정렬 key(LEDG-W01 분개 목록) → 표현식. 차변·대변 합계는 목록과 같은 헤더 라인 합계 식이다. */
+    private static final Map<String, ComparableExpressionBase<?>> SORTABLE = Map.of(
+            "journalNo", journalHeader.journalNo,
+            "journalDate", journalHeader.journalDate,
+            "contractNo", insuranceContract.contractNo,
+            DEBIT_TOTAL, lineTotal(journalLine.debitAmount),
+            CREDIT_TOTAL, lineTotal(journalLine.creditAmount));
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+    public static final ListSort DEFAULT_SORT = new ListSort("journalDate", false);
+
+    private static ComparableExpressionBase<BigDecimal> lineTotal(
+            com.querydsl.core.types.dsl.NumberPath<BigDecimal> amount) {
+        return Expressions.numberTemplate(BigDecimal.class, "({0})",
+                JPAExpressions.select(amount.sumAggregate().coalesce(BigDecimal.ZERO))
+                        .from(journalLine).where(journalLine.journalHeaderId.eq(journalHeader.journalHeaderId)));
+    }
+
+    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 비어 있으면 분개일 내림차순. */
+    public static ListSort sortOf(String raw) {
+        return ListSort.parse(raw, SORT_KEYS, DEFAULT_SORT);
+    }
+
     public boolean existsValidationRun(Long validationRunId) {
         return entityManager.createQuery("SELECT count(v) FROM ValidationRun v WHERE v.validationRunId = :id", Long.class)
                 .setParameter("id", validationRunId).getSingleResult() > 0;
@@ -66,10 +97,19 @@ public class JournalQueryRepository {
         return search(from, to, journalType, accountCode, contractId, null, status, offset, limit);
     }
 
-    /** 계정과목 필터는 EXISTS, 합계는 헤더의 모든 라인을 대상으로 유지한다. */
+    /** 기본 정렬(분개일 내림차순)로 검색한다(기존 호출 호환). */
     public List<JournalListRow> search(LocalDate from, LocalDate to, String journalType,
                                        String accountCode, Long contractId, String contractNo, String status,
                                        int offset, int limit) {
+        return search(from, to, journalType, accountCode, contractId, contractNo, status, offset, limit, DEFAULT_SORT);
+    }
+
+    /** 계정과목 필터는 EXISTS, 합계는 헤더의 모든 라인을 대상으로 유지한다. 정렬은 검색된 전체 데이터에 적용한다. */
+    // S107: 기존 검색 인자에 정렬만 더했다(기존 호출 호환). 인자 묶음 객체로 바꾸면 기존 호출·테스트가 모두 바뀐다.
+    @SuppressWarnings("java:S107")
+    public List<JournalListRow> search(LocalDate from, LocalDate to, String journalType,
+                                       String accountCode, Long contractId, String contractNo, String status,
+                                       int offset, int limit, ListSort sort) {
         var h = journalHeader;
         var l = journalLine;
         var c = insuranceContract;
@@ -81,9 +121,9 @@ public class JournalQueryRepository {
                         h.sourceEntityType, h.sourceEntityId, h.contractId, c.contractNo,
                         h.status.stringValue().as(STATUS_ALIAS),
                         ExpressionUtils.as(JPAExpressions.select(l.debitAmount.sumAggregate().coalesce(BigDecimal.ZERO))
-                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), "debitTotal"),
+                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), DEBIT_TOTAL),
                         ExpressionUtils.as(JPAExpressions.select(l.creditAmount.sumAggregate().coalesce(BigDecimal.ZERO))
-                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), "creditTotal"),
+                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), CREDIT_TOTAL),
                         h.reversalOfId, rev.journalNo.as("reversalOfJournalNo"),
                         creator.loginId.as("createdBy"), poster.loginId.as("postedBy"), h.postedAt, h.createdAt))
                 .from(h).leftJoin(c).on(c.contractId.eq(h.contractId))
@@ -91,7 +131,8 @@ public class JournalQueryRepository {
                 .leftJoin(creator).on(creator.userId.eq(h.createdBy))
                 .leftJoin(poster).on(poster.userId.eq(h.postedBy))
                 .where(searchFilters(from, to, journalType, accountCode, contractId, contractNo, status))
-                .orderBy(h.journalDate.desc(), h.journalHeaderId.desc()).offset(offset).limit(limit).fetch();
+                .orderBy(QuerydslSort.order(sort, SORTABLE, h.journalDate.desc(), h.journalHeaderId.desc()))
+                .offset(offset).limit(limit).fetch();
     }
 
     public long count(LocalDate from, LocalDate to, String journalType,
@@ -203,8 +244,8 @@ public class JournalQueryRepository {
                 .map(row -> {
                     JournalBalanceSummary result = new JournalBalanceSummary();
                     result.setJournalHeaderId(row.get("journalHeaderId", Long.class));
-                    result.setDebitTotal(row.get("debitTotal", BigDecimal.class));
-                    result.setCreditTotal(row.get("creditTotal", BigDecimal.class));
+                    result.setDebitTotal(row.get(DEBIT_TOTAL, BigDecimal.class));
+                    result.setCreditTotal(row.get(CREDIT_TOTAL, BigDecimal.class));
                     return result;
                 })
                 .findFirst().orElse(null);

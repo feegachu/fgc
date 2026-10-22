@@ -25,4 +25,5 @@ public class ScheduleSearchCondition {
     private ScheduleRegime regime; // 적용 체계
     private SchedulePurpose purpose;        // 스케줄 용도
     private ScheduleHeaderStatus status;         // 스케줄 상태
+    private String sort;           // 정렬 "key,asc|desc" (#604). 비우면 스케줄 ID 내림차순
 }

@@ -19,8 +19,16 @@ public record AuditLogSearchCriteria(
         Long userId,
         String action,
         LocalDateTime from,
-        LocalDateTime toExclusive
+        LocalDateTime toExclusive,
+        /** 정렬 "key,asc|desc" (#604). 비우면 발생 시각 내림차순 */
+        String sort
 ) {
+
+    /** 정렬 없이 검색하는 기존 호출용 생성자. */
+    public AuditLogSearchCriteria(String entityType, String entityId, Long userId, String action,
+                                  LocalDateTime from, LocalDateTime toExclusive) {
+        this(entityType, entityId, userId, action, from, toExclusive, null);
+    }
 
     /**
      * 설명 : 조회 시작 시각을 기존 JDBC 바인딩과 동일한 JVM 기본 시간대의 OffsetDateTime으로 변환한다.

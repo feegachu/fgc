@@ -2,6 +2,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import { PAYMENT_STAGE, SCHEDULE_PURPOSE, SCHEDULE_REGIME, SCHEDULE_STATUS } from './labels'
+import { formatSort, parseSort } from '../../lib/tableSort'
 
 type Schemas = components['schemas']
 export type ScheduleHeader = Schemas['ScheduleHeaderResponse']
@@ -25,7 +26,11 @@ export interface ScheduleFilters {
 }
 export interface ScheduleCriteria extends ScheduleFilters {
   page: number
+  /** 서버(ScheduleQueryRepository.SORT_KEYS)와 같은 정렬 key. 비어 있으면 서버 기본(최신 스케줄 순) */
+  sort: string
 }
+/** 서버와 같은 정렬 key. 지급단계·적용체계·용도·상태·사용중은 순서 기준이 없어 제외한다. */
+export const SCHEDULE_SORT_KEYS = ['contractNo', 'version', 'lines', 'total', 'policy'] as const
 export const FILTER_NAMES = ['contractNo', 'stage', 'regime', 'purpose', 'status'] as const
 export const DEFAULT_PURPOSE = 'OPERATIONAL'
 
@@ -51,6 +56,7 @@ export function criteriaFromParams(params: URLSearchParams): ScheduleCriteria {
     purpose: allowed(SCHEDULE_PURPOSE, params.get('purpose'), DEFAULT_PURPOSE),
     status: allowed(SCHEDULE_STATUS, params.get('status'), ''),
     page: positivePage(params.get('page')),
+    sort: formatSort(parseSort(params.get('sort'), SCHEDULE_SORT_KEYS)),
   }
 }
 
@@ -60,11 +66,12 @@ export function normalizePage(requested: number, totalPages: number | undefined)
   return Math.min(Math.max(1, requested), last)
 }
 
-export function filterQuery(filters: ScheduleFilters) {
+export function filterQuery(filters: ScheduleFilters & { sort?: string }) {
   const query = new URLSearchParams()
   FILTER_NAMES.forEach((name) => {
     if (filters[name]) query.set(name, filters[name])
   })
+  if (filters.sort) query.set('sort', filters.sort)
   return query
 }
 

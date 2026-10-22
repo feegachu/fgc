@@ -8,11 +8,18 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { dateTime, errorText, int } from '../../lib/format'
+import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { withMonth } from '../../stores/workspace'
 import { ActionPanel } from './ActionPanel'
 import { Disclosure } from './Disclosure'
-import { ALL_STATUS, exceptionOptionsQueryOptions, exceptionSearchQueryOptions, OPEN_STATUS } from './api'
+import {
+  ALL_STATUS,
+  EXCEPTION_SORT_KEYS,
+  exceptionOptionsQueryOptions,
+  exceptionSearchQueryOptions,
+  OPEN_STATUS,
+} from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
 import { severityTone, statusOptions, statusTone, typeTone } from './rules'
 import { exceptionSummaryDescription } from './labels'
@@ -35,6 +42,7 @@ function filtersFromParams(params: URLSearchParams): ExceptionFilters {
     assigneeFilter: params.get('assigneeFilter') ?? '',
     validationMonth: params.get('validationMonth') ?? '',
     contractNo: params.get('contractNo') ?? '',
+    sort: formatSort(parseSort(params.get('sort'), EXCEPTION_SORT_KEYS)),
     page: Number.isInteger(page) && page > 0 ? page : 1,
   }
 }
@@ -83,7 +91,14 @@ export function ExceptionPage() {
   }
 
   const columns: TableColumn<ExceptionCase>[] = [
-    { key: 'id', label: '번호', width: '4rem', align: 'left', render: (row) => row.exceptionCaseId },
+    {
+      key: 'id',
+      label: '번호',
+      sortKey: 'exceptionCaseId',
+      sortable: true,
+      width: '4rem',
+      align: 'left',
+      render: (row) => row.exceptionCaseId },
     {
       key: 'type',
       label: '유형',
@@ -102,14 +117,24 @@ export function ExceptionPage() {
     {
       key: 'severity',
       label: '심각도',
+      sortKey: 'severity',
+      sortable: true,
       width: '5rem',
       align: 'center',
       render: (row) => <StatusBadge tone={severityTone(row.severity)}>{row.severityLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'contract', label: '계약', width: '12rem', render: (row) => row.contractNo ?? '-' },
+    {
+      key: 'contract',
+      label: '계약',
+      sortKey: 'contractNo',
+      sortable: true,
+      width: '12rem',
+      render: (row) => row.contractNo ?? '-' },
     {
       key: 'title',
       label: '내용',
+      sortKey: 'title',
+      sortable: true,
       cellClassName: 'exception-title-cell exception-disclosure-cell',
       render: (row) => <Disclosure preview={row.title ?? '-'} />,
     },
@@ -120,14 +145,28 @@ export function ExceptionPage() {
       align: 'center',
       render: (row) => <StatusBadge tone={statusTone(row.status)}>{row.statusLabel ?? '-'}</StatusBadge>,
     },
-    { key: 'assignee', label: '담당자', width: '6rem', render: (row) => row.assigneeLoginId ?? '미배정' },
+    {
+      key: 'assignee',
+      label: '담당자',
+      sortKey: 'assigneeLoginId',
+      sortable: true,
+      width: '6rem',
+      render: (row) => row.assigneeLoginId ?? '미배정' },
     {
       key: 'detectedAt',
       label: '최근 검출',
+      sortKey: 'lastDetectedAt',
+      sortable: true,
       width: '8.5rem',
       render: (row) => dateTime(row.lastDetectedAt),
     },
-    { key: 'count', label: '검출', width: '4rem', render: (row) => `${row.detectionCount ?? 0}회` },
+    {
+      key: 'count',
+      label: '검출',
+      sortKey: 'detectionCount',
+      sortable: true,
+      width: '4rem',
+      render: (row) => `${row.detectionCount ?? 0}회` },
     {
       key: 'reference',
       label: '참조',
@@ -232,6 +271,7 @@ export function ExceptionPage() {
                     rowClassName={() => 'exception-row'}
                     onRowActivate={(row) => select(String(row.exceptionCaseId))}
                     columns={columns}
+                    {...sortBinding(filters.sort, EXCEPTION_SORT_KEYS, (sort) => apply({ sort }))}
                     rows={rows}
                     rowKey={(row) => String(row.exceptionCaseId)}
                     selectedKeys={selectedId ? [selectedId] : []}
