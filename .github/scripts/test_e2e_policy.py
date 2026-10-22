@@ -43,7 +43,8 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(result, {"ui": False, "server": True, "stability": False})
 
     def test_push_uses_before_and_after(self):
-        with patch("e2e_policy.changed_paths", return_value=["README.md"]) as diff:
+        with patch("e2e_policy.commit_available", return_value=True), \
+                patch("e2e_policy.changed_paths", return_value=["README.md"]) as diff:
             self.assertFalse(plan_for_event("push", {"before": "a" * 40, "after": "b" * 40})["server"])
         diff.assert_called_once_with("a" * 40, "b" * 40)
 
@@ -51,10 +52,18 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(plan_for_event("push", {"before": "0" * 40, "after": "b" * 40}),
                          {"ui": True, "server": True, "stability": False})
 
+    def test_unavailable_push_base_runs_all(self):
+        with patch("e2e_policy.commit_available", return_value=False), \
+                patch("e2e_policy.changed_paths") as diff:
+            self.assertEqual(plan_for_event("push", {"before": "a" * 40, "after": "b" * 40}),
+                             {"ui": True, "server": True, "stability": False})
+            diff.assert_not_called()
+
     def test_unknown_event_and_failed_diff_do_not_skip(self):
         with self.assertRaises(ValueError):
             plan_for_event("unexpected", {})
-        with patch("e2e_policy.changed_paths", side_effect=RuntimeError("git failed")):
+        with patch("e2e_policy.commit_available", return_value=True), \
+                patch("e2e_policy.changed_paths", side_effect=RuntimeError("git failed")):
             with self.assertRaises(RuntimeError):
                 plan_for_event("push", {"before": "a" * 40, "after": "b" * 40})
 

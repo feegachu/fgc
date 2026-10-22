@@ -45,11 +45,24 @@ def git(*args):
     return subprocess.check_output(["git", *args])
 
 
+def require_sha(revision):
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("Expected a full Git commit SHA")
+
+
+def commit_available(revision):
+    require_sha(revision)
+    try:
+        git("cat-file", "-e", revision + "^{commit}")
+    except subprocess.CalledProcessError:
+        return False
+    return True
+
+
 def changed_paths(base, head, *, merge_base=False):
     """Use NUL-delimited paths and disable rename folding to inspect old and new names."""
     for revision in (base, head):
-        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
-            raise ValueError("Expected a full Git commit SHA")
+        require_sha(revision)
     if merge_base:
         base = git("merge-base", base, head).decode().strip()
     raw = git("diff", "--name-only", "--no-renames", "-z", base, head, "--")
@@ -65,8 +78,11 @@ def plan_for_event(event_name, event):
         return classify(changed_paths(pr["base"]["sha"], pr["head"]["sha"], merge_base=True))
     if event_name == "push":
         before, after = event["before"], event["after"]
+        require_sha(before)
+        require_sha(after)
         # A new branch has no previous tree; never interpret it as documentation-only.
-        if before == "0" * 40:
+        # Full fetches cannot recover an unreachable before SHA after rewritten history.
+        if before == "0" * 40 or not commit_available(before):
             return {"ui": True, "server": True, "stability": False}
         return classify(changed_paths(before, after))
     raise ValueError(f"Unsupported event: {event_name}")
