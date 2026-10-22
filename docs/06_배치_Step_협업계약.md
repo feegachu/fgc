@@ -4,7 +4,7 @@
 
 ## 공통 규칙
 
-- Step 1은 `ValidationJobContext`를 받고 `validation_run_id`를 반환한다. Step 2~8은 이 ID와 모든 JobParameter를 포함한 `ValidationStepContext`를 받는다.
+- 현재 Step 1은 JobParameter에서 `CreateValidationRunCommand`를 만들어 서비스를 호출하고, 반환된 `validation_run_id`를 Job ExecutionContext에 넣는다. Step 2는 그 ID와 `validationMonth`로 선별 서비스를 직접 호출한다. Step 3~8의 포트가 `ValidationStepContext`를 받는다. `ValidationJobContext`는 현재 미연결된 생성 포트의 설계 입력이므로 실제 Step 1 입력과 구분한다(SRC-064).
 - 모든 포트 구현체는 `requestId`, `triggeredBy`를 감사 로그·업무 저장에 그대로 전달한다.
 - Writer는 UPSERT 또는 `ON CONFLICT DO NOTHING`을 사용한다. 기존 결과를 삭제하고 다시 쓰지 않는다.
 - 치명적 오류는 예외로 전파해 Spring Batch Step을 실패시킨다. 계약 단위로 허용된 오류만 `StepProcessingResult.skips`로 반환한다.
