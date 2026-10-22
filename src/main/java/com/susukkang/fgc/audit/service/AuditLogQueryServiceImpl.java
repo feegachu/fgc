@@ -9,6 +9,7 @@ import com.susukkang.fgc.audit.repository.AuditLogQueryRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.audit.repository.AuditLogSearchImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,6 @@ public class AuditLogQueryServiceImpl implements AuditLogQueryService {
     private static final int MIN_PAGE = 1;
     private static final int MIN_SIZE = 1;
     private static final int MAX_SIZE = 100;
-    private static final String SORT = "occurredAt,desc";
 
     private final AuditLogQueryRepository auditLogQueryRepository;
     private final AuditDiffCalculator auditDiffCalculator;
@@ -54,6 +54,7 @@ public class AuditLogQueryServiceImpl implements AuditLogQueryService {
             String action,
             LocalDate from,
             LocalDate to,
+            String sort,
             int page,
             int size
     ) {
@@ -69,7 +70,8 @@ public class AuditLogQueryServiceImpl implements AuditLogQueryService {
                 userId,
                 normalize(action),
                 from == null ? null : from.atStartOfDay(),
-                to == null ? null : to.plusDays(1).atStartOfDay()
+                to == null ? null : to.plusDays(1).atStartOfDay(),
+                sort
         );
 
         long offsetLong = (long) (page - 1) * size;
@@ -84,7 +86,7 @@ public class AuditLogQueryServiceImpl implements AuditLogQueryService {
                 .toList();
         long totalElements = auditLogQueryRepository.countAuditLogs(criteria);
 
-        return PageResponse.of(content, page, size, totalElements, SORT);
+        return PageResponse.of(content, page, size, totalElements, AuditLogSearchImpl.sortOf(criteria).value());
     }
 
     /**

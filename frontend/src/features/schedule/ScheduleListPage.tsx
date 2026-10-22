@@ -9,9 +9,18 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { exportCsv } from '../../lib/exportCsv'
+import { sortBinding } from '../../lib/tableSort'
 import { errorText, int, isNegative, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
-import { criteriaFromParams, DEFAULT_PURPOSE, listCsvPath, normalizePage, PAGE_SIZE, scheduleListQuery } from './api'
+import {
+  criteriaFromParams,
+  DEFAULT_PURPOSE,
+  listCsvPath,
+  normalizePage,
+  PAGE_SIZE,
+  SCHEDULE_SORT_KEYS,
+  scheduleListQuery,
+} from './api'
 import type { ScheduleFilters, ScheduleHeader } from './api'
 import { ActiveBadge, ClassificationBadge, RegimeEvidence, ScheduleStatusBadge } from './badges'
 import { EMPTY, PAYMENT_STAGE, responseLabel, SCHEDULE_PURPOSE, SCHEDULE_REGIME, SCHEDULE_STATUS } from './labels'
@@ -21,7 +30,7 @@ import './schedule.css'
  * FGC-UI-SCHE-W01 예상 스케줄 목록. 1차 schedule/list.html · schedule-list.js 와 같은 문구·딥링크를 쓴다.
  * 검색조건은 URL 쿼리(contractNo·stage·regime·purpose·status·page)가 단일 출처다.
  */
-const FILTER_KEYS = { contractNo: '', stage: '', regime: '', purpose: '', status: '', page: '' }
+const FILTER_KEYS = { contractNo: '', stage: '', regime: '', purpose: '', status: '', sort: '', page: '' }
 const DEFAULT_FILTERS: ScheduleFilters = { contractNo: '', stage: '', regime: '', purpose: DEFAULT_PURPOSE, status: '' }
 
 const detailHref = (row: ScheduleHeader) => `/schedules/${encodeURIComponent(String(row.scheduleHeaderId))}`
@@ -44,6 +53,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
   {
     key: 'contractNo',
     label: '계약번호',
+    sortable: true,
     width: '12rem',
     cellClassName: 'tabular-nums',
     // 계약번호는 폭을 넓게 잡아 토글 없이 항상 전체를 보여준다(#326).
@@ -79,6 +89,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
   {
     key: 'version',
     label: '버전',
+    sortable: true,
     width: '4.25rem',
     align: 'left',
     cellClassName: 'tabular-nums',
@@ -100,10 +111,11 @@ const columns: TableColumn<ScheduleHeader>[] = [
     align: 'center',
     render: (row) => <ActiveBadge active={row.activeYn} />,
   },
-  { key: 'lines', label: '회차 수', width: '5.5rem', align: 'left', render: (row) => int(row.lineCount) },
+  { key: 'lines', label: '회차 수', sortable: true, width: '5.5rem', align: 'left', render: (row) => int(row.lineCount) },
   {
     key: 'total',
     label: '예상 총액',
+    sortable: true,
     width: '8.5rem',
     align: 'number',
     render: (row) => (
@@ -113,6 +125,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
   {
     key: 'policy',
     label: '정책버전',
+    sortable: true,
     width: '13rem',
     render: (row) => (
       <CellDisclosure
@@ -224,6 +237,7 @@ export default function ScheduleListPage() {
             viewportClassName="schedule-table-viewport"
             caption="예상 지급 스케줄 검색 결과"
             columns={columns}
+            {...sortBinding(criteria.sort, SCHEDULE_SORT_KEYS, (sort) => update({ sort }))}
             rows={rows}
             rowKey={(row) =>
               String(row.scheduleHeaderId ?? `${row.contractNo}-${row.paymentStage}-${row.scheduleVersionNo}`)

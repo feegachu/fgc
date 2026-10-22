@@ -83,6 +83,44 @@ class ScheduleRepositoryIntegrationTest {
     private Long committedContractId;
 
     @Test
+    void sortsByEachAllowedColumnInBothDirectionsAcrossPagesAndRejectsOthers() {
+        java.util.Map<String, String> columns = java.util.Map.of(
+                "contractNo", "c.contract_no", "version", "sh.schedule_version_no",
+                "lines", "COUNT(sl.schedule_line_id)", "total", "SUM(sl.expected_amount)",
+                "policy", "pv.policy_code");
+        assertThat(ScheduleQueryRepository.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        for (var column : columns.entrySet()) {
+            for (String direction : List.of("asc", "desc")) {
+                ScheduleSearchCondition condition = new ScheduleSearchCondition();
+                condition.setPurpose(SchedulePurpose.OPERATIONAL);
+                condition.setSort(column.getKey() + "," + direction);
+                List<Long> expected = jdbc.queryForList("""
+                        SELECT sh.schedule_header_id FROM fgc.schedule_header sh
+                          JOIN fgc.insurance_contract c ON c.contract_id = sh.contract_id
+                          JOIN fgc.policy_version pv ON pv.policy_version_id = sh.policy_version_id
+                          LEFT JOIN fgc.schedule_line sl ON sl.schedule_header_id = sh.schedule_header_id
+                         WHERE sh.schedule_purpose = 'OPERATIONAL'
+                         GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_code
+                         ORDER BY %s %s NULLS LAST, sh.schedule_header_id DESC
+                        """.formatted(column.getValue(), direction), Long.class);
+                assertThat(queryRepository.selectAllByCondition(condition))
+                        .extracting(ScheduleHeaderResponse::getScheduleHeaderId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                assertThat(queryRepository.selectByCondition(condition, 3, 3))
+                        .extracting(ScheduleHeaderResponse::getScheduleHeaderId)
+                        .as("%s %s page 2", column.getKey(), direction)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+        for (String sort : List.of("status,asc", "total,sideways", "total", "total;DROP,asc")) {
+            ScheduleSearchCondition condition = new ScheduleSearchCondition();
+            condition.setSort(sort);
+            assertThatThrownBy(() -> queryRepository.selectAllByCondition(condition))
+                    .isInstanceOf(FgcBusinessException.class);
+        }
+    }
+
+    @Test
     void readsMatchJdbcBaselineIncludingSearchPagingAndEmptyResults() {
         inRolledBackTransaction(() -> {
             Long contractId = createContract(ContractStatus.ACTIVE);

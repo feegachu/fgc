@@ -1,5 +1,7 @@
 package com.susukkang.fgc.reconciliation.repository;
 
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.SqlSort;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationClassificationContext;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchDetailRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchInsertRow;
@@ -16,6 +18,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 설명 : 대사 결과·원천 연결의 멱등 저장과 분류 문맥·목록·상세·요약 조회.
@@ -29,6 +33,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReconciliationResultRepository {
+    private static final String CREATED_AT = "createdAt";
+    private static final String DIFFERENCE_AMOUNT = "differenceAmount";
+
     private static final String RECONCILIATION_RESULT_ID_PARAM = "reconciliationResultId";
     private static final String EXPECTED_AGENT_ID_PARAM = "expectedAgentId";
     private static final String ACTUAL_AGENT_ID_PARAM = "actualAgentId";
@@ -90,11 +97,11 @@ public class ReconciliationResultRepository {
             new ReconciliationNativeProjection.Column("actualSourceAgentCode", String.class),
             new ReconciliationNativeProjection.Column("expectedTotalAmount", BigDecimal.class),
             new ReconciliationNativeProjection.Column("actualTotalAmount", BigDecimal.class),
-            new ReconciliationNativeProjection.Column("differenceAmount", BigDecimal.class),
+            new ReconciliationNativeProjection.Column(DIFFERENCE_AMOUNT, BigDecimal.class),
             new ReconciliationNativeProjection.Column(RESULT_TYPE_PARAM, String.class),
             new ReconciliationNativeProjection.Column("primaryReasonCode", String.class),
             new ReconciliationNativeProjection.Column("secondaryReasonCodesCsv", String.class),
-            new ReconciliationNativeProjection.Column("createdAt", OffsetDateTime.class));
+            new ReconciliationNativeProjection.Column(CREATED_AT, OffsetDateTime.class));
     private final EntityManager entityManager;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
@@ -129,7 +136,7 @@ public class ReconciliationResultRepository {
         query.setParameter(RESULT_TYPE_PARAM, row.getResultType());
         query.setParameter("expectedAmount", row.getExpectedTotalAmount());
         query.setParameter("actualAmount", row.getActualTotalAmount());
-        query.setParameter("differenceAmount", row.getDifferenceAmount());
+        query.setParameter(DIFFERENCE_AMOUNT, row.getDifferenceAmount());
         query.setParameter("primaryReason", row.getPrimaryReasonCode());
         query.setParameter("reasons", writeReasons(row.getSecondaryReasonCodes()));
         query.setParameter("snapshot", row.getDetailSnapshotJson());
@@ -237,8 +244,29 @@ public class ReconciliationResultRepository {
         return ((Number) query.getSingleResult()).longValue();
     }
 
+    /** 화면 정렬 key(RECO-W02 결과 목록) → SQL 표현식. 결과 유형·원인은 순서 기준이 없어 제외한다. */
+    private static final Map<String, String> RESULT_SORTABLE = Map.of(
+            CREATED_AT, "result.created_at",
+            "contractNo", "contract.contract_no",
+            "commissionItemName", "item.item_name",
+            "installmentNo", "result.installment_no",
+            "expectedAgentName", "expected_agent.agent_name",
+            "actualAgentName", "actual_agent.agent_name",
+            "expectedTotalAmount", "result.expected_total_amount",
+            "actualTotalAmount", "result.actual_total_amount",
+            DIFFERENCE_AMOUNT, "result.difference_amount");
+    public static final Set<String> RESULT_SORT_KEYS = Set.copyOf(RESULT_SORTABLE.keySet());
+    public static final ListSort DEFAULT_RESULT_SORT = new ListSort(CREATED_AT, false);
+
+    /** 기존 호출 호환: 생성 시각 기준 방향만 고른다. */
     public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, String sortDirection, int offset, int limit) {
-        // 정렬 방향·결과 유형·식별자는 고정 SQL의 파라미터로 바인딩한다.
+        return findResults(reconciliationRunId, resultType, new ListSort(CREATED_AT, "asc".equals(sortDirection)), offset, limit);
+    }
+
+    public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, ListSort sort, int offset, int limit) {
+        // 결과 유형·식별자는 바인딩하고 정렬은 허용 목록의 코드 상수 표현식만 쓴다. 동률은 결과 ID가 방향을 따른다.
+        String orderBy = SqlSort.orderBy(sort, RESULT_SORTABLE,
+                "result.reconciliation_result_id " + (sort.ascending() ? "ASC" : "DESC"));
         NativeQuery<?> query = entityManager.createNativeQuery("""
                 SELECT result.reconciliation_result_id AS reconciliationResultId,
                 contract.contract_no AS contractNo,
@@ -272,12 +300,8 @@ public class ReconciliationResultRepository {
                 ON actual_org.organization_id = actual_agent.organization_id
                 WHERE result.reconciliation_run_id = :reconciliationRunId
                 AND (CAST(:resultType AS varchar) IS NULL OR result.result_type = :resultType)
-                ORDER BY CASE WHEN :ascending THEN result.created_at END ASC,
-                         CASE WHEN NOT :ascending THEN result.created_at END DESC,
-                         CASE WHEN :ascending THEN result.reconciliation_result_id END ASC,
-                         CASE WHEN NOT :ascending THEN result.reconciliation_result_id END DESC
-                """).unwrap(NativeQuery.class);
-        query.setParameter("ascending", "asc".equals(sortDirection));
+                __order__
+                """.replace("__order__", orderBy)).unwrap(NativeQuery.class);
         query.setParameter(RECONCILIATION_RUN_ID_PARAM, reconciliationRunId);
         query.setParameter(RESULT_TYPE_PARAM, resultType);
         query.setFirstResult(offset).setMaxResults(limit);

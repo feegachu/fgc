@@ -20,6 +20,17 @@ export const PAGE_SIZE = 20
 export const ALL_STATUS = 'ALL'
 export const OPEN_STATUS = 'OPEN'
 
+/** 유형·상세 원인·상태·참조는 순서 기준이 없어 제외한다. */
+export const EXCEPTION_SORT_KEYS = [
+  'exceptionCaseId',
+  'severity',
+  'contractNo',
+  'title',
+  'assigneeLoginId',
+  'lastDetectedAt',
+  'detectionCount',
+] as const
+
 export interface ExceptionFilters {
   type: string
   reasonCode: string
@@ -28,6 +39,8 @@ export interface ExceptionFilters {
   assigneeFilter: string
   validationMonth: string
   contractNo: string
+  /** 서버(ExceptionCaseQueryRepository.SORT_KEYS)와 같은 정렬 key. 비어 있으면 심각도 높은 순 → 최근 생성 순 */
+  sort: string
   page: number
 }
 
@@ -42,6 +55,7 @@ export function searchPath(filters: ExceptionFilters) {
   set('assigneeFilter', filters.assigneeFilter)
   set('validationMonth', filters.validationMonth)
   set('contractNo', filters.contractNo.trim())
+  set('sort', filters.sort)
   query.set('page', String(filters.page))
   query.set('size', String(PAGE_SIZE))
   return `/api/v1/exceptions?${query.toString()}`

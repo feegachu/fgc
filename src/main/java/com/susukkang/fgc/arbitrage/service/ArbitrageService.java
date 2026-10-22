@@ -3,6 +3,7 @@ package com.susukkang.fgc.arbitrage.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.arbitrage.dto.*;
+import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckQueriesImpl;
 import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService;
 import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService.Applicability;
 import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
@@ -102,7 +103,7 @@ public class ArbitrageService {
                 page,
                 size,
                 totalElements,
-                "arbitrageCheckId,desc"
+                ArbitrageCheckQueriesImpl.sortOf(condition).value()
         );
 
         // 요약 정보와 페이징 목록을 하나의 응답으로 반환

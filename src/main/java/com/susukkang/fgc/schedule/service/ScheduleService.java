@@ -102,7 +102,7 @@ public class ScheduleService {
                 page,
                 size,
                 totalSchedules,
-                "scheduleHeaderId,desc"
+                ScheduleQueryRepository.sortOf(condition).value()
         );
     }
 

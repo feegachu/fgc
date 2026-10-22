@@ -10,6 +10,10 @@ export interface TableColumn<T> {
   width?: string
   cellClassName?: string
   sortable?: boolean
+  /** 정렬 key. 서버 API 의 sort 파라미터와 같은 이름을 쓰며, 없으면 column.key 를 쓴다. */
+  sortKey?: string
+  /** 헤더 글자 옆에 붙는 도움말 등. 정렬 버튼 안에 버튼이 중첩되지 않도록 버튼 밖에 둔다. */
+  labelExtra?: ReactNode
   align?: 'left' | 'center' | 'number'
 }
 export interface DataTableProps<T> {
@@ -218,42 +222,49 @@ function TableContents<T>({
                 />
               </th>
             )}
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                scope="col"
-                className={`is-${column.align ?? 'left'}`}
-                aria-sort={
-                  sort?.key === column.key
-                    ? sort.direction === 'asc'
-                      ? 'ascending'
-                      : 'descending'
-                    : column.sortable
-                      ? 'none'
-                      : undefined
-                }
-              >
-                {column.sortable && onSort ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onSort({
-                        key: column.key,
-                        direction: sort?.key === column.key && sort.direction === 'asc' ? 'desc' : 'asc',
-                      })
-                    }
-                  >
-                    {column.label}
-                    <span aria-hidden="true">
-                      {' '}
-                      {sort?.key === column.key ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </button>
-                ) : (
-                  column.label
-                )}
-              </th>
-            ))}
+            {columns.map((column) => {
+              const sortId = column.sortKey ?? column.key
+              const active = sort?.key === sortId
+              return (
+                <th
+                  key={column.key}
+                  scope="col"
+                  className={`is-${column.align ?? 'left'}`}
+                  aria-sort={
+                    active
+                      ? sort.direction === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : column.sortable
+                        ? 'none'
+                        : undefined
+                  }
+                >
+                  {column.sortable && onSort ? (
+                    <>
+                      <button
+                        type="button"
+                        className={`table-sort-button ${active ? 'is-active' : ''}`}
+                        onClick={() =>
+                          onSort({ key: sortId, direction: active && sort.direction === 'asc' ? 'desc' : 'asc' })
+                        }
+                      >
+                        {column.label}
+                        <span className="table-sort-icon" aria-hidden="true">
+                          {active ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </button>
+                      {column.labelExtra}
+                    </>
+                  ) : (
+                    <>
+                      {column.label}
+                      {column.labelExtra}
+                    </>
+                  )}
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody id={bodyId}>

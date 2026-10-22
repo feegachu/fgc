@@ -3,6 +3,7 @@ import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import { safeRedirect } from '../../lib/api/redirect'
 import { JOURNAL_STATUS, JOURNAL_TYPE } from './labels'
+import { formatSort, parseSort } from '../../lib/tableSort'
 
 type Schemas = components['schemas']
 export type Journal = Schemas['JournalItemResponse']
@@ -10,6 +11,8 @@ export type JournalDetail = Schemas['JournalDetailResponse']
 export type JournalLine = Schemas['JournalDetailLineResponse']
 export type JournalSearch = Schemas['JournalSearchResponse']
 export const PAGE_SIZE = 20
+/** 서버(JournalQueryRepository.SORT_KEYS)와 같은 정렬 key. 유형·원천·상태·역분개 표시는 순서 기준이 없어 제외한다. */
+export const LEDGER_SORT_KEYS = ['journalNo', 'journalDate', 'contractNo', 'debitTotal', 'creditTotal'] as const
 export const FILTER_KEYS = {
   from: '',
   to: '',
@@ -17,6 +20,7 @@ export const FILTER_KEYS = {
   account: '',
   contractNo: '',
   status: '',
+  sort: '',
   searched: '',
   selected: '',
   page: '',
@@ -42,6 +46,7 @@ export function criteriaFromParams(params: URLSearchParams) {
     account: params.get('account')?.trim() ?? '',
     contractNo: params.get('contractNo')?.trim() ?? '',
     status: Object.hasOwn(JOURNAL_STATUS, status) ? status : '',
+    sort: formatSort(parseSort(params.get('sort'), LEDGER_SORT_KEYS)),
     page: Number(positiveId(params.get('page')) || 1),
   }
 }

@@ -5,6 +5,8 @@ import java.time.LocalDate;
 /**
  * IF-API-30 검색조건. month는 화면에서 "정산월"로 부르지만 cap_check에는 그런 컬럼이 없어
  * as_of_date가 속한 달로 거른다(그 달 1일로 받는다 — SIR-008 정산월 관행과 동일).
+ *
+ * <p>sort 는 {@code key,asc|desc} 형식이며(#604) 비어 있으면 기준일 내림차순이다.
  */
 public record CapCheckSearchCriteria(
         LocalDate month,
@@ -12,6 +14,12 @@ public record CapCheckSearchCriteria(
         String resultStatus,
         Long insurerId,
         Long organizationId,
-        String contractNo
+        String contractNo,
+        String sort
 ) {
+    public CapCheckSearchCriteria(
+            LocalDate month, String paymentStage, String resultStatus,
+            Long insurerId, Long organizationId, String contractNo) {
+        this(month, paymentStage, resultStatus, insurerId, organizationId, contractNo, null);
+    }
 }

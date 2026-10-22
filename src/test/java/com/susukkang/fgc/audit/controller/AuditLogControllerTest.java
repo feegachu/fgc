@@ -31,6 +31,7 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -82,7 +83,7 @@ class AuditLogControllerTest {
     void returnsAuditLogsForAllowedRoles(String role) throws Exception {
         given(auditLogQueryService.search(
                 eq("COMMISSION_PAYMENT"), eq("42"), eq(12L), eq("PAYMENT_CONFIRMED"),
-                eq(LocalDate.parse("2026-08-01")), eq(LocalDate.parse("2026-08-16")), eq(1), eq(20)))
+                eq(LocalDate.parse("2026-08-01")), eq(LocalDate.parse("2026-08-16")), isNull(), eq(1), eq(20)))
                 .willReturn(PageResponse.of(List.of(sampleLog()), 1, 20, 1, "occurredAt,desc"));
 
         mockMvc.perform(get("/api/v1/audit-logs")
@@ -108,7 +109,7 @@ class AuditLogControllerTest {
 
         verify(auditLogQueryService).search(
                 "COMMISSION_PAYMENT", "42", 12L, "PAYMENT_CONFIRMED",
-                LocalDate.parse("2026-08-01"), LocalDate.parse("2026-08-16"), 1, 20);
+                LocalDate.parse("2026-08-01"), LocalDate.parse("2026-08-16"), null, 1, 20);
     }
 
     /** 배치 발 감사행은 userLoginId 가 null 로 내려간다 — "BATCH" 표기는 화면 책임. */
@@ -117,7 +118,7 @@ class AuditLogControllerTest {
         AuditLogResponse batchRow = new AuditLogResponse(
                 2L, OffsetDateTime.parse("2026-08-16T02:00:00+09:00"), null, null,
                 "VALIDATION_RUN_STARTED", "VALIDATION_RUN", "7", null, null, null, "batch-req", null);
-        given(auditLogQueryService.search(any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        given(auditLogQueryService.search(any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .willReturn(PageResponse.of(List.of(batchRow), 1, 20, 1, "occurredAt,desc"));
 
         mockMvc.perform(get("/api/v1/audit-logs").with(user("audit01").roles("COMPLIANCE")))
@@ -143,7 +144,7 @@ class AuditLogControllerTest {
     @Test
     void rejectsInvalidDateRange() throws Exception {
         given(auditLogQueryService.search(any(), any(), any(), any(),
-                eq(LocalDate.parse("2026-08-16")), eq(LocalDate.parse("2026-08-01")), anyInt(), anyInt()))
+                eq(LocalDate.parse("2026-08-16")), eq(LocalDate.parse("2026-08-01")), any(), anyInt(), anyInt()))
                 .willThrow(new FgcBusinessException(
                         FgcErrorCode.COMMON_002, "from", Map.of("field", "from"), null));
 

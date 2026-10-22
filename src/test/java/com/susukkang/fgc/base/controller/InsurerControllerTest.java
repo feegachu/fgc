@@ -56,7 +56,7 @@ class InsurerControllerTest {
                 "생명보험",
                 true
         );
-        given(insurerService.search("미래", 1, 20)).willReturn(
+        given(insurerService.search("미래", null, 1, 20)).willReturn(
                 PageResponse.of(List.of(insurer), 1, 20, 1, "insurerCode,asc")
         );
 
@@ -78,7 +78,7 @@ class InsurerControllerTest {
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.requestId", matchesPattern("^\\d{8}-[0-9a-f]{6}$")));
 
-        verify(insurerService).search("미래", 1, 20);
+        verify(insurerService).search("미래", null, 1, 20);
     }
 
     @Test
@@ -91,7 +91,7 @@ class InsurerControllerTest {
                 "손해보험",
                 false
         );
-        given(insurerService.search(null, 1, 20)).willReturn(
+        given(insurerService.search(null, null, 1, 20)).willReturn(
                 PageResponse.of(List.of(inactive), 1, 20, 1, "insurerCode,asc")
         );
 
@@ -106,7 +106,7 @@ class InsurerControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE"})
     void allowsEveryAuthenticatedRole(String role) throws Exception {
-        given(insurerService.search(null, 2, 10)).willReturn(
+        given(insurerService.search(null, null, 2, 10)).willReturn(
                 PageResponse.of(List.of(), 2, 10, 0, "insurerCode,asc")
         );
 
@@ -129,7 +129,7 @@ class InsurerControllerTest {
     @ParameterizedTest
     @CsvSource({"0, 20, page", "1, 101, size"})
     void rejectsInvalidPaging(int page, int size, String field) throws Exception {
-        given(insurerService.search(null, page, size)).willThrow(
+        given(insurerService.search(null, null, page, size)).willThrow(
                 new FgcBusinessException(
                         FgcErrorCode.COMMON_002,
                         field,

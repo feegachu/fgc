@@ -65,6 +65,9 @@ public class AuditLogController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate to,
+            @Parameter(description = "정렬(key,asc|desc). occurredAt·userLoginId·policyVersionId. 비우면 발생 시각 내림차순")
+            @RequestParam(required = false)
+            String sort,
             @Parameter(description = "페이지(1-base)", example = "1")
             @RequestParam(defaultValue = "1")
             int page,
@@ -73,7 +76,7 @@ public class AuditLogController {
             int size
     ) {
         return ApiResponse.success(
-                auditLogQueryService.search(entityType, entityId, userId, action, from, to, page, size));
+                auditLogQueryService.search(entityType, entityId, userId, action, from, to, sort, page, size));
     }
 
     @Operation(

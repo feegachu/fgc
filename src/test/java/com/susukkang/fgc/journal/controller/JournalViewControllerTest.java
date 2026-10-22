@@ -22,8 +22,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -172,6 +174,22 @@ class JournalViewControllerTest {
         mvc.perform(get("/journals").with(user(userWithRole(role))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-can-reverse=\"" + allowed + "\"")));
+    }
+
+    @Test
+    void negativeDebitAndCreditRenderWithMinusAndRedAmountClass() throws Exception {
+        JournalListRow row = journalRow();
+        row.setDebitTotal(BigDecimal.valueOf(-1517944));
+        row.setCreditTotal(BigDecimal.valueOf(-1517944));
+        given(journalSearchService.search(any(), eq(1), eq(20)))
+                .willReturn(PageResponse.of(List.of(row), 1, 20, 1, "journalDate,desc"));
+
+        String html = mvc.perform(get("/journals").with(user(userWithRole("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        Pattern negativeCell = Pattern.compile(
+                "<td\\b[^>]*class=\"[^\"]*\\bis-negative-amount\\b[^\"]*\"[^>]*>\\s*-1,517,944원\\s*</td>");
+        assertThat(negativeCell.matcher(html).results().count()).isEqualTo(2);
     }
 
     private JournalListRow journalRow() {

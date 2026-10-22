@@ -151,8 +151,43 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
         ),
         '2026-07',
       ),
-    ).toEqual({ month: '2026-07', stage: '', status: '', page: 1, size: 20, insurerId: '', orgId: '', contractNo: 'C' })
+    ).toEqual({
+      month: '2026-07',
+      stage: '',
+      status: '',
+      page: 1,
+      size: 20,
+      insurerId: '',
+      orgId: '',
+      contractNo: 'C',
+      sort: '',
+    })
     expect(criteriaFromParams(new URLSearchParams(), null).month).toBe('')
+  })
+  it('#604 허용된 정렬만 요청에 싣고 나머지는 서버 기본 정렬로 되돌린다', () => {
+    expect(criteriaFromParams(new URLSearchParams('sort=usagePct,desc'), '2026-07').sort).toBe('usagePct,desc')
+    expect(criteriaFromParams(new URLSearchParams('sort=resultStatus,asc'), '2026-07').sort).toBe('')
+    expect(criteriaFromParams(new URLSearchParams('sort=usagePct'), '2026-07').sort).toBe('')
+  })
+  it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 유지한다', async () => {
+    const { router, user } = renderAt('/cap-checks?month=2026-07&contractNo=C-1&page=2')
+    const table = await screen.findByRole('table', { name: '계약별 판정 목록' })
+    // 순서 기준이 없는 판정 컬럼은 정렬 버튼이 없다. 도움말 버튼은 정렬 버튼과 분리되어 있다.
+    expect(within(table).queryByRole('button', { name: '판정' })).toBeNull()
+    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'none')
+    await user.click(within(table).getByRole('button', { name: '사용률' }))
+    await waitFor(() => expect(new URLSearchParams(listCalls().at(-1)!.split('?')[1]).get('sort')).toBe('usagePct,asc'))
+    const last = new URLSearchParams(listCalls().at(-1)!.split('?')[1])
+    expect(last.get('page')).toBe('1')
+    expect(last.get('contractNo')).toBe('C-1')
+    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'ascending')
+    await user.click(within(table).getByRole('button', { name: '사용률' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=usagePct%2Cdesc'))
+    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'descending')
+    // 한도 헤더의 도움말은 정렬을 바꾸지 않는다.
+    expect(within(table).getByRole('button', { name: '한도' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=usagePct%2Cdesc'))
   })
   it('서버 기준월로 조회하며 문자열 절삭·저장 판정·음수·전체 범위 집계를 표시한다', async () => {
     renderAt('/cap-checks')
@@ -162,7 +197,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     expect(listCalls().every((url) => new URLSearchParams(url.split('?')[1]).get('month') === '2026-07')).toBe(true)
     expect(within(table).getByText('1,200.000000%')).toBeVisible()
     expect(within(table).getByText('주의')).toBeVisible() // 1200%를 프론트에서 VIOLATION으로 다시 판정하지 않음
-    expect(within(table).getByText('(85,000)원')).toHaveClass('is-negative-amount')
+    expect(within(table).getByText('-85,000원')).toHaveClass('is-negative-amount')
     expect(within(table).getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/contracts/3?tab=cap')
     expect(screen.getByRole('button', { name: /저장 판정 정상\s*30/ })).toBeVisible()
     expect(screen.getByText('30,000,000원')).toBeVisible() // 현재 페이지 1행으로 합산하지 않음

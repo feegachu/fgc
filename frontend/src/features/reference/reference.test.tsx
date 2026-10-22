@@ -177,7 +177,7 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
   await screen.findByText('650.1234')
   expect(screen.getByText('1 ~ 12회차')).toBeVisible()
-  expect(screen.getByText('(1,234)')).toHaveClass('is-negative-amount')
+  expect(screen.getByText('-1,234')).toHaveClass('is-negative-amount')
   await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
   await screen.findByText('89.1234')
   expect(screen.getByText('증빙 확인')).toBeVisible()
@@ -351,6 +351,55 @@ it.each(['organization', 'insurer', 'product', 'agent'])(
       expect(request.mock.calls.some(([p]) => p.includes('insurerId=1') && p.includes('asOf=2026-07-01'))).toBe(true)
   },
 )
+it.each([
+  ['organization', '조직', '조직명', 'organizationName'],
+  ['insurer', '보험회사', '보험회사명', 'insurerName'],
+  ['product', '상품', '상품명', 'productName'],
+  ['agent', '설계사', '설계사명', 'agentName'],
+])('#604 BASE %s header toggles sort, returns to page 1 and keeps the filters', async (tab, caption, header, key) => {
+  const user = userEvent.setup()
+  const { router, request } = mount(
+    `/base?month=2026-08&tab=${tab}&page=2&insurerId=1&organizationId=1&asOf=2026-07-01&keyword=서울`,
+  )
+  const table = await screen.findByRole('table', { name: caption })
+  const lastQuery = () =>
+    new URLSearchParams(
+      request.mock.calls
+        .map(([p]) => p)
+        .filter((p) => new URL(p, 'http://test').pathname.endsWith(`/${tab === 'insurer' ? 'insurers' : `${tab}s`}`))
+        .filter((p) => !p.includes('size=100'))
+        .at(-1)!
+        .split('?')[1],
+    )
+  expect(within(table).getByRole('columnheader', { name: new RegExp(`^${header}`) })).toHaveAttribute('aria-sort', 'none')
+  await user.click(within(table).getByRole('button', { name: header }))
+  await waitFor(() => expect(lastQuery().get('sort')).toBe(`${key},asc`))
+  expect(lastQuery().has('page') ? lastQuery().get('page') : '1').toBe('1')
+  expect(router.state.location.search).toContain('sort=')
+  expect(router.state.location.search).not.toContain('page=')
+  expect(router.state.location.search).toContain('asOf=2026-07-01')
+  await user.click(within(await screen.findByRole('table', { name: caption })).getByRole('button', { name: header }))
+  await waitFor(() => expect(lastQuery().get('sort')).toBe(`${key},desc`))
+  // 검색을 다시 제출해도 정렬은 유지된다.
+  await user.click(screen.getByRole('button', { name: '조회' }))
+  await waitFor(() => expect(router.state.location.search).toContain(`sort=${encodeURIComponent(`${key},desc`)}`))
+})
+it('#604 BASE sort is kept per tab and unsupported URL values are ignored', async () => {
+  const user = userEvent.setup()
+  const { router, request } = mount('/base?month=2026-08&tab=organization&sort=organizationName,desc')
+  await screen.findByText('서울지사')
+  await user.click(screen.getByRole('tab', { name: '보험회사' }))
+  await screen.findByText('가상생명')
+  // 다른 탭으로 가면 조직 탭의 정렬은 빠지고, 조직 탭으로 돌아오면 복원된다.
+  expect(router.state.location.search).not.toContain('sort=')
+  await user.click(screen.getByRole('tab', { name: '조직' }))
+  await waitFor(() => expect(router.state.location.search).toContain('sort=organizationName%2Cdesc'))
+  // 허용되지 않은 값은 서버 기본 정렬을 쓴다.
+  request.mockClear()
+  mount('/base?month=2026-08&tab=insurer&sort=organizationName,asc')
+  await screen.findAllByText('가상생명')
+  expect(request.mock.calls.some(([p]) => p.includes('sort='))).toBe(false)
+})
 it('BASE commission-item queries selected date and restores it from URL', async () => {
   const { request } = mount('/base?tab=commission-item&asOf=2026-09-17')
   await screen.findByText('기본수수료')

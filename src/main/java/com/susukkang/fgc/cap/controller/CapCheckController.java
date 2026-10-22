@@ -65,6 +65,8 @@ public class CapCheckController {
             @Parameter(description = "계약 소속 조직 ID")
             @RequestParam(name = "orgId", required = false) Long organizationId,
             @Parameter(description = "계약번호") @RequestParam(required = false) String contractNo,
+            @Parameter(description = "정렬(key,asc|desc). contractNo·asOfDate·basePremiumAmount·refund12mAmount·complianceDeductionAmount·limitAmount·includedAmount·remainingAmount·usagePct. 비우면 기준일 내림차순")
+            @RequestParam(required = false) String sort,
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size
     ) {
@@ -74,7 +76,8 @@ public class CapCheckController {
                 status == null ? null : status.name(),
                 insurerId,
                 organizationId,
-                contractNo);
+                contractNo,
+                sort);
 
         return ApiResponse.success(CapCheckSearchResponse.from(capCheckService.search(criteria, page, size)));
     }

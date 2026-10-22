@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
+import { formatSort, parseSort } from '../../lib/tableSort'
 
 export type AuditLog = components['schemas']['AuditLogResponse']
 export type AuditLogPage = components['schemas']['PageResponseAuditLogResponse']
@@ -12,6 +13,9 @@ export const PAGE_SIZE = 20
 const MAX_PAGE = Math.floor(2147483647 / PAGE_SIZE)
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
+/** 행위·대상 종류·대상 ID·사유·요청 ID는 순서 기준이 없어 제외한다. */
+export const AUDIT_SORT_KEYS = ['occurredAt', 'userLoginId', 'policyVersionId'] as const
+
 export interface AuditCriteria {
   entityType: string
   entityId: string
@@ -19,6 +23,8 @@ export interface AuditCriteria {
   action: string
   from: string
   to: string
+  /** 서버(AuditLogSearchImpl.SORT_KEYS)와 같은 정렬 key. 비어 있으면 발생 시각 내림차순 */
+  sort: string
   page: number
 }
 
@@ -40,6 +46,7 @@ export function normalizeCriteria(params: URLSearchParams): AuditCriteria {
     action: text('action'),
     from,
     to,
+    sort: formatSort(parseSort(text('sort'), AUDIT_SORT_KEYS)),
     page: Number.isNaN(page) ? 1 : Math.max(1, Math.min(page, MAX_PAGE)),
   }
 }

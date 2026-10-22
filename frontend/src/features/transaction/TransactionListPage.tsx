@@ -11,10 +11,19 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { int, isNegative, month as formatMonth, won } from '../../lib/format'
+import { sortBinding } from '../../lib/tableSort'
 import { withMonth } from '../../stores/workspace'
 import { useInsurers } from '../base/api'
 import type { Insurer } from '../base/api'
-import { filterParams, listError, readFilters, sourceOptions, statusOptions, transactionListQuery } from './list-api'
+import {
+  filterParams,
+  listError,
+  readFilters,
+  sourceOptions,
+  statusOptions,
+  TRANSACTION_SORT_KEYS,
+  transactionListQuery,
+} from './list-api'
 import type { PaymentFilters, PaymentRow, TextFilter } from './list-api'
 import './transaction.css'
 
@@ -68,21 +77,24 @@ export default function TransactionListPage() {
     {
       key: 'key',
       label: '업무키',
+      sortable: true,
       width: '12rem',
       cellClassName: 'transaction-mono',
       render: (row) => <span title={row.sourceBusinessKey}>{row.sourceBusinessKey || '-'}</span>,
     },
-    { key: 'month', label: '정산월', width: '5.5rem', render: (row) => formatMonth(row.settlementMonth) },
-    { key: 'agent', label: '수령 설계사', width: '9rem', render: (row) => disclosure(row.recipientAgentName) },
+    { key: 'month', label: '정산월', sortable: true, width: '5.5rem', render: (row) => formatMonth(row.settlementMonth) },
+    { key: 'agent', label: '수령 설계사', sortable: true, width: '9rem', render: (row) => disclosure(row.recipientAgentName) },
     {
       key: 'item',
       label: '수수료 항목',
+      sortable: true,
       width: '8.5rem',
       render: (row) => disclosure(row.commissionItemName || row.commissionItemCode),
     },
     {
       key: 'amount',
       label: '금액',
+      sortable: true,
       width: '7rem',
       align: 'number',
       render: (row) => (
@@ -116,6 +128,7 @@ export default function TransactionListPage() {
     {
       key: 'attributions',
       label: '귀속',
+      sortable: true,
       width: '6.5rem',
       align: 'center',
       render: (row) => {
@@ -210,6 +223,7 @@ export default function TransactionListPage() {
           bodyId="list-body"
           caption="검색 조건에 해당하는 수수료 지급 건"
           columns={columns}
+          {...sortBinding(filters.sort, TRANSACTION_SORT_KEYS, (sort) => apply({ ...filters, sort, page: 1 }))}
           rows={rows}
           rowKey={(row) => String(row.commissionTransactionId)}
           emptyMessage={
