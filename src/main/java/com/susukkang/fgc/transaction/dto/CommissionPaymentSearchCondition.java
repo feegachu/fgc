@@ -31,4 +31,7 @@ public class CommissionPaymentSearchCondition {
     // 문제: 지급액과 귀속합계가 다른 전체 건을 체크리스트에서 직접 확인할 수 없음
     // 개선: 정본 뷰와 같은 기준의 귀속 불균형 지급 건 선택 조회 지원
     private Boolean attributionImbalanceOnly;
+
+    /** 정렬 "key,asc|desc" (#604). 비우면 지급 건 ID 내림차순 */
+    private String sort;
 }

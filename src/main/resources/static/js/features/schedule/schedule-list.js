@@ -261,7 +261,7 @@
   /*
    * 금액·건수는 공통 유틸만 쓴다 (FGC-SIR-008).
    * 전에는 이 파일이 직접 짠 정규식으로 콤마를 찍어서, 같은 도메인인 SCHE-W02 의
-   * Intl 기반 포맷과 결과가 갈렸다. 음수 괄호 표기(화면정의서 4장 규칙 1)도 여기서만 빠져 있었다.
+   * Intl 기반 포맷과 결과가 갈렸다. 음수 마이너스 기호 표기(화면정의서 4장 규칙 1)도 여기서만 빠져 있었다.
    */
   function textCell(value, className) {
     var cell = document.createElement("td");

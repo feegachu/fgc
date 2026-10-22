@@ -41,4 +41,6 @@ public class ExceptionCaseSearchDTO {
     private List<ExceptionType> types;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate validationMonth;
+    /** 정렬 "key,asc|desc" (#604). 비우면 심각도 높은 순 → 최근 생성 순 */
+    private String sort;
 }

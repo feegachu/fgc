@@ -398,7 +398,7 @@ class ExceptionCaseViewControllerTest {
         int totalPages = total == 0 ? 0 : (int) ((total + size - 1) / size);
         return new ExceptionCaseSearchResponse(
                 summary, content, page, size, total, totalPages,
-                "severity,asc,createdAt,desc");
+                "severity,desc");
     }
 
     private static ExceptionCaseResponseDTO journalCorrection(ExceptionStatus status) {

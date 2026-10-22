@@ -189,6 +189,38 @@ describe('VRUN-W01 실행 목록', () => {
     await waitFor(() => expect(router.state.location.search).toContain('status=RUNNING'))
   })
 
+  it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 상태 조건을 유지한다', async () => {
+    handlers['GET /api/v1/validation-runs'] = () => listPage([run()], 3)
+    handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+    const { router, actions } = renderAt('/app/validation-runs?status=FAILED&page=2&month=2026-07')
+    const table = await screen.findByRole('table', { name: '월 통합검증 실행 목록' })
+    const lastQuery = () => new URLSearchParams(calls('GET /api/v1/validation-runs').at(-1)![0].split('?')[1])
+    // 순서 기준이 없는 상태·실행 유형 컬럼은 정렬 버튼이 없다.
+    expect(within(table).queryByRole('button', { name: '상태' })).toBeNull()
+    expect(within(table).getByRole('columnheader', { name: /^시작/ })).toHaveAttribute('aria-sort', 'none')
+    await actions.click(within(table).getByRole('button', { name: '시작' }))
+    await waitFor(() => expect(lastQuery().get('sort')).toBe('startedAt,asc'))
+    expect(lastQuery().get('page')).toBe('1')
+    expect(lastQuery().get('status')).toBe('FAILED')
+    expect(within(table).getByRole('columnheader', { name: /^시작/ })).toHaveAttribute('aria-sort', 'ascending')
+    await actions.click(within(table).getByRole('button', { name: '시작' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=startedAt%2Cdesc'))
+    expect(within(table).getByRole('columnheader', { name: /^시작/ })).toHaveAttribute('aria-sort', 'descending')
+    // 상태 조건을 바꿔 조회해도 정렬은 유지된다.
+    await actions.selectOptions(screen.getByLabelText('상태'), 'RUNNING')
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(router.state.location.search).toContain('status=RUNNING'))
+    expect(router.state.location.search).toContain('sort=startedAt%2Cdesc')
+  })
+
+  it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬을 쓴다', async () => {
+    handlers['GET /api/v1/validation-runs'] = () => listPage([run()], 1)
+    handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+    renderAt('/app/validation-runs?sort=status,asc&month=2026-07')
+    await screen.findByRole('table', { name: '월 통합검증 실행 목록' })
+    expect(calls('GET /api/v1/validation-runs').every(([url]) => !url.includes('sort='))).toBe(true)
+  })
+
   it('새 실행을 만들면 상세로 이동한다', async () => {
     handlers['GET /api/v1/validation-runs'] = () => listPage([])
     handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })

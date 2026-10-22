@@ -6,7 +6,11 @@ import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.querydsl.core.BooleanBuilder;
+
 import com.querydsl.core.types.Projections;
+import com.susukkang.fgc.common.web.ListSort;
+import com.querydsl.core.types.dsl.ComparableExpressionBase;
+import com.susukkang.fgc.common.web.QuerydslSort;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -30,6 +34,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 설명 : 계약 검색·CSV·상세 화면용 조회와 등록·수정에 필요한 기준정보 검증을 담당한다.
@@ -174,7 +179,6 @@ public class ContractQueryRepository {
         return entityManager.createNativeQuery(sql).unwrap(NativeQuery.class);
     }
 
-
     /** 목록·CSV·건수에 동일한 조건과 조인을 적용한다. 최신 판정은 기존 뷰를 그대로 사용한다. */
     @Transactional(readOnly = true)
     public Page<ContractView> search(ContractSearchCondition condition, Pageable pageable) {
@@ -198,7 +202,23 @@ public class ContractQueryRepository {
                         Expressions.stringTemplate("concat('FC-', lpad(cast({0} as string), 4, '0'), ' ', {1})",
                                 agent.agentId, agent.agentName),
                         c.currentStatus, latestCapCheck.resultStatus, c.dataOrigin)).from(c))
-                .where(filters(condition)).orderBy(c.contractId.desc());
+                .where(filters(condition)).orderBy(QuerydslSort.order(sortOf(condition), SORTABLE, insuranceContract.contractId.desc()));
+    }
+
+    /** 화면 정렬 key(CONT-W01 컬럼) → 정렬 가능한 표현식. 상태·판정·출처 컬럼은 순서 기준이 없어 제외한다. */
+    private static final Map<String, ComparableExpressionBase<?>> SORTABLE = Map.of(
+            "contractNo", insuranceContract.contractNo,
+            "insurerName", insurer.insurerName,
+            "productName", product.productName,
+            "contractDate", insuranceContract.contractDate,
+            "premium", insuranceContract.monthlyEquivalentFirstPremium,
+            "agent", agent.agentId);
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+    public static final ListSort DEFAULT_SORT = new ListSort(CONTRACT_ID_PARAMETER, false);
+
+    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 조건이 없거나 비어 있으면 계약 ID 내림차순. */
+    public static ListSort sortOf(ContractSearchCondition condition) {
+        return ListSort.parse(condition == null ? null : condition.getSort(), SORT_KEYS, DEFAULT_SORT);
     }
 
     private <T> JPAQuery<T> joins(JPAQuery<T> query) {

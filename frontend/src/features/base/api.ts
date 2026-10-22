@@ -7,6 +7,27 @@ export type Insurer = Schema['InsurerResponse']
 export type Product = Schema['ProductResponse']
 export type Agent = Schema['AgentResponse']
 export type CommissionItem = Schema['CommissionItemResponse']
+/** 탭별 정렬 key. 서버의 허용 목록과 같고, 유형·상태·직급 같은 코드·표시 전용 컬럼은 순서 기준이 없어 제외한다. */
+export const BASE_SORT_KEYS = {
+  organization: ['organizationCode', 'organizationName', 'parentName', 'effectiveFrom', 'effectiveTo'],
+  insurer: ['insurerCode', 'insurerName'],
+  product: [
+    'insurerProductCode',
+    'productName',
+    'standardProductCode',
+    'offeringVersion',
+    'salesStartDate',
+    'basicDocumentDate',
+  ],
+  agent: [
+    'agentCode',
+    'agentName',
+    'organizationName',
+    'appointmentDate',
+    'terminationDate',
+    'latestRegistrationDate',
+  ],
+} as const
 export interface BaseCriteria {
   asOf?: string
   keyword?: string
@@ -15,6 +36,8 @@ export interface BaseCriteria {
   includeTerminated?: boolean
   includeExpired?: boolean
   includeHistorical?: boolean
+  /** 서버(각 목록의 SORT_KEYS)와 같은 정렬 key. 비어 있으면 서버 기본(코드 오름차순) */
+  sort?: string
   page?: number
   size?: number
 }

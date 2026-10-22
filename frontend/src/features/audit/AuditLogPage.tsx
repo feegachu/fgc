@@ -7,7 +7,14 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTimeSeconds, errorText, int } from '../../lib/format'
-import { auditLogDetailQuery, auditLogOptionsQuery, auditLogsQuery, normalizeCriteria } from './api'
+import { sortBinding } from '../../lib/tableSort'
+import {
+  AUDIT_SORT_KEYS,
+  auditLogDetailQuery,
+  auditLogOptionsQuery,
+  auditLogsQuery,
+  normalizeCriteria,
+} from './api'
 import type { AuditCriteria, AuditLog, AuditLogOptions } from './api'
 import {
   auditActionLabel,
@@ -24,15 +31,25 @@ import './audit.css'
  * [막을 것] 수정·삭제 버튼 자체를 만들지 않는다 — 감사로그를 고칠 수 있으면 감사로그가 아니다.
  * 검색조건과 선택 행은 URL 쿼리(entityType·entityId·userId·action·from·to·page·selected)에 둔다.
  */
-const FILTER_KEYS = { entityType: '', entityId: '', userId: '', action: '', from: '', to: '', page: '', selected: '' }
-type Filters = Omit<AuditCriteria, 'page'>
+const FILTER_KEYS = {
+  entityType: '',
+  entityId: '',
+  userId: '',
+  action: '',
+  from: '',
+  to: '',
+  sort: '',
+  page: '',
+  selected: '',
+}
+type Filters = Omit<AuditCriteria, 'page' | 'sort'>
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
 // 열 너비는 1차 audit.css 의 .audit-col-* 와 같은 값이다.
 const columns: TableColumn<AuditLog>[] = [
-  { key: 'occurredAt', label: '발생시각', width: '10rem', render: (row) => dateTimeSeconds(row.occurredAt) },
-  { key: 'user', label: '행위자', width: '6.5rem', render: (row) => row.userLoginId ?? 'BATCH' },
+  { key: 'occurredAt', label: '발생시각', sortable: true, width: '10rem', render: (row) => dateTimeSeconds(row.occurredAt) },
+  { key: 'user', label: '행위자', sortKey: 'userLoginId', sortable: true, width: '6.5rem', render: (row) => row.userLoginId ?? 'BATCH' },
   { key: 'action', label: '행위', width: '11rem', render: (row) => auditActionLabel(row.actionCode) },
   { key: 'entityType', label: '대상 종류', width: '11rem', render: (row) => auditEntityTypeLabel(row.entityType) },
   { key: 'entityId', label: '대상 ID', width: '6rem', render: (row) => dash(row.entityId) },
@@ -42,7 +59,7 @@ const columns: TableColumn<AuditLog>[] = [
     width: '14rem',
     render: (row) => auditReasonLabel(row.actionCode, row.reason),
   },
-  { key: 'policy', label: '정책버전', width: '7rem', render: (row) => dash(row.policyVersionId) },
+  { key: 'policy', label: '정책버전', sortKey: 'policyVersionId', sortable: true, width: '7rem', render: (row) => dash(row.policyVersionId) },
   { key: 'requestId', label: '요청 ID', width: '10rem', render: (row) => dash(row.requestId) },
 ]
 
@@ -103,6 +120,7 @@ export default function AuditLogPage() {
             className="audit-log-table"
             caption="검색조건에 해당하는 감사 기록 목록"
             columns={columns}
+            {...sortBinding(criteria.sort, AUDIT_SORT_KEYS, (sort) => update({ sort, selected: '' }))}
             rows={rows}
             rowKey={(row) => String(row.auditLogId)}
             selectedKeys={selected ? [String(selected.auditLogId)] : []}

@@ -3,6 +3,7 @@ package com.susukkang.fgc.journal.service;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.journal.dto.JournalListRow;
 import com.susukkang.fgc.journal.dto.JournalSearchCriteria;
 import com.susukkang.fgc.journal.repository.JournalQueryRepository;
@@ -39,14 +40,15 @@ public class JournalSearchServiceImpl implements JournalSearchService {
         }
         int offset = (int) offLong;
 
+        ListSort sort = JournalQueryRepository.sortOf(criteria.sort());
         List<JournalListRow> rows = journalQueryRepository.search(
                 criteria.from(), criteria.to(), criteria.journalType(), criteria.accountCode(),
-                criteria.contractId(), criteria.contractNo(), criteria.status(), offset, size
+                criteria.contractId(), criteria.contractNo(), criteria.status(), offset, size, sort
         );
 
         long total = journalQueryRepository.count(criteria.from(), criteria.to(), criteria.journalType(),
                 criteria.accountCode(), criteria.contractId(), criteria.contractNo(), criteria.status());
 
-        return PageResponse.of(rows, page, size, total, "journalDate,desc");
+        return PageResponse.of(rows, page, size, total, sort.value());
     }
 }

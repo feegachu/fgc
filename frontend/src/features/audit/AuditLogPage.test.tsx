@@ -127,6 +127,31 @@ describe('AUDT-W01 감사로그 조회', () => {
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07'))
   })
 
+  it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지·선택을 지우며 검색조건을 유지한다', async () => {
+    const { router, actions } = renderAt('/audit-logs?month=2026-07&entityType=COMMISSION_PAYMENT&page=2&selected=1')
+    const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    const lastQuery = () =>
+      new URLSearchParams(requested.filter((url) => url.startsWith('/api/v1/audit-logs?')).at(-1)!.split('?')[1])
+    // 순서 기준이 없는 행위·대상 종류 컬럼은 정렬 버튼이 없다.
+    expect(within(table).queryByRole('button', { name: '행위' })).toBeNull()
+    expect(within(table).getByRole('columnheader', { name: /정책버전/ })).toHaveAttribute('aria-sort', 'none')
+    await actions.click(within(table).getByRole('button', { name: '정책버전' }))
+    await waitFor(() => expect(lastQuery().get('sort')).toBe('policyVersionId,asc'))
+    expect(lastQuery().get('page')).toBe('1')
+    expect(lastQuery().get('entityType')).toBe('COMMISSION_PAYMENT')
+    const params = new URLSearchParams(router.state.location.search)
+    expect(params.has('selected')).toBe(false)
+    expect(within(table).getByRole('columnheader', { name: /정책버전/ })).toHaveAttribute('aria-sort', 'ascending')
+    await actions.click(within(table).getByRole('button', { name: '정책버전' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=policyVersionId%2Cdesc'))
+    expect(within(table).getByRole('columnheader', { name: /정책버전/ })).toHaveAttribute('aria-sort', 'descending')
+    // 검색을 다시 제출해도 정렬은 유지되고, 초기화하면 서버 기본 정렬로 돌아간다.
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=policyVersionId%2Cdesc'))
+    await actions.click(screen.getByRole('button', { name: '초기화' }))
+    await waitFor(() => expect(router.state.location.search).not.toContain('sort='))
+  })
+
   it('행을 고르면 ?selected= 를 남기고 서버 diff 의 바뀐 칸만 강조한다', async () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07&page=2')
     const [first] = await screen.findAllByRole('button', { name: '2026-08-16 10:00:07' })
@@ -307,9 +332,13 @@ describe('normalizeCriteria', () => {
       action: '',
       from: '',
       to: '2026-08-01',
+      sort: '',
       page: 1,
     })
     expect(normalizeCriteria(new URLSearchParams('page=999999999')).page).toBe(107374182)
+    // #604 허용된 정렬만 남기고 나머지는 서버 기본 정렬로 되돌린다.
+    expect(normalizeCriteria(new URLSearchParams('sort=policyVersionId,desc')).sort).toBe('policyVersionId,desc')
+    expect(normalizeCriteria(new URLSearchParams('sort=actionCode,asc')).sort).toBe('')
   })
 })
 

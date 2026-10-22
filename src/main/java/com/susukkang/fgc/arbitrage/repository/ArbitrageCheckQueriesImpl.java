@@ -2,6 +2,8 @@ package com.susukkang.fgc.arbitrage.repository;
 
 import com.susukkang.fgc.arbitrage.dto.*;
 import com.susukkang.fgc.common.code.*;
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.SqlSort;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
@@ -10,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * PostgreSQL DISTINCT ON, LATERAL, 행별 ROUND 집계 및 UPSERT RETURNING의 기존 의미를 유지한다.
@@ -18,6 +22,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
+    private static final String CONTRACT_MONTH_NO = "contractMonthNo";
+
     private final EntityManager entityManager;
 
     private static final String CONTRACT_ID = "contractId";
@@ -51,9 +57,26 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             ON
             c.contract_id = ac.contract_id
             __FILTER__
-            ORDER BY
-            ac.arbitrage_check_id DESC
+            __ORDER__
             """;
+
+    /** 화면 정렬 key(ARB-W01 목록) → SQL 표현식. 지급단계·환급금 출처·가산 여부·판정은 순서 기준이 없어 제외한다. */
+    private static final Map<String, String> SORTABLE = Map.of(
+            "contractNo", "c.contract_no",
+            AS_OF_DATE, "ac.as_of_date",
+            CONTRACT_MONTH_NO, "ac.contract_month_no",
+            "cumulativePaidPremium", "ac.cumulative_paid_premium",
+            "paidCommissionAmount", "ac.paid_commission_amount",
+            "plannedCommissionAmount", "ac.planned_commission_amount",
+            "includedSurrenderValueAmount", "ac.included_surrender_value_amount",
+            "netDifferenceAmount", "ac.net_difference_amount");
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+    public static final ListSort DEFAULT_SORT = new ListSort("arbitrageCheckId", false);
+
+    /** 요청 정렬을 검증한다(condition 은 null 이 아니다). 허용 key 가 아니면 COMMON_002. 비어 있으면 판정 ID 내림차순. */
+    public static ListSort sortOf(ArbitrageCheckSearchCondition condition) {
+        return ListSort.parse(condition.getSort(), SORT_KEYS, DEFAULT_SORT);
+    }
 
     private static final String ARBITRAGE_CHECK_SUMMARY = """
             SELECT
@@ -350,7 +373,9 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
 
     @Override
     public List<ArbitrageCheckView> selectByCondition(ArbitrageCheckSearchCondition condition, int offset, int size) {
-        return search(SELECT_BY_CONDITION, condition).setFirstResult(offset).setMaxResults(size)
+        String sql = SELECT_BY_CONDITION.replace("__ORDER__",
+                SqlSort.orderBy(sortOf(condition), SORTABLE, "ac.arbitrage_check_id DESC"));
+        return search(sql, condition).setFirstResult(offset).setMaxResults(size)
                 .setTupleTransformer((tuple, aliases) -> view(tuple)).getResultList();
     }
 
@@ -409,7 +434,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
                 .setParameter("channelCode", source.getChannelCode())
                 .setParameter("productOfferingId", source.getProductOfferingId())
                 .setParameter("contractDate", source.getContractDate())
-                .setParameter("contractMonthNo", source.getContractMonthNo())
+                .setParameter(CONTRACT_MONTH_NO, source.getContractMonthNo())
                 .getResultList().stream().map(tuple -> {
                     ArbitrageRefundRateCandidate result = new ArbitrageRefundRateCandidate();
                     result.setRefundRateTableId((Long) tuple[0]);
@@ -427,7 +452,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         q.setParameter(CONTRACT_ID, row.getContractId(), Long.class);
         q.setParameter(PAYMENT_STAGE, row.getPaymentStage() == null ? null : row.getPaymentStage().name(), String.class);
         q.setParameter(AS_OF_DATE, row.getAsOfDate(), LocalDate.class);
-        q.setParameter("contractMonthNo", row.getContractMonthNo(), Integer.class);
+        q.setParameter(CONTRACT_MONTH_NO, row.getContractMonthNo(), Integer.class);
         q.setParameter("cumulativePaidPremium", row.getCumulativePaidPremium(), BigDecimal.class);
         q.setParameter("paidCommissionAmount", row.getPaidCommissionAmount(), BigDecimal.class);
         q.setParameter("plannedCommissionAmount", row.getPlannedCommissionAmount(), BigDecimal.class);

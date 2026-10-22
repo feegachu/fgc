@@ -1,5 +1,7 @@
 package com.susukkang.fgc.reconciliation.repository;
 
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.SqlSort;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 설명 : 대사 실행 이력의 필터·정렬·페이징과 결과 집계 조회.
@@ -23,10 +27,34 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReconciliationRunHistoryRepository {
+    private static final String CREATED_AT = "createdAt";
+    private static final String SETTLEMENT_MONTH = "settlementMonth";
+
     private final EntityManager entityManager;
 
+    /** 화면 정렬 key(RECO-W01 실행 이력) → SQL 표현식. 지급단계·상태는 순서 기준이 없어 제외한다. */
+    private static final Map<String, String> SORTABLE = Map.of(
+            CREATED_AT, "rr.created_at",
+            "reconciliationRunId", "rr.reconciliation_run_id",
+            SETTLEMENT_MONTH, "rr.settlement_month",
+            "insurerName", "ins.insurer_name",
+            "targetCount", "vw.result_count",
+            "matchedCount", "vw.matched_count",
+            "exceptionCount", "vw.exception_count",
+            "matchRatePct", "(vw.matched_count::numeric / NULLIF(vw.result_count, 0))",
+            "differenceTotal", "vw.difference_total",
+            "startedAt", "rr.started_at");
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+    public static final ListSort DEFAULT_SORT = new ListSort(CREATED_AT, false);
+
+    /** 기존 호출 호환: 실행 시각 기준 방향만 고른다. */
     public List<ReconciliationRunHistoryRow> search(LocalDate settlementMonth, String paymentStage, Long insurerId, String sortDirection, int offset, int limit) {
-        // 검색값은 모두 바인딩하며 정렬 키워드는 고정된 ASC/DESC 중에서만 선택한다.
+        return search(settlementMonth, paymentStage, insurerId, new ListSort(CREATED_AT, "asc".equals(sortDirection)), offset, limit);
+    }
+
+    public List<ReconciliationRunHistoryRow> search(LocalDate settlementMonth, String paymentStage, Long insurerId, ListSort sort, int offset, int limit) {
+        // 검색값은 모두 바인딩하며 정렬은 허용 목록(SORTABLE)의 코드 상수 표현식만 쓴다. 동률은 실행 ID가 방향을 따른다.
+        String orderBy = SqlSort.orderBy(sort, SORTABLE, "rr.reconciliation_run_id " + (sort.ascending() ? "ASC" : "DESC"));
         NativeQuery<?> query = entityManager.createNativeQuery("""
                 SELECT rr.reconciliation_run_id, rr.validation_run_id, rr.settlement_month, rr.payment_stage,
                 rr.insurer_id, ins.insurer_name AS insurerName,
@@ -47,13 +75,9 @@ public class ReconciliationRunHistoryRepository {
                 AND (CAST(:settlementMonth AS date) IS NULL OR rr.settlement_month = :settlementMonth)
                 AND (CAST(:paymentStage AS varchar) IS NULL OR rr.payment_stage = :paymentStage)
                 AND (CAST(:insurerId AS bigint) IS NULL OR rr.insurer_id = :insurerId)
-                ORDER BY CASE WHEN :ascending THEN rr.created_at END ASC,
-                         CASE WHEN NOT :ascending THEN rr.created_at END DESC,
-                         CASE WHEN :ascending THEN rr.reconciliation_run_id END ASC,
-                         CASE WHEN NOT :ascending THEN rr.reconciliation_run_id END DESC
-                """).unwrap(NativeQuery.class);
-        query.setParameter("ascending", "asc".equals(sortDirection));
-        query.setParameter("settlementMonth", settlementMonth);
+                __order__
+                """.replace("__order__", orderBy)).unwrap(NativeQuery.class);
+        query.setParameter(SETTLEMENT_MONTH, settlementMonth);
         query.setParameter("paymentStage", paymentStage);
         query.setParameter("insurerId", insurerId);
         query.setFirstResult(offset).setMaxResults(limit);
@@ -116,7 +140,7 @@ public class ReconciliationRunHistoryRepository {
                 AND (CAST(:paymentStage AS varchar) IS NULL OR rr.payment_stage = :paymentStage)
                 AND (CAST(:insurerId AS bigint) IS NULL OR rr.insurer_id = :insurerId)
                 """).unwrap(NativeQuery.class);
-        query.setParameter("settlementMonth", settlementMonth);
+        query.setParameter(SETTLEMENT_MONTH, settlementMonth);
         query.setParameter("paymentStage", paymentStage);
         query.setParameter("insurerId", insurerId);
         return ((Number) query.getSingleResult()).longValue();

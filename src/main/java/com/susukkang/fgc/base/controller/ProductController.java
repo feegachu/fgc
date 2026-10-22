@@ -48,6 +48,9 @@ public class ProductController {
             @Parameter(description = "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.")
             @RequestParam(defaultValue = "false")
             boolean includeHistorical,
+            @Parameter(description = "정렬(key,asc|desc). insurerProductCode·productName·standardProductCode·offeringVersion·salesStartDate·basicDocumentDate. 비우면 상품코드·판매버전 순")
+            @RequestParam(required = false)
+            String sort,
             @Parameter(description = "페이지(1-base)", example = "1")
             @RequestParam(defaultValue = "1")
             int page,
@@ -55,7 +58,7 @@ public class ProductController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        ProductSearchCriteria criteria = new ProductSearchCriteria(insurerId, asOf, includeExpired, includeHistorical);
+        ProductSearchCriteria criteria = new ProductSearchCriteria(insurerId, asOf, includeExpired, includeHistorical, sort);
         return ApiResponse.success(productService.search(criteria, page, size));
     }
 }

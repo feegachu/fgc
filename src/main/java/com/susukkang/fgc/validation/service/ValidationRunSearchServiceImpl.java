@@ -3,10 +3,12 @@ package com.susukkang.fgc.validation.service;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.validation.repository.ValidationRunSearchImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -50,11 +52,13 @@ public class ValidationRunSearchServiceImpl implements ValidationRunSearchServic
         ValidationRunStatus status = criteria.status() != null ? ValidationRunStatus.valueOf(criteria.status()) : null;
 
         // 4) Repository 호출 (목록 + 전체 건수를 Page 하나로)
-        Page<ValidationRunListRow> resultPage = validationRunRepository.search(
-                criteria.month(), status, PageRequest.of(page - 1, size));
+        // 정렬(#604): 허용 컬럼만 받고(아니면 COMMON_002), 비어 있으면 기존 검증월·회차 내림차순이다.
+        ListSort sort = ValidationRunSearchImpl.sortOf(criteria.sort());
+        Page<ValidationRunListRow> resultPage = validationRunRepository.searchSorted(
+                criteria.month(), status, sort, PageRequest.of(page - 1, size));
 
         // 5) PageResponse로 조립
-        return PageResponse.of(resultPage.getContent(), page, size, resultPage.getTotalElements(), "validationMonth,desc");
+        return PageResponse.of(resultPage.getContent(), page, size, resultPage.getTotalElements(), sort.value());
     }
 
     @Override

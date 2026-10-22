@@ -21,6 +21,7 @@ import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.contract.repository.ContractLockRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -147,9 +148,10 @@ public class CapCheckServiceImpl implements CapCheckService {
         }
         int offset = (int) offsetLong;
 
+        ListSort sort = CapCheckQueryRepository.sortOf(criteria.sort());
         List<CapCheckListRow> rows = capCheckQueryRepository.search(
                 criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
-                criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), offset, size);
+                criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), offset, size, sort);
         long total = capCheckQueryRepository.count(
                 criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
                 criteria.insurerId(), criteria.organizationId(), criteria.contractNo());
@@ -162,7 +164,7 @@ public class CapCheckServiceImpl implements CapCheckService {
                 criteria.month(), criteria.insurerId(), criteria.organizationId(), criteria.contractNo());
 
         PageResponse<CapCheckListRow> pageResponse =
-                PageResponse.of(rows, page, size, total, "asOfDate,desc");
+                PageResponse.of(rows, page, size, total, sort.value());
         return new CapCheckSearchResult(summary, stageSummary, agentSummary, pageResponse);
     }
 

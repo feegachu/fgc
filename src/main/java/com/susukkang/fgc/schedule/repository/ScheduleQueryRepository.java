@@ -8,7 +8,10 @@ import com.susukkang.fgc.schedule.code.SchedulePurpose;
 import com.susukkang.fgc.schedule.code.ScheduleRegime;
 import com.susukkang.fgc.schedule.dto.*;
 import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.dsl.ComparableExpressionBase;
 import com.querydsl.core.types.dsl.Expressions;
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.QuerydslSort;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import static com.susukkang.fgc.schedule.entity.QScheduleHeader.scheduleHeader;
@@ -25,7 +28,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 설명 : 예상 스케줄 목록·상세·버전과 생성·확정에 필요한 현재 상태를 조회한다.
@@ -237,6 +242,21 @@ public class ScheduleQueryRepository {
                 .getResultList();
     }
 
+    /** 화면 정렬 key(SCHE-W01 컬럼) → 표현식. 지급단계·적용체계·용도·상태·사용중은 순서 기준이 없어 제외한다. */
+    private static final Map<String, ComparableExpressionBase<?>> SORTABLE = Map.of(
+            "contractNo", insuranceContract.contractNo,
+            "version", scheduleHeader.scheduleVersionNo,
+            "lines", scheduleLine.scheduleLineId.count(),
+            "total", scheduleLine.expectedAmount.sumAggregate(),
+            "policy", policyVersion.policyCode);
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+    public static final ListSort DEFAULT_SORT = new ListSort("scheduleHeaderId", false);
+
+    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 조건이 없거나 비어 있으면 스케줄 ID 내림차순. */
+    public static ListSort sortOf(ScheduleSearchCondition condition) {
+        return ListSort.parse(condition == null ? null : condition.getSort(), SORT_KEYS, DEFAULT_SORT);
+    }
+
     private JPAQuery<com.querydsl.core.Tuple> headerQuery(ScheduleSearchCondition condition) {
         var sh = scheduleHeader;
         var c = insuranceContract;
@@ -253,7 +273,7 @@ public class ScheduleQueryRepository {
                 .leftJoin(sl).on(sl.scheduleHeaderId.eq(sh.scheduleHeaderId))
                 .where(searchFilters(condition))
                 .groupBy(sh.scheduleHeaderId, c.contractNo, pv.policyCode, pv.versionNo)
-                .orderBy(sh.scheduleHeaderId.desc());
+                .orderBy(QuerydslSort.order(sortOf(condition), SORTABLE, sh.scheduleHeaderId.desc()));
     }
 
     private BooleanBuilder searchFilters(ScheduleSearchCondition c) {

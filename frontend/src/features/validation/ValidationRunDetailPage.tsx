@@ -327,7 +327,7 @@ function DetailBody({
 /** 최근 실행 20건 — 고르고 [이동]을 눌러야 넘어간다(1차와 같다). */
 function RunPicker({ currentId, link }: { currentId: string; link: (path: string) => string }) {
   const navigate = useNavigate()
-  const runs = useQuery(runsQuery({ status: '', page: 1 }))
+  const runs = useQuery(runsQuery({ status: '', page: 1, sort: '' }))
   const [picked, setPicked] = useState('')
   const value = picked || currentId
   return (

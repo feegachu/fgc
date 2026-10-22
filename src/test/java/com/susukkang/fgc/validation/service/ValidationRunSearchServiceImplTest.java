@@ -3,10 +3,12 @@ package com.susukkang.fgc.validation.service;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.validation.dto.ValidationRunListRow;
 import com.susukkang.fgc.validation.dto.ValidationRunSearchCriteria;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.validation.repository.ValidationRunSearchImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +52,7 @@ class ValidationRunSearchServiceImplTest {
         ValidationRunSearchCriteria criteria = new ValidationRunSearchCriteria(LocalDate.of(2026, 8, 1), "RUNNING");
         PageRequest pageable = PageRequest.of(0, 20);
         Page<ValidationRunListRow> page = new PageImpl<>(List.of(sampleRow()), pageable, 1);
-        when(validationRunRepository.search(criteria.month(), ValidationRunStatus.RUNNING, pageable))
+        when(validationRunRepository.searchSorted(criteria.month(), ValidationRunStatus.RUNNING, ValidationRunSearchImpl.DEFAULT_SORT, pageable))
                 .thenReturn(page);
 
         PageResponse<ValidationRunListRow> result = service.search(criteria, 1, 20);
@@ -67,7 +69,7 @@ class ValidationRunSearchServiceImplTest {
     void searchPassesNullCriteriaThroughWhenNoFilterGiven() {
         ValidationRunSearchCriteria criteria = new ValidationRunSearchCriteria(null, null);
         PageRequest pageable = PageRequest.of(0, 20);
-        when(validationRunRepository.search(null, null, pageable))
+        when(validationRunRepository.searchSorted(null, null, ValidationRunSearchImpl.DEFAULT_SORT, pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
         PageResponse<ValidationRunListRow> result = service.search(criteria, 1, 20);
@@ -78,11 +80,31 @@ class ValidationRunSearchServiceImplTest {
     }
 
     @Test
+    // #604 요청한 정렬은 그대로 Repository에 넘기고 응답 sort 로 돌려준다. 허용되지 않는 값은 COMMON_002 다.
+    void searchPassesRequestedSortAndRejectsUnsupportedOnes() {
+        PageRequest pageable = PageRequest.of(0, 20);
+        ListSort sort = new ListSort("startedAt", true);
+        when(validationRunRepository.searchSorted(null, null, sort, pageable))
+                .thenReturn(new PageImpl<>(List.of(sampleRow()), pageable, 1));
+
+        PageResponse<ValidationRunListRow> result =
+                service.search(new ValidationRunSearchCriteria(null, null, "startedAt,asc"), 1, 20);
+
+        assertThat(result.sort()).isEqualTo("startedAt,asc");
+        for (String bad : List.of("status,asc", "startedAt,sideways", "startedAt")) {
+            assertThatThrownBy(() -> service.search(new ValidationRunSearchCriteria(null, null, bad), 1, 20))
+                    .isInstanceOf(FgcBusinessException.class)
+                    .satisfies(e -> assertThat(((FgcBusinessException) e).getErrorCode())
+                            .isEqualTo(FgcErrorCode.COMMON_002));
+        }
+    }
+
+    @Test
     // 2페이지·size 10 이면 PageRequest.of(1, 10)이어야 한다(0-base)
     void searchComputesPageableFromPageAndSize() {
         ValidationRunSearchCriteria criteria = new ValidationRunSearchCriteria(null, null);
         PageRequest pageable = PageRequest.of(1, 10);
-        when(validationRunRepository.search(null, null, pageable))
+        when(validationRunRepository.searchSorted(null, null, ValidationRunSearchImpl.DEFAULT_SORT, pageable))
                 .thenReturn(new PageImpl<>(List.of(sampleRow()), pageable, 11));
 
         PageResponse<ValidationRunListRow> result = service.search(criteria, 2, 10);
