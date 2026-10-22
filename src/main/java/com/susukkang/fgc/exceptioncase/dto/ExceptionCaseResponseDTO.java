@@ -40,7 +40,8 @@ public record ExceptionCaseResponseDTO(
         int detectionCount,
         OffsetDateTime createdAt,
         List<ExceptionOccurrenceResponse> occurrences,
-        List<ExceptionActionResponse> actions
+        List<ExceptionActionResponse> actions,
+        boolean sourceDeleted
 ) {
     public ExceptionCaseResponseDTO {
         occurrences = List.copyOf(occurrences);
@@ -61,7 +62,7 @@ public record ExceptionCaseResponseDTO(
                 row.sourceEntityId(), row.capCheckId(), row.reconciliationResultType(), row.validationMonth(), row.firstDetectedRunId(),
                 row.lastDetectedRunId(), DateUtil.toSeoul(row.firstDetectedAt()),
                 DateUtil.toSeoul(row.lastDetectedAt()), row.detectionCount(),
-                DateUtil.toSeoul(row.createdAt()), occurrences, actions
+                DateUtil.toSeoul(row.createdAt()), occurrences, actions, row.sourceDeleted()
         );
     }
 
@@ -127,8 +128,9 @@ public record ExceptionCaseResponseDTO(
 
     /** 예외의 원천 업무 화면이 제공되는 경우 바로 이동할 링크를 반환한다. */
     @JsonProperty("sourceLink")
+    @io.swagger.v3.oas.annotations.media.Schema(types = {"string", "null"})
     public String sourceLink() {
-        if (sourceEntityType == null || sourceEntityId == null || sourceEntityId.isBlank()) {
+        if (sourceDeleted || sourceEntityType == null || sourceEntityId == null || sourceEntityId.isBlank()) {
             return null;
         }
         return switch (sourceEntityType) {

@@ -47,6 +47,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -64,6 +65,303 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 // 이 통합 테스트에도 SecurityContext가 필요하다. 지급 확정은 SETTLEMENT가 소유하는 동작이다.
 @WithMockUser(roles = "SETTLEMENT")
 class CommissionPaymentIntegrationTest {
+
+    @org.junit.jupiter.api.BeforeEach
+    void authenticateActualActor() {
+        var view = jdbcTemplate.queryForObject("SELECT user_id, login_id FROM fgc.app_user ORDER BY user_id LIMIT 1", (rs, index) -> {
+            var value = new com.susukkang.fgc.auth.dto.AppUserView();
+            value.setUserId(rs.getLong("user_id"));
+            value.setLoginId(rs.getString("login_id"));
+            value.setPasswordHash("{bcrypt}dummy");
+            value.setUserName(value.getLoginId());
+            value.setRoleCode("SETTLEMENT");
+            return value;
+        });
+        var principal = new com.susukkang.fgc.auth.dto.FgcUserDetails(view, true, true);
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                        principal, null, principal.getAuthorities()));
+    }
+
+    @Autowired
+    private com.susukkang.fgc.cap.repository.CapCheckQueryRepository capCheckQueryRepository;
+    @Autowired
+    private com.susukkang.fgc.dashboard.repository.DashboardQueryRepository dashboardQueryRepository;
+    @Autowired
+    private com.susukkang.fgc.validation.repository.ValidationRunRepository validationRunRepository;
+    @Autowired
+    private com.susukkang.fgc.exceptioncase.service.ExceptionCaseService exceptionCaseService;
+    @Autowired
+    private com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository exceptionCaseQueryRepository;
+
+    @Test
+    void deleteDraftRemovesPaymentAndAttributionsAndPreservesAudit() {
+        var created = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), new BigDecimal("1000")));
+        commissionPaymentService.deleteDraft(created.paymentId());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.commission_transaction WHERE commission_transaction_id=?", Long.class, created.paymentId())).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.transaction_attribution WHERE commission_transaction_id=?", Long.class, created.paymentId())).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT before_value->'payment'->>'sourceBusinessKey' FROM fgc.audit_log WHERE action_code='PAYMENT_DELETED' AND entity_id=?", String.class, created.paymentId().toString())).isEqualTo(created.sourceBusinessKey());
+        assertThat(jdbcTemplate.queryForObject("SELECT jsonb_array_length(before_value->'attributions') FROM fgc.audit_log WHERE action_code='PAYMENT_DELETED' AND entity_id=?", Integer.class, created.paymentId().toString())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='PAYMENT_CREATED' AND entity_id=?", Long.class, created.paymentId().toString())).isEqualTo(1);
+        assertThatThrownBy(() -> commissionPaymentService.deleteDraft(created.paymentId())).isInstanceOf(FgcBusinessException.class);
+    }
+
+    @Test
+    void deleteDraftPreservesRejectedCapEvidenceWithoutChangingCurrentContractVerdict() {
+        Long runId = checklistRun();
+        long criticalBefore = validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount();
+        long dashboardBefore = dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1));
+        var viewBefore = jdbcTemplate.queryForList("SELECT cap_check_id FROM fgc.vw_latest_cap_check WHERE contract_id=1 AND payment_stage='GA_TO_FC'", Long.class);
+        var created = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), new BigDecimal("1300000")));
+        assertCapViolation(created.paymentId());
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount()).isGreaterThan(criticalBefore);
+        assertThat(dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1))).isEqualTo(dashboardBefore);
+        var before = capCheckQueryRepository.findLatestByContractAndStage(1L, "GA_TO_FC");
+        Long capId = jdbcTemplate.queryForObject("SELECT max(cap_check_id) FROM fgc.cap_check WHERE candidate_transaction_id=?", Long.class, created.paymentId());
+        Long exceptionCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE cap_check_id=?", Long.class, capId);
+        String snapshot = jdbcTemplate.queryForObject("SELECT calculation_snapshot::text FROM fgc.cap_check WHERE cap_check_id=?", String.class, capId);
+        commissionPaymentService.deleteDraft(created.paymentId());
+        assertThat(capCheckQueryRepository.findById(capId)).isNotNull();
+        assertThat(jdbcTemplate.queryForObject("SELECT calculation_snapshot @> CAST(? AS jsonb) FROM fgc.cap_check WHERE cap_check_id=?", Boolean.class, snapshot, capId)).isTrue();
+        assertThat(jdbcTemplate.queryForObject("SELECT calculation_snapshot->>'deletedCandidateTransactionId' FROM fgc.cap_check WHERE cap_check_id=?", String.class, capId)).isEqualTo(created.paymentId().toString());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_case WHERE cap_check_id=?", Long.class, capId)).isEqualTo(exceptionCount);
+        var after = capCheckQueryRepository.findLatestByContractAndStage(1L, "GA_TO_FC");
+        assertThat(after == null ? null : after.getCapCheckId()).isEqualTo(before == null ? null : before.getCapCheckId());
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedCriticalExceptionCount()).isEqualTo(criticalBefore);
+        assertThat(dashboardQueryRepository.countCapViolation(LocalDate.of(2026, 7, 1))).isEqualTo(dashboardBefore);
+        assertThat(jdbcTemplate.queryForList("SELECT cap_check_id FROM fgc.vw_latest_cap_check WHERE contract_id=1 AND payment_stage='GA_TO_FC'", Long.class)).isEqualTo(viewBefore);
+        assertThat(jdbcTemplate.queryForList("SELECT status FROM fgc.exception_case WHERE cap_check_id=?", String.class, capId)).isNotEmpty().containsOnly("RESOLVED");
+        Long caseId = jdbcTemplate.queryForObject("SELECT exception_case_id FROM fgc.exception_case WHERE cap_check_id=? LIMIT 1", Long.class, capId);
+        assertThat(jdbcTemplate.queryForList("SELECT action_type FROM fgc.exception_action WHERE exception_case_id=? ORDER BY action_seq", String.class, caseId)).containsExactly("START_REVIEW", "CANCEL");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='EXCEPTION_ACTION' AND entity_id=?", Integer.class, caseId.toString())).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT action_by FROM fgc.exception_action WHERE exception_case_id=? ORDER BY action_seq DESC LIMIT 1", Long.class, caseId))
+                .isEqualTo(jdbcTemplate.queryForObject("SELECT MIN(user_id) FROM fgc.app_user", Long.class));
+        var rows = exceptionCaseQueryRepository.search(new com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO(), List.of(), 0, 10000);
+        var deleted = rows.stream().filter(row -> row.exceptionCaseId().equals(caseId)).findFirst().orElseThrow();
+        var response = com.susukkang.fgc.exceptioncase.dto.ExceptionCaseResponseDTO.from(deleted, List.of(), List.of());
+        assertThat(response.sourceEntityId()).isEqualTo(created.paymentId().toString());
+        assertThat(response.sourceLink()).isNull();
+        assertThat(response.capBasisLink()).contains(capId.toString());
+    }
+
+    private Long checklistRun() {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run(validation_month,run_no,run_type)
+                SELECT DATE '2026-07-01', COALESCE(MAX(run_no),0)+1, 'PRE_CONFIRM'
+                  FROM fgc.validation_run WHERE validation_month=DATE '2026-07-01'
+                RETURNING validation_run_id
+                """, Long.class);
+    }
+
+    @Test
+    void deletionClosesOnlyOpenExceptionsOfThatPaymentAndCannotReopenDeletedSource() {
+        var created = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), BigDecimal.ONE));
+        var other = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), BigDecimal.ONE));
+        Long open = insertDeletionException(created.paymentId(), "IN_REVIEW");
+        Long resolved = insertDeletionException(created.paymentId(), "RESOLVED");
+        Long rejected = insertDeletionException(created.paymentId(), "REJECTED");
+        Long unrelated = insertDeletionException(other.paymentId(), "NEW");
+        commissionPaymentService.deleteDraft(created.paymentId());
+        assertThat(jdbcTemplate.queryForList("SELECT action_type FROM fgc.exception_action WHERE exception_case_id=?", String.class, open)).containsExactly("CANCEL");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id IN (?, ?, ?)", Integer.class, resolved, rejected, unrelated)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, unrelated)).isEqualTo("NEW");
+        assertThatThrownBy(() -> exceptionCaseService.action(rejected,
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(ExceptionActionType.REOPEN, "재검토", null), null, "test"))
+                .isInstanceOfSatisfying(FgcBusinessException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(FgcErrorCode.EXCP_003));
+    }
+
+    private Long insertDeletionException(Long paymentId, String status) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.exception_case(exception_key,exception_type,severity,status,validation_month,
+                    source_entity_type,source_entity_id,title)
+                VALUES(?,'POLICY_MISSING','WARNING',?,DATE '2026-07-01','COMMISSION_TRANSACTION',?,'삭제 예외 회귀')
+                RETURNING exception_case_id
+                """, Long.class, "IT-607-" + UUID.randomUUID(), status, paymentId.toString());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void deleteDraftRollbackRestoresPaymentAndAttributions() {
+        var created = commissionPaymentService.create(request("IT-FUN065-LOCK-ROLLBACK-" + UUID.randomUUID(), new BigDecimal("1000")));
+        Long exceptionId = insertDeletionException(created.paymentId(), "NEW");
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                commissionPaymentService.deleteDraft(created.paymentId());
+                status.setRollbackOnly();
+            });
+            assertThat(commissionPaymentService.get(created.paymentId()).attributions()).hasSize(1);
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId)).isEqualTo("NEW");
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=?", Integer.class, exceptionId)).isZero();
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='EXCEPTION_ACTION' AND entity_id=?", Integer.class, exceptionId.toString())).isZero();
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='PAYMENT_DELETED' AND entity_id=?", Long.class, created.paymentId().toString())).isZero();
+            commissionPaymentService.deleteDraft(created.paymentId());
+        } finally {
+            cleanupDeletionException(exceptionId);
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @Timeout(20)
+    void deletionAndConfirmationSerializeOnThePaymentRow(boolean deleteFirst) throws Exception {
+        var created = commissionPaymentService.create(request("IT-FUN065-LOCK-607-" + UUID.randomUUID(), new BigDecimal("1000")));
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2));
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        AtomicInteger secondBackendPid = new AtomicInteger();
+        try {
+            Future<?> first = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                if (deleteFirst) commissionPaymentService.deleteDraft(created.paymentId());
+                else commissionPaymentService.confirm(created.paymentId(), "IT-607-" + created.paymentId());
+                locked.countDown();
+                try { if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("release timeout"); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+            }));
+            assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<FgcErrorCode> second = executor.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                secondBackendPid.set(jdbcTemplate.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                secondStarted.countDown();
+                try {
+                    if (deleteFirst) commissionPaymentService.confirm(created.paymentId(), "IT-607-second");
+                    else commissionPaymentService.deleteDraft(created.paymentId());
+                    return null;
+                } catch (FgcBusinessException e) {
+                    status.setRollbackOnly();
+                    return e.getErrorCode();
+                }
+            }));
+            assertThat(secondStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            awaitDatabaseLock(secondBackendPid.get());
+            release.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(deleteFirst ? FgcErrorCode.COMMON_002 : FgcErrorCode.TRAN_005);
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.commission_transaction WHERE commission_transaction_id=?", Long.class, created.paymentId())).isEqualTo(deleteFirst ? 0L : 1L);
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
+    private void awaitDatabaseLock(int backendPid) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            if (Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+                    SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = ? AND wait_event_type = 'Lock')
+                    """, Boolean.class, backendPid))) return;
+            Thread.sleep(50);
+        }
+        throw new AssertionError("DB 잠금 대기가 관측되지 않음: " + backendPid);
+    }
+
+    private void cleanupDeletionException(Long exceptionId) {
+        TransactionTemplate cleanup = new TransactionTemplate(transactionManager);
+        cleanup.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
+        cleanup.executeWithoutResult(status -> {
+            // 임시 PostgreSQL의 테스트 전용 정리. append-only 운영 트리거는 변경하지 않는다.
+            jdbcTemplate.execute("SET LOCAL session_replication_role = replica");
+            jdbcTemplate.update("DELETE FROM fgc.exception_action WHERE exception_case_id=?", exceptionId);
+            jdbcTemplate.update("DELETE FROM fgc.exception_case WHERE exception_case_id=?", exceptionId);
+        });
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @Timeout(25)
+    void deletionAndManualReopenSerializeOnTheExceptionRow(boolean deleteFirst) throws Exception {
+        var payment = commissionPaymentService.create(request("IT-FUN065-LOCK-EXCEPTION-" + UUID.randomUUID(), BigDecimal.ONE));
+        Long exceptionId = insertDeletionException(payment.paymentId(), "REJECTED");
+        Long actor = jdbcTemplate.queryForObject("SELECT MIN(user_id) FROM fgc.app_user", Long.class);
+        Runnable reopen = () -> exceptionCaseService.action(exceptionId,
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(ExceptionActionType.REOPEN, "동시 재검토", null), actor, "test");
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2));
+        CountDownLatch firstLocked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch secondReady = new CountDownLatch(1);
+        AtomicInteger backend = new AtomicInteger();
+        try {
+            Future<?> first = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                if (deleteFirst) commissionPaymentService.deleteDraft(payment.paymentId());
+                else reopen.run();
+                firstLocked.countDown();
+                try {
+                    if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("release timeout");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }));
+            assertThat(firstLocked.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<FgcErrorCode> second = executor.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                backend.set(jdbcTemplate.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                secondReady.countDown();
+                try {
+                    if (deleteFirst) reopen.run();
+                    else commissionPaymentService.deleteDraft(payment.paymentId());
+                    return null;
+                } catch (FgcBusinessException e) {
+                    status.setRollbackOnly();
+                    return e.getErrorCode();
+                }
+            }));
+            assertThat(secondReady.await(5, TimeUnit.SECONDS)).isTrue();
+            awaitDatabaseLock(backend.get());
+            release.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(deleteFirst ? FgcErrorCode.EXCP_003 : null);
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId))
+                    .isEqualTo(deleteFirst ? "REJECTED" : "RESOLVED");
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.commission_transaction WHERE commission_transaction_id=?", Integer.class, payment.paymentId())).isZero();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            try {
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) throw new IllegalStateException("작업 종료 대기 실패");
+            } finally {
+                cleanupDeletionException(exceptionId);
+            }
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"not-a-number", "9223372036854775808", ""})
+    void malformedHistoricalSourceIdsDoNotBreakDeletionLookup(String sourceId) {
+        Long exceptionId = insertDeletionException(0L, "REJECTED");
+        String reasonCode = "IT-607-" + UUID.randomUUID();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET source_entity_id=?, reason_code=? WHERE exception_case_id=?", sourceId, reasonCode, exceptionId);
+        var criteria = com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO.builder().reasonCode(reasonCode).build();
+        var rows = exceptionCaseQueryRepository.search(criteria, List.of(), 0, 1);
+        assertThat(rows.stream().filter(row -> row.exceptionCaseId().equals(exceptionId)).findFirst().orElseThrow().sourceDeleted()).isTrue();
+        assertThatThrownBy(() -> exceptionCaseService.action(exceptionId,
+                new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(ExceptionActionType.REOPEN, "재검토", null), null, "test"))
+                .isInstanceOfSatisfying(FgcBusinessException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(FgcErrorCode.EXCP_003));
+    }
+
+    @Test
+    void deleteDraftRejectsAttributionsUsedByOtherValidationEvidence() {
+        var other = commissionPaymentService.create(request("IT-607-other-" + UUID.randomUUID(), new BigDecimal("1300000")));
+        assertCapViolation(other.paymentId());
+        Long otherCapId = jdbcTemplate.queryForObject("SELECT max(cap_check_id) FROM fgc.cap_check WHERE candidate_transaction_id=?", Long.class, other.paymentId());
+        var created = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), new BigDecimal("1000")));
+        int linked = jdbcTemplate.update("""
+                UPDATE fgc.cap_check_detail
+                   SET transaction_attribution_id = (SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id=?)
+                 WHERE cap_check_detail_id = (SELECT min(cap_check_detail_id) FROM fgc.cap_check_detail WHERE cap_check_id=? AND transaction_attribution_id IS NOT NULL)
+                """, created.paymentId(), otherCapId);
+        assertThat(linked).isEqualTo(1);
+        assertThatThrownBy(() -> commissionPaymentService.deleteDraft(created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_009));
+        assertThat(commissionPaymentService.get(created.paymentId()).attributions()).hasSize(1);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"CONFIRMED", "CANCELLED"})
+    void deleteDraftRejectsNonDraftState(String state) {
+        var created = commissionPaymentService.create(request("IT-607-" + UUID.randomUUID(), new BigDecimal("1000")));
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET status=? WHERE commission_transaction_id=?", state, created.paymentId());
+        assertThatThrownBy(() -> commissionPaymentService.deleteDraft(created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_005));
+        assertThat(paymentStatus(created.paymentId())).isEqualTo(state);
+    }
 
     @Autowired
     private CommissionPaymentService commissionPaymentService;
@@ -121,6 +419,8 @@ class CommissionPaymentIntegrationTest {
 
     @Test
     void effectiveDatePaymentWithoutRuleIsBlockedAndRecordsPolicyMissing() {
+        Long runId = checklistRun();
+        long policiesBefore = validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedPolicyExceptionCount();
         jdbcTemplate.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-07-01' WHERE contract_id=1");
         var created = commissionPaymentService.create(request("IT-482-BOUNDARY-" + UUID.randomUUID(), new BigDecimal("200000")));
         jdbcTemplate.update("UPDATE fgc.policy_version SET status='RETIRED' WHERE status='ACTIVE' AND policy_version_id IN (SELECT policy_version_id FROM fgc.cap_rule_set WHERE payment_stage='GA_TO_FC')");
@@ -137,6 +437,9 @@ class CommissionPaymentIntegrationTest {
                 String.class, created.paymentId().toString())).isEqualTo("POLICY_MISSING");
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.cap_check WHERE candidate_transaction_id=?",
                 Integer.class, created.paymentId())).isZero();
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedPolicyExceptionCount()).isEqualTo(policiesBefore + 1);
+        commissionPaymentService.deleteDraft(created.paymentId());
+        assertThat(validationRunRepository.findFinalizeChecklistCounts(runId).orElseThrow().getUnresolvedPolicyExceptionCount()).isEqualTo(policiesBefore);
     }
 
     @Test

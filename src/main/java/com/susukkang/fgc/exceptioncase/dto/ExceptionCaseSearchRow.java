@@ -28,6 +28,7 @@ public record ExceptionCaseSearchRow(
         OffsetDateTime firstDetectedAt,
         OffsetDateTime lastDetectedAt,
         int detectionCount,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        boolean sourceDeleted
 ) {
 }

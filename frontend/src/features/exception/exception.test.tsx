@@ -174,6 +174,25 @@ function renderPage(path = '/app/exceptions') {
 const table = () => screen.findByRole('table', { name: '예외 목록' })
 
 describe('EXCP-W01 예외함', () => {
+  it('삭제된 지급의 반려 예외에는 재검토 폼과 원천 링크를 표시하지 않는다', async () => {
+    searchResponse = () =>
+      search([
+        {
+          ...baseCase,
+          status: 'REJECTED',
+          sourceEntityType: 'COMMISSION_TRANSACTION',
+          sourceEntityId: '41',
+          sourceLink: null,
+          sourceDeleted: true,
+        },
+      ])
+    renderPage('/app/exceptions?status=REJECTED')
+    await userEvent.setup().click(within(await table()).getAllByRole('row')[1])
+    expect(screen.queryByRole('option', { name: '재검토 시작' })).not.toBeInTheDocument()
+    expect(document.querySelector('a[href*="transactions/new?id=41"]')).toBeNull()
+    expect(screen.getAllByText('COMMISSION_TRANSACTION:41')).not.toHaveLength(0)
+  })
+
   it('미처리 기본값으로 요약 카드와 목록을 보여 준다', async () => {
     renderPage()
     const row = within(await table()).getAllByRole('row')[1]
