@@ -96,7 +96,7 @@ const search = (content: ExceptionCase[]): ExceptionSearchResult => ({
   size: 20,
   totalElements: content.length,
   totalPages: content.length ? 1 : 0,
-  sort: 'severity,asc,createdAt,desc',
+  sort: 'severity,desc',
 })
 const journal = {
   journalHeaderId: 70,

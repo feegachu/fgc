@@ -44,7 +44,7 @@ public class ExceptionCaseService {
     private static final int MIN_PAGE = 1;
     private static final int MIN_SIZE = 1;
     private static final int MAX_SIZE = 100;
-    private static final String SORT = "severity,asc,createdAt,desc";
+    private static final String SORT = "severity,desc";
 
     private final ExceptionCaseQueryRepository exceptionCaseQueryRepository;
     private final ExceptionCaseRepository exceptionCaseRepository;

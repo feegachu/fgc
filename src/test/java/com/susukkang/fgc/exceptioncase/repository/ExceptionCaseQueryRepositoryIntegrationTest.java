@@ -509,7 +509,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
                 occurrenceRows.getOrDefault(row.exceptionCaseId(), List.of()),
                 actionRows.getOrDefault(row.exceptionCaseId(), List.of()))).toList();
         return new ExceptionCaseSearchResponse(summary, content, 1, size, total,
-                (int) ((total + size - 1) / size), "severity,asc,createdAt,desc");
+                (int) ((total + size - 1) / size), "severity,desc");
     }
 
     /** JPA 저장·벌크 조치와 조회를 연결해도 관리 엔티티의 이전 상태를 반환하지 않는다. */
