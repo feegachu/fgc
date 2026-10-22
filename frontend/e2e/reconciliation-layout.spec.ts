@@ -23,7 +23,7 @@ for (const width of [1440, 1024, 390]) {
       return route.fulfill({ json: { data, error: null, requestId: 'reco-layout' } })
     })
     await page.goto('reconciliations?month=2026-07')
-    await expect(page.getByLabel('보험회사')).toBeEnabled()
+    await expect(page.getByRole('combobox', { name: '보험회사', exact: true })).toBeEnabled()
     const capture = async (name: string) => {
       if (process.env.FGC_RECO_CAPTURE !== '1') return
       await page.evaluate(() => window.scrollTo(0, 0))
@@ -72,7 +72,7 @@ for (const width of [1440, 1024, 390]) {
       })
     const legacy = await measure()
     await page.reload()
-    await expect(page.getByLabel('보험회사')).toBeEnabled()
+    await expect(page.getByRole('combobox', { name: '보험회사', exact: true })).toBeEnabled()
     await capture('react-after')
     const react = await measure()
     await info.attach('geometry', { body: JSON.stringify({ legacy, react }), contentType: 'application/json' })
