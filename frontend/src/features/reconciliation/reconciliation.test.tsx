@@ -306,7 +306,7 @@ describe('RECO-W01·W02 React 전환', () => {
       sort: 'createdAt,desc',
     })
     expect(screen.getByText('50.0%')).toBeVisible()
-    expect(screen.getByText('(1,000)원')).toHaveClass('is-negative-amount')
+    expect(screen.getByText('-1,000원')).toHaveClass('is-negative-amount', 'reco-react-difference')
     const pagination = within(screen.getByRole('region', { name: '실행 이력' }))
     await user.click(pagination.getByRole('button', { name: '2' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
@@ -447,11 +447,17 @@ describe('RECO-W01·W02 React 전환', () => {
   it('실행 선택 → 결과 보기 → 비교 모달·원천·요율·관련 경로를 제공한다', async () => {
     const { router, user } = renderAt()
     await user.click(await screen.findByRole('button', { name: '41' }))
+    const resultTable = await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
+    expect(await within(resultTable).findByText('-1,000원')).toHaveClass('reco-react-difference')
+    expect(within(resultTable.querySelector('tfoot')!).getByText('-1,000')).toHaveClass('reco-react-difference')
+    expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('-1,000원')
     await user.click(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' }))
     const dialog = screen.getByRole('dialog')
     expect(await within(dialog).findByText('예상 원천 1 · schedule_line #12')).toBeVisible()
     expect(within(dialog).getByText('실제 원천 1 · commission_transaction #8')).toBeVisible()
     expect(within(dialog).getByText('123.1234%')).toBeVisible()
+    for (const difference of within(dialog).getAllByText('-1,000원'))
+      expect(difference).toHaveClass('is-negative-amount', 'reco-react-difference')
     expect(within(dialog).getByRole('link', { name: '스케줄 상세' })).toHaveAttribute(
       'href',
       '/schedules/11?month=2026-07',
@@ -529,6 +535,7 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(footer).toHaveTextContent('이 페이지 합계')
     expect(within(footer).getByText('12,000')).toBeVisible()
     expect(within(footer).getByText('11,000')).toBeVisible()
+    expect(within(footer).getByText('-1,000')).toHaveClass('reco-react-difference')
     expect(screen.getByRole('region', { name: '대상' })).toHaveTextContent('2건')
   })
   it('미선택은 0 합계, 무필터 조회는 페이지 행이 아닌 서버 실행 합계를 표시한다', async () => {
@@ -546,7 +553,7 @@ describe('RECO-W01·W02 React 전환', () => {
   it.each([
     { amount: 500.49, rowText: '500원', totalText: '1,000' },
     { amount: 500.5, rowText: '501원', totalText: '1,002' },
-    { amount: -500.5, rowText: '(501)원', totalText: '(1,002)' },
+    { amount: -500.5, rowText: '-501원', totalText: '-1,002' },
   ])('결과 유형 필터는 행별 HALF_UP 표시와 합계를 일치시킨다: $amount', async ({ amount, rowText, totalText }) => {
     renderAt('/reconciliations?runId=41&resultType=AMOUNT_DIFFERENCE', (url) =>
       /\/41\/results/.test(url)

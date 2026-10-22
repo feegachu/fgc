@@ -130,6 +130,10 @@
   white-space: normal;
 }
 
+.kpi-card-error #sum-diff-total {
+  color: var(--color-status-error-text);
+}
+
 .reco-agent-mismatch,
 .reco-amount-error {
   color: var(--color-status-error-text);

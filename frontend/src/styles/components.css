@@ -481,27 +481,11 @@ a.kpi-card:active {
 }
 
 .kpi-value {
-  color: var(--color-text-link);
+  color: var(--color-text-primary);
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 2.125rem;
   font-variant-numeric: tabular-nums;
-}
-
-.kpi-card-error .kpi-value {
-  color: var(--color-status-error-text);
-}
-
-.kpi-card-warning .kpi-value {
-  color: var(--color-status-warning-text);
-}
-
-.kpi-card-risk .kpi-value {
-  color: var(--color-status-risk-text);
-}
-
-.kpi-card-success .kpi-value {
-  color: var(--color-status-success-text);
 }
 
 .kpi-unit,
