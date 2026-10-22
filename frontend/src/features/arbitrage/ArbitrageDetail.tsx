@@ -46,7 +46,7 @@ function Timeline({ rows }: { rows: ArbitrageRow[] }) {
         rowKey={(r) => String(r.arbitrageCheckId)}
         columns={[
           { key: 'date', label: '기준일', render: (r) => date(r.asOfDate) },
-          { key: 'month', label: '차월', align: 'number', render: (r) => int(r.contractMonthNo) },
+          { key: 'month', label: '차월', align: 'left', render: (r) => int(r.contractMonthNo) },
           {
             key: 'premium',
             label: '누적 보험료',

@@ -235,13 +235,13 @@ function ScheduleDetailView({ id }: { id: string }) {
             </colgroup>
             <thead>
               <tr>
-                <th scope="col" className="is-number">
+                <th scope="col" className="is-left">
                   줄
                 </th>
-                <th scope="col" className="is-number">
+                <th scope="col" className="is-left">
                   회차
                 </th>
-                <th scope="col" className="is-number">
+                <th scope="col" className="is-left">
                   계약차월
                 </th>
                 <th scope="col">지급예정일</th>
@@ -251,10 +251,10 @@ function ScheduleDetailView({ id }: { id: string }) {
                 <th scope="col" className="is-number">
                   기준금액
                 </th>
-                <th scope="col" className="is-center">
+                <th scope="col" className="is-left">
                   계산방식
                 </th>
-                <th scope="col" className="is-number">
+                <th scope="col" className="is-left">
                   요율
                 </th>
                 <th scope="col" className="is-number">
@@ -264,7 +264,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                   상태
                 </th>
                 {/* IF-API-28 ruleRef — 규칙 5 "근거 없는 숫자는 화면에 띄우지 않습니다" */}
-                <th scope="col" className="is-number">
+                <th scope="col" className="is-left">
                   규칙 ID
                 </th>
               </tr>
@@ -326,7 +326,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             </colgroup>
             <thead>
               <tr>
-                <th scope="col" className="is-center">
+                <th scope="col" className="is-left">
                   버전
                 </th>
                 <th scope="col" className="is-center">
@@ -338,7 +338,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 <th scope="col">정책버전</th>
                 <th scope="col">생성 사유</th>
                 <th scope="col">생성 일시</th>
-                <th scope="col" className="is-number">
+                <th scope="col" className="is-left">
                   회차 수
                 </th>
                 <th scope="col" className="is-number">
@@ -478,9 +478,9 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
 function LineRow({ line }: { line: ScheduleLine }) {
   return (
     <tr>
-      <td className="is-number tabular-nums">{int(line.lineNo)}</td>
-      <td className="is-number tabular-nums">{int(line.installmentNo)}</td>
-      <td className="is-number tabular-nums">{int(line.contractMonthNo)}</td>
+      <td className="is-left tabular-nums">{int(line.lineNo)}</td>
+      <td className="is-left tabular-nums">{int(line.installmentNo)}</td>
+      <td className="is-left tabular-nums">{int(line.contractMonthNo)}</td>
       <td>{date(line.dueDate)}</td>
       <td>
         <Text content={line.commissionItemName} />
@@ -494,15 +494,15 @@ function LineRow({ line }: { line: ScheduleLine }) {
       <td className="is-number tabular-nums">
         <Money amount={line.basisAmount} />
       </td>
-      <td className="is-center">{responseLabel(null, CALCULATION_TYPE, line.calculationType)}</td>
-      <td className="is-number tabular-nums">{line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
+      <td className="is-left">{responseLabel(null, CALCULATION_TYPE, line.calculationType)}</td>
+      <td className="is-left tabular-nums">{line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
       <td className="is-number tabular-nums">
         <Money amount={line.expectedAmount} />
       </td>
       <td className="is-center">
         <ScheduleStatusBadge code={line.lineStatus} label={responseLabel(null, LINE_STATUS, line.lineStatus)} />
       </td>
-      <td className="is-number tabular-nums">{line.ruleRef == null ? EMPTY : int(line.ruleRef)}</td>
+      <td className="is-left tabular-nums">{line.ruleRef == null ? EMPTY : int(line.ruleRef)}</td>
     </tr>
   )
 }
@@ -510,7 +510,7 @@ function LineRow({ line }: { line: ScheduleLine }) {
 function VersionRow({ version, current }: { version: ScheduleHeader; current: boolean }) {
   return (
     <tr className={current ? 'is-selected' : undefined} aria-current={current || undefined}>
-      <td className="is-center">
+      <td className="is-left">
         <Link className="tabular-nums" to={`/schedules/${encodeURIComponent(String(version.scheduleHeaderId))}`}>
           {versionText(version.scheduleVersionNo)}
         </Link>
@@ -531,7 +531,7 @@ function VersionRow({ version, current }: { version: ScheduleHeader; current: bo
         <Text content={version.generationReason} />
       </td>
       <td>{dateTime(version.generatedAt)}</td>
-      <td className="is-number tabular-nums">{int(version.lineCount)}</td>
+      <td className="is-left tabular-nums">{int(version.lineCount)}</td>
       <td className="is-number tabular-nums">
         <Money amount={version.expectedTotal} />
       </td>

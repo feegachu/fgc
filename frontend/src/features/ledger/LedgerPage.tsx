@@ -1,3 +1,4 @@
+import { ResizableSplit } from '../../components/ResizableSplit'
 import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -101,6 +102,7 @@ const columns: TableColumn<Journal>[] = [
     key: 'status',
     label: '상태',
     width: '7rem',
+    align: 'center',
     render: (row) => <Badge status={row.status} label={row.statusLabel} />,
   },
   { key: 'reversal', label: '역분개 표시', width: '12rem', render: (row) => disclose(row.reversalOfJournalNo) },
@@ -160,7 +162,12 @@ export default function LedgerPage() {
         onSearch={(fields) => update({ ...fields, searched: 'true', selected: '' })}
         onReset={reset}
       />
-      <div className="ledger-react-grid">
+      <ResizableSplit
+        className="ledger-react-grid"
+        storageKey="ledger-workspace"
+        label="분개 목록과 분개 상세 카드 너비"
+        defaultRatio={55}
+      >
         <section className="surface" aria-busy={list.isFetching}>
           <header className="surface-header">
             <h2 className="surface-title">분개 목록</h2>
@@ -250,7 +257,7 @@ export default function LedgerPage() {
             )
           )}
         </section>
-      </div>
+      </ResizableSplit>
       {action && detail.data?.journalHeaderId != null && (
         <JournalActionModal
           key={`${action}-${detail.data.journalHeaderId}`}

@@ -58,20 +58,20 @@ const columns: TableColumn<ScheduleHeader>[] = [
   },
   {
     key: 'regime',
-    // 1차 badgeCell 처럼 배지만 가운데 둔다(머리글은 왼쪽).
-    cellClassName: 'is-center',
+    // 태그 컬럼은 머리글과 값을 함께 가운데 정렬한다.
     label: <RegimeEvidence />,
     width: '7.75rem',
+    align: 'center',
     render: (row) => (
       <ClassificationBadge label={responseLabel(row.scheduleRegimeLabel, SCHEDULE_REGIME, row.scheduleRegime)} />
     ),
   },
   {
     key: 'purpose',
-    // 1차 badgeCell 처럼 배지만 가운데 둔다(머리글은 왼쪽).
-    cellClassName: 'is-center',
+    // 태그 컬럼은 머리글과 값을 함께 가운데 정렬한다.
     label: '용도',
     width: '6.5rem',
+    align: 'center',
     render: (row) => (
       <ClassificationBadge label={responseLabel(row.schedulePurposeLabel, SCHEDULE_PURPOSE, row.schedulePurpose)} />
     ),
@@ -80,7 +80,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
     key: 'version',
     label: '버전',
     width: '4.25rem',
-    align: 'center',
+    align: 'left',
     cellClassName: 'tabular-nums',
     render: (row) => (row.scheduleVersionNo == null ? EMPTY : `v${row.scheduleVersionNo}`),
   },
@@ -100,7 +100,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
     align: 'center',
     render: (row) => <ActiveBadge active={row.activeYn} />,
   },
-  { key: 'lines', label: '회차 수', width: '5.5rem', align: 'number', render: (row) => int(row.lineCount) },
+  { key: 'lines', label: '회차 수', width: '5.5rem', align: 'left', render: (row) => int(row.lineCount) },
   {
     key: 'total',
     label: '예상 총액',
@@ -126,7 +126,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
     key: 'action',
     label: '상세',
     width: '6.5rem',
-    align: 'center',
+    align: 'left',
     render: (row) =>
       hasId(row) ? (
         <Link

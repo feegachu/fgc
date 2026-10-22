@@ -246,7 +246,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     await screen.findByText('payment.amount')
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     const reasonCell = within(table).getAllByRole('cell')[5]
-    expect(reasonCell.querySelector('.cell-preview')!.textContent).toBe(reason)
+    expect(reasonCell.textContent).toBe(reason)
     expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
   })
 
@@ -312,8 +312,12 @@ describe('normalizeCriteria', () => {
   })
 })
 
-it('감사로그 CSS 는 1차 static/css/features/audit.css 와 같다 (웨이브 C 전까지 한 벌 유지)', () => {
-  // Windows 체크아웃(CRLF)과 LF 차이는 스타일 차이가 아니다.
-  const read = (path: string) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n')
+it('공통 리사이즈로 대체한 좌우 배치 외의 감사로그 CSS 는 1차와 같다', () => {
+  // #597: React의 좌우 배치·모바일 전환은 ResizableSplit에서 담당한다.
+  const read = (path: string) => readFileSync(path, 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/@media \(max-width: 56.25rem\) \{\s*\.audit-layout \{[^}]*\}\s*\}/, '')
+    .replace(/\.audit-layout \{[^}]*\}/, '')
+    .replace(/\n{3,}/g, '\n\n')
   expect(read('src/features/audit/audit.css')).toBe(read('../src/main/resources/static/css/features/audit.css'))
 })

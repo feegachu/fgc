@@ -10,12 +10,7 @@
 .ledger-react-number {
   overflow-wrap: anywhere;
 }
-.ledger-react-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 1.25rem;
-}
-.ledger-react-grid > .surface {
+.ledger-react-grid > .resizable-split-panel > .surface {
   min-width: 0;
   overflow: hidden;
 }
@@ -48,9 +43,6 @@
   width: auto;
 }
 @media (max-width: 1200px) {
-  .ledger-react-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .ledger-react-filters .filter-fields {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

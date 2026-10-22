@@ -60,8 +60,8 @@
   width: 5.625rem;
 }
 
-/* 예외 내용은 자유 텍스트라 잘리면 볼 방법이 없다 — table-cell-disclosure가
-   실제로 넘칠 때만 "전체 보기"를 드러내려면 이 셀은 nowrap 잘라내기 규칙에서 빠져야 한다
+/* 예외 내용은 컬럼 너비에 맞게 표시한다.
+   셀 내부의 텍스트 래퍼가 말줄임을 담당하므로 td의 nowrap 규칙에서 제외한다
    (exception.css의 .exception-disclosure-cell과 같은 패턴). 계약번호는 #326에서
    폭을 넓혀 토글 자체를 없앴다. */
 .priority-table td.dashboard-disclosure-cell {

@@ -1,3 +1,4 @@
+import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
@@ -168,7 +169,12 @@ export default function ArbitragePage() {
           </button>
         ))}
       </section>
-      <div className="arb-content-grid">
+      <ResizableSplit
+        className="arb-content-grid"
+        storageKey="arbitrage-workspace"
+        label="계약별 판정과 상세 카드 너비"
+        defaultRatio={56}
+      >
         <section className="surface arb-list-panel" aria-labelledby="arb-list-title">
           <header className="surface-header arb-panel-header">
             <h2 className="surface-title" id="arb-list-title">
@@ -240,7 +246,7 @@ export default function ArbitragePage() {
             ) : null}
           </div>
         </section>
-      </div>
+      </ResizableSplit>
       {modalRow ? (
         <RecheckModal row={modalRow} onClose={() => setModalRow(null)} onSuccess={() => setSelection(null)} />
       ) : null}
