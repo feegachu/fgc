@@ -245,6 +245,30 @@ class AuditLogViewControllerTest {
 
     /** 자동 생성 사유는 한글로 읽고 원문은 선택한 상세에서 확인한다. */
     @Test
+    void translates_draft_deletion_action_and_linked_exception_reason() throws Exception {
+        String reason = "초안 삭제(PAYMENT_DELETED): 지급 9007199254740993의 지급 예정이 철회되어 종결";
+        AuditLogResponse deletion = new AuditLogResponse(
+                1L, OffsetDateTime.parse("2026-08-16T10:00:00+09:00"), 12L, "admin",
+                "PAYMENT_DELETED", "COMMISSION_PAYMENT", "42", null, null, null, "delete", null);
+        AuditLogResponse resolution = new AuditLogResponse(
+                2L, deletion.occurredAt(), 12L, "admin", "EXCEPTION_ACTION", "EXCEPTION_CASE", "70",
+                null, null, reason, "resolve", null);
+        stubSearch(List.of(deletion, resolution));
+        given(auditLogQueryService.actionCodes()).willReturn(List.of("PAYMENT_DELETED", "EXCEPTION_ACTION"));
+
+        String html = mvc.perform(get("/audit-logs").param("selected", "1").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("지급 초안 삭제 (PAYMENT_DELETED)")))
+                .andExpect(content().string(containsString(
+                        "지급 초안 삭제: 지급 9007199254740993의 지급 예정이 철회되어 종결")))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(html).containsPattern("value=\"PAYMENT_DELETED\"[^>]*>지급 초안 삭제</option>");
+        mvc.perform(get("/audit-logs").param("selected", "2").with(user(complianceUser())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<p>" + reason + "</p>")));
+    }
+
+    @Test
     void translates_automatic_reasons_and_preserves_original_details() throws Exception {
         String stepReason = "MonthlyValidationJob advanced to step 7";
         String draftReason = "journalType=CONFIRMED_FC_PAYOUT,sourceEntityType=COMMISSION_TRANSACTION,"

@@ -61,6 +61,8 @@ public final class AuditDisplayLabels {
             "CredentialsExpiredException", "비밀번호 유효기간 만료"
     );
     private static final Pattern STEP_REASON = Pattern.compile("MonthlyValidationJob advanced to step ([0-9]+)");
+    private static final Pattern DELETION_REASON = Pattern.compile(
+            "초안 삭제\\(PAYMENT_DELETED\\): 지급 ([0-9]+)의 지급 예정이 철회되어 종결");
     private static final Pattern DRAFT_REASON = Pattern.compile(
             "journalType=([A-Z_]+),sourceEntityType=([A-Z_]+),sourceEntityId=([0-9]+|null),validationRunId=([0-9]+|null)");
 
@@ -83,6 +85,10 @@ public final class AuditDisplayLabels {
     /** 자동 생성한 사유의 알려진 형식만 번역하며 저장 원문은 변경하지 않는다. */
     public String reason(String actionCode, String reason) {
         if (reason == null || reason.isEmpty()) return "-";
+        if ("EXCEPTION_ACTION".equals(actionCode)) {
+            var deletion = DELETION_REASON.matcher(reason);
+            if (deletion.matches()) return "지급 초안 삭제: 지급 " + deletion.group(1) + "의 지급 예정이 철회되어 종결";
+        }
         if ("VALIDATION_RUN_STARTED".equals(actionCode) && "MonthlyValidationJob started".equals(reason))
             return "월 통합검증 시작";
         if ("VALIDATION_RUN_COMPLETED".equals(actionCode) && "MonthlyValidationJob completed".equals(reason))
