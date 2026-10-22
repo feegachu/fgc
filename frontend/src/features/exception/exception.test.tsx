@@ -190,6 +190,38 @@ describe('EXCP-W01 예외함', () => {
     expect(searchPaths()[0]).toContain('page=1')
   })
 
+  it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건을 유지한다', async () => {
+    searchResponse = (path) => ({
+      ...search([baseCase]),
+      page: Number(new URLSearchParams(path.split('?')[1]).get('page')),
+      totalPages: 12,
+      totalElements: 240,
+    })
+    const { router, actions } = renderPage('/app/exceptions?month=2026-07&contractNo=C-0001&page=4&selected=11')
+    const list = await table()
+    const lastQuery = () => new URLSearchParams(searchPaths().at(-1)!.split('?')[1])
+    // 순서 기준이 없는 유형·상태 컬럼은 정렬 버튼이 없다.
+    expect(within(list).queryByRole('button', { name: '상태' })).toBeNull()
+    expect(within(list).getByRole('columnheader', { name: /^검출/ })).toHaveAttribute('aria-sort', 'none')
+    await actions.click(within(list).getByRole('button', { name: '검출' }))
+    await waitFor(() => expect(lastQuery().get('sort')).toBe('detectionCount,asc'))
+    expect(lastQuery().get('page')).toBe('1')
+    expect(lastQuery().get('contractNo')).toBe('C-0001')
+    expect(lastQuery().get('status')).toBe('OPEN')
+    expect(within(list).getByRole('columnheader', { name: /^검출/ })).toHaveAttribute('aria-sort', 'ascending')
+    await actions.click(within(list).getByRole('button', { name: '검출' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=detectionCount%2Cdesc'))
+    expect(within(list).getByRole('columnheader', { name: /^검출/ })).toHaveAttribute('aria-sort', 'descending')
+    // 다른 컬럼을 누르면 그 컬럼이 오름차순으로 시작한다.
+    await actions.click(within(list).getByRole('button', { name: '심각도' }))
+    await waitFor(() => expect(lastQuery().get('sort')).toBe('severity,asc'))
+  })
+  it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬을 쓴다', async () => {
+    renderPage('/app/exceptions?sort=status,asc')
+    await table()
+    expect(searchPaths().every((path) => !path.includes('sort='))).toBe(true)
+  })
+
   it('상세 원인·참조 컬럼은 헤더와 내용을 가운데 정렬한다', async () => {
     renderPage()
     const list = await table()
@@ -203,7 +235,7 @@ describe('EXCP-W01 예외함', () => {
       expect(cell).toHaveClass('is-center')
     }
     // 다른 컬럼의 정렬은 바뀌지 않는다.
-    expect(headers.find((header) => header.textContent === '계약')).not.toHaveClass('is-center')
+    expect(headers.find((header) => header.textContent?.startsWith('계약'))).not.toHaveClass('is-center')
   })
 
   it('페이지네이션은 간결한 화살표와 5페이지 묶음으로 이동하며 검색조건을 유지한다', async () => {

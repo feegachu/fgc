@@ -6,8 +6,10 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { int } from '../../lib/format'
+import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
 import { QueryState, ReferenceTabs } from '../reference/ReferenceUI'
 import {
+  BASE_SORT_KEYS,
   useAgents,
   useCommissionItems,
   useInsurerOptions,
@@ -32,7 +34,7 @@ const resultCopy = {
   'commission-item': { title: '수수료 항목 목록', description: '선택한 기준일에 유효한 항목입니다.' },
 }
 type Tab = (typeof tabs)[number]['id']
-const filterKeys = ['keyword', 'asOf', 'insurerId', 'organizationId', 'page']
+const filterKeys = ['keyword', 'asOf', 'insurerId', 'organizationId', 'sort', 'page']
 interface Filters {
   keyword: string
   asOf: string
@@ -150,7 +152,9 @@ export function BasePage() {
   const rawPage = Number(params.get('page') ?? 1)
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1
   const enabled = Boolean(defaultDate)
-  const common = { page, size: 20 }
+  const sortKeys: readonly string[] = tab === 'commission-item' ? [] : BASE_SORT_KEYS[tab]
+  const sort = formatSort(parseSort(params.get('sort'), sortKeys))
+  const common = { page, size: 20, sort }
   const organization = useOrganizations(
     { ...common, keyword: values.keyword, asOf: values.asOf },
     enabled && tab === 'organization',
@@ -199,10 +203,23 @@ export function BasePage() {
       return next
     })
   }
+  /** 헤더를 눌러 정렬을 바꾼다. 첫 페이지로 돌아가고 검색 조건은 유지한다. */
+  function changeSort(value: string) {
+    setParams((current) => {
+      const next = new URLSearchParams(current)
+      next.delete('page')
+      if (value) next.set('sort', value)
+      else next.delete('sort')
+      return next
+    })
+  }
   function submit(nextValues: Filters) {
     setParams((current) => {
       const next = new URLSearchParams(current)
+      // 검색 조건을 바꿔도 고른 정렬은 유지한다(페이지만 첫 페이지로 돌아간다).
+      const keepSort = current.get('sort')
       filterKeys.forEach((k) => next.delete(k))
+      if (keepSort) next.set('sort', keepSort)
       next.set('tab', tab)
       Object.entries(nextValues).forEach(([k, v]) => {
         if (
@@ -275,6 +292,7 @@ export function BasePage() {
                       viewportClassName="base-table-viewport"
                       caption="조직"
                       columns={organizationColumns}
+                      {...sortBinding(sort, BASE_SORT_KEYS.organization, changeSort)}
                       rows={organization.data?.content ?? []}
                       rowKey={(r) => String(r.organizationId)}
                     />
@@ -285,6 +303,7 @@ export function BasePage() {
                       viewportClassName="base-table-viewport"
                       caption="보험회사"
                       columns={insurerColumns}
+                      {...sortBinding(sort, BASE_SORT_KEYS.insurer, changeSort)}
                       rows={insurer.data?.content ?? []}
                       rowKey={(r) => String(r.insurerId)}
                     />
@@ -295,6 +314,7 @@ export function BasePage() {
                       viewportClassName="base-table-viewport"
                       caption="상품"
                       columns={productColumns}
+                      {...sortBinding(sort, BASE_SORT_KEYS.product, changeSort)}
                       rows={product.data?.content ?? []}
                       rowKey={(r) => String(r.productOfferingId)}
                     />
@@ -305,6 +325,7 @@ export function BasePage() {
                       viewportClassName="base-table-viewport"
                       caption="설계사"
                       columns={agentColumns}
+                      {...sortBinding(sort, BASE_SORT_KEYS.agent, changeSort)}
                       rows={agent.data?.content ?? []}
                       rowKey={(r) => String(r.agentId)}
                     />

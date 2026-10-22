@@ -45,6 +45,9 @@ public class OrganizationController {
             @Parameter(description = "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.")
             @RequestParam(defaultValue = "false")
             boolean includeHistorical,
+            @Parameter(description = "정렬(key,asc|desc). organizationCode·organizationName·parentName·effectiveFrom·effectiveTo. 비우면 조직코드 오름차순")
+            @RequestParam(required = false)
+            String sort,
             @Parameter(description = "페이지(1-base)", example = "1")
             @RequestParam(defaultValue = "1")
             int page,
@@ -52,7 +55,7 @@ public class OrganizationController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        OrganizationSearchCriteria criteria = new OrganizationSearchCriteria(keyword, asOf, includeHistorical);
+        OrganizationSearchCriteria criteria = new OrganizationSearchCriteria(keyword, asOf, includeHistorical, sort);
         return ApiResponse.success(organizationService.search(criteria, page, size));
     }
 }

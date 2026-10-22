@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
+import { formatSort, parseSort } from '../../lib/tableSort'
 
 type Schemas = components['schemas']
 export type ValidationRun = Schemas['ValidationRunItemResponse']
@@ -27,9 +28,14 @@ export const RUN_TYPES = [
   { value: 'MANUAL_CONTRACT', label: '계약수동' },
 ] as const
 
+/** 서버(ValidationRunSearchImpl.SORT_KEYS)와 같은 정렬 key. 실행 유형·상태·진행·실패 사유는 순서 기준이 없어 제외한다. */
+export const RUN_SORT_KEYS = ['validationMonth', 'runNo', 'triggeredBy', 'startedAt', 'completedAt', 'finalizedAt'] as const
+
 export interface RunCriteria {
   status: string
   page: number
+  /** 비어 있으면 서버 기본(검증월·회차 내림차순) */
+  sort: string
 }
 
 /** 1차 화면과 같이 알 수 없는 status 는 전체로, page 는 1~최대 범위로 보정한다. */
@@ -38,6 +44,7 @@ export function normalizeCriteria(params: URLSearchParams): RunCriteria {
   const page = Number.parseInt(params.get('page') ?? '', 10)
   return {
     status: RUN_STATUSES.some((item) => item.value === status) ? status : '',
+    sort: formatSort(parseSort(params.get('sort'), RUN_SORT_KEYS)),
     page: Number.isNaN(page) ? 1 : Math.max(1, Math.min(page, MAX_PAGE)),
   }
 }
@@ -54,6 +61,7 @@ export const runsQuery = (criteria: RunCriteria, size = PAGE_SIZE) =>
     queryFn: ({ signal }) => {
       const query = new URLSearchParams({ page: String(criteria.page), size: String(size) })
       if (criteria.status) query.set('status', criteria.status)
+      if (criteria.sort) query.set('sort', criteria.sort)
       return get<ValidationRunPage>(`/api/v1/validation-runs?${query}`, signal)
     },
     placeholderData: keepPreviousData,

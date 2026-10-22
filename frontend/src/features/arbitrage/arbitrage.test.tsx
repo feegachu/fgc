@@ -122,6 +122,45 @@ it('rows support keyboard activation and timeline uses stored excess without rec
   const cells = within(detail).getByRole('table').querySelectorAll('tbody tr td:first-child')
   expect([...cells].map((cell) => cell.textContent)).toEqual(['2026-07-01', '2026-07-31'])
 })
+it('#604 header toggles sort direction, returns to page 1, and keeps filters and Enter search', async () => {
+  const user = userEvent.setup()
+  const { router, request } = mount('/arbitrage-checks?month=2026-07&status=CANDIDATE&contractNo=ARB&page=2')
+  const tableName = { name: '검색 조건에 해당하는 계약별 차익거래 판정' }
+  const table = await screen.findByRole('table', tableName)
+  const lastQuery = () =>
+    new URLSearchParams(
+      request.mock.calls
+        .map(([path]) => path)
+        .filter((path) => path.startsWith('/api/v1/arbitrage-checks?') && !path.includes('size=100'))
+        .at(-1)!
+        .split('?')[1],
+    )
+  // 순서 기준이 없는 지급단계·판정 컬럼은 정렬 버튼이 없다.
+  expect(within(table).queryByRole('button', { name: '판정' })).toBeNull()
+  expect(within(table).getByRole('columnheader', { name: /초과액/ })).toHaveAttribute('aria-sort', 'none')
+  await user.click(within(table).getByRole('button', { name: '초과액' }))
+  await waitFor(() => expect(lastQuery().get('sort')).toBe('netDifferenceAmount,asc'))
+  expect(lastQuery().has('page') ? lastQuery().get('page') : '1').toBe('1')
+  expect(lastQuery().get('status')).toBe('CANDIDATE')
+  expect(lastQuery().get('contractNo')).toBe('ARB')
+  expect(
+    within(await screen.findByRole('table', tableName)).getByRole('columnheader', { name: /초과액/ }),
+  ).toHaveAttribute('aria-sort', 'ascending')
+  await user.click(within(await screen.findByRole('table', tableName)).getByRole('button', { name: '초과액' }))
+  await waitFor(() => expect(router.state.location.search).toContain('sort=netDifferenceAmount%2Cdesc'))
+  expect(
+    within(await screen.findByRole('table', tableName)).getByRole('columnheader', { name: /초과액/ }),
+  ).toHaveAttribute('aria-sort', 'descending')
+  // 검색 조건을 바꿔도 정렬은 유지된다.
+  await user.selectOptions(screen.getByLabelText('판정'), 'CLEAR')
+  expect(router.state.location.search).toContain('sort=netDifferenceAmount%2Cdesc')
+  expect(router.state.location.search).toContain('status=CLEAR')
+})
+it('#604 ignores unsupported sort values from the URL', async () => {
+  const { request } = mount('/arbitrage-checks?month=2026-07&sort=status,asc')
+  await screen.findAllByRole('row', { name: '계약 ARB-001 상세 보기' })
+  expect(request.mock.calls.some(([path]) => path.includes('sort='))).toBe(false)
+})
 it('summary filter, page navigation and Enter search preserve month', async () => {
   const user = userEvent.setup()
   const { router, request } = mount()
@@ -323,9 +362,15 @@ it('pagination shows at most five numbers and moves between page groups', async 
 })
 
 it('keeps projected-only excess separate from the CLEAR result in list and detail', async () => {
-  const projected = { ...row, resultStatus: 'CLEAR' as const, resultStatusLabel: '이상없음',
-    netDifferenceAmount: 0, projectedExcessAmount: 100000, candidateType: 'PROJECTED_EXCESS' }
-  mount(undefined, true, (path) => path.includes('/insurers') ? fixtures(path) : result([projected], 1, 1))
+  const projected = {
+    ...row,
+    resultStatus: 'CLEAR' as const,
+    resultStatusLabel: '이상없음',
+    netDifferenceAmount: 0,
+    projectedExcessAmount: 100000,
+    candidateType: 'PROJECTED_EXCESS',
+  }
+  mount(undefined, true, (path) => (path.includes('/insurers') ? fixtures(path) : result([projected], 1, 1)))
   await screen.findByText('서버 판정 근거')
   expect(screen.getByText(/지급예정 포함 시 초과 \(모니터링\)/)).toBeVisible()
   expect(screen.getAllByText('이상없음').length).toBeGreaterThan(0)

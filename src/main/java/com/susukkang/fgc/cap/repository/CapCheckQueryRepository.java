@@ -2,6 +2,8 @@ package com.susukkang.fgc.cap.repository;
 
 import com.susukkang.fgc.cap.dto.*;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.SqlSort;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
@@ -12,6 +14,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 설명 : 한도 결과 화면의 월별 최신 판정·집계를 보존하는 JPA 네이티브 조회 저장소.
@@ -145,7 +148,7 @@ public class CapCheckQueryRepository {
                    cap_rule_set_id              AS "capRuleSetId"
               FROM latest_cap_check
             __resultFilterWhere__
-             ORDER BY as_of_date DESC, cap_check_id DESC
+             __order__
              LIMIT :limit OFFSET :offset
             """;
 
@@ -376,7 +379,30 @@ public class CapCheckQueryRepository {
         return row;
     }
 
+    /** 화면 정렬 key(CAP-W01 계약별 판정 목록) → latest_cap_check 컬럼. 지급단계·판정·룰셋은 순서 기준이 없어 제외한다. */
+    private static final Map<String, String> SORTABLE = Map.of(
+            "contractNo", "contract_no",
+            "asOfDate", "as_of_date",
+            "basePremiumAmount", "base_premium_amount",
+            "refund12mAmount", "refund_12m_amount",
+            "complianceDeductionAmount", "compliance_deduction_amount",
+            "limitAmount", "limit_amount",
+            "includedAmount", "included_amount",
+            "remainingAmount", "remaining_amount",
+            "usagePct", "usage_pct");
+    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final ListSort DEFAULT_SORT = new ListSort("asOfDate", false);
+
+    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 비어 있으면 기준일 내림차순. */
+    public static ListSort sortOf(String raw) {
+        return ListSort.parse(raw, SORT_KEYS, DEFAULT_SORT);
+    }
+
     public List<CapCheckListRow> search(LocalDate month, String paymentStage, String resultStatus, Long insurerId, Long organizationId, String contractNo, int offset, int limit) {
+        return search(month, paymentStage, resultStatus, insurerId, organizationId, contractNo, offset, limit, DEFAULT_SORT);
+    }
+
+    public List<CapCheckListRow> search(LocalDate month, String paymentStage, String resultStatus, Long insurerId, Long organizationId, String contractNo, int offset, int limit, ListSort sort) {
         Map<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("month", month);
         parameters.put("paymentStage", paymentStage);
@@ -386,7 +412,8 @@ public class CapCheckQueryRepository {
         parameters.put("contractNo", contractNo);
         parameters.put("offset", offset);
         parameters.put("limit", limit);
-        NativeQuery<?> query = prepare(SEARCH, parameters);
+        NativeQuery<?> query = prepare(
+                SEARCH.replace("__order__", SqlSort.orderBy(sort, SORTABLE, "as_of_date DESC, cap_check_id DESC")), parameters);
         query.addScalar("capCheckId", Long.class);
         query.addScalar("contractId", Long.class);
         query.addScalar("contractNo", String.class);

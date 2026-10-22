@@ -34,6 +34,9 @@ public class InsurerController {
             @Parameter(description = "보험회사 코드 또는 보험회사명 검색어")
             @RequestParam(required = false)
             String keyword,
+            @Parameter(description = "정렬(key,asc|desc). insurerCode·insurerName. 비우면 보험회사 코드 오름차순")
+            @RequestParam(required = false)
+            String sort,
             @Parameter(description = "페이지(1-base)", example = "1")
             @RequestParam(defaultValue = "1")
             int page,
@@ -41,6 +44,6 @@ public class InsurerController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        return ApiResponse.success(insurerService.search(keyword, page, size));
+        return ApiResponse.success(insurerService.search(keyword, sort, page, size));
     }
 }

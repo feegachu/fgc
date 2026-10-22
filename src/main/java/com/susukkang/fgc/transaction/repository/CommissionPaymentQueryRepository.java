@@ -3,6 +3,8 @@ package com.susukkang.fgc.transaction.repository;
 import com.susukkang.fgc.base.entity.Agent;
 import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.common.code.*;
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.SqlSort;
 import com.susukkang.fgc.transaction.domain.*;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentListResponse;
 import com.susukkang.fgc.transaction.dto.CommissionPaymentSearchCondition;
@@ -18,6 +20,7 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.susukkang.fgc.transaction.repository.CommissionPaymentSql.*;
 
@@ -34,6 +37,22 @@ import static com.susukkang.fgc.transaction.repository.CommissionPaymentSql.*;
 public class CommissionPaymentQueryRepository {
     private final EntityManager entityManager;
     private final AgentRepository agentRepository;
+
+    /** 화면 정렬 key(TRAN-W01 컬럼) → SQL 표현식. 지급단계·원천유형·흐름·상태는 순서 기준이 없어 제외한다. */
+    private static final Map<String, String> SORTABLE = Map.of(
+            "key", "ct.source_business_key",
+            "month", "ct.settlement_month",
+            "agent", "agent.agent_name",
+            "item", "item.item_name",
+            "amount", "ct.amount",
+            "attributions", "COUNT(attribution.transaction_attribution_id)");
+    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final ListSort DEFAULT_SORT = new ListSort("commissionTransactionId", false);
+
+    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 조건이 없거나 비어 있으면 지급 건 ID 내림차순. */
+    public static ListSort sortOf(CommissionPaymentSearchCondition condition) {
+        return ListSort.parse(condition == null ? null : condition.getSort(), SORT_KEYS, DEFAULT_SORT);
+    }
 
     public boolean existsAgent(Long agentId) {
         return agentId != null && agentRepository.existsById(agentId);
@@ -98,7 +117,8 @@ public class CommissionPaymentQueryRepository {
 
     public List<CommissionPaymentListResponse> selectByCondition(CommissionPaymentSearchCondition condition, int size, long offset) {
         SearchFilter filter = searchFilter(condition);
-        NativeQuery<?> query = nativeQuery(SELECT_BY_CONDITION.replace("__FILTER__", filter.sql()));
+        NativeQuery<?> query = nativeQuery(SELECT_BY_CONDITION.replace("__FILTER__", filter.sql())
+                .replace("__ORDER__", SqlSort.orderBy(sortOf(condition), SORTABLE, "ct.commission_transaction_id DESC")));
         filter.parameters().forEach(query::setParameter);
         query.setParameter("size", size);
         query.setParameter("offset", offset);

@@ -30,4 +30,5 @@ public class ContractSearchCondition {
     private ContractStatus currentStatus; //계약상태
     private LocalDate contractDateFrom; //계약일 시작
     private LocalDate contractDateTo; //계약일 끝
+    private String sort; //정렬 "key,asc|desc" (#604). 비우면 계약 ID 내림차순
 }

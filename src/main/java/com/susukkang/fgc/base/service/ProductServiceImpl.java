@@ -1,10 +1,13 @@
 package com.susukkang.fgc.base.service;
 
 import com.susukkang.fgc.base.dto.ProductResponse;
+import com.susukkang.fgc.base.dto.ProductRow;
 import com.susukkang.fgc.base.dto.ProductSearchCriteria;
 import com.susukkang.fgc.base.repository.ProductRepository;
+import com.susukkang.fgc.base.repository.ProductSearchImpl;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,12 +43,21 @@ public class ProductServiceImpl implements ProductService {
         if (offsetLong > Integer.MAX_VALUE) {
             throw validationException("page");
         }
-        Page<ProductResponse> result = (criteria.includeHistorical()
-                ? productRepository.search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), true, PageRequest.of(page - 1, size))
-                : productRepository.search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), PageRequest.of(page - 1, size)))
-                .map(ProductResponse::from);
+        // 정렬(#604): 허용 컬럼만 받고(아니면 COMMON_002), 정렬을 주지 않으면 기존 기본 정렬 조회를 그대로 쓴다.
+        ListSort sort = ProductSearchImpl.sortOf(criteria.sort());
+        Page<ProductRow> rows;
+        if (sort != null) {
+            rows = productRepository.searchSorted(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(),
+                    criteria.includeHistorical(), sort, PageRequest.of(page - 1, size));
+        } else {
+            rows = criteria.includeHistorical()
+                    ? productRepository.search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), true, PageRequest.of(page - 1, size))
+                    : productRepository.search(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(), PageRequest.of(page - 1, size));
+        }
+        Page<ProductResponse> result = rows.map(ProductResponse::from);
 
-        return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), SORT);
+        return PageResponse.of(result.getContent(), page, size, result.getTotalElements(),
+                sort == null ? SORT : sort.value());
     }
 
     private void validateCriteria(ProductSearchCriteria criteria) {

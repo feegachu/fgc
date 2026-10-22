@@ -29,6 +29,13 @@ public class ArbitrageCheckSearchCondition {
     private PaymentStage stage; // 지급 단계
     private Long insurerId; // 보험사 ID
     private String contractNo; // 계약번호
+    private String sort; // 정렬 "key,asc|desc" (#604). 비우면 판정 ID 내림차순
+
+    /** 정렬 없이 검색하는 기존 호출용 생성자. */
+    public ArbitrageCheckSearchCondition(YearMonth month, ArbitrageCheckStatus status, PaymentStage stage,
+                                         Long insurerId, String contractNo) {
+        this(month, status, stage, insurerId, contractNo, null);
+    }
 
     public LocalDate getMonthStart() {
         return month == null ? null : month.atDay(1);

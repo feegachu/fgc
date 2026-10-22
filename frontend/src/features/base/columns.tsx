@@ -11,12 +11,16 @@ export const organizationColumns: TableColumn<Organization>[] = [
   {
     key: 'code',
     label: '조직코드',
+    sortKey: 'organizationCode',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.organizationCode} limit={20} singleLine />,
   },
   {
     key: 'name',
     label: '조직명',
+    sortKey: 'organizationName',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.organizationName} limit={24} singleLine />,
   },
@@ -32,23 +36,29 @@ export const organizationColumns: TableColumn<Organization>[] = [
   {
     key: 'parent',
     label: '상위 조직',
+    sortKey: 'parentName',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.parentName} limit={24} singleLine />,
   },
-  { key: 'from', label: '적용 시작일', render: (r) => date(r.effectiveFrom) },
-  { key: 'to', label: '적용 종료일', render: (r) => date(r.effectiveTo) },
+  { key: 'from', label: '적용 시작일', sortKey: 'effectiveFrom', sortable: true, render: (r) => date(r.effectiveFrom) },
+  { key: 'to', label: '적용 종료일', sortKey: 'effectiveTo', sortable: true, render: (r) => date(r.effectiveTo) },
   { key: 'active', label: '상태', align: 'center', render: (r) => active(r.activeYn) },
 ]
 export const insurerColumns: TableColumn<Insurer>[] = [
   {
     key: 'code',
     label: '보험회사 코드',
+    sortKey: 'insurerCode',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.insurerCode} limit={20} singleLine />,
   },
   {
     key: 'name',
     label: '보험회사명',
+    sortKey: 'insurerName',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.insurerName} limit={24} singleLine />,
   },
@@ -67,31 +77,47 @@ export const productColumns: TableColumn<Product>[] = [
   {
     key: 'code',
     label: '상품코드',
+    sortKey: 'insurerProductCode',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.insurerProductCode} limit={20} singleLine />,
   },
   {
     key: 'name',
     label: '상품명',
+    sortKey: 'productName',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.productName} limit={28} />,
   },
   {
     key: 'standard',
     label: '표준상품코드',
+    sortKey: 'standardProductCode',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.standardProductCode} limit={20} singleLine />,
   },
   { key: 'group', label: '상품군', render: (r) => present(r.productGroupCode) },
-  { key: 'version', label: '판매버전', render: (r) => present(r.offeringVersion) },
+  {
+    key: 'version',
+    label: '판매버전',
+    sortKey: 'offeringVersion',
+    sortable: true,
+    render: (r) => present(r.offeringVersion),
+  },
   {
     key: 'period',
     label: '판매기간',
+    sortKey: 'salesStartDate',
+    sortable: true,
     render: (r) => `${date(r.salesStartDate)} ~ ${r.salesEndDate ? date(r.salesEndDate) : '현재'}`,
   },
   {
     key: 'document',
     label: '기초서류',
+    sortKey: 'basicDocumentDate',
+    sortable: true,
     render: (r) => (
       <>
         {present(r.basicDocumentVersion)}
@@ -120,10 +146,12 @@ export const agentColumns: TableColumn<Agent>[] = [
   {
     key: 'code',
     label: '설계사 코드',
+    sortKey: 'agentCode',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.agentCode} limit={20} singleLine />,
   },
-  { key: 'name', label: '설계사명', render: (r) => present(r.agentName) },
+  { key: 'name', label: '설계사명', sortKey: 'agentName', sortable: true, render: (r) => present(r.agentName) },
   {
     key: 'rank',
     label: '직급',
@@ -136,6 +164,8 @@ export const agentColumns: TableColumn<Agent>[] = [
   {
     key: 'org',
     label: '소속 조직',
+    sortKey: 'organizationName',
+    sortable: true,
     cellClassName: 'base-disclosure-cell',
     render: (r) => (
       <>
@@ -144,8 +174,8 @@ export const agentColumns: TableColumn<Agent>[] = [
       </>
     ),
   },
-  { key: 'from', label: '위촉일', render: (r) => date(r.appointmentDate) },
-  { key: 'to', label: '해촉일', render: (r) => date(r.terminationDate) },
+  { key: 'from', label: '위촉일', sortKey: 'appointmentDate', sortable: true, render: (r) => date(r.appointmentDate) },
+  { key: 'to', label: '해촉일', sortKey: 'terminationDate', sortable: true, render: (r) => date(r.terminationDate) },
   {
     key: 'status',
     label: '상태',
@@ -159,7 +189,13 @@ export const agentColumns: TableColumn<Agent>[] = [
       </>
     ),
   },
-  { key: 'registration', label: '최근 등록일', render: (r) => date(r.latestRegistrationDate) },
+  {
+    key: 'registration',
+    label: '최근 등록일',
+    sortKey: 'latestRegistrationDate',
+    sortable: true,
+    render: (r) => date(r.latestRegistrationDate),
+  },
   {
     key: 'experience',
     label: '직전 3년 경력',

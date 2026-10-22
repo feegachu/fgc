@@ -70,7 +70,6 @@ public class ContractServiceImpl implements ContractService {
     private static final int MIN_PAGE = 1;
     private static final int MIN_SIZE = 1;
     private static final int MAX_SIZE = 100;
-    private static final String SORT = "contractId,desc";
     // FUN-061·운영정책서 제51조 "계약·상태 사건" — 등록·수정과 같은 트랜잭션에서 감사행을 남긴다.
     private static final String AUDIT_ENTITY_TYPE = "CONTRACT";
     private static final String AUDIT_CONTRACT_CREATED = "CONTRACT_CREATED";
@@ -109,7 +108,7 @@ public class ContractServiceImpl implements ContractService {
                 page,
                 size,
                 result.getTotalElements(),
-                SORT
+                ContractQueryRepository.sortOf(condition).value()
         );
     }
 
