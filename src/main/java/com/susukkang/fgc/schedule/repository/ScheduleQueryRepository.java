@@ -249,7 +249,7 @@ public class ScheduleQueryRepository {
             "lines", scheduleLine.scheduleLineId.count(),
             "total", scheduleLine.expectedAmount.sumAggregate(),
             "policy", policyVersion.policyCode);
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("scheduleHeaderId", false);
 
     /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 조건이 없거나 비어 있으면 스케줄 ID 내림차순. */

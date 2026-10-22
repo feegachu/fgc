@@ -15,7 +15,7 @@ public final class QuerydslSort {
     private QuerydslSort() {
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked", "rawtypes", "java:S1452"}) // S1452: Querydsl OrderSpecifier<?> 는 정렬 대상 타입이 열마다 달라 와일드카드가 불가피하다
     public static OrderSpecifier<?>[] order(
             ListSort sort, Map<String, ? extends ComparableExpressionBase<?>> sortable, OrderSpecifier<?>... tieBreakers) {
         ComparableExpressionBase<?> column = sortable.get(sort.key());

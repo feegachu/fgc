@@ -33,7 +33,7 @@ public class OrganizationServiceImpl implements OrganizationService {
             "parentName", "parent.organizationName",
             "effectiveFrom", "o.effectiveFrom",
             "effectiveTo", "o.effectiveTo");
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
 
     private final OrganizationRepository organizationRepository;
 

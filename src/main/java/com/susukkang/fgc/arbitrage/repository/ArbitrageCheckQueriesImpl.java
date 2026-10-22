@@ -22,6 +22,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
+    private static final String CONTRACT_MONTH_NO = "contractMonthNo";
+
     private final EntityManager entityManager;
 
     private static final String CONTRACT_ID = "contractId";
@@ -61,19 +63,19 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
     /** 화면 정렬 key(ARB-W01 목록) → SQL 표현식. 지급단계·환급금 출처·가산 여부·판정은 순서 기준이 없어 제외한다. */
     private static final Map<String, String> SORTABLE = Map.of(
             "contractNo", "c.contract_no",
-            "asOfDate", "ac.as_of_date",
-            "contractMonthNo", "ac.contract_month_no",
+            AS_OF_DATE, "ac.as_of_date",
+            CONTRACT_MONTH_NO, "ac.contract_month_no",
             "cumulativePaidPremium", "ac.cumulative_paid_premium",
             "paidCommissionAmount", "ac.paid_commission_amount",
             "plannedCommissionAmount", "ac.planned_commission_amount",
             "includedSurrenderValueAmount", "ac.included_surrender_value_amount",
             "netDifferenceAmount", "ac.net_difference_amount");
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("arbitrageCheckId", false);
 
-    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 비어 있으면 판정 ID 내림차순. */
+    /** 요청 정렬을 검증한다(condition 은 null 이 아니다). 허용 key 가 아니면 COMMON_002. 비어 있으면 판정 ID 내림차순. */
     public static ListSort sortOf(ArbitrageCheckSearchCondition condition) {
-        return ListSort.parse(condition == null ? null : condition.getSort(), SORT_KEYS, DEFAULT_SORT);
+        return ListSort.parse(condition.getSort(), SORT_KEYS, DEFAULT_SORT);
     }
 
     private static final String ARBITRAGE_CHECK_SUMMARY = """
@@ -432,7 +434,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
                 .setParameter("channelCode", source.getChannelCode())
                 .setParameter("productOfferingId", source.getProductOfferingId())
                 .setParameter("contractDate", source.getContractDate())
-                .setParameter("contractMonthNo", source.getContractMonthNo())
+                .setParameter(CONTRACT_MONTH_NO, source.getContractMonthNo())
                 .getResultList().stream().map(tuple -> {
                     ArbitrageRefundRateCandidate result = new ArbitrageRefundRateCandidate();
                     result.setRefundRateTableId((Long) tuple[0]);
@@ -450,7 +452,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         q.setParameter(CONTRACT_ID, row.getContractId(), Long.class);
         q.setParameter(PAYMENT_STAGE, row.getPaymentStage() == null ? null : row.getPaymentStage().name(), String.class);
         q.setParameter(AS_OF_DATE, row.getAsOfDate(), LocalDate.class);
-        q.setParameter("contractMonthNo", row.getContractMonthNo(), Integer.class);
+        q.setParameter(CONTRACT_MONTH_NO, row.getContractMonthNo(), Integer.class);
         q.setParameter("cumulativePaidPremium", row.getCumulativePaidPremium(), BigDecimal.class);
         q.setParameter("paidCommissionAmount", row.getPaidCommissionAmount(), BigDecimal.class);
         q.setParameter("plannedCommissionAmount", row.getPlannedCommissionAmount(), BigDecimal.class);

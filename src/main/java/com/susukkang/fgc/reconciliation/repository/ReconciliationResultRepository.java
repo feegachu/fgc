@@ -33,6 +33,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReconciliationResultRepository {
+    private static final String CREATED_AT = "createdAt";
+    private static final String DIFFERENCE_AMOUNT = "differenceAmount";
+
     private static final String RECONCILIATION_RESULT_ID_PARAM = "reconciliationResultId";
     private static final String EXPECTED_AGENT_ID_PARAM = "expectedAgentId";
     private static final String ACTUAL_AGENT_ID_PARAM = "actualAgentId";
@@ -94,11 +97,11 @@ public class ReconciliationResultRepository {
             new ReconciliationNativeProjection.Column("actualSourceAgentCode", String.class),
             new ReconciliationNativeProjection.Column("expectedTotalAmount", BigDecimal.class),
             new ReconciliationNativeProjection.Column("actualTotalAmount", BigDecimal.class),
-            new ReconciliationNativeProjection.Column("differenceAmount", BigDecimal.class),
+            new ReconciliationNativeProjection.Column(DIFFERENCE_AMOUNT, BigDecimal.class),
             new ReconciliationNativeProjection.Column(RESULT_TYPE_PARAM, String.class),
             new ReconciliationNativeProjection.Column("primaryReasonCode", String.class),
             new ReconciliationNativeProjection.Column("secondaryReasonCodesCsv", String.class),
-            new ReconciliationNativeProjection.Column("createdAt", OffsetDateTime.class));
+            new ReconciliationNativeProjection.Column(CREATED_AT, OffsetDateTime.class));
     private final EntityManager entityManager;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
@@ -133,7 +136,7 @@ public class ReconciliationResultRepository {
         query.setParameter(RESULT_TYPE_PARAM, row.getResultType());
         query.setParameter("expectedAmount", row.getExpectedTotalAmount());
         query.setParameter("actualAmount", row.getActualTotalAmount());
-        query.setParameter("differenceAmount", row.getDifferenceAmount());
+        query.setParameter(DIFFERENCE_AMOUNT, row.getDifferenceAmount());
         query.setParameter("primaryReason", row.getPrimaryReasonCode());
         query.setParameter("reasons", writeReasons(row.getSecondaryReasonCodes()));
         query.setParameter("snapshot", row.getDetailSnapshotJson());
@@ -243,7 +246,7 @@ public class ReconciliationResultRepository {
 
     /** 화면 정렬 key(RECO-W02 결과 목록) → SQL 표현식. 결과 유형·원인은 순서 기준이 없어 제외한다. */
     private static final Map<String, String> RESULT_SORTABLE = Map.of(
-            "createdAt", "result.created_at",
+            CREATED_AT, "result.created_at",
             "contractNo", "contract.contract_no",
             "commissionItemName", "item.item_name",
             "installmentNo", "result.installment_no",
@@ -251,13 +254,13 @@ public class ReconciliationResultRepository {
             "actualAgentName", "actual_agent.agent_name",
             "expectedTotalAmount", "result.expected_total_amount",
             "actualTotalAmount", "result.actual_total_amount",
-            "differenceAmount", "result.difference_amount");
-    public static final Set<String> RESULT_SORT_KEYS = RESULT_SORTABLE.keySet();
-    public static final ListSort DEFAULT_RESULT_SORT = new ListSort("createdAt", false);
+            DIFFERENCE_AMOUNT, "result.difference_amount");
+    public static final Set<String> RESULT_SORT_KEYS = Set.copyOf(RESULT_SORTABLE.keySet());
+    public static final ListSort DEFAULT_RESULT_SORT = new ListSort(CREATED_AT, false);
 
     /** 기존 호출 호환: 생성 시각 기준 방향만 고른다. */
     public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, String sortDirection, int offset, int limit) {
-        return findResults(reconciliationRunId, resultType, new ListSort("createdAt", "asc".equals(sortDirection)), offset, limit);
+        return findResults(reconciliationRunId, resultType, new ListSort(CREATED_AT, "asc".equals(sortDirection)), offset, limit);
     }
 
     public List<ReconciliationResultListRow> findResults(Long reconciliationRunId, String resultType, ListSort sort, int offset, int limit) {

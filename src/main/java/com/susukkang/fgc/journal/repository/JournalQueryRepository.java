@@ -47,6 +47,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class JournalQueryRepository {
+    private static final String DEBIT_TOTAL = "debitTotal";
+    private static final String CREDIT_TOTAL = "creditTotal";
+
 
     private static final String STATUS_ALIAS = "status";
     private static final String VALIDATION_RUN_ID_PARAMETER = "validationRunId";
@@ -65,9 +68,9 @@ public class JournalQueryRepository {
             "journalNo", journalHeader.journalNo,
             "journalDate", journalHeader.journalDate,
             "contractNo", insuranceContract.contractNo,
-            "debitTotal", lineTotal(journalLine.debitAmount),
-            "creditTotal", lineTotal(journalLine.creditAmount));
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+            DEBIT_TOTAL, lineTotal(journalLine.debitAmount),
+            CREDIT_TOTAL, lineTotal(journalLine.creditAmount));
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("journalDate", false);
 
     private static ComparableExpressionBase<BigDecimal> lineTotal(
@@ -102,6 +105,8 @@ public class JournalQueryRepository {
     }
 
     /** 계정과목 필터는 EXISTS, 합계는 헤더의 모든 라인을 대상으로 유지한다. 정렬은 검색된 전체 데이터에 적용한다. */
+    // S107: 기존 검색 인자에 정렬만 더했다(기존 호출 호환). 인자 묶음 객체로 바꾸면 기존 호출·테스트가 모두 바뀐다.
+    @SuppressWarnings("java:S107")
     public List<JournalListRow> search(LocalDate from, LocalDate to, String journalType,
                                        String accountCode, Long contractId, String contractNo, String status,
                                        int offset, int limit, ListSort sort) {
@@ -116,9 +121,9 @@ public class JournalQueryRepository {
                         h.sourceEntityType, h.sourceEntityId, h.contractId, c.contractNo,
                         h.status.stringValue().as(STATUS_ALIAS),
                         ExpressionUtils.as(JPAExpressions.select(l.debitAmount.sumAggregate().coalesce(BigDecimal.ZERO))
-                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), "debitTotal"),
+                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), DEBIT_TOTAL),
                         ExpressionUtils.as(JPAExpressions.select(l.creditAmount.sumAggregate().coalesce(BigDecimal.ZERO))
-                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), "creditTotal"),
+                                .from(l).where(l.journalHeaderId.eq(h.journalHeaderId)), CREDIT_TOTAL),
                         h.reversalOfId, rev.journalNo.as("reversalOfJournalNo"),
                         creator.loginId.as("createdBy"), poster.loginId.as("postedBy"), h.postedAt, h.createdAt))
                 .from(h).leftJoin(c).on(c.contractId.eq(h.contractId))
@@ -239,8 +244,8 @@ public class JournalQueryRepository {
                 .map(row -> {
                     JournalBalanceSummary result = new JournalBalanceSummary();
                     result.setJournalHeaderId(row.get("journalHeaderId", Long.class));
-                    result.setDebitTotal(row.get("debitTotal", BigDecimal.class));
-                    result.setCreditTotal(row.get("creditTotal", BigDecimal.class));
+                    result.setDebitTotal(row.get(DEBIT_TOTAL, BigDecimal.class));
+                    result.setCreditTotal(row.get(CREDIT_TOTAL, BigDecimal.class));
                     return result;
                 })
                 .findFirst().orElse(null);

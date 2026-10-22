@@ -213,8 +213,8 @@ public class ContractQueryRepository {
             "contractDate", insuranceContract.contractDate,
             "premium", insuranceContract.monthlyEquivalentFirstPremium,
             "agent", agent.agentId);
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
-    public static final ListSort DEFAULT_SORT = new ListSort("contractId", false);
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+    public static final ListSort DEFAULT_SORT = new ListSort(CONTRACT_ID_PARAMETER, false);
 
     /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 조건이 없거나 비어 있으면 계약 ID 내림차순. */
     public static ListSort sortOf(ContractSearchCondition condition) {

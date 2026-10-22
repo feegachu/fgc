@@ -25,7 +25,7 @@ public class AuditLogSearchImpl implements AuditLogSearch {
             "occurredAt", auditLog.occurredAt,
             "userLoginId", appUser.loginId,
             "policyVersionId", auditLog.policyVersionId);
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("occurredAt", false);
 
     /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 비어 있으면 발생 시각 내림차순. */

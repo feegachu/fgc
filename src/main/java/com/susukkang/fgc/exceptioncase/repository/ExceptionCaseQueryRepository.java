@@ -36,6 +36,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ExceptionCaseQueryRepository {
+    private static final String SEVERITY = "severity";
+
 
     private static final String FROM_SQL = """
             FROM fgc.exception_case ec
@@ -69,19 +71,19 @@ public class ExceptionCaseQueryRepository {
             """;
 
     /** 심각도 순서: 숫자가 클수록 심각하다(치명 3 > 높음 2 > 경고 1 > 그 밖 0). 정렬 desc 가 "심각한 순"이다. */
-    private static final String SEVERITY_RANK = """
-            CASE ec.severity WHEN 'CRITICAL' THEN 3 WHEN 'HIGH' THEN 2 WHEN 'WARNING' THEN 1 ELSE 0 END""";
+    private static final String SEVERITY_RANK =
+            "CASE ec.severity WHEN 'CRITICAL' THEN 3 WHEN 'HIGH' THEN 2 WHEN 'WARNING' THEN 1 ELSE 0 END";
 
     /** 화면 정렬 key(EXCP-W01 목록) → SQL 표현식. 유형·상세 원인·상태·참조는 순서 기준이 없어 제외한다. */
     private static final Map<String, String> SORTABLE = Map.of(
             "exceptionCaseId", "ec.exception_case_id",
-            "severity", SEVERITY_RANK,
+            SEVERITY, SEVERITY_RANK,
             "contractNo", "ic.contract_no",
             "title", "ec.title",
             "assigneeLoginId", "assignee.login_id",
             "lastDetectedAt", "ec.last_detected_at",
             "detectionCount", "ec.detection_count");
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
 
     /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 비어 있으면 null — 심각도 높은 순 → 최근 생성 순. */
     public static ListSort sortOf(ExceptionCaseSearchDTO criteria) {
@@ -111,7 +113,7 @@ public class ExceptionCaseQueryRepository {
         query.addScalar("exception_key", String.class);
         query.addScalar("exception_type", String.class);
         query.addScalar("reason_code", String.class);
-        query.addScalar("severity", String.class);
+        query.addScalar(SEVERITY, String.class);
         query.addScalar("status", String.class);
         query.addScalar("title", String.class);
         query.addScalar("description", String.class);
@@ -251,7 +253,7 @@ public class ExceptionCaseQueryRepository {
         if (criteria.getReasonCode() != null && !criteria.getReasonCode().isBlank()) {
             append(where, parameters, "ec.reason_code = :reasonCode", "reasonCode", criteria.getReasonCode());
         }
-        append(where, parameters, "ec.severity = :severity", "severity", criteria.getSeverity());
+        append(where, parameters, "ec.severity = :severity", SEVERITY, criteria.getSeverity());
         append(where, parameters, "ec.validation_run_id = :validationRunId", "validationRunId",
                 criteria.getValidationRunId());
         if (criteria.getTypes() != null && !criteria.getTypes().isEmpty()) {

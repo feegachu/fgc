@@ -29,7 +29,7 @@ public class ProductSearchImpl implements ProductSearch {
             "offeringVersion", "po.offering_version",
             "salesStartDate", "po.sales_start_date",
             "basicDocumentDate", "po.basic_document_date");
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
 
     private final EntityManager entityManager;
 
@@ -42,8 +42,9 @@ public class ProductSearchImpl implements ProductSearch {
         return ListSort.parse(raw, SORT_KEYS, null);
     }
 
+    // S2077: ORDER BY 는 SORTABLE 의 코드 상수 표현식만 쓰고(요청 key 는 ListSort 가 허용 목록으로 먼저 걸러 낸다), 값은 모두 setParameter 로 바인딩한다.
+    @SuppressWarnings({"unchecked", "java:S2077"})
     @Override
-    @SuppressWarnings("unchecked")
     public Page<ProductRow> searchSorted(long insurerId, LocalDate asOf, boolean includeExpired,
                                          boolean includeHistorical, ListSort sort, Pageable pageable) {
         // 정렬 표현식은 SORTABLE 의 코드 상수만 쓴다. 값이 비면 방향과 관계없이 맨 뒤로, 동률은 기존 기본 정렬을 따른다.

@@ -34,7 +34,7 @@ public class AgentServiceImpl implements AgentService {
             "appointmentDate", "a.appointmentDate",
             "terminationDate", "a.terminationDate",
             "latestRegistrationDate", "a.latestRegistrationDate");
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
 
     private final AgentRepository agentRepository;
 

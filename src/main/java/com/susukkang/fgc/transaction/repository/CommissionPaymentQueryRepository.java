@@ -35,6 +35,8 @@ import static com.susukkang.fgc.transaction.repository.CommissionPaymentSql.*;
 @Repository
 @RequiredArgsConstructor
 public class CommissionPaymentQueryRepository {
+    private static final String COL_AMOUNT = "amount";
+
     private final EntityManager entityManager;
     private final AgentRepository agentRepository;
 
@@ -44,9 +46,9 @@ public class CommissionPaymentQueryRepository {
             "month", "ct.settlement_month",
             "agent", "agent.agent_name",
             "item", "item.item_name",
-            "amount", "ct.amount",
+            COL_AMOUNT, "ct.amount",
             "attributions", "COUNT(attribution.transaction_attribution_id)");
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("commissionTransactionId", false);
 
     /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 조건이 없거나 비어 있으면 지급 건 ID 내림차순. */
@@ -134,7 +136,7 @@ public class CommissionPaymentQueryRepository {
         query.addScalar("commission_item_id", Long.class);
         query.addScalar("commission_item_code", String.class);
         query.addScalar("commission_item_name", String.class);
-        query.addScalar("amount", BigDecimal.class);
+        query.addScalar(COL_AMOUNT, BigDecimal.class);
         query.addScalar("cashflow_type", String.class);
         query.addScalar("cashflow_type_label", String.class);
         query.addScalar("status", String.class);
@@ -215,7 +217,7 @@ public class CommissionPaymentQueryRepository {
         query.addScalar("commission_item_id", Long.class);
         query.addScalar("commission_item_code", String.class);
         query.addScalar("commission_item_name", String.class);
-        query.addScalar("amount", BigDecimal.class);
+        query.addScalar(COL_AMOUNT, BigDecimal.class);
         query.addScalar("settlement_month", LocalDate.class);
         query.addScalar("cashflow_type", String.class);
         query.addScalar("scheduled_payment_date", LocalDate.class);
@@ -256,7 +258,7 @@ public class CommissionPaymentQueryRepository {
         query.addScalar("contract_id", Long.class);
         query.addScalar("attribution_date", LocalDate.class);
         query.addScalar("attribution_month", LocalDate.class);
-        query.addScalar("amount", BigDecimal.class);
+        query.addScalar(COL_AMOUNT, BigDecimal.class);
         query.addScalar("inclusion_decision_status", String.class);
         query.addScalar("exclusion_type", String.class);
         query.addScalar("inclusion_decision_reason", String.class);
@@ -291,7 +293,7 @@ public class CommissionPaymentQueryRepository {
         query.setParameter("paymentId", paymentId);
         query.addScalar("payment_id", Long.class);
         query.addScalar("status", String.class);
-        query.addScalar("amount", BigDecimal.class);
+        query.addScalar(COL_AMOUNT, BigDecimal.class);
         query.addScalar("attributed_amount", BigDecimal.class);
         query.addScalar("total_attributed_amount", BigDecimal.class);
         query.addScalar("confirm_idempotency_key", String.class);
@@ -412,7 +414,7 @@ public class CommissionPaymentQueryRepository {
         query.addScalar("item_code", String.class);
         query.addScalar("item_name", String.class);
         query.addScalar("classification_snapshot", String.class);
-        query.addScalar("amount", BigDecimal.class);
+        query.addScalar(COL_AMOUNT, BigDecimal.class);
         query.addScalar("decision_reason", String.class);
         query.addScalar("evidence_ref", String.class);
         return query.setTupleTransformer((row, aliases) -> new ExistingIncludedDetail(

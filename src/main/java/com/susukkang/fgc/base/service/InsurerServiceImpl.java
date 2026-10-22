@@ -32,7 +32,7 @@ public class InsurerServiceImpl implements InsurerService {
     private static final Map<String, String> SORTABLE = Map.of(
             "insurerCode", "i.insurerCode",
             "insurerName", "i.insurerName");
-    public static final Set<String> SORT_KEYS = SORTABLE.keySet();
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
 
     private final InsurerRepository insurerRepository;
 
