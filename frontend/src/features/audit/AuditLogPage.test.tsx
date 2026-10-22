@@ -88,6 +88,27 @@ afterEach(() => {
 })
 
 describe('AUDT-W01 감사로그 조회', () => {
+  it('지급 초안 삭제를 필터·목록·상세에서 한글로 표시하고 검색 코드는 유지한다', async () => {
+    renderAt('/audit-logs?action=PAYMENT_DELETED&selected=1', 'COMPLIANCE', [
+      log(1, { actionCode: 'PAYMENT_DELETED', reason: undefined }),
+    ])
+    expect(await screen.findByText('지급 초안 삭제 (PAYMENT_DELETED)')).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: '지급 초안 삭제' })).toHaveValue('PAYMENT_DELETED')
+    const table = screen.getByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    expect(within(table).getByText('지급 초안 삭제')).toBeInTheDocument()
+    expect(within(table).queryByText('PAYMENT_DELETED')).not.toBeInTheDocument()
+    expect(listRequest().get('action')).toBe('PAYMENT_DELETED')
+  })
+
+  it('삭제에 따른 예외 종결 사유는 한글로 읽고 상세에서 원문을 보존한다', async () => {
+    const reason = '초안 삭제(PAYMENT_DELETED): 지급 9007199254740993의 지급 예정이 철회되어 종결'
+    renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'EXCEPTION_ACTION', reason })])
+    const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    expect(await within(table).findByText('지급 초안 삭제: 지급 9007199254740993의 지급 예정이 철회되어 종결')).toBeInTheDocument()
+    await screen.findByText('사유 원문 보기')
+    expect(document.querySelector('.audit-reason-original')).toHaveTextContent(reason)
+  })
+
   it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 BATCH 표기를 유지한다', async () => {
     renderAt('/audit-logs?month=2026-07&userId=12&action=PAYMENT_CONFIRMED&from=2026-08-01&to=2026-08-16&page=2')
     expect(await screen.findByRole('heading', { name: '감사로그 조회' })).toBeInTheDocument()

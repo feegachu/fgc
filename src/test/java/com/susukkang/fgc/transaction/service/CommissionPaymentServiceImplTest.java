@@ -104,6 +104,8 @@ class CommissionPaymentServiceImplTest {
     private AuditLogService auditLogService;
     @Mock
     private CommissionPolicyService commissionPolicyService;
+    @Mock
+    private com.susukkang.fgc.exceptioncase.service.ExceptionCaseService exceptionCaseService;
 
     private CommissionPaymentServiceImpl service;
     private FgcMessageResolver messageResolver;
@@ -128,7 +130,8 @@ class CommissionPaymentServiceImplTest {
                 capExceptionService,
                 messageResolver,
                 auditLogService,
-                commissionPolicyService
+                commissionPolicyService,
+                exceptionCaseService
         );
     }
 
