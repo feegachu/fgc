@@ -14,6 +14,7 @@ const actionLabels = {
   CONTRACT_SCHEDULES_REGENERATED: '계약 스케줄 재생성',
   PAYMENT_CREATED: '지급 등록',
   PAYMENT_UPDATED: '지급 수정',
+  PAYMENT_DELETED: '지급 초안 삭제',
   PAYMENT_CONFIRMED: '지급 확정',
   PAYMENT_CANCELLED: '지급 취소',
   SCHEDULE_CONFIRMED: '스케줄 확정',
@@ -72,6 +73,11 @@ const loginFailureReasons = {
 /** 알려진 자동 생성 형식만 번역한다. 사용자 사유·오류 원문·미등록 형식은 보존한다. */
 export function auditReasonLabel(actionCode?: string | null, reason?: string | null) {
   if (reason == null || reason === '') return '-'
+  if (actionCode === 'EXCEPTION_ACTION') {
+    const deletion = /^초안 삭제\(PAYMENT_DELETED\): 지급 ([0-9]+)의 지급 예정이 철회되어 종결$/.exec(reason)
+    if (deletion && deletion[0] === reason)
+      return `지급 초안 삭제: 지급 ${deletion[1]}의 지급 예정이 철회되어 종결`
+  }
   if (actionCode === 'VALIDATION_RUN_STARTED' && reason === 'MonthlyValidationJob started') return '월 통합검증 시작'
   if (actionCode === 'VALIDATION_RUN_COMPLETED' && reason === 'MonthlyValidationJob completed')
     return '월 통합검증 완료'
