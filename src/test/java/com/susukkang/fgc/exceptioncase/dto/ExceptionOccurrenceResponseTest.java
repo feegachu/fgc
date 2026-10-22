@@ -1,6 +1,8 @@
 package com.susukkang.fgc.exceptioncase.dto;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,18 +25,51 @@ class ExceptionOccurrenceResponseTest {
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::label)
                 .containsExactly("지급단계", "결과유형", "예상금액", "차액");
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
-                .containsExactly("GA_TO_FC", "실제 지급 없음", "5,000원", "-5,000원");
+                .containsExactly("GA→설계사", "실제 지급 없음", "5,000원", "-5,000원");
     }
 
     /** CAP·차익거래 증거는 resultType 이 아니라 resultStatus 키를 쓴다 — 둘 다 풀린다. */
-    @Test
-    void CAP_차익거래_증거의_resultStatus_키도_푼다() {
-        var items = withEvidence("{\"resultStatus\":\"VIOLATION\",\"limitAmount\":1000}").evidenceItems();
+    @ParameterizedTest
+    @CsvSource({
+            "CAP_CHECK,NORMAL,정상",
+            "CAP_CHECK,WARNING,주의",
+            "CAP_CHECK,VIOLATION,위반",
+            "CAP_CHECK,REVIEW_REQUIRED,검토필요",
+            "CAP_CHECK,NOT_APPLICABLE,적용대상 아님",
+            "ARBITRAGE_CHECK,CLEAR,이상없음",
+            "ARBITRAGE_CHECK,CANDIDATE,검토대상",
+            "ARBITRAGE_CHECK,REVIEW_REQUIRED,자료부족",
+            "ARBITRAGE_CHECK,NOT_APPLICABLE,적용대상 아님"
+    })
+    void CAP_차익거래_증거의_resultStatus_키도_푼다(String sourceType, String status, String label) {
+        String evidenceJson = "{\"paymentStage\":\"INSURER_TO_GA\",\"resultStatus\":\"" + status
+                + "\",\"limitAmount\":1000}";
+        var response = new ExceptionOccurrenceResponse(1L, 2L, 3, null, null,
+                null, sourceType, "129", evidenceJson, true, false, null);
+        var items = response.evidenceItems();
 
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::label)
-                .containsExactly("결과상태", "한도액");
+                .containsExactly("지급단계", "결과상태", "한도액");
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
-                .containsExactly("VIOLATION", "1,000원");
+                .containsExactly("원수사→GA", label, "1,000원");
+        assertThat(response.evidenceJson()).isEqualTo(evidenceJson);
+        assertThat(response.detectionLabel()).isEqualTo("신규");
+    }
+
+    @Test
+    void 알수없는_코드와_이미_번역된_값은_원문을_유지하고_null은_생략한다() {
+        assertThat(withEvidence("""
+                {"paymentStage":"FUTURE_STAGE","resultStatus":"FUTURE_STATUS"}
+                """).evidenceItems()).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
+                .containsExactly("FUTURE_STAGE", "FUTURE_STATUS");
+        assertThat(withEvidence("""
+                {"paymentStage":"원수사→GA","resultStatus":"위반"}
+                """).evidenceItems()).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
+                .containsExactly("원수사→GA", "위반");
+        assertThat(withEvidence("""
+                {"paymentStage":"","resultStatus":null}
+                """).evidenceItems()).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
+                .containsExactly("");
     }
 
     @Test

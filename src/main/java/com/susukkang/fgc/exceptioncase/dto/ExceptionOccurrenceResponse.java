@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
+import com.susukkang.fgc.common.code.CapResultStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.util.DateUtil;
 
 import java.text.DecimalFormat;
@@ -30,6 +33,7 @@ public record ExceptionOccurrenceResponse(
         boolean reopened,
         OffsetDateTime detectedAt
 ) {
+    private static final String PAYMENT_STAGE_KEY = "paymentStage";
     private static final ObjectMapper EVIDENCE_MAPPER = new ObjectMapper();
 
     /**
@@ -40,7 +44,7 @@ public record ExceptionOccurrenceResponse(
 
     private static Map<String, String> evidenceLabels() {
         Map<String, String> labels = new LinkedHashMap<>();
-        labels.put("paymentStage", "지급단계");
+        labels.put(PAYMENT_STAGE_KEY, "지급단계");
         labels.put("resultType", "결과유형");   // 대사(reconciliation_result.result_type)
         labels.put("resultStatus", "결과상태"); // CAP·차익거래(cap_check/arbitrage_check.result_status)
         labels.put("primaryReasonCode", "주원인");
@@ -108,7 +112,22 @@ public record ExceptionOccurrenceResponse(
         return items;
     }
 
-    private static String formatValue(String key, JsonNode value, DecimalFormat amountFormat) {
+    private String formatValue(String key, JsonNode value, DecimalFormat amountFormat) {
+        // #602: 저장된 증거 코드는 보존하고 기존 업무 코드의 한국어 라벨만 표시한다.
+        if (PAYMENT_STAGE_KEY.equals(key) || "resultStatus".equals(key)) {
+            String code = value.asText();
+            try {
+                if (PAYMENT_STAGE_KEY.equals(key)) {
+                    return PaymentStage.valueOf(code).label();
+                }
+                // REVIEW_REQUIRED는 한도(검토필요)와 차익거래(자료부족)의 의미가 다르다.
+                return "ARBITRAGE_CHECK".equals(sourceEntityType)
+                        ? ArbitrageCheckStatus.valueOf(code).label()
+                        : CapResultStatus.valueOf(code).label();
+            } catch (IllegalArgumentException unknownCode) {
+                return code;
+            }
+        }
         if (CODE_KEYS.contains(key)) {
             return ExceptionCaseResponseDTO.labelOf(value.asText());
         }
