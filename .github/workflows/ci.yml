@@ -21,11 +21,28 @@ permissions:
   checks: write        # JUnit 리포트를 PR 체크로 생성
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run_checks: ${{ steps.plan.outputs.run_checks }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Test documentation selection and required-check policy
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_*policy.py' -v
+      - name: Select verification from the complete change set
+        id: plan
+        run: python3 .github/scripts/e2e_policy.py ci-plan
+
   # ⚠️ 이 job의 체크 이름은 'build'이며, 브랜치 보호의 필수 체크로 등록되어 있다.
   # job id를 바꾸거나 name: 을 새로 붙이면 체크 이름이 따라 바뀌고,
   # 보호 규칙이 찾는 이름이 사라져 모든 PR의 머지가 영구 차단된다.
   # (name: 을 지정하면 job id가 아니라 그 name이 체크 이름이 된다.)
   build:
+    needs: changes
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -37,24 +54,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
+      - name: Validate verification plan
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python3 .github/scripts/e2e_policy.py ci-gate
+
       - name: Set up Java 21
+        if: needs.changes.outputs.run_checks == 'true'
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           java-version: '21'
           distribution: 'temurin'
 
       - name: Set up Gradle (의존성·빌드 캐시)
+        if: needs.changes.outputs.run_checks == 'true'
         # v6는 캐시 컴포넌트의 별도 이용약관 검토가 필요해 Node 24 기반 최신 v5를 사용한다.
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
 
       - name: Build and test
+        if: needs.changes.outputs.run_checks == 'true'
         run: ./gradlew build
 
       # Dependabot/fork PR의 토큰은 read-only이므로, 권한 있는 별도 workflow_run이
       # 이 아티팩트를 읽어 동일 커밋에 "테스트 결과" 체크를 게시한다.
       - name: Upload JUnit XML
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' }}
         with:
           name: junit-test-results
           path: '**/build/test-results/test/TEST-*.xml'
@@ -63,7 +88,7 @@ jobs:
 
       - name: Publish test report (쓰기 가능한 실행)
         uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
-        if: ${{ !cancelled() && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)) }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)) }}
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_name: 테스트 결과
@@ -73,7 +98,7 @@ jobs:
       # 별도 체크 게시 자체는 test-report.yml의 workflow_run이 담당한다.
       - name: Annotate test report (Dependabot/fork PR)
         uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository) }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' && github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository) }}
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
           annotate_only: true
@@ -81,7 +106,7 @@ jobs:
 
       - name: Upload HTML test report (실패 분석용)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: failure()
+        if: ${{ failure() && needs.changes.outputs.run_checks == 'true' }}
         with:
           name: test-report
           path: build/reports/tests/test
@@ -91,6 +116,8 @@ jobs:
   # 브랜치 보호의 두 번째 필수 체크로 등록한다 — build와 같은 이유로 job id·name: 을 바꾸지 않는다.
   # workflow 단위 paths 필터를 쓰지 않는다. 건너뛴 workflow는 필수 체크를 보고하지 않아 머지가 막힌다.
   frontend:
+    needs: changes
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -101,7 +128,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
+      - name: Validate verification plan
+        working-directory: .
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python3 .github/scripts/e2e_policy.py ci-gate
+
       - name: Set up Node (frontend/.nvmrc)
+        if: needs.changes.outputs.run_checks == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: frontend/.nvmrc
@@ -110,12 +144,17 @@ jobs:
 
       # Audit runs once in npm-audit; registry outages must not stall every installer.
       - run: npm ci --no-audit
+        if: needs.changes.outputs.run_checks == 'true'
       - run: npm run check:api
+        if: needs.changes.outputs.run_checks == 'true'
       - run: npm run check:e2e
+        if: needs.changes.outputs.run_checks == 'true'
       - run: npm run lint
+        if: needs.changes.outputs.run_checks == 'true'
       - run: npm run test:coverage
+        if: needs.changes.outputs.run_checks == 'true'
       - name: Upload frontend coverage
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: frontend-coverage
@@ -124,9 +163,12 @@ jobs:
           retention-days: 7
       # tsc -b(타입 검사) 후 vite build
       - run: npm run build
+        if: needs.changes.outputs.run_checks == 'true'
 
   # Preserve the previous informational audit policy; this is not a merge/publish gate.
   npm-audit:
+    needs: changes
+    if: needs.changes.outputs.run_checks == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -167,8 +209,8 @@ jobs:
           retention-days: 7
 
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: [build, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && needs.changes.outputs.run_checks == 'true'
+    needs: [changes, build, frontend]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
