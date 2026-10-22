@@ -45,7 +45,8 @@ class Phase2SchemaMigrationIntegrationTest {
                     'compare_confirmation_receipt','notice','inquiry','inquiry_action','library_item',
                     'knowledge_chunk','agent_contract_check','ai_call_log')""")).isEqualTo(16L);
             assertThat(scalar(conn, "SELECT max(version::int) FROM fgc.flyway_schema_history WHERE version ~ '^[0-9]+$'"))
-                    .isEqualTo(57L);
+            assertThat(scalar(conn, "SELECT count(*) FROM fgc.flyway_schema_history WHERE script = 'V58__phase2_intake_compare_tables.sql' AND success"))
+                    .isEqualTo(1L);
         }
     }
 
