@@ -108,7 +108,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm ci
+      # Audit runs once in npm-audit; registry outages must not stall every installer.
+      - run: npm ci --no-audit
       - run: npm run check:api
       - run: npm run check:e2e
       - run: npm run lint
@@ -123,6 +124,47 @@ jobs:
           retention-days: 7
       # tsc -b(타입 검사) 후 vite build
       - run: npm run build
+
+  # Preserve the previous informational audit policy; this is not a merge/publish gate.
+  npm-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          package-manager-cache: false
+      - name: Test audit result classification
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_npm_audit_summary.py' -v
+      - name: Audit locked dependencies (informational, bounded to 60 seconds)
+        id: audit
+        continue-on-error: true
+        working-directory: frontend
+        run: |
+          status=0
+          timeout 60s npm audit --package-lock-only --json --fetch-timeout=15000 --fetch-retries=0 > npm-audit.json 2> npm-audit.stderr || status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Report findings separately from registry failures
+        if: ${{ !cancelled() }}
+        env:
+          AUDIT_EXIT_CODE: ${{ steps.audit.outputs.exit_code }}
+        run: python3 .github/scripts/npm_audit_summary.py
+      - name: Upload npm audit evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: npm-audit-report
+          path: |
+            frontend/npm-audit.json
+            frontend/npm-audit.stderr
+          if-no-files-found: error
+          retention-days: 7
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
