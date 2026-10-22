@@ -53,6 +53,7 @@ class ExceptionResponseJsonTest {
         assertThat(json.get("statusLabel").asText()).isEqualTo("신규");
         assertThat(json.get("reasonLabel").asText()).isEqualTo("1,200% 한도 초과");
         assertThat(json.get("sourceLink").asText()).isEqualTo("/contracts/3");
+        assertThat(json.get("sourceDeleted").asBoolean()).isFalse();
         assertThat(json.get("capBasisLink").isNull()).isTrue();
         assertThat(json.at("/occurrences/0/detectionLabel").asText()).isEqualTo("신규");
         assertThat(json.at("/occurrences/0/evidenceItems/0/label").asText()).isEqualTo("한도액");
@@ -60,5 +61,19 @@ class ExceptionResponseJsonTest {
         assertThat(json.at("/actions/0/actionTypeLabel").asText()).isEqualTo("검토 시작");
         assertThat(json.at("/actions/0/fromStatusLabel").asText()).isEqualTo("신규");
         assertThat(json.at("/actions/0/toStatusLabel").asText()).isEqualTo("검토중");
+    }
+
+    @Test
+    void deletedPaymentSourceIsExplicitAndHasNoNavigationLink() {
+        var dto = new ExceptionCaseResponseDTO(
+                11L, "DELETED", ExceptionType.CAP_VIOLATION, "CAP_LIMIT_VIOLATION", ExceptionSeverity.HIGH,
+                ExceptionStatus.RESOLVED, "초안 삭제", "설명", 3L, "C-0001", "설계사", null, null,
+                "COMMISSION_TRANSACTION", "41", 9L, null, LocalDate.of(2026, 7, 1), null, null,
+                null, null, 1, null, List.of(), List.of(), true);
+        JsonNode json = mapper.valueToTree(dto);
+        assertThat(json.get("sourceDeleted").asBoolean()).isTrue();
+        assertThat(json.get("sourceLink").isNull()).isTrue();
+        assertThat(json.get("sourceEntityId").asText()).isEqualTo("41");
+        assertThat(json.get("capBasisLink").asText()).isEqualTo("/cap-checks?capCheckId=9");
     }
 }

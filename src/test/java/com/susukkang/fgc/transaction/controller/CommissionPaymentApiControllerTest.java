@@ -74,7 +74,8 @@ class CommissionPaymentApiControllerTest {
     void deleteDraftRejectsReadOnlyRoles(String role) throws Exception {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/transactions/41")
                         .with(user("reader").roles(role)).with(csrf()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
         verify(commissionPaymentService, never()).deleteDraft(any());
     }
 

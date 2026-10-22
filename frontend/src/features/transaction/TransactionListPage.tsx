@@ -48,6 +48,7 @@ export default function TransactionListPage() {
       }
       await queryClient.invalidateQueries({ queryKey: ['transactions'] })
     },
+    onError: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
   })
   function closeDelete() {
     if (!deletion.isPending) {

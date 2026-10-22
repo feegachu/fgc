@@ -185,16 +185,16 @@ class CommissionPaymentIntegrationTest {
         var created = commissionPaymentService.create(request("IT-FUN065-LOCK-ROLLBACK-" + UUID.randomUUID(), new BigDecimal("1000")));
         Long exceptionId = insertDeletionException(created.paymentId(), "NEW");
         try {
-        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                commissionPaymentService.deleteDraft(created.paymentId());
+                status.setRollbackOnly();
+            });
+            assertThat(commissionPaymentService.get(created.paymentId()).attributions()).hasSize(1);
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId)).isEqualTo("NEW");
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=?", Integer.class, exceptionId)).isZero();
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='EXCEPTION_ACTION' AND entity_id=?", Integer.class, exceptionId.toString())).isZero();
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='PAYMENT_DELETED' AND entity_id=?", Long.class, created.paymentId().toString())).isZero();
             commissionPaymentService.deleteDraft(created.paymentId());
-            status.setRollbackOnly();
-        });
-        assertThat(commissionPaymentService.get(created.paymentId()).attributions()).hasSize(1);
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id=?", String.class, exceptionId)).isEqualTo("NEW");
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.exception_action WHERE exception_case_id=?", Integer.class, exceptionId)).isZero();
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='EXCEPTION_ACTION' AND entity_id=?", Integer.class, exceptionId.toString())).isZero();
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code='PAYMENT_DELETED' AND entity_id=?", Long.class, created.paymentId().toString())).isZero();
-        commissionPaymentService.deleteDraft(created.paymentId());
         } finally {
             cleanupDeletionException(exceptionId);
         }
@@ -249,7 +249,7 @@ class CommissionPaymentIntegrationTest {
                     """, Boolean.class, backendPid))) return;
             Thread.sleep(50);
         }
-        throw new AssertionError("지급 행 잠금 대기가 관측되지 않음: " + backendPid);
+        throw new AssertionError("DB 잠금 대기가 관측되지 않음: " + backendPid);
     }
 
     private void cleanupDeletionException(Long exceptionId) {
@@ -314,8 +314,11 @@ class CommissionPaymentIntegrationTest {
         } finally {
             release.countDown();
             executor.shutdownNow();
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) throw new IllegalStateException("작업 종료 대기 실패");
-            cleanupDeletionException(exceptionId);
+            try {
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) throw new IllegalStateException("작업 종료 대기 실패");
+            } finally {
+                cleanupDeletionException(exceptionId);
+            }
         }
     }
 
@@ -323,8 +326,10 @@ class CommissionPaymentIntegrationTest {
     @org.junit.jupiter.params.provider.ValueSource(strings = {"not-a-number", "9223372036854775808", ""})
     void malformedHistoricalSourceIdsDoNotBreakDeletionLookup(String sourceId) {
         Long exceptionId = insertDeletionException(0L, "REJECTED");
-        jdbcTemplate.update("UPDATE fgc.exception_case SET source_entity_id=? WHERE exception_case_id=?", sourceId, exceptionId);
-        var rows = exceptionCaseQueryRepository.search(new com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO(), List.of(), 0, 10000);
+        String reasonCode = "IT-607-" + UUID.randomUUID();
+        jdbcTemplate.update("UPDATE fgc.exception_case SET source_entity_id=?, reason_code=? WHERE exception_case_id=?", sourceId, reasonCode, exceptionId);
+        var criteria = com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO.builder().reasonCode(reasonCode).build();
+        var rows = exceptionCaseQueryRepository.search(criteria, List.of(), 0, 1);
         assertThat(rows.stream().filter(row -> row.exceptionCaseId().equals(exceptionId)).findFirst().orElseThrow().sourceDeleted()).isTrue();
         assertThatThrownBy(() -> exceptionCaseService.action(exceptionId,
                 new com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest(ExceptionActionType.REOPEN, "재검토", null), null, "test"))

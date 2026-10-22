@@ -159,6 +159,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     expect(within(dialog).getByRole('button', { name: '취소' })).toBeDisabled()
     await actions.keyboard('{Escape}')
     expect(dialog).toBeVisible()
+    resultRows = [{ ...row, status: 'CONFIRMED', statusLabel: '확정' }]
     await act(async () =>
       reject(
         new ApiError(
@@ -169,6 +170,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
       ),
     )
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('작성중인 지급 건만 삭제')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'TRAN-410 삭제' })).not.toBeInTheDocument())
     expect(deleteCalls).toHaveLength(1)
   })
 

@@ -245,7 +245,11 @@ if (typeof module !== "undefined" && module.exports) {
         remove.disabled = true;
         apiClient.request("/api/v1/transactions/" + encodeURIComponent(item.commissionTransactionId), { method: "DELETE" })
           .then(function () { toast("지급 초안을 삭제했습니다.", "success"); load(); })
-          .catch(function (error) { toast(format.errorText(error, "초안을 삭제하지 못했습니다."), "error"); remove.disabled = false; });
+          .catch(function (error) {
+            toast(format.errorText(error, "초안을 삭제하지 못했습니다."), "error");
+            remove.disabled = false;
+            load();
+          });
       });
       cell.appendChild(remove);
     } else {
