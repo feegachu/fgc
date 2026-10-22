@@ -11,8 +11,6 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +48,7 @@ public class CapCheckController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = CapCheckSearchResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류 등 (FGC-COMMON-002)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -89,7 +87,7 @@ public class CapCheckController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = CapCheckBasisResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(

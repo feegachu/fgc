@@ -6,7 +6,8 @@ import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
+import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { date, int, usageRate, won } from '../../lib/format'
 import { useWorkspaceStore } from '../../stores/workspace'
@@ -46,7 +47,7 @@ const agentColumns: TableColumn<CapAgent>[] = [
       />
     ),
   },
-  { key: 'count', label: '계약 수', align: 'number', render: (row) => `${int(row.contractCount)}건` },
+  { key: 'count', label: '계약 수', align: 'left', render: (row) => `${int(row.contractCount)}건` },
   { key: 'limit', label: '한도 합계', align: 'number', render: (row) => <Amount value={row.limitAmountTotal} /> },
   { key: 'included', label: '산입 합계', align: 'number', render: (row) => <Amount value={row.includedAmountTotal} /> },
   {
@@ -55,7 +56,7 @@ const agentColumns: TableColumn<CapAgent>[] = [
     width: '14rem',
     render: (row) => <CapUsage value={row.usagePct} status={monitoringStatus(row).code} />,
   },
-  { key: 'status', label: '모니터링', render: (row) => <CapStatus {...monitoringStatus(row)} /> },
+  { key: 'status', label: '모니터링', align: 'center', render: (row) => <CapStatus {...monitoringStatus(row)} /> },
 ]
 
 /** CAP-W01. 검색조건·상세 ID는 URL에, 판정·전체 검색범위 집계는 서버에 둔다. */
@@ -156,6 +157,7 @@ export default function CapListPage() {
       key: 'status',
       label: '판정',
       width: '6rem',
+      align: 'center',
       render: (row) => <CapStatus code={row.resultStatus} label={row.resultStatusLabel} />,
     },
     {
@@ -188,16 +190,21 @@ export default function CapListPage() {
               aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}`}
               onClick={() => update({ status: criteria.status === code ? '' : code, capCheckId: '' })}
             >
-              <span>{label}</span>
-              <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
-              <small>건 · {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}</small>
+              <span className="kpi-label">{label}</span>
+              <span className="cap-react-kpi-value">
+                <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
+                <small>건</small>
+              </span>
+              <span className="kpi-comparison">
+                {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
+              </span>
             </button>
           ))}
       </div>
-      <section className="surface">
+      <section className="surface cap-react-stage-panel">
         <header className="surface-header">
           <h2 className="surface-title">지급단계별 한도 게이지</h2>
-          <span>전체 검색범위 집계</span>
+          <StatusBadge>전체 검색범위 집계</StatusBadge>
         </header>
         <div className="cap-react-stages">
           {data?.stageSummary?.length ? (
@@ -230,29 +237,30 @@ export default function CapListPage() {
             emptyMessage={list.isPending ? '판정 목록을 불러오는 중입니다.' : '조건에 맞는 계약 판정이 없습니다.'}
           />
         )}
-        <footer className="cap-react-pagination">
-          <label>
-            한 화면{' '}
-            <select
-              className="select-control"
-              aria-label="한 화면 행 수"
-              value={criteria.size}
-              onChange={(event) => update({ size: event.target.value })}
-            >
-              {[10, 20, 50].map((size) => (
-                <option key={size} value={size}>
-                  {size}행
-                </option>
-              ))}
-            </select>
-          </label>
-          <Pagination
-            compact
-            page={criteria.page}
-            totalPages={data?.totalPages ?? 0}
-            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-          />
-        </footer>
+        <ListPagination
+          className="cap-react-pagination"
+          label="1,200% 한도 검증 목록 페이지 선택"
+          page={criteria.page}
+          totalPages={data?.totalPages ?? 0}
+          onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+          controls={
+            <label>
+              한 화면{' '}
+              <select
+                className="select-control"
+                aria-label="한 화면 행 수"
+                value={criteria.size}
+                onChange={(event) => update({ size: event.target.value })}
+              >
+                {[10, 20, 50].map((size) => (
+                  <option key={size} value={size}>
+                    {size}행
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+        />
       </section>
       <section className="surface">
         <header className="surface-header">
@@ -278,15 +286,18 @@ export default function CapListPage() {
   )
 }
 
+/** 지급단계별 전체 검색범위 집계와 사용률·공제 안내를 표시한다. */
 function StageCard({ stage }: { stage: CapStage }) {
   const status = monitoringStatus(stage)
   return (
     <article className="cap-react-stage">
       <header>
-        <h3>{stage.paymentStageLabel || STAGES[stage.paymentStage as keyof typeof STAGES]}</h3>
+        <div>
+          <h3>{stage.paymentStageLabel || STAGES[stage.paymentStage as keyof typeof STAGES]}</h3>
+          <p className="cap-react-stage-code">{stage.paymentStage}</p>
+        </div>
         <CapStatus {...status} />
       </header>
-      <p>{stage.paymentStage}</p>
       <dl>
         <div>
           <dt>계약 수</dt>
@@ -305,13 +316,15 @@ function StageCard({ stage }: { stage: CapStage }) {
           </dd>
         </div>
       </dl>
-      <CapUsage value={stage.usagePct} status={status.code} />
-      <p>
+      <div className="cap-react-stage-usage">
+        <span>사용률</span>
+        <CapUsage value={stage.usagePct} status={status.code} />
+      </div>
+      <p className="cap-react-stage-note">
         {stage.paymentStage === 'GA_TO_FC'
           ? '준법경영비 공제를 적용하지 않습니다.'
           : `준법경영비 공제 합계 ${won(stage.complianceDeductionAmountTotal)}`}
-      </p>
-      <p>
+        <br />
         {stage.worstContractNo
           ? `최고 사용률 ${stage.worstContractNo} · ${usageRate(stage.worstUsagePct)}%`
           : '판정 대상 계약이 없습니다.'}

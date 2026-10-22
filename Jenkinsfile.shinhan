@@ -1,0 +1,86 @@
+// Configure a separate Pipeline-from-SCM job named release-shinhan-fgc.
+// stage-fgc archives bundle.tgz and release.json only in its post.success block.
+pipeline {
+    agent { label 'shinhan-fgc' }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timestamps()
+        timeout(time: 60, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '20'))
+    }
+    parameters {
+        string(name: 'SOURCE_BUILD', defaultValue: '', description: '검증 완료한 AWS stage-fgc 성공 빌드 번호 (dev 빌드 번호가 아님)')
+        string(name: 'PRD_URL', defaultValue: '', description: '실제 배정된 신한 운영 HTTPS 주소. 예시 호스트명 사용 금지')
+        string(name: 'RFC_URL', defaultValue: '', description: '기존 운영 승격과 동일한 변경 요청 문서 URL')
+    }
+    environment {
+        PL_APPROVER = 'hjkang'
+    }
+    stages {
+        stage('Prepare manual production promotion') {
+            steps {
+                script {
+                    if (env.JOB_BASE_NAME != 'release-shinhan-fgc') { error('release-shinhan-fgc 전용 파이프라인') }
+                    if (!(params.SOURCE_BUILD ==~ /[1-9][0-9]*/)) { error('SOURCE_BUILD는 stage-fgc 성공 빌드의 정수 번호') }
+                    if (!params.PRD_URL.trim()) { error('실제 신한 PRD_URL이 필요합니다') }
+                    if (!params.RFC_URL.trim()) { error('RFC_URL이 필요합니다') }
+                }
+                deleteDir()
+                checkout scm
+                withEnv(["FGC_PUBLIC_URL=${params.PRD_URL.trim()}"]) {
+                    sh '''#!/usr/bin/env bash
+set -euo pipefail
+python3 infra/scripts/shinhan_release.py origin "$FGC_PUBLIC_URL"
+'''
+                }
+            }
+        }
+        stage('Select verified AWS staging bundle') {
+            steps {
+                dir('source') {
+                    copyArtifacts(projectName: 'stage-fgc',
+                        selector: specific(params.SOURCE_BUILD),
+                        filter: 'bundle.tgz,release.json',
+                        fingerprintArtifacts: true)
+                }
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+python3 infra/scripts/shinhan_release.py promote \
+  source/bundle.tgz source/release.json "$SOURCE_BUILD" "$JENKINS_URL" source/promotion.json
+cat source/promotion.json
+'''
+            }
+        }
+        stage('Production approval') {
+            steps {
+                script {
+                    timeout(time: 30, unit: 'MINUTES') {
+                        input message: "AWS stage-fgc #${params.SOURCE_BUILD}의 검증된 bundle을 신한 PRD에 배포합니다. 위 commit/digest, DB 호환성과 RFC를 확인하세요. RFC: ${params.RFC_URL}",
+                            ok: 'Approve', submitter: env.PL_APPROVER,
+                            submitterParameter: 'APPROVED_BY'
+                    }
+                }
+            }
+        }
+        stage('Deploy Shinhan production') {
+            steps {
+                withEnv(["FGC_PUBLIC_URL=${params.PRD_URL.trim()}"]) {
+                    sh 'bash infra/scripts/deploy-shinhan.sh source/promotion.json'
+                }
+            }
+        }
+    }
+    post {
+        success {
+            archiveArtifacts artifacts: 'source/bundle.tgz,source/release.json,source/promotion.json', fingerprint: true
+            echo '신한 PRD 배포 및 HTTPS 검증 성공'
+        }
+        failure {
+            echo '신한 PRD 승격 실패. 실제 API/WEB/DB 상태와 ~/fgc-stg/releases 기록을 확인하세요. DB는 자동 롤백하지 않습니다.'
+        }
+        aborted {
+            echo '신한 PRD 승격 중단. 승인 전 중단인지 배포 중 중단인지 확인하세요.'
+        }
+    }
+}

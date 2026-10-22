@@ -289,7 +289,7 @@ it('negative money uses common brackets/red and displays stored excess independe
   await screen.findByRole('img', { name: '기준일별 초과액 추이' })
   for (const amount of screen.getAllByText('(987)원')) expect(amount).toHaveClass('is-negative-amount')
   const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector('.arb-calculation')!
-  expect(stored).toHaveTextContent('초과액 (서버 저장값): (987)원')
+  expect(stored).toHaveTextContent('지급분 기준 초과액: (987)원')
 })
 
 it('timeline cache separates contract IDs even when contract number/stage match', async () => {
@@ -300,17 +300,34 @@ it('timeline cache separates contract IDs even when contract number/stage match'
   expect((await client.fetchQuery(arbitrageTimelineQuery(other))).map((r) => r.contractId)).toEqual([99])
   client.clear()
 })
-it('legacy pagination includes more than five page numbers and moves one page at a time', async () => {
+it('pagination shows at most five numbers and moves between page groups', async () => {
   const user = userEvent.setup()
-  const { router } = mount(undefined, true, (p) =>
+  const { router } = mount('/arbitrage-checks?month=2026-07&page=4&contractNo=ARB', true, (p) =>
     p.includes('/insurers')
       ? fixtures(p)
-      : result([row], Number(new URL(p, 'http://test').searchParams.get('page') ?? 1), 7),
+      : result([row], Number(new URL(p, 'http://test').searchParams.get('page') ?? 1), 12),
   )
   await screen.findByText('서버 판정 근거')
-  await user.click(screen.getByRole('button', { name: '7' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '7' })).toHaveAttribute('aria-current', 'page'))
-  expect(router.state.location.search).toContain('page=7')
-  await user.click(screen.getByRole('button', { name: '이전 페이지' }))
-  expect(router.state.location.search).toContain('page=6')
+  const nav = () => screen.getByRole('navigation', { name: '차익거래 검증 목록 페이지' })
+  const controls = () => within(nav())
+  expect(nav().querySelectorAll('.pagination-button')).toHaveLength(7)
+  expect(controls().queryByRole('button', { name: '7' })).toBeNull()
+  expect(controls().getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+  await user.click(controls().getByRole('button', { name: '다음 5페이지' }))
+  await waitFor(() => expect(router.state.location.search).toContain('page=6'))
+  await waitFor(() => expect(nav().querySelector('[aria-current="page"]')).toHaveTextContent('6'))
+  await user.click(controls().getByRole('button', { name: '이전 5페이지' }))
+  await waitFor(() => expect(router.state.location.search).toContain('page=5'))
+  expect(router.state.location.search).toContain('month=2026-07')
+  expect(router.state.location.search).toContain('contractNo=ARB')
+})
+
+it('keeps projected-only excess separate from the CLEAR result in list and detail', async () => {
+  const projected = { ...row, resultStatus: 'CLEAR' as const, resultStatusLabel: '이상없음',
+    netDifferenceAmount: 0, projectedExcessAmount: 100000, candidateType: 'PROJECTED_EXCESS' }
+  mount(undefined, true, (path) => path.includes('/insurers') ? fixtures(path) : result([projected], 1, 1))
+  await screen.findByText('서버 판정 근거')
+  expect(screen.getByText(/지급예정 포함 시 초과 \(모니터링\)/)).toBeVisible()
+  expect(screen.getAllByText('이상없음').length).toBeGreaterThan(0)
+  expect(screen.getByText(/지급예정 포함 초과액 \(모니터링\)/)).toBeVisible()
 })

@@ -9,7 +9,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTime, errorText, month as formatMonth } from '../../lib/format'
 import { toast } from '../../stores/toasts'
@@ -48,7 +48,7 @@ export default function ValidationRunListPage() {
       cellClassName: 'tabular-nums',
       render: (r) => formatMonth(r.validationMonth),
     },
-    { key: 'runNo', label: '회차', width: '3.5rem', align: 'number', render: (r) => r.runNo },
+    { key: 'runNo', label: '회차', width: '3.5rem', align: 'left', render: (r) => r.runNo },
     { key: 'type', label: '실행 유형', width: '7rem', render: (r) => dash(r.runTypeLabel) },
     {
       key: 'status',
@@ -110,13 +110,13 @@ export default function ValidationRunListPage() {
       key: 'open',
       label: '상세',
       width: '5rem',
-      align: 'center',
+      align: 'left',
       render: (r) => <OpenLink run={r} />,
     },
   ]
 
   return (
-    <div className="page-content vrun-page vrun-list-page">
+    <div className="vrun-page vrun-list-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 실행 목록</h1>
@@ -147,17 +147,13 @@ export default function ValidationRunListPage() {
           emptyMessage={runs.isPending ? '불러오는 중입니다.' : undefined}
         />
         {totalPages > 1 && (
-          <nav className="vrun-pagination" aria-label="월 통합검증 실행 목록 페이지">
-            <span className="tabular-nums" aria-live="polite">
-              {criteria.page} / {totalPages} 페이지
-            </span>
-            <Pagination
-              compact
-              page={criteria.page}
-              totalPages={totalPages}
-              onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-            />
-          </nav>
+          <ListPagination
+            className="vrun-pagination"
+            label="월 통합검증 실행 목록 페이지 선택"
+            page={criteria.page}
+            totalPages={totalPages}
+            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+          />
         )}
       </section>
     </div>

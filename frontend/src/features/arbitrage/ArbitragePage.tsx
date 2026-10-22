@@ -1,3 +1,4 @@
+import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
@@ -6,7 +7,7 @@ import { Button } from '../../components/Button'
 import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { int } from '../../lib/format'
 import { useInsurerOptions } from '../base/api'
 import { QueryState } from '../reference/ReferenceUI'
@@ -168,7 +169,12 @@ export default function ArbitragePage() {
           </button>
         ))}
       </section>
-      <div className="arb-content-grid">
+      <ResizableSplit
+        className="arb-content-grid"
+        storageKey="arbitrage-workspace"
+        label="계약별 판정과 상세 카드 너비"
+        defaultRatio={56}
+      >
         <section className="surface arb-list-panel" aria-labelledby="arb-list-title">
           <header className="surface-header arb-panel-header">
             <h2 className="surface-title" id="arb-list-title">
@@ -195,18 +201,15 @@ export default function ArbitragePage() {
               rowLabel={(row) => `계약 ${row.contractNo} 상세 보기`}
             />
           )}
-          <footer className="arb-pagination-footer">
-            {(query.data?.items?.totalPages ?? 0) > 1 && !query.error ? (
-              <Pagination
-                compact
-                allPages
-                label="차익거래 검증 목록 페이지"
-                page={query.data?.items?.page ?? criteria.page}
-                totalPages={query.data?.items?.totalPages ?? 0}
-                onPageChange={(page) => patch({ page }, false)}
-              />
-            ) : null}
-          </footer>
+          {!query.error && (
+            <ListPagination
+              className="arb-pagination-footer"
+              label="차익거래 검증 목록 페이지"
+              page={query.data?.items?.page ?? criteria.page}
+              totalPages={query.data?.items?.totalPages ?? 0}
+              onPageChange={(page) => patch({ page }, false)}
+            />
+          )}
         </section>
         <section className="surface arb-detail-panel" aria-labelledby="arb-detail-title">
           <header className="surface-header arb-panel-header">
@@ -243,7 +246,7 @@ export default function ArbitragePage() {
             ) : null}
           </div>
         </section>
-      </div>
+      </ResizableSplit>
       {modalRow ? (
         <RecheckModal row={modalRow} onClose={() => setModalRow(null)} onSuccess={() => setSelection(null)} />
       ) : null}

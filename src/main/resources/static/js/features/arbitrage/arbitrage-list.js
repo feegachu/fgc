@@ -102,7 +102,7 @@
       '<td class="is-number tabular-nums">' + number(row.contractMonthNo) + '</td>' +
       '<td class="is-number tabular-nums">' + money(row.cumulativePaidPremium) + '</td>' +
       '<td class="is-number tabular-nums">' + money(row.paidCommissionAmount) + '</td>' +
-      '<td class="is-number tabular-nums">' + money(row.plannedCommissionAmount) + '</td>' +
+      '<td class="is-number tabular-nums">' + money(row.plannedCommissionAmount) + (Number(row.projectedExcessAmount) > 0 ? '<div>지급예정 포함 시 초과 (모니터링): ' + money(row.projectedExcessAmount) + '</div>' : '') + '</td>' +
       '<td class="is-number tabular-nums">' + money(row.includedSurrenderValueAmount) + '</td>' +
       '<td>' + escapeHtml(surrenderValueSourceLabel(row)) + '</td>' +
       '<td class="is-number tabular-nums' + differenceClass + '">' + money(row.netDifferenceAmount) + '</td>' +
@@ -125,7 +125,7 @@
       '<div><dt>기준일 · 계약차월</dt><dd>' + escapeHtml(value(row.asOfDate)) + " · " + number(row.contractMonthNo) + '개월</dd></div>' +
       '<div><dt>환급금 가산 여부</dt><dd>' + (row.refundAdditionAppliedYn ? "가산 함" : "가산 안 함") + '</dd></div><div><dt>환급금 출처</dt><dd>' + escapeHtml(surrenderValueSourceLabel(row)) + '</dd></div>' +
       '<div><dt>판정 근거</dt><dd>' + escapeHtml(value(row.decisionReason)) + '</dd></div></dl>' +
-      '<pre class="arb-calculation tabular-nums">초과액 = ' + money(row.paidCommissionAmount) + ' (확정 수수료)\n      + ' + money(row.plannedCommissionAmount) + ' (지급예정액)\n      + ' + money(row.includedSurrenderValueAmount) + ' (해약환급금)\n      - ' + money(row.cumulativePaidPremium) + ' (누적 납입보험료)\n      = ' + money(row.netDifferenceAmount) + '</pre>' +
+      '<pre class="arb-calculation tabular-nums">지급분 기준 초과액 = ' + money(row.paidCommissionAmount) + ' (확정 수수료)\n      + ' + money(row.includedSurrenderValueAmount) + ' (해약환급금)\n      - ' + money(row.cumulativePaidPremium) + ' (누적 납입보험료)\n      = ' + money(row.netDifferenceAmount) + '\n지급예정 포함 초과액 (모니터링): ' + (row.projectedExcessAmount == null ? '—' : money(row.projectedExcessAmount)) + '</pre>' +
       '<section id="arb-timeline" class="arb-timeline-panel" aria-label="기준일별 초과액 추이">' +
       '<p class="empty-state arb-timeline-state">기준일별 이력을 불러오는 중입니다.</p></section>';
     loadTimeline(row);

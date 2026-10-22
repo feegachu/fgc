@@ -35,11 +35,13 @@ function DashboardContent({ month }: { month: string }) {
     {
       key: 'severity',
       label: '심각도',
+      align: 'center',
       render: (e) => <StatusBadge tone={severityTone(e.severity)}>{e.severityLabel ?? '-'}</StatusBadge>,
     },
     {
       key: 'type',
       label: '유형',
+      align: 'center',
       render: (e) => <StatusBadge tone={exceptionTypeTone(e.exceptionType)}>{e.exceptionTypeLabel ?? '-'}</StatusBadge>,
     },
     { key: 'contractNo', label: '계약번호', cellClassName: 'tabular-nums', render: (e) => e.contractNo ?? '-' },
@@ -58,6 +60,7 @@ function DashboardContent({ month }: { month: string }) {
     {
       key: 'status',
       label: '상태',
+      align: 'center',
       render: (e) => <StatusBadge tone={exceptionStatusTone(e.status)}>{e.statusLabel ?? '-'}</StatusBadge>,
     },
     { key: 'createdAt', label: '발생', cellClassName: 'tabular-nums', render: (e) => dateTime(e.createdAt) },
@@ -112,7 +115,7 @@ function DashboardContent({ month }: { month: string }) {
     ] as const)
 
   return (
-    <div className="page-content dashboard-page">
+    <div className="dashboard-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>

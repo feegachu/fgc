@@ -9,6 +9,8 @@ import com.susukkang.fgc.common.web.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -49,12 +51,12 @@ class ProductServiceImplTest {
                 LocalDate.of(2026, 7, 1), "FACE_TO_FACE", "CURRENT", true, 240
         );
         PageRequest pageable = PageRequest.of(1, 20);
-        when(productRepository.search(criteria.insurerId(), criteria.asOf(), pageable))
+        when(productRepository.search(criteria.insurerId(), criteria.asOf(), false, pageable))
                 .thenReturn(new PageImpl<>(List.of(row), pageable, 21L));
 
         PageResponse<ProductResponse> result = productService.search(criteria, 2, 20);
 
-        verify(productRepository).search(criteria.insurerId(), criteria.asOf(), pageable);
+        verify(productRepository).search(criteria.insurerId(), criteria.asOf(), false, pageable);
         assertThat(result.page()).isEqualTo(2);
         assertThat(result.size()).isEqualTo(20);
         assertThat(result.totalElements()).isEqualTo(21);
@@ -72,7 +74,7 @@ class ProductServiceImplTest {
     void returnsEmptyPageForUnknownPositiveInsurer() {
         ProductSearchCriteria criteria = criteria(999_999L);
         PageRequest pageable = PageRequest.of(0, 20);
-        when(productRepository.search(criteria.insurerId(), criteria.asOf(), pageable))
+        when(productRepository.search(criteria.insurerId(), criteria.asOf(), false, pageable))
                 .thenReturn(Page.empty(pageable));
 
         PageResponse<ProductResponse> result = productService.search(criteria, 1, 20);
@@ -86,7 +88,7 @@ class ProductServiceImplTest {
     void preservesTotalCountWhenRequestedPageIsBeyondLastPage() {
         ProductSearchCriteria criteria = criteria(2L);
         PageRequest pageable = PageRequest.of(2, 20);
-        when(productRepository.search(criteria.insurerId(), criteria.asOf(), pageable))
+        when(productRepository.search(criteria.insurerId(), criteria.asOf(), false, pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 21L));
 
         PageResponse<ProductResponse> result = productService.search(criteria, 3, 20);
@@ -135,5 +137,21 @@ class ProductServiceImplTest {
 
     private ProductSearchCriteria criteria(long insurerId) {
         return new ProductSearchCriteria(insurerId, LocalDate.of(2026, 8, 11));
+    }
+
+    // FGC-FUN-007·018: 상품 입력용 기본 조회와 이력 조회 옵션을 구분한다.
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void forwardsHistoryFlagAndPreservesRequestedPage(boolean includeExpired) {
+        var asOf = LocalDate.of(2026, 10, 13);
+        var pageable = PageRequest.of(1, 10);
+        when(productRepository.search(2L, asOf, includeExpired, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 3));
+
+        var result = productService.search(new ProductSearchCriteria(2L, asOf, includeExpired), 2, 10);
+
+        verify(productRepository).search(2L, asOf, includeExpired, pageable);
+        assertThat(result.page()).isEqualTo(2);
+        assertThat(result.totalElements()).isEqualTo(3);
     }
 }

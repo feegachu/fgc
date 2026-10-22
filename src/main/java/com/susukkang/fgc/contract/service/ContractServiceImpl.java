@@ -429,10 +429,19 @@ public class ContractServiceImpl implements ContractService {
     private void validateInputForUpdate(InsuranceContract currentContract, ContractUpdateRequest request) {
         // 1. 계약일이 서울 기준 미래 날짜인지 확인
         validateContractDate(request);
-        // 2. 활성 보험회사와 계약일에 판매 가능한 상품인지 확인
-        validateInsurerAndProduct(request);
-        // 3. 계약일 기준 설계사의 자격과 소속 조직 확인
-        validateAgentAndOrganization(request);
+        // 과거 계약의 변경하지 않은 기준정보는 계약 당시 스냅샷으로 보존한다.
+        // 계약일이나 참조를 바꾸는 요청에는 신규 입력과 같은 검증을 적용한다.
+        boolean dateChanged = !Objects.equals(currentContract.getContractDate(), request.getContractDate());
+        if (dateChanged
+                || !Objects.equals(currentContract.getInsurerId(), request.getInsurerId())
+                || !Objects.equals(currentContract.getProductOfferingId(), request.getProductOfferingId())) {
+            validateInsurerAndProduct(request);
+        }
+        if (dateChanged
+                || !Objects.equals(currentContract.getAgentId(), request.getAgentId())
+                || !Objects.equals(currentContract.getOrganizationId(), request.getOrganizationId())) {
+            validateAgentAndOrganization(request);
+        }
         // 4. 보험회사·계약번호가 변경된 경우에만 중복 확인
         validateContractIdentityForUpdate(currentContract, request);
     }

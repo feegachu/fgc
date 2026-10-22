@@ -8,7 +8,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { int, isNegative, month as formatMonth, won } from '../../lib/format'
 import { withMonth } from '../../stores/workspace'
@@ -93,9 +93,12 @@ export default function TransactionListPage() {
       key: 'flow',
       label: '흐름',
       width: '5rem',
+      align: 'center',
       render: (row) => (
-        <StatusBadge tone={row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}>
-          {row.cashflowTypeLabel || row.cashflowType}
+        <StatusBadge
+          tone={row.status === 'CANCELLED' ? 'neutral' : row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}
+        >
+          {row.status === 'CANCELLED' ? '취소' : row.cashflowTypeLabel || row.cashflowType}
         </StatusBadge>
       ),
     },
@@ -103,6 +106,7 @@ export default function TransactionListPage() {
       key: 'status',
       label: '상태',
       width: '5.5rem',
+      align: 'center',
       render: (row) => (
         <StatusBadge tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}>
           {row.statusLabel || row.status}
@@ -113,6 +117,7 @@ export default function TransactionListPage() {
       key: 'attributions',
       label: '귀속',
       width: '6.5rem',
+      align: 'center',
       render: (row) => {
         const count = row.attributionCount ?? 0
         const imbalance = count === 0 || Number(row.differenceAmount ?? 0) !== 0
@@ -246,16 +251,13 @@ export default function TransactionListPage() {
           }
         />
         {total > 0 && (
-          <div className="transaction-pagination">
-            <span>
-              {page} / {totalPages} 페이지
-            </span>
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              onPageChange={(next) => apply({ ...filters, page: next })}
-            />
-          </div>
+          <ListPagination
+            className="transaction-pagination"
+            label="수수료 지급 건 목록 페이지 선택"
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(next) => apply({ ...filters, page: next })}
+          />
         )}
       </section>
     </div>

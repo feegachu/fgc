@@ -125,6 +125,59 @@ test('잘못된 상세 딥링크는 목록을 막지 않는다', async ({ page }
   ).toBeVisible()
 })
 
+test('좁은 화면에서도 지급단계의 큰 합계 금액을 모두 표시한다', async ({ page }) => {
+  await fixture(page)
+  await page.route('**/api/v1/cap-checks?**', (route) =>
+    route.fulfill({
+      json: envelope({
+        content: [],
+        summary: { normal: 1234, warning: 0, violation: 0, reviewRequired: 0 },
+        stageSummary: ['INSURER_TO_GA', 'GA_TO_FC'].map((paymentStage) => ({
+          paymentStage,
+          contractCount: 1234,
+          limitAmountTotal: 1234567890,
+          includedAmountTotal: 1000000000,
+          complianceDeductionAmountTotal: 0,
+          usagePct: '81.000000',
+        })),
+        agentSummary: [],
+        totalElements: 0,
+        totalPages: 0,
+        page: 1,
+        size: 20,
+      }),
+    }),
+  )
+  await page.goto('cap-checks?month=2026-07')
+  const cards = page.locator('.cap-react-stage')
+  await expect(cards).toHaveCount(2)
+  for (const width of [901, 1000, 1100, 390]) {
+    await page.setViewportSize({ width, height: 1000 })
+    for (const card of await cards.all()) {
+      await expect(card.getByText('1,234,567,890원', { exact: true })).toBeVisible()
+      await expect(card.getByText('1,000,000,000원', { exact: true })).toBeVisible()
+      for (const value of await card.locator('dd').all()) {
+        // DOM에 값이 있어도 말줄임으로 숨겨질 수 있으므로 실제 텍스트 영역을 확인한다.
+        await expect(async () => {
+          const fits = await value.evaluate((element) => {
+            const range = document.createRange()
+            range.selectNodeContents(element)
+            const bounds = element.getBoundingClientRect()
+            return Array.from(range.getClientRects()).every(
+              (rect) =>
+                rect.left >= bounds.left - 1 &&
+                rect.right <= bounds.right + 1 &&
+                rect.top >= bounds.top - 1 &&
+                rect.bottom <= bounds.bottom + 1,
+            )
+          })
+          expect(fits).toBe(true)
+        }).toPass()
+      }
+    }
+  }
+})
+
 test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }) => {
   test.skip(process.env.FGC_CAP_REAL_SERVER !== '1', '격리 DB와 실서버를 준비한 뒤 실행한다')
   const qaLoginId = process.env.FGC_CAP_QA_LOGIN_ID
@@ -147,14 +200,11 @@ test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }
   const legacy = (await legacyResponse.json()).data
   expect(legacy.content.length).toBeGreaterThan(0)
   await expect(page.locator('#cap-total-count')).toHaveText(String(legacy.totalElements))
-  if (process.env.FGC_CAP_CAPTURE === '1')
-    await page.screenshot({ path: 'docs/411/legacy-cap-list.png', fullPage: true })
   const id = legacy.content[0].capCheckId
   await page.locator(`[data-cap-detail-id="${id}"]`).click()
   await expect(page.locator('#cap-detail-content')).toBeVisible()
   const legacyDetail = await context.request.get(`http://localhost:8081/api/v1/cap-checks/${id}/details`)
   const stored = (await legacyDetail.json()).data
-  if (process.env.FGC_CAP_CAPTURE === '1') await page.screenshot({ path: 'docs/411/legacy-cap-detail.png' })
   // SPA는 별도 JWT로 인증. 이 로그인은 동일한 임시 QA DB의 계정이다.
   await page.goto(`login?redirect=${encodeURIComponent(`/cap-checks?month=${month}`)}`)
   await page.getByLabel(/^아이디/).fill(qaLoginId!)
@@ -175,8 +225,6 @@ test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }
   await expect(firstRow).toContainText(won(first.remainingAmount))
   await expect(firstRow).toContainText(`${usageRate(first.usagePct)}%`)
   await expect(firstRow).toContainText(first.resultStatusLabel)
-  if (process.env.FGC_CAP_CAPTURE === '1')
-    await page.screenshot({ path: 'docs/411/react-cap-list.png', fullPage: true })
   await page.goto(`cap-checks?month=${month}&capCheckId=${id}`)
   const dialog = page.getByRole('dialog', { name: '계산근거' })
   await expect(dialog.getByText('① 입력값')).toBeVisible()
@@ -185,5 +233,4 @@ test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }
   await expect(dialog.getByRole('table', { name: '항목별 산입 내역' }).locator('tbody tr')).toHaveCount(
     stored.details.length || 1,
   )
-  if (process.env.FGC_CAP_CAPTURE === '1') await page.screenshot({ path: 'docs/411/react-cap-detail.png' })
 })

@@ -25,7 +25,9 @@ final class ArbitrageBaselineSql {
                         ac.refund_addition_applied_yn,
                         ac.surrender_value_source_type,
                         ac.result_status,
-                        ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
+                        ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
+                        CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
+                        ac.calculation_snapshot ->> 'candidateType' AS candidate_type
                     FROM
                     """);
                 sql.append(" ");
@@ -239,7 +241,8 @@ final class ArbitrageBaselineSql {
                         fs.surrender_value,
                         fs.surrender_value_type,
                         fs.refund_rate_table_id AS snapshot_refund_rate_table_id,
-                        p.protection_type
+                        p.protection_type,
+                        termination.termination_date
                     FROM
                         insurance_contract c
                     JOIN
@@ -250,6 +253,20 @@ final class ArbitrageBaselineSql {
                         product p
                     ON
                         p.product_id = po.product_id
+                    LEFT JOIN LATERAL (
+                        SELECT MIN((e.effective_at AT TIME ZONE 'Asia/Seoul')::date) AS termination_date
+                          FROM fgc.contract_status_event e
+                         WHERE e.contract_id = c.contract_id AND e.new_status IN ('TERMINATED', 'LAPSED')
+                           AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :p0
+                           AND NOT EXISTS (
+                               SELECT 1 FROM fgc.contract_status_event resumed
+                                WHERE resumed.contract_id = e.contract_id
+                                  AND resumed.new_status NOT IN ('TERMINATED', 'LAPSED')
+                                  AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :p0
+                                  AND (resumed.effective_at, resumed.event_seq, resumed.contract_status_event_id)
+                                      > (e.effective_at, e.event_seq, e.contract_status_event_id)
+                           )
+                    ) termination ON true
                     LEFT JOIN LATERAL (
                         SELECT
                             cfs.as_of_date,
@@ -263,7 +280,7 @@ final class ArbitrageBaselineSql {
                         WHERE
                             cfs.contract_id = c.contract_id
                         AND
-                            cfs.as_of_date  <=  :p0
+                            cfs.as_of_date <= COALESCE(termination.termination_date, :p0)
                         ORDER BY
                             cfs.as_of_date DESC,
                             CASE WHEN cfs.surrender_value_type = 'ACTUAL' THEN 0 ELSE 1 END,
@@ -318,6 +335,7 @@ final class ArbitrageBaselineSql {
                 var parameters = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
                 parameters.addValue("p0", parameter(value(input, "contractId")));
                 parameters.addValue("p1", parameter(value(input, "paymentStage")));
+                parameters.addValue("asOfDate", parameter(value(input, "asOfDate")));
                 sql.append("""
                     SELECT
                         COALESCE(SUM(ROUND(sl.expected_amount, 0)), 0)
@@ -337,6 +355,22 @@ final class ArbitrageBaselineSql {
                         sh.schedule_purpose = 'OPERATIONAL'
                     AND
                         sl.line_status = 'PLANNED'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM fgc.contract_status_event e
+                            WHERE e.contract_id=sh.contract_id
+                              AND e.new_status IN ('TERMINATED','LAPSED','MATURED','CANCELLED')
+                              AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                              AND sl.due_date > (e.effective_at AT TIME ZONE 'Asia/Seoul')::date
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM fgc.contract_status_event resumed
+                                   WHERE resumed.contract_id=e.contract_id
+                                     AND resumed.new_status IN ('ACTIVE','REVIVED')
+                                     AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
+                                     AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= sl.due_date
+                                     AND (resumed.effective_at, resumed.event_seq, resumed.contract_status_event_id)
+                                         > (e.effective_at, e.event_seq, e.contract_status_event_id)
+                              )
+                        )
                     """);
                 sql.append(" ");
                 yield new Statement(sql.toString(), parameters, scalar(java.math.BigDecimal.class), "", "");
@@ -482,7 +516,9 @@ final class ArbitrageBaselineSql {
                         ac.refund_addition_applied_yn,
                         ac.surrender_value_source_type,
                         ac.result_status,
-                        ac.calculation_snapshot ->> 'decisionReason' AS decision_reason
+                        ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
+                        CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
+                        ac.calculation_snapshot ->> 'candidateType' AS candidate_type
                     FROM
                     """);
                 sql.append(" ");

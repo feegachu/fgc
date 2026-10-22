@@ -15,7 +15,7 @@ export const FILTER_KEYS = {
   to: '',
   type: '',
   account: '',
-  contract: '',
+  contractNo: '',
   status: '',
   searched: '',
   selected: '',
@@ -40,18 +40,32 @@ export function criteriaFromParams(params: URLSearchParams) {
     to: validDate(params.get('to')),
     type: Object.hasOwn(JOURNAL_TYPE, type) ? type : '',
     account: params.get('account')?.trim() ?? '',
-    contract: positiveId(params.get('contract')),
+    contractNo: params.get('contractNo')?.trim() ?? '',
     status: Object.hasOwn(JOURNAL_STATUS, status) ? status : '',
     page: Number(positiveId(params.get('page')) || 1),
   }
 }
 export type JournalCriteria = ReturnType<typeof criteriaFromParams>
+/** 기준 정산월(yyyy-MM)의 첫날·말일. 기준월이 없으면 빈 범위다. */
+export function monthRange(month: string | null) {
+  if (!month) return { from: '', to: '' }
+  const lastDay = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, '0')}` }
+}
+/**
+ * 조회 버튼을 누르기 전(searched 없음)에 분개일 조건이 비어 있으면 기준 정산월 범위로 목록을 바로 조회한다.
+ * 조회 버튼으로 직접 비운 날짜(searched=true)는 기간 제한 없음으로 존중한다.
+ */
+export function effectiveCriteria(criteria: JournalCriteria, searched: boolean, month: string | null): JournalCriteria {
+  if (searched || criteria.from || criteria.to) return criteria
+  return { ...criteria, ...monthRange(month) }
+}
 export async function get<T>(path: string, signal?: AbortSignal) {
   const { data } = await apiClient.request<T>(path, { signal })
   if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
   return data
 }
-export const journalSearchQuery = (criteria: JournalCriteria, searched: boolean) =>
+export const journalSearchQuery = (criteria: JournalCriteria, enabled: boolean) =>
   queryOptions({
     queryKey: ['journals', 'search', criteria],
     queryFn: ({ signal }) => {
@@ -61,7 +75,7 @@ export const journalSearchQuery = (criteria: JournalCriteria, searched: boolean)
       })
       return get<JournalSearch>(`/api/v1/journals?${query}`, signal)
     },
-    enabled: searched,
+    enabled,
     placeholderData: keepPreviousData,
     meta: { errorToast: false },
   })

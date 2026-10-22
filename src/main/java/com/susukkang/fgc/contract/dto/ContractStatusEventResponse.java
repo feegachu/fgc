@@ -19,4 +19,12 @@ public record ContractStatusEventResponse(
     public ContractStatusEventResponse {
         processings = List.copyOf(processings);
     }
+
+    public String getPreviousStatusLabel() {
+        return previousStatus == null ? null : previousStatus.label();
+    }
+
+    public String getNewStatusLabel() {
+        return newStatus == null ? null : newStatus.label();
+    }
 }

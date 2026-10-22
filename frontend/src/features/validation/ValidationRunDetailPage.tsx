@@ -41,7 +41,7 @@ export default function ValidationRunDetailPage() {
   const detail = useQuery(runDetailQuery(id))
   if (detail.isPending) {
     return (
-      <div className="page-content vrun-page vrun-detail-page">
+      <div className="vrun-page vrun-detail-page">
         <p className="vrun-inline-state is-loading" role="status">
           불러오는 중입니다.
         </p>
@@ -55,7 +55,7 @@ export default function ValidationRunDetailPage() {
 function DetailError({ error, onRetry }: { error: Error; onRetry: () => void }) {
   const notFound = error instanceof ApiError && (error.status === 404 || error.code === 'FGC-COMMON-004')
   return (
-    <div className="page-content vrun-page vrun-detail-page">
+    <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세 · 확정</h1>
@@ -152,7 +152,7 @@ function DetailBody({
   const link = (path: string) => (shellMonth ? withMonth(path, shellMonth) : path)
 
   return (
-    <div className="page-content vrun-page vrun-detail-page">
+    <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세 · 확정</h1>
@@ -557,7 +557,7 @@ function ChecklistSection({
     )
   } else if (data) {
     summary = data.passed
-      ? { text: '6개 조건 모두 통과', tone: 'success' }
+      ? { text: '8개 조건 모두 통과', tone: 'success' }
       : { text: '미충족 조건 있음', tone: 'error' }
     body = (
       <div className="vrun-checklist">
@@ -594,7 +594,7 @@ function ChecklistSection({
     <section className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
-          ⑤ 확정 조건 (운영정책서 제44조 · 6개 전부 통과해야 함)
+          ⑤ 확정 조건 (운영정책서 제44조 · 8개 전부 통과해야 함)
         </h2>
         {summary.tone ? (
           <StatusBadge tone={summary.tone}>{summary.text}</StatusBadge>
@@ -660,7 +660,7 @@ function FinalizeSection({
   if (!canFinalize) reason = '확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.'
   else if (status === 'FINALIZED') reason = '이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.'
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
-  else if (!passed) reason = '확정 조건 6개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
+  else if (!passed) reason = '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
   return (
     <section className="surface" aria-labelledby="vrun-finalize-section-title">
       <div className="vrun-finalize-row">
@@ -669,7 +669,7 @@ function FinalizeSection({
             ⑥ 확정 (FINALIZED)
           </p>
           <p className="field-helper vrun-finalize-guide" id="finalize-action-guide">
-            위 6개 조건이 모두 통과한 실행만 확정할 수 있습니다.
+            위 8개 조건이 모두 통과한 실행만 확정할 수 있습니다.
             <br />
             확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 <strong>잠깁니다</strong>.{' '}
             <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong>

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -153,7 +153,7 @@ it('BASE five tabs, required product selection, dropdowns and item categories', 
   await user.click(screen.getByRole('tab', { name: '수수료 항목' }))
   await screen.findByText('기본수수료')
   expect(screen.getByText('모집수수료')).toBeVisible()
-  expect(screen.queryByRole('navigation', { name: '페이지 선택' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('navigation', { name: '기준정보 목록 페이지 선택' })).not.toBeInTheDocument()
 })
 it.each(['organization', 'insurer', 'product', 'agent', 'commission-item'])(
   'BASE %s supports empty 200',
@@ -197,6 +197,55 @@ it('POL restores detail tab and selected id from a shared URL', async () => {
   await screen.findByText('34.5678%')
   expect(screen.getByRole('tab', { name: '예상 해약환급률표' })).toHaveAttribute('aria-selected', 'true')
   expect(request.mock.calls.some(([p]) => p === '/api/v1/policies/2')).toBe(true)
+})
+
+it('POL 직급을 한글로 표시하고 GA 수령과 누락·미등록 값을 구분하며 탭 전환 후에도 유지한다', async () => {
+  const user = userEvent.setup()
+  const rankInputs: Pick<NonNullable<PolicyDetail['commissionRules']>[number], 'agentRankCode' | 'paymentStage'>[] = [
+    { agentRankCode: 'FC', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: 'TEAM_LEADER', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: 'BRANCH_MANAGER', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: 'DIVISION_HEAD', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: null, paymentStage: 'INSURER_TO_GA' },
+    { agentRankCode: null, paymentStage: 'GA_TO_FC' },
+    { agentRankCode: null },
+    { agentRankCode: undefined, paymentStage: 'INSURER_TO_GA' },
+    { agentRankCode: '', paymentStage: 'GA_TO_FC' },
+    { agentRankCode: '<NEW_RANK>', paymentStage: 'GA_TO_FC' },
+  ]
+  const commissionRules = rankInputs.map((rank, index) => ({
+    ...detail.commissionRules![0],
+    commissionRuleId: index + 1,
+    ...rank,
+  }))
+  mount('/policies?tab=commission&policyVersionId=1', (path) =>
+    /\/policies\/\d/.test(path) ? envelope({ ...detail, commissionRules }) : fixtures(path),
+  )
+  const table = await screen.findByRole('table', { name: '수수료 규칙' })
+  const rankCells = () =>
+    within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[3])
+  expect(rankCells().map((cell) => cell.textContent)).toEqual([
+    '설계사',
+    '팀장',
+    '지사장',
+    '본부장',
+    '해당 없음(GA 수령)',
+    '-',
+    '-',
+    '-',
+    '-',
+    '<NEW_RANK>',
+  ])
+  expect(table.querySelector('NEW_RANK')).toBeNull()
+  expect(within(table).getAllByText('650.1234')).toHaveLength(rankInputs.length)
+  await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
+  await screen.findByText('89.1234')
+  await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
+  expect(await screen.findByText('지사장')).toBeVisible()
+  expect(commissionRules[2].agentRankCode).toBe('BRANCH_MANAGER')
 })
 it('POL asOf changes query and clears selected id while retaining month/tab', async () => {
   const { router, request } = mount('/policies?month=2026-08&tab=cap&policyVersionId=2')

@@ -14,7 +14,7 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   { key: 'stage', label: '지급단계', width: '7rem', render: (r) => present(r.paymentStageLabel) },
   { key: 'date', label: '기준일', width: '6.5rem', cellClassName: 'tabular-nums', render: (r) => date(r.asOfDate) },
-  { key: 'month', label: '계약차월', width: '5.5rem', align: 'number', render: (r) => int(r.contractMonthNo) },
+  { key: 'month', label: '계약차월', width: '5.5rem', align: 'left', render: (r) => int(r.contractMonthNo) },
   {
     key: 'premium',
     label: '누적 납입보험료',
@@ -34,7 +34,16 @@ export const columns: TableColumn<ArbitrageRow>[] = [
     label: '지급예정액',
     width: '8rem',
     align: 'number',
-    render: (r) => <ArbitrageAmount value={r.plannedCommissionAmount} />,
+    render: (r) => (
+      <>
+        <ArbitrageAmount value={r.plannedCommissionAmount} />
+        {Number(r.projectedExcessAmount) > 0 && (
+          <div>
+            지급예정 포함 시 초과 (모니터링): <ArbitrageAmount value={r.projectedExcessAmount} />
+          </div>
+        )}
+      </>
+    ),
   },
   {
     key: 'refund',
@@ -55,11 +64,12 @@ export const columns: TableColumn<ArbitrageRow>[] = [
     key: 'addition',
     label: '환급금 가산',
     width: '7.5rem',
+    align: 'center',
     render: (r) => (
       <StatusBadge tone={r.refundAdditionAppliedYn ? 'info' : 'neutral'}>
         {r.refundAdditionAppliedYn ? '가산 함' : '가산 안 함'}
       </StatusBadge>
     ),
   },
-  { key: 'status', label: '판정', width: '7rem', render: (r) => <ArbitrageBadge row={r} /> },
+  { key: 'status', label: '판정', width: '7rem', align: 'center', render: (r) => <ArbitrageBadge row={r} /> },
 ]

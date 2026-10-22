@@ -1,13 +1,21 @@
+import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTimeSeconds, errorText, int } from '../../lib/format'
 import { auditLogDetailQuery, auditLogOptionsQuery, auditLogsQuery, normalizeCriteria } from './api'
 import type { AuditCriteria, AuditLog, AuditLogOptions } from './api'
+import {
+  auditActionLabel,
+  auditActionWithCode,
+  auditEntityTypeLabel,
+  auditEntityTypeWithCode,
+  auditReasonLabel,
+} from './labels'
 import './audit.css'
 
 /*
@@ -24,10 +32,15 @@ const dash = (value: unknown) => (value == null || value === '' ? '-' : String(v
 const columns: TableColumn<AuditLog>[] = [
   { key: 'occurredAt', label: '발생시각', width: '10rem', render: (row) => dateTimeSeconds(row.occurredAt) },
   { key: 'user', label: '행위자', width: '6.5rem', render: (row) => row.userLoginId ?? 'BATCH' },
-  { key: 'action', label: '행위', width: '11rem', render: (row) => dash(row.actionCode) },
-  { key: 'entityType', label: '대상 종류', width: '11rem', render: (row) => dash(row.entityType) },
+  { key: 'action', label: '행위', width: '11rem', render: (row) => auditActionLabel(row.actionCode) },
+  { key: 'entityType', label: '대상 종류', width: '11rem', render: (row) => auditEntityTypeLabel(row.entityType) },
   { key: 'entityId', label: '대상 ID', width: '6rem', render: (row) => dash(row.entityId) },
-  { key: 'reason', label: '사유', width: '14rem', render: (row) => dash(row.reason), expandable: true },
+  {
+    key: 'reason',
+    label: '사유',
+    width: '14rem',
+    render: (row) => auditReasonLabel(row.actionCode, row.reason),
+  },
   { key: 'policy', label: '정책버전', width: '7rem', render: (row) => dash(row.policyVersionId) },
   { key: 'requestId', label: '요청 ID', width: '10rem', render: (row) => dash(row.requestId) },
 ]
@@ -65,7 +78,12 @@ export default function AuditLogPage() {
         </p>
       )}
 
-      <div className="audit-layout">
+      <ResizableSplit
+        className="audit-layout"
+        storageKey="audit-workspace"
+        label="감사 기록과 변경 내용 비교 카드 너비"
+        defaultRatio={60}
+      >
         <section className="surface audit-list-panel" aria-labelledby="audit-list-title">
           <header className="surface-header audit-panel-header">
             <h2 id="audit-list-title" className="surface-title">
@@ -94,17 +112,13 @@ export default function AuditLogPage() {
             emptyMessage={logs.isPending ? '불러오는 중입니다.' : undefined}
           />
           {totalPages > 1 && (
-            <footer className="audit-pagination">
-              <span className="audit-pagination-status tabular-nums" aria-live="polite">
-                {criteria.page} / {totalPages} 페이지
-              </span>
-              <Pagination
-                compact
-                page={criteria.page}
-                totalPages={totalPages}
-                onPageChange={(page) => update({ page: String(page), selected: '' }, { resetPage: false })}
-              />
-            </footer>
+            <ListPagination
+              className="audit-pagination"
+              label="감사로그 목록 페이지 선택"
+              page={criteria.page}
+              totalPages={totalPages}
+              onPageChange={(page) => update({ page: String(page), selected: '' }, { resetPage: false })}
+            />
           )}
         </section>
 
@@ -122,7 +136,7 @@ export default function AuditLogPage() {
             )}
           </div>
         </section>
-      </div>
+      </ResizableSplit>
     </div>
   )
 }
@@ -187,7 +201,9 @@ function AuditFilter({
           <select className="select-control" {...bind('action')}>
             <option value="">전체</option>
             {options?.actionCodes?.map((code) => (
-              <option key={code}>{code}</option>
+              <option key={code} value={code}>
+                {auditActionLabel(code)}
+              </option>
             ))}
           </select>
         </div>
@@ -198,7 +214,9 @@ function AuditFilter({
           <select className="select-control" {...bind('entityType')}>
             <option value="">전체</option>
             {options?.entityTypes?.map((type) => (
-              <option key={type}>{type}</option>
+              <option key={type} value={type}>
+                {auditEntityTypeLabel(type)}
+              </option>
             ))}
           </select>
         </div>
@@ -216,12 +234,19 @@ function AuditFilter({
 function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
   const detail = useQuery(auditLogDetailQuery(auditLogId))
   const entries = detail.data?.diff ?? []
+  const reason = auditReasonLabel(log.actionCode, log.reason)
   return (
     <div>
       <p className="audit-diff-context">
-        <span className="tabular-nums">{log.actionCode}</span> ·{' '}
-        <span className="tabular-nums">{`${log.entityType} #${log.entityId}`}</span>
+        <span>{auditActionWithCode(log.actionCode)}</span> ·{' '}
+        <span>{`${auditEntityTypeWithCode(log.entityType)} #${dash(log.entityId)}`}</span>
       </p>
+      {log.reason && reason !== log.reason && (
+        <details className="audit-reason-original">
+          <summary>사유 원문 보기</summary>
+          <p>{log.reason}</p>
+        </details>
+      )}
       {detail.isError && (
         <p className="field-error" role="alert">
           {errorText(detail.error)}

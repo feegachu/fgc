@@ -46,7 +46,7 @@ function Timeline({ rows }: { rows: ArbitrageRow[] }) {
         rowKey={(r) => String(r.arbitrageCheckId)}
         columns={[
           { key: 'date', label: '기준일', render: (r) => date(r.asOfDate) },
-          { key: 'month', label: '차월', align: 'number', render: (r) => int(r.contractMonthNo) },
+          { key: 'month', label: '차월', align: 'left', render: (r) => int(r.contractMonthNo) },
           {
             key: 'premium',
             label: '누적 보험료',
@@ -100,13 +100,13 @@ export function ArbitrageDetail({ row }: { row: ArbitrageRow }) {
           <dd>{present(row.decisionReason)}</dd>
         </div>
       </dl>
-      {/* #481: do not present the existing projected result as a newly calculated regulatory formula. */}
       <pre className="arb-calculation tabular-nums">
         확정 수수료: <ArbitrageAmount value={row.paidCommissionAmount} />
         {'\n'}지급예정액: <ArbitrageAmount value={row.plannedCommissionAmount} />
         {'\n'}해약환급금: <ArbitrageAmount value={row.includedSurrenderValueAmount} />
         {'\n'}누적 납입보험료: <ArbitrageAmount value={row.cumulativePaidPremium} />
-        {'\n'}초과액 (서버 저장값): <ArbitrageAmount value={row.netDifferenceAmount} />
+        {'\n'}지급분 기준 초과액: <ArbitrageAmount value={row.netDifferenceAmount} />
+        {'\n'}지급예정 포함 초과액 (모니터링): <ArbitrageAmount value={row.projectedExcessAmount} />
       </pre>
       <section className="arb-timeline-panel" aria-label="기준일별 초과액 추이">
         {timeline.isLoading || timeline.error ? (

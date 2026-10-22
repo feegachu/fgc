@@ -183,21 +183,19 @@
       var root = document.createDocumentFragment();
       var paymentSection = section("수수료 지급", transactions.length + "건");
       paymentSection.appendChild(table("수수료 지급 건",
-        ["정산월", "지급단계", "금액", "귀속금액", "차액", "상태", "원천"],
+        ["정산월", "지급단계", "금액", "귀속금액", "차액", "상태"],
         transactions.map(function (row) {
           return [month(row.settlementMonth), value(row.paymentStageLabel || row.paymentStage), money(row.amount),
             money(row.attributionTotal), money(row.differenceAmount),
-            statusBadge(row.statusLabel, row.status), value(row.sourceType)];
-        }), [6]));
+            statusBadge(row.statusLabel, row.status)];
+        })));
       var recoSection = section("대사 결과", reconciliations.length + "건");
-      /* 주원인 코드는 RECO 화면(reco.js)과 같은 방식으로 전체 보기를 붙인다. */
       recoSection.appendChild(table("대사 결과",
-        ["결과", "회차", "예상액", "실제액", "차액", "주원인"],
+        ["결과", "회차", "예상액", "실제액", "차액"],
         reconciliations.map(function (row) {
           return [value(row.resultTypeLabel || row.resultType), value(row.installmentNo),
-            money(row.expectedTotalAmount), money(row.actualTotalAmount), money(row.differenceAmount),
-            value(row.primaryReasonCode)];
-        }), [0, 5]));
+            money(row.expectedTotalAmount), money(row.actualTotalAmount), money(row.differenceAmount)];
+        }), [0]));
       root.append(paymentSection, recoSection);
       return root;
     });

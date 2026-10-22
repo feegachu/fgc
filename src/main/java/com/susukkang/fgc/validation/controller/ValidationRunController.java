@@ -30,8 +30,6 @@ import com.susukkang.fgc.validation.service.ValidationRunFinalizationService;
 import com.susukkang.fgc.validation.service.ValidationRunSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -75,7 +73,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "201", description = "생성 성공",
-                    content = @Content(schema = @Schema(implementation = CreateValidationRunResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "validationMonth 형식(yyyy-MM) 오류, runType 값 오류 등 (FGC-COMMON-002)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -125,7 +123,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = ValidationRunSearchResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류, "
                             + "status 값 오류 등 (FGC-COMMON-002)"),
@@ -179,7 +177,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = ActiveMonthlyRunResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "month 누락 또는 형식(yyyy-MM) 오류 (FGC-COMMON-002)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -210,7 +208,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = ValidationRunDetailResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -234,7 +232,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "202", description = "기동 수락",
-                    content = @Content(schema = @Schema(implementation = ValidationRunExecuteResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -264,7 +262,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = ValidationRunProgressResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -285,7 +283,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = FinalizeChecklistResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -307,7 +305,7 @@ public class ValidationRunController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "확정 성공 또는 동일 멱등키 재요청",
-                    content = @Content(schema = @Schema(implementation = FinalizeValidationRunResponse.class))),
+                    useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "Idempotency-Key 형식 오류 (FGC-COMMON-002)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(

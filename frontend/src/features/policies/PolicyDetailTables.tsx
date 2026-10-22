@@ -6,6 +6,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { date, int, isNegative, rate, won } from '../../lib/format'
 import type { PolicyDetail } from './api'
+import { policyAgentRankLabel } from './labels'
 export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['commissionRules']> }) {
   if (!rows.length)
     return (
@@ -35,7 +36,7 @@ export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['comm
           cellClassName: 'policy-disclosure-cell',
           render: (r) => <ReferenceText value={r.productName ?? '전체'} limit={28} />,
         },
-        { key: 'rank', label: '직급', render: (r) => present(r.agentRankCode) },
+        { key: 'rank', label: '직급', render: (r) => policyAgentRankLabel(r.agentRankCode, r.paymentStage) },
         {
           key: 'item',
           label: '수수료 항목',
@@ -62,7 +63,7 @@ export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['comm
           cellClassName: 'policy-disclosure-cell',
           render: (r) => <ReferenceText value={present(r.basisCode)} limit={20} singleLine />,
         },
-        { key: 'rate', label: '요율(%)', align: 'number', render: (r) => rate(r.ratePct) },
+        { key: 'rate', label: '요율(%)', align: 'left', render: (r) => rate(r.ratePct) },
         {
           key: 'amount',
           label: '정액(원)',
@@ -99,15 +100,15 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
             label: '계약일 범위',
             render: (r) => `${date(r.contractDateFrom)} ~ ${r.contractDateTo ? date(r.contractDateTo) : '계속'}`,
           },
-          { key: 'months', label: '초년도 개월', align: 'number', render: (r) => present(r.firstYearMonths) },
-          { key: 'multiplier', label: '배수', align: 'number', render: (r) => rate(r.premiumMultiplier) },
+          { key: 'months', label: '초년도 개월', align: 'left', render: (r) => present(r.firstYearMonths) },
+          { key: 'multiplier', label: '배수', align: 'left', render: (r) => rate(r.premiumMultiplier) },
           {
             key: 'deduction',
             label: '준법경영비 공제율(%)',
-            align: 'number',
+            align: 'left',
             render: (r) => rate(r.complianceDeductionPct),
           },
-          { key: 'warning', label: '주의 기준(%)', align: 'number', render: (r) => rate(r.warningUsagePct) },
+          { key: 'warning', label: '주의 기준(%)', align: 'left', render: (r) => rate(r.warningUsagePct) },
           {
             key: 'refund',
             label: '환급금 가산 조건',
@@ -137,6 +138,7 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
                 {
                   key: 'status',
                   label: '판정',
+                  align: 'center',
                   render: (r) => (
                     <StatusBadge
                       tone={
@@ -227,11 +229,12 @@ export function RefundTables({ rows }: { rows: NonNullable<PolicyDetail['refundR
         rows={table.lines ?? []}
         rowKey={(r) => String(r.contractMonthNo)}
         columns={[
-          { key: 'month', label: '차월', align: 'number', render: (r) => `${r.contractMonthNo}차월` },
-          { key: 'rate', label: '예상 해약환급률(%)', align: 'number', render: (r) => `${rate(r.refundRatePct)}%` },
+          { key: 'month', label: '차월', align: 'left', render: (r) => `${r.contractMonthNo}차월` },
+          { key: 'rate', label: '예상 해약환급률(%)', align: 'left', render: (r) => `${rate(r.refundRatePct)}%` },
           {
             key: 'note',
             label: '비고',
+            align: 'center',
             render: (r) =>
               r.contractMonthNo === 12 && table.standardDeduction80Yn ? (
                 <StatusBadge tone="warning">1,200% 한도 가산에 쓰는 값</StatusBadge>

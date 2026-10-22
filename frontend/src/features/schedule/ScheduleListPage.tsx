@@ -6,7 +6,7 @@ import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
-import { Pagination } from '../../components/Pagination'
+import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { exportCsv } from '../../lib/exportCsv'
 import { errorText, int, isNegative, won } from '../../lib/format'
@@ -58,20 +58,20 @@ const columns: TableColumn<ScheduleHeader>[] = [
   },
   {
     key: 'regime',
-    // 1차 badgeCell 처럼 배지만 가운데 둔다(머리글은 왼쪽).
-    cellClassName: 'is-center',
+    // 태그 컬럼은 머리글과 값을 함께 가운데 정렬한다.
     label: <RegimeEvidence />,
     width: '7.75rem',
+    align: 'center',
     render: (row) => (
       <ClassificationBadge label={responseLabel(row.scheduleRegimeLabel, SCHEDULE_REGIME, row.scheduleRegime)} />
     ),
   },
   {
     key: 'purpose',
-    // 1차 badgeCell 처럼 배지만 가운데 둔다(머리글은 왼쪽).
-    cellClassName: 'is-center',
+    // 태그 컬럼은 머리글과 값을 함께 가운데 정렬한다.
     label: '용도',
     width: '6.5rem',
+    align: 'center',
     render: (row) => (
       <ClassificationBadge label={responseLabel(row.schedulePurposeLabel, SCHEDULE_PURPOSE, row.schedulePurpose)} />
     ),
@@ -80,7 +80,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
     key: 'version',
     label: '버전',
     width: '4.25rem',
-    align: 'center',
+    align: 'left',
     cellClassName: 'tabular-nums',
     render: (row) => (row.scheduleVersionNo == null ? EMPTY : `v${row.scheduleVersionNo}`),
   },
@@ -100,7 +100,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
     align: 'center',
     render: (row) => <ActiveBadge active={row.activeYn} />,
   },
-  { key: 'lines', label: '회차 수', width: '5.5rem', align: 'number', render: (row) => int(row.lineCount) },
+  { key: 'lines', label: '회차 수', width: '5.5rem', align: 'left', render: (row) => int(row.lineCount) },
   {
     key: 'total',
     label: '예상 총액',
@@ -126,7 +126,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
     key: 'action',
     label: '상세',
     width: '6.5rem',
-    align: 'center',
+    align: 'left',
     render: (row) =>
       hasId(row) ? (
         <Link
@@ -233,17 +233,13 @@ export default function ScheduleListPage() {
         )}
 
         {data && !list.isError && (
-          <footer className="schedule-pagination">
-            <span className="tabular-nums">
-              {criteria.page} / {Math.max(1, totalPages)} 페이지
-            </span>
-            <Pagination
-              compact
-              page={criteria.page}
-              totalPages={totalPages}
-              onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-            />
-          </footer>
+          <ListPagination
+            className="schedule-pagination"
+            label="예상 스케줄 목록 페이지 선택"
+            page={criteria.page}
+            totalPages={totalPages}
+            onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
+          />
         )}
       </section>
     </div>

@@ -68,8 +68,8 @@ class ArbitragePersistenceComparisonTest {
                 for (PaymentStage stage : PaymentStage.values()) {
                     same(repository.sumConfirmedCommissionAmount(reference.contractId(), stage, date),
                             baseline.sumConfirmedCommissionAmount(reference.contractId(), stage, date));
-                    same(repository.sumPlannedCommissionAmount(reference.contractId(), stage),
-                            baseline.sumPlannedCommissionAmount(reference.contractId(), stage));
+                    same(repository.sumPlannedCommissionAmount(reference.contractId(), stage, date),
+                            baseline.sumPlannedCommissionAmount(reference.contractId(), stage, date));
                 }
             }
         }
@@ -180,7 +180,7 @@ class ArbitragePersistenceComparisonTest {
     private Object input(boolean jpa, Long contractId, LocalDate date) {
         var source = jpa ? repository.selectCalculationSource(contractId, date) : baseline.selectCalculationSource(contractId, date);
         var confirmed = jpa ? repository.sumConfirmedCommissionAmount(contractId, PaymentStage.GA_TO_FC, date) : baseline.sumConfirmedCommissionAmount(contractId, PaymentStage.GA_TO_FC, date);
-        var planned = jpa ? repository.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC) : baseline.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC);
+        var planned = jpa ? repository.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC, date) : baseline.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC, date);
         var refund = jpa ? repository.selectRefundRateCandidates(source, date) : baseline.selectRefundRateCandidates(source, date);
         return List.of(source, confirmed, planned, refund);
     }

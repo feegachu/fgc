@@ -26,6 +26,8 @@ public class ReconciliationRunHistoryRow {
     private Long insurerId;
     private String insurerName;
     private String status;
+    private boolean superseded;
+    private Long correctsReconciliationRunId;
     private Long tolerancePolicyVersionId;
     private String createdBy;
     private OffsetDateTime createdAt;

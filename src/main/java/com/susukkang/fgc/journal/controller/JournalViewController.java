@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -30,6 +31,7 @@ import java.util.List;
 public class JournalViewController {
 
     private static final int PAGE_SIZE = 20;
+    private static final int MAX_CONTRACT_NO_LENGTH = 80;
 
     private final JournalSearchService journalSearchService;
 
@@ -40,10 +42,11 @@ public class JournalViewController {
             @RequestParam(name = "type", required = false) String journalType,
             @RequestParam(name = "account", required = false) String accountCode,
             @RequestParam(name = "contract", required = false) Long contractId,
+            @RequestParam(name = "contractNo", required = false) String contractNo,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long selected,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "false") boolean searched,
+            @RequestParam(required = false) Boolean searched,
             Model model
     ) {
         // 2026-08-19 yslee - IF-API-34 목록 조회를 인터페이스정의서의 MPA 방식으로 적용
@@ -55,23 +58,41 @@ public class JournalViewController {
         String safeAccount = enumNameOrNull(JournalAccountCode.class, accountCode);
         LocalDate safeFrom = dateOrNull(from);
         LocalDate safeTo = dateOrNull(to);
+        // 화면에 처음 들어오면(searched 없음) 분개일 조건이 비어 있어도 기준 정산월 범위로 바로 조회한다.
+        // 조회 버튼(searched=true)으로 직접 비운 날짜는 기간 제한 없음으로 존중하고, searched=false는 조회하지 않는다.
+        boolean doSearch = searched == null || searched;
+        if (searched == null && safeFrom == null && safeTo == null) {
+            YearMonth baseMonth = monthOrNull(model.getAttribute("month"));
+            if (baseMonth != null) {
+                safeFrom = baseMonth.atDay(1);
+                safeTo = baseMonth.atEndOfMonth();
+            }
+        }
         int safePage = Math.max(page, 1);
+        // REST(JournalSearchController)와 같이 80자 초과 계약번호는 잘라 검색하지 않고 거절한다.
+        String safeContractNo = contractNo == null || contractNo.isBlank() ? null : contractNo.trim();
+        String contractNoError = safeContractNo != null && safeContractNo.length() > MAX_CONTRACT_NO_LENGTH
+                ? "계약번호는 " + MAX_CONTRACT_NO_LENGTH + "자 이하로 입력해 주세요."
+                : null;
 
         JournalSearchResponse journals = emptyPage(safePage);
-        if (searched) {
+
+        if (doSearch && contractNoError == null) {
             JournalSearchCriteria criteria = new JournalSearchCriteria(
-                    safeFrom, safeTo, safeType, safeAccount, contractId, safeStatus);
+                    safeFrom, safeTo, safeType, safeAccount, contractId, safeContractNo, safeStatus);
             PageResponse<JournalListRow> result = journalSearchService.search(criteria, safePage, PAGE_SIZE);
             journals = JournalSearchResponse.from(result);
         }
 
         model.addAttribute("journals", journals);
-        model.addAttribute("searched", searched);
-        model.addAttribute("fromFilter", from);
-        model.addAttribute("toFilter", to);
+        model.addAttribute("searched", doSearch);
+        model.addAttribute("fromFilter", safeFrom != null ? safeFrom.toString() : from);
+        model.addAttribute("toFilter", safeTo != null ? safeTo.toString() : to);
         model.addAttribute("typeFilter", safeType);
         model.addAttribute("accountFilter", safeAccount);
         model.addAttribute("contractFilter", contractId);
+        model.addAttribute("contractNoFilter", safeContractNo);
+        model.addAttribute("contractNoError", contractNoError);
         model.addAttribute("statusFilter", safeStatus);
         model.addAttribute("journalTypes", JournalType.values());
         model.addAttribute("journalStatuses", JournalHeaderStatus.values());
@@ -82,6 +103,17 @@ public class JournalViewController {
 
     private JournalSearchResponse emptyPage(int page) {
         return JournalSearchResponse.from(PageResponse.of(List.of(), page, PAGE_SIZE, 0, "journalDate,desc"));
+    }
+
+    private YearMonth monthOrNull(Object value) {
+        if (!(value instanceof String text)) {
+            return null;
+        }
+        try {
+            return YearMonth.parse(text);
+        } catch (DateTimeException ignored) {
+            return null;
+        }
     }
 
     private LocalDate dateOrNull(String value) {

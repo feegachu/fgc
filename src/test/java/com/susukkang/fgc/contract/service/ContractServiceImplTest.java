@@ -335,7 +335,7 @@ class ContractServiceImplTest {
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
-        givenValidReferences(request);
+        givenValidReferences(request, current);
         given(insuranceContractRepository.existsByInsurerIdAndContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(false);
         given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
@@ -372,7 +372,7 @@ class ContractServiceImplTest {
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
-        givenValidReferences(request);
+        givenValidReferences(request, current);
         given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
                 .willReturn(List.of(200L, 201L));
 
@@ -399,7 +399,7 @@ class ContractServiceImplTest {
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
-        givenValidReferences(request);
+        givenValidReferences(request, current);
         given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
                 .willReturn(List.of(101L, 102L));
         given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.INSURER_TO_GA)).willReturn(true);
@@ -469,7 +469,7 @@ class ContractServiceImplTest {
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
-        givenValidReferences(request);
+        givenValidReferences(request, current);
         given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
                 .willReturn(List.of(101L));
         given(scheduleService.hasActiveOperationalSchedule(21L, PaymentStage.INSURER_TO_GA)).willReturn(true);
@@ -495,7 +495,7 @@ class ContractServiceImplTest {
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
-        givenValidReferences(request);
+        givenValidReferences(request, current);
         given(insuranceContractRepository.existsByInsurerIdAndContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(true);
 
@@ -522,7 +522,7 @@ class ContractServiceImplTest {
         InsuranceContract current = contractMatching(request, request.getAgentId(), request.getOrganizationId());
         request.setContractNo("CHANGED-001");
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
-        givenValidReferences(request);
+        givenValidReferences(request, current);
 
         ContractUpdateResponse response = contractService.updateContract(21L, request);
 
@@ -607,7 +607,7 @@ class ContractServiceImplTest {
             InsuranceContract current
     ) {
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
-        givenValidReferences(request);
+        givenValidReferences(request, current);
         given(scheduleService.regenerateContractSchedules(21L, "CONTRACT_UPDATED"))
                 .willReturn(List.of(101L, 102L));
 
@@ -680,6 +680,47 @@ class ContractServiceImplTest {
     private void givenActiveSchedule(PaymentStage activeStage) {
         given(scheduleService.hasActiveOperationalSchedule(eq(21L), any(PaymentStage.class)))
                 .willAnswer(invocation -> invocation.getArgument(1) == activeStage);
+    }
+
+    private void givenValidReferences(ContractInput request, InsuranceContract current) {
+        boolean dateChanged = !java.util.Objects.equals(current.getContractDate(), request.getContractDate());
+        if (dateChanged || !java.util.Objects.equals(current.getInsurerId(), request.getInsurerId())
+                || !java.util.Objects.equals(current.getProductOfferingId(), request.getProductOfferingId())) {
+            given(contractQueryRepository.existsActiveInsurer(request.getInsurerId())).willReturn(true);
+            given(contractQueryRepository.existsValidProductOffering(request.getInsurerId(),
+                    request.getProductOfferingId(), request.getContractDate())).willReturn(true);
+        }
+        if (dateChanged || !java.util.Objects.equals(current.getAgentId(), request.getAgentId())
+                || !java.util.Objects.equals(current.getOrganizationId(), request.getOrganizationId())) {
+            given(contractQueryRepository.existsEligibleAgent(request.getAgentId(), request.getContractDate())).willReturn(true);
+            given(contractQueryRepository.existsValidAgentOrganization(request.getAgentId(),
+                    request.getOrganizationId(), request.getContractDate())).willReturn(true);
+        }
+    }
+
+    @Test
+    void historicalReferencesRemainUsableWhenOnlyNonReferenceFieldsChange() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = contractMatching(request, request.getAgentId(), request.getOrganizationId());
+        request.setContractNo("HISTORICAL-CORRECTION");
+        given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
+        given(insuranceContractRepository.existsByInsurerIdAndContractNo(request.getInsurerId(), request.getContractNo()))
+                .willReturn(false);
+        contractService.updateContract(21L, request);
+        verifyNoInteractions(contractQueryRepository, scheduleService, capCheckService);
+        assertThat(current.getOrganizationId()).isEqualTo(request.getOrganizationId());
+        verify(insuranceContractRepository).flush();
+    }
+
+    @Test
+    void changingHistoricalRecipientStillRequiresEligibleAgent() {
+        ContractUpdateRequest request = updateRequest();
+        InsuranceContract current = contractMatching(request, 999L, request.getOrganizationId());
+        given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
+        given(contractQueryRepository.existsEligibleAgent(request.getAgentId(), request.getContractDate())).willReturn(false);
+        assertThatThrownBy(() -> contractService.updateContract(21L, request)).isInstanceOf(FgcBusinessException.class);
+        verify(insuranceContractRepository, never()).flush();
+        verifyNoInteractions(scheduleService, capCheckService, auditLogService);
     }
 
     private void givenValidReferences(ContractInput request) {

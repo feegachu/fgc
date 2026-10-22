@@ -169,6 +169,7 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("href=\"/transactions/new?id=77\"")))
                 .andExpect(content().string(containsString("page=2")))
                 .andExpect(content().string(containsString("데이터 품질")))
+                .andExpect(content().string(containsString("입력 데이터 확인 필요")))
                 .andExpect(content().string(containsString("status-badge-review")))
                 .andExpect(content().string(containsString("status-badge-warning")))
                 .andExpect(content().string(containsString("status-badge-info")))
@@ -208,7 +209,7 @@ class ExceptionCaseViewControllerTest {
                 .andExpect(content().string(containsString("원분개 (읽기 전용)")))
                 .andExpect(content().string(containsString("신규 재기표 입력")))
                 .andExpect(content().string(containsString("data-add-correction-line")))
-                .andExpect(content().string(containsString("EXPECTED_RECEIVABLE · 예상 미수금")))
+                .andExpect(content().string(containsString("예상 미수금")))
                 .andExpect(content().string(containsString("정정 실행")))
                 .andExpect(content().string(containsString("href=\"/journals?selected=10\"")));
     }

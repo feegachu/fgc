@@ -49,7 +49,7 @@ it('StatusBadge는 색상 의미와 서버 문구를 함께, KPI는 값·단위�
   expect(screen.getByText('주의')).toHaveClass('status-badge-warning')
   expect(screen.getByRole('region', { name: '후보 계약' })).toHaveTextContent('1,234건')
 })
-it('DataTable 정렬·행 선택·페이지 전체 선택·전체 보기/접기를 제공한다', async () => {
+it('DataTable 정렬·행 선택·페이지 전체 선택을 제공하고 셀 펼치기 버튼은 표시하지 않는다', async () => {
   const user = userEvent.setup()
   const sort = vi.fn()
   function Table() {
@@ -64,7 +64,7 @@ it('DataTable 정렬·행 선택·페이지 전체 선택·전체 보기/접기�
         rowKey={(row) => row.id}
         columns={[
           { key: 'id', label: '계약', sortable: true, render: (row) => row.id },
-          { key: 'reason', label: '근거', expandable: true, render: (row) => row.reason },
+          { key: 'reason', label: '근거', render: (row) => row.reason },
         ]}
         sort={{ key: 'id', direction: 'asc' }}
         onSort={sort}
@@ -81,10 +81,9 @@ it('DataTable 정렬·행 선택·페이지 전체 선택·전체 보기/접기�
   expect(screen.getByLabelText('C1 선택')).toBeChecked()
   await user.click(screen.getByLabelText('현재 페이지 전체 선택'))
   expect(screen.getByLabelText('C2 선택')).toBeChecked()
-  await user.click(screen.getAllByRole('button', { name: '전체 보기' })[0])
-  expect(screen.getByRole('button', { name: '접기' })).toHaveAttribute('aria-expanded', 'true')
-  await user.click(screen.getByRole('button', { name: '접기' }))
-  expect(screen.getAllByRole('button', { name: '전체 보기' })).toHaveLength(2)
+  expect(screen.getByText('검증 상세 근거')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '전체 보기' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '접기' })).not.toBeInTheDocument()
 })
 it('DataTable 빈 목록은 오류 대신 빈 상태 문구를 보여 준다', () => {
   render(
@@ -110,6 +109,21 @@ it('Pagination은 1-base 5페이지 그룹이며 끝에서 다음을 막는다',
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   expect(screen.getByRole('button', { name: '마지막' })).toBeDisabled()
 })
+it('기존 방식 Pagination은 처음·마지막 없이 5페이지씩 이동하고 경계에서 멈춘다', async () => {
+  const change = vi.fn()
+  const { rerender } = render(<Pagination legacy page={6} totalPages={12} onPageChange={change} />)
+  expect(screen.queryByRole('button', { name: '처음' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '마지막' })).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: '이전 5페이지' }))
+  expect(change).toHaveBeenLastCalledWith(5)
+  await userEvent.click(screen.getByRole('button', { name: '다음 5페이지' }))
+  expect(change).toHaveBeenLastCalledWith(11)
+  rerender(<Pagination legacy page={1} totalPages={12} onPageChange={change} />)
+  expect(screen.getByRole('button', { name: '이전 5페이지' })).toBeDisabled()
+  rerender(<Pagination legacy page={12} totalPages={12} onPageChange={change} />)
+  expect(screen.getByRole('button', { name: '다음 5페이지' })).toBeDisabled()
+})
+
 it('FilterBar와 URL 훅은 다른 조건·기준월을 보존하고 조회 시 page만 초기화한다', async () => {
   function Filters() {
     const { values, update, reset, params } = useSearchParamsState({ status: '' })

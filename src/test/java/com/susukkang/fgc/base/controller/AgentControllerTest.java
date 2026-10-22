@@ -49,6 +49,18 @@ class AgentControllerTest {
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
 
     @Test
+    void bindsHistoricalSearchModeWithoutChangingDefault() throws Exception {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(null, null, asOf, false, true);
+        given(agentService.search(criteria, 1, 20)).willReturn(PageResponse.of(List.of(), 1, 20, 0, ""));
+        mockMvc.perform(get("/api/v1/base/agents")
+                        .param("asOf", "2026-08-11").param("includeHistorical", "true")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        verify(agentService).search(criteria, 1, 20);
+    }
+
+    @Test
     void returnsPagedAgentsForBaseAndContractScreens() throws Exception {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         AgentSearchCriteria criteria = new AgentSearchCriteria(11L, "김설계", asOf);
@@ -109,6 +121,41 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.requestId", matchesPattern("^\\d{8}-[0-9a-f]{6}$")));
 
         verify(agentService).search(criteria, 1, 20);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void passesExplicitIncludeTerminatedFlagWithoutChangingOtherSearchConditions(boolean includeTerminated) throws Exception {
+        LocalDate asOf = LocalDate.of(2026, 8, 11);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(11L, "과거설계사", asOf, includeTerminated);
+        given(agentService.search(criteria, 2, 10)).willReturn(
+                PageResponse.of(List.of(), 2, 10, 0, "agentCode,asc")
+        );
+
+        mockMvc.perform(get("/api/v1/base/agents")
+                        .param("organizationId", "11")
+                        .param("keyword", "과거설계사")
+                        .param("asOf", "2026-08-11")
+                        .param("includeTerminated", String.valueOf(includeTerminated))
+                        .param("page", "2")
+                        .param("size", "10")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(2))
+                .andExpect(jsonPath("$.data.size").value(10));
+
+        verify(agentService).search(criteria, 2, 10);
+    }
+
+    @Test
+    void rejectsInvalidIncludeTerminatedFlag() throws Exception {
+        mockMvc.perform(get("/api/v1/base/agents")
+                        .param("asOf", "2026-08-11")
+                        .param("includeTerminated", "invalid")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("includeTerminated"));
     }
 
     @ParameterizedTest

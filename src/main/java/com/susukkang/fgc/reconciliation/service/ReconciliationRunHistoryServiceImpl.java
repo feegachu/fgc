@@ -91,7 +91,8 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
                 row.getReconciliationRunId(), row.getValidationRunId(),
                 row.getSettlementMonth(), row.getPaymentStage(), paymentStage.label(),
                 row.getInsurerId(), row.getInsurerName(),
-                row.getStatus(), status.label(),
+                row.getStatus(), row.isSuperseded() ? "정정 전 이력"
+                        : row.getCorrectsReconciliationRunId() != null ? status.label() + " (정정)" : status.label(),
                 row.getTolerancePolicyVersionId(),
                 row.getCreatedBy(), DateUtil.toSeoul(row.getCreatedAt()),
                 DateUtil.toSeoul(row.getStartedAt()), DateUtil.toSeoul(row.getCompletedAt()),

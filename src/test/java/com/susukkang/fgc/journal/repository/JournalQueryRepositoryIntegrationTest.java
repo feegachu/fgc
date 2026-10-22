@@ -339,6 +339,28 @@ class JournalQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void contractNoFilterMatchesPartiallyIgnoringCaseAndTreatsWildcardsAsLiterals() {
+        Long matching = insertHeader(DATE, "ADJUSTMENT", contractId, null);
+        Long noContract = insertHeader(DATE, "ADJUSTMENT", null, null);
+        insertLine(matching, 1, accountId, "10", "0");
+        insertLine(noContract, 1, accountId, "10", "0");
+        String contractNo = contractNo();
+        String middle = contractNo.substring(1, contractNo.length() - 1);
+
+        assertThat(repository.count(null, null, null, accountCode, null, contractNo.toLowerCase(), null)).isEqualTo(1);
+        assertThat(repository.count(null, null, null, accountCode, null, middle.toUpperCase(), null)).isEqualTo(1);
+        assertThat(repository.search(null, null, null, accountCode, null, " " + contractNo + " ", null, 0, 20))
+                .extracting(JournalListRow::getJournalHeaderId).containsExactly(matching);
+        // 계약이 없는 분개와 일치하지 않는 번호, LIKE 와일드카드는 결과에 포함되지 않는다.
+        assertThat(repository.count(null, null, null, accountCode, null, "NO-SUCH-" + UUID.randomUUID(), null)).isZero();
+        assertThat(repository.count(null, null, null, accountCode, null, "%", null)).isZero();
+        assertThat(repository.count(null, null, null, accountCode, null, "_", null)).isZero();
+        // 계약 ID 조건과 함께 주면 둘 다 만족해야 한다.
+        assertThat(repository.count(null, null, null, accountCode, contractId, contractNo, null)).isEqualTo(1);
+        assertThat(repository.count(null, null, null, accountCode, contractId + 1_000_000L, contractNo, null)).isZero();
+    }
+
+    @Test
     void balanceSummaryAggregatesAllLinesForOnlyRequestedHeader() {
         Long target = insertHeader(DATE, "ADJUSTMENT", contractId, null);
         insertLine(target, 1, accountId, "3.25", "0");
