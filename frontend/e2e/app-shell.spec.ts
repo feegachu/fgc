@@ -3,6 +3,14 @@ import type { Page } from '@playwright/test'
 
 async function session(page: Page, roleCode = 'SETTLEMENT') {
   const envelope = (data: unknown) => ({ data, error: null, requestId: 'shell-fixture' })
+  // Shell scenarios must not depend on an unmocked domain API or a developer's backend.
+  // Later, specific fixtures take precedence over this unavailable-service response.
+  await page.route('**/api/v1/**', (route) =>
+    route.fulfill({
+      status: 503,
+      json: { data: null, error: { code: 'E2E-DOMAIN-UNAVAILABLE' }, requestId: 'shell-fixture' },
+    }),
+  )
   await page.route('**/api/v1/base/**', (route) =>
     route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }),
   )
