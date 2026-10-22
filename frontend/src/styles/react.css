@@ -103,3 +103,37 @@ footer.list-pagination .pagination-controls {
   width: auto;
   justify-content: flex-end;
 }
+
+/* #604 정렬 가능한 컬럼 헤더: 버튼이지만 헤더 글자 모양을 그대로 쓴다. (1차와 동일해야 하는 components.css 밖에 둔다) */
+.data-table th .table-sort-button {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.data-table th .table-sort-button:hover,
+.data-table th .table-sort-button.is-active {
+  color: var(--color-text-link);
+}
+
+.data-table th .table-sort-button:focus-visible {
+  border-radius: var(--radius-4);
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.data-table th .table-sort-icon {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.data-table th .table-sort-button.is-active .table-sort-icon {
+  color: inherit;
+}

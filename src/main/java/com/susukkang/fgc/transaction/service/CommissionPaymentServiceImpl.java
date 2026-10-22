@@ -516,7 +516,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         List<CommissionPaymentListResponse> content = queryRepository.selectByCondition(condition, size, offset);
         long totalElements = queryRepository.countByCondition(condition);
 
-        return PageResponse.of(content, page, size, totalElements, "commissionTransactionId,desc");
+        return PageResponse.of(content, page, size, totalElements,
+                CommissionPaymentQueryRepository.sortOf(condition).value());
     }
 
     private FgcBusinessException validationException(String field, String detail) {

@@ -15,6 +15,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { usePermission } from '../auth/useAuth'
 import { journalAccountsQueryOptions, journalDetailQueryOptions } from '../exception/api'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
+import { sortBinding } from '../../lib/tableSort'
 import { ApiError } from '../../lib/api/errors'
 import { date, errorText, int, isNegative, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
@@ -26,6 +27,7 @@ import {
   FILTER_KEYS,
   imbalanceQuery,
   journalSearchQuery,
+  LEDGER_SORT_KEYS,
   monthRange,
   positiveId,
   requestCorrection,
@@ -66,10 +68,19 @@ const columns: TableColumn<Journal>[] = [
   {
     key: 'no',
     label: '분개번호',
+    sortKey: 'journalNo',
+    sortable: true,
     width: '14rem',
     render: (row) => <span className="ledger-react-number">{text(row.journalNo)}</span>,
   },
-  { key: 'date', label: '분개일', width: '7.5rem', render: (row) => date(row.journalDate) },
+  {
+    key: 'date',
+    label: '분개일',
+    sortKey: 'journalDate',
+    sortable: true,
+    width: '7.5rem',
+    render: (row) => date(row.journalDate),
+  },
   {
     key: 'type',
     label: '유형',
@@ -83,10 +94,19 @@ const columns: TableColumn<Journal>[] = [
     render: (row) =>
       disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} #${row.sourceEntityId ?? EMPTY}`),
   },
-  { key: 'contract', label: '계약', width: '10rem', render: (row) => text(row.contractNo || row.contractId) },
+  {
+    key: 'contract',
+    label: '계약',
+    sortKey: 'contractNo',
+    sortable: true,
+    width: '10rem',
+    render: (row) => text(row.contractNo || row.contractId),
+  },
   {
     key: 'debit',
     label: '차변 합계',
+    sortKey: 'debitTotal',
+    sortable: true,
     width: '9rem',
     align: 'number',
     render: (row) => <Money value={row.debitTotal} />,
@@ -94,6 +114,8 @@ const columns: TableColumn<Journal>[] = [
   {
     key: 'credit',
     label: '대변 합계',
+    sortKey: 'creditTotal',
+    sortable: true,
     width: '9rem',
     align: 'number',
     render: (row) => <Money value={row.creditTotal} />,
@@ -155,7 +177,7 @@ export default function LedgerPage() {
         </p>
       )}
       <LedgerFilters
-        key={JSON.stringify(criteria) + month + searched}
+        key={JSON.stringify({ ...criteria, sort: '' }) + month + searched}
         criteria={criteria}
         month={month}
         searched={searched}
@@ -177,6 +199,7 @@ export default function LedgerPage() {
           {list.isPending && list.fetchStatus !== 'idle' && <p role="status">분개 목록을 불러오는 중입니다.</p>}
           <DataTable
             columns={columns}
+            {...sortBinding(criteria.sort, LEDGER_SORT_KEYS, (sort) => update({ sort }))}
             rows={data?.content ?? []}
             rowKey={(row) => String(row.journalHeaderId)}
             caption="조회 조건에 해당하는 검증원장 분개 목록"
@@ -282,7 +305,7 @@ function LedgerFilters({
   criteria: JournalCriteria
   month: string | null
   searched: boolean
-  onSearch: (fields: Omit<JournalCriteria, 'page'>) => void
+  onSearch: (fields: Omit<JournalCriteria, 'page' | 'sort'>) => void
   onReset: () => void
 }) {
   const initial = {

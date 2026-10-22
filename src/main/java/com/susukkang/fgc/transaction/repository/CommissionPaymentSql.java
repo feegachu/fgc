@@ -96,7 +96,7 @@ final class CommissionPaymentSql {
                         ON attribution.commission_transaction_id = ct.commission_transaction_id
             __FILTER__
                      GROUP BY ct.commission_transaction_id, agent.agent_name, item.item_code, item.item_name
-                     ORDER BY ct.commission_transaction_id DESC
+                     __ORDER__
                      LIMIT :size
                     OFFSET :offset
             """;

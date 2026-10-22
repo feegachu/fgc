@@ -1,6 +1,7 @@
 package com.susukkang.fgc.reconciliation.service;
 
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow;
@@ -64,7 +65,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void returnsNullMatchRateWhenTargetCountIsZero() {
-        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))
                 .willReturn(List.of(row(0, 0, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -77,7 +78,7 @@ class ReconciliationRunHistoryServiceImplTest {
     @Test
     void calculatesMatchRatePctRoundedToOneDecimal() {
         // 3건 중 2건 일치 = 66.6666...% → 소수점 첫째 자리 반올림으로 66.7
-        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))
                 .willReturn(List.of(row(3, 2, 1)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -93,7 +94,7 @@ class ReconciliationRunHistoryServiceImplTest {
         // 12.449%다. 소수 넷째 자리에서 먼저 반올림한 뒤 다시 소수 첫째 자리로
         // 반올림하면(두 번 반올림) 12.45 → 12.5로 틀어진다. 한 번에 반올림하면 12.4가
         // 맞는 값이다.
-        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))
                 .willReturn(List.of(row(100000, 12449, 87551)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -105,7 +106,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void calculatesFullMatchRateAsHundred() {
-        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))
                 .willReturn(List.of(row(5, 5, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -117,7 +118,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void mapsPaymentStageAndStatusLabels() {
-        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))
                 .willReturn(List.of(row(1, 1, 0)));
 
         PageResponse<ReconciliationRunHistoryResponse> result =
@@ -133,7 +134,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void returnsEmptyPageWhenMapperFindsNothing() {
-        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))
                 .willReturn(List.of());
         given(reconciliationRunHistoryRepository.count(null, null, null)).willReturn(0L);
 
@@ -149,35 +150,35 @@ class ReconciliationRunHistoryServiceImplTest {
         ReconciliationRunSearchCriteria criteria =
                 new ReconciliationRunSearchCriteria(LocalDate.of(2026, 7, 1), "GA_TO_FC", null);
         given(reconciliationRunHistoryRepository.search(
-                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, "desc", 0, 20))
+                LocalDate.of(2026, 7, 1), "GA_TO_FC", null, new ListSort("createdAt", false), 0, 20))
                 .willReturn(List.of());
 
         service.findHistory(criteria, 1, 20, "createdAt,desc");
 
         verify(reconciliationRunHistoryRepository)
-                .search(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq((Long) null), eq("desc"), eq(0), eq(20));
+                .search(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq((Long) null), eq(new ListSort("createdAt", false)), eq(0), eq(20));
         verify(reconciliationRunHistoryRepository)
                 .count(eq(LocalDate.of(2026, 7, 1)), eq("GA_TO_FC"), eq((Long) null));
     }
 
     @Test
     void ascendingSortIsPassedThroughAsDirection() {
-        given(reconciliationRunHistoryRepository.search(null, null, null, "asc", 0, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", true), 0, 20))
                 .willReturn(List.of());
 
         service.findHistory(NO_FILTER, 1, 20, "createdAt,asc");
 
-        verify(reconciliationRunHistoryRepository).search(null, null, null, "asc", 0, 20);
+        verify(reconciliationRunHistoryRepository).search(null, null, null, new ListSort("createdAt", true), 0, 20);
     }
 
     @Test
     void secondPageUsesOffsetOfSizeTimesPageMinusOne() {
-        given(reconciliationRunHistoryRepository.search(null, null, null, "desc", 40, 20))
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 40, 20))
                 .willReturn(List.of());
 
         service.findHistory(NO_FILTER, 3, 20, "createdAt,desc");
 
-        verify(reconciliationRunHistoryRepository).search(null, null, null, "desc", 40, 20);
+        verify(reconciliationRunHistoryRepository).search(null, null, null, new ListSort("createdAt", false), 40, 20);
     }
 
     @Test
@@ -204,7 +205,7 @@ class ReconciliationRunHistoryServiceImplTest {
 
     @Test
     void throwsCommon002WhenSortIsNotSupported() {
-        assertThatThrownBy(() -> service.findHistory(NO_FILTER, 1, 20, "insurerName,asc"))
+        assertThatThrownBy(() -> service.findHistory(NO_FILTER, 1, 20, "status,asc"))
                 .isInstanceOf(FgcBusinessException.class)
                 .satisfies(exception ->
                         assertThat(((FgcBusinessException) exception).getField()).isEqualTo("sort"));

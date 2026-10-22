@@ -107,3 +107,11 @@ export function auditReasonLabel(actionCode?: string | null, reason?: string | n
   }
   return reason
 }
+/** 배열 인덱스("[0]")만 "1번째"로 풀어 읽기 쉽게 한다("[0].result.details[1].amount" → "1번째.result.details.2번째.amount"). 점 경로는 그대로 두고 원래 경로는 title 로 남긴다. */
+export function diffFieldLabel(field: string): string {
+  return field
+    .replace(/\[(\d+)]/g, (_, index: string) => `.${Number(index) + 1}번째.`)
+    .split('.')
+    .filter(Boolean)
+    .join('.')
+}

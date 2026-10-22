@@ -12,6 +12,7 @@ import com.susukkang.fgc.audit.repository.AuditLogRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import com.susukkang.fgc.exceptioncase.dto.*;
@@ -46,7 +47,7 @@ public class ExceptionCaseService {
     private static final int MIN_PAGE = 1;
     private static final int MIN_SIZE = 1;
     private static final int MAX_SIZE = 100;
-    private static final String SORT = "severity,asc,createdAt,desc";
+    private static final String SORT = "severity,desc";
 
     private final ExceptionCaseQueryRepository exceptionCaseQueryRepository;
     private final ExceptionCaseRepository exceptionCaseRepository;
@@ -62,6 +63,7 @@ public class ExceptionCaseService {
     public ExceptionCaseSearchResponse search(ExceptionCaseSearchDTO criteria, int page, int size) {
         validatePage(page, size);
         List<ExceptionStatus> statuses = parseStatuses(criteria.getStatus());
+        ListSort sort = ExceptionCaseQueryRepository.sortOf(criteria);
 
         // 총 건수를 먼저 세어 범위 밖 page 를 마지막 페이지로 보정한다 — 큰 OFFSET 으로
         // 정렬·조인을 헛도는 행 조회를 아예 만들지 않는다. 응답의 page 가 보정된 값이다.
@@ -98,7 +100,7 @@ public class ExceptionCaseService {
                 .toList();
 
         PageResponse<ExceptionCaseResponseDTO> result =
-                PageResponse.of(content, page, size, total, SORT);
+                PageResponse.of(content, page, size, total, sort == null ? SORT : sort.value());
         return new ExceptionCaseSearchResponse(
                 summary, result.content(), result.page(), result.size(), result.totalElements(),
                 result.totalPages(), result.sort());

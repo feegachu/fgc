@@ -12,6 +12,7 @@ import { ReconciliationPagination } from './ReconciliationPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTime, int, month as formatMonth } from '../../lib/format'
+import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
 import { toast } from '../../stores/toasts'
 import { useWorkspaceStore, withMonth } from '../../stores/workspace'
 import { usePermission } from '../auth/useAuth'
@@ -21,8 +22,10 @@ import {
   createRun,
   criteriaFromParams,
   FILTER_KEYS,
+  HISTORY_SORT_KEYS,
   historyQuery,
   positiveId,
+  RESULT_SORT_KEYS,
   resultQuery,
 } from './api'
 import type { Criteria, Result, Run, RunInput, Summary } from './api'
@@ -33,8 +36,8 @@ import { CompareModal } from './CompareModal'
 import './reconciliation.css'
 
 const historyColumns: TableColumn<Run>[] = [
-  { key: 'id', label: '실행 ID', width: '5rem', render: (row) => text(row.reconciliationRunId) },
-  { key: 'month', label: '정산월', width: '6rem', render: (row) => formatMonth(row.settlementMonth) },
+  { key: 'id', label: '실행 ID', sortKey: 'reconciliationRunId', sortable: true, width: '5rem', render: (row) => text(row.reconciliationRunId) },
+  { key: 'month', label: '정산월', sortKey: 'settlementMonth', sortable: true, width: '6rem', render: (row) => formatMonth(row.settlementMonth) },
   {
     key: 'stage',
     label: '지급단계',
@@ -42,7 +45,7 @@ const historyColumns: TableColumn<Run>[] = [
     render: (row) =>
       row.paymentStageLabel || PAYMENT_STAGE[row.paymentStage as keyof typeof PAYMENT_STAGE] || text(row.paymentStage),
   },
-  { key: 'insurer', label: '보험회사', width: '8rem', render: (row) => <Disclosure value={row.insurerName} /> },
+  { key: 'insurer', label: '보험회사', sortKey: 'insurerName', sortable: true, width: '8rem', render: (row) => <Disclosure value={row.insurerName} /> },
   {
     key: 'status',
     label: '상태',
@@ -64,12 +67,14 @@ const historyColumns: TableColumn<Run>[] = [
       </StatusBadge>
     ),
   },
-  { key: 'target', label: '대상', width: '4.5rem', align: 'left', render: (row) => int(row.targetCount) },
-  { key: 'matched', label: '일치', width: '4.5rem', align: 'left', render: (row) => int(row.matchedCount) },
-  { key: 'exception', label: '불일치', width: '4.5rem', align: 'left', render: (row) => int(row.exceptionCount) },
+  { key: 'target', label: '대상', sortKey: 'targetCount', sortable: true, width: '4.5rem', align: 'left', render: (row) => int(row.targetCount) },
+  { key: 'matched', label: '일치', sortKey: 'matchedCount', sortable: true, width: '4.5rem', align: 'left', render: (row) => int(row.matchedCount) },
+  { key: 'exception', label: '불일치', sortKey: 'exceptionCount', sortable: true, width: '4.5rem', align: 'left', render: (row) => int(row.exceptionCount) },
   {
     key: 'rate',
     label: '일치율',
+    sortKey: 'matchRatePct',
+    sortable: true,
     width: '5.5rem',
     align: 'left',
     render: (row) => (row.matchRatePct == null ? EMPTY : `${Number(row.matchRatePct).toFixed(1)}%`),
@@ -77,6 +82,8 @@ const historyColumns: TableColumn<Run>[] = [
   {
     key: 'diff',
     label: '차액 합계',
+    sortKey: 'differenceTotal',
+    sortable: true,
     width: '7rem',
     align: 'number',
     render: (row) => <Money value={row.differenceTotal} difference />,
@@ -84,29 +91,37 @@ const historyColumns: TableColumn<Run>[] = [
   {
     key: 'period',
     label: '시작 · 완료',
+    sortKey: 'startedAt',
+    sortable: true,
     width: '11rem',
     render: (row) => `${dateTime(row.startedAt)} · ${dateTime(row.completedAt)}`,
   },
 ]
 const resultColumns: TableColumn<Result>[] = [
-  { key: 'contract', label: '계약', width: '13rem', render: (row) => text(row.contractNo) },
-  { key: 'item', label: '수수료 항목', width: '8rem', render: (row) => <Disclosure value={row.commissionItemName} /> },
-  { key: 'installment', label: '회차', width: '3.5rem', render: (row) => int(row.installmentNo) },
+  { key: 'contract', label: '계약', sortKey: 'contractNo', sortable: true, width: '13rem', render: (row) => text(row.contractNo) },
+  { key: 'item', label: '수수료 항목', sortKey: 'commissionItemName', sortable: true, width: '8rem', render: (row) => <Disclosure value={row.commissionItemName} /> },
+  { key: 'installment', label: '회차', sortKey: 'installmentNo', sortable: true, width: '3.5rem', render: (row) => int(row.installmentNo) },
   {
     key: 'expectedAgent',
     label: '예상 설계사',
+    sortKey: 'expectedAgentName',
+    sortable: true,
     width: '7rem',
     render: (row) => row.expectedAgent?.agentName || '예상 없음',
   },
   {
     key: 'actualAgent',
     label: '실제 설계사',
+    sortKey: 'actualAgentName',
+    sortable: true,
     width: '7rem',
     render: (row) => row.actualAgent?.agentName || '실제 없음',
   },
   {
     key: 'expected',
     label: '예상 금액',
+    sortKey: 'expectedTotalAmount',
+    sortable: true,
     width: '6.5rem',
     align: 'number',
     render: (row) => <Money value={row.expectedTotalAmount} />,
@@ -114,6 +129,8 @@ const resultColumns: TableColumn<Result>[] = [
   {
     key: 'actual',
     label: '실제 금액',
+    sortKey: 'actualTotalAmount',
+    sortable: true,
     width: '6.5rem',
     align: 'number',
     render: (row) => <Money value={row.actualTotalAmount} />,
@@ -121,6 +138,8 @@ const resultColumns: TableColumn<Result>[] = [
   {
     key: 'difference',
     label: '차액',
+    sortKey: 'differenceAmount',
+    sortable: true,
     width: '6.5rem',
     align: 'number',
     render: (row) => <Money value={row.differenceAmount} difference />,
@@ -164,7 +183,8 @@ export default function ReconciliationPage() {
   const selectedRun = history.data?.content?.find((run) => String(run.reconciliationRunId) === runId)
   const status = selectedRun?.status
   const running = status === 'RUNNING' || status === 'CREATED'
-  const results = useQuery(resultQuery(runId, type, resultPage, running))
+  const resultSort = parseSort(params.get('resultSort'), RESULT_SORT_KEYS)
+  const results = useQuery(resultQuery(runId, type, resultPage, running, formatSort(resultSort)))
   const client = useQueryClient()
   const canProcess = usePermission('canProcess')
   const [bulkMessage, setBulkMessage] = useState<{ runId: string; message: string } | null>(null)
@@ -247,7 +267,7 @@ export default function ReconciliationPage() {
           <h2 className="surface-title">대사 실행</h2>
         </header>
         <RunFilters
-          key={JSON.stringify(criteria)}
+          key={JSON.stringify({ ...criteria, sort: '' })}
           criteria={criteria}
           pending={execution.isPending}
           canProcess={canProcess}
@@ -338,6 +358,9 @@ export default function ReconciliationPage() {
           <DataTable
             className="reco-react-result-table"
             columns={compareColumns}
+            {...sortBinding(formatSort(resultSort), RESULT_SORT_KEYS, (sort) =>
+              update({ resultSort: sort, resultPage: '' }, { resetPage: false }),
+            )}
             rows={filteredRows}
             rowKey={(row) => String(row.reconciliationResultId)}
             caption="선택한 대사 실행의 계약별 결과"
@@ -383,6 +406,7 @@ export default function ReconciliationPage() {
             className="reco-react-history-table"
             emptyMessage={<div className="reco-react-empty">조건에 맞는 자료가 없습니다.</div>}
             columns={historyColumns}
+            {...sortBinding(criteria.sort, HISTORY_SORT_KEYS, (sort) => update({ sort }))}
             rows={history.data?.content ?? []}
             rowKey={(row) => String(row.reconciliationRunId)}
             caption="검색조건에 해당하는 대사 실행 이력"

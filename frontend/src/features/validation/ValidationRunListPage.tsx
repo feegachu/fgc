@@ -11,11 +11,20 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
+import { sortBinding } from '../../lib/tableSort'
 import { dateTime, errorText, month as formatMonth } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { validMonth, withMonth } from '../../stores/workspace'
 import { usePermission } from '../auth/useAuth'
-import { activeMonthlyQuery, createRun, normalizeCriteria, RUN_STATUSES, RUN_TYPES, runsQuery } from './api'
+import {
+  activeMonthlyQuery,
+  createRun,
+  normalizeCriteria,
+  RUN_SORT_KEYS,
+  RUN_STATUSES,
+  RUN_TYPES,
+  runsQuery,
+} from './api'
 import type { ValidationRun } from './api'
 import { RunStatusBadge } from './RunStatusBadge'
 import { progressText } from './steps'
@@ -28,7 +37,7 @@ import './validation.css'
  * [막을 것] 같은 달에 진행 중(생성됨·실행중)인 월간 실행이 있으면 새로 만들 수 없다 —
  * 화면에서 버튼을 끄고, 서버(409 FGC-VRUN-001)가 최종 방어한다.
  */
-const FILTER_KEYS = { status: '', page: '' }
+const FILTER_KEYS = { status: '', sort: '', page: '' }
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const finalizedText = (run: ValidationRun) =>
   run.finalizedAt ? `${run.finalizedBy ?? '-'} · ${dateTime(run.finalizedAt)}` : '-'
@@ -43,12 +52,14 @@ export default function ValidationRunListPage() {
   const columns: TableColumn<ValidationRun>[] = [
     {
       key: 'month',
+      sortKey: 'validationMonth',
+      sortable: true,
       label: '검증월',
       width: '5.5rem',
       cellClassName: 'tabular-nums',
       render: (r) => formatMonth(r.validationMonth),
     },
-    { key: 'runNo', label: '회차', width: '3.5rem', align: 'left', render: (r) => r.runNo },
+    { key: 'runNo', label: '회차', sortable: true, width: '3.5rem', align: 'left', render: (r) => r.runNo },
     { key: 'type', label: '실행 유형', width: '7rem', render: (r) => dash(r.runTypeLabel) },
     {
       key: 'status',
@@ -64,10 +75,19 @@ export default function ValidationRunListPage() {
       cellClassName: 'tabular-nums',
       render: (r) => progressText(r.currentStep),
     },
-    { key: 'actor', label: '실행자', width: '6rem', render: (r) => dash(r.triggeredBy) },
+    {
+      key: 'actor',
+      label: '실행자',
+      sortKey: 'triggeredBy',
+      sortable: true,
+      width: '6rem',
+      render: (r) => dash(r.triggeredBy),
+    },
     {
       key: 'started',
       label: '시작',
+      sortKey: 'startedAt',
+      sortable: true,
       width: '8.5rem',
       cellClassName: 'tabular-nums',
       render: (r) => dateTime(r.startedAt),
@@ -75,6 +95,8 @@ export default function ValidationRunListPage() {
     {
       key: 'completed',
       label: '완료',
+      sortKey: 'completedAt',
+      sortable: true,
       width: '8.5rem',
       cellClassName: 'tabular-nums',
       render: (r) => dateTime(r.completedAt),
@@ -82,6 +104,8 @@ export default function ValidationRunListPage() {
     {
       key: 'finalized',
       label: '확정자 · 확정시각',
+      sortKey: 'finalizedAt',
+      sortable: true,
       width: '10.5rem',
       render: (r) => (
         <CellDisclosure
@@ -142,6 +166,7 @@ export default function ValidationRunListPage() {
           className="vrun-run-table"
           viewportClassName="vrun-table-viewport"
           columns={columns}
+          {...sortBinding(criteria.sort, RUN_SORT_KEYS, (sort) => update({ sort }))}
           rows={rows}
           rowKey={(r) => String(r.validationRunId)}
           emptyMessage={runs.isPending ? '불러오는 중입니다.' : undefined}

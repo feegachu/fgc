@@ -52,6 +52,107 @@ class ReconciliationRunHistoryRepositoryIntegrationTest {
                 """, reconRunId, matchGroupKey, resultType);
     }
 
+    @Autowired
+    private ReconciliationResultRepository resultRepository;
+
+    @Test
+    void sortsResultsByEachAllowedColumnInBothDirectionsAcrossPages() {
+        Long runId = insertReconciliationRun("GA_TO_FC", insertInsurer("FUN604-R"), null);
+        List<Long> contracts = jdbcTemplate.queryForList(
+                "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 3", Long.class);
+        List<Long> items = jdbcTemplate.queryForList(
+                "SELECT commission_item_id FROM fgc.commission_item ORDER BY commission_item_id LIMIT 3", Long.class);
+        List<Long> agents = jdbcTemplate.queryForList("SELECT agent_id FROM fgc.agent ORDER BY agent_id LIMIT 3", Long.class);
+        for (int i = 0; i < 9; i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO fgc.reconciliation_result (reconciliation_run_id, match_group_key, result_type,
+                        contract_id, commission_item_id, installment_no, expected_agent_id, actual_agent_id,
+                        expected_total_amount, actual_total_amount, difference_amount)
+                    VALUES (?, ?, 'AMOUNT_DIFFERENCE', ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, runId, "FUN604-RES-" + i, contracts.get(i % contracts.size()), items.get(i % items.size()),
+                    1 + i % 4, agents.get(i % agents.size()), i % 3 == 0 ? null : agents.get((i + 1) % agents.size()),
+                    1000 + (i % 5) * 100, 900 + (i % 3) * 100, i % 4 * 10 - 5);
+        }
+        java.util.Map<String, String> columns = java.util.Map.ofEntries(
+                java.util.Map.entry("createdAt", "result.created_at"),
+                java.util.Map.entry("contractNo", "contract.contract_no"),
+                java.util.Map.entry("commissionItemName", "item.item_name"),
+                java.util.Map.entry("installmentNo", "result.installment_no"),
+                java.util.Map.entry("expectedAgentName", "expected_agent.agent_name"),
+                java.util.Map.entry("actualAgentName", "actual_agent.agent_name"),
+                java.util.Map.entry("expectedTotalAmount", "result.expected_total_amount"),
+                java.util.Map.entry("actualTotalAmount", "result.actual_total_amount"),
+                java.util.Map.entry("differenceAmount", "result.difference_amount"));
+        assertThat(ReconciliationResultRepository.RESULT_SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        for (var column : columns.entrySet()) {
+            for (boolean ascending : new boolean[] {true, false}) {
+                String direction = ascending ? "ASC" : "DESC";
+                List<Long> expected = jdbcTemplate.queryForList("""
+                        SELECT result.reconciliation_result_id
+                          FROM fgc.reconciliation_result result
+                          LEFT JOIN fgc.insurance_contract contract ON contract.contract_id = result.contract_id
+                          LEFT JOIN fgc.commission_item item ON item.commission_item_id = result.commission_item_id
+                          LEFT JOIN fgc.agent expected_agent ON expected_agent.agent_id = result.expected_agent_id
+                          LEFT JOIN fgc.agent actual_agent ON actual_agent.agent_id = result.actual_agent_id
+                         WHERE result.reconciliation_run_id = ?
+                         ORDER BY %s %s NULLS LAST, result.reconciliation_result_id %s
+                        """.formatted(column.getValue(), direction, direction), Long.class, runId);
+                var sort = new com.susukkang.fgc.common.web.ListSort(column.getKey(), ascending);
+                assertThat(resultRepository.findResults(runId, null, sort, 0, 100))
+                        .extracting(com.susukkang.fgc.reconciliation.dto.ReconciliationResultListRow::getReconciliationResultId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                assertThat(resultRepository.findResults(runId, null, sort, 3, 3))
+                        .extracting(com.susukkang.fgc.reconciliation.dto.ReconciliationResultListRow::getReconciliationResultId)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+    }
+
+    @Test
+    void sortsByEachAllowedColumnInBothDirectionsAcrossPages() {
+        // 실행마다 보험회사·대상 건수·불일치 건수를 달리하고, 같은 값(동률)과 비어 있는 일치율(0건)도 섞는다.
+        String[] insurerNames = {"FUN604-C", "FUN604-A", "FUN604-B", "FUN604-A", "FUN604-C", "FUN604-B", "FUN604-D"};
+        for (int i = 0; i < insurerNames.length; i++) {
+            Long insurerId = insertInsurer(insurerNames[i] + i);
+            Long runId = insertReconciliationRun("GA_TO_FC", insurerId, null);
+            for (int r = 0; r < i % 4; r++) {
+                insertReconciliationResult(runId, "FUN604-" + i + "-" + r, r == 0 ? "MATCHED" : "AMOUNT_DIFFERENCE");
+            }
+        }
+        java.util.Map<String, String> columns = java.util.Map.ofEntries(
+                java.util.Map.entry("createdAt", "rr.created_at"),
+                java.util.Map.entry("reconciliationRunId", "rr.reconciliation_run_id"),
+                java.util.Map.entry("settlementMonth", "rr.settlement_month"),
+                java.util.Map.entry("insurerName", "ins.insurer_name"),
+                java.util.Map.entry("targetCount", "vw.result_count"),
+                java.util.Map.entry("matchedCount", "vw.matched_count"),
+                java.util.Map.entry("exceptionCount", "vw.exception_count"),
+                java.util.Map.entry("matchRatePct", "(vw.matched_count::numeric / NULLIF(vw.result_count, 0))"),
+                java.util.Map.entry("differenceTotal", "vw.difference_total"),
+                java.util.Map.entry("startedAt", "rr.started_at"));
+        assertThat(ReconciliationRunHistoryRepository.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        for (var column : columns.entrySet()) {
+            for (boolean ascending : new boolean[] {true, false}) {
+                String direction = ascending ? "ASC" : "DESC";
+                List<Long> expected = jdbcTemplate.queryForList("""
+                        SELECT rr.reconciliation_run_id
+                          FROM fgc.reconciliation_run rr
+                          JOIN fgc.vw_reconciliation_summary vw ON vw.reconciliation_run_id = rr.reconciliation_run_id
+                          LEFT JOIN fgc.insurer ins ON ins.insurer_id = rr.insurer_id
+                         WHERE rr.settlement_month = ?
+                         ORDER BY %s %s NULLS LAST, rr.reconciliation_run_id %s
+                        """.formatted(column.getValue(), direction, direction), Long.class, TEST_MONTH);
+                var sort = new com.susukkang.fgc.common.web.ListSort(column.getKey(), ascending);
+                assertThat(mapper.search(TEST_MONTH, null, null, sort, 0, 100))
+                        .extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                assertThat(mapper.search(TEST_MONTH, null, null, sort, 3, 3))
+                        .extracting(ReconciliationRunHistoryRow::getReconciliationRunId)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+    }
+
     @Test
     void searchIncludesRunsWithNoResultsAsZeroCounts() {
         Long insurerId = insertInsurer("FUN051-1");

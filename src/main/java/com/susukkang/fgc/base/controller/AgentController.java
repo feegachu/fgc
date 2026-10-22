@@ -52,6 +52,9 @@ public class AgentController {
             @Parameter(description = "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.")
             @RequestParam(defaultValue = "false")
             boolean includeHistorical,
+            @Parameter(description = "정렬(key,asc|desc). agentCode·agentName·organizationName·appointmentDate·terminationDate·latestRegistrationDate. 비우면 설계사 코드 오름차순")
+            @RequestParam(required = false)
+            String sort,
             @Parameter(description = "페이지(1-base)", example = "1")
             @RequestParam(defaultValue = "1")
             int page,
@@ -59,7 +62,7 @@ public class AgentController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        AgentSearchCriteria criteria = new AgentSearchCriteria(organizationId, keyword, asOf, includeTerminated, includeHistorical);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort);
         return ApiResponse.success(agentService.search(criteria, page, size));
     }
 }

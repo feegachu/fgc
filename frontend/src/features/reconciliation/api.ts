@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/api/errors'
 import type { components } from '../../lib/api/schema'
 import { validMonth } from '../../stores/workspace'
 import { PAYMENT_STAGE, RESULT_TYPE } from './labels'
+import { formatSort, parseSort } from '../../lib/tableSort'
 
 type Schemas = components['schemas']
 export type Run = Schemas['ReconciliationRunHistoryResponse']
@@ -14,6 +15,31 @@ export type Summary = Schemas['ReconciliationSummaryResponse']
 export type History = Schemas['ReconciliationRunSearchResponse']
 export type Results = Schemas['ReconciliationResultSearchResponse']
 export const PAGE_SIZE = 20
+/** 서버(ReconciliationRunHistoryRepository.SORT_KEYS)와 같은 이력 정렬 key. 지급단계·상태는 순서 기준이 없어 제외한다. */
+export const HISTORY_SORT_KEYS = [
+  'createdAt',
+  'reconciliationRunId',
+  'settlementMonth',
+  'insurerName',
+  'targetCount',
+  'matchedCount',
+  'exceptionCount',
+  'matchRatePct',
+  'differenceTotal',
+  'startedAt',
+] as const
+/** 서버(ReconciliationResultRepository.RESULT_SORT_KEYS)와 같은 결과 정렬 key. 결과 유형·원인은 제외한다. */
+export const RESULT_SORT_KEYS = [
+  'createdAt',
+  'contractNo',
+  'commissionItemName',
+  'installmentNo',
+  'expectedAgentName',
+  'actualAgentName',
+  'expectedTotalAmount',
+  'actualTotalAmount',
+  'differenceAmount',
+] as const
 export const FILTER_KEYS = {
   stage: '',
   insurer: '',
@@ -24,6 +50,8 @@ export const FILTER_KEYS = {
   resultType: '',
   onlyMismatch: '',
   resultPage: '',
+  sort: '',
+  resultSort: '',
 }
 export const positiveId = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? value : ''
@@ -33,6 +61,7 @@ export function criteriaFromParams(params: URLSearchParams, month: string | null
     month: validMonth(month) ? month : '',
     stage: Object.hasOwn(PAYMENT_STAGE, stage) ? stage : '',
     insurer: positiveId(params.get('insurer')),
+    sort: formatSort(parseSort(params.get('sort'), HISTORY_SORT_KEYS)),
     page: Math.min(Number(positiveId(params.get('page')) || 1), Math.floor(2147483647 / PAGE_SIZE)),
   }
 }
@@ -51,7 +80,7 @@ export const historyQuery = (criteria: Criteria) =>
         month: criteria.month,
         page: String(criteria.page),
         size: String(PAGE_SIZE),
-        sort: 'createdAt,desc',
+        sort: criteria.sort || 'createdAt,desc',
       })
       if (criteria.stage) query.set('stage', criteria.stage)
       if (criteria.insurer) query.set('insurerId', criteria.insurer)
@@ -64,11 +93,11 @@ export const historyQuery = (criteria: Criteria) =>
     refetchInterval: (query) =>
       query.state.data?.content?.some((run) => run.status === 'RUNNING' || run.status === 'CREATED') ? 2000 : false,
   })
-export const resultQuery = (runId: string, resultType: string, page: number, running: boolean) =>
+export const resultQuery = (runId: string, resultType: string, page: number, running: boolean, sort = '') =>
   queryOptions({
-    queryKey: ['reconciliations', 'results', runId, resultType, page],
+    queryKey: ['reconciliations', 'results', runId, resultType, page, sort],
     queryFn: ({ signal }) => {
-      const query = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE), sort: 'createdAt,desc' })
+      const query = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE), sort: sort || 'createdAt,desc' })
       if (Object.hasOwn(RESULT_TYPE, resultType)) query.set('resultType', resultType)
       return get<Results>(`/api/v1/reconciliations/${runId}/results?${query}`, signal)
     },

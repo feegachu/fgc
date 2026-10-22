@@ -57,6 +57,47 @@ class ContractRepositoryIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
+    @DisplayName("#604 허용된 컬럼으로 양방향 정렬하고 동률은 계약 ID 내림차순으로 고정한다")
+    void sortsByEachAllowedColumnInBothDirectionsAcrossPages() {
+        Map<String, String> columns = Map.of(
+                "contractNo", "c.contract_no", "insurerName", "i.insurer_name", "productName", "p.product_name",
+                "contractDate", "c.contract_date", "premium", "c.monthly_equivalent_first_premium",
+                "agent", "c.agent_id");
+        assertThat(ContractQueryRepository.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        for (var column : columns.entrySet()) {
+            for (String direction : List.of("asc", "desc")) {
+                ContractSearchCondition condition = new ContractSearchCondition();
+                condition.setSort(column.getKey() + "," + direction);
+                List<Long> expected = jdbcTemplate.queryForList("""
+                        SELECT c.contract_id FROM fgc.insurance_contract c
+                          JOIN fgc.insurer i ON i.insurer_id = c.insurer_id
+                          JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
+                          JOIN fgc.product p ON p.product_id = po.product_id
+                         ORDER BY %s %s NULLS LAST, c.contract_id DESC
+                        """.formatted(column.getValue(), direction), Long.class);
+                assertThat(contractQueryRepository.searchAll(condition)).extracting(ContractView::getContractId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                // 현재 페이지가 아니라 검색된 전체 데이터 기준으로 정렬한다.
+                assertThat(contractQueryRepository.search(condition, PageRequest.of(1, 3)).getContent())
+                        .extracting(ContractView::getContractId)
+                        .as("%s %s page 2", column.getKey(), direction)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("#604 허용 목록에 없는 정렬 key 와 형식은 COMMON_002 로 거부한다")
+    void rejectsUnsupportedSort() {
+        for (String sort : List.of("password,asc", "contractNo,sideways", "contractNo", "contractNo;DROP,asc")) {
+            ContractSearchCondition condition = new ContractSearchCondition();
+            condition.setSort(sort);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> contractQueryRepository.searchAll(condition))
+                    .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+        }
+    }
+
+    @Test
     void querydslSearchPreservesPostgresLikeWildcardsAndEscapes() {
         for (String keyword : List.of("", "%", "_", "FGC-FGL01", "FGC%0001", "FGC_FGL01", "FGC" + (char) 92 + "_")) {
             ContractSearchCondition condition = new ContractSearchCondition();

@@ -334,7 +334,7 @@ class CapCheckServiceImplTest {
         CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(
                 LocalDate.of(2026, 7, 1), "GA_TO_FC", null, null, 21L, null);
         when(capCheckQueryRepository.search(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
-                criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), 0, 20)).thenReturn(List.of(row));
+                criteria.insurerId(), criteria.organizationId(), criteria.contractNo(), 0, 20, CapCheckQueryRepository.DEFAULT_SORT)).thenReturn(List.of(row));
         when(capCheckQueryRepository.count(criteria.month(), criteria.paymentStage(), criteria.resultStatus(),
                 criteria.insurerId(), criteria.organizationId(), criteria.contractNo())).thenReturn(1L);
         when(capCheckQueryRepository.summarize(criteria.month(), criteria.paymentStage(),

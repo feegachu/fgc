@@ -137,6 +137,8 @@ public class ValidationRunController {
             @RequestParam(required = false) String month,
             @Parameter(description = "실행 상태(CREATED/RUNNING/COMPLETED/FAILED/FINALIZED)")
             @RequestParam(required = false) String status,
+            @Parameter(description = "정렬(key,asc|desc). validationMonth·runNo·triggeredBy·startedAt·completedAt·finalizedAt. 비우면 검증월·회차 내림차순")
+            @RequestParam(required = false) String sort,
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size
     ) {
@@ -162,7 +164,7 @@ public class ValidationRunController {
         }
 
         // 3) criteria 조립 + 서비스 호출
-        ValidationRunSearchCriteria criteria = new ValidationRunSearchCriteria(validationMonth, status);
+        ValidationRunSearchCriteria criteria = new ValidationRunSearchCriteria(validationMonth, status, sort);
         PageResponse<ValidationRunListRow> pageResponse = validationRunSearchService.search(criteria, page, size);
 
         // 4) 응답 변환

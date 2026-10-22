@@ -33,6 +33,7 @@ describe('contract URL and labels', () => {
           capResultStatus: 'FAKE',
           contractDateFrom: '2026-02-30',
           contractDateTo: '2026-10-12',
+          sort: 'password,asc',
           page: 'Infinity',
         }),
       ),
@@ -46,10 +47,18 @@ describe('contract URL and labels', () => {
       capResultStatus: '',
       contractDateFrom: '',
       contractDateTo: '2026-10-12',
+      sort: '',
       page: 1,
     })
     expect(validDate('2024-02-29')).toBe(true)
     expect(validDate('2026-02-29')).toBe(false)
+  })
+
+  it('#604 허용된 정렬만 목록·CSV 요청에 그대로 싣는다', () => {
+    const criteria = criteriaFromParams(new URLSearchParams({ sort: 'premium,desc', contractNo: 'C-1' }))
+    expect(criteria.sort).toBe('premium,desc')
+    expect(new URL(listCsvPath(criteria), 'http://localhost').searchParams.get('sort')).toBe('premium,desc')
+    expect(criteriaFromParams(new URLSearchParams({ sort: 'status,asc' })).sort).toBe('')
   })
 
   it('exports all matching rows while keeping all nine applied filters', () => {

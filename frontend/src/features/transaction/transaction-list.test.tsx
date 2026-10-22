@@ -229,6 +229,32 @@ describe('TRAN-W01 수수료 지급 목록', () => {
       '/app/transactions/new?id=41&month=2026-07',
     )
   })
+  it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 다음 검색에 유지한다', async () => {
+    const { router, actions } = renderAt('/app/transactions?month=2026-07&contractNo=POL-2&page=3')
+    const table = await screen.findByRole('table', { name: '검색 조건에 해당하는 수수료 지급 건' })
+    expect(within(table).queryByRole('button', { name: '상태' })).toBeNull()
+    expect(within(table).getByRole('columnheader', { name: /^금액/ })).toHaveAttribute('aria-sort', 'none')
+    await actions.click(within(table).getByRole('button', { name: '금액' }))
+    await waitFor(() => expect(lastRequest().get('sort')).toBe('amount,asc'))
+    expect(lastRequest().get('page')).toBe('1')
+    expect(lastRequest().get('contractNo')).toBe('POL-2')
+    expect(within(table).getByRole('columnheader', { name: /^금액/ })).toHaveAttribute('aria-sort', 'ascending')
+    await actions.click(within(table).getByRole('button', { name: '금액' }))
+    await waitFor(() => expect(lastRequest().get('sort')).toBe('amount,desc'))
+    expect(within(table).getByRole('columnheader', { name: /^금액/ })).toHaveAttribute('aria-sort', 'descending')
+    // 다음 검색을 제출해도 선택한 정렬은 유지되고, 초기화하면 서버 기본 정렬로 돌아간다.
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(lastRequest().get('page')).toBe('1'))
+    expect(lastRequest().get('sort')).toBe('amount,desc')
+    expect(new URLSearchParams(router.state.location.search).get('sort')).toBe('amount,desc')
+    await actions.click(screen.getByRole('button', { name: '초기화' }))
+    await waitFor(() => expect(lastRequest().has('sort')).toBe(false))
+  })
+  it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬을 쓴다', async () => {
+    renderAt('/app/transactions?sort=status,asc')
+    await screen.findByText('TRAN-410')
+    expect(lastRequest().has('sort')).toBe(false)
+  })
   it('검색 제출은 숨은 불균형 필터를 보존하고 초기화만 해제한다', async () => {
     const { router, actions } = renderAt('/app/transactions?month=2026-07&attributionImbalanceOnly=true&page=4')
     await screen.findByText('TRAN-410')

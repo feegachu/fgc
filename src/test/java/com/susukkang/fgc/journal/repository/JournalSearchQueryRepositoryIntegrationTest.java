@@ -69,6 +69,45 @@ class JournalSearchQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void sortsByEachAllowedColumnInBothDirectionsAcrossPagesAndRejectsOthers() {
+        List<Long> contracts = jdbcTemplate.queryForList(
+                "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 2", Long.class);
+        for (int i = 0; i < 8; i++) {
+            Long headerId = insertHeader(contracts.get(i % contracts.size()), LocalDate.of(2036, 1, 1 + i % 3),
+                    "TEST-SORT-" + (i % 4) + "-" + i, "ADJUSTMENT");
+            insertLine(headerId, 1, "EXPECTED_RECEIVABLE", new BigDecimal(1000 + (i % 4) * 100), BigDecimal.ZERO);
+            insertLine(headerId, 2, "EXPECTED_INCOME", BigDecimal.ZERO, new BigDecimal(2000 + (i % 3) * 100));
+        }
+        java.util.Map<String, String> columns = java.util.Map.of(
+                "journalNo", "h.journal_no", "journalDate", "h.journal_date", "contractNo", "c.contract_no",
+                "debitTotal", "(SELECT COALESCE(SUM(l.debit_amount), 0) FROM fgc.journal_line l WHERE l.journal_header_id = h.journal_header_id)",
+                "creditTotal", "(SELECT COALESCE(SUM(l.credit_amount), 0) FROM fgc.journal_line l WHERE l.journal_header_id = h.journal_header_id)");
+        assertThat(JournalQueryRepository.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        for (var column : columns.entrySet()) {
+            for (boolean ascending : new boolean[] {true, false}) {
+                String direction = ascending ? "ASC" : "DESC";
+                List<Long> expected = jdbcTemplate.queryForList("""
+                        SELECT h.journal_header_id FROM fgc.journal_header h
+                          LEFT JOIN fgc.insurance_contract c ON c.contract_id = h.contract_id
+                         ORDER BY %s %s NULLS LAST, h.journal_date DESC, h.journal_header_id DESC
+                        """.formatted(column.getValue(), direction), Long.class);
+                var sort = new com.susukkang.fgc.common.web.ListSort(column.getKey(), ascending);
+                assertThat(journalQueryRepository.search(null, null, null, null, null, null, null, 0, 1000, sort))
+                        .extracting(JournalListRow::getJournalHeaderId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                // 현재 페이지가 아니라 검색된 전체 데이터 기준으로 정렬한다.
+                assertThat(journalQueryRepository.search(null, null, null, null, null, null, null, 3, 3, sort))
+                        .extracting(JournalListRow::getJournalHeaderId)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+        for (String raw : List.of("status,asc", "debitTotal,sideways", "debitTotal", "debitTotal;DROP,asc")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> JournalQueryRepository.sortOf(raw))
+                    .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+        }
+    }
+
+    @Test
     void searchByContractIdReturnsHeaderWithLineTotals() {
         Long contractId = anyContractId();
         Long headerId = insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-0001");

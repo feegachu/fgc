@@ -132,6 +132,35 @@ it('URL 필터 복원, 서버 라벨·금액, 페이지 이동, CSV에 동일한
   )
 })
 
+it('#604 헤더를 누르면 오름차순·내림차순으로 바뀌고 첫 페이지로 돌아가며 검색조건과 CSV에 유지한다', async () => {
+  const { router, user } = mount('/contracts?insurerId=1&contractNo=C-2026&page=2')
+  const table = await screen.findByRole('table', { name: '보험계약 검색 결과' })
+  // 정렬할 수 없는 상태 컬럼에는 정렬 버튼이 없고, 정렬 가능한 컬럼은 방향 표시를 가진다.
+  expect(within(table).queryByRole('button', { name: /계약상태/ })).toBeNull()
+  expect(within(table).getByRole('columnheader', { name: /계약일/ })).toHaveAttribute('aria-sort', 'none')
+  await user.click(within(table).getByRole('button', { name: '월납환산 초회보험료' }))
+  await waitFor(() => expect(requests.some((path) => path.includes('sort=premium%2Casc'))).toBe(true))
+  const params = new URLSearchParams(router.state.location.search)
+  expect(params.get('sort')).toBe('premium,asc')
+  expect(params.has('page')).toBe(false)
+  expect(params.get('contractNo')).toBe('C-2026')
+  expect(within(table).getByRole('columnheader', { name: /월납환산 초회보험료/ })).toHaveAttribute('aria-sort', 'ascending')
+  await user.click(within(table).getByRole('button', { name: '월납환산 초회보험료' }))
+  await waitFor(() => expect(router.state.location.search).toContain('sort=premium%2Cdesc'))
+  expect(within(table).getByRole('columnheader', { name: /월납환산 초회보험료/ })).toHaveAttribute('aria-sort', 'descending')
+  // 도움말 버튼은 정렬 버튼과 분리되어 있어 눌러도 정렬이 바뀌지 않는다.
+  await user.click(screen.getByRole('button', { name: '월납환산 초회보험료 설명 보기' }))
+  expect(router.state.location.search).toContain('sort=premium%2Cdesc')
+  await user.click(screen.getByRole('button', { name: 'CSV 내보내기' }))
+  expect(vi.mocked(exportCsv).mock.calls.at(-1)![0]).toContain('sort=premium%2Cdesc')
+})
+
+it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬을 쓴다', async () => {
+  mount('/contracts?sort=password,asc')
+  await screen.findByRole('table', { name: '보험계약 검색 결과' })
+  expect(requests.some((path) => path.includes('sort='))).toBe(false)
+})
+
 it.each([
   [500, 'FGC-COMMON-500', 'internal CSV SQL detail', '요청 ID: csv-request'],
   [
