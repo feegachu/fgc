@@ -18,6 +18,8 @@ public interface CommissionPaymentService {
 
     CommissionPaymentResponse update(Long paymentId, CommissionPaymentUpdateRequest request);
 
+    void deleteDraft(Long paymentId);
+
     CommissionPaymentResponse confirm(Long paymentId, String idempotencyKey);
 
     /** 원장 정정으로 연결된 대체 지급만 기존 확정 게이트로 승인한다. */

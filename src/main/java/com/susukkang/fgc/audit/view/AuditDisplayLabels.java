@@ -20,6 +20,7 @@ public final class AuditDisplayLabels {
             Map.entry("CONTRACT_SCHEDULES_REGENERATED", "계약 스케줄 재생성"),
             Map.entry("PAYMENT_CREATED", "지급 등록"),
             Map.entry("PAYMENT_UPDATED", "지급 수정"),
+            Map.entry("PAYMENT_DELETED", "지급 초안 삭제"),
             Map.entry("PAYMENT_CONFIRMED", "지급 확정"),
             Map.entry("PAYMENT_CANCELLED", "지급 취소"),
             Map.entry("SCHEDULE_CONFIRMED", "스케줄 확정"),

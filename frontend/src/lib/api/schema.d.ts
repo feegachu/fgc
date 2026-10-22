@@ -943,7 +943,11 @@ export interface paths {
          */
         put: operations["update"];
         post?: never;
-        delete?: never;
+        /**
+         * 수수료 지급 초안 삭제
+         * @description 직접 작성한 DRAFT와 귀속행을 삭제합니다. 검출·감사 이력은 보존하며, 확정 건과 원장·대사·환수·정정에 연결된 건은 거절합니다.
+         */
+        delete: operations["deleteDraft"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1575,6 +1579,7 @@ export interface components {
             arbitrageCheckId?: number;
             /** Format: date */
             asOfDate?: string;
+            candidateType?: string;
             /** Format: int64 */
             contractId?: number;
             /** Format: int32 */
@@ -1589,6 +1594,7 @@ export interface components {
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             paymentStageLabel?: string;
             plannedCommissionAmount?: number;
+            projectedExcessAmount?: number;
             refundAdditionAppliedYn?: boolean;
             /** @enum {string} */
             resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
@@ -1596,8 +1602,6 @@ export interface components {
             /** @enum {string} */
             surrenderValueSourceType?: "ACTUAL" | "EXPECTED_TABLE" | "NOT_APPLICABLE";
             surrenderValueSourceTypeLabel?: string;
-            projectedExcessAmount?: number;
-            candidateType?: string;
         };
         ArbitrageSearchResponse: {
             items?: components["schemas"]["PageResponseArbitrageCheckView"];
@@ -5545,6 +5549,55 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                };
+            };
+        };
+    };
+    deleteDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                paymentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 초안 삭제 성공 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+            /** @description 존재하지 않는 지급 건 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+            /** @description 지급 처리 권한 없음 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+            /** @description 초안이 아니거나 삭제할 수 없는 연관 이력 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };

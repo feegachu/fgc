@@ -14,6 +14,7 @@ const actionLabels = {
   CONTRACT_SCHEDULES_REGENERATED: '계약 스케줄 재생성',
   PAYMENT_CREATED: '지급 등록',
   PAYMENT_UPDATED: '지급 수정',
+  PAYMENT_DELETED: '지급 초안 삭제',
   PAYMENT_CONFIRMED: '지급 확정',
   PAYMENT_CANCELLED: '지급 취소',
   SCHEDULE_CONFIRMED: '스케줄 확정',

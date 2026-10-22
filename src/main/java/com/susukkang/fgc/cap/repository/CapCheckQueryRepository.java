@@ -50,7 +50,7 @@ public class CapCheckQueryRepository {
                AND cc.payment_stage = :paymentStage
 
                AND (
-                    cc.candidate_transaction_id IS NULL
+                    (cc.candidate_transaction_id IS NULL AND NOT jsonb_exists(cc.calculation_snapshot, 'deletedCandidateTransactionId'))
                     OR EXISTS (
                         SELECT 1
                           FROM fgc.commission_transaction candidate_ct
@@ -111,7 +111,7 @@ public class CapCheckQueryRepository {
                           FROM fgc.cap_check cc
                           JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
                         WHERE (
-                                cc.candidate_transaction_id IS NULL
+                                (cc.candidate_transaction_id IS NULL AND NOT jsonb_exists(cc.calculation_snapshot, 'deletedCandidateTransactionId'))
                                 OR EXISTS (
                                     SELECT 1
                                       FROM fgc.commission_transaction candidate_ct

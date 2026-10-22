@@ -90,6 +90,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private static final String AUDIT_ENTITY_TYPE = "COMMISSION_PAYMENT";
     private static final String AUDIT_PAYMENT_CREATED = "PAYMENT_CREATED";
     private static final String AUDIT_PAYMENT_UPDATED = "PAYMENT_UPDATED";
+    private static final String AUDIT_PAYMENT_DELETED = "PAYMENT_DELETED";
     private static final String AUDIT_PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
 
     private final CommissionPaymentQueryRepository queryRepository;
@@ -155,6 +156,32 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .policyVersionId(prepared.payment().getPolicyVersionId())
                 .build());
         return afterRow.toResponse(afterAttributions, List.of());
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public void deleteDraft(Long paymentId) {
+        // 수정·확정과 같은 지급 행 잠금을 잡고 대기 후의 상태를 다시 검사한다.
+        requireDraft(requireConfirmationData(paymentId).get(0));
+        CommissionPaymentRow before = requireRow(paymentId);
+        if (!"GA_MANUAL_PAYMENT".equals(before.sourceType()) || writeRepository.hasDeletionDependencies(paymentId)) {
+            throw new FgcBusinessException(FgcErrorCode.TRAN_009);
+        }
+        List<CommissionPaymentAttributionRow> attributions = queryRepository.findAttributions(paymentId);
+        capCheckWriteRepository.detachPreConfirmDetails(paymentId);
+        writeRepository.archiveDraftChecks(paymentId);
+        writeRepository.deleteAttributions(paymentId);
+        if (writeRepository.deleteDraft(paymentId) != 1) {
+            throw new FgcBusinessException(FgcErrorCode.TRAN_005);
+        }
+        auditLogService.record(AuditLogService.AuditEvent.builder()
+                .actionCode(AUDIT_PAYMENT_DELETED)
+                .entityType(AUDIT_ENTITY_TYPE)
+                .entityId(String.valueOf(paymentId))
+                .before(paymentAuditValue(before, attributions))
+                .policyVersionId(before.allocationPolicyVersion())
+                .build());
     }
 
     /**
