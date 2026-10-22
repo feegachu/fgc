@@ -85,7 +85,8 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
     public ValidationRunProgressResponse progress(Long validationRunId) {
         ValidationRun run = validationRunRepository.findById(validationRunId)
                 .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
+        var trace = validationRunRepository.findLatestAttemptTrace(validationRunId).orElse(null);
         return ValidationRunProgressResponse.from(ValidationRunRow.from(run),
-                validationRunRepository.findLatestAttemptRequestId(validationRunId));
+                trace == null ? null : trace.getRequestId(), trace == null ? null : trace.getAttemptId());
     }
 }

@@ -5996,6 +5996,10 @@
       },
       "ValidationRunProgressResponse" : {
         "properties" : {
+          "attemptId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "requestId" : {
             "type" : "string"
           },

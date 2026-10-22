@@ -89,15 +89,18 @@ export const runDetailQuery = (id: string) =>
 /** IF-API-49 — 진행 중인 동안 2초 간격으로 폴링하고, 끝나면(COMPLETED/FAILED/FINALIZED) 멈춘다. */
 export const POLL_INTERVAL = 2000
 export const isRunning = (status?: string) => status === 'RUNNING' || status === 'CREATED'
-export const runProgressQuery = (id: string, enabled: boolean, expectedRequestId: string | null = null) =>
+export const hasNewAttempt = (data: ValidationProgress | undefined, previousAttemptId: number | null) =>
+  previousAttemptId === null || (data?.attemptId ?? 0) > previousAttemptId
+
+export const runProgressQuery = (id: string, enabled: boolean, previousAttemptId: number | null = null) =>
   queryOptions({
-    queryKey: ['validation-runs', 'progress', id, expectedRequestId],
+    queryKey: ['validation-runs', 'progress', id, previousAttemptId],
     queryFn: ({ signal }) =>
       get<ValidationProgress>(`/api/v1/validation-runs/${encodeURIComponent(id)}/progress`, signal),
     enabled,
     // execute 직후엔 배치가 아직 안 떠서 CREATED 가 조회될 수 있다 — 종료 상태에서만 멈춘다.
     refetchInterval: (query) =>
-      query.state.data && (!expectedRequestId || query.state.data.requestId === expectedRequestId)
+      query.state.data && hasNewAttempt(query.state.data, previousAttemptId)
         && !isRunning(query.state.data.status) ? false : POLL_INTERVAL,
     // 폴링은 항상 최신값이어야 하므로 캐시를 재사용하지 않는다.
     gcTime: 0,

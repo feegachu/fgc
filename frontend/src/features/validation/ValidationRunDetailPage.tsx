@@ -14,6 +14,7 @@ import { withMonth } from '../../stores/workspace'
 import { useAuth } from '../auth/useAuth'
 import {
   executeRun,
+  hasNewAttempt,
   finalizeChecklistQuery,
   finalizeRun,
   isRunning,
@@ -95,12 +96,13 @@ function DetailBody({
   const client = useQueryClient()
   const header = detail.header ?? {}
   const [executed, setExecuted] = useState(false)
-  const [expectedRequestId, setExpectedRequestId] = useState<string | null>(null)
+  const [previousAttemptId, setPreviousAttemptId] = useState<number | null>(null)
   const polling = executed || header.status === 'RUNNING'
-  const progress = useQuery(runProgressQuery(id, polling, expectedRequestId))
+    || (header.status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT' && user?.canProcess === true)
+  const progress = useQuery(runProgressQuery(id, polling, previousAttemptId))
   // 확정(FINALIZED)은 폴링 응답보다 늦게 도착한 헤더가 정답이다 — 이전 폴링 값이 확정 상태를 덮지 않게 한다.
   const live = header.status === 'FINALIZED'
-    || (expectedRequestId && progress.data?.requestId !== expectedRequestId) ? undefined : progress.data
+    || !hasNewAttempt(progress.data, previousAttemptId) ? undefined : progress.data
   const status = live?.status ?? header.status
   const currentStep = live?.currentStep ?? header.currentStep ?? 0
   const failureMessage = live?.failureMessage ?? header.failureMessage
@@ -112,7 +114,7 @@ function DetailBody({
   const canExecute = status === 'CREATED' || canRestart
 
   // 폴링이 종료 상태에 닿으면 헤더·결과 요약·확정 조건을 다시 불러온다(1차는 전체 리로드였다).
-  const finished = live && !isRunning(live.status)
+  const finished = (executed || header.status === 'RUNNING') && live && !isRunning(live.status)
   const announced = useRef(false)
   useEffect(() => {
     if (!finished || announced.current) return
@@ -145,9 +147,10 @@ function DetailBody({
   const execute = useMutation({
     mutationFn: () => executeRun(id),
     meta: { errorToast: false },
-    onSuccess: (response) => {
+    onMutate: () => ({ restarting: canRestart, attemptId: progress.data?.attemptId ?? 0 }),
+    onSuccess: (_response, _variables, before) => {
       announced.current = false
-      setExpectedRequestId(canRestart ? response.requestId ?? null : null)
+      setPreviousAttemptId(before?.restarting ? before.attemptId : null)
       setExecuted(true)
       toast('검증 실행을 시작했습니다. 진행률을 2초 간격으로 갱신합니다.', 'info')
     },
@@ -238,6 +241,7 @@ function DetailBody({
               onClick={() => {
                 toast('최신 상태를 불러옵니다.', 'info', 2000)
                 refetchDetail()
+                if (polling) void progress.refetch()
                 void progress.refetch()
                 void checklist.refetch()
               }}
@@ -252,7 +256,7 @@ function DetailBody({
               className="vrun-row-button"
               aria-describedby="execute-action-note"
               loading={execute.isPending}
-              disabled={!canProcess || !canExecute || (executed && !finished)}
+              disabled={!canProcess || !canExecute || (canRestart && !progress.isSuccess) || (executed && !finished)}
               onClick={() => execute.mutate()}
             >
               <span className="material-symbols-rounded" aria-hidden="true">

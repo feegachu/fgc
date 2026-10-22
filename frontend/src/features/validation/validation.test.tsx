@@ -309,23 +309,33 @@ describe('VRUN-W02 상세·실행·확정', () => {
     handlers['POST /api/v1/validation-runs/7/execute'] = () => ({ validationRunId: 7, status: 'RUNNING' })
     handlers['GET /api/v1/validation-runs/7/progress'] = () => {
       polls += 1
-      return polls === 1
-        ? { status: 'FAILED', currentStep: 5, failureMessage: '25번째 실패', requestId: 'old-request' }
-        : { status: 'FAILED', currentStep: 5, failureMessage: '다시 실패', requestId: 'vrun-test' }
+      return polls <= 2
+        ? { status: 'FAILED', currentStep: 5, failureMessage: '25번째 실패', requestId: 'old-request', attemptId: 10 }
+        : { status: 'FAILED', currentStep: 5, failureMessage: '다시 실패', requestId: 'other-tab-request', attemptId: 11 }
     }
     const { actions } = renderAt('/app/validation-runs/7')
-    await actions.click(await screen.findByRole('button', { name: /실패 지점부터 재시작/ }))
-    await waitFor(() => expect(polls).toBe(1))
+    const restart = await screen.findByRole('button', { name: /실패 지점부터 재시작/ })
+    await waitFor(() => expect(restart).toBeEnabled())
+    await actions.click(restart)
+    await waitFor(() => expect(polls).toBe(2))
     expect(screen.getByRole('button', { name: /실패 지점부터 재시작/ })).toBeDisabled()
-    await waitFor(() => expect(polls).toBeGreaterThan(1), { timeout: 5000 })
+    await waitFor(() => expect(polls).toBeGreaterThan(2), { timeout: 5000 })
     await waitFor(() => expect(screen.getByRole('button', { name: /실패 지점부터 재시작/ })).toBeEnabled())
     expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
   }, 15000)
 
-  it('계약수동 실패와 조회 전용 사용자는 월 재시작을 할 수 없다', async () => {
+  it('계약수동 실패는 월 재시작을 할 수 없다', async () => {
     detailHandlers(run({ status: 'FAILED', runType: 'MANUAL_CONTRACT', currentStep: 3 }))
     renderAt('/app/validation-runs/7')
     expect(await screen.findByRole('button', { name: /실행$/ })).toBeDisabled()
+    expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(0)
+  })
+
+  it('실패한 월 실행도 조회 전용 사용자는 재시작할 수 없다', async () => {
+    currentUser = gaAdmin
+    detailHandlers(run({ status: 'FAILED', currentStep: 5 }))
+    renderAt('/app/validation-runs/7')
+    expect(await screen.findByRole('button', { name: /실패 지점부터 재시작/ })).toBeDisabled()
     expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(0)
   })
 

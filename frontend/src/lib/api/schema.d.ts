@@ -3854,6 +3854,8 @@ export interface components {
             validationRunId?: number;
         };
         ValidationRunProgressResponse: {
+            /** Format: int64 */
+            attemptId?: number;
             requestId?: string;
             /** Format: int32 */
             currentStep?: number;
