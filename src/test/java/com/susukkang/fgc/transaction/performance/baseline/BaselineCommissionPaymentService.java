@@ -79,6 +79,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class BaselineCommissionPaymentService implements CommissionPaymentService {
+    @Override
+    public void deleteDraft(Long paymentId) {
+        throw new UnsupportedOperationException("초안 삭제는 성능 비교 기준 버전에 없는 기능입니다.");
+    }
 
     @Override
     @Transactional(readOnly = true)

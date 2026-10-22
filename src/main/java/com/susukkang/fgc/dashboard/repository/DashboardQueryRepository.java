@@ -42,9 +42,18 @@ public class DashboardQueryRepository {
                 SELECT COUNT(*)
                   FROM (
                       SELECT DISTINCT ON (contract_id, payment_stage) result_status
-                        FROM fgc.cap_check
+                        FROM fgc.cap_check cc
                        WHERE date_trunc('month', CAST(as_of_date AS timestamp))
                              = date_trunc('month', CAST(CAST(:month AS date) AS timestamp))
+                          AND (
+                              (cc.candidate_transaction_id IS NULL
+                               AND NOT jsonb_exists(cc.calculation_snapshot, 'deletedCandidateTransactionId'))
+                              OR EXISTS (
+                                  SELECT 1 FROM fgc.commission_transaction candidate
+                                   WHERE candidate.commission_transaction_id = cc.candidate_transaction_id
+                                     AND candidate.status = 'CONFIRMED'
+                              )
+                          )
                        ORDER BY contract_id, payment_stage, checked_at DESC, cap_check_id DESC
                   ) AS latest_in_month
                  WHERE result_status = :resultStatus

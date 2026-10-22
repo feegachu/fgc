@@ -60,6 +60,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class CommissionPaymentApiControllerTest {
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SETTLEMENT", "SYSTEM_ADMIN"})
+    void deleteDraftAllowsProcessingRoles(String role) throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/transactions/41")
+                        .with(user("processor").roles(role)).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.error").isEmpty());
+        verify(commissionPaymentService).deleteDraft(41L);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"COMPLIANCE", "GA_ADMIN", "AGENT"})
+    void deleteDraftRejectsReadOnlyRoles(String role) throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/transactions/41")
+                        .with(user("reader").roles(role)).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
+        verify(commissionPaymentService, never()).deleteDraft(any());
+    }
+
     @Autowired
     private MockMvc mockMvc;
 

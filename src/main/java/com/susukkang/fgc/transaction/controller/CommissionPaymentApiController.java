@@ -119,6 +119,21 @@ public class CommissionPaymentApiController {
         );
     }
 
+    @Operation(summary = "수수료 지급 초안 삭제",
+            description = "직접 작성한 DRAFT와 귀속행을 삭제합니다. 검출·감사 이력은 보존하며, 확정 건과 원장·대사·환수·정정에 연결된 건은 거절합니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "초안 삭제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "존재하지 않는 지급 건"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "지급 처리 권한 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "초안이 아니거나 삭제할 수 없는 연관 이력")
+    })
+    @DeleteMapping("/{paymentId}")
+    @PreAuthorize(Roles.CAN_PROCESS)
+    public ApiResponse<Void> deleteDraft(@PathVariable Long paymentId) {
+        commissionPaymentService.deleteDraft(paymentId);
+        return ApiResponse.success(null);
+    }
+
     @Operation(
             summary = "수수료 지급 건 확정",
             description = "FUN-033 사전 한도 검증을 수행하고 성공한 DRAFT만 CONFIRMED로 전환합니다."
