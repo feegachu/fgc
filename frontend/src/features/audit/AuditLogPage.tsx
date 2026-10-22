@@ -22,6 +22,7 @@ import {
   auditEntityTypeLabel,
   auditEntityTypeWithCode,
   auditReasonLabel,
+  diffFieldLabel,
 } from './labels'
 import './audit.css'
 
@@ -299,7 +300,7 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
                 const changed = entry.changed ? ' audit-diff-cell-changed' : ''
                 return (
                   <tr key={entry.field}>
-                    <td className="tabular-nums audit-diff-value">{entry.field}</td>
+                    <td className="tabular-nums audit-diff-value" title={entry.field}>{diffFieldLabel(entry.field ?? '')}</td>
                     <td className={`tabular-nums audit-diff-value${changed}`}>{entry.before}</td>
                     <td className={`tabular-nums audit-diff-value${changed}`}>{entry.after}</td>
                   </tr>

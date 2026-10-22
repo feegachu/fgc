@@ -322,11 +322,11 @@ class AuditLogViewControllerTest {
     void falls_back_to_raw_comparison_when_after_is_not_a_json_object() throws Exception {
         stubSearch(List.of(log(1L, "settle01",
                 "{\"status\":\"DRAFT\"}",
-                "[1,2,3]")));
+                "42")));
         mvc.perform(get("/audit-logs").param("selected", "1").with(user(complianceUser())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("{&quot;status&quot;:&quot;DRAFT&quot;}")))
-                .andExpect(content().string(containsString("[1,2,3]")));
+                .andExpect(content().string(containsString("42")));
     }
 
     /** 화면정의서 "막아야 할 것": 별도 안내 문구와 무관하게 수정·삭제 버튼 자체를 만들지 않는다. */
