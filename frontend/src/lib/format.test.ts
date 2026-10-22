@@ -1,9 +1,8 @@
 import { test, assert, vi } from "vitest";
 import * as format from "./format";
-test("금액은 천 단위로 묶고 음수는 숫자만 괄호로 감싼다 (화면정의서 4장 규칙 1)", () => {
+test("금액은 천 단위로 묶고 음수는 마이너스 기호를 붙인다 (화면정의서 4장 규칙 1)", () => {
   assert.strictEqual(format.won(1517944), "1,517,944원");
-  // 산출물 리터럴 예시가 (1,517,944) 이므로 "원" 은 괄호 밖이다.
-  assert.strictEqual(format.won(-1517944), "(1,517,944)원");
+  assert.strictEqual(format.won(-1517944), "-1,517,944원");
   assert.strictEqual(format.won(0), "0원");
   assert.strictEqual(format.isNegative(-1), true);
   assert.strictEqual(format.isNegative(0), false);

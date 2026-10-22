@@ -45,7 +45,7 @@
 
   /*
    * 표시 형식은 공통 유틸만 쓴다 (FGC-SIR-008).
-   * format.won() 은 음수 괄호까지 만들고, 호출부가 isNegative() 로 빨강을 함께 적용한다.
+   * format.won() 은 음수 마이너스 기호까지 만들고, 호출부가 isNegative() 로 빨강을 함께 적용한다.
    */
   function money(value) {
     return format ? format.won(value) : text(value) + "원";
