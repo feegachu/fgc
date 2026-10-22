@@ -162,7 +162,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     expect(listCalls().every((url) => new URLSearchParams(url.split('?')[1]).get('month') === '2026-07')).toBe(true)
     expect(within(table).getByText('1,200.000000%')).toBeVisible()
     expect(within(table).getByText('주의')).toBeVisible() // 1200%를 프론트에서 VIOLATION으로 다시 판정하지 않음
-    expect(within(table).getByText('(85,000)원')).toHaveClass('is-negative-amount')
+    expect(within(table).getByText('-85,000원')).toHaveClass('is-negative-amount')
     expect(within(table).getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/contracts/3?tab=cap')
     expect(screen.getByRole('button', { name: /저장 판정 정상\s*30/ })).toBeVisible()
     expect(screen.getByText('30,000,000원')).toBeVisible() // 현재 페이지 1행으로 합산하지 않음

@@ -511,7 +511,7 @@ describe('RECO-W01·W02 React 전환', () => {
   it.each([
     { amount: 500.49, rowText: '500원', totalText: '1,000' },
     { amount: 500.5, rowText: '501원', totalText: '1,002' },
-    { amount: -500.5, rowText: '(501)원', totalText: '(1,002)' },
+    { amount: -500.5, rowText: '-501원', totalText: '-1,002' },
   ])('결과 유형 필터는 행별 HALF_UP 표시와 합계를 일치시킨다: $amount', async ({ amount, rowText, totalText }) => {
     renderAt('/reconciliations?runId=41&resultType=AMOUNT_DIFFERENCE', (url) =>
       /\/41\/results/.test(url)

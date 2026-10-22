@@ -189,11 +189,11 @@
               <td class="is-number tabular-nums"
                   th:classappend="${journal.debitTotal.signum() < 0} ? ' is-negative-amount' : (${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' ledger-imbalanced-amount' : '')"
                   th:title="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? '차변·대변 합계 불일치' : null"
-                  th:text="${journal.debitTotal.signum() < 0 ? '(' + #numbers.formatDecimal(journal.debitTotal.abs(), 1, 'COMMA', 0, 'POINT') + ')원' : #numbers.formatDecimal(journal.debitTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
+                  th:text="${journal.debitTotal.signum() < 0 ? '-' + #numbers.formatDecimal(journal.debitTotal.abs(), 1, 'COMMA', 0, 'POINT') + '원' : #numbers.formatDecimal(journal.debitTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
               <td class="is-number tabular-nums"
                   th:classappend="${journal.creditTotal.signum() < 0} ? ' is-negative-amount' : (${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? ' ledger-imbalanced-amount' : '')"
                   th:title="${journal.debitTotal.compareTo(journal.creditTotal) != 0} ? '차변·대변 합계 불일치' : null"
-                  th:text="${journal.creditTotal.signum() < 0 ? '(' + #numbers.formatDecimal(journal.creditTotal.abs(), 1, 'COMMA', 0, 'POINT') + ')원' : #numbers.formatDecimal(journal.creditTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
+                  th:text="${journal.creditTotal.signum() < 0 ? '-' + #numbers.formatDecimal(journal.creditTotal.abs(), 1, 'COMMA', 0, 'POINT') + '원' : #numbers.formatDecimal(journal.creditTotal, 1, 'COMMA', 0, 'POINT') + '원'}">0원</td>
               <td><span class="status-badge"
                         th:classappend="${journal.status.name() == 'POSTED'} ? ' status-badge-success' : (${journal.status.name() == 'REVERSED'} ? ' status-badge-review' : ' status-badge-neutral')"
                         th:text="${journal.statusLabel}">기표됨</span></td>

@@ -278,18 +278,18 @@ it('insurer-to-GA rows remain readable but cannot invoke the GA-only manual API'
   expect(screen.getByRole('button', { name: '이 계약만 다시 검증' })).toBeDisabled()
   expect(request.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(false)
 })
-it('negative money uses common brackets/red and displays stored excess independently of input amounts', async () => {
+it('negative money uses common minus/red and displays stored excess independently of input amounts', async () => {
   mount(undefined, true, (p) =>
     p.includes('/insurers')
       ? fixtures(p)
       : result([{ ...row, paidCommissionAmount: -1234, netDifferenceAmount: -987 }], 1, 1),
   )
   await screen.findByText('서버 판정 근거')
-  for (const amount of screen.getAllByText('(1,234)원')) expect(amount).toHaveClass('is-negative-amount')
+  for (const amount of screen.getAllByText('-1,234원')) expect(amount).toHaveClass('is-negative-amount')
   await screen.findByRole('img', { name: '기준일별 초과액 추이' })
-  for (const amount of screen.getAllByText('(987)원')) expect(amount).toHaveClass('is-negative-amount')
+  for (const amount of screen.getAllByText('-987원')) expect(amount).toHaveClass('is-negative-amount')
   const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector('.arb-calculation')!
-  expect(stored).toHaveTextContent('지급분 기준 초과액: (987)원')
+  expect(stored).toHaveTextContent('지급분 기준 초과액: -987원')
 })
 
 it('timeline cache separates contract IDs even when contract number/stage match', async () => {

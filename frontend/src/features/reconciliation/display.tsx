@@ -21,7 +21,7 @@ export function Money({
     <span
       className={`${isNegative(value) ? 'is-negative-amount' : ''} ${difference && value != null && Number(value) !== 0 ? 'reco-react-difference' : ''}`}
     >
-      {amountText(value, unit, difference ? 'minus' : 'parentheses')}
+      {amountText(value, unit)}
     </span>
   )
 }

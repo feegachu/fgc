@@ -184,7 +184,7 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
     // 서버 라벨이 비면 코드표로 대체한다.
     expect(within(table).getByText('원수사→GA')).toBeInTheDocument()
     expect(within(table).getByText('1,500,000원')).toBeInTheDocument()
-    expect(within(table).getByText('(1,517,944)원')).toHaveClass('is-negative-amount')
+    expect(within(table).getByText('-1,517,944원')).toHaveClass('is-negative-amount')
     expect(within(table).getByText('미사용')).toBeInTheDocument()
     expect(within(table).getByText('확정').querySelector('.schedule-badge-lock')).not.toBeNull()
     expect(screen.getByText('41')).toBeInTheDocument()
@@ -283,7 +283,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     expect(within(lines).getByText('1,000.1234%')).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '요율' })).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '정액' })).toBeInTheDocument()
-    expect(within(lines).getAllByText('(100,000)원')[0]).toHaveClass('is-negative-amount')
+    expect(within(lines).getAllByText('-100,000원')[0]).toHaveClass('is-negative-amount')
     // 합계는 서버 expectedTotal 이다.
     expect(lines.querySelector('tfoot')).toHaveTextContent('합계 (2줄)1,500,000원')
     const versionTable = await screen.findByRole('table', { name: '같은 계약의 스케줄 버전 이력' })

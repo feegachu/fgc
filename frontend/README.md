@@ -110,7 +110,7 @@ blob을 서버 `Content-Disposition` 파일명(UTF-8 포함)으로 저장한다.
 | cap-list.js `number` | `int`, `won`, `usageRate` | 빈 값 `0` → `-`; #410 |
 | reco.js 숫자 표시 | `int`, `won` | 빈 값 `0` → `-`; #414 |
 | policy-list.js 숫자·요율 표시 | `int`, `rate` | 기존 문자열 4자리 절사와 동일; #406 |
-| exception-list.js 금액 표시 | `won`, `isNegative` | 음수 `-1,234` → `(1,234)원` 및 음수 색상; #415 |
+| exception-list.js 금액 표시 | `won`, `isNegative` | 음수 `-1,234원` 및 빨간색; #609 |
 | contract-form.js `int` | `int` | 기존 공통 `format.int`와 동일; 단위는 화면에서 유지; #407 |
 | month-selector.js 현재 월 | `month(today())` | 브라우저 시간대 → KST; #403 |
 
@@ -271,7 +271,7 @@ POL 기준일은 제목 오른쪽에 두고, 표의 열 너비와 상세 제목�
 화면 CSS는 공통 CSS 뒤에서 적용한다. DataTable의 선택·열 너비 옵션과 FilterBar/Pagination의
 선택적 배치 옵션을 쓰며 다른 화면의 기본 동작은 유지한다.
 
-탭·선택 정책의 URL 복원과 EvidenceLink, 음수 금액의 괄호/빨간색, 요율 4자리 절사는 유지한다.
+탭·선택 정책의 URL 복원과 EvidenceLink, 음수 금액의 마이너스 기호/빨간색, 요율 4자리 절사는 유지한다.
 수수료 항목 분류는 API에 라벨 필드가 없어 `base-list.js`의 표시용 매핑을 그대로 옮겼다.
 키보드 선택은 라디오 버튼을 사용하고 근거 버튼·셀 전체 보기 클릭은 행 선택을 바꾸지 않는다.
 

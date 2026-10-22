@@ -29,12 +29,14 @@ async function historyFixture(page: import('@playwright/test').Page) {
             ? {
                 ...result,
                 installmentNo: null,
+                expectedTotalAmount: -12000,
+                actualTotalAmount: -13000,
                 matches: [
                   {
                     matchSeq: 1,
                     matchRole: 'ACTUAL',
                     commissionTransactionId: 12,
-                    matchedAmount: 11000,
+                    matchedAmount: -13000,
                     installmentNo: null,
                   },
                 ],
@@ -56,12 +58,19 @@ test('비활성 보험회사 과거 이력 조회는 가능하고 신규 대사�
   await expect(page).toHaveURL(/insurer=9/)
 })
 
-test('비교 모달의 null 회차는 대시로 표시한다', async ({ page }) => {
+test('비교 모달의 null 회차는 대시, 음수 예상·실제·차액은 마이너스와 빨간색으로 표시한다', async ({ page }) => {
   await historyFixture(page)
   await page.goto('reconciliations?month=2026-07&resultId=7')
   await expect(page.getByRole('dialog').getByText('C-001 · 초회 수수료 · —')).toBeVisible()
   await expect(page.getByRole('dialog')).not.toContainText('-회차')
   await expect(page.getByRole('dialog')).not.toContainText('—회차')
+  for (const text of ['-12,000원', '-13,000원', '-1,000원']) {
+    const amounts = page.getByRole('dialog').getByText(text, { exact: true })
+    await expect(amounts.first()).toBeVisible()
+    for (const amount of await amounts.all()) {
+      await expect(amount).toHaveCSS('color', 'rgb(185, 28, 28)')
+    }
+  }
 })
 
 test('상태 미확인 실행은 일괄 예외 버튼을 활성화하지 않는다', async ({ page }) => {
