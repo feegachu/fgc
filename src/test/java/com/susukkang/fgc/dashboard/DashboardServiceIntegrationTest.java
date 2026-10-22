@@ -169,11 +169,19 @@ class DashboardServiceIntegrationTest {
         LocalDate month = LocalDate.of(2097, 1, 1);
         insertCapCheck(contract, stage, month, "WARNING", OffsetDateTime.parse("2097-01-01T09:00:00+09:00"));
         Long payment = jdbcTemplate.queryForObject("""
-                INSERT INTO fgc.commission_transaction(payment_stage,source_type,source_business_key,
+                INSERT INTO fgc.commission_transaction(payment_stage,source_type,source_business_key,recipient_agent_id,
                     commission_item_id,settlement_month,amount,cashflow_type,status)
-                VALUES(?,'GA_MANUAL_PAYMENT',?,(SELECT MIN(commission_item_id) FROM fgc.commission_item),?,100,'PAYMENT',?)
+                VALUES(?,'GA_MANUAL_PAYMENT',?,(SELECT MIN(agent_id) FROM fgc.agent),
+                    (SELECT MIN(commission_item_id) FROM fgc.commission_item),?,0,'PAYMENT','DRAFT')
                 RETURNING commission_transaction_id
-                """, Long.class, stage, "IT-607-" + java.util.UUID.randomUUID(), month, state.equals("DELETED") ? "DRAFT" : state);
+                """, Long.class, stage, "IT-607-" + java.util.UUID.randomUUID(), month);
+        // 집계 자격만 검사하는 0원 fixture도 실제 DB 상태 전이 순서를 따른다.
+        if (state.equals("CONFIRMED") || state.equals("CANCELLED")) {
+            jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", payment);
+        }
+        if (state.equals("CANCELLED")) {
+            jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?", payment);
+        }
         jdbcTemplate.update("""
                 INSERT INTO fgc.cap_check(contract_id,payment_stage,cap_rule_set_id,check_kind,as_of_date,
                     base_premium_amount,limit_amount,included_amount,remaining_amount,result_status,
