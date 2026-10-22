@@ -47,6 +47,7 @@ const historyColumns: TableColumn<Run>[] = [
     key: 'status',
     label: '상태',
     width: '6rem',
+    align: 'center',
     render: (row) => (
       <StatusBadge
         tone={
@@ -63,14 +64,14 @@ const historyColumns: TableColumn<Run>[] = [
       </StatusBadge>
     ),
   },
-  { key: 'target', label: '대상', width: '4.5rem', align: 'number', render: (row) => int(row.targetCount) },
-  { key: 'matched', label: '일치', width: '4.5rem', align: 'number', render: (row) => int(row.matchedCount) },
-  { key: 'exception', label: '불일치', width: '4.5rem', align: 'number', render: (row) => int(row.exceptionCount) },
+  { key: 'target', label: '대상', width: '4.5rem', align: 'left', render: (row) => int(row.targetCount) },
+  { key: 'matched', label: '일치', width: '4.5rem', align: 'left', render: (row) => int(row.matchedCount) },
+  { key: 'exception', label: '불일치', width: '4.5rem', align: 'left', render: (row) => int(row.exceptionCount) },
   {
     key: 'rate',
     label: '일치율',
     width: '5.5rem',
-    align: 'number',
+    align: 'left',
     render: (row) => (row.matchRatePct == null ? EMPTY : `${Number(row.matchRatePct).toFixed(1)}%`),
   },
   {
@@ -223,7 +224,7 @@ export default function ReconciliationPage() {
       key: 'detail',
       label: '상세',
       width: '4rem',
-      align: 'center',
+      align: 'left',
       render: (row) => (
         <Button
           variant="ghost"
@@ -372,7 +373,6 @@ export default function ReconciliationPage() {
             totalPages={results.data?.items?.totalPages ?? 0}
             onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
           />
-
         </section>
         <section className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching}>
           <header className="surface-header reco-react-panel-header">

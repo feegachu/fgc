@@ -30,9 +30,6 @@
 }
 
 .exception-work-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(20rem, 1fr);
-  gap: var(--space-4);
   margin-top: var(--space-4);
 }
 
@@ -58,7 +55,7 @@
   height: auto;
   padding-block: var(--space-2);
   overflow: visible;
-  vertical-align: top;
+  vertical-align: middle;
   text-overflow: clip;
   white-space: normal;
 }

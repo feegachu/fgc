@@ -34,6 +34,7 @@ const columns: TableColumn<Detail>[] = [
     key: 'classification',
     label: '판정',
     width: '6rem',
+    align: 'center',
     render: (row) => (
       <StatusBadge
         tone={
@@ -150,12 +151,12 @@ function BasisContent({ data }: { data: CapBasis }) {
   )
   const matches = includedTotal === item.includedAmount
   const inputs = [
-    ['월납환산 초회보험료', won(item.basePremiumAmount)],
-    ['한도 배수', `${multiplier}배`],
-    ['해약환급금 합산', won(item.refund12mAmount)],
-    ['준법경영비 공제', insurerStage ? won(item.complianceDeductionAmount) : '적용하지 않음'],
-    ['적용 룰셋', item.capRuleSetId == null ? '—' : `룰셋 ID ${item.capRuleSetId}`],
-  ]
+    ['월납환산 초회보험료', won(item.basePremiumAmount), true],
+    ['한도 배수', `${multiplier}배`, false],
+    ['해약환급금 합산', won(item.refund12mAmount), true],
+    ['준법경영비 공제', insurerStage ? won(item.complianceDeductionAmount) : '적용하지 않음', insurerStage],
+    ['적용 룰셋', item.capRuleSetId == null ? '—' : `룰셋 ID ${item.capRuleSetId}`, false],
+  ] as const
   return (
     <div className="cap-react-detail">
       <header className="cap-react-detail-summary">
@@ -172,10 +173,10 @@ function BasisContent({ data }: { data: CapBasis }) {
             <h3>① 입력값</h3>
             <table className="data-table">
               <tbody>
-                {inputs.map(([label, value]) => (
+                {inputs.map(([label, value, monetary]) => (
                   <tr key={label}>
                     <th scope="row">{label}</th>
-                    <td>{value}</td>
+                    <td className={monetary ? 'is-number' : 'is-left'}>{value}</td>
                   </tr>
                 ))}
               </tbody>

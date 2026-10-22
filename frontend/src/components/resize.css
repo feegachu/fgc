@@ -1,0 +1,81 @@
+.data-table.data-table-resizable th {
+  padding-right: max(var(--data-table-cell-padding-x), 14px);
+}
+
+.resizable-table-viewport {
+  position: relative;
+}
+
+/* Preserve intrinsic tag widths so their columns can enforce a readable minimum. */
+.data-table.data-table-resizable .status-badge {
+  width: max-content;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.resize-handle {
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.column-resize-handle {
+  position: absolute;
+  z-index: 3;
+  width: 10px;
+}
+
+.resize-handle::after {
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: calc(50% - 1px);
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-border-default);
+  content: '';
+}
+
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after,
+.resize-handle.is-resizing::after {
+  background: var(--color-border-focus);
+  width: 3px;
+}
+
+.resize-handle:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.resizable-split {
+  display: grid;
+  grid-template-columns: minmax(16rem, var(--split-primary)) 16px minmax(16rem, var(--split-secondary));
+  gap: 0;
+  min-width: 0;
+}
+
+.resizable-split-panel {
+  min-width: 0;
+}
+
+.split-resize-handle {
+  position: relative;
+  align-self: stretch;
+  min-height: 5rem;
+}
+
+.split-resize-handle::after {
+  top: 12px;
+  bottom: 12px;
+}
+
+@media (max-width: 63.9375rem) {
+  .resizable-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+  .split-resize-handle {
+    display: none;
+  }
+}

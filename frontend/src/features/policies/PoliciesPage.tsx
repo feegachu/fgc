@@ -121,13 +121,14 @@ export function PoliciesPage() {
                   key: 'source',
                   label: '출처분류',
                   width: '7.5rem',
+                  align: 'center',
                   render: (r) => (
                     <StatusBadge tone={sourceTones[r.sourceClass ?? ''] ?? 'neutral'}>
                       {present(r.sourceClassLabel)}
                     </StatusBadge>
                   ),
                 },
-                { key: 'version', label: '버전', width: '4.5rem', align: 'number', render: (r) => `v${r.versionNo}` },
+                { key: 'version', label: '버전', width: '4.5rem', align: 'left', render: (r) => `v${r.versionNo}` },
                 { key: 'from', label: '적용 시작', width: '7.5rem', render: (r) => date(r.effectiveFrom) },
                 {
                   key: 'to',
@@ -139,6 +140,7 @@ export function PoliciesPage() {
                   key: 'status',
                   label: '상태',
                   width: '6rem',
+                  align: 'center',
                   render: (r) => (
                     <StatusBadge
                       tone={r.status === 'ACTIVE' ? 'success' : r.status === 'DRAFT' ? 'warning' : 'neutral'}

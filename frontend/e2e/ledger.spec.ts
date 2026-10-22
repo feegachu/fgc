@@ -76,7 +76,8 @@ test('LEDG-W01 조건 조회 → 행 선택 → 역분개 생성 → 상태 갱�
     await route.fulfill({ json: envelope(data) })
   })
   await page.goto('journals')
-  await expect(page.getByText('조회 조건을 설정하고 조회 버튼을 눌러 주세요.')).toBeVisible()
+  // 진입 시 기준 정산월을 자동 조회한다. 조건 재조회 후에도 행 선택을 유지한다.
+  await expect(page.getByRole('button', { name: 'JRN-001', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '조회', exact: true }).click()
   await page.getByRole('button', { name: 'JRN-001', exact: true }).click()
   await page.getByRole('button', { name: '역분개', exact: true }).click()
