@@ -276,12 +276,14 @@ describe('CONT-W02 계약 상세', () => {
             journalHeaderId: 7,
             journalNo: 'JOURNAL-7',
             journalDate: '2026-07-02',
+            journalType: 'EXPECTED_FC_PAYOUT',
             debitTotal: 1000,
             creditTotal: 900,
             differenceAmount: 77,
             status: 'CONFIRMED',
             statusLabel: '서버 원장 확정',
           },
+          { journalHeaderId: 8, journalNo: 'JOURNAL-8', journalType: 'REVERSAL' },
         ]
       if (url.endsWith('/transactions'))
         return {
@@ -314,6 +316,10 @@ describe('CONT-W02 계약 상세', () => {
     await screen.findByRole('cell', { name: 'JOURNAL-7' })
     expect(screen.getByText('77원')).toBeInTheDocument()
     expect(screen.getByText('서버 원장 확정')).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '예상 지급(GA→설계사)' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '역분개' })).toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: 'EXPECTED_FC_PAYOUT' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: 'REVERSAL' })).not.toBeInTheDocument()
     await actions.click(screen.getByRole('tab', { name: '지급·대사' }))
     await screen.findByRole('cell', { name: '서버 대사 결과' })
     expect(screen.getByText('3원')).toBeInTheDocument()
