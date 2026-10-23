@@ -57,6 +57,7 @@ class IntakeFileServiceIntegrationTest {
         storage.failDelete.set(false);
         storage.failedKeys.clear();
         jdbc.execute("DROP TRIGGER IF EXISTS trg_637_fail_audit ON fgc.audit_log");
+        jdbc.execute("DROP TRIGGER IF EXISTS trg_637_fail_delete_confirm ON fgc.intake_document");
         jdbc.update("DELETE FROM fgc.intake_document");
         userId = jdbc.queryForObject("SELECT min(user_id) FROM fgc.app_user", Long.class);
     }
@@ -127,6 +128,8 @@ class IntakeFileServiceIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT source_deleted_at IS NOT NULL FROM fgc.intake_document WHERE intake_document_id=?", Boolean.class, id)).isTrue();
         assertThat(audits(id, "INTAKE_SOURCE_PURGED")).isEqualTo(1);
         assertThat(service.purgeExpired(100).selected()).isZero();
+        assertThatThrownBy(() -> jdbc.update("UPDATE fgc.intake_document SET status='EXTRACTING' WHERE intake_document_id=?", id))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         assertThatThrownBy(() -> service.withSource(id, source -> 1))
                 .isInstanceOfSatisfying(FgcBusinessException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_004));
     }
@@ -153,6 +156,20 @@ class IntakeFileServiceIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT source_purged_at IS NULL FROM fgc.intake_document WHERE intake_document_id=?", Boolean.class, id)).isTrue();
         byte[] preserved = service.withSource(id, source -> source.stream().readAllBytes());
         assertThat(preserved).isEqualTo(csv("purge rollback").getBytes());
+    }
+
+    @Test void deletionConfirmationDatabaseFailureResumesWhenFileIsAlreadyAbsent() {
+        long id = service.upload(csv("confirm retry"), userId).documentId();
+        expire(id);
+        String key = jdbc.queryForObject("SELECT storage_key FROM fgc.intake_document WHERE intake_document_id=?", String.class, id);
+        jdbc.execute("CREATE OR REPLACE FUNCTION fgc.fail_delete_confirm_637() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '637 confirm fault injection'; RETURN NEW; END $$");
+        jdbc.execute("CREATE TRIGGER trg_637_fail_delete_confirm BEFORE UPDATE OF source_deleted_at ON fgc.intake_document FOR EACH ROW EXECUTE FUNCTION fgc.fail_delete_confirm_637()");
+        assertThat(service.purgeExpired(100).failed()).isEqualTo(1);
+        assertThat(Files.exists(ROOT.resolve(key))).isFalse();
+        assertThat(jdbc.queryForObject("SELECT source_purged_at IS NOT NULL AND source_deleted_at IS NULL FROM fgc.intake_document WHERE intake_document_id=?", Boolean.class, id)).isTrue();
+        jdbc.execute("DROP TRIGGER trg_637_fail_delete_confirm ON fgc.intake_document");
+        assertThat(service.purgeExpired(100).deleted()).isEqualTo(1);
+        assertThat(audits(id, "INTAKE_SOURCE_PURGED")).isEqualTo(1);
     }
 
     @Test void unexpiredOrExtractingSourcesAreNotPurged() {
