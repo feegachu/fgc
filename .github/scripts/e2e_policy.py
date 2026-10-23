@@ -72,6 +72,18 @@ def changed_paths(base, head, *, merge_base=False):
     return raw.decode("utf-8", errors="surrogateescape").rstrip("\0").split("\0") if raw else []
 
 
+def documentation_only_since(base, head):
+    """Jenkins dev-fgc: a docs-only push reuses the previous images, so their revision must be a docs-only ancestor."""
+    require_sha(base)
+    require_sha(head)
+    try:
+        git("merge-base", "--is-ancestor", base, head)
+    except subprocess.CalledProcessError:
+        return False
+    plan = classify(changed_paths(base, head))
+    return not (plan["ui"] or plan["server"])
+
+
 def plan_for_event(event_name, event):
     """PR diffs cover the entire PR; push diffs cover all commits in that push."""
     if event_name in {"schedule", "workflow_dispatch"}:
