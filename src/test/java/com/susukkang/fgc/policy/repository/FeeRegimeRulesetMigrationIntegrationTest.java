@@ -64,10 +64,6 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                     INSERT INTO fgc.fee_regime_ruleset_limit (fee_regime_ruleset_id, limit_code, limit_pct)
                     VALUES (?, 'UPFRONT_TOTAL', 1)
                     """, rulesetId);
-            jdbc.update("""
-                    INSERT INTO fgc.fee_regime_transition_rule (fee_regime_ruleset_id, transition_code, applies_from)
-                    VALUES (?, 'TEST-TRANSITION', DATE '2027-01-01')
-                    """, rulesetId);
 
             // 체계 코드·한도 코드·장기유지 구간 검증
             assertThatThrownBy(() -> insertRuleset(jdbc, policyId, "CURRENT", 48, null, null))
@@ -85,8 +81,12 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                     .hasMessageContaining("ck_fee_regime_ruleset_installments");
             assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", "BD-NEG-3", 85, null, null))
                     .hasMessageContaining("ck_fee_regime_ruleset_installments");
+            // 기초서류 버전은 선택 키(NULL = 모든 버전): 등록할 수 있고, 같은 구간의 NULL 룰셋끼리는 겹칠 수 없다
+            insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", null, 84, null, null);
             assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", null, 84, null, null))
                     .isInstanceOf(DataIntegrityViolationException.class);
+            // 정책버전에 기초서류 버전이 있어도 NULL 룰셋은 일치 검사를 통과한다
+            insertRulesetWithVersion(jdbc, documentPolicyId, "FOUR_YEAR_2027", null, 48, null, null);
             // 같은 정책·체계·기초서류 버전에서 구간이 겹치는 룰셋은 거부
             assertThatThrownBy(() -> insertRuleset(jdbc, policyId, "FOUR_YEAR_2027", 48, null, null))
                     .isInstanceOf(DataIntegrityViolationException.class);
@@ -121,23 +121,20 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                      WHERE policy_version_id = ?
                     """, policyId);
             assertThatThrownBy(() -> jdbc.update(
-                    "UPDATE fgc.fee_regime_ruleset SET monthly_rate_pct = 3 WHERE fee_regime_ruleset_id = ?", rulesetId))
+                    "UPDATE fgc.fee_regime_ruleset SET max_installments = 40 WHERE fee_regime_ruleset_id = ?", rulesetId))
                     .hasMessageContaining("immutable");
             assertThatThrownBy(() -> jdbc.update(
                     "DELETE FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = ?", rulesetId))
                     .hasMessageContaining("immutable");
-            assertThatThrownBy(() -> jdbc.update(
-                    "DELETE FROM fgc.fee_regime_transition_rule WHERE fee_regime_ruleset_id = ?", rulesetId))
-                    .hasMessageContaining("immutable");
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset", Integer.class)).isEqualTo(3);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset", Integer.class)).isEqualTo(5);
         }
     }
 
     private void insertRulesetWithDocumentPeriod(JdbcTemplate jdbc, long policyId, String from, String to) {
         jdbc.update("""
                 INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from, basic_document_version,
-                    basic_document_date_from, basic_document_date_to, total_installments, monthly_rate_pct)
-                VALUES (?, 'SEVEN_YEAR_2029', DATE '2029-01-01', 'BD-2029-01', ?::date, ?::date, 84, 2)
+                    basic_document_date_from, basic_document_date_to, max_installments)
+                VALUES (?, 'SEVEN_YEAR_2029', DATE '2029-01-01', 'BD-2029-01', ?::date, ?::date, 84)
                 """, policyId, from, to);
     }
 
@@ -154,9 +151,9 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                                           int installments, Integer ltFrom, Integer ltTo) {
         jdbc.update("""
                 INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from,
-                    basic_document_version, total_installments, monthly_rate_pct,
+                    basic_document_version, max_installments,
                     long_term_maintenance_from, long_term_maintenance_to)
-                VALUES (?, ?, DATE '2027-01-01', ?, ?, 2, ?, ?)
+                VALUES (?, ?, DATE '2027-01-01', ?, ?, ?, ?)
                 """, policyId, regime, version, installments, ltFrom, ltTo);
     }
 
@@ -164,8 +161,8 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                                Integer ltFrom, Integer ltTo) {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.fee_regime_ruleset (policy_version_id, fee_regime_code, sales_start_date_from, basic_document_version,
-                    total_installments, monthly_rate_pct, long_term_maintenance_from, long_term_maintenance_to)
-                VALUES (?, ?, DATE '2027-01-01', 'BD-2027-01', ?, 2, ?, ?)
+                    max_installments, long_term_maintenance_from, long_term_maintenance_to)
+                VALUES (?, ?, DATE '2027-01-01', 'BD-2027-01', ?, ?, ?)
                 RETURNING fee_regime_ruleset_id
                 """, Long.class, policyId, regime, installments, ltFrom, ltTo);
     }
