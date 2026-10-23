@@ -43,6 +43,7 @@ public interface FeeRegimeResolverRepository extends Repository<PolicyVersion, L
                AND pv.effective_from <= :contractDate
                AND (pv.effective_to IS NULL OR pv.effective_to >= :contractDate)
                AND r.fee_regime_code = :feeRegimeCode
+               AND (pv.basic_document_version IS NULL OR pv.basic_document_version = :basicDocumentVersion)
                AND (r.basic_document_version IS NULL OR r.basic_document_version = :basicDocumentVersion)
                AND r.sales_start_date_from <= :salesStartDate
                AND (r.sales_start_date_to IS NULL OR r.sales_start_date_to >= :salesStartDate)

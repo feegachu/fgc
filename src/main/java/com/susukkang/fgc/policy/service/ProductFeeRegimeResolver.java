@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 설명 : 계약의 분급 체계와 룰셋을 고르는 Resolver (FUN-014-03, #536). 읽기 전용이다.
@@ -52,10 +54,10 @@ public class ProductFeeRegimeResolver {
                 policyType, input.declaredFeeRegimeCode(), input.contractDate(), input.salesStartDate(),
                 input.basicDocumentVersion(), input.basicDocumentDate());
 
-        // 기초서류 버전이 지정된 룰셋이 있으면 모든 버전용(NULL) 룰셋보다 우선한다(#534 선택 키 규칙)
-        if (candidates.stream().anyMatch(c -> c.getBasicDocumentVersion() != null)) {
-            candidates = candidates.stream().filter(c -> c.getBasicDocumentVersion() != null).toList();
-        }
+        // 기초서류 버전이 지정된 룰셋이 있으면 모든 버전용(NULL) 룰셋보다 우선한다(#534 선택 키 규칙).
+        // 이 우선 규칙은 같은 정책버전 안의 겹침에만 적용한다. 정책버전이 다르면 후보를 가리지 않으므로
+        // 정책버전 중복은 아래에서 RULESET_AMBIGUOUS 로 드러난다.
+        candidates = preferDocumentSpecificWithinPolicyVersion(candidates);
         List<Long> candidateIds = candidates.stream().map(RulesetCandidate::getRulesetId).toList();
 
         if (candidates.isEmpty()) {
@@ -74,6 +76,17 @@ public class ProductFeeRegimeResolver {
         }
         return build(input, FeeRegimeResolutionStatus.SELECTED, FeeRegimeReasonCode.RULESET_SELECTED,
                 only.getRulesetId(), only.getPolicyVersionId(), List.of(), List.of());
+    }
+
+    private static List<RulesetCandidate> preferDocumentSpecificWithinPolicyVersion(List<RulesetCandidate> candidates) {
+        Set<Long> policyVersionsWithSpecific = candidates.stream()
+                .filter(c -> c.getBasicDocumentVersion() != null)
+                .map(RulesetCandidate::getPolicyVersionId)
+                .collect(Collectors.toSet());
+        return candidates.stream()
+                .filter(c -> c.getBasicDocumentVersion() != null
+                        || !policyVersionsWithSpecific.contains(c.getPolicyVersionId()))
+                .toList();
     }
 
     private FeeRegimeResolution build(FeeRegimeDecisionInput input, FeeRegimeResolutionStatus status,

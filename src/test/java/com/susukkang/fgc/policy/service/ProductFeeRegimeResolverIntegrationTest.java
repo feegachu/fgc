@@ -141,24 +141,54 @@ class ProductFeeRegimeResolverIntegrationTest {
         assertThat(resolution.rulesetId()).isNull();
     }
 
-    // #534 선택 키: 기초서류 버전이 NULL 인 룰셋은 모든 버전에 맞고, 값이 있는 룰셋이 있으면 그쪽이 우선한다
+    // #534 선택 키: 같은 정책버전 안에서는 기초서류 버전이 지정된 룰셋이 NULL(모든 버전) 룰셋보다 우선한다
     @Test
-    void documentSpecificRulesetBeatsAllVersionRuleset() {
+    void documentSpecificRulesetBeatsAllVersionRulesetWithinSamePolicyVersion() {
         long contractId = g1ContractId();
         makeG1OfferingFourYear();
-        long policyId = insertDraftFourYearPolicy("TEST-RES-4Y-NULL");
-        long allVersions = insertRuleset(policyId, null, false);
+        long policyId = insertDraftFourYearPolicy("TEST-RES-4Y-SAME");
+        insertRuleset(policyId, null, false);
+        long specific = insertRuleset(policyId, "BD-2026-01", false);
         activate(policyId);
 
-        assertThat(resolver.resolve(contractId).rulesetId()).isEqualTo(allVersions);
+        FeeRegimeResolution resolution = resolver.resolve(contractId);
 
+        assertThat(resolution.status()).isEqualTo(FeeRegimeResolutionStatus.SELECTED);
+        assertThat(resolution.rulesetId()).isEqualTo(specific);
+    }
+
+    // 정책버전이 서로 다르면 우선 규칙으로 후보를 가리지 않는다 — 정책 중복이 RULESET_AMBIGUOUS 로 드러난다
+    @Test
+    void rulesetsFromDifferentPolicyVersionsAreAmbiguousEvenIfOneIsDocumentSpecific() {
+        long contractId = g1ContractId();
+        makeG1OfferingFourYear();
+        long allVersionsPolicy = insertDraftFourYearPolicy("TEST-RES-4Y-NULL");
+        long allVersions = insertRuleset(allVersionsPolicy, null, false);
         long specificPolicy = insertDraftFourYearPolicy("TEST-RES-4Y-SPECIFIC");
         long specific = insertRuleset(specificPolicy, "BD-2026-01", false);
+        activate(allVersionsPolicy);
         activate(specificPolicy);
 
         FeeRegimeResolution resolution = resolver.resolve(contractId);
-        assertThat(resolution.status()).isEqualTo(FeeRegimeResolutionStatus.SELECTED);
-        assertThat(resolution.rulesetId()).isEqualTo(specific);
+
+        assertThat(resolution.status()).isEqualTo(FeeRegimeResolutionStatus.REVIEW_REQUIRED);
+        assertThat(resolution.reasonCode()).isEqualTo(FeeRegimeReasonCode.RULESET_AMBIGUOUS);
+        assertThat(resolution.candidateRulesetIds()).containsExactlyInAnyOrder(allVersions, specific);
+    }
+
+    // 정책버전이 다른 기초서류 버전(BD-OTHER) 전용이면 그 아래 NULL 룰셋도 이 계약(BD-2026-01)에 걸리지 않는다
+    @Test
+    void policyVersionForOtherDocumentVersionIsNotSelected() {
+        long contractId = g1ContractId();
+        makeG1OfferingFourYear();
+        long policyId = insertDraftFourYearPolicy("TEST-RES-4Y-BD-OTHER", "BD-OTHER");
+        insertRuleset(policyId, null, false);
+        activate(policyId);
+
+        FeeRegimeResolution resolution = resolver.resolve(contractId);
+
+        assertThat(resolution.status()).isEqualTo(FeeRegimeResolutionStatus.REVIEW_REQUIRED);
+        assertThat(resolution.reasonCode()).isEqualTo(FeeRegimeReasonCode.RULESET_MISSING);
     }
 
     // G1 계약의 판매버전을 "2027-01-01 판매개시, 4년 체계 선언"으로 바꿔 룰셋 조회 단계까지 가게 한다
@@ -186,13 +216,17 @@ class ProductFeeRegimeResolverIntegrationTest {
     }
 
     private long insertDraftFourYearPolicy(String code) {
+        return insertDraftFourYearPolicy(code, null);
+    }
+
+    private long insertDraftFourYearPolicy(String code, String documentVersion) {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.policy_version (policy_code, policy_name, policy_type, source_class,
-                    version_no, effective_from, status)
+                    version_no, effective_from, status, basic_document_version)
                 VALUES (?, '분급 판정 테스트 4년 정책', 'FOUR_YEAR_COMMISSION', 'PROJECT_ASSUMPTION',
-                        1, DATE '2026-01-01', 'DRAFT')
+                        1, DATE '2026-01-01', 'DRAFT', ?)
                 RETURNING policy_version_id
-                """, Long.class, code);
+                """, Long.class, code, documentVersion);
     }
 
     private long insertRuleset(long policyId, String documentVersion, boolean reviewRequired) {
