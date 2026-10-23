@@ -102,13 +102,15 @@ public class AgentDataScopeService {
         var query = entityManager.createNativeQuery("""
                 SELECT count(*) FROM fgc.generated_document d
                 WHERE d.document_no = :documentNo AND d.version_no = :version AND (
-                  (d.document_kind = 'COMPARE_CONFIRMATION' AND d.created_by = :userId)
+                  (d.document_kind = 'COMPARE_CONFIRMATION' AND d.source_entity_type = 'COMPARE_EXPLANATION'
+                    AND EXISTS (SELECT 1 FROM fgc.compare_explanation e
+                      WHERE e.compare_explanation_id = d.source_entity_id AND e.agent_id = :agentId))
                   OR (d.document_kind = 'CLAWBACK_NOTICE' AND EXISTS (
                     SELECT 1 FROM fgc.clawback_notice_delivery n
                     WHERE n.generated_document_id = d.generated_document_id AND n.recipient_agent_id = :agentId)))
                 """);
         query.setParameter("documentNo", documentNo).setParameter("version", version)
-                .setParameter("userId", userId()).setParameter("agentId", agentId);
+                .setParameter("agentId", agentId);
         if (((Number) query.getSingleResult()).longValue() == 0) denied();
     }
 

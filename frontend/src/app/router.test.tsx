@@ -65,6 +65,21 @@ describe('AppShell·라우트', () => {
     await screen.findByRole('heading', { name: '403 · 권한 없음' })
     expect(vi.mocked(apiClient.request).mock.calls.some(([path]) => path.startsWith('/api/v1/journals'))).toBe(false)
   })
+  it('AGENT가 홈의 월 링크를 다시 열면 요청한 정산월을 적용한다', async () => {
+    const router = renderAt('/contracts?month=2026-07', 'AGENT')
+    await screen.findByRole('heading', { name: '보험계약 목록' })
+    await router.navigate('/?month=2026-08')
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/contracts')
+      expect(router.state.location.search).toContain('month=2026-08')
+      expect(useWorkspaceStore.getState().month).toBe('2026-08')
+    })
+    await router.navigate('/?month=2026-99')
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/contracts')
+      expect(router.state.location.search).toContain('month=2026-08')
+    })
+  })
   it.each(['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN'])(
     '%s 역할의 감사로그 메뉴는 서버 권한 플래그를 따른다',
     async (role) => {

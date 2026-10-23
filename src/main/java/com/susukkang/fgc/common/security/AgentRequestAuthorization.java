@@ -26,8 +26,8 @@ public final class AgentRequestAuthorization {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         return new AuthorizationDecision(HttpMethod.GET.matches(request.getMethod()) && (
                 PUBLIC_READS.contains(path)
-                || path.matches("/api/v1/contracts(?:/export\\.csv|/[1-9][0-9]*(?:/status-events)?)?")
-                || path.matches("/api/v1/transactions(?:/[1-9][0-9]*)?")));
+                || path.matches("/api/v1/contracts(?:/export\\.csv|/[1-9]\\d*(?:/status-events)?)?")
+                || path.matches("/api/v1/transactions(?:/[1-9]\\d*)?")));
     };
 
     private AgentRequestAuthorization() { }
