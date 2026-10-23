@@ -25,6 +25,8 @@ public record Dar012Properties(String datasetId, Long seed, Integer contracts, L
     public static final long DEFAULT_SEED = 20261118L;
     public static final int DEFAULT_CONTRACTS = 1000;
     public static final LocalDate DEFAULT_BASE_DATE = LocalDate.of(2026, 9, 10);
+    /** 설계사 임용일(2024-01-01~2026-05-29)이 계약 창(기준월 2개월 전 1일~) 시작보다 앞서도록 하는 기준일 하한. */
+    public static final LocalDate MIN_BASE_DATE = LocalDate.of(2026, 8, 1);
 
     public Dar012Properties {
         if (datasetId == null || !datasetId.matches("[A-Za-z0-9][A-Za-z0-9_-]{0,39}")) {
@@ -37,6 +39,10 @@ public record Dar012Properties(String datasetId, Long seed, Integer contracts, L
             throw new IllegalArgumentException("fgc.dar012.contracts 는 대표 설계사 사례 5건 이상이어야 한다: " + contracts);
         }
         baseDate = baseDate == null ? DEFAULT_BASE_DATE : baseDate;
+        if (baseDate.isBefore(MIN_BASE_DATE)) {
+            throw new IllegalArgumentException(
+                    "fgc.dar012.base-date 는 " + MIN_BASE_DATE + " 이후여야 한다(임용일이 계약일보다 늦어지지 않게): " + baseDate);
+        }
         outputDir = outputDir == null ? Path.of("build", "dar012") : outputDir;
         runValidation = runValidation != null && runValidation;
         validationMonth = validationMonth == null ? baseDate.withDayOfMonth(1).minusMonths(1) : validationMonth.withDayOfMonth(1);
