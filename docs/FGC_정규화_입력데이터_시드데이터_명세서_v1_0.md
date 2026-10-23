@@ -52,11 +52,11 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 
 ### 현재 체크인된 구현 현황
 
-전 demo 시드를 적용한 뒤의 건수다(develop `fe6d0e6c`, SQL 정적 계산).
+전 demo 시드를 적용한 뒤의 건수다(기본 수량은 develop `fe6d0e6c` SQL 정적 계산, 역할·사용자는 #634 V64 반영).
 
 | 대상 | 건수 | 출처 |
 |---|---:|---|
-| 역할 / 사용자 | 4 / 4 | V3, V17_1(COMPLIANCE 표시명) |
+| 역할 / 사용자 | 5 / 5 | V3, V17_1(COMPLIANCE 표시명), V64(AGENT·agent01, 초기 DISABLED) |
 | 조직 | 9 | V3 |
 | 보험회사 | 6 (FGN02는 상품 없음) | V3 |
 | 설계사 | 8 (강동2팀 팀장 `A-TL-002` 포함) | V3, V34 |
@@ -76,7 +76,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 
 | 구분 | 현재 상태 |
 |---|---|
-| 데모 시드 파일 | V3(GOLDEN 축소본), V4(검증 시나리오 14건), V6_1(원수사→GA 룰셋 보정), V8(환산코드 변경), V17_1(COMPLIANCE 표시명), V34(A-TL-002), V42(STD-SAV-A 환급률표), V45_1(시행 후 차익거래 계약 2건 `FGC-FGL02-202603-0475`·`FGC-FGL01-202603-0475`, REG-12·REG-19), V46(CAP 정책 v2 — CLAWBACK 사유 교정 #478), V49(TM 판매버전·G3 삭제, SRC-036), V52(CAP 정책 v3 — 정착지원금 모집월 #525), V56(ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 #480) |
+| 데모 시드 파일 | V3(GOLDEN 축소본), V4(검증 시나리오 14건), V6_1(원수사→GA 룰셋 보정), V8(환산코드 변경), V17_1(COMPLIANCE 표시명), V34(A-TL-002), V42(STD-SAV-A 환급률표), V45_1(시행 후 차익거래 계약 2건 `FGC-FGL02-202603-0475`·`FGC-FGL01-202603-0475`, REG-12·REG-19), V46(CAP 정책 v2 — CLAWBACK 사유 교정 #478), V49(TM 판매버전·G3 삭제, SRC-036), V52(CAP 정책 v3 — 정착지원금 모집월 #525), V56(ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 #480), V60(STD-LIFE-B 현행 판매기간 종료), V64(AGENT·비활성 agent01) |
 | 시나리오 식별 | V3의 C001~C006 별칭과 V4의 R1~R8·A1~A3·G1·G2(G3은 V49로 삭제). 아래 목표 구간 T001~T068과 다르다(§24). 현행 정답은 §31-1 |
 | 현재 수수료 규칙 | 보험회사→GA 900%@1·8%@2~12, GA→FC FC 650%@1·관리자 40/30/20%@1·시책 100%@1·유지 5%@2~12 (`INS-CUR-2026-V1`·`GA-CUR-2026-V1`). 운영정책서 제19·20조 패턴(1,485%·740%)의 축소판 |
 | 정착지원금 | 현재 210,000원(2건에 105,000원씩). 아래 2,400,000원/4,000,000원은 전체 GOLDEN 목표 |
@@ -84,14 +84,14 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 
 따라서 현재 `db/demo`만 실행한 결과를 “25명·68계약 GOLDEN 완료”로 표시하지 않는다. 이 문서의 T001~T068(§24)는 전체 GOLDEN 구현을 위한 목표 명세이며, 해당 SQL과 기대값 파일이 추가되어야 완료된다.
 
-**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 정책(§35), AGENT 계정(§5), DAR-012 생성기(§50), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
+**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 정책(§35), DAR-012 생성기(§50), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
 
 ## 2. 시드 파일 구성
 
 현재 저장소의 실제 경로와 Flyway 버전 체인은 다음과 같다.
 
 ```text
-src/main/resources/db/migration/   V1 ~ V55 (V47·V53 결번). 스키마·제약·트리거 + 운영 기준정보 일부
+src/main/resources/db/migration/   V1 ~ V61 (V47·V53 결번). 스키마·제약·트리거 + 운영 기준정보 일부
   V2   batch_watermark 초기 2행 · STATUS-MONTH-RULE-2026 v1(유산, §4-1)
   V16  journal_account 8개 계정과목
 src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀스)
@@ -107,6 +107,8 @@ src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀
   V49    TM 판매버전·G3 삭제(SRC-036)
   V52    현행 CAP 정책 v3 — 정착지원금 모집월 사유 교정(#525)
   V56    ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 파라미터(#480)
+  V60    STD-LIFE-B 2026-CURRENT-B 판매기간 종료(#540)
+  V64    AGENT 역할·agent01 → A-FC-001(초기 비밀번호 미지정·DISABLED, #634)
 src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 등) — 아직 없음
 ```
 
@@ -127,7 +129,7 @@ src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 
 | 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 |
 
 - 따라서 **`db/demo`에 넣는 모든 행은 신한 prd에도 들어간다.** 시연 환경 밖으로 내보내면 안 되는 데이터나 대량 데이터(DAR-012)는 `db/demo`에 넣지 않는다(§50).
-- **Flyway 번호**: `db/migration`과 `db/demo`는 하나의 버전 시퀀스다. 다음 번호는 **V57**이다(V56은 demo). 결번(V47·V53)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
+- **Flyway 번호**: `db/migration`과 `db/demo`는 하나의 버전 시퀀스다. #634는 사용자 지정 **V64**를 사용한다. 이 브랜치의 다음 번호는 **V65**이며 병합 직전 다른 PR의 번호도 대조한다. 결번(V47·V53 등)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
 
 ---
 
@@ -287,7 +289,7 @@ auth_refresh_token
 | `GA_ADMIN` | GA관리자 |
 | `SETTLEMENT` | 정산담당자 |
 | `COMPLIANCE` | 준법·감사 |
-| `AGENT` | 설계사 (2차, FUN-085 — 아직 없음) |
+| `AGENT` | 설계사 (2차, FUN-085 — #634 V64 추가) |
 
 ### GOLDEN 사용자
 
@@ -297,13 +299,15 @@ auth_refresh_token
 | `gaadmin` | GA_ADMIN | 정책·조직 조회 |
 | `settle01` | SETTLEMENT | 정산 실행·예외처리 |
 | `audit01` | COMPLIANCE | 조회 전용 |
-| `agent01` | AGENT | (2차, 아직 없음) `app_user.agent_id` = 설계사 1명. 본인 범위만 조회 |
+| `agent01` | AGENT | (2차, V64) `app_user.agent_id` = `A-FC-001`. 초기 DISABLED, 개별 비밀번호 설정 후 활성화 |
 
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
 
-- **AGENT 역할·`agent01`(2차)**: 새 demo 마이그레이션으로 넣는다(번호는 작성 시점의 다음 빈 번호 — `db/migration`·`db/demo`는 한 버전 시퀀스이므로 develop에 있는 번호와 열린 PR이 잡은 번호를 모두 피한다). 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정, 팀 확인 필요. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
-- **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 네 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
-- **보호·검증을 보장할 수 없으면 배포 중단**: 신한 prd에서 `db/demo`를 제외하고 별도 기준정보·정책·보호된 계정 이관 절차를 마련한다. 이미 데모가 적재된 DB는 locations 변경만으로 계정이 없어지지 않으므로 기존 4개 계정 보호 검증도 필요하다. 새 시드·문서·PR·배포 로그에는 평문 비밀번호를 남기지 않는다. 현 배포 스크립트에 이 보호 단계가 구현됐다는 뜻은 아니며 S44의 배포 검증에서 증명해야 한다(SRC-065).
+`agent01`은 공통 시연 자격 증명을 복제하지 않는다. V64 신규 행의 `password_hash='!'`는 로그인 불가능한 미지정 표식이고 `account_status='DISABLED'`다. 시연 관리자가 별도 Secret으로 전달한 비밀번호를 애플리케이션의 BCryptPasswordEncoder로 해시한 뒤, 보호된 관리 연결에서 해당 행에 해시와 `ACTIVE` 상태를 함께 설정해야 실제 로그인할 수 있다. SQL·PR·로그에 비밀번호나 해시를 붙이지 않는다. 통합 테스트는 트랜잭션 안에서 일회성 UUID 비밀번호를 설정·활성화한 뒤 롤백한다. 이미 존재하는 동일 연결의 agent01은 V64가 덮어쓰지 않으므로 배포 전 별도 보호 검증이 필요하다.
+
+- **AGENT 역할·`agent01`(2차)**: `db/demo/V64__seed_agent_role_and_account.sql`로 추가한다(#634). 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정이며 #634의 V64에서 기본 연결로 적용한다. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
+- **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01`·`agent01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 다섯 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
+- **보호·검증을 보장할 수 없으면 배포 중단**: 신한 prd에서 `db/demo`를 제외하고 별도 기준정보·정책·보호된 계정 이관 절차를 마련한다. 이미 데모가 적재된 DB는 locations 변경만으로 계정이 없어지지 않으므로 기존 계정과 agent01의 보호 검증도 필요하다. 새 시드·문서·PR·배포 로그에는 평문 비밀번호를 남기지 않는다. 현 배포 스크립트에 이 보호 단계가 구현됐다는 뜻은 아니며 S44의 배포 검증에서 증명해야 한다(SRC-065).
 
 ## 6. 조직
 
