@@ -88,7 +88,7 @@ public final class Dar012Planner {
                     : INSURER_CODES.get(contractRng.nextInt(INSURER_CODES.size()));
             AgentRow agent = representative ? agents.get(0) : activeAgents.get(contractRng.nextInt(activeAgents.size()));
             int dayLimit = "NORMAL".equals(statusPath) ? (int) ChronoUnit.DAYS.between(windowStart, windowEnd) : scenarioDayLimit;
-            LocalDate contractDate = representative ? windowStart.plusDays(4 + i)
+            LocalDate contractDate = representative ? windowStart.plusDays(4L + i)
                     : windowStart.plusDays(contractRng.nextInt(dayLimit + 1));
             BigDecimal monthly = BigDecimal.valueOf((30L + contractRng.nextInt(270)) * 1000L).setScale(2);
             int cycleRoll = contractRng.nextInt(100);

@@ -181,10 +181,12 @@ public class Dar012Verifier {
     /** 배치가 만든 파생 데이터 건수. 이 값은 정답표 비교와 단계별 성능 기록의 규모 지표다. */
     public Map<String, Long> derivedCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
-        for (String table : new String[]{"schedule_line", "cap_check", "journal_header", "reconciliation_result",
-                "exception_case", "arbitrage_check"}) {
-            counts.put(table, jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class));
-        }
+        counts.put("schedule_line", jdbc.queryForObject("SELECT COUNT(*) FROM schedule_line", Long.class));
+        counts.put("cap_check", jdbc.queryForObject("SELECT COUNT(*) FROM cap_check", Long.class));
+        counts.put("journal_header", jdbc.queryForObject("SELECT COUNT(*) FROM journal_header", Long.class));
+        counts.put("reconciliation_result", jdbc.queryForObject("SELECT COUNT(*) FROM reconciliation_result", Long.class));
+        counts.put("exception_case", jdbc.queryForObject("SELECT COUNT(*) FROM exception_case", Long.class));
+        counts.put("arbitrage_check", jdbc.queryForObject("SELECT COUNT(*) FROM arbitrage_check", Long.class));
         return counts;
     }
 }
