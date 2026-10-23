@@ -22,6 +22,14 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                     .locations("classpath:db/migration", "classpath:db/demo").load().migrate();
             JdbcTemplate jdbc = new JdbcTemplate(new SingleConnectionDataSource(connection, true));
 
+            // V7 규칙: 가드·검사 함수는 호출자 search_path 에 의존하지 않도록 함수 수준으로 고정한다
+            for (String function : new String[]{"guard_policy_child_mutation", "check_fee_regime_ruleset_policy",
+                    "check_policy_version_fee_regime_ruleset"}) {
+                assertThat(jdbc.queryForObject(
+                        "SELECT array_to_string(proconfig, ',') FROM pg_proc WHERE oid = ('fgc." + function + "()')::regprocedure",
+                        String.class)).isEqualTo("search_path=fgc, pg_temp");
+            }
+
             long policyId = jdbc.queryForObject("""
                     INSERT INTO fgc.policy_version (policy_code, policy_name, policy_type, source_class,
                         version_no, effective_from, status)

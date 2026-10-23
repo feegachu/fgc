@@ -72,6 +72,10 @@ CREATE INDEX ix_fee_regime_ruleset_lookup
     ON fgc.fee_regime_ruleset (fee_regime_code, sales_start_date_from);
 COMMENT ON TABLE fgc.fee_regime_ruleset IS
     '4년·7년 분급 룰셋 헤더. 판매개시일·기초서류 버전·작성/변경일 키로 선택(REG-19, 판매채널은 기준 아님), 값은 정책버전 소속';
+COMMENT ON COLUMN fgc.fee_regime_ruleset.monthly_rate_pct IS
+    '참고용 FGC 월 지급률(GA_POLICY). 규제 상한이 아니다 — 상한은 fee_regime_ruleset_limit 에만 두고, 실제 지급률은 commission_rule 이 정한다';
+COMMENT ON COLUMN fgc.fee_regime_ruleset.equal_monthly_amount_yn IS
+    '참고용 매월 동일 금액 조건. 실제 지급 방식은 commission_rule.equal_monthly_yn 이 정한다';
 COMMENT ON COLUMN fgc.fee_regime_ruleset.review_required_yn IS
     '규정만으로 적용 여부를 확정할 수 없는 경계 룰셋. true 면 선택기는 자동 확정하지 않고 REVIEW_REQUIRED 로 돌려준다';
 
@@ -87,7 +91,7 @@ CREATE TABLE fgc.fee_regime_ruleset_limit (
     CONSTRAINT uq_fee_regime_ruleset_limit UNIQUE (fee_regime_ruleset_id, limit_code)
 );
 COMMENT ON TABLE fgc.fee_regime_ruleset_limit IS
-    '계약체결비용 한도율. 한도마다 따로 사용률을 계산하므로 한 행이 한 한도다(고정 19% 같은 상수 금지)';
+    '계약체결비용 한도율(REGULATORY 상한의 유일한 저장 위치). 한도마다 따로 사용률을 계산하므로 한 행이 한 한도다(고정 19% 같은 상수 금지)';
 
 CREATE TABLE fgc.fee_regime_transition_rule (
     fee_regime_transition_rule_id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -109,6 +113,7 @@ COMMENT ON TABLE fgc.fee_regime_transition_rule IS '룰셋 경과조치. 적용 
 CREATE OR REPLACE FUNCTION fgc.guard_policy_child_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = fgc, pg_temp
 AS $$
 DECLARE
   v_old_policy_id bigint;
@@ -201,6 +206,7 @@ FOR EACH ROW EXECUTE FUNCTION fgc.guard_policy_child_mutation();
 CREATE OR REPLACE FUNCTION fgc.check_fee_regime_ruleset_policy()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = fgc, pg_temp
 AS $$
 DECLARE
   v_type varchar(40);
@@ -245,6 +251,7 @@ FOR EACH ROW EXECUTE FUNCTION fgc.check_fee_regime_ruleset_policy();
 CREATE OR REPLACE FUNCTION fgc.check_policy_version_fee_regime_ruleset()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = fgc, pg_temp
 AS $$
 DECLARE
   v_ruleset_id bigint;
