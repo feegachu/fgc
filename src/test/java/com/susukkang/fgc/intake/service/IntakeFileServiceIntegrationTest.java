@@ -55,6 +55,7 @@ class IntakeFileServiceIntegrationTest {
 
     @BeforeEach void setup() {
         storage.failDelete.set(false);
+        storage.failedKeys.clear();
         jdbc.execute("DROP TRIGGER IF EXISTS trg_637_fail_audit ON fgc.audit_log");
         jdbc.update("DELETE FROM fgc.intake_document");
         userId = jdbc.queryForObject("SELECT min(user_id) FROM fgc.app_user", Long.class);
@@ -122,10 +123,10 @@ class IntakeFileServiceIntegrationTest {
     @Test void expiredSourceIsDeletedButMetadataAndAuditArePreserved() {
         long id = service.upload(csv("expired"), userId).documentId();
         expire(id);
-        assertThat(service.purgeExpired(100)).isEqualTo(1);
+        assertThat(service.purgeExpired(100).deleted()).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT source_deleted_at IS NOT NULL FROM fgc.intake_document WHERE intake_document_id=?", Boolean.class, id)).isTrue();
         assertThat(audits(id, "INTAKE_SOURCE_PURGED")).isEqualTo(1);
-        assertThat(service.purgeExpired(100)).isZero();
+        assertThat(service.purgeExpired(100).selected()).isZero();
         assertThatThrownBy(() -> service.withSource(id, source -> 1))
                 .isInstanceOfSatisfying(FgcBusinessException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_004));
     }
@@ -134,11 +135,11 @@ class IntakeFileServiceIntegrationTest {
         long id = service.upload(csv("retry purge"), userId).documentId();
         expire(id);
         storage.failDelete.set(true);
-        assertThatThrownBy(() -> service.purgeExpired(100)).isInstanceOf(FgcBusinessException.class);
+        assertThat(service.purgeExpired(100).failed()).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT source_purged_at IS NOT NULL AND source_deleted_at IS NULL FROM fgc.intake_document WHERE intake_document_id=?", Boolean.class, id)).isTrue();
         assertThatThrownBy(() -> service.withSource(id, source -> 1)).isInstanceOf(FgcBusinessException.class);
         storage.failDelete.set(false);
-        assertThat(service.purgeExpired(100)).isEqualTo(1);
+        assertThat(service.purgeExpired(100).deleted()).isEqualTo(1);
         assertThat(audits(id, "INTAKE_SOURCE_PURGED")).isEqualTo(1);
     }
 
@@ -157,16 +158,16 @@ class IntakeFileServiceIntegrationTest {
     @Test void unexpiredOrExtractingSourcesAreNotPurged() {
         long id = service.upload(csv("keep"), userId).documentId();
         jdbc.update("UPDATE fgc.intake_document SET purge_after = CURRENT_DATE + 1 WHERE intake_document_id=?", id);
-        assertThat(service.purgeExpired(100)).isZero();
+        assertThat(service.purgeExpired(100).selected()).isZero();
         expire(id);
         jdbc.update("UPDATE fgc.intake_document SET status='EXTRACTING' WHERE intake_document_id=?", id);
-        assertThat(service.purgeExpired(100)).isZero();
+        assertThat(service.purgeExpired(100).selected()).isZero();
     }
 
     @Test void purgeBatchesAdvancePastAlreadyDeletedMetadata() {
         for (int i = 0; i < 3; i++) expire(service.upload(csv("batch " + i), userId).documentId());
-        for (int i = 0; i < 3; i++) assertThat(service.purgeExpired(1)).isEqualTo(1);
-        assertThat(service.purgeExpired(1)).isZero();
+        for (int i = 0; i < 3; i++) assertThat(service.purgeExpired(1).deleted()).isEqualTo(1);
+        assertThat(service.purgeExpired(1).selected()).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.intake_document WHERE source_deleted_at IS NOT NULL", Long.class)).isEqualTo(3);
     }
 
@@ -201,11 +202,11 @@ class IntakeFileServiceIntegrationTest {
             });
             try {
                 assertThat(opened.await(10, TimeUnit.SECONDS)).isTrue();
-                assertThat(service.purgeExpired(100)).isZero();
+                assertThat(service.purgeExpired(100).selected()).isZero();
             } finally { release.countDown(); }
             assertThat(read.get(30, TimeUnit.SECONDS)).isEqualTo(csv("leased").getBytes());
         }
-        assertThat(service.purgeExpired(100)).isEqualTo(1);
+        assertThat(service.purgeExpired(100).deleted()).isEqualTo(1);
     }
 
     @Test @WithMockUser(roles = "AGENT") void agentCannotUploadOrReadOriginal() {
@@ -220,6 +221,23 @@ class IntakeFileServiceIntegrationTest {
 
     private long audits(long id, String action) {
         return jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE entity_type='intake_document' AND entity_id=? AND action_code=?", Long.class, Long.toString(id), action);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {1, 100})
+    void permanentlyFailingFileCannotStarveFollowingOriginal(int limit) {
+        long first = service.upload(csv("poison first"), userId).documentId();
+        long following = service.upload(csv("healthy following"), userId).documentId();
+        expire(first);
+        expire(following);
+        storage.failedKeys.add(jdbc.queryForObject("SELECT storage_key FROM fgc.intake_document WHERE intake_document_id=?", String.class, first));
+        int failures = 0;
+        for (int i = 0; i < 3; i++) failures += service.purgeExpired(limit).failed();
+        assertThat(failures).isPositive();
+        assertThat(jdbc.queryForObject("SELECT source_deleted_at IS NULL FROM fgc.intake_document WHERE intake_document_id=?", Boolean.class, first)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT source_deleted_at IS NOT NULL FROM fgc.intake_document WHERE intake_document_id=?", Boolean.class, following)).isTrue();
+        assertThat(audits(first, "INTAKE_SOURCE_PURGED")).isEqualTo(1);
+        assertThat(audits(following, "INTAKE_SOURCE_PURGED")).isEqualTo(1);
     }
     private void expire(long id) { jdbc.update("UPDATE fgc.intake_document SET purge_after=CURRENT_DATE WHERE intake_document_id=?", id); }
     private long fileCount() throws IOException {
@@ -243,12 +261,13 @@ class IntakeFileServiceIntegrationTest {
     }
     static final class TestStorage implements FileStorage {
         final AtomicBoolean failDelete = new AtomicBoolean();
+        final java.util.Set<String> failedKeys = java.util.concurrent.ConcurrentHashMap.newKeySet();
         private final FileStorage delegate;
         TestStorage(FileStorage delegate) { this.delegate = delegate; }
         @Override public String store(byte[] content) throws IOException { return delegate.store(content); }
         @Override public InputStream open(String key) throws IOException { return delegate.open(key); }
         @Override public boolean delete(String key) throws IOException {
-            if (failDelete.get()) throw new IOException("test fault injection");
+            if (failDelete.get() || failedKeys.contains(key)) throw new IOException("test fault injection");
             return delegate.delete(key);
         }
     }

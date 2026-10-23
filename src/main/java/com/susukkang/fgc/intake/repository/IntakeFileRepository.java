@@ -52,7 +52,8 @@ public class IntakeFileRepository {
                 SELECT intake_document_id, storage_key, media_type, original_file_name, source_purged_at IS NOT NULL
                 FROM fgc.intake_document
                 WHERE purge_after <= :today AND status <> 'EXTRACTING' AND source_deleted_at IS NULL
-                ORDER BY purge_after, intake_document_id LIMIT :limit FOR UPDATE SKIP LOCKED
+                ORDER BY source_delete_attempted_at NULLS FIRST, purge_after, intake_document_id
+                LIMIT :limit FOR UPDATE SKIP LOCKED
                 """).setParameter("today", today).setParameter("limit", limit).getResultList();
         return rows.stream().map(IntakeFileRepository::source).toList();
     }
@@ -76,6 +77,13 @@ public class IntakeFileRepository {
                 SELECT intake_document_id FROM fgc.intake_document WHERE intake_document_id = :id
                 AND source_purged_at IS NOT NULL AND source_deleted_at IS NULL FOR UPDATE SKIP LOCKED
                 """).setParameter("id", id).getResultList().isEmpty();
+    }
+
+    public void markDeleteAttempt(long id) {
+        em.createNativeQuery("""
+                UPDATE fgc.intake_document SET source_delete_attempted_at = clock_timestamp(),
+                  source_delete_attempts = source_delete_attempts + 1 WHERE intake_document_id = :id
+                """).setParameter("id", id).executeUpdate();
     }
 
     public record SourceFile(long documentId, String storageKey, String mediaType, String originalName, boolean purged) { }

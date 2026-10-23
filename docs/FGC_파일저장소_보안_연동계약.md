@@ -12,7 +12,7 @@ ECR-006·SER-005와 OI-021의 **개인정보 없는 합성 문서만** 받는 2�
 |---|---|---|
 | `IntakeFileService.upload(file, uploadedBy)` | #640 IF-API-53 | SETTLEMENT·GA_ADMIN·SYSTEM_ADMIN. 파일 검증 후 SHA-256으로 직렬화·중복 검사, UPLOADED/UNCLASSIFIED 메타데이터와 감사 기록. 사용자는 컨트롤러의 인증 주체에서 얻고 요청 본문으로 받지 않는다 |
 | `IntakeFileService.withSource(id, reader)` | #640 추출·미리보기 | 내부 4역할만. 콜백이 끝날 때까지 공유 행 잠금과 스트림을 유지한다. 스트림을 콜백 밖으로 반환하거나 비동기 스레드로 넘기지 않는다. 만료 파기된 원본은 404 |
-| `IntakeFileService.purgeExpired(limit)` | #675의 명시적 파기 작업 | SYSTEM_ADMIN. KST 오늘 이하의 purge_after만, EXTRACTING 제외. 1~1000개. 보존일을 자체 계산하거나 자동 실행하지 않는다 |
+| `IntakeFileService.purgeExpired(limit)` | #675의 명시적 파기 작업 | SYSTEM_ADMIN. KST 오늘 이하의 purge_after만, EXTRACTING 제외. 1~1000개. 반환은 PurgeResult(selected, deleted, skipped, failed). failed가 있으면 작업 경고로 보고한다. 보존일을 자체 계산하거나 자동 실행하지 않는다 |
 | `FileStorage.store/open/delete` | 내부 인프라·생성 PDF | 서버 생성 32자리 저장키만 사용. 클라이언트가 보낸 저장키·경로로 직접 호출하는 컨트롤러를 만들지 않는다. 생성 PDF는 신뢰된 생성기 출력만 저장하고 권한·판·해시는 해당 업무 서비스에서 관리한다 |
 
 #640은 사람이 지정한 documentType·합성 문서 여부 확인과 문서 상태 전이를 담당한다. 상위 트랜잭션에서 upload를 호출하면 같은 트랜잭션에 참여하며, 뒤의 상태 변경·감사 저장이 실패해도 새 물리 파일이 정리된다. 같은 SHA-256은 409 `FGC-INTK-002`, `error.params.documentId`로 기존 문서를 안내한다. 이미 파기된 문서도 같은 해시는 새 문서로 만들지 않으므로 원본 없음 상태를 별도로 안내한다.
@@ -41,6 +41,8 @@ ECR-006·SER-005와 OI-021의 **개인정보 없는 합성 문서만** 받는 2�
 1. 전용 REQUIRES_NEW 트랜잭션에서 만료 행을 `FOR UPDATE SKIP LOCKED`로 선택하고 source_purged_at 및 파기 감사 기록을 함께 커밋한다. 이 트랜잭션이 실패하면 파일은 건드리지 않는다.
 2. 커밋 후 별도 트랜잭션에서 파기 대기 행을 잠그고 파일을 삭제한 뒤 source_deleted_at을 기록한다. 동시 파기 작업은 잠긴 행을 건너뛴다.
 3. 파일 삭제 또는 확인 DB 커밋 실패 시 source_purged_at은 남아 접근이 차단되고 source_deleted_at이 비어 있어 재시도한다. 이미 파일이 없어도 삭제 완료로 확인하며 감사는 중복하지 않는다.
+
+각 삭제 행의 실패는 격리해 뒤 행을 계속 처리한다. 1단계에서 source_delete_attempted_at·source_delete_attempts를 기록하고, 미시도 행을 먼저, 이후 가장 오래 시도한 행 순으로 선택한다. 따라서 A가 영구 실패해도 limit=1의 다음 호출에서 B가 선택되며, 같은 묶음에서도 B의 삭제를 막지 않는다. 경로·내용 없이 문서 ID와 오류 유형만 로그에 남기고 호출자는 failed 건수를 반드시 확인한다. deleted는 실제 삭제 또는 이미 없음까지 확인·커밋한 문서 수, skipped는 다른 파기 작업이 점유·완료한 문서 수다.
 
 추출·확정 자료와 감사 이력은 지우지 않는다. 파기는 상위 업무 트랜잭션의 롤백과 독립적으로 커밋되는 명시적 비가역 작업이며, 복구를 약속하는 일반 업무 저장 API에 섞지 않는다. source_purged_at이 있는 문서는 재추출을 시작하지 않는다. 워커는 withSource를 통해 원본을 소비하고 EXTRACTING 상태 전이를 행 잠금과 함께 수행해야 한다.
 

@@ -84,39 +84,51 @@ public class IntakeFileService {
 
     /** #675가 호출할 삭제 경로. 자동 스케줄·보존일 계산은 여기서 임의로 만들지 않는다. */
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    public int purgeExpired(int limit) {
+    public PurgeResult purgeExpired(int limit) {
         if (limit < 1 || limit > 1000) throw new IllegalArgumentException("파기 묶음 크기는 1~1000입니다");
         var tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         var sources = tx.execute(status -> {
             var rows = repository.lockExpired(LocalDate.now(ZoneId.of("Asia/Seoul")), limit);
-            for (var source : rows) if (!source.purged()) {
-                repository.markPurge(source.documentId());
-                audit.record(AuditLogService.AuditEvent.builder().actionCode("INTAKE_SOURCE_PURGED")
-                        .entityType("intake_document").entityId(Long.toString(source.documentId()))
-                        .after(Map.of("sourceAccess", "BLOCKED")).build());
+            for (var source : rows) {
+                repository.markDeleteAttempt(source.documentId());
+                if (!source.purged()) {
+                    repository.markPurge(source.documentId());
+                    audit.record(AuditLogService.AuditEvent.builder().actionCode("INTAKE_SOURCE_PURGED")
+                            .entityType("intake_document").entityId(Long.toString(source.documentId()))
+                            .after(Map.of("sourceAccess", "BLOCKED")).build());
+                }
             }
             return rows;
         });
         // DB·감사 커밋이 성공하기 전에는 물리 원본을 삭제하지 않는다.
         int deleted = 0;
+        int skipped = 0;
+        int failed = 0;
         for (var source : java.util.Objects.requireNonNull(sources)) {
-            Boolean completed = tx.execute(status -> {
-                if (!repository.lockPendingDeletion(source.documentId())) return false;
-                try {
-                    storage.delete(source.storageKey());
-                    repository.confirmDeletion(source.documentId());
-                    return true;
-                } catch (IOException ex) {
-                    throw new FgcBusinessException(FgcErrorCode.COMMON_500);
-                }
-            });
-            if (Boolean.TRUE.equals(completed)) deleted++;
+            try {
+                Boolean completed = tx.execute(status -> {
+                    if (!repository.lockPendingDeletion(source.documentId())) return false;
+                    try {
+                        storage.delete(source.storageKey());
+                        repository.confirmDeletion(source.documentId());
+                        return true;
+                    } catch (IOException ex) {
+                        throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+                    }
+                });
+                if (Boolean.TRUE.equals(completed)) deleted++; else skipped++;
+            } catch (RuntimeException ex) {
+                // 한 파일의 영구 오류가 뒤 파일을 막지 않게 격리한다. 경로·내용은 로그에 넣지 않는다.
+                failed++;
+                log.error("원본 파기 실패 documentId={} errorType={}", source.documentId(), ex.getClass().getSimpleName());
+            }
         }
-        return deleted;
+        return new PurgeResult(sources.size(), deleted, skipped, failed);
     }
 
     public record UploadedDocument(long documentId, String status, String detectedType) { }
+    public record PurgeResult(int selected, int deleted, int skipped, int failed) { }
     @FunctionalInterface
     public interface SourceReader<T> { T read(SourceContent source) throws IOException; }
     public record SourceContent(String mediaType, InputStream stream) implements AutoCloseable {
