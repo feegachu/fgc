@@ -85,7 +85,8 @@ class ChangedContractArbitrageIntegrationTest {
 
         // exception_occurrence가 append-only라 이 실행은 정리하지 못하고 남는다 — 다른 테스트의
         // 예외 키(검증월 포함)·uq_validation_run과 겹치지 않도록 먼 미래의 무작위 월을 쓴다.
-        LocalDate month = LocalDate.of(2040 + ThreadLocalRandom.current().nextInt(60),
+        // 다른 테스트가 고정 월로 쓰는 2098~2099는 피해 2040~2097에서만 고른다.
+        LocalDate month = LocalDate.of(2040 + ThreadLocalRandom.current().nextInt(58),
                 1 + ThreadLocalRandom.current().nextInt(12), 1);
         validationRunId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status)
