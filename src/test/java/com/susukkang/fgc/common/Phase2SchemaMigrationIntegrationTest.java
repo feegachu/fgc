@@ -159,6 +159,161 @@ class Phase2SchemaMigrationIntegrationTest {
         }
     }
 
+    @Test
+    void confirmsDraftRowInOneStatementThenFreezesIt() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                seedIntakeDocument(conn);
+                insertDraftRow(conn, 1, "REVIEW_REQUIRED");
+                insertDraftRow(conn, 2, "REVIEW_REQUIRED");
+                execute(conn, """
+                        INSERT INTO fgc.intake_draft_row(intake_document_id, row_no, source_location, original_fields,
+                                                         row_status, exclude_reason)
+                        SELECT intake_document_id, 3, '{}', '{}', 'EXCLUDED', 'test' FROM fgc.intake_document LIMIT 1""");
+                // 정상 경로: 확정은 ck_intake_draft_row_confirmed 때문에 한 문장으로 바꾼다
+                execute(conn, """
+                        UPDATE fgc.intake_draft_row SET row_status = 'CONFIRMED', confirmed_at = now(),
+                               result_entity_type = 'STATEMENT_LINE', result_entity_id = 1 WHERE row_no = 1""");
+                assertRejected(conn, "UPDATE fgc.intake_draft_row SET edited_fields = '{}' WHERE row_no = 1");
+                assertRejected(conn, "DELETE FROM fgc.intake_draft_row WHERE row_no = 1");
+                // 남은 행은 계속 고치거나 제외할 수 있다
+                execute(conn, "UPDATE fgc.intake_draft_row SET edited_fields = '{}' WHERE row_no = 2");
+                execute(conn, "UPDATE fgc.intake_draft_row SET exclude_reason = 'again' WHERE row_no = 3");
+                execute(conn, "DELETE FROM fgc.intake_draft_row WHERE row_no = 2");
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    @Test
+    void protectsClawbackNoticeHistory() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                seedIntakeDocument(conn);
+                String insertFirst = """
+                        INSERT INTO fgc.clawback_notice_delivery(clawback_case_id, generated_document_id, recipient_agent_id,
+                                                                 notice_date, notice_kind, delivery_method, evidence_ref,
+                                                                 registered_by)
+                        SELECT (SELECT clawback_case_id FROM fgc.clawback_case WHERE case_no = 'TEST-CASE'),
+                               (SELECT generated_document_id FROM fgc.generated_document WHERE document_no = 'TEST-DOC'),
+                               (SELECT min(agent_id) FROM fgc.agent), DATE '2026-09-01', 'FIRST', 'POST', 'ref',
+                               (SELECT min(user_id) FROM fgc.app_user)""";
+                execute(conn, insertFirst);
+                assertRejected(conn, "DELETE FROM fgc.clawback_notice_delivery");
+                assertRejected(conn, "UPDATE fgc.clawback_notice_delivery SET evidence_ref = 'x'");
+                assertThatThrownBy(() -> execute(conn, insertFirst)).isInstanceOf(SQLException.class)
+                        .hasMessageContaining("uq_clawback_notice_first");
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    @Test
+    void rejectsChangesToReceiptAndInquiryActionHistory() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                seedIntakeDocument(conn);
+                execute(conn, """
+                        INSERT INTO fgc.compare_confirmation_receipt(generated_document_id, received_on,
+                                                                     receipt_confirmed_by, paper_storage_ref)
+                        SELECT generated_document_id, DATE '2026-09-01', (SELECT min(user_id) FROM fgc.app_user), 'ref'
+                        FROM fgc.generated_document WHERE document_no = 'TEST-DOC'""");
+                assertRejected(conn, "UPDATE fgc.compare_confirmation_receipt SET paper_storage_ref = 'x'");
+                assertRejected(conn, "DELETE FROM fgc.compare_confirmation_receipt");
+
+                execute(conn, """
+                        INSERT INTO fgc.inquiry(inquiry_kind, target_type, target_id, agent_id, content, due_date, created_by)
+                        SELECT 'INQUIRY', 'CONTRACT', 1, (SELECT min(agent_id) FROM fgc.agent), 'q', DATE '2026-09-10',
+                               (SELECT min(user_id) FROM fgc.app_user)""");
+                execute(conn, """
+                        INSERT INTO fgc.inquiry_action(inquiry_id, action_seq, action_type, acted_by)
+                        SELECT min(inquiry_id), 1, 'START_REVIEW', (SELECT min(user_id) FROM fgc.app_user)
+                        FROM fgc.inquiry""");
+                assertRejected(conn, "UPDATE fgc.inquiry_action SET message = 'x'");
+                assertRejected(conn, "DELETE FROM fgc.inquiry_action");
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    @Test
+    void requiresRankSetAndRankAsOfTogetherAndTouchesUpdatedAt() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                seedGradeParents(conn);
+                String insert = """
+                        INSERT INTO fgc.compare_explanation(grade_data_as_of, agent_id, compare_product_group_id,
+                                                            recommended_offering_id, compared_offering_ids, rank_set_key,
+                                                            rank_as_of, selection_criteria, recommendation_reason, fee_level_note)
+                        SELECT DATE '2026-09-01', (SELECT min(agent_id) FROM fgc.agent),
+                               (SELECT compare_product_group_id FROM fgc.compare_product_group WHERE group_code = 'TEST-GRP'),
+                               (SELECT min(product_offering_id) FROM fgc.product_offering), '[1]', %s, %s, 'c', 'r', 'f'""";
+                assertThatThrownBy(() -> execute(conn, insert.formatted("'ABC'", "NULL")))
+                        .isInstanceOf(SQLException.class).hasMessageContaining("ck_compare_explanation_rank");
+            } finally {
+                conn.rollback();
+            }
+        }
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                seedGradeParents(conn);
+                execute(conn, """
+                        INSERT INTO fgc.compare_explanation(grade_data_as_of, agent_id, compare_product_group_id,
+                                                            recommended_offering_id, compared_offering_ids, selection_criteria,
+                                                            recommendation_reason, fee_level_note)
+                        SELECT DATE '2026-09-01', (SELECT min(agent_id) FROM fgc.agent),
+                               (SELECT compare_product_group_id FROM fgc.compare_product_group WHERE group_code = 'TEST-GRP'),
+                               (SELECT min(product_offering_id) FROM fgc.product_offering), '[1]', 'c', 'r', 'f'""");
+                execute(conn, "UPDATE fgc.compare_explanation SET fee_level_note = 'g'");
+                assertThat(scalar(conn, "SELECT count(*) FROM fgc.compare_explanation WHERE updated_at > created_at"))
+                        .isEqualTo(1L);
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    /** 실패한 문장이 트랜잭션 전체를 중단시키지 않도록 savepoint 안에서 거절을 확인한다. */
+    private static void assertRejected(Connection conn, String sql) throws SQLException {
+        var savepoint = conn.setSavepoint();
+        try {
+            assertThatThrownBy(() -> execute(conn, sql)).isInstanceOf(SQLException.class);
+        } finally {
+            conn.rollback(savepoint);
+        }
+    }
+
+    private void seedIntakeDocument(Connection conn) throws SQLException {
+        execute(conn, """
+                INSERT INTO fgc.intake_document(original_file_name, storage_key, media_type, file_size_bytes, content_hash,
+                                                uploaded_by)
+                SELECT 'test.pdf', 'test-key', 'application/pdf', 1, 'test-hash-guard', min(user_id) FROM fgc.app_user""");
+        execute(conn, """
+                INSERT INTO fgc.generated_document(document_no, document_kind, source_entity_type, source_entity_id,
+                                                   storage_key, content_hash, created_by)
+                SELECT 'TEST-DOC', 'CLAWBACK_NOTICE', 'CLAWBACK_CASE', 1, 'doc-key', 'doc-hash', min(user_id)
+                FROM fgc.app_user""");
+        execute(conn, """
+                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no)
+                SELECT (SELECT min(contract_id) FROM fgc.insurance_contract),
+                       (SELECT min(policy_version_id) FROM fgc.policy_version), 'TEST-CASE'""");
+    }
+
+    private void insertDraftRow(Connection conn, int rowNo, String status) throws SQLException {
+        execute(conn, """
+                INSERT INTO fgc.intake_draft_row(intake_document_id, row_no, source_location, original_fields, row_status)
+                SELECT intake_document_id, %d, '{}', '{}', '%s' FROM fgc.intake_document LIMIT 1"""
+                .formatted(rowNo, status));
+    }
+
     private void seedGradeParents(Connection conn) throws SQLException {
         execute(conn, """
                 INSERT INTO fgc.compare_product_group(group_code, insurance_sector, major_class, minor_class_name)
