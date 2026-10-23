@@ -48,6 +48,16 @@ fgc:
     secret: ${FGC_JWT_SECRET:}
     access-token-ttl: 30m
     refresh-token-ttl: 14d
+  # 외부 LLM(SER-013·IF-EXT-03, OI-023). 키는 커밋하지 않는다 — 비어 있으면 AI 기능만 꺼지고 기본 업무는 그대로(FGC-AI-001).
+  llm:
+    # SDK 표준 이름을 먼저 보고, 기존 Podman 매니페스트(secret fgc-app)의 SPRING_AI_OPENAI_API_KEY 도 받는다.
+    api-key: ${OPENAI_API_KEY:${SPRING_AI_OPENAI_API_KEY:}}
+    base-url: https://api.openai.com/v1
+    model: gpt-4o-mini           # 주최 측 제공 키(SRC-060). 모델 교체는 이 값만 바꾼다
+    timeout: 30s
+    max-input-chars: 20000       # 요청당 입력 상한 — 예산 10달러(SRC-060) 보호. 팀 운영 정책
+    max-output-tokens: 1024
+    cooldown: 10m                # 401·403·404·429 뒤 AI 를 끄는 시간 — 재시도 폭주 방지. 팀 운영 정책
   batch:
     daily-changed-contract:
       cron: "0 0 2 * * *"        # 매일 02:00. 프로젝트 운영 가정일 뿐 법정 기준 아님
