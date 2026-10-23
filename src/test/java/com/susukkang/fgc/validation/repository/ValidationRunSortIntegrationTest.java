@@ -25,12 +25,17 @@ class ValidationRunSortIntegrationTest {
     @Test
     void sortsByEachAllowedColumnInBothDirectionsAcrossPages() {
         List<Long> users = jdbc.queryForList("SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 2", Long.class);
+        // 고정 월(2098-01~03)은 ChangedContractArbitrageIntegrationTest 가 무작위 월(2040~2099)로 커밋하고 못 지우는
+        // 실행과 uq_validation_run 에서 충돌했다(PR #690 CI). 실행 시점의 최댓값 다음 해를 쓴다.
+        LocalDate base = jdbc.queryForObject(
+                "SELECT COALESCE(MAX(validation_month), DATE '2026-01-01') FROM fgc.validation_run", LocalDate.class)
+                .plusYears(1).withDayOfYear(1);
         // 같은 달에 회차 여러 개, 실행자·시각이 같은 행과 비어 있는 행을 섞는다.
         for (int i = 0; i < 8; i++) {
             jdbc.update("""
                     INSERT INTO fgc.validation_run (validation_month, run_no, run_type, status, triggered_by, started_at)
                     VALUES (?, ?, 'PRE_CONFIRM', 'CREATED', ?, ?::timestamptz)
-                    """, LocalDate.of(2098, 1 + i % 3, 1), 1 + i / 3, i % 3 == 0 ? null : users.get(i % users.size()),
+                    """, base.plusMonths(i % 3), 1 + i / 3, i % 3 == 0 ? null : users.get(i % users.size()),
                     i % 4 == 0 ? null : "2098-01-0" + (1 + i % 3) + "T09:00:00+09:00");
         }
         Map<String, String> columns = Map.of(
