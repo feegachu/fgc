@@ -119,6 +119,8 @@ class RefundRateQueryRepositoryIntegrationTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void selectsLatestEffectiveDateAndMapsAllFieldsForProductWithMultipleOfferings(boolean standardDeduction80) {
+        // 이 테스트는 같은 상품에 기준일이 같은 판매버전 여러 개를 일부러 만든다(롤백되므로 지연 검사는 실행되지 않는다)
+        jdbcTemplate.execute("SET CONSTRAINTS fgc.ex_product_offering_sales_period DEFERRED");
         jdbcTemplate.update("""
                 INSERT INTO fgc.product_offering (
                     product_id, offering_version, sales_start_date,
