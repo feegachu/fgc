@@ -14,6 +14,9 @@ spring:
       - classpath:db/demo
 
 fgc:
+  # 개발자 PC 의 OPENAI_API_KEY 로 테스트가 예산(SRC-060)을 쓰지 않게 끈다. 게이트웨이 테스트는 가짜 서버로 직접 만든다.
+  llm:
+    api-key: ""
   batch:
     daily-changed-contract:
       # 테스트 픽스처와 02시 예약 실행이 경합하지 않게 한다. 배치 테스트는 Job을 직접 실행한다.
