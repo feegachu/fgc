@@ -11,7 +11,8 @@ import time
 import uuid
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 NOTION_VERSION = "2025-09-03"
@@ -25,12 +26,24 @@ class SyncError(RuntimeError):
     pass
 
 
+class SameOriginRedirect(HTTPRedirectHandler):
+    """Keep authenticated API requests on the same HTTPS origin."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        original, target = urlsplit(req.full_url), urlsplit(newurl)
+        if (target.scheme != "https" or target.hostname != original.hostname
+                or (target.port or 443) != (original.port or 443) or target.username or target.password):
+            raise SyncError("Cross-origin API redirect rejected")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class API:
     def __init__(self, base, token, headers=None, sleep=time.sleep):
         self.base = base
         self.token = token
         self.headers = headers or {}
         self.sleep = sleep
+        self.opener = build_opener(SameOriginRedirect())
 
     def request(self, method, path, payload=None):
         body = None if payload is None else json.dumps(payload).encode()
@@ -40,7 +53,7 @@ class API:
         for attempt in range(5):
             request = Request(self.base + path, data=body, headers=headers, method=method)
             try:
-                with urlopen(request, timeout=30) as response:
+                with self.opener.open(request, timeout=30) as response:
                     return json.load(response)
             except HTTPError as error:
                 if error.code in (429, 500, 502, 503, 504) and attempt < 4:
@@ -96,6 +109,7 @@ def resolve_source(notion, database_id, configured_source=""):
 def read_rows(notion, source):
     rows = []
     cursor = None
+    seen_cursors = set()
     while True:
         payload = {"page_size": 100}
         if cursor:
@@ -108,19 +122,22 @@ def read_rows(notion, source):
         cursor = result.get("next_cursor")
         if not cursor:
             raise SyncError("Notion pagination cursor is missing")
+        if cursor in seen_cursors:
+            raise SyncError("Notion pagination cursor repeated; no updates applied")
+        seen_cursors.add(cursor)
 
 
 def tracked_rows(rows, repository):
-    pattern = re.compile(r"https://github\.com/" + re.escape(repository)
-                         + r"/issues/([1-9][0-9]*)/?$", re.IGNORECASE)
+    pattern = re.compile(r"/" + re.escape(repository) + r"/issues/([1-9][0-9]*)/?$", re.IGNORECASE)
     tracked = {}
     for row in rows:
         url = row.get("properties", {}).get(ISSUE_PROPERTY, {}).get("url") or ""
-        match = pattern.fullmatch(url)
-        if not match:
-            if url:
-                raise SyncError("A GitHub 이슈 URL is not an issue URL in this repository")
+        if not url:
             continue
+        parsed = urlsplit(url)
+        match = pattern.fullmatch(parsed.path)
+        if (not match or parsed.scheme != "https" or parsed.netloc.lower() != "github.com"):
+            raise SyncError(f"Invalid GitHub 이슈 URL on Notion page {row['id']}; use an issue URL in {repository}")
         number = int(match[1])
         if number in tracked:
             raise SyncError(f"Duplicate Notion rows for GitHub issue #{number}; no updates applied")
@@ -161,7 +178,8 @@ def read_evidence(github, repository, numbers):
     return evidence
 
 
-def plan_updates(tracked, evidence, repository, target_branch):
+def plan_updates(tracked, evidence, repository, target_branch, reopened_issue=None):
+    """Complete merge-backed issues, preserving manual status except an explicit reopen."""
     updates = []
     for number, row in sorted(tracked.items()):
         issue = evidence[number]
@@ -176,11 +194,24 @@ def plan_updates(tracked, evidence, repository, target_branch):
                 pr = max(merged, key=lambda item: item["mergedAt"])
                 updates.append({"number": number, "page": row["id"], "status": DONE,
                                 "pr": pr["url"]})
-        elif issue["state"] == "OPEN" and current_name == DONE:
-            # Reopened work must no longer count toward the WBS Complete rollup.
+        elif number == reopened_issue and issue["state"] == "OPEN" and current_name == DONE:
+            # Only the actual reopened event may demote this row, not unrelated manual work.
             updates.append({"number": number, "page": row["id"], "status": IN_PROGRESS,
                             "pr": None})
     return updates
+
+
+def reopened_issue_from_event(repository):
+    """Return the single issue explicitly reopened in this repository's event."""
+    if os.environ.get("GITHUB_EVENT_NAME") != "issues":
+        return None
+    event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+    number = event.get("issue", {}).get("number")
+    if (event.get("action") == "reopened"
+            and event.get("repository", {}).get("full_name", "").lower() == repository.lower()
+            and type(number) is int and number > 0):
+        return number
+    return None
 
 
 def apply_updates(notion, updates, dry_run):
@@ -214,7 +245,7 @@ def run():
                             os.environ.get("NOTION_DATA_SOURCE_ID", ""))
     tracked = tracked_rows(read_rows(notion, source), repository)
     evidence = read_evidence(github, repository, tracked)
-    updates = plan_updates(tracked, evidence, repository, "develop")
+    updates = plan_updates(tracked, evidence, repository, "develop", reopened_issue_from_event(repository))
     print(f"Tracked {len(tracked)} issues; planned {len(updates)} status changes")
     apply_updates(notion, updates, dry_run)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")

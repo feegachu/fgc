@@ -1,13 +1,16 @@
 import copy
 import io
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
+from urllib.request import Request
 
-from notion_wbs_sync import (API, DONE, IN_PROGRESS, SyncError, apply_updates,
+from notion_wbs_sync import (API, DONE, IN_PROGRESS, SameOriginRedirect, SyncError, apply_updates,
                              plan_updates, read_evidence, read_rows, resolve_source,
-                             tracked_rows)
+                             reopened_issue_from_event, tracked_rows)
 
 
 SOURCE = "4022f20a-c4dd-801d-b1c6-cf502f956f76"
@@ -75,9 +78,22 @@ class CompletionTests(unittest.TestCase):
             self.assertEqual(self.plan(data), [])
 
     def test_reopened_issue_stops_counting_as_complete(self):
-        self.assertEqual(self.plan(issue(state="OPEN", reason="REOPENED"), DONE)[0]["status"],
-                         IN_PROGRESS)
+        changes = plan_updates({632: row(status=DONE)},
+                               {632: issue(state="OPEN", reason="REOPENED")},
+                               REPO, "develop", reopened_issue=632)
+        self.assertEqual(changes[0]["status"], IN_PROGRESS)
         self.assertEqual(self.plan(issue(state="OPEN", reason=None), IN_PROGRESS), [])
+
+    def test_general_sync_preserves_manual_done_without_completion_evidence(self):
+        for data in [issue(state="OPEN", reason=None), issue(reason="NOT_PLANNED"),
+                     issue(merged=False)]:
+            self.assertEqual(self.plan(data, DONE), [])
+
+    def test_reopened_event_cannot_demote_another_issue_or_a_reclosed_issue(self):
+        self.assertEqual(plan_updates({632: row(status=DONE)}, {632: issue(state="OPEN")},
+                                     REPO, "develop", reopened_issue=999), [])
+        self.assertEqual(plan_updates({632: row(status=DONE)}, {632: issue()},
+                                     REPO, "develop", reopened_issue=632), [])
 
     def test_combined_fun_row_is_one_issue_not_two_requirements(self):
         tracked = {679: row(679)}
@@ -89,13 +105,20 @@ class CompletionTests(unittest.TestCase):
 class MappingTests(unittest.TestCase):
     def test_exact_issue_url_only_and_duplicates_fail_before_writes(self):
         self.assertEqual(list(tracked_rows([row()], REPO)), [632])
-        for suffix in ["/pull/632", "/issues/632?ref=other", "/issues/6320/evil"]:
+        for suffix in ["/pull/632", "/issues/6320/evil"]:
             bad = row()
             bad["properties"]["GitHub 이슈"]["url"] = "https://github.com/" + REPO + suffix
             with self.subTest(suffix=suffix), self.assertRaises(SyncError):
                 tracked_rows([bad], REPO)
         with self.assertRaises(SyncError):
             tracked_rows([row(), row()], REPO)
+
+    def test_issue_permalink_query_and_fragment_resolve_to_same_issue(self):
+        permalink = row()
+        permalink["properties"]["GitHub 이슈"]["url"] += "?source=copy#issuecomment-123"
+        self.assertEqual(list(tracked_rows([permalink], REPO)), [632])
+        with self.assertRaises(SyncError):
+            tracked_rows([row(), permalink], REPO)
 
     def test_notion_pagination_and_archived_rows(self):
         archived = row(534)
@@ -104,6 +127,13 @@ class MappingTests(unittest.TestCase):
                       {"results": [row(538)], "has_more": False})
         self.assertEqual(len(read_rows(api, SOURCE)), 2)
         self.assertEqual(api.calls[1][2]["start_cursor"], "next")
+
+    def test_repeated_or_cyclic_cursor_fails_before_writes(self):
+        for cursors in [["a", "a"], ["a", "b", "a"], [None]]:
+            api = FakeAPI(*[{"results": [], "has_more": True, "next_cursor": cursor}
+                            for cursor in cursors])
+            with self.subTest(cursors=cursors), self.assertRaises(SyncError):
+                read_rows(api, SOURCE)
 
     def test_source_is_discovered_and_complete_group_is_validated(self):
         schema = {"properties": {"GitHub 이슈": {"type": "url"}, "상태": {
@@ -153,14 +183,45 @@ class WriteTests(unittest.TestCase):
                           {"Retry-After": "2"}, None)
         result = io.BytesIO(json.dumps({"ok": True}).encode())
         api = API("https://api.notion.com/v1", "secret-token", sleep=lambda _: None)
-        with patch("notion_wbs_sync.urlopen", side_effect=[error, result]) as call:
+        with patch.object(api.opener, "open", side_effect=[error, result]) as call:
             self.assertEqual(api.request("GET", "/pages/test"), {"ok": True})
             self.assertEqual(call.call_count, 2)
         forbidden = HTTPError("https://api.notion.com/v1/pages/test", 403, "denied", {}, None)
-        with patch("notion_wbs_sync.urlopen", side_effect=forbidden):
+        with patch.object(api.opener, "open", side_effect=forbidden):
             with self.assertRaises(SyncError) as context:
                 api.request("GET", "/pages/test")
         self.assertNotIn("secret-token", str(context.exception))
+
+
+class EventAndRedirectTests(unittest.TestCase):
+    def test_reopen_requires_correct_event_action_repository_and_issue(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "event.json"
+            event = {"action": "reopened", "repository": {"full_name": REPO},
+                     "issue": {"number": 632}}
+            path.write_text(json.dumps(event), encoding="utf-8")
+            with patch.dict("os.environ", {"GITHUB_EVENT_NAME": "issues", "GITHUB_EVENT_PATH": str(path)}):
+                self.assertEqual(reopened_issue_from_event(REPO), 632)
+                for changed in [{**event, "action": "closed"},
+                                {**event, "repository": {"full_name": "other/fgc"}},
+                                {**event, "issue": {"number": "632"}}]:
+                    path.write_text(json.dumps(changed), encoding="utf-8")
+                    self.assertIsNone(reopened_issue_from_event(REPO))
+            with patch.dict("os.environ", {"GITHUB_EVENT_NAME": "workflow_dispatch"}):
+                self.assertIsNone(reopened_issue_from_event(REPO))
+
+    def test_authenticated_redirect_stays_on_same_https_origin(self):
+        handler = SameOriginRedirect()
+        request = Request("https://api.notion.com/v1/pages/old",
+                          headers={"Authorization": "Bearer secret-token"})
+        same = handler.redirect_request(request, None, 302, "Moved", {},
+                                        "https://api.notion.com/v1/pages/new")
+        self.assertEqual(same.get_header("Authorization"), "Bearer secret-token")
+        for target in ["https://elsewhere.invalid/", "https://api.notion.com.evil.invalid/",
+                       "http://api.notion.com/", "https://api.notion.com:444/",
+                       "https://user@api.notion.com/"]:
+            with self.subTest(target=target), self.assertRaises(SyncError):
+                handler.redirect_request(request, None, 302, "Moved", {}, target)
 
 
 if __name__ == "__main__":

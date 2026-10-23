@@ -19,10 +19,11 @@ permissions:
   issues: read
   pull-requests: read
 
-# Every run reconciles all tracked rows, so replacing a queued run loses no updates.
+# Keep explicit reopen events and prevent previews from replacing queued writes.
 concurrency:
-  group: notion-wbs-sync
+  group: notion-wbs-sync-${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'preview' || 'apply' }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   sync:
