@@ -35,9 +35,16 @@ let requests: string[]
 let resultRows: PaymentRow[]
 let failure: Error | null
 let interceptList: ((url: string) => Promise<PaymentPage> | undefined) | undefined
+let deleteDraft: () => Promise<void>
+let deleteCalls: string[]
 function renderAt(path = '/app/transactions', canProcess = true) {
-  vi.spyOn(apiClient, 'request').mockImplementation(async (url) => {
+  vi.spyOn(apiClient, 'request').mockImplementation(async (url, options) => {
     requests.push(url)
+    if (options?.method === 'DELETE') {
+      deleteCalls.push(url)
+      await deleteDraft()
+      return envelope(null)
+    }
     if (url === '/api/v1/auth/me')
       return envelope({
         loginId: 'transaction-user',
@@ -91,6 +98,10 @@ beforeEach(() => {
   resultRows = [row]
   failure = null
   interceptList = undefined
+  deleteCalls = []
+  deleteDraft = async () => {
+    resultRows = []
+  }
   useAuthStore.setState({ accessToken: 'fixture', loggingOut: false })
   useWorkspaceStore.getState().clear()
 })
@@ -100,6 +111,80 @@ afterEach(() => {
 })
 
 describe('TRAN-W01 수수료 지급 목록', () => {
+  it('GA 수기지급 이외의 초안은 삭제 요청과 확인창을 열지 않는다', async () => {
+    resultRows = [{ ...row, sourceType: 'INSURER_STATEMENT' }]
+    const { actions } = renderAt()
+    const button = await screen.findByRole('button', { name: 'TRAN-410 삭제' })
+    expect(button).toBeDisabled()
+    await actions.click(button)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(deleteCalls).toHaveLength(0)
+  })
+
+  it('작업 헤더와 초안 삭제 확인창을 표시하고 취소하면 요청하지 않는다', async () => {
+    const { actions } = renderAt()
+    await screen.findByRole('columnheader', { name: '작업' })
+    await actions.click(await screen.findByRole('button', { name: 'TRAN-410 삭제' }))
+    const dialog = screen.getByRole('dialog', { name: '지급 초안 삭제' })
+    expect(dialog).toHaveTextContent('TRAN-410')
+    expect(dialog).toHaveTextContent('10,000원')
+    await actions.click(within(dialog).getByRole('button', { name: '취소' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(deleteCalls).toHaveLength(0)
+  })
+
+  it('삭제 후 필터를 보존하고 마지막 페이지를 보정하여 목록을 다시 조회한다', async () => {
+    const { actions, router } = renderAt('/app/transactions?page=3&status=DRAFT&contractNo=C-001')
+    await actions.click(await screen.findByRole('button', { name: 'TRAN-410 삭제' }))
+    await actions.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }))
+    await waitFor(() => expect(router.state.location.search).toContain('page=2'))
+    expect(router.state.location.search).toContain('status=DRAFT')
+    expect(router.state.location.search).toContain('contractNo=C-001')
+    await waitFor(() => expect(lastRequest().get('page')).toBe('2'))
+    expect(deleteCalls).toEqual(['/api/v1/transactions/41'])
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('삭제 중 중복 요청과 닫기를 막고 충돌 오류를 확인창에서 알린다', async () => {
+    let reject!: (error: Error) => void
+    deleteDraft = () =>
+      new Promise<void>((_, failure) => {
+        reject = failure
+      })
+    const { actions } = renderAt()
+    await actions.click(await screen.findByRole('button', { name: 'TRAN-410 삭제' }))
+    const dialog = screen.getByRole('dialog')
+    await actions.click(within(dialog).getByRole('button', { name: '삭제' }))
+    expect(within(dialog).getByRole('button', { name: /삭제 중/ })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: '취소' })).toBeDisabled()
+    await actions.keyboard('{Escape}')
+    expect(dialog).toBeVisible()
+    resultRows = [{ ...row, status: 'CONFIRMED', statusLabel: '확정' }]
+    await act(async () =>
+      reject(
+        new ApiError(
+          { code: 'FGC-TRAN-005', message: '작성중인 지급 건만 삭제할 수 있습니다.' },
+          'delete-conflict',
+          409,
+        ),
+      ),
+    )
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('작성중인 지급 건만 삭제')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'TRAN-410 삭제' })).not.toBeInTheDocument())
+    expect(deleteCalls).toHaveLength(1)
+  })
+
+  it('확정·취소 행에는 삭제가 없고 조회 전용 사용자에게는 비활성이다', async () => {
+    resultRows = [
+      row,
+      { ...row, commissionTransactionId: 42, sourceBusinessKey: 'CONFIRMED', status: 'CONFIRMED' },
+      { ...row, commissionTransactionId: 43, sourceBusinessKey: 'CANCELLED', status: 'CANCELLED' },
+    ]
+    renderAt('/app/transactions', false)
+    expect(await screen.findByRole('button', { name: 'TRAN-410 삭제 (조회 전용 권한)' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'CONFIRMED 삭제' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'CANCELLED 삭제' })).not.toBeInTheDocument()
+  })
   it('취소된 원 지급은 흐름도 취소로 표시하고 대체 지급은 지급으로 표시한다', async () => {
     resultRows = [
       { ...row, status: 'CANCELLED', statusLabel: '취소', sourceBusinessKey: 'OLD-548' },
@@ -196,9 +281,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     await waitFor(() => expect(lastRequest().get('page')).toBe('5'))
   })
   it('4페이지는 첫 묶음을 표시하고 숫자 선택·묶음 이동·경계·안내를 유지한다', async () => {
-    const { actions } = renderAt(
-      '/app/transactions?month=2026-07&settlementMonth=2026-07&contractNo=POL-2&page=4',
-    )
+    const { actions } = renderAt('/app/transactions?month=2026-07&settlementMonth=2026-07&contractNo=POL-2&page=4')
     await screen.findByText('4 / 7 페이지')
     const pagination = () => screen.getByRole('navigation', { name: '수수료 지급 건 목록 페이지 선택' })
     const controls = () => within(pagination())

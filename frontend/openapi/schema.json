@@ -1077,6 +1077,9 @@
             "format" : "date",
             "type" : "string"
           },
+          "candidateType" : {
+            "type" : "string"
+          },
           "contractId" : {
             "format" : "int64",
             "type" : "integer"
@@ -1113,6 +1116,9 @@
           "plannedCommissionAmount" : {
             "type" : "number"
           },
+          "projectedExcessAmount" : {
+            "type" : "number"
+          },
           "refundAdditionAppliedYn" : {
             "type" : "boolean"
           },
@@ -1128,12 +1134,6 @@
             "type" : "string"
           },
           "surrenderValueSourceTypeLabel" : {
-            "type" : "string"
-          },
-          "projectedExcessAmount" : {
-            "type" : "number"
-          },
-          "candidateType" : {
             "type" : "string"
           }
         },
@@ -3489,6 +3489,9 @@
           "severityLabel" : {
             "type" : "string"
           },
+          "sourceDeleted" : {
+            "type" : "boolean"
+          },
           "sourceEntityId" : {
             "type" : "string"
           },
@@ -3496,7 +3499,7 @@
             "type" : "string"
           },
           "sourceLink" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "status" : {
             "enum" : [ "NEW", "IN_REVIEW", "RESOLVED", "REJECTED" ],
@@ -8401,6 +8404,63 @@
       }
     },
     "/api/v1/transactions/{paymentId}" : {
+      "delete" : {
+        "description" : "직접 작성한 DRAFT와 귀속행을 삭제합니다. 검출·감사 이력은 보존하며, 확정 건과 원장·대사·환수·정정에 연결된 건은 거절합니다.",
+        "operationId" : "deleteDraft",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "paymentId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description" : "초안 삭제 성공"
+          },
+          "400" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description" : "존재하지 않는 지급 건"
+          },
+          "403" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description" : "지급 처리 권한 없음"
+          },
+          "409" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description" : "초안이 아니거나 삭제할 수 없는 연관 이력"
+          }
+        },
+        "summary" : "수수료 지급 초안 삭제",
+        "tags" : [ "수수료 지급 건" ]
+      },
       "get" : {
         "operationId" : "get",
         "parameters" : [ {

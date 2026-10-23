@@ -21,6 +21,7 @@ jobs:
   claude-review:
     if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 30   # 기본값 360분 — 평소 1~3분, 멈춘 리뷰가 러너를 6시간 잡지 않게 한다
     permissions:
       contents: read
       pull-requests: write
@@ -164,8 +165,9 @@ jobs:
             | 판단할 것 | 볼 파일 | 찾는 법 |
             |---|---|---|
             | 요구사항·인수조건 | docs/FGC_요구사항명세서_v2_2_2_정합성교정_FUN_기능_요구사항.CSV | `검증기준(인수조건)` 열 |
+            | FUN 외 요구사항(SER·TER·SIR·ECR·DAR·PER 등) 인수조건 | PR 본문이 연결한 이슈 본문 | `gh issue view <번호>`의 "요구사항 원문" 펼침 블록 (저장소 CSV에는 FUN만 있다) |
             | 규제 위반 | docs/07_규제조문표_v0.2.1.md | REG-01 ~ REG-24 |
-            | 금액 반올림 | docs/FGC_가상_GA_운영정책서_v1_0.md | 제17조의2 (L408~424) |
+            | 금액 반올림 | docs/FGC_가상_GA_운영정책서_v1_0.md | `## 제17조의2` grep |
             | 초년도/차년도 경계 | docs/FGC_가상_GA_운영정책서_v1_0.md, docs/FGC_정규화_입력데이터_시드데이터_명세서_v1_0.md | `초년도` grep |
             | API 계약 | docs/05_인터페이스정의서_v2_0.md | IF-API-xx |
             | 화면 필드 | docs/FGC_화면정의서_v2_0.md | FGC-UI-xxx-Wxx |
@@ -175,8 +177,9 @@ jobs:
             문서 총합이 300KB가 넘는다. 통째로 읽지 마라.
             1) `gh pr view`, `gh pr diff`로 변경 범위를 파악하고
                PR 제목·브랜치명에서 요구사항 번호를 찾는다.
-            2) 요구사항 ID 형식은 `FGC-FUN-047`이다.
+            2) 요구사항 ID 형식은 `FGC-FUN-047`·`FGC-SER-013`처럼 `FGC-<분류>-<번호>`이다.
                `grep -rn "FUN-047" docs/`로 해당 ID만 찾아 그 주변만 읽는다.
+               FUN이 아니면 PR이 연결한 이슈 본문의 "요구사항 원문"을 기준으로 삼는다.
                (`-r` 없이 디렉터리를 주면 "Is a directory"로 아무것도 찾지 못한다.)
             3) 위 표에서 지금 필요한 행만 골라 grep한다. 나머지 파일은 열지 마라.
 
@@ -263,7 +266,7 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --effort high
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments:*),Bash(${{ runner.temp }}/claude-review-threads.sh:*),Read,Glob,Grep"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments:*),Bash(${{ runner.temp }}/claude-review-threads.sh:*),Read,Glob,Grep"
 
       # 첫 리뷰인데 요약이 없으면 리뷰가 실제로 됐는지 알 수 없다(#444) — 초록색으로 두지 않고 실패로 드러낸다.
       # 필수 체크(build·frontend)가 아니라 병합은 막지 않는다. 일시 오류면 이 run 을 Re-run 한다.

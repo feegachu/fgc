@@ -209,7 +209,7 @@ jobs:
           retention-days: 7
 
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && needs.changes.outputs.run_checks == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     needs: [changes, build, frontend]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -228,6 +228,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build both images
+        if: needs.changes.outputs.run_checks == 'true'
         run: |
           set -euo pipefail
           # docker build는 .containerignore를 읽지 않는다 (위 주의 참고)
@@ -239,6 +240,7 @@ jobs:
               -f "Containerfile.$app" -t "$REGISTRY/$app:sha-$GITHUB_SHA" .
           done
       - name: Scan API
+        if: needs.changes.outputs.run_checks == 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/feegachu/fgc/api:sha-${{ github.sha }}
@@ -248,6 +250,7 @@ jobs:
           trivyignores: .trivyignore
           format: table
       - name: Scan WEB
+        if: needs.changes.outputs.run_checks == 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/feegachu/fgc/web:sha-${{ github.sha }}
@@ -257,8 +260,32 @@ jobs:
           trivyignores: .trivyignore
           format: table
       - name: Push only after both scans pass
+        if: needs.changes.outputs.run_checks == 'true'
         run: |
           set -euo pipefail
           for app in api web; do
             docker push "$REGISTRY/$app:sha-$GITHUB_SHA"
           done
+      # 문서 전용 push(#615)는 이미지를 새로 빌드하지 않는다. 그래도 Jenkins dev-fgc는 develop HEAD의
+      # sha 태그를 기다리므로(Jenkinsfile.fgc), 직전 커밋 이미지에 같은 digest로 태그만 더한다.
+      - name: Tag previous images (documentation-only push)
+        if: needs.changes.outputs.run_checks != 'true'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # 직전 push의 publish가 아직 진행 중일 수 있어 최대 20분 기다린다.
+          for n in $(seq 1 80); do
+            if docker buildx imagetools inspect "$REGISTRY/api:sha-$BEFORE" > /dev/null 2>&1 \
+               && docker buildx imagetools inspect "$REGISTRY/web:sha-$BEFORE" > /dev/null 2>&1; then
+              for app in api web; do
+                # --prefer-index=false: 새 index로 감싸지 않고 그대로 복사해 digest를 유지한다.
+                docker buildx imagetools create --prefer-index=false \
+                  -t "$REGISTRY/$app:sha-$GITHUB_SHA" "$REGISTRY/$app:sha-$BEFORE"
+              done
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::직전 커밋 $BEFORE 의 이미지가 20분 안에 없습니다. 그 커밋의 CI publish 결과를 확인하세요."
+          exit 1
