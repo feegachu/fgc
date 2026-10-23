@@ -67,7 +67,8 @@
 .transaction-col-cashflow { width: 5rem; }
 .transaction-col-status { width: 5.5rem; }
 .transaction-col-attribution { width: 6.5rem; }
-.transaction-col-action { width: 5rem; }
+.transaction-col-action { width: 9rem; }
+.transaction-delete { color: var(--color-status-error-text); }
 
 .transaction-state-row td {
   height: 8rem;

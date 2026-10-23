@@ -378,7 +378,7 @@
       </dl>
       <!-- 2026-08-20 yslee - FGC-FUN-053 원장 정정 예외도 검토중 오탐·반려 조치를 유지 -->
       <form class="exception-action-form" data-exception-action-form
-            th:if="${c.status() == newStatus or c.status() == inReviewStatus or c.status() == rejectedStatus}"
+            th:if="${c.status() == newStatus or c.status() == inReviewStatus or (c.status() == rejectedStatus and !c.sourceDeleted())}"
             th:attr="data-exception-id=${c.exceptionCaseId()},data-current-status=${c.status()}"
             sec:authorize="hasAnyRole('SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN')">
         <label class="field">
