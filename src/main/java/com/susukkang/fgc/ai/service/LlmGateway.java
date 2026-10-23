@@ -39,7 +39,7 @@ import java.util.Set;
  * - 키는 서버 설정(fgc.llm.api-key ← 환경변수)으로만 받는다. 클라이언트를 빈으로 내보내지 않아 다른 코드가 SDK 를 직접 부르지 못한다.
  * - store=false, Files API 미사용(입력을 요청에 바로 넣는다), SDK 자동 재시도 0회.
  * - 실패하면 FGC-AI-001 을 던진다. 호출자는 이를 받아 규칙형 안내·결정론 파서 경로로 계속한다.
- *   401·403·404(모델 접근 불가)·429(쿼터 소진·한도)는 fgc.llm.cooldown 동안 AI 기능을 꺼서 반복 호출하지 않는다.
+ *   시간 초과·401·403·404(모델 접근 불가)·429(쿼터 소진·한도)는 fgc.llm.cooldown 동안 AI 기능을 꺼서 반복 호출하지 않는다(IF-EXT-03 오류 처리).
  * - 호출마다 ai_call_log 1행(모델·목적·토큰·지연·오류·관련 엔티티). 원문은 남기지 않는다(SER-006).
  *
  * @author yslee
@@ -118,17 +118,31 @@ public class LlmGateway {
                     .build());
         } catch (OpenAIServiceException e) {
             if (DISABLING_STATUSES.contains(e.statusCode())) {
-                disabledUntil = Instant.now().plus(properties.cooldown());
+                disable();
             }
             String code = "HTTP_" + e.statusCode() + e.code().map(c -> "_" + c).orElse("");
             throw failed(request, AiCallStatus.ERROR, code, null, started);
         } catch (OpenAIIoException e) {
-            boolean timeout = e.getCause() instanceof InterruptedIOException;
-            throw failed(request, timeout ? AiCallStatus.TIMEOUT : AiCallStatus.ERROR, timeout ? "TIMEOUT" : "IO", null, started);
+            if (!(e.getCause() instanceof InterruptedIOException)) {
+                throw failed(request, AiCallStatus.ERROR, "IO", null, started);
+            }
+            // 응답 없는 장애가 이어지면 요청마다 timeout 만큼 막히므로 시간 초과도 AI 를 끈다(IF-EXT-03).
+            disable();
+            throw failed(request, AiCallStatus.TIMEOUT, "TIMEOUT", null, started);
         } catch (OpenAIException e) {
             throw failed(request, AiCallStatus.ERROR, e.getClass().getSimpleName(), null, started);
         }
+        return readOutput(request, response, started);
+    }
 
+    /**
+     * 설명 : 구조화 출력 본문을 꺼내고 SUCCESS 를 기록한다. 스키마 불일치·거절·빈 응답은 쓴 토큰과 함께 ERROR 로 남긴다.
+     *
+     * @author yslee
+     * @version 1.0
+     * @since 2026-10-23
+     */
+    private <T> T readOutput(LlmRequest request, StructuredResponse<T> response, long started) {
         Optional<ResponseUsage> usage = response.usage();
         Optional<T> output;
         try {
@@ -174,6 +188,10 @@ public class LlmGateway {
         if (client != null) {
             client.close();
         }
+    }
+
+    private void disable() {
+        disabledUntil = Instant.now().plus(properties.cooldown());
     }
 
     private FgcBusinessException skipped(LlmRequest request, String reason) {

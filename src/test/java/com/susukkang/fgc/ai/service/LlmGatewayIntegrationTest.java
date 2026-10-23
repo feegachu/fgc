@@ -158,18 +158,26 @@ class LlmGatewayIntegrationTest {
                 "ERROR:HTTP_429_insufficient_quota", "FALLBACK_RULE:AI_DISABLED");
     }
 
-    /** 시간 초과는 일시 장애라 AI 를 끄지 않는다 — 다음 요청은 다시 1회 보낸다. */
+    /** 시간 초과도 AI 를 끈다(IF-EXT-03) — 응답 없는 장애에서 다음 요청이 timeout 만큼 다시 막히지 않는다. */
     @Test
-    void timeoutIsRecordedWithoutDisablingAi() {
+    void timeoutDisablesAi() {
         delayMs = 1_500;
         LlmGateway gateway = gateway("test-key");
 
         assertAi001(() -> gateway.call(request("문서"), DocKind.class));
-        delayMs = 0;
-        assertThat(gateway.call(request("문서"), DocKind.class).rowCount).isEqualTo(3);
+        assertAi001(() -> gateway.call(request("문서"), DocKind.class));
 
-        assertThat(paths).hasSize(2);
-        assertThat(statusAndError()).containsExactly("TIMEOUT:TIMEOUT", "SUCCESS:null");
+        assertThat(paths).hasSize(1);
+        assertThat(statusAndError()).containsExactly("TIMEOUT:TIMEOUT", "FALLBACK_RULE:AI_DISABLED");
+    }
+
+    /** 입력 상한(100자)과 같은 길이는 보낸다 — 초과(101자)만 건너뛴다. */
+    @Test
+    void sendsInputAtExactLimit() {
+        assertThat(gateway("test-key").call(request("가".repeat(100)), DocKind.class).rowCount).isEqualTo(3);
+
+        assertThat(paths).containsExactly("/v1/responses");
+        assertThat(statusAndError()).containsExactly("SUCCESS:null");
     }
 
     /** 키가 없거나 입력이 상한을 넘으면 외부 호출 없이 FALLBACK_RULE 로 남긴다. */
