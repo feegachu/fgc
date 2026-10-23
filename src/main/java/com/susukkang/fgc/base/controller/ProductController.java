@@ -35,6 +35,8 @@ public class ProductController {
     @GetMapping
     @PreAuthorize(Roles.ANY_ROLE)
     public ApiResponse<PageResponse<ProductResponse>> search(
+            @Parameter(description = "상품명·상품코드·판매버전 부분 검색") @RequestParam(required = false) String keyword,
+            @Parameter(description = "기존 선택 판매버전 ID 재조회. 기준일·보험회사 조건은 유지") @RequestParam(required = false) Long selectedId,
             @Parameter(description = "보험회사 ID", example = "2", required = true)
             @RequestParam
             long insurerId,
@@ -58,7 +60,7 @@ public class ProductController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        ProductSearchCriteria criteria = new ProductSearchCriteria(insurerId, asOf, includeExpired, includeHistorical, sort);
+        ProductSearchCriteria criteria = new ProductSearchCriteria(insurerId, asOf, includeExpired, includeHistorical, sort, keyword, selectedId);
         return ApiResponse.success(productService.search(criteria, page, size));
     }
 }

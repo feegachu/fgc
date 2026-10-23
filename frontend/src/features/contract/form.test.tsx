@@ -1,3 +1,4 @@
+import { selectOption } from '../../test/selectOption'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -212,7 +213,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     expect(field('소속 조직')).toHaveValue('저장 당시 조직')
     fireEvent.change(field('계약번호'), { target: { value: '  USER-EDIT  ' } })
     fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '110000' } })
-    await user.selectOptions(field('납입주기'), 'ANNUAL')
+    await selectOption(user, field('납입주기'), 'ANNUAL')
     expect(field('주기 보험료(원)')).toHaveValue(299000)
     await user.click(save())
     await screen.findByText('계약 상세')
@@ -327,11 +328,11 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
   it('상품을 직접 바꿀 때만 상품 납입기간·공제액 규칙을 반영한다', async () => {
     const { user } = renderAt()
     await ready()
-    await user.selectOptions(field('상품 판매버전'), '8')
+    await selectOption(user, field('상품 판매버전'), '8')
     expect(field('납입기간(개월)')).toHaveValue(360)
     expect(field('납입기간(개월)')).toHaveAttribute('readonly')
     expect(field('표준해약공제액(원)')).toBeEnabled()
-    await user.selectOptions(field('상품 판매버전'), '7')
+    await selectOption(user, field('상품 판매버전'), '7')
     expect(field('납입기간(개월)')).toHaveValue(240)
     expect(field('표준해약공제액(원)')).toHaveValue(null)
     expect(field('표준해약공제액(원)')).toBeDisabled()
@@ -342,10 +343,10 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await waitFor(() => expect(field('보험회사')).toBeEnabled())
     expect(save()).toBeDisabled()
     expect(screen.getByRole('option', { name: /비활성 보험사/ })).toBeDisabled()
-    await user.selectOptions(field('보험회사'), '1')
+    await selectOption(user, field('보험회사'), '1')
     await waitFor(() => expect(field('상품 판매버전')).toBeEnabled())
-    await user.selectOptions(field('상품 판매버전'), '7')
-    await user.selectOptions(field('모집 설계사'), '3')
+    await selectOption(user, field('상품 판매버전'), '7')
+    await selectOption(user, field('모집 설계사'), '3')
     expect(field('소속 조직')).toHaveValue('현재 조직')
     expect(screen.queryByRole('option', { name: /퇴사 설계사|팀장|비활성 설계사/ })).not.toBeInTheDocument()
     fireEvent.change(field('계약번호'), { target: { value: 'NEW-21' } })
@@ -386,11 +387,12 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
         return { content: [{ ...product, productOfferingId: 99, productName: '두 번째 보험사 상품' }] }
     })
     await waitFor(() => expect(field('보험회사')).toBeEnabled())
-    await user.selectOptions(field('보험회사'), '1')
-    await user.selectOptions(field('보험회사'), '2')
+    await selectOption(user, field('보험회사'), '1')
+    await selectOption(user, field('보험회사'), '2')
+    await user.click(field('상품 판매버전'))
     await screen.findByRole('option', { name: /두 번째 보험사 상품/ })
     await act(async () => release({ content: [{ ...product, productName: '늦게 도착한 상품' }] }))
-    expect(within(field('상품 판매버전')).queryByRole('option', { name: /늦게 도착한 상품/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /늦게 도착한 상품/ })).not.toBeInTheDocument()
   })
 
   it('기준정보 실패 시 저장을 잠그고 재조회로 복구한다', async () => {
@@ -486,8 +488,8 @@ describe('[FGC-FUN-018] 서버 오류·과거 기준정보', () => {
     )
     await ready()
     expect(field('보험회사')).toHaveValue('1')
-    expect(field('상품 판매버전')).toHaveValue('7')
-    expect(field('모집 설계사')).toHaveValue('3')
+    expect(field('상품 판매버전')).toHaveValue('상품 · v1 ()')
+    expect(field('모집 설계사')).toHaveValue('설계사 ()')
     expect(field('소속 조직')).toHaveValue('저장 당시 조직')
     await user.click(save())
     await screen.findByText('계약 상세')

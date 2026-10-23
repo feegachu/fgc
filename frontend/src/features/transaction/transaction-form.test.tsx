@@ -1,3 +1,4 @@
+import { selectOption } from '../../test/selectOption'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -62,6 +63,13 @@ beforeEach(() => {
     if (options.method && options.method !== 'GET') return envelope(await mutation(path, options))
     if (referenceFailure) throw referenceFailure
     if (path.startsWith('/api/v1/base/agents')) return envelope({ content: agents })
+    if (path.startsWith('/api/v1/base/commission-items/search'))
+      return envelope({
+        content: items.filter(
+          (item) =>
+            item.cashflowType === (new URL(path, 'http://local').searchParams.get('cashflowType') || item.cashflowType),
+        ),
+      })
     if (path.startsWith('/api/v1/base/commission-items')) return envelope(items)
     if (path === '/api/v1/contracts/103') {
       if (contractDetailFailure)
@@ -106,11 +114,11 @@ const writes = () =>
   vi.mocked(apiClient.request).mock.calls.filter(([, options]) => ['POST', 'PUT'].includes(options?.method ?? ''))
 async function fillNew(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => expect(screen.getByLabelText(/수령 설계사/)).toBeEnabled())
-  await user.selectOptions(screen.getByLabelText(/수령 설계사/), '1')
+  await selectOption(user, screen.getByLabelText(/수령 설계사/), '1')
   await waitFor(() => expect(button('btn-add-attr')).toBeEnabled())
-  await user.selectOptions(screen.getByLabelText(/수수료 항목/), '1')
+  await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
   await user.click(button('btn-add-attr'))
-  await user.selectOptions(screen.getByLabelText('1번 귀속행 계약번호'), '3')
+  await selectOption(user, screen.getByLabelText('1번 귀속행 계약번호'), '3')
 }
 async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
   await fillNew(user)
@@ -123,6 +131,39 @@ async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('TRAN-W02 React form workflow', () => {
+  it('이미 저장된 초안은 URL의 새 지급 맥락으로 덮어쓰지 않는다', async () => {
+    mount(
+      '/app/transactions/new?id=77&month=2026-07&contractId=7&agentId=2&commissionItemId=3&amount=1&cashflowType=DEDUCTION',
+    )
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('C-003 · 상품')
+    expect(document.getElementById('amount')).toHaveValue(250000)
+  })
+  it('계약 상세에서 전달한 맥락으로 실제 선택값을 채우고 저장한다', async () => {
+    const { user } = mount(
+      '/app/transactions/new?month=2026-07&contractId=3&agentId=1&commissionItemId=1&attributionDate=2026-07-20&amount=150000&returnTo=%2Fcontracts%2F3',
+    )
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('C-003 · 상품')
+    expect(screen.getByLabelText('1번 귀속행 귀속일')).toHaveValue('2026-07-20')
+    expect(
+      vi
+        .mocked(apiClient.request)
+        .mock.calls.some(
+          ([path]) =>
+            path.startsWith('/api/v1/contracts?') && new URL(path, 'http://local').searchParams.get('agentId') === '1',
+        ),
+    ).toBe(true)
+    await user.click(button('btn-save'))
+    await waitFor(() => expect(writes()).toHaveLength(1))
+    expect(writes()[0][1]?.body).toMatchObject({
+      agentId: 1,
+      commissionItemId: 1,
+      amount: 150000,
+      attributions: [expect.objectContaining({ contractId: 3, attributionDate: '2026-07-20' })],
+    })
+    expect(screen.getByRole('link', { name: '목록으로' })).toHaveAttribute('href', '/app/contracts/3')
+  })
   it('shows a non-applicable precheck reason without a usage gauge or numeric amounts', async () => {
     precheckResult = {
       confirmable: true,
@@ -389,7 +430,7 @@ describe('TRAN-W02 React form workflow', () => {
   it('requires attribution and evidence but allows an imbalanced draft for server precheck', async () => {
     const { user } = mount()
     await fillNew(user)
-    await user.selectOptions(screen.getByLabelText('1번 귀속행 산입 판정'), 'EXCLUDED:NEW_AGENT_SUPPORT')
+    await selectOption(user, screen.getByLabelText('1번 귀속행 산입 판정'), 'EXCLUDED:NEW_AGENT_SUPPORT')
     await user.click(button('btn-save'))
     expect(await screen.findByText('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.')).toBeVisible()
     expect(writes()).toHaveLength(0)
@@ -404,13 +445,13 @@ describe('TRAN-W02 React form workflow', () => {
   it('switches newcomer, manager and insurer modes with legacy clearing behavior', async () => {
     const { user } = mount()
     await fillNew(user)
-    await user.selectOptions(screen.getByLabelText(/수수료 항목/), '2')
+    await selectOption(user, screen.getByLabelText(/수수료 항목/), '2')
     expect(screen.queryByLabelText('1번 귀속행 계약번호')).not.toBeInTheDocument()
     expect(screen.getByLabelText('1번 귀속행 산입 판정')).toHaveValue('EXCLUDED:NEW_AGENT_SUPPORT')
-    await user.selectOptions(screen.getByLabelText(/수수료 항목/), '1')
+    await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
     expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('')
     expect(screen.getByLabelText('1번 귀속행 귀속 방법')).toHaveValue('DIRECT')
-    await user.selectOptions(screen.getByLabelText(/수령 설계사/), '2')
+    await selectOption(user, screen.getByLabelText(/수령 설계사/), '2')
     await waitFor(() => expect(button('btn-add-attr')).toBeEnabled())
     expect(screen.getByText('귀속행을 추가하세요.')).toBeVisible()
     expect(
@@ -418,9 +459,9 @@ describe('TRAN-W02 React form workflow', () => {
         .mocked(apiClient.request)
         .mock.calls.filter(([path]) => path.startsWith('/api/v1/contracts'))
         .at(-1)?.[0],
-    ).toBe('/api/v1/contracts?page=1&size=100')
+    ).toBe('/api/v1/contracts?page=1&size=20')
     await user.click(button('btn-add-attr'))
-    await user.selectOptions(screen.getByLabelText(/지급단계/), 'INSURER_TO_GA')
+    await selectOption(user, screen.getByLabelText(/지급단계/), 'INSURER_TO_GA')
     expect(screen.queryByLabelText(/수령 설계사/)).not.toBeInTheDocument()
     expect(screen.getByLabelText(/수수료 항목/)).toHaveValue('')
     expect(
@@ -532,7 +573,7 @@ describe('TRAN-W02 legacy defect regressions (#410)', () => {
       if (source === 'preview')
         expect(
           vi.mocked(apiClient.request).mock.calls.filter(([path]) => path === '/api/v1/contracts/103'),
-        ).toHaveLength(0)
+        ).toHaveLength(1)
       if (source === 'lookup failure')
         await waitFor(() =>
           expect(vi.mocked(apiClient.request)).toHaveBeenCalledWith('/api/v1/contracts/103', expect.anything()),

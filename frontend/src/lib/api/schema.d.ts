@@ -31,7 +31,7 @@ export interface paths {
          * 감사로그 조회
          * @description 누가 언제 무엇을 바꿨는지 검색합니다. userLoginId 가 null 인 행은 배치 발 감사행(화면 표기 BATCH)입니다.
          */
-        get: operations["search_9"];
+        get: operations["search_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -155,7 +155,7 @@ export interface paths {
          * 보험설계사 기준정보 조회·선택 (IF-API-07)
          * @description 기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.
          */
-        get: operations["search_8"];
+        get: operations["search_9"];
         put?: never;
         post?: never;
         delete?: never;
@@ -176,6 +176,26 @@ export interface paths {
          * @description 기준일자에 사용 가능한 수수료 항목과 사용기간을 조회합니다. 1,200% 산입 여부는 룰셋별 cap_rule_item에서 결정합니다.
          */
         get: operations["findCommissionItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base/commission-items/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 수수료 항목 검색형 선택
+         * @description 기존 asOf 목록 응답은 유지하고 검색·페이지·선택 ID 재조회를 제공합니다.
+         */
+        get: operations["search_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1438,6 +1458,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponsePageResponseCommissionItemResponse: {
+            data?: components["schemas"]["PageResponseCommissionItemResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponsePageResponseCommissionPaymentListResponse: {
             data?: components["schemas"]["PageResponseCommissionPaymentListResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1557,6 +1582,7 @@ export interface components {
             monthStart?: string;
             /** Format: date */
             nextMonthStart?: string;
+            sort?: string;
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
@@ -2228,6 +2254,7 @@ export interface components {
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             settlementMonth?: string;
+            sort?: string;
             sourceType?: string;
             /** @enum {string} */
             status?: "DRAFT" | "CONFIRMED" | "CANCELLED";
@@ -2481,6 +2508,7 @@ export interface components {
             orgId?: number;
             /** Format: int64 */
             productOfferingId?: number;
+            sort?: string;
         };
         ContractStatusEventProcessingResponse: {
             /** Format: date-time */
@@ -2722,6 +2750,7 @@ export interface components {
             reasonCode?: string;
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
+            sort?: string;
             status?: string;
             /** @enum {string} */
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
@@ -3191,6 +3220,18 @@ export interface components {
         };
         PageResponseAuditLogResponse: {
             content?: components["schemas"]["AuditLogResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageResponseCommissionItemResponse: {
+            content?: components["schemas"]["CommissionItemResponse"][];
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -3747,10 +3788,19 @@ export interface components {
             statusLabel?: string;
         };
         ScheduleLineResponse: {
+            /** Format: date */
+            attributionDate?: string;
             basisAmount?: number;
             basisCode?: string;
+            /** Format: int64 */
+            beneficiaryAgentId?: number;
             calculationType?: string;
+            cashflowType?: string;
+            /** Format: int64 */
+            commissionItemId?: number;
             commissionItemName?: string;
+            /** Format: int64 */
+            contractId?: number;
             /** Format: int32 */
             contractMonthNo?: number;
             /** Format: date */
@@ -3781,6 +3831,7 @@ export interface components {
             purpose?: "OPERATIONAL" | "COMPARISON" | "SIMULATION";
             /** @enum {string} */
             regime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
+            sort?: string;
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
@@ -3923,7 +3974,7 @@ export interface operations {
             };
         };
     };
-    search_9: {
+    search_10: {
         parameters: {
             query?: {
                 /**
@@ -3956,6 +4007,8 @@ export interface operations {
                  * @example 2026-08-16
                  */
                 to?: string;
+                /** @description 정렬(key,asc|desc). occurredAt·userLoginId·policyVersionId. 비우면 발생 시각 내림차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4118,9 +4171,11 @@ export interface operations {
             };
         };
     };
-    search_8: {
+    search_9: {
         parameters: {
             query: {
+                /** @description 기존 선택 설계사 ID 재조회. 위촉기간 조건은 유지 */
+                selectedId?: number;
                 /** @description 소속 조직 ID */
                 organizationId?: number;
                 /** @description 설계사 코드 또는 이름 검색어 */
@@ -4134,6 +4189,8 @@ export interface operations {
                 includeTerminated?: boolean;
                 /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
                 includeHistorical?: boolean;
+                /** @description 정렬(key,asc|desc). agentCode·agentName·organizationName·appointmentDate·terminationDate·latestRegistrationDate. 비우면 설계사 코드 오름차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4188,11 +4245,40 @@ export interface operations {
             };
         };
     };
+    search_8: {
+        parameters: {
+            query: {
+                asOf: string;
+                keyword?: string;
+                cashflowType?: string;
+                selectedId?: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseCommissionItemResponse"];
+                };
+            };
+        };
+    };
     search_7: {
         parameters: {
             query?: {
                 /** @description 보험회사 코드 또는 보험회사명 검색어 */
                 keyword?: string;
+                /** @description 정렬(key,asc|desc). insurerCode·insurerName. 비우면 보험회사 코드 오름차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4233,6 +4319,8 @@ export interface operations {
                 asOf: string;
                 /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
                 includeHistorical?: boolean;
+                /** @description 정렬(key,asc|desc). organizationCode·organizationName·parentName·effectiveFrom·effectiveTo. 비우면 조직코드 오름차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4264,6 +4352,10 @@ export interface operations {
     search_5: {
         parameters: {
             query: {
+                /** @description 상품명·상품코드·판매버전 부분 검색 */
+                keyword?: string;
+                /** @description 기존 선택 판매버전 ID 재조회. 기준일·보험회사 조건은 유지 */
+                selectedId?: number;
                 /**
                  * @description 보험회사 ID
                  * @example 2
@@ -4278,6 +4370,8 @@ export interface operations {
                 includeExpired?: boolean;
                 /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
                 includeHistorical?: boolean;
+                /** @description 정렬(key,asc|desc). insurerProductCode·productName·standardProductCode·offeringVersion·salesStartDate·basicDocumentDate. 비우면 상품코드·판매버전 순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4324,6 +4418,8 @@ export interface operations {
                 orgId?: number;
                 /** @description 계약번호 */
                 contractNo?: string;
+                /** @description 정렬(key,asc|desc). contractNo·asOfDate·basePremiumAmount·refund12mAmount·complianceDeductionAmount·limitAmount·includedAmount·remainingAmount·usagePct. 비우면 기준일 내림차순 */
+                sort?: string;
                 /** @description 페이지(1-base) */
                 page?: number;
                 /** @description 페이지 크기(최대 100) */
@@ -4887,6 +4983,8 @@ export interface operations {
                 contractNo?: string;
                 /** @description 상태(DRAFT/POSTED/REVERSED) */
                 status?: string;
+                /** @description 정렬(key,asc|desc). journalNo·journalDate·contractNo·debitTotal·creditTotal. 비우면 분개일 내림차순 */
+                sort?: string;
                 /** @description 페이지(1-base) */
                 page?: number;
                 /** @description 페이지 크기(최대 100) */
@@ -5725,6 +5823,8 @@ export interface operations {
                 month?: string;
                 /** @description 실행 상태(CREATED/RUNNING/COMPLETED/FAILED/FINALIZED) */
                 status?: string;
+                /** @description 정렬(key,asc|desc). validationMonth·runNo·triggeredBy·startedAt·completedAt·finalizedAt. 비우면 검증월·회차 내림차순 */
+                sort?: string;
                 /** @description 페이지(1-base) */
                 page?: number;
                 /** @description 페이지 크기(최대 100) */

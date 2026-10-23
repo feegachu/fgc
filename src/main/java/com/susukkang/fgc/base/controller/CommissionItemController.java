@@ -3,6 +3,7 @@ package com.susukkang.fgc.base.controller;
 import com.susukkang.fgc.base.dto.CommissionItemResponse;
 import com.susukkang.fgc.base.service.CommissionItemService;
 import com.susukkang.fgc.common.web.ApiResponse;
+import com.susukkang.fgc.common.web.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +26,19 @@ public class CommissionItemController {
 
     public CommissionItemController(CommissionItemService commissionItemService) {
         this.commissionItemService = commissionItemService;
+    }
+
+    @Operation(summary = "수수료 항목 검색형 선택", description = "기존 asOf 목록 응답은 유지하고 검색·페이지·선택 ID 재조회를 제공합니다.")
+    @GetMapping("/search")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<PageResponse<CommissionItemResponse>> search(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String cashflowType,
+            @RequestParam(required = false) Long selectedId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(commissionItemService.search(asOf, keyword, cashflowType, selectedId, page, size));
     }
 
     @Operation(

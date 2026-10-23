@@ -1,3 +1,4 @@
+import { selectEntity } from './selectEntity'
 import { expect, test } from '@playwright/test'
 
 // #418 인계: 격리한 demo DB에서만 수행한다. 실제 저장/수정이 있으므로 명시적으로 활성화한다.
@@ -97,11 +98,11 @@ test('실서버 CONT-W01·W02·W03 전후 대조와 등록 → 상세 → 수정
   const unique = `QA-408-${Date.now()}`
   await page.locator('input[name=contractDate]').fill(detail.contractDate)
   await page.locator('select[name=insurerId]').selectOption(String(detail.insurerId))
-  await expect(page.locator('select[name=productOfferingId]')).toBeEnabled()
-  await page.locator('select[name=productOfferingId]').selectOption(String(detail.productOfferingId))
+  await expect(page.locator('input[name=productOfferingId]')).toBeEnabled()
+  await selectEntity(page, page.locator('input[name=productOfferingId]'), String(detail.productOfferingId))
   await page.locator('input[name=contractNo]').fill(unique)
-  await expect(page.locator('select[name=agentId]')).toBeEnabled()
-  await page.locator('select[name=agentId]').selectOption(String(detail.agentId))
+  await expect(page.locator('input[name=agentId]')).toBeEnabled()
+  await selectEntity(page, page.locator('input[name=agentId]'), String(detail.agentId))
   for (const field of ['premiumPerCycleAmount', 'firstPremiumAmount', 'monthlyEquivalentFirstPremium']) {
     await page.locator(`input[name="${field}"]`).fill(String(detail[field]))
   }
