@@ -52,31 +52,52 @@ public class Dar012Verifier {
         this.validationRunRepository = validationRunRepository;
     }
 
-    /** 시나리오별 정답표 비교 결과. divergences 는 엔진 판정이 정답표와 다른 계약번호(최대 20건). */
-    public record ScenarioResult(String scenario, int inScope, int matched, List<String> divergences) {}
+    /**
+     * 시나리오별 정답표 비교 결과. deferred 는 합치 여부를 판정하지 않고 보류한 건수다(한도 경계 시나리오).
+     * divergences 는 정답표와 다른 계약번호(최대 20건).
+     */
+    public record ScenarioResult(String scenario, int inScope, int matched, int deferred, List<String> divergences) {}
 
     /** 조회 응답시간. 단위 ms. */
     public record QueryTiming(String name, int repeats, long p50, long p95, long max) {}
 
+    /** 한도 경계 시나리오는 정답표 한도 계산식이 엔진(환급·준수공제 반영)과 달라 합치를 판정하지 않는다. */
+    static boolean isDeferred(String expectedResultType) {
+        return "CAP_AT_LIMIT".equals(expectedResultType) || "CAP_EXCEEDED".equals(expectedResultType);
+    }
+
     /**
-     * 정답표와 월 통합검증 결과를 비교한다. 대사·상태 시나리오는 보험사→GA 단계 1회차 행의 결과로,
-     * 1,200% 시나리오는 보험사→GA 단계 cap_check 가 판정되었는지로 본다. 대상은 계약일이 검증월인 계약이다
-     * (명세 지급은 계약월 1회차만 만들기 때문). 한도 시나리오의 상태 분포는 엔진 한도(환급·준수공제 반영)가
-     * 단순 월환산×배수와 다르므로 합치 여부가 아니라 {@link #capStatusDistribution}으로 따로 기록한다.
+     * 한 계약의 보험사→GA 단계 1회차 대사 행 전체로 정답표 기대를 판정한다. 행 순서와 무관하다.
+     * 금액차이·명세 없음은 해당 유형 행이 하나라도 있으면, 상태 시나리오는 행이 있고 전부 MATCHED 이면 합치다.
      */
-    public List<ScenarioResult> compareWithAnswerKey(Dar012Plan plan, LocalDate month) {
+    static boolean judgeReconciliation(String expectedResultType, List<String> resultTypes) {
+        return switch (expectedResultType) {
+            case "RECON_AMOUNT_MISMATCH" -> resultTypes.contains("AMOUNT_DIFFERENCE");
+            case "RECON_MISSING_STATEMENT" -> resultTypes.contains("ACTUAL_MISSING");
+            default -> !resultTypes.isEmpty() && resultTypes.stream().allMatch("MATCHED"::equals);
+        };
+    }
+
+    /**
+     * 정답표와 이번 월 통합검증 실행의 결과를 비교한다. 대사 결과는 이 검증 실행에 연결된 대사 실행(reconciliation_run)의
+     * 보험사→GA 단계 1회차 행만, 계약 상태는 계약 현재 상태로 본다. 대상은 계약일이 검증월인 계약이다
+     * (명세 지급은 계약월 1회차만 만들기 때문). 한도 경계 시나리오는 보류로 세고 상태 분포만
+     * {@link #capStatusDistribution}으로 기록한다.
+     */
+    public List<ScenarioResult> compareWithAnswerKey(Dar012Plan plan, LocalDate month, long validationRunId) {
         LocalDate from = month.withDayOfMonth(1);
         LocalDate to = from.plusMonths(1);
-        Map<String, String> recon = new LinkedHashMap<>();
+        Map<String, List<String>> recon = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT c.contract_no, rr.result_type
-                  FROM reconciliation_result rr JOIN insurance_contract c ON c.contract_id = rr.contract_id
-                 WHERE rr.match_group_key LIKE 'INSURER_TO_GA:%' AND rr.installment_no = 1
+                  FROM reconciliation_result rr
+                  JOIN reconciliation_run r ON r.reconciliation_run_id = rr.reconciliation_run_id
+                  JOIN insurance_contract c ON c.contract_id = rr.contract_id
+                 WHERE r.validation_run_id = ? AND rr.match_group_key LIKE 'INSURER_TO_GA:%' AND rr.installment_no = 1
                    AND c.contract_date >= ? AND c.contract_date < ? AND starts_with(c.contract_no, 'FGC-')
                 """, rs -> {
-            recon.putIfAbsent(rs.getString(1), rs.getString(2));
-        }, from, to);
-        Map<String, String> cap = capStatusByContract(from, to);
+            recon.computeIfAbsent(rs.getString(1), k -> new ArrayList<>()).add(rs.getString(2));
+        }, validationRunId, from, to);
         Map<String, String> status = new LinkedHashMap<>();
         jdbc.query("SELECT contract_no, current_status FROM insurance_contract WHERE contract_date >= ? AND contract_date < ? "
                 + "AND starts_with(contract_no, 'FGC-')", rs -> {
@@ -89,16 +110,16 @@ public class Dar012Verifier {
             if (!status.containsKey(a.contractNo())) {
                 continue;
             }
-            String r = recon.get(a.contractNo());
-            boolean ok = switch (a.expectedResultType()) {
-                case "RECON_AMOUNT_MISMATCH" -> "AMOUNT_DIFFERENCE".equals(r);
-                case "RECON_MISSING_STATEMENT" -> "ACTUAL_MISSING".equals(r);
-                case "CAP_AT_LIMIT", "CAP_EXCEEDED" -> cap.get(a.contractNo()) != null;
-                case "STATUS_LATE_ARRIVAL" -> "MATCHED".equals(r);
-                default -> "MATCHED".equals(r) && a.expectedResultType().endsWith(status.get(a.contractNo()));
-            };
-            int[] c = counts.computeIfAbsent(a.scenario(), k -> new int[2]);
+            int[] c = counts.computeIfAbsent(a.scenario(), k -> new int[3]);
             c[0]++;
+            if (isDeferred(a.expectedResultType())) {
+                c[2]++;
+                continue;
+            }
+            boolean ok = judgeReconciliation(a.expectedResultType(), recon.getOrDefault(a.contractNo(), List.of()));
+            if (ok && a.expectedResultType().startsWith("STATUS_") && !"STATUS_LATE_ARRIVAL".equals(a.expectedResultType())) {
+                ok = a.expectedResultType().endsWith(status.get(a.contractNo()));
+            }
             if (ok) {
                 c[1]++;
             } else {
@@ -109,13 +130,14 @@ public class Dar012Verifier {
             }
         }
         List<ScenarioResult> results = new ArrayList<>();
-        counts.forEach((k, c) -> results.add(new ScenarioResult(k, c[0], c[1], divergences.getOrDefault(k, List.of()))));
+        counts.forEach((k, c) -> results.add(new ScenarioResult(k, c[0], c[1], c[2], divergences.getOrDefault(k, List.of()))));
         return results;
     }
 
-    /** 1,200% 시나리오 계약의 보험사→GA 단계 엔진 판정 분포(시나리오 → 상태 → 건수). */
-    public Map<String, Map<String, Long>> capStatusDistribution(Dar012Plan plan, LocalDate month) {
-        Map<String, String> cap = capStatusByContract(month.withDayOfMonth(1), month.withDayOfMonth(1).plusMonths(1));
+    /** 1,200% 시나리오 계약의 이번 검증 실행 보험사→GA 단계 엔진 판정 분포(시나리오 → 상태 → 건수). */
+    public Map<String, Map<String, Long>> capStatusDistribution(Dar012Plan plan, LocalDate month, long validationRunId) {
+        Map<String, String> cap = capStatusByContract(month.withDayOfMonth(1), month.withDayOfMonth(1).plusMonths(1),
+                validationRunId);
         Map<String, Map<String, Long>> out = new LinkedHashMap<>();
         for (Dar012Plan.AnswerRow a : plan.answers()) {
             String s = cap.get(a.contractNo());
@@ -126,15 +148,15 @@ public class Dar012Verifier {
         return out;
     }
 
-    private Map<String, String> capStatusByContract(LocalDate from, LocalDate to) {
+    private Map<String, String> capStatusByContract(LocalDate from, LocalDate to, long validationRunId) {
         Map<String, String> cap = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT c.contract_no, cc.result_status FROM cap_check cc JOIN insurance_contract c ON c.contract_id = cc.contract_id
-                 WHERE cc.payment_stage = 'INSURER_TO_GA' AND c.contract_date >= ? AND c.contract_date < ?
-                   AND starts_with(c.contract_no, 'FGC-')
+                 WHERE cc.validation_run_id = ? AND cc.payment_stage = 'INSURER_TO_GA'
+                   AND c.contract_date >= ? AND c.contract_date < ? AND starts_with(c.contract_no, 'FGC-')
                 """, rs -> {
-            cap.putIfAbsent(rs.getString(1), rs.getString(2));
-        }, from, to);
+            cap.put(rs.getString(1), rs.getString(2));
+        }, validationRunId, from, to);
         return cap;
     }
 
