@@ -43,7 +43,7 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
     private static final String CONSTRAINT_JOURNAL_NO = "uq_journal_no";
     private static final String CONSTRAINT_SOURCE_REVISION = "uq_journal_source_revision";
     private static final int MAX_JOURNAL_NO_RETRIES = 3;
-    private static final int MAX_MONTHLY_SEQ = 9999;
+    private static final int MAX_MONTHLY_SEQ = 99_999;
 
     private final JournalHeaderRepository journalHeaderRepository;
     private final JournalLineRepository journalLineRepository;

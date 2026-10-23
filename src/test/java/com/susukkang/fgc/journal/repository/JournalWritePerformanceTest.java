@@ -448,7 +448,7 @@ class JournalWritePerformanceTest {
             String year = String.valueOf(draft.getJournalDate().getYear());
             String month = String.format("%02d", draft.getJournalDate().getMonthValue());
             int seq = session.selectOne(MAPPER + "findNextJournalSeq", params("year", year, "month", month));
-            if (seq > 9999) throw new IllegalStateException("journal_no monthly sequence limit exceeded");
+            if (seq > 99_999) throw new IllegalStateException("journal_no monthly sequence limit exceeded");
             Map<String, Object> header = params("journalNo", String.format("JV-%s-%s-%04d", year, month, seq),
                     "journalDate", draft.getJournalDate(), "journalType", draft.getJournalType().name(),
                     "sourceEntityType", draft.getSourceEntityType(), "sourceEntityId", draft.getSourceEntityId(),

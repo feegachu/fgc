@@ -181,14 +181,14 @@ class JournalPersistenceBoundaryIntegrationTest {
 
     @Test
     void lastMonthlySequenceSucceedsAndOverflowLeavesNoAdditionalWrites() {
-        seedHeader(month, 9998);
+        seedHeader(month, 99_998);
         JournalHeaderRow last = persistenceService.saveDraft(draft(month, "last-number"), actorId, marker + "-last");
 
-        assertThat(last.getJournalNo()).isEqualTo(numberPrefix(month) + "9999");
+        assertThat(last.getJournalNo()).isEqualTo(numberPrefix(month) + "99999");
         assertThatThrownBy(() -> persistenceService.saveDraft(draft(month, "overflow"), actorId, marker + "-overflow"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("월간 일련번호 상한(9999) 초과")
-                .hasMessageContaining("seq=10000");
+                .hasMessageContaining("월간 일련번호 상한(99999) 초과")
+                .hasMessageContaining("seq=100000");
         assertOwnedWrites(2, 2, 1);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.audit_log WHERE request_id = ?",
                 Long.class, marker + "-overflow")).isZero();
