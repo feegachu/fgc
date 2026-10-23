@@ -60,6 +60,7 @@ public class Dar012Runner implements ApplicationRunner {
             verification.put("derivedCounts", derived);
             verification.put("answerKeyComparison", verifier.compareWithAnswerKey(generated.plan(), properties.validationMonth(), batch.validationRunId()));
             verification.put("capStatusDistribution", verifier.capStatusDistribution(generated.plan(), properties.validationMonth(), batch.validationRunId()));
+            verification.put("aggregateConsistency", verifier.checkAggregateConsistency(properties.validationMonth(), batch.validationRunId()));
             verification.put("queryTimings", verifier.measureQueries(properties.validationMonth(), batch.validationRunId(),
                     properties.queryRepeats()));
             log.info("DAR-012 검증 결과: {}", Dar012ReportWriter.writeVerification(properties.datasetId(),

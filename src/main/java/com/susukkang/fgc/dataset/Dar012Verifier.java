@@ -1,5 +1,6 @@
 package com.susukkang.fgc.dataset;
 
+import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.service.ContractService;
@@ -158,6 +159,39 @@ public class Dar012Verifier {
             cap.put(rs.getString(1), rs.getString(2));
         }, validationRunId, from, to);
         return cap;
+    }
+
+    /** 같은 1,200% 판정 건수를 홈·설계사 소계·계약 목록·원천 cap_check 네 곳에서 읽은 값. */
+    public record ConsistencyCheck(String name, long home, long agentSubtotal, long contractList, long source,
+                                   boolean consistent) {}
+
+    /**
+     * 홈 카드, 설계사별 소계, 계약 목록의 1,200% 판정 건수가 원천 cap_check 와 일치하는지 본다
+     * (인수조건 "홈·설계사 소계·계약 상세 집계가 일치한다"). 홈과 설계사 소계는 판정(계약×지급단계) 건수,
+     * 계약 목록은 계약별 최신 GA→FC 단계 판정을 보여 주므로 그 단계 계약 수로 센다.
+     */
+    public List<ConsistencyCheck> checkAggregateConsistency(LocalDate month, long validationRunId) {
+        var kpis = dashboardService.summarize(month).kpis();
+        var agentRows = validationRunRepository.summarizeCapByAgent(validationRunId);
+        List<ConsistencyCheck> checks = new ArrayList<>();
+        for (var status : List.of(CapResultStatus.VIOLATION, CapResultStatus.WARNING)) {
+            long home = status == CapResultStatus.VIOLATION ? kpis.capViolation() : kpis.capWarning();
+            long agent = agentRows.stream().mapToLong(r ->
+                    status == CapResultStatus.VIOLATION ? r.getViolationCount() : r.getWarningCount()).sum();
+            ContractSearchCondition condition = new ContractSearchCondition();
+            condition.setCapResultStatus(status);
+            long list = contractService.selectByCondition(condition, 1, 1).totalElements();
+            long sourceChecks = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM cap_check WHERE validation_run_id = ? AND result_status = ?", Long.class,
+                    validationRunId, status.name());
+            long sourceContracts = jdbc.queryForObject(
+                    "SELECT COUNT(DISTINCT contract_id) FROM cap_check WHERE validation_run_id = ? AND result_status = ? "
+                            + "AND payment_stage = 'GA_TO_FC'",
+                    Long.class, validationRunId, status.name());
+            checks.add(new ConsistencyCheck("CAP_" + status.name(), home, agent, list, sourceChecks,
+                    home == sourceChecks && agent == sourceChecks && list == sourceContracts));
+        }
+        return checks;
     }
 
     /** 대표 조회를 반복 실행해 응답시간을 잰다. 첫 호출은 워밍업으로 버린다. */
