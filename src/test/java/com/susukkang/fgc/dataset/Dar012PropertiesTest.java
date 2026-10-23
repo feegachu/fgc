@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class Dar012PropertiesTest {
 
     private static Dar012Properties withBaseDate(LocalDate baseDate) {
-        return new Dar012Properties("D12-T", null, null, baseDate, null);
+        return new Dar012Properties("D12-T", null, null, baseDate, null, null, null, null);
     }
 
     @Test

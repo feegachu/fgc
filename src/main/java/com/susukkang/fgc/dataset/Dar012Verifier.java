@@ -1,6 +1,8 @@
 package com.susukkang.fgc.dataset;
 
+import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.CapResultStatus;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.service.ContractService;
@@ -41,16 +43,18 @@ public class Dar012Verifier {
     private final DashboardService dashboardService;
     private final ContractService contractService;
     private final ValidationRunRepository validationRunRepository;
+    private final CapCheckService capCheckService;
 
     public Dar012Verifier(ValidationRunCreateService createService, MonthlyValidationJobTrigger trigger, JdbcTemplate jdbc,
                           DashboardService dashboardService, ContractService contractService,
-                          ValidationRunRepository validationRunRepository) {
+                          ValidationRunRepository validationRunRepository, CapCheckService capCheckService) {
         this.createService = createService;
         this.trigger = trigger;
         this.jdbc = jdbc;
         this.dashboardService = dashboardService;
         this.contractService = contractService;
         this.validationRunRepository = validationRunRepository;
+        this.capCheckService = capCheckService;
     }
 
     /**
@@ -162,12 +166,17 @@ public class Dar012Verifier {
     }
 
     /** 같은 1,200% 판정 건수를 홈·설계사 소계·계약 목록·원천 cap_check 네 곳에서 읽은 값. */
-    public record ConsistencyCheck(String name, long home, long agentSubtotal, long contractList, long source,
-                                   boolean consistent) {}
+    public record ConsistencyCheck(String name, long home, long agentSubtotal, long contractList, long sourceChecks,
+                                   long sourceContracts, boolean consistent) {}
+
+    /** 계약 상세가 쓰는 최신 판정 조회(capCheckService.findLatest)를 원천 cap_check 표본과 대조한 결과. */
+    public record DetailSample(String name, String paymentStage, int sampled, int matched) {}
+
+    private static final int DETAIL_SAMPLE_SIZE = 20;
 
     /**
      * 홈 카드, 설계사별 소계, 계약 목록의 1,200% 판정 건수가 원천 cap_check 와 일치하는지 본다
-     * (인수조건 "홈·설계사 소계·계약 상세 집계가 일치한다"). 홈과 설계사 소계는 판정(계약×지급단계) 건수,
+     * (인수조건 중 홈·설계사 소계·계약 목록 부분. 계약 상세 게이지는 {@link #checkContractDetailSample}이 표본으로 확인한다). 홈과 설계사 소계는 판정(계약×지급단계) 건수,
      * 계약 목록은 계약별 최신 GA→FC 단계 판정을 보여 주므로 그 단계 계약 수로 센다.
      */
     public List<ConsistencyCheck> checkAggregateConsistency(LocalDate month, long validationRunId) {
@@ -188,10 +197,35 @@ public class Dar012Verifier {
                     "SELECT COUNT(DISTINCT contract_id) FROM cap_check WHERE validation_run_id = ? AND result_status = ? "
                             + "AND payment_stage = 'GA_TO_FC'",
                     Long.class, validationRunId, status.name());
-            checks.add(new ConsistencyCheck("CAP_" + status.name(), home, agent, list, sourceChecks,
+            checks.add(new ConsistencyCheck("CAP_" + status.name(), home, agent, list, sourceChecks, sourceContracts,
                     home == sourceChecks && agent == sourceChecks && list == sourceContracts));
         }
         return checks;
+    }
+
+    /**
+     * 계약 상세(CONT-W02)의 지급단계별 1,200% 게이지가 읽는 최신 판정(capCheckService.findLatest)을 원천 cap_check 와 대조한다.
+     * 두 지급단계 모두에서 상태별로 계약 ID 순 표본 최대 20건을 확인한다(전수가 아니라 표본).
+     */
+    public List<DetailSample> checkContractDetailSample(long validationRunId) {
+        List<DetailSample> samples = new ArrayList<>();
+        for (PaymentStage stage : PaymentStage.values()) {
+            for (var status : List.of(CapResultStatus.VIOLATION, CapResultStatus.WARNING)) {
+                List<Long> contractIds = jdbc.queryForList(
+                        "SELECT contract_id FROM cap_check WHERE validation_run_id = ? AND payment_stage = ? AND result_status = ? "
+                                + "ORDER BY contract_id LIMIT ?", Long.class, validationRunId, stage.name(), status.name(),
+                        DETAIL_SAMPLE_SIZE);
+                int matched = 0;
+                for (Long contractId : contractIds) {
+                    if (capCheckService.findLatest(contractId, stage)
+                            .map(r -> r.result().resultStatus()).filter(status::equals).isPresent()) {
+                        matched++;
+                    }
+                }
+                samples.add(new DetailSample("CAP_" + status.name(), stage.name(), contractIds.size(), matched));
+            }
+        }
+        return samples;
     }
 
     /** 대표 조회를 반복 실행해 응답시간을 잰다. 첫 호출은 워밍업으로 버린다. */
