@@ -3,8 +3,8 @@ title: "FGC 정규화 입력데이터·시드데이터 명세서"
 version: "1.0"
 status: "규제·스키마·추가자료 정합성 보정본 — 배포용"
 effective_date: "2026-08-03"
-revised_at: "2026-08-10"
-database_baseline: "PostgreSQL 17 · Flyway db/migration V1~V7 · 유효 스키마 v2.1.7"
+revised_at: "2026-10-22"
+database_baseline: "PostgreSQL 17 · Flyway db/migration V1~V55 + db/demo V3~V56 (develop fe6d0e6c, 2026-10-22)"
 operating_policy: "FGC 가상 GA 운영정책서 v1.0"
 regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 ---
@@ -15,7 +15,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 > **어떤 데이터가 어떤 형태로 DB에 미리 존재해야 하는지**,  
 > **어떤 합성 시나리오로 계산결과를 검증해야 하는지**를 확정한다.
 
-> **정합성 기준:** 규제 기대값은 `FGC 규제 근거·조문표 v0.2.1`의 REG-01~24를 따르고, 컬럼·제약·적재순서는 `src/main/resources/db/migration/` V1~V7을 모두 적용한 v2.1.7을 따른다. SRC 정의는 07_규제조문표_v0.2.1.md §11을 따른다. `db/demo`의 현재 데이터는 아래 전체 GOLDEN 목표의 축소 fixture다.
+> **정합성 기준:** 규제 기대값은 `FGC 규제 근거·조문표 v0.2.1`의 REG-01~24를 따르고, 컬럼·제약·적재순서는 `src/main/resources/db/migration/`의 최신 적용본(V55)을 따른다. 스키마는 버전 숫자(v2.1.x)가 아니라 Flyway 버전과 커밋 SHA로 부른다. SRC 정의는 `docs/FGC-Vault/00_인덱스/근거대장.md`(활성 레지스트리 `99_근거자료.csv`)를 따른다. `db/demo`의 현재 데이터는 아래 전체 GOLDEN 목표의 축소 fixture다.
 
 ---
 
@@ -26,7 +26,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 3. 실제 보험회사명·실제 증권번호·실제 지급액을 그대로 재현하지 않는다.
 4. 기준정보·정책·입력사실만 시드한다.
 5. 스케줄·검증결과·원장·대사결과·예외는 애플리케이션이 생성한다.
-6. 동일 시드를 반복 적용해도 결과가 같아야 한다.
+6. 동일 시드를 반복 적용해도 결과가 같아야 한다. 승인 시각 등 시각 값도 고정 리터럴을 쓴다(기존 예외: V56의 `clock_timestamp()` — 적용된 파일이라 고칠 수 없다).
 7. 기술키인 `bigint identity` 값을 SQL에 직접 하드코딩하지 않는다.
 8. 참조는 `insurer_code`, `organization_code`, `agent_code`, `policy_code`, `contract_no` 같은 업무코드로 찾는다.
 9. 금액은 `numeric(15,2)`를 사용한다. 수수료·환급·환수 요율은 `numeric(9,6)`, 1,200% 룰셋 파라미터는 `numeric(7,4)`, 계산 사용률은 `numeric(12,6)`을 사용한다.
@@ -42,70 +42,92 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 
 | 프로파일 | 목적 | 설계사 | 계약 | 예상 스케줄행 | 사용시점 |
 |---|---|---:|---:|---:|---|
-| `GOLDEN` | 기능·인수시험 | 25명 | **64건** | 약 3,500행 | 개발·발표 |
-| `DEMO` | 화면·통합시험 | 200명 | 500건 | 약 25,000행 | 발표 리허설 |
-| `LOAD` | 성능시험 | 3,200명 | 50,000건 | 250만~500만행 | 부하테스트 |
+| `GOLDEN` | 기능·인수시험 (`db/demo`, 불변) | 현재 8명 / 목표 25명 | 현재 21건 / 목표 **68건** | 약 3,500행 | 개발·테스트·발표 |
+| `DAR012` | 시연·성능·AI 평가 (2차, §50) | 600명 | 1,000 → 3,000 → 12,000건 | 최대 2,016,000행 | 발표 리허설·성능 측정 |
 
-`GOLDEN`은 사람이 계산기로 검산할 수 있는 **목표 데이터 세트**다. 시나리오 간 간섭을 막기 위해 64개 계약을 고정 배정한다.  
-`LOAD`는 회사 규모를 표현하기 위한 자동생성 데이터이며 개별 계약의 스토리는 만들지 않는다.
+옛 `DEMO`(200명·500건)·`LOAD`(3,200명·50,000건) 프로파일은 2차 범위에서 `DAR012`로 대체한다(DAR-012). 운영정책서 제1조의 "소속 설계사 3,200명"과의 차이는 §6 참조.
+
+`GOLDEN`은 사람이 계산기로 검산할 수 있는 **목표 데이터 세트**다. 시나리오 간 간섭을 막기 위해 68개 계약을 고정 배정한다(기존 64건 + §30 수취인 짝짓기 REC-11~14의 4건, SRC-064).
+`DAR012`는 회사 규모를 표현하기 위한 자동생성 데이터이며, 대표 설계사 1명과 일부러 심은 이상 사례(정답표 보유)만 개별 스토리를 가진다.
 
 ### 현재 체크인된 구현 현황
 
+전 demo 시드를 적용한 뒤의 건수다(develop `fe6d0e6c`, SQL 정적 계산).
+
+| 대상 | 건수 | 출처 |
+|---|---:|---|
+| 역할 / 사용자 | 4 / 4 | V3, V17_1(COMPLIANCE 표시명) |
+| 조직 | 9 | V3 |
+| 보험회사 | 6 (FGN02는 상품 없음) | V3 |
+| 설계사 | 8 (강동2팀 팀장 `A-TL-002` 포함) | V3, V34 |
+| 원수사 설계사코드 | 10 | V3, V4 |
+| 상품 / 판매버전 | 5 / 7 | V3, V4, V49 |
+| 수수료 항목 | 11 | V3 |
+| 정책버전 행 / ACTIVE 정책코드 | 22 / 12 | V2, V3, V6_1, V42, V45_1, V46, V52, V56 |
+| 수수료 규칙 | 8 (원수사→GA 2, GA→FC 6) | V3 |
+| ACTIVE 1,200% 룰셋 / 항목분류 | 4 / 36 | V3, V6_1 → V46·V52가 v3로 복제 |
+| 예상 해약환급률표 / 행 | 5 / 180 | V3, V42 |
+| 계약 | 21 | V3 6 + V4 14 − V49 1(G3) + V45_1 2 (`TmChannelRemovalMigrationIntegrationTest`) |
+| 계약상태 사건 | 28 | V3, V4, V45_1 |
+| 재무 스냅샷 | 23 | V3, V4, V45_1 |
+| 지급명세 묶음 | 15 | V3 3(2026-07), V4 12 |
+| 지급 건 / 귀속행 | 81 / 82 (DRAFT 2건: `GA-2026-07-0303`, `GA-2026-07-0001`) | V3, V4, V45_1 |
+| 결과 테이블 | 0 (스케줄·검증·원장·대사·예외는 앱이 생성) | — |
+
 | 구분 | 현재 상태 |
 |---|---|
-| `db/demo/V3` | GOLDEN 축소본: 설계사 7명, 계약 6건, 핵심 기준·정책·귀속 fixture |
-| `db/demo/V4` | 검증 시나리오 계약 14건 추가 |
-| `db/demo/V45.1` | 시행 후 차익거래 검증 계약 2건 추가: `FGC-FGL02-202603-0475`, `FGC-FGL01-202603-0475`(REG-12·REG-19, SRC-022·SRC-025 Q11) |
-| `db/demo/V49` | TM 판매버전 `2026-TM-A`와 계약 G3 `FGC-FGL03-202608-0002` 삭제(SRC-036 — FGC는 대면 모집만). 현재 합계 계약 21건(22건 중 G3 1건 삭제) |
-| 시나리오 식별 | V3의 C계열과 V4의 R1~R8·A1~A3·G1·G2(G3은 V49로 삭제). 아래 C001~C064 전체 목록과 동일하지 않음 |
-| 현재 수수료 규칙 | 보험회사→GA 900%@1·8%@2~12, GA→FC 650/40/30/20/100%@1·5%@2~12의 축소 규칙 |
+| 데모 시드 파일 | V3(GOLDEN 축소본), V4(검증 시나리오 14건), V6_1(원수사→GA 룰셋 보정), V8(환산코드 변경), V17_1(COMPLIANCE 표시명), V34(A-TL-002), V42(STD-SAV-A 환급률표), V45_1(시행 후 차익거래 계약 2건 `FGC-FGL02-202603-0475`·`FGC-FGL01-202603-0475`, REG-12·REG-19), V46(CAP 정책 v2 — CLAWBACK 사유 교정 #478), V49(TM 판매버전·G3 삭제, SRC-036), V52(CAP 정책 v3 — 정착지원금 모집월 #525), V56(ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 #480) |
+| 시나리오 식별 | V3의 C001~C006 별칭과 V4의 R1~R8·A1~A3·G1·G2(G3은 V49로 삭제). 아래 목표 구간 T001~T068과 다르다(§24). 현행 정답은 §31-1 |
+| 현재 수수료 규칙 | 보험회사→GA 900%@1·8%@2~12, GA→FC FC 650%@1·관리자 40/30/20%@1·시책 100%@1·유지 5%@2~12 (`INS-CUR-2026-V1`·`GA-CUR-2026-V1`). 운영정책서 제19·20조 패턴(1,485%·740%)의 축소판 |
 | 정착지원금 | 현재 210,000원(2건에 105,000원씩). 아래 2,400,000원/4,000,000원은 전체 GOLDEN 목표 |
 | 결과 시드 | 스케줄·검증·원장·대사 결과는 넣지 않음 |
 
-따라서 현재 `db/demo`만 실행한 결과를 “25명·64계약 GOLDEN 완료”로 표시하지 않는다. 이 문서의 C001~C064는 전체 GOLDEN 구현을 위한 목표 명세이며, 해당 SQL과 기대값 파일이 추가되어야 완료된다.
+따라서 현재 `db/demo`만 실행한 결과를 “25명·68계약 GOLDEN 완료”로 표시하지 않는다. 이 문서의 T001~T068(§24)는 전체 GOLDEN 구현을 위한 목표 명세이며, 해당 SQL과 기대값 파일이 추가되어야 완료된다.
+
+**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 정책(§35), AGENT 계정(§5), DAR-012 생성기(§50), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
 
 ## 2. 시드 파일 구성
 
 현재 저장소의 실제 경로와 Flyway 버전 체인은 다음과 같다.
 
 ```text
-src/main/resources/db/migration/
-  V1__baseline_v2_1_2.sql
-  V2__batch_watermark_and_schedule_eligibility.sql
-  V2_1__policy_parameter_and_fixes.sql
-  V5__cap_check_detail_snapshot.sql
-  V6__integrity_hardening.sql
-  V7__run_progress_and_snapshot_locks.sql
-
-src/main/resources/db/demo/
-  V3__seed_demo_data.sql
-  V4__seed_validation_scenarios.sql
-  V6_1__cap_ins_compliance_deduction_correction.sql
-  V8__migrate_premium_conversion_rule_codes.sql
-
-src/test/resources/sql/
-  golden_reset.sql                  # 목표 파일, 현재 없음
-  golden_expected_assertions.sql    # 목표 파일, 현재 없음
-  load_data_generator.sql           # 목표 파일, 현재 없음
+src/main/resources/db/migration/   V1 ~ V55 (V47·V53 결번). 스키마·제약·트리거 + 운영 기준정보 일부
+  V2   batch_watermark 초기 2행 · STATUS-MONTH-RULE-2026 v1(유산, §4-1)
+  V16  journal_account 8개 계정과목
+src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀스)
+  V3     기준정보·정책·계약 6·지급·귀속 (GOLDEN 축소본)
+  V4     검증 시나리오 계약 14(R1~R8·A1~A3·G1~G3)
+  V6_1   원수사→GA 룰셋 보정 REG-CAP-INS-2021-V2(0%)·2027-V1(3%)
+  V8     premium_conversion_rule_code 신규 코드로 변경
+  V17_1  COMPLIANCE 표시명 '준법·감사'
+  V34    강동2팀 팀장 A-TL-002
+  V42    STD-SAV-A 예상 해약환급률표(INS-REFUND-2026-SAV-V1)
+  V45_1  ARB-APPLICABILITY-2026 v1 + 시행 후 차익거래 계약 2
+  V46    현행 CAP 정책 v2 — CLAWBACK 사유 교정(#478)
+  V49    TM 판매버전·G3 삭제(SRC-036)
+  V52    현행 CAP 정책 v3 — 정착지원금 모집월 사유 교정(#525)
+  V56    ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 파라미터(#480)
+src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 등) — 아직 없음
 ```
 
 ### 원칙
 
 - 운영과 같은 기준정보·정책은 versioned migration(`V__`)으로 넣는다.
-- 데모 초기화는 별도 `golden_reset.sql`로 한다.
-- 결과 테이블을 `DELETE`한 후 입력사실을 재생성한다.
-- `R__` 반복 마이그레이션이 운영 데이터까지 삭제하지 않게 주의한다.
-- Spring `demo` 프로필에서만 GOLDEN·DEMO 데이터를 넣는다.
+- 초기화는 DB 안에서 행을 지우지 않고 DB를 새로 만든다(§43).
+- `R__` 반복 마이그레이션을 쓰지 않는다.
+- 데모 시드(`db/demo`)는 별도 프로필이 아니라 **Flyway 위치**로 켠다(`demo` 프로필은 없다). 현재 `db/demo`를 적재하는 곳은 다음과 같다(develop `fe6d0e6c`).
 
-현재 `application.yml`과 `application-local.yml`에는 `spring.flyway.locations`가 없으므로 별도 환경설정이 없다면 기본 `classpath:db/migration`만 적용되고 `db/demo`는 로드되지 않는다. 데모 실행에서만 다음과 동등한 설정을 명시한다.
+| 환경 | 설정 위치 | db/demo |
+|---|---|---|
+| 로컬 | `application-local.yml` (저장소 밖, `.gitignore:58`) | 팀 관례상 포함 — 각자 확인 |
+| 통합 테스트 | `src/test/resources/application-test.yml` | 포함 |
+| E2E | `frontend/scripts/e2e-server.mjs` | 포함 |
+| AWS 개발·검증계 | `podman/fgc-app-combined.yaml:19`, `podman/fgc-app-was.yaml:19` (`SPRING_FLYWAY_LOCATIONS`) | 포함 |
+| 신한 prd(발표 시연) | `infra/shinhan/compose.yaml:39` | 포함 — 이미 적용된 데모 이력 보존 목적(:37-38) |
+| 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 |
 
-```yaml
-spring:
-  flyway:
-    locations: classpath:db/migration,classpath:db/demo
-```
-
-운영환경에는 `db/demo`를 추가하지 않는다. 특히 이미 존재하는 V5를 다른 목적의 `V5__golden_input_seed.sql`로 재사용하면 Flyway 버전 충돌이 발생하므로 금지한다.
+- 따라서 **`db/demo`에 넣는 모든 행은 신한 prd에도 들어간다.** 시연 환경 밖으로 내보내면 안 되는 데이터나 대량 데이터(DAR-012)는 `db/demo`에 넣지 않는다(§50).
+- **Flyway 번호**: `db/migration`과 `db/demo`는 하나의 버전 시퀀스다. 다음 번호는 **V57**이다(V56은 demo). 결번(V47·V53)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
 
 ---
 
@@ -164,12 +186,13 @@ spring:
    `allocation_policy`, `refund_rate_table`, `refund_rate_line`, `policy_parameter`
 2. `DRAFT → ACTIVE` 직행 전이가 막혀 있다.
    허용 전이는 `DRAFT → REVIEW → APPROVED → ACTIVE → RETIRED`이며,
-   `DRAFT → APPROVED`와 `APPROVED → RETIRED`도 허용된다.
+   `DRAFT → APPROVED`, `REVIEW → DRAFT`, `APPROVED → RETIRED`도 허용된다(V6).
 
 따라서 시드 SQL은 다음 형태여야 한다.
 
 ```sql
--- 10. 정책버전을 DRAFT로 INSERT (status를 ACTIVE로 넣으면 11~16번이 전부 실패)
+-- 10. 정책버전을 DRAFT로 INSERT (DRAFT가 아니면 INSERT 자체가 실패한다, V6)
+--     아래 'GA-CUR-LIFE-A-2026-V1'은 새 정책을 만드는 예시다. 현재 시드의 GA 현행 정책 코드는 'GA-CUR-2026-V1'이다(§13).
 INSERT INTO fgc.policy_version
   (policy_code, policy_name, policy_type, source_class,
    version_no, effective_from, status, regulation_refs, source_refs, created_by)
@@ -192,7 +215,7 @@ INSERT INTO fgc.refund_rate_line (...) VALUES (...);
 --       (APPROVED 이후에는 approved_at도 수정 불가)
 UPDATE fgc.policy_version
    SET status = 'APPROVED',
-       approved_at = now(),
+       approved_at = TIMESTAMPTZ '2026-01-01 09:00:00+09', -- 고정 합성 승인 시각(§0, SRC-065)
        approved_by = (SELECT user_id FROM fgc.app_user WHERE login_id = 'gaadmin'),
        approval_evidence_ref = 'SYNTHETIC:POLICY-APPROVAL-2026-001'
  WHERE policy_code = 'GA-CUR-LIFE-A-2026-V1' AND version_no = 1;
@@ -206,18 +229,20 @@ UPDATE fgc.policy_version
 
 | 오류 메시지 | 원인 | 해결 |
 |---|---|---|
-| `Rules under locked policy version N are immutable` | 정책을 `ACTIVE`로 넣고 자식 행을 INSERT함 | 정책을 `DRAFT`로 INSERT한 뒤 자식 행을 넣고 마지막에 승격 |
+| `policy_version must be inserted as DRAFT (got …)` | 정책을 DRAFT 아닌 상태로 INSERT | DRAFT로 INSERT한 뒤 두 번의 UPDATE로 승격 (V6) |
+| `Rules under locked policy version N are immutable` | APPROVED·ACTIVE·RETIRED 정책에 자식 행을 넣거나 고치거나 지움 | 새 `version_no`를 DRAFT로 만들어 그 아래에 넣는다 (V2_1 guard_policy_child_mutation) |
 | `Invalid policy status transition: DRAFT -> ACTIVE` | 한 번의 UPDATE로 활성화하려 함 | `DRAFT → APPROVED → ACTIVE` 두 번으로 나눔 |
+| `APPROVED/ACTIVE/RETIRED policy version is immutable` | 승인 뒤 `approved_at`·`approved_by`·유효기간 등을 고침 | 승인 UPDATE에서 한 번에 넣는다. 고치려면 새 버전 (V6) |
+| `Only DRAFT policy versions may be deleted` | 승인된 정책 삭제 | 삭제하지 않고 RETIRED (V6) |
 | `ck_policy_approval` 위반 | `APPROVED` 이상인데 `approved_at`이 비어 있음 | `APPROVED`로 가는 UPDATE에서 `approved_at`을 함께 설정 |
 | `ck_policy_authorship` 위반 | 작성자·승인자가 없거나 동일인임 | DRAFT INSERT에 `created_by`, 승인 UPDATE에 다른 `approved_by`를 저장 |
 
 #### 정책 수정이 필요할 때
 
 `ACTIVE` 정책의 요율을 고치는 마이그레이션은 작성하지 않는다.
-새 `version_no`의 정책버전을 `DRAFT`로 만들고, 자식 행을 넣고, 승격한 다음,
-이전 버전을 `RETIRED`로 바꾼다. 과거 계산 결과는 계속 이전 버전을 참조한다.
+새 `version_no`의 정책버전을 `DRAFT`로 만들고 자식 행을 넣은 뒤 **APPROVED → (이전 버전 RETIRED) → ACTIVE** 순서로 바꾼다. 같은 `policy_code`에 ACTIVE가 둘이 되는 순간을 만들지 않는다(DB에 "코드당 ACTIVE 1개" 제약이 없다 — V46·V52·V56 선례, `CapGrossPolicyMigrationIntegrationTest`). 과거 계산 결과는 계속 이전 버전을 참조한다.
 
-`V2`가 직접 `ACTIVE`로 삽입한 `STATUS-MONTH-RULE-2026` v1은 유산 예외다. `db/demo/V3`가 적용되면 이를 폐기하고 작성자·승인자가 분리된 v2를 발행하지만, 기본 migration만 적용한 DB에는 v1이 남을 수 있다. 이 유산 행 때문에 v2.1.6의 저작자 CHECK는 `NOT VALID`다. 신규 시드가 이 예외를 모방해서는 안 되며, 운영 전 유산 행 폐기·정상 재발행·제약 VALIDATE를 별도 마이그레이션으로 수행한다.
+`V2`가 직접 `ACTIVE`로 삽입한 `STATUS-MONTH-RULE-2026` v1은 유산 예외다. `db/demo/V3`가 적용되면 이를 폐기하고 작성자·승인자가 분리된 v2를 발행하지만, 기본 migration만 적용한 DB에는 v1이 남을 수 있다. 이 유산 행 때문에 v2.1.6의 저작자 CHECK는 `NOT VALID`다. 신규 시드가 이 예외를 모방해서는 안 되며, 운영 전 유산 행 폐기·정상 재발행·제약 VALIDATE를 별도 마이그레이션으로 수행한다. 2026-10-22 기준 VALIDATE는 아직 실행하지 않았다. 이 설명은 `db/demo`를 적용한 환경에서만 v1이 RETIRED가 된다는 뜻이다. 실제 운영 DB에는 `db/demo`를 적용하지 않으며, 유산 행 폐기·작성자/승인자 분리 정상 재발행·기존 행 정합성 점검·제약 `VALIDATE`를 별도 마이그레이션으로 완료해야 한다(SRC-027 D-04·SRC-049·SRC-065).
 
 다음 테이블은 초기 입력시 비워둔다.
 
@@ -241,7 +266,12 @@ reconciliation_match
 exception_case
 exception_occurrence
 exception_action
+journal_correction_group
+payment_journal_correction
+auth_refresh_token
 ```
+
+`batch_watermark`는 V2가 만들고 V3가 시드 직후 시각으로 맞춘다 — 시드 데이터가 첫 일일 배치에 다시 읽히지 않게 하기 위해서다. `journal_account`는 V16이 8개 계정과목을 넣는다(운영 기준정보).
 
 이 테이블에 결과를 미리 넣으면 애플리케이션이 실제로 계산했는지 증명할 수 없다.
 
@@ -257,6 +287,7 @@ exception_action
 | `GA_ADMIN` | GA관리자 |
 | `SETTLEMENT` | 정산담당자 |
 | `COMPLIANCE` | 준법·감사 |
+| `AGENT` | 설계사 (2차, FUN-085 — 아직 없음) |
 
 ### GOLDEN 사용자
 
@@ -266,18 +297,21 @@ exception_action
 | `gaadmin` | GA_ADMIN | 정책·조직 조회 |
 | `settle01` | SETTLEMENT | 정산 실행·예외처리 |
 | `audit01` | COMPLIANCE | 조회 전용 |
+| `agent01` | AGENT | (2차, 아직 없음) `app_user.agent_id` = 설계사 1명. 본인 범위만 조회 |
 
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
+
+- **AGENT 역할·`agent01`(2차)**: 새 demo 마이그레이션(V57 이후)으로 넣는다. 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정, 팀 확인 필요. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
+- **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 네 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
+- **보호·검증을 보장할 수 없으면 배포 중단**: 신한 prd에서 `db/demo`를 제외하고 별도 기준정보·정책·보호된 계정 이관 절차를 마련한다. 이미 데모가 적재된 DB는 locations 변경만으로 계정이 없어지지 않으므로 기존 4개 계정 보호 검증도 필요하다. 새 시드·문서·PR·배포 로그에는 평문 비밀번호를 남기지 않는다. 현 배포 스크립트에 이 보호 단계가 구현됐다는 뜻은 아니며 S44의 배포 검증에서 증명해야 한다(SRC-065).
 
 ## 6. 조직
 
 ### 회사 전체 조직 규모
 
-- GA 1
-- 본사 1
-- 본부 4
-- 지사 20
-- 팀 100
+- 2차 시연 기준(DAR-012): GA 1 · 지점 12(예시) · 설계사 600(활동 ≥ 500). 데이터셋 메타데이터의 "기준일 직전 분기 일평균 소속 설계사 600명"은 대형 GA 판정용 프로젝트 가정이다(OI-024, SRC-022 제4-11조①).
+- 운영정책서 제1조의 옛 규모(본부 4·지사 20·팀 100, 설계사 3,200명)는 2차에서 쓰지 않는다.
+- GOLDEN 조직(아래 9개)은 그대로 둔다.
 
 ### GOLDEN 조직
 
@@ -319,6 +353,7 @@ GOLDEN은 다음 직급을 포함한다.
 | `A-FC-003` | FC | ACTIVE | 신인활동지원비 |
 | `A-FC-004` | FC | TERMINATED | 설계사 불일치·해촉 사례 |
 | `A-TL-001` | TEAM_LEADER | ACTIVE | 팀장수수료 |
+| `A-TL-002` | TEAM_LEADER | ACTIVE | 강동2팀 팀장 — 팀마다 팀장이 있어야 관리자수수료 수취인이 정해진다(V34) |
 | `A-BM-001` | BRANCH_MANAGER | ACTIVE | 지사장수수료 |
 | `A-DH-001` | DIVISION_HEAD | ACTIVE | 본부장수수료 |
 
@@ -346,6 +381,8 @@ newcomer_support_end_date = registration_scheduled_date + 1 year - 1 day
 
 `agent_history`에는 위 등록·모집 이력의 발생일·종료일·확인일·출처참조를 각각 저장한다. 이력 원천이 없거나 두 이력을 구분할 수 없으면 `newcomer_support_eligible_yn`을 확정하지 않고 `REVIEW_REQUIRED`로 둔다. (`REG-21`, `SRC-025`)
 
+> 현재 상태: `agent_history`는 시드가 없다(0행). 스키마의 `change_type`은 `RANK·ORG·STATUS·APPOINT·TERMINATE·EXPERIENCE`뿐이라 등록 이력과 모집 이력을 칸으로 구분할 수 없고 출처참조 칸도 없다. 적재할 때는 `change_type='EXPERIENCE'` 한 행에 `newcomer_snapshot = {registration_history:[…], recruitment_history:[…], window_start, window_end}`로 넣는다. 전용 칸이 필요한지는 근거 없음 — 확인 필요. 현재 데모는 `agent`의 요약 칸(`latest_registration_date`, `prior_three_year_experience_yn`, `experience_checked_on`)만 쓴다.
+
 ### 경력 정착지원 대상
 
 `A-FC-002` — 최근 3년 내 모집 이력이 있어 신인이 아닌 사례:
@@ -355,24 +392,37 @@ prior_three_year_registration_history_count = 1
 prior_three_year_recruitment_history_count = 1
 prior_three_year_experience_yn = true
 newcomer_support_eligible_yn = false
+newcomer_support_end_date = NULL   # 신인 아님
 evidence_ref = SYNTHETIC:REG-21:A-FC-002 registration_scheduled_date
 history_window_start_date = registration_scheduled_date - 3 years
 history_window_end_date = registration_scheduled_date - 1 day
-newcomer_support_end_date = registration_scheduled_date + 1 year - 1 day
 ```
 
 ## 9. 원수사 설계사코드
 
 각 보험회사마다 다른 코드를 만든다.
 
+현재 시드(V3·V4)의 10건:
+
 | insurer_code | insurer_agent_code | agent_code | effective_from | source_ref |
 |---|---|---|---|---|
-| FGL01 | `L01-77881` | A-FC-001 | 2026-01-01 | `SYNTHETIC:AGENT-CODE-001` |
-| FGL02 | `L02-11027` | A-FC-001 | 2026-01-01 | `SYNTHETIC:AGENT-CODE-002` |
-| FGN01 | `N01-99315` | A-FC-001 | 2026-01-01 | `SYNTHETIC:AGENT-CODE-003` |
-| FGL01 | `L01-77882` | A-FC-002 | 2026-01-01 | `SYNTHETIC:AGENT-CODE-004` |
 
-AGENT_MISMATCH 시나리오는 실제명세에 존재하지 않거나 다른 설계사로 매핑되는 코드를 넣는다.
+| insurer_code | insurer_agent_code | agent_code |
+|---|---|---|
+| FGL01 | `L01-77881` | A-FC-001 |
+| FGL02 | `L02-11027` | A-FC-001 |
+| FGN01 | `N01-99315` | A-FC-001 |
+| FGL01 | `L01-77882` | A-FC-002 |
+| FGL02 | `L02-11028` | A-FC-002 |
+| FGL01 | `L01-77883` | A-FC-003 |
+| FGL03 | `L03-55011` | A-FC-001 |
+| FGL03 | `L03-55012` | A-FC-002 |
+| FGL04 | `L04-33021` | A-FC-001 |
+| FGL02 | `L02-11029` | A-FC-004 (해촉자, R5) |
+
+`effective_from`은 2026-01-01이다. `source_ref`는 기존 행에서 NULL이며 신규 시드부터 `SYNTHETIC:AGENT-CODE-xxx`로 채운다.
+
+AGENT_MISMATCH 시나리오는 실제명세에 존재하지 않거나 다른 설계사로 매핑되는 코드를 넣는다. R5 원수사 명세의 `L02-99999`는 일부러 매핑하지 않은 코드다(V4).
 
 ---
 
@@ -382,12 +432,12 @@ AGENT_MISMATCH 시나리오는 실제명세에 존재하지 않거나 다른 설
 
 | standard_product_code | insurer_product_code | 원수사 | 상품명 | 상품군 | 유형 |
 |---|---|---|---|---|---|
-| `STD-LIFE-A` | `FGL01-LIFE-A` | FGL01 | 가상 건강보장보험 A | HEALTH_PROTECTION | PROTECTION |
-| `STD-LIFE-B` | `FGL02-LIFE-B` | FGL02 | 가상 저해지 건강보험 B | HEALTH_PROTECTION | PROTECTION |
-| `STD-TERM-A` | `FGL03-TERM-A` | FGL03 | 가상 경영인정기보험 | TERM_PROTECTION | PROTECTION |
-| `STD-NL-A` | `FGN01-NL-A` | FGN01 | 가상 장기상해보험 A | LONG_TERM_NONLIFE | PROTECTION |
-| `STD-SAV-A` | `FGL04-SAV-A` | FGL04 | 가상 연금저축보험 | SAVINGS | SAVINGS |
-| `STD-AUTO-A` | `FGN02-AUTO-A` | FGN02 | 가상 자동차보험 | AUTO | AUTO |
+| `STD-LIFE-A` | `P-A-001` | FGL01 | 가상 건강보장보험 A | HEALTH_PROTECTION | PROTECTION |
+| `STD-LIFE-B` | `P-B-001` | FGL02 | 가상 저해지 건강보험 B | HEALTH_PROTECTION | PROTECTION |
+| `STD-TERM-A` | `P-T-001` | FGL03 | 가상 경영인정기보험 | TERM_PROTECTION | PROTECTION |
+| `STD-NL-A` | `P-N-001` | FGN01 | 가상 장기상해보험 A | LONG_TERM_NONLIFE | PROTECTION |
+| `STD-SAV-A` | `P-S-001` | FGL04 | 가상 연금저축보험 | SAVINGS | SAVINGS |
+| `STD-AUTO-A` | (미적재) | FGN02 | 가상 자동차보험 | AUTO | AUTO |
 
 1차 규제 데모는 앞의 네 보장성 상품을 사용한다.
 
@@ -396,16 +446,23 @@ AGENT_MISMATCH 시나리오는 실제명세에 존재하지 않거나 다른 설
 | product | offering_version | sales_start | basic_document_version | basic_document_date | channel | fee_regime | 80% 공제 | 상품위원회 메타데이터 |
 |---|---|---|---|---|---|---|---|---|
 | STD-LIFE-A | `2026-CURRENT-A` | 2026-01-01 | BD-2026-01 | 2026-01-01 | FACE_TO_FACE | CURRENT | false | 승인일·문서참조·상태 |
+| STD-LIFE-B | `2026-H1-B` | 2026-01-01 (~2026-06-30) | BD-2026-01 | 2026-01-01 | FACE_TO_FACE | CURRENT | true | 승인일·문서참조·상태 |
 | STD-LIFE-B | `2026-CURRENT-B` | 2026-07-01 | BD-2026-07 | 2026-07-01 | FACE_TO_FACE | CURRENT | true | 승인일·문서참조·상태 |
 | STD-LIFE-B | `2027-FOUR-YEAR` | 2027-01-01 | BD-2027-01 | 2027-01-01 | FACE_TO_FACE | FOUR_YEAR_2027 | true | 승인일·문서참조·상태 |
-| STD-TERM-A | `2029-SEVEN-YEAR` | 2029-01-01 | BD-2029-01 | 2029-01-01 | FACE_TO_FACE | SEVEN_YEAR_2029 | true | 승인일·문서참조·상태 |
+| STD-TERM-A | `2026-CURRENT-A` | 2026-01-01 | BD-2026-01 | 2026-01-01 | FACE_TO_FACE | CURRENT | true | 승인일·문서참조·상태 |
+| STD-NL-A | `2026-CURRENT-A` | 2026-01-01 | BD-2026-01 | 2026-01-01 | FACE_TO_FACE | CURRENT | false | 승인일·문서참조·상태 |
+| STD-SAV-A | `2026-CURRENT-A` | 2026-01-01 | BD-2026-01 | 2026-01-01 | FACE_TO_FACE | CURRENT | false | 승인일·문서참조·상태 (V4) |
+| STD-TERM-A | `2029-SEVEN-YEAR` | 2029-01-01 | BD-2029-01 | 2029-01-01 | FACE_TO_FACE | SEVEN_YEAR_2029 | true | (목표 — 미적재) |
+
+현재 판매버전은 7개다(V3 5개 + V4 `2027-FOUR-YEAR`·STD-SAV-A, V49가 TM 판매버전 삭제). `2029-SEVEN-YEAR`만 목표다.
 
 `product_offering`은 REG-19 판정의 핵심이므로 `product_id`, `basic_document_date`를 생략한 실행용 시드를 허용하지 않는다. REG-24 관련 `committee_approval_date`, `committee_document_ref`, `governance_status`는 상품위원회 자체를 구현하는 값이 아니라 외부 승인결과를 연결하는 메타데이터다.
 
 경계시험용으로 다음도 만든다.
 
-- 계약일은 2027년이지만 상품 판매개시일·기초서류가 2026년인 상품
-- 계약일은 2029년이지만 `FOUR_YEAR_2027` 상품버전
+- G1(적재됨): 계약일 2027-03-02, 판매버전 `2026-CURRENT-A`(CURRENT) → **분급 미적용(현행 체계)**. 계약연도만 보고 4년 분급으로 정하면 오답이다. 2026-10-22에 `REVIEW_REQUIRED`에서 정정했다(SRC-022 `:5096`·SRC-025 Q4, 운영정책서 제45조). V4 파일의 "전부 REVIEW_REQUIRED" 주석은 고치지 않으므로(SRC-027 D-04) 이 문서가 기준이다.
+- G2(적재됨): 계약일 2026-11-10이 판매개시일 2027-01-01보다 이른 `2027-FOUR-YEAR` → `REVIEW_REQUIRED`·`POLICY_MISSING` (데이터를 고치지 않는다, V4)
+- 목표(미적재): 계약일 2029년·`FOUR_YEAR_2027` 판매버전
 
 자동으로 새 체계로 확정하지 않고 `REVIEW_REQUIRED` 기대값을 사용한다.
 
@@ -427,7 +484,9 @@ AGENT_MISMATCH 시나리오는 실제명세에 존재하지 않거나 다른 설
 | ADJUSTMENT | 정정·조정 | PAYMENT | ADJUSTMENT | 2026-01-01 |
 | CLAWBACK | 환수 | DEDUCTION | CLAWBACK | 2026-01-01 |
 | RECOVERY | 환수금 회수 | DEDUCTION | RECOVERY | 2026-01-01 |
-| LONG_TERM_MAINTENANCE | 장기유지수수료 | PAYMENT | MAINTENANCE | 2029-01-01 |
+| LONG_TERM_MAINTENANCE | 장기유지수수료 | PAYMENT | MAINTENANCE | 2027-01-01 (시드 값. 항목 유효일이며 분급 체계 적용은 판매버전 `fee_regime_code`로 정한다, REG-19) |
+
+표의 `item_name`은 설명용이다. 시드의 표시명은 "FC 기본수수료", "유지수수료(현행)", "정착지원금(경력)", "공통비 귀속분", "회수" 등으로 조금 다르다(V3).
 
 ## 13. 정책코드 규칙
 
@@ -440,14 +499,21 @@ ASM-*: 프로젝트 가정
 
 예:
 
-| policy_code | policy_type | source_class |
-|---|---|---|
-| `REG-CAP-INS-2026-V1` | CAP_1200 | REGULATORY |
-| `REG-CAP-GA-2026-V1` | CAP_1200 | REGULATORY |
-| `INS-CUR-LIFE-A-2026-V1` | CURRENT_COMMISSION | INSURER_RULE |
-| `GA-CUR-LIFE-A-2026-V1` | CURRENT_COMMISSION | GA_POLICY |
-| `GA-ALLOC-COMMON-2026-V1` | ALLOCATION | GA_POLICY |
-| `ASM-RECON-ZERO-2026-V1` | RECONCILIATION_TOLERANCE | PROJECT_ASSUMPTION |
+| policy_code | policy_type | source_class | 현재 ACTIVE 버전 | 출처 |
+|---|---|---|---:|---|
+| `REG-CAP-INS-2026-V1` | CAP_1200 | REGULATORY | v3 (유산 겹침, §15) | V3·V46·V52 |
+| `REG-CAP-INS-2021-V2` | CAP_1200 | REGULATORY | v3 (2021~2026, 0%) | V6_1·V46·V52 |
+| `REG-CAP-INS-2027-V1` | CAP_1200 | REGULATORY | v3 (2027~, 3%) | V6_1·V46·V52 |
+| `REG-CAP-GA-2026-V1` | CAP_1200 | REGULATORY | v3 (2026-07-01~) | V3·V46·V52 |
+| `INS-CUR-2026-V1` | CURRENT_COMMISSION | INSURER_RULE | v1 | V3 |
+| `GA-CUR-2026-V1` | CURRENT_COMMISSION | GA_POLICY | v1 | V3 |
+| `GA-ALLOC-COMMON-2026-V1` | ALLOCATION | GA_POLICY | v1 | V3 |
+| `INS-REFUND-2026-V1` / `INS-REFUND-2026-SAV-V1` | REFUND_RATE | INSURER_RULE | v1 / v1 | V3 / V42 |
+| `ASM-RECON-ZERO-2026-V1` | RECONCILIATION_TOLERANCE | PROJECT_ASSUMPTION | v1 | V3 |
+| `STATUS-MONTH-RULE-2026` | SCHEDULE_ELIGIBILITY | PROJECT_ASSUMPTION | v2 | V2·V3 |
+| `ARB-APPLICABILITY-2026` | ARBITRAGE | REGULATORY | v2 (적용일 2026-03-01, 합산 36개월, 3주년 당일 제외) | V45_1·V56 |
+
+허용 `policy_type`: CURRENT_COMMISSION, FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION, CAP_1200, ALLOCATION, REFUND_RATE, CLAWBACK, RECONCILIATION_TOLERANCE, SCHEDULE_ELIGIBILITY, ARBITRAGE (V45). 접두어 규칙의 기존 예외 2건(`STATUS-MONTH-RULE-2026`, `ARB-APPLICABILITY-2026`)은 적용된 마이그레이션이라 이름을 바꾸지 않는다. 새 정책은 접두어를 지킨다.
 
 `policy_version.source_class` 전용 컬럼에 다음 값 중 하나를 필수 저장한다.
 
@@ -501,7 +567,7 @@ payment_stage = INSURER_TO_GA
 공통: first_year_months = 12, premium_multiplier = 12, warning_usage_pct = 90
 ```
 
-3%는 자동 정액공제가 아니라 REG-10 목적·증빙을 충족한 실제 준법경영비의 최대 공제율이다. `compliance_deduction_amount`가 0~한도 사이인지와 증빙참조를 별도 검증한다.
+3%는 자동 정액공제가 아니라 REG-10 목적·증빙을 충족한 실제 준법경영비의 최대 공제율이다. 공제액 = `min(증빙된 실제 준법경영비, 월납환산 초회보험료 × 3%)`이며 원수사→GA 2027-01-01 이후 체결 계약에만 쓴다(`CapCalculationResult`). GA→FC는 0%(DB CHECK `ck_cap_compliance_stage`). 증빙참조를 별도 검증한다.
 
 ### GA→설계사
 
@@ -514,24 +580,30 @@ compliance_deduction_pct = 0
 warning_usage_pct = 90
 ```
 
+주의(WARNING) 판정: `잔여 한도 ≤ (100 − warning_usage_pct)% × (월납환산 × 12)`. 기준액이 한도가 아니라 연간 기준액이므로 80% 공제 상품은 사용률 90% 전에 주의가 된다(#490).
+
 ### 항목 분류
 
-| item_code | inclusion_status | attribution_method |
-|---|---|---|
-| BASE_COMMISSION | INCLUDED | DIRECT |
-| MANAGEMENT_COMMISSION | INCLUDED | DIRECT |
-| INCENTIVE | INCLUDED | DIRECT |
-| SETTLEMENT_SUPPORT | INCLUDED | SETTLEMENT_SUPPORT_MONTHLY |
-| NEWCOMER_SUPPORT | EXCLUDED 또는 REVIEW_REQUIRED | MANUAL_REVIEW |
-| COMMON_COST | INCLUDED | APPROVED_ALLOCATION |
-| ADJUSTMENT | 정책에 따라 | DIRECT |
-| CLAWBACK | 차감 | DIRECT |
+| item_code | inclusion_status | attribution_method | 제외유형 코드 |
+|---|---|---|---|
+| BASE_COMMISSION | INCLUDED | DIRECT | — |
+| MAINTENANCE_COMMISSION | INCLUDED (초년도 구간 지급분) | DIRECT | — |
+| MANAGEMENT_COMMISSION | INCLUDED | DIRECT | — |
+| INCENTIVE | INCLUDED | DIRECT | — |
+| SETTLEMENT_SUPPORT | INCLUDED | SETTLEMENT_SUPPORT_MONTHLY | — |
+| NEWCOMER_SUPPORT | EXCLUDED(요건·증빙 충족 시) / 아니면 REVIEW_REQUIRED | MANUAL_REVIEW | `NEW_AGENT_SUPPORT` |
+| COMMON_COST | INCLUDED | APPROVED_ALLOCATION | — |
+| ADJUSTMENT | REVIEW_REQUIRED | MANUAL_REVIEW | — |
+| CLAWBACK | 1,200% 누계에 영향 없음(gross). 차익거래에서만 차감 | DIRECT | — |
+
+- 환수(`DEDUCTION`·`CLAWBACK`)는 1,200% 지급 누계를 줄이지 않는다. 한 번 지급한 금액은 환수해도 초년도 누계에 남는다(일시 초과도 위반, REG-08). 차익거래는 `지급 − 환수` 순액을 쓴다. 근거: `docs/478_cap_gross_payment.md`, V46.
+- 제외유형 코드는 `NEW_AGENT_SUPPORT`와 `COMPLIANCE_3PCT`(원수사→GA만) 두 개다(V50, 조문표 §9.3). 기존 시드의 `cap_rule_item.exclusion_type='NEWCOMER_SUPPORT'`는 같은 뜻의 옛 코드이며 계산에 쓰이지 않는다(조회 화면 표시만). 신규 시드는 `NEW_AGENT_SUPPORT`를 쓰고, 기존 행 정정은 다음 CAP 정책 재버전 때 함께 한다.
 
 신인활동지원비를 `EXCLUDED`로 넣는 시드는 직전 3년의 등록·모집 이력을 구분한 조회결과, 최근 등록일, 등록예정일과 조회기간 시작·종료일, 지원근거 `evidence_ref`를 반드시 가진다. 두 이력 중 하나라도 확인할 수 없으면 `REVIEW_REQUIRED`다. (`REG-21`, `SRC-022`, `SRC-025`)
 
 각 `cap_rule_item`은 실행 가능한 시드에서 `decision_reason`을 반드시 저장한다. `EXCLUDED`이면 `exclusion_type`과 `evidence_required_yn=true`, `APPROVED_ALLOCATION`이면 `allocation_policy_id`가 필수다. REG-11의 허용 제외유형은 적격 신인활동지원 하나다(제7항 제1·2호 녹취·방송송출은 FGC 적용 대상 없음, SRC-036). 그리고 REG-10 준법경영비는 GA→설계사 제외유형으로 재사용하지 않는다.
 
-현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 2021~2026 0%, 2027 이후 3%로 시행일을 보정한다. FGC는 대면 모집만 다루므로 채널별 룰셋을 나누지 않는다(SRC-036). 또한 V3의 기존 활성 룰셋과 보정 룰셋이 겹치므로 `cap_rule_set_id`만으로 조용히 승자를 정하는 방식을 일반 정책선택 규칙으로 승격하지 않는다. 유산 룰셋 폐기와 비중복 범위 정리는 별도 마이그레이션 대상이다.
+현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 2021~2026 0%, 2027 이후 3%로 시행일을 보정한다. FGC는 대면 모집만 다루므로 채널별 룰셋을 나누지 않는다(SRC-036). 또한 V3의 기존 활성 룰셋과 보정 룰셋이 겹치므로 `cap_rule_set_id`만으로 조용히 승자를 정하는 방식을 일반 정책선택 규칙으로 승격하지 않는다. 유산 룰셋 폐기와 비중복 범위 정리는 별도 마이그레이션 대상이다. V46·V52가 이 유산 룰셋을 v3로 복제했고(승자는 여전히 `cap_rule_set_id` 순서), 폐기 마이그레이션은 아직 없다. §40 인수 검사는 이 정리 마이그레이션을 먼저 적용해야 한다(SRC-065).
 
 ## 16. 공통비 배부정책
 
@@ -539,7 +611,7 @@ REG-06A의 1,200%룰상 모집 공통비, REG-06B의 유지관리 간접지원�
 
 ```text
 allocation_code = GA-COMMON-PREMIUM-PROPORTIONAL
-allocation_name = 월 신계약 월납환산보험료 비례 안분
+allocation_name = 월 신계약 월납환산보험료 비례 안분   # 현재 시드 표시명: "공통비 월납환산보험료 비례배부"
 pool_type = RECRUITING_COMMON_COST
 allocation_basis_code = MONTHLY_EQUIVALENT_PREMIUM_PROPORTIONAL
 rounding_scale = 0
@@ -573,7 +645,7 @@ approved_basis_ref = SYNTHETIC:COMMON-COST-POLICY-2026-001
 
 - 0 이상
 - 1~36차월 누락 없음
-- `source_product_code`가 월 정산 상품코드와 일치
+- `source_product_code` = 해당 상품의 `standard_product_code`(V3·V42). 원수사 명세·AI 입력의 원수사 상품코드는 `product.insurer_product_code`로 표준코드에 매핑한 뒤 비교한다(REG-23)
 - 유효기간 중복 없음
 - 12차월 값 존재
 - 변경본은 새 정책버전과 새 헤더로 적재
@@ -596,7 +668,8 @@ approved_basis_ref = SYNTHETIC:COMMON-COST-POLICY-2026-001
 | premium_per_cycle_amount | 0 이상 |
 | first_premium_amount | 0 이상 |
 | monthly_equivalent_first_premium | 0 이상 |
-| payment_cycle_code | 1차는 MONTHLY |
+| payment_cycle_code | MONTHLY·QUARTERLY·SEMI_ANNUAL·ANNUAL·SINGLE·OTHER (V3 C003은 QUARTERLY). 1,200% 기준은 `monthly_equivalent_first_premium` |
+| premium_conversion_rule_code | `MONTHLY_AS_IS`, `MONTHLY_TO_QUARTERLY_X3`, `MONTHLY_TO_SEMI_ANNUAL_X6`, `MONTHLY_TO_ANNUAL_X12`, `DIRECT_INPUT` 중 하나(V8 이후 코드, `PremiumConversionRuleCode`). DB CHECK는 없다 |
 | payment_term_months | 양수 |
 | current_status | 허용 코드 |
 | data_origin | SEED |
@@ -612,6 +685,8 @@ FGC-{보험회사코드}-{계약월YYYYMM}-{일련번호4자리}
 ```text
 FGC-FGL01-202607-0001
 ```
+
+목표 구간(§24 T001~T068)은 일련번호 `9001~9068`, DAR-012는 `5001~` 구간을 쓴다.
 
 ## 19. 계약상태 사건
 
@@ -707,6 +782,8 @@ source_ref = SYNTHETIC:FGL01:202608:COMMISSION
 data_origin = SEED
 ```
 
+기존 시드 형식(바꾸지 않음): `source_ref = {보험사}-{YYYYMM}-COMMISSION`, `external_statement_no`는 비어 있다(V3·V4). 2차 AI 문서 입력으로 적재한 묶음은 `data_origin='AI_INTAKE'`, 전체 대체본은 `version_no`·`supersedes_statement_batch_id`로 연결한다(제안 DDL — Flyway 반영 전까지 미구현, FUN-068).
+
 ## 22. 지급 건 작성순서
 
 모든 `commission_transaction`은 `DRAFT`로 생성한다.
@@ -728,8 +805,15 @@ INSERT DRAFT
 
 ```text
 INSURER_STATEMENT:FGL01:202608:000001
-GA_CONFIRMED_PAYMENT:202608:A-FC-001:000001
+GA_MANUAL_PAYMENT:202607:A-FC-001:0001
 ```
+
+기존 시드 형식(바꾸지 않음): 원수사 `INS-{보험사}-{YYYYMM}-{4자리}`, GA 지급 `GA-{YYYY}-{MM}-{4자리}`, 차익거래 `ARB475-…`. 신규 시드는 위 형식 또는 `SYNTHETIC:DAR012:…`(§50)를 쓰고 한 파일 안에서 섞지 않는다.
+
+필수 추가 칸:
+
+- `installment_no` — 원천에 회차가 있으면 반드시 넣는다. 없으면 NULL이고 대사는 `REVIEW_REQUIRED`다(V18). 확정 후에는 바꿀 수 없다. V35 백필은 그때까지의 행만 한 번 채웠으므로 **이후 시드(2차 생성기 포함)는 회차를 직접 넣어야 한다.**
+- `GA_MANUAL_PAYMENT`는 `source_contract_id`·`source_sequence`로 자연키를 만든다(V9).
 
 ## 23. 계약귀속
 
@@ -809,22 +893,25 @@ expected_amount = ROUND(basis_amount × rate_pct ÷ 100, 0, HALF_UP)
 
 GOLDEN 계약은 다음과 같이 전용 구간을 사용한다. 하나의 계약이 서로 다른 주요 실패 시나리오를 겸하지 않게 한다.
 
-| 계약번호 | 시나리오 |
-|---|---|
-| C001~C012 | CAP-01~CAP-12 |
-| C013~C019 | SCH-01~SCH-07 |
-| C020~C029 | REC-01~REC-10 |
-| C030~C034 | ARB-01~ARB-05 |
-| C035~C039 | SET-NORMAL-01~05 |
-| C040~C044 | SET-STRESS-01~05 |
-| C045~C048 | COMMON-01~04 |
-| C049~C055 | JRN-01~JRN-07 |
-| C056~C057 | RND-01~02 |
-| C058~C060 | FOUR-01~03 |
-| C061~C063 | SEVEN-01~03 |
-| C064 | EXC-01 |
+> **번호 주의.** `C001~C006`은 이미 V3 데모 계약의 별칭으로 쓰이고 있다(V3 주석, 테스트 주석). 아래 목표 구간은 이와 섞이지 않도록 **`T001~T068`**로 부른다. V3 별칭과 목표 시나리오의 대응: C001→CAP-01, C002→CAP-02, C003→CAP-03, C004→CAP-04(확정 시도 시), C006→조정 검토필요(신인 증빙 사례 아님), C005→차익거래(실효). 현행 정답은 §31-1.
 
-실제 증권번호는 `FGC-{보험회사코드}-{계약월}-{C번호}` 형식으로 만든다.
+| 목표 구간 | 시나리오 |
+|---|---|
+| T001~T012 | CAP-01~CAP-12 |
+| T013~T019 | SCH-01~SCH-07 |
+| T020~T029 | REC-01~REC-10 |
+| T030~T034 | ARB-01~ARB-05 |
+| T035~T039 | SET-NORMAL-01~05 |
+| T040~T044 | SET-STRESS-01~05 |
+| T045~T048 | COMMON-01~04 |
+| T049~T055 | JRN-01~JRN-07 |
+| T056~T057 | RND-01~02 |
+| T058~T060 | FOUR-01~03 |
+| T061~T063 | SEVEN-01~03 |
+| T064 | EXC-01 |
+| T065~T068 | REC-11~REC-14 (수취인 짝짓기, §30 — 나중에 추가된 시나리오) |
+
+계약번호는 §18 형식 `FGC-{보험회사코드}-{계약월}-{일련번호4자리}`를 따르고 일련번호 `9001~9068`을 목표 구간 전용으로 예약한다.
 각 계약의 기대결과는 후속 `golden_expected_assertions.sql`에서 시나리오 ID로 조회한다.
 
 ## 25. 1,200% 기본 수치
@@ -837,6 +924,8 @@ GOLDEN 계약은 다음과 같이 전용 구간을 사용한다. 하나의 계�
 기본 한도 = 100,000 × 12 = 1,200,000원
 ```
 
+판정식: `산입 수수료등 + 12차월 예상 해약환급금(80% 공제 상품만) − 준법경영비 공제액 ≤ 월납환산 초회보험료 × 12`. 저장하는 `limit_amount`는 이를 한도 쪽으로 옮긴 값이다: `max(0, 월납×12 − 환급금 + 준법경영비)`. 예: STD-LIFE-B(12차월 24%) 월납 100,000 → 환급금 288,000, 한도 912,000. V3 주석의 "한도에 더해진다"는 표현은 틀렸다(파일은 고칠 수 없음, #468).
+
 ## 26. 한도 시나리오
 
 | ID | 입력 | 기대결과 |
@@ -847,7 +936,8 @@ GOLDEN 계약은 다음과 같이 전용 구간을 사용한다. 하나의 계�
 | CAP-04 | 포함액 1,250,000 | VIOLATION, 초과 50,000 |
 | CAP-05 | 신인활동지원 2,000,000 제외증빙 완비 + 포함액 800,000 | NORMAL |
 | CAP-06 | 신인활동지원 증빙누락 | REVIEW_REQUIRED, 확정 차단 |
-| CAP-07 | 2026-06-30 계약의 GA→FC 지급 | GA_TO_FC 룰 비적용 |
+| CAP-07 | 2026-06-30 계약의 GA→FC 지급 | `NOT_APPLICABLE` 저장(금액 칸 NULL, 사유 스냅샷 필수 — V48·V51), 예외 없음 |
+| CAP-07b | 저축성 상품 계약 | `NOT_APPLICABLE`(REG-01 보장성 한정) |
 | CAP-08 | 2026-07-01 계약의 GA→FC 지급 | 룰 적용 |
 | CAP-09 | 실제 지급을 초년도에 하고 due_date만 13차월 | 위반 또는 데이터품질 예외 |
 | CAP-10 | 환급률표 대상인데 12차월 값 없음 | REVIEW_REQUIRED |
@@ -897,6 +987,8 @@ FC 기본수수료      650,000
 
 ## 27. 정착지원금 귀속 시나리오
 
+> 이 절과 §29는 운영정책서 제19·20조 패턴(`CUR-LIFE-A` 1,485%, `GA-LIFE-A` 740%, 시책 없음)을 담은 별도 정책버전을 전제로 한다. 현 시드 정책 `GA-CUR-2026-V1`(시책 100% 포함 840%)로 만들면 SET-NORMAL은 95% WARNING이 된다. 목표 시드를 만들 때 정책코드를 `GA-CUR-LIFE-A-2026-V1`처럼 따로 둔다.
+
 ### SET-NORMAL — 정상 운영정책
 
 지급액 2,400,000원, 신계약 월납환산보험료:
@@ -910,17 +1002,17 @@ FC 기본수수료      650,000
 
 | 계약 | 월납환산 | 기본 GA 지급 740% | 지원금 귀속 | 총 산입액 | 한도 | 기대 |
 |---|---:|---:|---:|---:|---:|---|
-| C035 | 100,000 | 740,000 | 300,000 | 1,040,000 | 1,200,000 | NORMAL |
-| C036 | 100,000 | 740,000 | 300,000 | 1,040,000 | 1,200,000 | NORMAL |
-| C037 | 200,000 | 1,480,000 | 600,000 | 2,080,000 | 2,400,000 | NORMAL |
-| C038 | 300,000 | 2,220,000 | 900,000 | 3,120,000 | 3,600,000 | NORMAL |
-| C039 | 100,000 | 740,000 | 300,000 | 1,040,000 | 1,200,000 | NORMAL |
+| T035 | 100,000 | 740,000 | 300,000 | 1,040,000 | 1,200,000 | NORMAL |
+| T036 | 100,000 | 740,000 | 300,000 | 1,040,000 | 1,200,000 | NORMAL |
+| T037 | 200,000 | 1,480,000 | 600,000 | 2,080,000 | 2,400,000 | NORMAL |
+| T038 | 300,000 | 2,220,000 | 900,000 | 3,120,000 | 3,600,000 | NORMAL |
+| T039 | 100,000 | 740,000 | 300,000 | 1,040,000 | 1,200,000 | NORMAL |
 
 모든 계약의 사용률은 86.666667%다.
 
 ### SET-STRESS — 의도적 전 계약 위반
 
-지급액 4,000,000원은 C040~C044에 `500,000 / 500,000 / 1,000,000 / 1,500,000 / 500,000`으로 귀속한다.
+지급액 4,000,000원은 T040~T044에 `500,000 / 500,000 / 1,000,000 / 1,500,000 / 500,000`으로 귀속한다.
 기본 지급 740%와 합산하면 각 계약은 한도의 103.333333%가 되어 모두 `VIOLATION`이어야 한다.
 이 시나리오는 정상 회사정책이 아니라 한도차단 데모 전용이다.
 
@@ -982,7 +1074,7 @@ FC 기본수수료      650,000
 |---|---|---|---|
 | REC-11 | 팀장 40,000 · 지사장 30,000 · 본부장 20,000 | 동일 수취인 3건, 동일 금액 | 결과 3행 모두 `MATCHED` |
 | REC-12 | 위와 같음 | 팀장 건만 없음 | 팀장 `ACTUAL_MISSING`, 나머지 2행 `MATCHED` |
-| REC-13 | 위와 같음 | 팀장 몫 40,000이 지사장에게 지급 | 지사장 `AMOUNT_DIFFERENCE`(30,000↔70,000)가 아니라 **수취인 기준 짝짓기 후** 팀장 `ACTUAL_MISSING` + 지사장 금액차이로 분리 |
+| REC-13 | 위와 같음 | 지사장에게 70,000 **1건**(자기 몫 30,000 + 팀장 몫 40,000), 팀장 없음 | 결과 3행: 팀장 `ACTUAL_MISSING`(40,000↔0), 지사장 `AMOUNT_DIFFERENCE`(30,000↔70,000), 본부장 `MATCHED`. 계약 합계가 90,000으로 같아도 `MATCHED`로 묶지 않는다 |
 | REC-14 | 위와 같음 | 팀장 40,000이 미등록 설계사에게 지급 | 남은 예상 1명·실제 1명 → `AGENT_MISMATCH` |
 
 합계만 비교하면 REC-13·REC-14가 전부 `MATCHED`로 통과해버린다. 결과 건수가 아니라 **수취인별 행이 맞는지**를 인수조건으로 삼는다.
@@ -1038,6 +1130,29 @@ EXPECTED_TABLE 환급금 합산 = 금지
 
 기대: `REVIEW_REQUIRED`와 예외 생성
 
+## 31-1. 현행 demo fixture 정답표
+
+V4 주석의 정답표는 Flyway 체크섬 때문에 고칠 수 없다(SRC-027 D-04). 현행 기대값은 이 표를 따른다(정적 계산, 테스트로 고정된 것은 표시).
+
+| 계약 | 시나리오 | 기대 | 고정 테스트 |
+|---|---|---|---|
+| FGC-FGL01-202607-0001 (C001) | GA→FC 확정 산입 890,000 | NORMAL, 74.166667% | — |
+| …-0002 (C002) | 1,100,000 | WARNING, 91.666667% | — |
+| …-0004 (C003) | 1,200,000 | WARNING, 잔여 0 | — |
+| …-0005 (C004) | 확정 1,000,000 + DRAFT 시책 250,000 | 확정 시도 시 1,250,000 → 차단(104.166667%) | — |
+| …-0003 (C006) | 확정 980,000 + 조정 150,000 검토필요 | 조정 건 확정 불가 | — |
+| FGC-FGN01-202605-0001 (C005) | 지급 640,000 − 납입 100,000 | 차익거래 초과 540,000 | — |
+| R1~R8 | V4 주석 정답표 | 같음. 다만 R5는 관리자·시책 `ACTUAL_MISSING`도 함께 생긴다(수취인 짝짓기, 운영정책서 제36조) | — |
+| A1 FGC-FGL02-202601-0001, A2 FGC-FGL01-202601-0001 | 차익거래 시행일(2026-03-01) 전 계약 | GA→FC 차익거래 **CLEAR(적용대상 아님)**, 예외 0. V4 주석의 CANDIDATE는 V45_1 이후 틀림 | `ArbitrageManualCheckIntegrationTest` |
+| A1′ FGC-FGL02-202603-0475 | 890,000 + 환급금 120,000 − 납입 600,000 | CANDIDATE 410,000 | `ChangedContractArbitrageIntegrationTest` |
+| A2′ FGC-FGL01-202603-0475 | 890,000 − 600,000 (일반 상품) | CANDIDATE 290,000 | 상태만 고정(`ArbitrageManualCheckIntegrationTest`) |
+| A3 FGC-FGL03-202608-0001 | 240개월납·환급률표 120개월뿐 | REVIEW_REQUIRED, REFUND_TABLE_MISSING | — |
+| 1,200% A1(원수사→GA) | 80% 공제 상품 | 12차월 환급금 288,000, 한도 912,000 | `CapCalculatorIntegrationTest` |
+| G1 FGC-FGL01-202703-0001 | 원수사→GA 2027 계약 | 준법경영비 3% 공제 대상(증빙 3,000 → 한도 1,203,000) | `CapCalculatorIntegrationTest` |
+| G2 FGC-FGL02-202611-0001 | 2026 계약·2027 판매버전 | REVIEW_REQUIRED, POLICY_MISSING | — |
+
+A1·A2(및 0475 복제본)의 관리자수수료는 팀장 1명에게 90,000 1행으로 들어가 있다(V4). 1월·3월 GA→FC 대사 결과는 수취인 짝짓기 규칙에 따라 불일치가 정상이다. 차익거래 합계에는 영향 없다.
+
 ## 32. 원장 시나리오
 
 | ID | 입력 | 기대 |
@@ -1053,10 +1168,15 @@ EXPECTED_TABLE 환급금 합산 = 금지
 ## 33. 예외 시나리오
 
 - 같은 검증결과 재실행 시 예외 중복 0건
+- 같은 실행 재시도: 예외 업무건 +0, 검출 이력 +0 `[SRC-032]`
+- 같은 월의 새 실행에서 같은 문제 재검출: 예외 업무건 +0, 검출 이력 +1 `[SRC-032]`
+- 다른 월의 같은 계약·같은 문제: 예외 업무건 +1 `[SRC-032]`
+- 해결(`RESOLVED`)된 문제가 다시 검출되면 기존 업무건을 `NEW`로 재오픈하고 검출 이력에 재오픈 여부를 남긴다. 반려(`REJECTED`)된 건은 증거가 같으면 닫힌 채 남는다(운영정책서 제44조) `[SRC-032]`
 - 상태전이:
-  - NEW → IN_REVIEW 성공
-  - IN_REVIEW → RESOLVED 성공
-  - NEW → RESOLVED는 회사정책상 허용 여부를 서비스에서 명시
+  - NEW → IN_REVIEW → RESOLVED / REJECTED 성공
+  - NEW에서 바로 해결 조치 → 거절(운영정책서 제41조, `ExceptionActionType`)
+  - REJECTED → REOPEN → IN_REVIEW 성공
+  - RESOLVED 원장 정정 예외는 재오픈하지 않고 새 정정 예외를 만든다
 - 처리사유 없음 → 저장 차단
 - 해결조치와 근거참조 보존
 
@@ -1117,6 +1237,12 @@ EXPECTED_TABLE 환급금 합산 = 금지
 - 부활은 자동 소급지급하지 않고 REVIEW_REQUIRED
 - 담당설계사 변경일 이후 회차만 새 담당자 귀속
 
+**적재 상태와 전제 (2026-10-22)**
+
+- 4년·7년 시드는 아직 없다. 필요한 것: 4년·7년 정책버전(DRAFT→승격), 판매버전(`fee_regime_code` FOUR_YEAR_2027·SEVEN_YEAR_2029), 계약.
+- 계약체결비용 3,000,000원을 담을 칸이 스키마에 없다(계약 테이블·정책 파라미터 어느 쪽인지 미정). 근거 없음 — 확인 필요. 정하기 전에는 `policy_parameter`(상품 판매버전 단위 값)로 두는 안을 기본으로 검토한다 — 프로젝트 가정.
+- SCH-07(현행·4년·7년 비교)은 `schedule_purpose='COMPARISON'` 헤더로 만들어 운영 집계(`OPERATIONAL`)와 섞지 않는다(DAR-012).
+
 ## 36. 환수
 
 2차 시드에는 실제 공개 환수표를 그대로 쓰지 않고 `PROJECT_ASSUMPTION`으로 단순화한 가상 그룹을 사용한다. 아래 비율은 법정 공통 환수율이나 특정 보험회사 지급기준이 아니다. (`REG-14`, `REG-16`, `SRC-019`, `SRC-020`)
@@ -1138,12 +1264,14 @@ EXPECTED_TABLE 환급금 합산 = 금지
 
 # 제10장 API·입력 예시
 
-## 37. 계약 입력 예시
+## 37. 계약 입력 예시 (DB 적재용 입력 사실 — 업무키 기준)
+
+> API 요청 본문이 아니다. API 요청은 IF-API-18이며 `insurerId`·`productOfferingId`·`agentId`·`organizationId`·`contractStatus` 같은 대리키를 쓴다.
 
 ```json
 {
   "insurerCode": "FGL01",
-  "productOfferingCode": "STD-LIFE-A:2026-CURRENT-B:FACE_TO_FACE",
+  "productOfferingCode": "STD-LIFE-A:2026-CURRENT-A:FACE_TO_FACE",
   "contractNo": "FGC-FGL01-202607-0001",
   "contractDate": "2026-07-10",
   "agentCode": "A-FC-001",
@@ -1176,7 +1304,7 @@ EXPECTED_TABLE 환급금 합산 = 금지
   "sourceBusinessKey": "GA_MANUAL_PAYMENT:202607:A-FC-001:0001",
   "recipientAgentCode": "A-FC-001",
   "commissionItemCode": "INCENTIVE",
-  "policyCode": "GA-CUR-LIFE-A-2026-V1",
+  "policyCode": "GA-CUR-2026-V1",
   "settlementMonth": "2026-07-01",
   "dueDate": "2026-07-10",
   "amount": 100000,
@@ -1212,7 +1340,11 @@ EXPECTED_TABLE 환급금 합산 = 금지
 
 ## 40. 입력 정합성
 
-시드 적재 직후 다음 결과가 0건이어야 한다.
+**선행 조건·적용 순서(SRC-027 D-04·SRC-065):** 기존 시드 적용 → 새 버전 마이그레이션으로 CAP 유산 정책 폐기·활성 범위 중복 정리 → 전체 입력 정합성 검사 → §41 생성결과 검사 순서로 진행한다. V3·V6_1과 이를 복제한 V46·V52의 동일 범위 활성 룰셋을 조사하고, 과거 참조는 보존하면서 유산 정책을 RETIRED로 전환하고 필요한 비중복 룰셋을 새 승인 버전으로 발행한다. 적용된 Flyway 파일이나 잠긴 자식 행을 직접 고치지 않는다.
+
+정리 전 검사는 결함 파악용으로만 실행할 수 있고 인수 합격으로 처리하지 않는다. 현재 `cap_rule_set_id` 정렬은 이 중복을 우회하는 기존 동작일 뿐 허용 예외나 일반 선택 정책이 아니다. 정리 후에는 같은 범위·유효기간의 활성 중복이 0건임과 계약 경계일의 정책 선택을 확인한다. S04의 시드·발표 데이터 인수 전에 이 선행 조건을 완료한다.
+
+위 선행 작업까지 적용한 뒤 다음 결과가 0건이어야 한다.
 
 - 상위조직 없는 비GA 조직
 - 유효기간 역전
@@ -1232,11 +1364,11 @@ EXPECTED_TABLE 환급금 합산 = 금지
 |---|---|
 | 스케줄 | Golden 기대 회차·금액과 정확히 일치 |
 | 멱등성 | 동일 재실행 신규행 0 |
-| 1,200% | CAP-01~10 기대상태 일치 |
+| 1,200% | CAP-01~12 기대상태 일치 |
 | 차익거래 | 최초 후보차월과 초과액 일치 |
 | 원장 | 불균형 POSTED 0 |
-| 대사 | REC-01~10 유형·금액 일치 |
-| 예외 | 동일 원천 중복 0 |
+| 대사 | REC-01~14 유형·금액 일치(수취인 짝짓기 포함) |
+| 예외 | 같은 월·같은 안정 업무키의 `exception_case` 1건, 실행별 `exception_occurrence` 1건. 같은 실행 재시도는 업무건·검출 이력 신규행 0 `[SRC-032]` |
 | 확정잠금 | FINALIZED 상세 수정 0 |
 | 감사로그 | 핵심 변경 시나리오 기록률 100% |
 
@@ -1246,11 +1378,11 @@ EXPECTED_TABLE 환급금 합산 = 금지
 
 ## 42. 성능 데이터 기대
 
-LOAD 프로파일:
+DAR012 프로파일(§50):
 
 - 정책 조회는 계약별 N+1 쿼리를 만들지 않는다.
 - 스케줄 라인은 batch insert를 사용한다.
-- 50,000계약의 스케줄 생성과 월검증 시간을 측정한다.
+- 1천·3천·1만2천 계약 단계마다 스케줄 생성과 월검증 시간, 조회 p95를 측정한다(DAR-012, PER-003·004).
 - 실행계획에서 주요 조인은 인덱스를 사용한다.
 - `schedule_line.due_month` 조건으로 대사한다.
 - 테스트결과에 PostgreSQL `EXPLAIN (ANALYZE, BUFFERS)`를 보관한다.
@@ -1261,20 +1393,18 @@ LOAD 프로파일:
 
 # 제12장 초기화·재현성
 
-## 43. 초기화 순서
+## 43. 초기화
 
-```text
-예외·대사·원장·검증결과(계약체결비용 상세 포함) 삭제
-→ 스케줄 삭제
-→ 지급귀속·지급 건 삭제
-→ 명세·재무스냅샷·상태사건 처리이력·상태사건·계약 삭제
-→ 정책상세·정책버전 삭제
-→ 상품·설계사·조직 기준정보 재적재
-→ GOLDEN 입력 재적재
-→ 애플리케이션 실행
-```
+DB 안에서 행을 지워 초기화하지 않는다. `audit_log`·`contract_status_event`(append-only), 정책·정책 자식 가드, `exception_action`·`exception_occurrence`, 처리이력, 재무 스냅샷, 확정 실행 결과의 트리거가 DELETE를 막는다. 막지 않게 만들면 그 통제가 시연용으로 약해진다.
 
-FK 순서를 지키며 운영환경에서는 초기화 스크립트를 실행하지 않는다.
+| 환경 | 방법 |
+|---|---|
+| 통합 테스트 | Testcontainers가 매번 빈 DB에 Flyway를 다시 적용한다(`application-test.yml`) |
+| 로컬 | DB 컨테이너 볼륨을 지우고 앱을 다시 띄워 Flyway를 처음부터 적용한다. `flyway clean`은 로컬에서만 쓴다 |
+| 600인 데이터셋(§50) | 새 DB에 Flyway 적용 → 생성기 실행 → 배치 실행. 같은 DB에 같은 `dataset_id`가 있으면 생성기가 멈춘다 |
+| 신한 prd·검증계 | 초기화하지 않는다 |
+
+`golden_reset.sql`은 만들지 않는다. 기대값 검증 SQL(`golden_expected_assertions.sql`)은 유지한다.
 
 ## 44. 시간 고정
 
@@ -1285,15 +1415,13 @@ business_date = 2026-09-10
 validation_month = 2026-08-01
 ```
 
+화면 기본 정산월은 `fgc.demo-month`(`application.yml`, 2026-07)이다. 테스트 시계 값과 다르면 테스트에서 명시한다.
+
 Java에서는 `Clock`을 주입하고 테스트에서 고정시계를 사용한다.
 
 ## 45. 난수
 
-LOAD 생성기는 고정 seed를 사용한다.
-
-```text
-random_seed = 20260803
-```
+DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). Java `SplittableRandom(seed)` 같은 결정적 생성기를 쓰고 `clock_timestamp()`·`now()`를 값에 쓰지 않는다.
 
 같은 seed로 같은 계약수·금액분포가 생성되어야 한다.
 
@@ -1341,11 +1469,15 @@ random_seed = 20260803
 | 대사 | FUN-048~052 |
 | 예외 | FUN-053, FUN-061 |
 | 2차 분급 | FUN-037~038, FUN-062, FUN-064 |
-| 환수 | FUN-054~056 |
+| 환수 | FUN-054~056, FUN-084 |
+| 600인 데이터셋 | DAR-012, FUN-075·080·085, PER-003·004, TER-011 |
+| AI 입력 샘플 | FUN-066~069·078, TER-011, SER-013 |
+| 설계사 계정 | FUN-085, SER-002 |
+| 협회 등급자료 | FUN-078·079, OI-024·025 |
 
 ## 48. 요구사항 정정 메모
 
-- 1차 정책은 화면에서 수정하지 않고 시드 조회만 한다.
+- 1차 정책은 시드로만 넣는다. 2차부터 화면 경로(IF-API-75)로 DRAFT 정책을 승인·활성화할 수 있지만, 시드는 계속 §4-1 절차를 따른다.
 - `contract_status_event`는 1차 데이터이지만 자동 상태머신은 2차다.
 - 실제 지급의 초년도 귀속일은 `attribution_date`(일 단위)이며, 판정식은 `계약일 <= 귀속일 < 계약일 + 1년`이다. `attribution_month`는 월 집계에만 쓴다.
 - 공통비는 1차에 계산하지 않고 사전 배부결과를 검증한다.
@@ -1363,7 +1495,7 @@ random_seed = 20260803
 | REG-05 | 0.4% 장기유지 규칙 | 5년 유지 전 지급 없음, 61차월 정책경계 검증 |
 | REG-06 | 공통비와 간접지원경비를 다른 항목·정책으로 적재 | 승인 안분근거와 배부 전후 총액 일치 |
 | REG-07 | 원모집자와 유지관리 담당자 이력 | 회차 기준 수령인 검증, 담당자 누락 검토 |
-| REG-08 | 지급단계별 cap 룰셋·초년도 귀속일 | 월납보험료×12, 80% 상품의 12차월 환급금 가산 |
+| REG-08 | 지급단계별 cap 룰셋·초년도 귀속일 | 월납보험료×12, 80% 상품은 12차월 예상 해약환급금을 수수료등에 합산(한도에서 차감, §25) |
 | REG-09 | 직·간접 비용 항목과 귀속행 | 명칭이 아니라 실질·귀속근거로 산입 |
 | REG-10 | 2027 원수사→GA 룰셋 | GA→FC 0%, 실제 증빙액만 3% 이내 공제 |
 | REG-11 | 신인 지원의 증빙 (녹취·방송은 FGC 적용 대상 없음, SRC-036) | 요건충족 제외, 누락 시 `REVIEW_REQUIRED` |
@@ -1373,7 +1505,7 @@ random_seed = 20260803
 | REG-15 | 구법 정책은 종료·참조용으로만 보존 | 신규 상품에 구 60%·105% 규칙 미적용 |
 | REG-16 | 정착지원 약정·귀속·회사 환수조건 | REG-20 귀속과 환수는 별도 정책으로 연결 |
 | REG-17 | 대표가입속성·총보험료·수수료 구성 입력 | 산식 검산값이며 법정 공시 완료로 표시 금지 |
-| REG-18 | 외부 등급·순위 버전 또는 의도적 미지원 표시 | 전용 테이블이 없으므로 비교설명 완료 시나리오 생성 금지 |
+| REG-18 | 외부 등급·순위 버전(협회 자료 기준일·비교 집합 포함, §53) | 2차 FUN-078·079. 테이블이 Flyway로 들어오기 전에는 비교설명 완료 시나리오를 만들지 않는다. 들어온 뒤에도 '법정 의무 완료'로 표시하지 않는다 |
 | REG-19 | 판매개시일·기초서류일/버전·체계코드 (판매채널은 대면 하나라 판정 기준 아님, SRC-036) | 계약연도 단독 판정 금지, 경계는 검토대상 |
 | REG-20 | 모집월 신계약·보험료 배부기준·무실적 이월 근거 | 계약별 재귀속 후 cap 재검증 |
 | REG-21 | 등록예정일·직전 3년 등록/모집 이력·지원기간·증빙 | 등록 이력이 있어도 모집 이력이 없으면 신인 가능, 모집 이력이 있으면 신인 아님 (`SRC-022`, `SRC-025`) |
@@ -1388,16 +1520,63 @@ REG-17·18·24처럼 FGC가 외부 의무 전체를 구현하지 않는 영역�
 
 # 제14장 승인상태
 
-본 문서는 `v1.0 규제·스키마·추가자료 정합성 보정본(2026-08-10)`이며 팀에 배포한다. 신인 판정, 분급 시드의 출처 분류, 환수 시드 원칙은 `REG-02~05`, `REG-13`, `REG-14`, `REG-16`, `REG-21`과 `SRC-016`, `SRC-019`, `SRC-020`, `SRC-022`, `SRC-025`를 기준으로 재검토했다.
-기준 스키마는 `db/migration` V1~V7의 유효 결과인 v2.1.7이다. 이 문서는 전체 GOLDEN 목표 명세이며 현재 `db/demo` 축소 fixture의 구현완료 선언이 아니다.
+본 문서는 `v1.0 규제·스키마·추가자료 정합성 보정본(2026-08-10)`에 2026-10-22 정합성 교정(실제 시드·배포 설정·2차 요구사항 r19 대조)을 반영한 판이며 팀에 배포한다. 신인 판정, 분급 시드의 출처 분류, 환수 시드 원칙은 `REG-02~05`, `REG-13`, `REG-14`, `REG-16`, `REG-21`과 `SRC-016`, `SRC-019`, `SRC-020`, `SRC-022`, `SRC-025`를 기준으로 재검토했다.
+기준 스키마는 develop `fe6d0e6c`의 Flyway V55(+ demo V56)이다. 이 문서는 전체 GOLDEN 목표 명세이며 현재 `db/demo` 축소 fixture의 구현완료 선언이 아니다.
 
 다음 작업은 본 문서를 기준으로 진행하며, 진행 결과가 본 문서를 바꾸지 않는다.
 
-1. 요구사항명세서 v2.2.1에 운영정책서 제53조의 여섯 문구 반영
-2. C001~C064 전체 GOLDEN 시드 SQL 작성 — **제4-1항의 정책 승격 순서를 반드시 지킬 것**
+1. 요구사항명세서 v2.2.2-r19 기준 유지(운영정책서 제53조 문구는 반영됨)
+2. T001~T068 전체 GOLDEN 시드 SQL 작성 — **제4-1항의 정책 승격 순서를 반드시 지킬 것**
 3. REG-10 유산 룰셋 폐기 마이그레이션 작성 (일반/TM 시행일 분리는 SRC-036으로 삭제)
-4. `golden_reset.sql`, `golden_expected_assertions.sql`, `load_data_generator.sql` 작성
+4. `golden_expected_assertions.sql` 작성, DAR-012 생성기(§50)·AI 입력 샘플(§52)·협회 등급자료(§53) 작성 — 초기화는 §43(DB 재생성)
 5. 전체 회귀테스트 실행
+
+# 제15장 2차 시드 명세 (요구사항 r19 — 초안, 팀 승인 시 확정)
+
+## 50. DAR-012 600인 합성 데이터셋
+
+**위치와 적재 방식 — 프로젝트 가정, 팀 확인 필요**
+
+- Flyway(`db/migration`·`db/demo`)에 넣지 않는다. 이유: ① test 프로필이 `db/demo`를 적용하고 정확한 집합·건수를 단언한다(`ValidationTargetSelectionRepositoryIntegrationTest`, `TmChannelRemovalMigrationIntegrationTest`, Dashboard KPI 테스트) ② `db/demo`는 검증계·신한 prd에 자동 적재된다(§2) ③ Flyway에서는 배치를 돌릴 수 없는데 DAR-012는 "기초 데이터 적재 → 기존 배치 실행" 순서를 요구한다.
+- 생성기는 명시적으로 실행하는 별도 진입점으로 둔다(예: `@Profile("dar012")` `ApplicationRunner` 또는 Gradle 태스크). 기본 프로필·test·배포 환경에서는 자동 실행하지 않는다.
+- 실행 순서: ① 빈 DB에 Flyway(`db/migration`+`db/demo`) 적용 ② 생성기가 기초 데이터만 적재 ③ 기존 `MonthlyValidationJob` 등 배치 실행 ④ 정답표와 비교. 단계(1천→3천→1만2천)는 새 DB에서 각각 처음부터 만든다.
+- **발표 환경 재현**: 발표 서버에서도 같은 명령으로 만든다. 실행 명령·`dataset_id`·seed·기준일·검증 결과(건수·합계)를 PR과 Runbook에 남긴다. 개발자 PC에서만 성공한 것으로 닫지 않는다.
+
+**생성기가 넣는 것 / 넣지 않는 것**
+
+- 넣는다: 조직(GA 1·지점 12·팀), 설계사 600(등록·활동·해촉, 활동 ≥ 500), 원수사 설계사코드, 필요하면 상품·판매버전, 계약, 상태 사건(정상·미납·실효·부활·해지), 재무 스냅샷, 원천 명세 묶음·지급 건(DRAFT→귀속→CONFIRMED, §22, `installment_no` 포함).
+- 넣지 않는다: 스케줄·1,200%·차익거래·분개·대사·예외(§0 원칙 5). 정책은 기존 db/demo 정책을 쓰고, 새 정책이 필요하면 §4-1 절차를 따른다.
+- GOLDEN 행(V3·V4·V45_1 계약·설계사)은 바꾸지 않는다(DAR-012 "기존 데이터 불변").
+
+**식별과 재현성**
+
+- 업무코드 접두어로 데이터셋을 구분한다: 설계사 `D12-A-0001~0600`, 조직 `D12-B01~B12`, 계약 일련번호 `5001~` 구간, `source_ref`/`evidence_ref`는 `SYNTHETIC:DAR012:{dataset_id}:…`. `data_origin`은 `SEED`.
+- 메타데이터 파일 `{dataset_id}.json`(위치는 구현 PR에서 확정)에 `dataset_id`, 생성기 버전, seed, 기준일, 단계별 건수·금액 합계, "기준일 직전 분기 일평균 소속 설계사 600명 — 프로젝트 가정(OI-024)"을 남긴다. 전용 테이블은 만들지 않는다.
+- 같은 seed·같은 단계로 두 번 만들면 건수·합계가 같아야 한다(DAR-012). 같은 DB에 같은 `dataset_id`가 있으면 실패하고 멈춘다.
+- 정답표: 심은 이상(대사 차이·공통 패턴·한도 경계·상태 사건)마다 `{계약번호, 시나리오, 기대 결과 유형, 기대 금액}`을 `{dataset_id}-answers.csv`로 남긴다(FUN-075, TER-011).
+- 대표 설계사와 `agent01` 연결은 §5.
+- 금지: 계약자 개인정보 컬럼·값 생성(SRC-027 D-05). 4년·7년 시연 계약을 운영형 스케줄 집계에 섞기(`schedule_purpose`로 분리).
+
+## 52. AI 문서 입력 합성 샘플 (FUN-066~069·078, TER-011)
+
+- 샘플은 DB 시드가 아니라 **파일 + 정답 JSON**이다. 위치 제안: `src/test/resources/ai-intake/{서식}/{샘플ID}.{xlsx|pdf|png}` + 같은 이름 `.answer.json` — 프로젝트 가정.
+- 모든 샘플은 합성이고 계약자 개인정보 칸이 없다(SRC-027 D-05, OI-021). 실제 회사 자료(SRC-058)의 요율을 옮기지 않는다.
+- 샘플 값은 demo 시드 기준정보와 맞물려야 매칭·대사까지 이어진다: 보험사 `FGL01~FGN01`, 원수사 상품코드 `P-A-001` 등(§10), 원수사 설계사코드 `L01-77881` 등(§9), 계약번호 V3·V4 실제 값.
+- 필수 샘플 세트(Must 3종):
+  1. 해약환급률표: 정상(36차월) xlsx·pdf 각 1, 12차월 누락 1, 상품코드 불일치 1 → 정답은 1~36차월 값과 기대 상태.
+  2. 정산데이터: R1~R8과 같은 계약으로 정상·한도 초과·해지 후 지급·원본 내 중복·모집자 불일치 각 1행 이상, 차감·환수 행 1, 1,001행·여러 시트·합계행·원/천원 단위·선행 0 코드 변형 각 1 → 정답은 행별 정규화 값과 대사 후 기대 결과 유형.
+  3. 협회 등급자료: §53의 ABC·ABCD 집합.
+- 정답 JSON 형식: `{sample_id, document_type, rows:[{row_no, source_location, fields:{…}, expected_row_status}], expected_after_confirm:{statement_batch_count, transaction_count, amount_total, reconciliation:[…]}}`.
+
+## 53. 협회 등급자료 시드 (FUN-078)
+
+- 현재 시드의 보장성 상품은 상품군이 제각각이라(HEALTH_PROTECTION은 FGL01·FGL02 2개뿐) **다른 보험사 상품 3개 이상 비교가 성립하는 상품군이 없다.**
+- 동종·유사 상품군 하나(예: 생보 보장성 건강보장, 일반심사, 같은 환급 유형)에 서로 다른 보험사 상품 4개를 둔다. 추가 상품은 새 demo 마이그레이션 또는 DAR-012 생성기로 넣는다 — 팀 결정 필요.
+- 순위 집합 2개: `rank_set_key='ABC'`(3개 상품 순위), `'ABCD'`(4개 상품 순위). 같은 상품·기준일에 두 집합이 공존해야 한다(제안 DDL 유일키).
+- 차단 사례: 다른 회사 상품이 2개뿐인 상품군 1개, 비교 표 집합에 대응하는 순위 집합이 없는 경우 1개.
+- 차이 표시 사례: 자체 계산 등급이 협회 등급과 다른 상품 1개(SRC-002 5단계 기준).
+- 협회 자료는 정책버전이 아니라 기준일 버전 참조 자료다 — DRAFT·승인 절차를 적용하지 않는다(FUN-078).
+- 실제 협회 파일 형식은 근거 없음 — 확인 필요. 시연은 가상 양식(§52)으로 한다.
 
 # 부록 A. 시드 완료 체크리스트
 
@@ -1413,14 +1592,14 @@ REG-17·18·24처럼 FGC가 외부 의무 전체를 구현하지 않는 영역�
 - [ ] 규제 상한과 FGC 회사 정책이 서로 다른 `policy_version`으로 분리됨
 - [ ] 계약체결비용·최초 지급회차·가상 환수율이 `PROJECT_ASSUMPTION`으로 표시됨
 - [ ] 신인 판정에서 직전 3년의 등록 이력과 모집 이력이 분리 저장·판정됨
-- [ ] FAQ 배포안 정책에 FAQ 버전·최종여부가 정책 파라미터로 저장됨
+- [ ] FAQ 배포안 정책의 `source_refs`에 배포 차수(SRC-024/025)가 저장됨
 - [ ] REG-10 2027 시행경계와 지급단계가 분리됨
 - [ ] 지급 건은 모두 DRAFT → 귀속 → CONFIRMED 순서
 - [ ] 귀속합계 오류 의도건은 회귀테스트 안에서 롤백
 - [ ] 생성결과 테이블 초기 0건
 - [ ] Golden 기대값 파일과 시나리오 ID 일치
-- [ ] `golden_reset.sql` 재실행 결과 동일
-- [ ] LOAD 난수 seed 고정
+- [ ] DB 재생성 후 재적재 결과 동일(§43)
+- [ ] DAR012 난수 seed·dataset_id 고정
 - [ ] `contract_status_event.processed_at` 신규값 0건, Job별 처리이력은 별도 테이블에 존재
 - [ ] `cap_check_detail` 항목코드·항목명·조건부 회차 스냅샷 누락 0건
 - [ ] REG-17·18·24 메타데이터/범위 밖 기능을 규제 완료로 표시한 테스트 0건
@@ -1430,9 +1609,9 @@ REG-17·18·24처럼 FGC가 외부 의무 전체를 구현하지 않는 영역�
 # 부록 B. 참고자료
 
 - FGC 가상 GA 운영정책서 v1.0
-- FGC 요구사항명세서 v2.2.1
+- FGC 요구사항명세서 v2.2.2-r19
 - FGC 규제 근거·조문표 v0.2.1
-- PostgreSQL Flyway 유효 스키마 v2.1.7 (`db/migration` V1~V7)
+- PostgreSQL Flyway `db/migration` V1~V55 + `db/demo` V3~V56 (develop `fe6d0e6c`)
 - 보험사별 수수료자료 양식
 - 보험사별 지급방식·환수율·시책 자료
 - GA 영업규정 사례

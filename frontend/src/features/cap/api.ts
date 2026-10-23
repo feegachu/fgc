@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
+import { formatSort, parseSort } from '../../lib/tableSort'
 import { validMonth } from '../../stores/workspace'
 import { STAGES, STATUS_LABELS } from './labels'
 
@@ -17,10 +18,23 @@ export const FILTER_KEYS = {
   insurerId: '',
   orgId: '',
   contractNo: '',
+  sort: '',
   page: '',
   size: '',
   capCheckId: '',
 }
+/** 지급단계·판정·룰셋은 순서 기준이 없어 제외한다. */
+export const CAP_SORT_KEYS = [
+  'contractNo',
+  'asOfDate',
+  'basePremiumAmount',
+  'refund12mAmount',
+  'complianceDeductionAmount',
+  'limitAmount',
+  'includedAmount',
+  'remainingAmount',
+  'usagePct',
+] as const
 export interface CapCriteria {
   month: string
   stage: string
@@ -28,6 +42,8 @@ export interface CapCriteria {
   insurerId: string
   orgId: string
   contractNo: string
+  /** 서버(CapCheckQueryRepository.SORT_KEYS)와 같은 정렬 key. 비어 있으면 기준일 내림차순 */
+  sort: string
   page: number
   size: number
 }
@@ -51,6 +67,7 @@ export function criteriaFromParams(params: URLSearchParams, workspaceMonth: stri
     insurerId: referenceId(params.get('insurerId')),
     orgId: referenceId(params.get('orgId')),
     contractNo: params.get('contractNo')?.trim() ?? '',
+    sort: formatSort(parseSort(params.get('sort'), CAP_SORT_KEYS)),
     page: positive(params.get('page')),
     size: [10, 20, 50].includes(size) ? size : 20,
   }

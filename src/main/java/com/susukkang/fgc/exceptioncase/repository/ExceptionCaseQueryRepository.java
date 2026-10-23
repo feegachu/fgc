@@ -1,6 +1,8 @@
 package com.susukkang.fgc.exceptioncase.repository;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.common.web.ListSort;
+import com.susukkang.fgc.common.web.SqlSort;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
@@ -19,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 설명 : IF-API-43 예외 검색·요약·선택지·이력을 DTO로 조회한다.
@@ -33,6 +36,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ExceptionCaseQueryRepository {
+    private static final String SEVERITY = "severity";
+
 
     private static final String FROM_SQL = """
             FROM fgc.exception_case ec
@@ -47,7 +52,11 @@ public class ExceptionCaseQueryRepository {
                    ec.source_entity_type, ec.source_entity_id, ec.cap_check_id,
                    reconciliation.result_type AS reconciliation_result_type,
                    ec.validation_month, ec.first_detected_run_id, ec.last_detected_run_id,
-                   ec.first_detected_at, ec.last_detected_at, ec.detection_count, ec.created_at
+                   ec.first_detected_at, ec.last_detected_at, ec.detection_count, ec.created_at,
+                   (ec.source_entity_type = 'COMMISSION_TRANSACTION' AND NOT EXISTS (
+                       SELECT 1 FROM fgc.commission_transaction source_payment
+                        WHERE source_payment.commission_transaction_id = CASE WHEN pg_input_is_valid(ec.source_entity_id, 'bigint') THEN CAST(ec.source_entity_id AS bigint) END
+                   )) AS source_deleted
             """;
 
     private static final String DISPLAY_JOINS = """
@@ -65,6 +74,32 @@ public class ExceptionCaseQueryRepository {
                       ec.created_at DESC, ec.exception_case_id DESC
             """;
 
+    /** 심각도 순서: 숫자가 클수록 심각하다(치명 3 > 높음 2 > 경고 1 > 그 밖 0). 정렬 desc 가 "심각한 순"이다. */
+    private static final String SEVERITY_RANK =
+            "CASE ec.severity WHEN 'CRITICAL' THEN 3 WHEN 'HIGH' THEN 2 WHEN 'WARNING' THEN 1 ELSE 0 END";
+
+    /** 화면 정렬 key(EXCP-W01 목록) → SQL 표현식. 유형·상세 원인·상태·참조는 순서 기준이 없어 제외한다. */
+    private static final Map<String, String> SORTABLE = Map.of(
+            "exceptionCaseId", "ec.exception_case_id",
+            SEVERITY, SEVERITY_RANK,
+            "contractNo", "ic.contract_no",
+            "title", "ec.title",
+            "assigneeLoginId", "assignee.login_id",
+            "lastDetectedAt", "ec.last_detected_at",
+            "detectionCount", "ec.detection_count");
+    public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
+
+    /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 비어 있으면 null — 심각도 높은 순 → 최근 생성 순. */
+    public static ListSort sortOf(ExceptionCaseSearchDTO criteria) {
+        return ListSort.parse(criteria == null ? null : criteria.getSort(), SORT_KEYS, null);
+    }
+
+    private static String orderBy(ListSort sort) {
+        return sort == null
+                ? ORDER_BY
+                : " " + SqlSort.orderBy(sort, SORTABLE, "ec.created_at DESC, ec.exception_case_id DESC") + "\n";
+    }
+
     private final EntityManager entityManager;
 
     /** count로 보정한 offset만 받아 현재 페이지를 조회한다. */
@@ -74,7 +109,7 @@ public class ExceptionCaseQueryRepository {
             ExceptionCaseSearchDTO criteria, List<ExceptionStatus> statuses, int offset, int limit) {
         Map<String, Object> parameters = new LinkedHashMap<>();
         NativeQuery<?> query = nativeQuery(SELECT_SQL + FROM_SQL + DISPLAY_JOINS
-                + buildWhere(criteria, statuses, parameters) + ORDER_BY);
+                + buildWhere(criteria, statuses, parameters) + orderBy(sortOf(criteria)));
         parameters.forEach(query::setParameter);
         query.setFirstResult(offset);
         query.setMaxResults(limit);
@@ -82,7 +117,7 @@ public class ExceptionCaseQueryRepository {
         query.addScalar("exception_key", String.class);
         query.addScalar("exception_type", String.class);
         query.addScalar("reason_code", String.class);
-        query.addScalar("severity", String.class);
+        query.addScalar(SEVERITY, String.class);
         query.addScalar("status", String.class);
         query.addScalar("title", String.class);
         query.addScalar("description", String.class);
@@ -102,6 +137,7 @@ public class ExceptionCaseQueryRepository {
         query.addScalar("last_detected_at", OffsetDateTime.class);
         query.addScalar("detection_count", Integer.class);
         query.addScalar("created_at", OffsetDateTime.class);
+        query.addScalar("source_deleted", Boolean.class);
         return query.setTupleTransformer((row, aliases) -> new ExceptionCaseSearchRow(
                 (Long) row[0], (String) row[1], (String) row[2], (String) row[3],
                 (String) row[4], (String) row[5], (String) row[6], (String) row[7],
@@ -109,7 +145,7 @@ public class ExceptionCaseQueryRepository {
                 (String) row[12], (String) row[13], (String) row[14], (Long) row[15],
                 (String) row[16], (LocalDate) row[17], (Long) row[18], (Long) row[19],
                 (OffsetDateTime) row[20], (OffsetDateTime) row[21], (Integer) row[22],
-                (OffsetDateTime) row[23])).getResultList();
+                (OffsetDateTime) row[23], Boolean.TRUE.equals(row[24]))).getResultList();
     }
 
     /** 목록과 동일한 필터로 먼저 전체 건수를 구한다. */
@@ -222,7 +258,7 @@ public class ExceptionCaseQueryRepository {
         if (criteria.getReasonCode() != null && !criteria.getReasonCode().isBlank()) {
             append(where, parameters, "ec.reason_code = :reasonCode", "reasonCode", criteria.getReasonCode());
         }
-        append(where, parameters, "ec.severity = :severity", "severity", criteria.getSeverity());
+        append(where, parameters, "ec.severity = :severity", SEVERITY, criteria.getSeverity());
         append(where, parameters, "ec.validation_run_id = :validationRunId", "validationRunId",
                 criteria.getValidationRunId());
         if (criteria.getTypes() != null && !criteria.getTypes().isEmpty()) {

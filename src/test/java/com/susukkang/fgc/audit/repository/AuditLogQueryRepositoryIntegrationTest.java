@@ -187,6 +187,53 @@ class AuditLogQueryRepositoryIntegrationTest {
         assertThat(queryRepository.countAuditLogs(search)).isEqualTo(3);
     }
 
+    /** #604 허용 컬럼 양방향 정렬: 같은 시각(동률)·배치 행(행위자 없음)·정책버전 없음을 섞어 DB 정렬과 비교한다. */
+    @Test
+    void sortsByEachAllowedColumnInBothDirectionsAcrossPages() {
+        List<Long> users = jdbcTemplate.queryForList("SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 2", Long.class);
+        List<Long> policies = jdbcTemplate.queryForList(
+                "SELECT policy_version_id FROM fgc.policy_version ORDER BY policy_version_id LIMIT 3", Long.class);
+        // audit_log 는 추가 전용이라 정책버전도 INSERT 때 넣는다. i % 3 == 2 인 행은 정책버전이 없다.
+        for (int i = 0; i < 6; i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO fgc.audit_log (occurred_at, user_id, action_code, entity_type, entity_id,
+                                               policy_version_id, request_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, BASE.plusHours(i % 3), i % 3 == 0 ? null : users.get(i % users.size()), actionA, entityTypeA,
+                    "SORT-" + i, i % 3 == 2 ? null : policies.get(i % policies.size()), "req-" + marker);
+        }
+        Map<String, String> columns = Map.of(
+                "occurredAt", "al.occurred_at", "userLoginId", "u.login_id", "policyVersionId", "al.policy_version_id");
+        assertThat(AuditLogSearchImpl.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        LocalDateTime from = BASE.minusDays(1);
+        LocalDateTime to = BASE.plusDays(1);
+        for (var column : columns.entrySet()) {
+            for (String direction : List.of("asc", "desc")) {
+                List<Long> expected = jdbcTemplate.queryForList("""
+                        SELECT al.audit_log_id FROM fgc.audit_log al
+                          LEFT JOIN fgc.app_user u ON u.user_id = al.user_id
+                         WHERE al.occurred_at >= ? AND al.occurred_at < ?
+                         ORDER BY %s %s NULLS LAST, al.occurred_at DESC, al.audit_log_id DESC
+                        """.formatted(column.getValue(), direction), Long.class,
+                        from.atZone(com.susukkang.fgc.common.util.DateUtil.SEOUL_ZONE).toOffsetDateTime(),
+                        to.atZone(com.susukkang.fgc.common.util.DateUtil.SEOUL_ZONE).toOffsetDateTime());
+                var sorted = new AuditLogSearchCriteria(null, null, null, null, from, to, column.getKey() + "," + direction);
+                assertThat(queryRepository.selectAuditLogs(sorted, org.springframework.data.domain.Pageable.unpaged()))
+                        .extracting(AuditLogRow::auditLogId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                assertThat(queryRepository.selectAuditLogs(sorted, org.springframework.data.domain.PageRequest.of(1, 3)))
+                        .extracting(AuditLogRow::auditLogId)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+        for (String raw : List.of("actionCode,asc", "occurredAt,sideways", "occurredAt", "occurredAt;DROP,asc")) {
+            var bad = new AuditLogSearchCriteria(null, null, null, null, from, to, raw);
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> queryRepository.selectAuditLogs(bad, org.springframework.data.domain.Pageable.unpaged()))
+                    .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+        }
+    }
+
     /**
      * 설명 : 필터와 정렬 검증을 위해 사용자 감사행과 처리자 없는 배치 감사행을 준비한다.
      *

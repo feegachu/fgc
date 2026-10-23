@@ -159,6 +159,48 @@ class DashboardServiceIntegrationTest {
     }
 
     // 1. 1,200% 위반·주의: 계약·지급단계별 최신 판정만, 월 필터 있음
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "GA_TO_FC,DRAFT", "GA_TO_FC,CONFIRMED", "GA_TO_FC,CANCELLED", "GA_TO_FC,DELETED",
+            "INSURER_TO_GA,DRAFT", "INSURER_TO_GA,CONFIRMED", "INSURER_TO_GA,CANCELLED", "INSURER_TO_GA,DELETED"
+    })
+    void currentVerdictSkipsIneligibleCandidatesBeforeChoosingLatest(String stage, String state) {
+        Long contract = contractId("FGC-FGL01-202607-0001");
+        LocalDate month = LocalDate.of(2097, 1, 1);
+        insertCapCheck(contract, stage, month, "WARNING", OffsetDateTime.parse("2097-01-01T09:00:00+09:00"));
+        Long payment = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction(payment_stage,source_type,source_business_key,recipient_agent_id,
+                    commission_item_id,settlement_month,amount,cashflow_type,status)
+                VALUES(?,'GA_MANUAL_PAYMENT',?,(SELECT MIN(agent_id) FROM fgc.agent),
+                    (SELECT MIN(commission_item_id) FROM fgc.commission_item),?,0,'PAYMENT','DRAFT')
+                RETURNING commission_transaction_id
+                """, Long.class, stage, "IT-607-" + java.util.UUID.randomUUID(), month);
+        // 집계 자격만 검사하는 0원 fixture도 실제 DB 상태 전이 순서를 따른다.
+        if (state.equals("CONFIRMED") || state.equals("CANCELLED")) {
+            jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", payment);
+        }
+        if (state.equals("CANCELLED")) {
+            jdbcTemplate.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?", payment);
+        }
+        jdbcTemplate.update("""
+                INSERT INTO fgc.cap_check(contract_id,payment_stage,cap_rule_set_id,check_kind,as_of_date,
+                    base_premium_amount,limit_amount,included_amount,remaining_amount,result_status,
+                    checked_at,candidate_transaction_id,calculation_snapshot)
+                VALUES(?,?,?,'PRE_CONFIRM',?,100,1200,1300,-100,'VIOLATION',
+                    TIMESTAMPTZ '2097-01-02 09:00:00+09',?,CAST(? AS jsonb))
+                """, contract, stage, capRuleSetId(stage), month, state.equals("DELETED") ? null : payment,
+                state.equals("DELETED") ? "{\"deletedCandidateTransactionId\":" + payment + "}" : "{}");
+        if (state.equals("DELETED")) {
+            jdbcTemplate.update("DELETE FROM fgc.commission_transaction WHERE commission_transaction_id=?", payment);
+        }
+        var summary = dashboardService.summarize(month);
+        boolean confirmed = state.equals("CONFIRMED");
+        assertThat(summary.kpis().capViolation()).isEqualTo(confirmed ? 1 : 0);
+        assertThat(summary.kpis().capWarning()).isEqualTo(confirmed ? 0 : 1);
+        assertThat(jdbcTemplate.queryForObject("SELECT result_status FROM fgc.vw_latest_cap_check WHERE contract_id=? AND payment_stage=?",
+                String.class, contract, stage)).isEqualTo(confirmed ? "VIOLATION" : "WARNING");
+    }
+
     @Test
     void summarizeCountsOnlyLatestCapCheckPerContract() {
         Long id = contractId("FGC-FGL01-202607-0001");

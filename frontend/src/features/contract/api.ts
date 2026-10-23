@@ -3,6 +3,7 @@ import { apiClient } from '../../lib/api/client'
 import type { RequestOptions } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import { capStatusLabels, contractStatusLabels } from './labels'
+import { formatSort, parseSort } from '../../lib/tableSort'
 
 type Schema = components['schemas']
 export type ContractSummary = Schema['ContractView']
@@ -31,10 +32,13 @@ export interface ContractFilters {
   capResultStatus: string
   contractDateFrom: string
   contractDateTo: string
+  sort: string
 }
 export interface ContractCriteria extends ContractFilters {
   page: number
 }
+/** 서버(ContractQueryRepository.SORT_KEYS)와 같은 정렬 key */
+export const CONTRACT_SORT_KEYS = ['contractNo', 'insurerName', 'productName', 'contractDate', 'premium', 'agent'] as const
 export const FILTER_NAMES = [
   'contractNo',
   'insurerId',
@@ -45,6 +49,7 @@ export const FILTER_NAMES = [
   'capResultStatus',
   'contractDateFrom',
   'contractDateTo',
+  'sort',
 ] as const
 
 export function validDate(value: string | null | undefined): value is string {
@@ -74,6 +79,7 @@ export function criteriaFromParams(params: URLSearchParams): ContractCriteria {
     capResultStatus: allowedCode(capStatusLabels, params.get('capResultStatus')),
     contractDateFrom: validDate(from) ? from : '',
     contractDateTo: validDate(to) ? to : '',
+    sort: formatSort(parseSort(params.get('sort'), CONTRACT_SORT_KEYS)),
     page: positivePage(params.get('page')),
   }
 }

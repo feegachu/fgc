@@ -69,7 +69,7 @@ class ExceptionCaseControllerTest {
     void searchesExceptionsForAuthenticatedUser() throws Exception {
         ExceptionCaseSearchResponse response = new ExceptionCaseSearchResponse(
                 List.of(), List.of(), 2, 10, 0, 0,
-                "severity,asc,createdAt,desc");
+                "severity,desc");
         given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(2), eq(10)))
                 .willReturn(response);
 
@@ -88,7 +88,7 @@ class ExceptionCaseControllerTest {
     void bindsValidationRunAndMultiplePolicyTypesForFinalizeChecklistLink() throws Exception {
         ExceptionCaseSearchResponse response = new ExceptionCaseSearchResponse(
                 List.of(), List.of(), 1, 20, 0, 0,
-                "severity,asc,createdAt,desc");
+                "severity,desc");
         given(exceptionCaseService.search(any(ExceptionCaseSearchDTO.class), eq(1), eq(20)))
                 .willReturn(response);
 
@@ -109,7 +109,7 @@ class ExceptionCaseControllerTest {
 
     private ExceptionCaseSearchResponse emptySearchResponse() {
         return new ExceptionCaseSearchResponse(
-                List.of(), List.of(), 1, 20, 0, 0, "severity,asc,createdAt,desc");
+                List.of(), List.of(), 1, 20, 0, 0, "severity,desc");
     }
 
     @Test

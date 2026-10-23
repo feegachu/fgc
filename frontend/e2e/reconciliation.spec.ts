@@ -29,12 +29,14 @@ async function historyFixture(page: import('@playwright/test').Page) {
             ? {
                 ...result,
                 installmentNo: null,
+                expectedTotalAmount: -12000,
+                actualTotalAmount: -13000,
                 matches: [
                   {
                     matchSeq: 1,
                     matchRole: 'ACTUAL',
                     commissionTransactionId: 12,
-                    matchedAmount: 11000,
+                    matchedAmount: -13000,
                     installmentNo: null,
                   },
                 ],
@@ -48,7 +50,7 @@ test('비활성 보험회사 과거 이력 조회는 가능하고 신규 대사�
   await historyFixture(page)
   await page.goto('reconciliations?month=2026-07&stage=GA_TO_FC')
   await expect(page.getByRole('option', { name: 'OLD · 과거회사' })).toBeEnabled()
-  await page.getByLabel('보험회사').selectOption('9')
+  await page.getByRole('combobox', { name: '보험회사', exact: true }).selectOption('9')
   await expect(page.getByRole('button', { name: '대사 실행', exact: true })).toBeDisabled()
   const response = page.waitForResponse((res) => new URL(res.url()).searchParams.get('insurerId') === '9')
   await page.getByRole('button', { name: '조회', exact: true }).click()
@@ -56,12 +58,19 @@ test('비활성 보험회사 과거 이력 조회는 가능하고 신규 대사�
   await expect(page).toHaveURL(/insurer=9/)
 })
 
-test('비교 모달의 null 회차는 대시로 표시한다', async ({ page }) => {
+test('비교 모달의 null 회차는 대시, 음수 예상·실제·차액은 마이너스와 빨간색으로 표시한다', async ({ page }) => {
   await historyFixture(page)
   await page.goto('reconciliations?month=2026-07&resultId=7')
   await expect(page.getByRole('dialog').getByText('C-001 · 초회 수수료 · —')).toBeVisible()
   await expect(page.getByRole('dialog')).not.toContainText('-회차')
   await expect(page.getByRole('dialog')).not.toContainText('—회차')
+  for (const text of ['-12,000원', '-13,000원', '-1,000원']) {
+    const amounts = page.getByRole('dialog').getByText(text, { exact: true })
+    await expect(amounts.first()).toBeVisible()
+    for (const amount of await amounts.all()) {
+      await expect(amount).toHaveCSS('color', 'rgb(185, 28, 28)')
+    }
+  }
 })
 
 test('상태 미확인 실행은 일괄 예외 버튼을 활성화하지 않는다', async ({ page }) => {
@@ -86,7 +95,7 @@ test('화면 월 변경은 탭 영향 확인 후 취소하거나 명시적으로
   await expect(page).toHaveURL(/month=2026-08/)
 })
 
-test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외', async ({ page }) => {
+test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외', async ({ page }, testInfo) => {
   let created = false
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
@@ -123,6 +132,7 @@ test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외
                 targetCount: 1,
                 matchedCount: 0,
                 exceptionCount: 1,
+                differenceTotal: -1000,
               },
             ]
           : [],
@@ -148,10 +158,17 @@ test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외
     await route.fulfill({ json: envelope(data) })
   })
   await page.goto('reconciliations')
-  await page.getByLabel('지급단계').selectOption('GA_TO_FC')
-  await page.getByLabel('보험회사').selectOption('1')
+  await page.getByRole('combobox', { name: '지급단계', exact: true }).selectOption('GA_TO_FC')
+  await page.getByRole('combobox', { name: '보험회사', exact: true }).selectOption('1')
   await page.getByRole('button', { name: '대사 실행', exact: true }).click()
   await expect(page).toHaveURL(/runId=42/)
+  const differences = page.locator('.reco-react-difference')
+  await expect(differences.first()).toBeVisible()
+  for (const difference of await differences.all()) {
+    await expect(difference).toHaveText(/^-1,000(원)?$/)
+    await expect(difference).toHaveCSS('color', 'rgb(185, 28, 28)')
+  }
+  await page.screenshot({ path: testInfo.outputPath('reconciliation-minus-differences.png'), fullPage: true })
   await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()
   await expect(page.getByRole('dialog').getByText('예상 없음', { exact: true })).toBeVisible()
   await expect(page.getByRole('dialog').getByText('실제 없음', { exact: true })).toBeVisible()

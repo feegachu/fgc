@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailRow;
@@ -20,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /** FUN-049-02/03 대사 결과 목록·상세 조회. */
 @Service
@@ -28,7 +28,6 @@ import java.util.Set;
 public class ReconciliationResultQueryService {
 
     private static final int MAX_PAGE_SIZE = 100;
-    private static final Set<String> SUPPORTED_SORTS = Set.of("createdAt,desc", "createdAt,asc");
 
     private final ReconciliationRunRepository reconciliationRunRepository;
     private final ReconciliationResultRepository reconciliationResultRepository;
@@ -42,7 +41,9 @@ public class ReconciliationResultQueryService {
             int size,
             String sort
     ) {
-        validatePage(page, size, sort);
+        validatePage(page, size);
+        ListSort listSort = ListSort.parse(sort, ReconciliationResultRepository.RESULT_SORT_KEYS,
+                ReconciliationResultRepository.DEFAULT_RESULT_SORT);
         if (reconciliationRunRepository.findById(reconciliationRunId) == null) {
             throw notFound(reconciliationRunId);
         }
@@ -50,9 +51,8 @@ public class ReconciliationResultQueryService {
         if (offsetLong > Integer.MAX_VALUE) {
             throw invalid("page");
         }
-        String direction = sort.endsWith(",asc") ? "asc" : "desc";
         List<ReconciliationResultListItemResponse> content = reconciliationResultRepository
-                .findResults(reconciliationRunId, resultType, direction, (int) offsetLong, size)
+                .findResults(reconciliationRunId, resultType, listSort, (int) offsetLong, size)
                 .stream()
                 .map(ReconciliationResultListItemResponse::from)
                 .toList();
@@ -60,7 +60,7 @@ public class ReconciliationResultQueryService {
         ReconciliationSummaryRow summary = reconciliationResultRepository.findSummary(reconciliationRunId);
         return new ReconciliationResultSearchResponse(
                 ReconciliationSummaryResponse.from(summary),
-                PageResponse.of(content, page, size, total, sort));
+                PageResponse.of(content, page, size, total, listSort.value()));
     }
 
     @Transactional(readOnly = true)
@@ -83,15 +83,12 @@ public class ReconciliationResultQueryService {
         }
     }
 
-    private static void validatePage(int page, int size, String sort) {
+    private static void validatePage(int page, int size) {
         if (page < 1) {
             throw invalid("page");
         }
         if (size < 1 || size > MAX_PAGE_SIZE) {
             throw invalid("size");
-        }
-        if (!SUPPORTED_SORTS.contains(sort)) {
-            throw invalid("sort");
         }
     }
 

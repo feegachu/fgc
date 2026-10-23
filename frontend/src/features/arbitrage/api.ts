@@ -1,16 +1,31 @@
 import { queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
+import { formatSort, parseSort } from '../../lib/tableSort'
 type Schemas = components['schemas']
 export type ArbitrageRow = Schemas['ArbitrageCheckView']
 export type ArbitrageResult = Schemas['ArbitrageSearchResponse']
 export type RecheckRequest = Schemas['ReArbitrageCheckRequest']
+/** 서버(ArbitrageCheckQueriesImpl.SORT_KEYS)와 같은 정렬 key. 지급단계·환급금 출처·가산 여부·판정은 순서 기준이 없어 제외한다. */
+export const ARBITRAGE_SORT_KEYS = [
+  'contractNo',
+  'asOfDate',
+  'contractMonthNo',
+  'cumulativePaidPremium',
+  'paidCommissionAmount',
+  'plannedCommissionAmount',
+  'includedSurrenderValueAmount',
+  'netDifferenceAmount',
+] as const
+
 export interface Criteria {
   month: string
   status: string
   stage: string
   insurerId: string
   contractNo: string
+  /** 비어 있으면 서버 기본(최신 판정 순) */
+  sort: string
   page: number
 }
 export function criteriaFromParams(params: URLSearchParams, month: string): Criteria {
@@ -21,6 +36,7 @@ export function criteriaFromParams(params: URLSearchParams, month: string): Crit
     stage: params.get('stage') ?? 'GA_TO_FC',
     insurerId: params.get('insurerId') ?? '',
     contractNo: params.get('contractNo')?.trim() ?? '',
+    sort: formatSort(parseSort(params.get('sort'), ARBITRAGE_SORT_KEYS)),
     page: Number.isSafeInteger(raw) && raw > 0 ? raw : 1,
   }
 }

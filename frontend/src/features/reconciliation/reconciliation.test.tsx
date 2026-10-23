@@ -306,11 +306,53 @@ describe('RECO-W01·W02 React 전환', () => {
       sort: 'createdAt,desc',
     })
     expect(screen.getByText('50.0%')).toBeVisible()
-    expect(screen.getByText('(1,000)원')).toHaveClass('is-negative-amount')
+    expect(screen.getByText('-1,000원')).toHaveClass('is-negative-amount', 'reco-react-difference')
     const pagination = within(screen.getByRole('region', { name: '실행 이력' }))
     await user.click(pagination.getByRole('button', { name: '2' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
     await waitFor(() => expect(calls.some((call) => call.url.includes('page=2'))).toBe(true))
+  })
+  it('#604 이력과 결과는 각자 헤더로 정렬하고 서로의 정렬·페이지·검색조건을 건드리지 않는다', async () => {
+    const { router, user } = renderAt(
+      '/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=1&runId=41&runMonth=2026-07&page=2&resultPage=3',
+    )
+    const historyTable = await screen.findByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' })
+    const resultTable = await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
+    const lastQuery = (match: (url: string) => boolean) =>
+      new URLSearchParams(calls.filter((call) => match(call.url)).at(-1)!.url.split('?')[1])
+    const historyQuery = () => lastQuery((url) => url.startsWith('/api/v1/reconciliations?'))
+    const resultQuery = () => lastQuery((url) => /\/41\/results/.test(url))
+    // 순서 기준이 없는 상태·결과 유형 컬럼은 정렬 버튼이 없다.
+    expect(within(historyTable).queryByRole('button', { name: '상태' })).toBeNull()
+    expect(within(resultTable).queryByRole('button', { name: '결과 유형' })).toBeNull()
+    // 이력 정렬: 이력 페이지만 1로 돌아가고 결과 쪽 요청은 그대로다.
+    await user.click(within(historyTable).getByRole('button', { name: '불일치' }))
+    await waitFor(() => expect(historyQuery().get('sort')).toBe('exceptionCount,asc'))
+    expect(historyQuery().get('page')).toBe('1')
+    expect(historyQuery().get('stage')).toBe('GA_TO_FC')
+    expect(new URLSearchParams(router.state.location.search).get('resultPage')).toBe('3')
+    expect(resultQuery().get('sort')).toBe('createdAt,desc')
+    // 결과 정렬: 결과 페이지만 1로 돌아가고 이력 정렬은 그대로다.
+    await user.click(within(resultTable).getByRole('button', { name: '차액' }))
+    await waitFor(() => expect(resultQuery().get('sort')).toBe('differenceAmount,asc'))
+    expect(resultQuery().get('page')).toBe('1')
+    const params = new URLSearchParams(router.state.location.search)
+    expect(params.get('resultSort')).toBe('differenceAmount,asc')
+    expect(params.get('sort')).toBe('exceptionCount,asc')
+    expect(params.has('resultPage')).toBe(false)
+    expect(params.get('page')).toBeNull()
+    expect(historyQuery().get('sort')).toBe('exceptionCount,asc')
+    await user.click(within(resultTable).getByRole('button', { name: '차액' }))
+    await waitFor(() => expect(resultQuery().get('sort')).toBe('differenceAmount,desc'))
+    expect(within(resultTable).getByRole('columnheader', { name: /차액/ })).toHaveAttribute('aria-sort', 'descending')
+    expect(within(historyTable).getByRole('columnheader', { name: /불일치/ })).toHaveAttribute('aria-sort', 'ascending')
+  })
+  it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬을 쓴다', async () => {
+    renderAt('/reconciliations?month=2026-07&runId=41&sort=status,asc&resultSort=resultType,desc')
+    await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
+    for (const call of calls.filter((c) => /reconciliations/.test(c.url) && c.url.includes('?'))) {
+      expect(new URLSearchParams(call.url.split('?')[1]).get('sort')).toBe('createdAt,desc')
+    }
   })
   it('결과와 이력은 공통 숫자·5페이지 묶음으로 독립적으로 이동한다', async () => {
     const { router, user } = renderAt(
@@ -405,11 +447,17 @@ describe('RECO-W01·W02 React 전환', () => {
   it('실행 선택 → 결과 보기 → 비교 모달·원천·요율·관련 경로를 제공한다', async () => {
     const { router, user } = renderAt()
     await user.click(await screen.findByRole('button', { name: '41' }))
+    const resultTable = await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
+    expect(await within(resultTable).findByText('-1,000원')).toHaveClass('reco-react-difference')
+    expect(within(resultTable.querySelector('tfoot')!).getByText('-1,000')).toHaveClass('reco-react-difference')
+    expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('-1,000원')
     await user.click(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' }))
     const dialog = screen.getByRole('dialog')
     expect(await within(dialog).findByText('예상 원천 1 · schedule_line #12')).toBeVisible()
     expect(within(dialog).getByText('실제 원천 1 · commission_transaction #8')).toBeVisible()
     expect(within(dialog).getByText('123.1234%')).toBeVisible()
+    for (const difference of within(dialog).getAllByText('-1,000원'))
+      expect(difference).toHaveClass('is-negative-amount', 'reco-react-difference')
     expect(within(dialog).getByRole('link', { name: '스케줄 상세' })).toHaveAttribute(
       'href',
       '/schedules/11?month=2026-07',
@@ -487,6 +535,7 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(footer).toHaveTextContent('이 페이지 합계')
     expect(within(footer).getByText('12,000')).toBeVisible()
     expect(within(footer).getByText('11,000')).toBeVisible()
+    expect(within(footer).getByText('-1,000')).toHaveClass('reco-react-difference')
     expect(screen.getByRole('region', { name: '대상' })).toHaveTextContent('2건')
   })
   it('미선택은 0 합계, 무필터 조회는 페이지 행이 아닌 서버 실행 합계를 표시한다', async () => {
@@ -504,7 +553,7 @@ describe('RECO-W01·W02 React 전환', () => {
   it.each([
     { amount: 500.49, rowText: '500원', totalText: '1,000' },
     { amount: 500.5, rowText: '501원', totalText: '1,002' },
-    { amount: -500.5, rowText: '(501)원', totalText: '(1,002)' },
+    { amount: -500.5, rowText: '-501원', totalText: '-1,002' },
   ])('결과 유형 필터는 행별 HALF_UP 표시와 합계를 일치시킨다: $amount', async ({ amount, rowText, totalText }) => {
     renderAt('/reconciliations?runId=41&resultType=AMOUNT_DIFFERENCE', (url) =>
       /\/41\/results/.test(url)

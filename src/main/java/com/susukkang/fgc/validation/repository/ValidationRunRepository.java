@@ -37,7 +37,7 @@ import java.util.Optional;
  * @version 1.0
  * @since 2026-10-03
  */
-public interface ValidationRunRepository extends JpaRepository<ValidationRun, Long> {
+public interface ValidationRunRepository extends JpaRepository<ValidationRun, Long>, ValidationRunSearch {
 
     /**
      * 검증월 단위 트랜잭션 advisory lock(#491). 커밋·롤백 때 자동으로 풀린다.

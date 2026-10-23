@@ -2,6 +2,7 @@ package com.susukkang.fgc.reconciliation.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationMatchDetailRow;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailRow;
@@ -41,7 +42,7 @@ class ReconciliationResultQueryServiceTest {
     @Test
     void emptyResultListReturns200ShapeWithZeroPageTotals() {
         given(runMapper.findById(41L)).willReturn(new ReconciliationRunRow());
-        given(resultMapper.findResults(41L, null, "desc", 0, 20)).willReturn(List.of());
+        given(resultMapper.findResults(41L, null, new ListSort("createdAt", false), 0, 20)).willReturn(List.of());
         given(resultMapper.countResults(41L, null)).willReturn(0L);
         given(resultMapper.findSummary(41L)).willReturn(summary());
 
@@ -62,7 +63,7 @@ class ReconciliationResultQueryServiceTest {
 
     @Test
     void unsupportedSortReturnsCommonValidationError() {
-        assertThatThrownBy(() -> service.search(41L, null, 1, 20, "differenceAmount,desc"))
+        assertThatThrownBy(() -> service.search(41L, null, 1, 20, "resultType,desc"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_002);
                     assertThat(exception.getField()).isEqualTo("sort");

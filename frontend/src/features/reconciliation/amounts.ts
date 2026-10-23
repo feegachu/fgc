@@ -34,5 +34,6 @@ export function amountText(value: Amount, unit = true) {
   const negative = part.coefficient < 0n
   const rounded = wholeWon(part)
   const digits = (rounded < 0n ? -rounded : rounded).toLocaleString('ko-KR')
-  return `${negative ? `(${digits})` : digits}${unit ? '원' : ''}`
+  const signed = negative ? `-${digits}` : digits
+  return `${signed}${unit ? '원' : ''}`
 }

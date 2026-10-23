@@ -66,6 +66,12 @@ public enum FgcErrorCode {
             "error.transaction.attributionBeforeContract"
     ),
 
+    TRAN_009(
+            "FGC-TRAN-009",
+            HttpStatus.CONFLICT,
+            "error.transaction.deleteLinked"
+    ),
+
     CONT_001(
             "FGC-CONT-001",
             HttpStatus.CONFLICT,

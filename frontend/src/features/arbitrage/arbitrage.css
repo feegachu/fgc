@@ -61,10 +61,6 @@
   border-color: var(--color-status-review-border);
 }
 
-.arb-summary-review .kpi-value {
-  color: var(--color-status-review-text);
-}
-
 .arb-content-grid {
   align-items: start;
 }

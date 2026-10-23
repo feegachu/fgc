@@ -12,6 +12,21 @@ import java.util.Optional;
 
 public interface AuditLogQueryService {
 
+    /** 정렬 없이(발생 시각 내림차순) 조회한다. */
+    default PageResponse<AuditLogResponse> search(
+            String entityType,
+            String entityId,
+            Long userId,
+            String action,
+            LocalDate from,
+            LocalDate to,
+            int page,
+            int size
+    ) {
+        return search(entityType, entityId, userId, action, from, to, null, page, size);
+    }
+
+    /** sort 는 {@code key,asc|desc} 형식이며(#604) 비어 있으면 발생 시각 내림차순이다. */
     PageResponse<AuditLogResponse> search(
             String entityType,
             String entityId,
@@ -19,6 +34,7 @@ public interface AuditLogQueryService {
             String action,
             LocalDate from,
             LocalDate to,
+            String sort,
             int page,
             int size
     );

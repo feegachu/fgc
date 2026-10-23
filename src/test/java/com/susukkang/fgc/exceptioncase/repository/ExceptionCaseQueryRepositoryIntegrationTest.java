@@ -128,6 +128,50 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void 허용된_컬럼으로_양방향_정렬하고_동률은_고정하며_다른_값은_거부한다() {
+        // 심각도·제목·검출 횟수를 달리한 건과 같은 값(동률)을 섞는다. 기본 3건은 setUp 이 만든다.
+        insertCase("CAP_VIOLATION", "NEW", "HIGH", "IT 정렬B-" + suffix);
+        insertCase("CAP_VIOLATION", "IN_REVIEW", "WARNING", "IT 정렬B-" + suffix);
+        insertCase("RECONCILIATION_MISMATCH", "NEW", "CRITICAL", "IT 정렬A-" + suffix);
+        insertCase("RECONCILIATION_MISMATCH", "RESOLVED", "HIGH", "IT 정렬C-" + suffix);
+        jdbcTemplate.update("UPDATE fgc.exception_case SET detection_count = 1 + (exception_case_id % 3), "
+                + "last_detected_at = now() - (exception_case_id % 4) * interval '1 day' WHERE exception_key LIKE ?",
+                "IT:" + suffix + ":%");
+        Map<String, String> columns = Map.of(
+                "exceptionCaseId", "ec.exception_case_id",
+                "severity", "CASE ec.severity WHEN 'CRITICAL' THEN 3 WHEN 'HIGH' THEN 2 WHEN 'WARNING' THEN 1 ELSE 0 END",
+                "contractNo", "ic.contract_no", "title", "ec.title", "assigneeLoginId", "assignee.login_id",
+                "lastDetectedAt", "ec.last_detected_at", "detectionCount", "ec.detection_count");
+        assertThat(ExceptionCaseQueryRepository.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        for (var column : columns.entrySet()) {
+            for (String direction : List.of("asc", "desc")) {
+                List<Long> expected = jdbcTemplate.queryForList("""
+                        SELECT ec.exception_case_id FROM fgc.exception_case ec
+                          LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = ec.contract_id
+                          LEFT JOIN fgc.app_user assignee ON assignee.user_id = ec.assigned_to
+                         WHERE ic.contract_no = ?
+                         ORDER BY %s %s NULLS LAST, ec.created_at DESC, ec.exception_case_id DESC
+                        """.formatted(column.getValue(), direction), Long.class, contractNo);
+                var criteria = ExceptionCaseSearchDTO.builder().contractNo(contractNo)
+                        .sort(column.getKey() + "," + direction).build();
+                assertThat(repository.search(criteria, List.of(), 0, 100))
+                        .extracting(ExceptionCaseSearchRow::exceptionCaseId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                assertThat(repository.search(criteria, List.of(), 3, 3))
+                        .extracting(ExceptionCaseSearchRow::exceptionCaseId)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+        // 정렬을 주지 않으면 기존 순서(심각도 높은 순 → 최근 생성 순)를 그대로 쓴다.
+        assertThat(ExceptionCaseQueryRepository.sortOf(ExceptionCaseSearchDTO.builder().build())).isNull();
+        for (String sort : List.of("status,asc", "title,sideways", "title", "title;DROP,asc")) {
+            var criteria = ExceptionCaseSearchDTO.builder().sort(sort).build();
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> ExceptionCaseQueryRepository.sortOf(criteria))
+                    .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+        }
+    }
+
+    @Test
     void OPEN_필터는_신규와_검토중만_조회한다() {
         var rows = repository.search(ExceptionCaseSearchDTO.builder().contractNo(contractNo).build(),
                 ExceptionStatus.dbStatuses("OPEN"), 0, 100);
@@ -465,7 +509,7 @@ class ExceptionCaseQueryRepositoryIntegrationTest {
                 occurrenceRows.getOrDefault(row.exceptionCaseId(), List.of()),
                 actionRows.getOrDefault(row.exceptionCaseId(), List.of()))).toList();
         return new ExceptionCaseSearchResponse(summary, content, 1, size, total,
-                (int) ((total + size - 1) / size), "severity,asc,createdAt,desc");
+                (int) ((total + size - 1) / size), "severity,desc");
     }
 
     /** JPA 저장·벌크 조치와 조회를 연결해도 관리 엔티티의 이전 상태를 반환하지 않는다. */

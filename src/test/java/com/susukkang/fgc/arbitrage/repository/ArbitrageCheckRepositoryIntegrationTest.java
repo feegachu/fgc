@@ -36,6 +36,64 @@ class ArbitrageCheckRepositoryIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /** #604 허용 컬럼의 양방향 정렬을 DB 의 같은 정렬과 비교한다. 같은 값(동률)과 비어 있는 값을 섞는다. */
+    @Test
+    void sortsByEachAllowedColumnInBothDirectionsAcrossPages() {
+        TestReference reference = testReference();
+        Long validationRunId = insertValidationRun();
+        for (int i = 0; i < 8; i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO fgc.arbitrage_check (
+                        validation_run_id, contract_id, payment_stage, as_of_date, contract_month_no,
+                        cumulative_paid_premium, paid_commission_amount, planned_commission_amount,
+                        included_surrender_value_amount, refund_addition_applied_yn, surrender_value_source_type,
+                        net_difference_amount, standard_deduction_80_yn, result_status, calculation_snapshot)
+                    VALUES (?, ?, 'GA_TO_FC', ?, ?, ?, ?, ?, ?, ?, ?, ?, false, 'CLEAR', '{}'::jsonb)
+                    """, validationRunId, reference.contractId(), LocalDate.of(2098, 11, 1 + i),
+                    1 + i % 3, 100000 + (i % 4) * 1000, 50000 + (i % 3) * 100, 70000 + (i % 5) * 100,
+                    i % 2 == 0 ? 0 : 5000 + (i % 3) * 10,
+                    i % 2 != 0, i % 2 == 0 ? "NOT_APPLICABLE" : "ACTUAL", (i % 4) * 100 - 150);
+        }
+        java.util.Map<String, String> columns = java.util.Map.of(
+                "contractNo", "c.contract_no", "asOfDate", "ac.as_of_date",
+                "contractMonthNo", "ac.contract_month_no", "cumulativePaidPremium", "ac.cumulative_paid_premium",
+                "paidCommissionAmount", "ac.paid_commission_amount",
+                "plannedCommissionAmount", "ac.planned_commission_amount",
+                "includedSurrenderValueAmount", "ac.included_surrender_value_amount",
+                "netDifferenceAmount", "ac.net_difference_amount");
+        assertThat(ArbitrageCheckQueriesImpl.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
+        for (var column : columns.entrySet()) {
+            for (String direction : List.of("asc", "desc")) {
+                List<Long> expected = jdbcTemplate.queryForList("""
+                        SELECT ac.arbitrage_check_id
+                          FROM (SELECT DISTINCT ON (contract_id, payment_stage, as_of_date) *
+                                  FROM fgc.arbitrage_check
+                                 ORDER BY contract_id, payment_stage, as_of_date, arbitrage_check_id DESC) ac
+                          JOIN fgc.insurance_contract c ON c.contract_id = ac.contract_id
+                         WHERE ac.as_of_date >= ? AND ac.as_of_date < ? AND ac.payment_stage = 'GA_TO_FC'
+                           AND c.contract_no = ?
+                         ORDER BY %s %s NULLS LAST, ac.arbitrage_check_id DESC
+                        """.formatted(column.getValue(), direction), Long.class,
+                        LocalDate.of(2098, 11, 1), LocalDate.of(2098, 12, 1), reference.contractNo());
+                ArbitrageCheckSearchCondition condition = condition(TEST_MONTH, null, PaymentStage.GA_TO_FC, null);
+                condition.setContractNo(reference.contractNo());
+                condition.setSort(column.getKey() + "," + direction);
+                assertThat(arbitrageCheckRepository.selectByCondition(condition, 0, 100))
+                        .extracting(ArbitrageCheckView::getArbitrageCheckId)
+                        .as("%s %s", column.getKey(), direction).containsExactlyElementsOf(expected);
+                assertThat(arbitrageCheckRepository.selectByCondition(condition, 3, 3))
+                        .extracting(ArbitrageCheckView::getArbitrageCheckId)
+                        .containsExactlyElementsOf(expected.stream().skip(3).limit(3).toList());
+            }
+        }
+        for (String raw : List.of("resultStatus,asc", "asOfDate,sideways", "asOfDate", "asOfDate;DROP,asc")) {
+            ArbitrageCheckSearchCondition bad = condition(TEST_MONTH, null, PaymentStage.GA_TO_FC, null);
+            bad.setSort(raw);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> arbitrageCheckRepository.selectByCondition(bad, 0, 20))
+                    .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+        }
+    }
+
     /**
      * 설명 : 정산월과 지급단계 조건으로 목록과 판정별 요약 건수를 조회한다.
      *

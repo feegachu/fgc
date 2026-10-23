@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryResponse;
 import com.susukkang.fgc.reconciliation.dto.ReconciliationRunHistoryRow;
@@ -18,7 +19,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +27,6 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
     private static final int MIN_PAGE = 1;
     private static final int MIN_SIZE = 1;
     private static final int MAX_SIZE = 100;
-    private static final Set<String> SUPPORTED_SORTS = Set.of("createdAt,asc", "createdAt,desc");
 
     private final ReconciliationRunHistoryRepository reconciliationRunHistoryRepository;
 
@@ -41,9 +40,8 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
         if (size < MIN_SIZE || size > MAX_SIZE) {
             throw invalid("size");
         }
-        if (!SUPPORTED_SORTS.contains(sort)) {
-            throw invalid("sort");
-        }
+        ListSort listSort = ListSort.parse(sort, ReconciliationRunHistoryRepository.SORT_KEYS,
+                ReconciliationRunHistoryRepository.DEFAULT_SORT);
 
         long offsetLong = (long) (page - 1) * size;
         if (offsetLong > Integer.MAX_VALUE) {
@@ -51,17 +49,16 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
         }
         int offset = (int) offsetLong;
 
-        String direction = sort.endsWith(",asc") ? "asc" : "desc";
 
         List<ReconciliationRunHistoryResponse> content = reconciliationRunHistoryRepository
-                .search(criteria.settlementMonth(), criteria.paymentStage(), criteria.insurerId(), direction, offset, size)
+                .search(criteria.settlementMonth(), criteria.paymentStage(), criteria.insurerId(), listSort, offset, size)
                 .stream()
                 .map(this::toResponse)
                 .toList();
         long total = reconciliationRunHistoryRepository.count(
                 criteria.settlementMonth(), criteria.paymentStage(), criteria.insurerId());
 
-        return PageResponse.of(content, page, size, total, sort);
+        return PageResponse.of(content, page, size, total, listSort.value());
     }
 
     private static FgcBusinessException invalid(String field) {

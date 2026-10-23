@@ -138,6 +138,12 @@ if (typeof module !== "undefined" && module.exports) {
         if (sequence !== requestSequence) return;
         var pageData = envelope && envelope.data;
         if (!pageData || !Array.isArray(pageData.content)) throw new Error("Invalid transaction page response");
+        if (state.page > Math.max(1, number(pageData.totalPages))) {
+          state.page = Math.max(1, number(pageData.totalPages));
+          updateUrl();
+          load();
+          return;
+        }
         renderRows(pageData.content);
         renderPagination(pageData);
       })
@@ -208,6 +214,7 @@ if (typeof module !== "undefined" && module.exports) {
 
   function appendActionCell(row, item) {
     var cell = document.createElement("td");
+    cell.className = "is-center";
     if (item.status === "DRAFT") {
       if (canProcess) {
         var link = document.createElement("a");
@@ -227,6 +234,24 @@ if (typeof module !== "undefined" && module.exports) {
         disabledButton.setAttribute("aria-label", (item.sourceBusinessKey || "선택한 지급 건") + " 수정 (조회 전용 권한)");
         cell.appendChild(disabledButton);
       }
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-ghost transaction-delete";
+      remove.textContent = "삭제";
+      remove.disabled = !canProcess || item.sourceType !== "GA_MANUAL_PAYMENT";
+      remove.setAttribute("aria-label", (item.sourceBusinessKey || "선택한 지급 건") + " 삭제" + (canProcess ? "" : " (조회 전용 권한)"));
+      remove.addEventListener("click", function () {
+        if (remove.disabled || !window.confirm((item.sourceBusinessKey || "선택한 지급 건") + " · " + format.won(item.amount) + " 초안을 삭제하시겠습니까? 삭제한 초안은 복구할 수 없습니다.")) return;
+        remove.disabled = true;
+        apiClient.request("/api/v1/transactions/" + encodeURIComponent(item.commissionTransactionId), { method: "DELETE" })
+          .then(function () { toast("지급 초안을 삭제했습니다.", "success"); load(); })
+          .catch(function (error) {
+            toast(format.errorText(error, "초안을 삭제하지 못했습니다."), "error");
+            remove.disabled = false;
+            load();
+          });
+      });
+      cell.appendChild(remove);
     } else {
       cell.textContent = "-";
     }

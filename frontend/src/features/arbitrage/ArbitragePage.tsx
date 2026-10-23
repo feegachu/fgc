@@ -9,9 +9,10 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { int } from '../../lib/format'
+import { sortBinding } from '../../lib/tableSort'
 import { useInsurerOptions } from '../base/api'
 import { QueryState } from '../reference/ReferenceUI'
-import { arbitrageListQuery, criteriaFromParams } from './api'
+import { ARBITRAGE_SORT_KEYS, arbitrageListQuery, criteriaFromParams } from './api'
 import type { Criteria, ArbitrageRow } from './api'
 import { columns } from './columns'
 import { ArbitrageBadge } from './badges'
@@ -193,6 +194,7 @@ export default function ArbitragePage() {
               caption="검색 조건에 해당하는 계약별 차익거래 판정"
               className="arb-list-table"
               columns={columns}
+              {...sortBinding(criteria.sort, ARBITRAGE_SORT_KEYS, (sort) => patch({ sort }))}
               rows={rows}
               rowKey={(row) => String(row.arbitrageCheckId)}
               selectedKeys={selected ? [String(selected.arbitrageCheckId)] : []}

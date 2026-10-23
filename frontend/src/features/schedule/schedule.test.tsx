@@ -150,7 +150,13 @@ describe('1차 schedule-list.test.cjs 이전', () => {
       purpose: 'OPERATIONAL',
       status: '',
       page: 1,
+      sort: '',
     })
+  })
+  it('#604 허용된 정렬만 요청에 싣고 나머지는 서버 기본 정렬로 되돌린다', () => {
+    expect(criteriaFromParams(new URLSearchParams('sort=total,desc')).sort).toBe('total,desc')
+    expect(criteriaFromParams(new URLSearchParams('sort=status,asc')).sort).toBe('')
+    expect(criteriaFromParams(new URLSearchParams('sort=total')).sort).toBe('')
   })
 })
 
@@ -184,7 +190,7 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
     // 서버 라벨이 비면 코드표로 대체한다.
     expect(within(table).getByText('원수사→GA')).toBeInTheDocument()
     expect(within(table).getByText('1,500,000원')).toBeInTheDocument()
-    expect(within(table).getByText('(1,517,944)원')).toHaveClass('is-negative-amount')
+    expect(within(table).getByText('-1,517,944원')).toHaveClass('is-negative-amount')
     expect(within(table).getByText('미사용')).toBeInTheDocument()
     expect(within(table).getByText('확정').querySelector('.schedule-badge-lock')).not.toBeNull()
     expect(screen.getByText('41')).toBeInTheDocument()
@@ -224,6 +230,29 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
       expect(blob).toHaveBeenCalledWith('/api/v1/schedules/export.csv?purpose=OPERATIONAL', expect.anything()),
     )
     await waitFor(() => expect(toasts()).toContain('예상 스케줄 CSV를 내려받았습니다.'))
+  })
+
+  it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건·CSV에 유지한다', async () => {
+    const { router, actions } = renderAt('/schedules?month=2026-07&contractNo=C-1&page=2', (url) =>
+      url.startsWith('/api/v1/schedules?') ? listPage([header(11)], { page: 2, totalPages: 3 }) : undefined,
+    )
+    const table = await screen.findByRole('table', { name: '예상 지급 스케줄 검색 결과' })
+    // 순서 기준이 없는 상태 컬럼은 정렬 버튼이 없고, 정렬 가능한 컬럼은 방향 표시를 가진다.
+    expect(within(table).queryByRole('button', { name: '상태' })).toBeNull()
+    expect(within(table).getByRole('columnheader', { name: /예상 총액/ })).toHaveAttribute('aria-sort', 'none')
+    await actions.click(within(table).getByRole('button', { name: '예상 총액' }))
+    await waitFor(() => expect(query(calls('/api/v1/schedules?').at(-1)!.url).sort).toBe('total,asc'))
+    expect(query(calls('/api/v1/schedules?').at(-1)!.url).contractNo).toBe('C-1')
+    expect(new URLSearchParams(router.state.location.search).has('page')).toBe(false)
+    expect(within(table).getByRole('columnheader', { name: /예상 총액/ })).toHaveAttribute('aria-sort', 'ascending')
+    await actions.click(within(table).getByRole('button', { name: '예상 총액' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=total%2Cdesc'))
+    expect(within(table).getByRole('columnheader', { name: /예상 총액/ })).toHaveAttribute('aria-sort', 'descending')
+    const blob = vi.spyOn(apiClient, 'requestBlob').mockResolvedValue({ blob: new Blob(['a']), disposition: null })
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} }))
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    await actions.click(screen.getByRole('button', { name: /CSV 내보내기/ }))
+    await waitFor(() => expect(String(blob.mock.calls.at(-1)![0])).toContain('sort=total%2Cdesc'))
   })
 
   it('범위를 넘은 page 는 마지막 페이지로 바꿔 다시 조회하고, 운영 스케줄 중복을 경고한다', async () => {
@@ -283,7 +312,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     expect(within(lines).getByText('1,000.1234%')).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '요율' })).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '정액' })).toBeInTheDocument()
-    expect(within(lines).getAllByText('(100,000)원')[0]).toHaveClass('is-negative-amount')
+    expect(within(lines).getAllByText('-100,000원')[0]).toHaveClass('is-negative-amount')
     // 합계는 서버 expectedTotal 이다.
     expect(lines.querySelector('tfoot')).toHaveTextContent('합계 (2줄)1,500,000원')
     const versionTable = await screen.findByRole('table', { name: '같은 계약의 스케줄 버전 이력' })

@@ -9,9 +9,17 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
+import { sortBinding } from '../../lib/tableSort'
 import { date, int, usageRate, won } from '../../lib/format'
 import { useWorkspaceStore } from '../../stores/workspace'
-import { capInsurersQuery, capListQuery, capOrganizationsQuery, criteriaFromParams, FILTER_KEYS } from './api'
+import {
+  CAP_SORT_KEYS,
+  capInsurersQuery,
+  capListQuery,
+  capOrganizationsQuery,
+  criteriaFromParams,
+  FILTER_KEYS,
+} from './api'
 import type { CapAgent, CapCriteria, CapItem, CapStage } from './api'
 import { CapDetailModal } from './CapDetailModal'
 import { Amount, CapError, CapEvidence, CapStatus, CapUsage } from './badges'
@@ -76,6 +84,8 @@ export default function CapListPage() {
     {
       key: 'contract',
       label: '계약번호',
+      sortKey: 'contractNo',
+      sortable: true,
       width: '12rem',
       render: (row) =>
         row.contractId == null ? (
@@ -90,10 +100,19 @@ export default function CapListPage() {
       width: '9rem',
       render: (row) => row.paymentStageLabel || STAGES[row.paymentStage as keyof typeof STAGES] || '—',
     },
-    { key: 'date', label: '기준일', width: '7rem', render: (row) => date(row.asOfDate) },
+    {
+      key: 'date',
+      label: '기준일',
+      sortKey: 'asOfDate',
+      sortable: true,
+      width: '7rem',
+      render: (row) => date(row.asOfDate),
+    },
     {
       key: 'premium',
       label: '기준 보험료',
+      sortKey: 'basePremiumAmount',
+      sortable: true,
       width: '8rem',
       align: 'number',
       render: (row) => <Amount value={row.basePremiumAmount} />,
@@ -101,6 +120,8 @@ export default function CapListPage() {
     {
       key: 'refund',
       label: '해약환급금 합산',
+      sortKey: 'refund12mAmount',
+      sortable: true,
       width: '9rem',
       align: 'number',
       render: (row) => (row.refund12mAmount === 0 ? '해당없음' : <Amount value={row.refund12mAmount} />),
@@ -108,6 +129,8 @@ export default function CapListPage() {
     {
       key: 'deduction',
       label: '준법경영비 공제',
+      sortKey: 'complianceDeductionAmount',
+      sortable: true,
       width: '9rem',
       align: 'number',
       render: (row) =>
@@ -115,11 +138,10 @@ export default function CapListPage() {
     },
     {
       key: 'limit',
-      label: (
-        <>
-          한도 <CapEvidence />
-        </>
-      ),
+      label: '한도',
+      labelExtra: <CapEvidence />,
+      sortKey: 'limitAmount',
+      sortable: true,
       width: '8rem',
       align: 'number',
       render: (row) => <Amount value={row.limitAmount} />,
@@ -127,6 +149,8 @@ export default function CapListPage() {
     {
       key: 'included',
       label: '산입금액',
+      sortKey: 'includedAmount',
+      sortable: true,
       width: '9rem',
       align: 'number',
       render: (row) => (
@@ -143,6 +167,8 @@ export default function CapListPage() {
     {
       key: 'remaining',
       label: '잔여',
+      sortKey: 'remainingAmount',
+      sortable: true,
       width: '8rem',
       align: 'number',
       render: (row) => <Amount value={row.remainingAmount} />,
@@ -150,6 +176,8 @@ export default function CapListPage() {
     {
       key: 'usage',
       label: '사용률',
+      sortKey: 'usagePct',
+      sortable: true,
       width: '14rem',
       render: (row) => <CapUsage value={row.usagePct} status={row.resultStatus} />,
     },
@@ -231,6 +259,7 @@ export default function CapListPage() {
           <DataTable
             caption="계약별 판정 목록"
             columns={columns}
+            {...sortBinding(criteria.sort, CAP_SORT_KEYS, (sort) => update({ sort, capCheckId: '' }))}
             rows={rows}
             rowKey={(row) => String(row.capCheckId)}
             onRowActivate={openDetail}
@@ -333,7 +362,7 @@ function StageCard({ stage }: { stage: CapStage }) {
   )
 }
 
-type Filters = Omit<CapCriteria, 'page' | 'size'>
+type Filters = Omit<CapCriteria, 'page' | 'size' | 'sort'>
 function CapFilter({
   initial,
   onSearch,

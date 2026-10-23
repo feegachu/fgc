@@ -162,7 +162,7 @@ describe('CONT-W02 계약 상세', () => {
     await screen.findByRole('cell', { name: '팀장' })
     expect(screen.getByRole('tab', { name: '예상 스케줄' })).toHaveAttribute('aria-selected', 'true')
     const fc = screen.getByRole('region', { name: 'GA→설계사' })
-    expect(within(fc).getByText('(12,500)원')).toHaveClass('is-negative-amount')
+    expect(within(fc).getByText('-12,500원')).toHaveClass('is-negative-amount')
     expect(calls('/status-events')).toHaveLength(0)
     expect(calls('/schedules?paymentStage=INSURER_TO_GA')).toHaveLength(1)
     expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
@@ -276,12 +276,14 @@ describe('CONT-W02 계약 상세', () => {
             journalHeaderId: 7,
             journalNo: 'JOURNAL-7',
             journalDate: '2026-07-02',
+            journalType: 'EXPECTED_FC_PAYOUT',
             debitTotal: 1000,
             creditTotal: 900,
             differenceAmount: 77,
             status: 'CONFIRMED',
             statusLabel: '서버 원장 확정',
           },
+          { journalHeaderId: 8, journalNo: 'JOURNAL-8', journalType: 'REVERSAL' },
         ]
       if (url.endsWith('/transactions'))
         return {
@@ -309,15 +311,19 @@ describe('CONT-W02 계약 상세', () => {
     })
     await screen.findByText('자료부족')
     expect(screen.queryByText('검토필요')).not.toBeInTheDocument()
-    expect(screen.getByText('(700)원')).toBeInTheDocument()
+    expect(screen.getByText('-700원')).toBeInTheDocument()
     await actions.click(screen.getByRole('tab', { name: '원장' }))
     await screen.findByRole('cell', { name: 'JOURNAL-7' })
     expect(screen.getByText('77원')).toBeInTheDocument()
     expect(screen.getByText('서버 원장 확정')).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '예상 지급(GA→설계사)' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '역분개' })).toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: 'EXPECTED_FC_PAYOUT' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('cell', { name: 'REVERSAL' })).not.toBeInTheDocument()
     await actions.click(screen.getByRole('tab', { name: '지급·대사' }))
     await screen.findByRole('cell', { name: '서버 대사 결과' })
     expect(screen.getByText('3원')).toBeInTheDocument()
-    expect(screen.getByText('(12)원')).toBeInTheDocument()
+    expect(screen.getByText('-12원')).toBeInTheDocument()
 
     // #589 수수료 지급 표에는 원천 컬럼이 없다.
     expect(screen.queryByRole('columnheader', { name: '원천' })).not.toBeInTheDocument()
