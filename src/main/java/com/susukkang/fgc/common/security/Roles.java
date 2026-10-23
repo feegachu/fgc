@@ -20,6 +20,14 @@ public final class Roles {
     public static final String GA_ADMIN = "GA_ADMIN";
     public static final String SETTLEMENT = "SETTLEMENT";
     public static final String COMPLIANCE = "COMPLIANCE";
+    public static final String AGENT = "AGENT";
+
+    /** FUN-085: 내부 업무 조회와 설계사 본인 업무를 명시적으로 구분한다. */
+    public static final String IS_AGENT = "hasRole('" + AGENT + "')";
+    public static final String CAN_USE_AGENT_WORKSPACE =
+            "hasAnyRole('" + AGENT + "','" + SYSTEM_ADMIN + "')";
+    public static final String CAN_VIEW_PUBLIC_PRODUCTS = "hasAnyRole('" + SYSTEM_ADMIN + "','" + GA_ADMIN
+            + "','" + SETTLEMENT + "','" + COMPLIANCE + "','" + AGENT + "')";
 
     /** 계약·지급·스케줄·검증실행 생성 등 "처리" 화면 공통 역할. 화면정의서 v2.0 §4-1/각 화면 권한 줄. */
     public static final String CAN_PROCESS =

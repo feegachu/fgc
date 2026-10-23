@@ -5,6 +5,7 @@ import com.susukkang.fgc.auth.dto.AuthTokenDtos.MeResponse;
 import com.susukkang.fgc.auth.dto.AuthTokenDtos.TokenResponse;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.auth.service.AuthTokenService;
+import com.susukkang.fgc.auth.service.FgcUserDetailsService;
 import com.susukkang.fgc.auth.service.AuthTokenService.IssuedTokens;
 import com.susukkang.fgc.auth.service.AuthTokenService.RefreshResult;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -22,6 +23,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.access.expression.SecurityExpressionRoot;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -59,13 +61,16 @@ public class AuthTokenController {
     private static final Expression CAN_FINALIZE_VALIDATION = PARSER.parseExpression(Roles.CAN_FINALIZE_VALIDATION);
 
     private final AuthTokenService authTokenService;
+    private final FgcUserDetailsService userDetailsService;
     private final AuthenticationConfiguration authenticationConfiguration;
     private final YearMonth demoMonth;
 
     public AuthTokenController(AuthTokenService authTokenService,
+                               FgcUserDetailsService userDetailsService,
                                AuthenticationConfiguration authenticationConfiguration,
                                @Value("${fgc.demo-month}") String demoMonth) {
         this.authTokenService = authTokenService;
+        this.userDetailsService = userDetailsService;
         this.authenticationConfiguration = authenticationConfiguration;
         this.demoMonth = YearMonth.parse(demoMonth);
     }
@@ -123,11 +128,20 @@ public class AuthTokenController {
     /** 세션·Bearer 어느 쪽으로 인증했든 principal 은 FgcUserDetails 다(FgcJwtAuthenticationConverter). */
     @GetMapping("/me")
     public ApiResponse<MeResponse> me(Authentication authentication) {
-        FgcUserDetails user = (FgcUserDetails) authentication.getPrincipal();
+        FgcUserDetails user;
+        try {
+            user = (FgcUserDetails) userDetailsService.loadUserByUsername(authentication.getName());
+            new AccountStatusUserDetailsChecker().check(user);
+        } catch (AuthenticationException exception) {
+            throw new FgcBusinessException(FgcErrorCode.AUTH_002);
+        }
+        Authentication current = UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities());
         StandardEvaluationContext context = new StandardEvaluationContext(
-                new SecurityExpressionRoot(authentication) { });
+                new SecurityExpressionRoot(current) { });
         return ApiResponse.success(new MeResponse(
                 user.getUsername(), user.getUserName(), user.getRoleCode(),
+                user.getAgentId(), Roles.AGENT.equals(user.getRoleCode()),
+                allowed(PARSER.parseExpression(Roles.CAN_USE_AGENT_WORKSPACE), context),
                 allowed(CAN_PROCESS, context),
                 allowed(CAN_VIEW_AUDIT_LOG, context),
                 allowed(CAN_HANDLE_EXCEPTION, context),

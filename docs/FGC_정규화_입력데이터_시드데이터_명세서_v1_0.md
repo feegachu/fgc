@@ -84,7 +84,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 
 따라서 현재 `db/demo`만 실행한 결과를 “25명·68계약 GOLDEN 완료”로 표시하지 않는다. 이 문서의 T001~T068(§24)는 전체 GOLDEN 구현을 위한 목표 명세이며, 해당 SQL과 기대값 파일이 추가되어야 완료된다.
 
-**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 정책(§35), AGENT 계정(§5), DAR-012 생성기(§50), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
+**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 정책(§35), DAR-012 생성기(§50), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
 
 ## 2. 시드 파일 구성
 
@@ -287,7 +287,7 @@ auth_refresh_token
 | `GA_ADMIN` | GA관리자 |
 | `SETTLEMENT` | 정산담당자 |
 | `COMPLIANCE` | 준법·감사 |
-| `AGENT` | 설계사 (2차, FUN-085 — 아직 없음) |
+| `AGENT` | 설계사 (2차, FUN-085 — #634 V62 추가) |
 
 ### GOLDEN 사용자
 
@@ -297,13 +297,13 @@ auth_refresh_token
 | `gaadmin` | GA_ADMIN | 정책·조직 조회 |
 | `settle01` | SETTLEMENT | 정산 실행·예외처리 |
 | `audit01` | COMPLIANCE | 조회 전용 |
-| `agent01` | AGENT | (2차, 아직 없음) `app_user.agent_id` = 설계사 1명. 본인 범위만 조회 |
+| `agent01` | AGENT | (2차, V62) `app_user.agent_id` = `A-FC-001`. 본인 범위만 조회 |
 
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
 
-- **AGENT 역할·`agent01`(2차)**: 새 demo 마이그레이션(V57 이후)으로 넣는다. 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정, 팀 확인 필요. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
-- **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 네 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
-- **보호·검증을 보장할 수 없으면 배포 중단**: 신한 prd에서 `db/demo`를 제외하고 별도 기준정보·정책·보호된 계정 이관 절차를 마련한다. 이미 데모가 적재된 DB는 locations 변경만으로 계정이 없어지지 않으므로 기존 4개 계정 보호 검증도 필요하다. 새 시드·문서·PR·배포 로그에는 평문 비밀번호를 남기지 않는다. 현 배포 스크립트에 이 보호 단계가 구현됐다는 뜻은 아니며 S44의 배포 검증에서 증명해야 한다(SRC-065).
+- **AGENT 역할·`agent01`(2차)**: `db/demo/V62__seed_agent_role_and_account.sql`로 추가한다(#634). 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정이며 #634의 V62에서 기본 연결로 적용한다. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
+- **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01`·`agent01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 다섯 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
+- **보호·검증을 보장할 수 없으면 배포 중단**: 신한 prd에서 `db/demo`를 제외하고 별도 기준정보·정책·보호된 계정 이관 절차를 마련한다. 이미 데모가 적재된 DB는 locations 변경만으로 계정이 없어지지 않으므로 기존 계정과 agent01의 보호 검증도 필요하다. 새 시드·문서·PR·배포 로그에는 평문 비밀번호를 남기지 않는다. 현 배포 스크립트에 이 보호 단계가 구현됐다는 뜻은 아니며 S44의 배포 검증에서 증명해야 한다(SRC-065).
 
 ## 6. 조직
 

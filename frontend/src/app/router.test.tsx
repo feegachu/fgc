@@ -52,6 +52,19 @@ function renderAt(path: string, roleCode = 'SETTLEMENT') {
   return router
 }
 describe('AppShell·라우트', () => {
+  it('AGENT의 관리자 홈 직접 접근은 관리자 API 호출 없이 본인 계약 목록으로 이동한다', async () => {
+    const router = renderAt('/', 'AGENT')
+    await screen.findByRole('heading', { name: '보험계약 목록' })
+    expect(router.state.location.pathname).toBe('/contracts')
+    const paths = vi.mocked(apiClient.request).mock.calls.map(([path]) => path)
+    expect(paths.some((path) => /dashboard|home\/summary|base\/agents|base\/organizations/.test(path))).toBe(false)
+    expect(screen.queryByRole('link', { name: '업무 대시보드' })).not.toBeInTheDocument()
+  })
+  it('AGENT가 저장된 내부 화면 URL로 들어가도 업무 화면을 호출하지 않는다', async () => {
+    renderAt('/journals', 'AGENT')
+    await screen.findByRole('heading', { name: '403 · 권한 없음' })
+    expect(vi.mocked(apiClient.request).mock.calls.some(([path]) => path.startsWith('/api/v1/journals'))).toBe(false)
+  })
   it.each(['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN'])(
     '%s 역할의 감사로그 메뉴는 서버 권한 플래그를 따른다',
     async (role) => {
