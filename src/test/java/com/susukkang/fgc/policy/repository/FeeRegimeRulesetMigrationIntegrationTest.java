@@ -11,7 +11,7 @@ import java.sql.DriverManager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** V53(#534): 분급 룰셋 테이블 제약과 정책버전 잠금. */
+/** V59(#534): 분급 룰셋 테이블 제약과 정책버전 잠금. */
 class FeeRegimeRulesetMigrationIntegrationTest {
     private static final String URL = "jdbc:tc:postgresql:17:///fgc_fee_regime_ruleset";
 
