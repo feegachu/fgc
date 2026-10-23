@@ -71,6 +71,14 @@ public final class Dar012ReportWriter {
         return json;
     }
 
+    /** 검증 결과(배치 시간·파생 건수·정답표 비교·조회 p95). 측정값이라 결정적 메타데이터와 별도 파일에 둔다. */
+    public static Path writeVerification(String datasetId, Path outputDir, Map<String, Object> verification) throws IOException {
+        Files.createDirectories(outputDir);
+        Path json = outputDir.resolve(datasetId + "-verification.json");
+        Files.writeString(json, MAPPER.writeValueAsString(verification) + "\n", StandardCharsets.UTF_8);
+        return json;
+    }
+
     public static String answersCsv(Dar012Plan plan) {
         StringBuilder sb = new StringBuilder("contract_no,scenario,expected_result_type,expected_amount,note\n");
         for (AnswerRow a : plan.answers()) {

@@ -68,8 +68,28 @@ public class Dar012Loader {
             throw new IllegalStateException("계약 기간 전체를 덮는 원수사→GA 1,200% 룰셋이 1건으로 정해지지 않는다: " + caps.size()
                     + "건 (V58 적용 여부를 확인한다)");
         }
+        // 월 통합검증은 상품·납입기간·채널로 예상 해약환급률표를 찾는다. 표가 없는 납입기간의 계약은 REVIEW_REQUIRED가 되므로
+        // 계약 납입기간은 보험사의 현행 판매버전 상품에 연결된 활성 환급률표의 값을 그대로 쓴다.
+        Map<String, Integer> terms = new HashMap<>();
+        for (String insurerCode : Dar012Planner.INSURER_CODES) {
+            List<Integer> found = jdbc.queryForList("""
+                    SELECT DISTINCT rt.payment_term_months
+                      FROM refund_rate_table rt
+                      JOIN policy_version pv ON pv.policy_version_id = rt.policy_version_id AND pv.status = 'ACTIVE'
+                      JOIN product p ON p.product_id = rt.product_id
+                      JOIN insurer i ON i.insurer_id = p.insurer_id
+                      JOIN product_offering po ON po.product_id = p.product_id
+                     WHERE i.insurer_code = ? AND rt.channel_code = po.channel_code AND po.fee_regime_code = 'CURRENT'
+                       AND po.active_yn AND po.sales_start_date <= ? AND (po.sales_end_date IS NULL OR po.sales_end_date >= ?)
+                    """, Integer.class, insurerCode, Date.valueOf(windowStart), Date.valueOf(windowEnd));
+            if (found.size() != 1) {
+                throw new IllegalStateException("현행 판매버전 상품의 예상 해약환급률표 납입기간이 1개로 정해지지 않는 보험사: "
+                        + insurerCode + " (" + found.size() + "개)");
+            }
+            terms.put(insurerCode, found.get(0));
+        }
         return new PolicyRefs(new Dar012Planner.PolicyInputs((BigDecimal) rates.get(0).get("rate_pct"),
-                (BigDecimal) caps.get(0).get("premium_multiplier")),
+                (BigDecimal) caps.get(0).get("premium_multiplier"), Map.copyOf(terms)),
                 ((Number) rates.get(0).get("policy_version_id")).longValue(),
                 ((Number) caps.get(0).get("cap_rule_item_id")).longValue());
     }
@@ -105,16 +125,17 @@ public class Dar012Loader {
             batch("""
                     INSERT INTO agent(organization_id, agent_code, agent_name, rank_code, appointment_date, termination_date,
                                       agent_status, latest_registration_date, active_yn)
-                    VALUES (?, ?, ?, 'FC', ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, plan.agents(), (ps, a) -> {
                 ps.setLong(1, org.get(a.orgCode()));
                 ps.setString(2, a.code());
                 ps.setString(3, a.name());
-                ps.setDate(4, Date.valueOf(a.appointmentDate()));
-                ps.setDate(5, a.terminationDate() == null ? null : Date.valueOf(a.terminationDate()));
-                ps.setString(6, a.status());
-                ps.setDate(7, Date.valueOf(a.appointmentDate()));
-                ps.setBoolean(8, "ACTIVE".equals(a.status()));
+                ps.setString(4, a.rankCode());
+                ps.setDate(5, Date.valueOf(a.appointmentDate()));
+                ps.setDate(6, a.terminationDate() == null ? null : Date.valueOf(a.terminationDate()));
+                ps.setString(7, a.status());
+                ps.setDate(8, Date.valueOf(a.appointmentDate()));
+                ps.setBoolean(9, "ACTIVE".equals(a.status()));
             });
             Map<String, Long> agent = idMap("SELECT agent_code, agent_id FROM agent WHERE starts_with(agent_code, 'D12-A-')");
 

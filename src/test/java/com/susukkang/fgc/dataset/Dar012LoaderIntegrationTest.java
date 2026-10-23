@@ -39,10 +39,10 @@ class Dar012LoaderIntegrationTest {
         var dataSource = new DriverManagerDataSource(postgres.getJdbcUrl() + "&currentSchema=fgc", "fgc", PASSWORD);
         jdbc = new JdbcTemplate(dataSource);
         loader = new Dar012Loader(jdbc, new TransactionTemplate(new DataSourceTransactionManager(dataSource)));
-        properties = new Dar012Properties("D12-IT", 20261118L, CONTRACTS, LocalDate.of(2026, 9, 10), tempDir);
+        properties = new Dar012Properties("D12-IT", 20261118L, CONTRACTS, LocalDate.of(2026, 9, 10), tempDir, false, null, null);
         long goldenContractsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM insurance_contract", Long.class);
         goldenContracts = goldenContractsBefore;
-        metadataFile = Dar012Runner.generate(loader, properties);
+        metadataFile = Dar012Runner.generate(loader, properties).metadataFile();
     }
 
     private long goldenContracts;

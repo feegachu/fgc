@@ -25,7 +25,7 @@ public record Dar012Plan(
 
     public record OrgRow(String code, String name, String type, String parentCode) {}
 
-    public record AgentRow(String code, String name, String orgCode, String status,
+    public record AgentRow(String code, String name, String orgCode, String rankCode, String status,
                            LocalDate appointmentDate, LocalDate terminationDate) {}
 
     public record AgentCodeRow(String insurerCode, String agentCode, String insurerAgentCode) {}

@@ -16,7 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class Dar012PlannerTest {
     private static final LocalDate BASE = LocalDate.of(2026, 9, 10);
     private static final Dar012Planner.PolicyInputs POLICY =
-            new Dar012Planner.PolicyInputs(new BigDecimal("900.000000"), new BigDecimal("12.0000"));
+            new Dar012Planner.PolicyInputs(new BigDecimal("900.000000"), new BigDecimal("12.0000"),
+                    java.util.Map.of("FGL01", 240, "FGL02", 240, "FGL03", 120, "FGL04", 120, "FGN01", 240));
 
     private Dar012Plan plan(long seed, int contracts) {
         return Dar012Planner.plan("TEST", seed, contracts, BASE, POLICY);
@@ -54,7 +55,7 @@ class Dar012PlannerTest {
         Dar012Plan p = plan(20261118L, 3000);
         Set<String> numbers = new HashSet<>();
         p.contracts().forEach(c -> assertThat(numbers.add(c.contractNo())).isTrue());
-        Set<String> active = p.agents().stream().filter(a -> "ACTIVE".equals(a.status()))
+        Set<String> active = p.agents().stream().filter(a -> "ACTIVE".equals(a.status()) && "FC".equals(a.rankCode()))
                 .map(Dar012Plan.AgentRow::code).collect(Collectors.toSet());
         assertThat(p.contracts()).allSatisfy(c -> {
             assertThat(active).contains(c.agentCode());
