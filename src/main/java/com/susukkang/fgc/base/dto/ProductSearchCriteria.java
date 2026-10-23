@@ -9,8 +9,13 @@ public record ProductSearchCriteria(
         LocalDate asOf,
         boolean includeExpired,
         boolean includeHistorical,
-        String sort
+        String sort,
+        String keyword,
+        Long selectedId
 ) {
+    public ProductSearchCriteria(long insurerId, LocalDate asOf, boolean includeExpired, boolean includeHistorical, String sort) {
+        this(insurerId, asOf, includeExpired, includeHistorical, sort, null, null);
+    }
     /** 기존 기준정보·계약 입력은 기준일에 판매 중인 버전만 조회한다. */
     public ProductSearchCriteria(long insurerId, LocalDate asOf) {
         this(insurerId, asOf, false);

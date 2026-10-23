@@ -31,7 +31,7 @@ export interface paths {
          * 감사로그 조회
          * @description 누가 언제 무엇을 바꿨는지 검색합니다. userLoginId 가 null 인 행은 배치 발 감사행(화면 표기 BATCH)입니다.
          */
-        get: operations["search_9"];
+        get: operations["search_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -155,7 +155,7 @@ export interface paths {
          * 보험설계사 기준정보 조회·선택 (IF-API-07)
          * @description 기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.
          */
-        get: operations["search_8"];
+        get: operations["search_9"];
         put?: never;
         post?: never;
         delete?: never;
@@ -176,6 +176,26 @@ export interface paths {
          * @description 기준일자에 사용 가능한 수수료 항목과 사용기간을 조회합니다. 1,200% 산입 여부는 룰셋별 cap_rule_item에서 결정합니다.
          */
         get: operations["findCommissionItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base/commission-items/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 수수료 항목 검색형 선택
+         * @description 기존 asOf 목록 응답은 유지하고 검색·페이지·선택 ID 재조회를 제공합니다.
+         */
+        get: operations["search_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1435,6 +1455,11 @@ export interface components {
         };
         ApiResponsePageResponseAuditLogResponse: {
             data?: components["schemas"]["PageResponseAuditLogResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseCommissionItemResponse: {
+            data?: components["schemas"]["PageResponseCommissionItemResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3212,6 +3237,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseCommissionItemResponse: {
+            content?: components["schemas"]["CommissionItemResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseCommissionPaymentListResponse: {
             content?: components["schemas"]["CommissionPaymentListResponse"][];
             /** Format: int32 */
@@ -3758,10 +3795,19 @@ export interface components {
             statusLabel?: string;
         };
         ScheduleLineResponse: {
+            /** Format: date */
+            attributionDate?: string;
             basisAmount?: number;
             basisCode?: string;
+            /** Format: int64 */
+            beneficiaryAgentId?: number;
             calculationType?: string;
+            cashflowType?: string;
+            /** Format: int64 */
+            commissionItemId?: number;
             commissionItemName?: string;
+            /** Format: int64 */
+            contractId?: number;
             /** Format: int32 */
             contractMonthNo?: number;
             /** Format: date */
@@ -3935,7 +3981,7 @@ export interface operations {
             };
         };
     };
-    search_9: {
+    search_10: {
         parameters: {
             query?: {
                 /**
@@ -4132,9 +4178,11 @@ export interface operations {
             };
         };
     };
-    search_8: {
+    search_9: {
         parameters: {
             query: {
+                /** @description 기존 선택 설계사 ID 재조회. 위촉기간 조건은 유지 */
+                selectedId?: number;
                 /** @description 소속 조직 ID */
                 organizationId?: number;
                 /** @description 설계사 코드 또는 이름 검색어 */
@@ -4200,6 +4248,33 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListCommissionItemResponse"];
+                };
+            };
+        };
+    };
+    search_8: {
+        parameters: {
+            query: {
+                asOf: string;
+                keyword?: string;
+                cashflowType?: string;
+                selectedId?: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseCommissionItemResponse"];
                 };
             };
         };
@@ -4284,6 +4359,10 @@ export interface operations {
     search_5: {
         parameters: {
             query: {
+                /** @description 상품명·상품코드·판매버전 부분 검색 */
+                keyword?: string;
+                /** @description 기존 선택 판매버전 ID 재조회. 기준일·보험회사 조건은 유지 */
+                selectedId?: number;
                 /**
                  * @description 보험회사 ID
                  * @example 2
