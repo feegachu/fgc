@@ -11,7 +11,7 @@ import java.sql.DriverManager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** V52(#534): 분급 룰셋 테이블 제약과 정책버전 잠금. */
+/** V53(#534): 분급 룰셋 테이블 제약과 정책버전 잠금. */
 class FeeRegimeRulesetMigrationIntegrationTest {
     private static final String URL = "jdbc:tc:postgresql:17:///fgc_fee_regime_ruleset";
 
@@ -88,6 +88,21 @@ class FeeRegimeRulesetMigrationIntegrationTest {
             insertRulesetWithDocumentPeriod(jdbc, sevenPolicyId, "2026-07-01", "2026-12-31");
             assertThatThrownBy(() -> insertRulesetWithDocumentPeriod(jdbc, sevenPolicyId, "2026-06-01", "2026-07-31"))
                     .isInstanceOf(DataIntegrityViolationException.class);
+
+            // 룰셋이 달린 정책버전의 체계 값을 어긋나게 바꾸는 것은 거부, 일치하는 값으로의 변경은 허용
+            assertThatThrownBy(() -> jdbc.update(
+                    "UPDATE fgc.policy_version SET policy_type = 'SEVEN_YEAR_COMMISSION' WHERE policy_version_id = ?", policyId))
+                    .hasMessageContaining("no longer matches");
+            assertThatThrownBy(() -> jdbc.update(
+                    "UPDATE fgc.policy_version SET fee_regime_code = 'SEVEN_YEAR_2029' WHERE policy_version_id = ?", policyId))
+                    .hasMessageContaining("no longer matches");
+            assertThatThrownBy(() -> jdbc.update(
+                    "UPDATE fgc.policy_version SET basic_document_version = 'BD-OTHER' WHERE policy_version_id = ?", policyId))
+                    .hasMessageContaining("no longer matches");
+            assertThat(jdbc.update("""
+                    UPDATE fgc.policy_version SET fee_regime_code = 'FOUR_YEAR_2027', basic_document_version = 'BD-2027-01'
+                     WHERE policy_version_id = ?
+                    """, policyId)).isEqualTo(1);
 
             // 승인된 정책 아래 룰셋·한도·경과조치는 변경 불가
             jdbc.update("""

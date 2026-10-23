@@ -1,5 +1,5 @@
 -- ============================================================================
--- V52: 분급 룰셋 데이터 모델 (FUN-014-01, #534)
+-- V53: 분급 룰셋 데이터 모델 (FUN-014-01, #534)
 --
 -- 왜: 4년(2027)·7년(2029) 분급의 회차 수·월 요율·매월 동일 금액 조건·장기유지수수료·
 --     계약체결비용 한도·경과조치를 코드 상수가 아니라 버전 데이터로 둔다(COR-004).
@@ -235,3 +235,42 @@ $$;
 CREATE TRIGGER trg_fee_regime_ruleset_policy_match
 BEFORE INSERT OR UPDATE ON fgc.fee_regime_ruleset
 FOR EACH ROW EXECUTE FUNCTION fgc.check_fee_regime_ruleset_policy();
+
+-- ----------------------------------------------------------------------------
+-- 반대 방향 재검사: 룰셋이 달린 정책버전의 체계 값(policy_type·fee_regime_code·basic_document_version)을
+-- 바꿀 때도 같은 일치 조건을 지킨다. DRAFT/REVIEW 에서는 이 값을 고칠 수 있으므로,
+-- 고친 뒤 룰셋과 어긋난 채로 승인·잠금되는 일이 없게 한다.
+-- 룰셋 쪽 트리거가 정책 행을 FOR SHARE 로 읽으므로 두 방향은 행 잠금으로 직렬화된다.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fgc.check_policy_version_fee_regime_ruleset()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_ruleset_id bigint;
+BEGIN
+  SELECT r.fee_regime_ruleset_id
+    INTO v_ruleset_id
+    FROM fgc.fee_regime_ruleset r
+   WHERE r.policy_version_id = NEW.policy_version_id
+     AND NOT (
+           ((NEW.policy_type = 'FOUR_YEAR_COMMISSION'  AND r.fee_regime_code = 'FOUR_YEAR_2027')
+         OR (NEW.policy_type = 'SEVEN_YEAR_COMMISSION' AND r.fee_regime_code = 'SEVEN_YEAR_2029'))
+         AND (NEW.fee_regime_code IS NULL OR NEW.fee_regime_code = r.fee_regime_code)
+         AND (NEW.basic_document_version IS NULL OR NEW.basic_document_version = r.basic_document_version)
+         )
+   ORDER BY r.fee_regime_ruleset_id
+   LIMIT 1;
+
+  IF FOUND THEN
+    RAISE EXCEPTION 'Policy version % cannot change type/fee regime/document version: fee regime ruleset % no longer matches',
+      NEW.policy_version_id, v_ruleset_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_policy_version_fee_regime_ruleset_match
+BEFORE UPDATE OF policy_type, fee_regime_code, basic_document_version ON fgc.policy_version
+FOR EACH ROW EXECUTE FUNCTION fgc.check_policy_version_fee_regime_ruleset();
