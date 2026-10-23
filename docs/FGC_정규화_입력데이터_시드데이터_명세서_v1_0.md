@@ -76,7 +76,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 
 | 구분 | 현재 상태 |
 |---|---|
-| 데모 시드 파일 | V3(GOLDEN 축소본), V4(검증 시나리오 14건), V6_1(원수사→GA 룰셋 보정), V8(환산코드 변경), V17_1(COMPLIANCE 표시명), V34(A-TL-002), V42(STD-SAV-A 환급률표), V45_1(시행 후 차익거래 계약 2건 `FGC-FGL02-202603-0475`·`FGC-FGL01-202603-0475`, REG-12·REG-19), V46(CAP 정책 v2 — CLAWBACK 사유 교정 #478), V49(TM 판매버전·G3 삭제, SRC-036), V52(CAP 정책 v3 — 정착지원금 모집월 #525), V56(ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 #480) |
+| 데모 시드 파일 | V3(GOLDEN 축소본), V4(검증 시나리오 14건), V6_1(원수사→GA 룰셋 보정), V8(환산코드 변경), V17_1(COMPLIANCE 표시명), V34(A-TL-002), V42(STD-SAV-A 환급률표), V45_1(시행 후 차익거래 계약 2건 `FGC-FGL02-202603-0475`·`FGC-FGL01-202603-0475`, REG-12·REG-19), V46(CAP 정책 v2 — CLAWBACK 사유 교정 #478), V49(TM 판매버전·G3 삭제, SRC-036), V52(CAP 정책 v3 — 정착지원금 모집월 #525), V56(ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 #480), V65(4년·7년 분급 규제 상한 룰셋 `REG-FOUR-YEAR-2027-V1`·`REG-SEVEN-YEAR-2029-V1` #538) |
 | 시나리오 식별 | V3의 C001~C006 별칭과 V4의 R1~R8·A1~A3·G1·G2(G3은 V49로 삭제). 아래 목표 구간 T001~T068과 다르다(§24). 현행 정답은 §31-1 |
 | 현재 수수료 규칙 | 보험회사→GA 900%@1·8%@2~12, GA→FC FC 650%@1·관리자 40/30/20%@1·시책 100%@1·유지 5%@2~12 (`INS-CUR-2026-V1`·`GA-CUR-2026-V1`). 운영정책서 제19·20조 패턴(1,485%·740%)의 축소판 |
 | 정착지원금 | 현재 210,000원(2건에 105,000원씩). 아래 2,400,000원/4,000,000원은 전체 GOLDEN 목표 |
@@ -84,7 +84,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 
 따라서 현재 `db/demo`만 실행한 결과를 “25명·68계약 GOLDEN 완료”로 표시하지 않는다. 이 문서의 T001~T068(§24)는 전체 GOLDEN 구현을 위한 목표 명세이며, 해당 SQL과 기대값 파일이 추가되어야 완료된다.
 
-**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 정책(§35), AGENT 계정(§5), DAR-012 생성기(§50), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
+**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 GA 지급률 정책(`commission_rule`·계약체결비용 `policy_parameter`, #649·#651; 규제 상한 룰셋은 V65로 적재), AGENT 계정(§5), DAR-012 생성기(§50), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
 
 ## 2. 시드 파일 구성
 
@@ -107,6 +107,7 @@ src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀
   V49    TM 판매버전·G3 삭제(SRC-036)
   V52    현행 CAP 정책 v3 — 정착지원금 모집월 사유 교정(#525)
   V56    ARB-APPLICABILITY-2026 v2 — 환급금 합산 기간 파라미터(#480)
+  V65    4년·7년 분급 규제 상한 룰셋(REGULATORY, 한도 행 포함, #538)
 src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 등) — 아직 없음
 ```
 
@@ -462,9 +463,28 @@ AGENT_MISMATCH 시나리오는 실제명세에 존재하지 않거나 다른 설
 
 - G1(적재됨): 계약일 2027-03-02, 판매버전 `2026-CURRENT-A`(CURRENT) → **분급 미적용(현행 체계)**. 계약연도만 보고 4년 분급으로 정하면 오답이다. 2026-10-22에 `REVIEW_REQUIRED`에서 정정했다(SRC-022 `:5096`·SRC-025 Q4, 운영정책서 제45조). V4 파일의 "전부 REVIEW_REQUIRED" 주석은 고치지 않으므로(SRC-027 D-04) 이 문서가 기준이다.
 - G2(적재됨): 계약일 2026-11-10이 판매개시일 2027-01-01보다 이른 `2027-FOUR-YEAR` → `REVIEW_REQUIRED`·`POLICY_MISSING` (데이터를 고치지 않는다, V4)
-- 목표(미적재): 계약일 2029년·`FOUR_YEAR_2027` 판매버전
+- 목표(미적재): 계약일 2029년·`FOUR_YEAR_2027` 판매버전 (FR6은 테스트 픽스처로 확인한다)
 
 자동으로 새 체계로 확정하지 않고 `REVIEW_REQUIRED` 기대값을 사용한다.
+
+**경계 샘플 FR1~FR12 (테스트 픽스처 — `db/demo`에 넣지 않음, #538)**: `FeeRegimeBoundarySampleIntegrationTest`가 G1 계약과 판매버전 값을 테스트 안에서만 바꿔 만든다(롤백). 판정표(운영정책서 제45조)와 1:1이다.
+
+| ID | 계약일 | 판매개시일 | 기초서류 버전·작성/변경일 | 선언 체계 | 기대 결과 |
+|---|---|---|---|---|---|
+| FR1 | 2027-03-02 | 2027-01-01 | BD-2027-01 · 2026-12-01 | FOUR | 4년 룰셋 `SELECTED` |
+| FR2 (=G1) | 2027-03-02 | 2026-01-01 | BD-2026-01 · 2026-01-01 | CURRENT | `NOT_APPLICABLE` |
+| FR3 | 2027-03-02 | 2027-01-01 | BD-2026-02 · 2026-02-01 | FOUR | `REVIEW_REQUIRED` (`REGIME_NOT_ELIGIBLE`) |
+| FR4 | 2027-03-02 | 2026-12-31 | BD-2026-12 · 2026-12-01 | FOUR | `REVIEW_REQUIRED` (`REGIME_NOT_ELIGIBLE`) |
+| FR5 (=G2 유형) | 2026-11-10 | 2027-01-01 | BD-2027-01 · 2027-01-01 | FOUR | `REVIEW_REQUIRED` (`CONTRACT_OUTSIDE_SALES_PERIOD`) |
+| FR6 | 2029-03-02 | 2027-01-01 | BD-2027-01 · 2026-12-01 | FOUR | `REVIEW_REQUIRED` (`FOUR_YEAR_AFTER_SPECIAL_PERIOD`, 특례 종료 기준 미확정) |
+| FR7 | 2029-03-02 | 2029-01-01 | BD-2029-01 · 2028-12-01 | SEVEN | 7년 룰셋 `SELECTED` (84회·장기유지 61~84차월) |
+| FR8 | 2028-03-02 | 2028-01-01 | BD-2028-01 · 2027-12-01 | SEVEN | `REVIEW_REQUIRED` (`SEVEN_YEAR_IN_SPECIAL_PERIOD`) |
+| FR9 | 2027-03-02 | 2027-01-01 | BD-2027-01 · 2026-03-01 | FOUR | 4년 룰셋 `SELECTED` (시행일 당일 작성 포함) |
+| FR10 | FR1과 같음 | FR1과 같음 | FR1과 같음 | FOUR | FR1과 같은 결과 (판매버전 `channel_code`만 다름, SRC-036) |
+| FR11 | 2027-03-02 | 2027-01-01 | BD-2027-01 · 2026-12-01 | CURRENT | `REVIEW_REQUIRED` (`CURRENT_BUT_ELIGIBLE`) |
+| FR12 | 2027-03-02 | 2026-07-01(판매종료일 없음) | BD-2026-07 · 2026-07-01 | CURRENT | `REVIEW_REQUIRED` (`OFFERING_NOT_UNIQUE`, 같은 상품에 2027-01-01 판매개시 FOUR 판매버전 존재) |
+
+V65 룰셋: 4년 — 판매개시일 2027-01-01~2028-12-31, 기초서류 BD-2027-01, 최대 48회, 한도 선지급 총액 100%·유지관리 월 1.5%·유지관리 총액 100%. 7년 — 판매개시일 2029-01-01부터, 기초서류 버전 무관, 최대 84회, 장기유지 61~84차월, 한도 선지급 총액 100%·유지관리 월 0.8%·유지관리 총액 100%·장기유지 월 0.4%. 한도율은 계약체결비용 대비 %이며 '계약체결비용 이내'는 100으로 옮겼다. 61차월 시작은 `PROJECT_ASSUMPTION`(운영정책서 제47조)이다.
 
 ---
 
