@@ -168,6 +168,8 @@ CREATE TABLE compare_explanation (
   recommended_offering_id bigint   NOT NULL REFERENCES product_offering(product_offering_id),
   compared_offering_ids jsonb      NOT NULL,
   customer_selected_offering_ids jsonb,
+  rank_set_key        varchar(100),
+  rank_as_of          date,
   selection_criteria  varchar(2000) NOT NULL,
   recommendation_reason varchar(2000) NOT NULL,
   fee_level_note      varchar(1000) NOT NULL,
@@ -176,8 +178,11 @@ CREATE TABLE compare_explanation (
   generated_document_id bigint REFERENCES generated_document(generated_document_id),
   created_at          timestamptz  NOT NULL DEFAULT clock_timestamp(),
   updated_at          timestamptz  NOT NULL DEFAULT clock_timestamp(),
+  CONSTRAINT ck_compare_explanation_rank CHECK ((rank_set_key IS NULL) = (rank_as_of IS NULL)),
   CONSTRAINT ck_compare_explanation_exception CHECK ((industry_exception_ref IS NULL) = (industry_exception_confirmed_by IS NULL))
 );
+COMMENT ON COLUMN compare_explanation.rank_set_key IS '초안 저장 시 서버가 정한 순위 비교 집합(commission_grade.rank_set_key). 맞는 자료가 없으면 rank_as_of와 함께 NULL (IF-API-66A)';
+COMMENT ON COLUMN compare_explanation.rank_as_of IS '순위 기준일(commission_grade.data_as_of). 확인서 생성 시 비교 상품 집합과 이 값을 저장된 판으로 다시 검사한다 (IF-API-67)';
 COMMENT ON TABLE compare_explanation IS '설계사 비교설명 초안·기록 — 판 번호로 저장하고 확인서는 같은 판으로만 생성. 비교 상품·계약자 선택 상품·선정기준·추천사유·수수료 수준. generated_document_id 는 최근 생성 PDF, 수령은 compare_confirmation_receipt(PDF 판마다). 고객 개인정보 없음(2차 제안, FUN-079, D-05)';
 
 CREATE TABLE compare_confirmation_receipt (
@@ -299,3 +304,39 @@ CREATE TABLE ai_call_log (
   requested_at        timestamptz  NOT NULL DEFAULT clock_timestamp()
 );
 COMMENT ON TABLE ai_call_log IS '외부 LLM 호출 기록 — 원문·개인정보 미저장(2차 제안, SER-013·PER-008)';
+
+-- ---------------------------------------------------------------- DB 가드(이력 불변·updated_at)
+CREATE OR REPLACE FUNCTION fgc.reject_confirmed_draft_row_change()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD.row_status = 'CONFIRMED' THEN
+    RAISE EXCEPTION 'intake_draft_row % is confirmed; UPDATE/DELETE is not allowed', OLD.intake_draft_row_id;
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_intake_draft_row_confirmed_immutable
+BEFORE UPDATE OR DELETE ON intake_draft_row
+FOR EACH ROW EXECUTE FUNCTION fgc.reject_confirmed_draft_row_change();
+CREATE TRIGGER trg_inquiry_action_append_only
+BEFORE UPDATE OR DELETE ON inquiry_action
+FOR EACH ROW EXECUTE FUNCTION fgc.reject_update_delete();
+CREATE TRIGGER trg_clawback_notice_delivery_append_only
+BEFORE UPDATE OR DELETE ON clawback_notice_delivery
+FOR EACH ROW EXECUTE FUNCTION fgc.reject_update_delete();
+CREATE TRIGGER trg_compare_confirmation_receipt_append_only
+BEFORE UPDATE OR DELETE ON compare_confirmation_receipt
+FOR EACH ROW EXECUTE FUNCTION fgc.reject_update_delete();
+
+CREATE TRIGGER trg_intake_document_updated_at BEFORE UPDATE ON intake_document
+FOR EACH ROW EXECUTE FUNCTION fgc.set_updated_at();
+CREATE TRIGGER trg_compare_explanation_updated_at BEFORE UPDATE ON compare_explanation
+FOR EACH ROW EXECUTE FUNCTION fgc.set_updated_at();
+CREATE TRIGGER trg_notice_updated_at BEFORE UPDATE ON notice
+FOR EACH ROW EXECUTE FUNCTION fgc.set_updated_at();

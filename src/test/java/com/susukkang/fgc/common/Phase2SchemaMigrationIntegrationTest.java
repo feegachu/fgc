@@ -14,7 +14,7 @@ import java.sql.SQLException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** 이슈 #632: V57 2차 신규 테이블·statement_batch 판 관리 제약을 실제 PostgreSQL에서 확인한다. */
+/** 이슈 #632: V58 2차 신규 테이블·statement_batch 판 관리 제약을 실제 PostgreSQL에서 확인한다. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Phase2SchemaMigrationIntegrationTest {
     private static final String PASSWORD = "fgc_test_only";
@@ -140,6 +140,22 @@ class Phase2SchemaMigrationIntegrationTest {
             } finally {
                 conn.rollback();
             }
+        }
+    }
+
+    @Test
+    void installsHistoryGuardsAndRankSetColumns() throws Exception {
+        try (var conn = connect()) {
+            assertThat(scalar(conn, """
+                    SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgname IN (
+                    'trg_intake_draft_row_confirmed_immutable','trg_inquiry_action_append_only',
+                    'trg_clawback_notice_delivery_append_only','trg_compare_confirmation_receipt_append_only',
+                    'trg_intake_document_updated_at','trg_compare_explanation_updated_at','trg_notice_updated_at')"""))
+                    .isEqualTo(7L);
+            assertThat(scalar(conn, """
+                    SELECT count(*) FROM information_schema.columns WHERE table_schema = 'fgc'
+                    AND table_name = 'compare_explanation' AND column_name IN ('rank_set_key','rank_as_of')"""))
+                    .isEqualTo(2L);
         }
     }
 
