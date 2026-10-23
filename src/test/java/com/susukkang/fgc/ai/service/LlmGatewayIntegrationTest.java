@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -188,6 +189,25 @@ class LlmGatewayIntegrationTest {
 
         assertThat(paths).isEmpty();
         assertThat(statusAndError()).containsExactly("FALLBACK_RULE:NO_API_KEY", "FALLBACK_RULE:INPUT_TOO_LARGE");
+    }
+
+    /** 호출자 트랜잭션이 롤백돼도 REQUIRES_NEW 로 남긴 호출 기록(이미 쓴 토큰)은 유지된다. */
+    @Test
+    void callLogSurvivesCallerRollback() {
+        LlmGateway gateway = gateway("test-key");
+        String outerMarker = marker + "-OUTER";
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            // 호출자 트랜잭션의 쓰기 — 롤백되는지 보는 대조군
+            jdbc.update("INSERT INTO ai_call_log (purpose, model_name, call_status, related_entity_type) "
+                    + "VALUES ('INTAKE_CLASSIFY', 'outer', 'SUCCESS', ?)", outerMarker);
+            gateway.call(request("문서"), DocKind.class);
+            status.setRollbackOnly();
+        });
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ai_call_log WHERE related_entity_type = ?",
+                Integer.class, outerMarker)).isZero();
+        assertThat(statusAndError()).containsExactly("SUCCESS:null");
     }
 
     private LlmGateway gateway(String apiKey) {
