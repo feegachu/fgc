@@ -91,7 +91,9 @@ class Phase2SchemaMigrationIntegrationTest {
                 execute(conn, insert.formatted(2));
                 execute(conn, "UPDATE fgc.statement_batch SET status = 'SUPERSEDED' WHERE version_no = 1 "
                         + "AND statement_batch_id = (SELECT min(statement_batch_id) FROM fgc.statement_batch)");
-                // 같은 이전 판을 대체하는 두 번째 후속본은 거절된다
+                // 같은 이전 판을 대체하는 두 번째 후속본은 거절된다.
+                // 같은 업무키·판이라 uq_statement_batch 와 uq_statement_batch_successor 가 함께 걸리고 어느 쪽이 먼저인지는
+                // 정해져 있지 않으므로 두 이름의 공통 접두어로 확인한다.
                 assertThatThrownBy(() -> execute(conn, insert.formatted(2)))
                         .hasMessageContaining("uq_statement_batch");
             } finally {
@@ -111,16 +113,16 @@ class Phase2SchemaMigrationIntegrationTest {
                         SELECT insurer_id, settlement_month, statement_type, %s, received_on, 'test',
                                %d, statement_batch_id
                         FROM fgc.statement_batch ORDER BY statement_batch_id LIMIT 1""";
-                assertRejected(conn, insert.formatted("external_statement_no", 5));
-                assertRejected(conn, insert.formatted("'OTHER-NO'", 2));
+                assertRejected(conn, insert.formatted("external_statement_no", 5), "must share the business key");
+                assertRejected(conn, insert.formatted("'OTHER-NO'", 2), "must share the business key");
                 execute(conn, insert.formatted("external_statement_no", 2));
                 // 적재 뒤 키·판 번호 컬럼을 바꾸는 우회도 막는다
-                assertRejected(conn, "UPDATE fgc.statement_batch SET version_no = 5 WHERE version_no = 2");
-                assertRejected(conn, "UPDATE fgc.statement_batch SET external_statement_no = 'OTHER-NO' WHERE version_no = 2");
+                assertRejected(conn, "UPDATE fgc.statement_batch SET version_no = 5 WHERE version_no = 2", "are immutable");
+                assertRejected(conn, "UPDATE fgc.statement_batch SET external_statement_no = 'OTHER-NO' WHERE version_no = 2", "are immutable");
                 // 후속본이 있는 이전 판의 업무키도 바꿀 수 없다
                 assertRejected(conn, "UPDATE fgc.statement_batch SET external_statement_no = 'OTHER-NO' "
                         + "WHERE statement_batch_id = (SELECT supersedes_statement_batch_id FROM fgc.statement_batch "
-                        + "WHERE version_no = 2)");
+                        + "WHERE version_no = 2)", "are immutable");
             } finally {
                 conn.rollback();
             }
@@ -134,7 +136,7 @@ class Phase2SchemaMigrationIntegrationTest {
             try {
                 String min = " WHERE statement_batch_id = (SELECT min(statement_batch_id) FROM fgc.statement_batch)";
                 execute(conn, "UPDATE fgc.statement_batch SET status = 'SUPERSEDED'" + min);
-                assertRejected(conn, "UPDATE fgc.statement_batch SET status = 'AVAILABLE'" + min);
+                assertRejected(conn, "UPDATE fgc.statement_batch SET status = 'AVAILABLE'" + min, "cannot be changed back");
             } finally {
                 conn.rollback();
             }
@@ -147,8 +149,8 @@ class Phase2SchemaMigrationIntegrationTest {
             conn.setAutoCommit(false);
             try {
                 seedIntakeDocument(conn);
-                assertRejected(conn, "UPDATE fgc.generated_document SET content_hash = 'changed'");
-                assertRejected(conn, "DELETE FROM fgc.generated_document");
+                assertRejected(conn, "UPDATE fgc.generated_document SET content_hash = 'changed'", "is append-only");
+                assertRejected(conn, "DELETE FROM fgc.generated_document", "is append-only");
             } finally {
                 conn.rollback();
             }
@@ -230,8 +232,8 @@ class Phase2SchemaMigrationIntegrationTest {
                 execute(conn, """
                         UPDATE fgc.intake_draft_row SET row_status = 'CONFIRMED', confirmed_at = now(),
                                result_entity_type = 'STATEMENT_LINE', result_entity_id = 1 WHERE row_no = 1""");
-                assertRejected(conn, "UPDATE fgc.intake_draft_row SET edited_fields = '{}' WHERE row_no = 1");
-                assertRejected(conn, "DELETE FROM fgc.intake_draft_row WHERE row_no = 1");
+                assertRejected(conn, "UPDATE fgc.intake_draft_row SET edited_fields = '{}' WHERE row_no = 1", "is confirmed");
+                assertRejected(conn, "DELETE FROM fgc.intake_draft_row WHERE row_no = 1", "is confirmed");
                 // 남은 행은 계속 고치거나 제외할 수 있다
                 execute(conn, "UPDATE fgc.intake_draft_row SET edited_fields = '{}' WHERE row_no = 2");
                 execute(conn, "UPDATE fgc.intake_draft_row SET exclude_reason = 'again' WHERE row_no = 3");
@@ -257,8 +259,8 @@ class Phase2SchemaMigrationIntegrationTest {
                                (SELECT min(agent_id) FROM fgc.agent), DATE '2026-09-01', 'FIRST', 'POST', 'ref',
                                (SELECT min(user_id) FROM fgc.app_user)""";
                 execute(conn, insertFirst);
-                assertRejected(conn, "DELETE FROM fgc.clawback_notice_delivery");
-                assertRejected(conn, "UPDATE fgc.clawback_notice_delivery SET evidence_ref = 'x'");
+                assertRejected(conn, "DELETE FROM fgc.clawback_notice_delivery", "is append-only");
+                assertRejected(conn, "UPDATE fgc.clawback_notice_delivery SET evidence_ref = 'x'", "is append-only");
                 assertThatThrownBy(() -> execute(conn, insertFirst)).isInstanceOf(SQLException.class)
                         .hasMessageContaining("uq_clawback_notice_first");
             } finally {
@@ -272,14 +274,19 @@ class Phase2SchemaMigrationIntegrationTest {
         try (var conn = connect()) {
             conn.setAutoCommit(false);
             try {
-                seedIntakeDocument(conn);
+                execute(conn, """
+                        INSERT INTO fgc.generated_document(document_no, document_kind, source_entity_type, source_entity_id,
+                                                           storage_key, content_hash, created_by)
+                        SELECT 'TEST-CONFIRM', 'COMPARE_CONFIRMATION', 'COMPARE_EXPLANATION', 1, 'doc-key', 'doc-hash',
+                               min(user_id)
+                        FROM fgc.app_user""");
                 execute(conn, """
                         INSERT INTO fgc.compare_confirmation_receipt(generated_document_id, received_on,
                                                                      receipt_confirmed_by, paper_storage_ref)
                         SELECT generated_document_id, DATE '2026-09-01', (SELECT min(user_id) FROM fgc.app_user), 'ref'
-                        FROM fgc.generated_document WHERE document_no = 'TEST-DOC'""");
-                assertRejected(conn, "UPDATE fgc.compare_confirmation_receipt SET paper_storage_ref = 'x'");
-                assertRejected(conn, "DELETE FROM fgc.compare_confirmation_receipt");
+                        FROM fgc.generated_document WHERE document_no = 'TEST-CONFIRM'""");
+                assertRejected(conn, "UPDATE fgc.compare_confirmation_receipt SET paper_storage_ref = 'x'", "is append-only");
+                assertRejected(conn, "DELETE FROM fgc.compare_confirmation_receipt", "is append-only");
 
                 execute(conn, """
                         INSERT INTO fgc.inquiry(inquiry_kind, target_type, target_id, agent_id, content, due_date, created_by)
@@ -289,8 +296,8 @@ class Phase2SchemaMigrationIntegrationTest {
                         INSERT INTO fgc.inquiry_action(inquiry_id, action_seq, action_type, acted_by)
                         SELECT min(inquiry_id), 1, 'START_REVIEW', (SELECT min(user_id) FROM fgc.app_user)
                         FROM fgc.inquiry""");
-                assertRejected(conn, "UPDATE fgc.inquiry_action SET message = 'x'");
-                assertRejected(conn, "DELETE FROM fgc.inquiry_action");
+                assertRejected(conn, "UPDATE fgc.inquiry_action SET message = 'x'", "is append-only");
+                assertRejected(conn, "DELETE FROM fgc.inquiry_action", "is append-only");
             } finally {
                 conn.rollback();
             }
@@ -327,7 +334,7 @@ class Phase2SchemaMigrationIntegrationTest {
                         SELECT DATE '2026-09-01', (SELECT min(agent_id) FROM fgc.agent),
                                (SELECT compare_product_group_id FROM fgc.compare_product_group WHERE group_code = 'TEST-GRP'),
                                (SELECT min(product_offering_id) FROM fgc.product_offering), '[1]', 'c', 'r', 'f'""");
-                execute(conn, "UPDATE fgc.compare_explanation SET fee_level_note = 'g'");
+                execute(conn, "UPDATE fgc.compare_explanation SET fee_level_note = 'g', version_no = version_no + 1");
                 assertThat(scalar(conn, "SELECT count(*) FROM fgc.compare_explanation WHERE updated_at > created_at"))
                         .isEqualTo(1L);
             } finally {
@@ -336,11 +343,15 @@ class Phase2SchemaMigrationIntegrationTest {
         }
     }
 
-    /** 실패한 문장이 트랜잭션 전체를 중단시키지 않도록 savepoint 안에서 거절을 확인한다. */
-    private static void assertRejected(Connection conn, String sql) throws SQLException {
+    /**
+     * 실패한 문장이 트랜잭션 전체를 중단시키지 않도록 savepoint 안에서 거절을 확인한다.
+     * FK·CHECK 같은 다른 오류로 실패해도 통과하지 않도록 기대한 가드의 메시지까지 확인한다.
+     */
+    private static void assertRejected(Connection conn, String sql, String expectedMessage) throws SQLException {
         var savepoint = conn.setSavepoint();
         try {
-            assertThatThrownBy(() -> execute(conn, sql)).isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> execute(conn, sql)).isInstanceOf(SQLException.class)
+                    .hasMessageContaining(expectedMessage);
         } finally {
             conn.rollback(savepoint);
         }
