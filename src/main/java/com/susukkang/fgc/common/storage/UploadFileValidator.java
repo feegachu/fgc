@@ -211,7 +211,8 @@ public class UploadFileValidator {
     }
 
     private FgcBusinessException invalid() {
-        return new FgcBusinessException(FgcErrorCode.INTK_001, Map.of("max", maxBytes / 1024 / 1024));
+        return new FgcBusinessException(FgcErrorCode.INTK_001, Map.of("max", java.math.BigDecimal.valueOf(maxBytes)
+                .divide(java.math.BigDecimal.valueOf(1024L * 1024)).stripTrailingZeros().toPlainString()));
     }
 
     public record ValidatedFile(String originalName, String mediaType, byte[] bytes, String sha256) {

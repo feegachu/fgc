@@ -25,6 +25,7 @@ ECR-006·SER-005와 OI-021의 **개인정보 없는 합성 문서만** 받는 2�
 
 - pdf, xlsx, xls, csv, png, jpg/jpeg. 확장자·요청 MIME·실제 파서 결과가 모두 맞아야 한다. CSV는 Windows Excel의 application/vnd.ms-excel 및 application/csv 별칭도 받되 text/csv로 저장한다. MIME이 없거나 application/octet-stream이면 거절한다.
 - 파일명에 경로 구분자·드라이브 구문·제어문자·끝 공백/점 등을 허용하지 않는다. 크기 0, 보고된 크기와 읽은 크기의 차이, 상한 초과도 400 `FGC-INTK-001`이다.
+- 서블릿 multipart 파싱 중 파일/요청 상한을 넘으면 컨트롤러 선택 전에도 ApiMultipartExceptionResolver가 공통 핸들러를 재사용해 같은 400 JSON 봉투로 반환한다. API가 아닌 경로와 다른 예외는 기존 MVC/MPA 처리로 넘긴다. 실제 Tomcat HTTP에서 두 상한을 각각 검증한다.
 - PDFBox로 암호화·스크립트·자동 동작·첨부·외부 실행 동작을 거절한다. 순환 참조는 방문 집합으로 처리한다.
 - POI로 실제 xls/xlsx 구조를 확인한다. 합성 입력은 **값 전용** 정책이다: 수식·정의된 이름·매크로·외부 링크·내장 객체를 거절한다. 원본을 임의로 고쳐 저장하지 않는다. zip은 중복/경로 조작 엔트리, 4096개 초과 또는 전개 64MiB 초과를 거절하고 셀은 100만 개를 상한으로 둔다.
 - CSV는 UTF-8(BOM 허용), 제어문자 및 수식 주입을 거절한다. 음수 등 부호 있는 숫자는 허용한다. CP949 입력은 변환한 합성 UTF-8 파일로 다시 올려야 한다.
@@ -56,7 +57,7 @@ ECR-006·SER-005와 OI-021의 **개인정보 없는 합성 문서만** 받는 2�
 
 ## 재현 테스트
 
-`gradlew.bat test --tests '*UploadFileValidatorTest' --tests '*PrivateVolumeFileStorageTest' --tests '*IntakeFileServiceIntegrationTest' --tests '*GlobalExceptionHandlerTest'`
+`gradlew.bat test --tests '*UploadFileValidatorTest' --tests '*PrivateVolumeFileStorageTest' --tests '*IntakeFileServiceIntegrationTest' --tests '*MultipartLimitHttpIntegrationTest' --tests '*ApiMultipartExceptionResolverTest' --tests '*GlobalExceptionHandlerTest'`
 
 통합 테스트는 별도 일회성 PostgreSQL `fgc_files_637`과 `build/tmp/intake-637-*`만 사용한다. 원본 내용·메타데이터·감사, 동시 중복, 상위 롤백, 감사 실패, 보존기한·EXTRACTING 제외, 읽기/파기 경합, 삭제 실패 재시도, 작은 배치 반복을 확인한다. POSIX 권한·symlink 검사는 Linux CI에서, ACL 검사는 Windows에서 수행한다. 같은 볼륨의 다른 저장소 인스턴스에서 읽는 테스트가 재기동 보존을 검증하며 실제 배포 서버의 재배포·백업 리허설을 대신하지 않는다.
 

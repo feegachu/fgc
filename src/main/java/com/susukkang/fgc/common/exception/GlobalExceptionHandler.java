@@ -249,7 +249,8 @@ public class GlobalExceptionHandler {
             org.springframework.web.multipart.MaxUploadSizeExceededException exception) {
         long maxBytes = environment.getProperty("fgc.storage.max-file-bytes", Long.class, 20971520L);
         return handleBusinessException(new FgcBusinessException(FgcErrorCode.INTK_001,
-                Map.of("max", maxBytes / 1024 / 1024)));
+                Map.of("max", java.math.BigDecimal.valueOf(maxBytes).divide(java.math.BigDecimal.valueOf(1024L * 1024))
+                        .stripTrailingZeros().toPlainString())));
     }
 
     @ExceptionHandler(Exception.class)
