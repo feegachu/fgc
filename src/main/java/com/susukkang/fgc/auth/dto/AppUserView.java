@@ -25,4 +25,11 @@ public class AppUserView {
     private String userName;
     private String roleCode;
     private String accountStatus;
+    private Long agentId;
+
+    /** 기존 내부 사용자 fixture와의 생성자 호환. 설계사 인증 조회는 agentId까지 전달한다. */
+    public AppUserView(Long userId, String loginId, String passwordHash, String userName,
+                       String roleCode, String accountStatus) {
+        this(userId, loginId, passwordHash, userName, roleCode, accountStatus, null);
+    }
 }

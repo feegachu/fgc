@@ -2,11 +2,14 @@ package com.susukkang.fgc.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter;
+import com.susukkang.fgc.auth.service.FgcUserDetailsService;
 import com.susukkang.fgc.auth.service.JwtSessionRevokedException;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.common.security.AgentRequestAuthorization;
+import com.susukkang.fgc.common.security.SessionRoleValidationFilter;
 import com.susukkang.fgc.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,6 +32,7 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthen
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -146,7 +150,8 @@ public class SecurityConfig {
             HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
             ObjectProvider<JwtDecoder> jwtDecoder,
             ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
-            AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
+            AuthenticationEntryPoint bearerAuthenticationEntryPoint,
+            ObjectProvider<FgcUserDetailsService> sessionUsers, GlobalExceptionHandler errors, ObjectMapper mapper) throws Exception {
         bearerAndSession(http, jwtDecoder, jwtConverter, bearerAuthenticationEntryPoint);
         http
                 // 2026-08-12 yslee - 대사 실행 상태 변경 API에 CSRF 보호 적용
@@ -163,6 +168,8 @@ public class SecurityConfig {
                 // 2026-10-06 yslee - Bearer 요청만 CSRF 토큰 검사에서 면제(#400). 세션 요청은 그대로 검사한다.
                 .csrf(csrf -> csrf.ignoringRequestMatchers(BEARER_REQUEST))
                 .authorizeHttpRequests(auth -> auth
+                        // FUN-085: 새 AGENT에만 적용한다. 기존 4개 역할의 아래 규칙은 유지한다.
+                        .requestMatchers(AgentRequestAuthorization.IS_AGENT).access(AgentRequestAuthorization.SCOPED_READS)
                         // FUN-002(#82) — COMPLIANCE는 역할 정의(§4-1)상 "조회만". 컨트롤러
                         // @PreAuthorize를 빠뜨려도 최소한 이 굵은 규칙이 COMPLIANCE의 상태 변경
                         // 요청을 막는다. 세분화된 역할 구분(SETTLEMENT vs GA_ADMIN 등)은
@@ -176,6 +183,7 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                         .accessDeniedHandler(apiAccessDeniedHandler));
+        http.addFilterBefore(new SessionRoleValidationFilter(sessionUsers, errors, mapper), AuthorizationFilter.class);
         return http.build();
     }
 
@@ -197,7 +205,8 @@ public class SecurityConfig {
             HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
             ObjectProvider<JwtDecoder> jwtDecoder,
             ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
-            AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
+            AuthenticationEntryPoint bearerAuthenticationEntryPoint,
+            ObjectProvider<FgcUserDetailsService> sessionUsers, GlobalExceptionHandler errors, ObjectMapper mapper) throws Exception {
         bearerAndSession(http, jwtDecoder, jwtConverter, bearerAuthenticationEntryPoint);
         http
                 .securityMatcher("/api/**")
@@ -208,6 +217,7 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(AUTH_TOKEN_ENDPOINTS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, AUTH_TOKEN_ENDPOINTS).permitAll()
+                        .requestMatchers(AgentRequestAuthorization.IS_AGENT).access(AgentRequestAuthorization.SCOPED_READS)
                         // 감사로그 API(IF-API-52)는 아직 미구현이지만 구현 시점에 바로
                         // 적용되도록 선제 등록한다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/audit-logs/**")
@@ -222,6 +232,7 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                         .accessDeniedHandler(apiAccessDeniedHandler));
+        http.addFilterBefore(new SessionRoleValidationFilter(sessionUsers, errors, mapper), AuthorizationFilter.class);
         return http.build();
     }
 
@@ -233,12 +244,14 @@ public class SecurityConfig {
      */
     @Bean
     @Order(3)
-    public SecurityFilterChain webSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain webSecurityFilterChain(HttpSecurity http,
+            ObjectProvider<FgcUserDetailsService> sessionUsers, GlobalExceptionHandler errors, ObjectMapper mapper) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/assets/**", "/css/**", "/js/**",
                                 "/images/**", "/fonts/**", "/favicon.ico", "/error",
                                 "/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers(AgentRequestAuthorization.IS_AGENT).access(AgentRequestAuthorization.SCOPED_READS)
                         .requestMatchers(HttpMethod.GET, "/audit-logs")
                         .hasAnyRole(Roles.COMPLIANCE, Roles.SYSTEM_ADMIN)
                         // FUN-002(#82) 굵은 규칙 — protectedStateChangeApiSecurityFilterChain 주석 참고.
@@ -256,6 +269,7 @@ public class SecurityConfig {
                         .logoutSuccessUrl("/login?logout")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID"));
+        http.addFilterBefore(new SessionRoleValidationFilter(sessionUsers, errors, mapper), AuthorizationFilter.class);
         return http.build();
     }
 

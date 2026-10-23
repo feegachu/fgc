@@ -14,7 +14,7 @@ import { exportCsv } from '../../lib/exportCsv'
 import { sortBinding } from '../../lib/tableSort'
 import { date, int, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
-import { usePermission } from '../auth/useAuth'
+import { useAuth, usePermission } from '../auth/useAuth'
 import { useAgentOptions, useInsurerOptions, useOrganizationOptions, useProductOptions } from '../base/api'
 import type { Agent } from '../base/api'
 import { Amount, CapStatus } from '../cap/badges'
@@ -229,14 +229,15 @@ function ContractFilters({
     ),
   )
   const asOf = today()
+  const isAgent = useAuth().user?.roleCode === 'AGENT'
   const [agentOptionsRequested, setAgentOptionsRequested] = useState(Boolean(initial.agentId || initial.orgId))
   const insurers = useInsurerOptions()
-  const organizations = useOrganizationOptions(asOf, true, true)
+  const organizations = useOrganizationOptions(asOf, !isAgent, true)
   // 과거 계약 검색에는 판매가 종료된 버전도 포함한다. 등록·수정은 기본 조회를 사용한다.
   const products = useProductOptions(asOf, draft.insurerId, true, true, true)
   // 전체 설계사 이력은 많을 수 있으므로 목록 진입 시에는 조회하지 않는다.
   // 조직/설계사 URL 필터가 있거나 사용자가 선택 목록을 열 때 조회한다.
-  const agents = useAgentOptions(asOf, draft.orgId, agentOptionsRequested, true, true)
+  const agents = useAgentOptions(asOf, draft.orgId, !isAgent && agentOptionsRequested, true, true)
   const set = (key: string, value: string) => {
     if (key === 'orgId' && value) setAgentOptionsRequested(true)
     setDraft((current) => ({
@@ -338,7 +339,7 @@ function ContractFilters({
             draft.insurerId ? '전체' : '보험회사를 선택하세요',
             !draft.insurerId,
           )}
-          {select(
+          {!isAgent && select(
             'agentId',
             '모집 설계사',
             (agents.data ?? []).map((row) => ({ value: String(row.agentId), label: agentOptionLabel(row) })),
@@ -348,7 +349,7 @@ function ContractFilters({
             () => setAgentOptionsRequested(true),
             false,
           )}
-          {select(
+          {!isAgent && select(
             'orgId',
             '조직',
             (organizations.data ?? []).map((row) => ({

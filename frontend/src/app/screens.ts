@@ -177,8 +177,13 @@ export const screens: ScreenDefinition[] = [
 export const screenFor = (pathname: string) =>
   screens.find((screen) => matchPath({ path: screen.path, end: true }, pathname))
 // 화면 권한 판정은 여기 한 곳에서 한다. 권한 종류가 늘어도 호출부는 그대로다.
-export const canOpen = (screen: ScreenDefinition, user: Partial<Record<Permission, boolean>>) =>
-  !screen.permission || user[screen.permission] === true
+export const canOpen = (
+  screen: ScreenDefinition,
+  user: Partial<Record<Permission, boolean>> & { isAgent?: boolean; roleCode?: string },
+) => {
+  if ((user.isAgent || user.roleCode === 'AGENT') && !['CONT-W01', 'CONT-W02', 'TRAN-W01'].includes(screen.id)) return false
+  return !screen.permission || user[screen.permission] === true
+}
 export function legacyHref(screen: ScreenDefinition, pathname: string, search: string) {
   const params = matchPath(screen.path, pathname)?.params ?? {}
   return screen.legacy.replace(/:([a-z]+)/g, (_, key: string) => encodeURIComponent(params[key] ?? '')) + search
