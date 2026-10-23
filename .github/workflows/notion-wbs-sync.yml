@@ -1,0 +1,46 @@
+name: Sync Notion WBS
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [develop]
+  issues:
+    types: [closed, reopened]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview changes without updating Notion
+        type: boolean
+        default: true
+
+# Only default-branch automation is executed; PR code and artifacts are never used.
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+# Every run reconciles all tracked rows, so replacing a queued run loses no updates.
+concurrency:
+  group: notion-wbs-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Test synchronization rules
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_notion_wbs_sync.py' -v
+      - name: Reconcile merged issues with Notion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: 37b2f20a-c4dd-8210-b93b-01c8ea93ec5c
+          NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_WBS_DATA_SOURCE_ID }}
+          NOTION_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+        run: python3 -B .github/scripts/notion_wbs_sync.py
