@@ -31,7 +31,7 @@ public record FeeRegimeRulesetSelection(
             Long policyVersionId,
             String feeRegimeCode,
             LocalDate salesStartDateFrom,
-            LocalDate salesStartDateTo,      // 이 날짜(당일 포함)까지 판매를 시작한 상품에 적용 — 특례 종료일, 없으면 null
+            LocalDate salesStartDateTo,      // 이 날짜(당일 포함)까지 판매를 시작한 상품에 적용하는 판매개시일 구간 상한, 없으면 null
             String basicDocumentVersion,     // null 이면 모든 기초서류 버전
             LocalDate basicDocumentDateFrom,
             LocalDate basicDocumentDateTo,
@@ -57,8 +57,14 @@ public record FeeRegimeRulesetSelection(
         return limits.stream().filter(l -> l.limitCode().equals(limitCode)).findFirst();
     }
 
-    /** 이 룰셋의 특례기간(판매개시일 상한) 종료일. 없으면 비어 있다(#649가 사용). */
+    /**
+     * 4년 체계(FOUR_YEAR_2027) 룰셋의 판매개시일 구간 상한(당일 포함). 4년 체계가 아니거나 상한이 없으면 비어 있다(#649가 사용).
+     * 값은 판매개시일 기준 상한일 뿐이며, 특례 종료를 판매개시일·계약일·지급일 중 무엇으로 볼지는 미결이다(규제조문표 REG-04).
+     */
     public Optional<LocalDate> specialPeriodEnd() {
-        return ruleset == null ? Optional.empty() : Optional.ofNullable(ruleset.salesStartDateTo());
+        if (ruleset == null || !"FOUR_YEAR_2027".equals(ruleset.feeRegimeCode())) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(ruleset.salesStartDateTo());
     }
 }

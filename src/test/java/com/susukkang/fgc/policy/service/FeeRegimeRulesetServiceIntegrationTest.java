@@ -89,6 +89,7 @@ class FeeRegimeRulesetServiceIntegrationTest {
                 contractId);
         long policyId = insertDraftPolicy("TEST-SVC-7Y", "SEVEN_YEAR_COMMISSION");
         long rulesetId = insertRuleset(policyId, "SEVEN_YEAR_2029", "2029-01-01", null, 84, 61, 84);
+        insertLimit(rulesetId, "UPFRONT_TOTAL", "1.000000");
         insertLimit(rulesetId, "MAINTENANCE_MONTHLY", "0.800000");
         insertLimit(rulesetId, "LONG_TERM_MONTHLY", "0.400000");
         activate(policyId);
@@ -112,7 +113,9 @@ class FeeRegimeRulesetServiceIntegrationTest {
         jdbc.update("UPDATE fgc.insurance_contract SET contract_date = DATE '2027-07-15' WHERE contract_id = ?",
                 contractId);
         long policyId = insertDraftPolicy("TEST-SVC-4Y-SPECIAL", "FOUR_YEAR_COMMISSION");
-        insertRuleset(policyId, "FOUR_YEAR_2027", "2027-01-01", "2027-06-30", 48, null, null);
+        long rulesetId = insertRuleset(policyId, "FOUR_YEAR_2027", "2027-01-01", "2027-06-30", 48, null, null);
+        insertLimit(rulesetId, "UPFRONT_TOTAL", "1.000000");
+        insertLimit(rulesetId, "MAINTENANCE_MONTHLY", "1.500000");
         activate(policyId);
 
         makeG1Offering("FOUR_YEAR_2027", "2027-06-30");
@@ -127,6 +130,64 @@ class FeeRegimeRulesetServiceIntegrationTest {
         assertThat(afterBoundary.specialPeriodEnd()).isEmpty();
     }
 
+    // 리뷰 반영: 특례기간 종료일은 4년 체계 룰셋에서만 돌려준다 — 7년 룰셋의 구간 상한은 특례와 무관하다
+    @Test
+    void specialPeriodEndIsEmptyForSevenYearRulesetWithUpperBound() {
+        long contractId = g1ContractId();
+        makeG1Offering("SEVEN_YEAR_2029", "2029-01-01");
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date = DATE '2029-03-02' WHERE contract_id = ?",
+                contractId);
+        long policyId = insertDraftPolicy("TEST-SVC-7Y-BOUND", "SEVEN_YEAR_COMMISSION");
+        long rulesetId = insertRuleset(policyId, "SEVEN_YEAR_2029", "2029-01-01", "2029-12-31", 84, 61, 84);
+        insertLimit(rulesetId, "UPFRONT_TOTAL", "1.000000");
+        insertLimit(rulesetId, "MAINTENANCE_MONTHLY", "0.800000");
+        insertLimit(rulesetId, "LONG_TERM_MONTHLY", "0.400000");
+        activate(policyId);
+
+        FeeRegimeRulesetSelection selection = service.resolve(contractId);
+
+        assertThat(selection.isSelected()).isTrue();
+        assertThat(selection.ruleset().salesStartDateTo()).isEqualTo(LocalDate.of(2029, 12, 31));
+        assertThat(selection.specialPeriodEnd()).isEmpty();
+    }
+
+    // 리뷰 반영: 필수 한도 행이 없는 룰셋은 SELECTED 로 내보내지 않고 REVIEW_REQUIRED 로 돌려준다
+    @Test
+    void rulesetWithoutAnyLimitRowIsReviewRequired() {
+        long contractId = g1ContractId();
+        makeG1Offering("FOUR_YEAR_2027", "2027-01-01");
+        long policyId = insertDraftPolicy("TEST-SVC-4Y-NOLIMIT", "FOUR_YEAR_COMMISSION");
+        long rulesetId = insertRuleset(policyId, "FOUR_YEAR_2027", "2027-01-01", null, 48, null, null);
+        activate(policyId);
+
+        FeeRegimeRulesetSelection selection = service.resolve(contractId);
+
+        assertThat(selection.isSelected()).isFalse();
+        assertThat(selection.resolution().status()).isEqualTo(FeeRegimeResolutionStatus.REVIEW_REQUIRED);
+        assertThat(selection.resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.RULESET_LIMIT_MISSING);
+        assertThat(selection.resolution().candidateRulesetIds()).containsExactly(rulesetId);
+        assertThat(selection.ruleset()).isNull();
+        assertThat(selection.limits()).isEmpty();
+    }
+
+    @Test
+    void sevenYearRulesetWithoutLongTermLimitIsReviewRequired() {
+        long contractId = g1ContractId();
+        makeG1Offering("SEVEN_YEAR_2029", "2029-01-01");
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date = DATE '2029-03-02' WHERE contract_id = ?",
+                contractId);
+        long policyId = insertDraftPolicy("TEST-SVC-7Y-NOLT", "SEVEN_YEAR_COMMISSION");
+        long rulesetId = insertRuleset(policyId, "SEVEN_YEAR_2029", "2029-01-01", null, 84, 61, 84);
+        insertLimit(rulesetId, "UPFRONT_TOTAL", "1.000000");
+        insertLimit(rulesetId, "MAINTENANCE_MONTHLY", "0.800000");
+        activate(policyId);
+
+        FeeRegimeRulesetSelection selection = service.resolve(contractId);
+
+        assertThat(selection.resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.RULESET_LIMIT_MISSING);
+        assertThat(selection.isSelected()).isFalse();
+    }
+
     // 시나리오 4: 정책 잠금(ACTIVE) 뒤 다시 조회해도 같은 룰셋 ID·같은 값이다
     @Test
     void sameContractReturnsSameSelectionOnRepeatedLookup() {
@@ -135,6 +196,7 @@ class FeeRegimeRulesetServiceIntegrationTest {
         long policyId = insertDraftPolicy("TEST-SVC-4Y-REPEAT", "FOUR_YEAR_COMMISSION");
         long rulesetId = insertRuleset(policyId, "FOUR_YEAR_2027", "2027-01-01", null, 48, null, null);
         insertLimit(rulesetId, "UPFRONT_TOTAL", "1.000000");
+        insertLimit(rulesetId, "MAINTENANCE_MONTHLY", "1.500000");
         activate(policyId);
 
         FeeRegimeRulesetSelection first = service.resolve(contractId);
