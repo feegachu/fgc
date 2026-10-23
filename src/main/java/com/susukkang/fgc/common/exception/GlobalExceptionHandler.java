@@ -244,6 +244,14 @@ public class GlobalExceptionHandler {
      * 나간다(미인증이면 그 전에 401). 봉투가 필요해지면 여기가 아니라 FgcErrorAttributes 를 넓혀야 한다.
      */
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUploadSizeExceeded(
+            org.springframework.web.multipart.MaxUploadSizeExceededException exception) {
+        long maxBytes = environment.getProperty("fgc.storage.max-file-bytes", Long.class, 20971520L);
+        return handleBusinessException(new FgcBusinessException(FgcErrorCode.INTK_001,
+                Map.of("max", maxBytes / 1024 / 1024)));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(
             Exception exception

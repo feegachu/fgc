@@ -244,6 +244,17 @@ public enum FgcErrorCode {
             "error.ai.unavailable"
     ),
 
+    INTK_001(
+            "FGC-INTK-001",
+            HttpStatus.BAD_REQUEST,
+            "error.intake.invalidFile"
+    ),
+    INTK_002(
+            "FGC-INTK-002",
+            HttpStatus.CONFLICT,
+            "error.intake.duplicateFile"
+    ),
+
     COMMON_002(
             "FGC-COMMON-002",
             HttpStatus.BAD_REQUEST,

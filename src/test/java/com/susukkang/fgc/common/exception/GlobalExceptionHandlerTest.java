@@ -51,6 +51,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void multipartLimitUsesIntake400Envelope() {
+        org.mockito.Mockito.when(environment.getProperty("fgc.storage.max-file-bytes", Long.class, 20971520L))
+                .thenReturn(20971520L);
+        var response = handler().handleUploadSizeExceeded(new org.springframework.web.multipart.MaxUploadSizeExceededException(20971520L));
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().error().code()).isEqualTo("FGC-INTK-001");
+        assertThat(response.getBody().error().message()).contains("20MB").doesNotContain("{max}");
+    }
+
+    @Test
     void fillsRequestIdWhenCallerOmitsIt() {
         RequestIdContext.set("20260821-test01");
 
