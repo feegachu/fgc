@@ -121,6 +121,20 @@ class Phase2SchemaMigrationIntegrationTest {
     }
 
     @Test
+    void rejectsRevivingSupersededStatementBatch() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                String min = " WHERE statement_batch_id = (SELECT min(statement_batch_id) FROM fgc.statement_batch)";
+                execute(conn, "UPDATE fgc.statement_batch SET status = 'SUPERSEDED'" + min);
+                assertRejected(conn, "UPDATE fgc.statement_batch SET status = 'AVAILABLE'" + min);
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    @Test
     void rejectsChangesToGeneratedDocument() throws Exception {
         try (var conn = connect()) {
             conn.setAutoCommit(false);

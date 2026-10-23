@@ -372,3 +372,19 @@ FOR EACH ROW EXECUTE FUNCTION fgc.check_statement_batch_successor();
 CREATE TRIGGER trg_generated_document_append_only
 BEFORE UPDATE OR DELETE ON generated_document
 FOR EACH ROW EXECUTE FUNCTION fgc.reject_update_delete();
+
+CREATE OR REPLACE FUNCTION fgc.reject_superseded_statement_batch_revival()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD.status = 'SUPERSEDED' AND NEW.status <> 'SUPERSEDED' THEN
+    RAISE EXCEPTION 'statement_batch % is SUPERSEDED; status cannot be changed back', OLD.statement_batch_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_statement_batch_no_revival
+BEFORE UPDATE OF status ON statement_batch
+FOR EACH ROW EXECUTE FUNCTION fgc.reject_superseded_statement_batch_revival();
