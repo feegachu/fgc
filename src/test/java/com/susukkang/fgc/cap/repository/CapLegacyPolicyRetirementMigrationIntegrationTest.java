@@ -11,7 +11,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 이슈 #635 / SRC-065 / 시드명세 §40: V62가 유산 CAP 정책을 폐기해 동일 범위 활성 중복을 0건으로 만든다. */
+/** 이슈 #635 / SRC-065 / 시드명세 §40: V63이 유산 CAP 정책을 폐기해 동일 범위 활성 중복을 0건으로 만든다. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CapLegacyPolicyRetirementMigrationIntegrationTest {
     private static final String PASSWORD = "fgc_test_only";
@@ -37,7 +37,7 @@ class CapLegacyPolicyRetirementMigrationIntegrationTest {
     @BeforeAll
     void setup() {
         postgres.start();
-        flyway("61").migrate();
+        flyway("62").migrate();
         jdbc = new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(), "fgc", PASSWORD));
         overlapBefore = jdbc.queryForObject(OVERLAP_COUNT, Long.class);
         legacyChildCountBefore = legacyChildCount();
