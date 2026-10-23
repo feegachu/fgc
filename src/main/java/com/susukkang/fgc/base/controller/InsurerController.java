@@ -29,7 +29,7 @@ public class InsurerController {
                     + "사용중지된 보험회사도 반환되며 activeYn=false인 항목은 신규 입력에서 선택할 수 없습니다."
     )
     @GetMapping
-    @PreAuthorize(Roles.ANY_ROLE)
+    @PreAuthorize(Roles.CAN_VIEW_PUBLIC_PRODUCTS)
     public ApiResponse<PageResponse<InsurerResponse>> search(
             @Parameter(description = "보험회사 코드 또는 보험회사명 검색어")
             @RequestParam(required = false)

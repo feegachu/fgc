@@ -118,17 +118,20 @@ export function ContractTabs({
   contract,
   active,
   onSelect,
+  agentOnly = false,
 }: {
   id: string
   contract: ContractDetail
   active: ContractTab
   onSelect: (tab: ContractTab) => void
+  agentOnly?: boolean
 }) {
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])
+  const visibleTabs = agentOnly ? tabs.filter(([name]) => name === 'basic') : tabs
   return (
     <>
       <div className="tab-list contract-detail-tabs" role="tablist" aria-label="계약 상세 영역">
-        {tabs.map(([name, label], index) => (
+        {visibleTabs.map(([name, label], index) => (
           <button
             key={name}
             ref={(element) => {
@@ -145,17 +148,17 @@ export function ContractTabs({
             onKeyDown={(event) => {
               const next =
                 event.key === 'ArrowRight'
-                  ? (index + 1) % tabs.length
+                  ? (index + 1) % visibleTabs.length
                   : event.key === 'ArrowLeft'
-                    ? (index - 1 + tabs.length) % tabs.length
+                    ? (index - 1 + visibleTabs.length) % visibleTabs.length
                     : event.key === 'Home'
                       ? 0
                       : event.key === 'End'
-                        ? tabs.length - 1
+                        ? visibleTabs.length - 1
                         : null
               if (next == null) return
               event.preventDefault()
-              onSelect(tabs[next][0])
+              onSelect(visibleTabs[next][0])
               tabButtons.current[next]?.focus()
             }}
           >
@@ -163,7 +166,7 @@ export function ContractTabs({
           </button>
         ))}
       </div>
-      {tabs.map(([name]) => (
+      {visibleTabs.map(([name]) => (
         <section
           key={name}
           id={`contract-panel-${name}`}

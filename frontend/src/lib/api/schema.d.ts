@@ -3119,16 +3119,23 @@ export interface components {
             transactionAttributionId?: number;
         };
         MeResponse: {
+            /**
+             * Format: int64
+             * @description 로그인 사용자와 연결된 설계사 ID. 내부 사용자 등 미연결 계정은 null.
+             */
+            agentId?: number | null;
             canFinalizeValidation?: boolean;
             canHandleException?: boolean;
             canProcess?: boolean;
             canReverseJournal?: boolean;
+            canUseAgentWorkspace?: boolean;
             canViewAuditLog?: boolean;
             /**
              * @description 서버 fgc.demo-month 설정의 기본 기준 정산월. URL·세션의 선택 월과 독립적이다.
              * @example 2026-07
              */
             demoMonth: string;
+            isAgent?: boolean;
             loginId?: string;
             roleCode?: string;
             userName?: string;

@@ -1,6 +1,7 @@
 package com.susukkang.fgc.contract.repository;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
@@ -52,10 +53,12 @@ public class ContractQueryRepository {
 
     private final EntityManager entityManager;
     private final JPAQueryFactory queryFactory;
+    private final AgentDataScopeService agentScope;
 
     /** 계약 상세 화면에 필요한 기준정보를 함께 조회한다. */
     @Transactional(readOnly = true)
     public Optional<ContractDetailResponse> findDetailById(Long contractId) {
+        agentScope.requireContract(contractId);
         if (contractId == null) {
             return Optional.empty();
         }
@@ -233,8 +236,9 @@ public class ContractQueryRepository {
 
     private BooleanBuilder filters(ContractSearchCondition condition) {
         BooleanBuilder where = new BooleanBuilder();
-        if (condition == null) return where;
         var c = insuranceContract;
+        where.and(agentScope.contractPredicate(c.contractId, c.agentId));
+        if (condition == null) return where;
         // LIKE의 %, _와 PostgreSQL 기본 역슬래시 이스케이프 의미를 기존 그대로 보존한다.
         if (condition.getContractNo() != null && !condition.getContractNo().isEmpty())
             where.and(c.contractNo.like("%" + condition.getContractNo() + "%", (char) 92));

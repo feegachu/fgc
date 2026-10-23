@@ -75,6 +75,7 @@ export function Sidebar({
       </li>
     )
   }
+  const hasVisibleLinks = (paths: string[]) => paths.some((path) => canOpen(screens.find((screen) => screen.path === path)!, user))
   return (
     <aside id="app-sidebar" className="app-sidebar">
       <div className="sidebar-brand">
@@ -113,7 +114,7 @@ export function Sidebar({
       <nav className="sidebar-nav" aria-label="주요 업무 메뉴">
         <ul className="sidebar-nav-list">
           {link('/')}
-          {groups.slice(0, 3).map((group) => (
+          {groups.slice(0, 3).filter((group) => hasVisibleLinks(group.paths)).map((group) => (
             <li key={group.id}>
               <details className="sidebar-nav-details" open={openSections.includes(group.id)}>
                 <summary
@@ -138,7 +139,7 @@ export function Sidebar({
             </li>
           ))}
           {link('/exceptions')}
-          <li className="sidebar-nav-section">
+          {hasVisibleLinks(groups[3].paths) && <li className="sidebar-nav-section">
             <details className="sidebar-nav-details" open={openSections.includes('admin')}>
               <summary
                 className="sidebar-nav-summary"
@@ -159,7 +160,7 @@ export function Sidebar({
               </summary>
               <ul className="sidebar-subnav">{groups[3].paths.map((path) => link(path, true))}</ul>
             </details>
-          </li>
+          </li>}
         </ul>
       </nav>
       <div className="sidebar-user-panel">

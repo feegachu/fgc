@@ -4469,6 +4469,11 @@
       },
       "MeResponse" : {
         "properties" : {
+          "agentId" : {
+            "description" : "로그인 사용자와 연결된 설계사 ID. 내부 사용자 등 미연결 계정은 null.",
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
           "canFinalizeValidation" : {
             "type" : "boolean"
           },
@@ -4481,6 +4486,9 @@
           "canReverseJournal" : {
             "type" : "boolean"
           },
+          "canUseAgentWorkspace" : {
+            "type" : "boolean"
+          },
           "canViewAuditLog" : {
             "type" : "boolean"
           },
@@ -4489,6 +4497,9 @@
             "example" : "2026-07",
             "pattern" : "^(?!0000)\\d{4}-(0[1-9]|1[0-2])$",
             "type" : "string"
+          },
+          "isAgent" : {
+            "type" : "boolean"
           },
           "loginId" : {
             "type" : "string"

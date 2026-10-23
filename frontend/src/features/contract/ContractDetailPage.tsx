@@ -5,7 +5,7 @@ import { paymentEntryHref, safeReturnTo, returnLink } from '../transaction/payme
 import { Button } from '../../components/Button'
 import { date, int, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
-import { usePermission } from '../auth/useAuth'
+import { useAuth, usePermission } from '../auth/useAuth'
 import { contractDetailQuery, recheckContractCap, regenerateContractSchedules } from './api'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
 import { ContractFacts, ContractLoadState, ContractTabs } from './ContractTabs'
@@ -24,10 +24,11 @@ function ContractDetailView({ id }: { id: string }) {
   const detail = useQuery({ ...contractDetailQuery(id), enabled: validId })
   const client = useQueryClient()
   const canProcess = usePermission('canProcess')
+  const isAgent = useAuth().user?.roleCode === 'AGENT'
   const navigate = useNavigate()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
-  const active = contractTab(params.get('tab'))
+  const active = isAgent ? 'basic' : contractTab(params.get('tab'))
   const mounted = useRef(true)
   const displayedSave = useRef<string | null>(null)
   const saveMessage: unknown = location.state?.message
@@ -211,7 +212,7 @@ function ContractDetailView({ id }: { id: string }) {
               ]}
             />
           </section>
-          <ContractTabs id={id} contract={contract} active={active} onSelect={selectTab} />
+          <ContractTabs id={id} contract={contract} active={active} onSelect={selectTab} agentOnly={isAgent} />
         </>
       )}
     </div>
