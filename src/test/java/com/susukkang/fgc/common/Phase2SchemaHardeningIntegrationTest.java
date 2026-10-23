@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * V61: V58 판 승계·이력 가드 보완을 실제 PostgreSQL에서 확인한다.
+ * V62: V58 판 승계·이력 가드 보완을 실제 PostgreSQL에서 확인한다.
  * 커밋 시점 검사와 두 연결의 경합을 보려고 데이터를 실제로 커밋하므로 V58 테스트와 컨테이너를 나눈다.
  * 테스트마다 아직 대체되지 않은 다른 명세 묶음을 골라 서로 영향을 주지 않는다.
  */
