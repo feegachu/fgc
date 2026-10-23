@@ -32,7 +32,7 @@ class AgentSeedMigrationIntegrationTest {
         assertThat(seed).containsEntry("password_hash", "!").containsEntry("account_status", "DISABLED")
                 .containsEntry("role_code", "AGENT").containsEntry("agent_code", "A-FC-001");
         var manager = authentication.getAuthenticationManager();
-        assertThatThrownBy(() -> manager.authenticate(UsernamePasswordAuthenticationToken.unauthenticated(
-                "agent01", "unprovisioned-password"))).isInstanceOf(DisabledException.class);
+        var login = UsernamePasswordAuthenticationToken.unauthenticated("agent01", "unprovisioned-password");
+        assertThatThrownBy(() -> manager.authenticate(login)).isInstanceOf(DisabledException.class);
     }
 }
