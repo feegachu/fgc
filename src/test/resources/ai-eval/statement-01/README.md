@@ -90,5 +90,8 @@
 
 - `intake_draft_row.source_location` 에 `{"sheet": "<시트 이름>", "row": <엑셀 행 번호>}` 를 담는다
 - `normalized_fields` 키는 위 정답 필드 이름을 쓴다(다르면 내보내기 SQL 에서 바꿔 담는다)
+- `normalized_fields` 값 형식도 정답에 맞춘다 — `settlementMonth` 는 `YYYY-MM`(`2026.09` 를 `2026-09` 로), `amount` 는 원 단위 양수(차감·환수의 부호는 `cashflowType` 에만), 코드(`policyNo`·`agentCode`·`productCode`)는 선행 0 을 지킨 문자열(JSON 숫자 `451` 은 `000451` 과 다르다고 센다)
 - 사람 수정은 `edited_fields` 에 남긴다(수정률은 검토 뒤 내보내기의 `edited_fields IS NOT NULL` 로 센다)
 - ai_call_log 에 서식 분류는 `INTAKE_CLASSIFY`, 행 추출(열 의미 매핑 포함)은 `INTAKE_EXTRACT` 로 나눠 남긴다
+
+초과 행 수가 추출 행 수와 거의 같으면 추출이 틀렸다기보다 `source_location` 행 번호가 어긋난 것이다 — 엑셀 행 번호(1부터, 헤더 행 포함)가 아니라 0부터 세거나 데이터 행 순번을 넣었는지부터 의심한다.
