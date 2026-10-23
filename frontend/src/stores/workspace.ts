@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { screenFor, screens } from '../app/screens'
+import { canOpen, screenFor, screens } from '../app/screens'
 export interface WorkspaceTab {
   id: string
   title: string
@@ -69,7 +69,10 @@ export function createWorkspaceStore(
         : saved.owner === user && validMonth(saved.month)
           ? saved.month
           : defaultMonth
-      const tabs: WorkspaceTab[] = [{ ...dashboard, href: withMonth('/', month) }]
+      const home = permissions.isAgent
+        ? { id: 'CONT-W01', title: '보험계약 목록', href: '/contracts', icon: 'description', modified: false }
+        : dashboard
+      const tabs: WorkspaceTab[] = [{ ...home, href: withMonth(home.href, month) }]
       if (saved.owner === user && Array.isArray(saved.tabs)) {
         for (const candidate of saved.tabs) {
           if (
@@ -83,8 +86,8 @@ export function createWorkspaceStore(
           const route = screenFor(new URL(candidate.href, 'http://workspace.local').pathname)
           if (
             !route ||
-            route.id === dashboard.id ||
-            (route.permission && !permissions[route.permission]) ||
+            route.id === home.id ||
+            !canOpen(route, permissions) ||
             tabs.some((tab) => tab.id === route.id)
           )
             continue
@@ -107,14 +110,14 @@ export function createWorkspaceStore(
       if (!tabs.some((item) => item.id === tab.id)) tabs = [...tabs, { ...tab, modified: false }]
       if (tabs.length > 10)
         tabs.splice(
-          tabs.findIndex((item) => item.id !== dashboard.id),
+          tabs.findIndex((item) => item.id !== get().tabs[0]?.id),
           1,
         )
       set({ tabs })
       save(tabs, get().month)
     },
     closeTab: (id, activeId) => {
-      if (id === dashboard.id) return null
+      if (id === get().tabs[0]?.id) return null
       const index = get().tabs.findIndex((tab) => tab.id === id)
       if (index < 0) return null
       const tabs = get().tabs.filter((tab) => tab.id !== id)

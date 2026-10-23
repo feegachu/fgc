@@ -57,7 +57,8 @@ public class FgcUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("등록되지 않은 로그인 아이디");
         }
 
-        boolean enabled = !STATUS_DISABLED.equals(user.getAccountStatus());
+        boolean enabled = !STATUS_DISABLED.equals(user.getAccountStatus())
+                && (!com.susukkang.fgc.common.security.Roles.AGENT.equals(user.getRoleCode()) || user.getAgentId() != null);
         boolean accountNonLocked = !STATUS_LOCKED.equals(user.getAccountStatus());
 
         return new FgcUserDetails(user, enabled, accountNonLocked);

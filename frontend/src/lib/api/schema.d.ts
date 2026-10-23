@@ -1557,6 +1557,7 @@ export interface components {
             monthStart?: string;
             /** Format: date */
             nextMonthStart?: string;
+            sort?: string;
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
@@ -2228,6 +2229,7 @@ export interface components {
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             settlementMonth?: string;
+            sort?: string;
             sourceType?: string;
             /** @enum {string} */
             status?: "DRAFT" | "CONFIRMED" | "CANCELLED";
@@ -2481,6 +2483,7 @@ export interface components {
             orgId?: number;
             /** Format: int64 */
             productOfferingId?: number;
+            sort?: string;
         };
         ContractStatusEventProcessingResponse: {
             /** Format: date-time */
@@ -2722,6 +2725,7 @@ export interface components {
             reasonCode?: string;
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
+            sort?: string;
             status?: string;
             /** @enum {string} */
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
@@ -3090,16 +3094,23 @@ export interface components {
             transactionAttributionId?: number;
         };
         MeResponse: {
+            /**
+             * Format: int64
+             * @description 로그인 사용자와 연결된 설계사 ID. 내부 사용자 등 미연결 계정은 null.
+             */
+            agentId?: number | null;
             canFinalizeValidation?: boolean;
             canHandleException?: boolean;
             canProcess?: boolean;
             canReverseJournal?: boolean;
+            canUseAgentWorkspace?: boolean;
             canViewAuditLog?: boolean;
             /**
              * @description 서버 fgc.demo-month 설정의 기본 기준 정산월. URL·세션의 선택 월과 독립적이다.
              * @example 2026-07
              */
             demoMonth: string;
+            isAgent?: boolean;
             loginId?: string;
             roleCode?: string;
             userName?: string;
@@ -3781,6 +3792,7 @@ export interface components {
             purpose?: "OPERATIONAL" | "COMPARISON" | "SIMULATION";
             /** @enum {string} */
             regime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
+            sort?: string;
             /** @enum {string} */
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
@@ -3959,6 +3971,8 @@ export interface operations {
                  * @example 2026-08-16
                  */
                 to?: string;
+                /** @description 정렬(key,asc|desc). occurredAt·userLoginId·policyVersionId. 비우면 발생 시각 내림차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4137,6 +4151,8 @@ export interface operations {
                 includeTerminated?: boolean;
                 /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
                 includeHistorical?: boolean;
+                /** @description 정렬(key,asc|desc). agentCode·agentName·organizationName·appointmentDate·terminationDate·latestRegistrationDate. 비우면 설계사 코드 오름차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4196,6 +4212,8 @@ export interface operations {
             query?: {
                 /** @description 보험회사 코드 또는 보험회사명 검색어 */
                 keyword?: string;
+                /** @description 정렬(key,asc|desc). insurerCode·insurerName. 비우면 보험회사 코드 오름차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4236,6 +4254,8 @@ export interface operations {
                 asOf: string;
                 /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
                 includeHistorical?: boolean;
+                /** @description 정렬(key,asc|desc). organizationCode·organizationName·parentName·effectiveFrom·effectiveTo. 비우면 조직코드 오름차순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4281,6 +4301,8 @@ export interface operations {
                 includeExpired?: boolean;
                 /** @description 계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다. */
                 includeHistorical?: boolean;
+                /** @description 정렬(key,asc|desc). insurerProductCode·productName·standardProductCode·offeringVersion·salesStartDate·basicDocumentDate. 비우면 상품코드·판매버전 순 */
+                sort?: string;
                 /**
                  * @description 페이지(1-base)
                  * @example 1
@@ -4327,6 +4349,8 @@ export interface operations {
                 orgId?: number;
                 /** @description 계약번호 */
                 contractNo?: string;
+                /** @description 정렬(key,asc|desc). contractNo·asOfDate·basePremiumAmount·refund12mAmount·complianceDeductionAmount·limitAmount·includedAmount·remainingAmount·usagePct. 비우면 기준일 내림차순 */
+                sort?: string;
                 /** @description 페이지(1-base) */
                 page?: number;
                 /** @description 페이지 크기(최대 100) */
@@ -4890,6 +4914,8 @@ export interface operations {
                 contractNo?: string;
                 /** @description 상태(DRAFT/POSTED/REVERSED) */
                 status?: string;
+                /** @description 정렬(key,asc|desc). journalNo·journalDate·contractNo·debitTotal·creditTotal. 비우면 분개일 내림차순 */
+                sort?: string;
                 /** @description 페이지(1-base) */
                 page?: number;
                 /** @description 페이지 크기(최대 100) */
@@ -5728,6 +5754,8 @@ export interface operations {
                 month?: string;
                 /** @description 실행 상태(CREATED/RUNNING/COMPLETED/FAILED/FINALIZED) */
                 status?: string;
+                /** @description 정렬(key,asc|desc). validationMonth·runNo·triggeredBy·startedAt·completedAt·finalizedAt. 비우면 검증월·회차 내림차순 */
+                sort?: string;
                 /** @description 페이지(1-base) */
                 page?: number;
                 /** @description 페이지 크기(최대 100) */

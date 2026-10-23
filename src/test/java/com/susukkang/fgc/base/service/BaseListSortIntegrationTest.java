@@ -112,6 +112,8 @@ class BaseListSortIntegrationTest {
         // 데모 데이터는 보험회사당 판매버전이 적어, 값이 겹치는 버전을 더 만들어 동률·페이지 이동을 함께 검증한다.
         Long productId = jdbc.queryForObject(
                 "SELECT product_id FROM fgc.product WHERE insurer_id = ? ORDER BY product_id LIMIT 1", Long.class, insurerId);
+        // 이 테스트는 같은 상품에 기준일이 같은 판매버전 여러 개를 일부러 만든다(롤백되므로 지연 검사는 실행되지 않는다)
+        jdbc.execute("SET CONSTRAINTS fgc.ex_product_offering_sales_period DEFERRED");
         for (int i = 0; i < 6; i++) {
             jdbc.update("""
                     INSERT INTO fgc.product_offering (product_id, offering_version, sales_start_date,
