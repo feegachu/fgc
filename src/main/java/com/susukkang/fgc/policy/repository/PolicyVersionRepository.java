@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 설명 : 정책 버전 목록 및 계약에 적용할 현행 수수료 정책을 조회하는 Repository
@@ -74,6 +75,36 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
             @Param("contractId") Long contractId,
             @Param("paymentStage") PaymentStage paymentStage
     );
+
+    // #535: 분급 체계 판정 입력. 계약 → 판매버전 값을 고치거나 추정하지 않고 그대로 읽는다(판매채널은 읽지 않는다, SRC-036).
+    // 판매버전의 체계 코드는 CHECK 제약이 없어 정의된 세 값 밖의 코드도 그대로 반환한다(판정은 #536).
+    @Query(value = """
+            SELECT c.contract_id AS "contractId",
+                   c.contract_date AS "contractDate",
+                   po.product_offering_id AS "productOfferingId",
+                   po.offering_version AS "offeringVersion",
+                   po.sales_start_date AS "salesStartDate",
+                   po.sales_end_date AS "salesEndDate",
+                   po.basic_document_version AS "basicDocumentVersion",
+                   po.basic_document_date AS "basicDocumentDate",
+                   po.fee_regime_code AS "declaredFeeRegimeCode"
+              FROM fgc.insurance_contract c
+              JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
+             WHERE c.contract_id = :contractId
+            """, nativeQuery = true)
+    Optional<FeeRegimeDecisionInputRow> findFeeRegimeDecisionInput(@Param("contractId") Long contractId);
+
+    interface FeeRegimeDecisionInputRow {
+        Long getContractId();
+        LocalDate getContractDate();
+        Long getProductOfferingId();
+        String getOfferingVersion();
+        LocalDate getSalesStartDate();
+        LocalDate getSalesEndDate();
+        String getBasicDocumentVersion();
+        LocalDate getBasicDocumentDate();
+        String getDeclaredFeeRegimeCode();
+    }
 
     // 정책 응답에 필요한 작성자·승인자 로그인 ID를 한 번에 조회한다.
     @Query(value = """
