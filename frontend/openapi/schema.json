@@ -1031,6 +1031,9 @@
             "format" : "date",
             "type" : "string"
           },
+          "sort" : {
+            "type" : "string"
+          },
           "stage" : {
             "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
             "type" : "string"
@@ -2379,6 +2382,9 @@
           "settlementMonth" : {
             "type" : "string"
           },
+          "sort" : {
+            "type" : "string"
+          },
           "sourceType" : {
             "type" : "string"
           },
@@ -2912,6 +2918,9 @@
           "productOfferingId" : {
             "format" : "int64",
             "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -3539,6 +3548,9 @@
           },
           "severity" : {
             "enum" : [ "INFO", "WARNING", "HIGH", "CRITICAL" ],
+            "type" : "string"
+          },
+          "sort" : {
             "type" : "string"
           },
           "status" : {
@@ -4443,6 +4455,11 @@
       },
       "MeResponse" : {
         "properties" : {
+          "agentId" : {
+            "description" : "로그인 사용자와 연결된 설계사 ID. 내부 사용자 등 미연결 계정은 null.",
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
           "canFinalizeValidation" : {
             "type" : "boolean"
           },
@@ -4455,6 +4472,9 @@
           "canReverseJournal" : {
             "type" : "boolean"
           },
+          "canUseAgentWorkspace" : {
+            "type" : "boolean"
+          },
           "canViewAuditLog" : {
             "type" : "boolean"
           },
@@ -4463,6 +4483,9 @@
             "example" : "2026-07",
             "pattern" : "^(?!0000)\\d{4}-(0[1-9]|1[0-2])$",
             "type" : "string"
+          },
+          "isAgent" : {
+            "type" : "boolean"
           },
           "loginId" : {
             "type" : "string"
@@ -5810,6 +5833,9 @@
             "enum" : [ "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029" ],
             "type" : "string"
           },
+          "sort" : {
+            "type" : "string"
+          },
           "stage" : {
             "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
             "type" : "string"
@@ -6202,6 +6228,14 @@
             "type" : "string"
           }
         }, {
+          "description" : "정렬(key,asc|desc). occurredAt·userLoginId·policyVersionId. 비우면 발생 시각 내림차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
           "description" : "페이지(1-base)",
           "example" : 1,
           "in" : "query",
@@ -6439,6 +6473,14 @@
             "type" : "boolean"
           }
         }, {
+          "description" : "정렬(key,asc|desc). agentCode·agentName·organizationName·appointmentDate·terminationDate·latestRegistrationDate. 비우면 설계사 코드 오름차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
           "description" : "페이지(1-base)",
           "example" : 1,
           "in" : "query",
@@ -6521,6 +6563,14 @@
             "type" : "string"
           }
         }, {
+          "description" : "정렬(key,asc|desc). insurerCode·insurerName. 비우면 보험회사 코드 오름차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
           "description" : "페이지(1-base)",
           "example" : 1,
           "in" : "query",
@@ -6589,6 +6639,14 @@
           "schema" : {
             "default" : false,
             "type" : "boolean"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). organizationCode·organizationName·parentName·effectiveFrom·effectiveTo. 비우면 조직코드 오름차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         }, {
           "description" : "페이지(1-base)",
@@ -6670,6 +6728,14 @@
           "schema" : {
             "default" : false,
             "type" : "boolean"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). insurerProductCode·productName·standardProductCode·offeringVersion·salesStartDate·basicDocumentDate. 비우면 상품코드·판매버전 순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         }, {
           "description" : "페이지(1-base)",
@@ -6763,6 +6829,14 @@
           "description" : "계약번호",
           "in" : "query",
           "name" : "contractNo",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). contractNo·asOfDate·basePremiumAmount·refund12mAmount·complianceDeductionAmount·limitAmount·includedAmount·remainingAmount·usagePct. 비우면 기준일 내림차순",
+          "in" : "query",
+          "name" : "sort",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -7551,6 +7625,14 @@
           "description" : "상태(DRAFT/POSTED/REVERSED)",
           "in" : "query",
           "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). journalNo·journalDate·contractNo·debitTotal·creditTotal. 비우면 분개일 내림차순",
+          "in" : "query",
+          "name" : "sort",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -8710,6 +8792,14 @@
           "description" : "실행 상태(CREATED/RUNNING/COMPLETED/FAILED/FINALIZED)",
           "in" : "query",
           "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). validationMonth·runNo·triggeredBy·startedAt·completedAt·finalizedAt. 비우면 검증월·회차 내림차순",
+          "in" : "query",
+          "name" : "sort",
           "required" : false,
           "schema" : {
             "type" : "string"

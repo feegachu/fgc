@@ -20,6 +20,8 @@ public final class AuthTokenDtos {
 
     /** 1차 ShellAdvice 가 화면 모델에 넣던 값을 대신한다. 플래그는 @PreAuthorize 와 같은 식으로 판정한다. */
     public record MeResponse(String loginId, String userName, String roleCode,
+                             @Schema(description = "로그인 사용자와 연결된 설계사 ID. 내부 사용자 등 미연결 계정은 null.", nullable = true)
+                             Long agentId, boolean isAgent, boolean canUseAgentWorkspace,
                              boolean canProcess, boolean canViewAuditLog, boolean canHandleException,
                              boolean canReverseJournal, boolean canFinalizeValidation,
                              @Schema(description = "서버 fgc.demo-month 설정의 기본 기준 정산월. URL·세션의 선택 월과 독립적이다.",

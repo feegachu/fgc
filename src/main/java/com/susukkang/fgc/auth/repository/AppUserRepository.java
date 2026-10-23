@@ -30,7 +30,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
                 u.passwordHash,
                 u.userName,
                 r.roleCode,
-                u.accountStatus)
+                u.accountStatus,
+                u.agentId)
             FROM AppUser u JOIN u.role r
             WHERE u.loginId = :loginId
             """)

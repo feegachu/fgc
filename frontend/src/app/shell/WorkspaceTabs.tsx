@@ -25,7 +25,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
   return (
     <nav className="workspace-tab-bar" aria-label="열린 업무 화면">
       <div className="workspace-tabs" ref={rail}>
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <div
             className={`workspace-tab ${tab.id === activeId ? 'is-active' : ''} ${tab.modified ? 'is-modified' : ''}`}
             key={tab.id}
@@ -37,7 +37,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
               <span className="workspace-tab-label">{tab.title}</span>
             </Link>
             {tab.modified && <span className="workspace-tab-modified" role="img" aria-label="수정됨" />}
-            {tab.id !== 'DASH-W01' && (
+            {index !== 0 && (
               <button
                 className="workspace-tab-close"
                 type="button"
