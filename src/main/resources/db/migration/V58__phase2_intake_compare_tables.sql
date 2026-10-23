@@ -340,3 +340,35 @@ CREATE TRIGGER trg_compare_explanation_updated_at BEFORE UPDATE ON compare_expla
 FOR EACH ROW EXECUTE FUNCTION fgc.set_updated_at();
 CREATE TRIGGER trg_notice_updated_at BEFORE UPDATE ON notice
 FOR EACH ROW EXECUTE FUNCTION fgc.set_updated_at();
+
+-- ---------------------------------------------------------------- 판 승계 키·버전 검사, 생성 문서 불변
+CREATE OR REPLACE FUNCTION fgc.check_statement_batch_successor()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  prev fgc.statement_batch%ROWTYPE;
+BEGIN
+  IF NEW.supersedes_statement_batch_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT * INTO prev FROM fgc.statement_batch WHERE statement_batch_id = NEW.supersedes_statement_batch_id;
+  IF NOT FOUND
+     OR prev.insurer_id <> NEW.insurer_id
+     OR prev.settlement_month <> NEW.settlement_month
+     OR prev.statement_type <> NEW.statement_type
+     OR COALESCE(prev.external_statement_no, '') <> COALESCE(NEW.external_statement_no, '')
+     OR NEW.version_no <> prev.version_no + 1 THEN
+    RAISE EXCEPTION 'statement_batch successor must share the business key and be version_no + 1 of the superseded batch';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_statement_batch_successor
+BEFORE INSERT ON statement_batch
+FOR EACH ROW EXECUTE FUNCTION fgc.check_statement_batch_successor();
+
+CREATE TRIGGER trg_generated_document_append_only
+BEFORE UPDATE OR DELETE ON generated_document
+FOR EACH ROW EXECUTE FUNCTION fgc.reject_update_delete();

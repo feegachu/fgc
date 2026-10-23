@@ -92,8 +92,42 @@ class Phase2SchemaMigrationIntegrationTest {
                 execute(conn, "UPDATE fgc.statement_batch SET status = 'SUPERSEDED' WHERE version_no = 1 "
                         + "AND statement_batch_id = (SELECT min(statement_batch_id) FROM fgc.statement_batch)");
                 // 같은 이전 판을 대체하는 두 번째 후속본은 거절된다
-                assertThatThrownBy(() -> execute(conn, insert.formatted(3)))
+                assertThatThrownBy(() -> execute(conn, insert.formatted(2)))
                         .hasMessageContaining("uq_statement_batch");
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    @Test
+    void rejectsSuccessorWithSkippedVersionOrDifferentBusinessKey() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                String insert = """
+                        INSERT INTO fgc.statement_batch(insurer_id, settlement_month, statement_type, external_statement_no,
+                                                        received_on, source_ref, version_no, supersedes_statement_batch_id)
+                        SELECT insurer_id, settlement_month, statement_type, %s, received_on, 'test',
+                               %d, statement_batch_id
+                        FROM fgc.statement_batch ORDER BY statement_batch_id LIMIT 1""";
+                assertRejected(conn, insert.formatted("external_statement_no", 5));
+                assertRejected(conn, insert.formatted("'OTHER-NO'", 2));
+                execute(conn, insert.formatted("external_statement_no", 2));
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    @Test
+    void rejectsChangesToGeneratedDocument() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                seedIntakeDocument(conn);
+                assertRejected(conn, "UPDATE fgc.generated_document SET content_hash = 'changed'");
+                assertRejected(conn, "DELETE FROM fgc.generated_document");
             } finally {
                 conn.rollback();
             }
