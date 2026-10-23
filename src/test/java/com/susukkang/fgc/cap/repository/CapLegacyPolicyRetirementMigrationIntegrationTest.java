@@ -33,7 +33,7 @@ class CapLegacyPolicyRetirementMigrationIntegrationTest {
     private JdbcTemplate jdbc;
     private long legacyChildCountBefore;
     private long overlapBefore;
-    private long legacyBoundaryWinnersBefore;
+    private long legacyActiveVersionsBefore;
 
     @BeforeAll
     void setup() {
@@ -42,7 +42,7 @@ class CapLegacyPolicyRetirementMigrationIntegrationTest {
         jdbc = new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(), "fgc", PASSWORD));
         overlapBefore = jdbc.queryForObject(OVERLAP_COUNT, Long.class);
         legacyChildCountBefore = legacyChildCount();
-        legacyBoundaryWinnersBefore = jdbc.queryForObject(
+        legacyActiveVersionsBefore = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM fgc.policy_version WHERE policy_code = 'REG-CAP-INS-2026-V1' AND status = 'ACTIVE'",
                 Long.class);
         flyway(postgres.getJdbcUrl(), null).migrate();
@@ -56,7 +56,7 @@ class CapLegacyPolicyRetirementMigrationIntegrationTest {
     @Test
     void legacyPolicyOverlappedBeforeCleanupAndIsGoneAfter() {
         assertThat(overlapBefore).isGreaterThan(0L);
-        assertThat(legacyBoundaryWinnersBefore).isEqualTo(1L);
+        assertThat(legacyActiveVersionsBefore).isEqualTo(1L);
         assertThat(jdbc.queryForObject(OVERLAP_COUNT, Long.class)).isZero();
         assertThat(jdbc.queryForObject("""
                 SELECT COUNT(*) FROM fgc.policy_version
