@@ -23,6 +23,19 @@ import static org.assertj.core.api.Assertions.*;
 class UploadFileValidatorTest {
     private final UploadFileValidator validator = new UploadFileValidator(new FileStorageProperties(Path.of("files"), 1024 * 1024));
 
+    @Test void validatedValueUsesArrayContentWithoutAllowingMutationOrContentLogging() {
+        byte[] input = "DO_NOT_LOG".getBytes(StandardCharsets.UTF_8);
+        var first = new UploadFileValidator.ValidatedFile("secret.csv", "text/csv", input, "hash");
+        var same = new UploadFileValidator.ValidatedFile("secret.csv", "text/csv", input.clone(), "hash");
+        assertThat(first).isEqualTo(same).hasSameHashCodeAs(same);
+        input[0] = 0;
+        byte[] returned = first.bytes();
+        returned[0] = 0;
+        assertThat(first).isEqualTo(same);
+        assertThat(first.bytes()).isEqualTo("DO_NOT_LOG".getBytes(StandardCharsets.UTF_8));
+        assertThat(first.toString()).doesNotContain("secret.csv", "DO_NOT_LOG");
+    }
+
     @Test void acceptsXlsxAndHashesExactBytes() throws Exception {
         byte[] bytes = workbook(false, false);
         var result = validator.validate(file("원본.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes));

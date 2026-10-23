@@ -214,5 +214,29 @@ public class UploadFileValidator {
         return new FgcBusinessException(FgcErrorCode.INTK_001, Map.of("max", maxBytes / 1024 / 1024));
     }
 
-    public record ValidatedFile(String originalName, String mediaType, byte[] bytes, String sha256) { }
+    public record ValidatedFile(String originalName, String mediaType, byte[] bytes, String sha256) {
+        public ValidatedFile {
+            java.util.Objects.requireNonNull(originalName);
+            java.util.Objects.requireNonNull(mediaType);
+            java.util.Objects.requireNonNull(sha256);
+            bytes = java.util.Objects.requireNonNull(bytes).clone();
+        }
+
+        @Override public byte[] bytes() { return bytes.clone(); }
+
+        @Override public boolean equals(Object other) {
+            if (this == other) return true;
+            if (!(other instanceof ValidatedFile file)) return false;
+            return originalName.equals(file.originalName) && mediaType.equals(file.mediaType)
+                    && sha256.equals(file.sha256) && java.util.Arrays.equals(bytes, file.bytes);
+        }
+
+        @Override public int hashCode() {
+            return 31 * java.util.Objects.hash(originalName, mediaType, sha256) + java.util.Arrays.hashCode(bytes);
+        }
+
+        @Override public String toString() {
+            return "ValidatedFile[mediaType=" + mediaType + ", length=" + bytes.length + ", sha256=" + sha256 + "]";
+        }
+    }
 }

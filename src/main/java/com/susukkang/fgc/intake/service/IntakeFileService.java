@@ -44,7 +44,8 @@ public class IntakeFileService {
             throw new FgcBusinessException(FgcErrorCode.INTK_002, Map.of("documentId", existing));
         });
         try {
-            String key = storage.store(validated.bytes());
+            byte[] content = validated.bytes();
+            String key = storage.store(content);
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCompletion(int status) {
@@ -57,11 +58,11 @@ public class IntakeFileService {
                     }
                 }
             });
-            long id = repository.insert(validated.originalName(), key, validated.mediaType(), validated.bytes().length,
+            long id = repository.insert(validated.originalName(), key, validated.mediaType(), content.length,
                     validated.sha256(), uploadedBy);
             audit.record(AuditLogService.AuditEvent.builder().actionCode("INTAKE_FILE_UPLOADED")
                     .entityType("intake_document").entityId(Long.toString(id)).userId(uploadedBy)
-                    .after(Map.of("sha256", validated.sha256(), "fileSizeBytes", validated.bytes().length)).build());
+                    .after(Map.of("sha256", validated.sha256(), "fileSizeBytes", content.length)).build());
             return new UploadedDocument(id, "UPLOADED", "UNCLASSIFIED");
         } catch (IOException ex) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500);
