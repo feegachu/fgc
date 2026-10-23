@@ -501,7 +501,7 @@ ASM-*: 프로젝트 가정
 
 | policy_code | policy_type | source_class | 현재 ACTIVE 버전 | 출처 |
 |---|---|---|---:|---|
-| `REG-CAP-INS-2026-V1` | CAP_1200 | REGULATORY | v3 (유산 겹침, §15) | V3·V46·V52 |
+| `REG-CAP-INS-2026-V1` | CAP_1200 | REGULATORY | 없음 — v3 RETIRED (유산, §15) | V3·V46·V52·V63 |
 | `REG-CAP-INS-2021-V2` | CAP_1200 | REGULATORY | v3 (2021~2026, 0%) | V6_1·V46·V52 |
 | `REG-CAP-INS-2027-V1` | CAP_1200 | REGULATORY | v3 (2027~, 3%) | V6_1·V46·V52 |
 | `REG-CAP-GA-2026-V1` | CAP_1200 | REGULATORY | v3 (2026-07-01~) | V3·V46·V52 |
@@ -603,7 +603,7 @@ warning_usage_pct = 90
 
 각 `cap_rule_item`은 실행 가능한 시드에서 `decision_reason`을 반드시 저장한다. `EXCLUDED`이면 `exclusion_type`과 `evidence_required_yn=true`, `APPROVED_ALLOCATION`이면 `allocation_policy_id`가 필수다. REG-11의 허용 제외유형은 적격 신인활동지원 하나다(제7항 제1·2호 녹취·방송송출은 FGC 적용 대상 없음, SRC-036). 그리고 REG-10 준법경영비는 GA→설계사 제외유형으로 재사용하지 않는다.
 
-현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 2021~2026 0%, 2027 이후 3%로 시행일을 보정한다. FGC는 대면 모집만 다루므로 채널별 룰셋을 나누지 않는다(SRC-036). 또한 V3의 기존 활성 룰셋과 보정 룰셋이 겹치므로 `cap_rule_set_id`만으로 조용히 승자를 정하는 방식을 일반 정책선택 규칙으로 승격하지 않는다. 유산 룰셋 폐기와 비중복 범위 정리는 별도 마이그레이션 대상이다. V46·V52가 이 유산 룰셋을 v3로 복제했고(승자는 여전히 `cap_rule_set_id` 순서), 폐기 마이그레이션은 아직 없다. §40 인수 검사는 이 정리 마이그레이션을 먼저 적용해야 한다(SRC-065).
+현재 `db/demo/V6_1__cap_ins_compliance_deduction_correction.sql`은 2021~2026 0%, 2027 이후 3%로 시행일을 보정한다. FGC는 대면 모집만 다루므로 채널별 룰셋을 나누지 않는다(SRC-036). 또한 V3의 기존 활성 룰셋과 보정 룰셋이 겹치므로 `cap_rule_set_id`만으로 조용히 승자를 정하는 방식을 일반 정책선택 규칙으로 승격하지 않는다. 유산 룰셋 폐기와 비중복 범위 정리는 별도 마이그레이션 대상이다. V46·V52가 이 유산 룰셋을 v3로 복제했지만(당시 승자는 `cap_rule_set_id` 순서), `db/demo/V63__retire_legacy_cap_ins_policy_overlap.sql`이 `REG-CAP-INS-2026-V1`의 ACTIVE 버전(v3)을 RETIRED로 전환했다. V6_1의 두 룰셋(2021-V2: 2021-01-01~2026-12-31, 2027-V1: 2027-01-01~)이 유산 범위를 빈틈·겹침 없이 채우므로 새 룰셋은 발행하지 않았고, 자식 행과 과거 `cap_check` 참조는 그대로 보존된다. V63은 대체 룰셋이 범위를 채우지 못하거나 정리 뒤 활성 중복이 남으면 트랜잭션을 중단한다. §40 인수 검사는 V63 적용 뒤에 수행한다(SRC-065).
 
 ## 16. 공통비 배부정책
 
@@ -1527,7 +1527,7 @@ REG-17·18·24처럼 FGC가 외부 의무 전체를 구현하지 않는 영역�
 
 1. 요구사항명세서 v2.2.2-r19 기준 유지(운영정책서 제53조 문구는 반영됨)
 2. T001~T068 전체 GOLDEN 시드 SQL 작성 — **제4-1항의 정책 승격 순서를 반드시 지킬 것**
-3. REG-10 유산 룰셋 폐기 마이그레이션 작성 (일반/TM 시행일 분리는 SRC-036으로 삭제)
+3. ~~REG-10 유산 룰셋 폐기 마이그레이션 작성~~ — 완료: `db/demo/V63` (일반/TM 시행일 분리는 SRC-036으로 삭제)
 4. `golden_expected_assertions.sql` 작성, DAR-012 생성기(§50)·AI 입력 샘플(§52)·협회 등급자료(§53) 작성 — 초기화는 §43(DB 재생성)
 5. 전체 회귀테스트 실행
 
