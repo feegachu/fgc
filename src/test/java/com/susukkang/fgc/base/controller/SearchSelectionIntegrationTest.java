@@ -52,6 +52,15 @@ class SearchSelectionIntegrationTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(25))
             .andExpect(jsonPath("$.data.content.length()").value(5))
             .andExpect(jsonPath("$.data.content[0].itemCode").value("S633-0021"));
+        jdbc.update("""
+            INSERT INTO fgc.commission_item(item_code,item_name,cashflow_type,item_category,effective_from,active_yn)
+            VALUES ('S633-DEDUCTION', '검색항목 차감', 'DEDUCTION', 'SALES', DATE '2026-01-01', true)
+            """);
+        mvc.perform(get("/api/v1/base/commission-items/search").param("asOf","2026-07-01")
+            .param("keyword","검색항목").param("cashflowType","DEDUCTION"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+            .andExpect(jsonPath("$.data.content[0].itemCode").value("S633-DEDUCTION"))
+            .andExpect(jsonPath("$.data.content[0].cashflowType").value("DEDUCTION"));
         mvc.perform(get("/api/v1/base/commission-items").param("asOf","2026-07-01"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data").isArray());
         mvc.perform(get("/api/v1/base/commission-items/search").param("asOf","2026-07-01").param("size","101"))

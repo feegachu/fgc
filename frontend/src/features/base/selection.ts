@@ -28,11 +28,12 @@ export function entityId<K extends EntityKind>(kind: K, option: Entities[K]): st
 }
 export function entityLabel<K extends EntityKind>(kind: K, option: Entities[K]): string {
   const row = option as Record<string, unknown>
-  if (kind === 'agents') return `${row.agentName ?? ''} (${row.agentCode ?? ''})`
+  const coded = (name: unknown, code: unknown) => (code ? `${name ?? ''} (${code})` : String(name ?? ''))
+  if (kind === 'agents') return coded(row.agentName, row.agentCode)
   if (kind === 'products')
-    return `${row.productName ?? ''} · ${row.offeringVersion ?? ''} (${row.insurerProductCode ?? ''})`
+    return coded(`${row.productName ?? ''} · ${row.offeringVersion ?? ''}`, row.insurerProductCode)
   if (kind === 'contracts') return `${row.contractNo ?? ''} · ${row.productName ?? ''}`
-  return `${row.itemName ?? ''} (${row.itemCode ?? ''})`
+  return coded(row.itemName, row.itemCode)
 }
 
 export function useEntityChoices<K extends EntityKind>(
