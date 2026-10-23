@@ -90,7 +90,7 @@ class ValidationRunExecuteServiceImplTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"RUNNING", "COMPLETED", "FAILED"})
+    @ValueSource(strings = {"RUNNING", "COMPLETED"})
     void rejectsNonCreatedRunWithVrun004(String status) {
         ValidationRunStatus target = ValidationRunStatus.valueOf(status);
         given(validationRunRepository.findById(100L)).willReturn(Optional.of(run(target)));
@@ -118,6 +118,24 @@ class ValidationRunExecuteServiceImplTest {
         assertThat(captor.getValue().getValidationRunId()).isEqualTo(100L);
         assertThat(captor.getValue().getStatus()).isEqualTo("CREATED");
         verify(dailyChangedContractJobTrigger, never()).runManual(any(), anyLong(), anyString());
+    }
+
+    @Test
+    void failedMonthlyRunUsesMonthlyRestartPath() {
+        given(validationRunRepository.findById(100L)).willReturn(Optional.of(run(ValidationRunStatus.FAILED)));
+        assertThat(service.execute(100L, 9L, "retry-request").getStatus()).isEqualTo("FAILED");
+        verify(monthlyValidationJobTrigger).launch(any(), eq("retry-request"));
+        verify(dailyChangedContractJobTrigger, never()).runManual(any(), anyLong(), anyString());
+    }
+
+    @Test
+    void failedManualContractRunIsNotRoutedToMonthlyRestart() {
+        given(validationRunRepository.findById(100L))
+                .willReturn(Optional.of(run(ValidationRunStatus.FAILED, "MANUAL_CONTRACT")));
+        assertThatThrownBy(() -> service.execute(100L, 9L, "retry-request"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_004));
+        verify(monthlyValidationJobTrigger, never()).launch(any(), anyString());
     }
 
     /** MANUAL_CONTRACT는 MonthlyValidationJob이 아니라 DailyChangedContractJob으로 가야 한다(코드리뷰 반영). */

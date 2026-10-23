@@ -89,14 +89,19 @@ export const runDetailQuery = (id: string) =>
 /** IF-API-49 — 진행 중인 동안 2초 간격으로 폴링하고, 끝나면(COMPLETED/FAILED/FINALIZED) 멈춘다. */
 export const POLL_INTERVAL = 2000
 export const isRunning = (status?: string) => status === 'RUNNING' || status === 'CREATED'
-export const runProgressQuery = (id: string, enabled: boolean) =>
+export const hasNewAttempt = (data: ValidationProgress | undefined, previousAttemptId: number | null) =>
+  previousAttemptId === null || (data?.attemptId ?? 0) > previousAttemptId
+
+export const runProgressQuery = (id: string, enabled: boolean, previousAttemptId: number | null = null) =>
   queryOptions({
-    queryKey: ['validation-runs', 'progress', id],
+    queryKey: ['validation-runs', 'progress', id, previousAttemptId],
     queryFn: ({ signal }) =>
       get<ValidationProgress>(`/api/v1/validation-runs/${encodeURIComponent(id)}/progress`, signal),
     enabled,
     // execute 직후엔 배치가 아직 안 떠서 CREATED 가 조회될 수 있다 — 종료 상태에서만 멈춘다.
-    refetchInterval: (query) => (query.state.data && !isRunning(query.state.data.status) ? false : POLL_INTERVAL),
+    refetchInterval: (query) =>
+      query.state.data && hasNewAttempt(query.state.data, previousAttemptId)
+        && !isRunning(query.state.data.status) ? false : POLL_INTERVAL,
     // 폴링은 항상 최신값이어야 하므로 캐시를 재사용하지 않는다.
     gcTime: 0,
     meta: { errorToast: false },
@@ -130,8 +135,13 @@ export const createRun = (validationMonth: string, runType: string) =>
   post<CreatedRun>('/api/v1/validation-runs', { validationMonth, runType })
 
 /** IF-API-48 — 202 수락만 의미하고 진행은 폴링으로 본다. */
-export const executeRun = (id: string) =>
-  post<Schemas['ValidationRunExecuteResponse']>(`/api/v1/validation-runs/${encodeURIComponent(id)}/execute`)
+export const executeRun = async (id: string) => {
+  const response = await apiClient.request<Schemas['ValidationRunExecuteResponse']>(
+    `/api/v1/validation-runs/${encodeURIComponent(id)}/execute`, { method: 'POST' },
+  )
+  if (response.data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  return { ...response.data, requestId: response.requestId }
+}
 
 /** IF-API-51 — 같은 멱등키로 다시 보내면 서버가 같은 결과를 돌려준다. */
 export const finalizeRun = (id: string, idempotencyKey: string) =>

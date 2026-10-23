@@ -39,6 +39,33 @@ import java.util.Optional;
  */
 public interface ValidationRunRepository extends JpaRepository<ValidationRun, Long>, ValidationRunSearch {
 
+    /** 비동기 재시작 대기 중의 이전 FAILED와 새 시도 결과를 구별하는 추적 ID다. */
+    @Query(value = """
+            SELECT audit_log_id AS "attemptId", request_id AS "requestId" FROM fgc.audit_log
+             WHERE entity_type='VALIDATION_RUN' AND entity_id=CAST(:validationRunId AS varchar)
+               AND action_code IN ('VALIDATION_RUN_STARTED', 'VALIDATION_RUN_RETRIED')
+             ORDER BY audit_log_id DESC LIMIT 1
+            """, nativeQuery = true)
+    Optional<AttemptTrace> findLatestAttemptTrace(@Param("validationRunId") Long validationRunId);
+
+    interface AttemptTrace {
+        Long getAttemptId();
+        String getRequestId();
+    }
+
+    default String findLatestAttemptRequestId(Long validationRunId) {
+        return findLatestAttemptTrace(validationRunId).map(AttemptTrace::getRequestId).orElse(null);
+    }
+
+    /** 같은 실패 실행의 재시작 점유 이력은 재실패 후에도 소모된 채로 보존한다. */
+    @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM fgc.audit_log
+              WHERE entity_type='VALIDATION_RUN' AND entity_id=CAST(:runId AS varchar)
+                AND action_code='VALIDATION_RUN_RETRIED'
+                AND after_value ->> 'restartFromExecutionId'=CAST(:executionId AS varchar))
+            """, nativeQuery = true)
+    boolean hasRestartClaim(@Param("runId") Long runId, @Param("executionId") Long executionId);
+
     /**
      * 검증월 단위 트랜잭션 advisory lock(#491). 커밋·롤백 때 자동으로 풀린다.
      *
@@ -183,6 +210,16 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
     int transitionToRunning(@Param("validationRunId") Long validationRunId,
                              @Param("created") ValidationRunStatus created,
                              @Param("running") ValidationRunStatus running);
+
+    /** 재시작은 실패 단계·기존 시작 시각을 보존하고 동시 요청 한 건만 점유한다. */
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            UPDATE ValidationRun v SET v.status = :running, v.completedAt = NULL, v.failureMessage = NULL
+             WHERE v.validationRunId = :validationRunId AND v.status = :failed
+            """)
+    int restartFailed(@Param("validationRunId") Long validationRunId,
+                      @Param("failed") ValidationRunStatus failed,
+                      @Param("running") ValidationRunStatus running);
 
     /**
      * 배치 진행 기록 2/4: RUNNING 상태에서 current_step만 전진.
