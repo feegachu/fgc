@@ -79,7 +79,7 @@ class JournalSearchQueryRepositoryIntegrationTest {
             insertLine(headerId, 2, "EXPECTED_INCOME", BigDecimal.ZERO, new BigDecimal(2000 + (i % 3) * 100));
         }
         java.util.Map<String, String> columns = java.util.Map.of(
-                "journalNo", "h.journal_no", "journalDate", "h.journal_date", "contractNo", "c.contract_no",
+                "journalNo", "(substring(h.journal_no from 1 for 10) || lpad(substring(h.journal_no from 12), 8, '0'))", "journalDate", "h.journal_date", "contractNo", "c.contract_no",
                 "debitTotal", "(SELECT COALESCE(SUM(l.debit_amount), 0) FROM fgc.journal_line l WHERE l.journal_header_id = h.journal_header_id)",
                 "creditTotal", "(SELECT COALESCE(SUM(l.credit_amount), 0) FROM fgc.journal_line l WHERE l.journal_header_id = h.journal_header_id)");
         assertThat(JournalQueryRepository.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
