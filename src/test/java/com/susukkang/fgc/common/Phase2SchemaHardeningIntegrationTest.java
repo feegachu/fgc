@@ -107,6 +107,17 @@ class Phase2SchemaHardeningIntegrationTest {
             // 대체된 판 아래 원천은 새로 확정할 수 없다
             long draft = insertDraftSource(conn, v1, "AFTER-SUPERSEDE");
             assertThatThrownBy(() -> confirm(conn, draft)).hasMessageContaining("cannot be confirmed");
+            // 커밋된 전환 뒤 후속본을 거절하면 이전 판(복귀 불가)만 남아 명세가 대사에서 사라지므로 막는다(PR #690 리뷰)
+            assertThatThrownBy(() -> execute(conn, "UPDATE fgc.statement_batch SET status = 'REJECTED' "
+                    + "WHERE statement_batch_id = " + v2)).hasMessageContaining("cannot be REJECTED");
+            assertThat(status(conn, v2)).isEqualTo("AVAILABLE");
+            // 전환과 같은 트랜잭션에서 후속본을 거절해도 커밋이 막힌다
+            long other = freshBatch(false);
+            conn.setAutoCommit(false);
+            insertSuccessor(conn, other);
+            execute(conn, "UPDATE fgc.statement_batch SET status = 'SUPERSEDED' WHERE statement_batch_id = " + other);
+            execute(conn, "UPDATE fgc.statement_batch SET status = 'REJECTED' WHERE supersedes_statement_batch_id = " + other);
+            assertThatThrownBy(conn::commit).hasMessageContaining("cannot be REJECTED");
         }
     }
 

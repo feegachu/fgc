@@ -7,7 +7,8 @@ SET search_path = fgc, pg_temp;
 -- ---------------------------------------------------------------- 1. 명세 묶음 식별값 불변
 -- V58은 후속본이 "있을 때만" 이전 판의 업무키 변경을 막았다. 후속본 INSERT와 이전 판 UPDATE가 동시에 오면
 -- 서로의 미커밋 행을 못 봐 둘 다 커밋됐다(READ COMMITTED 재현). 식별값을 아예 바꾸지 못하게 해 격리수준과 무관하게 막는다.
--- 정정은 다음 판(전체 대체본)으로만 한다(FUN-068). 잘못 적재한 묶음은 REJECTED 로 두고 올바른 업무키로 새로 넣는다.
+-- 정정은 다음 판(전체 대체본)으로만 한다(FUN-068). 판 사슬에 들지 않은 묶음을 잘못 적재했으면 REJECTED 로 두고 올바른 업무키로 새로 넣는다.
+-- 후속본이 잘못됐으면 REJECTED 가 아니라 그다음 판으로 바로잡는다(3번 (a) 참고).
 CREATE OR REPLACE FUNCTION fgc.check_statement_batch_successor()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -72,7 +73,9 @@ FOR EACH ROW EXECUTE FUNCTION fgc.reject_superseded_statement_batch_revival();
 -- 제55조 5: 새 판 적재 → 이전 판 SUPERSEDED → 이전 원천 CANCELLED 를 한 트랜잭션으로 한다.
 -- 커밋 직전에 다음을 확인한다. 하나라도 어기면 트랜잭션 전체가 롤백된다.
 --   (a) 후속본의 이전 판은 SUPERSEDED 다 — 두 판이 함께 유효하면 대사가 실제액을 두 번 센다.
---   (b) SUPERSEDED 판에는 후속본이 있다 — 없으면 명세가 대사에서 사라진다.
+--       후속본은 REJECTED 가 될 수 없다 — 이전 판은 되살릴 수 없으므로 후속본을 거절하면 명세가 대사에서 사라진다.
+--       전환을 커밋한 뒤 후속본을 거절하는 규칙은 문서에 없다 — 업무 규칙 아님, 가상 GA 정책으로 정함(다음 판으로 정정).
+--   (b) SUPERSEDED 판에는 후속본이 있다 — 없으면 명세가 대사에서 사라진다. (a)로 후속본은 늘 유효한 상태다.
 --   (c) SUPERSEDED 판 아래 CONFIRMED 원천이 없다 — 분개 원천 조회(JournalPostingSourceQueryRepository)는
 --       묶음 상태를 보지 않고 원천의 CONFIRMED 만 보므로, 남아 있으면 이전 판이 다시 기표된다.
 -- 이전 POSTED 실제 분개의 역분개(제40조)는 분개 테이블 쪽 일이라 여기서 검사하지 않는다(#643).
@@ -93,6 +96,10 @@ BEGIN
        SELECT 1 FROM fgc.statement_batch
         WHERE statement_batch_id = cur.supersedes_statement_batch_id AND status = 'SUPERSEDED') THEN
     RAISE EXCEPTION 'statement_batch % supersedes %, which must be SUPERSEDED in the same transaction',
+      cur.statement_batch_id, cur.supersedes_statement_batch_id;
+  END IF;
+  IF cur.supersedes_statement_batch_id IS NOT NULL AND cur.status = 'REJECTED' THEN
+    RAISE EXCEPTION 'statement_batch % replaces % and cannot be REJECTED; correct it with the next version',
       cur.statement_batch_id, cur.supersedes_statement_batch_id;
   END IF;
   IF cur.status = 'SUPERSEDED' THEN
