@@ -6,5 +6,7 @@ export type Permission =
   | 'canHandleException'
   | 'canReverseJournal'
   | 'canFinalizeValidation'
+  | 'canUseAgentWorkspace'
 
-export type AuthUser = Required<MeResponse>
+export type AuthUser = Required<Omit<MeResponse, 'agentId' | 'isAgent' | 'canUseAgentWorkspace'>>
+  & Pick<MeResponse, 'agentId' | 'isAgent' | 'canUseAgentWorkspace'>

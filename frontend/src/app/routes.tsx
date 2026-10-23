@@ -10,7 +10,7 @@ import { TransitionPage } from './TransitionPage'
 import { NotFoundPage } from '../features/error/ErrorPages'
 import { RouteErrorBoundary } from './ErrorBoundary'
 import { LoginPage } from '../features/auth/LoginPage'
-import { DashboardPage } from '../features/dashboard/DashboardPage'
+import { HomePage } from './HomePage'
 import { ExceptionPage } from '../features/exception/ExceptionPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RequirePermission } from './RequirePermission'
@@ -18,7 +18,7 @@ import { RequirePermission } from './RequirePermission'
 // 직접 import한 화면은 초기 번들에 들어간다.
 // 여기 없는 경로는 기존 Thymeleaf 화면으로 안내하는 TransitionPage를 그린다.
 const pages: Record<string, ComponentType> = {
-  '/': DashboardPage,
+  '/': HomePage,
   '/base': BasePage,
   '/policies': PoliciesPage,
   '/arbitrage-checks': lazy(() => import('../features/arbitrage/ArbitragePage')),
@@ -43,7 +43,7 @@ export const screenRoutes: RouteObject[] = screens.map((screen) => {
   return {
     path: screen.path,
     element: (
-      <RequirePermission permission={screen.permission}>
+      <RequirePermission permission={screen.permission} screen={screen.path === '/' ? undefined : screen}>
         {Page ? (
           <Suspense fallback={null}>
             <Page />

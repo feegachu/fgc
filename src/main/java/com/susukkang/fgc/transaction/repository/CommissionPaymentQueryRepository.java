@@ -3,6 +3,7 @@ package com.susukkang.fgc.transaction.repository;
 import com.susukkang.fgc.base.entity.Agent;
 import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.common.code.*;
+import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.SqlSort;
 import com.susukkang.fgc.transaction.domain.*;
@@ -39,6 +40,7 @@ public class CommissionPaymentQueryRepository {
 
     private final EntityManager entityManager;
     private final AgentRepository agentRepository;
+    private final AgentDataScopeService agentScope;
 
     /** 화면 정렬 key(TRAN-W01 컬럼) → SQL 표현식. 지급단계·원천유형·흐름·상태는 순서 기준이 없어 제외한다. */
     private static final Map<String, String> SORTABLE = Map.of(
@@ -207,6 +209,7 @@ public class CommissionPaymentQueryRepository {
     }
 
     public CommissionPaymentRow findById(Long paymentId) {
+        agentScope.requirePayment(paymentId);
         NativeQuery<?> query = nativeQuery(FIND_BY_ID);
         query.setParameter("paymentId", paymentId);
         query.addScalar("payment_id", Long.class);
@@ -439,6 +442,11 @@ public class CommissionPaymentQueryRepository {
     private SearchFilter searchFilter(CommissionPaymentSearchCondition condition) {
         StringBuilder sql = new StringBuilder("WHERE 1 = 1\n");
         Map<String, Object> parameters = new LinkedHashMap<>();
+        Long scopeAgentId = agentScope.currentAgentId();
+        if (scopeAgentId != null) {
+            sql.append(" AND ct.recipient_agent_id = :scopeAgentId\n");
+            parameters.put("scopeAgentId", scopeAgentId);
+        }
         if (condition.getSettlementMonth() != null && !condition.getSettlementMonth().isEmpty()) {
             sql.append("""
                     AND ct.settlement_month = CAST(CONCAT(:settlementMonth, '-01') AS date)

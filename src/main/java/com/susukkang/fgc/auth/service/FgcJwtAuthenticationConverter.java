@@ -31,6 +31,7 @@ public class FgcJwtAuthenticationConverter {
 
     public static final String CLAIM_SID = "sid";
     public static final String CLAIM_ROLES = "roles";
+    public static final String CLAIM_AGENT_ID = "agentId";
 
     private final FgcUserDetailsService userDetailsService;
     private final AuthRefreshTokenRepository refreshTokenRepository;
