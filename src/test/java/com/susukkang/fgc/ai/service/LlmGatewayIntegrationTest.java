@@ -172,6 +172,41 @@ class LlmGatewayIntegrationTest {
         assertThat(statusAndError()).containsExactly("TIMEOUT:TIMEOUT", "FALLBACK_RULE:AI_DISABLED");
     }
 
+    /** 5xx 는 IF-EXT-03 차단 대상(시간 초과·401·403·모델 접근 불가·쿼터 소진)이 아니다 — 다음 요청은 다시 1회 보낸다. */
+    @Test
+    void serverErrorDoesNotDisableAi() {
+        status = 500;
+        responseBody = "{\"error\":{\"message\":\"server error\",\"type\":\"server_error\",\"code\":null}}";
+        LlmGateway gateway = gateway("test-key");
+
+        assertAi001(() -> gateway.call(request("문서"), DocKind.class));
+        status = 200;
+        responseBody = OK_BODY;
+        assertThat(gateway.call(request("문서"), DocKind.class).rowCount).isEqualTo(3);
+
+        assertThat(paths).hasSize(2);
+        assertThat(statusAndError()).containsExactly("ERROR:HTTP_500", "SUCCESS:null");
+    }
+
+    /** 차단은 cooldown 이 지나면 풀린다 — 재기동 없이 다음 요청부터 다시 외부로 보낸다. */
+    @Test
+    void aiIsReenabledAfterCooldown() throws InterruptedException {
+        status = 429;
+        responseBody = "{\"error\":{\"message\":\"You exceeded your current quota\",\"type\":\"insufficient_quota\",\"code\":\"insufficient_quota\"}}";
+        LlmGateway gateway = gateway("test-key", Duration.ofMillis(300));
+
+        assertAi001(() -> gateway.call(request("문서"), DocKind.class));
+        assertAi001(() -> gateway.call(request("문서"), DocKind.class));
+        status = 200;
+        responseBody = OK_BODY;
+        Thread.sleep(500);
+        assertThat(gateway.call(request("문서"), DocKind.class).rowCount).isEqualTo(3);
+
+        assertThat(paths).hasSize(2);
+        assertThat(statusAndError()).containsExactly(
+                "ERROR:HTTP_429_insufficient_quota", "FALLBACK_RULE:AI_DISABLED", "SUCCESS:null");
+    }
+
     /** 입력 상한(100자)과 같은 길이는 보낸다 — 초과(101자)만 건너뛴다. */
     @Test
     void sendsInputAtExactLimit() {
@@ -211,8 +246,12 @@ class LlmGatewayIntegrationTest {
     }
 
     private LlmGateway gateway(String apiKey) {
+        return gateway(apiKey, Duration.ofMinutes(10));
+    }
+
+    private LlmGateway gateway(String apiKey, Duration cooldown) {
         LlmProperties properties = new LlmProperties(apiKey, "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
-                "fgc-test-model", Duration.ofSeconds(1), 100, 256, Duration.ofMinutes(10));
+                "fgc-test-model", Duration.ofSeconds(1), 100, 256, cooldown);
         return new LlmGateway(properties, aiCallLogRepository, transactionManager);
     }
 
