@@ -50,7 +50,10 @@ final class ExtractionEvaluator {
     record ExtractedRow(SourceLocation sourceLocation, String rowStatus, boolean edited, Map<String, JsonNode> fields) {
     }
 
-    /** aiSuccessCalls 는 이 문서의 ai_call_log SUCCESS 건수. 0 이면 결정론 파서만 돈 '대체 경로'로 본다. */
+    /**
+     * aiSuccessCalls 는 이 문서의 ai_call_log 중 purpose=INTAKE_EXTRACT·SUCCESS 건수 — 서식 분류(INTAKE_CLASSIFY)는 세지 않는다.
+     * 0 이면 행 추출은 결정론 파서만 돈 '대체 경로'로 본다. 토큰은 비용이므로 분류 호출까지 모두 더한다.
+     */
     record RunMeta(String model, long inputTokens, long outputTokens, int aiSuccessCalls,
                    double inputUsdPerMTok, double outputUsdPerMTok, Long elapsedSeconds) {
     }
@@ -142,7 +145,7 @@ final class ExtractionEvaluator {
         long reviewRows = extracted.stream().filter(row -> REVIEW.contains(row.rowStatus())).count();
         long editedRows = extracted.stream().filter(ExtractedRow::edited).count();
         boolean ai = meta.aiSuccessCalls() > 0;
-        String path = ai ? "AI 추출(성공 호출 " + meta.aiSuccessCalls() + "회)"
+        String path = ai ? "AI 추출(추출 호출 성공 " + meta.aiSuccessCalls() + "회)"
                 : "대체 경로 동작(결정론 파서 — AI 추출 합격으로 보지 않음)";
         String verdict = falseAcceptances > 0
                 ? "시연 차단 결함 " + falseAcceptances + "건(오수락)"
@@ -156,6 +159,17 @@ final class ExtractionEvaluator {
                 meta.elapsedSeconds() == null ? "미측정" : meta.elapsedSeconds() + "초",
                 cost.toPlainString() + " (" + meta.model() + ", 입력 " + meta.inputTokens() + "·출력 " + meta.outputTokens() + " 토큰)",
                 sums, failures);
+    }
+
+    /**
+     * 검토 전 내보내기(시스템 판단 그대로)에 검토 뒤 내보내기의 사람 수정 여부만 얹는다.
+     * 검토 중 '제외'는 row_status 를 EXCLUDED 로 덮어쓰므로(V58 ck_intake_draft_row_excluded) 상태는 검토 전 것을 쓴다.
+     */
+    static List<ExtractedRow> withReviewEdits(List<ExtractedRow> beforeReview, List<ExtractedRow> afterReview) {
+        Set<SourceLocation> edited = afterReview.stream().filter(ExtractedRow::edited)
+                .map(ExtractedRow::sourceLocation).collect(Collectors.toSet());
+        return beforeReview.stream().map(row -> new ExtractedRow(row.sourceLocation(), row.rowStatus(),
+                edited.contains(row.sourceLocation()), row.fields())).toList();
     }
 
     /** 실행마다 result-{runId}.md·.json 을 남긴다. */

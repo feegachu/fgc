@@ -41,7 +41,10 @@
 | 사람 수정률 | 사람이 고친 행 / 추출 행 |
 | 업무 소요시간 | 업로드 시작부터 검토 완료(확정 직전)까지 사람이 잰 시간(초) |
 | 비용 | (입력 토큰 × 입력 단가 + 출력 토큰 × 출력 단가) / 1,000,000 달러 |
-| 경로 | 이 문서의 AI 성공 호출이 0회면 **"대체 경로 동작"** 으로 표시하고 AI 추출 합격으로 보지 않는다 |
+| 경로 | 이 문서의 **행 추출**(`INTAKE_EXTRACT`) 성공 호출이 0회면 **"대체 경로 동작"** 으로 표시하고 AI 추출 합격으로 보지 않는다. 서식 분류(`INTAKE_CLASSIFY`)만 LLM 을 썼어도 대체 경로다 |
+
+행 상태(오수락·확인 필요 비율)는 **추출 직후** 내보내기로, 사람 수정 여부(수정률·무수정 처리율)는 **검토 완료 뒤** 내보내기로 본다.
+검토 중 '제외'는 `row_status` 를 `EXCLUDED` 로 덮어쓰므로(V58 `ck_intake_draft_row_excluded`), 검토 뒤 상태만 보면 시스템이 정상으로 통과시킨 소계 행이 오수락에서 빠진다.
 
 필수 식별값 5개를 고른 것은 **프로젝트 가정**이다(FUN-068 의 계약·설계사 매칭과 대사가 기대는 값). 상품·회차·항목은 정확도에는 들어가지만 오수락으로는 세지 않는다.
 합격 기준 수치는 정하지 않았다 — 10/27 실측 뒤 TER-011 검증기준 칸에 기록한다(실측 전 업계 기준을 쓰지 않는다).
@@ -49,18 +52,20 @@
 ## 10/27 PoC 실행 절차
 
 1. #640 업로드 화면으로 `statement-01.xlsx` 를 올리고, 스톱워치로 검토 완료까지 시간을 잰다
-2. **확정 전에**(행 상태가 시스템 판단 그대로일 때) 추출 초안을 내보낸다
+2. 추출 초안을 **두 번** 내보낸다 — 문서가 REVIEW 가 된 직후(아무도 손대기 전) `before-review.json`, 검토를 마친 뒤(확정 전) `after-review.json`
 
    ```bash
    psql -At -c "SELECT json_agg(json_build_object('sourceLocation', source_location, 'rowStatus', row_status,
      'edited', edited_fields IS NOT NULL, 'fields', normalized_fields) ORDER BY row_no)
-     FROM fgc.intake_draft_row WHERE intake_document_id = <문서ID>" > build/ai-eval/poc-1027/extraction.json
+     FROM fgc.intake_draft_row WHERE intake_document_id = <문서ID>" > build/ai-eval/poc-1027/before-review.json
+   # 검토를 마친 뒤 같은 명령으로 > build/ai-eval/poc-1027/after-review.json
    ```
 
-3. 같은 문서의 토큰을 `ai_call_log` 에서 읽어 `run.json` 을 쓴다
+3. 같은 문서의 토큰을 `ai_call_log` 에서 읽어 `run.json` 을 쓴다 — 토큰은 비용이라 분류 호출까지 모두 더하고, `aiSuccessCalls` 는 행 추출 성공만 센다
 
    ```sql
-   SELECT model_name, sum(input_tokens), sum(output_tokens), count(*) FILTER (WHERE call_status = 'SUCCESS')
+   SELECT model_name, sum(input_tokens), sum(output_tokens),
+          count(*) FILTER (WHERE call_status = 'SUCCESS' AND purpose = 'INTAKE_EXTRACT')
    FROM fgc.ai_call_log WHERE related_entity_type = '<#640이 정한 값>' AND related_entity_id = <문서ID> GROUP BY model_name;
    ```
 
@@ -74,8 +79,10 @@
 4. 측정한다 — 실제 API 를 부르지 않는다
 
    ```bash
-   FGC_EVAL_RUN=build/ai-eval/poc-1027 ./gradlew test --tests '*StatementExtractionEvalRunTest'
+   FGC_EVAL_RUN=build/ai-eval/poc-1027 ./gradlew test --tests '*StatementExtractionEvalRunTest' --rerun
    ```
+
+   `--rerun` 이 없으면 Gradle 이 환경변수 변화를 모르고 `test` 를 UP-TO-DATE 로 건너뛰어 새 결과가 안 남는다.
 
    같은 폴더에 `result-{시각}.md`·`.json` 이 실행마다 남는다. md 를 #638 에 코멘트로 붙이고, 합격 기준 수치를 TER-011 에 기록한다.
 
@@ -83,4 +90,5 @@
 
 - `intake_draft_row.source_location` 에 `{"sheet": "<시트 이름>", "row": <엑셀 행 번호>}` 를 담는다
 - `normalized_fields` 키는 위 정답 필드 이름을 쓴다(다르면 내보내기 SQL 에서 바꿔 담는다)
-- 사람 수정은 `edited_fields` 에만 남기고, 시스템이 매긴 `row_status` 를 확정 전까지 덮어쓰지 않는다 — 덮어쓰면 오수락을 셀 수 없다
+- 사람 수정은 `edited_fields` 에 남긴다(수정률은 검토 뒤 내보내기의 `edited_fields IS NOT NULL` 로 센다)
+- ai_call_log 에 서식 분류는 `INTAKE_CLASSIFY`, 행 추출(열 의미 매핑 포함)은 `INTAKE_EXTRACT` 로 나눠 남긴다

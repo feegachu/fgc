@@ -135,6 +135,23 @@ class ExtractionEvaluatorTest {
         assertThat(result.sums().getFirst().diff()).isNotEqualByComparingTo(BigDecimal.ZERO);
     }
 
+    /** 검토 중 소계 행을 '제외'해 row_status 가 EXCLUDED 로 바뀌어도, 시스템이 READY 로 통과시킨 오수락은 검토 전 상태로 남는다. */
+    @Test
+    void exclusionDuringReviewDoesNotHideFalseAcceptance() {
+        List<ExtractedRow> before = extraction("READY");
+        before.add(new ExtractedRow(new SourceLocation(FEE_SHEET, 53), "READY", false,
+                Map.of("amount", JSON.numberNode(38_857_590), "cashflowType", JSON.textNode("PAYMENT"))));
+        List<ExtractedRow> after = new ArrayList<>(before);
+        after.set(after.size() - 1, withStatus(after.getLast(), "EXCLUDED"));
+        after.set(0, new ExtractedRow(after.get(0).sourceLocation(), "READY", true, after.get(0).fields()));
+
+        Result result = ExtractionEvaluator.evaluate(gold, ExtractionEvaluator.withReviewEdits(before, after), AI_RUN);
+        assertThat(result.falseAcceptances()).isEqualTo(1);
+        assertThat(result.failures()).singleElement().extracting(ExtractionEvaluator.Failure::kind).isEqualTo("오수락(없는 행)");
+        assertThat(result.humanEditRate()).startsWith("0.09% (1/1062)");
+        assertThat(ExtractionEvaluator.evaluate(gold, after, AI_RUN).falseAcceptances()).as("검토 뒤 상태만 보면 놓친다").isZero();
+    }
+
     private List<ExtractedRow> extraction(String status) {
         List<ExtractedRow> rows = new ArrayList<>();
         for (GoldRow row : gold.rows()) {
