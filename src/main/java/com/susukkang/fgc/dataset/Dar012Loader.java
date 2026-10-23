@@ -262,6 +262,7 @@ public class Dar012Loader {
 
     private Map<String, Long> offeringByInsurer(Dar012Plan plan) {
         LocalDate first = plan.contracts().stream().map(ContractRow::contractDate).min(LocalDate::compareTo).orElseThrow();
+        LocalDate last = plan.contracts().stream().map(ContractRow::contractDate).max(LocalDate::compareTo).orElseThrow();
         Map<String, Long> result = new HashMap<>();
         for (String insurerCode : Dar012Planner.INSURER_CODES) {
             List<Long> ids = jdbc.queryForList("""
@@ -270,10 +271,10 @@ public class Dar012Loader {
                       JOIN product p ON p.product_id = po.product_id
                       JOIN insurer i ON i.insurer_id = p.insurer_id
                      WHERE i.insurer_code = ? AND po.active_yn AND po.fee_regime_code = 'CURRENT'
-                       AND po.sales_start_date <= ? AND po.sales_end_date IS NULL
+                       AND po.sales_start_date <= ? AND (po.sales_end_date IS NULL OR po.sales_end_date >= ?)
                      ORDER BY po.sales_start_date DESC, po.product_offering_id
                      LIMIT 1
-                    """, Long.class, insurerCode, Date.valueOf(first));
+                    """, Long.class, insurerCode, Date.valueOf(first), Date.valueOf(last));
             if (ids.isEmpty()) {
                 throw new IllegalStateException("계약일에 유효한 현행 판매버전이 없는 보험사: " + insurerCode);
             }
