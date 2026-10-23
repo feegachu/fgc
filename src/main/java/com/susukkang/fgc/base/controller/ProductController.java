@@ -33,7 +33,7 @@ public class ProductController {
                     + "includeExpired=true이면 판매 종료 버전을 포함하고, includeHistorical=true이면 판매기간·활성 조건을 해제해 계약 검색용 전체 버전을 반환합니다."
     )
     @GetMapping
-    @PreAuthorize(Roles.ANY_ROLE)
+    @PreAuthorize(Roles.CAN_VIEW_PUBLIC_PRODUCTS)
     public ApiResponse<PageResponse<ProductResponse>> search(
             @Parameter(description = "보험회사 ID", example = "2", required = true)
             @RequestParam

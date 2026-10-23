@@ -1,7 +1,7 @@
 package com.susukkang.fgc.base.controller;
 
-import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.auth.service.FgcUserDetailsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,6 +37,9 @@ class BaseViewIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private FgcUserDetailsService users;
+
     @Test
     void DB의_유효한_수수료_항목을_BASE_W01에_표시한다() throws Exception {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -71,14 +74,7 @@ class BaseViewIntegrationTest {
         );
     }
 
-    private static FgcUserDetails settlementPrincipal() {
-        AppUserView view = new AppUserView();
-        view.setUserId(1L);
-        view.setLoginId("settle01");
-        view.setPasswordHash("{noop}x");
-        view.setUserName("정산담당자");
-        view.setRoleCode("SETTLEMENT");
-        view.setAccountStatus("ACTIVE");
-        return new FgcUserDetails(view, true, true);
+    private FgcUserDetails settlementPrincipal() {
+        return (FgcUserDetails) users.loadUserByUsername("settle01");
     }
 }

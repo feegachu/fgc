@@ -24,14 +24,17 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const collapsed = useSidebarStore((state) => state.collapsed)
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
-  const allowed = current && canOpen(current, { canProcess: user.canProcess, canViewAuditLog: user.canViewAuditLog })
+  const allowed = current && canOpen(current, user)
   useEffect(() => {
     const workspace = useWorkspaceStore.getState()
     const requestedMonth = new URLSearchParams(location.search).get('month')
     workspace.initialize(user.loginId, defaultMonth, requestedMonth, {
       canProcess: user.canProcess,
       canViewAuditLog: user.canViewAuditLog,
+      isAgent: user.roleCode === 'AGENT',
     })
+    // 설계사 홈 전환과 이 셸의 월 URL 정규화가 서로 덮어쓰지 않게 한다.
+    if (user.roleCode === 'AGENT' && location.pathname === '/') return
     if (validMonth(requestedMonth) && requestedMonth !== useWorkspaceStore.getState().month)
       workspace.applyMonth(requestedMonth)
     const activeMonth = useWorkspaceStore.getState().month!
@@ -52,6 +55,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
     user.loginId,
     user.canProcess,
     user.canViewAuditLog,
+    user.roleCode,
     defaultMonth,
     navigate,
   ])
