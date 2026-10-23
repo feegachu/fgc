@@ -114,6 +114,9 @@ class Phase2SchemaMigrationIntegrationTest {
                 assertRejected(conn, insert.formatted("external_statement_no", 5));
                 assertRejected(conn, insert.formatted("'OTHER-NO'", 2));
                 execute(conn, insert.formatted("external_statement_no", 2));
+                // 적재 뒤 키·판 번호 컬럼을 바꾸는 우회도 막는다
+                assertRejected(conn, "UPDATE fgc.statement_batch SET version_no = 5 WHERE version_no = 2");
+                assertRejected(conn, "UPDATE fgc.statement_batch SET external_statement_no = 'OTHER-NO' WHERE version_no = 2");
             } finally {
                 conn.rollback();
             }

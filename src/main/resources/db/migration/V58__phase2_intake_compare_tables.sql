@@ -366,7 +366,8 @@ END;
 $$;
 
 CREATE TRIGGER trg_statement_batch_successor
-BEFORE INSERT ON statement_batch
+BEFORE INSERT OR UPDATE OF supersedes_statement_batch_id, version_no, insurer_id, settlement_month, statement_type,
+                           external_statement_no ON statement_batch
 FOR EACH ROW EXECUTE FUNCTION fgc.check_statement_batch_successor();
 
 CREATE TRIGGER trg_generated_document_append_only
