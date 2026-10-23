@@ -50,7 +50,7 @@ CREATE TABLE fgc.fee_regime_ruleset (
             AND long_term_maintenance_to >= long_term_maintenance_from
             AND long_term_maintenance_to <= max_installments)
     ),
-    -- 체계별 법정 상한(REG-03·04·05): 4년은 최대 48회차·장기유지 없음, 7년은 최대 84회차.
+    -- 체계별 법정 최대 회차(REG-03·04·05): 4년은 최대 48회차·장기유지 없음, 7년은 최대 84회차.
     -- 장기유지 시작회차(49/61)는 미결(P1-01)이라 고정하지 않는다.
     CONSTRAINT ck_fee_regime_ruleset_installments CHECK (
         (fee_regime_code = 'FOUR_YEAR_2027'

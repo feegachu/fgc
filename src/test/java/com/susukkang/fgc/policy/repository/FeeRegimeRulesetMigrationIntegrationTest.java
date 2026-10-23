@@ -81,6 +81,10 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                     .hasMessageContaining("ck_fee_regime_ruleset_installments");
             assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", "BD-NEG-3", 85, null, null))
                     .hasMessageContaining("ck_fee_regime_ruleset_installments");
+            // 장기유지 구간 상한 경계: 끝 회차 = 최대 회차(84)는 허용, 85는 거부
+            insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", "BD-LT-BOUNDARY", 84, 61, 84);
+            assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", "BD-NEG-5", 84, 61, 85))
+                    .hasMessageContaining("ck_fee_regime_ruleset_long_term");
             // 기초서류 버전은 선택 키(NULL = 모든 버전): 등록할 수 있고, 같은 구간의 NULL 룰셋끼리는 겹칠 수 없다
             insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", null, 84, null, null);
             assertThatThrownBy(() -> insertRulesetWithVersion(jdbc, sevenPolicyId, "SEVEN_YEAR_2029", null, 84, null, null))
@@ -112,7 +116,7 @@ class FeeRegimeRulesetMigrationIntegrationTest {
                      WHERE policy_version_id = ?
                     """, policyId)).isEqualTo(1);
 
-            // 승인된 정책 아래 룰셋·한도·경과조치는 변경 불가
+            // 승인된 정책 아래 룰셋·한도는 변경 불가
             jdbc.update("""
                     UPDATE fgc.policy_version
                        SET status = 'APPROVED', approved_at = now(),
@@ -126,7 +130,7 @@ class FeeRegimeRulesetMigrationIntegrationTest {
             assertThatThrownBy(() -> jdbc.update(
                     "DELETE FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = ?", rulesetId))
                     .hasMessageContaining("immutable");
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset", Integer.class)).isEqualTo(5);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset", Integer.class)).isEqualTo(6);
         }
     }
 
