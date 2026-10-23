@@ -349,6 +349,13 @@ AS $$
 DECLARE
   prev fgc.statement_batch%ROWTYPE;
 BEGIN
+  IF TG_OP = 'UPDATE'
+     AND (OLD.insurer_id, OLD.settlement_month, OLD.statement_type, COALESCE(OLD.external_statement_no, ''), OLD.version_no)
+         IS DISTINCT FROM
+         (NEW.insurer_id, NEW.settlement_month, NEW.statement_type, COALESCE(NEW.external_statement_no, ''), NEW.version_no)
+     AND EXISTS (SELECT 1 FROM fgc.statement_batch WHERE supersedes_statement_batch_id = OLD.statement_batch_id) THEN
+    RAISE EXCEPTION 'statement_batch % has a successor; its business key and version_no cannot be changed', OLD.statement_batch_id;
+  END IF;
   IF NEW.supersedes_statement_batch_id IS NULL THEN
     RETURN NEW;
   END IF;

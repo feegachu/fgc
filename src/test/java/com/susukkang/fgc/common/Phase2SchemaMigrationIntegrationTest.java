@@ -117,6 +117,10 @@ class Phase2SchemaMigrationIntegrationTest {
                 // 적재 뒤 키·판 번호 컬럼을 바꾸는 우회도 막는다
                 assertRejected(conn, "UPDATE fgc.statement_batch SET version_no = 5 WHERE version_no = 2");
                 assertRejected(conn, "UPDATE fgc.statement_batch SET external_statement_no = 'OTHER-NO' WHERE version_no = 2");
+                // 후속본이 있는 이전 판의 업무키도 바꿀 수 없다
+                assertRejected(conn, "UPDATE fgc.statement_batch SET external_statement_no = 'OTHER-NO' "
+                        + "WHERE statement_batch_id = (SELECT supersedes_statement_batch_id FROM fgc.statement_batch "
+                        + "WHERE version_no = 2)");
             } finally {
                 conn.rollback();
             }
