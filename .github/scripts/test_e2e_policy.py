@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from e2e_policy import changed_paths, classify, plan_for_event, validate_gate
+from e2e_policy import changed_paths, classify, documentation_only_since, plan_for_event, validate_gate
 
 
 class SelectionTests(unittest.TestCase):
@@ -143,6 +143,48 @@ class GitDiffTests(unittest.TestCase):
                 paths = changed_paths(base, head, merge_base=True)
             self.assertCountEqual(paths, ["frontend/old.ts", "README.md"])
             self.assertTrue(classify(paths)["ui"])
+
+
+class DocumentationOnlySinceTests(unittest.TestCase):
+    """Jenkins dev-fgc: 문서 전용 push 는 직전 이미지를 재사용하므로 라벨 커밋이 HEAD 의 문서 전용 조상인지 확인한다."""
+
+    def test_accepts_only_documentation_descendants(self):
+        with tempfile.TemporaryDirectory() as directory:
+            def git(*args):
+                return subprocess.check_output(["git", "-C", directory, *args]).decode().strip()
+            git("init", "-q", "-b", "main")
+            git("config", "user.name", "E2E test")
+            git("config", "user.email", "test@example.invalid")
+            root = Path(directory)
+            (root / "src").mkdir()
+            (root / "docs").mkdir()
+            (root / "src/App.java").write_text("v1", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-qm", "image build")
+            built = git("rev-parse", "HEAD")
+            (root / "docs/policy.md").write_text("doc", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-qm", "docs only")
+            docs = git("rev-parse", "HEAD")
+            (root / "src/App.java").write_text("v2", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-qm", "code")
+            code = git("rev-parse", "HEAD")
+            git("switch", "-q", "-c", "other", built)
+            (root / "docs").mkdir(exist_ok=True)
+            (root / "docs/other.md").write_text("doc", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-qm", "sibling docs")
+            sibling = git("rev-parse", "HEAD")
+            from e2e_policy import git as real_git
+            with patch("e2e_policy.git", side_effect=lambda *args: real_git("-C", directory, *args)):
+                self.assertTrue(documentation_only_since(built, built))
+                self.assertTrue(documentation_only_since(built, docs))
+                self.assertFalse(documentation_only_since(built, code))
+                self.assertFalse(documentation_only_since(docs, built))
+                self.assertFalse(documentation_only_since(sibling, docs))
+                with self.assertRaises(ValueError):
+                    documentation_only_since(None, docs)
 
 
 if __name__ == "__main__":
