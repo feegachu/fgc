@@ -73,8 +73,8 @@ public class FeeRegimeRulesetService {
 
     private static FeeRegimeResolution limitMissing(FeeRegimeResolution r) {
         return new FeeRegimeResolution(FeeRegimeResolutionStatus.REVIEW_REQUIRED,
-                FeeRegimeReasonCode.RULESET_LIMIT_MISSING, r.declaredFeeRegimeCode(), r.rulesetId(),
-                r.policyVersionId(), r.contractDate(), r.salesStartDate(), r.basicDocumentVersion(),
+                FeeRegimeReasonCode.RULESET_LIMIT_MISSING, r.declaredFeeRegimeCode(), null,
+                null, r.contractDate(), r.salesStartDate(), r.basicDocumentVersion(),
                 r.basicDocumentDate(), r.candidateOfferingIds(), List.of(r.rulesetId()), r.regRefs());
     }
 

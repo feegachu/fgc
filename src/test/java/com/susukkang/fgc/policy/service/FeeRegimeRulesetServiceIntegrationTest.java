@@ -166,6 +166,9 @@ class FeeRegimeRulesetServiceIntegrationTest {
         assertThat(selection.resolution().status()).isEqualTo(FeeRegimeResolutionStatus.REVIEW_REQUIRED);
         assertThat(selection.resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.RULESET_LIMIT_MISSING);
         assertThat(selection.resolution().candidateRulesetIds()).containsExactly(rulesetId);
+        // 다른 REVIEW_REQUIRED 결과처럼 rulesetId·policyVersionId 는 SELECTED 일 때만 채운다
+        assertThat(selection.resolution().rulesetId()).isNull();
+        assertThat(selection.resolution().policyVersionId()).isNull();
         assertThat(selection.ruleset()).isNull();
         assertThat(selection.limits()).isEmpty();
     }
