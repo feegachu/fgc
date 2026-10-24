@@ -24,4 +24,11 @@ class Dar012PropertiesTest {
         assertThat(withBaseDate(Dar012Properties.MIN_BASE_DATE).baseDate()).isEqualTo(Dar012Properties.MIN_BASE_DATE);
         assertThat(withBaseDate(null).baseDate()).isEqualTo(Dar012Properties.DEFAULT_BASE_DATE);
     }
+
+    @Test
+    void rejectsQueryRepeatsBelowOneAndDefaultsToFifty() {
+        assertThatThrownBy(() -> new Dar012Properties("D12-T", null, null, null, null, null, null, 0))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("query-repeats");
+        assertThat(withBaseDate(null).queryRepeats()).isEqualTo(50);
+    }
 }

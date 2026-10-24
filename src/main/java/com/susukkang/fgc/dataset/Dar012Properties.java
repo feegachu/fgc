@@ -47,5 +47,8 @@ public record Dar012Properties(String datasetId, Long seed, Integer contracts, L
         runValidation = runValidation != null && runValidation;
         validationMonth = validationMonth == null ? baseDate.withDayOfMonth(1).minusMonths(1) : validationMonth.withDayOfMonth(1);
         queryRepeats = queryRepeats == null ? 50 : queryRepeats;
+        if (queryRepeats < 1) {
+            throw new IllegalArgumentException("fgc.dar012.query-repeats 는 1 이상이어야 한다: " + queryRepeats);
+        }
     }
 }
