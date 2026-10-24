@@ -70,9 +70,8 @@ class Dar012PlannerTest {
     @Test
     void everyPaymentIsRoundedPerRowAndPlantedAnomaliesAreInTheAnswerKey() {
         Dar012Plan p = plan(20261118L, 1000);
-        BigDecimal summed = p.payments().stream().map(PaymentRow::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        assertThat(summed).isEqualByComparingTo(p.payments().stream()
-                .map(x -> x.amount().setScale(0, java.math.RoundingMode.HALF_UP)).reduce(BigDecimal.ZERO, BigDecimal::add));
+        assertThat(p.payments()).allSatisfy(x ->
+                assertThat(x.amount()).isEqualByComparingTo(x.amount().setScale(0, java.math.RoundingMode.HALF_UP)));
         Set<String> scenarios = p.answers().stream().map(AnswerRow::scenario).collect(Collectors.toSet());
         assertThat(scenarios).contains("RECON_AMOUNT_DIFF", "COMMON_PATTERN_SHORT_10PCT", "CAP_AT_LIMIT", "CAP_OVER_LIMIT",
                 "STATUS_LAPSED", "STATUS_REVIVED", "STATUS_TERMINATED", "REP_AMOUNT_UNCONFIRMED");
