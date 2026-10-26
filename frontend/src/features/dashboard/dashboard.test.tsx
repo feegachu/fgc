@@ -57,15 +57,34 @@ const summary: DashboardSummary = {
 }
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'dash-test' })
 const clients: QueryClient[] = []
+const insights = {
+  month: '2026-07-01',
+  insurerBreakdown: [
+    { insurerName: '가나다생명', capViolation: 9, capWarning: 3 },
+    { insurerName: '라마바화재', capViolation: 2, capWarning: 0 },
+  ],
+  monthlyTrend: ['2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07'].map((m, i) => ({
+    month: `${m}-01`,
+    capViolation: i * 10,
+    capWarning: i,
+    reconMismatch: 2,
+  })),
+}
 let summaryResponse: () => Promise<unknown>
+let insightsResponse: () => Promise<unknown>
 
 beforeEach(() => {
   useAuthStore.setState({ accessToken: null, loggingOut: false })
   useWorkspaceStore.getState().clear()
   sessionStorage.clear()
   summaryResponse = async () => envelope(summary)
+  insightsResponse = async () => envelope(insights)
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string) =>
-    path.startsWith('/api/v1/dashboard/summary') ? summaryResponse() : envelope(user)) as typeof apiClient.request)
+    path.startsWith('/api/v1/dashboard/summary')
+      ? summaryResponse()
+      : path.startsWith('/api/v1/dashboard/insights')
+        ? insightsResponse()
+        : envelope(user)) as typeof apiClient.request)
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -98,8 +117,8 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(within(kpis).getAllByRole('link')).toHaveLength(6)
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
     expect(summaryCalls()).toEqual(['/api/v1/dashboard/summary?month=2026-07'])
-    const table = screen.getByRole('table', { name: '최근 예외 목록' })
-    expect(within(table).getByText('C-0001')).toBeInTheDocument()
+    const table = screen.getByRole('list', { name: '최근 예외 목록' })
+    expect(within(table).getByText(/C-0001/)).toBeInTheDocument()
     // UTC 15:30 은 Asia/Seoul 로 다음 날 00:30 이다.
     expect(within(table).getByText('2026-07-11 00:30')).toBeInTheDocument()
     const run = screen.getByRole('link', { name: /2026-07-01 · 2회차/ })
@@ -180,5 +199,40 @@ describe('DASH-W01 업무 대시보드', () => {
     renderDashboard()
     expect(await screen.findByRole('region', { name: '주요 검증 지표' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '403 · 권한 없음' })).toBeNull()
+  })
+})
+
+describe('DASH-W01 차트', () => {
+  it('최근 6개월 추이와 보험사별 건수를 보여 준다', async () => {
+    renderDashboard()
+    const trend = await screen.findByRole('table', { name: '최근 월별 검증 건수 추이' })
+    expect(within(trend).getAllByRole('row')).toHaveLength(7)
+    expect(within(trend).getByRole('row', { name: /7월/ })).toHaveTextContent('50건')
+    expect(await screen.findByText('가나다생명')).toBeInTheDocument()
+    expect(screen.getByText('위반 9 · 주의 3')).toBeInTheDocument()
+    expect(vi.mocked(apiClient.request).mock.calls.map(([path]) => path)).toContain(
+      '/api/v1/dashboard/insights?month=2026-07',
+    )
+  })
+
+  it('차트 조회가 실패해도 KPI는 보이고 다시 시도하면 복구한다', async () => {
+    let fail = true
+    insightsResponse = async () => {
+      if (fail) throw new ApiError({ code: 'FGC-COMMON-500', message: '처리 중 오류가 발생했습니다.' }, 'req-2', 500)
+      return envelope(insights)
+    }
+    const { actions } = renderDashboard()
+    expect(await screen.findByRole('region', { name: '주요 검증 지표' })).toBeInTheDocument()
+    const alert = await screen.findAllByRole('alert')
+    expect(alert.length).toBeGreaterThan(0)
+    fail = false
+    await actions.click(screen.getAllByRole('button', { name: '다시 시도' })[0])
+    expect(await screen.findByText('가나다생명')).toBeInTheDocument()
+  })
+
+  it('판정이 난 보험사가 없으면 빈 상태 문구를 보여 준다', async () => {
+    insightsResponse = async () => envelope({ ...insights, insurerBreakdown: [] })
+    renderDashboard()
+    expect(await screen.findByText('이번 달 위반·주의 판정이 난 보험사가 없습니다.')).toBeInTheDocument()
   })
 })
