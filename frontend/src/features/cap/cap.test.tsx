@@ -195,7 +195,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     await waitFor(() => expect(within(table).getByText('C-2026-0001')).toBeVisible())
     expect(screen.getByLabelText('기준월')).toHaveValue('2026-07')
     expect(listCalls().every((url) => new URLSearchParams(url.split('?')[1]).get('month') === '2026-07')).toBe(true)
-    expect(within(table).getByText('1,200.000000%')).toBeVisible()
+    expect(within(table).getByText('1,200.0%')).toBeVisible()
     expect(within(table).getByText('주의')).toBeVisible() // 1200%를 프론트에서 VIOLATION으로 다시 판정하지 않음
     expect(within(table).getByText('-85,000원')).toHaveClass('is-negative-amount')
     expect(within(table).getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/contracts/3?tab=cap')
@@ -353,14 +353,14 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
       url.startsWith('/api/v1/cap-checks?') ? { ...list, content: [] } : undefined,
     )
     const dialog = await screen.findByRole('dialog')
-    await within(dialog).findByText('한도 = 100,000 × 12 − 288,000 + 3,000 = 915,000원')
+    await within(dialog).findByText('한도 = 100,000 × 12.0 − 288,000 + 3,000 = 915,000원')
     expect(within(dialog).getByText('증빙 미연결 / 후속 연결 대기')).toBeVisible()
     expect(within(dialog).getByText('제외 항목 미포함')).toBeVisible()
     const detailRows = within(dialog).getByRole('table', { name: '항목별 산입 내역' }).querySelectorAll('tbody tr')
     expect(detailRows[0]).toHaveTextContent('기본수수료') // API 순서를 프론트에서 임의 재정렬하지 않음
     expect(detailRows[1]).toHaveTextContent('지원비')
     expect(within(dialog).getByRole('link', { name: '예외 목록 보기' })).toHaveAttribute('href', '/exceptions')
-    expect(within(dialog).getAllByText(/1,200.000000%/).length).toBeGreaterThan(0)
+    expect(within(dialog).getAllByText(/1,200\.0%/).length).toBeGreaterThan(0)
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
   it('없는 ID의 서버 오류를 표시해도 목록은 정상이다', async () => {
@@ -423,9 +423,9 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
   it('주의선은 저장 정책 90이 아닌 서버의 사용률 위치를 쓰고 저장 판정을 유지한다', async () => {
     renderAt('/cap-checks?capCheckId=11')
     const dialog = await screen.findByRole('dialog')
-    const marker = await within(dialog).findByTitle('주의 기준 82.857142%')
+    const marker = await within(dialog).findByTitle('주의 기준 82.8%')
     expect(marker).toHaveStyle({ left: '82.857142%' })
-    expect(within(dialog).getByText('주의 기준 (1,200% 예산) 90.0000%')).toBeVisible()
+    expect(within(dialog).getByText('주의 기준 (1,200% 예산) 90.0%')).toBeVisible()
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
   it('서버 주의선 위치가 없으면 90% 선을 추정하지 않는다', async () => {
@@ -455,7 +455,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.')
     expect(within(dialog).getByText('적용하지 않음')).toBeVisible()
-    expect(within(dialog).getByText('한도 = 100,000 × 12 − 288,000 = 912,000원')).toBeVisible()
+    expect(within(dialog).getByText('한도 = 100,000 × 12.0 − 288,000 = 912,000원')).toBeVisible()
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
 })
