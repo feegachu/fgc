@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { waitFor } from '@testing-library/react'
 import { ApiError } from '../../lib/api/client'
 import type { RequestOptions } from '../../lib/api/client'
-import { errorText, isNegative, usageRate, won } from '../../lib/format'
+import * as format from '../../lib/format'
 import type { Payment, Precheck } from './form-api'
 const html = readFileSync('../src/main/resources/templates/transaction/form.html', 'utf8')
 const source = readFileSync('../src/main/resources/static/js/features/transaction/transaction-form.js', 'utf8')
@@ -94,7 +94,7 @@ async function mount(
     configurable: true,
     value: {
       apiClient: { request },
-      format: { errorText, isNegative, usageRate, won, today: () => '2026-07-31' },
+      format: { ...format, today: () => '2026-07-31' },
       modal,
       toast: { show: vi.fn() },
     },

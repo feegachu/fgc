@@ -355,11 +355,22 @@ describe('EXCP-W01 예외함', () => {
     expect(within(card).queryByText('FUTURE_TYPE')).not.toBeInTheDocument()
   })
 
-  it('행을 선택하면 상세·검출 이력·처리 이력을 보여 준다', async () => {
+  it('행을 선택하면 상세·검출 증거의 사용률을 한 자리로 표시하고 처리 이력을 보여 준다', async () => {
     searchResponse = () =>
       search([
         {
           ...baseCase,
+          title: '한도 초과 — 사용률 104.166667%',
+          description: '1,200% 한도 초과(사용률 104.166667%).',
+          occurrences: [
+            {
+              ...baseCase.occurrences![0],
+              evidenceItems: [
+                { label: '한도액', value: '1,200,000원' },
+                { label: '사용률', value: '104.166667%' },
+              ],
+            },
+          ],
           actions: [
             {
               actionSeq: 1,
@@ -376,6 +387,11 @@ describe('EXCP-W01 예외함', () => {
     const { actions } = renderPage()
     await actions.click(within(await table()).getByRole('button', { name: '11' }))
     expect(await screen.findByText('1,200,000원')).toBeInTheDocument()
+    expect(within(await table()).getByText('한도 초과 — 사용률 104.1%')).toBeInTheDocument()
+    expect(screen.getByText('한도 초과 — 사용률 104.1%', { selector: 'dd' })).toBeInTheDocument()
+    expect(screen.getByText('1,200% 한도 초과(사용률 104.1%).', { selector: 'dd' })).toBeInTheDocument()
+    expect(screen.getByText('104.1%')).toBeInTheDocument()
+    expect(screen.queryByText(/104\.166667%/)).not.toBeInTheDocument()
     expect(screen.getByText('1,200% 한도 초과', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('배정합니다')).toBeInTheDocument()
     for (const link of screen.getAllByRole('link', { name: /INSURANCE_CONTRACT:3/ }))

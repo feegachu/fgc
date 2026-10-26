@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
-import { date, int, month as formatMonth, rate as rate4 } from '../../lib/format'
+import { date, int, month as formatMonth, rate } from '../../lib/format'
 import { withMonth } from '../../stores/workspace'
 import { detailQuery } from './api'
 import type { Detail, Match } from './api'
@@ -182,7 +182,7 @@ function SourceSide({
                   </div>
                   <div>
                     <dt>적용 요율</dt>
-                    <dd>{match.ratePct == null ? EMPTY : `${rate4(match.ratePct)}%`}</dd>
+                    <dd>{match.ratePct == null ? EMPTY : `${rate(match.ratePct)}%`}</dd>
                   </div>
                 </>
               ) : (
