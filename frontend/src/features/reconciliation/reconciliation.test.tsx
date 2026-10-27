@@ -455,7 +455,7 @@ describe('RECO-W01·W02 React 전환', () => {
     const dialog = screen.getByRole('dialog')
     expect(await within(dialog).findByText('예상 원천 1 · schedule_line #12')).toBeVisible()
     expect(within(dialog).getByText('실제 원천 1 · commission_transaction #8')).toBeVisible()
-    expect(within(dialog).getByText('123.1234%')).toBeVisible()
+    expect(within(dialog).getByText('123.1%')).toBeVisible()
     for (const difference of within(dialog).getAllByText('-1,000원'))
       expect(difference).toHaveClass('is-negative-amount', 'reco-react-difference')
     expect(within(dialog).getByRole('link', { name: '스케줄 상세' })).toHaveAttribute(

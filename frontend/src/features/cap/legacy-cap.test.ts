@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, expect, it, vi } from 'vitest'
 import { waitFor } from '@testing-library/react'
+import * as format from '../../lib/format'
 
 const html = readFileSync('../src/main/resources/templates/cap/list.html', 'utf8')
 const source = readFileSync('../src/main/resources/static/js/features/cap/cap-list.js', 'utf8')
@@ -21,7 +22,7 @@ it('legacy CAP list distinguishes unavailable amounts from a real zero amount', 
         complianceDeductionAmount: 0, limitAmount: 0, includedAmount: 0, remainingAmount: 0, usagePct: '0' },
     ],
   } }))
-  vi.stubGlobal('FgcUi', { apiClient: { request }, modal: { open: vi.fn() } })
+  vi.stubGlobal('FgcUi', { apiClient: { request }, modal: { open: vi.fn() }, format })
   window.eval(source)
   await waitFor(() => expect(document.querySelectorAll('#cap-contract-body tr')).toHaveLength(2))
   const rows = document.querySelectorAll('#cap-contract-body tr')

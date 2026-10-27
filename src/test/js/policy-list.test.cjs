@@ -9,11 +9,11 @@ const {
   tableCellDisclosure
 } = require("../../main/resources/static/js/features/policy/policy-list.js");
 
-test("POL-W01 displays rates to four decimal places without rounding", () => {
-  assert.equal(formatRate("650.000000"), "650.0000");
-  assert.equal(formatRate("34.800000"), "34.8000");
-  assert.equal(formatRate("1.234567"), "1.2345");
-  assert.equal(formatRate("1200"), "1,200.0000");
+test("POL-W01 displays rates to one decimal place without rounding", () => {
+  assert.equal(formatRate("650.000000"), "650.0");
+  assert.equal(formatRate("34.800000"), "34.8");
+  assert.equal(formatRate("1.234567"), "1.2");
+  assert.equal(formatRate("1200"), "1,200.0");
 });
 
 test("POL-W01 formats serialized policy amounts without trailing zeroes", () => {

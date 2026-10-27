@@ -137,7 +137,7 @@ function BasisContent({ data }: { data: CapBasis }) {
   const insurerStage = item.paymentStage === 'INSURER_TO_GA'
   const multiplier =
     typeof snapshot.premiumMultiplier === 'string' || typeof snapshot.premiumMultiplier === 'number'
-      ? String(snapshot.premiumMultiplier)
+      ? rate(snapshot.premiumMultiplier)
       : '—'
   // 수식 문자열만 구성한다. 한도/사용률/판정은 재계산하지 않는다(#468).
   const limitParts = [int(item.basePremiumAmount), '×', multiplier]
