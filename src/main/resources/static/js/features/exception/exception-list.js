@@ -47,6 +47,18 @@
 
   const format = window.FgcUi && window.FgcUi.format;
 
+  function formatRates(scope) {
+    if (!format) return;
+    scope.querySelectorAll("[data-rate-text]").forEach((element) => {
+      element.textContent = format.rateText(element.textContent);
+    });
+    scope.querySelectorAll("[data-usage-rate='true']").forEach((element) => {
+      element.textContent = format.usageRate(element.textContent.replace(/[% ,]/g, "")) + "%";
+    });
+  }
+
+  formatRates(document);
+
   /*
    * 표시 형식은 공통 유틸만 쓴다 (FGC-SIR-008).
    * 전에는 문자열을 잘라 쓰느라 서버가 UTC 로 준 값이 그대로 노출됐다 — format.dateTime 은
@@ -490,6 +502,7 @@
   function clonePanel(template) {
     const wrapper = document.createElement("div");
     wrapper.append(template.content.cloneNode(true));
+    formatRates(wrapper);
     return wrapper;
   }
 
