@@ -39,9 +39,9 @@ describe('donutSegments', () => {
 describe('RiskComposition', () => {
   it('범례 줄이 이름·건수·비중을 접근 가능한 이름으로 갖고 목록 화면으로 연결한다', () => {
     renderChart()
-    const violation = screen.getByRole('link', { name: '1,200% 위반 6건, 비중 60%' })
+    const violation = screen.getByRole('link', { name: '1,200% 위반 6건, 비중 60.0%' })
     expect(violation).toHaveAttribute('href', '/cap-checks?status=VIOLATION')
-    expect(screen.getByRole('link', { name: '원장 불균형 0건, 비중 0%' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '원장 불균형 0건, 비중 0.0%' })).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(4)
   })
 

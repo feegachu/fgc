@@ -60,12 +60,14 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
       <ul className="risk-legend">
         {items.map((item, index) => {
           const share = total > 0 ? item.value / total : 0
+          // 화면정의서 공통 규칙 3: 비율은 소수점 첫째 자리까지, 정수에도 .0을 붙인다
+          const sharePct = `${(share * 100).toFixed(1)}%`
           return (
             <li key={item.key} style={{ '--i': index } as CSSProperties}>
               <Link
                 to={item.to}
                 className={`risk-legend-row${activeKey === item.key ? ' is-active' : ''}`}
-                aria-label={`${item.label} ${int(item.value)}건, 비중 ${Math.round(share * 100)}%`}
+                aria-label={`${item.label} ${int(item.value)}건, 비중 ${sharePct}`}
                 onMouseEnter={() => setActiveKey(item.key)}
                 onMouseLeave={() => setActiveKey(null)}
                 onFocus={() => setActiveKey(item.key)}
@@ -74,7 +76,7 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
                 <span className={`risk-swatch risk-color-${item.color}`} aria-hidden="true" />
                 <span className="risk-legend-label">{item.label}</span>
                 <span className="risk-legend-value tabular-nums">{int(item.value)}건</span>
-                <span className="risk-legend-share tabular-nums">{Math.round(share * 100)}%</span>
+                <span className="risk-legend-share tabular-nums">{sharePct}</span>
                 <span className="risk-legend-bar" aria-hidden="true">
                   <span
                     className={`risk-legend-bar-fill risk-color-${item.color}`}
