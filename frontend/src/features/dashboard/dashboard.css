@@ -260,11 +260,6 @@
   pointer-events: none;
 }
 
-.risk-donut-center strong {
-  color: var(--color-text-primary);
-  font-size: 1.375rem;
-  line-height: 1.75rem;
-}
 
 .risk-donut-center span {
   color: var(--color-text-tertiary);

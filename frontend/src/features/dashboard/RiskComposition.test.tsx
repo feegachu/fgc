@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
@@ -64,9 +64,10 @@ describe('RiskComposition', () => {
     expect(screen.getByRole('link', { name: /1,200% 위반/ })).toHaveClass('is-active')
   })
 
-  it('중앙에 합계를 보여 준다', () => {
+  it('중앙에는 합계 대신 안내 문구만 두어 단위가 다른 건수를 더하지 않는다', () => {
     const { container } = renderChart()
-    expect(within(container.querySelector('.risk-donut-center') as HTMLElement).getByText('10')).toBeInTheDocument()
+    expect(container.querySelector('.risk-donut-center')).toHaveTextContent('항목별 비중')
+    expect(screen.queryByText('10')).not.toBeInTheDocument()
   })
 
   it('모든 건수가 0이면 빈 상태를 보여 준다', () => {

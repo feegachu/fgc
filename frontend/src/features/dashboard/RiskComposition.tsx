@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
-import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { int } from '../../lib/format'
 import { useDrawn } from '../../lib/motion'
 import { CIRCUMFERENCE, RADIUS, donutSegments } from './donut'
@@ -55,10 +54,7 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
           })}
         </svg>
         <div className="risk-donut-center">
-          <strong className="tabular-nums">
-            <AnimatedNumber value={total} />
-          </strong>
-          <span>건</span>
+          <span>항목별 비중</span>
         </div>
       </div>
       <ul className="risk-legend">

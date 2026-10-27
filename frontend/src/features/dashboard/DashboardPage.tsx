@@ -252,7 +252,7 @@ function DashboardContent({ month }: { month: string }) {
                   </h2>
                 </header>
                 <RiskComposition items={compositionItems} />
-                <p className="risk-composition-note">미처리 예외는 위 항목에서 생기므로 비중에서 제외했습니다.</p>
+                <p className="risk-composition-note">미처리 예외는 일부가 위 항목과 겹치고 세는 단위(예외 건)가 달라 비중에서 제외했습니다. 비중은 항목별 건수의 단순 비율이며 세는 단위가 서로 다릅니다.</p>
               </section>
             </aside>
           </div>
