@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { errorText, int } from '../../lib/format'
@@ -446,13 +445,10 @@ function ChatbotLauncher({ open, need, onOpen, onClose }: { open: boolean; need:
         aria-label="FGC 보험 상품 비교분석 추천 AI 열기"
         onClick={onOpen}
       >
-        <img
-          src={`${base}images/brand/agent-mascot.png`}
-          alt=""
-          width={128}
-          height={128}
-          style={{ '--i': 0 } as CSSProperties}
-        />
+        <span className="ah-mascot" aria-hidden="true">
+          <img src={`${base}images/brand/agent-mascot-body.png`} alt="" width={128} height={128} />
+          <img className="ah-arm" src={`${base}images/brand/agent-mascot-arm.png`} alt="" width={128} height={128} />
+        </span>
         <span className="ah-launcher-label">상품 추천 AI</span>
       </button>
       {open && <ChatbotModal need={need} onClose={onClose} />}
