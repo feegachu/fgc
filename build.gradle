@@ -33,15 +33,13 @@ repositories {
 dependencies {
     // Actuator 추가
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    // Web / 화면
+    // Web
     implementation 'org.springframework.boot:spring-boot-starter-web'
     // WAR 로 외장 Tomcat 에 올릴 때 내장 Tomcat 은 WEB-INF/lib 에서 뺀다 (jar 실행에는 영향 없음)
     providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 
     // 인증·인가
     implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
     // 2차 JWT 공존 모드(#400) — NimbusJwtEncoder/Decoder(HS256)를 쓴다. jjwt 는 넣지 않는다.
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
