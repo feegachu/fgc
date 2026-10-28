@@ -1,6 +1,6 @@
 package com.susukkang.fgc.arbitrage.controller;
 
-import jakarta.servlet.http.Cookie;
+import com.susukkang.fgc.common.security.AuthenticatedSessions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -51,9 +51,10 @@ class ArbitrageApiIntegrationTest {
     }
 
     // 2026-10-27 yslee - #419 STATELESS: CSRF 토큰 대신 "세션 쿠키만으로는 실행되지 않는다"를 본다.
+    // 2026-10-28 yslee - 임의 쿠키 대신 SETTLEMENT 의 인증된 세션을 싣는다(PR #734 리뷰).
     @Test
     void manualCheckRejectsSessionCookieOnlyAndRequiresInput() throws Exception {
-        mvc.perform(post("/api/v1/contracts/1/arbitrage-check").cookie(new Cookie("JSESSIONID", "forged-session"))
+        mvc.perform(post("/api/v1/contracts/1/arbitrage-check").session(AuthenticatedSessions.withRoles("SETTLEMENT"))
                         .contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/contracts/1/arbitrage-check").with(user("settle").roles("SETTLEMENT"))

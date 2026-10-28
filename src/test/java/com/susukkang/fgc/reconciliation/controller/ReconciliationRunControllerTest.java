@@ -1,7 +1,7 @@
 package com.susukkang.fgc.reconciliation.controller;
 
-import jakarta.servlet.http.Cookie;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.common.security.AuthenticatedSessions;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.config.SecurityConfig;
@@ -207,10 +207,12 @@ class ReconciliationRunControllerTest {
 
     // 2026-10-27 yslee - #419 STATELESS·CSRF 비활성 이후의 같은 의도: 브라우저가 자동으로 싣는 쿠키만으로는
     // 상태 변경 요청이 통하지 않는다(세션 인증이 없어 401). 기존 "CSRF 토큰 없으면 403"을 대체한다.
+    // 2026-10-28 yslee - 임의 쿠키 대신 처리 권한이 있는 역할의 인증된 세션을 싣는다(PR #734 리뷰) — 세션을 읽는 정책으로
+    //   되돌아가면 이 요청이 컨트롤러까지 가서 실패한다.
     @Test
     void 세션_쿠키만_있는_요청은_401로_차단한다() throws Exception {
         mockMvc.perform(post("/api/v1/reconciliations")
-                        .cookie(new Cookie("JSESSIONID", "forged-session"))
+                        .session(AuthenticatedSessions.withRoles("SETTLEMENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isUnauthorized());
@@ -270,10 +272,12 @@ class ReconciliationRunControllerTest {
 
     // 2026-10-27 yslee - #419 STATELESS·CSRF 비활성 이후의 같은 의도: 브라우저가 자동으로 싣는 쿠키만으로는
     // 상태 변경 요청이 통하지 않는다(세션 인증이 없어 401). 기존 "CSRF 토큰 없으면 403"을 대체한다.
+    // 2026-10-28 yslee - 임의 쿠키 대신 처리 권한이 있는 역할의 인증된 세션을 싣는다(PR #734 리뷰) — 세션을 읽는 정책으로
+    //   되돌아가면 이 요청이 컨트롤러까지 가서 실패한다.
     @Test
     void 예외_일괄_생성_요청은_세션_쿠키만으로는_401로_차단한다() throws Exception {
         mockMvc.perform(post("/api/v1/reconciliations/41/exceptions")
-                        .cookie(new Cookie("JSESSIONID", "forged-session")))
+                        .session(AuthenticatedSessions.withRoles("SETTLEMENT")))
                 .andExpect(status().isUnauthorized());
         verify(reconciliationExceptionService, never()).bulkCreate(41L);
     }

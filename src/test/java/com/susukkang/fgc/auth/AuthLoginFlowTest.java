@@ -2,6 +2,9 @@ package com.susukkang.fgc.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.auth.service.FgcUserDetailsService;
+import com.susukkang.fgc.common.security.AuthenticatedSessions;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +17,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -22,6 +27,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,6 +60,8 @@ class AuthLoginFlowTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private FgcUserDetailsService userDetailsService;
 
     @AfterEach
     void restore() {
@@ -146,23 +154,33 @@ class AuthLoginFlowTest {
     }
 
     // #419 시나리오 4 — 미인증 요청은 리다이렉트 없이 401 이다(화면 이동은 SPA 가 한다)
+    // 2026-10-28 yslee - 응답 모양을 고정한다(PR #734 리뷰): 토큰이 없으면 본문 없는 401, 토큰이 틀리면 JSON 오류 봉투(인터페이스정의서 §5-3).
     @Test
     void anonymousRequestIsUnauthorizedWithoutRedirect() throws Exception {
         mockMvc.perform(get("/api/v1/contracts"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().doesNotExist(HttpHeaders.LOCATION));
+                .andExpect(header().doesNotExist(HttpHeaders.LOCATION))
+                .andExpect(content().string(""));
         mockMvc.perform(get("/"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist(HttpHeaders.LOCATION));
+        mockMvc.perform(get("/api/v1/contracts").header(HttpHeaders.AUTHORIZATION, "Bearer forged"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-002"));
     }
 
-    // #419 시나리오 5 — STATELESS: 로그인해도 세션 쿠키를 주지 않고, 세션 쿠키로는 인증되지 않는다
+    // #419 시나리오 5 — STATELESS: 로그인해도 세션 쿠키를 주지 않고, 세션으로는 인증되지 않는다
+    // 2026-10-28 yslee - 임의 JSESSIONID 대신 1차 폼 로그인이 남기던 인증 세션(같은 사용자)으로 검사한다(PR #734 리뷰).
+    //   세션을 읽는 정책(NEVER 등)으로 되돌아가면 이 요청이 200 이 되어 실패한다.
     @Test
     void sessionCookieNeitherIssuedNorAccepted() throws Exception {
         MockHttpServletResponse response = loginOk(DEMO_LOGIN_ID);
         assertThat(response.getCookie("JSESSIONID")).isNull();
 
-        mockMvc.perform(get("/api/v1/contracts").cookie(new Cookie("JSESSIONID", "legacy-session")))
+        FgcUserDetails user = (FgcUserDetails) userDetailsService.loadUserByUsername(DEMO_LOGIN_ID);
+        MockHttpSession authenticatedSession = AuthenticatedSessions.of(
+                UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities()));
+        mockMvc.perform(get("/api/v1/contracts").session(authenticatedSession))
                 .andExpect(status().isUnauthorized());
     }
 
