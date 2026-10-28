@@ -78,7 +78,7 @@ reviews:
     - path: "src/main/resources/db/migration/**"
       instructions: |
         1. 이미 적용된 Flyway 마이그레이션 파일 수정은 금지입니다. 새 V 파일로만 변경합니다.
-        2. db/migration 과 db/demo 사이에 버전 번호가 겹치면 안 됩니다.
+        2. db/migration · db/demo · db/demo-agent 사이에 버전 번호가 겹치면 안 됩니다.
            PR #30에서 병합 후 V6·V7이 양쪽에 되살아난 사고가 있었습니다.
         3. 금액 컬럼의 CHECK 제약과 감사 테이블의 append-only 성질이 깨지지 않는지 봐주세요.
         4. 정책 행은 불변입니다. APPROVED·ACTIVE·RETIRED 정책을 수정·삭제하지 않고

@@ -70,7 +70,7 @@ export function createWorkspaceStore(
           ? saved.month
           : defaultMonth
       const home = permissions.isAgent
-        ? { id: 'CONT-W01', title: '보험계약 목록', href: '/contracts', icon: 'description', modified: false }
+        ? { id: 'AGNT-W01', title: '포트폴리오', href: '/agent-home', icon: 'home', modified: false }
         : dashboard
       const tabs: WorkspaceTab[] = [{ ...home, href: withMonth(home.href, month) }]
       if (saved.owner === user && Array.isArray(saved.tabs)) {

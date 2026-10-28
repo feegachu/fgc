@@ -1,4 +1,4 @@
-import { test, expect, login, legacyLogin, backend, completeMonthly, password } from './fixtures'
+import { test, expect, login, completeMonthly, password, responseFor, successful } from './fixtures'
 
 test('로그인 4개 역할·대시보드·사용자·메뉴·로그아웃', async ({ browser, baseURL }) => {
   for (const [account, userName, roleName, auditMenu] of [
@@ -44,7 +44,7 @@ test('비로그인 지급 등록 딥링크 → 로그인 → 쿼리·해시 복�
   await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page.getByRole('heading', { name: '지급 건 등록 · 귀속 · 확정' })).toBeVisible()
-  await expect(page).toHaveURL(new URL(`/app${route}`, page.url()).href)
+  await expect(page).toHaveURL(new URL(route, page.url()).href)
 })
 
 test('중복 로그인은 이전 브라우저를 차단하고 재로그인 후 경로 복원', async ({ page, browser, baseURL }) => {
@@ -68,22 +68,9 @@ test('중복 로그인은 이전 브라우저를 차단하고 재로그인 후 �
   }
 })
 
-test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1차 비교', async ({ page }, info) => {
+test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·API 대조', async ({ page }, info) => {
   await login(page)
   await completeMonthly(page)
-  await legacyLogin(page, 'audit01')
-  await page.goto(`${backend}/audit-logs?action=JOURNAL_DRAFT_SAVED&page=2`)
-  const legacyRows = page.locator('tr[data-audit-detail-href]')
-  await expect(legacyRows.first()).toBeVisible()
-  const oldCount = (await page.locator('#row-count').innerText()).replace(/,/g, '')
-  const oldCells = await legacyRows.evaluateAll((rows) =>
-    rows.map((row) =>
-      [...row.querySelectorAll('td')].map((cell) =>
-        (cell.querySelector('.table-cell-preview')?.textContent ?? cell.textContent ?? '').replace(/\s+/g, ' ').trim(),
-      ),
-    ),
-  )
-  await info.attach('legacy-audit', { body: await page.screenshot(), contentType: 'image/png' })
   await login(page, 'audit01')
   const adminSection = page.locator('aside details').filter({ has: page.locator('summary', { hasText: '관리' }) })
   if ((await adminSection.getAttribute('open')) === null) await adminSection.locator('summary').click()
@@ -93,17 +80,21 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1�
   const table = page.getByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
   await expect(table.locator('tbody tr')).toHaveCount(20)
   await page.getByLabel('행위 종류').selectOption('JOURNAL_DRAFT_SAVED')
+  const filtered = responseFor(page, '/audit-logs', 'GET')
   await page.getByRole('button', { name: '조회', exact: true }).click()
+  const firstPage = await successful(filtered)
   await expect(page).toHaveURL(/action=JOURNAL_DRAFT_SAVED/)
-  await expect(page.locator('.audit-panel-caption .tabular-nums')).toHaveText(Number(oldCount).toLocaleString('en-US'))
+  await expect(page.locator('.audit-panel-caption .tabular-nums')).toHaveText(firstPage.totalElements.toLocaleString('en-US'))
+  const paged = responseFor(page, '/audit-logs', 'GET')
   await page.getByRole('button', { name: '2', exact: true }).click()
+  const secondPage = await successful(paged)
   await expect(page).toHaveURL(/page=2/)
   await expect(page.locator('.audit-pagination .list-pagination-status')).toHaveText(/^2 \/ \d+ 페이지$/)
   await expect(
     page.getByRole('navigation', { name: '감사로그 목록 페이지 선택' }).locator('[aria-current="page"]'),
   ).toHaveText('2')
   const rows = table.locator('tbody tr')
-  await expect(rows).toHaveCount(oldCells.length)
+  await expect(rows).toHaveCount(secondPage.content.length)
   const newCells = await rows.evaluateAll((rows) =>
     rows.map((row) =>
       [...row.querySelectorAll('td')].map((cell) =>
@@ -114,7 +105,10 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·1�
       ),
     ),
   )
-  expect(newCells).toEqual(oldCells)
+  // 1차 화면 대조 대신(#419에서 1차 제거) 화면이 받은 API 응답과 행 순서·대상 ID 를 대조한다.
+  expect(newCells.map((cells) => cells[4])).toEqual(
+    secondPage.content.map((item: { entityId: string }) => item.entityId),
+  )
   const row = rows.first()
   await row.focus()
   await page.keyboard.press('Enter')

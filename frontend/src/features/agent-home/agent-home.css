@@ -1,0 +1,264 @@
+/* AGNT-W01 포트폴리오 — 목업(agnt-w01-home-final.html)의 보라 디자인 토큰과 카드 구성을 그대로 옮긴다. */
+.ah {
+  --brand-50: #f7f4fb;
+  --brand-100: #efe9f6;
+  --brand-300: #cdbde3;
+  --brand-600: #7f57ac;
+  --brand-900: #6a4893;
+  --pink: #b6a0d3;
+  --border: #e2e8f0;
+  --ink: #0f172a;
+  --body: #475569;
+  --muted: #64748b;
+  --warn: #b45309;
+  --warn-bg: #fffbeb;
+  --bad: #b91c1c;
+  --bad-bg: #fef2f2;
+  --ok: #15803d;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+
+  & p, & h2, & h3, & ul { margin: 0; padding: 0; }
+  & ul { list-style: none; }
+  & button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
+  & button:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 2px; border-radius: 6px; }
+
+  /* 프로필 · 월 현황 · 네 가지 지표 */
+  & .ah-snapshot {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    margin-bottom: 16px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+  }
+  & .ah-hero {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    padding: 24px 20px;
+    min-height: 230px;
+    background: var(--brand-50);
+    border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  & .ah-avatar {
+    display: grid;
+    place-items: center;
+    width: 82px;
+    height: 82px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid var(--brand-100);
+    color: var(--brand-600);
+    font-size: 28px;
+    font-weight: 700;
+  }
+  & .ah-profile { margin-top: 10px; }
+  & .ah-profile-role { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  & .ah-profile-name { font-size: 20px; line-height: 1.5; font-weight: 700; letter-spacing: -0.03em; }
+  & .ah-heading {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: -0.035em;
+    color: var(--brand-600);
+  }
+  & .ah-kpis {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 24px 4px 24px;
+    min-width: 0;
+  }
+  & .ah-kpi {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
+    min-width: 0;
+    min-height: 140px;
+    padding: 14px 10px 0;
+    border-right: 1px solid var(--border);
+    background: transparent;
+    transition: background 0.15s ease;
+  }
+  & .ah-kpi:last-child { border-right: 0; }
+  & .ah-kpi:hover { background: var(--brand-50); }
+  & .ah-kpi-label { width: 100%; font-size: 12px; color: var(--muted); }
+  & .ah-kpi-num {
+    width: 100%;
+    margin: 20px 0 16px;
+    font-size: clamp(22px, 2.1vw, 30px);
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  & .ah-kpi-unit { margin-left: 3px; font-size: 14px; font-weight: 400; color: #94a3b8; letter-spacing: 0; }
+  & .ah-kpi-foot { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 0; min-height: 40px; font-size: 12px; color: #94a3b8; white-space: nowrap; }
+  & .ah-delta { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  & .ah-delta.up { color: var(--ok); }
+  & .ah-delta.down { color: var(--bad); }
+  & .ah-retry { font-size: 12px; color: var(--brand-600); text-decoration: underline; }
+  & .ah-kpi-alert { font: inherit; }
+  & .ah-badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+  & .ah-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px; border-radius: 5px; font-size: 9px; font-weight: 500; white-space: nowrap; }
+  & .ah-badge.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #fde68a; }
+  & .ah-badge.danger { background: var(--bad-bg); color: var(--bad); border: 1px solid #fecaca; }
+  & .ah-kpi-more { margin-top: 7px; font-size: 10.5px; font-weight: 700; color: var(--brand-600); }
+  & .ah-kpi-more::after { content: '→'; margin-left: 2px; }
+
+  /* 설계사 판매 관리 */
+  & .ah-panel { padding: 20px 22px; background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 2px 6px rgb(15 23 42 / 6%); }
+  & .ah-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  & .ah-panel-title { font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; }
+  & .ah-panel-sub { margin-top: 3px; font-size: 12.5px; color: var(--muted); }
+  & .ah-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  & .ah-seg { position: relative; display: inline-flex; padding: 2px; background: #f1f5f9; border: 1px solid var(--border); border-radius: 9px; }
+  & .ah-seg button { position: relative; z-index: 1; padding: 5px 10px; border-radius: 7px; font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; transition: color 0.15s; }
+  & .ah-seg button[aria-pressed='true'] { color: var(--brand-600); font-weight: 700; }
+  & .ah-seg-thumb { position: absolute; top: 2px; bottom: 2px; border-radius: 7px; background: #fff; box-shadow: 0 1px 3px rgb(15 23 42 / 10%); transition: left 0.2s var(--ease), width 0.2s var(--ease); }
+  & .ah-filter-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; min-height: 24px; }
+  & .ah-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 5px 4px 9px; background: var(--brand-50); border: 1px solid var(--brand-300); border-radius: 999px; color: var(--brand-600); font-size: 11px; font-weight: 500; }
+  & .ah-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand-600); }
+  & .ah-chip button { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--brand-100); color: var(--brand-600); font-size: 9px; }
+  & .ah-note { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+  & .ah-chart-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; margin-top: 6px; }
+  & .ah-box { grid-column: span 6; min-width: 0; padding: 12px 14px 6px; background: #fff; border: 1px solid #f1f5f9; border-radius: 12px; }
+  & .ah-donut-box, & .ah-product-box { grid-column: span 5; }
+  & .ah-trend-box, & .ah-status-box { grid-column: span 7; }
+  & .ah-box h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--body); }
+  & .ah-sub { font-size: 10.5px; font-weight: 400; color: #94a3b8; }
+  & .ah-chart { position: relative; }
+  & .ah-tip { position: absolute; z-index: 5; pointer-events: none; padding: 9px 11px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgb(15 23 42 / 12%); font-size: 11px; white-space: nowrap; }
+  & .ah-tip small { display: block; margin-top: 2px; font-size: 10px; color: var(--muted); }
+
+  & .ah-donut-flex { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+  & .ah-donut-canvas { position: relative; width: 200px; height: 200px; flex: 0 0 200px; }
+  & .ah-donut-canvas svg { width: 100%; height: 100%; }
+  & .ah-slice { cursor: pointer; transform-origin: 50% 50%; transition: transform 0.6s var(--ease), opacity 0.3s var(--ease), filter 0.2s; }
+  & .ah-slice.is-hover { transform: scale(1.07); filter: brightness(1.06); transition: transform 0.18s var(--ease), opacity 0.3s var(--ease), filter 0.2s; }
+  & .ah-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; }
+  & .ah-donut-center b { font-size: 26px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  & .ah-donut-center span { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+  & .ah-donut-center em { margin-top: 2px; max-width: 88px; font-style: normal; font-size: 9.5px; font-weight: 500; line-height: 1.3; color: var(--brand-600); }
+  & .ah-donut-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  & .ah-donut-legend button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px; border-radius: 6px; text-align: left; transition: background 0.15s, opacity 0.15s; }
+  & .ah-donut-legend button:hover, & .ah-donut-legend li.sel button { background: var(--brand-50); }
+  & .ah-donut-legend li.dim { opacity: 0.4; }
+  & .ah-lg-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 2px; }
+  & .ah-lg-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--body); }
+  & .ah-lg-name b { margin-left: 3px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  & .ah-donut-legend em { flex: 0 0 36px; text-align: right; font-style: normal; font-size: 9.5px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+  & .ah-trend { height: 246px; }
+  & .ah-trend svg { width: 100%; height: 100%; display: block; }
+  & .ah-axis { font-size: 9.5px; fill: #94a3b8; }
+  & .ah-best { font-size: 8px; font-weight: 700; fill: #fff; }
+  & .ah-bar { transition: filter 0.15s; }
+  & .ah-bar.is-hover { filter: brightness(1.12); }
+
+  & .ah-product { display: grid; gap: 14px; padding: 12px 0 10px; }
+  & .ah-product li { display: grid; grid-template-columns: 62px minmax(0, 1fr) 82px; align-items: center; gap: 8px; }
+  & .ah-pd-name { font-size: 10px; color: #475569; }
+  & .ah-pd-track { height: 12px; border-radius: 5px; background: #f1f5f9; overflow: hidden; }
+  & .ah-pd-fill { display: block; height: 100%; border-radius: 0 5px 5px 0; transition: width 0.6s var(--ease), filter 0.15s; }
+  & .ah-product li:hover .ah-pd-fill { filter: brightness(1.12); }
+  & .ah-product b { font-size: 9.5px; font-weight: 700; color: var(--brand-600); white-space: nowrap; }
+
+  & .ah-status-bar { display: flex; gap: 3px; height: 20px; margin: 20px 0 16px; border-radius: 6px; overflow: hidden; }
+  & .ah-status-bar span { height: 100%; transition: width 0.5s var(--ease); }
+  & .ah-status-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; padding-bottom: 8px; }
+  & .ah-status-legend li { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--body); }
+  & .ah-sg-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
+  & .ah-status-legend b { font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  & .ah-status-legend em { margin-left: auto; font-style: normal; font-size: 10.5px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+  /* 확인 필요 계약 모달 */
+  & .ah-modal { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 24px; background: rgb(15 23 42 / 45%); backdrop-filter: blur(4px); }
+  & .ah-modal-card { width: min(740px, 100%); max-height: 86vh; overflow: auto; background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgb(15 23 42 / 24%); }
+  & .ah-modal-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; gap: 11px; padding: 20px 22px 14px; background: #fff; border-bottom: 1px solid var(--border); }
+  & .ah-modal-head h3 { font-size: 15px; font-weight: 700; }
+  & .ah-modal-head p { margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+  & .ah-modal-close { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #f8fafc; color: var(--muted); font-size: 12px; }
+  & .ah-modal-close:hover { background: var(--brand-50); color: var(--brand-600); }
+  & .ah-modal-body { padding: 6px 22px; }
+  & .ah-empty { padding: 28px 0; text-align: center; font-size: 12.5px; color: var(--muted); }
+  & .ah-need-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid #f1f5f9; }
+  & a.ah-need-row { color: inherit; text-decoration: none; }
+  & a.ah-need-row:hover, & a.ah-need-row:focus-visible { background: var(--brand-50); }
+  & .ah-need-row:last-child { border-bottom: 0; }
+  & .ah-nr-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+  & .ah-nr-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 400; color: var(--muted); }
+  & .ah-nr-meta { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 10px; color: #94a3b8; }
+  & .ah-nr-meta i { width: 2px; height: 2px; border-radius: 50%; background: #cbd5e1; }
+  & .ah-modal-foot { display: flex; align-items: center; gap: 12px; padding: 13px 22px; background: #f8fafc; border-top: 1px solid var(--border); }
+  & .ah-modal-foot p { font-size: 10.5px; line-height: 1.5; color: var(--muted); }
+  & .ah-btn-ghost { margin-left: auto; padding: 7px 14px; background: #fff; border: 1px solid var(--brand-300); border-radius: 8px; font-size: 11.5px; font-weight: 500; color: var(--brand-600); white-space: nowrap; }
+  & .ah-btn-ghost:hover { background: var(--brand-50); }
+
+  /* 상품 추천 AI 런처와 챗봇 화면 */
+  & .ah-launcher { position: fixed; right: 28px; bottom: 26px; z-index: 85; display: grid; place-items: center; width: 132px; height: 132px; }
+  & .ah-launcher img { display: block; width: 128px; height: 128px; filter: drop-shadow(0 6px 10px rgb(15 23 42 / 22%)); animation: ah-float 3.2s ease-in-out infinite; will-change: transform; }
+  & .ah-launcher:hover img, & .ah-launcher:focus-visible img { animation-play-state: paused; }
+  & .ah-launcher-label { position: absolute; right: 136px; bottom: 46px; padding: 7px 11px; border: 1.5px solid transparent; border-radius: 16px; background: linear-gradient(#fff, #fff) padding-box, conic-gradient(from var(--ah-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box; animation: ah-border-spin 3.4s linear infinite; box-shadow: 0 1px 2px rgb(15 23 42 / 6%); font-size: 12px; font-weight: 600; color: var(--brand-900); white-space: nowrap; }
+  & .ah-frame-layer { position: fixed; z-index: 200; inset: 0 0 0 var(--ah-frame-left, 256px); }
+  & .ah-frame-layer iframe { width: 100%; height: 100%; border: 0; background: transparent; }
+}
+@keyframes ah-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+.app-shell.is-sidebar-collapsed .ah .ah-frame-layer { --ah-frame-left: 72px; }
+
+@media (max-width: 1180px) {
+  .ah .ah-snapshot { grid-template-columns: 195px minmax(0, 1fr); }
+  .ah .ah-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 0; }
+  .ah .ah-kpi:nth-child(2) { border-right: 0; }
+  .ah .ah-chart-grid { grid-template-columns: 1fr; }
+  .ah .ah-box { grid-column: span 1; }
+}
+@media (max-width: 760px) {
+  .ah .ah-snapshot { grid-template-columns: 1fr; }
+  .ah .ah-hero { grid-row: auto; border-right: 0; border-bottom: 1px solid var(--border); min-height: 0; }
+  .ah .ah-heading { grid-column: 1; grid-row: auto; }
+  .ah .ah-kpis { grid-column: 1; grid-row: auto; grid-template-columns: 1fr; padding: 0 14px; }
+  .ah .ah-kpi { min-height: 122px; padding: 14px 0; border-right: 0; border-bottom: 1px solid var(--border); }
+  .ah .ah-kpi:last-child { border-bottom: 0; }
+  .ah .ah-donut-flex { flex-direction: column; align-items: stretch; }
+  .ah .ah-donut-canvas { align-self: center; }
+  .ah .ah-donut-legend { flex: none; width: 100%; }
+  .ah .ah-frame-layer { inset: 0 0 60px 0; }
+  .ah .ah-launcher { width: 104px; height: 104px; right: 16px; bottom: 78px; }
+  .ah .ah-launcher img { width: 100px; height: 100px; }
+  .ah .ah-launcher-label { right: 108px; bottom: 34px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ah .ah-launcher img { animation: none; }
+  .ah .ah-launcher-label { animation: none; }
+  .ah .ah-slice, .ah .ah-bar, .ah .ah-pd-fill, .ah .ah-status-bar span { transition: none; }
+}
+
+@property --ah-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes ah-border-spin {
+  to { --ah-angle: 360deg; }
+}
