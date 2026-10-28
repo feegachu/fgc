@@ -15,8 +15,15 @@ public record PolicyActionRequest(
         @NotNull ActionType actionType,
         @NotBlank @Size(max = 2000) String reason,
         @NotNull PolicyStatus expectedStatus,
-        @NotNull OffsetDateTime expectedUpdatedAt
+        @NotNull OffsetDateTime expectedUpdatedAt,
+        @Schema(description = "APPROVE에서만 지정하는 승인 근거 문서 참조")
+        @Size(max = 500) String evidenceRef
 ) {
+    public PolicyActionRequest(ActionType actionType, String reason, PolicyStatus expectedStatus,
+                               OffsetDateTime expectedUpdatedAt) {
+        this(actionType, reason, expectedStatus, expectedUpdatedAt, null);
+    }
+
     public enum ActionType { SUBMIT, APPROVE, REJECT, ACTIVATE }
 
     @JsonAnySetter

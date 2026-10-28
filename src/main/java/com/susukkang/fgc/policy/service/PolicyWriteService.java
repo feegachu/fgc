@@ -31,6 +31,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -52,7 +53,9 @@ public class PolicyWriteService {
     private static final Set<PolicyType> WRITABLE_TYPES = Set.of(PolicyType.CURRENT_COMMISSION,
             PolicyType.FOUR_YEAR_COMMISSION, PolicyType.SEVEN_YEAR_COMMISSION,
             PolicyType.SCHEDULE_ELIGIBILITY, PolicyType.ARBITRAGE, PolicyType.RECONCILIATION_TOLERANCE);
-    private static final Pattern REFERENCE = Pattern.compile("^(REG-\\d{2}[A-Z]?|SRC-\\d{3})(?:\\s+.+)?$");
+    private static final Pattern REFERENCE = Pattern.compile("^(REG-\\d{2}[A-Z]?|SRC-\\d{3})(?:\\s++\\S.*)?$");
+    private static final String ACTION_CLONE = "CLONE";
+    private static final String FIELD_POLICY_TYPE = "policyType";
     private final PolicyVersionRepository policyVersionRepository;
     private final PolicyWriteRepository writeRepository;
     private final PolicyDraftValidator draftValidator;
@@ -75,7 +78,7 @@ public class PolicyWriteService {
             PolicyVersion policy = policyVersionRepository.saveAndFlush(PolicyVersion.draft(draft, 1, userId));
             writeRepository.replaceChildren(policy.getPolicyVersionId(), draft);
             writeRepository.refresh(policy);
-            return record("CREATE", policy, actor, null, null);
+            return recordChange("CREATE", policy, actor, null, null);
         });
     }
 
@@ -92,12 +95,12 @@ public class PolicyWriteService {
                 throw invalid("commissionRules", "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
             }
             if (writeRepository.hasUnsupportedChildren(id)) {
-                throw invalid("policyType", "전용 편집 계약이 없는 기존 규칙을 덮어쓸 수 없습니다.");
+                throw invalid(FIELD_POLICY_TYPE, "전용 편집 계약이 없는 기존 규칙을 덮어쓸 수 없습니다.");
             }
             validateReferences(draft, storedReferences(writeRepository.readDraft(policy)));
             Map<String, Object> before = snapshot(policy, actor);
             writeRepository.updateDraft(policy, draft);
-            return record("UPDATE", policy, actor, before, null);
+            return recordChange("UPDATE", policy, actor, before, null);
         });
     }
 
@@ -113,7 +116,7 @@ public class PolicyWriteService {
                 throw stateConflict("승인·활성·종료 버전만 새 초안으로 복제할 수 있습니다.");
             }
             if (writeRepository.hasUnsupportedChildren(id)) {
-                throw invalid("policyType", "이 유형의 전용 규칙 작성·복제는 아직 지원하지 않습니다.");
+                throw invalid(FIELD_POLICY_TYPE, "이 유형의 전용 규칙 작성·복제는 아직 지원하지 않습니다.");
             }
             writeRepository.lockPolicyCode(source.getPolicyCode());
             int version = writeRepository.nextVersion(source.getPolicyCode());
@@ -121,12 +124,16 @@ public class PolicyWriteService {
                     request.effectiveFrom(), request.effectiveTo(), version, userId));
             writeRepository.copyChildren(id, copy.getPolicyVersionId());
             writeRepository.refresh(copy);
-            return record("CLONE", copy, actor, Map.of("sourcePolicyVersionId", id), request.reason());
+            return recordChange(ACTION_CLONE, copy, actor, Map.of("sourcePolicyVersionId", id), request.reason());
         });
     }
 
     public PolicyWriteResult executeAction(Long id, PolicyActionRequest request, Long userId, String idempotencyKey) {
         validate(request);
+        if (request.evidenceRef() != null && (request.evidenceRef().isBlank()
+                || request.actionType() != PolicyActionRequest.ActionType.APPROVE)) {
+            throw invalid("evidenceRef", "승인 근거는 APPROVE에서만 비어 있지 않은 문서 참조로 지정하세요.");
+        }
         boolean submit = request.actionType() == PolicyActionRequest.ActionType.SUBMIT;
         FgcUserDetails actor = requireActor(userId, submit ? WRITERS : APPROVERS);
         return executeOnce(idempotencyKey, userId, "ACTION:" + id, request, () -> {
@@ -146,16 +153,17 @@ public class PolicyWriteService {
                     && writeRepository.hasActiveOverlap(policy)) {
                 throw new FgcBusinessException(FgcErrorCode.POL_002);
             }
-            policy.transition(next, next == PolicyStatus.APPROVED ? userId : null);
+            policy.transition(next, next == PolicyStatus.APPROVED ? userId : null, request.evidenceRef());
             policyVersionRepository.saveAndFlush(policy);
-            writeRepository.appendAction(id, request.actionType().name(), userId, request.reason());
+            writeRepository.appendAction(id, request.actionType().name(), userId, request.reason(), request.evidenceRef());
             writeRepository.refresh(policy);
-            return record(request.actionType().name(), policy, actor, before, request.reason());
+            return recordChange(request.actionType().name(), policy, actor, before, request.reason());
         });
     }
 
     /** UI도 같은 역할·상태·작성자 판정을 사용한다. */
-    public static List<String> allowedActions(PolicyVersion policy) {
+    @Transactional(readOnly = true)
+    public List<String> allowedActions(PolicyVersion policy) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof FgcUserDetails actor)) {
             return List.of();
@@ -163,7 +171,7 @@ public class PolicyWriteService {
         return allowedActions(policy, actor);
     }
 
-    private static List<String> allowedActions(PolicyVersion policy, FgcUserDetails actor) {
+    private List<String> allowedActions(PolicyVersion policy, FgcUserDetails actor) {
         if (!WRITERS.contains(actor.getRoleCode())) {
             return List.of();
         }
@@ -172,12 +180,21 @@ public class PolicyWriteService {
         }
         return switch (policy.getStatus()) {
             case DRAFT -> List.of("EDIT", "SUBMIT");
-            case REVIEW -> !APPROVERS.contains(actor.getRoleCode()) ? List.of()
-                    : Objects.equals(policy.getCreatedBy(), actor.getUserId()) ? List.of("REJECT")
-                    : List.of("APPROVE", "REJECT");
-            case APPROVED -> APPROVERS.contains(actor.getRoleCode()) ? List.of("CLONE", "ACTIVATE") : List.of("CLONE");
-            case ACTIVE, RETIRED -> List.of("CLONE");
+            case REVIEW -> reviewActions(policy, actor);
+            case APPROVED -> APPROVERS.contains(actor.getRoleCode()) ? List.of(ACTION_CLONE, "ACTIVATE") : List.of(ACTION_CLONE);
+            case ACTIVE, RETIRED -> List.of(ACTION_CLONE);
         };
+    }
+
+    private List<String> reviewActions(PolicyVersion policy, FgcUserDetails actor) {
+        if (!APPROVERS.contains(actor.getRoleCode())) return List.of();
+        if (hasAuthored(policy, actor.getUserId())) return List.of("REJECT");
+        return List.of("APPROVE", "REJECT");
+    }
+
+    private boolean hasAuthored(PolicyVersion policy, Long actorId) {
+        return Objects.equals(policy.getCreatedBy(), actorId)
+                || writeRepository.hasContributed(policy.getPolicyVersionId(), actorId);
     }
 
     private PolicyStatus nextStatus(PolicyVersion policy, PolicyActionRequest.ActionType action, Long actorId) {
@@ -189,7 +206,7 @@ public class PolicyWriteService {
         if (policy.getStatus() != expected) {
             throw stateConflict("허용되지 않은 정책 상태 전이입니다.");
         }
-        if (action == PolicyActionRequest.ActionType.APPROVE && Objects.equals(policy.getCreatedBy(), actorId)) {
+        if (action == PolicyActionRequest.ActionType.APPROVE && hasAuthored(policy, actorId)) {
             throw new FgcBusinessException(FgcErrorCode.POL_001);
         }
         return switch (action) {
@@ -220,7 +237,7 @@ public class PolicyWriteService {
             default -> false;
         };
         if (!complete) {
-            throw invalid("policyType", "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다.");
+            throw invalid(FIELD_POLICY_TYPE, "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다.");
         }
     }
 
@@ -285,21 +302,29 @@ public class PolicyWriteService {
         }
     }
 
-    private PolicyWriteResult record(String action, PolicyVersion policy, FgcUserDetails actor,
+    private PolicyWriteResult recordChange(String action, PolicyVersion policy, FgcUserDetails actor,
                                      Object before, String reason) {
         PolicyWriteResult result = result(policy, actor);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("document", writeRepository.readDraft(policy));
+        after.put("result", result);
+        after.put("approvalEvidenceRef", policy.getApprovalEvidenceRef());
+        after.put("reason", reason);
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode("POLICY_" + action).entityType("POLICY_VERSION")
                 .entityId(policy.getPolicyVersionId().toString()).policyVersionId(policy.getPolicyVersionId())
                 .userId(actor.getUserId()).before(before)
-                .after(Map.of("document", writeRepository.readDraft(policy), "result", result,
-                        "reason", reason == null ? "" : reason))
+                .after(after)
                 .reason(reason).build());
         return result;
     }
 
     private Map<String, Object> snapshot(PolicyVersion policy, FgcUserDetails actor) {
-        return Map.of("document", writeRepository.readDraft(policy), "result", result(policy, actor));
+        Map<String, Object> before = new LinkedHashMap<>();
+        before.put("document", writeRepository.readDraft(policy));
+        before.put("result", result(policy, actor));
+        before.put("approvalEvidenceRef", policy.getApprovalEvidenceRef());
+        return before;
     }
 
     private PolicyWriteResult result(PolicyVersion policy, FgcUserDetails actor) {

@@ -5102,6 +5102,12 @@
             "enum" : [ "SUBMIT", "APPROVE", "REJECT", "ACTIVATE" ],
             "type" : "string"
           },
+          "evidenceRef" : {
+            "description" : "APPROVE에서만 지정하는 승인 근거 문서 참조",
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          },
           "expectedStatus" : {
             "enum" : [ "DRAFT", "REVIEW", "APPROVED", "ACTIVE", "RETIRED" ],
             "type" : "string"
@@ -5185,6 +5191,10 @@
               "$ref" : "#/components/schemas/PolicyApprovalActionResponse"
             },
             "type" : "array"
+          },
+          "approvalEvidenceRef" : {
+            "description" : "승인 근거 문서 참조. 기초서류 버전은 editDocument.basicDocumentVersion에서 조회",
+            "type" : "string"
           },
           "capRuleSets" : {
             "description" : "1,200% 룰셋 탭 — 지급단계·적용범위별 복수",

@@ -44,6 +44,7 @@ public class PolicyQueryService {
     private final CapRuleSetRepository capRuleSetRepository;
     private final RefundRateTableRepository refundRateTableRepository;
     private final PolicyWriteRepository policyWriteRepository;
+    private final PolicyWriteService policyWriteService;
 
     /** IF-API-09 — 정책 버전 목록. 필터 3개는 전부 선택이며 0건은 빈 목록이다(404 아님). */
     public List<PolicyVersionResponse> findPolicyVersions(PolicyType type, LocalDate asOf, PolicyStatus status) {
@@ -80,7 +81,8 @@ public class PolicyQueryService {
                 refundRateTables,
                 policyWriteRepository.readDraft(policy),
                 policyWriteRepository.findApprovalActions(policyVersionId),
-                PolicyWriteService.allowedActions(policy));
+                policyWriteService.allowedActions(policy),
+                policy.getApprovalEvidenceRef());
     }
 
     private Map<Long, String> findUserLogins(List<PolicyVersion> policies) {

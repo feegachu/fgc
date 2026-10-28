@@ -12,7 +12,7 @@ export type PolicyWriteResult = Omit<Required<Schemas['PolicyWriteResult']>, 'ap
   approvedAt: string | null
 }
 
-const nullable = <T,>(value: T | ''): T | null => (value === '' ? null : value)
+const nullable = <T>(value: T | ''): T | null => (value === '' ? null : value)
 const cleanRefs = (refs: string[]) => [...new Set(refs.map((ref) => ref.trim()).filter(Boolean))]
 
 // Pick only fields accepted by PolicyDraft: display metadata and server-owned fields
@@ -30,7 +30,10 @@ export function serializePolicyDraft(draft: DraftDocument) {
     regulationRefs: cleanRefs(draft.regulationRefs),
     sourceRefs: cleanRefs(draft.sourceRefs),
     sourceDetails: draft.sourceDetails.map(({ ref, title, explanation, url }) => ({
-      ref: ref.trim(), title, explanation: nullable(explanation), url: nullable(url),
+      ref: ref.trim(),
+      title,
+      explanation: nullable(explanation),
+      url: nullable(url),
     })),
     commissionRules: draft.commissionRules.map((rule) => ({
       commissionRuleId: rule.commissionRuleId,
@@ -65,7 +68,11 @@ export function serializePolicyDraft(draft: DraftDocument) {
       reviewRequiredYn: rule.reviewRequiredYn,
       sourceRefs: cleanRefs(rule.sourceRefs),
     })),
-    parameters: draft.parameters.map(({ key, value, description }) => ({ key, value, description: nullable(description) })),
+    parameters: draft.parameters.map(({ key, value, description }) => ({
+      key,
+      value,
+      description: nullable(description),
+    })),
     clawbackRules: draft.clawbackRules.map((rule) => ({
       insurerId: nullable(rule.insurerId),
       productOfferingId: nullable(rule.productOfferingId),
@@ -80,8 +87,10 @@ export function serializePolicyDraft(draft: DraftDocument) {
 }
 
 export type PolicyDraftPayload = ReturnType<typeof serializePolicyDraft>
-type PolicyDraftResponse = Omit<NullableOptionals<Schemas['PolicyDraft']>,
-  'sourceDetails' | 'commissionRules' | 'feeRegimeRules' | 'parameters' | 'clawbackRules'> & {
+type PolicyDraftResponse = Omit<
+  NullableOptionals<Schemas['PolicyDraft']>,
+  'sourceDetails' | 'commissionRules' | 'feeRegimeRules' | 'parameters' | 'clawbackRules'
+> & {
   sourceDetails?: NullableOptionals<Schemas['SourceDetailDraft']>[] | null
   commissionRules: NullableOptionals<Schemas['CommissionRuleDraft']>[]
   feeRegimeRules: NullableOptionals<Schemas['FeeRegimeRuleDraft']>[]
@@ -94,7 +103,10 @@ type PolicyDraftResponse = Omit<NullableOptionals<Schemas['PolicyDraft']>,
     clawbackRatePct: string | number
   })[]
 }
-export interface PolicyDetailResponse extends Omit<PolicyDetail, 'editDocument' | 'approvalActions' | 'allowedActions'> {
+export interface PolicyDetailResponse extends Omit<
+  PolicyDetail,
+  'editDocument' | 'approvalActions' | 'allowedActions'
+> {
   editDocument?: PolicyDraftResponse | null
   allowedActions?: string[]
   approvalActions?: (Omit<Required<Schemas['PolicyApprovalActionResponse']>, 'evidenceRef'> & {
@@ -106,63 +118,71 @@ export function normalizePolicyDetail(detail: PolicyDetailResponse | ManagedPoli
   const draft = detail.editDocument
   return {
     ...detail,
-    allowedActions: detail.allowedActions?.map((action) => action === 'CLONE' ? 'NEW_VERSION' : action),
+    allowedActions: detail.allowedActions?.map((action) => (action === 'CLONE' ? 'NEW_VERSION' : action)),
     updatedAt: draft?.expectedUpdatedAt ?? ('updatedAt' in detail ? detail.updatedAt : undefined),
-    editDocument: draft ? {
-      ...draft,
-      expectedUpdatedAt: draft.expectedUpdatedAt ?? undefined,
-      effectiveTo: draft.effectiveTo ?? '',
-      feeRegimeCode: draft.feeRegimeCode ?? '',
-      basicDocumentVersion: draft.basicDocumentVersion ?? '',
-      sourceDetails: (draft.sourceDetails ?? []).map((source) => ({
-        ...source, explanation: source.explanation ?? '', url: source.url ?? null,
-      })),
-      commissionRules: draft.commissionRules.map((rule) => ({
-        ...rule,
-        commissionRuleId: rule.commissionRuleId ?? undefined,
-        insurerId: rule.insurerId ?? '',
-        productOfferingId: rule.productOfferingId ?? '',
-        organizationId: rule.organizationId ?? '',
-        agentRankCode: rule.agentRankCode ?? '',
-        commissionItemId: rule.commissionItemId ?? '',
-        installmentFrom: rule.installmentFrom ?? '',
-        installmentTo: rule.installmentTo ?? '',
-        ratePct: rule.ratePct ?? '',
-        fixedAmount: rule.fixedAmount ?? '',
-        equalMonthlyYn: rule.equalMonthlyYn ?? false,
-        paymentConditionCode: rule.paymentConditionCode ?? '',
-        priorityNo: rule.priorityNo ?? '',
-      })),
-      feeRegimeRules: draft.feeRegimeRules.map((rule) => ({
-        ...rule,
-        feeRegimeRulesetId: rule.feeRegimeRulesetId ?? undefined,
-        salesStartDateTo: rule.salesStartDateTo ?? '',
-        basicDocumentVersion: rule.basicDocumentVersion ?? '',
-        basicDocumentDateFrom: rule.basicDocumentDateFrom ?? '',
-        basicDocumentDateTo: rule.basicDocumentDateTo ?? '',
-        maxInstallments: rule.maxInstallments ?? '',
-        longTermMaintenanceFrom: rule.longTermMaintenanceFrom ?? '',
-        longTermMaintenanceTo: rule.longTermMaintenanceTo ?? '',
-        reviewRequiredYn: rule.reviewRequiredYn ?? false,
-      })),
-      parameters: draft.parameters.map((parameter) => ({ ...parameter, description: parameter.description ?? '' })),
-      clawbackRules: draft.clawbackRules.map((rule) => ({
-        ...rule,
-        insurerId: rule.insurerId ?? '',
-        productOfferingId: rule.productOfferingId ?? '',
-        commissionItemId: rule.commissionItemId ?? '',
-        elapsedMonthFrom: rule.elapsedMonthFrom ?? '',
-        elapsedMonthTo: rule.elapsedMonthTo ?? '',
-        clawbackRatePct: rule.clawbackRatePct ?? '',
-      })),
-    } : undefined,
-    approvalActions: detail.approvalActions?.map((entry) => 'actionBy' in entry ? {
-      actionType: entry.actionType === 'CLONE' ? 'NEW_VERSION' : entry.actionType,
-      actor: entry.actionBy,
-      actedAt: entry.actionAt,
-      reason: entry.reason,
-      evidenceRefs: entry.evidenceRef ? [entry.evidenceRef] : [],
-    } : entry),
+    editDocument: draft
+      ? {
+          ...draft,
+          expectedUpdatedAt: draft.expectedUpdatedAt ?? undefined,
+          effectiveTo: draft.effectiveTo ?? '',
+          feeRegimeCode: draft.feeRegimeCode ?? '',
+          basicDocumentVersion: draft.basicDocumentVersion ?? '',
+          sourceDetails: (draft.sourceDetails ?? []).map((source) => ({
+            ...source,
+            explanation: source.explanation ?? '',
+            url: source.url ?? null,
+          })),
+          commissionRules: draft.commissionRules.map((rule) => ({
+            ...rule,
+            commissionRuleId: rule.commissionRuleId ?? undefined,
+            insurerId: rule.insurerId ?? '',
+            productOfferingId: rule.productOfferingId ?? '',
+            organizationId: rule.organizationId ?? '',
+            agentRankCode: rule.agentRankCode ?? '',
+            commissionItemId: rule.commissionItemId ?? '',
+            installmentFrom: rule.installmentFrom ?? '',
+            installmentTo: rule.installmentTo ?? '',
+            ratePct: rule.ratePct ?? '',
+            fixedAmount: rule.fixedAmount ?? '',
+            equalMonthlyYn: rule.equalMonthlyYn ?? false,
+            paymentConditionCode: rule.paymentConditionCode ?? '',
+            priorityNo: rule.priorityNo ?? '',
+          })),
+          feeRegimeRules: draft.feeRegimeRules.map((rule) => ({
+            ...rule,
+            feeRegimeRulesetId: rule.feeRegimeRulesetId ?? undefined,
+            salesStartDateTo: rule.salesStartDateTo ?? '',
+            basicDocumentVersion: rule.basicDocumentVersion ?? '',
+            basicDocumentDateFrom: rule.basicDocumentDateFrom ?? '',
+            basicDocumentDateTo: rule.basicDocumentDateTo ?? '',
+            maxInstallments: rule.maxInstallments ?? '',
+            longTermMaintenanceFrom: rule.longTermMaintenanceFrom ?? '',
+            longTermMaintenanceTo: rule.longTermMaintenanceTo ?? '',
+            reviewRequiredYn: rule.reviewRequiredYn ?? false,
+          })),
+          parameters: draft.parameters.map((parameter) => ({ ...parameter, description: parameter.description ?? '' })),
+          clawbackRules: draft.clawbackRules.map((rule) => ({
+            ...rule,
+            insurerId: rule.insurerId ?? '',
+            productOfferingId: rule.productOfferingId ?? '',
+            commissionItemId: rule.commissionItemId ?? '',
+            elapsedMonthFrom: rule.elapsedMonthFrom ?? '',
+            elapsedMonthTo: rule.elapsedMonthTo ?? '',
+            clawbackRatePct: rule.clawbackRatePct ?? '',
+          })),
+        }
+      : undefined,
+    approvalActions: detail.approvalActions?.map((entry) =>
+      'actionBy' in entry
+        ? {
+            actionType: entry.actionType === 'CLONE' ? 'NEW_VERSION' : entry.actionType,
+            actor: entry.actionBy,
+            actedAt: entry.actionAt,
+            reason: entry.reason,
+            evidenceRefs: entry.evidenceRef ? [entry.evidenceRef] : [],
+          }
+        : entry,
+    ),
   }
 }
 
@@ -186,8 +206,10 @@ export async function savePolicyDraft(draft: DraftDocument, id: number | undefin
   return response.data
 }
 
-export type PolicyActionOptions = Partial<Pick<Schemas['PolicyActionRequest'], 'expectedStatus' | 'expectedUpdatedAt'>
-  & Pick<Schemas['PolicyCloneRequest'], 'effectiveFrom' | 'effectiveTo'>>
+export type PolicyActionOptions = Partial<
+  Pick<Schemas['PolicyActionRequest'], 'expectedStatus' | 'expectedUpdatedAt' | 'evidenceRef'> &
+    Pick<Schemas['PolicyCloneRequest'], 'effectiveFrom' | 'effectiveTo'>
+>
 
 export async function performPolicyAction(
   id: number,
@@ -199,10 +221,14 @@ export async function performPolicyAction(
   if (action === 'NEW_VERSION') {
     if (!options.effectiveFrom) throw new Error('새 버전 적용 시작일을 입력하세요.')
     const body: NullableOptionals<Schemas['PolicyCloneRequest']> = {
-      effectiveFrom: options.effectiveFrom, effectiveTo: nullable(options.effectiveTo ?? ''), reason,
+      effectiveFrom: options.effectiveFrom,
+      effectiveTo: nullable(options.effectiveTo ?? ''),
+      reason,
     }
     const response = await apiClient.request<PolicyWriteResult>(`/api/v1/policies/${id}/versions`, {
-      method: 'POST', idempotencyKey, body,
+      method: 'POST',
+      idempotencyKey,
+      body,
     })
     return response.data
   }
@@ -210,11 +236,16 @@ export async function performPolicyAction(
     throw new Error('정책 상태 또는 수정 시각 정보가 없습니다. 다시 조회한 후 처리하세요.')
   }
   const body: Schemas['PolicyActionRequest'] = {
-    actionType: action, reason,
-    expectedStatus: options.expectedStatus, expectedUpdatedAt: options.expectedUpdatedAt,
+    actionType: action,
+    reason,
+    expectedStatus: options.expectedStatus,
+    expectedUpdatedAt: options.expectedUpdatedAt,
+    ...(action === 'APPROVE' && options.evidenceRef?.trim() ? { evidenceRef: options.evidenceRef.trim() } : {}),
   }
   const response = await apiClient.request<PolicyWriteResult>(`/api/v1/policies/${id}/actions`, {
-    method: 'POST', idempotencyKey, body,
+    method: 'POST',
+    idempotencyKey,
+    body,
   })
   return response.data
 }

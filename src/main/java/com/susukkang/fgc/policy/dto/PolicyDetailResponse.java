@@ -26,12 +26,14 @@ public record PolicyDetailResponse(
         @Schema(description = "불변 정책 승인 이력, actionSeq 순")
         List<PolicyApprovalActionResponse> approvalActions,
         @Schema(description = "현재 사용자 역할·정책 상태·작성자를 반영한 동작")
-        List<String> allowedActions
+        List<String> allowedActions,
+        @Schema(description = "승인 근거 문서 참조. 기초서류 버전은 editDocument.basicDocumentVersion에서 조회")
+        String approvalEvidenceRef
 ) {
     public PolicyDetailResponse(PolicyVersionResponse header, List<String> sourceRefs,
                                 List<CommissionRuleResponse> commissionRules,
                                 List<CapRuleSetResponse> capRuleSets,
                                 List<RefundRateTableResponse> refundRateTables) {
-        this(header, sourceRefs, commissionRules, capRuleSets, refundRateTables, null, List.of(), List.of());
+        this(header, sourceRefs, commissionRules, capRuleSets, refundRateTables, null, List.of(), List.of(), null);
     }
 }

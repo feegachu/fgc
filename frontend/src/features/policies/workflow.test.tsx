@@ -157,6 +157,20 @@ describe('production policy workflow', () => {
     }))
   })
 
+  it('includes optional approval evidence in the real approval request', async () => {
+    const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
+    const { user, onSaved } = mountManagement('REVIEW', ['APPROVE'])
+    await user.click(screen.getByRole('button', { name: '승인' }))
+    const dialog = screen.getByRole('dialog')
+    await user.type(within(dialog).getByLabelText(/사유/), '위원회 심의 확인')
+    await user.type(within(dialog).getByLabelText('승인 근거 문서'), '의결서-001')
+    await user.click(within(dialog).getByRole('button', { name: '승인 확인' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(17))
+    expect(request).toHaveBeenCalledWith('/api/v1/policies/17/actions', expect.objectContaining({
+      body: expect.objectContaining({ evidenceRef: '의결서-001' }),
+    }))
+  })
+
   it('maps server CLONE permission to a new-version request and shows real approval history', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({ ...result, policyVersionId: 18, versionNo: 2 }))
     const { user, onSaved } = mountManagement('ACTIVE', ['CLONE'])

@@ -1465,7 +1465,7 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 |---|---|
 | 보험회사·조직·설계사 | insurer, organization, agent, agent_insurer_code |
 | 상품·판매버전 | product, product_offering |
-| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule |
+| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule, fee_regime_ruleset, policy_approval_action, policy_source_detail, policy_write_request |
 | 1,200% 정책 | cap_rule_set, cap_rule_item |
 | 배부근거 | allocation_policy |
 | 환급률 | refund_rate_table, refund_rate_line |

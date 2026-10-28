@@ -3428,6 +3428,8 @@ export interface components {
         PolicyActionRequest: {
             /** @enum {string} */
             actionType: "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE";
+            /** @description APPROVE에서만 지정하는 승인 근거 문서 참조 */
+            evidenceRef?: string;
             /** @enum {string} */
             expectedStatus: "DRAFT" | "REVIEW" | "APPROVED" | "ACTIVE" | "RETIRED";
             /** Format: date-time */
@@ -3461,6 +3463,8 @@ export interface components {
             allowedActions?: string[];
             /** @description 불변 정책 승인 이력, actionSeq 순 */
             approvalActions?: components["schemas"]["PolicyApprovalActionResponse"][];
+            /** @description 승인 근거 문서 참조. 기초서류 버전은 editDocument.basicDocumentVersion에서 조회 */
+            approvalEvidenceRef?: string;
             /** @description 1,200% 룰셋 탭 — 지급단계·적용범위별 복수 */
             capRuleSets?: components["schemas"]["CapRuleSetResponse"][];
             /** @description 수수료 규칙 탭 */

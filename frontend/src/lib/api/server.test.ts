@@ -179,6 +179,7 @@ describe.skipIf(!origin)('실제 JWT 서버 연동', () => {
         {
           expectedStatus: review.status,
           expectedUpdatedAt: review.updatedAt,
+          evidenceRef: '의결서-HTTP-001',
         },
         key(),
       )
@@ -194,6 +195,7 @@ describe.skipIf(!origin)('실제 JWT 서버 연동', () => {
       )
       expect(active.status).toBe('ACTIVE')
       const activeDetail = await read(created.policyVersionId)
+      expect(activeDetail.approvalEvidenceRef).toBe('의결서-HTTP-001')
       expect(activeDetail.allowedActions).toContain('NEW_VERSION')
       expect(activeDetail.approvalActions).toEqual(
         expect.arrayContaining([

@@ -151,10 +151,15 @@ public class PolicyVersion {
 
     /** 전이 권한·기대 상태·동시성은 작성 서비스가 잠금 안에서 검사한다. */
     public void transition(PolicyStatus nextStatus, Long approverId) {
+        transition(nextStatus, approverId, null);
+    }
+
+    public void transition(PolicyStatus nextStatus, Long approverId, String evidenceRef) {
         status = nextStatus;
         if (nextStatus == PolicyStatus.APPROVED) {
             approvedBy = approverId;
             approvedAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);
+            approvalEvidenceRef = evidenceRef;
         }
     }
 

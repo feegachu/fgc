@@ -298,6 +298,46 @@ class PolicyDraftValidatorTest {
         assertThat(MAPPER.valueToTree(clone).has("validPeriod")).isFalse();
     }
 
+    @Test
+    void submissionRequiresEveryCommissionToFitAllApplicableRegimeLimits() {
+        ObjectNode json = baseDraft().put("policyType", "FOUR_YEAR_COMMISSION").put("feeRegimeCode", "FOUR_YEAR_2027");
+        ObjectNode commission = commissionRule().put("installmentTo", 60);
+        array(json, "commissionRules").add(commission);
+        array(json, "feeRegimeRules").add(feeRule());
+        assertThatCode(() -> validator.validate(draft(json))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> validator.validateForSubmission(draft(json)))
+                .isInstanceOfSatisfying(FgcBusinessException.class, e ->
+                        assertThat(e.getField()).isEqualTo("commissionRules[0].installmentTo"));
+        commission.put("installmentTo", 48);
+        assertThatCode(() -> validator.validateForSubmission(draft(json))).doesNotThrowAnyException();
+        ((ObjectNode) json.path("feeRegimeRules").get(0)).put("salesStartDateTo", "2027-12-31");
+        array(json, "feeRegimeRules").add(feeRule().put("salesStartDateFrom", "2028-01-01").put("maxInstallments", 36));
+        assertThatThrownBy(() -> validator.validateForSubmission(draft(json)))
+                .isInstanceOfSatisfying(FgcBusinessException.class, e ->
+                        assertThat(e.getField()).isEqualTo("commissionRules[0].installmentTo"));
+    }
+
+    @Test
+    void submissionRejectsFourYearLongTermAndRequiresSevenYearLongTermRange() {
+        ObjectNode json = baseDraft().put("policyType", "FOUR_YEAR_COMMISSION").put("feeRegimeCode", "FOUR_YEAR_2027");
+        ObjectNode commission = commissionRule().put("feeComponentType", "LONG_TERM_MAINTENANCE");
+        ObjectNode regime = feeRule();
+        array(json, "commissionRules").add(commission);
+        array(json, "feeRegimeRules").add(regime);
+        assertThatThrownBy(() -> validator.validateForSubmission(draft(json)))
+                .isInstanceOfSatisfying(FgcBusinessException.class, e ->
+                        assertThat(e.getField()).isEqualTo("commissionRules[0].feeComponentType"));
+        json.put("policyType", "SEVEN_YEAR_COMMISSION").put("feeRegimeCode", "SEVEN_YEAR_2029");
+        regime.put("feeRegimeCode", "SEVEN_YEAR_2029").put("maxInstallments", 84)
+                .put("longTermMaintenanceFrom", 61).put("longTermMaintenanceTo", 84);
+        commission.put("installmentFrom", 60).put("installmentTo", 84);
+        assertThatThrownBy(() -> validator.validateForSubmission(draft(json)))
+                .isInstanceOfSatisfying(FgcBusinessException.class, e ->
+                        assertThat(e.getField()).isEqualTo("commissionRules[0].installmentFrom"));
+        commission.put("installmentFrom", 61);
+        assertThatCode(() -> validator.validateForSubmission(draft(json))).doesNotThrowAnyException();
+    }
+
     private void assertInvalid(ObjectNode json, String field) {
         assertThatThrownBy(() -> validator.validate(draft(json)))
                 .isInstanceOfSatisfying(FgcBusinessException.class, e -> {

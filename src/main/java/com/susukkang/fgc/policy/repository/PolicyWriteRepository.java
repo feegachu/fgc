@@ -430,12 +430,26 @@ public class PolicyWriteRepository {
         }
     }
 
-    public void appendAction(Long id, String actionType, Long actorId, String reason) {
+    /** 같은 불변 버전의 수정·제출 참여자는 반려를 거쳐도 그 버전을 직접 승인할 수 없다. */
+    public boolean hasContributed(Long id, Long actorId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM fgc.audit_log
+                    WHERE entity_type = 'POLICY_VERSION' AND entity_id = ? AND user_id = ?
+                      AND action_code IN ('POLICY_CREATE', 'POLICY_UPDATE', 'POLICY_CLONE')
+                ) OR EXISTS (
+                    SELECT 1 FROM fgc.policy_approval_action
+                    WHERE policy_version_id = ? AND action_by = ? AND action_type = 'SUBMIT'
+                )
+                """, Boolean.class, id.toString(), actorId, id, actorId));
+    }
+
+    public void appendAction(Long id, String actionType, Long actorId, String reason, String evidenceRef) {
         jdbc.update("""
-                INSERT INTO fgc.policy_approval_action (policy_version_id, action_seq, action_type, action_by, comment)
-                SELECT ?, COALESCE(MAX(action_seq), 0) + 1, ?, ?, ?
+                INSERT INTO fgc.policy_approval_action (policy_version_id, action_seq, action_type, action_by, comment, evidence_ref)
+                SELECT ?, COALESCE(MAX(action_seq), 0) + 1, ?, ?, ?, ?
                 FROM fgc.policy_approval_action WHERE policy_version_id = ?
-                """, id, actionType, actorId, reason, id);
+                """, id, actionType, actorId, reason, evidenceRef, id);
     }
 
     public List<PolicyApprovalActionResponse> findApprovalActions(Long id) {

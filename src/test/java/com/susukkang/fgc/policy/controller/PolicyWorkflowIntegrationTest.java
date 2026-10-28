@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.List;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -470,6 +472,65 @@ class PolicyWorkflowIntegrationTest {
                         (SELECT role_id FROM fgc.app_role WHERE role_code = ?)) RETURNING user_id
                 """, Long.class, login, role);
         return new FgcUserDetails(new AppUserView(id, login, "unused", "정책 API 검증 사용자", role, "ACTIVE"), true, true);
+    }
+
+    @Test
+    void rejectsApprovalByAnyEditorEvenAfterRejectionAndAnotherWritersResubmission() throws Exception {
+        JsonNode created = create(draft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode edited = (ObjectNode) detail(id, writer).path("editDocument").deepCopy();
+        edited.put("policyName", "다른 관리자가 보완한 초안");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edited, approver, key(), 200);
+        JsonNode review = action(id, "SUBMIT", updated, writer, 200);
+        assertThat(values(detail(id, approver).path("allowedActions"))).containsExactly("REJECT");
+        assertThat(actionError(id, "APPROVE", review, approver, 409).path("code").asText()).isEqualTo("FGC-POL-001");
+        JsonNode rejected = action(id, "REJECT", review, systemWriter, 200);
+        JsonNode resubmitted = action(id, "SUBMIT", rejected, writer, 200);
+        assertThat(actionError(id, "APPROVE", resubmitted, approver, 409).path("code").asText()).isEqualTo("FGC-POL-001");
+        assertThat(auditCount(id, "POLICY_APPROVE")).isZero();
+        assertThat(action(id, "APPROVE", resubmitted, systemWriter, 200).path("status").asText()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void treatsTheSubmitterAsAnAuthorForApprovalPermissions() throws Exception {
+        JsonNode created = create(draft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode review = action(id, "SUBMIT", created, systemWriter, 200);
+        assertThat(values(review.path("allowedActions"))).containsExactly("REJECT");
+        assertThat(actionError(id, "APPROVE", review, systemWriter, 409).path("code").asText()).isEqualTo("FGC-POL-001");
+        assertThat(action(id, "APPROVE", review, approver, 200).path("status").asText()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void rejectsLongWhitespaceReferenceWithoutBacktrackingAndKeepsDetailedReferencesSupported() throws Exception {
+        ObjectNode malformed = draft();
+        malformed.withArray("sourceRefs").add("SRC-022" + " ".repeat(50_000) + "\n");
+        JsonNode error = assertTimeout(Duration.ofSeconds(5), () ->
+                writeError(HttpMethod.POST, "/api/v1/policies", malformed, writer, key(), 400));
+        assertThat(error.path("field").asText()).isEqualTo("sourceRefs");
+        ObjectNode valid = draft();
+        valid.withArray("sourceRefs").add("SRC-022 Q11");
+        assertThat(create(valid, writer).path("status").asText()).isEqualTo("DRAFT");
+    }
+
+    @Test
+    void storesApprovalEvidenceWithItsDocumentVersionAndResetsItOnClone() throws Exception {
+        JsonNode created = create(draft().put("basicDocumentVersion", "DOC-V1"), writer);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode submit = actionRequest("SUBMIT", created).put("evidenceRef", "의결서-001");
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies/" + id + "/actions", submit, writer, key(), 400)
+                .path("field").asText()).isEqualTo("evidenceRef");
+        JsonNode review = action(id, "SUBMIT", created, writer, 200);
+        ObjectNode approval = actionRequest("APPROVE", review).put("evidenceRef", "의결서-001");
+        JsonNode approved = write(HttpMethod.POST, "/api/v1/policies/" + id + "/actions", approval, approver, key(), 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+        JsonNode active = detail(id, writer);
+        assertThat(active.path("approvalEvidenceRef").asText()).isEqualTo("의결서-001");
+        assertThat(active.path("editDocument").path("basicDocumentVersion").asText()).isEqualTo("DOC-V1");
+        assertThat(active.path("approvalActions").get(1).path("evidenceRef").asText()).isEqualTo("의결서-001");
+        JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2001-01-01"), writer, key(), 201);
+        assertThat(detail(clone.path("policyVersionId").asLong(), writer).path("approvalEvidenceRef").isNull()).isTrue();
     }
 
     private ObjectNode draft() {

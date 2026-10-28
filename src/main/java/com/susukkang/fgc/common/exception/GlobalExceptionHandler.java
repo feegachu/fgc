@@ -175,22 +175,24 @@ public class GlobalExceptionHandler {
         Throwable cause = exception.getCause();
         while (cause != null) {
             if (cause instanceof JsonMappingException mapping) {
-                StringBuilder field = new StringBuilder();
-                for (JsonMappingException.Reference reference : mapping.getPath()) {
-                    if (reference.getFieldName() != null) {
-                        if (!field.isEmpty()) {
-                            field.append('.');
-                        }
-                        field.append(reference.getFieldName());
-                    } else if (reference.getIndex() >= 0) {
-                        field.append('[').append(reference.getIndex()).append(']');
-                    }
-                }
-                return validationError(field.isEmpty() ? null : field.toString());
+                return validationError(jsonFieldPath(mapping));
             }
             cause = cause.getCause();
         }
         return validationError(null);
+    }
+
+    private static String jsonFieldPath(JsonMappingException mapping) {
+        StringBuilder field = new StringBuilder();
+        for (JsonMappingException.Reference reference : mapping.getPath()) {
+            if (reference.getFieldName() != null) {
+                if (!field.isEmpty()) field.append('.');
+                field.append(reference.getFieldName());
+            } else if (reference.getIndex() >= 0) {
+                field.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+        return field.isEmpty() ? null : field.toString();
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

@@ -121,6 +121,10 @@ export function PolicyManagement({
           <dt>기초서류 버전</dt>
           <dd>{draft?.basicDocumentVersion || '자료 없음'}</dd>
         </div>
+        <div>
+          <dt>승인 근거 문서</dt>
+          <dd>{detail.approvalEvidenceRef || '자료 없음'}</dd>
+        </div>
       </dl>
       <div className="policy-action-bar">
         <p>
@@ -187,9 +191,7 @@ export function PolicyManagement({
                     <span className="policy-timeline-dot" />
                     <div>
                       <header>
-                        <strong>
-                          {historyLabels[entry.actionType] ?? entry.actionType}
-                        </strong>
+                        <strong>{historyLabels[entry.actionType] ?? entry.actionType}</strong>
                         {entry.status && (
                           <span>
                             {entry.previousStatus ? statusLabels[entry.previousStatus] : '신규'} →{' '}
@@ -474,6 +476,7 @@ function PolicyActionDialog({
 }) {
   const preview = useContext(PolicyPreviewContext)
   const [reason, setReason] = useState('')
+  const [evidenceRef, setEvidenceRef] = useState('')
   const [effectiveFrom, setFrom] = useState('')
   const [effectiveTo, setTo] = useState('')
   const [error, setError] = useState('')
@@ -506,6 +509,7 @@ function PolicyActionDialog({
       const context = {
         expectedStatus: policy.status,
         expectedUpdatedAt: detail.editDocument?.expectedUpdatedAt ?? detail.updatedAt,
+        ...(action === 'APPROVE' && evidenceRef.trim() ? { evidenceRef: evidenceRef.trim() } : {}),
         ...dates,
       }
       const id = preview
@@ -616,6 +620,16 @@ function PolicyActionDialog({
           placeholder="변경 또는 검토 사유를 작성하세요."
         />
       </Field>
+      {action === 'APPROVE' && !preview && (
+        <Field label="승인 근거 문서" helper="상품위원회 의결서 등 승인 근거가 있으면 문서 참조를 입력하세요.">
+          <input
+            value={evidenceRef}
+            onChange={(event) => setEvidenceRef(event.target.value)}
+            maxLength={500}
+            disabled={busy}
+          />
+        </Field>
+      )}
       {action === 'ACTIVATE' && (
         <p className="policy-notice policy-notice-warning">
           적용 중인 다른 정책은 자동 종료되지 않습니다. 적용 기간의 겹침 여부를 확인하세요.
