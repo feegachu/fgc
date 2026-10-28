@@ -17,10 +17,30 @@ class PolicySuccessionValidatorTest {
     private final PolicySuccessionValidator validator = new PolicySuccessionValidator();
 
     @Test
-    void changingRatesRetainsTheOriginalSelectionScope() throws Exception {
+    void rejectsChangedPricesAndPriorityInsideTheOriginalContractScope() throws Exception {
         ObjectNode previous = document(), replacement = previous.deepCopy();
-        ((ObjectNode) replacement.path("commissionRules").get(0)).put("ratePct", "25.000001");
         assertValid(previous, replacement);
+        ((ObjectNode) replacement.path("commissionRules").get(0)).put("ratePct", "25.000001");
+        assertInvalid(previous, replacement, "commissionRules");
+        replacement = previous.deepCopy();
+        ((ObjectNode) replacement.path("commissionRules").get(0)).put("priorityNo", 2);
+        assertInvalid(previous, replacement, "commissionRules");
+        replacement = previous.deepCopy();
+        replacement.withArray("commissionRules").add(replacement.path("commissionRules").get(0).deepCopy());
+        ((ObjectNode) replacement.path("commissionRules").get(1)).put("commissionItemId", 99);
+        assertInvalid(previous, replacement, "commissionRules");
+    }
+
+    @Test
+    void permitsNewPricesOnlyInAProvablyDisjointContractScope() throws Exception {
+        ObjectNode previous = document();
+        ((ObjectNode) previous.path("commissionRules").get(0)).put("insurerId", 1);
+        ObjectNode replacement = previous.deepCopy();
+        replacement.withArray("commissionRules").add(previous.path("commissionRules").get(0).deepCopy());
+        ((ObjectNode) replacement.path("commissionRules").get(1)).put("insurerId", 2).put("ratePct", "25.000001");
+        assertValid(previous, replacement);
+        ((ObjectNode) replacement.path("commissionRules").get(1)).putNull("insurerId");
+        assertInvalid(previous, replacement, "commissionRules");
     }
 
     @Test
@@ -71,7 +91,49 @@ class PolicySuccessionValidatorTest {
             }
         }
         assertValid(previous, replacement);
+        ((ObjectNode) replacement.path("feeRegimeRules").get(3)).put("maxInstallments", 36);
+        assertInvalid(previous, replacement, "feeRegimeRules");
+        ((ObjectNode) replacement.path("feeRegimeRules").get(3)).put("maxInstallments", 48);
         replacement.withArray("feeRegimeRules").remove(3);
+        assertInvalid(previous, replacement, "feeRegimeRules");
+    }
+
+    @Test
+    void preservesParameterValuesIncludingOptionalKeysWithEquivalentNumericRepresentations() throws Exception {
+        ObjectNode previous = document().put("policyType", "RECONCILIATION_TOLERANCE");
+        previous.putArray("commissionRules");
+        previous.withArray("parameters").addObject().put("key", "TOLERANCE_AMOUNT_KRW").put("value", 0);
+        previous.withArray("parameters").addObject().put("key", "TOLERANCE_DAYS").put("value", 0);
+        ObjectNode replacement = previous.deepCopy();
+        ((ObjectNode) replacement.path("parameters").get(0)).put("value", 0.0);
+        assertValid(previous, replacement);
+        ((ObjectNode) replacement.path("parameters").get(0)).put("value", 1);
+        assertInvalid(previous, replacement, "parameters");
+        replacement = previous.deepCopy();
+        replacement.withArray("parameters").remove(1);
+        assertInvalid(previous, replacement, "parameters");
+    }
+
+    @Test
+    void cannotDropSpecificPricesAndFallBackToAnUnchangedWildcardRule() throws Exception {
+        ObjectNode previous = document();
+        previous.withArray("commissionRules").add(((ObjectNode) previous.path("commissionRules").get(0)).deepCopy()
+                .put("insurerId", 7).put("ratePct", "20.000000"));
+        ObjectNode replacement = previous.deepCopy();
+        replacement.withArray("commissionRules").remove(1);
+        assertInvalid(previous, replacement, "commissionRules");
+    }
+
+    @Test
+    void cannotDropSpecificRegimeConditionsAndFallBackToAWildcard() throws Exception {
+        ObjectNode previous = document().put("policyType", "FOUR_YEAR_COMMISSION").put("feeRegimeCode", "FOUR_YEAR_2027");
+        ObjectNode wildcard = JSON.createObjectNode().put("feeRegimeCode", "FOUR_YEAR_2027")
+                .put("salesStartDateFrom", "2027-01-01").put("maxInstallments", 48);
+        wildcard.putArray("sourceRefs");
+        previous.withArray("feeRegimeRules").add(wildcard);
+        previous.withArray("feeRegimeRules").add(wildcard.deepCopy().put("basicDocumentVersion", "DOC-1").put("maxInstallments", 36));
+        ObjectNode replacement = previous.deepCopy();
+        replacement.withArray("feeRegimeRules").remove(1);
         assertInvalid(previous, replacement, "feeRegimeRules");
     }
 

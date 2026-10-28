@@ -1,5 +1,6 @@
 package com.susukkang.fgc.policy.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
@@ -8,6 +9,7 @@ import com.susukkang.fgc.policy.dto.PolicyDraft.FeeRegimeRuleDraft;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -19,19 +21,92 @@ import java.util.stream.LongStream;
 public class PolicySuccessionValidator {
     public void validate(PolicyDraft previous, PolicyDraft replacement) {
         validateHeader(previous, replacement);
+        validateFinancialTerms(previous, replacement);
         for (CommissionRuleDraft oldRule : previous.commissionRules()) {
             List<long[]> intervals = replacement.commissionRules().stream()
-                    .filter(rule -> coversCommissionScope(rule, oldRule))
+                    .filter(rule -> sameCommissionTerms(rule, oldRule))
                     .map(rule -> new long[]{rule.installmentFrom(), rule.installmentTo()}).toList();
             if (!coversRange(oldRule.installmentFrom(), oldRule.installmentTo(), intervals)) {
                 throw incomplete("commissionRules", "승계본에 기존 ACTIVE 수수료 규칙의 적용 범위·항목·회차가 빠져 있습니다.");
             }
         }
         for (FeeRegimeRuleDraft oldRule : previous.feeRegimeRules()) {
-            if (!coversFeeRule(oldRule, replacement.feeRegimeRules())) {
+            if (!coversFeeRule(oldRule, replacement.feeRegimeRules().stream().filter(rule -> sameFeeTerms(rule, oldRule)).toList())) {
                 throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 룰셋의 판매일·기초서류 적용 범위가 빠져 있습니다.");
             }
         }
+    }
+
+    /** REG-22: 이미 적용하던 계약 범위에는 새 금액 조건이나 우선순위를 끼워 넣지 않는다. */
+    private static void validateFinancialTerms(PolicyDraft previous, PolicyDraft replacement) {
+        for (CommissionRuleDraft rule : replacement.commissionRules()) {
+            if (previous.commissionRules().stream().noneMatch(old -> contractScopesOverlap(rule, old))) continue;
+            List<long[]> sameTerms = previous.commissionRules().stream()
+                    .filter(old -> sameCommissionTerms(rule, old))
+                    .map(old -> new long[]{old.installmentFrom(), old.installmentTo()}).toList();
+            if (!coversRange(rule.installmentFrom(), rule.installmentTo(), sameTerms)) {
+                throw incomplete("commissionRules", "승계로 기존 계약의 금액·지급조건을 변경할 수 없습니다. 기존 규칙을 유지하세요.");
+            }
+        }
+        for (FeeRegimeRuleDraft rule : replacement.feeRegimeRules()) {
+            if (previous.feeRegimeRules().stream().noneMatch(old -> feeScopesOverlap(rule, old))) continue;
+            List<FeeRegimeRuleDraft> sameTerms = previous.feeRegimeRules().stream()
+                    .filter(old -> sameFeeTerms(rule, old)).toList();
+            if (!coversFeeRule(rule, sameTerms)) {
+                throw incomplete("feeRegimeRules", "승계로 기존 적용 범위의 분급 조건을 변경할 수 없습니다.");
+            }
+        }
+        for (PolicyDraft.ParameterDraft old : previous.parameters()) {
+            if (replacement.parameters().stream().noneMatch(value -> old.key().equals(value.key()) && sameValue(old.value(), value.value()))) {
+                throw incomplete("parameters", "승계본은 기존 계약의 정책 파라미터 키와 값을 유지해야 합니다.");
+            }
+        }
+    }
+
+    private static boolean sameValue(JsonNode first, JsonNode second) {
+        return first.isNumber() && second.isNumber() ? first.decimalValue().compareTo(second.decimalValue()) == 0 : first.equals(second);
+    }
+
+    private static boolean contractScopesOverlap(CommissionRuleDraft first, CommissionRuleDraft second) {
+        return overlapsScope(first.insurerId(), second.insurerId())
+                && overlapsScope(first.productOfferingId(), second.productOfferingId())
+                && overlapsScope(first.organizationId(), second.organizationId());
+    }
+
+    private static boolean sameCommissionTerms(CommissionRuleDraft first, CommissionRuleDraft second) {
+        return coversCommissionScope(first, second) && coversCommissionScope(second, first)
+                && first.calculationType() == second.calculationType()
+                && Objects.equals(first.basisCode(), second.basisCode())
+                && sameDecimal(first.ratePct(), second.ratePct()) && sameDecimal(first.fixedAmount(), second.fixedAmount())
+                && first.equalMonthlyYn() == second.equalMonthlyYn()
+                && Objects.equals(first.paymentConditionCode(), second.paymentConditionCode())
+                && Objects.equals(first.priorityNo(), second.priorityNo());
+    }
+
+    private static boolean sameDecimal(BigDecimal first, BigDecimal second) {
+        return first == null ? second == null : second != null && first.compareTo(second) == 0;
+    }
+
+    private static boolean overlapsScope(Object first, Object second) {
+        return first == null || second == null || Objects.equals(first, second);
+    }
+
+    private static boolean feeScopesOverlap(FeeRegimeRuleDraft first, FeeRegimeRuleDraft second) {
+        return Objects.equals(first.feeRegimeCode(), second.feeRegimeCode())
+                && overlapsScope(first.basicDocumentVersion(), second.basicDocumentVersion())
+                && start(first.salesStartDateFrom()) <= end(second.salesStartDateTo())
+                && start(second.salesStartDateFrom()) <= end(first.salesStartDateTo())
+                && start(first.basicDocumentDateFrom()) <= end(second.basicDocumentDateTo())
+                && start(second.basicDocumentDateFrom()) <= end(first.basicDocumentDateTo());
+    }
+
+    private static boolean sameFeeTerms(FeeRegimeRuleDraft first, FeeRegimeRuleDraft second) {
+        return Objects.equals(first.feeRegimeCode(), second.feeRegimeCode())
+                && Objects.equals(first.basicDocumentVersion(), second.basicDocumentVersion())
+                && Objects.equals(first.maxInstallments(), second.maxInstallments())
+                && Objects.equals(first.longTermMaintenanceFrom(), second.longTermMaintenanceFrom())
+                && Objects.equals(first.longTermMaintenanceTo(), second.longTermMaintenanceTo())
+                && first.reviewRequiredYn() == second.reviewRequiredYn();
     }
 
     private static void validateHeader(PolicyDraft previous, PolicyDraft replacement) {

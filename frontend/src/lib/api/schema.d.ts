@@ -731,7 +731,7 @@ export interface paths {
         put?: never;
         /**
          * 정책 제출·승인·반려·활성화 (IF-API-75)
-         * @description SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. 작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. ACTIVATE는 같은 코드의 기존 ACTIVE를 RETIRED로 전환하는 전체 대체본 승계이며 다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.
+         * @description SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. 작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. ACTIVATE는 기존 계약의 계산조건을 유지하며 같은 코드의 기존 ACTIVE를 RETIRED로 전환하는 전체 대체본 승계이며 다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.
          */
         post: operations["executePolicyAction"];
         delete?: never;

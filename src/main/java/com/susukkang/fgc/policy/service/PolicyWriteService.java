@@ -140,8 +140,7 @@ public class PolicyWriteService {
         FgcUserDetails actor = requireActor(userId, submit ? WRITERS : APPROVERS);
         return executeOnce(idempotencyKey, userId, "ACTION:" + id, request, () -> {
             // Cross-code activation must serialize the overlap check and state update together.
-            if (request.actionType() == PolicyActionRequest.ActionType.APPROVE
-                    || request.actionType() == PolicyActionRequest.ActionType.ACTIVATE) {
+            if (request.actionType() != PolicyActionRequest.ActionType.REJECT) {
                 writeRepository.lockActivationScope();
             }
             PolicyVersion policy = lockPolicy(id);
@@ -151,7 +150,7 @@ public class PolicyWriteService {
             if (request.actionType() != PolicyActionRequest.ActionType.REJECT) {
                 validateSubmission(writeRepository.readDraft(policy));
             }
-            if (next == PolicyStatus.APPROVED || next == PolicyStatus.ACTIVE) prepareSuccession(policy, next, actor, request.reason());
+            if (next != PolicyStatus.DRAFT) prepareSuccession(policy, next, actor, request.reason());
             policy.transition(next, next == PolicyStatus.APPROVED ? userId : null, evidenceRef);
             policyVersionRepository.saveAndFlush(policy);
             writeRepository.appendAction(id, request.actionType().name(), userId, request.reason(), evidenceRef);
@@ -169,6 +168,7 @@ public class PolicyWriteService {
             }
             successionValidator.validate(writeRepository.readDraft(previous), replacement);
         }
+        if (next == PolicyStatus.REVIEW) return; // 작성자가 불완전/소급 변경 초안을 바로 보완할 수 있도록 제출 때도 검사한다.
         if (next == PolicyStatus.ACTIVE) {
             for (PolicyVersion previous : previousVersions) {
                 Map<String, Object> before = snapshot(previous, actor);

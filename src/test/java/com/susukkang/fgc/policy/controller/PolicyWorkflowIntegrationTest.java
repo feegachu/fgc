@@ -427,7 +427,7 @@ class PolicyWorkflowIntegrationTest {
         String legacyRef = "docs/FGC_가상_GA_운영정책서_v1_0.md#제46조";
         assertThat(values(original.path("sourceRefs"))).contains(legacyRef);
         JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + sourceId + "/versions",
-                cloneRequest("2090-01-01"), writer, key(), 201);
+                cloneRequest(original.path("effectiveFrom").asText()), writer, key(), 201);
         long cloneId = clone.path("policyVersionId").asLong();
         ObjectNode edit = (ObjectNode) detail(cloneId, writer).path("editDocument").deepCopy();
         JsonNode originalFeeRefs = edit.path("feeRegimeRules").get(0).path("sourceRefs").deepCopy();
@@ -435,9 +435,6 @@ class PolicyWorkflowIntegrationTest {
         int limitCount = jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = ?",
                 Integer.class, feeId);
         assertThat(limitCount).isPositive();
-        String documentVersion = "P647-LEGACY-" + UUID.randomUUID();
-        edit.put("basicDocumentVersion", documentVersion);
-        ((ObjectNode) edit.path("feeRegimeRules").get(0)).put("basicDocumentVersion", documentVersion);
         ObjectNode commission = (ObjectNode) draft().path("commissionRules").get(0).deepCopy();
         commission.put("feeComponentType", "UPFRONT");
         edit.withArray("commissionRules").add(commission);
@@ -547,13 +544,15 @@ class PolicyWorkflowIntegrationTest {
         JsonNode copy = write(HttpMethod.POST, "/api/v1/policies/" + firstId + "/versions",
                 cloneRequest("1800-01-01").put("effectiveTo", "1800-12-31"), writer, key(), 201);
         long copyId = copy.path("policyVersionId").asLong();
-        ObjectNode edit = (ObjectNode) detail(copyId, writer).path("editDocument").deepCopy();
-        ((ObjectNode) edit.path("commissionRules").get(0)).putNull("insurerId");
-        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + copyId, edit, writer, key(), 200);
-        JsonNode approved = action(copyId, "APPROVE", action(copyId, "SUBMIT", updated, writer, 200), approver, 200);
         long otherInsurer = jdbc.queryForObject("""
                 INSERT INTO fgc.insurer(insurer_code, insurer_name, insurer_type) VALUES (?, '별도 보험사', 'LIFE') RETURNING insurer_id
                 """, Long.class, "P647-" + UUID.randomUUID().toString().substring(0, 12));
+        ObjectNode edit = (ObjectNode) detail(copyId, writer).path("editDocument").deepCopy();
+        ObjectNode extraScope = ((ObjectNode) edit.path("commissionRules").get(0)).deepCopy().put("insurerId", otherInsurer);
+        extraScope.remove("commissionRuleId");
+        edit.withArray("commissionRules").add(extraScope);
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + copyId, edit, writer, key(), 200);
+        JsonNode approved = action(copyId, "APPROVE", action(copyId, "SUBMIT", updated, writer, 200), approver, 200);
         ObjectNode otherDraft = draft().put("effectiveFrom", "1800-01-01").put("effectiveTo", "1800-12-31");
         ((ObjectNode) otherDraft.path("commissionRules").get(0)).put("insurerId", otherInsurer);
         JsonNode other = create(otherDraft, writer);
