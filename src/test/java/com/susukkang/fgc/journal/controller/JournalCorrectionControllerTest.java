@@ -1,5 +1,6 @@
 package com.susukkang.fgc.journal.controller;
 
+import jakarta.servlet.http.Cookie;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
@@ -121,13 +122,15 @@ class JournalCorrectionControllerTest {
         verify(journalCorrectionService, never()).reverse(any());
     }
 
+    // 2026-10-27 yslee - #419 STATELESS·CSRF 비활성 이후의 같은 의도: 브라우저가 자동으로 싣는 쿠키만으로는
+    // 상태 변경 요청이 통하지 않는다(세션 인증이 없어 401). 기존 "CSRF 토큰 없으면 403"을 대체한다.
     @Test
-    void requiresCsrfToken() throws Exception {
+    void rejectsSessionCookieOnly() throws Exception {
         mockMvc.perform(post("/api/v1/journals/10/reverse")
-                        .with(user(principal(1L, "settle01", "SETTLEMENT")))
+                        .cookie(new Cookie("JSESSIONID", "forged-session"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"정정\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         verify(journalCorrectionService, never()).reverse(any());
     }

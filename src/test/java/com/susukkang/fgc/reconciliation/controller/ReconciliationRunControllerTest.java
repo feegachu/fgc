@@ -1,5 +1,6 @@
 package com.susukkang.fgc.reconciliation.controller;
 
+import jakarta.servlet.http.Cookie;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
@@ -204,13 +205,16 @@ class ReconciliationRunControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    // 2026-10-27 yslee - #419 STATELESS·CSRF 비활성 이후의 같은 의도: 브라우저가 자동으로 싣는 쿠키만으로는
+    // 상태 변경 요청이 통하지 않는다(세션 인증이 없어 401). 기존 "CSRF 토큰 없으면 403"을 대체한다.
     @Test
-    void 세션_요청에_CSRF_토큰이_없으면_403으로_차단한다() throws Exception {
+    void 세션_쿠키만_있는_요청은_401로_차단한다() throws Exception {
         mockMvc.perform(post("/api/v1/reconciliations")
-                        .with(user(principal("SETTLEMENT")))
+                        .cookie(new Cookie("JSESSIONID", "forged-session"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest())))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
+        verify(reconciliationRunService, never()).create(any());
     }
 
     @Test
@@ -264,11 +268,14 @@ class ReconciliationRunControllerTest {
         verify(reconciliationExceptionService, never()).bulkCreate(41L);
     }
 
+    // 2026-10-27 yslee - #419 STATELESS·CSRF 비활성 이후의 같은 의도: 브라우저가 자동으로 싣는 쿠키만으로는
+    // 상태 변경 요청이 통하지 않는다(세션 인증이 없어 401). 기존 "CSRF 토큰 없으면 403"을 대체한다.
     @Test
-    void 예외_일괄_생성_요청에_CSRF_토큰이_없으면_403으로_차단한다() throws Exception {
+    void 예외_일괄_생성_요청은_세션_쿠키만으로는_401로_차단한다() throws Exception {
         mockMvc.perform(post("/api/v1/reconciliations/41/exceptions")
-                        .with(user(principal("SETTLEMENT"))))
-                .andExpect(status().isForbidden());
+                        .cookie(new Cookie("JSESSIONID", "forged-session")))
+                .andExpect(status().isUnauthorized());
+        verify(reconciliationExceptionService, never()).bulkCreate(41L);
     }
 
     private static CreateReconciliationRunRequest validRequest() {

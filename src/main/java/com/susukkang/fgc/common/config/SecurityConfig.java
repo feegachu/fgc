@@ -2,28 +2,24 @@ package com.susukkang.fgc.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter;
-import com.susukkang.fgc.auth.service.FgcUserDetailsService;
 import com.susukkang.fgc.auth.service.JwtSessionRevokedException;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.security.AgentRequestAuthorization;
-import com.susukkang.fgc.common.security.SessionRoleValidationFilter;
 import com.susukkang.fgc.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,34 +28,25 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthen
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import java.io.IOException;
 
 // FUN-001 개발 순서 1
 
 /**
- * FUN-001 로그인·로그아웃 / 인터페이스정의서 2-1-1(1차는 세션 방식), 5-3(MPA 302·Ajax 401).
+ * FUN-001 로그인·로그아웃 / 인터페이스정의서 §2-1-1(2차 JWT).
  * <p>
- * 체인을 둘로 나눈 이유
- * 한 체인에 formLogin(loginPage)과 httpBasic을 같이 두면 인증 진입점이 하나로 합쳐진다.
- * 그러면 미인증 REST 호출까지 로그인 화면으로 302 되어 화면 스크립트가 401을 구분할 수 없다.
- * 인터페이스정의서 5-3의 "MPA = /login 302 / Ajax = 401 JSON" 규칙을 체인 분리로 강제한다.
- * <p>
- * 2차 JWT 공존 모드(#400, 인터페이스정의서 §2-1-1)
- * API 체인(1·2)은 세션과 Bearer 토큰을 둘 다 받는다. Bearer 요청만 CSRF 토큰 검사에서 빼고,
- * 세션 쿠키로 들어온 요청은 1차와 같이 CSRF 를 검사한다. STATELESS·csrf.disable() 은 웨이브 C(#419)에서 건다 —
- * 지금 걸면 공존기 Thymeleaf Ajax 가 전부 401·403 이 되거나 위조 요청이 통한다.
+ * 인증은 Bearer Access 토큰 하나다. 미인증 요청은 리다이렉트 없이 401 이고(화면은 SPA 가 /login 으로 보낸다),
+ * 권한이 없으면 403 + ApiResponse 봉투다.
  */
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
     /**
-     * FUN-002(#82) — 필터 단계(아래 URL 굵은 규칙·CSRF)에서 거부된 /api/** 요청도 컨트롤러
+     * FUN-002(#82) — 필터 단계(아래 URL 굵은 규칙)에서 거부된 /api/** 요청도 컨트롤러
      *
      * @PreAuthorize 거부와 같은 ApiResponse 봉투(FGC-AUTH-003)로 나가게 한다.
      * 기본 핸들러는 sendError(403) → Boot 기본 오류 JSON이라 인터페이스정의서 3-3의
@@ -107,69 +94,44 @@ public class SecurityConfig {
     }
 
     /**
-     * Bearer 로 인증하려는 요청. DefaultBearerTokenResolver 가 읽는 헤더("bearer" 로 시작)의 부분집합이라,
-     * 여기 걸려 CSRF 를 면제받은 요청은 반드시 토큰 인증을 거친다 — 토큰이 틀리면 세션으로 넘어가지 않고 401.
-     */
-    private static final RequestMatcher BEARER_REQUEST = request -> {
-        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-        return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7);
-    };
-
-    /**
-     * Refresh 쿠키로 동작하는 토큰 API. Spring CSRF 토큰 대신 AuthTokenController 가
-     * Origin·X-FGC-Client 를 검사한다(인터페이스정의서 §2-1-1 "CSRF 판정").
+     * Refresh 쿠키로 동작하는 토큰 API. 로그인 전에 부르므로 인증을 요구하지 않는다(COMPLIANCE 도 막지 않는다).
+     * CSRF 는 AuthTokenController 가 Origin·X-FGC-Client 로 막는다(인터페이스정의서 §2-1-1 "CSRF 판정").
      */
     private static final String[] AUTH_TOKEN_ENDPOINTS = {
             "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout"};
 
     /**
-     * 체인 1·2 공통 — 세션과 Bearer 공존.
+     * 웨이브 C(#419, ADR-02 3단계) — 화면은 SPA 가 nginx 에서 받으므로 서버 체인은 하나다.
+     * 세션을 만들지도 읽지도 않고(STATELESS) Bearer 토큰만 받는다. 쿠키로 인증하지 않으니 CSRF 토큰 검사도 끈다.
+     * <p>
      * 디코더·Converter 를 요청 시점에 꺼내는 이유: SecurityConfig 를 import 하는 @WebMvcTest 슬라이스에는
      * JwtConfig·FgcUserDetailsService 가 없다. 빈이 없는 채로 Bearer 요청이 오면 500 으로 실패한다(통과시키지 않는다).
      */
-    private static void bearerAndSession(HttpSecurity http,
-                                         ObjectProvider<JwtDecoder> jwtDecoder,
-                                         ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
-                                         AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
+            ObjectProvider<JwtDecoder> jwtDecoder,
+            ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
+            AuthenticationEntryPoint bearerAuthenticationEntryPoint) throws Exception {
         http
                 .oauth2ResourceServer(resource -> resource
                         .jwt(jwt -> jwt
                                 .decoder(token -> jwtDecoder.getObject().decode(token))
                                 .jwtAuthenticationConverter(token -> jwtConverter.getObject().convert(token)))
                         .authenticationEntryPoint(bearerAuthenticationEntryPoint))
-                // NEVER: 새 세션을 만들지 않지만, 폼 로그인으로 생긴 세션이 있으면 읽는다(공존기 Thymeleaf Ajax).
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.NEVER));
-    }
-
-    /**
-     * FUN-065 지급 API와 FUN-048 대사 실행 API는 세션 인증과 CSRF 토큰을 함께 검증한다.
-     */
-    @Bean
-    @Order(1)
-    public SecurityFilterChain protectedStateChangeApiSecurityFilterChain(
-            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
-            ObjectProvider<JwtDecoder> jwtDecoder,
-            ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
-            AuthenticationEntryPoint bearerAuthenticationEntryPoint,
-            ObjectProvider<FgcUserDetailsService> sessionUsers, GlobalExceptionHandler errors, ObjectMapper mapper) throws Exception {
-        bearerAndSession(http, jwtDecoder, jwtConverter, bearerAuthenticationEntryPoint);
-        http
-                // 2026-08-12 yslee - 대사 실행 상태 변경 API에 CSRF 보호 적용
-                // 기존 코드: 지급 API 경로만 CSRF 보호 체인에 포함
-                // 문제: 세션 쿠키를 사용하는 대사 실행 POST가 위조 요청에 노출
-                // 개선: IF-API-38 경로를 동일한 보호 체인에 추가
-                .securityMatcher("/api/v1/transactions/**",
-                        "/api/v1/reconciliations/**",
-                        "/api/v1/journals/**")
-                // 2026-08-11 yslee - 세션 쿠키 기반 지급 API의 CSRF 보호 활성화
-                // 기존 코드: /api/** 전체에서 CSRF 검증을 비활성화
-                // 문제: 로그인 세션을 악용한 외부 사이트가 지급 등록·수정·확정 요청을 위조할 수 있음
-                // 개선: FUN-065 상태 변경 요청에 Spring Security 기본 CSRF 토큰 검증을 우선 적용
-                // 2026-10-06 yslee - Bearer 요청만 CSRF 토큰 검사에서 면제(#400). 세션 요청은 그대로 검사한다.
-                .csrf(csrf -> csrf.ignoringRequestMatchers(BEARER_REQUEST))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable)
+                // 로그아웃은 POST /api/v1/auth/logout 이다. 기본 LogoutFilter(POST /logout)를 남기지 않는다.
+                .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.POST, AUTH_TOKEN_ENDPOINTS).permitAll()
+                        // API 문서는 공개하고 실제 호출은 Swagger UI [Authorize]의 Bearer 로 한다(#419).
+                        .requestMatchers("/error", "/actuator/health", "/actuator/health/**",
+                                "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         // FUN-085: 새 AGENT에만 적용한다. 기존 4개 역할의 아래 규칙은 유지한다.
                         .requestMatchers(AgentRequestAuthorization.IS_AGENT).access(AgentRequestAuthorization.SCOPED_READS)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/audit-logs/**")
+                        .hasAnyRole(Roles.COMPLIANCE, Roles.SYSTEM_ADMIN)
                         // FUN-002(#82) — COMPLIANCE는 역할 정의(§4-1)상 "조회만". 컨트롤러
                         // @PreAuthorize를 빠뜨려도 최소한 이 굵은 규칙이 COMPLIANCE의 상태 변경
                         // 요청을 막는다. 세분화된 역할 구분(SETTLEMENT vs GA_ADMIN 등)은
@@ -179,97 +141,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
                         .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
                         .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                         .accessDeniedHandler(apiAccessDeniedHandler));
-        http.addFilterBefore(new SessionRoleValidationFilter(sessionUsers, errors, mapper), AuthorizationFilter.class);
-        return http.build();
-    }
-
-    /**
-     * /api/** - 미인증이면 리다이렉트 대신 항상 401을 돌려준다.
-     * <p>
-     * 세션 인증을 막지 않는 이유
-     * SessionCreationPolicy.STATELESS 를 걸면 폼 로그인 세션으로는 /api/** 를 못 부른다.
-     * 그런데 인터페이스정의서 3-4 는 "화면 스크립트가 401 을 받으면 location='/login'" 이라고
-     * 적어 두었다. 즉 화면이 세션 쿠키로 /api/** 를 Ajax 호출하는 것이 설계된 동작이다.
-     * STATELESS 를 켜면 로그인한 사용자의 화면 Ajax 가 전부 401 이 된다.
-     * <p>
-     * 화면 Ajax가 세션 쿠키로 /api/**를 호출하므로, Spring Security 기본 CSRF
-     * 검증을 모든 상태 변경 요청에 적용한다(SRC-028).
-     */
-    @Bean
-    @Order(2)
-    public SecurityFilterChain apiSecurityFilterChain(
-            HttpSecurity http, AccessDeniedHandler apiAccessDeniedHandler,
-            ObjectProvider<JwtDecoder> jwtDecoder,
-            ObjectProvider<FgcJwtAuthenticationConverter> jwtConverter,
-            AuthenticationEntryPoint bearerAuthenticationEntryPoint,
-            ObjectProvider<FgcUserDetailsService> sessionUsers, GlobalExceptionHandler errors, ObjectMapper mapper) throws Exception {
-        bearerAndSession(http, jwtDecoder, jwtConverter, bearerAuthenticationEntryPoint);
-        http
-                .securityMatcher("/api/**")
-                // 2026-10-06 yslee - Bearer 요청과 토큰 API 3개만 CSRF 토큰 검사에서 면제(#400)
-                // 토큰 API 는 로그인 전에 부르므로 COMPLIANCE 도 막지 않는다(아래 permitAll).
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers(BEARER_REQUEST)
-                        .ignoringRequestMatchers(AUTH_TOKEN_ENDPOINTS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, AUTH_TOKEN_ENDPOINTS).permitAll()
-                        .requestMatchers(AgentRequestAuthorization.IS_AGENT).access(AgentRequestAuthorization.SCOPED_READS)
-                        // 감사로그 API(IF-API-52)는 아직 미구현이지만 구현 시점에 바로
-                        // 적용되도록 선제 등록한다.
-                        .requestMatchers(HttpMethod.GET, "/api/v1/audit-logs/**")
-                        .hasAnyRole(Roles.COMPLIANCE, Roles.SYSTEM_ADMIN)
-                        // FUN-002(#82) 굵은 규칙 — protectedStateChangeApiSecurityFilterChain 주석 참고.
-                        .requestMatchers(HttpMethod.POST, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .requestMatchers(HttpMethod.PUT, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-                        .accessDeniedHandler(apiAccessDeniedHandler));
-        http.addFilterBefore(new SessionRoleValidationFilter(sessionUsers, errors, mapper), AuthorizationFilter.class);
-        return http.build();
-    }
-
-    /**
-     * 화면(MPA) - 세션 쿠키 기반 폼 로그인. CSRF는 켜 둔다(Thymeleaf th:action이 토큰을 자동 주입).
-     * <p>
-     * 실패 시 /login?error 하나로만 보낸다. 아이디 없음 / 비밀번호 틀림 / 잠긴 계정을 화면에서
-     * 구분하면 계정 존재 여부가 새어 나간다(화면정의서 AUTH-W01 "막아야 할 것").
-     */
-    @Bean
-    @Order(3)
-    public SecurityFilterChain webSecurityFilterChain(HttpSecurity http,
-            ObjectProvider<FgcUserDetailsService> sessionUsers, GlobalExceptionHandler errors, ObjectMapper mapper) throws Exception {
-        http
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/assets/**", "/css/**", "/js/**",
-                                "/images/**", "/fonts/**", "/favicon.ico", "/error",
-                                "/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers(AgentRequestAuthorization.IS_AGENT).access(AgentRequestAuthorization.SCOPED_READS)
-                        .requestMatchers(HttpMethod.GET, "/audit-logs")
-                        .hasAnyRole(Roles.COMPLIANCE, Roles.SYSTEM_ADMIN)
-                        // FUN-002(#82) 굵은 규칙 — protectedStateChangeApiSecurityFilterChain 주석 참고.
-                        .requestMatchers(HttpMethod.POST, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .requestMatchers(HttpMethod.PUT, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .requestMatchers(HttpMethod.PATCH, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
-                        .anyRequest().authenticated())
-                .formLogin(form -> form
-                        .loginPage("/login")
-                        .defaultSuccessUrl("/", true)
-                        .failureUrl("/login?error"))
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/login?logout")
-                        .invalidateHttpSession(true)
-                        .deleteCookies("JSESSIONID"));
-        http.addFilterBefore(new SessionRoleValidationFilter(sessionUsers, errors, mapper), AuthorizationFilter.class);
         return http.build();
     }
 

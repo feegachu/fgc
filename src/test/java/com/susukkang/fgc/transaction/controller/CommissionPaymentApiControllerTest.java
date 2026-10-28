@@ -1,5 +1,6 @@
 package com.susukkang.fgc.transaction.controller;
 
+import jakarta.servlet.http.Cookie;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CapResultStatus;
@@ -161,13 +162,15 @@ class CommissionPaymentApiControllerTest {
     // 기존 코드: 테스트가 csrf()를 항상 넣어 토큰 없는 위조 요청의 차단 여부를 확인하지 않음
     // 문제: SecurityConfig에서 CSRF가 다시 꺼져도 지급 등록 테스트가 계속 통과
     // 개선: 인증된 세션이어도 토큰이 없으면 403이고 서비스는 호출되지 않음을 검증
+    // 2026-10-27 yslee - #419 STATELESS·CSRF 비활성 이후의 같은 의도: 브라우저가 자동으로 싣는 쿠키만으로는
+    // 상태 변경 요청이 통하지 않는다(세션 인증이 없어 401). 기존 "CSRF 토큰 없으면 403"을 대체한다.
     @Test
-    void rejectsCreateWithoutCsrfToken() throws Exception {
+    void rejectsCreateWithSessionCookieOnly() throws Exception {
         mockMvc.perform(post("/api/v1/transactions")
-                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .cookie(new Cookie("JSESSIONID", "forged-session"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCreateJson()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         verify(commissionPaymentService, never()).create(any());
     }
@@ -265,11 +268,13 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(jsonPath("$.error.code").value("FGC-TRAN-005"));
     }
 
+    // 2026-10-27 yslee - #419 STATELESS·CSRF 비활성 이후의 같은 의도: 브라우저가 자동으로 싣는 쿠키만으로는
+    // 상태 변경 요청이 통하지 않는다(세션 인증이 없어 401). 기존 "CSRF 토큰 없으면 403"을 대체한다.
     @Test
-    void rejectsPrecheckWithoutCsrfToken() throws Exception {
+    void rejectsPrecheckWithSessionCookieOnly() throws Exception {
         mockMvc.perform(post("/api/v1/transactions/101/precheck")
-                        .with(user("settlement01").roles("SETTLEMENT")))
-                .andExpect(status().isForbidden());
+                        .cookie(new Cookie("JSESSIONID", "forged-session")))
+                .andExpect(status().isUnauthorized());
 
         verify(commissionPaymentService, never()).precheck(any());
     }
