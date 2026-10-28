@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
-import { int } from '../../lib/format'
+import { int, rate } from '../../lib/format'
 import { useDrawn } from '../../lib/motion'
 import { CIRCUMFERENCE, RADIUS, donutSegments } from './donut'
 
@@ -60,8 +60,8 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
       <ul className="risk-legend">
         {items.map((item, index) => {
           const share = total > 0 ? item.value / total : 0
-          // 화면정의서 공통 규칙 3: 비율은 소수점 첫째 자리까지, 정수에도 .0을 붙인다
-          const sharePct = `${(share * 100).toFixed(1)}%`
+          // 화면정의서 공통 규칙 3: 소수점 첫째 자리까지 절사. (value*100)/total이라야 0.29*100 같은 곱셈 오차가 없다
+          const sharePct = `${rate(total > 0 ? String((item.value * 100) / total) : '0')}%`
           return (
             <li key={item.key} style={{ '--i': index } as CSSProperties}>
               <Link
