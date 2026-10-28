@@ -74,7 +74,7 @@ describe('차트 집계', () => {
   })
   it('보장 유형·상태 비중은 건수 대비 반올림 비율이다', () => {
     const { focus } = aggregate(rows, '2026-07', 12, 'all', null)
-    expect(categoryCounts(focus).find((c) => c.name === '건강보장')).toMatchObject({ count: 2, pct: 67 })
+    expect(categoryCounts(focus).find((c) => c.name === '건강보장')).toMatchObject({ count: 2, pct: 66.7 })
     expect(statusCounts(focus).map((s) => [s.label, s.count])).toEqual([['정상', 2], ['미납', 1], ['실효', 0], ['해지·종료', 0]])
   })
 })
