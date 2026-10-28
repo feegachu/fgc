@@ -97,9 +97,12 @@ blob을 서버 `Content-Disposition` 파일명(UTF-8 포함)으로 저장한다.
 
 ### 표시 함수와 1차 화면의 차이
 
-`src/lib/format.ts`는 기존 공통 `format.js` 규칙을 유지한다. `int`, `won`, `isNegative`,
-`rate`, `usageRate`, `date`, `dateTime`, `month`, `today`, `errorText`를 각각 import한다.
-요율 4자리·사용률 6자리는 문자열을 절사하고, 시각·오늘은 Asia/Seoul 기준이다.
+`src/lib/format.ts`와 기존 공통 `format.js`는 화면정의서 공통규칙 3을 함께 적용한다. `int`, `won`, `isNegative`,
+`rate`, `usageRate`, `rateText`, `date`, `dateTime`, `month`, `today`, `errorText`를 각각 import한다.
+요율·사용률·배수는 소수점 첫째 자리까지 문자열을 절사하고 정수에도 `.0`을 붙인다(#712).
+예: `104.166667` → `104.1`, `650.0000` → `650.0`. API 원본 정밀도와 계산·정렬·판정·게이지 위치는 유지한다.
+시각·오늘은 Asia/Seoul 기준이다.
+서버 안내 문구의 소수 백분율은 `rateText`로 표시한다. `1,200%` 같은 규칙명과 감사 원문은 유지한다.
 금액 반올림과 업무 계산은 서버 책임이다. `%`는 호출부에서 붙이고, 음수 색상은
 `isNegative()` 결과로 적용한다. 1차 테스트의 32개 assert 호출을 모두 Vitest로 이전했다
 (반복문의 빈 값 검증도 그대로 유지).
@@ -109,7 +112,7 @@ blob을 서버 `Content-Disposition` 파일명(UTF-8 포함)으로 저장한다.
 | arbitrage-list.js `number` | `int`, 금액은 `won` | 빈 값 `0` → `-`; #412 |
 | cap-list.js `number` | `int`, `won`, `usageRate` | 빈 값 `0` → `-`; #410 |
 | reco.js 숫자 표시 | `int`, `won` | 빈 값 `0` → `-`; #414 |
-| policy-list.js 숫자·요율 표시 | `int`, `rate` | 기존 문자열 4자리 절사와 동일; #406 |
+| policy-list.js 숫자·요율 표시 | `int`, `rate` | 공통규칙 3에 따라 문자열 소수점 1자리 절사; #406·#712 |
 | exception-list.js 금액 표시 | `won`, `isNegative` | 음수 `-1,234원` 및 빨간색; #609 |
 | contract-form.js `int` | `int` | 기존 공통 `format.int`와 동일; 단위는 화면에서 유지; #407 |
 | month-selector.js 현재 월 | `month(today())` | 브라우저 시간대 → KST; #403 |
@@ -271,7 +274,8 @@ POL 기준일은 제목 오른쪽에 두고, 표의 열 너비와 상세 제목�
 화면 CSS는 공통 CSS 뒤에서 적용한다. DataTable의 선택·열 너비 옵션과 FilterBar/Pagination의
 선택적 배치 옵션을 쓰며 다른 화면의 기본 동작은 유지한다.
 
-탭·선택 정책의 URL 복원과 EvidenceLink, 음수 금액의 마이너스 기호/빨간색, 요율 4자리 절사는 유지한다.
+탭·선택 정책의 URL 복원과 EvidenceLink, 음수 금액의 마이너스 기호/빨간색은 유지한다.
+요율은 공통규칙 3에 따라 소수점 첫째 자리까지 절사한다(#712).
 수수료 항목 분류는 API에 라벨 필드가 없어 `base-list.js`의 표시용 매핑을 그대로 옮겼다.
 키보드 선택은 라디오 버튼을 사용하고 근거 버튼·셀 전체 보기 클릭은 행 선택을 바꾸지 않는다.
 
