@@ -72,35 +72,58 @@ public final class CompareRankingCalculator {
                 .toList();
     }
 
+    /** 한도를 적용한 지급액과 그 지급액에 대한 환수 노출액. */
+    private record Payout(long paid, long clawback) {
+    }
+
     static Result calculate(Candidate candidate, long basePremium, LocalDate asOf) {
         CapRule cap = candidate.cap();
         BigDecimal base = BigDecimal.valueOf(basePremium);
-        List<Row> rows = new ArrayList<>();
         List<Evidence> evidence = new ArrayList<>();
-        for (Rule rule : candidate.rules()) {
+        List<Row> rows = paymentRows(candidate.rules(), base, asOf, evidence);
+        long gross = rows.stream().mapToLong(Row::amount).sum();
+        long includedGross = rows.stream().filter(row -> !row.exempt()).mapToLong(Row::amount).sum();
+
+        long capAmount = cap == null ? Long.MAX_VALUE : round(base.multiply(cap.limitMultiplier()));
+        Payout payout = pay(rows, capAmount, candidate.clawbackRatePct());
+        long carryover = gross - payout.paid();
+        Double capImpact = cap == null || capAmount == 0 ? null
+                : BigDecimal.valueOf(includedGross).multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(capAmount), 1, RoundingMode.HALF_UP).doubleValue();
+
+        evidence.add(capEvidence(cap, gross, payout.paid(), carryover, asOf));
+        evidence.add(new Evidence("환수 노출액",
+                candidate.clawbackRatePct() == null ? "해약환급률표 자료 없음 — 0원으로 계산"
+                        : "지급액 × 해약환급률 %s%% (환수 규칙 구현 전 임시 기준)".formatted(plain(candidate.clawbackRatePct())),
+                payout.clawback(), "해약환급률표", candidate.clawbackPolicyVersion(), asOf));
+        return new Result(candidate, gross, payout.paid(), carryover, payout.clawback(), payout.paid() - payout.clawback(),
+                capImpact, evidence);
+    }
+
+    /** 규칙마다 1~12회차 안의 지급행을 만들고, 규칙별 수령 예상액 근거를 evidence 에 더한다. 지급행은 회차 순이다. */
+    private static List<Row> paymentRows(List<Rule> rules, BigDecimal base, LocalDate asOf, List<Evidence> evidence) {
+        List<Row> rows = new ArrayList<>();
+        for (Rule rule : rules) {
             int from = Math.max(1, rule.installmentFrom());
             int to = Math.min(FIRST_YEAR_INSTALLMENTS, rule.installmentTo());
             if (from > to) {
                 continue;
             }
-            long ruleTotal = 0;
+            long amount = rule.ratePct() != null ? round(base.multiply(rule.ratePct()).movePointLeft(2)) : round(rule.fixedAmount());
             for (int installment = from; installment <= to; installment++) {
-                long amount = rule.ratePct() != null
-                        ? round(base.multiply(rule.ratePct()).movePointLeft(2))
-                        : round(rule.fixedAmount());
                 rows.add(new Row(installment, amount, rule.capExempt()));
-                ruleTotal += amount;
             }
             String formula = rule.ratePct() != null
                     ? "%s %d~%d회차 · 기준 보험료 × %s%%".formatted(rule.label(), from, to, plain(rule.ratePct()))
                     : "%s %d~%d회차 · 정액".formatted(rule.label(), from, to);
-            evidence.add(new Evidence("수령 예상액", formula, ruleTotal, "수수료 규칙", rule.policyVersion(), asOf));
+            evidence.add(new Evidence("수령 예상액", formula, amount * (to - from + 1), "수수료 규칙", rule.policyVersion(), asOf));
         }
         rows.sort(Comparator.comparingInt(Row::installment));
-        long gross = rows.stream().mapToLong(Row::amount).sum();
-        long includedGross = rows.stream().filter(row -> !row.exempt()).mapToLong(Row::amount).sum();
+        return rows;
+    }
 
-        long capAmount = cap == null ? Long.MAX_VALUE : round(base.multiply(cap.limitMultiplier()));
+    /** 지급행을 회차 순서로 쌓다가 한도를 넘는 부분은 지급하지 않는다. 환수 노출액은 행마다 반올림해 합한다. */
+    private static Payout pay(List<Row> rows, long capAmount, BigDecimal clawbackRatePct) {
         long remaining = capAmount;
         long paid = 0;
         long clawback = 0;
@@ -110,28 +133,21 @@ public final class CompareRankingCalculator {
                 remaining -= payable;
             }
             paid += payable;
-            if (candidate.clawbackRatePct() != null) {
-                clawback += round(BigDecimal.valueOf(payable).multiply(candidate.clawbackRatePct()).movePointLeft(2));
+            if (clawbackRatePct != null) {
+                clawback += round(BigDecimal.valueOf(payable).multiply(clawbackRatePct).movePointLeft(2));
             }
         }
-        long carryover = gross - paid;
-        Double capImpact = cap == null || capAmount == 0 ? null
-                : BigDecimal.valueOf(includedGross).multiply(BigDecimal.valueOf(100))
-                        .divide(BigDecimal.valueOf(capAmount), 1, RoundingMode.HALF_UP).doubleValue();
+        return new Payout(paid, clawback);
+    }
 
-        if (cap != null) {
-            evidence.add(new Evidence("한도 영향",
-                    "한도 %s%% = 기준 보험료 × %s배 · 한도 적용 전 %,d원 → 지급 %,d원, 이월 예정 %,d원"
-                            .formatted(plain(cap.limitMultiplier().movePointRight(2)), plain(cap.limitMultiplier()), gross, paid, carryover),
-                    paid, "한도 규칙", cap.policyVersion(), asOf));
-        } else {
-            evidence.add(new Evidence("한도 영향", "한도 규칙 자료 없음 — 한도 미반영", paid, "한도 규칙", null, asOf));
+    private static Evidence capEvidence(CapRule cap, long gross, long paid, long carryover, LocalDate asOf) {
+        if (cap == null) {
+            return new Evidence("한도 영향", "한도 규칙 자료 없음 — 한도 미반영", paid, "한도 규칙", null, asOf);
         }
-        evidence.add(new Evidence("환수 노출액",
-                candidate.clawbackRatePct() == null ? "해약환급률표 자료 없음 — 0원으로 계산"
-                        : "지급액 × 해약환급률 %s%% (환수 규칙 구현 전 임시 기준)".formatted(plain(candidate.clawbackRatePct())),
-                clawback, "해약환급률표", candidate.clawbackPolicyVersion(), asOf));
-        return new Result(candidate, gross, paid, carryover, clawback, paid - clawback, capImpact, evidence);
+        return new Evidence("한도 영향",
+                "한도 %s%% = 기준 보험료 × %s배 · 한도 적용 전 %,d원 → 지급 %,d원, 이월 예정 %,d원"
+                        .formatted(plain(cap.limitMultiplier().movePointRight(2)), plain(cap.limitMultiplier()), gross, paid, carryover),
+                paid, "한도 규칙", cap.policyVersion(), asOf);
     }
 
     private static String plain(BigDecimal value) {

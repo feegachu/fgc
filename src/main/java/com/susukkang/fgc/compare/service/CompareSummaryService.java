@@ -5,13 +5,14 @@ import com.susukkang.fgc.ai.service.LlmGateway.LlmRequest;
 import com.susukkang.fgc.common.code.AiCallPurpose;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /**
  * 설명 : 서버가 확정한 순위 결과를 LLM 으로 풀어 쓴 요약 문장을 만든다(FUN-079, SER-013).
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Component;
  * 호출 실패·키 없음·차단은 빈 값으로 돌려준다(게이트웨이가 ai_call_log 를 남긴다).
  */
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 public class CompareSummaryService {
 
@@ -32,8 +33,8 @@ public class CompareSummaryService {
             """;
 
     private static final int MAX_LENGTH = 400;
-    private static final Pattern NUMBER = Pattern.compile("[0-9][0-9,]*(?:[.][0-9]+)?");
-    private static final Pattern FORBIDDEN = Pattern.compile("반드시|무조건|보장합니다|확정입니다");
+    private static final Pattern NUMBER = Pattern.compile("\\d+(?:,\\d{3})*(?:\\.\\d+)?");
+    private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
 
     private final LlmGateway llmGateway;
 
@@ -90,7 +91,7 @@ public class CompareSummaryService {
 
     /** 입력에 없는 숫자·단정 표현·너무 긴 글은 걸러낸다. 1위 상품 이름이 빠진 글도 쓰지 않는다. */
     static boolean isValid(String text, String data, CompareRankingResponse.Item top) {
-        if (text.isBlank() || text.length() > MAX_LENGTH || FORBIDDEN.matcher(text).find()) {
+        if (text.isBlank() || text.length() > MAX_LENGTH || FORBIDDEN.stream().anyMatch(text::contains)) {
             return false;
         }
         if (!text.contains(top.product()) && !text.contains(top.insurer())) {
@@ -104,7 +105,7 @@ public class CompareSummaryService {
         Set<String> found = new HashSet<>();
         Matcher m = NUMBER.matcher(text);
         while (m.find()) {
-            found.add(m.group().replaceAll("[,.]+$", "").replace(",", ""));
+            found.add(m.group().replace(",", ""));
         }
         return found;
     }

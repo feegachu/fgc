@@ -59,31 +59,42 @@ public final class CommissionRuleResolver {
                 .collect(Collectors.groupingBy(RuleRow::itemId, LinkedHashMap::new, Collectors.toList()));
         List<Run> runs = new ArrayList<>();
         for (List<RuleRow> itemRows : byItem.values()) {
-            RuleRow current = null;
-            int start = 0;
-            for (int n = 1; n <= lastInstallment; n++) {
-                RuleRow winner = winner(itemRows, n);
-                if (winner == DUPLICATE) {
-                    return Resolution.excluded("RULE_DUPLICATE");
-                }
-                if (current != null && (winner == null || winner.ruleId() != current.ruleId())) {
-                    runs.add(new Run(current, start, n - 1));
-                    current = null;
-                }
-                if (winner != null && current == null) {
-                    current = winner;
-                    start = n;
-                }
+            List<Run> itemRuns = resolveItem(itemRows, lastInstallment);
+            if (itemRuns == null) {
+                return Resolution.excluded("RULE_DUPLICATE");
             }
-            if (current != null) {
-                runs.add(new Run(current, start, lastInstallment));
-            }
+            runs.addAll(itemRuns);
         }
         if (runs.isEmpty()) {
             return Resolution.excluded("NO_COMMISSION_RULE");
         }
         runs.sort(Comparator.comparingInt(Run::from).thenComparingLong(run -> run.rule().itemId()));
         return new Resolution(List.copyOf(runs), null);
+    }
+
+    /** 한 수수료 항목의 회차별 승자를 연속 구간으로 묶는다. 우선순위까지 같은 규칙이 겹치는 회차가 있으면 null. */
+    private static List<Run> resolveItem(List<RuleRow> itemRows, int lastInstallment) {
+        List<Run> runs = new ArrayList<>();
+        RuleRow current = null;
+        int start = 0;
+        for (int n = 1; n <= lastInstallment; n++) {
+            RuleRow winner = winner(itemRows, n);
+            if (winner == DUPLICATE) {
+                return null;
+            }
+            if (current != null && (winner == null || winner.ruleId() != current.ruleId())) {
+                runs.add(new Run(current, start, n - 1));
+                current = null;
+            }
+            if (winner != null && current == null) {
+                current = winner;
+                start = n;
+            }
+        }
+        if (current != null) {
+            runs.add(new Run(current, start, lastInstallment));
+        }
+        return runs;
     }
 
     /** 이 회차에 적용되는 규칙. 없으면 null, 우선순위까지 같은 규칙이 둘 이상이면 중복 표지를 돌려준다. */

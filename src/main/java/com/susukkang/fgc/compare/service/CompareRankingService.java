@@ -82,27 +82,32 @@ public class CompareRankingService {
         if (label == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "categoryCode", Map.of("field", "categoryCode"), null);
         }
-        LocalDate asOf = today();
-        CapSummary cap = capSummary(agentId);
+        Scope scope = new Scope(categoryCode, label, today(), capSummary(agentId));
         // 순위 계산 기준(D-01)이 승인·설정되기 전에는 임의 점수·순위를 만들지 않는다(FUN-079, CT-A02).
         if (ruleVersion == null || ruleVersion.isBlank()) {
-            return result(null, CompareRankingResponse.RULE_NOT_CONFIGURED, categoryCode, label, asOf, null, null,
-                    List.of("RULE_NOT_CONFIGURED"), cap, List.of(), List.of());
+            return response(scope, new Outcome(CompareRankingResponse.RULE_NOT_CONFIGURED, null, null,
+                    List.of("RULE_NOT_CONFIGURED"), List.of(), List.of()));
         }
+        Outcome outcome = compute(agentId, scope);
+        CompareRankingResponse response = response(scope, outcome);
+        return outcome.items().isEmpty() ? response : withId(response, resultStore.save(agentId, response));
+    }
+
+    private Outcome compute(long agentId, Scope scope) {
         AgentProfile agent = repository.findAgent(agentId).orElseThrow(() -> new FgcBusinessException(FgcErrorCode.AUTH_005));
-        List<Offering> offerings = repository.findSellableOfferings(asOf).stream()
-                .filter(o -> categoryCode.equals(o.groupCode())).toList();
+        List<Offering> offerings = repository.findSellableOfferings(scope.asOf()).stream()
+                .filter(o -> scope.categoryCode().equals(o.groupCode())).toList();
         if (offerings.isEmpty()) {
-            return insufficient(categoryCode, label, asOf, null, "NO_CANDIDATE", cap, List.of());
+            return insufficient(null, "NO_CANDIDATE", List.of());
         }
         Long base = repository.averageMonthlyEquivalentPremium(agentId).orElse(null);
         if (base == null || base <= 0) {
-            return insufficient(categoryCode, label, asOf, null, "NO_BASE_PREMIUM", cap, List.of());
+            return insufficient(null, "NO_BASE_PREMIUM", List.of());
         }
         List<Candidate> candidates = new ArrayList<>();
         List<CompareRankingResponse.Excluded> excluded = new ArrayList<>();
         for (Offering offering : offerings) {
-            Built built = build(offering, agent, asOf);
+            Built built = build(offering, agent, scope.asOf());
             if (built.candidate() != null) {
                 candidates.add(built.candidate());
             } else {
@@ -110,8 +115,13 @@ public class CompareRankingService {
             }
         }
         if (candidates.isEmpty()) {
-            return insufficient(categoryCode, label, asOf, base, "ALL_EXCLUDED", cap, excluded);
+            return insufficient(base, "ALL_EXCLUDED", excluded);
         }
+        return ranked(candidates, excluded, base, scope.asOf());
+    }
+
+    private static Outcome ranked(List<Candidate> candidates, List<CompareRankingResponse.Excluded> excluded, long base,
+                                  LocalDate asOf) {
         List<String> warnings = new ArrayList<>();
         if (candidates.stream().map(Candidate::insurer).distinct().count() < MIN_INSURERS) {
             warnings.add("OTHER_INSURER_LT_3");
@@ -119,21 +129,22 @@ public class CompareRankingService {
         if (!excluded.isEmpty()) {
             warnings.add("SOME_EXCLUDED");
         }
-        List<Result> ranked = CompareRankingCalculator.rank(candidates, base, asOf);
+        List<Result> results = CompareRankingCalculator.rank(candidates, base, asOf);
         List<CompareRankingResponse.Item> items = new ArrayList<>();
-        for (int i = 0; i < ranked.size() && i < MAX_ITEMS; i++) {
-            Result r = ranked.get(i);
-            Candidate c = r.candidate();
-            items.add(new CompareRankingResponse.Item(i + 1, c.offeringId(), c.insurer(), c.product(),
-                    r.grossReceipt(), r.cappedReceipt(), r.carryover(), r.clawbackExposure(), r.conservativeNet(),
-                    c.clawbackRatePct() == null ? null : c.clawbackRatePct().setScale(1, RoundingMode.HALF_UP).doubleValue(),
-                    r.capImpactPct(), c.associationGrade(), r.evidence()));
+        for (int i = 0; i < results.size() && i < MAX_ITEMS; i++) {
+            items.add(item(i + 1, results.get(i)));
         }
         String policyVersion = candidates.stream().flatMap(c -> c.rules().stream()).map(CompareRankingCalculator.Rule::policyVersion)
                 .findFirst().orElse(null);
-        CompareRankingResponse response = result(null, CompareRankingResponse.READY, categoryCode, label, asOf, policyVersion,
-                base, warnings, cap, items, excluded);
-        return withId(response, resultStore.save(agentId, response));
+        return new Outcome(CompareRankingResponse.READY, policyVersion, base, warnings, items, excluded);
+    }
+
+    private static CompareRankingResponse.Item item(int rank, Result r) {
+        Candidate c = r.candidate();
+        Double refundPct = c.clawbackRatePct() == null ? null : c.clawbackRatePct().setScale(1, RoundingMode.HALF_UP).doubleValue();
+        return new CompareRankingResponse.Item(rank, c.offeringId(), c.insurer(), c.product(), r.grossReceipt(), r.cappedReceipt(),
+                r.carryover(), r.clawbackExposure(), r.conservativeNet(), refundPct, r.capImpactPct(), c.associationGrade(),
+                r.evidence());
     }
 
     /** 순위 결과를 풀어 쓴 요약. LLM 요약이 되면 그것을, 안 되면(키 없음·장애·검증 실패) 규칙형 문장을 돌려준다. */
@@ -164,60 +175,72 @@ public class CompareRankingService {
                 .formatted(label, insurers, items.size(), top.insurer(), top.product(), top.conservativeNet());
     }
 
+    /** 요청 한 건의 공통 맥락: 카테고리, 기준일, 본인 한도 현황. */
+    private record Scope(String categoryCode, String label, LocalDate asOf, CapSummary cap) {
+    }
+
+    /** 순위 계산 결과. items 가 비어 있으면 status 가 이유를 말한다. */
+    private record Outcome(String status, String policyVersion, Long base, List<String> warnings,
+                           List<CompareRankingResponse.Item> items, List<CompareRankingResponse.Excluded> excluded) {
+    }
+
     private record Built(Candidate candidate, CompareRankingResponse.Excluded excluded) {
     }
 
     /** 상품 하나의 계산 입력을 만든다. 자료가 없으면 0이나 최하위로 바꾸지 않고 사유 코드와 함께 제외한다. */
     private Built build(Offering o, AgentProfile agent, LocalDate asOf) {
-        List<String> reasons = new ArrayList<>();
         CommissionRuleResolver.Resolution resolution = CommissionRuleResolver.resolve(
                 repository.findCommissionRules(o, agent, asOf), CompareRankingCalculator.FIRST_YEAR_INSTALLMENTS);
-        if (resolution.excludeReason() != null) {
-            reasons.add(resolution.excludeReason());
-        }
         RefundRate refund = repository.findRefundRate(o, clawbackMonth, asOf).orElse(null);
-        if (refund == null) {
-            reasons.add("CLAWBACK_RATE_MISSING");
-        }
         CompareRankingCalculator.CapRule cap = repository.findCapRule(o, asOf).orElse(null);
-        if (cap == null) {
-            reasons.add("CAP_RULE_MISSING");
+        if (resolution.excludeReason() != null || refund == null || cap == null) {
+            return excluded(o, missingReasons(resolution, refund, cap));
         }
-        List<CompareRankingCalculator.Rule> rules = new ArrayList<>();
-        if (reasons.isEmpty()) {
-            Map<Long, String> inclusion = cap.capRuleSetId() == null ? Map.of() : repository.findCapItemInclusion(cap.capRuleSetId());
-            boolean review = false;
-            for (CommissionRuleResolver.Run run : resolution.runs()) {
-                // 한도 규칙에 구분이 없는 항목은 산입 여부를 추정하지 않고 확인 필요로 본다(REG-11).
-                String status = inclusion.getOrDefault(run.rule().itemId(), "REVIEW_REQUIRED");
-                review |= "REVIEW_REQUIRED".equals(status);
-                rules.add(new CompareRankingCalculator.Rule(run.from(), run.to(), run.rule().ratePct(), run.rule().fixedAmount(),
-                        run.rule().label(), run.rule().policyVersion(), "EXCLUDED".equals(status)));
-            }
-            if (review) {
-                reasons.add("CAP_ITEM_REVIEW_REQUIRED");
-            }
+        Map<Long, String> inclusion = cap.capRuleSetId() == null ? Map.of() : repository.findCapItemInclusion(cap.capRuleSetId());
+        // 한도 규칙에 구분이 없는 항목은 산입 여부를 추정하지 않고 확인 필요로 본다(REG-11).
+        if (resolution.runs().stream().anyMatch(run -> "REVIEW_REQUIRED".equals(inclusionOf(inclusion, run)))) {
+            return excluded(o, List.of("CAP_ITEM_REVIEW_REQUIRED"));
         }
-        if (!reasons.isEmpty()) {
-            return new Built(null, new CompareRankingResponse.Excluded(o.offeringId(), o.insurer(), o.product(), List.copyOf(reasons)));
-        }
+        List<CompareRankingCalculator.Rule> rules = resolution.runs().stream()
+                .map(run -> new CompareRankingCalculator.Rule(run.from(), run.to(), run.rule().ratePct(), run.rule().fixedAmount(),
+                        run.rule().label(), run.rule().policyVersion(), "EXCLUDED".equals(inclusionOf(inclusion, run))))
+                .toList();
         return new Built(new Candidate(o.offeringId(), o.insurer(), o.product(), rules, refund.ratePct(), refund.policyVersion(),
                 cap, repository.findAssociationGrade(o.offeringId(), asOf).orElse(null)), null);
     }
 
-    private CompareRankingResponse insufficient(String categoryCode, String label, LocalDate asOf, Long base, String warning,
-                                                CapSummary cap, List<CompareRankingResponse.Excluded> excluded) {
-        return result(null, CompareRankingResponse.INSUFFICIENT_DATA, categoryCode, label, asOf, null, base, List.of(warning), cap,
-                List.of(), excluded);
+    private static String inclusionOf(Map<Long, String> inclusion, CommissionRuleResolver.Run run) {
+        return inclusion.getOrDefault(run.rule().itemId(), "REVIEW_REQUIRED");
     }
 
-    private CompareRankingResponse result(String id, String status, String categoryCode, String label, LocalDate asOf,
-                                          String policyVersion, Long base, List<String> warnings, CapSummary cap,
-                                          List<CompareRankingResponse.Item> items, List<CompareRankingResponse.Excluded> excluded) {
-        String version = CompareRankingResponse.RULE_NOT_CONFIGURED.equals(status) || ruleVersion == null || ruleVersion.isBlank()
-                ? null : ruleVersion;
-        return new CompareRankingResponse(id, status, categoryCode, label, asOf, version, policyVersion, base, clawbackMonth,
-                warnings, cap, items, excluded);
+    private static List<String> missingReasons(CommissionRuleResolver.Resolution resolution, RefundRate refund,
+                                               CompareRankingCalculator.CapRule cap) {
+        List<String> reasons = new ArrayList<>();
+        if (resolution.excludeReason() != null) {
+            reasons.add(resolution.excludeReason());
+        }
+        if (refund == null) {
+            reasons.add("CLAWBACK_RATE_MISSING");
+        }
+        if (cap == null) {
+            reasons.add("CAP_RULE_MISSING");
+        }
+        return reasons;
+    }
+
+    private static Built excluded(Offering o, List<String> reasons) {
+        return new Built(null, new CompareRankingResponse.Excluded(o.offeringId(), o.insurer(), o.product(), List.copyOf(reasons)));
+    }
+
+    private static Outcome insufficient(Long base, String warning, List<CompareRankingResponse.Excluded> excluded) {
+        return new Outcome(CompareRankingResponse.INSUFFICIENT_DATA, null, base, List.of(warning), List.of(), excluded);
+    }
+
+    private CompareRankingResponse response(Scope scope, Outcome outcome) {
+        boolean configured = !CompareRankingResponse.RULE_NOT_CONFIGURED.equals(outcome.status());
+        return new CompareRankingResponse(null, outcome.status(), scope.categoryCode(), scope.label(), scope.asOf(),
+                configured ? ruleVersion : null, outcome.policyVersion(), outcome.base(), clawbackMonth, outcome.warnings(),
+                scope.cap(), outcome.items(), outcome.excluded());
     }
 
     private static CompareRankingResponse withId(CompareRankingResponse r, String id) {
