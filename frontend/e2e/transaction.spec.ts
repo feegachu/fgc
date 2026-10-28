@@ -338,7 +338,7 @@ test('한도 초과는 확정 시도 후 DRAFT를 유지하고 예외함 링크�
   await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
   await expect(page.getByRole('link', { name: '예외함에서 처리하기' })).toHaveAttribute(
     'href',
-    /\/app\/exceptions\?type=CAP_VIOLATION&contractNo=DEMO-CONTRACT-1(?:&month=2026-07)?$/,
+    /\/exceptions\?type=CAP_VIOLATION&contractNo=DEMO-CONTRACT-1(?:&month=2026-07)?$/,
   )
   await expect(page.locator('#btn-confirm-submit')).toBeHidden()
   await expect(page.getByRole('dialog')).toContainText('1,200% 한도를 초과했습니다.')

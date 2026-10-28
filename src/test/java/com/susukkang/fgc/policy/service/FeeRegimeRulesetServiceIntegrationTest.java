@@ -42,6 +42,9 @@ class FeeRegimeRulesetServiceIntegrationTest {
         ProductFeeRegimeResolver resolver = new ProductFeeRegimeResolver(
                 new FeeRegimeDecisionInputServiceImpl(policyVersionRepository), resolverRepository);
         service = new FeeRegimeRulesetService(resolver, resolverRepository);
+        // 데모 시드(V65)의 규제 상한 룰셋과 겹치지 않게, 이 테스트가 만든 룰셋만 후보로 남긴다
+        jdbc.update("UPDATE fgc.policy_version SET status = 'RETIRED' WHERE policy_code LIKE 'REG-%-V1' AND status = 'ACTIVE'");
+
     }
 
     private long g1ContractId() {

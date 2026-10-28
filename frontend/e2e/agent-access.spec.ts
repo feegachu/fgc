@@ -15,12 +15,14 @@ async function agentFixture(page: Page) {
       canHandleException: false, canReverseJournal: false, canFinalizeValidation: false, demoMonth: '2026-07',
     })
     if (path === '/api/v1/base/insurers') return fulfill({ content: [], totalPages: 0, totalElements: 0 })
+    if (path === '/api/v1/base/products') return fulfill({ content: [], totalPages: 0, totalElements: 0 })
     const contract = {
       contractId: 1, contractNo: 'FGC-FGL01-202607-0001', insurerName: '가상생명', productName: 'GOLDEN 상품',
       contractDate: '2026-07-10', monthlyEquivalentFirstPremium: 100000, contractStatus: 'ACTIVE',
       contractStatusLabel: '정상', agentIdName: 'A-FC-001 김정산', agentName: '김정산', dataOrigin: 'MANUAL',
     }
     if (path === '/api/v1/contracts') return fulfill({ content: [contract], totalPages: 1, totalElements: 1, page: 1, size: 20 })
+    if (path === '/api/v1/transactions') return fulfill({ content: [{ amount: 300000 }], totalPages: 1, totalElements: 1, page: 1, size: 100 })
     if (path === '/api/v1/contracts/1') return fulfill(contract)
     if (path === '/api/v1/contracts/1/status-events') return fulfill([])
     unexpected.push(path)
@@ -31,10 +33,15 @@ async function agentFixture(page: Page) {
   return unexpected
 }
 
-test('AGENT 홈은 본인 계약으로 이동하고 전체 설계사·조직·관리자 API를 호출하지 않는다', async ({ page }) => {
+test('AGENT 첫 화면은 포트폴리오이고 본인 계약 목록은 전체 설계사·조직·관리자 API를 호출하지 않는다', async ({ page }) => {
   const unexpected = await agentFixture(page)
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('./')
+  await expect(page.getByRole('heading', { name: '포트폴리오' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '이번 달 현황' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '설계사 판매 관리 그래프' })).toBeVisible()
+  await page.screenshot({ path: 'e2e-artifacts/714-agent-home.png', fullPage: true })
+  await page.goto('contracts')
   await expect(page.getByRole('heading', { name: '보험계약 목록' })).toBeVisible()
   await expect(page.getByText('FGC-FGL01-202607-0001', { exact: true })).toBeVisible()
   await expect(page.locator('.sidebar-user-role')).toHaveText('설계사')
