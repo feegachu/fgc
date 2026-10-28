@@ -63,6 +63,7 @@
     font-size: 28px;
     font-weight: 700;
   }
+  & .ah-profile { margin-top: 10px; }
   & .ah-profile-role { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
   & .ah-profile-name { font-size: 20px; line-height: 1.5; font-weight: 700; letter-spacing: -0.03em; }
   & .ah-heading {
@@ -153,8 +154,8 @@
   & .ah-donut-flex { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
   & .ah-donut-canvas { position: relative; width: 200px; height: 200px; flex: 0 0 200px; }
   & .ah-donut-canvas svg { width: 100%; height: 100%; }
-  & .ah-slice { cursor: pointer; transition: transform 0.6s var(--ease), opacity 0.15s; }
-  & .ah-slice.is-hover { filter: brightness(1.06); }
+  & .ah-slice { cursor: pointer; transform-origin: 50% 50%; transition: transform 0.6s var(--ease), opacity 0.3s var(--ease), filter 0.2s; }
+  & .ah-slice.is-hover { transform: scale(1.07); filter: brightness(1.06); transition: transform 0.18s var(--ease), opacity 0.3s var(--ease), filter 0.2s; }
   & .ah-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; }
   & .ah-donut-center b { font-size: 26px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
   & .ah-donut-center span { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
@@ -172,13 +173,15 @@
   & .ah-trend svg { width: 100%; height: 100%; display: block; }
   & .ah-axis { font-size: 9.5px; fill: #94a3b8; }
   & .ah-best { font-size: 8px; font-weight: 700; fill: #fff; }
-  & .ah-bar { transition: height 0.6s var(--ease), y 0.6s var(--ease); }
+  & .ah-bar { transition: filter 0.15s; }
+  & .ah-bar.is-hover { filter: brightness(1.12); }
 
   & .ah-product { display: grid; gap: 14px; padding: 12px 0 10px; }
   & .ah-product li { display: grid; grid-template-columns: 62px minmax(0, 1fr) 82px; align-items: center; gap: 8px; }
   & .ah-pd-name { font-size: 10px; color: #475569; }
   & .ah-pd-track { height: 12px; border-radius: 5px; background: #f1f5f9; overflow: hidden; }
-  & .ah-pd-fill { display: block; height: 100%; border-radius: 0 5px 5px 0; transition: width 0.6s var(--ease); }
+  & .ah-pd-fill { display: block; height: 100%; border-radius: 0 5px 5px 0; transition: width 0.6s var(--ease), filter 0.15s; }
+  & .ah-product li:hover .ah-pd-fill { filter: brightness(1.12); }
   & .ah-product b { font-size: 9.5px; font-weight: 700; color: var(--brand-600); white-space: nowrap; }
 
   & .ah-status-bar { display: flex; gap: 3px; height: 20px; margin: 20px 0 16px; border-radius: 6px; overflow: hidden; }
