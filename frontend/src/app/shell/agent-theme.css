@@ -1,0 +1,8 @@
+/* 설계사 화면: 사이드바 색을 포트폴리오 목업의 보라 계열로 바꾼다. 다른 역할에는 영향이 없다. */
+.app-shell.is-agent {
+  --color-nav-bg-default: #7f57ac;
+  --color-nav-bg-hover: #73509d;
+  --color-nav-bg-active: #6a4893;
+}
+.agent-topbar { display: flex; align-items: stretch; gap: 18px; min-width: 0; height: 100%; }
+.agent-top-title { display: flex; align-items: center; padding-left: 24px; font-size: 16px; font-weight: 700; white-space: nowrap; }
