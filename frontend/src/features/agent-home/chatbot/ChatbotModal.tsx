@@ -4,6 +4,9 @@ import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { compareCategoriesQuery, compareExplainQuery, rankCompare } from './api'
 import type { CompareCategory, CompareEvidence, CompareItem, CompareRanking } from './api'
+import { FilterPanel } from './FilterPanel'
+import { EMPTY_FILTERS, toFilters } from './filters'
+import type { FilterDraft } from './filters'
 import { FAQ, capBadge, gradeLabel, heroWhy, won } from './format'
 import './chatbot.css'
 
@@ -79,6 +82,7 @@ export function ChatbotModal({
   const [progress, setProgress] = useState(0)
   const [selected, setSelected] = useState<CompareItem | null>(null)
   const [faq, setFaq] = useState<string | null>(null)
+  const [filters, setFilters] = useState<FilterDraft>(EMPTY_FILTERS)
   const dialog = useRef<HTMLDivElement>(null)
   const thread = useRef<HTMLDivElement>(null)
   const evidenceTrigger = useRef<HTMLElement | null>(null)
@@ -110,7 +114,7 @@ export function ChatbotModal({
     setProgress(0)
     setSelected(null)
     rank.reset()
-    rank.mutate(next.code)
+    rank.mutate({ categoryCode: next.code, filters: toFilters(filters) })
   }
   const openEvidence = (item: CompareItem) => {
     evidenceTrigger.current = document.activeElement as HTMLElement | null
@@ -203,6 +207,8 @@ export function ChatbotModal({
                 faq={faq}
                 onFaq={setFaq}
                 need={need}
+                filters={filters}
+                onFilters={setFilters}
               />
             )}
             {view === 2 && category && (
@@ -317,6 +323,8 @@ function StepOne({
   faq,
   onFaq,
   need,
+  filters,
+  onFilters,
 }: {
   categories?: CompareCategory[]
   loading: boolean
@@ -326,7 +334,12 @@ function StepOne({
   faq: string | null
   onFaq: (key: string | null) => void
   need: { near: number; review: number } | null
+  filters: FilterDraft
+  onFilters: (next: FilterDraft) => void
 }) {
+  const insurers = [...new Map((categories ?? []).flatMap((c) => c.insurers ?? []).map((i) => [i.id, i])).values()].sort((a, b) =>
+    a.name.localeCompare(b.name, 'ko'),
+  )
   const open = FAQ.find((f) => f.key === faq)
   return (
     <>
@@ -351,6 +364,7 @@ function StepOne({
       {!loading && !failed && (
         <div className="cb-user cb-replies">
           <div className="cb-replies-bubble">
+            <FilterPanel insurers={insurers} value={filters} onChange={onFilters} />
             <div className="cb-cats" role="group" aria-label="카테고리 선택">
               {(categories ?? []).map((c) => (
                 <button
@@ -426,6 +440,26 @@ const WARNING_TEXT: Record<string, (n: number, excluded: number) => string> = {
   SOME_EXCLUDED: (_n, excluded) => `자료가 부족한 상품 ${excluded}개는 순위에서 제외했어요.`,
 }
 
+/** 순위가 비었을 때 서버 상태·경고 코드에 맞는 안내 문구. */
+function emptyReason(ranking: CompareRanking, category: CompareCategory) {
+  if (ranking.status === 'RULE_NOT_CONFIGURED') return '상품 순위 계산 기준이 아직 확정되지 않아 순위를 보여 드릴 수 없어요.'
+  if (ranking.warnings.includes('FILTER_NO_MATCH')) return '선택한 세부 조건에 맞는 상품이 없어요.'
+  if (ranking.warnings.includes('NO_BASE_PREMIUM')) return '본인 계약이 없어 기준 보험료를 정할 수 없어요.'
+  if (ranking.warnings.includes('ALL_EXCLUDED')) return '비교에 필요한 자료가 부족해 순위를 만들 수 없어요.'
+  return `${category.label} 후보 상품을 찾지 못했어요.`
+}
+
+/** 서버가 이번 계산에 적용했다고 돌려준 세부 조건을 사람이 읽는 문구로 바꾼다. */
+function appliedFilters(ranking: CompareRanking): string[] {
+  const filters = ranking.filters
+  if (!filters) return []
+  const lines: string[] = []
+  if (filters.insurerIds.length > 0) lines.push(`보험사 ${filters.insurerIds.length}곳`)
+  if (filters.monthlyPremium !== null) lines.push(`기준 월 보험료 ${won(filters.monthlyPremium)}`)
+  if (filters.excludeCapOverflow) lines.push('한도 초과 상품 제외')
+  return lines
+}
+
 function Result({
   ranking,
   category,
@@ -439,14 +473,7 @@ function Result({
 }) {
   const items = ranking.items
   if (items.length === 0) {
-    const reason =
-      ranking.status === 'RULE_NOT_CONFIGURED'
-        ? '상품 순위 계산 기준이 아직 확정되지 않아 순위를 보여 드릴 수 없어요.'
-        : ranking.warnings.includes('NO_BASE_PREMIUM')
-          ? '본인 계약이 없어 기준 보험료를 정할 수 없어요.'
-          : ranking.warnings.includes('ALL_EXCLUDED')
-            ? '비교에 필요한 자료가 부족해 순위를 만들 수 없어요.'
-            : `${category.label} 후보 상품을 찾지 못했어요.`
+    const reason = emptyReason(ranking, category)
     return (
       <>
         <User text={category.label} />
@@ -480,6 +507,11 @@ function Result({
           )}
         </div>
       </Bot>
+      {appliedFilters(ranking).length > 0 && (
+        <div className="cb-muted" role="note">
+          적용한 조건: {appliedFilters(ranking).join(' · ')}
+        </div>
+      )}
       {warnings.map((w) => (
         <div key={w} className="cb-warn" role="alert">
           {WARNING_TEXT[w](insurerCount, ranking.excludedItems.length)}

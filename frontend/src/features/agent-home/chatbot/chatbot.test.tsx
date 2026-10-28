@@ -43,25 +43,26 @@ const ranking = (patch: Partial<CompareRanking> = {}): CompareRanking => ({
   capSummary: { usagePct: null, status: null, contractCount: 0 },
   items: [1, 2, 3, 4, 5].map((n) => item(n)),
   excludedItems: [],
+  filters: { insurerIds: [], monthlyPremium: null, excludeCapOverflow: false },
   ...patch,
 })
 const explain = (patch: Partial<CompareExplain> = {}): CompareExplain => ({ rankResultId: 'r-1', summary: '건강보험 5개 보험사를 정렬했어요.', summarySource: 'RULE', summaryError: null, ...patch })
 
-let onRank: () => Promise<unknown>
+let onRank: (body?: unknown) => Promise<unknown>
 let onExplain: () => Promise<unknown>
 const clients: QueryClient[] = []
 
 beforeEach(() => {
   onRank = async () => envelope(ranking())
   onExplain = async () => envelope(explain())
-  vi.spyOn(apiClient, 'request').mockImplementation((async (path: string) => {
+  vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, init?: { body?: unknown }) => {
     if (path.endsWith('/categories')) {
       return envelope([
-        { code: 'HEALTH_PROTECTION', label: '건강보험', insurerCount: 4 },
-        { code: 'SAVINGS', label: '연금저축보험', insurerCount: 0 },
+        { code: 'HEALTH_PROTECTION', label: '건강보험', insurerCount: 4, insurers: [{ id: 1, name: '가보험' }, { id: 2, name: '나보험' }] },
+        { code: 'SAVINGS', label: '연금저축보험', insurerCount: 0, insurers: [] },
       ])
     }
-    if (path.endsWith('/rank')) return onRank()
+    if (path.endsWith('/rank')) return onRank(init?.body)
     if (path.endsWith('/explain')) return onExplain()
     throw new Error(`unexpected ${path}`)
   }) as typeof apiClient.request)
@@ -97,6 +98,33 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(screen.getAllByRole('row')).toHaveLength(6)
     expect(await screen.findByText('건강보험 5개 보험사를 정렬했어요.')).toBeInTheDocument()
     expect(screen.getAllByText('자료 없음').length).toBeGreaterThan(0)
+  })
+
+  it('세부 조건을 고르면 그 조건이 순위 요청에 담기고 결과에 적용 조건이 표시된다', async () => {
+    let sent: unknown
+    onRank = async (body) => {
+      sent = body
+      return envelope(ranking({ filters: { insurerIds: [2], monthlyPremium: 150000, excludeCapOverflow: true } }))
+    }
+    renderModal()
+    await userEvent.click(await screen.findByText('세부 조건 설정 (선택)'))
+    await userEvent.click(screen.getByRole('button', { name: '나보험' }))
+    await userEvent.type(screen.getByLabelText(/기준 월 보험료/), '150000')
+    await userEvent.click(screen.getByLabelText(/이월이 생기는 상품은 제외/))
+    await pickHealth()
+    await result()
+    expect(sent).toEqual({
+      categoryCode: 'HEALTH_PROTECTION',
+      filters: { insurerIds: [2], monthlyPremium: 150000, excludeCapOverflow: true },
+    })
+    expect(screen.getByRole('note')).toHaveTextContent('보험사 1곳 · 기준 월 보험료 150,000원 · 한도 초과 상품 제외')
+  })
+
+  it('조건에 맞는 상품이 없으면 안내한다', async () => {
+    onRank = async () => envelope(ranking({ status: 'INSUFFICIENT_DATA', items: [], rankResultId: null, warnings: ['FILTER_NO_MATCH'] }))
+    renderModal()
+    await pickHealth()
+    expect(await screen.findByText(/선택한 세부 조건에 맞는 상품이 없어요/, undefined, { timeout: 9000 })).toBeInTheDocument()
   })
 
   it('판매 중인 상품이 없는 카테고리는 선택할 수 없다', async () => {

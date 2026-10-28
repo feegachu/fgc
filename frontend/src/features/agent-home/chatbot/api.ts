@@ -6,6 +6,13 @@ export interface CompareCategory {
   code: string
   label: string
   insurerCount: number
+  insurers: { id: number; name: string }[]
+}
+/** 세부 조건(모두 선택). 서버는 후보를 거르거나 기준 보험료만 바꾸고 계산 규칙은 그대로 쓴다. */
+export interface CompareFilters {
+  insurerIds: number[]
+  monthlyPremium: number | null
+  excludeCapOverflow: boolean
 }
 export interface CompareEvidence {
   label: string
@@ -51,6 +58,7 @@ export interface CompareRanking {
   capSummary: { usagePct: number | null; status: string | null; contractCount: number }
   items: CompareItem[]
   excludedItems: CompareExcluded[]
+  filters: CompareFilters
 }
 export interface CompareExplain {
   rankResultId: string
@@ -69,8 +77,8 @@ export const compareCategoriesQuery = () =>
     meta: { errorToast: false },
   })
 
-export async function rankCompare(categoryCode: string) {
-  const { data } = await apiClient.request<CompareRanking>(`${BASE}/rank`, { method: 'POST', body: { categoryCode } })
+export async function rankCompare(request: { categoryCode: string; filters?: CompareFilters }) {
+  const { data } = await apiClient.request<CompareRanking>(`${BASE}/rank`, { method: 'POST', body: request })
   if (!data) throw new Error('응답 데이터를 확인할 수 없습니다.')
   return data
 }

@@ -3,6 +3,7 @@ package com.susukkang.fgc.compare.service;
 import com.susukkang.fgc.ai.service.LlmGateway;
 import com.susukkang.fgc.ai.service.LlmGateway.LlmRequest;
 import com.susukkang.fgc.common.code.AiCallPurpose;
+import com.susukkang.fgc.compare.dto.CompareRankingFilters;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse;
 import java.util.HashSet;
 import java.util.List;
@@ -74,6 +75,7 @@ public class CompareSummaryService {
         sb.append("카테고리: ").append(ranking.categoryLabel()).append('\n');
         sb.append("기준일: ").append(ranking.asOf()).append('\n');
         sb.append("순위 기준: 보수적 순수령액 = 한도 반영 수령 예상액 - 환수 노출액\n");
+        appendFilters(sb, ranking.filters());
         for (CompareRankingResponse.Item item : ranking.items()) {
             sb.append("%d위 %s %s | 수령 예상 %,d원 | 한도 반영 %,d원 | 환수 노출 %,d원 | 보수적 순수령액 %,d원"
                     .formatted(item.rank(), item.insurer(), item.product(), item.expectedReceipt(), item.cappedReceipt(),
@@ -87,6 +89,21 @@ public class CompareSummaryService {
             sb.append("경고 코드: ").append(String.join(", ", ranking.warnings())).append('\n');
         }
         return sb.toString();
+    }
+
+    private static void appendFilters(StringBuilder sb, CompareRankingFilters filters) {
+        if (filters == null || filters.isEmpty()) {
+            return;
+        }
+        if (filters.hasInsurers()) {
+            sb.append("적용 조건: 보험사 ").append(filters.insurerIds().size()).append("곳만 비교\n");
+        }
+        if (filters.monthlyPremium() != null) {
+            sb.append("적용 조건: 기준 월 보험료 %,d원\n".formatted(filters.monthlyPremium()));
+        }
+        if (filters.capOverflowExcluded()) {
+            sb.append("적용 조건: 한도 초과 이월이 생기는 상품 제외\n");
+        }
     }
 
     /** 입력에 없는 숫자·단정 표현·너무 긴 글은 걸러낸다. 1위 상품 이름이 빠진 글도 쓰지 않는다. */

@@ -6,6 +6,7 @@ import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.compare.dto.CompareCategoryResponse;
 import com.susukkang.fgc.compare.dto.CompareExplainResponse;
+import com.susukkang.fgc.compare.dto.CompareRankingFilters;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse.CapSummary;
 import com.susukkang.fgc.compare.repository.CompareRankingRepository;
@@ -18,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,21 +70,24 @@ public class CompareRankingService {
 
     public List<CompareCategoryResponse> categories() {
         requireAgent();
-        Map<String, Long> insurers = repository.findSellableOfferings(today()).stream()
-                .collect(Collectors.groupingBy(Offering::groupCode,
-                        Collectors.mapping(Offering::insurerId, Collectors.collectingAndThen(Collectors.toSet(), s -> (long) s.size()))));
-        return CATEGORY_LABELS.entrySet().stream()
-                .map(e -> new CompareCategoryResponse(e.getKey(), e.getValue(), insurers.getOrDefault(e.getKey(), 0L).intValue()))
-                .toList();
+        Map<String, List<Offering>> byGroup = repository.findSellableOfferings(today()).stream()
+                .collect(Collectors.groupingBy(Offering::groupCode));
+        return CATEGORY_LABELS.entrySet().stream().map(e -> {
+            List<CompareCategoryResponse.InsurerOption> insurers = byGroup.getOrDefault(e.getKey(), List.of()).stream()
+                    .map(o -> new CompareCategoryResponse.InsurerOption(o.insurerId(), o.insurer()))
+                    .distinct().sorted(Comparator.comparing(CompareCategoryResponse.InsurerOption::name)).toList();
+            return new CompareCategoryResponse(e.getKey(), e.getValue(), insurers.size(), insurers);
+        }).toList();
     }
 
-    public CompareRankingResponse rank(String categoryCode) {
+    public CompareRankingResponse rank(String categoryCode, CompareRankingFilters requested) {
         long agentId = requireAgent();
+        CompareRankingFilters filters = (requested == null ? CompareRankingFilters.NONE : requested).normalized();
         String label = CATEGORY_LABELS.get(categoryCode);
         if (label == null) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "categoryCode", Map.of("field", "categoryCode"), null);
         }
-        Scope scope = new Scope(categoryCode, label, today(), capSummary(agentId));
+        Scope scope = new Scope(categoryCode, label, today(), capSummary(agentId), filters);
         // 순위 계산 기준(D-01)이 승인·설정되기 전에는 임의 점수·순위를 만들지 않는다(FUN-079, CT-A02).
         if (ruleVersion == null || ruleVersion.isBlank()) {
             return response(scope, new Outcome(CompareRankingResponse.RULE_NOT_CONFIGURED, null, null,
@@ -95,12 +100,15 @@ public class CompareRankingService {
 
     private Outcome compute(long agentId, Scope scope) {
         AgentProfile agent = repository.findAgent(agentId).orElseThrow(() -> new FgcBusinessException(FgcErrorCode.AUTH_005));
+        CompareRankingFilters filters = scope.filters();
         List<Offering> offerings = repository.findSellableOfferings(scope.asOf()).stream()
-                .filter(o -> scope.categoryCode().equals(o.groupCode())).toList();
+                .filter(o -> scope.categoryCode().equals(o.groupCode()))
+                .filter(o -> !filters.hasInsurers() || filters.insurerIds().contains(o.insurerId())).toList();
         if (offerings.isEmpty()) {
-            return insufficient(null, "NO_CANDIDATE", List.of());
+            return insufficient(null, filters.hasInsurers() ? "FILTER_NO_MATCH" : "NO_CANDIDATE", List.of());
         }
-        Long base = repository.averageMonthlyEquivalentPremium(agentId).orElse(null);
+        Long base = filters.monthlyPremium() != null ? filters.monthlyPremium()
+                : repository.averageMonthlyEquivalentPremium(agentId).orElse(null);
         if (base == null || base <= 0) {
             return insufficient(null, "NO_BASE_PREMIUM", List.of());
         }
@@ -117,11 +125,11 @@ public class CompareRankingService {
         if (candidates.isEmpty()) {
             return insufficient(base, "ALL_EXCLUDED", excluded);
         }
-        return ranked(candidates, excluded, base, scope.asOf());
+        return ranked(candidates, excluded, base, scope);
     }
 
     private static Outcome ranked(List<Candidate> candidates, List<CompareRankingResponse.Excluded> excluded, long base,
-                                  LocalDate asOf) {
+                                  Scope scope) {
         List<String> warnings = new ArrayList<>();
         if (candidates.stream().map(Candidate::insurer).distinct().count() < MIN_INSURERS) {
             warnings.add("OTHER_INSURER_LT_3");
@@ -129,7 +137,11 @@ public class CompareRankingService {
         if (!excluded.isEmpty()) {
             warnings.add("SOME_EXCLUDED");
         }
-        List<Result> results = CompareRankingCalculator.rank(candidates, base, asOf);
+        List<Result> results = CompareRankingCalculator.rank(candidates, base, scope.asOf()).stream()
+                .filter(r -> !scope.filters().capOverflowExcluded() || r.carryover() == 0).toList();
+        if (results.isEmpty()) {
+            return insufficient(base, "FILTER_NO_MATCH", excluded);
+        }
         List<CompareRankingResponse.Item> items = new ArrayList<>();
         for (int i = 0; i < results.size() && i < MAX_ITEMS; i++) {
             items.add(item(i + 1, results.get(i)));
@@ -176,7 +188,7 @@ public class CompareRankingService {
     }
 
     /** 요청 한 건의 공통 맥락: 카테고리, 기준일, 본인 한도 현황. */
-    private record Scope(String categoryCode, String label, LocalDate asOf, CapSummary cap) {
+    private record Scope(String categoryCode, String label, LocalDate asOf, CapSummary cap, CompareRankingFilters filters) {
     }
 
     /** 순위 계산 결과. items 가 비어 있으면 status 가 이유를 말한다. */
@@ -240,12 +252,13 @@ public class CompareRankingService {
         boolean configured = !CompareRankingResponse.RULE_NOT_CONFIGURED.equals(outcome.status());
         return new CompareRankingResponse(null, outcome.status(), scope.categoryCode(), scope.label(), scope.asOf(),
                 configured ? ruleVersion : null, outcome.policyVersion(), outcome.base(), clawbackMonth, outcome.warnings(),
-                scope.cap(), outcome.items(), outcome.excluded());
+                scope.cap(), outcome.items(), outcome.excluded(), scope.filters());
     }
 
     private static CompareRankingResponse withId(CompareRankingResponse r, String id) {
         return new CompareRankingResponse(id, r.status(), r.categoryCode(), r.categoryLabel(), r.asOf(), r.ruleVersion(),
-                r.policyVersion(), r.basePremium(), r.clawbackMonth(), r.warnings(), r.capSummary(), r.items(), r.excludedItems());
+                r.policyVersion(), r.basePremium(), r.clawbackMonth(), r.warnings(), r.capSummary(), r.items(), r.excludedItems(),
+                r.filters());
     }
 
     private CapSummary capSummary(long agentId) {

@@ -26,7 +26,9 @@ public record CompareRankingResponse(
         CapSummary capSummary,
         List<Item> items,
         /** 자료가 없어 순위에서 뺀 상품과 사유. 결측을 0이나 최하위로 바꾸지 않는다 */
-        List<Excluded> excludedItems) {
+        List<Excluded> excludedItems,
+        /** 이번 계산에 적용한 세부 조건(없으면 모두 비어 있음) */
+        CompareRankingFilters filters) {
 
     public static final String READY = "READY";
     public static final String RULE_NOT_CONFIGURED = "RULE_NOT_CONFIGURED";

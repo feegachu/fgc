@@ -12,7 +12,7 @@ class CompareRankResultStoreTest {
 
     private static CompareRankingResponse response() {
         return new CompareRankingResponse(null, "READY", "HEALTH_PROTECTION", "건강보험", LocalDate.of(2026, 7, 31), "TEST-RULE",
-                "GA-CUR-2026-V1 v1", 100_000L, 12, List.of(), null, List.of(), List.of());
+                "GA-CUR-2026-V1 v1", 100_000L, 12, List.of(), null, List.of(), List.of(), com.susukkang.fgc.compare.dto.CompareRankingFilters.NONE);
     }
 
     @Test

@@ -37,11 +37,11 @@ public class CompareController {
         return ApiResponse.success(compareRankingService.categories());
     }
 
-    @Operation(summary = "상품 비교 참고 순위", description = "카테고리를 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).")
+    @Operation(summary = "상품 비교 참고 순위", description = "카테고리와 선택 세부 조건(보험사·기준 월 보험료·한도 초과 제외)을 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).")
     @PostMapping("/rank")
     @PreAuthorize("hasRole('AGENT')")
     public ApiResponse<CompareRankingResponse> rank(@Valid @RequestBody CompareRankingRequest request) {
-        return ApiResponse.success(compareRankingService.rank(request.categoryCode()));
+        return ApiResponse.success(compareRankingService.rank(request.categoryCode(), request.filters()));
     }
 
     @Operation(summary = "순위 요약 문장", description = "서버가 보관한 순위 결과(rankResultId)를 풀어 쓴 요약을 돌려준다. 요약 실패는 200 + summaryError 로 알린다.")
