@@ -99,6 +99,7 @@ describe('transaction draft and attribution contract', () => {
     expect(filterAgentId('1', agents)).toBe('1')
     expect(filterAgentId('2', agents)).toBe('')
     const contracts = [{ contractId: 3, contractDate: '2026-07-18' }]
+    expect(selectContract({ ...row, attributionDate: '' }, '3', contracts).attributionDate).toBe('')
     expect(selectContract(row, '3', contracts).attributionDate).toBe('2026-07-18')
     expect(selectContract({ ...row, attributionDate: '2026-08-02' }, '3', contracts).attributionDate).toBe('2026-08-02')
   })

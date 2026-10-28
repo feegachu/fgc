@@ -137,7 +137,6 @@ function ContractDetailView({ id }: { id: string }) {
                       {
                         contractId: id,
                         agentId: contract.agentId == null ? undefined : String(contract.agentId),
-                        attributionDate: contract.contractDate,
                       },
                       location.pathname + location.search,
                       params.get('month') ?? undefined,

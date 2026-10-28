@@ -292,6 +292,32 @@ test('600번째 설계사는 서버 검색 후 키보드로 선택하며 첫 페
   expect(searched.every((url) => Number(url.searchParams.get('size')) <= 20)).toBe(true)
 })
 
+test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경계 날짜를 보존한다', async ({ page }, info) => {
+  const fixture = await installApi(page)
+  await page.route('**/api/v1/contracts/1', (route) =>
+    route.fulfill({ json: envelope({ ...contracts[0], agentId: 6, agentName: '한지사', contractStatus: 'ACTIVE' }) }),
+  )
+  await page.goto('contracts/1?month=2027-07')
+  await page.getByRole('link', { name: '지급 등록', exact: true }).click()
+  expect(new URL(page.url()).searchParams.has('attributionDate')).toBe(false)
+  await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), '1')
+  const attributionDate = page.getByLabel('1번 귀속행 귀속일', { exact: true })
+  await expect(attributionDate).toHaveValue('')
+  await page.locator('#btn-save').click()
+  await expect(attributionDate).toHaveAttribute('aria-invalid', 'true')
+  expect(
+    fixture.requests.filter((request) => request.method === 'POST' && request.path === '/api/v1/transactions'),
+  ).toHaveLength(0)
+  await info.attach('귀속일 필수 입력', { body: await page.screenshot(), contentType: 'image/png' })
+  await attributionDate.fill('2027-07-10')
+  await page.locator('#btn-save').click()
+  await expect(page.locator('#btn-precheck')).toBeEnabled()
+  expect(fixture.payment()).toMatchObject({
+    settlementMonth: '2027-07-01',
+    attributions: [expect.objectContaining({ contractId: 1, attributionDate: '2027-07-10' })],
+  })
+})
+
 async function enterDraft(page: Page, amount: number, count: number) {
   await page.goto('transactions/new?month=2026-07')
   await selectEntity(page, page.getByLabel('수령 설계사', { exact: false }), '6')

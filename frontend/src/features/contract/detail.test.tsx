@@ -93,9 +93,9 @@ describe('CONT-W02 계약 상세', () => {
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       contractId: '1',
       agentId: '600',
-      attributionDate: '2026-07-01',
       month: '2026-07',
     })
+    expect(url.searchParams.has('attributionDate')).toBe(false)
     expect(url.searchParams.get('returnTo')).toBe('/contracts/1?month=2026-07&returnTo=%2Fcontracts%3Fpage%3D3')
     await actions.click(screen.getByRole('link', { name: '목록으로' }))
     expect(router.state.location.pathname + router.state.location.search).toBe('/contracts?page=3')

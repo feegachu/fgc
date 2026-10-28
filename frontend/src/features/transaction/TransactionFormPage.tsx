@@ -121,7 +121,7 @@ function TransactionForm({
     !draft && entry.contractId
       ? [
           {
-            ...newRow(1, entry.attributionDate ?? `${month}-01`, entry.amount ?? '250000'),
+            ...newRow(1, entry.attributionDate ?? '', entry.amount ?? '250000'),
             contractId: entry.contractId,
           },
         ]
@@ -218,12 +218,6 @@ function TransactionForm({
       if (rows.length) toast('수령 설계사가 변경되어 기존 귀속행을 비웠습니다. 계약을 다시 선택하세요.', 'warning')
     } else if (patch.settlementMonth !== undefined) {
       next.agentId = ''
-      setRows(
-        rows.map((row) => ({
-          ...row,
-          attributionDate: row.attributionDate || (patch.settlementMonth ? `${patch.settlementMonth}-01` : ''),
-        })),
-      )
     } else {
       setRows(rows.map((row) => normalizeRow(row, next.paymentStage === 'INSURER_TO_GA', isNewcomer(next, items))))
     }

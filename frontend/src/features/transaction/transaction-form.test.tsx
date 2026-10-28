@@ -1,5 +1,5 @@
 import { selectOption } from '../../test/selectOption'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, Outlet } from 'react-router'
@@ -86,13 +86,14 @@ afterEach(() => {
   clients.splice(0).forEach((client) => client.clear())
 })
 function mount(path = '/app/transactions/new?month=2026-07', canProcess = true, cached?: Payment) {
+  const month = new URL(path, 'http://local').searchParams.get('month') ?? '2026-07'
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   clients.push(client)
   if (cached) client.setQueryData(draftQuery('77').queryKey, cached)
   const router = createMemoryRouter(
     [
       {
-        element: <Outlet context={{ user: { canProcess }, month: '2026-07' }} />,
+        element: <Outlet context={{ user: { canProcess }, month }} />,
         children: [
           { path: '/transactions/new', element: <TransactionFormPage /> },
           { path: '/transactions', element: <h1>지급 목록 결과</h1> },
@@ -131,6 +132,36 @@ async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('TRAN-W02 React form workflow', () => {
+  it('회차 없는 계약 맥락은 귀속일을 비워 두고 입력 전 저장을 차단한다', async () => {
+    const { user } = mount(
+      '/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1',
+    )
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    const date = screen.getByLabelText('1번 귀속행 귀속일')
+    expect(date).toHaveValue('')
+    await user.click(button('btn-save'))
+    expect(date).toHaveAttribute('aria-invalid', 'true')
+    expect(date).toHaveFocus()
+    expect(writes()).toHaveLength(0)
+    fireEvent.change(document.getElementById('settlementMonth')!, { target: { value: '2027-08' } })
+    expect(date).toHaveValue('')
+  })
+  it.each(['2027-07-17', '2027-07-18'])(
+    '계약 12개월 경계의 실제 귀속일 %s를 정산월과 별도로 저장한다',
+    async (attributionDate) => {
+      const { user } = mount(
+        '/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1',
+      )
+      await waitFor(() => expect(button('btn-save')).toBeEnabled())
+      await user.type(screen.getByLabelText('1번 귀속행 귀속일'), attributionDate)
+      await user.click(button('btn-save'))
+      await waitFor(() => expect(writes()).toHaveLength(1))
+      expect(writes()[0][1]?.body).toMatchObject({
+        settlementMonth: '2027-07-01',
+        attributions: [expect.objectContaining({ contractId: 3, attributionDate })],
+      })
+    },
+  )
   it('이미 저장된 초안은 URL의 새 지급 맥락으로 덮어쓰지 않는다', async () => {
     mount(
       '/app/transactions/new?id=77&month=2026-07&contractId=7&agentId=2&commissionItemId=3&amount=1&cashflowType=DEDUCTION',

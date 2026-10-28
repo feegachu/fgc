@@ -134,7 +134,7 @@ export function selectContract(row: AttributionRow, contractId: string, contract
   return {
     ...row,
     contractId,
-    attributionDate: date && (!row.attributionDate || row.attributionDate < date) ? date : row.attributionDate,
+    attributionDate: date && row.attributionDate && row.attributionDate < date ? date : row.attributionDate,
   }
 }
 export class FormValidationError extends Error {
