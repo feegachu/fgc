@@ -33,7 +33,9 @@ export function followUpQuestion(kind: FollowUpKind, top: CompareItem) {
 export function followUpAnswer(kind: FollowUpKind, items: CompareItem[]) {
   const top = items[0]
   if (kind === 'why') {
-    const lead = `1위는 ${top.insurer} ${top.product}예요. 한도를 반영한 수령 예상액 ${won(top.cappedReceipt)}에서 환수 노출액 ${won(top.clawbackExposure)}을 뺀 보수적 순수령액이 ${won(top.conservativeNet)}으로 가장 높아요.`
+    // 순수령액이 2위와 같으면 "가장 높다"가 아니라 서버가 실제로 순위를 가른 기준을 heroWhy 가 설명한다.
+    const tied = items.length > 1 && items[1].conservativeNet === top.conservativeNet
+    const lead = `1위는 ${top.insurer} ${top.product}예요. 한도를 반영한 수령 예상액 ${won(top.cappedReceipt)}에서 환수 노출액 ${won(top.clawbackExposure)}을 뺀 보수적 순수령액은 ${won(top.conservativeNet)}${tied ? '이에요.' : '으로 가장 높아요.'}`
     return [lead, heroWhy(items), '최종 선택은 설계사님이 하세요.'].filter(Boolean).join(' ')
   }
   const cap = `1위 상품의 한도 영향은 ${capBadge(top.capImpactPct).text}예요.`
@@ -50,6 +52,12 @@ export function heroWhy(items: CompareItem[]) {
   if (items.length < 2) return ''
   const [top, second] = items
   const gap = top.conservativeNet - second.conservativeNet
+  // 서버 정렬: 순수령액 내림차순, 같으면 환수 노출액 오름차순, 그래도 같으면 상품 ID 오름차순.
+  if (gap === 0) {
+    return top.clawbackExposure < second.clawbackExposure
+      ? '2위와 순수령액은 같고, 환수 노출액이 더 작아서 1위예요.'
+      : '2위와 순수령액·환수 노출액이 같아서 표시 순서(상품 ID) 기준으로 1위예요.'
+  }
   const claw =
     top.clawbackExposure <= second.clawbackExposure
       ? '환수 부담도 더 작아요.'
