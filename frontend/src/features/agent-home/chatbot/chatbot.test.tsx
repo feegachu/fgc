@@ -107,7 +107,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
       return envelope(ranking({ filters: { insurerIds: [2], excludeCapOverflow: true } }))
     }
     renderModal()
-    await userEvent.click(await screen.findByText('세부 조건 설정 (선택)'))
+    await screen.findByRole('region', { name: '세부 조건 설정' })
     await userEvent.click(screen.getByRole('button', { name: '나보험' }))
     await userEvent.click(screen.getByLabelText(/이월이 생기는 상품은 제외/))
     await pickHealth()

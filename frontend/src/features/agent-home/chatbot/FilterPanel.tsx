@@ -23,15 +23,16 @@ export function FilterPanel({
       insurerIds: value.insurerIds.includes(id) ? value.insurerIds.filter((x) => x !== id) : [...value.insurerIds, id],
     })
   return (
-    <details className="cb-filters">
-      <summary>
-        세부 조건 설정 (선택)
+    <section className="cb-filters" aria-label="세부 조건 설정">
+      <div className="cb-filters-head">
+        세부 조건 설정
+        <span className="cb-muted">선택 사항</span>
         {count > 0 && <span className="cb-pill">{count}개 적용</span>}
-      </summary>
+      </div>
       <div className="cb-filters-body">
         {insurers.length > 0 && (
           <fieldset>
-            <legend>비교할 보험사 (선택하지 않으면 전체)</legend>
+            <legend>비교할 보험사 · 고르지 않으면 전체</legend>
             <div className="cb-chips">
               {insurers.map((insurer) => (
                 <button
@@ -61,6 +62,6 @@ export function FilterPanel({
           </button>
         )}
       </div>
-    </details>
+    </section>
   )
 }
