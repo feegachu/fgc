@@ -98,9 +98,6 @@ public class CompareSummaryService {
         if (filters.hasInsurers()) {
             sb.append("적용 조건: 보험사 ").append(filters.insurerIds().size()).append("곳만 비교\n");
         }
-        if (filters.monthlyPremium() != null) {
-            sb.append("적용 조건: 기준 월 보험료 %,d원\n".formatted(filters.monthlyPremium()));
-        }
         if (filters.capOverflowExcluded()) {
             sb.append("적용 조건: 한도 초과 이월이 생기는 상품 제외\n");
         }

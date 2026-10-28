@@ -455,7 +455,6 @@ function appliedFilters(ranking: CompareRanking): string[] {
   if (!filters) return []
   const lines: string[] = []
   if (filters.insurerIds.length > 0) lines.push(`보험사 ${filters.insurerIds.length}곳`)
-  if (filters.monthlyPremium !== null) lines.push(`기준 월 보험료 ${won(filters.monthlyPremium)}`)
   if (filters.excludeCapOverflow) lines.push('한도 초과 상품 제외')
   return lines
 }

@@ -8,10 +8,9 @@ export interface CompareCategory {
   insurerCount: number
   insurers: { id: number; name: string }[]
 }
-/** 세부 조건(모두 선택). 서버는 후보를 거르거나 기준 보험료만 바꾸고 계산 규칙은 그대로 쓴다. */
+/** 세부 조건(모두 선택). 서버는 후보만 거르고 평가 입력과 계산 규칙은 그대로 쓴다. */
 export interface CompareFilters {
   insurerIds: number[]
-  monthlyPremium: number | null
   excludeCapOverflow: boolean
 }
 export interface CompareEvidence {

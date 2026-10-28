@@ -3,10 +3,10 @@ import type { FilterDraft } from './filters'
 
 function activeCount(draft: FilterDraft) {
   const filters = toFilters(draft)
-  return (filters.insurerIds.length > 0 ? 1 : 0) + (filters.monthlyPremium !== null ? 1 : 0) + (filters.excludeCapOverflow ? 1 : 0)
+  return (filters.insurerIds.length > 0 ? 1 : 0) + (filters.excludeCapOverflow ? 1 : 0)
 }
 
-/** 카테고리를 고르기 전에 설정하는 선택 조건. 후보를 거르거나 기준 보험료를 바꿀 뿐 계산 규칙은 서버가 그대로 적용한다. */
+/** 카테고리를 고르기 전에 설정하는 선택 조건. 후보를 거를 뿐 평가 입력과 계산 규칙은 서버가 그대로 적용한다. */
 export function FilterPanel({
   insurers,
   value,
@@ -47,16 +47,6 @@ export function FilterPanel({
             </div>
           </fieldset>
         )}
-        <label className="cb-field">
-          <span>기준 월 보험료 (원, 비우면 내 계약 평균)</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            placeholder="예: 100000"
-            value={value.monthlyPremium}
-            onChange={(event) => onChange({ ...value, monthlyPremium: event.target.value.replace(/\D/g, '').slice(0, 9) })}
-          />
-        </label>
         <label className="cb-check">
           <input
             type="checkbox"

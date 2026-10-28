@@ -107,8 +107,7 @@ public class CompareRankingService {
         if (offerings.isEmpty()) {
             return insufficient(null, filters.hasInsurers() ? "FILTER_NO_MATCH" : "NO_CANDIDATE", List.of());
         }
-        Long base = filters.monthlyPremium() != null ? filters.monthlyPremium()
-                : repository.averageMonthlyEquivalentPremium(agentId).orElse(null);
+        Long base = repository.averageMonthlyEquivalentPremium(agentId).orElse(null);
         if (base == null || base <= 0) {
             return insufficient(null, "NO_BASE_PREMIUM", List.of());
         }

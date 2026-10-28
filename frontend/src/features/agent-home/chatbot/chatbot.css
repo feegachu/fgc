@@ -289,6 +289,4 @@
 .cb .cb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .cb .cb-chip { padding: 6px 14px; border: 1.5px solid #cbd5e1; border-radius: 99px; background: #fff; font-size: 13px; font-weight: 600; color: var(--cb-t700); }
 .cb .cb-chip.on { border-color: var(--cb-brand-dark); background: var(--cb-brand-100); color: var(--cb-brand-dark); }
-.cb .cb-field { display: grid; gap: 6px; font-size: 12.5px; color: var(--cb-t700); }
-.cb .cb-field input { padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; }
 .cb .cb-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--cb-t700); }

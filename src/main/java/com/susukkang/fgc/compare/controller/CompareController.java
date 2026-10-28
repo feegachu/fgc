@@ -37,7 +37,7 @@ public class CompareController {
         return ApiResponse.success(compareRankingService.categories());
     }
 
-    @Operation(summary = "상품 비교 참고 순위", description = "카테고리와 선택 세부 조건(보험사·기준 월 보험료·한도 초과 제외)을 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).")
+    @Operation(summary = "상품 비교 참고 순위", description = "카테고리와 선택 세부 조건(보험사·한도 초과 제외)을 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).")
     @PostMapping("/rank")
     @PreAuthorize("hasRole('AGENT')")
     public ApiResponse<CompareRankingResponse> rank(@Valid @RequestBody CompareRankingRequest request) {

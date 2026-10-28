@@ -1,22 +1,14 @@
 import type { CompareFilters } from './api'
 
-/** 입력 중인 세부 조건. 보험료는 입력 편의를 위해 문자열로 들고 있다가 요청 직전에 숫자로 바꾼다. */
+/** 입력 중인 세부 조건. */
 export interface FilterDraft {
   insurerIds: number[]
-  monthlyPremium: string
   excludeCapOverflow: boolean
 }
 
-export const EMPTY_FILTERS: FilterDraft = { insurerIds: [], monthlyPremium: '', excludeCapOverflow: false }
+export const EMPTY_FILTERS: FilterDraft = { insurerIds: [], excludeCapOverflow: false }
 
-const MAX_PREMIUM = 100_000_000
-
-/** 서버 요청용 조건. 비어 있거나 잘못된 보험료는 보내지 않는다. */
+/** 서버 요청용 조건. 후보를 거르는 조건만 보내고 평가 입력(기준 보험료 등)은 서버가 본인 DB 에서 조회한다. */
 export function toFilters(draft: FilterDraft): CompareFilters {
-  const premium = Number(draft.monthlyPremium)
-  return {
-    insurerIds: draft.insurerIds,
-    monthlyPremium: Number.isInteger(premium) && premium > 0 && premium <= MAX_PREMIUM ? premium : null,
-    excludeCapOverflow: draft.excludeCapOverflow,
-  }
+  return { insurerIds: draft.insurerIds, excludeCapOverflow: draft.excludeCapOverflow }
 }

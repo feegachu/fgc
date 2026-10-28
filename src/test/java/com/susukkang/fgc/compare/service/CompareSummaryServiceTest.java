@@ -20,7 +20,7 @@ class CompareSummaryServiceTest {
         return new CompareRankingResponse("r-1", "READY", "HEALTH_PROTECTION", "건강보험", LocalDate.of(2026, 7, 31), "TEST-RULE",
                 "GA-CUR-2026-V1 v1", 100_000L, 12, List.of(), null,
                 List.of(item(1, "가보험", "든든건강", 684_000), item(2, "나보험", "튼튼건강", 650_000)), List.of(),
-                new CompareRankingFilters(List.of(1L), 100_000L, true));
+                new CompareRankingFilters(List.of(1L), true));
     }
 
     @Test
@@ -37,7 +37,7 @@ class CompareSummaryServiceTest {
     void describeIncludesAppliedFilters() {
         String data = CompareSummaryService.describe(ranking());
 
-        assertThat(data).contains("보험사 1곳만 비교", "기준 월 보험료 100,000원", "한도 초과 이월이 생기는 상품 제외");
+        assertThat(data).contains("보험사 1곳만 비교", "한도 초과 이월이 생기는 상품 제외");
     }
 
     @Test
@@ -55,11 +55,11 @@ class CompareSummaryServiceTest {
     @Test
     @DisplayName("세부 조건은 null 을 비우고 보험사 ID 를 중복 없이 정렬해 정규화한다")
     void filtersAreNormalized() {
-        CompareRankingFilters normalized = new CompareRankingFilters(List.of(3L, 1L, 3L), null, null).normalized();
+        CompareRankingFilters normalized = new CompareRankingFilters(List.of(3L, 1L, 3L), null).normalized();
 
         assertThat(normalized.insurerIds()).containsExactly(1L, 3L);
         assertThat(normalized.capOverflowExcluded()).isFalse();
-        assertThat(new CompareRankingFilters(null, null, null).normalized().isEmpty()).isTrue();
+        assertThat(new CompareRankingFilters(null, null).normalized().isEmpty()).isTrue();
     }
 
     @Test
