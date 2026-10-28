@@ -10,10 +10,9 @@ export interface ScreenDefinition {
   section?: string
   icon: string
   permission?: Permission
-  legacy: string
 }
 export const screens: ScreenDefinition[] = [
-  { id: 'DASH-W01', path: '/', title: '업무 대시보드', menu: '/', icon: 'dashboard', legacy: '/' },
+  { id: 'DASH-W01', path: '/', title: '업무 대시보드', menu: '/', icon: 'dashboard' },
   {
     id: 'BASE-W01',
     path: '/base',
@@ -21,7 +20,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/base',
     section: 'admin',
     icon: 'settings',
-    legacy: '/base',
   },
   {
     id: 'POL-W01',
@@ -30,7 +28,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/policies',
     section: 'admin',
     icon: 'settings',
-    legacy: '/policies',
   },
   {
     id: 'CONT-W03',
@@ -40,7 +37,6 @@ export const screens: ScreenDefinition[] = [
     section: 'contracts',
     icon: 'description',
     permission: 'canProcess',
-    legacy: '/contracts/new',
   },
   {
     id: 'CONT-W03',
@@ -50,7 +46,6 @@ export const screens: ScreenDefinition[] = [
     section: 'contracts',
     icon: 'description',
     permission: 'canProcess',
-    legacy: '/contracts/:id/edit',
   },
   {
     id: 'CONT-W02',
@@ -59,7 +54,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',
-    legacy: '/contracts/:id',
   },
   {
     id: 'CONT-W01',
@@ -69,7 +63,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',
-    legacy: '/contracts',
   },
   {
     id: 'TRAN-W02',
@@ -79,7 +72,6 @@ export const screens: ScreenDefinition[] = [
     section: 'contracts',
     icon: 'payments',
     permission: 'canProcess',
-    legacy: '/transactions/new',
   },
   {
     id: 'TRAN-W01',
@@ -88,7 +80,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/transactions',
     section: 'contracts',
     icon: 'payments',
-    legacy: '/transactions',
   },
   {
     id: 'SCHE-W02',
@@ -97,7 +88,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/schedules',
     section: 'contracts',
     icon: 'description',
-    legacy: '/schedules/:id',
   },
   {
     id: 'SCHE-W01',
@@ -106,7 +96,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/schedules',
     section: 'contracts',
     icon: 'description',
-    legacy: '/schedules',
   },
   {
     id: 'CAP-W01',
@@ -115,7 +104,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/cap-checks',
     section: 'compliance',
     icon: 'fact_check',
-    legacy: '/cap-checks',
   },
   {
     id: 'ARB-W01',
@@ -124,7 +112,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/arbitrage-checks',
     section: 'compliance',
     icon: 'fact_check',
-    legacy: '/arbitrage-checks',
   },
   {
     id: 'LEDG-W01',
@@ -133,7 +120,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/journals',
     section: 'ledger',
     icon: 'menu_book',
-    legacy: '/journals',
   },
   {
     id: 'RECO-W01',
@@ -142,9 +128,8 @@ export const screens: ScreenDefinition[] = [
     menu: '/reconciliations',
     section: 'ledger',
     icon: 'menu_book',
-    legacy: '/reconciliations',
   },
-  { id: 'EXCP-W01', path: '/exceptions', title: '예외', menu: '/exceptions', icon: 'inbox', legacy: '/exceptions' },
+  { id: 'EXCP-W01', path: '/exceptions', title: '예외', menu: '/exceptions', icon: 'inbox' },
   {
     id: 'VRUN-W02',
     path: '/validation-runs/:id',
@@ -152,7 +137,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/validation-runs',
     section: 'compliance',
     icon: 'fact_check',
-    legacy: '/validation-runs/:id',
   },
   {
     id: 'VRUN-W01',
@@ -161,7 +145,6 @@ export const screens: ScreenDefinition[] = [
     menu: '/validation-runs',
     section: 'compliance',
     icon: 'fact_check',
-    legacy: '/validation-runs',
   },
   {
     id: 'AUDT-W01',
@@ -171,7 +154,6 @@ export const screens: ScreenDefinition[] = [
     section: 'admin',
     icon: 'settings',
     permission: 'canViewAuditLog',
-    legacy: '/audit-logs',
   },
 ]
 export const screenFor = (pathname: string) =>
@@ -183,8 +165,4 @@ export const canOpen = (
 ) => {
   if ((user.isAgent || user.roleCode === 'AGENT') && !['CONT-W01', 'CONT-W02', 'TRAN-W01'].includes(screen.id)) return false
   return !screen.permission || user[screen.permission] === true
-}
-export function legacyHref(screen: ScreenDefinition, pathname: string, search: string) {
-  const params = matchPath(screen.path, pathname)?.params ?? {}
-  return screen.legacy.replace(/:([a-z]+)/g, (_, key: string) => encodeURIComponent(params[key] ?? '')) + search
 }

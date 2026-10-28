@@ -36,7 +36,7 @@ child.on('exit', (code) => {
 })
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal))
 try {
-  await waitForBackend('http://127.0.0.1:18081/login', 180_000, () => child.exitCode === null)
+  await waitForBackend('http://127.0.0.1:18081/actuator/health', 180_000, () => child.exitCode === null)
 } catch (error) {
   console.error(error.message)
   child.kill()

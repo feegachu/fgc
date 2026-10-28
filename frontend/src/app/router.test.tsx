@@ -11,14 +11,13 @@ import { screens } from './screens'
 import { queryClient } from './queryClient'
 import { subscribeApiErrors } from '../lib/api/errorNotifications'
 import { useAuthStore } from '../stores/auth'
-import { TransitionPage } from './TransitionPage'
 
-// 셸·기존 링크 계약은 업무 화면의 React 전환 여부와 독립적으로 검증한다.
+// 셸·라우트 계약은 업무 화면 구현과 독립적으로 검증한다.
 vi.mock('../features/validation/ValidationRunListPage', () => ({
-  default: () => <TransitionPage screen={screens.find((item) => item.id === 'VRUN-W01')!} />,
+  default: () => <h1>{screens.find((item) => item.id === 'VRUN-W01')!.title}</h1>,
 }))
 vi.mock('../features/validation/ValidationRunDetailPage', () => ({
-  default: () => <TransitionPage screen={screens.find((item) => item.id === 'VRUN-W02')!} />,
+  default: () => <h1>{screens.find((item) => item.id === 'VRUN-W02')!.title}</h1>,
 }))
 
 beforeEach(() => {
@@ -106,26 +105,19 @@ describe('AppShell·라우트', () => {
       ])
     },
   )
-  it('서버 기본월을 적용하며 상세 기존 경로와 검색 조건을 유지한다', async () => {
+  it('서버 기본월을 적용하며 상세 경로와 검색 조건을 유지한다', async () => {
     const router = renderAt('/validation-runs/12?status=ACTIVE&page=2')
     await screen.findByRole('heading', { name: '월 통합검증 상세' })
-    await waitFor(() =>
-      expect(screen.getByRole('link', { name: '기존 화면으로 이동' })).toHaveAttribute(
-        'href',
-        '/validation-runs/12?status=ACTIVE&page=2&month=2026-07',
-      ),
-    )
-    expect(router.state.location.search).toContain('month=2026-07')
-    expect(router.state.location.search).toContain('page=2')
+    await waitFor(() => expect(router.state.location.search).toBe('?status=ACTIVE&page=2&month=2026-07'))
+    expect(router.state.location.pathname).toBe('/validation-runs/12')
   })
   it('미등록 경로를 404 연결 화면으로 보낸다', async () => {
     renderAt('/xyz')
     expect(await screen.findByRole('heading', { name: '404 · 찾을 수 없음' })).toBeInTheDocument()
   })
-  it('수정 라우트 메타데이터를 등록하고 쓰기 권한이 없으면 기존 링크도 숨긴다', async () => {
+  it('수정 라우트 메타데이터를 등록하고 쓰기 권한이 없으면 403을 보여 준다', async () => {
     renderAt('/contracts/12/edit', 'COMPLIANCE')
     expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: '기존 화면으로 이동' })).toBeNull()
     expect(screens.find((route) => route.path === '/contracts/:id/edit')?.permission).toBe('canProcess')
   })
 })
