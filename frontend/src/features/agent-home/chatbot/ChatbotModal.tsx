@@ -7,7 +7,8 @@ import type { CompareCategory, CompareEvidence, CompareItem, CompareRanking } fr
 import { FilterPanel } from './FilterPanel'
 import { EMPTY_FILTERS, toFilters } from './filters'
 import type { FilterDraft } from './filters'
-import { FAQ, capBadge, gradeLabel, heroWhy, won } from './format'
+import { FAQ, capBadge, followUpAnswer, followUpQuestion, gradeLabel, heroWhy, won } from './format'
+import type { FollowUpKind } from './format'
 import './chatbot.css'
 
 const STEPS = ['카테고리 선택', '상품 선별', '비교 결과·근거']
@@ -83,6 +84,9 @@ export function ChatbotModal({
   const [selected, setSelected] = useState<CompareItem | null>(null)
   const [faq, setFaq] = useState<string | null>(null)
   const [filters, setFilters] = useState<FilterDraft>(EMPTY_FILTERS)
+  // 3단계 하단 질문 버튼을 누르면 입력창에 들어가고, 보내기를 눌러야 답변을 받거나 1단계로 돌아간다.
+  const [draft, setDraft] = useState<{ kind: FollowUpKind | 'restart'; text: string } | null>(null)
+  const [asked, setAsked] = useState<{ kind: FollowUpKind; question: string; answer: string }[]>([])
   const dialog = useRef<HTMLDivElement>(null)
   const thread = useRef<HTMLDivElement>(null)
   const evidenceTrigger = useRef<HTMLElement | null>(null)
@@ -101,6 +105,10 @@ export function ChatbotModal({
   useEffect(() => {
     if (thread.current) thread.current.scrollTop = 0
   }, [view])
+  // 질문에 답이 붙으면 새 답변이 보이도록 대화 맨 아래로 내린다.
+  useEffect(() => {
+    if (asked.length > 0 && thread.current) thread.current.scrollTop = thread.current.scrollHeight
+  }, [asked.length])
   // 서랍을 닫으면 포커스를 근거 버튼으로 돌려 Esc·Tab 이 모달 안에서 계속 동작하게 한다.
   useEffect(() => {
     if (!selected) evidenceTrigger.current?.focus({ preventScroll: true })
@@ -113,8 +121,21 @@ export function ChatbotModal({
     setCategory(next)
     setProgress(0)
     setSelected(null)
+    setDraft(null)
+    setAsked([])
     rank.reset()
     rank.mutate({ categoryCode: next.code, filters: toFilters(filters) })
+  }
+  const send = () => {
+    if (!draft) return
+    if (draft.kind === 'restart') {
+      restart()
+      return
+    }
+    if (ranking && ranking.items.length > 0) {
+      setAsked((list) => [...list, { kind: draft.kind as FollowUpKind, question: draft.text, answer: followUpAnswer(draft.kind as FollowUpKind, ranking.items) }])
+    }
+    setDraft(null)
   }
   const openEvidence = (item: CompareItem) => {
     evidenceTrigger.current = document.activeElement as HTMLElement | null
@@ -123,6 +144,8 @@ export function ChatbotModal({
   const restart = () => {
     setCategory(null)
     setSelected(null)
+    setDraft(null)
+    setAsked([])
     setProgress(0)
     rank.reset()
   }
@@ -288,15 +311,54 @@ export function ChatbotModal({
                 onEvidence={openEvidence}
               />
             )}
+            {view === 3 &&
+              asked.map((qa) => (
+                <div key={qa.kind}>
+                  <User text={qa.question} />
+                  <Bot avatar="sum">
+                    <div className="cb-card" role="status">
+                      <span>{qa.answer}</span>
+                    </div>
+                  </Bot>
+                </div>
+              ))}
           </div>
 
           {view === 3 ? (
-            <div className="cb-composer">
-              <div className="cb-composer-field ready">🔍 다른 카테고리도 추천 받기</div>
-              <button type="button" className="cb-send on" aria-label="보내기" onClick={restart}>
-                ➤
-              </button>
-            </div>
+            <>
+              <div className="cb-suggest" role="group" aria-label="연관 질문">
+                {ranking && ranking.items.length > 0 &&
+                  (['why', 'limit'] as const).map((kind) => {
+                    const text = followUpQuestion(kind, ranking.items[0])
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        className={`cb-suggest-btn${draft?.kind === kind ? ' on' : ''}`}
+                        aria-pressed={draft?.kind === kind}
+                        disabled={asked.some((qa) => qa.kind === kind)}
+                        onClick={() => setDraft({ kind, text })}
+                      >
+                        {text}
+                      </button>
+                    )
+                  })}
+                <button
+                  type="button"
+                  className={`cb-suggest-btn${draft?.kind === 'restart' ? ' on' : ''}`}
+                  aria-pressed={draft?.kind === 'restart'}
+                  onClick={() => setDraft({ kind: 'restart', text: '다른 카테고리도 추천 받기' })}
+                >
+                  다른 카테고리도 추천 받기
+                </button>
+              </div>
+              <div className="cb-composer">
+                <div className={`cb-composer-field${draft ? ' ready' : ''}`}>{draft ? draft.text : '궁금한 점을 골라 보내기를 눌러 보세요'}</div>
+                <button type="button" className={`cb-send${draft ? ' on' : ''}`} aria-label="보내기" disabled={!draft} onClick={send}>
+                  ➤
+                </button>
+              </div>
+            </>
           ) : (
             <div className="cb-composer" aria-hidden="true">
               <div className="cb-composer-field">{hint}</div>

@@ -22,6 +22,29 @@ export const FAQ = [
   { key: 'privacy', label: '개인정보 안내', body: '고객 이름·주민번호·연락처는 입력받지 않아요. 상품 구조와 내 수수료·한도 정보만 사용해요.' },
 ]
 
+export type FollowUpKind = 'why' | 'limit'
+
+/** 결과 아래에 보여 주는 연관 질문 문구. 1위 상품 이름만 서버 값에서 가져온다. */
+export function followUpQuestion(kind: FollowUpKind, top: CompareItem) {
+  return kind === 'why' ? `왜 1위가 ${top.insurer} ${top.product}인지 궁금해요` : '한도와 환수가 어떻게 반영됐는지 궁금해요'
+}
+
+/** 연관 질문의 답. 서버가 준 순위·금액·한도 값만 풀어 쓰고 새 수치를 만들지 않는다. */
+export function followUpAnswer(kind: FollowUpKind, items: CompareItem[]) {
+  const top = items[0]
+  if (kind === 'why') {
+    const lead = `1위는 ${top.insurer} ${top.product}예요. 한도를 반영한 수령 예상액 ${won(top.cappedReceipt)}에서 환수 노출액 ${won(top.clawbackExposure)}을 뺀 보수적 순수령액이 ${won(top.conservativeNet)}으로 가장 높아요.`
+    return [lead, heroWhy(items), '최종 선택은 설계사님이 하세요.'].filter(Boolean).join(' ')
+  }
+  const cap = `1위 상품의 한도 영향은 ${capBadge(top.capImpactPct).text}예요.`
+  const carry = top.carryover > 0 ? ` 한도를 넘는 ${won(top.carryover)}은 이월 예정액으로 따로 계산해요.` : ''
+  const claw =
+    top.clawbackRatePct == null
+      ? ''
+      : ` 환수 노출액 ${won(top.clawbackExposure)}은 지급액에 ${top.clawbackRatePct.toFixed(1)}%를 곱한 값이고, 이 환수율은 해약환급률을 임시로 쓴 값이에요.`
+  return `${cap}${carry}${claw} 자세한 계산은 근거 보기에서 확인할 수 있어요.`
+}
+
 /** 1위가 2위보다 얼마나 앞서는지를 서버가 준 값으로만 풀어 쓴다(새 수치를 만들지 않는다). */
 export function heroWhy(items: CompareItem[]) {
   if (items.length < 2) return ''

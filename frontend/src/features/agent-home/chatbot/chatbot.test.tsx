@@ -171,8 +171,35 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     renderModal()
     await pickHealth()
     await result()
+    await userEvent.click(screen.getByRole('button', { name: '다른 카테고리도 추천 받기' }))
     await userEvent.click(screen.getByRole('button', { name: '보내기' }))
     expect(await screen.findByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
+  })
+
+  it('질문을 고르기 전에는 보내기가 눌리지 않고, 골라서 보내면 답변이 붙는다', async () => {
+    renderModal()
+    await pickHealth()
+    await result()
+    expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled()
+
+    await userEvent.click(screen.getByRole('button', { name: /왜 1위가 1번보험 상품1인지/ }))
+    expect(screen.getByRole('button', { name: '보내기' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
+
+    expect(await screen.findByText(/1위는 1번보험 상품1예요/)).toBeInTheDocument()
+    // 이미 받은 질문 버튼은 다시 누를 수 없고 보내기는 다시 잠긴다
+    expect(screen.getByRole('button', { name: /왜 1위가 1번보험 상품1인지/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled()
+  })
+
+  it('한도·환수 질문은 서버가 준 값으로만 답한다', async () => {
+    renderModal()
+    await pickHealth()
+    await result()
+    await userEvent.click(screen.getByRole('button', { name: '한도와 환수가 어떻게 반영됐는지 궁금해요' }))
+    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
+    expect(await screen.findByText(/1위 상품의 한도 영향은/)).toBeInTheDocument()
+    expect(screen.getByText(/해약환급률을 임시로 쓴 값이에요/)).toBeInTheDocument()
   })
 
   it('후보 상품이 없으면 답변을 찾지 못했어요를 보여 준다', async () => {
