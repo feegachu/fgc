@@ -6,7 +6,6 @@ import type { RouteObject } from 'react-router'
 import { AppShell } from './shell/AppShell'
 import { ApplicationRoot } from './ApplicationRoot'
 import { screens } from './screens'
-import { TransitionPage } from './TransitionPage'
 import { NotFoundPage } from '../features/error/ErrorPages'
 import { RouteErrorBoundary } from './ErrorBoundary'
 import { LoginPage } from '../features/auth/LoginPage'
@@ -14,9 +13,8 @@ import { HomePage } from './HomePage'
 import { ExceptionPage } from '../features/exception/ExceptionPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RequirePermission } from './RequirePermission'
-// React로 전환을 마친 화면. lazy()로 등록한 화면만 별도 청크로 나뉘어 그 경로에 들어갈 때 받는다
+// 화면 경로 → 컴포넌트. lazy()로 등록한 화면만 별도 청크로 나뉘어 그 경로에 들어갈 때 받는다
 // 직접 import한 화면은 초기 번들에 들어간다.
-// 여기 없는 경로는 기존 Thymeleaf 화면으로 안내하는 TransitionPage를 그린다.
 const pages: Record<string, ComponentType> = {
   '/': HomePage,
   '/agent-home': lazy(() => import('../features/agent-home/AgentHomePage').then((m) => ({ default: m.AgentHomePage }))),
@@ -45,13 +43,9 @@ export const screenRoutes: RouteObject[] = screens.map((screen) => {
     path: screen.path,
     element: (
       <RequirePermission permission={screen.permission} screen={screen.path === '/' ? undefined : screen}>
-        {Page ? (
-          <Suspense fallback={null}>
-            <Page />
-          </Suspense>
-        ) : (
-          <TransitionPage screen={screen} />
-        )}
+        <Suspense fallback={null}>
+          <Page />
+        </Suspense>
       </RequirePermission>
     ),
     handle: { screenId: screen.id, title: screen.title, parentMenu: screen.menu, permission: screen.permission },

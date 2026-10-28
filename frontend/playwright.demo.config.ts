@@ -16,7 +16,7 @@ export default defineConfig({
     ['junit', { outputFile: 'e2e-artifacts/demo.xml' }],
   ],
   use: {
-    baseURL: 'http://127.0.0.1:15173/app/',
+    baseURL: 'http://127.0.0.1:15173/',
     viewport: { width: 1440, height: 1000 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -29,14 +29,14 @@ export default defineConfig({
   webServer: [
     {
       command: 'node scripts/e2e-server.mjs',
-      url: 'http://127.0.0.1:18081/login',
+      url: 'http://127.0.0.1:18081/actuator/health',
       timeout: 200_000,
       reuseExistingServer: false,
       stderr: 'pipe',
     },
     {
       command: 'npm run dev -- --host 127.0.0.1 --port 15173 --strictPort',
-      url: 'http://127.0.0.1:15173/app/',
+      url: 'http://127.0.0.1:15173/',
       env: { FGC_API_TARGET: 'http://127.0.0.1:18081' },
       reuseExistingServer: false,
     },
