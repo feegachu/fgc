@@ -67,6 +67,14 @@ public class PolicyWriteRepository {
         jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('policy-activation', 0))");
     }
 
+    /** 활성화 전역 잠금 안에서 호출한다. 같은 코드의 ACTIVE를 일정 순서로 잠근다. */
+    public List<PolicyVersion> lockActiveVersions(String policyCode) {
+        return jdbc.queryForList("""
+                SELECT policy_version_id FROM fgc.policy_version
+                WHERE policy_code = ? AND status = 'ACTIVE' ORDER BY policy_version_id
+                """, Long.class, policyCode).stream().map(id -> lockPolicy(id).orElseThrow()).toList();
+    }
+
     public int nextVersion(String code) {
         return jdbc.queryForObject("SELECT COALESCE(MAX(version_no), 0) + 1 FROM fgc.policy_version WHERE policy_code = ?",
                 Integer.class, code);
@@ -497,12 +505,13 @@ public class PolicyWriteRepository {
                 """, String.class));
     }
 
-    public boolean hasActiveOverlap(PolicyVersion policy) {
+    public boolean hasActiveOverlap(PolicyVersion policy, boolean excludeSameCode) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
                   SELECT 1 FROM fgc.policy_version active
                   JOIN fgc.policy_version candidate ON candidate.policy_version_id = ?
                   WHERE active.status = 'ACTIVE' AND active.policy_version_id <> candidate.policy_version_id
+                    AND (NOT ? OR active.policy_code <> candidate.policy_code)
                     AND daterange(active.effective_from, active.effective_to, '[]')
                         && daterange(candidate.effective_from, candidate.effective_to, '[]')
                     AND (
@@ -540,7 +549,7 @@ public class PolicyWriteRepository {
                               && daterange(c.basic_document_date_from, c.basic_document_date_to, '[]'))
                     )
                 )
-                """, Boolean.class, policy.getPolicyVersionId()));
+                """, Boolean.class, policy.getPolicyVersionId(), excludeSameCode));
     }
 
     private String json(Object value) {

@@ -33,7 +33,12 @@ const tones: Record<string, StatusTone> = {
   RETIRED: 'neutral',
 }
 const steps = ['DRAFT', 'REVIEW', 'APPROVED', 'ACTIVE']
-const historyLabels: Record<string, string> = { ...actionLabels, CREATE: '초안 등록', UPDATE: '초안 수정' }
+const historyLabels: Record<string, string> = {
+  ...actionLabels,
+  CREATE: '초안 등록',
+  UPDATE: '초안 수정',
+  RETIRE: '승계로 종료',
+}
 const panels = [
   { id: 'rules', label: '설정 규칙' },
   { id: 'sources', label: '근거 자료' },
@@ -477,8 +482,8 @@ function PolicyActionDialog({
   const preview = useContext(PolicyPreviewContext)
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
-  const [effectiveFrom, setFrom] = useState('')
-  const [effectiveTo, setTo] = useState('')
+  const [effectiveFrom, setFrom] = useState(policy.effectiveFrom ?? '')
+  const [effectiveTo, setTo] = useState(policy.effectiveTo ?? '')
   const [error, setError] = useState('')
   const [dateError, setDateError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -554,7 +559,7 @@ function PolicyActionDialog({
     >
       <p className="policy-section-description">
         {newVersion
-          ? '기존 정책의 규칙과 근거를 복사하여 새로운 초안을 작성합니다.'
+          ? '기존 정책의 규칙과 근거를 복사합니다. 활성 정책을 교체하려면 기존 적용 기간과 규칙 범위를 모두 포함한 대체본을 작성하세요.'
           : action === 'REJECT'
             ? '반려하면 작성자가 초안을 다시 수정할 수 있습니다.'
             : `아래 정책의 정보와 작업 사유를 확인한 후 ${label}하세요.`}
@@ -632,7 +637,8 @@ function PolicyActionDialog({
       )}
       {action === 'ACTIVATE' && (
         <p className="policy-notice policy-notice-warning">
-          적용 중인 다른 정책은 자동 종료되지 않습니다. 적용 기간의 겹침 여부를 확인하세요.
+          같은 정책코드의 기존 적용 버전을 종료하고 이 버전을 활성화합니다. 다른 정책과 적용 범위가 겹치거나 승계에
+          실패하면 기존 버전을 유지합니다.
         </p>
       )}
     </Modal>

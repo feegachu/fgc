@@ -274,26 +274,32 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
-    void rejectsOverlappingActivationWithoutRetiringExistingActiveVersion() throws Exception {
+    void atomicallyRetiresSameCodeAndRecordsBothTransitionsOnce() throws Exception {
         JsonNode created = create(draft(), writer);
         long id = created.path("policyVersionId").asLong();
         JsonNode review = action(id, "SUBMIT", created, writer, 200);
         JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        JsonNode active = action(id, "ACTIVATE", approved, approver, 200);
+        JsonNode original = detail(id, writer);
         JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
-                cloneRequest("2000-06-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+                cloneRequest("2000-01-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
         long cloneId = clone.path("policyVersionId").asLong();
         JsonNode cloneReview = action(cloneId, "SUBMIT", clone, writer, 200);
         JsonNode cloneApproved = action(cloneId, "APPROVE", cloneReview, approver, 200);
-        JsonNode active = action(id, "ACTIVATE", approved, approver, 200);
-
-        JsonNode error = actionError(cloneId, "ACTIVATE", cloneApproved, approver, 422);
-        assertThat(error.path("code").asText()).isEqualTo("FGC-POL-002");
-        assertThat(statusOf(id)).isEqualTo("ACTIVE");
-        assertThat(statusOf(cloneId)).isEqualTo("APPROVED");
-        assertThat(auditCount(cloneId, "POLICY_ACTIVATE")).isZero();
-        assertThat(count("policy_approval_action", cloneId)).isEqualTo(2);
-        assertThat(detail(id, writer).path("editDocument").path("expectedUpdatedAt").asText())
-                .isEqualTo(active.path("updatedAt").asText());
+        assertThat(statusOf(id)).isEqualTo("ACTIVE"); // 승인만으로는 기존 버전을 종료하지 않는다.
+        String activateKey = key();
+        ObjectNode activate = actionRequest("ACTIVATE", cloneApproved);
+        JsonNode successor = write(HttpMethod.POST, "/api/v1/policies/" + cloneId + "/actions", activate, approver, activateKey, 200);
+        assertThat(write(HttpMethod.POST, "/api/v1/policies/" + cloneId + "/actions", activate, approver, activateKey, 200)).isEqualTo(successor);
+        assertThat(statusOf(id)).isEqualTo("RETIRED");
+        assertThat(statusOf(cloneId)).isEqualTo("ACTIVE");
+        JsonNode retired = detail(id, writer);
+        assertThat(retired.path("editDocument").path("commissionRules")).isEqualTo(original.path("editDocument").path("commissionRules"));
+        assertThat(retired.path("editDocument").path("effectiveTo")).isEqualTo(original.path("editDocument").path("effectiveTo"));
+        assertThat(retired.path("header").path("approvedAt")).isEqualTo(original.path("header").path("approvedAt"));
+        assertThat(retired.path("approvalActions").get(3).path("evidenceRef").asText()).isEqualTo("policy:" + cloneId);
+        assertThat(auditCount(id, "POLICY_RETIRE")).isEqualTo(1);
+        assertThat(auditCount(cloneId, "POLICY_ACTIVATE")).isEqualTo(1);
         assertThat(active.path("status").asText()).isEqualTo("ACTIVE");
     }
 
@@ -531,6 +537,64 @@ class PolicyWorkflowIntegrationTest {
         JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
                 cloneRequest("2001-01-01"), writer, key(), 201);
         assertThat(detail(clone.path("policyVersionId").asLong(), writer).path("approvalEvidenceRef").isNull()).isTrue();
+    }
+
+    @Test
+    void rollsBackRetirementWhenAnotherCodeConflictsWithTheReplacement() throws Exception {
+        JsonNode first = create(draft().put("effectiveFrom", "1800-01-01").put("effectiveTo", "1800-12-31"), writer);
+        long firstId = first.path("policyVersionId").asLong();
+        action(firstId, "ACTIVATE", action(firstId, "APPROVE", action(firstId, "SUBMIT", first, writer, 200), approver, 200), approver, 200);
+        JsonNode copy = write(HttpMethod.POST, "/api/v1/policies/" + firstId + "/versions",
+                cloneRequest("1800-01-01").put("effectiveTo", "1800-12-31"), writer, key(), 201);
+        long copyId = copy.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(copyId, writer).path("editDocument").deepCopy();
+        ((ObjectNode) edit.path("commissionRules").get(0)).putNull("insurerId");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + copyId, edit, writer, key(), 200);
+        JsonNode approved = action(copyId, "APPROVE", action(copyId, "SUBMIT", updated, writer, 200), approver, 200);
+        long otherInsurer = jdbc.queryForObject("""
+                INSERT INTO fgc.insurer(insurer_code, insurer_name, insurer_type) VALUES (?, '별도 보험사', 'LIFE') RETURNING insurer_id
+                """, Long.class, "P647-" + UUID.randomUUID().toString().substring(0, 12));
+        ObjectNode otherDraft = draft().put("effectiveFrom", "1800-01-01").put("effectiveTo", "1800-12-31");
+        ((ObjectNode) otherDraft.path("commissionRules").get(0)).put("insurerId", otherInsurer);
+        JsonNode other = create(otherDraft, writer);
+        long otherId = other.path("policyVersionId").asLong();
+        action(otherId, "ACTIVATE", action(otherId, "APPROVE", action(otherId, "SUBMIT", other, writer, 200), approver, 200), approver, 200);
+        String activationKey = key();
+        ObjectNode activation = actionRequest("ACTIVATE", approved);
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies/" + copyId + "/actions", activation, approver, activationKey, 422)
+                .path("code").asText()).isEqualTo("FGC-POL-002");
+        assertThat(statusOf(firstId)).isEqualTo("ACTIVE");
+        assertThat(statusOf(otherId)).isEqualTo("ACTIVE");
+        assertThat(statusOf(copyId)).isEqualTo("APPROVED");
+        assertThat(auditCount(firstId, "POLICY_RETIRE")).isZero();
+        assertThat(count("policy_approval_action", firstId)).isEqualTo(3);
+        assertThat(auditCount(copyId, "POLICY_ACTIVATE")).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_write_request WHERE idempotency_key = ?",
+                Integer.class, activationKey)).isZero();
+    }
+
+    @Test
+    void concurrentSuccessorsLeaveOnlyTheNewestVersionActive() throws Exception {
+        JsonNode created = create(draft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        action(id, "ACTIVATE", action(id, "APPROVE", action(id, "SUBMIT", created, writer, 200), approver, 200), approver, 200);
+        JsonNode second = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2000-01-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+        JsonNode third = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2000-01-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+        long secondId = second.path("policyVersionId").asLong(), thirdId = third.path("policyVersionId").asLong();
+        JsonNode approved2 = action(secondId, "APPROVE", action(secondId, "SUBMIT", second, writer, 200), approver, 200);
+        JsonNode approved3 = action(thirdId, "APPROVE", action(thirdId, "SUBMIT", third, writer, 200), approver, 200);
+        List<MvcResult> outcomes = concurrently(
+                () -> perform(HttpMethod.POST, "/api/v1/policies/" + secondId + "/actions", actionRequest("ACTIVATE", approved2), approver, key()),
+                () -> perform(HttpMethod.POST, "/api/v1/policies/" + thirdId + "/actions", actionRequest("ACTIVATE", approved3), approver, key()));
+        assertThat(outcomes.get(0).getResponse().getStatus()).isIn(200, 409);
+        assertThat(outcomes.get(1).getResponse().getStatus()).isEqualTo(200);
+        assertThat(statusOf(id)).isEqualTo("RETIRED");
+        assertThat(statusOf(thirdId)).isEqualTo("ACTIVE");
+        assertThat(statusOf(secondId)).isIn("APPROVED", "RETIRED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code = ? AND status = 'ACTIVE'",
+                Integer.class, created.path("policyCode").asText())).isEqualTo(1);
     }
 
     private ObjectNode draft() {

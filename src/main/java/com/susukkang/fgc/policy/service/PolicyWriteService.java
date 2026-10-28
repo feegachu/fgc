@@ -59,6 +59,7 @@ public class PolicyWriteService {
     private final PolicyVersionRepository policyVersionRepository;
     private final PolicyWriteRepository writeRepository;
     private final PolicyDraftValidator draftValidator;
+    private final PolicySuccessionValidator successionValidator;
     private final Validator validator;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
@@ -150,16 +151,39 @@ public class PolicyWriteService {
             if (request.actionType() != PolicyActionRequest.ActionType.REJECT) {
                 validateSubmission(writeRepository.readDraft(policy));
             }
-            if ((next == PolicyStatus.APPROVED || next == PolicyStatus.ACTIVE)
-                    && writeRepository.hasActiveOverlap(policy)) {
-                throw new FgcBusinessException(FgcErrorCode.POL_002);
-            }
+            if (next == PolicyStatus.APPROVED || next == PolicyStatus.ACTIVE) prepareSuccession(policy, next, actor, request.reason());
             policy.transition(next, next == PolicyStatus.APPROVED ? userId : null, evidenceRef);
             policyVersionRepository.saveAndFlush(policy);
             writeRepository.appendAction(id, request.actionType().name(), userId, request.reason(), evidenceRef);
             writeRepository.refresh(policy);
             return recordChange(request.actionType().name(), policy, actor, before, request.reason());
         });
+    }
+
+    private void prepareSuccession(PolicyVersion policy, PolicyStatus next, FgcUserDetails actor, String reason) {
+        List<PolicyVersion> previousVersions = writeRepository.lockActiveVersions(policy.getPolicyCode());
+        PolicyDraft replacement = writeRepository.readDraft(policy);
+        for (PolicyVersion previous : previousVersions) {
+            if (previous.getVersionNo() >= policy.getVersionNo()) {
+                throw stateConflict("현재 ACTIVE보다 높은 버전만 승계할 수 있습니다.");
+            }
+            successionValidator.validate(writeRepository.readDraft(previous), replacement);
+        }
+        if (next == PolicyStatus.ACTIVE) {
+            for (PolicyVersion previous : previousVersions) {
+                Map<String, Object> before = snapshot(previous, actor);
+                previous.transition(PolicyStatus.RETIRED, null);
+                policyVersionRepository.saveAndFlush(previous);
+                writeRepository.appendAction(previous.getPolicyVersionId(), "RETIRE", actor.getUserId(), reason,
+                        "policy:" + policy.getPolicyVersionId());
+                writeRepository.refresh(previous);
+                recordChange("RETIRE", previous, actor, before, reason);
+            }
+        }
+        // APPROVE는 아직 바꾸지 않은 같은 코드의 ACTIVE를 제외한다. ACTIVATE는 종료 후 남은 집합을 검사한다.
+        if (writeRepository.hasActiveOverlap(policy, next == PolicyStatus.APPROVED)) {
+            throw new FgcBusinessException(FgcErrorCode.POL_002);
+        }
     }
 
     /** UI도 같은 역할·상태·작성자 판정을 사용한다. */
