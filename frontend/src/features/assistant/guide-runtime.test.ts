@@ -3,6 +3,7 @@ import { completion, resolvePaymentTarget, subscribeGuideEvents, useGuideRuntime
 import type { PaymentObservation } from './guide-runtime'
 const observation: PaymentObservation = {
   owner: 'page-1',
+  paymentId: '77',
   scopeKey: 'scope-1',
   revision: 0,
   canProcess: true,

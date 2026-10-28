@@ -66,7 +66,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-batch'
 
     // 외부 LLM(SER-013·IF-EXT-03) — OI-023 결정: OpenAI 공식 Java SDK, Spring AI 는 2차 미사용. 호출은 ai.service.LlmGateway 한 곳에서만.
-    implementation 'com.openai:openai-java:4.80.0'
+    implementation('com.openai:openai-java:4.80.0') {
+        // Same annotation classes as swagger-annotations-jakarta; keep Springdoc's compatible version.
+        exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
+    }
 
     // Swagger / OpenAPI - Spring Boot 3용
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'

@@ -10,6 +10,7 @@ import basic from './assets/pico-basic.png'
 import guide from './assets/pico-guide.png'
 import detective from './assets/pico-detective.png'
 import './pico-assistant.css'
+import { PaymentCalculationPanel } from './PaymentCalculationPanel'
 import { PaymentGuideOverlay } from './PaymentGuide'
 import { useGuideRuntime } from './guide-runtime'
 
@@ -149,6 +150,7 @@ function AssistantWithGuide({ canProcess }: { canProcess: boolean }) {
 }
 export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   const [open, setOpen] = useState(false)
+  const [calculationEpoch, setCalculationEpoch] = useState(0)
   const runtimeSession = useGuideRuntime((state) => state.session)
   const observed = useGuideRuntime((state) => state.observation)
   const guideActive =
@@ -181,7 +183,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   useEffect(() => {
     if (open && tab === 'chat')
       stream.current?.scrollTo?.({
-        top: stream.current.scrollHeight,
+        top: conversation.entries.length === 0 ? 0 : stream.current.scrollHeight,
         behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
       })
   }, [open, tab, conversation.entries])
@@ -283,6 +285,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
               aria-label="새 대화"
               onClick={() => {
                 setConversation(initial())
+                setCalculationEpoch((value) => value + 1)
                 setPickedScenario('PAY-02')
                 setInput('')
                 setPlanError('')
@@ -339,6 +342,13 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
           >
             {tab === 'chat' ? (
               <>
+                {observed && (
+                  <PaymentCalculationPanel
+                    key={`${observed.owner}:${observed.paymentId}:${observed.scopeKey}:${observed.revision}:${observed.saved}:${observed.busy}:${observed.ready}:${calculationEpoch}`}
+                    observation={observed}
+                    canProcess={canProcess}
+                  />
+                )}
                 {conversation.entries.length === 0 && (
                   <div className="pico-welcome">
                     <img src={basic} alt="피코" />
@@ -530,7 +540,11 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                 <Symbol name="arrow_upward" />
               </button>
             </form>
-            <small>합성 데이터 시연 · 실제 AI/계약/지급과 연결되지 않습니다.</small>
+            <small>
+              {observed
+                ? '시연 질문은 합성 자료 · 저장된 지급 계산은 별도 조회 · 실제 AI 미연결'
+                : '합성 데이터 시연 · 실제 AI/계약/지급과 연결되지 않습니다.'}
+            </small>
           </div>
         </aside>
       )}

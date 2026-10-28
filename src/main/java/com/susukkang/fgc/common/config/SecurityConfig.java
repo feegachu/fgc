@@ -217,6 +217,9 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(AUTH_TOKEN_ENDPOINTS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, AUTH_TOKEN_ENDPOINTS).permitAll()
+                        // #733 exact read-only POST only; CSRF remains enabled for session requests.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/assistant/calculations")
+                        .hasAnyRole(Roles.SYSTEM_ADMIN, Roles.GA_ADMIN, Roles.SETTLEMENT, Roles.COMPLIANCE)
                         .requestMatchers(AgentRequestAuthorization.IS_AGENT).access(AgentRequestAuthorization.SCOPED_READS)
                         // 감사로그 API(IF-API-52)는 아직 미구현이지만 구현 시점에 바로
                         // 적용되도록 선제 등록한다.
