@@ -304,6 +304,8 @@ auth_refresh_token
 | `audit01` | COMPLIANCE | 조회 전용 |
 | `agent01` | AGENT | (2차, V64) `app_user.agent_id` = `A-FC-001`. 초기 DISABLED, 개별 비밀번호 설정 후 활성화 |
 
+
+**V66 갱신**: 시연 편의를 위해 `db/demo/V66__activate_agent_demo_account.sql`이 `password_hash='!'`인 `agent01`만 팀 합의 시연 비밀번호의 BCrypt 해시로 `ACTIVE` 처리한다(평문은 저장소에 없다). 해시가 저장소에 있으므로 이 계정은 공유 시연 자격 증명이며, 위 신한 prd 배포 전 보호·검증 대상에 `agent01`이 활성 계정으로 포함된다.
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
 
 `agent01`은 공통 시연 자격 증명을 복제하지 않는다. V64 신규 행의 `password_hash='!'`는 로그인 불가능한 미지정 표식이고 `account_status='DISABLED'`다. 시연 관리자가 별도 Secret으로 전달한 비밀번호를 애플리케이션의 BCryptPasswordEncoder로 해시한 뒤, 보호된 관리 연결에서 해당 행에 해시와 `ACTIVE` 상태를 함께 설정해야 실제 로그인할 수 있다. SQL·PR·로그에 비밀번호나 해시를 붙이지 않는다. 통합 테스트는 트랜잭션 안에서 일회성 UUID 비밀번호를 설정·활성화한 뒤 롤백한다. 이미 존재하는 동일 연결의 agent01은 V64가 덮어쓰지 않으므로 배포 전 별도 보호 검증이 필요하다.
