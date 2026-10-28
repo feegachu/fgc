@@ -68,6 +68,24 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void preservesFixedAmountDecimalTextAcrossReadAndEdit() throws Exception {
+        ObjectNode draft = draft();
+        ObjectNode rule = (ObjectNode) draft.path("commissionRules").get(0);
+        rule.put("calculationType", "FIXED").putNull("ratePct");
+        rule.put("fixedAmount", "9999999999999.99");
+        JsonNode created = create(draft, writer);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument");
+        JsonNode amount = edit.path("commissionRules").get(0).path("fixedAmount");
+        assertThat(amount.isTextual()).isTrue();
+        assertThat(amount.asText()).isEqualTo("9999999999999.99");
+        edit.put("policyName", "정밀도를 보존한 고정금액 정책");
+        write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 200);
+        assertThat(detail(id, writer).path("editDocument").path("commissionRules").get(0)
+                .path("fixedAmount").asText()).isEqualTo("9999999999999.99");
+    }
+
+    @Test
     void createsEditsSubmitsApprovesActivatesAndClonesWithHistoryAndSources() throws Exception {
         ObjectNode draft = draft();
         JsonNode created = create(draft, systemWriter);

@@ -22,6 +22,8 @@ import {
 import type { DraftDocument, ManagedPolicyDetail, PolicyAction, SourceDetail } from './management'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
+import { performPolicyAction } from './writeApi'
+import { usePolicyRequest } from './usePolicyRequest'
 
 const tones: Record<string, StatusTone> = {
   DRAFT: 'warning',
@@ -31,6 +33,7 @@ const tones: Record<string, StatusTone> = {
   RETIRED: 'neutral',
 }
 const steps = ['DRAFT', 'REVIEW', 'APPROVED', 'ACTIVE']
+const historyLabels: Record<string, string> = { ...actionLabels, CREATE: '초안 등록', UPDATE: '초안 수정' }
 const panels = [
   { id: 'rules', label: '설정 규칙' },
   { id: 'sources', label: '근거 자료' },
@@ -50,7 +53,6 @@ export function PolicyManagement({
   initialPanel?: (typeof panels)[number]['id']
 }) {
   const { user } = useAuth()
-  const preview = useContext(PolicyPreviewContext)
   const [editing, setEditing] = useState(false)
   const [action, setAction] = useState<PolicyAction | null>(null)
   const [panel, setPanel] = useState<(typeof panels)[number]['id']>(initialPanel)
@@ -157,9 +159,6 @@ export function PolicyManagement({
         </p>
       )}
       {!detail.allowedActions && <p className="policy-note">작업 권한 정보가 제공되지 않아 조회만 가능합니다.</p>}
-      {!preview && allowed.length > 0 && (
-        <p className="policy-note">UI 구현 단계입니다. 저장·제출·승인 동작은 API 연결 후 사용할 수 있습니다.</p>
-      )}
       <ReferenceTabs
         tabs={panels}
         active={panel}
@@ -189,13 +188,14 @@ export function PolicyManagement({
                     <div>
                       <header>
                         <strong>
-                          {actionLabels[entry.actionType as PolicyAction] ??
-                            (entry.actionType === 'CREATE' ? '초안 등록' : entry.actionType)}
+                          {historyLabels[entry.actionType] ?? entry.actionType}
                         </strong>
-                        <span>
-                          {entry.previousStatus ? statusLabels[entry.previousStatus] : '신규'} →{' '}
-                          {statusLabels[entry.status] ?? entry.status}
-                        </span>
+                        {entry.status && (
+                          <span>
+                            {entry.previousStatus ? statusLabels[entry.previousStatus] : '신규'} →{' '}
+                            {statusLabels[entry.status] ?? entry.status}
+                          </span>
+                        )}
                         <time>{dateTime(entry.actedAt)}</time>
                       </header>
                       <p>{entry.reason}</p>
@@ -429,7 +429,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             <h4>{parameter.key}</h4>
             <StatusBadge tone="info">지원 조건</StatusBadge>
           </header>
-          <strong>{parameter.value || '설정 필요'}</strong>
+          <strong>{parameter.value == null || parameter.value === '' ? '설정 필요' : String(parameter.value)}</strong>
           <p>{parameter.description}</p>
         </article>
       ))}
@@ -480,12 +480,13 @@ function PolicyActionDialog({
   const [dateError, setDateError] = useState('')
   const [busy, setBusy] = useState(false)
   const saving = useRef(false)
+  const requestKey = usePolicyRequest()
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const dateRef = useRef<HTMLInputElement>(null)
   const newVersion = action === 'NEW_VERSION'
   const label = actionLabels[action]
   async function submit() {
-    if (!preview || saving.current || !policy.policyVersionId) return
+    if (saving.current || !policy.policyVersionId) return
     setError('')
     setDateError('')
     if (newVersion && (!effectiveFrom || (effectiveTo && effectiveTo < effectiveFrom))) {
@@ -501,14 +502,24 @@ function PolicyActionDialog({
     saving.current = true
     setBusy(true)
     try {
-      onSaved(
-        await preview.action(
-          policy.policyVersionId,
-          action,
-          reason.trim(),
-          newVersion ? { effectiveFrom, effectiveTo } : undefined,
-        ),
-      )
+      const dates = newVersion ? { effectiveFrom, effectiveTo } : undefined
+      const context = {
+        expectedStatus: policy.status,
+        expectedUpdatedAt: detail.editDocument?.expectedUpdatedAt ?? detail.updatedAt,
+        ...dates,
+      }
+      const id = preview
+        ? await preview.action(policy.policyVersionId, action, reason.trim(), dates)
+        : (
+            await performPolicyAction(
+              policy.policyVersionId,
+              action,
+              reason.trim(),
+              context,
+              requestKey({ id: policy.policyVersionId, action, reason: reason.trim(), context }),
+            )
+          ).policyVersionId
+      onSaved(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
     } finally {
@@ -531,7 +542,7 @@ function PolicyActionDialog({
           <Button variant="secondary" disabled={busy} onClick={onClose}>
             취소
           </Button>
-          <Button disabled={!preview} loading={busy} onClick={() => void submit()}>
+          <Button loading={busy} onClick={() => void submit()}>
             {newVersion ? '새 초안 만들기' : `${label} 확인`}
           </Button>
         </>
@@ -610,7 +621,6 @@ function PolicyActionDialog({
           적용 중인 다른 정책은 자동 종료되지 않습니다. 적용 기간의 겹침 여부를 확인하세요.
         </p>
       )}
-      {!preview && <p className="policy-notice">UI 구현 단계입니다. API 연결 후 실제 동작을 실행할 수 있습니다.</p>}
     </Modal>
   )
 }

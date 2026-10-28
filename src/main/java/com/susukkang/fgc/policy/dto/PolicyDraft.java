@@ -74,6 +74,8 @@ public record PolicyDraft(
             @JsonFormat(shape = JsonFormat.Shape.STRING)
             @Schema(type = "string", description = "요율(%), 소수 정밀도를 보존한 문자열")
             @DecimalMin("0") @Digits(integer = 3, fraction = 6) BigDecimal ratePct,
+            @JsonFormat(shape = JsonFormat.Shape.STRING)
+            @Schema(type = "string", description = "고정금액(원), 소수 정밀도를 보존한 문자열")
             @DecimalMin("0") @Digits(integer = 13, fraction = 2) BigDecimal fixedAmount,
             boolean equalMonthlyYn,
             @Size(max = 50) String paymentConditionCode,

@@ -7,6 +7,7 @@ import com.susukkang.fgc.common.code.PolicySourceClass;
 import com.susukkang.fgc.common.code.PolicyStatus;
 import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.config.SecurityConfig;
+import com.susukkang.fgc.common.security.AuthenticatedSessions;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -114,7 +115,7 @@ class PolicyControllerTest {
         given(policyWriteService.createDraft(any(), eq(17L), eq("create-81")))
                 .willReturn(sampleWriteResult());
 
-        mockMvc.perform(post("/api/v1/policies").with(user(principal(role))).with(csrf())
+        mockMvc.perform(post("/api/v1/policies").with(user(principal(role)))
                         .header("Idempotency-Key", "create-81")
                         .contentType(APPLICATION_JSON).content(DRAFT_JSON))
                 .andExpect(status().isCreated())
@@ -149,13 +150,13 @@ class PolicyControllerTest {
     }
 
     @Test
-    void requiresAuthenticationAndSessionCsrfForCreation() throws Exception {
-        mockMvc.perform(post("/api/v1/policies").with(csrf())
+    void requiresAuthenticationAndRejectsSessionOnlyAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/policies")
                         .contentType(APPLICATION_JSON).content(DRAFT_JSON))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/v1/policies").with(user(principal("SETTLEMENT")))
+        mockMvc.perform(post("/api/v1/policies").session(AuthenticatedSessions.withRoles("SETTLEMENT"))
                         .contentType(APPLICATION_JSON).content(DRAFT_JSON))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         verifyNoInteractions(policyWriteService);
     }
 

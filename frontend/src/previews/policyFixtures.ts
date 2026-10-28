@@ -186,7 +186,7 @@ export function previewCommissionRules(draft: DraftDocument): ManagedPolicyDetai
     installmentFrom: Number(rule.installmentFrom),
     installmentTo: Number(rule.installmentTo),
     ratePct: rule.ratePct === '' ? undefined : String(rule.ratePct),
-    fixedAmount: rule.fixedAmount === '' ? undefined : rule.fixedAmount,
+    fixedAmount: rule.fixedAmount === '' ? undefined : Number(rule.fixedAmount),
   }))
 }
 export const nextStatus: Partial<Record<PolicyAction, Policy['status']>> = {

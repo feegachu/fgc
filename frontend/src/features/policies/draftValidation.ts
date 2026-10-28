@@ -16,6 +16,8 @@ export function validateDraft(draft: DraftDocument): DraftErrors {
   for (const key of ['policyCode', 'policyName', 'policyType', 'sourceClass', 'effectiveFrom'] as const)
     required(key, draft[key])
   range('', 'effectiveFrom', 'effectiveTo', draft.effectiveFrom, draft.effectiveTo)
+  if (draft.clawbackRules.length)
+    errors.clawbackRules = '환수 기준(D-02)이 미확정이므로 환수 규칙을 등록할 수 없습니다.'
   draft.commissionRules.forEach((rule, i) => {
     const prefix = `commissionRules.${i}.`
     for (const key of [
@@ -72,12 +74,13 @@ export function validateDraft(draft: DraftDocument): DraftErrors {
   const refs = new Set<string>()
   draft.sourceDetails.forEach((source, i) => {
     const prefix = `sourceDetails.${i}.`
+    const ref = source.ref.trim()
     required(prefix + 'ref', source.ref)
     required(prefix + 'title', source.title)
-    if (source.ref && !/^(REG|SRC)-[A-Za-z0-9_-]+$/.test(source.ref))
+    if (ref && !/^(REG|SRC)-[A-Za-z0-9_-]+$/.test(ref))
       errors[prefix + 'ref'] = 'REG- 또는 SRC-로 시작하는 근거 코드를 입력하세요.'
-    if (refs.has(source.ref)) errors[prefix + 'ref'] = '이미 추가한 근거 코드입니다.'
-    refs.add(source.ref)
+    if (refs.has(ref)) errors[prefix + 'ref'] = '이미 추가한 근거 코드입니다.'
+    refs.add(ref)
     if (source.url && !safeSourceUrl(source.url)) errors[prefix + 'url'] = 'http 또는 https 링크를 입력하세요.'
   })
   return errors

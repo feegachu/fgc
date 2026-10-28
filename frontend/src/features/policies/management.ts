@@ -1,7 +1,7 @@
 import { createContext } from 'react'
 import type { Policy, PolicyDetail } from './api'
 
-// UI contract for #722. Write endpoints are intentionally not connected in this UI-only change.
+// Editable UI values are converted to the API contract in writeApi.ts.
 export const policyTypes = {
   CURRENT_COMMISSION: '현행 수수료',
   FOUR_YEAR_COMMISSION: '4년 분급',
@@ -33,6 +33,7 @@ export const actionLabels = {
 } as const
 export type PolicyAction = keyof typeof actionLabels
 export type NumberInput = number | ''
+export type DecimalInput = number | string
 export const numberValue = (value: string): NumberInput => (value === '' ? '' : Number(value))
 export const optionsFor = (record: Record<string, string>) =>
   Object.entries(record).map(([value, label]) => ({ value, label }))
@@ -57,8 +58,8 @@ export interface CommissionDraft {
   installmentTo: NumberInput
   calculationType: 'RATE' | 'FIXED'
   basisCode: string
-  ratePct: NumberInput
-  fixedAmount: NumberInput
+  ratePct: DecimalInput
+  fixedAmount: DecimalInput
   equalMonthlyYn: boolean
   paymentConditionCode: string
   priorityNo: NumberInput
@@ -84,7 +85,7 @@ export interface ClawbackDraft {
   elapsedMonthFrom: NumberInput
   elapsedMonthTo: NumberInput
   clawbackBasisCode: string
-  clawbackRatePct: NumberInput
+  clawbackRatePct: DecimalInput
 }
 export interface DraftDocument {
   policyCode: string
@@ -100,19 +101,20 @@ export interface DraftDocument {
   sourceDetails: SourceDetail[]
   commissionRules: CommissionDraft[]
   feeRegimeRules: FeeRegimeDraft[]
-  parameters: { key: string; value: string; description: string }[]
+  parameters: { key: string; value: string | number | boolean | null; description: string }[]
   clawbackRules: ClawbackDraft[]
+  expectedUpdatedAt?: string
 }
 export interface ApprovalAction {
   actionType: string
-  previousStatus: string | null
-  status: string
+  previousStatus?: string | null
+  status?: string
   actor: string
   actedAt: string
   reason: string
   evidenceRefs?: string[]
 }
-export interface ManagedPolicyDetail extends PolicyDetail {
+export interface ManagedPolicyDetail extends Omit<PolicyDetail, 'editDocument' | 'approvalActions'> {
   editDocument?: DraftDocument
   allowedActions?: string[]
   sourceDetails?: SourceDetail[]

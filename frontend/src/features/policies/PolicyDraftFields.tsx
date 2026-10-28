@@ -333,7 +333,7 @@ export function CommissionRow({
           step="0.000001"
           errors={errors}
           value={rule.ratePct}
-          onChange={(v) => set('ratePct', numberValue(v))}
+          onChange={(v) => set('ratePct', v)}
         />
         <DraftInput
           path={prefix + 'fixedAmount'}
@@ -345,7 +345,7 @@ export function CommissionRow({
           step="0.01"
           errors={errors}
           value={rule.fixedAmount}
-          onChange={(v) => set('fixedAmount', numberValue(v))}
+          onChange={(v) => set('fixedAmount', v)}
         />
         <DraftInput
           path={prefix + 'priorityNo'}
