@@ -4,9 +4,10 @@ import com.susukkang.fgc.policy.entity.PolicyVersion;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
-
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 설명 : 분급 체계 판정(ProductFeeRegimeResolver)에 필요한 판매버전 후보와 룰셋 후보를 읽는 Repository.
@@ -60,10 +61,58 @@ public interface FeeRegimeResolverRepository extends Repository<PolicyVersion, L
             @Param("basicDocumentDate") LocalDate basicDocumentDate
     );
 
+    // #537: 선택된 룰셋 헤더. 승인된 정책 아래의 룰셋은 잠금 트리거로 바뀌지 않으므로 같은 ID로 다시 읽어도 같다.
+    @Query(value = """
+            SELECT r.fee_regime_ruleset_id AS "rulesetId",
+                   r.policy_version_id AS "policyVersionId",
+                   r.fee_regime_code AS "feeRegimeCode",
+                   r.sales_start_date_from AS "salesStartDateFrom",
+                   r.sales_start_date_to AS "salesStartDateTo",
+                   r.basic_document_version AS "basicDocumentVersion",
+                   r.basic_document_date_from AS "basicDocumentDateFrom",
+                   r.basic_document_date_to AS "basicDocumentDateTo",
+                   r.max_installments AS "maxInstallments",
+                   r.long_term_maintenance_from AS "longTermMaintenanceFrom",
+                   r.long_term_maintenance_to AS "longTermMaintenanceTo"
+              FROM fgc.fee_regime_ruleset r
+             WHERE r.fee_regime_ruleset_id = :rulesetId
+            """, nativeQuery = true)
+    Optional<RulesetHeader> findRulesetHeader(@Param("rulesetId") Long rulesetId);
+
+    @Query(value = """
+            SELECT l.limit_code AS "limitCode",
+                   l.limit_pct AS "limitPct",
+                   l.includes_indirect_expense_yn AS "includesIndirectExpense"
+              FROM fgc.fee_regime_ruleset_limit l
+             WHERE l.fee_regime_ruleset_id = :rulesetId
+             ORDER BY l.limit_code
+            """, nativeQuery = true)
+    List<RulesetLimitRow> findRulesetLimits(@Param("rulesetId") Long rulesetId);
+
     interface RulesetCandidate {
         Long getRulesetId();
         Long getPolicyVersionId();
         Boolean getReviewRequired();
         String getBasicDocumentVersion();
+    }
+
+    interface RulesetHeader {
+        Long getRulesetId();
+        Long getPolicyVersionId();
+        String getFeeRegimeCode();
+        LocalDate getSalesStartDateFrom();
+        LocalDate getSalesStartDateTo();
+        String getBasicDocumentVersion();
+        LocalDate getBasicDocumentDateFrom();
+        LocalDate getBasicDocumentDateTo();
+        Integer getMaxInstallments();
+        Integer getLongTermMaintenanceFrom();
+        Integer getLongTermMaintenanceTo();
+    }
+
+    interface RulesetLimitRow {
+        String getLimitCode();
+        BigDecimal getLimitPct();
+        Boolean getIncludesIndirectExpense();
     }
 }

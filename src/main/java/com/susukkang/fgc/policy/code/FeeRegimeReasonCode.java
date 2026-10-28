@@ -15,5 +15,6 @@ public enum FeeRegimeReasonCode {
     RULESET_MISSING,                 // 적용 가능한 룰셋 없음
     RULESET_AMBIGUOUS,               // 적용 가능한 룰셋이 둘 이상
     RULESET_FLAGGED,                 // 룰셋이 경계사례(review_required_yn)로 표시됨
-    RULESET_SELECTED                 // 룰셋 하나를 선택함
+    RULESET_LIMIT_MISSING,           // 선택된 룰셋에 필수 한도 행이 없음 (#537)
+    RULESET_SELECTED                // 룰셋 하나를 선택함
 }
