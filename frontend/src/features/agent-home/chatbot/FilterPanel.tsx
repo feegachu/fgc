@@ -28,6 +28,11 @@ export function FilterPanel({
         보험사 세부 선택
         <span className="cb-muted">선택 사항</span>
         {count > 0 && <span className="cb-pill">{count}개 적용</span>}
+        {count > 0 && (
+          <button type="button" className="cb-filters-reset" onClick={() => onChange(EMPTY_FILTERS)}>
+            초기화
+          </button>
+        )}
       </div>
       <div className="cb-filters-body">
         {insurers.length > 0 && (
@@ -47,7 +52,7 @@ export function FilterPanel({
             </div>
           </fieldset>
         )}
-        <label className="cb-check">
+        <label className="cb-filter-check">
           <input
             type="checkbox"
             checked={value.excludeCapOverflow}
@@ -55,11 +60,6 @@ export function FilterPanel({
           />
           <span>한도를 넘어 이월이 생기는 상품은 제외</span>
         </label>
-        {count > 0 && (
-          <button type="button" className="cb-btn" onClick={() => onChange(EMPTY_FILTERS)}>
-            조건 초기화
-          </button>
-        )}
       </div>
     </section>
   )
