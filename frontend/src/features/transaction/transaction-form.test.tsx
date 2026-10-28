@@ -728,6 +728,39 @@ describe('FUN-087 real form observer', () => {
     expect((await read()).state.confirmed).toBe(false)
     expect(screen.queryByRole('heading', { name: '지급 목록 결과' })).not.toBeInTheDocument()
   })
+  it.each(['before', 'after'])('preserves precheck success when the guide %s read fails', async (phase) => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    const observer = getPaymentGuideObserver()!
+    const reading = vi.spyOn(observer, 'readOperationPayment')
+    if (phase === 'after') reading.mockResolvedValueOnce(saved)
+    reading.mockRejectedValueOnce(new Error('GET 503'))
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    expect((await read()).state.prechecked).toBe(false)
+    expect(writes().filter(([path]) => path.endsWith('/precheck'))).toHaveLength(1)
+    expect(screen.queryByText('1,200% 사전검증을 수행하지 못했습니다.')).not.toBeInTheDocument()
+  })
+
+  it.each(['read failure', 'rejected evidence', 'changed revision'])(
+    'keeps confirmed success with %s',
+    async (failure) => {
+      const { user } = mount()
+      const dialog = await saveAndPrecheck(user)
+      const observer = getPaymentGuideObserver()!
+      if (failure === 'read failure') vi.spyOn(observer, 'readOperationPayment').mockRejectedValue(new Error('GET 503'))
+      if (failure === 'rejected evidence') vi.spyOn(observer, 'acceptConfirmed').mockReturnValue(false)
+      mutation = () => {
+        if (failure === 'changed revision') observer.invalidateInput()
+        return { ...saved, status: 'CONFIRMED' }
+      }
+      await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+      expect(await screen.findByRole('heading', { name: '지급 목록 결과' })).toBeVisible()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(writes().filter(([path]) => path.endsWith('/confirm'))).toHaveLength(1)
+    },
+  )
+
   it('rejects a precheck for another payment even with confirmable true', async () => {
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
@@ -794,6 +827,33 @@ describe('FUN-087 guide card and spotlight', () => {
     expect(await within(panel()).findByRole('heading', { name: '안내 완료' })).toBeVisible()
     expect(writes()).toHaveLength(1)
   })
+  it.each(['read failure', 'rejected evidence'])(
+    'shows business success but not guide completion on %s',
+    async (failure) => {
+      const { user } = mount()
+      const dialog = await saveAndPrecheck(user)
+      await user.click(within(dialog).getByRole('button', { name: '취소' }))
+      await user.click(screen.getByRole('button', { name: '도움말' }))
+      const observer = getPaymentGuideObserver()!
+      if (failure === 'read failure') vi.spyOn(observer, 'readOperationPayment').mockRejectedValue(new Error('GET 503'))
+      else vi.spyOn(observer, 'acceptConfirmed').mockReturnValue(false)
+      mutation = () => ({ ...saved, status: 'CONFIRMED' })
+      await user.click(button('btn-confirm'))
+      await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정 실행' }))
+      expect(await screen.findByRole('heading', { name: '지급 확정 완료' })).toBeVisible()
+      expect(screen.getByText(/가이드 완료 확인은 보류/)).toBeVisible()
+      expect(screen.getByRole('region', { name: '지급 업무 가이드' })).not.toHaveAttribute(
+        'data-guide-status',
+        'COMPLETED',
+      )
+      expect(button('btn-confirm')).toBeDisabled()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: '목록으로 이동' }))
+      expect(await screen.findByRole('heading', { name: '지급 목록 결과' })).toBeVisible()
+      expect(writes().filter(([path]) => path.endsWith('/confirm'))).toHaveLength(1)
+    },
+  )
+
   it('shows confirmation completion before navigation, and removes spotlight while the modal owns focus', async () => {
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())

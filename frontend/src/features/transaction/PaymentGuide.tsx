@@ -281,7 +281,11 @@ function GuideSession({
             </h2>
             <div aria-live="polite" aria-atomic="true">
               {confirmed ? (
-                <p>서버에서 지급 확정과 저장 결과를 확인했습니다. 목록으로 이동할 수 있습니다.</p>
+                <p>
+                  {state?.confirmed
+                    ? '서버에서 지급 확정과 저장 결과를 확인했습니다. 목록으로 이동할 수 있습니다.'
+                    : '지급 확정은 성공했습니다. 가이드 완료 확인은 보류되었습니다. 목록에서 처리 결과를 확인할 수 있습니다.'}
+                </p>
               ) : complete ? (
                 <p>
                   {current?.workflowId === 'payment.draft'

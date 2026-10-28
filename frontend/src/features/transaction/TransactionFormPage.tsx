@@ -330,14 +330,18 @@ function TransactionForm({
     setConfirmFailure(null)
     setConfirmError('')
     try {
-      const before = await observer.readOperationPayment(operation)
+      const before = await observer.readOperationPayment(operation).catch(() => null)
       if (!observer.isCurrent(operation)) return
       const checked = await precheckPayment(paymentId)
       if (!observer.isCurrent(operation)) return
-      const after = await observer.readOperationPayment(operation)
+      const after = await observer.readOperationPayment(operation).catch(() => null)
       if (!observer.isCurrent(operation)) return
-      if (!observer.acceptPrecheck(operation, before, checked, after))
+      if (
+        checked.paymentId !== Number(paymentId) ||
+        (before && after && !observer.acceptPrecheck(operation, before, checked, after))
+      )
         throw new Error('지급 저장본이 변경되어 검증 결과를 사용할 수 없습니다. 초안을 다시 확인하세요.')
+      if (!before || !after) observer.fail(operation)
       setResult(checked)
       toast(
         checked.confirmable
@@ -373,19 +377,25 @@ function TransactionForm({
     setConfirmError('')
     try {
       const response = await confirmPayment(paymentId)
-      if (!observer.isCurrent(operation)) return
+      if (!observer.isSamePayment(operation)) return
       if (response.commissionTransactionId !== Number(paymentId) || response.status !== 'CONFIRMED')
-        throw new Error('지급 확정 결과를 확인하지 못했습니다.')
-      const refreshed = await observer.readOperationPayment(operation)
-      if (!observer.isCurrent(operation)) return
-      if (!observer.acceptConfirmed(operation, response, refreshed))
         throw new Error('지급 확정 결과를 확인하지 못했습니다.')
       setConfirmed(true)
       setModalOpen(false)
       // Keep the verified completion screen mounted; the list/detail refresh on their next opening.
       void queryClient.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
       toast('수수료 지급 건을 확정했습니다.', 'success')
-      if (!helpOpen) void navigate(withMonth('/transactions', month))
+      if (!helpOpen) {
+        void navigate(withMonth('/transactions', month))
+      } else {
+        // A guide read must never turn a committed business success into a retryable failure.
+        try {
+          const refreshed = await observer.readOperationPayment(operation)
+          if (!observer.acceptConfirmed(operation, response, refreshed)) observer.fail(operation)
+        } catch {
+          observer.fail(operation)
+        }
+      }
     } catch (error) {
       if (!observer.isCurrent(operation)) return
       observer.fail(operation)

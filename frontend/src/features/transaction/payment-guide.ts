@@ -136,6 +136,9 @@ export class PaymentGuideObserver {
     this.confirmation = null
     return { revision: this.revision, paymentId: input.paymentId, kind, sequence: ++this.sequence }
   }
+  isSamePayment(operation: PaymentOperation) {
+    return !this.disposed && operation.paymentId === this.input?.paymentId
+  }
   isCurrent(operation: PaymentOperation) {
     return (
       !this.disposed &&
