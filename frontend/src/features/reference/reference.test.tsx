@@ -257,6 +257,21 @@ it('POL asOf changes query and clears selected id while retaining month/tab', as
   expect(router.state.location.search).not.toContain('policyVersionId=')
   expect(router.state.location.search).toContain('month=2026-08')
 })
+it('POL management shows existing read-only rules without an edit document', async () => {
+  mount('/policies?tab=management&policyVersionId=1')
+  expect(await screen.findByRole('table', { name: '수수료 규칙' })).toBeVisible()
+  expect(screen.getByRole('table', { name: '선택 정책의 1,200% 룰셋' })).toBeVisible()
+  expect(screen.getByRole('table', { name: '보험상품 차월별 예상 해약환급률' })).toBeVisible()
+  expect(screen.getByText('650.1')).toBeVisible()
+  expect(screen.getByText('34.5%')).toBeVisible()
+  expect(screen.queryByRole('button', { name: '초안 수정' })).not.toBeInTheDocument()
+})
+it('POL management displays an empty state for an empty legacy response', async () => {
+  mount('/policies?tab=management&policyVersionId=1', (path) =>
+    path.includes('/policies/') ? envelope({ header: policies[0] }) : fixtures(path),
+  )
+  expect(await screen.findByText('조회된 설정 규칙이 없습니다.')).toBeVisible()
+})
 it('POL 404 detail does not discard version rows', async () => {
   const user = userEvent.setup()
   mount('/policies?tab=commission&policyVersionId=999', (p) => {
