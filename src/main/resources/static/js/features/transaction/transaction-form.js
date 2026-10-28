@@ -725,7 +725,7 @@
       label.className = "transaction-gate-label";
       copy.appendChild(label);
       var detail = textElement("div", failures.length
-        ? failures.map(function (blocker) { return blocker.message || blocker.code; }).join(" / ")
+        ? failures.map(function (blocker) { return format.rateText(blocker.message || blocker.code); }).join(" / ")
         : state === "pass" ? "서버 사전검증 결과 통과했습니다."
           : evaluated ? "앞 단계가 막혀 아직 판정하지 않았습니다."
             : "사전검증 후 서버 판정이 표시됩니다.");
@@ -798,7 +798,7 @@
     clear(confirmBlockers);
     var blockers = result.blockers || [];
     blockers.forEach(function (blocker) {
-      confirmBlockers.appendChild(textElement("p", (blocker.code ? blocker.code + " · " : "") + (blocker.message || "확정 차단 사유를 확인하세요.")));
+      confirmBlockers.appendChild(textElement("p", (blocker.code ? blocker.code + " · " : "") + format.rateText(blocker.message || "확정 차단 사유를 확인하세요.")));
     });
     confirmBlockers.hidden = blockers.length === 0;
 

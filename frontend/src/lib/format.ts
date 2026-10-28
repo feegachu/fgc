@@ -1,4 +1,4 @@
-// Display rules ported from static/js/common/format.js; decimal strings are truncated, never rounded.
+// 화면정의서 §4 규칙 3: 소수 표시는 한 자리로 절사하고 원본 계산·판정값은 유지한다.
   const EMPTY = "-";
   const SEOUL = "Asia/Seoul";
 
@@ -57,24 +57,26 @@
   }
 
   /*
-   * 요율 — 소수 넷째 자리. 예: 650.0000%
-   * 인터페이스정의서 2-4 "요율 소수점 4자리".
+   * 요율·배수 — 소수 첫째 자리. 예: 650.0%, 12.0배.
    */
   export function rate(value: unknown) {
-    return truncateDecimal(value, 4);
+    return truncateDecimal(value, 1);
   }
 
   /*
-   * 사용률 — 소수 여섯째 자리. 예: 104.166667%
-   *
-   * 요율과 자리수가 다르다. 1,200% 한도 판정이 소수 6자리까지 쓰기 때문에 4자리로 자르면
-   * 화면 숫자와 판정 근거가 어긋난다.
-   *   인터페이스정의서 2-4 (:177) — "요율 소수점 4자리, 사용률 6자리"
-   *   화면정의서 CAP-W01 (:934) — "사용률 | 게이지 막대 + 숫자 (소수점 6자리)"
-   *   화면정의서 CAP-W02 (:1005) — "사용률 74.166667%"
+   * 사용률 — 소수 첫째 자리. 예: 104.1%.
+   * 저장·API의 소수 6자리와 서버 판정은 보존하고 화면 문자열만 절사한다.
    */
   export function usageRate(value: unknown) {
-    return truncateDecimal(value, 6);
+    return rate(value);
+  }
+
+  /* 서버 안내 문구에 포함된 소수 백분율만 표시 규칙을 적용한다. 1,200% 같은 명칭은 유지한다. */
+  export function rateText(value: unknown) {
+    return String(value == null ? "" : value).replace(
+      /(^|[^\w.,+-])([+-]?\d[\d,]*\.\d+)(\s*%)/g,
+      (_, prefix: string, decimal: string, suffix: string) => prefix + rate(decimal.replace(/,/g, "")) + suffix,
+    );
   }
 
   function seoulParts(value: string | Date) {
@@ -172,7 +174,7 @@
    *   그래서 본문에 이미 들어 있으면 뒤에 다시 적지 않는다.
    */
   export function errorText(error?: { message?: string; code?: string; requestId?: string | null } | null, fallbackMessage?: string) {
-    const message = (error && error.message) || fallbackMessage || "요청을 처리하지 못했습니다.";
+    const message = rateText((error && error.message) || fallbackMessage || "요청을 처리하지 못했습니다.");
     const requestId = error && error.requestId;
     const trace: string[] = [];
 

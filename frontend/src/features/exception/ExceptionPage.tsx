@@ -7,7 +7,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { StatusBadge } from '../../components/StatusBadge'
-import { dateTime, errorText, int } from '../../lib/format'
+import { dateTime, errorText, int, rateText, usageRate } from '../../lib/format'
 import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { withMonth } from '../../stores/workspace'
@@ -136,7 +136,7 @@ export function ExceptionPage() {
       sortKey: 'title',
       sortable: true,
       cellClassName: 'exception-title-cell exception-disclosure-cell',
-      render: (row) => <Disclosure preview={row.title ?? '-'} />,
+      render: (row) => <Disclosure preview={rateText(row.title ?? '-')} />,
     },
     {
       key: 'status',
@@ -357,7 +357,11 @@ function Occurrences({ item }: { item: ExceptionCase }) {
                 {occurrence.evidenceItems.map((evidence) => (
                   <li key={evidence.label}>
                     <span className="text-secondary">{evidence.label}</span>{' '}
-                    <span className="tabular-nums">{evidence.value}</span>
+                    <span className="tabular-nums">
+                      {evidence.label === '사용률' && /%$/.test(evidence.value ?? '')
+                        ? `${usageRate(evidence.value?.replace(/[% ,]/g, ''))}%`
+                        : rateText(evidence.value)}
+                    </span>
                   </li>
                 ))}
               </ul>
