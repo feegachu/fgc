@@ -95,7 +95,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 src/main/resources/db/migration/   V1 ~ V61 (V47·V53 결번). 스키마·제약·트리거 + 운영 기준정보 일부
   V2   batch_watermark 초기 2행 · STATUS-MONTH-RULE-2026 v1(유산, §4-1)
   V16  journal_account 8개 계정과목
-src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀스)
+src/main/resources/db/demo/        Flyway 버전 순서(db/migration·db/demo·db/demo-agent 세 폴더가 한 시퀀스)
   V3     기준정보·정책·계약 6·지급·귀속 (GOLDEN 축소본)
   V4     검증 시나리오 계약 14(R1~R8·A1~A3·G1~G3)
   V6_1   원수사→GA 룰셋 보정 REG-CAP-INS-2021-V2(0%)·2027-V1(3%)
@@ -111,6 +111,8 @@ src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀
   V65    4년·7년 분급 규제 상한 룰셋(REGULATORY, 한도 행 포함, #538
   V60    STD-LIFE-B 2026-CURRENT-B 판매기간 종료(#540)
   V64    AGENT 역할·agent01 → A-FC-001(초기 비밀번호 미지정·DISABLED, #634)
+src/main/resources/db/demo-agent/  시연 서버·로컬 한정(신한 prd·E2E 제외). 같은 버전 시퀀스
+  V66    agent01 활성화 — password_hash='!'인 행만 BCrypt 해시·ACTIVE (V64 이후)
 
 src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 등) — 아직 없음
 ```
@@ -122,17 +124,17 @@ src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 
 - `R__` 반복 마이그레이션을 쓰지 않는다.
 - 데모 시드(`db/demo`)는 별도 프로필이 아니라 **Flyway 위치**로 켠다(`demo` 프로필은 없다). 현재 `db/demo`를 적재하는 곳은 다음과 같다(develop `fe6d0e6c`).
 
-| 환경 | 설정 위치 | db/demo |
-|---|---|---|
-| 로컬 | `application-local.yml` (저장소 밖, `.gitignore:58`) | 팀 관례상 포함 — 각자 확인 |
-| 통합 테스트 | `src/test/resources/application-test.yml` | 포함 |
-| E2E | `frontend/scripts/e2e-server.mjs` | 포함 |
-| AWS 개발·검증계 | `podman/fgc-app-combined.yaml:19`, `podman/fgc-app-was.yaml:19` (`SPRING_FLYWAY_LOCATIONS`) | 포함 |
-| 신한 prd(발표 시연) | `infra/shinhan/compose.yaml:39` | 포함 — 이미 적용된 데모 이력 보존 목적(:37-38) |
-| 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 |
+| 환경 | 설정 위치 | db/demo | db/demo-agent |
+|---|---|---|---|
+| 로컬 | `application-local.yml` (저장소 밖, `.gitignore:58`) | 팀 관례상 포함 — 각자 확인 | 각자 `application-local.yml`에 추가 |
+| 통합 테스트 | `src/test/resources/application-test.yml` | 포함 | 포함 |
+| E2E | `frontend/scripts/e2e-server.mjs` | 포함 | 제외 |
+| AWS 개발·검증계 | `podman/fgc-app-combined.yaml:19`, `podman/fgc-app-was.yaml:19` (`SPRING_FLYWAY_LOCATIONS`) | 포함 | 포함 |
+| 신한 prd(발표 시연) | `infra/shinhan/compose.yaml:39` | 포함 — 이미 적용된 데모 이력 보존 목적(:37-38) | 제외 — prd 에서 agent01 이 활성화되지 않게 한다 |
+| 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 | 해당 없음 |
 
 - 따라서 **`db/demo`에 넣는 모든 행은 신한 prd에도 들어간다.** 시연 환경 밖으로 내보내면 안 되는 데이터나 대량 데이터(DAR-012)는 `db/demo`에 넣지 않는다(§50).
-- **Flyway 번호**: `db/migration`과 `db/demo`는 하나의 버전 시퀀스다. #634는 사용자 지정 **V64**를 사용한다. 이 브랜치의 다음 번호는 **V65**이며 병합 직전 다른 PR의 번호도 대조한다. 결번(V47·V53 등)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
+- **Flyway 번호**: `db/migration`·`db/demo`·`db/demo-agent`(시연 서버·로컬 한정, V66)는 하나의 버전 시퀀스다. 같은 번호를 세 폴더 중 어디에도 중복해서 쓰지 않는다 — prd·E2E 는 `db/demo-agent`를 읽지 않아 통과해도 시연 서버·통합 테스트에서 기동이 실패한다. #634는 사용자 지정 **V64**를 사용한다. 이 브랜치의 다음 번호는 **V65**이며 병합 직전 다른 PR의 번호도 대조한다. 결번(V47·V53 등)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
 
 ---
 
